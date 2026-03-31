@@ -8,7 +8,7 @@ use terraphim_persistence::Persistable;
 use terraphim_service::TerraphimService;
 use terraphim_settings::{DeviceSettings, Error as DeviceSettingsError};
 use terraphim_types::{
-    CoverageSignal, Document, ExtractedEntity, GroundingMetadata, NormalizationMethod,
+    CoverageSignal, Document, ExtractedEntity, GroundingMetadata, Layer, NormalizationMethod,
     NormalizedTerm, NormalizedTermValue, OntologySchema, RoleName, SchemaSignal, SearchQuery,
     Thesaurus,
 };
@@ -265,6 +265,7 @@ impl CliService {
             skip: Some(0),
             limit,
             role: Some(role.clone()),
+            layer: Layer::default(),
         };
 
         let mut service = self.service.lock().await;

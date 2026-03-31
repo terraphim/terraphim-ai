@@ -411,7 +411,7 @@ impl ReplHandler {
                 }
             } else if let Some(api_client) = &self.api_client {
                 // Server mode - use current role if no role specified
-                use terraphim_types::{NormalizedTermValue, RoleName, SearchQuery};
+                use terraphim_types::{Layer, NormalizedTermValue, RoleName, SearchQuery};
 
                 let role_name = Some(match role.as_deref() {
                     Some(r) => api_client.resolve_role(r).await?,
@@ -424,6 +424,7 @@ impl ReplHandler {
                     skip: Some(0),
                     limit,
                     role: role_name,
+                    layer: Layer::default(),
                 };
 
                 match api_client.search(&search_query).await {

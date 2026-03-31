@@ -249,7 +249,7 @@ impl Display for AutomataPath {
 impl AutomataPath {
     /// Create a new AutomataPath from a URL
     pub fn from_remote(url: &str) -> Result<Self> {
-        if !url.starts_with("http") || !url.starts_with("https") {
+        if !url.starts_with("http://") && !url.starts_with("https://") {
             return Err(TerraphimAutomataError::Dict(format!(
                 "Invalid URL scheme. Only `http` and `https` are supported right now. Got {}",
                 url
@@ -686,6 +686,48 @@ mod tests {
     fn test_load_thesaurus_from_json_invalid() {
         let invalid_json = "{invalid_json}";
         let result = load_thesaurus_from_json(invalid_json);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_from_remote_accepts_https() {
+        let result = AutomataPath::from_remote("https://example.com/thesaurus.json");
+        assert!(result.is_ok());
+        match result.unwrap() {
+            AutomataPath::Remote(url) => {
+                assert_eq!(url, "https://example.com/thesaurus.json");
+            }
+            AutomataPath::Local(_) => panic!("Expected Remote variant"),
+        }
+    }
+
+    #[test]
+    fn test_from_remote_accepts_http() {
+        let result = AutomataPath::from_remote("http://example.com/thesaurus.json");
+        assert!(result.is_ok());
+        match result.unwrap() {
+            AutomataPath::Remote(url) => {
+                assert_eq!(url, "http://example.com/thesaurus.json");
+            }
+            AutomataPath::Local(_) => panic!("Expected Remote variant"),
+        }
+    }
+
+    #[test]
+    fn test_from_remote_rejects_ftp() {
+        let result = AutomataPath::from_remote("ftp://example.com/thesaurus.json");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_from_remote_rejects_file_path() {
+        let result = AutomataPath::from_remote("/tmp/thesaurus.json");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_from_remote_rejects_empty() {
+        let result = AutomataPath::from_remote("");
         assert!(result.is_err());
     }
 }

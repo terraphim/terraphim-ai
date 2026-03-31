@@ -53,6 +53,73 @@ pub enum SpawnerError {
     ConfigValidation(#[from] ValidationError),
 }
 
+/// Request to spawn an agent with primary and fallback configuration.
+///
+/// If the primary provider fails to spawn, the spawner will automatically
+/// retry with the fallback provider (if configured).
+#[derive(Debug, Clone)]
+pub struct SpawnRequest {
+    /// Primary provider configuration
+    pub primary_provider: Provider,
+    /// Primary model to use (if applicable)
+    pub primary_model: Option<String>,
+    /// Fallback provider configuration (if primary fails)
+    pub fallback_provider: Option<Provider>,
+    /// Fallback model to use (if applicable)
+    pub fallback_model: Option<String>,
+    /// Task/prompt to give the agent
+    pub task: String,
+    /// Whether to deliver task via stdin (for large prompts)
+    pub use_stdin: bool,
+    /// Resource limits for the spawned process.
+    pub resource_limits: ResourceLimits,
+}
+
+impl SpawnRequest {
+    /// Create a new spawn request with primary provider and task.
+    pub fn new(primary_provider: Provider, task: impl Into<String>) -> Self {
+        Self {
+            primary_provider,
+            primary_model: None,
+            fallback_provider: None,
+            fallback_model: None,
+            task: task.into(),
+            use_stdin: false,
+            resource_limits: ResourceLimits::default(),
+        }
+    }
+
+    /// Set the primary model.
+    pub fn with_primary_model(mut self, model: impl Into<String>) -> Self {
+        self.primary_model = Some(model.into());
+        self
+    }
+
+    /// Set the fallback provider.
+    pub fn with_fallback_provider(mut self, provider: Provider) -> Self {
+        self.fallback_provider = Some(provider);
+        self
+    }
+
+    /// Set the fallback model.
+    pub fn with_fallback_model(mut self, model: impl Into<String>) -> Self {
+        self.fallback_model = Some(model.into());
+        self
+    }
+
+    /// Use stdin for task delivery (for large prompts).
+    pub fn with_stdin(mut self) -> Self {
+        self.use_stdin = true;
+        self
+    }
+
+    /// Set resource limits for the spawned process.
+    pub fn with_resource_limits(mut self, limits: ResourceLimits) -> Self {
+        self.resource_limits = limits;
+        self
+    }
+}
+
 /// Handle to a spawned agent process
 #[derive(Debug)]
 pub struct AgentHandle {
@@ -371,6 +438,24 @@ impl AgentSpawner {
         self.spawn_config(provider, &config, task, true).await
     }
 
+    /// Internal: spawn with model, stdin option, and resource limits.
+    async fn spawn_with_options(
+        &self,
+        provider: &Provider,
+        task: &str,
+        model: Option<&str>,
+        use_stdin: bool,
+        resource_limits: ResourceLimits,
+    ) -> Result<AgentHandle, SpawnerError> {
+        let config = AgentConfig::from_provider(provider)?;
+        let config = config.with_resource_limits(resource_limits);
+        let config = match model {
+            Some(m) => config.with_model(m),
+            None => config,
+        };
+        self.spawn_config(provider, &config, task, use_stdin).await
+    }
+
     /// Spawn an agent from a provider configuration
     pub async fn spawn(
         &self,
@@ -379,6 +464,78 @@ impl AgentSpawner {
     ) -> Result<AgentHandle, SpawnerError> {
         let config = AgentConfig::from_provider(provider)?;
         self.spawn_config(provider, &config, task, false).await
+    }
+
+    /// Spawn an agent with primary and fallback configuration.
+    ///
+    /// Attempts to spawn with the primary provider first. If that fails,
+    /// falls back to the fallback provider (if configured).
+    pub async fn spawn_with_fallback(
+        &self,
+        request: &SpawnRequest,
+    ) -> Result<AgentHandle, SpawnerError> {
+        // Try primary first with resource limits
+        let primary_result = self
+            .spawn_with_options(
+                &request.primary_provider,
+                &request.task,
+                request.primary_model.as_deref(),
+                request.use_stdin,
+                request.resource_limits.clone(),
+            )
+            .await;
+
+        // If primary succeeds, return the handle
+        match primary_result {
+            Ok(handle) => Ok(handle),
+            Err(primary_err) => {
+                tracing::warn!(
+                    primary_provider = %request.primary_provider.id,
+                    error = %primary_err,
+                    "Primary spawn failed, attempting fallback"
+                );
+
+                // Try fallback if configured
+                if let Some(ref fallback) = request.fallback_provider {
+                    tracing::info!(
+                        fallback_provider = %fallback.id,
+                        "Attempting fallback spawn"
+                    );
+
+                    let fallback_result = self
+                        .spawn_with_options(
+                            fallback,
+                            &request.task,
+                            request.fallback_model.as_deref(),
+                            request.use_stdin,
+                            request.resource_limits.clone(),
+                        )
+                        .await;
+
+                    match fallback_result {
+                        Ok(handle) => {
+                            tracing::info!(
+                                fallback_provider = %fallback.id,
+                                "Fallback spawn succeeded"
+                            );
+                            Ok(handle)
+                        }
+                        Err(fallback_err) => {
+                            tracing::error!(
+                                fallback_provider = %fallback.id,
+                                error = %fallback_err,
+                                "Fallback spawn also failed"
+                            );
+                            // Return the primary error since that's the original failure
+                            Err(primary_err)
+                        }
+                    }
+                } else {
+                    // No fallback configured, return primary error
+                    Err(primary_err)
+                }
+            }
+        }
     }
 
     /// Internal spawn implementation shared by spawn() and spawn_with_model().
@@ -851,5 +1008,25 @@ mod tests {
 
         let handle = handle.unwrap();
         assert_eq!(handle.provider.id, "@model-cat-agent");
+    }
+
+    // =========================================================================
+    // ADF Remediation Tests (Gitea #117)
+    // =========================================================================
+
+    #[test]
+    fn test_spawn_request_with_resource_limits() {
+        let provider = create_test_agent_provider();
+        let limits = ResourceLimits {
+            max_cpu_seconds: Some(3600),
+            max_memory_bytes: Some(2_147_483_648),
+            ..Default::default()
+        };
+        let request = SpawnRequest::new(provider, "test").with_resource_limits(limits.clone());
+        assert_eq!(request.resource_limits.max_cpu_seconds, Some(3600));
+        assert_eq!(
+            request.resource_limits.max_memory_bytes,
+            Some(2_147_483_648)
+        );
     }
 }

@@ -38,7 +38,9 @@ mod repl;
 
 use client::{ApiClient, SearchResponse};
 use service::TuiService;
-use terraphim_types::{Document, LogicalOperator, NormalizedTermValue, RoleName, SearchQuery};
+use terraphim_types::{
+    Document, Layer, LogicalOperator, NormalizedTermValue, RoleName, SearchQuery,
+};
 use terraphim_update::{check_for_updates, check_for_updates_startup, update_binary};
 
 #[derive(clap::ValueEnum, Debug, Clone)]
@@ -1155,6 +1157,7 @@ async fn run_offline_command(
                     skip: Some(0),
                     limit: Some(limit),
                     role: Some(role_name.clone()),
+                    layer: Layer::default(),
                 };
 
                 service.search_with_query(&search_query).await?
@@ -2101,6 +2104,7 @@ async fn run_server_command(
                     skip: Some(0),
                     limit: Some(limit),
                     role: Some(role_name),
+                    layer: Layer::default(),
                 }
             } else {
                 // Single term query (backward compatibility)
@@ -2111,6 +2115,7 @@ async fn run_server_command(
                     skip: Some(0),
                     limit: Some(limit),
                     role: Some(role_name),
+                    layer: Layer::default(),
                 }
             };
 
@@ -2861,6 +2866,7 @@ fn ui_loop(
                                             skip: Some(0),
                                             limit: Some(10),
                                             role: Some(RoleName::new(&role)),
+                                            layer: Layer::default(),
                                         };
                                         let resp = api.search(&q).await?;
                                         let lines: Vec<String> = resp

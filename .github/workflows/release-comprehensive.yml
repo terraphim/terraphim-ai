@@ -110,11 +110,11 @@ jobs:
           - os: ubuntu-22.04
             target: armv7-unknown-linux-musleabihf
             use_cross: true
-          # macOS builds - use same runner with cross-compilation for x86_64
+          # macOS builds
           - os: [self-hosted, macOS]
             target: x86_64-apple-darwin
             use_cross: false
-          - os: [self-hosted, macOS]
+          - os: macos-14
             target: aarch64-apple-darwin
             use_cross: false
           # Windows builds
@@ -168,8 +168,8 @@ jobs:
           yarn install --frozen-lockfile
           yarn build
 
-      - name: Copy frontend to server dist for rust-embed
-        if: "!matrix.use_cross"
+      - name: Copy frontend to server dist for rust-embed (Unix)
+        if: "!matrix.use_cross && matrix.os != 'windows-latest'"
         run: |
           rm -r terraphim_server/dist/assets 2>/dev/null || true
           cp -a desktop/dist/. terraphim_server/dist/
@@ -180,6 +180,25 @@ jobs:
           
           # Force rebuild by touching build.rs
           touch terraphim_server/build.rs
+
+      - name: Copy frontend to server dist for rust-embed (Windows)
+        if: "matrix.os == 'windows-latest'"
+        shell: pwsh
+        run: |
+          # Create dist directory if it doesn't exist
+          New-Item -ItemType Directory -Force -Path terraphim_server/dist
+          
+          # Remove old assets if they exist
+          Remove-Item -Recurse -Force terraphim_server/dist/assets -ErrorAction SilentlyContinue
+          
+          # Copy frontend assets
+          Copy-Item -Recurse -Force desktop/dist/* terraphim_server/dist/
+          
+          # Verify
+          Get-ChildItem terraphim_server/dist/
+          
+          # Touch build.rs to force rebuild
+          (Get-Item terraphim_server/build.rs).LastWriteTime = Get-Date
 
       - name: Build server binary
         if: "!matrix.use_cross"
@@ -526,6 +545,24 @@ jobs:
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
+        id: download
+        continue-on-error: true
+
+      - name: Retry artifact download if needed
+        if: steps.download.outcome == 'failure'
+        run: |
+          echo "Artifact download failed, retrying with gh CLI..."
+          for attempt in 1 2 3; do
+            echo "Download attempt $attempt..."
+            sleep 30
+            gh run download ${{ github.run_id }} --dir . && break
+            if [ $attempt -eq 3 ]; then
+              echo "Failed to download artifacts after 3 attempts"
+              exit 1
+            fi
+          done
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Prepare release assets
         run: |

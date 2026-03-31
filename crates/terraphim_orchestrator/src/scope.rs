@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 /// Check if `prefix` is a proper path prefix of `path`.
 /// Ensures "src/" matches "src/main.rs" but not "src-backup/".
-fn is_path_prefix(prefix: &str, path: &str) -> bool {
+pub(crate) fn is_path_prefix(prefix: &str, path: &str) -> bool {
     if prefix.is_empty() {
         return false;
     }
@@ -227,9 +227,17 @@ impl WorktreeManager {
     ///
     /// Worktrees will be created under `<worktree_base>/<name>`.
     pub fn with_base(repo_path: impl AsRef<Path>, worktree_base: impl AsRef<Path>) -> Self {
+        let repo = repo_path.as_ref().to_path_buf();
+        let base = worktree_base.as_ref().to_path_buf();
+        // Resolve relative worktree_base against repo_path to avoid CWD-dependent behaviour
+        let resolved_base = if base.is_relative() {
+            repo.join(&base)
+        } else {
+            base
+        };
         Self {
-            repo_path: repo_path.as_ref().to_path_buf(),
-            worktree_base: worktree_base.as_ref().to_path_buf(),
+            repo_path: repo,
+            worktree_base: resolved_base,
         }
     }
 

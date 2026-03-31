@@ -5,7 +5,7 @@ use terraphim_persistence::Persistable;
 use terraphim_service::TerraphimService;
 use terraphim_service::llm::{ChatOptions, build_llm_from_role};
 use terraphim_settings::{DeviceSettings, Error as DeviceSettingsError};
-use terraphim_types::{Document, NormalizedTermValue, RoleName, SearchQuery, Thesaurus};
+use terraphim_types::{Document, Layer, NormalizedTermValue, RoleName, SearchQuery, Thesaurus};
 use tokio::sync::Mutex;
 
 #[derive(Clone)]
@@ -267,6 +267,7 @@ impl TuiService {
             skip: Some(0),
             limit,
             role: Some(role.clone()),
+            layer: Layer::default(),
         };
 
         let mut service = self.service.lock().await;

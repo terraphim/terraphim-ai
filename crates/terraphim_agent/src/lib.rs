@@ -1,6 +1,7 @@
 pub mod client;
 pub mod onboarding;
 pub mod service;
+pub mod tui_backend;
 
 // Robot mode - always available for AI agent integration
 pub mod robot;

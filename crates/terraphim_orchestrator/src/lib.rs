@@ -36,6 +36,7 @@ pub mod dispatcher;
 pub mod dual_mode;
 pub mod error;
 pub mod handoff;
+pub mod metrics_persistence;
 pub mod mode;
 pub mod nightwatch;
 pub mod persona;
@@ -46,31 +47,50 @@ pub use compound::{CompoundReviewResult, CompoundReviewWorkflow, ReviewGroupDef,
 pub use concurrency::{ConcurrencyController, FairnessPolicy, ModeQuotas};
 pub use config::{
     AgentDefinition, AgentLayer, CompoundReviewConfig, ConcurrencyConfig, NightwatchConfig,
-    OrchestratorConfig, TrackerConfig, TrackerStates, WorkflowConfig,
+    OrchestratorConfig, PreCheckStrategy, TrackerConfig, TrackerStates, WorkflowConfig,
 };
-pub use cost_tracker::{BudgetVerdict, CostSnapshot, CostTracker};
+pub use cost_tracker::{AgentMetrics, BudgetVerdict, CostSnapshot, CostTracker, ExecutionMetrics};
 pub use dispatcher::{DispatchTask, Dispatcher, DispatcherStats};
 pub use dual_mode::DualModeOrchestrator;
 pub use error::OrchestratorError;
 pub use handoff::{HandoffBuffer, HandoffContext, HandoffLedger};
+pub use metrics_persistence::{
+    InMemoryMetricsPersistence, MetricsPersistence, MetricsPersistenceConfig,
+    MetricsPersistenceError, PersistedAgentMetrics,
+};
 pub use mode::{IssueMode, TimeMode};
 pub use nightwatch::{
-    CorrectionAction, CorrectionLevel, DriftAlert, DriftMetrics, DriftScore, NightwatchMonitor,
-    RateLimitTracker, RateLimitWindow,
+    dual_panel_evaluate, validate_certificate, Claim, CorrectionAction, CorrectionLevel,
+    DriftAlert, DriftMetrics, DriftScore, DualPanelResult, NightwatchMonitor, RateLimitTracker,
+    RateLimitWindow, ReasoningCertificate,
 };
 pub use persona::{MetapromptRenderError, MetapromptRenderer, PersonaRegistry};
 pub use scheduler::{ScheduleEvent, TimeScheduler};
 
+use chrono::Timelike;
 use std::collections::HashMap;
 use std::path::Path;
 use std::time::{Duration, Instant};
 
+use std::sync::{Arc, Mutex};
+
 use terraphim_router::RoutingEngine;
-use terraphim_spawner::health::HealthStatus;
+use terraphim_spawner::health::{CircuitBreaker, HealthStatus};
 use terraphim_spawner::output::OutputEvent;
-use terraphim_spawner::{AgentHandle, AgentSpawner};
+use terraphim_spawner::{AgentHandle, AgentSpawner, ResourceLimits, SpawnRequest};
 use tokio::sync::broadcast;
 use tracing::{error, info, warn};
+
+/// Result of evaluating a pre-check strategy before spawning an agent.
+#[derive(Debug, Clone)]
+pub enum PreCheckResult {
+    /// Pre-check found actionable findings. Agent should spawn with findings prepended.
+    Findings(String),
+    /// Nothing to do. Skip spawn.
+    NoFindings,
+    /// Pre-check execution itself failed. Fail-open: spawn anyway.
+    Failed(String),
+}
 
 /// Status of a single agent in the fleet.
 #[derive(Debug, Clone)]
@@ -123,6 +143,14 @@ pub struct AgentOrchestrator {
     persona_registry: PersonaRegistry,
     /// Renderer for persona metaprompts.
     metaprompt_renderer: MetapromptRenderer,
+    /// Circuit breakers for each provider to prevent cascading failures.
+    #[allow(dead_code)]
+    circuit_breakers: Arc<Mutex<HashMap<String, CircuitBreaker>>>,
+    /// Per-agent last-run commit hash for GitDiff strategy.
+    /// Key: agent name. Value: commit SHA.
+    last_run_commits: HashMap<String, String>,
+    /// Lazy-initialised Gitea tracker for gitea-issue pre-check.
+    pre_check_tracker: Option<terraphim_tracker::GiteaTracker>,
 }
 
 /// Validate agent name for safe use in file paths.
@@ -209,6 +237,9 @@ impl AgentOrchestrator {
             cost_tracker,
             persona_registry,
             metaprompt_renderer,
+            circuit_breakers: Arc::new(Mutex::new(HashMap::new())),
+            last_run_commits: HashMap::new(),
+            pre_check_tracker: None,
         })
     }
 
@@ -419,12 +450,95 @@ impl AgentOrchestrator {
         &mut self.cost_tracker
     }
 
+    /// Load skill chain content from SKILL.md files for the given agent definition.
+    ///
+    /// Reads each skill named in `def.skill_chain` from `{skill_data_dir}/{name}/SKILL.md`.
+    /// Returns a formatted string with all skill contents, or empty string if no skills
+    /// or no skill_data_dir is configured.
+    fn load_skill_chain_content(&self, def: &AgentDefinition) -> String {
+        if def.skill_chain.is_empty() {
+            return String::new();
+        }
+        let skills_dir = match &self.config.skill_data_dir {
+            Some(dir) => dir.clone(),
+            None => {
+                // Default: ~/.claude/skills (resolve HOME from env)
+                match std::env::var("HOME") {
+                    Ok(home) => std::path::PathBuf::from(home)
+                        .join(".claude")
+                        .join("skills"),
+                    Err(_) => return String::new(),
+                }
+            }
+        };
+
+        let mut sections = Vec::new();
+        for skill_name in &def.skill_chain {
+            let skill_path = skills_dir.join(skill_name).join("SKILL.md");
+            match std::fs::read_to_string(&skill_path) {
+                Ok(content) => {
+                    // Strip YAML frontmatter (between --- markers) to keep just instructions
+                    let body = if let Some(after_prefix) = content.strip_prefix("---") {
+                        if let Some(end) = after_prefix.find("---") {
+                            after_prefix[end + 3..].trim_start().to_string()
+                        } else {
+                            content
+                        }
+                    } else {
+                        content
+                    };
+                    sections.push(format!("### Skill: {}\n\n{}", skill_name, body.trim()));
+                    info!(
+                        agent = %def.name,
+                        skill = %skill_name,
+                        bytes = body.len(),
+                        "loaded skill content"
+                    );
+                }
+                Err(e) => {
+                    warn!(
+                        agent = %def.name,
+                        skill = %skill_name,
+                        path = %skill_path.display(),
+                        error = %e,
+                        "failed to load skill, skipping"
+                    );
+                }
+            }
+        }
+
+        if sections.is_empty() {
+            return String::new();
+        }
+
+        format!(
+            "\n\n## Active Skills\n\nApply the following skill instructions to your work:\n\n{}\n",
+            sections.join("\n\n---\n\n")
+        )
+    }
+
     /// Spawn an agent from its definition.
     ///
     /// Model selection: if the agent has an explicit `model` field, use it.
     /// Otherwise, route the task prompt through the RoutingEngine to select
     /// a model based on keyword matching.
     async fn spawn_agent(&mut self, def: &AgentDefinition) -> Result<(), OrchestratorError> {
+        // === PRE-CHECK GATE ===
+        let pre_check_result = self.run_pre_check(def).await;
+        let findings = match pre_check_result {
+            PreCheckResult::NoFindings => {
+                info!(agent = %def.name, "skipping spawn: pre-check found nothing actionable");
+                return Ok(());
+            }
+            PreCheckResult::Findings(f) if f.is_empty() => None,
+            PreCheckResult::Findings(f) => Some(f),
+            PreCheckResult::Failed(reason) => {
+                warn!(agent = %def.name, reason = %reason,
+                      "pre-check failed, spawning anyway (fail-open)");
+                None
+            }
+        };
+
         // Select model via keyword routing or explicit config.
         // Skip keyword routing for CLIs that use OAuth and don't support -m
         // (e.g. codex with ChatGPT account). Only apply routed models when the
@@ -433,7 +547,7 @@ impl AgentOrchestrator {
             .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or(&def.cli_tool);
-        let supports_model_flag = matches!(cli_name, "claude" | "claude-code");
+        let supports_model_flag = matches!(cli_name, "claude" | "claude-code" | "opencode");
 
         let model = if let Some(m) = &def.model {
             info!(agent = %def.name, model = %m, "using explicit model");
@@ -467,6 +581,22 @@ impl AgentOrchestrator {
             None
         };
 
+        // For opencode, compose "provider/model" format when both fields are set.
+        // opencode requires `-m provider/model` whereas the TOML config stores them
+        // separately (provider = "kimi-for-coding", model = "k2p5").
+        let model = if cli_name == "opencode" {
+            match (&def.provider, &model) {
+                (Some(provider), Some(m)) => {
+                    let composed = format!("{}/{}", provider, m);
+                    info!(agent = %def.name, composed_model = %composed, "composed provider/model for opencode");
+                    Some(composed)
+                }
+                _ => model,
+            }
+        } else {
+            model
+        };
+
         info!(agent = %def.name, layer = ?def.layer, cli = %def.cli_tool, model = ?model, "spawning agent");
 
         // Compose persona-enriched task prompt
@@ -493,15 +623,40 @@ impl AgentOrchestrator {
             (def.task.clone(), false)
         };
 
+        // === FINDINGS INJECTION ===
+        let composed_task = if let Some(ref findings) = findings {
+            format!(
+                "## Pre-flight findings (automated checks already ran)\n\n{}\n\n---\n\n{}",
+                findings, composed_task
+            )
+        } else {
+            composed_task
+        };
+
+        // Inject skill_chain content between persona preamble and task
+        let skill_content = self.load_skill_chain_content(def);
+        let composed_task = if skill_content.is_empty() {
+            composed_task
+        } else {
+            info!(
+                agent = %def.name,
+                skills = def.skill_chain.len(),
+                skill_bytes = skill_content.len(),
+                "injecting skill_chain into prompt"
+            );
+            format!("{}{}", composed_task, skill_content)
+        };
+
         // Use stdin only when persona was actually resolved (prompt is enriched)
         // or when the task exceeds ARG_MAX safety threshold.
         // Do NOT use stdin for unfound personas -- the bare task is small and
         // stdin delivery to short-lived processes (echo) causes broken pipe races.
         const STDIN_THRESHOLD: usize = 32_768; // 32 KB
-        let use_stdin = persona_found || composed_task.len() > STDIN_THRESHOLD;
+        let use_stdin =
+            persona_found || !skill_content.is_empty() || composed_task.len() > STDIN_THRESHOLD;
 
-        // Build a Provider from the agent definition for the spawner
-        let provider = terraphim_types::capability::Provider {
+        // Build primary Provider from the agent definition for the spawner
+        let primary_provider = terraphim_types::capability::Provider {
             id: def.name.clone(),
             name: def.name.clone(),
             provider_type: terraphim_types::capability::ProviderType::Agent {
@@ -515,19 +670,56 @@ impl AgentOrchestrator {
             keywords: def.capabilities.clone(),
         };
 
-        let handle = if use_stdin {
-            self.spawner
-                .spawn_with_model_stdin(&provider, &composed_task, model.as_deref())
-                .await
-        } else {
-            self.spawner
-                .spawn_with_model(&provider, &composed_task, model.as_deref())
-                .await
+        // Build fallback Provider if fallback_provider is configured
+        let fallback_provider = def.fallback_provider.as_ref().map(|fallback_cli| {
+            terraphim_types::capability::Provider {
+                id: format!("{}-fallback", def.name),
+                name: format!("{} (fallback)", def.name),
+                provider_type: terraphim_types::capability::ProviderType::Agent {
+                    agent_id: format!("{}-fallback", def.name),
+                    cli_command: fallback_cli.clone(),
+                    working_dir: self.config.working_dir.clone(),
+                },
+                capabilities: vec![],
+                cost_level: terraphim_types::capability::CostLevel::Cheap,
+                latency: terraphim_types::capability::Latency::Medium,
+                keywords: def.capabilities.clone(),
+            }
+        });
+
+        // Build the spawn request with primary and fallback
+        let mut request = SpawnRequest::new(primary_provider, &composed_task)
+            .with_primary_model(model.as_deref().unwrap_or(""));
+
+        if let Some(fallback) = fallback_provider {
+            request = request.with_fallback_provider(fallback);
+            if let Some(fallback_model) = &def.fallback_model {
+                request = request.with_fallback_model(fallback_model);
+            }
         }
-        .map_err(|e| OrchestratorError::SpawnFailed {
-            agent: def.name.clone(),
-            reason: e.to_string(),
-        })?;
+
+        if use_stdin {
+            request = request.with_stdin();
+        }
+
+        // Thread resource limits from agent definition to spawner
+        let mut limits = ResourceLimits::default();
+        if let Some(max_cpu) = def.max_cpu_seconds {
+            limits.max_cpu_seconds = Some(max_cpu);
+        }
+        if let Some(max_mem) = def.max_memory_bytes {
+            limits.max_memory_bytes = Some(max_mem);
+        }
+        request = request.with_resource_limits(limits);
+
+        let handle = self
+            .spawner
+            .spawn_with_fallback(&request)
+            .await
+            .map_err(|e| OrchestratorError::SpawnFailed {
+                agent: def.name.clone(),
+                reason: e.to_string(),
+            })?;
 
         // Subscribe to the output broadcast for nightwatch drain
         let output_rx = handle.subscribe_output();
@@ -546,7 +738,281 @@ impl AgentOrchestrator {
             },
         );
 
+        // === RECORD COMMIT FOR GIT-DIFF STRATEGY ===
+        if let Ok(head) = self.get_current_head().await {
+            self.last_run_commits.insert(def.name.clone(), head);
+        }
+
         Ok(())
+    }
+
+    /// Evaluate the pre-check strategy for an agent.
+    async fn run_pre_check(&mut self, def: &AgentDefinition) -> PreCheckResult {
+        match &def.pre_check {
+            None | Some(PreCheckStrategy::Always) => PreCheckResult::Findings(String::new()),
+            Some(PreCheckStrategy::GitDiff { watch_paths }) => {
+                self.git_diff_pre_check(&def.name, watch_paths).await
+            }
+            Some(PreCheckStrategy::GiteaIssue { issue_number }) => {
+                self.gitea_issue_pre_check(*issue_number).await
+            }
+            Some(PreCheckStrategy::Shell {
+                script,
+                timeout_secs,
+            }) => self.shell_pre_check(script, *timeout_secs).await,
+        }
+    }
+
+    /// Git diff pre-check: compare last_run_commit to HEAD.
+    async fn git_diff_pre_check(&self, agent_name: &str, watch_paths: &[String]) -> PreCheckResult {
+        let last_commit = match self.last_run_commits.get(agent_name) {
+            Some(c) => c.clone(),
+            None => {
+                info!(agent = %agent_name, "no last_run_commit recorded, spawning (first run)");
+                return PreCheckResult::Findings(String::new());
+            }
+        };
+
+        // Get current HEAD
+        let head = match self.get_current_head().await {
+            Ok(h) => h,
+            Err(e) => {
+                warn!(agent = %agent_name, error = %e, "failed to get HEAD, spawning (fail-open)");
+                return PreCheckResult::Failed(format!("git rev-parse failed: {}", e));
+            }
+        };
+
+        if head == last_commit {
+            info!(agent = %agent_name, commit = %head, "HEAD unchanged since last run, skipping");
+            return PreCheckResult::NoFindings;
+        }
+
+        // Get changed files
+        let diff_range = format!("{}..{}", last_commit, head);
+        let output = match tokio::time::timeout(
+            Duration::from_secs(30),
+            tokio::process::Command::new("git")
+                .args(["diff", "--name-only", &diff_range])
+                .current_dir(&self.config.working_dir)
+                .output(),
+        )
+        .await
+        {
+            Ok(Ok(o)) => o,
+            Ok(Err(e)) => {
+                warn!(agent = %agent_name, error = %e, "git diff failed, spawning (fail-open)");
+                return PreCheckResult::Failed(format!("git diff failed: {}", e));
+            }
+            Err(_) => {
+                warn!(agent = %agent_name, "git diff timed out after 30s, spawning (fail-open)");
+                return PreCheckResult::Failed("git diff timed out after 30s".into());
+            }
+        };
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            warn!(agent = %agent_name, stderr = %stderr, "git diff non-zero exit, spawning (fail-open)");
+            return PreCheckResult::Failed(format!("git diff exit {}: {}", output.status, stderr));
+        }
+
+        let changed_files: Vec<String> = String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .filter(|l| !l.is_empty())
+            .map(|l| l.to_string())
+            .collect();
+
+        if changed_files.is_empty() {
+            info!(agent = %agent_name, "no files changed, skipping");
+            return PreCheckResult::NoFindings;
+        }
+
+        if has_matching_changes(&changed_files, watch_paths) {
+            let summary = format!("{} files changed matching watch_paths", changed_files.len());
+            info!(agent = %agent_name, files = changed_files.len(), "matching changes found");
+            PreCheckResult::Findings(summary)
+        } else {
+            info!(agent = %agent_name, files = changed_files.len(), "changes found but none match watch_paths, skipping");
+            PreCheckResult::NoFindings
+        }
+    }
+
+    /// Shell pre-check: run script via sh -c.
+    async fn shell_pre_check(&self, script: &str, timeout_secs: u64) -> PreCheckResult {
+        let result = tokio::time::timeout(
+            Duration::from_secs(timeout_secs),
+            tokio::process::Command::new("sh")
+                .arg("-c")
+                .arg(script)
+                .current_dir(&self.config.working_dir)
+                .output(),
+        )
+        .await;
+
+        match result {
+            Ok(Ok(output)) => {
+                if output.status.success() {
+                    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                    if stdout.is_empty() {
+                        PreCheckResult::NoFindings
+                    } else {
+                        PreCheckResult::Findings(stdout)
+                    }
+                } else {
+                    let stderr = String::from_utf8_lossy(&output.stderr);
+                    PreCheckResult::Failed(format!("script exit {}: {}", output.status, stderr))
+                }
+            }
+            Ok(Err(e)) => PreCheckResult::Failed(format!("script I/O error: {}", e)),
+            Err(_) => PreCheckResult::Failed(format!("script timed out after {}s", timeout_secs)),
+        }
+    }
+
+    /// Get or lazily construct the GiteaTracker for pre-check.
+    fn get_or_init_pre_check_tracker(&mut self) -> Option<&terraphim_tracker::GiteaTracker> {
+        if self.pre_check_tracker.is_some() {
+            return self.pre_check_tracker.as_ref();
+        }
+        let workflow = self.config.workflow.as_ref()?;
+        let tc = &workflow.tracker;
+        let config = terraphim_tracker::GiteaConfig {
+            base_url: tc.endpoint.clone(),
+            token: tc.api_key.clone(),
+            owner: tc.owner.clone(),
+            repo: tc.repo.clone(),
+            active_states: tc.states.active.clone(),
+            terminal_states: tc.states.terminal.clone(),
+            use_robot_api: tc.use_robot_api,
+        };
+        match terraphim_tracker::GiteaTracker::new(config) {
+            Ok(tracker) => {
+                self.pre_check_tracker = Some(tracker);
+                self.pre_check_tracker.as_ref()
+            }
+            Err(e) => {
+                warn!(error = %e, "failed to construct GiteaTracker for pre-check");
+                None
+            }
+        }
+    }
+
+    /// Evaluate the gitea-issue pre-check strategy.
+    async fn gitea_issue_pre_check(&mut self, issue_number: u64) -> PreCheckResult {
+        let tracker = match self.get_or_init_pre_check_tracker() {
+            Some(t) => t,
+            None => {
+                return PreCheckResult::Failed(
+                    "no workflow config for gitea-issue pre-check".into(),
+                );
+            }
+        };
+
+        // Fetch comments with 15s timeout
+        let comments = match tokio::time::timeout(
+            Duration::from_secs(15),
+            tracker.fetch_comments(issue_number, None),
+        )
+        .await
+        {
+            Ok(Ok(comments)) => comments,
+            Ok(Err(e)) => {
+                warn!(
+                    issue = issue_number,
+                    error = %e,
+                    "gitea comment fetch failed, spawning (fail-open)"
+                );
+                return PreCheckResult::Failed(format!("comment fetch failed: {}", e));
+            }
+            Err(_) => {
+                warn!(
+                    issue = issue_number,
+                    "gitea comment fetch timed out, spawning (fail-open)"
+                );
+                return PreCheckResult::Failed("comment fetch timed out after 15s".into());
+            }
+        };
+
+        if comments.is_empty() {
+            info!(issue = issue_number, "no comments on issue, spawning");
+            return PreCheckResult::Findings(String::new());
+        }
+
+        // Check the most recent comment for PASS verdict
+        let latest = comments.last().expect("checked non-empty above");
+        let body_lower = latest.body.to_lowercase();
+
+        if body_lower.contains("verdict: pass") {
+            // Check if there are new commits since this comment
+            let comment_time = &latest.created_at;
+
+            // Use git log to check for commits after the comment time
+            let output = match tokio::time::timeout(
+                Duration::from_secs(30),
+                tokio::process::Command::new("git")
+                    .args(["log", "--oneline", &format!("--since={}", comment_time)])
+                    .current_dir(&self.config.working_dir)
+                    .output(),
+            )
+            .await
+            {
+                Ok(Ok(o)) => o,
+                Ok(Err(e)) => {
+                    warn!(error = %e, "git log failed, spawning (fail-open)");
+                    return PreCheckResult::Failed(format!("git log failed: {}", e));
+                }
+                Err(_) => {
+                    warn!("git log --since timed out after 30s, spawning (fail-open)");
+                    return PreCheckResult::Failed("git log timed out after 30s".into());
+                }
+            };
+
+            let log_output = String::from_utf8_lossy(&output.stdout);
+            if log_output.trim().is_empty() {
+                info!(
+                    issue = issue_number,
+                    "PASS verdict and no new commits, skipping"
+                );
+                return PreCheckResult::NoFindings;
+            } else {
+                let commit_count = log_output.lines().count();
+                info!(
+                    issue = issue_number,
+                    new_commits = commit_count,
+                    "PASS verdict but new commits found, spawning"
+                );
+                return PreCheckResult::Findings(format!(
+                    "{} new commits since last PASS verdict",
+                    commit_count
+                ));
+            }
+        }
+
+        info!(
+            issue = issue_number,
+            "no PASS verdict in latest comment, spawning"
+        );
+        PreCheckResult::Findings(String::new())
+    }
+
+    /// Get current HEAD commit hash.
+    async fn get_current_head(&self) -> Result<String, OrchestratorError> {
+        let output = tokio::time::timeout(
+            Duration::from_secs(5),
+            tokio::process::Command::new("git")
+                .args(["rev-parse", "HEAD"])
+                .current_dir(&self.config.working_dir)
+                .output(),
+        )
+        .await
+        .map_err(|_| OrchestratorError::Config("git rev-parse HEAD timed out after 5s".into()))?
+        .map_err(OrchestratorError::from)?;
+
+        if output.status.success() {
+            Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+        } else {
+            Err(OrchestratorError::Config(
+                "git rev-parse HEAD failed".into(),
+            ))
+        }
     }
 
     /// Periodic reconciliation: detect exits, check cron, evaluate drift, drain output.
@@ -563,8 +1029,18 @@ impl AgentOrchestrator {
         // 4. Drain output events to nightwatch
         self.drain_output_events();
 
-        // 5. Evaluate nightwatch drift
-        self.nightwatch.evaluate();
+        // 5. Evaluate nightwatch drift (only during active hours)
+        let nw_cfg = &self.config.nightwatch;
+        let current_hour = chrono::Local::now().hour() as u8;
+        let in_window = if nw_cfg.active_start_hour <= nw_cfg.active_end_hour {
+            current_hour >= nw_cfg.active_start_hour && current_hour < nw_cfg.active_end_hour
+        } else {
+            // Wraps past midnight, e.g. start=22 end=6
+            current_hour >= nw_cfg.active_start_hour || current_hour < nw_cfg.active_end_hour
+        };
+        if in_window {
+            self.nightwatch.evaluate();
+        }
 
         // 6. Sweep expired handoff buffer entries
         let swept = self.handoff_buffer.sweep_expired();
@@ -621,19 +1097,68 @@ impl AgentOrchestrator {
     async fn poll_agent_exits(&mut self) {
         // Collect exited agents first to avoid borrow conflict
         let mut exited: Vec<(String, AgentDefinition, std::process::ExitStatus)> = Vec::new();
+        // Collect agents that exceeded their wall-clock timeout
+        let mut timed_out: Vec<String> = Vec::new();
+
         for (name, managed) in &mut self.active_agents {
             match managed.handle.try_wait() {
                 Ok(Some(status)) => {
                     exited.push((name.clone(), managed.definition.clone(), status));
                 }
-                Ok(None) => {} // still running
+                Ok(None) => {
+                    // Still running -- check wall-clock timeout
+                    if let Some(max_secs) = managed.definition.max_cpu_seconds {
+                        let elapsed = managed.started_at.elapsed();
+                        if elapsed > Duration::from_secs(max_secs) {
+                            warn!(
+                                agent = %name,
+                                elapsed_secs = elapsed.as_secs(),
+                                max_secs = max_secs,
+                                "agent exceeded wall-clock timeout, killing"
+                            );
+                            timed_out.push(name.clone());
+                        }
+                    }
+                }
                 Err(e) => {
                     warn!(agent = %name, error = %e, "try_wait failed");
                 }
             }
         }
 
-        // Process exits
+        // Kill timed-out agents
+        for name in timed_out {
+            if let Some(mut managed) = self.active_agents.remove(&name) {
+                let grace = Duration::from_secs(managed.definition.grace_period_secs.unwrap_or(5));
+                match managed.handle.shutdown(grace).await {
+                    Ok(graceful) => {
+                        info!(
+                            agent = %name,
+                            graceful = graceful,
+                            "timed-out agent terminated"
+                        );
+                    }
+                    Err(e) => {
+                        warn!(agent = %name, error = %e, "failed to kill timed-out agent");
+                    }
+                }
+                // Handle exit based on layer (similar to handle_agent_exit but for timeout)
+                if managed.definition.layer == AgentLayer::Safety {
+                    let count = self.restart_counts.entry(name.clone()).or_insert(0);
+                    *count += 1;
+                    self.restart_cooldowns.insert(name.clone(), Instant::now());
+                    info!(
+                        agent = %name,
+                        restart_count = *count,
+                        "safety agent timed out, will restart after cooldown"
+                    );
+                } else {
+                    info!(agent = %name, layer = ?managed.definition.layer, "agent timed out");
+                }
+            }
+        }
+
+        // Process natural exits
         for (name, def, status) in exited {
             self.active_agents.remove(&name);
             self.handle_agent_exit(&name, &def, status);
@@ -895,6 +1420,50 @@ impl AgentOrchestrator {
             self.stop_agent(&name).await;
         }
     }
+
+    /// Spawn a specific agent by name (test helper).
+    #[doc(hidden)]
+    pub async fn spawn_agent_for_test(&mut self, name: &str) -> Result<(), OrchestratorError> {
+        let def = self
+            .config
+            .agents
+            .iter()
+            .find(|a| a.name == name)
+            .ok_or_else(|| OrchestratorError::AgentNotFound(name.to_string()))?
+            .clone();
+        self.spawn_agent(&def).await
+    }
+
+    /// Check if an agent is in the active_agents map (test helper).
+    #[doc(hidden)]
+    pub fn is_agent_active(&self, name: &str) -> bool {
+        self.active_agents.contains_key(name)
+    }
+
+    /// Test helper: remove an agent from active_agents so it can be re-spawned.
+    #[doc(hidden)]
+    pub fn remove_agent_for_test(&mut self, name: &str) {
+        self.active_agents.remove(name);
+    }
+
+    /// Test helper: set last_run_commits for a given agent.
+    #[doc(hidden)]
+    pub fn set_last_run_commit(&mut self, agent_name: &str, commit: &str) {
+        self.last_run_commits
+            .insert(agent_name.to_string(), commit.to_string());
+    }
+}
+
+/// Check whether any changed file matches any of the watch path prefixes.
+fn has_matching_changes(changed_files: &[String], watch_paths: &[String]) -> bool {
+    for file in changed_files {
+        for prefix in watch_paths {
+            if scope::is_path_prefix(prefix, file) {
+                return true;
+            }
+        }
+    }
+    false
 }
 
 #[cfg(test)]
@@ -906,6 +1475,9 @@ mod tests {
             working_dir: std::path::PathBuf::from("/tmp/test-orchestrator"),
             nightwatch: NightwatchConfig::default(),
             compound_review: CompoundReviewConfig {
+                cli_tool: None,
+                provider: None,
+                model: None,
                 schedule: "0 2 * * *".to_string(),
                 max_duration_secs: 60,
                 repo_path: std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../.."),
@@ -935,6 +1507,7 @@ mod tests {
                     fallback_model: None,
                     grace_period_secs: None,
                     max_cpu_seconds: None,
+                    pre_check: None,
                 },
                 AgentDefinition {
                     name: "sync".to_string(),
@@ -955,6 +1528,7 @@ mod tests {
                     fallback_model: None,
                     grace_period_secs: None,
                     max_cpu_seconds: None,
+                    pre_check: None,
                 },
             ],
             restart_cooldown_secs: 60,
@@ -962,6 +1536,7 @@ mod tests {
             tick_interval_secs: 30,
             handoff_buffer_ttl_secs: None,
             persona_data_dir: None,
+            skill_data_dir: None,
         }
     }
 
@@ -1095,6 +1670,9 @@ task = "test"
             working_dir: std::path::PathBuf::from("/tmp"),
             nightwatch: NightwatchConfig::default(),
             compound_review: CompoundReviewConfig {
+                cli_tool: None,
+                provider: None,
+                model: None,
                 schedule: "0 2 * * *".to_string(),
                 max_duration_secs: 60,
                 repo_path: std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../.."),
@@ -1123,12 +1701,14 @@ task = "test"
                 fallback_model: None,
                 grace_period_secs: None,
                 max_cpu_seconds: None,
+                pre_check: None,
             }],
             restart_cooldown_secs: 0, // instant restart for testing
             max_restart_count: 3,
             tick_interval_secs: 1,
             handoff_buffer_ttl_secs: None,
             persona_data_dir: None,
+            skill_data_dir: None,
         }
     }
 
@@ -1204,6 +1784,7 @@ task = "test"
             fallback_model: None,
             grace_period_secs: None,
             max_cpu_seconds: None,
+            pre_check: None,
         }];
         let mut orch = AgentOrchestrator::new(config).unwrap();
 
@@ -1338,6 +1919,7 @@ task = "test"
             fallback_model: None,
             grace_period_secs: None,
             max_cpu_seconds: None,
+            pre_check: None,
         }];
 
         // Set up persona data dir with a test persona
@@ -1420,6 +2002,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             fallback_model: None,
             grace_period_secs: None,
             max_cpu_seconds: None,
+            pre_check: None,
         }];
 
         // No persona_data_dir, so registry will be empty
@@ -1470,5 +2053,130 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
         assert!(validate_agent_name("agent name").is_err()); // spaces
         assert!(validate_agent_name("agent@host").is_err()); // @
         assert!(validate_agent_name("agent.name").is_err()); // dots
+    }
+
+    // ==================== has_matching_changes Tests ====================
+
+    #[test]
+    fn test_has_matching_changes_prefix_match() {
+        let changed = vec!["crates/orchestrator/src/lib.rs".to_string()];
+        let watch = vec!["crates/orchestrator/".to_string()];
+        assert!(has_matching_changes(&changed, &watch));
+    }
+
+    #[test]
+    fn test_has_matching_changes_exact_match() {
+        let changed = vec!["Cargo.toml".to_string()];
+        let watch = vec!["Cargo.toml".to_string()];
+        assert!(has_matching_changes(&changed, &watch));
+    }
+
+    #[test]
+    fn test_has_matching_changes_no_match() {
+        let changed = vec!["docs/README.md".to_string()];
+        let watch = vec!["crates/orchestrator/".to_string()];
+        assert!(!has_matching_changes(&changed, &watch));
+    }
+
+    #[test]
+    fn test_has_matching_changes_multiple_files_one_matches() {
+        let changed = vec![
+            "docs/README.md".to_string(),
+            "crates/orchestrator/src/config.rs".to_string(),
+        ];
+        let watch = vec!["crates/orchestrator/".to_string()];
+        assert!(has_matching_changes(&changed, &watch));
+    }
+
+    #[test]
+    fn test_has_matching_changes_multiple_watch_paths() {
+        let changed = vec!["tests/integration.rs".to_string()];
+        let watch = vec!["crates/orchestrator/".to_string(), "tests/".to_string()];
+        assert!(has_matching_changes(&changed, &watch));
+    }
+
+    #[test]
+    fn test_has_matching_changes_empty_watch_paths() {
+        let changed = vec!["crates/orchestrator/src/lib.rs".to_string()];
+        let watch: Vec<String> = vec![];
+        assert!(!has_matching_changes(&changed, &watch));
+    }
+
+    // =========================================================================
+    // ADF Remediation Tests (Gitea #117)
+    // =========================================================================
+
+    #[test]
+    fn test_provider_model_composition_opencode() {
+        // Simulate what spawn_agent does for opencode with provider + model
+        let provider = Some("kimi-for-coding".to_string());
+        let model = Some("k2p5".to_string());
+        let cli_name = "opencode";
+
+        let composed = if cli_name == "opencode" {
+            match (&provider, &model) {
+                (Some(p), Some(m)) => Some(format!("{}/{}", p, m)),
+                _ => model,
+            }
+        } else {
+            model
+        };
+        assert_eq!(composed, Some("kimi-for-coding/k2p5".to_string()));
+    }
+
+    #[test]
+    fn test_provider_model_composition_claude_unchanged() {
+        // Claude should not have provider/model composed
+        let provider = Some("anthropic".to_string());
+        let model = Some("claude-opus-4-6".to_string());
+        let cli_name = "claude";
+
+        let composed = if cli_name == "opencode" {
+            match (&provider, &model) {
+                (Some(p), Some(m)) => Some(format!("{}/{}", p, m)),
+                _ => model.clone(),
+            }
+        } else {
+            model.clone()
+        };
+        assert_eq!(composed, Some("claude-opus-4-6".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_wall_clock_timeout_kills_agent() {
+        let mut config = test_config_fast_lifecycle();
+        // Use sleep agent with 1-second timeout
+        config.agents = vec![AgentDefinition {
+            name: "timeout-test".to_string(),
+            layer: AgentLayer::Core,
+            cli_tool: "sleep".to_string(),
+            task: "60".to_string(),
+            model: None,
+            schedule: None,
+            capabilities: vec![],
+            max_memory_bytes: None,
+            budget_monthly_cents: None,
+            provider: None,
+            persona: None,
+            terraphim_role: None,
+            skill_chain: vec![],
+            sfia_skills: vec![],
+            fallback_provider: None,
+            fallback_model: None,
+            grace_period_secs: Some(2),
+            max_cpu_seconds: Some(1), // 1 second timeout
+            pre_check: None,
+        }];
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+        let def = orch.config.agents[0].clone();
+        orch.spawn_agent(&def).await.unwrap();
+        assert!(orch.active_agents.contains_key("timeout-test"));
+
+        // Wait for the timeout to elapse
+        tokio::time::sleep(Duration::from_secs(2)).await;
+
+        // Poll should detect timeout and kill
+        orch.poll_agent_exits().await;
+        assert!(!orch.active_agents.contains_key("timeout-test"));
     }
 }

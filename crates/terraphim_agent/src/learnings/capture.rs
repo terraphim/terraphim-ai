@@ -758,6 +758,7 @@ pub fn list_learnings(
 
 #[allow(dead_code)]
 /// Query learnings by pattern (simple text search).
+#[allow(dead_code)]
 pub fn query_learnings(
     storage_dir: &PathBuf,
     pattern: &str,
@@ -930,6 +931,338 @@ pub fn query_all_entries(
         .collect();
 
     Ok(filtered)
+}
+
+/// Score entry relevance based on keyword matching.
+/// Returns a score based on the number of matching keywords between
+/// the context and the learning content.
+fn score_entry_relevance(entry: &LearningEntry, context_keywords: &[String]) -> usize {
+    let text = match entry {
+        LearningEntry::Learning(l) => {
+            format!("{} {} {:?}", l.command, l.error_output, l.tags)
+        }
+        LearningEntry::Correction(c) => {
+            format!("{} {} {}", c.original, c.corrected, c.context_description)
+        }
+    }
+    .to_lowercase();
+
+    context_keywords
+        .iter()
+        .filter(|keyword| text.contains(*keyword))
+        .count()
+}
+
+/// A scored learning entry with its relevance score.
+#[derive(Debug, Clone)]
+pub struct ScoredEntry {
+    /// The learning entry
+    pub entry: LearningEntry,
+    /// Relevance score (higher is better)
+    pub score: usize,
+}
+
+impl ScoredEntry {
+    /// Format as a suggestion line for display.
+    #[allow(dead_code)]
+    pub fn format_suggestion(&self) -> String {
+        match &self.entry {
+            LearningEntry::Learning(l) => {
+                format!("[cmd] {} (exit: {}) - {}", l.command, l.exit_code, l.id)
+            }
+            LearningEntry::Correction(c) => {
+                format!(
+                    "[{}] {} -> {} - {}",
+                    c.correction_type, c.original, c.corrected, c.id
+                )
+            }
+        }
+    }
+}
+
+/// JSONL transcript entry types for auto-extraction.
+#[derive(Debug, Clone, Deserialize)]
+pub struct TranscriptEntry {
+    #[serde(default)]
+    pub r#type: Option<String>,
+    #[serde(default)]
+    pub content: Option<String>,
+    #[serde(default)]
+    pub tool_name: Option<String>,
+    #[serde(default)]
+    pub tool_input: Option<serde_json::Value>,
+    #[serde(default)]
+    pub tool_result: Option<serde_json::Value>,
+    #[serde(default)]
+    pub exit_code: Option<i32>,
+    #[serde(default)]
+    pub error: Option<String>,
+}
+
+/// Check if content contains explicit correction phrases.
+fn contains_correction_phrase(content: &str) -> Option<(String, String)> {
+    let lower = content.to_lowercase();
+
+    // Pattern: "instead use X" or "use X instead"
+    if let Some(idx) = lower.find("instead use") {
+        let after = &content[idx + 11..];
+        return Some((content.to_string(), after.trim().to_string()));
+    }
+    if let Some(idx) = lower.find("use ") {
+        let rest = &lower[idx + 4..];
+        if rest.contains("instead") {
+            let end = rest.find("instead").unwrap_or(rest.len());
+            let tool = &content[idx + 4..idx + 4 + end].trim();
+            return Some((content.to_string(), tool.to_string()));
+        }
+    }
+
+    // Pattern: "should be"
+    if let Some(idx) = lower.find("should be") {
+        let after = &content[idx + 9..];
+        return Some((content.to_string(), after.trim().to_string()));
+    }
+
+    // Pattern: "correct way"
+    if let Some(idx) = lower.find("correct way") {
+        let after = &content[idx + 11..];
+        // Look for "is to" or "to"
+        if after.contains("is to") {
+            let start = after.find("is to").unwrap_or(0) + 5;
+            return Some((content.to_string(), after[start..].trim().to_string()));
+        }
+        return Some((content.to_string(), after.trim().to_string()));
+    }
+
+    // Pattern: "use X not Y" or "use X, not Y"
+    if let Some(idx) = lower.find("use ") {
+        let rest = &content[idx + 4..];
+        let lower_rest = rest.to_lowercase();
+        if let Some(not_idx) = lower_rest.find(" not ") {
+            let tool = rest[..not_idx].trim();
+            // Find the end of the old tool (rest of string or next word boundary)
+            let old_tool_rest = &rest[not_idx + 5..];
+            let old_tool = old_tool_rest
+                .split_whitespace()
+                .next()
+                .unwrap_or(old_tool_rest)
+                .trim();
+            return Some((old_tool.to_string(), tool.to_string()));
+        }
+    }
+
+    None
+}
+
+/// Extract command from Bash tool input.
+fn extract_command_from_input(input: &serde_json::Value) -> Option<String> {
+    input
+        .get("command")
+        .or_else(|| input.get("cmd"))
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
+}
+
+/// Auto-extract corrections from a JSONL session transcript.
+///
+/// Scans the transcript line by line and identifies:
+/// 1. Failed Bash commands (exit code != 0) followed by successful variants
+/// 2. Explicit correction phrases like "instead use", "should be", etc.
+///
+/// # Arguments
+///
+/// * `transcript_path` - Path to the JSONL transcript file
+///
+/// # Returns
+///
+/// Vector of extracted CorrectionEvent objects.
+pub fn auto_extract_corrections(
+    transcript_path: &std::path::Path,
+) -> Result<Vec<CorrectionEvent>, LearningError> {
+    use std::io::BufRead;
+
+    let file = fs::File::open(transcript_path)?;
+    let reader = std::io::BufReader::new(file);
+
+    let mut corrections = Vec::new();
+    let mut last_failed_command: Option<(String, i32, String)> = None; // (command, exit_code, error)
+
+    for line in reader.lines() {
+        let line = line?;
+        if line.trim().is_empty() {
+            continue;
+        }
+
+        let entry: TranscriptEntry = match serde_json::from_str(&line) {
+            Ok(e) => e,
+            Err(_) => continue, // Skip malformed lines
+        };
+
+        // Check for Bash tool results with exit codes
+        if entry.tool_name.as_deref() == Some("Bash")
+            || entry.r#type.as_deref() == Some("tool_result")
+        {
+            // Check if this is a failed Bash command
+            if let Some(exit_code) = entry.exit_code {
+                if exit_code != 0 {
+                    // Extract the command from tool_input in previous context or from error
+                    if let Some(ref tool_input) = entry.tool_input {
+                        if let Some(cmd) = extract_command_from_input(tool_input) {
+                            let error = entry
+                                .error
+                                .clone()
+                                .or_else(|| entry.content.clone())
+                                .unwrap_or_default();
+                            last_failed_command = Some((cmd, exit_code, error));
+                        }
+                    }
+                } else if exit_code == 0 {
+                    // Successful command - check if we had a previous failure
+                    if let Some((failed_cmd, failed_exit, failed_error)) =
+                        last_failed_command.take()
+                    {
+                        // Extract the successful command
+                        if let Some(ref tool_input) = entry.tool_input {
+                            if let Some(success_cmd) = extract_command_from_input(tool_input) {
+                                // Only create correction if commands are different
+                                if failed_cmd != success_cmd {
+                                    let context = format!(
+                                        "Auto-extracted from session transcript. Failed with exit {}: {}",
+                                        failed_exit, failed_error
+                                    );
+                                    let correction = CorrectionEvent::new(
+                                        CorrectionType::ToolPreference,
+                                        failed_cmd,
+                                        success_cmd,
+                                        context,
+                                        LearningSource::Project,
+                                    )
+                                    .with_tags(vec![
+                                        "auto-extracted".to_string(),
+                                        "transcript".to_string(),
+                                    ]);
+                                    corrections.push(correction);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Check for explicit correction phrases in content
+        if let Some(ref content) = entry.content {
+            if let Some((original, corrected)) = contains_correction_phrase(content) {
+                let context = format!(
+                    "Auto-extracted from session transcript content: {}",
+                    content.chars().take(100).collect::<String>()
+                );
+                let correction = CorrectionEvent::new(
+                    CorrectionType::Other("phrase-detected".to_string()),
+                    original,
+                    corrected,
+                    context,
+                    LearningSource::Project,
+                )
+                .with_tags(vec!["auto-extracted".to_string(), "phrase".to_string()]);
+                corrections.push(correction);
+            }
+        }
+
+        // Also check in tool_result if it's a string
+        if let Some(ref tool_result) = entry.tool_result {
+            if let Some(content) = tool_result.as_str() {
+                if let Some((original, corrected)) = contains_correction_phrase(content) {
+                    let context = format!(
+                        "Auto-extracted from tool result: {}",
+                        content.chars().take(100).collect::<String>()
+                    );
+                    let correction = CorrectionEvent::new(
+                        CorrectionType::Other("phrase-detected".to_string()),
+                        original,
+                        corrected,
+                        context,
+                        LearningSource::Project,
+                    )
+                    .with_tags(vec![
+                        "auto-extracted".to_string(),
+                        "tool-result".to_string(),
+                    ]);
+                    corrections.push(correction);
+                }
+            }
+        }
+    }
+
+    Ok(corrections)
+}
+
+/// Suggest learnings based on context relevance.
+///
+/// Takes a context string (e.g., current working directory or task description),
+/// extracts keywords from it, and scores all learnings by keyword frequency.
+/// Returns the top-N most relevant learnings.
+///
+/// # Arguments
+///
+/// * `storage_dir` - Directory containing learning markdown files
+/// * `context` - Context string to match against (e.g., "rust project with cargo build")
+/// * `limit` - Maximum number of suggestions to return
+///
+/// # Returns
+///
+/// List of scored entries sorted by relevance (highest first).
+pub fn suggest_learnings(
+    storage_dir: &PathBuf,
+    context: &str,
+    limit: usize,
+) -> Result<Vec<ScoredEntry>, LearningError> {
+    let all_entries = list_all_entries(storage_dir, usize::MAX)?;
+
+    if all_entries.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    // Extract keywords from context (simple word tokenization)
+    let context_keywords: Vec<String> = context
+        .split_whitespace()
+        .map(|w| {
+            w.to_lowercase()
+                .trim_matches(|c: char| !c.is_alphanumeric())
+                .to_string()
+        })
+        .filter(|w| !w.is_empty() && w.len() > 2) // Filter out short words
+        .collect();
+
+    if context_keywords.is_empty() {
+        // Fallback: return most recent entries if no keywords extracted
+        let recent: Vec<ScoredEntry> = all_entries
+            .into_iter()
+            .take(limit)
+            .map(|entry| ScoredEntry { entry, score: 0 })
+            .collect();
+        return Ok(recent);
+    }
+
+    // Score all entries
+    let mut scored: Vec<ScoredEntry> = all_entries
+        .into_iter()
+        .map(|entry| {
+            let score = score_entry_relevance(&entry, &context_keywords);
+            ScoredEntry { entry, score }
+        })
+        .filter(|se| se.score > 0) // Only include entries with at least one match
+        .collect();
+
+    // Sort by score descending
+    scored.sort_by(|a, b| b.score.cmp(&a.score));
+
+    // Limit results
+    if scored.len() > limit {
+        scored.truncate(limit);
+    }
+
+    Ok(scored)
 }
 
 #[cfg(test)]
@@ -1323,5 +1656,140 @@ mod tests {
         assert!(correction_entry.summary().contains("tool-preference"));
         assert!(correction_entry.summary().contains("npm"));
         assert!(correction_entry.summary().contains("bun"));
+    }
+
+    #[test]
+    fn test_contains_correction_phrase_instead_use() {
+        let content = "You should instead use cargo build";
+        let result = contains_correction_phrase(content);
+        assert!(result.is_some());
+        let (original, _corrected) = result.unwrap();
+        assert!(original.contains("You should"));
+    }
+
+    #[test]
+    fn test_contains_correction_phrase_use_instead() {
+        let content = "Use bun instead of npm for faster installs";
+        let result = contains_correction_phrase(content);
+        assert!(result.is_some());
+        let (original, _corrected) = result.unwrap();
+        assert!(original.contains("Use bun"));
+    }
+
+    #[test]
+    fn test_contains_correction_phrase_should_be() {
+        let content = "The variable name should be user_count";
+        let result = contains_correction_phrase(content);
+        assert!(result.is_some());
+        let (original, _corrected) = result.unwrap();
+        assert!(original.contains("variable name"));
+    }
+
+    #[test]
+    fn test_contains_correction_phrase_correct_way() {
+        let content = "The correct way is to use cargo check first";
+        let result = contains_correction_phrase(content);
+        assert!(result.is_some());
+        let (original, _corrected) = result.unwrap();
+        assert!(original.contains("The correct way"));
+    }
+
+    #[test]
+    fn test_contains_correction_phrase_use_not() {
+        let content = "Use yarn not npm for this project";
+        let result = contains_correction_phrase(content);
+        assert!(result.is_some());
+        let (original, corrected) = result.unwrap();
+        assert_eq!(original, "npm");
+        assert_eq!(corrected, "yarn");
+    }
+
+    #[test]
+    fn test_contains_correction_phrase_no_match() {
+        let content = "This is just a normal sentence without corrections";
+        let result = contains_correction_phrase(content);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_auto_extract_corrections_from_transcript() {
+        use std::io::Write;
+
+        let temp_dir = TempDir::new().unwrap();
+        let storage = temp_dir.path().join("learnings");
+        fs::create_dir(&storage).unwrap();
+
+        // Create a mock transcript with failed then successful commands
+        let transcript_path = temp_dir.path().join("session.jsonl");
+        let transcript_content = r#"
+{"type": "tool_use", "tool_name": "Bash", "tool_input": {"command": "git push -f"}}
+{"type": "tool_result", "tool_name": "Bash", "exit_code": 1, "error": "remote: rejected", "tool_input": {"command": "git push -f"}}
+{"type": "tool_use", "tool_name": "Bash", "tool_input": {"command": "git push origin main"}}
+{"type": "tool_result", "tool_name": "Bash", "exit_code": 0, "tool_input": {"command": "git push origin main"}}
+{"content": "You should instead use cargo check before building"}
+"#;
+        let mut file = fs::File::create(&transcript_path).unwrap();
+        file.write_all(transcript_content.as_bytes()).unwrap();
+
+        let corrections = auto_extract_corrections(&transcript_path).unwrap();
+
+        // Should find at least 2 corrections: the command fix + the phrase
+        assert!(
+            corrections.len() >= 2,
+            "Expected at least 2 corrections, got {}",
+            corrections.len()
+        );
+
+        // Check for the command correction
+        let cmd_correction = corrections
+            .iter()
+            .find(|c| c.original == "git push -f" && c.corrected == "git push origin main");
+        assert!(
+            cmd_correction.is_some(),
+            "Should find command correction: git push -f -> git push origin main"
+        );
+
+        // Check for the phrase correction
+        let phrase_correction = corrections
+            .iter()
+            .find(|c| c.corrected.contains("cargo check"));
+        assert!(
+            phrase_correction.is_some(),
+            "Should find phrase correction containing 'cargo check'"
+        );
+    }
+
+    #[test]
+    fn test_auto_extract_corrections_empty_transcript() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // Create an empty transcript
+        let transcript_path = temp_dir.path().join("empty.jsonl");
+        fs::write(&transcript_path, "").unwrap();
+
+        let corrections = auto_extract_corrections(&transcript_path).unwrap();
+        assert!(corrections.is_empty());
+    }
+
+    #[test]
+    fn test_auto_extract_corrections_no_failures() {
+        use std::io::Write;
+
+        let temp_dir = TempDir::new().unwrap();
+
+        // Create a transcript with only successful commands
+        let transcript_path = temp_dir.path().join("success.jsonl");
+        let transcript_content = r#"
+{"type": "tool_use", "tool_name": "Bash", "tool_input": {"command": "git status"}}
+{"type": "tool_result", "tool_name": "Bash", "exit_code": 0, "tool_input": {"command": "git status"}}
+{"type": "tool_use", "tool_name": "Bash", "tool_input": {"command": "git log"}}
+{"type": "tool_result", "tool_name": "Bash", "exit_code": 0, "tool_input": {"command": "git log"}}
+"#;
+        let mut file = fs::File::create(&transcript_path).unwrap();
+        file.write_all(transcript_content.as_bytes()).unwrap();
+
+        let corrections = auto_extract_corrections(&transcript_path).unwrap();
+        // No corrections since all commands succeeded
+        assert!(corrections.is_empty());
     }
 }

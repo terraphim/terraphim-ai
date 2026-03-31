@@ -72,6 +72,7 @@ a.out
 # Cache
 .cached-context/
 .ruff_cache/
+.cachebro/cache.db
 
 # Stale logs and test results
 *.log
@@ -80,3 +81,33 @@ benchmark-results/
 
 # Release tarballs
 *.tar.gz
+
+# UI design session artifacts
+*.png
+ui-session.txt
+
+# Agent skill directories (development artifacts)
+.agents/skills/
+skills/
+
+# Agent tool directories
+.cachebro/
+.claude/
+.commandcode/
+.continue/
+.crush/
+.factory/
+.goose/
+.kilocode/
+.kiro/
+.mcpjam/
+.neovate/
+.openhands/
+.pi/
+.qoder/
+.qwen/
+.roo/
+.trae/
+.windsurf/
+.zencoder/
+skills-lock.json

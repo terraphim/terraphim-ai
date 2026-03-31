@@ -20,7 +20,7 @@
 //! ## Creating a Search Query
 //!
 //! ```
-//! use terraphim_types::{SearchQuery, NormalizedTermValue, LogicalOperator, RoleName};
+//! use terraphim_types::{SearchQuery, NormalizedTermValue, Layer, LogicalOperator, RoleName};
 //!
 //! // Simple single-term query
 //! let query = SearchQuery {
@@ -30,6 +30,7 @@
 //!     skip: None,
 //!     limit: Some(10),
 //!     role: Some(RoleName::new("engineer")),
+//!     layer: Layer::default(),
 //! };
 //!
 //! // Multi-term AND query
@@ -392,6 +393,10 @@ pub struct MarkdownDirectives {
     pub route: Option<RouteDirective>,
     #[serde(default)]
     pub priority: Option<u8>,
+    #[serde(default)]
+    pub trigger: Option<String>,
+    #[serde(default)]
+    pub pinned: bool,
 }
 
 /// The central document type representing indexed and searchable content.
@@ -740,8 +745,67 @@ impl IntoIterator for Index {
     }
 }
 
+/// Quality scores for Knowledge/Learning/Synthesis (K/L/S) dimensions.
+///
+/// These scores represent the quality of a document across three dimensions:
+/// - Knowledge: Depth and accuracy of domain knowledge
+/// - Learning: Educational value and clarity
+/// - Synthesis: Integration of concepts and insight
+///
+/// All scores are optional and range from 0.0 to 1.0 when present.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct QualityScore {
+    /// Knowledge quality score (0.0-1.0)
+    pub knowledge: Option<f64>,
+    /// Learning quality score (0.0-1.0)
+    pub learning: Option<f64>,
+    /// Synthesis quality score (0.0-1.0)
+    pub synthesis: Option<f64>,
+}
+
+impl QualityScore {
+    /// Calculate the composite score by averaging all available scores.
+    ///
+    /// Returns 0.0 if no scores are available.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use terraphim_types::QualityScore;
+    ///
+    /// let score = QualityScore {
+    ///     knowledge: Some(0.8),
+    ///     learning: Some(0.6),
+    ///     synthesis: None,
+    /// };
+    /// assert_eq!(score.composite(), 0.7); // (0.8 + 0.6) / 2
+    ///
+    /// let empty = QualityScore::default();
+    /// assert_eq!(empty.composite(), 0.0);
+    /// ```
+    pub fn composite(&self) -> f64 {
+        let mut sum = 0.0;
+        let mut count = 0;
+
+        if let Some(k) = self.knowledge {
+            sum += k;
+            count += 1;
+        }
+        if let Some(l) = self.learning {
+            sum += l;
+            count += 1;
+        }
+        if let Some(s) = self.synthesis {
+            sum += s;
+            count += 1;
+        }
+
+        if count == 0 { 0.0 } else { sum / count as f64 }
+    }
+}
+
 /// Reference to external storage of documents
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct IndexedDocument {
     /// UUID of the indexed document, matching external storage id
     pub id: String,
@@ -754,6 +818,9 @@ pub struct IndexedDocument {
     pub tags: Vec<String>,
     /// List of node IDs for validation of matching
     pub nodes: Vec<u64>,
+    /// Quality scores for K/L/S dimensions
+    #[serde(default)]
+    pub quality_score: Option<QualityScore>,
 }
 
 impl IndexedDocument {
@@ -767,6 +834,7 @@ impl IndexedDocument {
             rank: 0,
             tags: document.tags.unwrap_or_default(),
             nodes: Vec::new(),
+            quality_score: None,
         }
     }
 }
@@ -784,6 +852,89 @@ pub enum LogicalOperator {
     Or,
 }
 
+/// Layered output levels for search results.
+///
+/// Controls how much content is returned per search result to optimize token usage:
+/// - Layer 1: Title + tags only (~50 tokens/result)
+/// - Layer 2: + first paragraph summary (~150 tokens/result)
+/// - Layer 3: Full content (current default behaviour)
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Default, JsonSchema)]
+#[cfg_attr(feature = "typescript", derive(Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+pub enum Layer {
+    /// Title + tags only (~50 tokens/result)
+    #[serde(rename = "1")]
+    #[default]
+    One,
+    /// + first paragraph summary (~150 tokens/result)
+    #[serde(rename = "2")]
+    Two,
+    /// Full content (default)
+    #[serde(rename = "3")]
+    Three,
+}
+
+impl Layer {
+    /// Parse a layer from an integer value (1, 2, or 3)
+    pub fn from_u8(value: u8) -> Option<Self> {
+        match value {
+            1 => Some(Layer::One),
+            2 => Some(Layer::Two),
+            3 => Some(Layer::Three),
+            _ => None,
+        }
+    }
+
+    /// Returns true if this layer includes content (layer 2 or 3)
+    pub fn includes_content(&self) -> bool {
+        matches!(self, Layer::Two | Layer::Three)
+    }
+
+    /// Returns true if this layer includes full content (layer 3)
+    pub fn includes_full_content(&self) -> bool {
+        matches!(self, Layer::Three)
+    }
+}
+
+impl std::fmt::Display for Layer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Layer::One => write!(f, "1"),
+            Layer::Two => write!(f, "2"),
+            Layer::Three => write!(f, "3"),
+        }
+    }
+}
+
+/// Extract the first paragraph from document body text.
+///
+/// Skips YAML frontmatter (content between `---` markers) and returns
+/// the first non-empty line or the first paragraph.
+pub fn extract_first_paragraph(body: &str) -> String {
+    // Skip YAML frontmatter if present
+    let content = if body.trim_start().starts_with("---") {
+        // Find the end of frontmatter
+        if let Some(end_pos) = body[3..].find("---") {
+            &body[end_pos + 6..] // Skip past the closing ---
+        } else {
+            body
+        }
+    } else {
+        body
+    };
+
+    // Find first non-empty line
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if !trimmed.is_empty() {
+            return trimmed.to_string();
+        }
+    }
+
+    // Fallback to empty string if no content found
+    String::new()
+}
+
 /// A search query for finding documents in the knowledge graph.
 ///
 /// Supports both single-term and multi-term queries with logical operators (AND/OR).
@@ -794,7 +945,7 @@ pub enum LogicalOperator {
 /// ## Single-term query
 ///
 /// ```
-/// use terraphim_types::{SearchQuery, NormalizedTermValue, RoleName};
+/// use terraphim_types::{SearchQuery, NormalizedTermValue, Layer, RoleName};
 ///
 /// let query = SearchQuery {
 ///     search_term: NormalizedTermValue::from("machine learning"),
@@ -803,6 +954,7 @@ pub enum LogicalOperator {
 ///     skip: None,
 ///     limit: Some(10),
 ///     role: Some(RoleName::new("data_scientist")),
+///     layer: Layer::default(),
 /// };
 /// ```
 ///
@@ -837,6 +989,9 @@ pub struct SearchQuery {
     pub limit: Option<usize>,
     /// Role context for this search
     pub role: Option<RoleName>,
+    /// Output layer for controlling result detail (1=minimal, 2=summary, 3=full)
+    #[serde(default)]
+    pub layer: Layer,
 }
 
 impl SearchQuery {
@@ -889,6 +1044,7 @@ impl SearchQuery {
             skip: None,
             limit: None,
             role,
+            layer: Layer::default(),
         }
     }
 }
@@ -2353,6 +2509,7 @@ mod tests {
             skip: None,
             limit: Some(10),
             role: Some(RoleName::new("test")),
+            layer: Layer::default(),
         };
 
         assert!(!single_query.is_multi_term_query());
@@ -2416,6 +2573,7 @@ mod tests {
             skip: Some(0),
             limit: Some(10),
             role: Some(RoleName::new("test_role")),
+            layer: Layer::default(),
         };
 
         let json = serde_json::to_string(&query).unwrap();
@@ -2757,5 +2915,205 @@ mod tests {
         assert!(schema.anti_patterns.is_empty());
         assert!(schema.entity_types[0].aliases.is_empty());
         assert!(schema.entity_types[0].uri_prefix.is_none());
+    }
+
+    #[test]
+    fn test_layer_enum() {
+        // Test default is Layer::One
+        let default: Layer = Default::default();
+        assert_eq!(default, Layer::One);
+
+        // Test from_u8
+        assert_eq!(Layer::from_u8(1), Some(Layer::One));
+        assert_eq!(Layer::from_u8(2), Some(Layer::Two));
+        assert_eq!(Layer::from_u8(3), Some(Layer::Three));
+        assert_eq!(Layer::from_u8(0), None);
+        assert_eq!(Layer::from_u8(4), None);
+
+        // Test Display
+        assert_eq!(format!("{}", Layer::One), "1");
+        assert_eq!(format!("{}", Layer::Two), "2");
+        assert_eq!(format!("{}", Layer::Three), "3");
+
+        // Test includes_content
+        assert!(!Layer::One.includes_content());
+        assert!(Layer::Two.includes_content());
+        assert!(Layer::Three.includes_content());
+
+        // Test includes_full_content
+        assert!(!Layer::One.includes_full_content());
+        assert!(!Layer::Two.includes_full_content());
+        assert!(Layer::Three.includes_full_content());
+    }
+
+    #[test]
+    fn test_extract_first_paragraph_simple() {
+        let body = "First paragraph here.\n\nSecond paragraph here.";
+        assert_eq!(extract_first_paragraph(body), "First paragraph here.");
+    }
+
+    #[test]
+    fn test_extract_first_paragraph_with_yaml_frontmatter() {
+        let body = "---\ntitle: My Document\ntags: [rust, programming]\n---\n\nThis is the actual first paragraph.\nMore content here.";
+        assert_eq!(
+            extract_first_paragraph(body),
+            "This is the actual first paragraph."
+        );
+    }
+
+    #[test]
+    fn test_extract_first_paragraph_empty_lines() {
+        let body = "\n\n\nFirst paragraph after empty lines.";
+        assert_eq!(
+            extract_first_paragraph(body),
+            "First paragraph after empty lines."
+        );
+    }
+
+    #[test]
+    fn test_extract_first_paragraph_single_line() {
+        let body = "Just one line";
+        assert_eq!(extract_first_paragraph(body), "Just one line");
+    }
+
+    #[test]
+    fn test_layer_serialization() {
+        // Test that Layer serializes correctly
+        let query = SearchQuery {
+            search_term: NormalizedTermValue::new("test".to_string()),
+            search_terms: None,
+            operator: None,
+            skip: None,
+            limit: None,
+            role: None,
+            layer: Layer::Two,
+        };
+
+        let json = serde_json::to_string(&query).unwrap();
+        assert!(json.contains("\"layer\""));
+
+        // Deserialize and check layer is preserved
+        let deserialized: SearchQuery = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.layer, Layer::Two);
+    }
+
+    #[test]
+    fn test_quality_score_composite() {
+        // Test with all three scores
+        let full_score = QualityScore {
+            knowledge: Some(0.8),
+            learning: Some(0.6),
+            synthesis: Some(0.7),
+        };
+        assert!((full_score.composite() - 0.7).abs() < f64::EPSILON); // (0.8 + 0.6 + 0.7) / 3
+
+        // Test with two scores
+        let partial_score = QualityScore {
+            knowledge: Some(0.9),
+            learning: None,
+            synthesis: Some(0.5),
+        };
+        assert!((partial_score.composite() - 0.7).abs() < f64::EPSILON); // (0.9 + 0.5) / 2
+
+        // Test with one score
+        let single_score = QualityScore {
+            knowledge: Some(0.8),
+            learning: None,
+            synthesis: None,
+        };
+        assert!((single_score.composite() - 0.8).abs() < f64::EPSILON);
+
+        // Test with no scores (default)
+        let empty_score = QualityScore::default();
+        assert_eq!(empty_score.composite(), 0.0);
+    }
+
+    #[test]
+    fn test_quality_score_serialization() {
+        let score = QualityScore {
+            knowledge: Some(0.8),
+            learning: Some(0.6),
+            synthesis: Some(0.7),
+        };
+
+        let json = serde_json::to_string(&score).unwrap();
+        assert!(json.contains("0.8"));
+        assert!(json.contains("0.6"));
+        assert!(json.contains("0.7"));
+
+        let deserialized: QualityScore = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.knowledge, Some(0.8));
+        assert_eq!(deserialized.learning, Some(0.6));
+        assert_eq!(deserialized.synthesis, Some(0.7));
+    }
+
+    #[test]
+    fn test_quality_score_default_serialization() {
+        // Test that default QualityScore serializes/deserializes correctly
+        let score = QualityScore::default();
+        let json = serde_json::to_string(&score).unwrap();
+        let deserialized: QualityScore = serde_json::from_str(&json).unwrap();
+        assert!(deserialized.knowledge.is_none());
+        assert!(deserialized.learning.is_none());
+        assert!(deserialized.synthesis.is_none());
+    }
+
+    #[test]
+    fn test_indexed_document_with_quality_score() {
+        let doc = IndexedDocument {
+            id: "test-doc-1".to_string(),
+            matched_edges: vec![],
+            rank: 10,
+            tags: vec!["rust".to_string()],
+            nodes: vec![1, 2],
+            quality_score: Some(QualityScore {
+                knowledge: Some(0.8),
+                learning: Some(0.6),
+                synthesis: Some(0.7),
+            }),
+        };
+
+        assert_eq!(doc.id, "test-doc-1");
+        assert!((doc.quality_score.as_ref().unwrap().composite() - 0.7).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_indexed_document_from_document_quality_score_none() {
+        let doc = Document {
+            id: "doc-1".to_string(),
+            url: "https://example.com".to_string(),
+            title: "Test".to_string(),
+            body: "Body".to_string(),
+            description: None,
+            summarization: None,
+            stub: None,
+            tags: None,
+            rank: None,
+            source_haystack: None,
+            doc_type: DocumentType::Document,
+            synonyms: None,
+            route: None,
+            priority: None,
+        };
+
+        let indexed = IndexedDocument::from_document(doc);
+        assert!(indexed.quality_score.is_none());
+    }
+
+    #[test]
+    fn test_indexed_document_serialization_backward_compat() {
+        // Test that IndexedDocument without quality_score deserializes correctly
+        // This simulates old data that doesn't have the quality_score field
+        let json = r#"{
+            "id": "doc-1",
+            "matched_edges": [],
+            "rank": 5,
+            "tags": ["test"],
+            "nodes": [1]
+        }"#;
+
+        let doc: IndexedDocument = serde_json::from_str(json).unwrap();
+        assert_eq!(doc.id, "doc-1");
+        assert!(doc.quality_score.is_none());
     }
 }

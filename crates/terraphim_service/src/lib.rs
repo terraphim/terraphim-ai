@@ -7,7 +7,7 @@ use terraphim_middleware::thesaurus::build_thesaurus_from_haystack;
 use terraphim_persistence::Persistable;
 use terraphim_rolegraph::{RoleGraph, RoleGraphSync};
 use terraphim_types::{
-    Document, Index, IndexedDocument, NormalizedTermValue, RelevanceFunction, RoleName,
+    Document, Index, IndexedDocument, Layer, NormalizedTermValue, RelevanceFunction, RoleName,
     SearchQuery, Thesaurus,
 };
 mod score;
@@ -1024,6 +1024,7 @@ impl TerraphimService {
             limit: Some(5), // Get a few results to check titles
             skip: None,
             role: None,
+            layer: Layer::default(),
         };
 
         let documents = self.search(&search_query).await?;
@@ -1398,6 +1399,7 @@ impl TerraphimService {
                 role: Some(role),
                 skip: None,
                 limit: None,
+                layer: Layer::default(),
             })
             .await?;
         Ok(documents)
@@ -3092,6 +3094,7 @@ mod tests {
             limit: Some(10),
             skip: None,
             role: Some(role_name),
+            layer: Layer::default(),
         };
 
         // Test that Atomic Data URLs are skipped during persistence lookup
@@ -3205,6 +3208,7 @@ mod tests {
             limit: Some(10),
             skip: None,
             role: Some(role_name),
+            layer: Layer::default(),
         };
 
         let result = service.search(&search_query).await;

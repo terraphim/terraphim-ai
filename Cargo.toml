@@ -7,7 +7,6 @@ exclude = [
     "crates/terraphim_agent_application",
     "crates/terraphim_truthforge",
     "crates/terraphim_automata_py",
-    "crates/terraphim_rlm",
     # Python bindings (need `maturin develop`)
     "crates/terraphim_automata_py",
     "crates/terraphim_rolegraph_py",
@@ -23,11 +22,16 @@ exclude = [
     "crates/terraphim_repl",
     # Symphony orchestrator (build separately: cd crates/terraphim_symphony && cargo build)
     "crates/terraphim_symphony",
+    # Firecracker-based crates (private git dependency fcctl-core)
+    "crates/terraphim_rlm",
+    "crates/terraphim_github_runner",
+    "crates/terraphim_github_runner_server",
+    "terraphim_firecracker",
 ]
 default-members = ["terraphim_server"]
 
 [workspace.package]
-version = "1.14.0"
+version = "1.15.0"
 edition = "2024"
 
 [workspace.dependencies]

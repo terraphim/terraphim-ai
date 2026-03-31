@@ -76,6 +76,12 @@ impl AgentConfig {
         self
     }
 
+    /// Set resource limits for this agent configuration.
+    pub fn with_resource_limits(mut self, limits: ResourceLimits) -> Self {
+        self.resource_limits = limits;
+        self
+    }
+
     /// Extract the binary name from a CLI command (handles full paths).
     fn cli_name(cli_command: &str) -> &str {
         std::path::Path::new(cli_command)
@@ -89,6 +95,7 @@ impl AgentConfig {
     /// Each CLI tool has its own subcommand/flag for non-interactive mode:
     /// - codex: `exec <prompt>` runs a single task and exits
     /// - claude: `-p <prompt>` prints output without interactive UI
+    /// - opencode: `run --format json` runs in non-interactive mode
     fn infer_args(cli_command: &str) -> Vec<String> {
         match Self::cli_name(cli_command) {
             "codex" => vec!["exec".to_string(), "--full-auto".to_string()],
@@ -96,6 +103,11 @@ impl AgentConfig {
                 "-p".to_string(),
                 "--allowedTools".to_string(),
                 "Bash,Read,Write,Edit,Glob,Grep".to_string(),
+            ],
+            "opencode" => vec![
+                "run".to_string(),
+                "--format".to_string(),
+                "json".to_string(),
             ],
             _ => Vec::new(),
         }
@@ -127,6 +139,7 @@ impl AgentConfig {
                 let normalised = Self::normalise_claude_model(model);
                 vec!["--model".to_string(), normalised]
             }
+            "opencode" => vec!["-m".to_string(), model.to_string()],
             _ => vec![],
         }
     }
@@ -332,5 +345,29 @@ mod tests {
         );
         assert_eq!(AgentConfig::cli_name("claude"), "claude");
         assert_eq!(AgentConfig::cli_name("/usr/bin/codex"), "codex");
+    }
+
+    #[test]
+    fn test_infer_args_opencode() {
+        let args = AgentConfig::infer_args("opencode");
+        assert_eq!(args, vec!["run", "--format", "json"]);
+    }
+
+    #[test]
+    fn test_infer_args_opencode_full_path() {
+        let args = AgentConfig::infer_args("/home/alex/.bun/bin/opencode");
+        assert_eq!(args, vec!["run", "--format", "json"]);
+    }
+
+    #[test]
+    fn test_model_args_opencode() {
+        let args = AgentConfig::model_args("opencode", "kimi-for-coding/k2p5");
+        assert_eq!(args, vec!["-m", "kimi-for-coding/k2p5"]);
+    }
+
+    #[test]
+    fn test_model_args_opencode_full_path() {
+        let args = AgentConfig::model_args("/home/alex/.bun/bin/opencode", "opencode-go/kimi-k2.5");
+        assert_eq!(args, vec!["-m", "opencode-go/kimi-k2.5"]);
     }
 }
