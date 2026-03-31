@@ -30,7 +30,7 @@ uuid = { version = "1.0", features = ["v4", "serde"] }
 cron = "0.13"
 
 # Config parsing
-toml = "0.9"
+toml = "0.8"
 
 # Template rendering
 handlebars = "6.3"
