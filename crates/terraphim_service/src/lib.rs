@@ -1262,17 +1262,6 @@ impl TerraphimService {
         Ok(role)
     }
 
-    /// Check if a term matches in text using word boundaries to avoid partial word matches
-    fn term_matches_with_word_boundaries(term: &str, text: &str) -> bool {
-        // Create regex pattern with word boundaries
-        if let Ok(regex) = Regex::new(&format!(r"\b{}\b", regex::escape(term))) {
-            regex.is_match(text)
-        } else {
-            // Fallback to simple contains if regex compilation fails
-            text.contains(term)
-        }
-    }
-
     /// Apply logical operators (AND/OR) to filter documents based on multiple search terms
     pub async fn apply_logical_operators_to_documents(
         &mut self,
@@ -1293,6 +1282,17 @@ impl TerraphimService {
             all_terms.len()
         );
 
+        // Pre-compile word-boundary regexes for each term to improve performance
+        // and avoid recompiling N * M times in the inner loop.
+        let compiled_terms: Vec<(String, Option<Regex>)> = all_terms
+            .iter()
+            .map(|term| {
+                let term_lower = term.as_str().to_lowercase();
+                let re = Regex::new(&format!(r"\b{}\b", regex::escape(&term_lower))).ok();
+                (term_lower, re)
+            })
+            .collect();
+
         let filtered_docs: Vec<Document> = documents
             .into_iter()
             .filter(|doc| {
@@ -1308,24 +1308,22 @@ impl TerraphimService {
                 );
 
                 match operator {
-                    LogicalOperator::And => {
-                        // Document must contain ALL terms
-                        all_terms.iter().all(|term| {
-                            Self::term_matches_with_word_boundaries(
-                                &term.as_str().to_lowercase(),
-                                &searchable_text,
-                            )
-                        })
-                    }
-                    LogicalOperator::Or => {
-                        // Document must contain ANY term
-                        all_terms.iter().any(|term| {
-                            Self::term_matches_with_word_boundaries(
-                                &term.as_str().to_lowercase(),
-                                &searchable_text,
-                            )
-                        })
-                    }
+                    LogicalOperator::And => compiled_terms.iter().all(|(_, re)| {
+                        re.as_ref()
+                            .map(|regex| regex.is_match(&searchable_text))
+                            .unwrap_or_else(|| {
+                                log::warn!("Regex compilation failed, using fallback");
+                                false
+                            })
+                    }),
+                    LogicalOperator::Or => compiled_terms.iter().any(|(_, re)| {
+                        re.as_ref()
+                            .map(|regex| regex.is_match(&searchable_text))
+                            .unwrap_or_else(|| {
+                                log::warn!("Regex compilation failed, using fallback");
+                                false
+                            })
+                    }),
                 }
             })
             .collect();
