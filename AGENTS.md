@@ -44,6 +44,12 @@ cargo test -p <crate_name> <test_name>
 cargo test --features openrouter
 cargo test --features mcp-rust-sdk
 
+# RLM-specific commands
+cargo build -p terraphim_rlm --features firecracker,mcp
+cargo test -p terraphim_rlm --features firecracker,mcp
+cargo test -p terraphim_rlm --features firecracker,mcp --test integration_test
+cargo test -p terraphim_rlm --features firecracker,mcp --test code_execution_test
+
 # Format and lint
 cargo fmt
 cargo clippy
@@ -109,6 +115,12 @@ yarn e2e              # End-to-end tests
 - Use `.docs/agents_instructions.json` as primary reference for project patterns
 - Contains machine-readable instructions for AI agents
 - Includes project context, critical lessons, and established practices
+
+### RLM Documentation (PR #426)
+- **Blog Post**: `.docs/blog-post-rlm-announcement.md` - Public announcement
+- **Crate Summary**: `.docs/summary-crates-terraphim_rlm.md` - Technical details
+- **Main Summary**: `.docs/summary.md` - Updated with RLM section
+- **Tests**: `crates/terraphim_rlm/tests/` - Integration and code execution tests
 
 ````markdown
 ## UBS Quick Reference for AI Agents
