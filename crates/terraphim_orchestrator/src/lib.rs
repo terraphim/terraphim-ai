@@ -35,6 +35,7 @@ pub mod cost_tracker;
 pub mod dispatcher;
 pub mod dual_mode;
 pub mod error;
+pub mod flow;
 pub mod handoff;
 pub mod mode;
 pub mod nightwatch;
@@ -64,7 +65,8 @@ pub use scheduler::{ScheduleEvent, TimeScheduler};
 
 use chrono::Timelike;
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use std::time::{Duration, Instant};
 
 use std::sync::{Arc, Mutex};
@@ -130,6 +132,9 @@ pub struct AgentOrchestrator {
     /// Circuit breakers for each provider to prevent cascading failures.
     #[allow(dead_code)]
     circuit_breakers: Arc<Mutex<HashMap<String, CircuitBreaker>>>,
+    /// Active flow executions keyed by flow name.
+    #[allow(dead_code)]
+    active_flows: HashMap<String, tokio::task::JoinHandle<flow::state::FlowRunState>>,
 }
 
 /// Validate agent name for safe use in file paths.
@@ -217,6 +222,7 @@ impl AgentOrchestrator {
             persona_registry,
             metaprompt_renderer,
             circuit_breakers: Arc::new(Mutex::new(HashMap::new())),
+            active_flows: HashMap::new(),
         })
     }
 
@@ -649,7 +655,33 @@ impl AgentOrchestrator {
         // 8. Enforce budget limits (pause exhausted agents)
         self.enforce_budgets().await;
 
-        // 9. Update last_tick_time
+        // 9. Poll active flows (non-blocking)
+        let completed_flows: Vec<String> = self.active_flows
+            .iter()
+            .filter(|(_, handle)| handle.is_finished())
+            .map(|(name, _)| name.clone())
+            .collect();
+
+        for name in completed_flows {
+            if let Some(handle) = self.active_flows.remove(&name) {
+                match handle.await {
+                    Ok(state) => {
+                        tracing::info!(flow = %name, status = ?state.status, "flow completed");
+                        if let Some(ref dir) = self.config.flow_state_dir {
+                            let _ = state.save_to_file(dir);
+                        }
+                    }
+                    Err(e) => {
+                        tracing::error!(flow = %name, error = %e, "flow task panicked");
+                    }
+                }
+            }
+        }
+
+        // 10. Check flow schedules
+        self.check_flow_schedules().await;
+
+        // 11. Update last_tick_time
         self.last_tick_time = chrono::Utc::now();
     }
 
@@ -864,6 +896,42 @@ impl AgentOrchestrator {
         }
     }
 
+    /// Check flow schedules and trigger due flows.
+    async fn check_flow_schedules(&mut self) {
+        let now = chrono::Utc::now();
+        let mut to_trigger: Vec<flow::config::FlowDefinition> = Vec::new();
+
+        for flow_def in &self.config.flows {
+            let Some(ref schedule_str) = flow_def.schedule else { continue };
+            let Ok(schedule) = cron::Schedule::from_str(schedule_str) else { continue };
+
+            // Overlap prevention: skip if this flow is already active
+            if self.active_flows.contains_key(&flow_def.name) {
+                tracing::info!(
+                    flow = %flow_def.name,
+                    "skipping cron trigger: flow already active"
+                );
+                continue;
+            }
+
+            let should_fire: bool = schedule
+                .after(&self.last_tick_time)
+                .take_while(|t| *t <= now)
+                .next()
+                .is_some();
+
+            if should_fire {
+                to_trigger.push(flow_def.clone());
+            }
+        }
+
+        for flow_def in to_trigger {
+            self.handle_schedule_event(
+                ScheduleEvent::Flow(Box::new(flow_def))
+            ).await;
+        }
+    }
+
     /// Handle a schedule event from the TimeScheduler.
     async fn handle_schedule_event(&mut self, event: ScheduleEvent) {
         match event {
@@ -895,6 +963,29 @@ impl AgentOrchestrator {
                         error!(error = %e, "compound review failed");
                     }
                 }
+            }
+            ScheduleEvent::Flow(flow_def) => {
+                let flow_name = flow_def.name.clone();
+                let flow_state_dir = self.config.flow_state_dir.clone()
+                    .unwrap_or_else(|| PathBuf::from("/tmp/flow-states"));
+                let working_dir = self.config.compound_review.repo_path.clone();
+                let flow_def = *flow_def;
+                let flow_name_for_closure = flow_name.clone();
+                // FlowExecutor contains non-Send types (Regex via AgentSpawner),
+                // so we use spawn_blocking + Handle::block_on as a Send-safe bridge.
+                let rt_handle = tokio::runtime::Handle::current();
+                let handle = tokio::task::spawn_blocking(move || {
+                    let executor = flow::executor::FlowExecutor::new(working_dir, flow_state_dir);
+                    rt_handle.block_on(async {
+                        executor.run(&flow_def, None).await
+                            .unwrap_or_else(|e| {
+                                tracing::error!(flow = %flow_name_for_closure, error = %e, "flow execution failed");
+                                flow::state::FlowRunState::failed(&flow_name_for_closure, &e.to_string())
+                            })
+                    })
+                });
+                self.active_flows.insert(flow_name.clone(), handle);
+                tracing::info!(flow = %flow_name, "flow spawned as background task");
             }
         }
     }
@@ -1036,6 +1127,8 @@ mod tests {
             tick_interval_secs: 30,
             handoff_buffer_ttl_secs: None,
             persona_data_dir: None,
+            flows: vec![],
+            flow_state_dir: None,
         }
     }
 
@@ -1206,6 +1299,8 @@ task = "test"
             tick_interval_secs: 1,
             handoff_buffer_ttl_secs: None,
             persona_data_dir: None,
+            flows: vec![],
+            flow_state_dir: None,
         }
     }
 
@@ -1547,5 +1642,61 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
         assert!(validate_agent_name("agent name").is_err()); // spaces
         assert!(validate_agent_name("agent@host").is_err()); // @
         assert!(validate_agent_name("agent.name").is_err()); // dots
+    }
+
+    // =========================================================================
+    // Flow DAG Orchestrator Integration Tests (Gitea #163)
+    // =========================================================================
+
+    #[test]
+    fn test_orchestrator_with_empty_flows() {
+        let mut config = test_config();
+        config.flows = vec![];
+        config.flow_state_dir = None;
+
+        let orch = AgentOrchestrator::new(config);
+        assert!(orch.is_ok(), "orchestrator should initialize with empty flows");
+
+        let orch = orch.unwrap();
+        assert!(orch.active_flows.is_empty(), "active_flows should be empty initially");
+    }
+
+    /// Test that flow scheduling overlap prevention works
+    #[tokio::test]
+    async fn test_flow_overlap_prevention() {
+        use crate::flow::config::{FlowDefinition, FlowStepDef, StepKind};
+
+        let mut config = test_config_fast_lifecycle();
+
+        // Add a test flow with a schedule
+        config.flows = vec![FlowDefinition {
+            name: "test-flow".to_string(),
+            schedule: Some("0 2 * * *".to_string()), // 2 AM daily
+            repo_path: "/tmp/test-repo".to_string(),
+            base_branch: "main".to_string(),
+            timeout_secs: 3600,
+            steps: vec![FlowStepDef {
+                name: "test-step".to_string(),
+                kind: StepKind::Action,
+                command: Some("echo test".to_string()),
+                cli_tool: None,
+                model: None,
+                task: None,
+                task_file: None,
+                condition: None,
+                timeout_secs: 60,
+                on_fail: crate::flow::config::FailStrategy::Abort,
+                provider: None,
+                persona: None,
+            }],
+        }];
+
+        config.flow_state_dir = Some(PathBuf::from("/tmp/test-flow-states"));
+
+        let orch = AgentOrchestrator::new(config);
+        assert!(orch.is_ok(), "orchestrator should initialize with flows");
+
+        let orch = orch.unwrap();
+        assert!(orch.active_flows.is_empty(), "active_flows should be empty initially");
     }
 }

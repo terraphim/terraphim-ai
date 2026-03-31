@@ -39,4 +39,17 @@ pub enum OrchestratorError {
 
     #[error(transparent)]
     Io(#[from] std::io::Error),
+
+    #[error("flow '{flow_name}' failed: {reason}")]
+    FlowFailed { flow_name: String, reason: String },
+
+    #[error("flow '{flow_name}' gate '{step_name}' rejected: {condition}")]
+    FlowGateRejected {
+        flow_name: String,
+        step_name: String,
+        condition: String,
+    },
+
+    #[error("flow template error: {0}")]
+    FlowTemplateError(String),
 }

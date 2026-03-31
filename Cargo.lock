@@ -8614,6 +8614,7 @@ dependencies = [
  "chrono",
  "cron",
  "handlebars",
+ "regex",
  "serde",
  "serde_json",
  "tempfile",
