@@ -107,6 +107,8 @@ fn test_config() -> OrchestratorConfig {
         handoff_buffer_ttl_secs: None,
         persona_data_dir: None,
         skill_data_dir: None,
+        flows: vec![],
+        flow_state_dir: None,
     }
 }
 
