@@ -10,18 +10,12 @@ repository = "https://github.com/terraphim/terraphim-ai"
 [dependencies]
 # Terraphim internal crates
 terraphim_types = { path = "../terraphim_types", version = "1.0.0" }
-terraphim_router = { path = "../terraphim_router", version = "1.0.0" }
 
 # Core dependencies
 tokio = { version = "1.0", features = ["full"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
 thiserror = "1.0"
-anyhow = "1.0"
 tracing = "0.1"
-chrono = { version = "0.4", features = ["serde"] }
 regex = "1.10"
-uuid = { version = "1.21", features = ["v4", "serde"] }
 
 # Process management
 nix = { version = "0.27", features = ["process", "signal", "resource"] }
