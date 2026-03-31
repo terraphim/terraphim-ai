@@ -7,7 +7,7 @@ pub mod gitea;
 pub mod linear;
 pub mod pagerank;
 
-pub use gitea::GiteaTracker;
+pub use gitea::{GiteaConfig, GiteaTracker, IssueComment, CommentUser};
 pub use linear::{LinearConfig, LinearTracker};
 pub use pagerank::{PagerankClient, PagerankScore};
 

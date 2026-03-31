@@ -4,7 +4,7 @@ use crate::{Issue, IssueTracker, Result, TrackerError};
 use async_trait::async_trait;
 use jiff::Zoned;
 use reqwest::Client;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// Configuration for Gitea tracker.
 #[derive(Debug, Clone)]
@@ -42,6 +42,22 @@ struct GiteaIssue {
 #[derive(Debug, Deserialize)]
 struct GiteaLabel {
     name: String,
+}
+
+/// Gitea issue comment from the API.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IssueComment {
+    pub id: u64,
+    pub body: String,
+    pub user: CommentUser,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// User who authored a comment.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CommentUser {
+    pub login: String,
 }
 
 impl GiteaTracker {
@@ -191,6 +207,66 @@ impl IssueTracker for GiteaTracker {
     }
 }
 
+impl GiteaTracker {
+    /// Post a comment on a Gitea issue.
+    pub async fn post_comment(
+        &self,
+        issue_number: u64,
+        body: &str,
+    ) -> Result<IssueComment> {
+        let url = format!(
+            "{}/api/v1/repos/{}/{}/issues/{}/comments",
+            self.config.base_url, self.config.owner, self.config.repo, issue_number
+        );
+        let response = self
+            .build_request(reqwest::Method::POST, &url)
+            .json(&serde_json::json!({"body": body}))
+            .send()
+            .await?;
+        if !response.status().is_success() {
+            let status = response.status();
+            let text = response.text().await.unwrap_or_default();
+            return Err(TrackerError::Api {
+                message: format!(
+                    "Gitea comment POST error {} on issue {}: {}",
+                    status, issue_number, text
+                ),
+            });
+        }
+        response.json().await.map_err(TrackerError::Http)
+    }
+
+    /// Fetch comments on a Gitea issue, optionally filtering by `since` timestamp.
+    pub async fn fetch_comments(
+        &self,
+        issue_number: u64,
+        since: Option<&str>,
+    ) -> Result<Vec<IssueComment>> {
+        let mut url = format!(
+            "{}/api/v1/repos/{}/{}/issues/{}/comments",
+            self.config.base_url, self.config.owner, self.config.repo, issue_number
+        );
+        if let Some(since_ts) = since {
+            url.push_str(&format!("?since={}", since_ts));
+        }
+        let response = self
+            .build_request(reqwest::Method::GET, &url)
+            .send()
+            .await?;
+        if !response.status().is_success() {
+            let status = response.status();
+            let text = response.text().await.unwrap_or_default();
+            return Err(TrackerError::Api {
+                message: format!(
+                    "Gitea comments GET error {} on issue {}: {}",
+                    status, issue_number, text
+                ),
+            });
+        }
+        response.json().await.map_err(TrackerError::Http)
+    }
+}
+
 /// Parse ISO 8601 datetime string.
 fn parse_datetime(s: &str) -> Option<Zoned> {
     s.parse::<jiff::Timestamp>()
@@ -201,6 +277,21 @@ fn parse_datetime(s: &str) -> Option<Zoned> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use wiremock::matchers::{method, path, query_param};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    fn make_tracker(base_url: &str) -> GiteaTracker {
+        let config = GiteaConfig {
+            base_url: base_url.to_string(),
+            token: "test-token".to_string(),
+            owner: "testowner".to_string(),
+            repo: "testrepo".to_string(),
+            active_states: vec!["open".to_string()],
+            terminal_states: vec!["closed".to_string()],
+            use_robot_api: false,
+        };
+        GiteaTracker::new(config).unwrap()
+    }
 
     fn test_config() -> GiteaConfig {
         GiteaConfig {
@@ -276,5 +367,125 @@ mod tests {
                 .iter()
                 .all(|l| l.chars().all(|c| !c.is_uppercase()))
         );
+    }
+
+    #[tokio::test]
+    async fn test_post_comment_success() {
+        let mock_server = MockServer::start().await;
+        let comment_json = serde_json::json!({
+            "id": 42,
+            "body": "Test comment",
+            "user": {"login": "testbot"},
+            "created_at": "2026-03-31T12:00:00Z",
+            "updated_at": "2026-03-31T12:00:00Z"
+        });
+        Mock::given(method("POST"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/1/comments"))
+            .respond_with(ResponseTemplate::new(201).set_body_json(&comment_json))
+            .mount(&mock_server)
+            .await;
+
+        let tracker = make_tracker(&mock_server.uri());
+        let result = tracker.post_comment(1, "Test comment").await;
+        assert!(result.is_ok());
+        let comment = result.unwrap();
+        assert_eq!(comment.id, 42);
+        assert_eq!(comment.body, "Test comment");
+        assert_eq!(comment.user.login, "testbot");
+    }
+
+    #[tokio::test]
+    async fn test_post_comment_error_returns_api_error() {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/999/comments"))
+            .respond_with(ResponseTemplate::new(403).set_body_string("forbidden"))
+            .mount(&mock_server)
+            .await;
+
+        let tracker = make_tracker(&mock_server.uri());
+        let result = tracker.post_comment(999, "body").await;
+        assert!(result.is_err());
+        let err_str = format!("{}", result.unwrap_err());
+        assert!(err_str.contains("403"), "Expected 403 in error: {}", err_str);
+    }
+
+    #[tokio::test]
+    async fn test_fetch_comments_without_since() {
+        let mock_server = MockServer::start().await;
+        let comments_json = serde_json::json!([
+            {
+                "id": 1,
+                "body": "First",
+                "user": {"login": "alice"},
+                "created_at": "2026-03-31T10:00:00Z",
+                "updated_at": "2026-03-31T10:00:00Z"
+            },
+            {
+                "id": 2,
+                "body": "Second",
+                "user": {"login": "bob"},
+                "created_at": "2026-03-31T11:00:00Z",
+                "updated_at": "2026-03-31T11:00:00Z"
+            }
+        ]);
+        Mock::given(method("GET"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/5/comments"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&comments_json))
+            .mount(&mock_server)
+            .await;
+
+        let tracker = make_tracker(&mock_server.uri());
+        let result = tracker.fetch_comments(5, None).await;
+        assert!(result.is_ok());
+        let comments = result.unwrap();
+        assert_eq!(comments.len(), 2);
+        assert_eq!(comments[0].body, "First");
+        assert_eq!(comments[1].user.login, "bob");
+    }
+
+    #[tokio::test]
+    async fn test_fetch_comments_with_since() {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/5/comments"))
+            .and(query_param("since", "2026-03-31T00:00:00Z"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([])))
+            .mount(&mock_server)
+            .await;
+
+        let tracker = make_tracker(&mock_server.uri());
+        let result = tracker.fetch_comments(5, Some("2026-03-31T00:00:00Z")).await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_fetch_comments_error() {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/404/comments"))
+            .respond_with(ResponseTemplate::new(404).set_body_string("not found"))
+            .mount(&mock_server)
+            .await;
+
+        let tracker = make_tracker(&mock_server.uri());
+        let result = tracker.fetch_comments(404, None).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_issue_comment_deserialisation() {
+        let json = r#"{
+            "id": 100,
+            "body": "Hello @adf:security-sentinel",
+            "user": {"login": "root"},
+            "created_at": "2026-03-31T14:00:00+02:00",
+            "updated_at": "2026-03-31T14:00:00+02:00"
+        }"#;
+        let comment: IssueComment = serde_json::from_str(json).unwrap();
+        assert_eq!(comment.id, 100);
+        assert!(comment.body.contains("@adf:security-sentinel"));
+        assert_eq!(comment.user.login, "root");
     }
 }
