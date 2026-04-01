@@ -1316,7 +1316,7 @@ Comment: {}",
                         fallback_def.model = Some(fb_model.clone());
                     }
                     // Clear provider field so model composition uses the new cli_tool
-                    fallback_def.provider = Some("fallback".to_string());
+                    fallback_def.provider = None;
                     // Clear fallback to prevent infinite loops
                     fallback_def.fallback_provider = None;
                     fallback_def.fallback_model = None;
