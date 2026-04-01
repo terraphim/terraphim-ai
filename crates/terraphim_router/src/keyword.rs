@@ -2,34 +2,41 @@
 //!
 //! This module provides keyword matching to extract capabilities from text,
 //! enabling intelligent routing based on prompt content.
+//!
+//! Uses terraphim_automata::find_matches with Thesaurus for O(text + patterns) performance,
+//! replacing the previous O(text * keywords) substring search approach.
 
-use std::collections::HashSet;
+use std::collections::HashMap;
+use terraphim_automata::find_matches;
 use terraphim_types::capability::Capability;
+use terraphim_types::{NormalizedTerm, NormalizedTermValue, Thesaurus};
 
-/// Maps keywords to capabilities
+/// Internal keyword mapping structure.
 #[derive(Debug, Clone)]
-pub struct KeywordRouter {
-    mappings: Vec<KeywordMapping>,
-}
-
-#[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct KeywordMapping {
     keywords: Vec<String>,
     capability: Capability,
     priority: u32,
 }
 
+/// Maps keywords to capabilities using terraphim_automata Thesaurus.
+#[derive(Debug, Clone)]
+pub struct KeywordRouter {
+    mappings: Vec<KeywordMapping>,
+    keyword_thesaurus: Thesaurus,
+    keyword_to_mapping: HashMap<String, usize>,
+}
+
 impl KeywordRouter {
-    /// Create a new KeywordRouter with default mappings
+    /// Create a new KeywordRouter with default mappings.
     pub fn new() -> Self {
-        Self {
-            mappings: Self::default_mappings(),
-        }
+        Self::from_mappings(Self::default_mappings())
     }
 
-    /// Create with custom mappings
+    /// Create with custom mappings.
     pub fn with_mappings(mappings: Vec<(Vec<String>, Capability, u32)>) -> Self {
-        let mappings = mappings
+        let keyword_mappings: Vec<KeywordMapping> = mappings
             .into_iter()
             .map(|(keywords, capability, priority)| KeywordMapping {
                 keywords,
@@ -38,37 +45,65 @@ impl KeywordRouter {
             })
             .collect();
 
-        Self { mappings }
+        Self::from_mappings(keyword_mappings)
     }
 
-    /// Extract capabilities from text
+    /// Build router from internal KeywordMapping structs using Thesaurus.
+    fn from_mappings(mappings: Vec<KeywordMapping>) -> Self {
+        let mut thesaurus = Thesaurus::new("keyword-routing".to_string());
+        let mut keyword_to_mapping: HashMap<String, usize> = HashMap::new();
+
+        for (mapping_idx, mapping) in mappings.iter().enumerate() {
+            for keyword in &mapping.keywords {
+                let key_lower = keyword.to_lowercase();
+                let term = NormalizedTerm::new(
+                    format!("{:?}", mapping.capability),
+                    NormalizedTermValue::from(key_lower.clone()),
+                );
+                thesaurus.insert(NormalizedTermValue::from(key_lower.clone()), term);
+                keyword_to_mapping.insert(key_lower, mapping_idx);
+            }
+        }
+
+        Self {
+            mappings,
+            keyword_thesaurus: thesaurus,
+            keyword_to_mapping,
+        }
+    }
+
+    /// Extract capabilities from text using terraphim_automata::find_matches.
+    ///
+    /// This method achieves O(text + patterns) performance by using the Thesaurus
+    /// with Aho-Corasick automaton via terraphim_automata.
     pub fn extract_capabilities(&self, text: &str) -> Vec<Capability> {
         let text_lower = text.to_lowercase();
-        let mut caps = HashSet::new();
-        let mut matched_keywords = Vec::new();
+        let matches = match find_matches(&text_lower, self.keyword_thesaurus.clone(), false) {
+            Ok(m) => m,
+            Err(_) => return vec![],
+        };
 
-        for mapping in &self.mappings {
-            for keyword in &mapping.keywords {
-                if text_lower.contains(&keyword.to_lowercase()) {
-                    caps.insert(mapping.capability);
-                    matched_keywords.push((keyword.clone(), mapping.priority));
-                    break; // Only match once per mapping
+        let mut caps = std::collections::HashSet::new();
+        let mut seen_mappings = std::collections::HashSet::new();
+
+        for matched in &matches {
+            let key = matched.term.to_lowercase();
+            if let Some(&mapping_idx) = self.keyword_to_mapping.get(&key) {
+                if seen_mappings.insert(mapping_idx) {
+                    caps.insert(self.mappings[mapping_idx].capability);
                 }
             }
         }
 
-        // Sort by priority (higher priority first)
-        matched_keywords.sort_by(|a, b| b.1.cmp(&a.1));
-
         caps.into_iter().collect()
     }
 
-    /// Check if text contains any capability-indicating keywords
+    /// Check if text contains any capability-indicating keywords.
     pub fn has_keywords(&self, text: &str) -> bool {
         !self.extract_capabilities(text).is_empty()
     }
 
-    /// Get the default keyword mappings
+    /// Get the default keyword mappings.
     fn default_mappings() -> Vec<KeywordMapping> {
         vec![
             // Deep thinking (high priority)
@@ -293,6 +328,54 @@ mod tests {
 
         assert!(router.has_keywords("Think about this problem"));
         assert!(!router.has_keywords("Hello world"));
+    }
+
+    #[test]
+    fn test_with_custom_mappings() {
+        let router = KeywordRouter::with_mappings(vec![
+            (
+                vec!["custom1".to_string(), "custom2".to_string()],
+                Capability::DeepThinking,
+                100,
+            ),
+            (
+                vec!["my_unique_keyword".to_string()],
+                Capability::CodeGeneration,
+                50,
+            ),
+        ]);
+
+        let caps = router.extract_capabilities("This has custom1 in it");
+        assert!(caps.contains(&Capability::DeepThinking));
+
+        let caps2 = router.extract_capabilities("This has my_unique_keyword");
+        assert!(caps2.contains(&Capability::CodeGeneration));
+    }
+
+    #[test]
+    fn test_thesaurus_keyword_count() {
+        let router = KeywordRouter::new();
+        assert!(router.keyword_thesaurus.len() >= 60);
+    }
+
+    #[test]
+    fn test_with_mappings_builds_thesaurus() {
+        let router = KeywordRouter::with_mappings(vec![(
+            vec!["foo".into(), "bar".into()],
+            Capability::Testing,
+            50,
+        )]);
+        let caps = router.extract_capabilities("this is a foo test");
+        assert!(caps.contains(&Capability::Testing));
+    }
+
+    #[test]
+    fn test_clone_preserves_behaviour() {
+        let router = KeywordRouter::new();
+        let cloned = router.clone();
+        let caps1 = router.extract_capabilities("implement a function");
+        let caps2 = cloned.extract_capabilities("implement a function");
+        assert_eq!(caps1, caps2);
     }
 }
 
