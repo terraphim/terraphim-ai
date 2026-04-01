@@ -4,14 +4,12 @@
 //! - Agent name: `@adf:security-sentinel` (exact match on agent name)
 //! - Persona name: `@adf:vigil` (resolved via PersonaRegistry)
 //!
-//! Uses Aho-Corasick automaton for O(text + patterns) mention detection,
+//! Uses Thesaurus-based Aho-Corasick automaton for O(text + patterns) mention detection,
 //! replacing the previous regex-based O(text * patterns) approach.
 
 use crate::config::AgentDefinition;
 use crate::persona::PersonaRegistry;
-use aho_corasick::AhoCorasick;
 use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
 use terraphim_automata::find_matches;
 use terraphim_tracker::IssueComment;
 use terraphim_types::{NormalizedTerm, Thesaurus};
@@ -34,113 +32,6 @@ pub struct DetectedMention {
     pub comment_body: String,
     pub mentioner: String,
     pub timestamp: String,
-}
-
-/// Aho-Corasick-based automaton for efficient mention detection.
-///
-/// Builds an automaton from agent names and persona names at construction time,
-/// enabling O(text + patterns) mention detection instead of O(text * patterns).
-pub struct MentionAutomaton {
-    /// The Aho-Corasick automaton for pattern matching
-    automaton: Arc<AhoCorasick>,
-    /// Map from pattern index to resolution info
-    pattern_map: Vec<PatternInfo>,
-}
-
-/// Information about a pattern in the automaton
-#[derive(Debug, Clone)]
-#[allow(dead_code)]
-struct PatternInfo {
-    /// The raw pattern string (agent name or persona name)
-    pattern: String,
-    /// Whether this is an agent name or persona name
-    kind: PatternKind,
-}
-
-#[derive(Debug, Clone)]
-#[allow(dead_code)]
-enum PatternKind {
-    AgentName,
-    PersonaName { persona: String },
-}
-
-impl MentionAutomaton {
-    /// Build a new automaton from agent definitions and personas.
-    ///
-    /// Creates patterns for:
-    /// - All agent names (e.g., "security-sentinel")
-    /// - All persona names (e.g., "vigil")
-    ///
-    /// The automaton is case-insensitive and matches leftmost-longest patterns.
-    pub fn new(agents: &[AgentDefinition], personas: &PersonaRegistry) -> Option<Self> {
-        let mut patterns = Vec::new();
-        let mut pattern_map = Vec::new();
-
-        // Add agent name patterns
-        for agent in agents {
-            patterns.push(agent.name.clone());
-            pattern_map.push(PatternInfo {
-                pattern: agent.name.clone(),
-                kind: PatternKind::AgentName,
-            });
-        }
-
-        // Add persona name patterns
-        for persona_name in personas.iter_names() {
-            // Skip if persona name is already an agent name (avoid duplicates)
-            if !agents
-                .iter()
-                .any(|a| a.name.eq_ignore_ascii_case(persona_name))
-            {
-                patterns.push(persona_name.to_string());
-                pattern_map.push(PatternInfo {
-                    pattern: persona_name.to_string(),
-                    kind: PatternKind::PersonaName {
-                        persona: persona_name.to_string(),
-                    },
-                });
-            }
-        }
-
-        if patterns.is_empty() {
-            tracing::warn!("No agent or persona patterns available for mention detection");
-            return None;
-        }
-
-        tracing::debug!(
-            "Building MentionAutomaton with {} patterns ({} agents, {} personas)",
-            patterns.len(),
-            agents.len(),
-            pattern_map.len() - agents.len()
-        );
-
-        let automaton = AhoCorasick::builder()
-            .ascii_case_insensitive(true)
-            .build(&patterns)
-            .map_err(|e| {
-                tracing::error!("Failed to build Aho-Corasick automaton: {}", e);
-                e
-            })
-            .ok()?;
-
-        Some(Self {
-            automaton: Arc::new(automaton),
-            pattern_map,
-        })
-    }
-
-    /// Find all @adf: mentions in the given text.
-    ///
-    /// Returns an iterator over (start, end, pattern_info) tuples.
-    fn find_mentions<'a>(
-        &'a self,
-        text: &'a str,
-    ) -> impl Iterator<Item = (usize, usize, &'a PatternInfo)> + 'a {
-        self.automaton.find_iter(text).map(|mat| {
-            let info = &self.pattern_map[mat.pattern()];
-            (mat.start(), mat.end(), info)
-        })
-    }
 }
 
 /// Pre-built capability Thesauri for agent scoring.
@@ -181,180 +72,241 @@ impl CapabilityThesauri {
     }
 }
 
-/// Resolve a raw mention to an agent name.
+/// Thesaurus-based mention detection.
 ///
-/// 1. If raw matches an agent name exactly -> AgentName
-/// 2. If raw matches a persona name -> PersonaName (pick best-fit agent)
-/// 3. No match -> None
-pub fn resolve_mention(
-    raw: &str,
-    agents: &[AgentDefinition],
-    personas: &PersonaRegistry,
-    context: &str,
-    cap_thesauri: &CapabilityThesauri,
-) -> Option<(String, MentionResolution)> {
-    // 1. Direct agent name match (case-insensitive)
-    if let Some(agent) = agents.iter().find(|a| a.name.eq_ignore_ascii_case(raw)) {
-        return Some((agent.name.clone(), MentionResolution::AgentName));
+/// Builds a Thesaurus at startup where:
+/// - Each agent name becomes: key="@adf:agent-name", NormalizedTerm { id: "agent-name", value: "@adf:agent-name" }
+/// - Each unique persona becomes a synonym: key="@adf:persona-name", NormalizedTerm {
+///   id: "agent-name", value: "@adf:persona-name", display_value: Some("persona:persona-name")
+///   }
+/// - For ambiguous personas (multiple agents share same persona name), tracked in ambiguous_personas
+pub struct MentionThesaurus {
+    thesaurus: Thesaurus,
+    /// Persona names that map to multiple agents (need disambiguation)
+    ambiguous_personas: HashSet<String>,
+}
+
+impl MentionThesaurus {
+    /// Build a new MentionThesaurus from agent definitions and persona registry.
+    ///
+    /// Creates Thesaurus entries for:
+    /// - All agent names as @adf:agent-name patterns
+    /// - All persona names as @adf:persona-name patterns
+    ///
+    /// Personas shared by multiple agents are tracked in ambiguous_personas.
+    pub fn build(agents: &[AgentDefinition], _personas: &PersonaRegistry) -> Self {
+        let mut thesaurus = Thesaurus::new("mention-thesaurus".to_string());
+        let mut ambiguous_personas: HashSet<String> = HashSet::new();
+        let mut persona_agent_counts: HashMap<String, Vec<String>> = HashMap::new();
+
+        // First pass: count how many agents share each persona
+        for agent in agents {
+            if let Some(ref persona) = agent.persona {
+                let persona_lower = persona.to_lowercase();
+                persona_agent_counts
+                    .entry(persona_lower)
+                    .or_default()
+                    .push(agent.name.clone());
+            }
+        }
+
+        // Add agent name patterns: @adf:agent-name -> agent-name
+        for agent in agents {
+            let key = format!("@adf:{}", agent.name.to_lowercase());
+            let term = NormalizedTerm::new(agent.name.clone(), key.clone().into());
+            thesaurus.insert(key.into(), term);
+        }
+
+        // Add persona patterns: @adf:persona-name -> agent-name
+        // For ambiguous personas, we'll use capability scoring at detection time
+        for (persona_lower, agent_names) in &persona_agent_counts {
+            let key = format!("@adf:{}", persona_lower);
+
+            if agent_names.len() > 1 {
+                // Ambiguous persona - mark it and use first agent as default
+                ambiguous_personas.insert(persona_lower.clone());
+                // Store all agents for this persona (we'll disambiguate at detection time)
+                // For now, use alphabetical first as default
+                let default_agent = agent_names.iter().min().unwrap().clone();
+                let term = NormalizedTerm::new(default_agent.clone(), key.clone().into())
+                    .with_display_value(format!("persona:{}", persona_lower));
+                thesaurus.insert(key.into(), term);
+            } else {
+                // Unambiguous persona - direct mapping
+                let agent_name = agent_names[0].clone();
+                let term = NormalizedTerm::new(agent_name.clone(), key.clone().into())
+                    .with_display_value(format!("persona:{}", persona_lower));
+                thesaurus.insert(key.into(), term);
+            }
+        }
+
+        tracing::debug!(
+            "Built MentionThesaurus with {} patterns ({} agents, {} personas, {} ambiguous)",
+            thesaurus.len(),
+            agents.len(),
+            persona_agent_counts.len(),
+            ambiguous_personas.len()
+        );
+
+        Self {
+            thesaurus,
+            ambiguous_personas,
+        }
     }
 
-    // 2. Persona name match (case-insensitive)
-    if personas.get(raw).is_some() {
-        let matching_agents: Vec<&AgentDefinition> = agents
+    /// Detect all @adf: mentions in the given text.
+    ///
+    /// Returns Vec of (agent_name, raw_mention, is_ambiguous) tuples.
+    /// Uses find_matches() for O(text + patterns) performance.
+    pub fn detect(&self, text: &str) -> Vec<(String, String, bool)> {
+        let mut results = Vec::new();
+
+        // Use find_matches to detect all patterns in one pass
+        let matches = match find_matches(text, self.thesaurus.clone(), true) {
+            Ok(m) => m,
+            Err(e) => {
+                tracing::error!("find_matches failed: {}", e);
+                return results;
+            }
+        };
+
+        for matched in matches {
+            let raw_mention = matched.term;
+            let agent_name = matched.normalized_term.id.clone();
+
+            // Check if this is a persona mention by looking at the pattern
+            let is_ambiguous = if let Some(name_part) = raw_mention.strip_prefix("@adf:") {
+                self.ambiguous_personas.contains(name_part)
+            } else {
+                false
+            };
+
+            results.push((agent_name, raw_mention, is_ambiguous));
+        }
+
+        results
+    }
+
+    /// Check if a persona name is ambiguous (maps to multiple agents).
+    pub fn is_ambiguous(&self, persona: &str) -> bool {
+        self.ambiguous_personas.contains(&persona.to_lowercase())
+    }
+
+    /// Get all agents that share an ambiguous persona.
+    pub fn get_ambiguous_agents<'a>(
+        &self,
+        persona: &str,
+        all_agents: &'a [AgentDefinition],
+    ) -> Vec<&'a AgentDefinition> {
+        let persona_lower = persona.to_lowercase();
+        if !self.ambiguous_personas.contains(&persona_lower) {
+            return Vec::new();
+        }
+
+        all_agents
             .iter()
             .filter(|a| {
                 a.persona
                     .as_ref()
-                    .map(|p| p.eq_ignore_ascii_case(raw))
+                    .map(|p| p.eq_ignore_ascii_case(&persona_lower))
                     .unwrap_or(false)
             })
-            .collect();
-
-        match matching_agents.len() {
-            0 => return None,
-            1 => {
-                return Some((
-                    matching_agents[0].name.clone(),
-                    MentionResolution::PersonaName {
-                        persona: raw.to_string(),
-                    },
-                ));
-            }
-            _ => {
-                // Multiple agents share this persona. Pick by keyword overlap with context.
-                let context_lower = context.to_lowercase();
-                let mut best_agent = &matching_agents[0];
-                let mut best_score = 0usize;
-
-                for agent in &matching_agents {
-                    let score = cap_thesauri.score(&agent.name, &context_lower);
-                    if score > best_score || (score == best_score && agent.name < best_agent.name) {
-                        best_score = score;
-                        best_agent = agent;
-                    }
-                }
-
-                return Some((
-                    best_agent.name.clone(),
-                    MentionResolution::PersonaName {
-                        persona: raw.to_string(),
-                    },
-                ));
-            }
-        }
+            .collect()
     }
-
-    None
 }
 
-/// Parse and resolve all @adf:name mentions from a comment using Aho-Corasick automaton.
+/// Parse and resolve all @adf:name mentions from a comment using Thesaurus-based detection.
 ///
-/// This function uses an Aho-Corasick automaton for O(text + patterns) performance,
+/// This function uses a Thesaurus with find_matches() for O(text + patterns) performance,
 /// replacing the previous regex-based O(text * patterns) approach.
 pub fn parse_mentions(
     comment: &IssueComment,
     issue_number: u64,
     agents: &[AgentDefinition],
-    personas: &PersonaRegistry,
+    _personas: &PersonaRegistry,
+    mention_thesaurus: &MentionThesaurus,
     cap_thesauri: &CapabilityThesauri,
 ) -> Vec<DetectedMention> {
     let mut mentions = Vec::new();
-
-    // Build automaton for this parse (agents/personas may change between calls)
-    let Some(automaton) = MentionAutomaton::new(agents, personas) else {
-        return mentions;
-    };
-
-    // Scan for @adf: prefixes followed by known agent/persona names
     let body = &comment.body;
-    let body_lower = body.to_lowercase();
 
-    // Find all @adf: occurrences
-    for (pos, _) in body_lower.match_indices("@adf:") {
-        // Look for a pattern match immediately after @adf:
-        let after_prefix = pos + 5; // Skip "@adf:"
-        if after_prefix >= body.len() {
-            continue;
-        }
+    // Use the thesaurus to detect all mentions in one pass
+    let detected = mention_thesaurus.detect(body);
 
-        // Check if there's a valid identifier after @adf:
-        // Valid identifier: [a-z][a-z0-9-]{1,39}
-        let remaining = &body[after_prefix..];
-        let _remaining_lower = remaining.to_lowercase();
-
-        // Use automaton to find matching patterns at this position
-        for (start, end, info) in automaton.find_mentions(remaining) {
-            // Ensure the match starts at the beginning of the remaining text
-            if start != 0 {
-                continue;
-            }
-
-            let raw = &info.pattern;
-            let matched_text = &remaining[..end];
-
-            // Verify this is a valid identifier (starts with letter, alphanumeric/ hyphens)
-            if !is_valid_identifier(&matched_text.to_lowercase()) {
-                continue;
-            }
-
-            // Check if this is a direct agent name match first (case-insensitive)
-            if let Some(agent) = agents.iter().find(|a| a.name.eq_ignore_ascii_case(raw)) {
-                mentions.push(DetectedMention {
-                    issue_number,
-                    comment_id: comment.id,
-                    raw_mention: raw.to_string(),
-                    agent_name: agent.name.clone(),
-                    resolution: MentionResolution::AgentName,
-                    comment_body: comment.body.clone(),
-                    mentioner: comment.user.login.clone(),
-                    timestamp: comment.created_at.clone(),
-                });
-            } else if let Some((agent_name, resolution)) =
-                resolve_mention(raw, agents, personas, &comment.body, cap_thesauri)
-            {
-                mentions.push(DetectedMention {
-                    issue_number,
-                    comment_id: comment.id,
-                    raw_mention: raw.to_string(),
-                    agent_name,
-                    resolution,
-                    comment_body: comment.body.clone(),
-                    mentioner: comment.user.login.clone(),
-                    timestamp: comment.created_at.clone(),
-                });
+    for (default_agent_name, raw_mention, is_ambiguous) in detected {
+        // Determine final agent name and resolution type
+        let (final_agent_name, resolution) = if is_ambiguous {
+            // Extract persona name from raw mention (e.g., "@adf:vigil" -> "vigil")
+            let persona_name = if let Some(name) = raw_mention.strip_prefix("@adf:") {
+                name.to_string()
             } else {
-                tracing::warn!(
-                    raw_mention = raw,
-                    issue = issue_number,
-                    "unresolved @adf mention"
-                );
+                raw_mention.clone()
+            };
+
+            // Get all agents with this persona
+            let matching_agents: Vec<&AgentDefinition> = agents
+                .iter()
+                .filter(|a| {
+                    a.persona
+                        .as_ref()
+                        .map(|p| p.eq_ignore_ascii_case(&persona_name))
+                        .unwrap_or(false)
+                })
+                .collect();
+
+            // Disambiguate using capability scoring
+            let context_lower = body.to_lowercase();
+            let mut best_agent = matching_agents[0];
+            let mut best_score = 0usize;
+
+            for agent in &matching_agents {
+                let score = cap_thesauri.score(&agent.name, &context_lower);
+                if score > best_score || (score == best_score && agent.name < best_agent.name) {
+                    best_score = score;
+                    best_agent = agent;
+                }
             }
 
-            // Only process the first match at this position
-            break;
-        }
+            (
+                best_agent.name.clone(),
+                MentionResolution::PersonaName {
+                    persona: persona_name,
+                },
+            )
+        } else if let Some(name_part) = raw_mention.strip_prefix("@adf:") {
+            // Check if this is a direct agent name match
+            if agents
+                .iter()
+                .any(|a| a.name.eq_ignore_ascii_case(name_part))
+            {
+                (default_agent_name, MentionResolution::AgentName)
+            } else {
+                // It's a persona mention (unambiguous)
+                let persona_name = name_part.to_string();
+                (
+                    default_agent_name,
+                    MentionResolution::PersonaName {
+                        persona: persona_name,
+                    },
+                )
+            }
+        } else {
+            (default_agent_name, MentionResolution::AgentName)
+        };
+
+        mentions.push(DetectedMention {
+            issue_number,
+            comment_id: comment.id,
+            raw_mention: raw_mention.clone(),
+            agent_name: final_agent_name,
+            resolution,
+            comment_body: comment.body.clone(),
+            mentioner: comment.user.login.clone(),
+            timestamp: comment.created_at.clone(),
+        });
     }
 
     mentions
-}
-
-/// Check if a string is a valid identifier for @adf: mentions.
-/// Valid: starts with lowercase letter, followed by lowercase letters, digits, or hyphens.
-fn is_valid_identifier(s: &str) -> bool {
-    if s.len() < 2 || s.len() > 40 {
-        return false;
-    }
-
-    let mut chars = s.chars();
-    let first = chars.next().unwrap();
-
-    // First character must be a lowercase letter
-    if !first.is_ascii_lowercase() {
-        return false;
-    }
-
-    // Remaining characters must be lowercase letters, digits, or hyphens
-    chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
 }
 
 /// Tracks processed mentions to prevent re-triggers and infinite loops.
@@ -507,17 +459,119 @@ mod tests {
         CapabilityThesauri::build(&test_agents())
     }
 
+    fn test_mention_thesaurus() -> MentionThesaurus {
+        let agents = test_agents();
+        let personas = test_personas();
+        MentionThesaurus::build(&agents, &personas)
+    }
+
+    #[test]
+    fn test_mention_thesaurus_build() {
+        let agents = test_agents();
+        let personas = test_personas();
+        let thesaurus = MentionThesaurus::build(&agents, &personas);
+
+        // Should have entries for 4 agents + 3 personas = 7 total
+        // But we need to verify by checking detection
+        assert_eq!(thesaurus.thesaurus.len(), 7);
+
+        // Vigil should be marked as ambiguous (2 agents share it)
+        assert!(thesaurus.is_ambiguous("Vigil"));
+        assert!(thesaurus.is_ambiguous("vigil"));
+
+        // Carthos and Lux should not be ambiguous
+        assert!(!thesaurus.is_ambiguous("Carthos"));
+        assert!(!thesaurus.is_ambiguous("Lux"));
+    }
+
+    #[test]
+    fn test_mention_thesaurus_direct_name_detection() {
+        let thesaurus = test_mention_thesaurus();
+
+        // Test direct agent name detection
+        let results = thesaurus.detect("Please @adf:security-sentinel review this");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].0, "security-sentinel");
+        assert_eq!(results[0].1, "@adf:security-sentinel");
+        assert!(!results[0].2); // Not ambiguous
+    }
+
+    #[test]
+    fn test_mention_thesaurus_persona_synonym() {
+        let thesaurus = test_mention_thesaurus();
+
+        // Test unambiguous persona detection (Carthos -> spec-validator)
+        let results = thesaurus.detect("@adf:carthos check the spec");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].0, "spec-validator");
+        assert_eq!(results[0].1, "@adf:carthos");
+        assert!(!results[0].2); // Not ambiguous
+    }
+
+    #[test]
+    fn test_mention_thesaurus_ambiguous_persona() {
+        let thesaurus = test_mention_thesaurus();
+
+        // Test ambiguous persona detection (Vigil is shared)
+        let results = thesaurus.detect("@adf:vigil check security");
+        assert_eq!(results.len(), 1);
+        // Should return one of the agents (default is alphabetical first)
+        assert!(results[0].0 == "compliance-watchdog" || results[0].0 == "security-sentinel");
+        assert_eq!(results[0].1, "@adf:vigil");
+        assert!(results[0].2); // Is ambiguous
+    }
+
+    #[test]
+    fn test_mention_thesaurus_multiple_mentions() {
+        let thesaurus = test_mention_thesaurus();
+
+        // Test multiple mentions in one comment
+        let results = thesaurus.detect("@adf:security-sentinel and @adf:carthos please review");
+        assert_eq!(results.len(), 2);
+
+        let agent_names: Vec<_> = results.iter().map(|r| r.0.clone()).collect();
+        assert!(agent_names.contains(&"security-sentinel".to_string()));
+        assert!(agent_names.contains(&"spec-validator".to_string()));
+    }
+
+    #[test]
+    fn test_mention_thesaurus_no_mentions() {
+        let thesaurus = test_mention_thesaurus();
+
+        // Test no false positives
+        let results = thesaurus.detect("No mentions here at all");
+        assert!(results.is_empty());
+
+        // Test non-@adf mentions are ignored
+        let results = thesaurus.detect("@alice please review");
+        assert!(results.is_empty());
+
+        // Test unknown agent names are ignored
+        let results = thesaurus.detect("@adf:unknown-agent please help");
+        assert!(results.is_empty());
+    }
+
     #[test]
     fn test_parse_single_mention_agent_name() {
         let agents = test_agents();
         let personas = test_personas();
         let cap_thesauri = test_cap_thesauri();
+        let mention_thesaurus = test_mention_thesaurus();
+
         let comment = make_comment(1, "Please @adf:security-sentinel review this code", "alice");
-        let mentions = parse_mentions(&comment, 42, &agents, &personas, &cap_thesauri);
+        let mentions = parse_mentions(
+            &comment,
+            42,
+            &agents,
+            &personas,
+            &mention_thesaurus,
+            &cap_thesauri,
+        );
+
         assert_eq!(mentions.len(), 1);
         assert_eq!(mentions[0].agent_name, "security-sentinel");
         assert_eq!(mentions[0].resolution, MentionResolution::AgentName);
-        assert_eq!(mentions[0].raw_mention, "security-sentinel");
+        assert_eq!(mentions[0].raw_mention, "@adf:security-sentinel");
     }
 
     #[test]
@@ -525,10 +579,20 @@ mod tests {
         let agents = test_agents();
         let personas = test_personas();
         let cap_thesauri = test_cap_thesauri();
+        let mention_thesaurus = test_mention_thesaurus();
+
         // "vigil" persona resolves to an agent. With "security" in context,
         // should prefer security-sentinel over compliance-watchdog.
         let comment = make_comment(2, "@adf:vigil check for security vulnerabilities", "alice");
-        let mentions = parse_mentions(&comment, 42, &agents, &personas, &cap_thesauri);
+        let mentions = parse_mentions(
+            &comment,
+            42,
+            &agents,
+            &personas,
+            &mention_thesaurus,
+            &cap_thesauri,
+        );
+
         assert_eq!(mentions.len(), 1);
         assert_eq!(mentions[0].agent_name, "security-sentinel");
         assert!(matches!(
@@ -542,8 +606,18 @@ mod tests {
         let agents = test_agents();
         let personas = test_personas();
         let cap_thesauri = test_cap_thesauri();
+        let mention_thesaurus = test_mention_thesaurus();
+
         let comment = make_comment(3, "@adf:vigil and @adf:carthos please review", "bob");
-        let mentions = parse_mentions(&comment, 42, &agents, &personas, &cap_thesauri);
+        let mentions = parse_mentions(
+            &comment,
+            42,
+            &agents,
+            &personas,
+            &mention_thesaurus,
+            &cap_thesauri,
+        );
+
         assert_eq!(mentions.len(), 2);
     }
 
@@ -552,8 +626,18 @@ mod tests {
         let agents = test_agents();
         let personas = test_personas();
         let cap_thesauri = test_cap_thesauri();
+        let mention_thesaurus = test_mention_thesaurus();
+
         let comment = make_comment(4, "No mentions here", "alice");
-        let mentions = parse_mentions(&comment, 42, &agents, &personas, &cap_thesauri);
+        let mentions = parse_mentions(
+            &comment,
+            42,
+            &agents,
+            &personas,
+            &mention_thesaurus,
+            &cap_thesauri,
+        );
+
         assert!(mentions.is_empty());
     }
 
@@ -562,8 +646,18 @@ mod tests {
         let agents = test_agents();
         let personas = test_personas();
         let cap_thesauri = test_cap_thesauri();
+        let mention_thesaurus = test_mention_thesaurus();
+
         let comment = make_comment(5, "@alice please review", "bob");
-        let mentions = parse_mentions(&comment, 42, &agents, &personas, &cap_thesauri);
+        let mentions = parse_mentions(
+            &comment,
+            42,
+            &agents,
+            &personas,
+            &mention_thesaurus,
+            &cap_thesauri,
+        );
+
         assert!(mentions.is_empty());
     }
 
@@ -572,12 +666,25 @@ mod tests {
         let agents = test_agents();
         let personas = test_personas();
         let cap_thesauri = test_cap_thesauri();
+        let mention_thesaurus = test_mention_thesaurus();
+
         // Lux has only one agent: product-development
-        let result = resolve_mention("lux", &agents, &personas, "some context", &cap_thesauri);
-        assert!(result.is_some());
-        let (name, res) = result.unwrap();
-        assert_eq!(name, "product-development");
-        assert!(matches!(res, MentionResolution::PersonaName { .. }));
+        let comment = make_comment(1, "@adf:lux help with frontend", "alice");
+        let mentions = parse_mentions(
+            &comment,
+            42,
+            &agents,
+            &personas,
+            &mention_thesaurus,
+            &cap_thesauri,
+        );
+
+        assert_eq!(mentions.len(), 1);
+        assert_eq!(mentions[0].agent_name, "product-development");
+        assert!(matches!(
+            mentions[0].resolution,
+            MentionResolution::PersonaName { .. }
+        ));
     }
 
     #[test]
@@ -585,27 +692,112 @@ mod tests {
         let agents = test_agents();
         let personas = test_personas();
         let cap_thesauri = test_cap_thesauri();
+        let mention_thesaurus = test_mention_thesaurus();
+
         // Vigil shared by security-sentinel and compliance-watchdog
         // Context mentions "license" -> should pick compliance-watchdog
-        let result = resolve_mention(
-            "vigil",
+        let comment = make_comment(1, "@adf:vigil check license compliance", "alice");
+        let mentions = parse_mentions(
+            &comment,
+            42,
             &agents,
             &personas,
-            "check license compliance",
+            &mention_thesaurus,
             &cap_thesauri,
         );
-        assert!(result.is_some());
-        let (name, _) = result.unwrap();
-        assert_eq!(name, "compliance-watchdog");
+
+        assert_eq!(mentions.len(), 1);
+        assert_eq!(mentions[0].agent_name, "compliance-watchdog");
     }
 
     #[test]
-    fn test_resolve_unknown_name() {
+    fn test_case_insensitive_mention() {
         let agents = test_agents();
         let personas = test_personas();
         let cap_thesauri = test_cap_thesauri();
-        let result = resolve_mention("nonexistent", &agents, &personas, "context", &cap_thesauri);
-        assert!(result.is_none());
+        let mention_thesaurus = test_mention_thesaurus();
+
+        // Test various casing
+        let comment1 = make_comment(1, "@adf:SECURITY-SENTINEL check this", "alice");
+        let mentions1 = parse_mentions(
+            &comment1,
+            42,
+            &agents,
+            &personas,
+            &mention_thesaurus,
+            &cap_thesauri,
+        );
+        assert_eq!(mentions1.len(), 1);
+        assert_eq!(mentions1[0].agent_name, "security-sentinel");
+
+        let comment2 = make_comment(2, "@adf:Vigil review please", "bob");
+        let mentions2 = parse_mentions(
+            &comment2,
+            42,
+            &agents,
+            &personas,
+            &mention_thesaurus,
+            &cap_thesauri,
+        );
+        assert_eq!(mentions2.len(), 1);
+        // Vigil persona is shared by security-sentinel and compliance-watchdog
+        // The specific agent returned depends on keyword matching or alphabetical tie-break
+        assert!(
+            mentions2[0].agent_name == "security-sentinel"
+                || mentions2[0].agent_name == "compliance-watchdog"
+        );
+        assert!(matches!(
+            mentions2[0].resolution,
+            MentionResolution::PersonaName { .. }
+        ));
+    }
+
+    #[test]
+    fn test_mention_at_end_of_sentence() {
+        let agents = test_agents();
+        let personas = test_personas();
+        let cap_thesauri = test_cap_thesauri();
+        let mention_thesaurus = test_mention_thesaurus();
+
+        let comment = make_comment(1, "Please review, @adf:spec-validator.", "alice");
+        let mentions = parse_mentions(
+            &comment,
+            42,
+            &agents,
+            &personas,
+            &mention_thesaurus,
+            &cap_thesauri,
+        );
+        // The period after spec-validator is a word boundary, so it should match
+        assert_eq!(mentions.len(), 1);
+        assert_eq!(mentions[0].agent_name, "spec-validator");
+    }
+
+    #[test]
+    fn test_multiple_mentions_same_comment() {
+        let agents = test_agents();
+        let personas = test_personas();
+        let cap_thesauri = test_cap_thesauri();
+        let mention_thesaurus = test_mention_thesaurus();
+
+        let comment = make_comment(
+            1,
+            "@adf:security-sentinel please audit. @adf:carthos check the design.",
+            "alice",
+        );
+        let mentions = parse_mentions(
+            &comment,
+            42,
+            &agents,
+            &personas,
+            &mention_thesaurus,
+            &cap_thesauri,
+        );
+        assert_eq!(mentions.len(), 2);
+
+        let agent_names: Vec<_> = mentions.iter().map(|m| m.agent_name.as_str()).collect();
+        assert!(agent_names.contains(&"security-sentinel"));
+        assert!(agent_names.contains(&"spec-validator"));
     }
 
     #[test]
@@ -637,106 +829,5 @@ mod tests {
         tracker.increment_depth(42);
         tracker.increment_depth(42);
         assert!(tracker.depth_exceeded(42));
-    }
-
-    #[test]
-    fn test_valid_identifier() {
-        assert!(is_valid_identifier("security-sentinel"));
-        assert!(is_valid_identifier("a1"));
-        assert!(is_valid_identifier("test-123-abc"));
-        assert!(!is_valid_identifier(""));
-        assert!(!is_valid_identifier("1abc"));
-        assert!(!is_valid_identifier("Test"));
-        assert!(!is_valid_identifier("test_123"));
-        assert!(!is_valid_identifier("a"));
-    }
-
-    #[test]
-    fn test_automaton_creation() {
-        let agents = test_agents();
-        let personas = test_personas();
-
-        let automaton = MentionAutomaton::new(&agents, &personas);
-        assert!(automaton.is_some());
-
-        let auto = automaton.unwrap();
-        assert_eq!(auto.pattern_map.len(), 7); // 4 agents + 3 personas
-    }
-
-    #[test]
-    fn test_automaton_empty_agents() {
-        let agents: Vec<AgentDefinition> = vec![];
-        let personas = test_personas();
-
-        let automaton = MentionAutomaton::new(&agents, &personas);
-        assert!(automaton.is_some()); // Should still work with just personas
-    }
-
-    #[test]
-    fn test_automaton_empty() {
-        let agents: Vec<AgentDefinition> = vec![];
-        let personas = PersonaRegistry::new();
-
-        let automaton = MentionAutomaton::new(&agents, &personas);
-        assert!(automaton.is_none()); // No patterns available
-    }
-
-    #[test]
-    fn test_case_insensitive_mention() {
-        let agents = test_agents();
-        let personas = test_personas();
-        let cap_thesauri = test_cap_thesauri();
-
-        // Test various casing
-        let comment1 = make_comment(1, "@adf:SECURITY-SENTINEL check this", "alice");
-        let mentions1 = parse_mentions(&comment1, 42, &agents, &personas, &cap_thesauri);
-        assert_eq!(mentions1.len(), 1);
-        assert_eq!(mentions1[0].agent_name, "security-sentinel");
-
-        let comment2 = make_comment(2, "@adf:Vigil review please", "bob");
-        let mentions2 = parse_mentions(&comment2, 42, &agents, &personas, &cap_thesauri);
-        assert_eq!(mentions2.len(), 1);
-        // Vigil persona is shared by security-sentinel and compliance-watchdog
-        // The specific agent returned depends on keyword matching or alphabetical tie-break
-        assert!(
-            mentions2[0].agent_name == "security-sentinel"
-                || mentions2[0].agent_name == "compliance-watchdog"
-        );
-        assert!(matches!(
-            mentions2[0].resolution,
-            MentionResolution::PersonaName { .. }
-        ));
-    }
-
-    #[test]
-    fn test_mention_at_end_of_sentence() {
-        let agents = test_agents();
-        let personas = test_personas();
-        let cap_thesauri = test_cap_thesauri();
-
-        let comment = make_comment(1, "Please review, @adf:spec-validator.", "alice");
-        let mentions = parse_mentions(&comment, 42, &agents, &personas, &cap_thesauri);
-        // The period after spec-validator is a word boundary, so it should match
-        assert_eq!(mentions.len(), 1);
-        assert_eq!(mentions[0].agent_name, "spec-validator");
-    }
-
-    #[test]
-    fn test_multiple_mentions_same_comment() {
-        let agents = test_agents();
-        let personas = test_personas();
-        let cap_thesauri = test_cap_thesauri();
-
-        let comment = make_comment(
-            1,
-            "@adf:security-sentinel please audit. @adf:carthos check the design.",
-            "alice",
-        );
-        let mentions = parse_mentions(&comment, 42, &agents, &personas, &cap_thesauri);
-        assert_eq!(mentions.len(), 2);
-
-        let agent_names: Vec<_> = mentions.iter().map(|m| m.agent_name.as_str()).collect();
-        assert!(agent_names.contains(&"security-sentinel"));
-        assert!(agent_names.contains(&"spec-validator"));
     }
 }

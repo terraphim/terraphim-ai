@@ -54,7 +54,7 @@ pub use config::{
     TrackerStates, WorkflowConfig,
 };
 pub use cost_tracker::{AgentMetrics, BudgetVerdict, CostSnapshot, CostTracker, ExecutionMetrics};
-pub use mention::{parse_mentions, resolve_mention, DetectedMention, MentionTracker};
+pub use mention::{parse_mentions, DetectedMention, MentionThesaurus, MentionTracker};
 pub use dispatcher::{DispatchTask, Dispatcher, DispatcherStats};
 pub use dual_mode::DualModeOrchestrator;
 pub use error::OrchestratorError;
@@ -167,6 +167,8 @@ pub struct AgentOrchestrator {
     mention_tracker: MentionTracker,
     /// Pre-built capability Thesauri for agent mention scoring.
     cap_thesauri: mention::CapabilityThesauri,
+    /// Pre-built mention Thesaurus for efficient @adf: mention detection.
+    mention_thesaurus: mention::MentionThesaurus,
     /// Monotonically increasing tick counter for poll_modulo gating.
     tick_count: u64,
 }
@@ -251,6 +253,9 @@ impl AgentOrchestrator {
         // Pre-build capability Thesauri for agent mention scoring
         let cap_thesauri = mention::CapabilityThesauri::build(&config.agents);
 
+        // Pre-build mention Thesaurus for efficient @adf: mention detection
+        let mention_thesaurus = mention::MentionThesaurus::build(&config.agents, &persona_registry);
+
         Ok(Self {
             config,
             spawner,
@@ -276,6 +281,7 @@ impl AgentOrchestrator {
             active_flows: HashMap::new(),
             mention_tracker,
             cap_thesauri,
+            mention_thesaurus,
             tick_count: 0,
         })
     }
@@ -1110,6 +1116,7 @@ impl AgentOrchestrator {
                             issue_number,
                             &agents,
                             &persona_registry,
+                            &self.mention_thesaurus,
                             &self.cap_thesauri,
                         );
 
