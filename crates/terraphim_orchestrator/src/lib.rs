@@ -165,6 +165,8 @@ pub struct AgentOrchestrator {
     active_flows: HashMap<String, tokio::task::JoinHandle<flow::state::FlowRunState>>,
     /// Tracker for processed @adf: mentions (dedup + depth limiting).
     mention_tracker: MentionTracker,
+    /// Pre-built capability Thesauri for agent mention scoring.
+    cap_thesauri: mention::CapabilityThesauri,
     /// Monotonically increasing tick counter for poll_modulo gating.
     tick_count: u64,
 }
@@ -246,6 +248,9 @@ impl AgentOrchestrator {
             .unwrap_or(3);
         let mention_tracker = MentionTracker::new(max_mention_depth);
 
+        // Pre-build capability Thesauri for agent mention scoring
+        let cap_thesauri = mention::CapabilityThesauri::build(&config.agents);
+
         Ok(Self {
             config,
             spawner,
@@ -270,6 +275,7 @@ impl AgentOrchestrator {
             pre_check_tracker: None,
             active_flows: HashMap::new(),
             mention_tracker,
+            cap_thesauri,
             tick_count: 0,
         })
     }
@@ -1104,6 +1110,7 @@ impl AgentOrchestrator {
                             issue_number,
                             &agents,
                             &persona_registry,
+                            &self.cap_thesauri,
                         );
 
                         for m in detected {

@@ -143,26 +143,41 @@ impl MentionAutomaton {
     }
 }
 
-/// Score an agent's capabilities against context using terraphim_automata.
-///
-/// Builds a Thesaurus from agent capabilities and uses find_matches() for
-/// efficient Aho-Corasick matching against the context.
-fn score_agent_capabilities(agent: &AgentDefinition, context_lower: &str) -> usize {
-    let mut thesaurus = Thesaurus::new(format!("{}-caps", agent.name));
-    for (idx, cap) in agent.capabilities.iter().enumerate() {
-        let key = cap.to_lowercase();
-        let term = NormalizedTerm::new(format!("cap-{}", idx), key.clone().into());
-        thesaurus.insert(key.into(), term);
-    }
-    if thesaurus.is_empty() {
-        return 0;
-    }
-    match find_matches(context_lower, thesaurus, false) {
-        Ok(matches) => {
-            let matched_terms: HashSet<&str> = matches.iter().map(|m| m.term.as_str()).collect();
-            matched_terms.len()
+/// Pre-built capability Thesauri for agent scoring.
+/// Built once at startup from all agents' capability lists.
+pub struct CapabilityThesauri {
+    thesauri: HashMap<String, Thesaurus>,
+}
+
+impl CapabilityThesauri {
+    pub fn build(agents: &[AgentDefinition]) -> Self {
+        let mut thesauri = HashMap::new();
+        for agent in agents {
+            let mut thesaurus = Thesaurus::new(format!("{}-caps", agent.name));
+            for (idx, cap) in agent.capabilities.iter().enumerate() {
+                let key = cap.to_lowercase();
+                let term = NormalizedTerm::new(format!("cap-{}", idx), key.clone().into());
+                thesaurus.insert(key.into(), term);
+            }
+            if !thesaurus.is_empty() {
+                thesauri.insert(agent.name.clone(), thesaurus);
+            }
         }
-        Err(_) => 0,
+        Self { thesauri }
+    }
+
+    pub fn score(&self, agent_name: &str, context_lower: &str) -> usize {
+        match self.thesauri.get(agent_name) {
+            Some(thesaurus) => match find_matches(context_lower, thesaurus.clone(), false) {
+                Ok(matches) => {
+                    let matched_terms: HashSet<&str> =
+                        matches.iter().map(|m| m.term.as_str()).collect();
+                    matched_terms.len()
+                }
+                Err(_) => 0,
+            },
+            None => 0,
+        }
     }
 }
 
@@ -176,6 +191,7 @@ pub fn resolve_mention(
     agents: &[AgentDefinition],
     personas: &PersonaRegistry,
     context: &str,
+    cap_thesauri: &CapabilityThesauri,
 ) -> Option<(String, MentionResolution)> {
     // 1. Direct agent name match (case-insensitive)
     if let Some(agent) = agents.iter().find(|a| a.name.eq_ignore_ascii_case(raw)) {
@@ -211,7 +227,7 @@ pub fn resolve_mention(
                 let mut best_score = 0usize;
 
                 for agent in &matching_agents {
-                    let score = score_agent_capabilities(agent, &context_lower);
+                    let score = cap_thesauri.score(&agent.name, &context_lower);
                     if score > best_score || (score == best_score && agent.name < best_agent.name) {
                         best_score = score;
                         best_agent = agent;
@@ -240,6 +256,7 @@ pub fn parse_mentions(
     issue_number: u64,
     agents: &[AgentDefinition],
     personas: &PersonaRegistry,
+    cap_thesauri: &CapabilityThesauri,
 ) -> Vec<DetectedMention> {
     let mut mentions = Vec::new();
 
@@ -293,7 +310,7 @@ pub fn parse_mentions(
                     timestamp: comment.created_at.clone(),
                 });
             } else if let Some((agent_name, resolution)) =
-                resolve_mention(raw, agents, personas, &comment.body)
+                resolve_mention(raw, agents, personas, &comment.body, cap_thesauri)
             {
                 mentions.push(DetectedMention {
                     issue_number,
@@ -486,12 +503,17 @@ mod tests {
         }
     }
 
+    fn test_cap_thesauri() -> CapabilityThesauri {
+        CapabilityThesauri::build(&test_agents())
+    }
+
     #[test]
     fn test_parse_single_mention_agent_name() {
         let agents = test_agents();
         let personas = test_personas();
+        let cap_thesauri = test_cap_thesauri();
         let comment = make_comment(1, "Please @adf:security-sentinel review this code", "alice");
-        let mentions = parse_mentions(&comment, 42, &agents, &personas);
+        let mentions = parse_mentions(&comment, 42, &agents, &personas, &cap_thesauri);
         assert_eq!(mentions.len(), 1);
         assert_eq!(mentions[0].agent_name, "security-sentinel");
         assert_eq!(mentions[0].resolution, MentionResolution::AgentName);
@@ -502,10 +524,11 @@ mod tests {
     fn test_parse_single_mention_persona() {
         let agents = test_agents();
         let personas = test_personas();
+        let cap_thesauri = test_cap_thesauri();
         // "vigil" persona resolves to an agent. With "security" in context,
         // should prefer security-sentinel over compliance-watchdog.
         let comment = make_comment(2, "@adf:vigil check for security vulnerabilities", "alice");
-        let mentions = parse_mentions(&comment, 42, &agents, &personas);
+        let mentions = parse_mentions(&comment, 42, &agents, &personas, &cap_thesauri);
         assert_eq!(mentions.len(), 1);
         assert_eq!(mentions[0].agent_name, "security-sentinel");
         assert!(matches!(
@@ -518,8 +541,9 @@ mod tests {
     fn test_parse_multiple_mentions() {
         let agents = test_agents();
         let personas = test_personas();
+        let cap_thesauri = test_cap_thesauri();
         let comment = make_comment(3, "@adf:vigil and @adf:carthos please review", "bob");
-        let mentions = parse_mentions(&comment, 42, &agents, &personas);
+        let mentions = parse_mentions(&comment, 42, &agents, &personas, &cap_thesauri);
         assert_eq!(mentions.len(), 2);
     }
 
@@ -527,8 +551,9 @@ mod tests {
     fn test_parse_no_mentions() {
         let agents = test_agents();
         let personas = test_personas();
+        let cap_thesauri = test_cap_thesauri();
         let comment = make_comment(4, "No mentions here", "alice");
-        let mentions = parse_mentions(&comment, 42, &agents, &personas);
+        let mentions = parse_mentions(&comment, 42, &agents, &personas, &cap_thesauri);
         assert!(mentions.is_empty());
     }
 
@@ -536,8 +561,9 @@ mod tests {
     fn test_parse_ignores_regular_mentions() {
         let agents = test_agents();
         let personas = test_personas();
+        let cap_thesauri = test_cap_thesauri();
         let comment = make_comment(5, "@alice please review", "bob");
-        let mentions = parse_mentions(&comment, 42, &agents, &personas);
+        let mentions = parse_mentions(&comment, 42, &agents, &personas, &cap_thesauri);
         assert!(mentions.is_empty());
     }
 
@@ -545,8 +571,9 @@ mod tests {
     fn test_resolve_persona_single_agent() {
         let agents = test_agents();
         let personas = test_personas();
+        let cap_thesauri = test_cap_thesauri();
         // Lux has only one agent: product-development
-        let result = resolve_mention("lux", &agents, &personas, "some context");
+        let result = resolve_mention("lux", &agents, &personas, "some context", &cap_thesauri);
         assert!(result.is_some());
         let (name, res) = result.unwrap();
         assert_eq!(name, "product-development");
@@ -557,9 +584,16 @@ mod tests {
     fn test_resolve_persona_multiple_agents_keyword_match() {
         let agents = test_agents();
         let personas = test_personas();
+        let cap_thesauri = test_cap_thesauri();
         // Vigil shared by security-sentinel and compliance-watchdog
         // Context mentions "license" -> should pick compliance-watchdog
-        let result = resolve_mention("vigil", &agents, &personas, "check license compliance");
+        let result = resolve_mention(
+            "vigil",
+            &agents,
+            &personas,
+            "check license compliance",
+            &cap_thesauri,
+        );
         assert!(result.is_some());
         let (name, _) = result.unwrap();
         assert_eq!(name, "compliance-watchdog");
@@ -569,7 +603,8 @@ mod tests {
     fn test_resolve_unknown_name() {
         let agents = test_agents();
         let personas = test_personas();
-        let result = resolve_mention("nonexistent", &agents, &personas, "context");
+        let cap_thesauri = test_cap_thesauri();
+        let result = resolve_mention("nonexistent", &agents, &personas, "context", &cap_thesauri);
         assert!(result.is_none());
     }
 
@@ -650,15 +685,16 @@ mod tests {
     fn test_case_insensitive_mention() {
         let agents = test_agents();
         let personas = test_personas();
+        let cap_thesauri = test_cap_thesauri();
 
         // Test various casing
         let comment1 = make_comment(1, "@adf:SECURITY-SENTINEL check this", "alice");
-        let mentions1 = parse_mentions(&comment1, 42, &agents, &personas);
+        let mentions1 = parse_mentions(&comment1, 42, &agents, &personas, &cap_thesauri);
         assert_eq!(mentions1.len(), 1);
         assert_eq!(mentions1[0].agent_name, "security-sentinel");
 
         let comment2 = make_comment(2, "@adf:Vigil review please", "bob");
-        let mentions2 = parse_mentions(&comment2, 42, &agents, &personas);
+        let mentions2 = parse_mentions(&comment2, 42, &agents, &personas, &cap_thesauri);
         assert_eq!(mentions2.len(), 1);
         // Vigil persona is shared by security-sentinel and compliance-watchdog
         // The specific agent returned depends on keyword matching or alphabetical tie-break
@@ -676,9 +712,10 @@ mod tests {
     fn test_mention_at_end_of_sentence() {
         let agents = test_agents();
         let personas = test_personas();
+        let cap_thesauri = test_cap_thesauri();
 
         let comment = make_comment(1, "Please review, @adf:spec-validator.", "alice");
-        let mentions = parse_mentions(&comment, 42, &agents, &personas);
+        let mentions = parse_mentions(&comment, 42, &agents, &personas, &cap_thesauri);
         // The period after spec-validator is a word boundary, so it should match
         assert_eq!(mentions.len(), 1);
         assert_eq!(mentions[0].agent_name, "spec-validator");
@@ -688,45 +725,18 @@ mod tests {
     fn test_multiple_mentions_same_comment() {
         let agents = test_agents();
         let personas = test_personas();
+        let cap_thesauri = test_cap_thesauri();
 
         let comment = make_comment(
             1,
             "@adf:security-sentinel please audit. @adf:carthos check the design.",
             "alice",
         );
-        let mentions = parse_mentions(&comment, 42, &agents, &personas);
+        let mentions = parse_mentions(&comment, 42, &agents, &personas, &cap_thesauri);
         assert_eq!(mentions.len(), 2);
 
         let agent_names: Vec<_> = mentions.iter().map(|m| m.agent_name.as_str()).collect();
         assert!(agent_names.contains(&"security-sentinel"));
         assert!(agent_names.contains(&"spec-validator"));
-    }
-
-    #[test]
-    fn test_score_agent_capabilities_basic() {
-        let agent = test_agents()
-            .into_iter()
-            .find(|a| a.name == "security-sentinel")
-            .unwrap();
-        let score = score_agent_capabilities(&agent, "run a security audit on this code");
-        assert!(score >= 2);
-    }
-
-    #[test]
-    fn test_score_agent_capabilities_empty_caps() {
-        let mut agent = test_agents()[0].clone();
-        agent.capabilities = vec![];
-        let score = score_agent_capabilities(&agent, "anything");
-        assert_eq!(score, 0);
-    }
-
-    #[test]
-    fn test_score_agent_capabilities_no_match() {
-        let agent = test_agents()
-            .into_iter()
-            .find(|a| a.name == "security-sentinel")
-            .unwrap();
-        let score = score_agent_capabilities(&agent, "hello world");
-        assert_eq!(score, 0);
     }
 }
