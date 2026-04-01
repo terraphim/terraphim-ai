@@ -96,6 +96,12 @@ impl PersonaRegistry {
             .map(|p| p.agent_name.as_str())
             .collect()
     }
+    /// Returns an iterator over all persona names in the registry.
+    pub fn iter_names(&self) -> impl Iterator<Item = &str> + '_ {
+        self.personas
+            .values()
+            .map(|p| p.agent_name.as_str())
+    }
 }
 
 impl Default for PersonaRegistry {

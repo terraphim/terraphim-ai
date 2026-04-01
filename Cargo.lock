@@ -8583,6 +8583,7 @@ dependencies = [
 name = "terraphim_orchestrator"
 version = "1.8.0"
 dependencies = [
+ "aho-corasick",
  "async-trait",
  "chrono",
  "cron",
@@ -8664,6 +8665,7 @@ dependencies = [
 name = "terraphim_router"
 version = "1.8.0"
 dependencies = [
+ "aho-corasick",
  "async-trait",
  "chrono",
  "criterion",
@@ -8674,6 +8676,7 @@ dependencies = [
  "serde_yaml",
  "serial_test",
  "tempfile",
+ "terraphim_automata",
  "terraphim_persistence",
  "terraphim_spawner",
  "terraphim_types",

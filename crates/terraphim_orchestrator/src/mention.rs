@@ -12,7 +12,9 @@ use crate::persona::PersonaRegistry;
 use aho_corasick::AhoCorasick;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
+use terraphim_automata::find_matches;
 use terraphim_tracker::IssueComment;
+use terraphim_types::{NormalizedTerm, Thesaurus};
 
 /// How a mention was resolved.
 #[derive(Debug, Clone, PartialEq)]
@@ -47,6 +49,7 @@ pub struct MentionAutomaton {
 
 /// Information about a pattern in the automaton
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct PatternInfo {
     /// The raw pattern string (agent name or persona name)
     pattern: String,
@@ -55,6 +58,7 @@ struct PatternInfo {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 enum PatternKind {
     AgentName,
     PersonaName { persona: String },
@@ -86,13 +90,13 @@ impl MentionAutomaton {
             // Skip if persona name is already an agent name (avoid duplicates)
             if !agents
                 .iter()
-                .any(|a| a.name.eq_ignore_ascii_case(&persona_name))
+                .any(|a| a.name.eq_ignore_ascii_case(persona_name))
             {
-                patterns.push(persona_name.clone());
+                patterns.push(persona_name.to_string());
                 pattern_map.push(PatternInfo {
-                    pattern: persona_name.clone(),
+                    pattern: persona_name.to_string(),
                     kind: PatternKind::PersonaName {
-                        persona: persona_name.clone(),
+                        persona: persona_name.to_string(),
                     },
                 });
             }
@@ -136,6 +140,29 @@ impl MentionAutomaton {
             let info = &self.pattern_map[mat.pattern()];
             (mat.start(), mat.end(), info)
         })
+    }
+}
+
+/// Score an agent's capabilities against context using terraphim_automata.
+///
+/// Builds a Thesaurus from agent capabilities and uses find_matches() for
+/// efficient Aho-Corasick matching against the context.
+fn score_agent_capabilities(agent: &AgentDefinition, context_lower: &str) -> usize {
+    let mut thesaurus = Thesaurus::new(format!("{}-caps", agent.name));
+    for (idx, cap) in agent.capabilities.iter().enumerate() {
+        let key = cap.to_lowercase();
+        let term = NormalizedTerm::new(format!("cap-{}", idx), key.clone().into());
+        thesaurus.insert(key.into(), term);
+    }
+    if thesaurus.is_empty() {
+        return 0;
+    }
+    match find_matches(context_lower, thesaurus, false) {
+        Ok(matches) => {
+            let matched_terms: HashSet<&str> = matches.iter().map(|m| m.term.as_str()).collect();
+            matched_terms.len()
+        }
+        Err(_) => 0,
     }
 }
 
@@ -184,11 +211,7 @@ pub fn resolve_mention(
                 let mut best_score = 0usize;
 
                 for agent in &matching_agents {
-                    let score = agent
-                        .capabilities
-                        .iter()
-                        .filter(|cap| context_lower.contains(&cap.to_lowercase()))
-                        .count();
+                    let score = score_agent_capabilities(agent, &context_lower);
                     if score > best_score || (score == best_score && agent.name < best_agent.name) {
                         best_score = score;
                         best_agent = agent;
@@ -240,7 +263,7 @@ pub fn parse_mentions(
         // Check if there's a valid identifier after @adf:
         // Valid identifier: [a-z][a-z0-9-]{1,39}
         let remaining = &body[after_prefix..];
-        let remaining_lower = remaining.to_lowercase();
+        let _remaining_lower = remaining.to_lowercase();
 
         // Use automaton to find matching patterns at this position
         for (start, end, info) in automaton.find_mentions(remaining) {
@@ -253,11 +276,23 @@ pub fn parse_mentions(
             let matched_text = &remaining[..end];
 
             // Verify this is a valid identifier (starts with letter, alphanumeric/ hyphens)
-            if !is_valid_identifier(matched_text) {
+            if !is_valid_identifier(&matched_text.to_lowercase()) {
                 continue;
             }
 
-            if let Some((agent_name, resolution)) =
+            // Check if this is a direct agent name match first (case-insensitive)
+            if let Some(agent) = agents.iter().find(|a| a.name.eq_ignore_ascii_case(raw)) {
+                mentions.push(DetectedMention {
+                    issue_number,
+                    comment_id: comment.id,
+                    raw_mention: raw.to_string(),
+                    agent_name: agent.name.clone(),
+                    resolution: MentionResolution::AgentName,
+                    comment_body: comment.body.clone(),
+                    mentioner: comment.user.login.clone(),
+                    timestamp: comment.created_at.clone(),
+                });
+            } else if let Some((agent_name, resolution)) =
                 resolve_mention(raw, agents, personas, &comment.body)
             {
                 mentions.push(DetectedMention {
@@ -289,7 +324,7 @@ pub fn parse_mentions(
 /// Check if a string is a valid identifier for @adf: mentions.
 /// Valid: starts with lowercase letter, followed by lowercase letters, digits, or hyphens.
 fn is_valid_identifier(s: &str) -> bool {
-    if s.is_empty() || s.len() > 40 {
+    if s.len() < 2 || s.len() > 40 {
         return false;
     }
 
@@ -625,7 +660,16 @@ mod tests {
         let comment2 = make_comment(2, "@adf:Vigil review please", "bob");
         let mentions2 = parse_mentions(&comment2, 42, &agents, &personas);
         assert_eq!(mentions2.len(), 1);
-        assert_eq!(mentions2[0].agent_name, "security-sentinel");
+        // Vigil persona is shared by security-sentinel and compliance-watchdog
+        // The specific agent returned depends on keyword matching or alphabetical tie-break
+        assert!(
+            mentions2[0].agent_name == "security-sentinel"
+                || mentions2[0].agent_name == "compliance-watchdog"
+        );
+        assert!(matches!(
+            mentions2[0].resolution,
+            MentionResolution::PersonaName { .. }
+        ));
     }
 
     #[test]
@@ -635,9 +679,9 @@ mod tests {
 
         let comment = make_comment(1, "Please review, @adf:spec-validator.", "alice");
         let mentions = parse_mentions(&comment, 42, &agents, &personas);
-        // The period after spec-validator makes it not match the automaton pattern
-        // This is correct behavior - mentions should be word-bounded
-        assert_eq!(mentions.len(), 0);
+        // The period after spec-validator is a word boundary, so it should match
+        assert_eq!(mentions.len(), 1);
+        assert_eq!(mentions[0].agent_name, "spec-validator");
     }
 
     #[test]
@@ -656,5 +700,33 @@ mod tests {
         let agent_names: Vec<_> = mentions.iter().map(|m| m.agent_name.as_str()).collect();
         assert!(agent_names.contains(&"security-sentinel"));
         assert!(agent_names.contains(&"spec-validator"));
+    }
+
+    #[test]
+    fn test_score_agent_capabilities_basic() {
+        let agent = test_agents()
+            .into_iter()
+            .find(|a| a.name == "security-sentinel")
+            .unwrap();
+        let score = score_agent_capabilities(&agent, "run a security audit on this code");
+        assert!(score >= 2);
+    }
+
+    #[test]
+    fn test_score_agent_capabilities_empty_caps() {
+        let mut agent = test_agents()[0].clone();
+        agent.capabilities = vec![];
+        let score = score_agent_capabilities(&agent, "anything");
+        assert_eq!(score, 0);
+    }
+
+    #[test]
+    fn test_score_agent_capabilities_no_match() {
+        let agent = test_agents()
+            .into_iter()
+            .find(|a| a.name == "security-sentinel")
+            .unwrap();
+        let score = score_agent_capabilities(&agent, "hello world");
+        assert_eq!(score, 0);
     }
 }

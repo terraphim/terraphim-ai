@@ -36,6 +36,7 @@ toml = "0.8"
 # Template rendering
 handlebars = "6.3"
 regex = "1"
+aho-corasick = "1.0"
 
 [dev-dependencies]
 tokio-test = "0.4"
