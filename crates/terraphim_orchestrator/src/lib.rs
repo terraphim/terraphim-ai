@@ -1043,8 +1043,10 @@ impl AgentOrchestrator {
             Err(OrchestratorError::Config(
                 "git rev-parse HEAD failed".into(),
             ))
+        }
+    }
 
-/// Poll configured Gitea issues for new @adf: mentions and enqueue MentionDriven tasks.
+    /// Poll configured Gitea issues for new @adf: mentions and enqueue MentionDriven tasks.
     ///
     /// Skipped when no mention configuration is present or when the Gitea tracker
     /// is not configured. Uses `tick_count % poll_modulo` to avoid polling on
@@ -2449,9 +2451,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
         assert!(!has_matching_changes(&changed, &watch));
     }
 
-    // 
-
-==================================================================
+    // =========================================================================
     // ADF Remediation Tests (Gitea #117)
     // =========================================================================
 
@@ -2527,7 +2527,8 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
         // Poll should detect timeout and kill
         orch.poll_agent_exits().await;
         assert!(!orch.active_agents.contains_key("timeout-test"));
-=======
+    }
+
     // =========================================================================
     // Flow DAG Orchestrator Integration Tests (Gitea #163)
     // =========================================================================

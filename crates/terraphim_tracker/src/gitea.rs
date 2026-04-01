@@ -62,8 +62,6 @@ pub struct CommentUser {
 
 /// Backward-compatible alias.
 pub type GiteaComment = IssueComment;
-}
-
 impl GiteaTracker {
     /// Create a new Gitea tracker from configuration.
     pub fn new(config: GiteaConfig) -> Result<Self> {
