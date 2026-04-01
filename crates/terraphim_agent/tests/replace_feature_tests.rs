@@ -285,7 +285,7 @@ bun install
         let mut thesaurus = Thesaurus::new("test".to_string());
         thesaurus.insert(
             NormalizedTermValue::from("example"),
-            NormalizedTerm::new(1, NormalizedTermValue::from("example"))
+            NormalizedTerm::new("1".to_string(), NormalizedTermValue::from("example"))
                 .with_display_value("REPLACED".to_string()),
         );
 
@@ -314,7 +314,7 @@ bun install
         let mut thesaurus = Thesaurus::new("test".to_string());
         thesaurus.insert(
             NormalizedTermValue::from("claude"),
-            NormalizedTerm::new(1, NormalizedTermValue::from("claude"))
+            NormalizedTerm::new("1".to_string(), NormalizedTermValue::from("claude"))
                 .with_display_value("Terraphim".to_string()),
         );
 
@@ -349,7 +349,7 @@ bun install
         let mut thesaurus = Thesaurus::new("test".to_string());
         thesaurus.insert(
             NormalizedTermValue::from("anthropic"),
-            NormalizedTerm::new(1, NormalizedTermValue::from("anthropic"))
+            NormalizedTerm::new("1".to_string(), NormalizedTermValue::from("anthropic"))
                 .with_display_value("Company".to_string()),
         );
 
@@ -379,7 +379,7 @@ bun install
         // Simulate what happens when building thesaurus from "Terraphim AI.md"
         thesaurus.insert(
             NormalizedTermValue::from("claude code"), // lowercase key for matching
-            NormalizedTerm::new(1, NormalizedTermValue::from("terraphim ai"))
+            NormalizedTerm::new("1".to_string(), NormalizedTermValue::from("terraphim ai"))
                 .with_display_value("Terraphim AI".to_string()), // Original case preserved
         );
 
@@ -415,7 +415,7 @@ bun install
         // NormalizedTerm without display_value (backward compatibility)
         thesaurus.insert(
             NormalizedTermValue::from("foo"),
-            NormalizedTerm::new(1, NormalizedTermValue::from("bar")), // No display_value
+            NormalizedTerm::new("1".to_string(), NormalizedTermValue::from("bar")), // No display_value
         );
 
         let text = "Replace foo here";
@@ -443,7 +443,7 @@ bun install
         let mut thesaurus = Thesaurus::new("test".to_string());
         thesaurus.insert(
             NormalizedTermValue::from("claude code"),
-            NormalizedTerm::new(1, NormalizedTermValue::from("terraphim ai"))
+            NormalizedTerm::new("1".to_string(), NormalizedTermValue::from("terraphim ai"))
                 .with_display_value("Terraphim AI".to_string()),
         );
 

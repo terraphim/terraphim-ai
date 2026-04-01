@@ -391,7 +391,7 @@ fn parse_thesaurus_json(contents: &str) -> Result<Thesaurus> {
             let mut thesaurus = Thesaurus::new("imported".to_string());
             for (key, term) in legacy {
                 let normalized =
-                    NormalizedTerm::new(term.id, NormalizedTermValue::from(key.as_str()))
+                    NormalizedTerm::new(term.id.to_string(), NormalizedTermValue::from(key.as_str()))
                         .with_display_value(
                             term.display_value.unwrap_or_else(|| term.nterm.clone()),
                         )
@@ -494,15 +494,15 @@ mod tests {
         assert_eq!(thesaurus.len(), 3);
         assert_eq!(
             thesaurus.get(&NormalizedTermValue::from("foo")).unwrap().id,
-            1_u64
+            "1"
         );
         assert_eq!(
             thesaurus.get(&NormalizedTermValue::from("bar")).unwrap().id,
-            2_u64
+            "2"
         );
         assert_eq!(
             thesaurus.get(&NormalizedTermValue::from("baz")).unwrap().id,
-            1_u64
+            "1"
         );
     }
 
@@ -518,7 +518,7 @@ mod tests {
                 .get(&NormalizedTermValue::from("@risk a user guide"))
                 .unwrap()
                 .id,
-            661_u64
+            "661"
         );
     }
 
@@ -530,15 +530,15 @@ mod tests {
         assert_eq!(thesaurus.len(), 3);
         assert_eq!(
             thesaurus.get(&NormalizedTermValue::from("foo")).unwrap().id,
-            1_u64
+            "1"
         );
         assert_eq!(
             thesaurus.get(&NormalizedTermValue::from("bar")).unwrap().id,
-            2_u64
+            "2"
         );
         assert_eq!(
             thesaurus.get(&NormalizedTermValue::from("baz")).unwrap().id,
-            1_u64
+            "1"
         );
     }
 
@@ -550,15 +550,15 @@ mod tests {
         assert_eq!(thesaurus.len(), 3);
         assert_eq!(
             thesaurus.get(&NormalizedTermValue::from("foo")).unwrap().id,
-            1_u64
+            "1"
         );
         assert_eq!(
             thesaurus.get(&NormalizedTermValue::from("bar")).unwrap().id,
-            2_u64
+            "2"
         );
         assert_eq!(
             thesaurus.get(&NormalizedTermValue::from("baz")).unwrap().id,
-            1_u64
+            "1"
         );
     }
 
@@ -569,17 +569,17 @@ mod tests {
   "name": "Engineering",
   "data": {
     "project management framework tailoring": {
-      "id": 1,
+      "id": "1",
       "nterm": "project tailoring strategy",
       "url": "https://example.com/project-tailoring-strategy"
     },
     "strategy documents": {
-      "id": 2,
+      "id": "2",
       "nterm": "strategy documents",
       "url": "https://example.com/strategy-documents"
     },
     "project constraints": {
-      "id": 3,
+      "id": "3",
       "nterm": "project constraints",
       "url": "https://example.com/project-constraints"
     }
@@ -595,21 +595,21 @@ mod tests {
                 ))
                 .unwrap()
                 .id,
-            1_u64
+            "1"
         );
         assert_eq!(
             thesaurus
                 .get(&NormalizedTermValue::from("strategy documents"))
                 .unwrap()
                 .id,
-            2_u64
+            "2"
         );
         assert_eq!(
             thesaurus
                 .get(&NormalizedTermValue::from("project constraints"))
                 .unwrap()
                 .id,
-            3_u64
+            "3"
         );
         assert_eq!(
             thesaurus
@@ -636,17 +636,17 @@ mod tests {
   "name": "Engineering",
   "data": {
     "project management framework tailoring": {
-      "id": 1,
+      "id": "1",
       "nterm": "project tailoring strategy",
       "url": "https://example.com/project-tailoring-strategy"
     },
     "strategy documents": {
-      "id": 2,
+      "id": "2",
       "nterm": "strategy documents",
       "url": "https://example.com/strategy-documents"
     },
     "project constraints": {
-      "id": 3,
+      "id": "3",
       "nterm": "project constraints",
       "url": "https://example.com/project-constraints"
     }

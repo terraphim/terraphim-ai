@@ -2,15 +2,15 @@
   "name": "Engineering",
   "data": {
     "foo": {
-      "id": 1,
+      "id": "1",
       "nterm": "foo"
     },
     "bar": {
-      "id": 2,
+      "id": "2",
       "nterm": "bar"
     },
     "baz": {
-      "id": 1,
+      "id": "1",
       "nterm": "foo"
     }
   }

@@ -482,7 +482,7 @@ mod tests {
 
         for (key, normalized, id) in terms {
             let normalized_term = NormalizedTerm {
-                id,
+                id: id.to_string(),
                 value: NormalizedTermValue::from(normalized),
                 display_value: None,
                 url: Some(format!(

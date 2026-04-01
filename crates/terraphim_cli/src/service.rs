@@ -414,7 +414,7 @@ impl CliService {
         let mut thesaurus = Thesaurus::new(schema.name.clone());
         for (idx, (_id, term, url)) in entries.into_iter().enumerate() {
             let nterm_value = NormalizedTermValue::new(term);
-            let mut nterm = NormalizedTerm::new(idx as u64, nterm_value.clone());
+            let mut nterm = NormalizedTerm::new((idx as u64).to_string(), nterm_value.clone());
             if let Some(url) = url {
                 nterm = nterm.with_url(url);
             }

@@ -129,7 +129,7 @@ impl McpToolIndex {
         for (idx, keyword) in keywords.iter().enumerate() {
             if keyword.len() >= 2 {
                 let key = NormalizedTermValue::from(*keyword);
-                let term = NormalizedTerm::new(idx as u64, key.clone());
+                let term = NormalizedTerm::new((idx as u64).to_string(), key.clone());
                 thesaurus.insert(key, term);
             }
         }

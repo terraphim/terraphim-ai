@@ -3,7 +3,7 @@ use terraphim_types::{NormalizedTerm, NormalizedTermValue, Thesaurus};
 
 fn make_thesaurus(terms: &[&str], norm: &str) -> Thesaurus {
     let mut t = Thesaurus::new("test".to_string());
-    let normalized = NormalizedTerm::new(1, NormalizedTermValue::from(norm));
+    let normalized = NormalizedTerm::new("1".to_string(), NormalizedTermValue::from(norm));
     for term in terms {
         t.insert(NormalizedTermValue::from(*term), normalized.clone());
     }

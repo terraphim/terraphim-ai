@@ -6,10 +6,9 @@ extern crate napi_derive;
 use anyhow::Context;
 use napi::bindgen_prelude::{Buffer, Status};
 use terraphim_automata::{
-  LinkType,
   autocomplete::{autocomplete_search, build_autocomplete_index},
   deserialize_autocomplete_index, load_thesaurus_from_json, load_thesaurus_from_json_and_replace,
-  serialize_autocomplete_index,
+  serialize_autocomplete_index, LinkType,
 };
 use terraphim_config::{Config, ConfigBuilder, ConfigId, ConfigState};
 use terraphim_persistence::Persistable;
@@ -100,7 +99,7 @@ pub async fn search_documents_selected_role(query: String) -> String {
 pub struct AutocompleteResult {
   pub term: String,
   pub normalized_term: String,
-  pub id: u32,
+  pub id: String,
   pub url: Option<String>,
   pub score: f64,
 }
@@ -155,7 +154,7 @@ pub fn autocomplete(
     .map(|r| AutocompleteResult {
       term: r.term.clone(),
       normalized_term: r.normalized_term.to_string(),
-      id: r.id as u32,
+      id: r.id.clone(),
       url: r.url.clone(),
       score: r.score,
     })
@@ -341,7 +340,7 @@ pub fn query_graph(
       nodes: indexed_doc
         .nodes
         .iter()
-        .map(|&node_id| node_id.to_string())
+        .map(|node_id| node_id.to_string())
         .collect(),
       title: indexed_doc.id.clone(), // Using ID as title for now
       url: "".to_string(),           // Will be available when we get full document data

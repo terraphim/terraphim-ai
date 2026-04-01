@@ -2515,6 +2515,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             grace_period_secs: Some(2),
             max_cpu_seconds: Some(1), // 1 second timeout
             pre_check: None,
+            gitea_issue: None,
         }];
         let mut orch = AgentOrchestrator::new(config).unwrap();
         let def = orch.config.agents[0].clone();
