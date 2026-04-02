@@ -11,10 +11,12 @@ thiserror = { workspace = true }
 anyhow = { workspace = true }
 reqwest = { workspace = true }
 tokio = { workspace = true }
-rusqlite = { version = "0.32", features = ["bundled"] }
 clap = { version = "4.5", features = ["derive"] }
 colored = "2.1"
 indicatif = "0.17"
 tracing = "0.1"
 async-trait = "0.1"
 which = "6.0"
+terraphim_persistence = { path = "../terraphim_persistence" }
+terraphim_types = { path = "../terraphim_types" }
+terraphim_settings = { path = "../terraphim_settings" }
