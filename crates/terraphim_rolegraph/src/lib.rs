@@ -1,5 +1,4 @@
 use ahash::AHashMap;
-use cached::proc_macro::cached;
 use itertools::Itertools;
 use regex::Regex;
 use std::collections::hash_map::Entry;
@@ -351,7 +350,11 @@ impl RoleGraph {
     /// Build Aho-Corasick automata from thesaurus
     fn build_aho_corasick(
         thesaurus: &Thesaurus,
-    ) -> Result<(AhoCorasick, Vec<String>, AHashMap<String, NormalizedTermValue>)> {
+    ) -> Result<(
+        AhoCorasick,
+        Vec<String>,
+        AHashMap<String, NormalizedTermValue>,
+    )> {
         let mut keys = Vec::new();
         let mut values = Vec::new();
         let mut ac_reverse_nterm = AHashMap::new();
@@ -1087,7 +1090,12 @@ impl RoleGraph {
         self.documents.contains_key(document_id)
     }
 
-    pub fn add_or_update_document(&mut self, document_id: &str, x: impl AsRef<str>, y: impl AsRef<str>) {
+    pub fn add_or_update_document(
+        &mut self,
+        document_id: &str,
+        x: impl AsRef<str>,
+        y: impl AsRef<str>,
+    ) {
         let edge_id = magic_pair(&x, &y);
         let edge = self.init_or_update_edge(edge_id, document_id);
         self.init_or_update_node(x, &edge);
@@ -2058,12 +2066,15 @@ mod tests {
     async fn tfidf_exact_match_scores_high() {
         let mut index = TriggerIndex::new(0.3);
         let mut triggers = AHashMap::new();
-        triggers.insert(1u64, "managing dependencies in rust projects".to_string());
+        triggers.insert(
+            "1".to_string(),
+            "managing dependencies in rust projects".to_string(),
+        );
         index.build(triggers);
 
         let results = index.query("managing dependencies rust");
         assert!(!results.is_empty());
-        assert_eq!(results[0].0, 1u64);
+        assert_eq!(results[0].0, "1");
         assert!(results[0].1 >= 0.3); // Above threshold
     }
 
@@ -2071,7 +2082,7 @@ mod tests {
     async fn tfidf_no_match_scores_zero() {
         let mut index = TriggerIndex::new(0.3);
         let mut triggers = AHashMap::new();
-        triggers.insert(1u64, "machine learning algorithms".to_string());
+        triggers.insert("1".to_string(), "machine learning algorithms".to_string());
         index.build(triggers);
 
         let results = index.query("quantum physics astronomy");
@@ -2083,7 +2094,7 @@ mod tests {
     async fn tfidf_partial_match() {
         let mut index = TriggerIndex::new(0.1); // Lower threshold for partial match
         let mut triggers = AHashMap::new();
-        triggers.insert(1u64, "managing dependencies cargo".to_string());
+        triggers.insert("1".to_string(), "managing dependencies cargo".to_string());
         index.build(triggers);
 
         let results = index.query("managing cargo");
@@ -2097,7 +2108,7 @@ mod tests {
         let mut index = TriggerIndex::new(0.8); // High threshold
         let mut triggers = AHashMap::new();
         triggers.insert(
-            1u64,
+            "1".to_string(),
             "machine learning deep learning neural networks".to_string(),
         );
         index.build(triggers);
@@ -2113,7 +2124,10 @@ mod tests {
         // Create a simple scenario where Aho-Corasick finds matches
         let mut index = TriggerIndex::new(0.3);
         let mut triggers = AHashMap::new();
-        triggers.insert(999u64, "fallback trigger when no synonym match".to_string());
+        triggers.insert(
+            "999".to_string(),
+            "fallback trigger when no synonym match".to_string(),
+        );
         index.build(triggers);
 
         // Build index but don't add it to rolegraph since we just want to test
@@ -2121,7 +2135,7 @@ mod tests {
         // This is a unit test of the TriggerIndex behavior, not the integration
         let results = index.query("fallback trigger");
         assert!(!results.is_empty());
-        assert_eq!(results[0].0, 999u64);
+        assert_eq!(results[0].0, "999");
     }
 
     #[tokio::test]
@@ -2133,14 +2147,17 @@ mod tests {
 
         // Load trigger index
         let mut triggers = AHashMap::new();
-        triggers.insert(100u64, "managing dependencies cargo rust".to_string());
+        triggers.insert(
+            "100".to_string(),
+            "managing dependencies cargo rust".to_string(),
+        );
         rolegraph.load_trigger_index(triggers, vec![], 0.3);
 
         // Query that won't match Aho-Corasick but should match trigger
         let results =
             rolegraph.find_matching_node_ids_with_fallback("managing cargo dependencies", false);
         assert!(!results.is_empty());
-        assert!(results.contains(&100u64));
+        assert!(results.contains(&"100".to_string()));
     }
 
     #[tokio::test]
@@ -2152,13 +2169,13 @@ mod tests {
 
         // Load trigger index with a pinned node
         let mut triggers = AHashMap::new();
-        triggers.insert(200u64, "some trigger text".to_string());
-        rolegraph.load_trigger_index(triggers, vec![300u64], 0.3); // 300 is pinned
+        triggers.insert("200".to_string(), "some trigger text".to_string());
+        rolegraph.load_trigger_index(triggers, vec!["300".to_string()], 0.3); // 300 is pinned
 
         // Query that matches nothing - but pinned should still be included
         let results =
             rolegraph.find_matching_node_ids_with_fallback("completely unrelated query xyz", true);
-        assert!(results.contains(&300u64));
+        assert!(results.contains(&"300".to_string()));
     }
 
     #[tokio::test]
@@ -2169,17 +2186,17 @@ mod tests {
 
         // Load trigger index and pinned nodes
         let mut triggers = AHashMap::new();
-        triggers.insert(1u64, "trigger one".to_string());
-        triggers.insert(2u64, "trigger two".to_string());
-        let pinned = vec![1u64];
+        triggers.insert("1".to_string(), "trigger one".to_string());
+        triggers.insert("2".to_string(), "trigger two".to_string());
+        let pinned = vec!["1".to_string()];
         rolegraph.load_trigger_index(triggers, pinned, 0.3);
 
         // Serialize
         let serializable = rolegraph.to_serializable();
         assert_eq!(serializable.trigger_descriptions.len(), 2);
-        assert!(serializable.trigger_descriptions.contains_key(&1u64));
-        assert!(serializable.trigger_descriptions.contains_key(&2u64));
-        assert_eq!(serializable.pinned_node_ids, vec![1u64]);
+        assert!(serializable.trigger_descriptions.contains_key("1"));
+        assert!(serializable.trigger_descriptions.contains_key("2"));
+        assert_eq!(serializable.pinned_node_ids, vec!["1".to_string()]);
 
         // Deserialize and restore
         let json = serializable.to_json().unwrap();
@@ -2187,10 +2204,10 @@ mod tests {
         let restored = RoleGraph::from_serializable(deserialized).await.unwrap();
 
         // Verify trigger data is preserved
-        assert_eq!(restored.pinned_node_ids, vec![1u64]);
+        assert_eq!(restored.pinned_node_ids, vec!["1".to_string()]);
 
         // Verify trigger index is functional after restore
         let results = restored.find_matching_node_ids_with_fallback("trigger one text", false);
-        assert!(results.contains(&1u64));
+        assert!(results.contains(&"1".to_string()));
     }
 }

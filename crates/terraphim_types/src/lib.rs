@@ -106,8 +106,8 @@ pub use persona::{CharacteristicDef, PersonaDefinition, PersonaLoadError, SfiaSk
 
 use ahash::AHashMap;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::collections::hash_map::Iter;
 use std::collections::HashSet;
+use std::collections::hash_map::Iter;
 use std::fmt::{self, Display, Formatter};
 use std::iter::IntoIterator;
 use std::ops::{Deref, DerefMut};
@@ -813,11 +813,7 @@ impl QualityScore {
             count += 1;
         }
 
-        if count == 0 {
-            0.0
-        } else {
-            sum / count as f64
-        }
+        if count == 0 { 0.0 } else { sum / count as f64 }
     }
 }
 

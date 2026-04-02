@@ -69,11 +69,17 @@ fn build_initial_thesaurus() -> Thesaurus {
 
     let mut id = 1u64;
     for (concept, synonyms) in concepts {
-        let term = NormalizedTerm::new(id, NormalizedTermValue::new(concept.to_string()));
+        let term = NormalizedTerm::new(
+            id.to_string(),
+            NormalizedTermValue::new(concept.to_string()),
+        );
         thesaurus.insert(NormalizedTermValue::new(concept.to_string()), term);
 
         for synonym in synonyms {
-            let syn_term = NormalizedTerm::new(id, NormalizedTermValue::new(concept.to_string()));
+            let syn_term = NormalizedTerm::new(
+                id.to_string(),
+                NormalizedTermValue::new(concept.to_string()),
+            );
             thesaurus.insert(NormalizedTermValue::new(synonym.to_string()), syn_term);
         }
         id += 1;
@@ -112,11 +118,17 @@ fn build_enhanced_thesaurus() -> Thesaurus {
 
     let mut id = 6u64; // Continue from initial
     for (concept, synonyms) in ds_concepts {
-        let term = NormalizedTerm::new(id, NormalizedTermValue::new(concept.to_string()));
+        let term = NormalizedTerm::new(
+            id.to_string(),
+            NormalizedTermValue::new(concept.to_string()),
+        );
         thesaurus.insert(NormalizedTermValue::new(concept.to_string()), term);
 
         for synonym in synonyms {
-            let syn_term = NormalizedTerm::new(id, NormalizedTermValue::new(concept.to_string()));
+            let syn_term = NormalizedTerm::new(
+                id.to_string(),
+                NormalizedTermValue::new(concept.to_string()),
+            );
             thesaurus.insert(NormalizedTermValue::new(synonym.to_string()), syn_term);
         }
         id += 1;
@@ -274,7 +286,7 @@ async fn demonstrate_embedding(
     nodes.sort_by_key(|(_, n)| std::cmp::Reverse(n.rank));
 
     for (node_id, node) in nodes.iter().take(5) {
-        if let Some(term) = rolegraph.ac_reverse_nterm.get(node_id) {
+        if let Some(term) = rolegraph.ac_reverse_nterm.get(&node_id.to_string()) {
             println!(
                 "   '{}' - rank: {}, connections: {}",
                 term,

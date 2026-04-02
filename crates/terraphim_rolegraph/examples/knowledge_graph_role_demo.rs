@@ -118,13 +118,19 @@ fn build_base_thesaurus() -> Thesaurus {
 
     let mut id = 1u64;
     for (concept, synonyms) in base_concepts {
-        let term = NormalizedTerm::new(id, NormalizedTermValue::new(concept.to_string()))
-            .with_display_value(concept.to_string());
+        let term = NormalizedTerm::new(
+            id.to_string(),
+            NormalizedTermValue::new(concept.to_string()),
+        )
+        .with_display_value(concept.to_string());
         thesaurus.insert(NormalizedTermValue::new(concept.to_string()), term);
 
         for syn in synonyms {
-            let syn_term = NormalizedTerm::new(id, NormalizedTermValue::new(concept.to_string()))
-                .with_display_value(concept.to_string());
+            let syn_term = NormalizedTerm::new(
+                id.to_string(),
+                NormalizedTermValue::new(concept.to_string()),
+            )
+            .with_display_value(concept.to_string());
             thesaurus.insert(NormalizedTermValue::new(syn.to_string()), syn_term);
         }
         id += 1;
@@ -216,14 +222,19 @@ fn build_enhanced_thesaurus() -> Thesaurus {
     ];
 
     for (concept, synonyms) in enhanced_concepts {
-        let term = NormalizedTerm::new(next_id, NormalizedTermValue::new(concept.to_string()))
-            .with_display_value(concept.to_string());
+        let term = NormalizedTerm::new(
+            next_id.to_string(),
+            NormalizedTermValue::new(concept.to_string()),
+        )
+        .with_display_value(concept.to_string());
         thesaurus.insert(NormalizedTermValue::new(concept.to_string()), term);
 
         for syn in synonyms {
-            let syn_term =
-                NormalizedTerm::new(next_id, NormalizedTermValue::new(concept.to_string()))
-                    .with_display_value(concept.to_string());
+            let syn_term = NormalizedTerm::new(
+                next_id.to_string(),
+                NormalizedTermValue::new(concept.to_string()),
+            )
+            .with_display_value(concept.to_string());
             thesaurus.insert(NormalizedTermValue::new(syn.to_string()), syn_term);
         }
         next_id += 1;
@@ -524,10 +535,10 @@ fn print_thesaurus_info(name: &str, thesaurus: &Thesaurus) {
     println!("Thesaurus: {}", name);
     println!("  Total terms: {}", thesaurus.len());
 
-    let mut concept_count: HashMap<u64, Vec<String>> = HashMap::new();
+    let mut concept_count: HashMap<String, Vec<String>> = HashMap::new();
     for (key, term) in thesaurus {
         concept_count
-            .entry(term.id)
+            .entry(term.id.clone())
             .or_default()
             .push(key.to_string());
     }
@@ -562,7 +573,8 @@ fn print_node_details(rolegraph: &RoleGraph, limit: usize) {
     nodes.sort_by_key(|(_, n)| std::cmp::Reverse(n.rank));
 
     for (id, node) in nodes.iter().take(limit) {
-        if let Some(term) = rolegraph.ac_reverse_nterm.get(id) {
+        let id_str = id.to_string();
+        if let Some(term) = rolegraph.ac_reverse_nterm.get(&id_str) {
             println!(
                 "  '{}': rank={}, edges={}",
                 term,

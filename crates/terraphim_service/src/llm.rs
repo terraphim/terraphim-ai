@@ -76,6 +76,15 @@ pub fn build_llm_from_role(role: &terraphim_config::Role) -> Option<Arc<dyn LlmC
         role.extra.keys().collect::<Vec<_>>()
     );
 
+    // If LLM is explicitly disabled, don't try to build a client
+    if !role.llm_enabled {
+        log::debug!(
+            "LLM disabled for role '{}', skipping client build",
+            role.name
+        );
+        return None;
+    }
+
     // Check if there's a nested "extra" key (this handles a serialization issue)
     if let Some(nested_extra) = role.extra.get("extra") {
         log::debug!("Found nested extra field");

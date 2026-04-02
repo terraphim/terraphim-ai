@@ -178,8 +178,8 @@ mod tests {
         let mut thesaurus = Thesaurus::new("Test Engineer".to_string());
 
         // Add some test terms
-        let term1 = NormalizedTerm::new(1, NormalizedTermValue::from("machine learning"));
-        let term2 = NormalizedTerm::new(2, NormalizedTermValue::from("artificial intelligence"));
+        let term1 = NormalizedTerm::new("1", NormalizedTermValue::from("machine learning"));
+        let term2 = NormalizedTerm::new("2", NormalizedTermValue::from("artificial intelligence"));
 
         thesaurus.insert(NormalizedTermValue::from("ml"), term1.clone());
         thesaurus.insert(NormalizedTermValue::from("ai"), term2.clone());
@@ -207,13 +207,13 @@ mod tests {
         let ml_term = loaded_thesaurus
             .get(&NormalizedTermValue::from("ml"))
             .unwrap();
-        assert_eq!(ml_term.id, 1);
+        assert_eq!(ml_term.id, "1");
         assert_eq!(ml_term.value, NormalizedTermValue::from("machine learning"));
 
         let ai_term = loaded_thesaurus
             .get(&NormalizedTermValue::from("ai"))
             .unwrap();
-        assert_eq!(ai_term.id, 2);
+        assert_eq!(ai_term.id, "2");
         assert_eq!(
             ai_term.value,
             NormalizedTermValue::from("artificial intelligence")

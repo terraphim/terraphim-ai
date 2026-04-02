@@ -38,11 +38,11 @@
 //! let mut thesaurus = Thesaurus::new("programming".to_string());
 //! thesaurus.insert(
 //!     NormalizedTermValue::from("rust"),
-//!     NormalizedTerm::new(1, NormalizedTermValue::from("rust"))
+//!     NormalizedTerm::new("1", NormalizedTermValue::from("rust"))
 //! );
 //! thesaurus.insert(
 //!     NormalizedTermValue::from("rust async"),
-//!     NormalizedTerm::new(2, NormalizedTermValue::from("rust async"))
+//!     NormalizedTerm::new("2", NormalizedTermValue::from("rust async"))
 //! );
 //!
 //! // Build autocomplete index
@@ -390,12 +390,12 @@ fn parse_thesaurus_json(contents: &str) -> Result<Thesaurus> {
             );
             let mut thesaurus = Thesaurus::new("imported".to_string());
             for (key, term) in legacy {
-                let normalized =
-                    NormalizedTerm::new(term.id, NormalizedTermValue::from(key.as_str()))
-                        .with_display_value(
-                            term.display_value.unwrap_or_else(|| term.nterm.clone()),
-                        )
-                        .with_url(term.url.unwrap_or_default());
+                let normalized = NormalizedTerm::new(
+                    term.id.to_string(),
+                    NormalizedTermValue::from(key.as_str()),
+                )
+                .with_display_value(term.display_value.unwrap_or_else(|| term.nterm.clone()))
+                .with_url(term.url.unwrap_or_default());
                 thesaurus.insert(NormalizedTermValue::from(key.as_str()), normalized);
             }
             return Ok(thesaurus);
@@ -494,15 +494,15 @@ mod tests {
         assert_eq!(thesaurus.len(), 3);
         assert_eq!(
             thesaurus.get(&NormalizedTermValue::from("foo")).unwrap().id,
-            1_u64
+            "1"
         );
         assert_eq!(
             thesaurus.get(&NormalizedTermValue::from("bar")).unwrap().id,
-            2_u64
+            "2"
         );
         assert_eq!(
             thesaurus.get(&NormalizedTermValue::from("baz")).unwrap().id,
-            1_u64
+            "1"
         );
     }
 
@@ -518,7 +518,7 @@ mod tests {
                 .get(&NormalizedTermValue::from("@risk a user guide"))
                 .unwrap()
                 .id,
-            661_u64
+            "661"
         );
     }
 
@@ -530,15 +530,15 @@ mod tests {
         assert_eq!(thesaurus.len(), 3);
         assert_eq!(
             thesaurus.get(&NormalizedTermValue::from("foo")).unwrap().id,
-            1_u64
+            "1"
         );
         assert_eq!(
             thesaurus.get(&NormalizedTermValue::from("bar")).unwrap().id,
-            2_u64
+            "2"
         );
         assert_eq!(
             thesaurus.get(&NormalizedTermValue::from("baz")).unwrap().id,
-            1_u64
+            "1"
         );
     }
 
@@ -550,15 +550,15 @@ mod tests {
         assert_eq!(thesaurus.len(), 3);
         assert_eq!(
             thesaurus.get(&NormalizedTermValue::from("foo")).unwrap().id,
-            1_u64
+            "1"
         );
         assert_eq!(
             thesaurus.get(&NormalizedTermValue::from("bar")).unwrap().id,
-            2_u64
+            "2"
         );
         assert_eq!(
             thesaurus.get(&NormalizedTermValue::from("baz")).unwrap().id,
-            1_u64
+            "1"
         );
     }
 
@@ -595,21 +595,21 @@ mod tests {
                 ))
                 .unwrap()
                 .id,
-            1_u64
+            "1"
         );
         assert_eq!(
             thesaurus
                 .get(&NormalizedTermValue::from("strategy documents"))
                 .unwrap()
                 .id,
-            2_u64
+            "2"
         );
         assert_eq!(
             thesaurus
                 .get(&NormalizedTermValue::from("project constraints"))
                 .unwrap()
                 .id,
-            3_u64
+            "3"
         );
         assert_eq!(
             thesaurus
