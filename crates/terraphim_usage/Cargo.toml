@@ -1,0 +1,23 @@
+[package]
+name = "terraphim_usage"
+version.workspace = true
+edition.workspace = true
+authors = ["Terraphim Contributors"]
+description = "Usage tracking system for Terraphim AI - provider usage metrics and persistence"
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
+repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["usage", "metrics", "tracking", "ai"]
+license = "Apache-2.0"
+readme = "../../README.md"
+
+[dependencies]
+thiserror = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+async-trait = { workspace = true }
+tokio = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }

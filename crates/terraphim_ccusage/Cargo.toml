@@ -1,0 +1,23 @@
+[package]
+name = "terraphim_ccusage"
+version.workspace = true
+edition.workspace = true
+authors = ["Terraphim Contributors"]
+description = "ccusage integration for Terraphim AI - daily usage reporting"
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
+repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["ccusage", "reporting", "cli", "usage"]
+license = "Apache-2.0"
+readme = "../../README.md"
+
+[dependencies]
+terraphim_usage = { path = "../terraphim_usage" }
+thiserror = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+tokio = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }
