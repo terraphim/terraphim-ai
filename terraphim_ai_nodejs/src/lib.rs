@@ -155,7 +155,7 @@ pub fn autocomplete(
     .map(|r| AutocompleteResult {
       term: r.term.clone(),
       normalized_term: r.normalized_term.to_string(),
-      id: r.id.clone(),
+      id: r.id.to_string(),
       url: r.url.clone(),
       score: r.score,
     })
@@ -338,7 +338,7 @@ pub fn query_graph(
       document_id: doc_id.clone(),
       rank: indexed_doc.rank as u32,
       tags: indexed_doc.tags.clone(),
-      nodes: indexed_doc.nodes.to_vec(),
+      nodes: indexed_doc.nodes.iter().map(|n| n.to_string()).collect(),
       title: indexed_doc.id.clone(), // Using ID as title for now
       url: "".to_string(),           // Will be available when we get full document data
     })

@@ -21,7 +21,7 @@ pub struct AutocompleteIndex {
 /// Metadata associated with each autocomplete term
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AutocompleteMetadata {
-    pub id: String,
+    pub id: u64,
     pub normalized_term: NormalizedTermValue,
     pub url: Option<String>,
     pub original_term: String,
@@ -32,7 +32,7 @@ pub struct AutocompleteMetadata {
 pub struct AutocompleteResult {
     pub term: String,
     pub normalized_term: NormalizedTermValue,
-    pub id: String,
+    pub id: u64,
     pub url: Option<String>,
     pub score: f64, // FST value as relevance score
 }
@@ -113,7 +113,7 @@ pub fn build_autocomplete_index(
         metadata.insert(
             term.clone(),
             AutocompleteMetadata {
-                id: normalized_term.id.clone(),
+                id: normalized_term.id,
                 normalized_term: normalized_term.value.clone(),
                 url: normalized_term.url.clone(),
                 original_term: if config.case_sensitive {
@@ -205,7 +205,7 @@ pub fn autocomplete_search(
             results.push(AutocompleteResult {
                 term: metadata.original_term.clone(),
                 normalized_term: metadata.normalized_term.clone(),
-                id: metadata.id.clone(),
+                id: metadata.id,
                 url: metadata.url.clone(),
                 score: score as f64,
             });
@@ -287,7 +287,7 @@ pub fn fuzzy_autocomplete_search_levenshtein(
                 fuzzy_candidates.push(AutocompleteResult {
                     term: metadata.original_term.clone(),
                     normalized_term: metadata.normalized_term.clone(),
-                    id: metadata.id.clone(),
+                    id: metadata.id,
                     url: metadata.url.clone(),
                     score: combined_score,
                 });
@@ -377,7 +377,7 @@ pub fn fuzzy_autocomplete_search(
                 fuzzy_candidates.push(AutocompleteResult {
                     term: metadata.original_term.clone(),
                     normalized_term: metadata.normalized_term.clone(),
-                    id: metadata.id.clone(),
+                    id: metadata.id,
                     url: metadata.url.clone(),
                     score: combined_score,
                 });
@@ -482,7 +482,7 @@ mod tests {
 
         for (key, normalized, id) in terms {
             let normalized_term = NormalizedTerm {
-                id: id.to_string(),
+                id,
                 value: NormalizedTermValue::from(normalized),
                 display_value: None,
                 url: Some(format!(

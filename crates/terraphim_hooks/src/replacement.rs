@@ -138,7 +138,7 @@ mod tests {
         let mut thesaurus = Thesaurus::new("test".to_string());
 
         // Add npm -> bun mapping
-        let bun_term = NormalizedTerm::new("1", NormalizedTermValue::from("bun"));
+        let bun_term = NormalizedTerm::new(1u64, NormalizedTermValue::from("bun"));
         thesaurus.insert(NormalizedTermValue::from("npm"), bun_term.clone());
         thesaurus.insert(NormalizedTermValue::from("yarn"), bun_term.clone());
         thesaurus.insert(NormalizedTermValue::from("pnpm"), bun_term);
