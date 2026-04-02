@@ -11,3 +11,6 @@ thiserror = { workspace = true }
 tracing = "0.1"
 tokio = { workspace = true }
 which = "6.0"
+
+[features]
+default = []
