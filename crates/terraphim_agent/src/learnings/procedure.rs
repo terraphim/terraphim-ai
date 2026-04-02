@@ -128,7 +128,8 @@ impl ProcedureStore {
         let mut thesaurus = Thesaurus::new("procedure_titles".to_string());
         for (idx, existing) in existing_procedures.iter().enumerate() {
             let normalized_title = existing.title.to_lowercase();
-            let term = NormalizedTerm::new(idx as u64, NormalizedTermValue::from(normalized_title));
+            let term =
+                NormalizedTerm::new(idx.to_string(), NormalizedTermValue::from(normalized_title));
             thesaurus.insert(
                 NormalizedTermValue::from(existing.title.to_lowercase()),
                 term,

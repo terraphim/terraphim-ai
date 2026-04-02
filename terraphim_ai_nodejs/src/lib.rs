@@ -100,7 +100,7 @@ pub async fn search_documents_selected_role(query: String) -> String {
 pub struct AutocompleteResult {
   pub term: String,
   pub normalized_term: String,
-  pub id: u32,
+  pub id: String,
   pub url: Option<String>,
   pub score: f64,
 }
@@ -155,7 +155,7 @@ pub fn autocomplete(
     .map(|r| AutocompleteResult {
       term: r.term.clone(),
       normalized_term: r.normalized_term.to_string(),
-      id: r.id as u32,
+      id: r.id.clone(),
       url: r.url.clone(),
       score: r.score,
     })
@@ -338,11 +338,7 @@ pub fn query_graph(
       document_id: doc_id.clone(),
       rank: indexed_doc.rank as u32,
       tags: indexed_doc.tags.clone(),
-      nodes: indexed_doc
-        .nodes
-        .iter()
-        .map(|&node_id| node_id.to_string())
-        .collect(),
+      nodes: indexed_doc.nodes.to_vec(),
       title: indexed_doc.id.clone(), // Using ID as title for now
       url: "".to_string(),           // Will be available when we get full document data
     })

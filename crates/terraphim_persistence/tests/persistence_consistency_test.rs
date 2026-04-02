@@ -82,7 +82,7 @@ async fn test_thesaurus_persistence_with_complex_names() -> Result<()> {
         // Create and populate thesaurus
         let mut thesaurus = Thesaurus::new(name.to_string());
         let test_term =
-            NormalizedTerm::new(1, NormalizedTermValue::from("test-concept".to_string()));
+            NormalizedTerm::new("1", NormalizedTermValue::from("test-concept".to_string()));
         thesaurus.insert(
             NormalizedTermValue::from("test".to_string()),
             test_term.clone(),
@@ -225,8 +225,8 @@ async fn test_cross_backend_consistency() -> Result<()> {
     let mut thesaurus = Thesaurus::new(thesaurus_name.to_string());
 
     // Add test data
-    let term1 = NormalizedTerm::new(1, NormalizedTermValue::from("concept1".to_string()));
-    let term2 = NormalizedTerm::new(2, NormalizedTermValue::from("concept2".to_string()));
+    let term1 = NormalizedTerm::new("1", NormalizedTermValue::from("concept1".to_string()));
+    let term2 = NormalizedTerm::new("2", NormalizedTermValue::from("concept2".to_string()));
     thesaurus.insert(
         NormalizedTermValue::from("term1".to_string()),
         term1.clone(),
@@ -331,7 +331,7 @@ async fn test_unicode_and_emoji_handling() -> Result<()> {
         // Only test save/load for cases that result in valid keys
         if !expected_normalized.is_empty() {
             let mut test_thesaurus = Thesaurus::new(input.to_string());
-            let term = NormalizedTerm::new(1, NormalizedTermValue::from("test".to_string()));
+            let term = NormalizedTerm::new("1", NormalizedTermValue::from("test".to_string()));
             test_thesaurus.insert(NormalizedTermValue::from("test".to_string()), term);
 
             test_thesaurus.save().await?;

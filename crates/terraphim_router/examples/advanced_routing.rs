@@ -91,7 +91,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create a thesaurus with synonyms
     let mut thesaurus = Thesaurus::new("programming".to_string());
-    let term = NormalizedTerm::new(1, NormalizedTermValue::from("rust"));
+    let term = NormalizedTerm::new("1", NormalizedTermValue::from("rust"));
     thesaurus.insert(NormalizedTermValue::from("rust"), term);
 
     kg_router.add_thesaurus(RoleName::new("engineer"), thesaurus);

@@ -159,8 +159,9 @@ fn index_inner(name: String, messages: Vec<Message>) -> Thesaurus {
                 let concept_with_display = match current_concept {
                     Some(ref cwd) => {
                         // Create NormalizedTerm with display_value preserving original case
-                        let nterm = NormalizedTerm::new(cwd.concept.id.clone(), cwd.concept.value.clone())
-                            .with_display_value(cwd.display_name.clone());
+                        let nterm =
+                            NormalizedTerm::new(cwd.concept.id.clone(), cwd.concept.value.clone())
+                                .with_display_value(cwd.display_name.clone());
                         thesaurus.insert(cwd.concept.value.clone(), nterm.clone());
                         cwd
                     }

@@ -114,7 +114,7 @@ mod tests {
 
         // Create a thesaurus with synonyms
         let mut thesaurus = Thesaurus::new("programming".to_string());
-        let term = NormalizedTerm::new(1, NormalizedTermValue::from("rust"));
+        let term = NormalizedTerm::new("1", NormalizedTermValue::from("rust"));
         thesaurus.insert(NormalizedTermValue::from("rust"), term);
 
         router.add_thesaurus(RoleName::new("engineer"), thesaurus);

@@ -65,7 +65,7 @@ fn create_large_thesaurus(size: usize) -> Thesaurus {
 
         for (j, term) in base_terms.into_iter().enumerate() {
             let normalized_term = NormalizedTerm {
-                id: (i * 8 + j) as u64 + 1,
+                id: ((i * 8 + j) as u64 + 1).to_string(),
                 value: NormalizedTermValue::from(term.clone()),
                 display_value: None,
                 url: Some(format!("https://example.com/{}", term.replace('_', "-"))),
@@ -350,7 +350,7 @@ fn bench_comparison_with_matcher(c: &mut Criterion) {
 /// Benchmark paragraph extraction using automata matcher
 fn bench_paragraph_extraction(c: &mut Criterion) {
     let mut thesaurus = Thesaurus::new("bench".to_string());
-    let norm = NormalizedTerm::new(1, NormalizedTermValue::from("alpha"));
+    let norm = NormalizedTerm::new("1", NormalizedTermValue::from("alpha"));
     thesaurus.insert(NormalizedTermValue::from("alpha"), norm);
     let text = "header\n\nalpha ipsum dolor sit amet,\nconsectetur adipiscing elit.\n\nfooter";
     c.bench_function("extract_paragraphs_from_automata_small_text", |b| {

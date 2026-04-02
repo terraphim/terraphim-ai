@@ -473,7 +473,8 @@ mod ontology_schema_tests {
         let mut thesaurus = terraphim_types::Thesaurus::new(schema.name.clone());
         for (idx, (_id, term, url)) in entries.into_iter().enumerate() {
             let nterm_value = terraphim_types::NormalizedTermValue::new(term);
-            let mut nterm = terraphim_types::NormalizedTerm::new(idx as u64, nterm_value.clone());
+            let mut nterm =
+                terraphim_types::NormalizedTerm::new(idx.to_string(), nterm_value.clone());
             if let Some(url) = url {
                 nterm = nterm.with_url(url);
             }
@@ -501,7 +502,8 @@ mod ontology_schema_tests {
         let mut thesaurus = terraphim_types::Thesaurus::new(schema.name.clone());
         for (idx, (_id, term, url)) in entries.into_iter().enumerate() {
             let nterm_value = terraphim_types::NormalizedTermValue::new(term);
-            let mut nterm = terraphim_types::NormalizedTerm::new(idx as u64, nterm_value.clone());
+            let mut nterm =
+                terraphim_types::NormalizedTerm::new(idx.to_string(), nterm_value.clone());
             if let Some(url) = url {
                 nterm = nterm.with_url(url);
             }
@@ -537,7 +539,8 @@ mod ontology_schema_tests {
         let mut thesaurus = terraphim_types::Thesaurus::new(schema.name.clone());
         for (idx, (_id, term, url)) in entries.into_iter().enumerate() {
             let nterm_value = terraphim_types::NormalizedTermValue::new(term);
-            let mut nterm = terraphim_types::NormalizedTerm::new(idx as u64, nterm_value.clone());
+            let mut nterm =
+                terraphim_types::NormalizedTerm::new(idx.to_string(), nterm_value.clone());
             if let Some(url) = url {
                 nterm = nterm.with_url(url);
             }
@@ -557,7 +560,8 @@ mod ontology_schema_tests {
         let mut thesaurus = terraphim_types::Thesaurus::new(schema.name.clone());
         for (idx, (_id, term, url)) in entries.into_iter().enumerate() {
             let nterm_value = terraphim_types::NormalizedTermValue::new(term);
-            let mut nterm = terraphim_types::NormalizedTerm::new(idx as u64, nterm_value.clone());
+            let mut nterm =
+                terraphim_types::NormalizedTerm::new(idx.to_string(), nterm_value.clone());
             if let Some(url) = url {
                 nterm = nterm.with_url(url);
             }

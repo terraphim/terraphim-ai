@@ -109,8 +109,6 @@ impl GiteaTracker {
             updated_at: gi.updated_at.and_then(|s| parse_datetime(&s)),
         }
     }
-
-
 }
 
 #[async_trait]
@@ -213,11 +211,7 @@ impl IssueTracker for GiteaTracker {
 
 impl GiteaTracker {
     /// Post a comment on a Gitea issue.
-    pub async fn post_comment(
-        &self,
-        issue_number: u64,
-        body: &str,
-    ) -> Result<IssueComment> {
+    pub async fn post_comment(&self, issue_number: u64, body: &str) -> Result<IssueComment> {
         let url = format!(
             "{}/api/v1/repos/{}/{}/issues/{}/comments",
             self.config.base_url, self.config.owner, self.config.repo, issue_number
@@ -411,7 +405,11 @@ mod tests {
         let result = tracker.post_comment(999, "body").await;
         assert!(result.is_err());
         let err_str = format!("{}", result.unwrap_err());
-        assert!(err_str.contains("403"), "Expected 403 in error: {}", err_str);
+        assert!(
+            err_str.contains("403"),
+            "Expected 403 in error: {}",
+            err_str
+        );
     }
 
     #[tokio::test]
@@ -459,7 +457,9 @@ mod tests {
             .await;
 
         let tracker = make_tracker(&mock_server.uri());
-        let result = tracker.fetch_comments(5, Some("2026-03-31T00:00:00Z")).await;
+        let result = tracker
+            .fetch_comments(5, Some("2026-03-31T00:00:00Z"))
+            .await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap().len(), 0);
     }

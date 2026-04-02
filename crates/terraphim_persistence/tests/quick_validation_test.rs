@@ -21,7 +21,7 @@ async fn test_quick_validation_all_features() -> Result<()> {
     // Test 1: Thesaurus key generation and persistence
     println!("📝 Test 1: Thesaurus persistence");
     let mut thesaurus = Thesaurus::new("Test Engineer".to_string());
-    let term = NormalizedTerm::new(1, NormalizedTermValue::from("concept".to_string()));
+    let term = NormalizedTerm::new("1", NormalizedTermValue::from("concept".to_string()));
     thesaurus.insert(NormalizedTermValue::from("test".to_string()), term);
 
     // Validate key generation

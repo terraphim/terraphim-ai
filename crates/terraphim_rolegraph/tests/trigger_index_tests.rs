@@ -18,7 +18,7 @@ fn test_is_empty_before_build() {
 fn test_is_not_empty_after_build() {
     let mut index = TriggerIndex::new(0.1);
     let mut triggers = AHashMap::new();
-    triggers.insert(1, "lung cancer treatment".to_string());
+    triggers.insert("1".to_string(), "lung cancer treatment".to_string());
     index.build(triggers);
     assert!(!index.is_empty());
 }
@@ -27,12 +27,12 @@ fn test_is_not_empty_after_build() {
 fn test_exact_match_scores_highest() {
     let mut index = TriggerIndex::new(0.1);
     let mut triggers = AHashMap::new();
-    triggers.insert(1, "lung cancer treatment".to_string());
+    triggers.insert("1".to_string(), "lung cancer treatment".to_string());
     index.build(triggers);
 
     let results = index.query("lung cancer treatment");
     assert_eq!(results.len(), 1);
-    assert_eq!(results[0].0, 1);
+    assert_eq!(results[0].0, "1");
     assert!(
         results[0].1 > 0.99,
         "Expected score near 1.0, got {}",
@@ -44,12 +44,12 @@ fn test_exact_match_scores_highest() {
 fn test_partial_overlap_positive_score() {
     let mut index = TriggerIndex::new(0.1);
     let mut triggers = AHashMap::new();
-    triggers.insert(1, "lung cancer treatment".to_string());
+    triggers.insert("1".to_string(), "lung cancer treatment".to_string());
     index.build(triggers);
 
     let results = index.query("cancer research");
     assert_eq!(results.len(), 1);
-    assert_eq!(results[0].0, 1);
+    assert_eq!(results[0].0, "1");
     assert!(
         results[0].1 > 0.0,
         "Expected positive score, got {}",
@@ -61,7 +61,7 @@ fn test_partial_overlap_positive_score() {
 fn test_no_overlap_below_threshold() {
     let mut index = TriggerIndex::new(0.1);
     let mut triggers = AHashMap::new();
-    triggers.insert(1, "lung cancer".to_string());
+    triggers.insert("1".to_string(), "lung cancer".to_string());
     index.build(triggers);
 
     let results = index.query("software engineering");
@@ -75,13 +75,13 @@ fn test_no_overlap_below_threshold() {
 fn test_stopword_removal() {
     let mut index = TriggerIndex::new(0.1);
     let mut triggers = AHashMap::new();
-    triggers.insert(1, "treatment for the lung cancer".to_string());
+    triggers.insert("1".to_string(), "treatment for the lung cancer".to_string());
     index.build(triggers);
 
     // Query without stopwords should still match
     let results = index.query("lung cancer treatment");
     assert_eq!(results.len(), 1);
-    assert_eq!(results[0].0, 1);
+    assert_eq!(results[0].0, "1");
     assert!(results[0].1 > 0.0);
 }
 
@@ -89,14 +89,14 @@ fn test_stopword_removal() {
 fn test_short_word_filtering() {
     let mut index = TriggerIndex::new(0.1);
     let mut triggers = AHashMap::new();
-    triggers.insert(1, "a b cd efg".to_string());
+    triggers.insert("1".to_string(), "a b cd efg".to_string());
     index.build(triggers);
 
     // Only "efg" (len > 2) should be indexed
     // Query with "efg" should match
     let results = index.query("efg");
     assert_eq!(results.len(), 1);
-    assert_eq!(results[0].0, 1);
+    assert_eq!(results[0].0, "1");
 
     // Query with short words only should not match
     let results_short = index.query("cd");
@@ -110,12 +110,12 @@ fn test_short_word_filtering() {
 fn test_case_insensitivity() {
     let mut index = TriggerIndex::new(0.1);
     let mut triggers = AHashMap::new();
-    triggers.insert(1, "Lung Cancer".to_string());
+    triggers.insert("1".to_string(), "Lung Cancer".to_string());
     index.build(triggers);
 
     let results = index.query("lung cancer");
     assert_eq!(results.len(), 1);
-    assert_eq!(results[0].0, 1);
+    assert_eq!(results[0].0, "1");
     assert!(results[0].1 > 0.0);
 }
 
@@ -123,7 +123,7 @@ fn test_case_insensitivity() {
 fn test_threshold_filtering() {
     let mut index = TriggerIndex::new(0.5); // Higher threshold
     let mut triggers = AHashMap::new();
-    triggers.insert(1, "lung cancer treatment".to_string());
+    triggers.insert("1".to_string(), "lung cancer treatment".to_string());
     index.build(triggers);
 
     // Partial match should be below 0.5 threshold
@@ -135,16 +135,16 @@ fn test_threshold_filtering() {
 fn test_result_ordering() {
     let mut index = TriggerIndex::new(0.1);
     let mut triggers = AHashMap::new();
-    triggers.insert(1, "lung cancer treatment".to_string());
-    triggers.insert(2, "lung cancer research".to_string());
-    triggers.insert(3, "heart disease treatment".to_string());
+    triggers.insert("1".to_string(), "lung cancer treatment".to_string());
+    triggers.insert("2".to_string(), "lung cancer research".to_string());
+    triggers.insert("3".to_string(), "heart disease treatment".to_string());
     index.build(triggers);
 
     let results = index.query("lung cancer treatment");
     assert_eq!(results.len(), 3);
 
     // First result should be exact match (highest score)
-    assert_eq!(results[0].0, 1);
+    assert_eq!(results[0].0, "1");
 
     // Results should be sorted descending by score
     for i in 1..results.len() {
@@ -160,24 +160,24 @@ fn test_idf_weighting() {
     let mut index = TriggerIndex::new(0.1);
     let mut triggers = AHashMap::new();
     // "treatment" appears in many documents (common term)
-    triggers.insert(1, "lung cancer treatment".to_string());
-    triggers.insert(2, "heart disease treatment".to_string());
-    triggers.insert(3, "diabetes treatment".to_string());
+    triggers.insert("1".to_string(), "lung cancer treatment".to_string());
+    triggers.insert("2".to_string(), "heart disease treatment".to_string());
+    triggers.insert("3".to_string(), "diabetes treatment".to_string());
     // "research" appears only once (rare term)
-    triggers.insert(4, "lung cancer research".to_string());
+    triggers.insert("4".to_string(), "lung cancer research".to_string());
     index.build(triggers);
 
     // Query with "research" should rank doc 4 higher due to IDF weighting
     let results = index.query("research");
     assert_eq!(results.len(), 1);
-    assert_eq!(results[0].0, 4);
+    assert_eq!(results[0].0, "4");
 
     // Query with both "lung" and "research"
     // Doc 4 (research) should score higher than docs with just "lung"
     let results = index.query("lung research");
     assert!(!results.is_empty());
     // Doc 4 has the rare "research" term, so it should be ranked highest
-    assert_eq!(results[0].0, 4);
+    assert_eq!(results[0].0, "4");
 }
 
 #[test]
@@ -187,7 +187,7 @@ fn test_multiple_triggers() {
 
     // Add 10+ triggers
     for i in 1..=12 {
-        triggers.insert(i, format!("medical condition {}", i));
+        triggers.insert(i.to_string(), format!("medical condition {}", i));
     }
     index.build(triggers);
 
@@ -204,8 +204,8 @@ fn test_rebuild_clears_old_data() {
 
     // First build
     let mut triggers1 = AHashMap::new();
-    triggers1.insert(1, "lung cancer".to_string());
-    triggers1.insert(2, "heart disease".to_string());
+    triggers1.insert("1".to_string(), "lung cancer".to_string());
+    triggers1.insert("2".to_string(), "heart disease".to_string());
     index.build(triggers1);
 
     assert_eq!(index.query("lung").len(), 1);
@@ -213,7 +213,7 @@ fn test_rebuild_clears_old_data() {
 
     // Second build with different data
     let mut triggers2 = AHashMap::new();
-    triggers2.insert(3, "diabetes treatment".to_string());
+    triggers2.insert("3".to_string(), "diabetes treatment".to_string());
     index.build(triggers2);
 
     // Old data should be gone
@@ -225,7 +225,7 @@ fn test_rebuild_clears_old_data() {
 
     // New data should be present
     assert_eq!(index.query("diabetes").len(), 1);
-    assert_eq!(index.query("diabetes")[0].0, 3);
+    assert_eq!(index.query("diabetes")[0].0, "3");
 }
 
 #[test]
@@ -249,8 +249,8 @@ fn test_custom_stopwords() {
 
     let mut index = TriggerIndex::with_stopwords(0.1, stopwords);
     let mut triggers = AHashMap::new();
-    triggers.insert(1, "lung cancer treatment".to_string());
-    triggers.insert(2, "treatment options".to_string());
+    triggers.insert("1".to_string(), "lung cancer treatment".to_string());
+    triggers.insert("2".to_string(), "treatment options".to_string());
     index.build(triggers);
 
     // "cancer" is a stopword now, so querying it should not match trigger 1

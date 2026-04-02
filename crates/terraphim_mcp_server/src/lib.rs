@@ -332,7 +332,7 @@ impl McpService {
                 use std::collections::HashSet;
                 let mut seen_terms: HashSet<String> =
                     combined.iter().map(|r| r.term.clone()).collect();
-                let concept_ids: HashSet<u64> = combined.iter().map(|r| r.id).collect();
+                let concept_ids: HashSet<String> = combined.iter().map(|r| r.id.clone()).collect();
                 let mut candidates: Vec<AutocompleteResult> = Vec::new();
                 // Iterate over all metadata and pick terms with same concept id
                 for (term, meta) in terraphim_automata::autocomplete_helpers::iter_metadata(index) {
@@ -340,9 +340,9 @@ impl McpService {
                         candidates.push(AutocompleteResult {
                             term: meta.original_term.clone(),
                             normalized_term: meta.normalized_term.clone(),
-                            id: meta.id,
+                            id: meta.id.clone(),
                             url: meta.url.clone(),
-                            score: meta.id as f64,
+                            score: 0.0,
                         });
                     }
                 }

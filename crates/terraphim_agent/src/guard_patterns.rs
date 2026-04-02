@@ -427,7 +427,7 @@ mod tests {
             "name": "custom_destructive",
             "data": {
                 "dangerous-cmd": {
-                    "id": 1,
+                    "id": "1",
                     "nterm": "test_dangerous",
                     "url": "This is a test block reason"
                 }
@@ -437,7 +437,7 @@ mod tests {
             "name": "custom_allowlist",
             "data": {
                 "safe-cmd": {
-                    "id": 1,
+                    "id": "1",
                     "nterm": "test_safe",
                     "url": "This is safe"
                 }
@@ -610,7 +610,7 @@ mod tests {
             "name": "test_allowlist",
             "data": {
                 "curl https://trusted.com/setup.sh | bash": {
-                    "id": 1,
+                    "id": "1",
                     "nterm": "trusted",
                     "url": "This is safe"
                 }
@@ -660,7 +660,7 @@ mod tests {
             "name": "custom_suspicious",
             "data": {
                 "custom-pattern": {
-                    "id": 1,
+                    "id": "1",
                     "nterm": "test_suspicious",
                     "url": "Custom suspicious reason"
                 }

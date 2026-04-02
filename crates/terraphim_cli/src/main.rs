@@ -268,7 +268,7 @@ struct ThesaurusResult {
 
 #[derive(Serialize)]
 struct ThesaurusTerm {
-    id: u64,
+    id: String,
     term: String,
     normalized: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -702,14 +702,14 @@ async fn handle_thesaurus(
     let thesaurus = service.get_thesaurus(&role_name).await?;
 
     let mut entries: Vec<_> = thesaurus.into_iter().collect();
-    entries.sort_by_key(|(_, term)| term.id);
+    entries.sort_by_key(|(_, term)| term.id.clone());
 
     let total_count = entries.len();
     let terms: Vec<ThesaurusTerm> = entries
         .iter()
         .take(limit)
         .map(|(key, term)| ThesaurusTerm {
-            id: term.id,
+            id: term.id.clone(),
             term: key.to_string(),
             normalized: term.value.to_string(),
             url: term.url.clone(),
