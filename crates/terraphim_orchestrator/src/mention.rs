@@ -14,6 +14,10 @@ use terraphim_automata::find_matches;
 use terraphim_tracker::IssueComment;
 use terraphim_types::{NormalizedTerm, Thesaurus};
 
+use terraphim_persistence::Persistable;
+use async_trait::async_trait;
+use serde::{Serialize, Deserialize};
+
 /// How a mention was resolved.
 #[derive(Debug, Clone, PartialEq)]
 pub enum MentionResolution {
@@ -310,18 +314,55 @@ pub fn parse_mentions(
 }
 
 /// Tracks processed mentions to prevent re-triggers and infinite loops.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct MentionTracker {
     processed: HashSet<(u64, u64, String)>,
     max_depth: u32,
     depth_counters: HashMap<u64, u32>,
+    #[serde(skip)]
+    key: String,
 }
 
 impl MentionTracker {
+    /// Synchronous constructor for tests (existing API preserved).
     pub fn new(max_depth: u32) -> Self {
         Self {
             processed: HashSet::new(),
             max_depth,
             depth_counters: HashMap::new(),
+            key: String::new(),
+        }
+    }
+
+    /// Async constructor that loads from persistence or creates new.
+    pub async fn load_or_new(max_depth: u32) -> Self {
+        let mut tracker = Self {
+            processed: HashSet::new(),
+            max_depth,
+            depth_counters: HashMap::new(),
+            key: "adf_mentions".to_string(),
+        };
+        match tracker.load().await {
+            Ok(mut loaded) => {
+                loaded.max_depth = max_depth;
+                loaded.key = "adf_mentions".to_string();
+                tracing::info!(
+                    processed_count = loaded.processed.len(),
+                    "loaded MentionTracker from persistence"
+                );
+                loaded
+            }
+            Err(e) => {
+                tracing::info!(?e, "no persisted MentionTracker found, starting fresh");
+                tracker
+            }
+        }
+    }
+
+    /// Persist the tracker state to storage.
+    pub async fn persist(&self) {
+        if let Err(e) = self.save().await {
+            tracing::warn!(?e, "failed to persist MentionTracker");
         }
     }
 
@@ -341,6 +382,10 @@ impl MentionTracker {
         ));
     }
 
+    pub fn max_depth(&self) -> u32 {
+        self.max_depth
+    }
+
     pub fn depth_exceeded(&self, issue_number: u64) -> bool {
         self.depth_counters
             .get(&issue_number)
@@ -350,6 +395,37 @@ impl MentionTracker {
 
     pub fn increment_depth(&mut self, issue_number: u64) {
         *self.depth_counters.entry(issue_number).or_insert(0) += 1;
+    }
+}
+
+#[async_trait]
+impl Persistable for MentionTracker {
+    fn new(key: String) -> Self {
+        Self {
+            processed: HashSet::new(),
+            max_depth: 10,
+            depth_counters: HashMap::new(),
+            key,
+        }
+    }
+
+    async fn save(&self) -> terraphim_persistence::Result<()> {
+        self.save_to_all().await
+    }
+
+    async fn save_to_one(&self, profile_name: &str) -> terraphim_persistence::Result<()> {
+        self.save_to_profile(profile_name).await
+    }
+
+    async fn load(&mut self) -> terraphim_persistence::Result<Self> {
+        let key = self.get_key();
+        let op = &self.load_config().await?.1;
+        self.load_from_operator(&key, op).await
+    }
+
+    fn get_key(&self) -> String {
+        let normalized = self.normalize_key(&self.key);
+        format!("mention_tracker_{}.json", normalized)
     }
 }
 

@@ -134,6 +134,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         flag.store(true, std::sync::atomic::Ordering::SeqCst);
     });
 
+    // Initialize persistence (load saved MentionTracker state)
+    orchestrator.init_persistence().await;
+
     tracing::info!("starting AI Dark Factory orchestrator");
     orchestrator.run().await?;
 

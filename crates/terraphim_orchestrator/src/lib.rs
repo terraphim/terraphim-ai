@@ -292,6 +292,19 @@ impl AgentOrchestrator {
         Self::new(config)
     }
 
+    /// Initialize persistence and load saved MentionTracker state.
+    /// Call this after construction and before run().
+    pub async fn init_persistence(&mut self) {
+        match terraphim_persistence::DeviceStorage::instance().await {
+            Ok(_) => {
+                self.mention_tracker = MentionTracker::load_or_new(self.mention_tracker.max_depth()).await;
+            }
+            Err(e) => {
+                tracing::warn!(?e, "DeviceStorage init failed, MentionTracker will not persist");
+            }
+        }
+    }
+
     /// Run the orchestrator (blocks until shutdown signal).
     ///
     /// 1. Spawns all Safety-layer agents immediately
@@ -1163,6 +1176,7 @@ Comment: {}",
 
                             self.mention_tracker.mark_processed(&m);
                             self.mention_tracker.increment_depth(issue_number);
+                            self.mention_tracker.persist().await;
                         }
                     }
                 }

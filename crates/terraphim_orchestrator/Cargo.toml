@@ -15,6 +15,7 @@ terraphim_types = { path = "../terraphim_types", version = "1.0.0" }
 terraphim_tracker = { path = "../terraphim_tracker", version = "1.0.0" }
 terraphim_symphony = { path = "../terraphim_symphony", version = "1.0.0" }
 terraphim_automata = { path = "../terraphim_automata", version = "1.0.0" }
+terraphim_persistence = { path = "../terraphim_persistence", version = "1.0.0" }
 
 # Core dependencies
 tokio = { version = "1.0", features = ["full", "signal"] }
