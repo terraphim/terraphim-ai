@@ -12,7 +12,7 @@ license = "Apache-2.0"
 readme = "../../README.md"
 
 [features]
-default = ["repl-interactive"]
+default = ["repl-interactive", "shared-learning"]
 repl = ["dep:rustyline", "dep:colored", "dep:comfy-table"]
 repl-interactive = ["repl"]
 # NOTE: repl-sessions re-enabled for local development (path dependency)
@@ -27,6 +27,8 @@ repl-web-advanced = ["repl-web"]  # Advanced web operations (screenshot, PDF, sc
 update-tests = []
 # Session history search - enabled for local development
 repl-sessions = ["repl", "dep:terraphim_sessions"]
+# Shared learning system with SQLite backend and Gitea wiki sync
+shared-learning = ["dep:sqlx"]
 
 [lints.rust]
 # repl-sessions feature is now enabled for local development
@@ -57,6 +59,7 @@ chrono = { workspace = true }
 strsim = "0.11"  # For edit distance / fuzzy matching in forgiving CLI
 uuid = { workspace = true }
 dialoguer = "0.12"  # Interactive CLI prompts for onboarding wizard
+sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "chrono", "migrate", "json"], optional = true }
 
 # REPL dependencies - only compiled with features
 rustyline = { version = "17.0", optional = true }
@@ -86,7 +89,7 @@ terraphim_test_utils = { path = "../terraphim_test_utils" }
 insta = { version = "1.41", features = ["yaml", "redactions"] }
 
 # Enable REPL features for testing
-terraphim_agent = { path = ".", features = ["repl-full"] }
+terraphim_agent = { path = ".", features = ["repl-full", "shared-learning"] }
 
 [build-dependencies]
 rustc_version = "0.4"

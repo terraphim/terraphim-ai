@@ -12,6 +12,10 @@ pub mod forgiving;
 // MCP Tool Index - for discovering and searching MCP tools
 pub mod mcp_tool_index;
 
+// Shared learning system - cross-agent learning with trust-gated promotion
+#[cfg(feature = "shared-learning")]
+pub mod shared_learning;
+
 #[cfg(feature = "repl")]
 pub mod repl;
 
@@ -28,6 +32,10 @@ pub use robot::{
 
 // Re-export forgiving CLI types
 pub use forgiving::{AliasRegistry, ForgivingParser, ParseResult};
+
+// Re-export shared learning types
+#[cfg(feature = "shared-learning")]
+pub use shared_learning::{GiteaWikiClient, SharedLearning, SharedLearningStore, StoreConfig, TrustLevel, WikiSyncError};
 
 #[cfg(feature = "repl")]
 pub use repl::*;
@@ -49,4 +57,7 @@ pub mod test_exports {
 
     pub use crate::forgiving::*;
     pub use crate::robot::*;
+
+    #[cfg(feature = "shared-learning")]
+    pub use crate::shared_learning::*;
 }

@@ -2301,7 +2301,7 @@ async fn run_server_command(
             let mut thesaurus = terraphim_types::Thesaurus::new(format!("role-{}", role_name));
             for entry in thesaurus_res.terms {
                 let normalized_term = terraphim_types::NormalizedTerm::new(
-                    1, // Simple ID for CLI usage
+                    "1", // Simple ID for CLI usage
                     terraphim_types::NormalizedTermValue::from(entry.nterm.clone()),
                 );
                 thesaurus.insert(
