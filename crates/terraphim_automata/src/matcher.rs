@@ -243,7 +243,7 @@ mod paragraph_tests {
     #[test]
     fn extracts_paragraph_from_term() {
         let mut thesaurus = Thesaurus::new("test".to_string());
-        let norm = NormalizedTerm::new(1, NormalizedTermValue::from("lorem"));
+        let norm = NormalizedTerm::new("1", NormalizedTermValue::from("lorem"));
         thesaurus.insert(NormalizedTermValue::from("lorem"), norm);
 
         let text = "Intro\n\nlorem ipsum dolor sit amet,\nconsectetur adipiscing elit.\n\nNext paragraph starts here.";
@@ -273,14 +273,14 @@ mod replacement_bug_tests {
 
         // Simulate the bug: empty pattern with a display value
         let bad_nterm = NormalizedTerm::new(
-            1,
+            "1",
             NormalizedTermValue::from("matching_and_iterators_in_rust"),
         )
         .with_display_value("matching_and_iterators_in_rust".to_string());
         thesaurus.insert(NormalizedTermValue::from(""), bad_nterm);
 
         // Add a valid pattern
-        let bun_nterm = NormalizedTerm::new(2, NormalizedTermValue::from("bun"))
+        let bun_nterm = NormalizedTerm::new("2", NormalizedTermValue::from("bun"))
             .with_display_value("bun".to_string());
         thesaurus.insert(NormalizedTermValue::from("npm"), bun_nterm);
 
@@ -298,12 +298,12 @@ mod replacement_bug_tests {
         let mut thesaurus = Thesaurus::new("test".to_string());
 
         // Single character pattern - should be filtered
-        let single_char_nterm = NormalizedTerm::new(1, NormalizedTermValue::from("expanded"))
+        let single_char_nterm = NormalizedTerm::new("1", NormalizedTermValue::from("expanded"))
             .with_display_value("expanded".to_string());
         thesaurus.insert(NormalizedTermValue::from("e"), single_char_nterm);
 
         // Valid pattern
-        let bun_nterm = NormalizedTerm::new(2, NormalizedTermValue::from("bun"))
+        let bun_nterm = NormalizedTerm::new("2", NormalizedTermValue::from("bun"))
             .with_display_value("bun".to_string());
         thesaurus.insert(NormalizedTermValue::from("npm"), bun_nterm);
 
@@ -321,12 +321,12 @@ mod replacement_bug_tests {
         let mut thesaurus = Thesaurus::new("test".to_string());
 
         // Whitespace-only pattern - should be filtered
-        let ws_nterm = NormalizedTerm::new(1, NormalizedTermValue::from("space"))
+        let ws_nterm = NormalizedTerm::new("1", NormalizedTermValue::from("space"))
             .with_display_value("space".to_string());
         thesaurus.insert(NormalizedTermValue::from("   "), ws_nterm);
 
         // Valid pattern
-        let bun_nterm = NormalizedTerm::new(2, NormalizedTermValue::from("bun"))
+        let bun_nterm = NormalizedTerm::new("2", NormalizedTermValue::from("bun"))
             .with_display_value("bun".to_string());
         thesaurus.insert(NormalizedTermValue::from("npm"), bun_nterm);
 
@@ -343,11 +343,11 @@ mod replacement_bug_tests {
         let mut thesaurus = Thesaurus::new("test".to_string());
 
         // Valid patterns
-        let bun_nterm = NormalizedTerm::new(1, NormalizedTermValue::from("bun"))
+        let bun_nterm = NormalizedTerm::new("1", NormalizedTermValue::from("bun"))
             .with_display_value("bun".to_string());
         thesaurus.insert(NormalizedTermValue::from("npm"), bun_nterm);
 
-        let yarn_nterm = NormalizedTerm::new(2, NormalizedTermValue::from("bun"))
+        let yarn_nterm = NormalizedTerm::new("2", NormalizedTermValue::from("bun"))
             .with_display_value("bun".to_string());
         thesaurus.insert(NormalizedTermValue::from("yarn"), yarn_nterm);
 
@@ -378,12 +378,12 @@ mod replacement_bug_tests {
         let mut thesaurus = Thesaurus::new("test".to_string());
 
         // Empty pattern
-        let empty_nterm = NormalizedTerm::new(1, NormalizedTermValue::from("empty"))
+        let empty_nterm = NormalizedTerm::new("1", NormalizedTermValue::from("empty"))
             .with_display_value("empty".to_string());
         thesaurus.insert(NormalizedTermValue::from(""), empty_nterm);
 
         // Valid pattern
-        let test_nterm = NormalizedTerm::new(2, NormalizedTermValue::from("test"))
+        let test_nterm = NormalizedTerm::new("2", NormalizedTermValue::from("test"))
             .with_display_value("test".to_string());
         thesaurus.insert(NormalizedTermValue::from("hello"), test_nterm);
 

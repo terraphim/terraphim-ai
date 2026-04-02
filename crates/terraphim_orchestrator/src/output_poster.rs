@@ -1,7 +1,7 @@
 //! Posts agent output to Gitea issues after agent exit.
 
-use terraphim_tracker::GiteaTracker;
 use terraphim_tracker::gitea::GiteaConfig;
+use terraphim_tracker::GiteaTracker;
 
 use crate::config::GiteaOutputConfig;
 
@@ -83,5 +83,3 @@ impl OutputPoster {
         }
     }
 }
-
-
