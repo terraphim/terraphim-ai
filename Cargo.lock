@@ -1228,6 +1228,32 @@ dependencies = [
 
 [[package]]
 name = "criterion"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f2b12d017a929603d80db1831cd3a24082f8137ce19c69e6447f54f5fc8d692f"
+dependencies = [
+ "anes",
+ "cast",
+ "ciborium",
+ "clap",
+ "criterion-plot 0.5.0",
+ "is-terminal",
+ "itertools 0.10.5",
+ "num-traits",
+ "once_cell",
+ "oorandom",
+ "plotters",
+ "rayon",
+ "regex",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "tinytemplate",
+ "walkdir",
+]
+
+[[package]]
+name = "criterion"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "950046b2aa2492f9a536f5f4f9a3de7b9e2476e575e05bd6c333371add4d98f3"
@@ -1237,7 +1263,7 @@ dependencies = [
  "cast",
  "ciborium",
  "clap",
- "criterion-plot",
+ "criterion-plot 0.8.2",
  "itertools 0.13.0",
  "num-traits",
  "oorandom",
@@ -1250,6 +1276,16 @@ dependencies = [
  "tinytemplate",
  "tokio",
  "walkdir",
+]
+
+[[package]]
+name = "criterion-plot"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6b50826342786a51a89e2da3a28f1c32b06e387201bc2d19791f622c673706b1"
+dependencies = [
+ "cast",
+ "itertools 0.10.5",
 ]
 
 [[package]]
@@ -3476,6 +3512,17 @@ checksum = "c91338f0783edbd6195decb37bae672fd3b165faffb89bf7b9e6942f8b1a731a"
 dependencies = [
  "memchr",
  "serde",
+]
+
+[[package]]
+name = "is-terminal"
+version = "0.4.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3640c1c38b8e4e43584d8df18be5fc6b0aa314ce6ebf51b53313d4306cca8e46"
+dependencies = [
+ "hermit-abi",
+ "libc",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -8080,7 +8127,7 @@ dependencies = [
  "anyhow",
  "clap",
  "colored 2.2.0",
- "criterion",
+ "criterion 0.8.2",
  "csv",
  "dialoguer",
  "glob",
@@ -8212,7 +8259,7 @@ dependencies = [
  "ahash",
  "async-trait",
  "chrono",
- "criterion",
+ "criterion 0.8.2",
  "env_logger",
  "futures-util",
  "indexmap 2.13.0",
@@ -8312,7 +8359,7 @@ dependencies = [
  "anyhow",
  "bincode",
  "cached",
- "criterion",
+ "criterion 0.8.2",
  "daachorse",
  "fst",
  "getrandom 0.3.4",
@@ -8388,7 +8435,7 @@ dependencies = [
  "ahash",
  "async-trait",
  "chrono",
- "criterion",
+ "criterion 0.8.2",
  "env_logger",
  "futures-util",
  "indexmap 2.13.0",
@@ -8570,7 +8617,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "chrono",
- "criterion",
+ "criterion 0.8.2",
  "futures",
  "genai",
  "log",
@@ -8673,7 +8720,7 @@ dependencies = [
  "aho-corasick",
  "anyhow",
  "cached",
- "criterion",
+ "criterion 0.8.2",
  "csv",
  "itertools 0.14.0",
  "log",
@@ -8697,7 +8744,7 @@ version = "1.8.0"
 dependencies = [
  "async-trait",
  "chrono",
- "criterion",
+ "criterion 0.8.2",
  "dirs 5.0.1",
  "notify",
  "proptest",
@@ -8879,7 +8926,7 @@ dependencies = [
  "ahash",
  "async-trait",
  "chrono",
- "criterion",
+ "criterion 0.8.2",
  "env_logger",
  "futures-util",
  "indexmap 2.13.0",
@@ -8912,7 +8959,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "clap",
- "criterion",
+ "criterion 0.8.2",
  "dirs 5.0.1",
  "env_home",
  "env_logger",
@@ -8964,6 +9011,7 @@ dependencies = [
  "ahash",
  "anyhow",
  "chrono",
+ "criterion 0.5.1",
  "getrandom 0.3.4",
  "log",
  "schemars 0.8.22",
@@ -9015,9 +9063,11 @@ dependencies = [
  "colored 2.2.0",
  "indicatif 0.17.11",
  "reqwest 0.12.28",
- "rusqlite",
  "serde",
  "serde_json",
+ "terraphim_persistence",
+ "terraphim_settings",
+ "terraphim_types",
  "thiserror 1.0.69",
  "tokio",
  "tracing",
