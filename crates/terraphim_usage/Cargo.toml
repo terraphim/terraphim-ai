@@ -9,14 +9,20 @@ serde_json = { workspace = true }
 chrono = { workspace = true }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
-reqwest = { workspace = true }
+reqwest = { workspace = true, optional = true }
 tokio = { workspace = true }
-clap = { version = "4.5", features = ["derive"] }
-colored = "2.1"
-indicatif = "0.17"
+clap = { version = "4.5", features = ["derive"], optional = true }
+colored = { version = "2.1", optional = true }
+indicatif = { version = "0.17", optional = true }
 tracing = "0.1"
 async-trait = "0.1"
 which = "6.0"
-terraphim_persistence = { path = "../terraphim_persistence" }
+terraphim_persistence = { path = "../terraphim_persistence", optional = true }
 terraphim_types = { path = "../terraphim_types" }
 terraphim_settings = { path = "../terraphim_settings" }
+
+[features]
+default = ["persistence", "providers"]
+persistence = ["dep:terraphim_persistence"]  # Enable storage via terraphim_persistence
+cli = ["dep:clap", "dep:colored", "dep:indicatif"]  # Enable CLI commands
+providers = ["dep:reqwest"]  # Enable external provider API fetchers

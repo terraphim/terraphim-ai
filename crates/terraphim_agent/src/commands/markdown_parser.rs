@@ -534,7 +534,7 @@ impl MarkdownCommandParser {
             thesaurus.insert(
                 normalized_term.clone(),
                 NormalizedTerm {
-                    id: term_id.to_string(),
+                    id: term_id,
                     value: normalized_term.clone(),
                     display_value: None,
                     url: Some(format!("learned-term:{}", term)),
@@ -1081,7 +1081,7 @@ Third paragraph with more information.";
         // Create a mock matched term at position in second paragraph
         let matched_term = Matched {
             term: "database".to_string(),
-            normalized_term: NormalizedTerm::new("1", NormalizedTermValue::from("database")),
+            normalized_term: NormalizedTerm::new(1u64, NormalizedTermValue::from("database")),
             pos: Some((70, 78)), // Position in second paragraph
         };
 
@@ -1102,12 +1102,12 @@ Third paragraph with more information.";
         let matched_terms = vec![
             Matched {
                 term: "kubernetes".to_string(),
-                normalized_term: NormalizedTerm::new("1", NormalizedTermValue::from("kubernetes")),
+                normalized_term: NormalizedTerm::new(1u64, NormalizedTermValue::from("kubernetes")),
                 pos: Some((0, 10)),
             },
             Matched {
                 term: "database".to_string(),
-                normalized_term: NormalizedTerm::new("2", NormalizedTermValue::from("database")),
+                normalized_term: NormalizedTerm::new(2u64, NormalizedTermValue::from("database")),
                 pos: Some((20, 28)),
             },
         ];
@@ -1278,7 +1278,7 @@ The service requires proper database configuration and SSL certificates for secu
         thesaurus.insert(
             NormalizedTermValue::from("database"),
             NormalizedTerm {
-                id: "1".to_string(),
+                id: 1u64,
                 value: NormalizedTermValue::from("database"),
                 display_value: None,
                 url: Some("concept:database".to_string()),
@@ -1288,7 +1288,7 @@ The service requires proper database configuration and SSL certificates for secu
         thesaurus.insert(
             NormalizedTermValue::from("kubernetes"),
             NormalizedTerm {
-                id: "2".to_string(),
+                id: 2u64,
                 value: NormalizedTermValue::from("kubernetes"),
                 display_value: None,
                 url: Some("concept:kubernetes".to_string()),

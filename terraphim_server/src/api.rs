@@ -215,15 +215,15 @@ pub(crate) async fn update_selected_role(
 // NOTE: RoleGraph visualisation DTOs
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GraphNodeDto {
-    pub id: String,
+    pub id: u64,
     pub label: String,
     pub rank: u64,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GraphEdgeDto {
-    pub source: String,
-    pub target: String,
+    pub source: u64,
+    pub target: u64,
     pub rank: u64,
 }
 
@@ -272,7 +272,7 @@ pub(crate) async fn get_rolegraph(
                 .map(|v| v.as_str().to_string())
                 .unwrap_or_else(|| id.to_string());
             GraphNodeDto {
-                id: id.clone(),
+                id: *id,
                 label,
                 rank: node.rank,
             }
@@ -284,7 +284,7 @@ pub(crate) async fn get_rolegraph(
         .edges_map()
         .iter()
         .map(|(edge_id, edge)| {
-            let (source, target) = magic_unpair(edge_id);
+            let (source, target) = magic_unpair(*edge_id);
             GraphEdgeDto {
                 source,
                 target,

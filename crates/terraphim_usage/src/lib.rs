@@ -1,6 +1,9 @@
+#[cfg(feature = "cli")]
 pub mod cli;
 pub mod formatter;
+#[cfg(feature = "providers")]
 pub mod providers;
+#[cfg(feature = "persistence")]
 pub mod store;
 
 use serde::{Deserialize, Serialize};

@@ -550,7 +550,7 @@ impl CommandRegistry {
             thesaurus_data.insert(
                 term_value.clone(),
                 NormalizedTerm {
-                    id: name.len().to_string(),
+                    id: name.len() as u64,
                     value: term_value.clone(),
                     display_value: None,
                     url: Some(format!("command:{}", name)),
@@ -564,7 +564,7 @@ impl CommandRegistry {
                 thesaurus_data.insert(
                     keyword_value.clone(),
                     NormalizedTerm {
-                        id: command.definition.name.len().to_string(),
+                        id: command.definition.name.len() as u64,
                         value: keyword_value,
                         display_value: None,
                         url: Some(format!("command:{}", name)),
@@ -579,7 +579,7 @@ impl CommandRegistry {
                 thesaurus_data.insert(
                     param_value.clone(),
                     NormalizedTerm {
-                        id: param.name.len().to_string(),
+                        id: param.name.len() as u64,
                         value: param_value,
                         display_value: None,
                         url: Some(format!("command:{}:param:{}", name, param.name)),
@@ -736,7 +736,7 @@ impl CommandRegistry {
             thesaurus_data.insert(
                 term_value.clone(),
                 NormalizedTerm {
-                    id: idx.to_string(),
+                    id: idx as u64,
                     value: term_value,
                     display_value: None,
                     url: None,

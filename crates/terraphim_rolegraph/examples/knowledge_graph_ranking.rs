@@ -72,7 +72,7 @@ fn build_agent_thesaurus() -> Thesaurus {
 
     // Concept 1: "agent" -- the core concept
     // Synonyms: "agent", "ai agent", "autonomous agent"
-    let agent_id = "1";
+    let agent_id = 1u64;
     let agent_nterm = NormalizedTermValue::from("agent");
     thesaurus.insert(
         NormalizedTermValue::from("agent"),
@@ -88,7 +88,7 @@ fn build_agent_thesaurus() -> Thesaurus {
     );
 
     // Concept 2: "planning"
-    let planning_id = "2";
+    let planning_id = 2u64;
     let planning_nterm = NormalizedTermValue::from("planning");
     thesaurus.insert(
         NormalizedTermValue::from("planning"),
@@ -100,7 +100,7 @@ fn build_agent_thesaurus() -> Thesaurus {
     );
 
     // Concept 3: "reasoning"
-    let reasoning_id = "3";
+    let reasoning_id = 3u64;
     let reasoning_nterm = NormalizedTermValue::from("reasoning");
     thesaurus.insert(
         NormalizedTermValue::from("reasoning"),
@@ -112,7 +112,7 @@ fn build_agent_thesaurus() -> Thesaurus {
     );
 
     // Concept 4: "tool use"
-    let tool_use_id = "4";
+    let tool_use_id = 4u64;
     let tool_use_nterm = NormalizedTermValue::from("tool use");
     thesaurus.insert(
         NormalizedTermValue::from("tool use"),
@@ -124,7 +124,7 @@ fn build_agent_thesaurus() -> Thesaurus {
     );
 
     // Concept 5: "memory"
-    let memory_id = "5";
+    let memory_id = 5u64;
     let memory_nterm = NormalizedTermValue::from("memory");
     thesaurus.insert(
         NormalizedTermValue::from("memory"),
@@ -321,7 +321,7 @@ async fn main() {
 
     // NEW Concept 6: "reflection" -- maps to "reasoning"
     // This means "reflection" in text will now match the "reasoning" concept.
-    let reasoning_id = "3";
+    let reasoning_id = 3u64;
     let reasoning_nterm = NormalizedTermValue::from("reasoning");
     expanded_thesaurus.insert(
         NormalizedTermValue::from("reflection"),
@@ -334,7 +334,7 @@ async fn main() {
     println!("  + Added \"reflection\" and \"self-reflection\" as synonyms of \"reasoning\"");
 
     // NEW Concept 7: "orchestration" -- maps to "planning"
-    let planning_id = "2";
+    let planning_id = 2u64;
     let planning_nterm = NormalizedTermValue::from("planning");
     expanded_thesaurus.insert(
         NormalizedTermValue::from("orchestration"),
@@ -347,7 +347,7 @@ async fn main() {
     println!("  + Added \"orchestration\" and \"coordination\" as synonyms of \"planning\"");
 
     // NEW Concept 8: "task decomposition" -- a new concept
-    let decomp_id = "6";
+    let decomp_id = 6u64;
     let decomp_nterm = NormalizedTermValue::from("task decomposition");
     expanded_thesaurus.insert(
         NormalizedTermValue::from("task decomposition"),

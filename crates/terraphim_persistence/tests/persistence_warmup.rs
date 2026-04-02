@@ -67,7 +67,7 @@ async fn test_small_data_not_compressed() -> Result<()> {
 
     // Create a small thesaurus (well under compression threshold)
     let mut thesaurus = Thesaurus::new("Small Test".to_string());
-    let term = NormalizedTerm::new("1", NormalizedTermValue::from("concept".to_string()));
+    let term = NormalizedTerm::new(1, NormalizedTermValue::from("concept".to_string()));
     thesaurus.insert(NormalizedTermValue::from("test".to_string()), term);
 
     // Save the thesaurus
@@ -470,7 +470,7 @@ async fn test_all_persistable_types_cached() -> Result<()> {
 
     // Test Thesaurus
     let mut thesaurus = Thesaurus::new("Persistable Test".to_string());
-    let term = NormalizedTerm::new("1", NormalizedTermValue::from("test".to_string()));
+    let term = NormalizedTerm::new(1, NormalizedTermValue::from("test".to_string()));
     thesaurus.insert(NormalizedTermValue::from("key".to_string()), term);
     thesaurus.save().await?;
     let mut loaded_thesaurus = Thesaurus::new("Persistable Test".to_string());

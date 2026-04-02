@@ -1,5 +1,10 @@
+#[cfg(feature = "providers")]
 pub mod claude;
+#[cfg(feature = "providers")]
 pub mod kimi;
+#[cfg(feature = "providers")]
 pub mod minimax;
+#[cfg(feature = "providers")]
 pub mod opencode_go;
+#[cfg(feature = "providers")]
 pub mod zai;

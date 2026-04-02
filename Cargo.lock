@@ -8090,6 +8090,7 @@ dependencies = [
  "terraphim_settings",
  "terraphim_types",
  "terraphim_update",
+ "terraphim_usage",
  "tokio",
 ]
 

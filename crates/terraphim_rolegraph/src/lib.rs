@@ -50,7 +50,7 @@ pub struct GraphStats {
 #[derive(Debug, Clone, Default)]
 pub struct TriggerIndex {
     /// Map from node_id to its trigger description tokens (lowercased)
-    triggers: AHashMap<String, Vec<String>>,
+    triggers: AHashMap<u64, Vec<String>>,
     /// Inverse document frequency for each token
     idf: AHashMap<String, f64>,
     /// Total number of documents with triggers
@@ -100,7 +100,7 @@ impl TriggerIndex {
     }
 
     /// Build the index from a map of node_id -> trigger description
-    pub fn build(&mut self, triggers: AHashMap<String, String>) {
+    pub fn build(&mut self, triggers: AHashMap<u64, String>) {
         self.triggers.clear();
         self.idf.clear();
         self.doc_count = triggers.len();
@@ -126,7 +126,7 @@ impl TriggerIndex {
     }
 
     /// Query the index, returning node_ids with scores above threshold
-    pub fn query(&self, text: &str) -> Vec<(String, f64)> {
+    pub fn query(&self, text: &str) -> Vec<(u64, f64)> {
         if self.triggers.is_empty() {
             return vec![];
         }
@@ -137,7 +137,7 @@ impl TriggerIndex {
         }
 
         // Compute TF-IDF cosine similarity between query and each trigger
-        let mut results: Vec<(String, f64)> = Vec::new();
+        let mut results: Vec<(u64, f64)> = Vec::new();
 
         // Query TF-IDF vector
         let mut query_tfidf: AHashMap<&str, f64> = AHashMap::new();
@@ -239,7 +239,7 @@ impl TriggerIndex {
     }
 
     /// Get the original trigger descriptions (reconstruct from tokens)
-    pub fn get_trigger_descriptions(&self) -> AHashMap<String, String> {
+    pub fn get_trigger_descriptions(&self) -> AHashMap<u64, String> {
         self.triggers
             .iter()
             .map(|(node_id, tokens)| (node_id.clone(), tokens.join(" ")))
@@ -256,21 +256,21 @@ pub struct SerializableRoleGraph {
     /// The role of the graph
     pub role: RoleName,
     /// A mapping from node IDs to nodes
-    pub nodes: AHashMap<String, Node>,
+    pub nodes: AHashMap<u64, Node>,
     /// A mapping from edge IDs to edges
-    pub edges: AHashMap<String, Edge>,
+    pub edges: AHashMap<u64, Edge>,
     /// A mapping from document IDs to indexed documents
     pub documents: AHashMap<String, IndexedDocument>,
     /// A thesaurus is a mapping from synonyms to concepts
     pub thesaurus: Thesaurus,
     /// Aho-Corasick values (needed to rebuild the automata)
-    pub aho_corasick_values: Vec<String>,
+    pub aho_corasick_values: Vec<u64>,
     /// reverse lookup - matched id into normalized term
-    pub ac_reverse_nterm: AHashMap<String, NormalizedTermValue>,
+    pub ac_reverse_nterm: AHashMap<u64, NormalizedTermValue>,
     /// Trigger descriptions for each node_id (used to rebuild TriggerIndex)
-    pub trigger_descriptions: AHashMap<String, String>,
+    pub trigger_descriptions: AHashMap<u64, String>,
     /// Node IDs that are pinned (always included in results)
-    pub pinned_node_ids: Vec<String>,
+    pub pinned_node_ids: Vec<u64>,
 }
 
 impl SerializableRoleGraph {
@@ -300,23 +300,23 @@ pub struct RoleGraph {
     /// The role of the graph
     pub role: RoleName,
     /// A mapping from node IDs to nodes
-    nodes: AHashMap<String, Node>,
+    nodes: AHashMap<u64, Node>,
     /// A mapping from edge IDs to edges
-    edges: AHashMap<String, Edge>,
+    edges: AHashMap<u64, Edge>,
     /// A mapping from document IDs to indexed documents
     documents: AHashMap<String, IndexedDocument>,
     /// A thesaurus is a mapping from synonyms to concepts
     pub thesaurus: Thesaurus,
     /// Aho-Corasick values
-    aho_corasick_values: Vec<String>,
+    aho_corasick_values: Vec<u64>,
     /// Aho-Corasick automata
     pub ac: AhoCorasick,
     /// reverse lookup - matched id into normalized term
-    pub ac_reverse_nterm: AHashMap<String, NormalizedTermValue>,
+    pub ac_reverse_nterm: AHashMap<u64, NormalizedTermValue>,
     /// TF-IDF index over trigger descriptions (semantic fallback)
     trigger_index: TriggerIndex,
     /// Node IDs that are pinned (always included in results)
-    pinned_node_ids: Vec<String>,
+    pinned_node_ids: Vec<u64>,
 }
 
 impl RoleGraph {
@@ -350,19 +350,15 @@ impl RoleGraph {
     /// Build Aho-Corasick automata from thesaurus
     fn build_aho_corasick(
         thesaurus: &Thesaurus,
-    ) -> Result<(
-        AhoCorasick,
-        Vec<String>,
-        AHashMap<String, NormalizedTermValue>,
-    )> {
+    ) -> Result<(AhoCorasick, Vec<u64>, AHashMap<u64, NormalizedTermValue>)> {
         let mut keys = Vec::new();
         let mut values = Vec::new();
         let mut ac_reverse_nterm = AHashMap::new();
 
         for (key, normalized_term) in thesaurus {
             keys.push(key.as_str());
-            values.push(normalized_term.id.clone());
-            ac_reverse_nterm.insert(normalized_term.id.clone(), normalized_term.value.clone());
+            values.push(normalized_term.id);
+            ac_reverse_nterm.insert(normalized_term.id, normalized_term.value.clone());
         }
 
         let ac = AhoCorasick::builder()
@@ -434,7 +430,7 @@ impl RoleGraph {
     /// Find all matches in the rolegraph for the given text
     ///
     /// Returns a list of IDs of the matched nodes
-    pub fn find_matching_node_ids(&self, text: &str) -> Vec<String> {
+    pub fn find_matching_node_ids(&self, text: &str) -> Vec<u64> {
         log::trace!("Finding matching node IDs for text: '{text}'");
         self.ac
             .find_iter(text)
@@ -448,20 +444,20 @@ impl RoleGraph {
         &self,
         text: &str,
         include_pinned: bool,
-    ) -> Vec<String> {
+    ) -> Vec<u64> {
         let mut results = self.find_matching_node_ids(text);
 
         // Pass 2: TF-IDF fallback when Aho-Corasick found nothing
         if results.is_empty() && !self.trigger_index.is_empty() {
             let trigger_matches = self.trigger_index.query(text);
-            results.extend(trigger_matches.iter().map(|(id, _score)| id.clone()));
+            results.extend(trigger_matches.iter().map(|(id, _score)| *id));
         }
 
         // Always include pinned entries
         if include_pinned {
             for pinned_id in &self.pinned_node_ids {
                 if !results.contains(pinned_id) {
-                    results.push(pinned_id.clone());
+                    results.push(*pinned_id);
                 }
             }
         }
@@ -473,8 +469,8 @@ impl RoleGraph {
     /// Call after loading KG entries and building the thesaurus.
     pub fn load_trigger_index(
         &mut self,
-        triggers: AHashMap<String, String>,
-        pinned: Vec<String>,
+        triggers: AHashMap<u64, String>,
+        pinned: Vec<u64>,
         threshold: f64,
     ) {
         let mut index = TriggerIndex::new(threshold);
@@ -501,12 +497,12 @@ impl RoleGraph {
         }
 
         // Build adjacency map of node_id -> neighbor node_ids
-        let mut adj: AHashMap<String, ahash::AHashSet<String>> = AHashMap::new();
+        let mut adj: AHashMap<u64, ahash::AHashSet<u64>> = AHashMap::new();
         for (node_id, node) in &self.nodes {
-            let entry = adj.entry(node_id.clone()).or_default();
+            let entry = adj.entry(*node_id).or_default();
             for edge_id in &node.connected_with {
                 if let Some(edge) = self.edges.get(edge_id) {
-                    let (a, b) = magic_unpair(&edge.id);
+                    let (a, b) = magic_unpair(edge.id);
                     entry.insert(if a == *node_id { b } else { a });
                 }
             }
@@ -522,32 +518,32 @@ impl RoleGraph {
 
         // Backtracking DFS to cover all targets
         fn dfs(
-            current: String,
-            remaining: &mut ahash::AHashSet<String>,
-            adj: &AHashMap<String, ahash::AHashSet<String>>,
-            visited_edges: &mut ahash::AHashSet<(String, String)>,
+            current: u64,
+            remaining: &mut ahash::AHashSet<u64>,
+            adj: &AHashMap<u64, ahash::AHashSet<u64>>,
+            visited_edges: &mut ahash::AHashSet<(u64, u64)>,
         ) -> bool {
             if remaining.is_empty() {
                 return true;
             }
             if let Some(neighbors) = adj.get(&current) {
                 for n in neighbors {
-                    let edge = if &current < n {
-                        (current.clone(), n.clone())
+                    let edge = if current < *n {
+                        (current, *n)
                     } else {
-                        (n.clone(), current.clone())
+                        (*n, current)
                     };
                     if visited_edges.contains(&edge) {
                         continue;
                     }
                     let removed = remaining.remove(n);
-                    visited_edges.insert(edge.clone());
-                    if dfs(n.clone(), remaining, adj, visited_edges) {
+                    visited_edges.insert(edge);
+                    if dfs(*n, remaining, adj, visited_edges) {
                         return true;
                     }
                     visited_edges.remove(&edge);
                     if removed {
-                        remaining.insert(n.clone());
+                        remaining.insert(*n);
                     }
                 }
             }
@@ -556,10 +552,10 @@ impl RoleGraph {
 
         // Try starting from each target
         for start in &targets {
-            let mut remaining: ahash::AHashSet<String> = targets.iter().cloned().collect();
+            let mut remaining: ahash::AHashSet<u64> = targets.iter().cloned().collect();
             remaining.remove(start);
-            let mut visited_edges: ahash::AHashSet<(String, String)> = ahash::AHashSet::new();
-            if dfs(start.clone(), &mut remaining, &adj, &mut visited_edges) {
+            let mut visited_edges: ahash::AHashSet<(u64, u64)> = ahash::AHashSet::new();
+            if dfs(*start, &mut remaining, &adj, &mut visited_edges) {
                 return true;
             }
         }
@@ -1090,29 +1086,23 @@ impl RoleGraph {
         self.documents.contains_key(document_id)
     }
 
-    pub fn add_or_update_document(
-        &mut self,
-        document_id: &str,
-        x: impl AsRef<str>,
-        y: impl AsRef<str>,
-    ) {
-        let edge_id = magic_pair(&x, &y);
+    pub fn add_or_update_document(&mut self, document_id: &str, x: u64, y: u64) {
+        let edge_id = magic_pair(x, y);
         let edge = self.init_or_update_edge(edge_id, document_id);
         self.init_or_update_node(x, &edge);
         self.init_or_update_node(y, &edge);
     }
 
-    fn init_or_update_node(&mut self, node_id: impl AsRef<str>, edge: &Edge) {
-        let node_id_str = node_id.as_ref().to_string();
-        match self.nodes.entry(node_id_str.clone()) {
+    fn init_or_update_node(&mut self, node_id: u64, edge: &Edge) {
+        match self.nodes.entry(node_id) {
             Entry::Vacant(_) => {
-                let node = Node::new(node_id_str, edge.clone());
-                self.nodes.insert(node.id.clone(), node);
+                let node = Node::new(node_id, edge.clone());
+                self.nodes.insert(node.id, node);
             }
             Entry::Occupied(mut entry) => {
                 let node = entry.get_mut();
                 node.rank += 1;
-                node.connected_with.insert(edge.id.clone());
+                node.connected_with.insert(edge.id);
             }
         };
     }
@@ -1190,12 +1180,11 @@ impl RoleGraph {
         document_ids.into_iter().collect()
     }
 
-    fn init_or_update_edge(&mut self, edge_key: impl AsRef<str>, document_id: &str) -> Edge {
-        let edge_key_str = edge_key.as_ref().to_string();
-        match self.edges.entry(edge_key_str.clone()) {
+    fn init_or_update_edge(&mut self, edge_key: u64, document_id: &str) -> Edge {
+        match self.edges.entry(edge_key) {
             Entry::Vacant(_) => {
-                let edge = Edge::new(edge_key_str, document_id.to_string());
-                self.edges.insert(edge.id.clone(), edge.clone());
+                let edge = Edge::new(edge_key, document_id.to_string());
+                self.edges.insert(edge.id, edge.clone());
                 edge
             }
             Entry::Occupied(mut entry) => {
@@ -1222,12 +1211,12 @@ impl RoleGraph {
     }
 
     /// Public accessor for nodes collection
-    pub fn nodes_map(&self) -> &ahash::AHashMap<String, Node> {
+    pub fn nodes_map(&self) -> &ahash::AHashMap<u64, Node> {
         &self.nodes
     }
 
     /// Public accessor for edges collection
-    pub fn edges_map(&self) -> &ahash::AHashMap<String, Edge> {
+    pub fn edges_map(&self) -> &ahash::AHashMap<u64, Edge> {
         &self.edges
     }
 }
@@ -1301,32 +1290,18 @@ pub fn split_paragraphs(paragraphs: &str) -> Vec<&str> {
         .collect()
 }
 
-/// Create a unique edge ID from two node IDs.
-/// Uses a concatenation approach with consistent ordering for idempotency.
+/// Magic pair - Cantor pairing function for edge IDs
 #[inline]
-pub fn magic_pair(x: impl AsRef<str>, y: impl AsRef<str>) -> String {
-    let x = x.as_ref();
-    let y = y.as_ref();
-    // Ensure consistent ordering for idempotency
-    if x <= y {
-        format!("{}#{}", x, y)
-    } else {
-        format!("{}#{}", y, x)
-    }
+pub fn magic_pair(x: u64, y: u64) -> u64 {
+    if x >= y { x * x + x + y } else { y * y + x }
 }
 
-/// Split an edge ID back into the two node IDs.
-/// Returns (first_id, second_id) as they appear in the edge ID.
+/// Magic unpair - inverse of Cantor pairing
 #[inline]
-pub fn magic_unpair(z: impl AsRef<str>) -> (String, String) {
-    let z = z.as_ref();
-    let parts: Vec<&str> = z.split('#').collect();
-    if parts.len() == 2 {
-        (parts[0].to_string(), parts[1].to_string())
-    } else {
-        // Fallback: return the whole string as first, empty as second
-        (z.to_string(), String::new())
-    }
+pub fn magic_unpair(z: u64) -> (u64, u64) {
+    let q = (z as f64).sqrt().floor() as u64;
+    let l = z - q * q;
+    if l < q { (l, q) } else { (q, l - q) }
 }
 
 // Examples for serialization usage
@@ -2066,15 +2041,12 @@ mod tests {
     async fn tfidf_exact_match_scores_high() {
         let mut index = TriggerIndex::new(0.3);
         let mut triggers = AHashMap::new();
-        triggers.insert(
-            "1".to_string(),
-            "managing dependencies in rust projects".to_string(),
-        );
+        triggers.insert(1u64, "managing dependencies in rust projects".to_string());
         index.build(triggers);
 
         let results = index.query("managing dependencies rust");
         assert!(!results.is_empty());
-        assert_eq!(results[0].0, "1");
+        assert_eq!(results[0].0, 1u64);
         assert!(results[0].1 >= 0.3); // Above threshold
     }
 
@@ -2082,7 +2054,7 @@ mod tests {
     async fn tfidf_no_match_scores_zero() {
         let mut index = TriggerIndex::new(0.3);
         let mut triggers = AHashMap::new();
-        triggers.insert("1".to_string(), "machine learning algorithms".to_string());
+        triggers.insert(1u64, "machine learning algorithms".to_string());
         index.build(triggers);
 
         let results = index.query("quantum physics astronomy");
@@ -2094,7 +2066,7 @@ mod tests {
     async fn tfidf_partial_match() {
         let mut index = TriggerIndex::new(0.1); // Lower threshold for partial match
         let mut triggers = AHashMap::new();
-        triggers.insert("1".to_string(), "managing dependencies cargo".to_string());
+        triggers.insert(1u64, "managing dependencies cargo".to_string());
         index.build(triggers);
 
         let results = index.query("managing cargo");
@@ -2108,7 +2080,7 @@ mod tests {
         let mut index = TriggerIndex::new(0.8); // High threshold
         let mut triggers = AHashMap::new();
         triggers.insert(
-            "1".to_string(),
+            1u64,
             "machine learning deep learning neural networks".to_string(),
         );
         index.build(triggers);
@@ -2124,10 +2096,7 @@ mod tests {
         // Create a simple scenario where Aho-Corasick finds matches
         let mut index = TriggerIndex::new(0.3);
         let mut triggers = AHashMap::new();
-        triggers.insert(
-            "999".to_string(),
-            "fallback trigger when no synonym match".to_string(),
-        );
+        triggers.insert(999u64, "fallback trigger when no synonym match".to_string());
         index.build(triggers);
 
         // Build index but don't add it to rolegraph since we just want to test
@@ -2135,7 +2104,7 @@ mod tests {
         // This is a unit test of the TriggerIndex behavior, not the integration
         let results = index.query("fallback trigger");
         assert!(!results.is_empty());
-        assert_eq!(results[0].0, "999");
+        assert_eq!(results[0].0, 999u64);
     }
 
     #[tokio::test]
@@ -2147,17 +2116,14 @@ mod tests {
 
         // Load trigger index
         let mut triggers = AHashMap::new();
-        triggers.insert(
-            "100".to_string(),
-            "managing dependencies cargo rust".to_string(),
-        );
+        triggers.insert(100u64, "managing dependencies cargo rust".to_string());
         rolegraph.load_trigger_index(triggers, vec![], 0.3);
 
         // Query that won't match Aho-Corasick but should match trigger
         let results =
             rolegraph.find_matching_node_ids_with_fallback("managing cargo dependencies", false);
         assert!(!results.is_empty());
-        assert!(results.contains(&"100".to_string()));
+        assert!(results.contains(&100u64));
     }
 
     #[tokio::test]
@@ -2169,13 +2135,13 @@ mod tests {
 
         // Load trigger index with a pinned node
         let mut triggers = AHashMap::new();
-        triggers.insert("200".to_string(), "some trigger text".to_string());
-        rolegraph.load_trigger_index(triggers, vec!["300".to_string()], 0.3); // 300 is pinned
+        triggers.insert(200u64, "some trigger text".to_string());
+        rolegraph.load_trigger_index(triggers, vec![300u64], 0.3); // 300 is pinned
 
         // Query that matches nothing - but pinned should still be included
         let results =
             rolegraph.find_matching_node_ids_with_fallback("completely unrelated query xyz", true);
-        assert!(results.contains(&"300".to_string()));
+        assert!(results.contains(&300u64));
     }
 
     #[tokio::test]
@@ -2186,17 +2152,17 @@ mod tests {
 
         // Load trigger index and pinned nodes
         let mut triggers = AHashMap::new();
-        triggers.insert("1".to_string(), "trigger one".to_string());
-        triggers.insert("2".to_string(), "trigger two".to_string());
-        let pinned = vec!["1".to_string()];
+        triggers.insert(1u64, "trigger one".to_string());
+        triggers.insert(2u64, "trigger two".to_string());
+        let pinned = vec![1u64];
         rolegraph.load_trigger_index(triggers, pinned, 0.3);
 
         // Serialize
         let serializable = rolegraph.to_serializable();
         assert_eq!(serializable.trigger_descriptions.len(), 2);
-        assert!(serializable.trigger_descriptions.contains_key("1"));
-        assert!(serializable.trigger_descriptions.contains_key("2"));
-        assert_eq!(serializable.pinned_node_ids, vec!["1".to_string()]);
+        assert!(serializable.trigger_descriptions.contains_key(&1u64));
+        assert!(serializable.trigger_descriptions.contains_key(&2u64));
+        assert_eq!(serializable.pinned_node_ids, vec![1u64]);
 
         // Deserialize and restore
         let json = serializable.to_json().unwrap();
@@ -2204,10 +2170,10 @@ mod tests {
         let restored = RoleGraph::from_serializable(deserialized).await.unwrap();
 
         // Verify trigger data is preserved
-        assert_eq!(restored.pinned_node_ids, vec!["1".to_string()]);
+        assert_eq!(restored.pinned_node_ids, vec![1u64]);
 
         // Verify trigger index is functional after restore
         let results = restored.find_matching_node_ids_with_fallback("trigger one text", false);
-        assert!(results.contains(&"1".to_string()));
+        assert!(results.contains(&1u64));
     }
 }
