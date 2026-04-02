@@ -1,5 +1,4 @@
 use ahash::AHashMap;
-use cached::proc_macro::cached;
 use itertools::Itertools;
 use regex::Regex;
 use std::collections::hash_map::Entry;

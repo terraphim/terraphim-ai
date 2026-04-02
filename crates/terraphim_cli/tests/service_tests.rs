@@ -390,7 +390,7 @@ mod output_format_tests {
 
         #[derive(serde::Serialize, serde::Deserialize)]
         struct ThesaurusTerm {
-            id: u64,
+            id: String,
             term: String,
             normalized: String,
             url: Option<String>,
@@ -400,7 +400,7 @@ mod output_format_tests {
             role: "Default".to_string(),
             name: "default".to_string(),
             terms: vec![ThesaurusTerm {
-                id: 1,
+                id: "550e8400-e29b-41d4-a716-446655440000".to_string(),
                 term: "rust".to_string(),
                 normalized: "rust programming language".to_string(),
                 url: Some("https://rust-lang.org".to_string()),
