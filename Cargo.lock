@@ -2355,7 +2355,7 @@ dependencies = [
  "memmap2",
  "neo_frizbee",
  "notify 8.2.0",
- "notify-debouncer-full",
+ "notify-debouncer-full 0.7.0",
  "once_cell",
  "parking_lot 0.12.5",
  "pathdiff",
@@ -4602,6 +4602,19 @@ dependencies = [
  "notify-types",
  "walkdir",
  "windows-sys 0.60.2",
+]
+
+[[package]]
+name = "notify-debouncer-full"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "375bd3a138be7bfeff3480e4a623df4cbfb55b79df617c055cd810ba466fa078"
+dependencies = [
+ "file-id",
+ "log",
+ "notify 8.2.0",
+ "notify-types",
+ "walkdir",
 ]
 
 [[package]]
@@ -8756,8 +8769,12 @@ name = "terraphim_file_search"
 version = "1.16.0"
 dependencies = [
  "ahash",
+ "criterion 0.5.1",
  "fff-search",
+ "notify 8.2.0",
+ "notify-debouncer-full 0.6.0",
  "parking_lot 0.12.5",
+ "tempfile",
  "terraphim_automata",
  "terraphim_types",
  "tokio",
