@@ -10,8 +10,7 @@ use ahash::AHashMap;
 use std::sync::Arc;
 use terraphim_config::Role;
 use terraphim_multi_agent::{
-    test_utils::create_test_role, AgentRegistry, CommandInput, CommandType, MultiAgentResult,
-    TerraphimAgent,
+    test_utils::create_test_role, CommandInput, CommandType, MultiAgentResult, TerraphimAgent,
 };
 use terraphim_persistence::DeviceStorage;
 use terraphim_types::RelevanceFunction;
@@ -169,9 +168,10 @@ async fn example_agent_registry() -> MultiAgentResult<()> {
     let persistence = Arc::new(storage_copy);
 
     // Create registry
-    let registry = AgentRegistry::new();
+    // TODO: Migrate to KnowledgeGraphAgentRegistry
+    // let _registry = KnowledgeGraphAgentRegistry::new(...);
 
-    // Create and register specialized agents
+    // Create specialized agents (registry temporarily disabled during migration)
     let roles = create_specialized_roles();
 
     for role in roles {
@@ -182,29 +182,15 @@ async fn example_agent_registry() -> MultiAgentResult<()> {
         let agent_id = agent.agent_id;
         let _capabilities = agent.get_capabilities();
 
-        // Register agent using the new API
-        let agent_arc = Arc::new(agent);
-        registry.register_agent(agent_arc).await?;
+        // TODO: Re-enable with KnowledgeGraphAgentRegistry
+        // registry.register_agent(agent_arc).await?;
 
-        println!("✅ Registered agent: {} (ID: {})", role_name, agent_id);
+        println!("✅ Created agent: {} (ID: {})", role_name, agent_id);
     }
 
-    // Discover agents by capability using the new API
-    let code_review_agents = registry.find_agents_by_capability("code_review").await;
-    println!("🔍 Code review agents: {:?}", code_review_agents);
-
-    let documentation_agents = registry.find_agents_by_capability("documentation").await;
-    println!("🔍 Documentation agents: {:?}", documentation_agents);
-
-    let performance_agents = registry
-        .find_agents_by_capability("performance_analysis")
-        .await;
-    println!("🔍 Performance agents: {:?}", performance_agents);
-
-    println!(
-        "📊 Total registered agents: {}",
-        registry.get_all_agents().await.len()
-    );
+    // TODO: Re-enable agent discovery with KG registry
+    println!("🔍 Agent discovery temporarily disabled during migration");
+    println!("📊 Registry migration in progress");
 
     Ok(())
 }
@@ -226,15 +212,14 @@ async fn example_coordinated_execution() -> MultiAgentResult<()> {
     let storage_copy = unsafe { ptr::read(storage) };
     let persistence = Arc::new(storage_copy);
 
-    // Create registry and register specialized agents
-    let registry = AgentRegistry::new();
+    // Create specialized agents (registry temporarily disabled during migration)
     let roles = create_specialized_roles();
+    let mut agents = Vec::new();
 
     for role in roles {
         let agent = TerraphimAgent::new(role, persistence.clone(), None).await?;
         agent.initialize().await?;
-        let agent_arc = Arc::new(agent);
-        registry.register_agent(agent_arc).await?;
+        agents.push(Arc::new(agent));
     }
 
     // Task: Create and review a Rust function
@@ -243,9 +228,8 @@ async fn example_coordinated_execution() -> MultiAgentResult<()> {
     println!("🎯 Collaborative Task: {}", task);
     println!();
 
-    // Get all agents from registry for coordination
-    let all_agents = registry.get_all_agents().await;
-    if all_agents.len() < 3 {
+    // Get all agents for coordination
+    if agents.len() < 3 {
         println!("⚠️ Need at least 3 agents for coordinated execution");
         return Ok(());
     }
@@ -253,96 +237,47 @@ async fn example_coordinated_execution() -> MultiAgentResult<()> {
     // Step 1: Code generation (using first agent)
     println!("👨‍💻 Step 1: Code Generation");
     let code_input = CommandInput::new(task.to_string(), CommandType::Generate);
-    let code_result = all_agents[0].process_command(code_input).await?;
+    let code_result = agents[0].process_command(code_input).await?;
     println!("Generated code:\n{}\n", code_result.text);
 
-    // Step 2: Code review (using agents with code review capability)
+    // Step 2: Code review (using second agent)
     println!("🔍 Step 2: Code Review");
-    let code_review_agents = registry.find_agents_by_capability("code_review").await;
-    if !code_review_agents.is_empty() {
-        if let Some(reviewer_agent) = registry.get_agent(&code_review_agents[0]).await {
-            let review_input = CommandInput::new(
-                format!(
-                    "Review this Rust code for quality and security:\n{}",
-                    code_result.text
-                ),
-                CommandType::Review,
-            );
-            let review_result = reviewer_agent.process_command(review_input).await?;
-            println!("Review feedback:\n{}\n", review_result.text);
-        }
-    } else {
-        println!("No code review agents found, using general agent");
-        let review_input = CommandInput::new(
-            format!(
-                "Review this Rust code for quality and security:\n{}",
-                code_result.text
-            ),
-            CommandType::Review,
-        );
-        let review_result = all_agents[0].process_command(review_input).await?;
-        println!("Review feedback:\n{}\n", review_result.text);
-    }
+    let review_input = CommandInput::new(
+        format!(
+            "Review this Rust code for quality and security:\n{}",
+            code_result.text
+        ),
+        CommandType::Review,
+    );
+    let review_result = agents[0].process_command(review_input).await?;
+    println!("Review feedback:\n{}\n", review_result.text);
 
-    // Step 3: Documentation (using documentation agents)
+    // Step 3: Documentation (using third agent)
     println!("📝 Step 3: Documentation Generation");
-    let doc_agents = registry.find_agents_by_capability("documentation").await;
-    if !doc_agents.is_empty() {
-        if let Some(doc_agent) = registry.get_agent(&doc_agents[0]).await {
-            let doc_input = CommandInput::new(
-                format!(
-                    "Create documentation for this Rust function:\n{}",
-                    code_result.text
-                ),
-                CommandType::Generate,
-            );
-            let doc_result = doc_agent.process_command(doc_input).await?;
-            println!("Documentation:\n{}\n", doc_result.text);
-        }
-    } else {
-        println!("No documentation agents found, using general agent");
-        let doc_input = CommandInput::new(
-            format!(
-                "Create documentation for this Rust function:\n{}",
-                code_result.text
-            ),
-            CommandType::Generate,
-        );
-        let doc_result = all_agents[1].process_command(doc_input).await?;
-        println!("Documentation:\n{}\n", doc_result.text);
-    }
+    let doc_input = CommandInput::new(
+        format!(
+            "Create documentation for this Rust function:\n{}",
+            code_result.text
+        ),
+        CommandType::Generate,
+    );
+    let doc_result = agents[1].process_command(doc_input).await?;
+    println!("Documentation:\n{}\n", doc_result.text);
 
-    // Step 4: Performance analysis (using performance agents)
+    // Step 4: Performance analysis (using third agent)
     println!("⚡ Step 4: Performance Analysis");
-    let perf_agents = registry
-        .find_agents_by_capability("performance_analysis")
-        .await;
-    if !perf_agents.is_empty() {
-        if let Some(perf_agent) = registry.get_agent(&perf_agents[0]).await {
-            let perf_input = CommandInput::new(
-                format!(
-                    "Analyze the performance of this Rust function and suggest optimizations:\n{}",
-                    code_result.text
-                ),
-                CommandType::Analyze,
-            );
-            let perf_result = perf_agent.process_command(perf_input).await?;
-            println!("Performance analysis:\n{}\n", perf_result.text);
-        }
-    } else {
-        println!("No performance agents found, using general agent");
-        let perf_input = CommandInput::new(
-            format!(
-                "Analyze the performance of this Rust function and suggest optimizations:\n{}",
-                code_result.text
-            ),
-            CommandType::Analyze,
-        );
-        let perf_result = all_agents[2].process_command(perf_input).await?;
-        println!("Performance analysis:\n{}\n", perf_result.text);
-    }
+    let perf_input = CommandInput::new(
+        format!(
+            "Analyze the performance of this Rust function and suggest optimizations:\n{}",
+            code_result.text
+        ),
+        CommandType::Analyze,
+    );
+    let perf_result = agents[2].process_command(perf_input).await?;
+    println!("Performance analysis:\n{}\n", perf_result.text);
 
-    println!("✅ Collaborative task completed with registry-based multi-agent coordination!");
+    println!("✅ Collaborative task completed with multi-agent coordination!");
+    println!("📝 Note: Registry-based discovery temporarily disabled during migration");
 
     Ok(())
 }

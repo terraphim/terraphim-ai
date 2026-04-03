@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use terraphim_multi_agent::{test_utils::*, *};
+use terraphim_multi_agent::{agent::AgentStatus, test_utils::*, TerraphimAgent};
 
 #[tokio::test]
 async fn test_agent_creation_with_defaults() {
