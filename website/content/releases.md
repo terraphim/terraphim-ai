@@ -35,22 +35,13 @@ v1.5.2 includes bug fixes and performance improvements:
 
 Choose your preferred method:
 
-\`\`\`bash
-# Universal installer
+```bash
+# Universal installer (recommended)
 curl -fsSL https://raw.githubusercontent.com/terraphim/terraphim-ai/main/scripts/install.sh | bash
 
-# Homebrew
-brew install terraphim-server terraphim-agent
-
 # Cargo
-cargo install terraphim-repl terraphim-cli
-
-# npm
-npm install @terraphim/autocomplete
-
-# PyPI
-pip install terraphim-automata
-\`\`\`
+cargo install terraphim-agent terraphim-cli
+```
 
 [Installation Guide](/docs/installation)
 
@@ -108,23 +99,14 @@ Check the [main branch](https://github.com/terraphim/terraphim-ai/tree/main) for
 
 ### From Any Version to Latest
 
-\`\`\`bash
+```bash
 # Universal installer (recommended)
 curl -fsSL https://raw.githubusercontent.com/terraphim/terraphim-ai/main/scripts/install.sh | bash
 
-# Homebrew
-brew upgrade terraphim-server terraphim-agent
-
 # Cargo
-cargo install terraphim-repl --force
+cargo install terraphim-agent --force
 cargo install terraphim-cli --force
-
-# npm
-npm update @terraphim/autocomplete
-
-# PyPI
-pip install --upgrade terraphim-automata
-\`\`\`
+```
 
 ### Configuration Compatibility
 
@@ -149,11 +131,10 @@ For detailed release notes and changelogs, visit:
 
 After installation or upgrade, verify your version:
 
-\`\`\`bash
+```bash
 terraphim-server --version
 terraphim-agent --version
-terraphim-repl --version
-\`\`\`
+```
 
 Expected output: \`Terraphim Server v1.5.2\` (or your installed version).
 
