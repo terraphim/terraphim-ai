@@ -88,15 +88,21 @@ pub struct GiteaOutputConfig {
 /// Configuration for mention-driven dispatch.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MentionConfig {
-    /// Issue numbers to watch for @adf: mentions.
+    /// DEPRECATED: Issue numbers to watch. Ignored when cursor polling is active.
     #[serde(default)]
     pub watch_issues: Vec<u64>,
-    /// Maximum dispatch depth per issue to prevent infinite loops.
+    /// DEPRECATED: Max dispatch depth per issue. Replaced by max_dispatches_per_tick.
     #[serde(default = "default_max_mention_depth")]
     pub max_mention_depth: u32,
     /// Poll every N reconciliation ticks (default 2).
     #[serde(default = "default_poll_modulo")]
     pub poll_modulo: u64,
+    /// Max mentions to dispatch per poll tick (default 3).
+    #[serde(default = "default_max_dispatches_per_tick")]
+    pub max_dispatches_per_tick: u32,
+    /// Max concurrent mention-spawned agents (default 5).
+    #[serde(default = "default_max_concurrent_mention_agents")]
+    pub max_concurrent_mention_agents: u32,
 }
 
 fn default_max_mention_depth() -> u32 {
@@ -105,6 +111,14 @@ fn default_max_mention_depth() -> u32 {
 
 fn default_poll_modulo() -> u64 {
     2
+}
+
+fn default_max_dispatches_per_tick() -> u32 {
+    3
+}
+
+fn default_max_concurrent_mention_agents() -> u32 {
+    5
 }
 
 /// Lightweight reference to an SFIA skill code and level.
