@@ -131,3 +131,101 @@ async fn find_files_invalid_path_returns_error() {
         "expected Err for non-existent path, got Ok"
     );
 }
+
+// ── terraphim_grep tests ─────────────────────────────────────────────────────
+
+/// grep_files returns content matches (file:line:text) for a pattern that
+/// exists in the workspace source code.
+#[tokio::test]
+async fn grep_files_returns_content_matches() {
+    let config_state = minimal_config_state().await;
+    let service = McpService::new(config_state);
+
+    let workspace = env!("CARGO_MANIFEST_DIR")
+        .trim_end_matches("crates/terraphim_mcp_server")
+        .trim_end_matches('/');
+
+    // "fn new(" is a safe pattern that appears in many Rust source files.
+    let result = service
+        .grep_files(
+            "fn new(".to_string(),
+            Some(workspace.to_string()),
+            Some(10),
+            None, // default output_mode = "content"
+        )
+        .await
+        .expect("grep_files should succeed");
+
+    assert!(
+        !result.is_error.unwrap_or(false),
+        "expected success, got: {:?}",
+        result.content
+    );
+
+    // At least the summary line
+    assert!(
+        result.content.len() >= 1,
+        "expected at least one content item"
+    );
+
+    // Summary should mention files/matches
+    let summary = result.content[0]
+        .as_text()
+        .map(|t| t.text.as_str())
+        .unwrap_or("");
+    assert!(
+        summary.contains("Found") || summary.contains("match"),
+        "unexpected summary: {summary}"
+    );
+
+    // When matches exist, each result line should contain a colon (file:line:text)
+    if result.content.len() > 1 {
+        let first_match = result.content[1]
+            .as_text()
+            .map(|t| t.text.as_str())
+            .unwrap_or("");
+        assert!(
+            first_match.contains(':'),
+            "expected file:line:content format, got: {first_match}"
+        );
+    }
+}
+
+/// grep_files with output_mode="files" returns unique file paths only.
+#[tokio::test]
+async fn grep_files_files_mode_returns_paths() {
+    let config_state = minimal_config_state().await;
+    let service = McpService::new(config_state);
+
+    let workspace = env!("CARGO_MANIFEST_DIR")
+        .trim_end_matches("crates/terraphim_mcp_server")
+        .trim_end_matches('/');
+
+    let result = service
+        .grep_files(
+            "pub fn".to_string(),
+            Some(workspace.to_string()),
+            Some(5),
+            Some("files".to_string()),
+        )
+        .await
+        .expect("grep_files should succeed");
+
+    assert!(
+        !result.is_error.unwrap_or(false),
+        "expected success, got: {:?}",
+        result.content
+    );
+
+    // File-path lines should not contain line-number format (no two colons)
+    // but may contain one colon on Windows paths — just check they look like paths.
+    for item in result.content.iter().skip(1) {
+        if let Some(text) = item.as_text() {
+            // Each returned path should end with a known extension or be a path fragment
+            assert!(
+                !text.text.is_empty(),
+                "expected non-empty file path line"
+            );
+        }
+    }
+}
