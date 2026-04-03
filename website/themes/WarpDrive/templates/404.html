@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}
+{{ config.title }} | 404 Not Found
+{% endblock %}
+
+{% block content %}
+<div class="error-page">
+  <div class="error-code">404</div>
+  <h1 class="error-message">Course Not Found</h1>
+  <p class="error-subtitle">The coordinates you entered do not match any known waypoint in this sector.</p>
+  <a href="{{ config.base_url }}" class="btn btn-primary">
+    <i class="fa-solid fa-house" aria-hidden="true"></i>
+    Return to Bridge
+  </a>
+</div>
+{% endblock %}

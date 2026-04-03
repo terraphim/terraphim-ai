@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block title %}
+{{ config.title }} | {{ section.title }}
+{% endblock title %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-inner">
+    <div class="section-overline">
+      <i class="fa-solid fa-folder-open" aria-hidden="true"></i>
+      {{ section.title }}
+    </div>
+    <h1 class="section-title">{{ section.title }}</h1>
+    {% if section.description %}
+    <p class="section-subtitle">{{ section.description }}</p>
+    {% endif %}
+  </div>
+</div>
+
+{% if section.content %}
+<div class="article-container">
+  <div class="prose">
+    {{ section.content | safe }}
+  </div>
+</div>
+{% endif %}
+
+<div class="post-list">
+  {% if paginator %}
+  {% set pages = paginator.pages %}
+  {% else %}
+  {% set pages = section.pages %}
+  {% endif %}
+
+  {% for page in pages %}
+  <article class="post-card">
+    <h2 class="post-card-title">
+      <a href="{{ page.permalink }}">{{ page.title }}</a>
+    </h2>
+    {{ macros::post_card_meta(page=page) }}
+    {% if page.summary %}
+    <div class="post-card-summary">{{ page.summary | safe }}</div>
+    {% elif page.description %}
+    <p class="post-card-summary">{{ page.description }}</p>
+    {% endif %}
+    <a class="post-card-read-more" href="{{ page.permalink }}">
+      Read More <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+    </a>
+    {% if page.taxonomies.categories or page.taxonomies.tags %}
+    <div class="post-card-tags">
+      {% if page.taxonomies.categories %}
+      {{ macros::render_categories(categories=page.taxonomies.categories) }}
+      {% endif %}
+      {% if page.taxonomies.tags %}
+      {{ macros::render_tags(tags=page.taxonomies.tags) }}
+      {% endif %}
+    </div>
+    {% endif %}
+  </article>
+  {% endfor %}
+</div>
+{% endblock %}
