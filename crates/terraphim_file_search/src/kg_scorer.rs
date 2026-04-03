@@ -62,10 +62,7 @@ impl ExternalScorer for KgPathScorer {
             }
         };
 
-        let unique_ids: AHashSet<&str> = matches
-            .iter()
-            .map(|m| m.normalized_term.id.as_str())
-            .collect();
+        let unique_ids: AHashSet<u64> = matches.iter().map(|m| m.normalized_term.id).collect();
 
         let unique_count = unique_ids.len() as i32;
         (unique_count * self.config.weight_per_term).min(self.config.max_boost)
@@ -96,10 +93,10 @@ mod tests {
         )
     }
 
-    fn make_term(id: &str, value: &str) -> (NormalizedTermValue, NormalizedTerm) {
+    fn make_term(id: u64, value: &str) -> (NormalizedTermValue, NormalizedTerm) {
         let key = NormalizedTermValue::from(value.to_string());
         let term = NormalizedTerm {
-            id: id.to_string(),
+            id,
             value: NormalizedTermValue::from(value.to_string()),
             display_value: None,
             url: None,
@@ -107,10 +104,10 @@ mod tests {
         (key, term)
     }
 
-    fn thesaurus_with(entries: &[(&str, &str)]) -> Thesaurus {
+    fn thesaurus_with(entries: &[(u64, &str)]) -> Thesaurus {
         let mut t = Thesaurus::new("test".to_string());
         for (id, val) in entries {
-            let (k, v) = make_term(id, val);
+            let (k, v) = make_term(*id, val);
             t.insert(k, v);
         }
         t
@@ -125,7 +122,7 @@ mod tests {
 
     #[test]
     fn path_match_returns_weight() {
-        let t = thesaurus_with(&[("1", "automata")]);
+        let t = thesaurus_with(&[(1, "automata")]);
         let scorer = KgPathScorer::new(t);
         let file = make_file("crates/terraphim_automata/src/lib.rs");
         // "automata" appears once -> 1 * 5 = 5
@@ -134,7 +131,7 @@ mod tests {
 
     #[test]
     fn no_match_returns_zero() {
-        let t = thesaurus_with(&[("1", "blockchain")]);
+        let t = thesaurus_with(&[(1, "blockchain")]);
         let scorer = KgPathScorer::new(t);
         let file = make_file("src/main.rs");
         assert_eq!(scorer.score(&file), 0);
@@ -142,7 +139,7 @@ mod tests {
 
     #[test]
     fn multiple_unique_terms_sum_weights() {
-        let t = thesaurus_with(&[("1", "terraphim"), ("2", "automata")]);
+        let t = thesaurus_with(&[(1, "terraphim"), (2, "automata")]);
         let scorer = KgPathScorer::new(t);
         // path contains both "terraphim" and "automata"
         let file = make_file("crates/terraphim_automata/src/lib.rs");
@@ -153,12 +150,10 @@ mod tests {
     #[test]
     fn score_capped_at_max_boost() {
         // 7 unique terms * 5 = 35, capped at 30
-        let entries: Vec<(String, String)> = (1..=7)
-            .map(|i| (i.to_string(), format!("term{i}")))
-            .collect();
+        let entries: Vec<(u64, String)> = (1..=7).map(|i| (i as u64, format!("term{i}"))).collect();
         let mut t = Thesaurus::new("test".to_string());
         for (id, val) in &entries {
-            let (k, v) = make_term(id, val);
+            let (k, v) = make_term(*id, val);
             t.insert(k, v);
         }
         let path = entries
@@ -173,14 +168,14 @@ mod tests {
 
     #[test]
     fn hot_reload_updates_thesaurus() {
-        let old = thesaurus_with(&[("1", "oldterm")]);
+        let old = thesaurus_with(&[(1, "oldterm")]);
         let scorer = KgPathScorer::new(old);
         let file = make_file("src/oldterm.rs");
 
         assert_eq!(scorer.score(&file), 5);
 
         // Replace with a thesaurus that does not match
-        let new_t = thesaurus_with(&[("2", "newterm")]);
+        let new_t = thesaurus_with(&[(2, "newterm")]);
         scorer.update_thesaurus(new_t);
 
         // "oldterm" no longer in thesaurus

@@ -16,12 +16,12 @@ async fn minimal_config_state() -> Arc<ConfigState> {
     Arc::new(state)
 }
 
-fn thesaurus_with_terms(name: &str, terms: &[(&str, &str)]) -> Thesaurus {
+fn thesaurus_with_terms(name: &str, terms: &[(u64, &str)]) -> Thesaurus {
     let mut t = Thesaurus::new(name.to_string());
     for (id, val) in terms {
         let key = NormalizedTermValue::from(val.to_string());
         let term = NormalizedTerm {
-            id: id.to_string(),
+            id: *id,
             value: NormalizedTermValue::from(val.to_string()),
             display_value: None,
             url: None,
@@ -76,7 +76,7 @@ async fn find_files_with_kg_scorer_boosts_matching_paths() {
 
     // Build a thesaurus that recognises "automata" - files under
     // crates/terraphim_automata/ should be boosted.
-    let thesaurus = thesaurus_with_terms("test", &[("1", "automata")]);
+    let thesaurus = thesaurus_with_terms("test", &[(1, "automata")]);
     let scorer = Arc::new(KgPathScorer::new(thesaurus));
     let service = McpService::new(config_state).with_kg_scorer(scorer);
 
@@ -222,10 +222,7 @@ async fn grep_files_files_mode_returns_paths() {
     for item in result.content.iter().skip(1) {
         if let Some(text) = item.as_text() {
             // Each returned path should end with a known extension or be a path fragment
-            assert!(
-                !text.text.is_empty(),
-                "expected non-empty file path line"
-            );
+            assert!(!text.text.is_empty(), "expected non-empty file path line");
         }
     }
 }
