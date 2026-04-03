@@ -668,6 +668,7 @@ mod llm_router_tests {
     #[cfg(feature = "llm_router")]
     async fn test_routing_disabled_returns_static_client() {
         let mut role = create_test_role();
+        role.llm_enabled = true;
         role.extra
             .insert("llm_model".to_string(), serde_json::json!("llama3.1"));
         let client = build_llm_from_role(&role);
@@ -681,6 +682,7 @@ mod llm_router_tests {
     #[cfg(feature = "llm_router")]
     async fn test_routing_enabled_returns_routed_client() {
         let mut role = create_test_role();
+        role.llm_enabled = true;
         role.llm_router_enabled = true;
         role.extra
             .insert("llm_model".to_string(), serde_json::json!("llama3.1"));
@@ -694,7 +696,10 @@ mod llm_router_tests {
     #[tokio::test]
     #[cfg(not(feature = "llm_router"))]
     async fn test_without_llm_router_feature() {
-        let role = create_test_role();
+        let mut role = create_test_role();
+        role.llm_enabled = true;
+        role.extra
+            .insert("llm_model".to_string(), serde_json::json!("llama3.1"));
         let client = build_llm_from_role(&role);
         // Without feature, should still build static client if configured
         assert!(client.is_some());

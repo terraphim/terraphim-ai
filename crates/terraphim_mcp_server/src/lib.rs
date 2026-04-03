@@ -2,6 +2,11 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use base64::Engine;
+use fff_search::external_scorer::ExternalScorer;
+use fff_search::{
+    ContentCacheBudget, FFFMode, FilePicker, FilePickerOptions, FuzzySearchOptions, GrepMode,
+    GrepSearchOptions, PaginationArgs, QueryParser, grep_search, parse_grep_query,
+};
 use rmcp::{
     RoleServer, ServerHandler,
     model::{
@@ -14,6 +19,7 @@ use terraphim_automata::builder::json_decode;
 use terraphim_automata::matcher::{extract_paragraphs_from_automata, find_matches};
 use terraphim_automata::{AutocompleteConfig, AutocompleteIndex, AutocompleteResult};
 use terraphim_config::{Config, ConfigState};
+use terraphim_file_search::kg_scorer::KgPathScorer;
 use terraphim_service::TerraphimService;
 use terraphim_types::{Layer, NormalizedTermValue, RoleName, SearchQuery};
 use thiserror::Error;
@@ -49,6 +55,8 @@ pub struct McpService {
     config_state: Arc<ConfigState>,
     resource_mapper: Arc<TerraphimResourceMapper>,
     autocomplete_index: Arc<tokio::sync::RwLock<Option<AutocompleteIndex>>>,
+    /// Optional KG scorer for boosting file search results by path concept matches.
+    kg_scorer: Option<Arc<KgPathScorer>>,
 }
 
 impl McpService {
@@ -58,7 +66,15 @@ impl McpService {
             config_state,
             resource_mapper: Arc::new(TerraphimResourceMapper::new()),
             autocomplete_index: Arc::new(tokio::sync::RwLock::new(None)),
+            kg_scorer: None,
         }
+    }
+
+    /// Attach a KG scorer so that `terraphim_find_files` boosts results by
+    /// knowledge-graph concept matches in the file path.
+    pub fn with_kg_scorer(mut self, scorer: Arc<KgPathScorer>) -> Self {
+        self.kg_scorer = Some(scorer);
+        self
     }
 
     /// Initialize autocomplete index for the currently selected role, if possible
@@ -1142,6 +1158,180 @@ impl McpService {
 
         Ok(CallToolResult::success(contents))
     }
+
+    /// Find files in a directory using fff-search fuzzy matching with optional
+    /// KG-scored path boosting.
+    ///
+    /// - `query`: fuzzy search string
+    /// - `path`: directory to search (defaults to current directory)
+    /// - `limit`: maximum number of results (defaults to 20)
+    pub async fn find_files(
+        &self,
+        query: String,
+        path: Option<String>,
+        limit: Option<usize>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let base_path = path.unwrap_or_else(|| ".".to_string());
+        let max_results = limit.unwrap_or(20);
+
+        // Build index synchronously (no background threads needed for MCP tool use)
+        let mut picker = FilePicker::new(FilePickerOptions {
+            base_path: base_path.clone(),
+            mode: FFFMode::Ai,
+            watch: false,
+            warmup_mmap_cache: false,
+            cache_budget: None,
+        })
+        .map_err(|e| ErrorData::internal_error(format!("FilePicker init failed: {e}"), None))?;
+
+        picker
+            .collect_files()
+            .map_err(|e| ErrorData::internal_error(format!("File scan failed: {e}"), None))?;
+
+        let files = picker.get_files();
+        if files.is_empty() {
+            return Ok(CallToolResult::success(vec![Content::text(format!(
+                "No files found under '{base_path}'"
+            ))]));
+        }
+
+        let parser = QueryParser::default();
+        let fff_query = parser.parse(&query);
+
+        let result = FilePicker::fuzzy_search(
+            files,
+            &fff_query,
+            None,
+            FuzzySearchOptions {
+                max_threads: 0,
+                pagination: PaginationArgs {
+                    offset: 0,
+                    limit: max_results * 4, // over-fetch so KG re-ranking has material to work with
+                },
+                ..Default::default()
+            },
+        );
+
+        // Apply KG boost: add scorer.score() to the fuzzy score, re-sort.
+        let mut scored: Vec<(i32, &str)> = result
+            .items
+            .iter()
+            .zip(result.scores.iter())
+            .map(|(file, score)| {
+                let base = score.total;
+                let kg_boost = self.kg_scorer.as_ref().map(|s| s.score(file)).unwrap_or(0);
+                (base + kg_boost, file.relative_path.as_str())
+            })
+            .collect();
+        scored.sort_by(|a, b| b.0.cmp(&a.0));
+
+        let mut contents = Vec::new();
+        contents.push(Content::text(format!(
+            "Found {} files matching '{}' (searched {} files under '{}')",
+            result.total_matched.min(max_results),
+            query,
+            result.total_files,
+            base_path
+        )));
+
+        for (score, path) in scored.into_iter().take(max_results) {
+            contents.push(Content::text(format!("{score:>5}  {path}")));
+        }
+
+        Ok(CallToolResult::success(contents))
+    }
+
+    /// Grep file contents with KG-aware file ordering.
+    ///
+    /// Files are sorted by KG path score before searching so that conceptually
+    /// relevant files appear first in paginated results.
+    pub async fn grep_files(
+        &self,
+        query: String,
+        path: Option<String>,
+        limit: Option<usize>,
+        output_mode: Option<String>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let base_path = path.unwrap_or_else(|| ".".to_string());
+        let max_results = limit.unwrap_or(50);
+        let files_only = output_mode.as_deref() == Some("files");
+
+        let mut picker = FilePicker::new(FilePickerOptions {
+            base_path: base_path.clone(),
+            mode: FFFMode::Ai,
+            watch: false,
+            warmup_mmap_cache: false,
+            cache_budget: None,
+        })
+        .map_err(|e| ErrorData::internal_error(format!("FilePicker init failed: {e}"), None))?;
+
+        picker
+            .collect_files()
+            .map_err(|e| ErrorData::internal_error(format!("File scan failed: {e}"), None))?;
+
+        let mut files = picker.get_files().to_vec();
+        if files.is_empty() {
+            return Ok(CallToolResult::success(vec![Content::text(format!(
+                "No files found under '{base_path}'"
+            ))]));
+        }
+
+        // Sort files: highest KG path score first so grep pages are most relevant first.
+        if let Some(scorer) = &self.kg_scorer {
+            files.sort_by_key(|f| std::cmp::Reverse(scorer.score(f)));
+        }
+
+        let fff_query = parse_grep_query(&query);
+        let budget = ContentCacheBudget::default();
+        let options = GrepSearchOptions {
+            max_file_size: 10 * 1024 * 1024,
+            max_matches_per_file: 200,
+            smart_case: true,
+            file_offset: 0,
+            page_limit: max_results,
+            mode: GrepMode::PlainText,
+            time_budget_ms: 0,
+            before_context: 0,
+            after_context: 0,
+            classify_definitions: false,
+        };
+
+        let result = grep_search(&files, &fff_query, &options, &budget, None, None, None);
+
+        let mut contents = Vec::new();
+        contents.push(Content::text(format!(
+            "Found {} matches across {} files (searched {} files under '{}')",
+            result.matches.len(),
+            result.files_with_matches,
+            result.total_files_searched,
+            base_path
+        )));
+
+        if files_only {
+            let mut seen = std::collections::HashSet::new();
+            for m in &result.matches {
+                if let Some(file) = result.files.get(m.file_index) {
+                    if seen.insert(file.relative_path.as_str()) {
+                        contents.push(Content::text(file.relative_path.clone()));
+                    }
+                }
+            }
+        } else {
+            for m in result.matches.iter().take(max_results) {
+                if let Some(file) = result.files.get(m.file_index) {
+                    let line = format!(
+                        "{}:{}:{}",
+                        file.relative_path,
+                        m.line_number,
+                        m.line_content.trim_end()
+                    );
+                    contents.push(Content::text(line));
+                }
+            }
+        }
+
+        Ok(CallToolResult::success(contents))
+    }
 }
 
 impl ServerHandler for McpService {
@@ -1525,6 +1715,65 @@ impl ServerHandler for McpService {
                 annotations: None,
                 icons: None,
                 meta: None,
+            },
+            Tool {
+                name: "terraphim_find_files".into(),
+                title: Some("Find Files (KG-boosted)".into()),
+                description: Some("Fuzzy file search using fff-search with optional knowledge-graph path scoring. Results are ranked by fuzzy match score plus KG concept boost.".into()),
+                input_schema: Arc::new(serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "Fuzzy search string"
+                        },
+                        "path": {
+                            "type": "string",
+                            "description": "Directory to search (defaults to current directory)"
+                        },
+                        "limit": {
+                            "type": "integer",
+                            "description": "Maximum number of results (default 20)"
+                        }
+                    },
+                    "required": ["query"]
+                }).as_object().unwrap().clone()),
+                output_schema: None,
+                annotations: None,
+                icons: None,
+                meta: None,
+            },
+            Tool {
+                name: "terraphim_grep".into(),
+                title: Some("Grep (KG-ordered)".into()),
+                description: Some("Search file contents with ripgrep-style matching. Files are searched in KG path-score order so conceptually relevant files appear first in paginated results.".into()),
+                input_schema: Arc::new(serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "Search pattern (plain text)"
+                        },
+                        "path": {
+                            "type": "string",
+                            "description": "Directory to search (defaults to current directory)"
+                        },
+                        "limit": {
+                            "type": "integer",
+                            "description": "Maximum number of matches to return (default 50)"
+                        },
+                        "output_mode": {
+                            "type": "string",
+                            "enum": ["content", "files"],
+                            "description": "Return 'content' (file:line:text, default) or 'files' (unique file paths only)"
+                        }
+                    },
+                    "required": ["query"]
+                }).as_object().unwrap().clone()),
+                output_schema: None,
+                annotations: None,
+                icons: None,
+                meta: None,
             }
         ];
 
@@ -1884,6 +2133,50 @@ impl ServerHandler for McpService {
                     .await
                     .map_err(TerraphimMcpError::Mcp)
                     .map_err(ErrorData::from)
+            }
+            "terraphim_find_files" => {
+                let arguments = request.arguments.unwrap_or_default();
+                let query = arguments
+                    .get("query")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| {
+                        ErrorData::invalid_params("Missing 'query' parameter".to_string(), None)
+                    })?
+                    .to_string();
+                let path = arguments
+                    .get("path")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                let limit = arguments
+                    .get("limit")
+                    .and_then(|v| v.as_i64())
+                    .map(|i| i as usize);
+
+                self.find_files(query, path, limit).await
+            }
+            "terraphim_grep" => {
+                let arguments = request.arguments.unwrap_or_default();
+                let query = arguments
+                    .get("query")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| {
+                        ErrorData::invalid_params("Missing 'query' parameter".to_string(), None)
+                    })?
+                    .to_string();
+                let path = arguments
+                    .get("path")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                let limit = arguments
+                    .get("limit")
+                    .and_then(|v| v.as_i64())
+                    .map(|i| i as usize);
+                let output_mode = arguments
+                    .get("output_mode")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+
+                self.grep_files(query, path, limit, output_mode).await
             }
             _ => Err(ErrorData::method_not_found::<
                 rmcp::model::CallToolRequestMethod,
