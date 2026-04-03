@@ -12,9 +12,36 @@ use terraphim_config::Role;
 use terraphim_persistence::DeviceStorage;
 
 use crate::{
-    AgentId, CommandInput, CommandOutput, LoadMetrics, MultiAgentError, MultiAgentResult,
-    TerraphimAgent,
+    AgentId, CommandInput, CommandOutput, MultiAgentError, MultiAgentResult, TerraphimAgent,
 };
+
+/// Load metrics for an agent in the pool
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LoadMetrics {
+    pub active_commands: u32,
+    pub queue_length: u32,
+    pub average_response_time_ms: f64,
+    pub success_rate: f64,
+    pub last_updated: DateTime<Utc>,
+}
+
+impl LoadMetrics {
+    pub fn new() -> Self {
+        Self {
+            active_commands: 0,
+            queue_length: 0,
+            average_response_time_ms: 0.0,
+            success_rate: 1.0,
+            last_updated: Utc::now(),
+        }
+    }
+}
+
+impl Default for LoadMetrics {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 /// Configuration for agent pooling
 #[derive(Debug, Clone, Serialize, Deserialize)]

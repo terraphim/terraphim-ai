@@ -16,7 +16,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use terraphim_config::Role;
 use terraphim_multi_agent::{
-    AgentRegistry, CommandInput, CommandType, MultiAgentError, MultiAgentResult, TerraphimAgent,
+    CommandInput, CommandType, MultiAgentError, MultiAgentResult, TerraphimAgent,
 };
 use terraphim_persistence::DeviceStorage;
 use terraphim_types::RelevanceFunction;
@@ -393,7 +393,8 @@ async fn demonstrate_orchestrator_workers() -> MultiAgentResult<()> {
     ];
 
     let mut workers = HashMap::new();
-    let registry = AgentRegistry::new();
+    // TODO: Migrate to KnowledgeGraphAgentRegistry
+    // Registry temporarily disabled during migration
 
     for (worker_name, worker_description, _worker_capability) in &worker_roles {
         let worker_role = create_worker_role(worker_name, worker_description);
@@ -401,7 +402,7 @@ async fn demonstrate_orchestrator_workers() -> MultiAgentResult<()> {
         worker_agent.initialize().await?;
 
         let worker_arc = Arc::new(worker_agent);
-        registry.register_agent(worker_arc.clone()).await?;
+        // registry.register_agent(worker_arc.clone()).await?; // TODO: Re-enable with KG registry
         workers.insert(worker_name.to_string(), worker_arc);
     }
 

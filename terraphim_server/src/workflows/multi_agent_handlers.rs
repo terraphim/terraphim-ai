@@ -10,7 +10,7 @@ use tokio::time::{Duration, sleep};
 use ahash::AHashMap;
 use terraphim_config::Role;
 use terraphim_multi_agent::{
-    AgentRegistry, CommandInput, CommandType, MultiAgentError, MultiAgentResult, TerraphimAgent,
+    CommandInput, CommandType, MultiAgentError, MultiAgentResult, TerraphimAgent,
 };
 use terraphim_persistence::DeviceStorage;
 use terraphim_types::RelevanceFunction;
@@ -23,8 +23,6 @@ use terraphim_config::ConfigState;
 
 /// Multi-agent workflow executor
 pub struct MultiAgentWorkflowExecutor {
-    #[allow(dead_code)]
-    agent_registry: AgentRegistry,
     persistence: Arc<DeviceStorage>,
     config_state: Option<ConfigState>,
 }
@@ -37,10 +35,7 @@ impl MultiAgentWorkflowExecutor {
             .await
             .map_err(|e| MultiAgentError::PersistenceError(e.to_string()))?;
 
-        let agent_registry = AgentRegistry::new();
-
         Ok(Self {
-            agent_registry,
             persistence,
             config_state: None,
         })
@@ -53,10 +48,7 @@ impl MultiAgentWorkflowExecutor {
             .await
             .map_err(|e| MultiAgentError::PersistenceError(e.to_string()))?;
 
-        let agent_registry = AgentRegistry::new();
-
         Ok(Self {
-            agent_registry,
             persistence,
             config_state: Some(config_state),
         })
