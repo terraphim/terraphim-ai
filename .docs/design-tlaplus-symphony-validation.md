@@ -1,27 +1,28 @@
-# Implementation Plan: TLA+ Formal Validation of Symphony Orchestrator
+# Implementation Plan: TLA+ Formal Validation of the Agent Dispatch Framework (ADF)
 
-**Status**: Draft
+**Status**: Draft (v2 -- expanded to full ADF scope)
 **Research Doc**: `.docs/research-tlaplus-symphony-validation.md`
 **Author**: Terraphim AI
 **Date**: 2026-04-04
-**Estimated Effort**: 3 days
+**Estimated Effort**: 5 days
 
 ## Overview
 
 ### Summary
-Write a TLA+ formal specification of the Symphony orchestrator's concurrency model, run TLC model checking via the existing `terraphim/tlaplus-ts` TypeScript bindings, and integrate into CI. The spec models dispatch, worker completion/failure, retry scheduling, reconciliation, dependency blocking, and shutdown -- proving safety (no double-dispatch, bounded slots, claim consistency) and liveness (every eligible issue eventually dispatched).
+Write three TLA+ formal specifications covering the Agent Dispatch Framework's three concurrency layers: (1) Symphony orchestrator dispatch/retry/reconciliation, (2) OTP-style agent supervisor with restart strategies, and (3) messaging delivery guarantees. Run TLC model checking via the existing `terraphim/tlaplus-ts` TypeScript bindings and integrate into CI. Each module proves layer-specific safety and liveness properties independently, with optional cross-layer composition.
 
 ### Approach
-Write TLA+ `.tla` files directly (no DSL generation). Use `tlaplus-ts` TLCBridge to invoke TLC from vitest tests. Bounded model: 3 issues, 2 concurrent agents, 3 max retries. Incremental build across 4 phases, each verifiable independently.
+Write TLA+ `.tla` files directly (no DSL generation). Use `tlaplus-ts` TLCBridge to invoke TLC from vitest tests. Three independent modules with bounded models. Incremental build: Module 1 (Symphony) across 4 phases, Module 2 (Supervisor) across 3 phases, Module 3 (Messaging) across 3 phases, plus optional cross-layer composition.
 
 ### Scope
 **In Scope:**
-1. TLA+ spec modelling the orchestrator state machine (dispatch, complete, fail, retry, reconcile, shutdown)
-2. Safety invariants: NoDoubleDispatch, SlotBound, ClaimedCovers, NoTerminalRunning, RetryBound
-3. Liveness properties: EventualDispatch, NoStarvation
-4. Dependency blocking rule (`all_blockers_terminal`)
-5. TypeScript test harness using tlaplus-ts TLCBridge
-6. TLC model configuration (.cfg files)
+1. **Module 1 (Symphony)**: Dispatch, complete, fail, retry, reconcile, shutdown state machine
+2. **Module 2 (Supervisor)**: OneForOne/OneForAll/RestForOne restart strategies, restart intensity bound, escalation
+3. **Module 3 (Messaging)**: AtMostOnce/AtLeastOnce/ExactlyOnce delivery, mailbox bounds, deduplication
+4. Safety invariants: 7 Symphony + 2 Supervisor + 4 Messaging = 13 total
+5. Liveness properties: 2 Symphony + 1 Supervisor + 1 Messaging = 4 total
+6. TypeScript test harness per module using tlaplus-ts TLCBridge
+7. TLC model configuration (.cfg files) per module
 
 **Out of Scope:**
 - Runner internals (Claude Code / Codex session protocol)
@@ -31,6 +32,10 @@ Write TLA+ `.tla` files directly (no DSL generation). Use `tlaplus-ts` TLCBridge
 - Config hot-reload / watcher
 - Per-state concurrency limits (simplify to global limit)
 - PageRank sort order (affects dispatch priority, not correctness)
+- Goal alignment algorithms (sequential KG analysis)
+- Task decomposition KG logic (no concurrent mutation hazards)
+- Agent evolution/learning (write-once-read-many pattern)
+- LLM client calls (external, orthogonal)
 
 **Avoid At All Cost** (5/25 elimination):
 - Generating TLA+ from Rust code automatically (over-engineering)
@@ -45,13 +50,26 @@ Write TLA+ `.tla` files directly (no DSL generation). Use `tlaplus-ts` TLCBridge
 ```
 specs/
   symphony/
-    SymphonyOrchestrator.tla     -- Main TLA+ spec (all actions, invariants)
-    SymphonyOrchestrator.cfg     -- TLC configuration (constants, invariants, properties)
-    MC_SymphonyOrchestrator.tla  -- Model-checking wrapper (instantiates constants)
+    SymphonyOrchestrator.tla     -- Symphony dispatch/retry/reconcile spec
+    SymphonyOrchestrator.cfg     -- TLC config (constants, invariants, properties)
+    MC_SymphonyOrchestrator.tla  -- Model-checking wrapper (concrete constants)
+  supervisor/
+    AgentSupervisor.tla          -- OTP-style supervisor restart spec
+    AgentSupervisor.cfg          -- TLC config
+    MC_AgentSupervisor.tla       -- Model-checking wrapper
+  messaging/
+    MessagingDelivery.tla        -- Delivery guarantee spec
+    MessagingDelivery.cfg        -- TLC config
+    MC_MessagingDelivery.tla     -- Model-checking wrapper
 test/
   symphony/
-    tlc-safety.test.ts           -- vitest: runs TLC safety check via TLCBridge
-    tlc-liveness.test.ts         -- vitest: runs TLC liveness check via TLCBridge
+    tlc-safety.test.ts           -- vitest: Symphony safety invariants
+    tlc-liveness.test.ts         -- vitest: Symphony liveness properties
+  supervisor/
+    tlc-safety.test.ts           -- vitest: Supervisor safety invariants
+  messaging/
+    tlc-safety.test.ts           -- vitest: Messaging safety invariants
+    tlc-liveness.test.ts         -- vitest: Messaging liveness properties
 ```
 
 All files live in the `terraphim/tlaplus-ts` Gitea repository (extending the existing project).

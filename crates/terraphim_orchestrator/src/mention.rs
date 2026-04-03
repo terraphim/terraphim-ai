@@ -123,16 +123,21 @@ impl MentionCursor {
     }
 
     /// Advance cursor past a comment's timestamp.
+    ///
+    /// Converts any RFC3339-ish timestamp to UTC Z format for Gitea compat.
     pub fn advance_to(&mut self, timestamp: &str) {
-        // Only advance if the new timestamp is newer
-        if let Ok(new_time) = DateTime::parse_from_rfc3339(timestamp) {
-            if let Ok(current_time) = DateTime::parse_from_rfc3339(&self.last_seen_at) {
-                if new_time > current_time {
-                    self.last_seen_at = timestamp.to_string();
+        // Parse any RFC3339 timestamp and convert to UTC Z format
+        if let Ok(parsed) = DateTime::parse_from_rfc3339(timestamp) {
+            let utc = parsed.with_timezone(&Utc);
+            let utc_str = utc.to_rfc3339_opts(SecondsFormat::Secs, true);
+
+            // Only advance if newer than current cursor
+            if let Ok(current) = DateTime::parse_from_rfc3339(&self.last_seen_at) {
+                if utc > current.with_timezone(&Utc) {
+                    self.last_seen_at = utc_str;
                 }
             } else {
-                // Invalid current time, just update
-                self.last_seen_at = timestamp.to_string();
+                self.last_seen_at = utc_str;
             }
         }
     }
