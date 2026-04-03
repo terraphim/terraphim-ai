@@ -711,7 +711,7 @@ async fn handle_thesaurus(
     let thesaurus = service.get_thesaurus(&role_name).await?;
 
     let mut entries: Vec<_> = thesaurus.into_iter().collect();
-    entries.sort_by_key(|(_, term)| term.id.clone());
+    entries.sort_by_key(|(_, term)| term.id);
 
     let total_count = entries.len();
     let terms: Vec<ThesaurusTerm> = entries

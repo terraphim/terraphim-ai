@@ -354,7 +354,9 @@ fn parse_thesaurus_json(contents: &str) -> Result<Thesaurus> {
     }
 
     #[derive(Deserialize)]
+    #[allow(dead_code)]
     struct LegacyTerm {
+        #[allow(dead_code)]
         id: u64,
         nterm: String,
         #[serde(default)]

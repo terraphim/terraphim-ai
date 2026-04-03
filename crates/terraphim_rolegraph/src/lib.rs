@@ -114,7 +114,7 @@ impl TriggerIndex {
             for token in &unique {
                 *doc_freq.entry(token.to_string()).or_insert(0) += 1;
             }
-            self.triggers.insert(node_id.clone(), tokens);
+            self.triggers.insert(*node_id, tokens);
         }
 
         // Compute IDF: log((N + 1) / (df + 1)) + 1 (smoothed)
@@ -175,7 +175,7 @@ impl TriggerIndex {
             let similarity = dot / (query_norm * doc_norm);
 
             if similarity >= self.threshold {
-                results.push((node_id.clone(), similarity));
+                results.push((*node_id, similarity));
             }
         }
 
@@ -242,7 +242,7 @@ impl TriggerIndex {
     pub fn get_trigger_descriptions(&self) -> AHashMap<u64, String> {
         self.triggers
             .iter()
-            .map(|(node_id, tokens)| (node_id.clone(), tokens.join(" ")))
+            .map(|(node_id, tokens)| (*node_id, tokens.join(" ")))
             .collect()
     }
 }
@@ -434,7 +434,7 @@ impl RoleGraph {
         log::trace!("Finding matching node IDs for text: '{text}'");
         self.ac
             .find_iter(text)
-            .map(|mat| self.aho_corasick_values[mat.pattern()].clone())
+            .map(|mat| self.aho_corasick_values[mat.pattern()])
             .collect()
     }
 
@@ -669,7 +669,7 @@ impl RoleGraph {
                                 matched_edges: vec![edge.clone()],
                                 rank: total_rank,
                                 tags: vec![normalized_term.to_string()],
-                                nodes: vec![node_id.clone()],
+                                nodes: vec![node_id],
                                 quality_score: None,
                             });
                         }
@@ -678,7 +678,7 @@ impl RoleGraph {
                             doc.rank += total_rank; // Adjust to correctly aggregate the rank
                             doc.matched_edges.push(edge.clone());
                             // Remove duplicate edges based on unique IDs
-                            doc.matched_edges.dedup_by_key(|e| e.id.clone());
+                            doc.matched_edges.dedup_by_key(|e| e.id);
                         }
                     }
                 }
@@ -769,7 +769,7 @@ impl RoleGraph {
                                 matched_edges: vec![edge.clone()],
                                 rank: total_rank,
                                 tags: vec![normalized_term.to_string()],
-                                nodes: vec![node_id.clone()],
+                                nodes: vec![node_id],
                                 quality_score: None,
                             });
                         }
@@ -778,7 +778,7 @@ impl RoleGraph {
                             doc.rank += total_rank; // Adjust to correctly aggregate the rank
                             doc.matched_edges.push(edge.clone());
                             // Remove duplicate edges based on unique IDs
-                            doc.matched_edges.dedup_by_key(|e| e.id.clone());
+                            doc.matched_edges.dedup_by_key(|e| e.id);
                         }
                     }
                 }
@@ -873,7 +873,7 @@ impl RoleGraph {
                                     matched_edges: vec![edge.clone()],
                                     rank: total_rank,
                                     tags: vec![normalized_term.to_string()],
-                                    nodes: vec![node_id.clone()],
+                                    nodes: vec![node_id],
                                     quality_score: None,
                                 });
                             }
@@ -881,13 +881,13 @@ impl RoleGraph {
                                 let doc = e.get_mut();
                                 doc.rank += total_rank;
                                 doc.matched_edges.push(edge.clone());
-                                doc.matched_edges.dedup_by_key(|e| e.id.clone());
+                                doc.matched_edges.dedup_by_key(|e| e.id);
                                 // Add the tag if not already present
                                 if !doc.tags.contains(&normalized_term.to_string()) {
                                     doc.tags.push(normalized_term.to_string());
                                 }
                                 if !doc.nodes.contains(&node_id) {
-                                    doc.nodes.push(node_id.clone());
+                                    doc.nodes.push(node_id);
                                 }
                             }
                         }
@@ -977,7 +977,7 @@ impl RoleGraph {
                                         matched_edges: vec![edge.clone()],
                                         rank: total_rank,
                                         tags: vec![normalized_term.to_string()],
-                                        nodes: vec![node_id.clone()],
+                                        nodes: vec![node_id],
                                         quality_score: None,
                                     },
                                     vec![term.to_string()],
@@ -987,12 +987,12 @@ impl RoleGraph {
                                 let (doc, terms) = e.get_mut();
                                 doc.rank += total_rank;
                                 doc.matched_edges.push(edge.clone());
-                                doc.matched_edges.dedup_by_key(|e| e.id.clone());
+                                doc.matched_edges.dedup_by_key(|e| e.id);
                                 if !doc.tags.contains(&normalized_term.to_string()) {
                                     doc.tags.push(normalized_term.to_string());
                                 }
                                 if !doc.nodes.contains(&node_id) {
-                                    doc.nodes.push(node_id.clone());
+                                    doc.nodes.push(node_id);
                                 }
                                 if !terms.contains(&term.to_string()) {
                                     terms.push(term.to_string());
@@ -1026,7 +1026,7 @@ impl RoleGraph {
                     combined_doc
                         .matched_edges
                         .extend(term_doc.matched_edges.clone());
-                    combined_doc.matched_edges.dedup_by_key(|e| e.id.clone());
+                    combined_doc.matched_edges.dedup_by_key(|e| e.id);
 
                     for tag in &term_doc.tags {
                         if !combined_doc.tags.contains(tag) {
@@ -1036,7 +1036,7 @@ impl RoleGraph {
 
                     for node in &term_doc.nodes {
                         if !combined_doc.nodes.contains(node) {
-                            combined_doc.nodes.push(node.clone());
+                            combined_doc.nodes.push(*node);
                         }
                     }
 

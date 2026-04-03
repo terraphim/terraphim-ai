@@ -1,7 +1,9 @@
-use crate::{MetricLine, ProgressFormat, ProviderUsage, Result, UsageError, UsageProvider};
+use crate::{ProviderUsage, Result, UsageError, UsageProvider};
 use std::path::PathBuf;
 
+#[allow(dead_code)]
 pub struct ClaudeProvider {
+    #[allow(dead_code)]
     credentials_path: PathBuf,
 }
 

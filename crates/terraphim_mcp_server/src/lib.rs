@@ -340,7 +340,7 @@ impl McpService {
                         candidates.push(AutocompleteResult {
                             term: meta.original_term.clone(),
                             normalized_term: meta.normalized_term.clone(),
-                            id: meta.id.clone(),
+                            id: meta.id,
                             url: meta.url.clone(),
                             score: 0.0,
                         });
