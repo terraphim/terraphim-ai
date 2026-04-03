@@ -2,6 +2,7 @@
 [workspace]
 resolver = "2"
 members = ["crates/*", "terraphim_server", "terraphim_firecracker", "terraphim_ai_nodejs"]
+# Note: terraphim_usage and terraphim_ccusage are new crates in crates/*
 exclude = [
     # Experimental crates
     "crates/terraphim_agent_application",

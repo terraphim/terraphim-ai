@@ -550,7 +550,7 @@ impl CommandRegistry {
             thesaurus_data.insert(
                 term_value.clone(),
                 NormalizedTerm {
-                    id: command.definition.name.len() as u64,
+                    id: name.len() as u64,
                     value: term_value.clone(),
                     display_value: None,
                     url: Some(format!("command:{}", name)),

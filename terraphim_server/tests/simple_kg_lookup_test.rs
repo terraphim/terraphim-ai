@@ -99,11 +99,11 @@ async fn test_rolegraph_find_documents_for_term_direct() {
     let mut thesaurus = Thesaurus::new("Test".to_string());
 
     // Add haystack and its synonyms
-    let haystack_term = NormalizedTerm::new(1, NormalizedTermValue::new("haystack".to_string()));
+    let haystack_term = NormalizedTerm::new(1u64, NormalizedTermValue::new("haystack".to_string()));
     let datasource_term =
-        NormalizedTerm::new(2, NormalizedTermValue::new("datasource".to_string()));
-    let service_term = NormalizedTerm::new(3, NormalizedTermValue::new("service".to_string()));
-    let agent_term = NormalizedTerm::new(4, NormalizedTermValue::new("agent".to_string()));
+        NormalizedTerm::new(2u64, NormalizedTermValue::new("datasource".to_string()));
+    let service_term = NormalizedTerm::new(3u64, NormalizedTermValue::new("service".to_string()));
+    let agent_term = NormalizedTerm::new(4u64, NormalizedTermValue::new("agent".to_string()));
 
     thesaurus.insert(
         NormalizedTermValue::new("haystack".to_string()),

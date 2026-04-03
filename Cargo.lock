@@ -1228,6 +1228,32 @@ dependencies = [
 
 [[package]]
 name = "criterion"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f2b12d017a929603d80db1831cd3a24082f8137ce19c69e6447f54f5fc8d692f"
+dependencies = [
+ "anes",
+ "cast",
+ "ciborium",
+ "clap",
+ "criterion-plot 0.5.0",
+ "is-terminal",
+ "itertools 0.10.5",
+ "num-traits",
+ "once_cell",
+ "oorandom",
+ "plotters",
+ "rayon",
+ "regex",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "tinytemplate",
+ "walkdir",
+]
+
+[[package]]
+name = "criterion"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "950046b2aa2492f9a536f5f4f9a3de7b9e2476e575e05bd6c333371add4d98f3"
@@ -1237,7 +1263,7 @@ dependencies = [
  "cast",
  "ciborium",
  "clap",
- "criterion-plot",
+ "criterion-plot 0.8.2",
  "itertools 0.13.0",
  "num-traits",
  "oorandom",
@@ -1250,6 +1276,16 @@ dependencies = [
  "tinytemplate",
  "tokio",
  "walkdir",
+]
+
+[[package]]
+name = "criterion-plot"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6b50826342786a51a89e2da3a28f1c32b06e387201bc2d19791f622c673706b1"
+dependencies = [
+ "cast",
+ "itertools 0.10.5",
 ]
 
 [[package]]
@@ -1328,7 +1364,7 @@ dependencies = [
  "document-features",
  "mio 1.1.1",
  "parking_lot 0.12.5",
- "rustix",
+ "rustix 1.1.4",
  "signal-hook 0.3.18",
  "signal-hook-mio",
  "winapi",
@@ -2231,7 +2267,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ce92ff622d6dadf7349484f42c93271a0d49b7cc4d466a936405bacbe10aa78"
 dependencies = [
  "cfg-if",
- "rustix",
+ "rustix 1.1.4",
  "windows-sys 0.59.0",
 ]
 
@@ -3479,6 +3515,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "is-terminal"
+version = "0.4.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3640c1c38b8e4e43584d8df18be5fc6b0aa314ce6ebf51b53313d4306cca8e46"
+dependencies = [
+ "hermit-abi",
+ "libc",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
 name = "is_terminal_polyfill"
 version = "1.70.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3761,6 +3808,12 @@ checksum = "5f4de44e98ddbf09375cbf4d17714d18f39195f4f4894e8524501726fd9a8a4a"
 dependencies = [
  "bitflags 2.11.0",
 ]
+
+[[package]]
+name = "linux-raw-sys"
+version = "0.4.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d26c52dbd32dccf2d10cac7725f8eae5296885fb5703b261f7d0a0739ec807ab"
 
 [[package]]
 name = "linux-raw-sys"
@@ -6248,6 +6301,19 @@ dependencies = [
 
 [[package]]
 name = "rustix"
+version = "0.38.44"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fdb5bc1ae2baa591800df16c9ca78619bf65c0488b41b96ccec5d11220d8c154"
+dependencies = [
+ "bitflags 2.11.0",
+ "errno",
+ "libc",
+ "linux-raw-sys 0.4.15",
+ "windows-sys 0.59.0",
+]
+
+[[package]]
+name = "rustix"
 version = "1.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6fe4565b9518b83ef4f91bb47ce29620ca828bd32cb7e408f0062e9930ba190"
@@ -6255,7 +6321,7 @@ dependencies = [
  "bitflags 2.11.0",
  "errno",
  "libc",
- "linux-raw-sys",
+ "linux-raw-sys 0.12.1",
  "windows-sys 0.61.2",
 ]
 
@@ -7907,7 +7973,7 @@ dependencies = [
  "fastrand",
  "getrandom 0.4.2",
  "once_cell",
- "rustix",
+ "rustix 1.1.4",
  "windows-sys 0.61.2",
 ]
 
@@ -8024,6 +8090,7 @@ dependencies = [
  "terraphim_settings",
  "terraphim_types",
  "terraphim_update",
+ "terraphim_usage",
  "tokio",
 ]
 
@@ -8061,7 +8128,7 @@ dependencies = [
  "anyhow",
  "clap",
  "colored 2.2.0",
- "criterion",
+ "criterion 0.8.2",
  "csv",
  "dialoguer",
  "glob",
@@ -8193,7 +8260,7 @@ dependencies = [
  "ahash",
  "async-trait",
  "chrono",
- "criterion",
+ "criterion 0.8.2",
  "env_logger",
  "futures-util",
  "indexmap 2.13.0",
@@ -8293,7 +8360,7 @@ dependencies = [
  "anyhow",
  "bincode",
  "cached",
- "criterion",
+ "criterion 0.8.2",
  "daachorse",
  "fst",
  "getrandom 0.3.4",
@@ -8312,6 +8379,19 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "zstd",
+]
+
+[[package]]
+name = "terraphim_ccusage"
+version = "1.16.0"
+dependencies = [
+ "chrono",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+ "which",
 ]
 
 [[package]]
@@ -8356,7 +8436,7 @@ dependencies = [
  "ahash",
  "async-trait",
  "chrono",
- "criterion",
+ "criterion 0.8.2",
  "env_logger",
  "futures-util",
  "indexmap 2.13.0",
@@ -8538,7 +8618,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "chrono",
- "criterion",
+ "criterion 0.8.2",
  "futures",
  "genai",
  "log",
@@ -8641,7 +8721,7 @@ dependencies = [
  "aho-corasick",
  "anyhow",
  "cached",
- "criterion",
+ "criterion 0.8.2",
  "csv",
  "itertools 0.14.0",
  "log",
@@ -8665,7 +8745,7 @@ version = "1.8.0"
 dependencies = [
  "async-trait",
  "chrono",
- "criterion",
+ "criterion 0.8.2",
  "dirs 5.0.1",
  "notify",
  "proptest",
@@ -8847,7 +8927,7 @@ dependencies = [
  "ahash",
  "async-trait",
  "chrono",
- "criterion",
+ "criterion 0.8.2",
  "env_logger",
  "futures-util",
  "indexmap 2.13.0",
@@ -8880,7 +8960,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "clap",
- "criterion",
+ "criterion 0.8.2",
  "dirs 5.0.1",
  "env_home",
  "env_logger",
@@ -8932,6 +9012,7 @@ dependencies = [
  "ahash",
  "anyhow",
  "chrono",
+ "criterion 0.5.1",
  "getrandom 0.3.4",
  "log",
  "schemars 0.8.22",
@@ -8970,6 +9051,29 @@ dependencies = [
  "ureq",
  "zip 8.4.0",
  "zipsign-api",
+]
+
+[[package]]
+name = "terraphim_usage"
+version = "1.16.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "clap",
+ "colored 2.2.0",
+ "indicatif 0.17.11",
+ "opendal",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "terraphim_persistence",
+ "terraphim_settings",
+ "terraphim_types",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+ "which",
 ]
 
 [[package]]
@@ -10292,6 +10396,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "which"
+version = "6.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b4ee928febd44d98f2f459a4a79bd4d928591333a494a10a868418ac1b39cf1f"
+dependencies = [
+ "either",
+ "home",
+ "rustix 0.38.44",
+ "winsafe",
+]
+
+[[package]]
 name = "whisper-rs"
 version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10772,6 +10888,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "winsafe"
+version = "0.0.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d135d17ab770252ad95e9a872d365cf3090e3be864a34ab46f48555993efc904"
+
+[[package]]
 name = "wiremock"
 version = "0.6.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10895,7 +11017,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32e45ad4206f6d2479085147f02bc2ef834ac85886624a23575ae137c8aa8156"
 dependencies = [
  "libc",
- "rustix",
+ "rustix 1.1.4",
 ]
 
 [[package]]

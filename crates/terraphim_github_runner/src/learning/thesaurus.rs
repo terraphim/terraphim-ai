@@ -85,7 +85,7 @@ pub fn build_command_thesaurus() -> Thesaurus {
         let normalized = normalize_command(cmd);
         let id = get_command_id();
         let value = NormalizedTermValue::new(normalized.clone());
-        let term = NormalizedTerm::new(id, value.clone());
+        let term = NormalizedTerm::new(id.to_string(), value.clone());
         thesaurus.insert(value, term);
     }
 
@@ -146,25 +146,17 @@ mod tests {
         assert!(thesaurus.len() > 30);
 
         // Check some specific commands exist using get with NormalizedTermValue
-        assert!(
-            thesaurus
-                .get(&NormalizedTermValue::new("cargo build".to_string()))
-                .is_some()
-        );
-        assert!(
-            thesaurus
-                .get(&NormalizedTermValue::new("git clone".to_string()))
-                .is_some()
-        );
-        assert!(
-            thesaurus
-                .get(&NormalizedTermValue::new("npm install".to_string()))
-                .is_some()
-        );
-        assert!(
-            thesaurus
-                .get(&NormalizedTermValue::new("docker build".to_string()))
-                .is_some()
-        );
+        assert!(thesaurus
+            .get(&NormalizedTermValue::new("cargo build".to_string()))
+            .is_some());
+        assert!(thesaurus
+            .get(&NormalizedTermValue::new("git clone".to_string()))
+            .is_some());
+        assert!(thesaurus
+            .get(&NormalizedTermValue::new("npm install".to_string()))
+            .is_some());
+        assert!(thesaurus
+            .get(&NormalizedTermValue::new("docker build".to_string()))
+            .is_some());
     }
 }

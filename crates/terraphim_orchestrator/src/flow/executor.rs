@@ -7,9 +7,9 @@ use tokio::time::{timeout, Duration};
 use super::config::{FailStrategy, FlowDefinition, FlowStepDef, StepKind};
 use super::envelope::StepEnvelope;
 use super::state::{FlowRunState, FlowRunStatus};
-use crate::error::OrchestratorError;
 use crate::config::{AgentDefinition, AgentLayer};
-use terraphim_spawner::{AgentSpawner, SpawnRequest, OutputEvent};
+use crate::error::OrchestratorError;
+use terraphim_spawner::{AgentSpawner, OutputEvent, SpawnRequest};
 use terraphim_types::capability::Provider;
 
 pub struct FlowExecutor {
@@ -36,7 +36,9 @@ impl FlowExecutor {
         flow: &FlowDefinition,
         state: &FlowRunState,
     ) -> Result<StepEnvelope, OrchestratorError> {
-        let command = step.command.as_ref()
+        let command = step
+            .command
+            .as_ref()
             .ok_or_else(|| OrchestratorError::FlowFailed {
                 flow_name: flow.name.clone(),
                 reason: format!("action step '{}' missing 'command' field", step.name),
@@ -51,8 +53,9 @@ impl FlowExecutor {
                 .arg("-lc")
                 .arg(&resolved_command)
                 .current_dir(&self.working_dir)
-                .output()
-        ).await;
+                .output(),
+        )
+        .await;
 
         match result {
             Ok(Ok(output)) => {
@@ -78,7 +81,10 @@ impl FlowExecutor {
             }),
             Err(_) => Err(OrchestratorError::FlowFailed {
                 flow_name: flow.name.clone(),
-                reason: format!("action step '{}' timed out after {}s", step.name, step.timeout_secs),
+                reason: format!(
+                    "action step '{}' timed out after {}s",
+                    step.name, step.timeout_secs
+                ),
             }),
         }
     }
@@ -91,7 +97,9 @@ impl FlowExecutor {
         flow: &FlowDefinition,
         state: &FlowRunState,
     ) -> Result<bool, OrchestratorError> {
-        let condition = step.condition.as_ref()
+        let condition = step
+            .condition
+            .as_ref()
             .ok_or_else(|| OrchestratorError::FlowFailed {
                 flow_name: flow.name.clone(),
                 reason: format!("gate step '{}' missing 'condition' field", step.name),
@@ -107,7 +115,10 @@ impl FlowExecutor {
         } else {
             Err(OrchestratorError::FlowFailed {
                 flow_name: flow.name.clone(),
-                reason: format!("gate step '{}': unsupported condition expression: {}", step.name, resolved),
+                reason: format!(
+                    "gate step '{}': unsupported condition expression: {}",
+                    step.name, resolved
+                ),
             })
         }
     }
@@ -120,7 +131,9 @@ impl FlowExecutor {
         flow: &FlowDefinition,
         state: &FlowRunState,
     ) -> Result<StepEnvelope, OrchestratorError> {
-        let cli_tool = step.cli_tool.as_ref()
+        let cli_tool = step
+            .cli_tool
+            .as_ref()
             .ok_or_else(|| OrchestratorError::FlowFailed {
                 flow_name: flow.name.clone(),
                 reason: format!("agent step '{}' missing 'cli_tool' field", step.name),
@@ -133,17 +146,24 @@ impl FlowExecutor {
             } else {
                 self.working_dir.join(task_file)
             };
-            std::fs::read_to_string(&path)
-                .map_err(|e| OrchestratorError::FlowFailed {
-                    flow_name: flow.name.clone(),
-                    reason: format!("agent step '{}' failed to read task_file '{}': {}", step.name, path.display(), e),
-                })?
+            std::fs::read_to_string(&path).map_err(|e| OrchestratorError::FlowFailed {
+                flow_name: flow.name.clone(),
+                reason: format!(
+                    "agent step '{}' failed to read task_file '{}': {}",
+                    step.name,
+                    path.display(),
+                    e
+                ),
+            })?
         } else if let Some(ref task) = step.task {
             self.resolve_templates(task, flow, state)
         } else {
             return Err(OrchestratorError::FlowFailed {
                 flow_name: flow.name.clone(),
-                reason: format!("agent step '{}' missing both 'task' and 'task_file' fields", step.name),
+                reason: format!(
+                    "agent step '{}' missing both 'task' and 'task_file' fields",
+                    step.name
+                ),
             });
         };
 
@@ -190,13 +210,14 @@ impl FlowExecutor {
 
         // Build spawn request
         let mut request = SpawnRequest::new(provider, &agent_def.task);
-        
+
         if let Some(ref model) = agent_def.model {
             request = request.with_primary_model(model);
         }
 
         // Spawn the agent
-        let mut handle = self.spawner
+        let mut handle = self
+            .spawner
             .spawn_with_fallback(&request)
             .await
             .map_err(|e| OrchestratorError::FlowFailed {
@@ -208,10 +229,7 @@ impl FlowExecutor {
         let mut output_rx = handle.subscribe_output();
 
         // Wait for process to exit naturally (with timeout)
-        let wait_result = timeout(
-            Duration::from_secs(step.timeout_secs),
-            handle.wait()
-        ).await;
+        let wait_result = timeout(Duration::from_secs(step.timeout_secs), handle.wait()).await;
 
         let finished_at = Utc::now();
 
@@ -224,7 +242,10 @@ impl FlowExecutor {
                 let _ = handle.shutdown(Duration::from_secs(5)).await;
                 return Err(OrchestratorError::FlowFailed {
                     flow_name: flow.name.clone(),
-                    reason: format!("agent step '{}' timed out after {}s", step.name, step.timeout_secs),
+                    reason: format!(
+                        "agent step '{}' timed out after {}s",
+                        step.name, step.timeout_secs
+                    ),
                 });
             }
         };
@@ -300,7 +321,10 @@ impl FlowExecutor {
             if tokio::time::Instant::now() >= flow_deadline {
                 state.status = FlowRunStatus::Failed;
                 state.finished_at = Some(Utc::now());
-                state.error = Some(format!("flow '{}' exceeded global timeout of {}s", flow.name, flow.timeout_secs));
+                state.error = Some(format!(
+                    "flow '{}' exceeded global timeout of {}s",
+                    flow.name, flow.timeout_secs
+                ));
                 let _ = state.save_to_file(&self.flow_state_dir);
                 return Err(OrchestratorError::FlowFailed {
                     flow_name: flow.name.clone(),
@@ -384,16 +408,16 @@ impl FlowExecutor {
                         Err(e) => Err(e),
                     }
                 }
-                StepKind::Checkpoint => unreachable!("Checkpoint should be handled before the match"),
+                StepKind::Checkpoint => {
+                    unreachable!("Checkpoint should be handled before the match")
+                }
             };
 
             match result {
                 Ok(mut envelope) => {
                     // Write stdout to temp file for downstream action steps
-                    let stdout_file_path = format!(
-                        "/tmp/flow-{}-{}.stdout",
-                        state.correlation_id, step.name
-                    );
+                    let stdout_file_path =
+                        format!("/tmp/flow-{}-{}.stdout", state.correlation_id, step.name);
                     if let Err(e) = std::fs::write(&stdout_file_path, &envelope.stdout) {
                         tracing::warn!(step = %step.name, error = %e, "failed to write stdout temp file");
                     } else {
@@ -404,21 +428,19 @@ impl FlowExecutor {
                     state.next_step_index = i + 1;
                     let _ = state.save_to_file(&self.flow_state_dir);
                 }
-                Err(e) => {
-                    match step.on_fail {
-                        FailStrategy::Abort => {
-                            state.status = FlowRunStatus::Failed;
-                            state.finished_at = Some(Utc::now());
-                            state.error = Some(e.to_string());
-                            let _ = state.save_to_file(&self.flow_state_dir);
-                            return Err(e);
-                        }
-                        FailStrategy::SkipFailed | FailStrategy::Continue => {
-                            tracing::warn!(step = %step.name, error = %e, "step failed, continuing per on_fail policy");
-                            continue;
-                        }
+                Err(e) => match step.on_fail {
+                    FailStrategy::Abort => {
+                        state.status = FlowRunStatus::Failed;
+                        state.finished_at = Some(Utc::now());
+                        state.error = Some(e.to_string());
+                        let _ = state.save_to_file(&self.flow_state_dir);
+                        return Err(e);
                     }
-                }
+                    FailStrategy::SkipFailed | FailStrategy::Continue => {
+                        tracing::warn!(step = %step.name, error = %e, "step failed, continuing per on_fail policy");
+                        continue;
+                    }
+                },
             }
         }
 
@@ -704,8 +726,9 @@ mod tests {
     #[tokio::test]
     async fn test_execute_action_echo() {
         let temp_dir = tempfile::tempdir().unwrap();
-        let executor = FlowExecutor::new(temp_dir.path().to_path_buf(), temp_dir.path().to_path_buf());
-        
+        let executor =
+            FlowExecutor::new(temp_dir.path().to_path_buf(), temp_dir.path().to_path_buf());
+
         let flow = FlowDefinition {
             name: "test-flow".to_string(),
             schedule: None,
@@ -714,9 +737,9 @@ mod tests {
             timeout_secs: 3600,
             steps: vec![],
         };
-        
+
         let state = FlowRunState::new("test-flow");
-        
+
         let step = FlowStepDef {
             name: "echo-step".to_string(),
             kind: StepKind::Action,
@@ -731,9 +754,9 @@ mod tests {
             provider: None,
             persona: None,
         };
-        
+
         let envelope = executor.execute_action(&step, &flow, &state).await.unwrap();
-        
+
         assert_eq!(envelope.step_name, "echo-step");
         assert_eq!(envelope.exit_code, 0);
         assert_eq!(envelope.stdout.trim(), "hello");
@@ -742,8 +765,9 @@ mod tests {
     #[tokio::test]
     async fn test_execute_action_timeout() {
         let temp_dir = tempfile::tempdir().unwrap();
-        let executor = FlowExecutor::new(temp_dir.path().to_path_buf(), temp_dir.path().to_path_buf());
-        
+        let executor =
+            FlowExecutor::new(temp_dir.path().to_path_buf(), temp_dir.path().to_path_buf());
+
         let flow = FlowDefinition {
             name: "test-flow".to_string(),
             schedule: None,
@@ -752,9 +776,9 @@ mod tests {
             timeout_secs: 3600,
             steps: vec![],
         };
-        
+
         let state = FlowRunState::new("test-flow");
-        
+
         let step = FlowStepDef {
             name: "sleep-step".to_string(),
             kind: StepKind::Action,
@@ -769,9 +793,9 @@ mod tests {
             provider: None,
             persona: None,
         };
-        
+
         let result = executor.execute_action(&step, &flow, &state).await;
-        
+
         assert!(result.is_err());
         let err_str = result.unwrap_err().to_string();
         assert!(err_str.contains("timed out"));
@@ -780,7 +804,7 @@ mod tests {
     #[test]
     fn test_evaluate_gate_exit_code_zero() {
         let executor = FlowExecutor::new(PathBuf::from("/tmp"), PathBuf::from("/tmp/state"));
-        
+
         let flow = FlowDefinition {
             name: "test-flow".to_string(),
             schedule: None,
@@ -789,7 +813,7 @@ mod tests {
             timeout_secs: 3600,
             steps: vec![],
         };
-        
+
         let mut state = FlowRunState::new("test-flow");
         state.step_envelopes.push(StepEnvelope {
             step_name: "test-step".to_string(),
@@ -804,7 +828,7 @@ mod tests {
             output_tokens: None,
             stdout_file: None,
         });
-        
+
         let step = FlowStepDef {
             name: "gate-step".to_string(),
             kind: StepKind::Gate,
@@ -819,16 +843,16 @@ mod tests {
             provider: None,
             persona: None,
         };
-        
+
         let result = executor.evaluate_gate(&step, &flow, &state).unwrap();
-        
+
         assert!(result, "Gate should pass when exit_code == 0");
     }
 
     #[test]
     fn test_evaluate_gate_exit_code_nonzero() {
         let executor = FlowExecutor::new(PathBuf::from("/tmp"), PathBuf::from("/tmp/state"));
-        
+
         let flow = FlowDefinition {
             name: "test-flow".to_string(),
             schedule: None,
@@ -837,7 +861,7 @@ mod tests {
             timeout_secs: 3600,
             steps: vec![],
         };
-        
+
         let mut state = FlowRunState::new("test-flow");
         state.step_envelopes.push(StepEnvelope {
             step_name: "test-step".to_string(),
@@ -852,7 +876,7 @@ mod tests {
             output_tokens: None,
             stdout_file: None,
         });
-        
+
         let step = FlowStepDef {
             name: "gate-step".to_string(),
             kind: StepKind::Gate,
@@ -867,17 +891,18 @@ mod tests {
             provider: None,
             persona: None,
         };
-        
+
         let result = executor.evaluate_gate(&step, &flow, &state).unwrap();
-        
+
         assert!(!result, "Gate should fail when exit_code != 0");
     }
 
     #[tokio::test]
     async fn test_flow_executor_two_actions() {
         let temp_dir = tempfile::tempdir().unwrap();
-        let executor = FlowExecutor::new(temp_dir.path().to_path_buf(), temp_dir.path().to_path_buf());
-        
+        let executor =
+            FlowExecutor::new(temp_dir.path().to_path_buf(), temp_dir.path().to_path_buf());
+
         let flow = FlowDefinition {
             name: "test-flow".to_string(),
             schedule: None,
@@ -915,22 +940,27 @@ mod tests {
                 },
             ],
         };
-        
+
         let state = executor.run(&flow, None).await.unwrap();
-        
+
         assert_eq!(state.status, FlowRunStatus::Completed);
         assert_eq!(state.step_envelopes.len(), 2);
-        
+
         // Check that step2 resolved the template from step1
         let step2_output = &state.step_envelopes[1].stdout;
-        assert!(step2_output.contains("first output"), "step2 should resolve template from step1: {}", step2_output);
+        assert!(
+            step2_output.contains("first output"),
+            "step2 should resolve template from step1: {}",
+            step2_output
+        );
     }
 
     #[tokio::test]
     async fn test_flow_executor_gate_pass() {
         let temp_dir = tempfile::tempdir().unwrap();
-        let executor = FlowExecutor::new(temp_dir.path().to_path_buf(), temp_dir.path().to_path_buf());
-        
+        let executor =
+            FlowExecutor::new(temp_dir.path().to_path_buf(), temp_dir.path().to_path_buf());
+
         let flow = FlowDefinition {
             name: "test-flow".to_string(),
             schedule: None,
@@ -982,9 +1012,9 @@ mod tests {
                 },
             ],
         };
-        
+
         let state = executor.run(&flow, None).await.unwrap();
-        
+
         assert_eq!(state.status, FlowRunStatus::Completed);
         assert_eq!(state.step_envelopes.len(), 3);
     }
@@ -992,8 +1022,9 @@ mod tests {
     #[tokio::test]
     async fn test_flow_executor_gate_fail_abort() {
         let temp_dir = tempfile::tempdir().unwrap();
-        let executor = FlowExecutor::new(temp_dir.path().to_path_buf(), temp_dir.path().to_path_buf());
-        
+        let executor =
+            FlowExecutor::new(temp_dir.path().to_path_buf(), temp_dir.path().to_path_buf());
+
         let flow = FlowDefinition {
             name: "test-flow".to_string(),
             schedule: None,
@@ -1045,9 +1076,9 @@ mod tests {
                 },
             ],
         };
-        
+
         let state = executor.run(&flow, None).await.unwrap();
-        
+
         // Flow should abort at the gate
         assert_eq!(state.status, FlowRunStatus::Aborted);
         assert_eq!(state.step_envelopes.len(), 2); // Only action1 and gate1
@@ -1058,9 +1089,9 @@ mod tests {
         let temp_dir = tempfile::tempdir().unwrap();
         let state_dir = temp_dir.path().join("state");
         std::fs::create_dir_all(&state_dir).unwrap();
-        
+
         let executor = FlowExecutor::new(temp_dir.path().to_path_buf(), state_dir.clone());
-        
+
         let flow = FlowDefinition {
             name: "test-flow".to_string(),
             schedule: None,
@@ -1112,19 +1143,23 @@ mod tests {
                 },
             ],
         };
-        
+
         let state = executor.run(&flow, None).await.unwrap();
-        
+
         assert_eq!(state.status, FlowRunStatus::Completed);
         assert_eq!(state.step_envelopes.len(), 3);
-        
+
         // Verify state file was created
         let state_files: Vec<_> = std::fs::read_dir(&state_dir)
             .unwrap()
             .filter_map(|e| e.ok())
-            .filter(|e| e.file_name().to_string_lossy().starts_with("flow-test-flow-"))
+            .filter(|e| {
+                e.file_name()
+                    .to_string_lossy()
+                    .starts_with("flow-test-flow-")
+            })
             .collect();
-        
+
         assert!(!state_files.is_empty(), "State file should be created");
     }
 
@@ -1133,9 +1168,9 @@ mod tests {
         let temp_dir = tempfile::tempdir().unwrap();
         let state_dir = temp_dir.path().join("state");
         std::fs::create_dir_all(&state_dir).unwrap();
-        
+
         let executor = FlowExecutor::new(temp_dir.path().to_path_buf(), state_dir.clone());
-        
+
         let flow = FlowDefinition {
             name: "test-flow".to_string(),
             schedule: None,
@@ -1187,7 +1222,7 @@ mod tests {
                 },
             ],
         };
-        
+
         // Create a state at step 1 (step 0 already completed)
         let mut resume_state = FlowRunState::new("test-flow");
         resume_state.next_step_index = 1;
@@ -1204,9 +1239,9 @@ mod tests {
             output_tokens: None,
             stdout_file: None,
         });
-        
+
         let state = executor.run(&flow, Some(resume_state)).await.unwrap();
-        
+
         // Should only run steps 2 and 3
         assert_eq!(state.status, FlowRunStatus::Completed);
         assert_eq!(state.step_envelopes.len(), 3);
@@ -1344,7 +1379,11 @@ mod tests {
         let result = executor.run(&flow, None).await;
         assert!(result.is_err());
         let err = result.unwrap_err().to_string();
-        assert!(err.contains("global timeout"), "Expected global timeout error, got: {}", err);
+        assert!(
+            err.contains("global timeout"),
+            "Expected global timeout error, got: {}",
+            err
+        );
 
         let _ = std::fs::remove_dir_all(&state_dir);
     }

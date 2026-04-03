@@ -191,6 +191,13 @@ enum Commands {
         /// Version to rollback to
         version: String,
     },
+
+    /// Show AI coding usage across all providers
+    #[cfg(feature = "usage")]
+    Usage {
+        #[command(subcommand)]
+        action: terraphim_usage::cli::UsageAction,
+    },
 }
 
 #[derive(Serialize)]
@@ -268,7 +275,7 @@ struct ThesaurusResult {
 
 #[derive(Serialize)]
 struct ThesaurusTerm {
-    id: u64,
+    id: String,
     term: String,
     normalized: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -373,6 +380,8 @@ async fn main() -> Result<()> {
         Some(Commands::CheckUpdate) => handle_check_update().await,
         Some(Commands::Update) => handle_update().await,
         Some(Commands::Rollback { version }) => handle_rollback(&version).await,
+        #[cfg(feature = "usage")]
+        Some(Commands::Usage { action }) => handle_usage(action).await,
         Some(Commands::Completions { .. }) => unreachable!(), // Handled above
         None => {
             eprintln!("No command specified. Use --help for usage information.");
@@ -709,7 +718,7 @@ async fn handle_thesaurus(
         .iter()
         .take(limit)
         .map(|(key, term)| ThesaurusTerm {
-            id: term.id,
+            id: term.id.to_string(),
             term: key.to_string(),
             normalized: term.value.to_string(),
             url: term.url.clone(),
@@ -842,4 +851,13 @@ fn format_as_text(value: &serde_json::Value) -> Result<String> {
     // This is a simplified text formatter
     // Could be enhanced with better formatting
     Ok(format!("{:#}", value))
+}
+
+#[cfg(feature = "usage")]
+async fn handle_usage(action: terraphim_usage::cli::UsageAction) -> Result<serde_json::Value> {
+    let registry = terraphim_usage::UsageRegistry::new();
+    let output = terraphim_usage::cli::execute_usage_action(action, &registry)
+        .await
+        .map_err(|e| anyhow::anyhow!("{}", e))?;
+    Ok(serde_json::json!({ "output": output }))
 }

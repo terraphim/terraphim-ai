@@ -1,0 +1,16 @@
+[package]
+name = "terraphim_ccusage"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+tracing = "0.1"
+tokio = { workspace = true }
+which = "6.0"
+
+[features]
+default = []

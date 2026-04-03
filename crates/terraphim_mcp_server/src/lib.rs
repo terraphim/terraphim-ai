@@ -342,7 +342,7 @@ impl McpService {
                             normalized_term: meta.normalized_term.clone(),
                             id: meta.id,
                             url: meta.url.clone(),
-                            score: meta.id as f64,
+                            score: 0.0,
                         });
                     }
                 }

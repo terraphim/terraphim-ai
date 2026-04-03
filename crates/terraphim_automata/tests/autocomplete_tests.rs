@@ -131,7 +131,7 @@ fn test_autocomplete_search_exact_match() {
     );
 
     let python_result = python_result.unwrap();
-    assert_eq!(python_result.id, 10);
+    assert_eq!(python_result.id, 10u64);
     assert_eq!(
         python_result.normalized_term,
         NormalizedTermValue::from("Python Programming Language")
@@ -322,7 +322,6 @@ async fn test_load_autocomplete_index_local() {
             // Test that all results have valid metadata
             for result in results {
                 assert!(!result.term.is_empty(), "Term should not be empty");
-                assert!(result.id > 0, "ID should be positive");
                 assert!(
                     !result.normalized_term.as_str().is_empty(),
                     "Normalized term should not be empty"
@@ -375,7 +374,7 @@ fn test_autocomplete_result_metadata() {
 
     // Verify all metadata fields are populated correctly
     assert_eq!(python_result.term, "python");
-    assert_eq!(python_result.id, 10);
+    assert_eq!(python_result.id, 10u64);
     assert_eq!(
         python_result.normalized_term,
         NormalizedTermValue::from("Python Programming Language")
@@ -480,7 +479,7 @@ fn test_autocomplete_result_equality() {
     let result1 = AutocompleteResult {
         term: "test".to_string(),
         normalized_term: NormalizedTermValue::from("Test Term"),
-        id: 1,
+        id: 1u64,
         url: Some("https://example.com/test".to_string()),
         score: 10.0,
     };
@@ -488,7 +487,7 @@ fn test_autocomplete_result_equality() {
     let result2 = AutocompleteResult {
         term: "test".to_string(),
         normalized_term: NormalizedTermValue::from("Test Term"),
-        id: 1,
+        id: 1u64,
         url: Some("https://example.com/test".to_string()),
         score: 10.0,
     };

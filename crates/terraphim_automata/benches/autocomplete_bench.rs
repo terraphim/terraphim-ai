@@ -350,7 +350,7 @@ fn bench_comparison_with_matcher(c: &mut Criterion) {
 /// Benchmark paragraph extraction using automata matcher
 fn bench_paragraph_extraction(c: &mut Criterion) {
     let mut thesaurus = Thesaurus::new("bench".to_string());
-    let norm = NormalizedTerm::new(1, NormalizedTermValue::from("alpha"));
+    let norm = NormalizedTerm::new(1u64, NormalizedTermValue::from("alpha"));
     thesaurus.insert(NormalizedTermValue::from("alpha"), norm);
     let text = "header\n\nalpha ipsum dolor sit amet,\nconsectetur adipiscing elit.\n\nfooter";
     c.bench_function("extract_paragraphs_from_automata_small_text", |b| {
