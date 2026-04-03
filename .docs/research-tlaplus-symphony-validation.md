@@ -226,6 +226,12 @@ reconcile -> find_stalled_issues -> abort + schedule_retry
 | Token counting | Pure accounting; no state machine impact |
 | Config hot-reload | Watcher is separate from dispatch loop |
 | Network failures in tracker | Modelled as non-deterministic fetch results (empty or stale) |
+| Goal alignment algorithms | Mostly sequential KG analysis; no concurrent shared state worth modelling |
+| Task decomposition KG logic | Single-threaded concept extraction and connectivity analysis; cache is RwLock but not safety-critical |
+| Agent evolution/learning | Versioned memory/tasks/lessons are write-once-read-many; no concurrent mutation hazards |
+| LLM client calls | External service calls are orthogonal to ADF coordination logic |
+| VM execution (TerraphimAgent) | Sandboxed execution is isolated from agent lifecycle |
+| Agent persistence serialisation | Serialise/deserialise is sequential; no state machine impact |
 
 ## Dependencies
 
@@ -291,6 +297,22 @@ reconcile -> find_stalled_issues -> abort + schedule_retry
 
 5. **The dependency/blocker rule is the most complex property** -- it involves checking that all blockers of a "todo" issue are in terminal states before dispatch. This requires modelling issue state transitions across the dependency graph.
 
+6. **The ADF has three layers of concurrency worth modelling separately**:
+   - **Layer 1 (Symphony)**: Issue dispatch, retry, reconciliation -- the "outer loop" that assigns work
+   - **Layer 2 (Supervisor)**: Agent lifecycle with OTP restart strategies -- manages agent failures
+   - **Layer 3 (Messaging)**: Message delivery with guarantees -- communication fabric between agents
+
+7. **The supervisor restart strategies are classically verified with TLA+**. The OneForAll and RestForOne strategies have subtle failure modes (restart storms, cascading failures) that are well-suited to bounded model checking. The `RestartIntensity` rate limiter adds a safety bound that should be formally verified.
+
+8. **The messaging delivery guarantees map directly to TLA+ properties**:
+   - AtMostOnce: `\A m: delivered(m) => ~redelivered(m)`
+   - AtLeastOnce: `\A m: sent(m) ~> delivered(m) \/ failed(m)`
+   - ExactlyOnce: AtLeastOnce /\ `\A m: |{d \in deliveries: d.id = m.id}| <= 1`
+
+9. **Three ADF crates have low TLA+ value** (mostly sequential/algorithmic): `terraphim_goal_alignment` (graph algorithms), `terraphim_task_decomposition` (KG analysis with RwLock cache), `terraphim_agent_evolution` (versioned state). These use `Arc<RwLock<>>` but their concurrent access patterns are simple (read-heavy, infrequent writes) and not prone to the invariant violations TLA+ excels at finding.
+
+10. **The KG Orchestration supervision tree** (`supervision.rs`) composes supervisor + scheduler + coordinator into a higher-level workflow manager. Its `max_concurrent_workflows` bound and escalation logic add properties worth verifying alongside the base supervisor.
+
 ### Relevant Prior Art
 - **tla-precheck** (kingbootoshi): TypeScript DSL -> TLA+ -> TLC bounded model checking. Validates spec/implementation equivalence.
 - **Amazon Web Services TLA+ usage**: AWS uses TLA+ to verify distributed protocols (DynamoDB, S3, EBS). Demonstrates real-world value for concurrent systems.
@@ -311,16 +333,36 @@ reconcile -> find_stalled_issues -> abort + schedule_retry
 **Proceed.** The orchestrator's concurrency model has sufficient complexity to benefit from formal verification, the tooling (tlaplus-ts) is already built and complete, and the state machine structure maps cleanly to TLA+.
 
 ### Scope Recommendations
-1. **Phase 1**: Model dispatch + worker completion + claim lifecycle (safety invariants only)
-2. **Phase 2**: Add retry queue + stall detection + reconciliation
-3. **Phase 3**: Add dependency blocking and PageRank priority ordering
-4. **Phase 4**: Liveness properties (no starvation, eventual dispatch)
+
+**Three TLA+ modules** (one per concurrency layer, composed for cross-layer properties):
+
+**Module 1 -- Symphony Orchestrator** (dispatch, retry, reconciliation):
+1. Phase 1a: Dispatch + worker completion + claim lifecycle (safety invariants)
+2. Phase 1b: Retry queue + stall detection + reconciliation
+3. Phase 1c: Dependency blocking and PageRank priority ordering
+4. Phase 1d: Liveness properties (no starvation, eventual dispatch)
+
+**Module 2 -- Agent Supervisor** (OTP restart strategies):
+1. Phase 2a: OneForOne restart + restart intensity bound
+2. Phase 2b: OneForAll and RestForOne strategies
+3. Phase 2c: Health check integration and escalation termination
+
+**Module 3 -- Messaging Delivery** (delivery guarantees):
+1. Phase 3a: AtMostOnce + AtLeastOnce delivery with retry bound
+2. Phase 3b: ExactlyOnce deduplication
+3. Phase 3c: Mailbox capacity bound + routing table consistency
+
+**Cross-layer composition** (optional Phase 4):
+- Compose Symphony dispatch with Supervisor restart to verify that supervisor restart storms do not violate dispatch slot bounds
+- Compose Messaging delivery with Supervisor health checks to verify that health check messages are eventually delivered
 
 ### Risk Mitigation Recommendations
 1. Start with a 3-issue, 2-agent bounded model to keep TLC tractable
-2. Validate tlaplus-ts TLC bridge with a trivial spec before investing in the full model
-3. Write the TLA+ spec in `.tla` files (not TypeScript DSL) for maximum TLC compatibility
+2. Validate tlaplus-ts TLC bridge with a trivial spec before investing in full models
+3. Write the TLA+ specs in `.tla` files (not TypeScript DSL) for maximum TLC compatibility
 4. Add TLC verification to CI as an optional job (not blocking)
+5. Keep modules independent initially; compose only after each module passes individually
+6. For Supervisor module, bound to 3 children and 2 max restarts to avoid state explosion
 
 ## Proposed TLA+ Spec Structure
 
