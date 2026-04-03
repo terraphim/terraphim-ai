@@ -1,4 +1,6 @@
-use terraphim_multi_agent::{agent::AgentStatus, test_utils::*, CommandInput, CommandType};
+use terraphim_multi_agent::{
+    agent::AgentStatus, test_utils::*, CommandInput, CommandType, TerraphimAgent,
+};
 
 #[tokio::test]
 async fn test_agent_creation_simple() {
