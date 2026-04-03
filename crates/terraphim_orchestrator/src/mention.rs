@@ -73,30 +73,31 @@ impl MentionCursor {
     ///
     /// On first run (no persisted cursor), returns a cursor set to the
     /// current time, effectively skipping all historical mentions.
+    /// Get the SQLite operator for persistent storage.
+    async fn sqlite_op() -> Option<opendal::Operator> {
+        let storage = terraphim_persistence::DeviceStorage::instance().await.ok()?;
+        let (op, _) = storage.ops.get("sqlite")?;
+        Some(op.clone())
+    }
+
     pub async fn load_or_now() -> Self {
         let key = "adf/mention_cursor";
 
-        match terraphim_persistence::DeviceStorage::instance().await {
-            Ok(storage) => match storage.fastest_op.read(key).await {
-                Ok(bs) => match serde_json::from_slice::<Self>(&bs.to_vec()) {
-                    Ok(cursor) => {
-                        tracing::info!(
-                            last_seen_at = %cursor.last_seen_at,
-                            "loaded MentionCursor from persistence"
-                        );
-                        return cursor;
-                    }
-                    Err(e) => {
-                        tracing::warn!(?e, "failed to deserialize MentionCursor, starting fresh");
-                    }
-                },
-                Err(_) => {
-                    tracing::info!("no persisted MentionCursor found, starting fresh");
+        if let Some(op) = Self::sqlite_op().await {
+            if let Ok(bs) = op.read(key).await {
+                if let Ok(cursor) = serde_json::from_slice::<Self>(&bs.to_vec()) {
+                    tracing::info!(
+                        last_seen_at = %cursor.last_seen_at,
+                        "loaded MentionCursor from persistence"
+                    );
+                    return cursor;
                 }
-            },
-            Err(e) => {
-                tracing::warn!(?e, "DeviceStorage init failed, using in-memory cursor");
+                tracing::warn!("failed to deserialize MentionCursor, starting fresh");
+            } else {
+                tracing::info!("no persisted MentionCursor found, starting fresh");
             }
+        } else {
+            tracing::warn!("DeviceStorage sqlite not available, using in-memory cursor");
         }
 
         Self::now()
@@ -106,23 +107,18 @@ impl MentionCursor {
     pub async fn save(&self) {
         let key = "adf/mention_cursor";
 
-        match terraphim_persistence::DeviceStorage::instance().await {
-            Ok(storage) => match serde_json::to_string(self) {
-                Ok(json) => match storage.fastest_op.write(key, json).await {
-                    Ok(_) => {
-                        tracing::debug!(last_seen_at = %self.last_seen_at, "saved MentionCursor");
-                    }
-                    Err(e) => {
-                        tracing::warn!(?e, "failed to save MentionCursor");
-                    }
-                },
-                Err(e) => {
-                    tracing::warn!(?e, "failed to serialize MentionCursor");
+        if let Some(op) = Self::sqlite_op().await {
+            if let Ok(json) = serde_json::to_string(self) {
+                if let Err(e) = op.write(key, json).await {
+                    tracing::warn!(?e, "failed to save MentionCursor");
+                } else {
+                    tracing::debug!(last_seen_at = %self.last_seen_at, "saved MentionCursor");
                 }
-            },
-            Err(e) => {
-                tracing::warn!(?e, "DeviceStorage init failed, cursor not persisted");
+            } else {
+                tracing::warn!("failed to serialize MentionCursor");
             }
+        } else {
+            tracing::warn!("DeviceStorage sqlite not available, cursor not persisted");
         }
     }
 
