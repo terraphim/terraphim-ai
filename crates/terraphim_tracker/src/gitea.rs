@@ -48,6 +48,9 @@ struct GiteaLabel {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IssueComment {
     pub id: u64,
+    /// Issue number (extracted from issue_url for repo-wide API, filled by caller for per-issue API).
+    #[serde(default)]
+    pub issue_number: u64,
     pub body: String,
     pub user: CommentUser,
     pub created_at: String,
@@ -262,6 +265,89 @@ impl GiteaTracker {
             });
         }
         response.json().await.map_err(TrackerError::Http)
+    }
+
+    /// Fetch comments across all issues in the repo, optionally filtering by `since` timestamp.
+    ///
+    /// This is the repo-wide endpoint that returns comments from all issues,
+    /// which is more efficient than polling each issue individually.
+    ///
+    /// # API Endpoint
+    ///
+    /// `GET /api/v1/repos/{owner}/{repo}/issues/comments?since={since}&limit={limit}`
+    ///
+    /// # Response
+    ///
+    /// Each comment includes an `issue_url` field from which the issue number
+    /// can be extracted.
+    pub async fn fetch_repo_comments(
+        &self,
+        since: Option<&str>,
+        limit: Option<u32>,
+    ) -> Result<Vec<IssueComment>> {
+        let mut url = format!(
+            "{}/api/v1/repos/{}/{}/issues/comments",
+            self.config.base_url, self.config.owner, self.config.repo
+        );
+        let mut params = Vec::new();
+        if let Some(since_ts) = since {
+            params.push(format!("since={}", since_ts));
+        }
+        if let Some(limit_val) = limit {
+            params.push(format!("limit={}", limit_val));
+        }
+        if !params.is_empty() {
+            url.push('?');
+            url.push_str(&params.join("&"));
+        }
+
+        let response = self
+            .build_request(reqwest::Method::GET, &url)
+            .send()
+            .await?;
+        if !response.status().is_success() {
+            let status = response.status();
+            let text = response.text().await.unwrap_or_default();
+            return Err(TrackerError::Api {
+                message: format!("Gitea repo comments GET error {}: {}", status, text),
+            });
+        }
+
+        // Parse response and extract issue numbers from issue_url
+        let raw_comments: Vec<RepoComment> = response.json().await.map_err(TrackerError::Http)?;
+        Ok(raw_comments.into_iter().map(|rc| rc.into()).collect())
+    }
+}
+
+/// Raw comment from repo-wide API (includes issue_url instead of issue number).
+#[derive(Debug, Clone, serde::Deserialize)]
+struct RepoComment {
+    id: u64,
+    issue_url: String,
+    user: CommentUser,
+    body: String,
+    created_at: String,
+    updated_at: String,
+}
+
+impl From<RepoComment> for IssueComment {
+    fn from(rc: RepoComment) -> Self {
+        // Extract issue number from issue_url like "/api/v1/repos/owner/repo/issues/123"
+        let issue_number = rc
+            .issue_url
+            .rsplit('/')
+            .next()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(0);
+
+        IssueComment {
+            id: rc.id,
+            issue_number,
+            body: rc.body,
+            user: rc.user,
+            created_at: rc.created_at,
+            updated_at: rc.updated_at,
+        }
     }
 }
 
