@@ -2324,6 +2324,7 @@ dependencies = [
 [[package]]
 name = "fff-grep"
 version = "0.5.1"
+source = "git+https://github.com/AlexMikhalev/fff.nvim.git?branch=feat%2Fexternal-scorer#efd15524383babd4d2d18a191240d3dcf494eb31"
 dependencies = [
  "bstr",
  "memchr",
@@ -2332,10 +2333,12 @@ dependencies = [
 [[package]]
 name = "fff-query-parser"
 version = "0.5.1"
+source = "git+https://github.com/AlexMikhalev/fff.nvim.git?branch=feat%2Fexternal-scorer#efd15524383babd4d2d18a191240d3dcf494eb31"
 
 [[package]]
 name = "fff-search"
 version = "0.5.1"
+source = "git+https://github.com/AlexMikhalev/fff.nvim.git?branch=feat%2Fexternal-scorer#efd15524383babd4d2d18a191240d3dcf494eb31"
 dependencies = [
  "ahash",
  "aho-corasick",

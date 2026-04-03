@@ -2,12 +2,11 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use base64::Engine;
-use fff_search::{
-    ContentCacheBudget, FFFMode, FilePickerOptions, FilePicker, FuzzySearchOptions,
-    GrepMode, GrepSearchOptions, PaginationArgs, QueryParser, grep_search, parse_grep_query,
-};
 use fff_search::external_scorer::ExternalScorer;
-use terraphim_file_search::kg_scorer::KgPathScorer;
+use fff_search::{
+    ContentCacheBudget, FFFMode, FilePicker, FilePickerOptions, FuzzySearchOptions, GrepMode,
+    GrepSearchOptions, PaginationArgs, QueryParser, grep_search, parse_grep_query,
+};
 use rmcp::{
     RoleServer, ServerHandler,
     model::{
@@ -20,6 +19,7 @@ use terraphim_automata::builder::json_decode;
 use terraphim_automata::matcher::{extract_paragraphs_from_automata, find_matches};
 use terraphim_automata::{AutocompleteConfig, AutocompleteIndex, AutocompleteResult};
 use terraphim_config::{Config, ConfigState};
+use terraphim_file_search::kg_scorer::KgPathScorer;
 use terraphim_service::TerraphimService;
 use terraphim_types::{Layer, NormalizedTermValue, RoleName, SearchQuery};
 use thiserror::Error;
@@ -1219,11 +1219,7 @@ impl McpService {
             .zip(result.scores.iter())
             .map(|(file, score)| {
                 let base = score.total;
-                let kg_boost = self
-                    .kg_scorer
-                    .as_ref()
-                    .map(|s| s.score(file))
-                    .unwrap_or(0);
+                let kg_boost = self.kg_scorer.as_ref().map(|s| s.score(file)).unwrap_or(0);
                 (base + kg_boost, file.relative_path.as_str())
             })
             .collect();
@@ -1282,7 +1278,7 @@ impl McpService {
 
         // Sort files: highest KG path score first so grep pages are most relevant first.
         if let Some(scorer) = &self.kg_scorer {
-            files.sort_by(|a, b| scorer.score(b).cmp(&scorer.score(a)));
+            files.sort_by_key(|f| std::cmp::Reverse(scorer.score(f)));
         }
 
         let fff_query = parse_grep_query(&query);
