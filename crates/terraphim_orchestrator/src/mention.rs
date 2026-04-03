@@ -6,7 +6,7 @@
 
 use crate::config::AgentDefinition;
 use crate::persona::PersonaRegistry;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, SecondsFormat, Utc};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -64,7 +64,7 @@ impl MentionCursor {
     /// Create a cursor set to "now" (skip all historical mentions).
     pub fn now() -> Self {
         Self {
-            last_seen_at: Utc::now().to_rfc3339(),
+            last_seen_at: Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true),
             dispatches_this_tick: 0,
         }
     }
