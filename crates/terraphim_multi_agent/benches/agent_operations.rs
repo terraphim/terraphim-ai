@@ -3,9 +3,7 @@ use std::hint::black_box;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 
-use terraphim_multi_agent::{
-    test_utils::create_test_agent_simple, AgentRegistry, CommandInput, CommandType,
-};
+use terraphim_multi_agent::{test_utils::create_test_agent_simple, CommandInput, CommandType};
 
 /// Benchmark agent creation time
 fn bench_agent_creation(c: &mut Criterion) {
@@ -77,40 +75,12 @@ fn bench_command_processing(c: &mut Criterion) {
     }
 }
 
-/// Benchmark agent registry operations
-fn bench_registry_operations(c: &mut Criterion) {
-    let rt = Runtime::new().unwrap();
-
-    c.bench_function("registry_register_agent", |b| {
-        b.iter(|| {
-            rt.block_on(async {
-                let registry = AgentRegistry::new();
-                let agent = create_test_agent_simple().await.unwrap();
-                agent.initialize().await.unwrap();
-
-                let result = registry.register_agent(Arc::new(agent)).await;
-                black_box(result)
-            })
-        })
-    });
-
-    c.bench_function("registry_find_by_capability", |b| {
-        b.iter(|| {
-            rt.block_on(async {
-                let registry = AgentRegistry::new();
-
-                // Pre-populate with test agents
-                for _i in 0..10 {
-                    let agent = create_test_agent_simple().await.unwrap();
-                    agent.initialize().await.unwrap();
-                    registry.register_agent(Arc::new(agent)).await.unwrap();
-                }
-
-                let result = registry.find_agents_by_capability("test_capability").await;
-                black_box(result)
-            })
-        })
-    });
+/// Benchmark agent registry operations (DISABLED during migration)
+#[allow(dead_code)]
+fn _bench_registry_operations(_c: &mut Criterion) {
+    // TODO: Migrate to KnowledgeGraphAgentRegistry
+    // This benchmark is temporarily disabled during the registry migration.
+    // Re-enable after implementing KnowledgeGraphAgentRegistry benchmarks.
 }
 
 /// Benchmark memory operations
@@ -378,7 +348,7 @@ criterion_group!(
     bench_agent_creation,
     bench_agent_initialization,
     bench_command_processing,
-    bench_registry_operations,
+    // bench_registry_operations, // TODO: Re-enable after KG registry migration
     bench_memory_operations,
     bench_batch_operations,
     bench_concurrent_operations,

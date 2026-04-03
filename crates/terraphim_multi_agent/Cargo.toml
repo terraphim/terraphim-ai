@@ -2,7 +2,7 @@
 name = "terraphim_multi_agent"
 version = "1.0.0"
 edition = "2021"
-description = "Multi-agent system for Terraphim built on roles with Rig framework integration"
+description = "Multi-agent system for Terraphim built on roles with rust-genai integration"
 license = "MIT"
 
 [features]
@@ -44,6 +44,7 @@ terraphim_automata = { path = "../terraphim_automata" }
 terraphim_persistence = { path = "../terraphim_persistence" }
 terraphim_agent_evolution = { path = "../terraphim_agent_evolution" }
 terraphim_service = { path = "../terraphim_service" }
+terraphim_agent_registry = { path = "../terraphim_agent_registry" }
 
 # Firecracker VM dependencies (optional, feature-gated)
 # Note: fcctl-repl has its own workspace dependencies that may conflict
