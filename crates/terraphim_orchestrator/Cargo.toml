@@ -16,15 +16,23 @@ terraphim_tracker = { path = "../terraphim_tracker", version = "1.0.0" }
 terraphim_symphony = { path = "../terraphim_symphony", version = "1.0.0" }
 
 # Core dependencies
-tokio = { version = "1.0", features = ["full", "signal"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-thiserror = "1.0"
-tracing = "0.1"
+tokio = { workspace = true, features = ["full", "signal"] }
+
+serde = { workspace = true, features = ["derive"] }
+
+serde_json = { workspace = true }
+
+thiserror = { workspace = true }
+
+tracing = { workspace = true }
+
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-chrono = { version = "0.4", features = ["serde"] }
-async-trait = "0.1"
-uuid = { version = "1.0", features = ["v4", "serde"] }
+chrono = { workspace = true, features = ["serde"] }
+
+async-trait = { workspace = true }
+
+uuid = { workspace = true, features = ["v4", "serde"] }
+
 
 # Scheduling
 cron = "0.13"
@@ -45,7 +53,8 @@ terraphim_persistence = { path = "../terraphim_persistence", version = "1.4.10",
 
 [dev-dependencies]
 tokio-test = "0.4"
-tempfile = "3.27"
+tempfile = { workspace = true }
+
 
 [[bin]]
 name = "adf"
