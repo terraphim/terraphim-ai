@@ -36,6 +36,9 @@ toml = "0.8"
 handlebars = "6.3"
 regex = "1"
 
+# Persistence layer for shared learnings
+terraphim_persistence = { path = "../terraphim_persistence", version = "1.4.10", features = ["sqlite"] }
+
 [dev-dependencies]
 tokio-test = "0.4"
 tempfile = "3.27"

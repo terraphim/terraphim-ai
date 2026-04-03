@@ -9059,6 +9059,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
+ "terraphim_persistence",
  "terraphim_router",
  "terraphim_spawner",
  "terraphim_symphony",
