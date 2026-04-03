@@ -1,13 +1,13 @@
-# Research Document: TLA+ Formal Validation of Symphony Orchestrator
+# Research Document: TLA+ Formal Validation of the Agent Dispatch Framework (ADF)
 
-**Status**: Draft
+**Status**: Draft (v2 -- expanded to full ADF scope)
 **Author**: Terraphim AI
 **Date**: 2026-04-04
 **Reviewers**: Alex
 
 ## Executive Summary
 
-The Symphony orchestrator (`crates/terraphim_symphony/`) is a concurrent, async Rust system that dispatches AI coding agents to Gitea issues using PageRank-based prioritisation, dependency enforcement, retry logic, and stall detection. This research evaluates using TLA+ formal verification via the existing `terraphim/tlaplus-ts` TypeScript bindings to prove safety and liveness properties of the orchestrator's concurrency model.
+The Terraphim Agent Dispatch Framework (ADF) is a suite of concurrent, async Rust crates that together manage AI agent lifecycle, dispatch, supervision, messaging, and coordination. The ADF comprises the Symphony orchestrator (`crates/terraphim_symphony/`), agent supervisor (`terraphim_agent_supervisor`), messaging system (`terraphim_agent_messaging`), registry (`terraphim_agent_registry`), goal alignment (`terraphim_goal_alignment`), task decomposition (`terraphim_task_decomposition`), multi-agent coordination (`terraphim_multi_agent`), and KG orchestration (`terraphim_kg_orchestration`). This research evaluates using TLA+ formal verification via the existing `terraphim/tlaplus-ts` TypeScript bindings to prove safety and liveness properties across the entire ADF's concurrency model.
 
 ## Essential Questions Check
 
@@ -22,20 +22,25 @@ The Symphony orchestrator (`crates/terraphim_symphony/`) is a concurrent, async 
 ## Problem Statement
 
 ### Description
-The Symphony orchestrator manages concurrent AI agent sessions with complex state transitions: poll-tick dispatch, worker exits, retry timer fires, reconciliation, and shutdown. The interaction of these concurrent events with shared state (running map, claimed set, retry queue) creates a state space too large to test exhaustively with traditional testing.
+The ADF manages concurrent AI agent sessions with complex state transitions across multiple subsystems: Symphony dispatch/retry/reconciliation, OTP-style supervision trees with restart strategies, Erlang-style message passing with delivery guarantees, agent registry with capacity limits, and supervised workflow coordination. The interaction of concurrent events with shared state across these subsystems creates a state space too large to test exhaustively with traditional testing.
 
 ### Impact
-Concurrency bugs in the orchestrator can cause:
-- **Double-dispatch**: same issue dispatched to two agents simultaneously
-- **Starvation**: issues permanently stuck in retry queue
-- **Claim leaks**: claims never released, blocking future dispatch
-- **Dependency deadlocks**: circular dependency cascades preventing any issue from being dispatched
-- **Shutdown races**: workers not properly terminated on shutdown
+Concurrency bugs in the ADF can cause:
+- **Double-dispatch**: same issue dispatched to two agents simultaneously (Symphony)
+- **Starvation**: issues permanently stuck in retry queue (Symphony)
+- **Claim leaks**: claims never released, blocking future dispatch (Symphony)
+- **Dependency deadlocks**: circular dependency cascades preventing any issue from being dispatched (Symphony)
+- **Shutdown races**: workers not properly terminated on shutdown (Symphony, Supervisor)
+- **Restart storms**: cascading restarts under OneForAll/RestForOne strategies (Supervisor)
+- **Message loss**: messages dropped or duplicated under concurrent delivery (Messaging)
+- **Duplicate registration**: agents registered twice causing routing conflicts (Registry, Messaging)
+- **Workflow resource exhaustion**: unbounded concurrent workflows consuming all capacity (KG Orchestration)
+- **Escalation cascades**: supervisor escalation loops when all children fail (Supervision Tree)
 
 ### Success Criteria
-1. TLA+ spec that models the core orchestrator state machine
-2. Safety properties verified: no double-dispatch, no claim leaks, bounded retry queue
-3. Liveness properties verified: every eligible issue eventually dispatched, no starvation
+1. TLA+ specs modelling the core ADF state machines (Symphony, Supervisor, Messaging)
+2. Safety properties verified: no double-dispatch, no claim leaks, bounded retry, restart intensity limits, message delivery invariants
+3. Liveness properties verified: every eligible issue eventually dispatched, no starvation, eventual message delivery
 4. TypeScript test harness using `tlaplus-ts` to run TLC model checking in CI
 
 ## Current State Analysis
@@ -52,6 +57,69 @@ Concurrency bugs in the orchestrator can cause:
 | Reconciliation | `src/orchestrator/reconcile.rs` | Stall detection, tracker state refresh |
 | Issue model | `src/tracker/mod.rs` | `Issue`, `BlockerRef`, `IssueTracker` trait |
 | Workflow config | `src/config/workflow.rs` | YAML front-matter + Liquid template parsing |
+
+**Agent Supervisor** (`crates/terraphim_agent_supervisor/`): OTP-style supervision trees
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| Supervisor | `src/supervisor.rs` | `AgentSupervisor` with `Arc<RwLock<HashMap<AgentPid, SupervisedAgentInfo>>>` children map |
+| Restart strategies | `src/supervisor.rs` | `OneForOne` (restart failed), `OneForAll` (restart all), `RestForOne` (restart failed + later siblings) |
+| Restart intensity | `src/supervisor.rs` | `RestartIntensity { max_restarts, time_window }` -- rate-limited restarts |
+| Health checks | `src/supervisor.rs` | Background task polling agent health at intervals |
+| Agent lifecycle | `src/supervisor.rs` | `spawn_agent`, `stop_agent`, `handle_agent_exit`, `restart_agent`, `restart_all_agents`, `restart_from_agent` |
+
+**Agent Messaging** (`crates/terraphim_agent_messaging/`): Erlang-style message passing
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| Message types | `src/message.rs` | `AgentMessage` enum: Call (sync), Cast (fire-and-forget), Info (system), Reply, Ack |
+| Mailbox | `src/mailbox.rs` | `AgentMailbox` with `mpsc::UnboundedSender/Receiver`, bounded check, stats |
+| Router | `src/router.rs` | `DefaultMessageRouter` with `Arc<RwLock<HashMap<AgentPid, MailboxSender>>>`, retry task, shutdown signal |
+| Delivery | `src/delivery.rs` | `DeliveryManager` with `AtMostOnce`/`AtLeastOnce`/`ExactlyOnce` guarantees, dedup cache, retry candidates |
+| Message system | `src/router.rs` | `MessageSystem` combining router + mailbox manager |
+
+**Agent Registry** (`crates/terraphim_agent_registry/`): Agent discovery with KG integration
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| Registry | `src/registry.rs` | `KnowledgeGraphAgentRegistry` with `Arc<RwLock<HashMap<AgentPid, AgentMetadata>>>` |
+| Discovery | `src/registry.rs` | `find_by_role`, `find_by_capability`, `find_by_supervisor` |
+| Capacity | `src/registry.rs` | `max_agents` limit check on registration |
+| Cleanup | `src/registry.rs` | Background task removing stale agents |
+
+**Goal Alignment** (`crates/terraphim_goal_alignment/`): Goal hierarchy and conflict resolution
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| Goal aligner | `src/alignment.rs` | `KnowledgeGraphGoalAligner` with `Arc<RwLock<GoalHierarchy>>` |
+| Cycle detection | `src/alignment.rs` | Dependency cycle detection in goal graph |
+| Conflict resolution | `src/alignment.rs` | Goal conflict detection and resolution strategies |
+
+**Task Decomposition** (`crates/terraphim_task_decomposition/`): KG-based task breakdown
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| Decomposer | `src/decomposition.rs` | `KnowledgeGraphTaskDecomposer` with concept extraction, connectivity analysis |
+| Circular dep check | `src/decomposition.rs` | `has_circular_dependency` DFS-based cycle detection |
+| Caching | `src/decomposition.rs` | `Arc<RwLock<HashMap<String, DecompositionResult>>>` decomposition cache |
+
+**Multi-Agent** (`crates/terraphim_multi_agent/`): Agent coordination
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| TerraphimAgent | `src/agent.rs` | Core agent with `Arc<RwLock<AgentStatus>>`, command processing, LLM integration |
+| Status machine | `src/agent.rs` | States: Initializing -> Ready <-> Busy -> Error -> Terminating -> Offline |
+| Persistence | `src/agent.rs` | `save_state`/`load_state` with `DeviceStorage` |
+
+**KG Orchestration** (`crates/terraphim_kg_orchestration/`): Supervision tree workflow orchestration
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| Scheduler | `src/scheduler.rs` | `TaskScheduler` integrating decomposition + agent pool |
+| Supervision tree | `src/supervision.rs` | `SupervisionTreeOrchestrator` combining supervisor + scheduler + coordinator |
+| Workflow management | `src/supervision.rs` | `SupervisedWorkflow` with `active_workflows: Arc<RwLock<HashMap>>`, fault recovery |
+| Health monitoring | `src/supervision.rs` | Background health check loop, workflow timeout detection |
+| Message handling | `src/supervision.rs` | `SupervisionMessage` enum: AgentFailed, AgentRecovered, WorkflowTimeout, HealthCheck, Escalation, Shutdown |
 
 **tlaplus-ts (TypeScript)**: Complete library at `terraphim/tlaplus-ts` on Gitea
 
@@ -95,11 +163,29 @@ reconcile -> find_stalled_issues -> abort + schedule_retry
 
 ### Key Invariants Identified from Code
 
+**Symphony Orchestrator:**
 1. **No double-dispatch** (`dispatch.rs:39`): `!state.running.contains_key(&issue.id) && !state.is_claimed(&issue.id)`
 2. **Slot bound** (`dispatch.rs:44`): `state.available_slots() == 0` prevents over-dispatch
 3. **Todo blocker rule** (`dispatch.rs:58-63`): issues in "todo" state blocked by non-terminal blockers cannot dispatch
 4. **Claim lifecycle**: claimed on dispatch (`mod.rs:213`), released on terminal reconcile (`mod.rs:721`) or retry not-found (`mod.rs:607`)
 5. **Retry cancellation**: old retry aborted when new retry scheduled (`mod.rs:635-636`)
+
+**Agent Supervisor:**
+6. **Restart intensity bound**: `max_restarts` within `time_window` (`supervisor.rs:RestartIntensity`)
+7. **No orphaned children**: every child has a valid supervisor_id; supervisor tracks all spawned agents
+8. **Restart strategy correctness**: OneForOne restarts only the failed agent; OneForAll restarts all; RestForOne restarts failed + those started after it
+9. **Health check liveness**: background health task runs at configured intervals
+
+**Agent Messaging:**
+10. **No duplicate registration**: `register_agent` rejects duplicate AgentPid (`router.rs:260`)
+11. **Mailbox capacity bound**: bounded mailboxes reject sends at capacity (`mailbox.rs:128-132`)
+12. **Exactly-once deduplication**: ExactlyOnce mode deduplicates by MessageId (`delivery.rs:158-163`)
+13. **Retry bound**: message retry capped at `max_retries` (`delivery.rs:276`)
+14. **Delivery status machine**: Pending -> InTransit -> Delivered -> Acknowledged (or Failed/Expired); no backwards transitions
+
+**KG Orchestration:**
+15. **Workflow concurrency bound**: `max_concurrent_workflows` checked before starting new workflow (`supervision.rs:598`)
+16. **Escalation terminates**: supervisor escalation triggers graceful shutdown of affected workflows (`supervision.rs:934-938`)
 
 ## Constraints
 
