@@ -20,46 +20,24 @@ curl -fsSL https://raw.githubusercontent.com/terraphim/terraphim-ai/main/scripts
 
 ### Homebrew (macOS/Linux)
 
-Homebrew provides signed and notarized binaries for macOS and Linux.
+Homebrew support coming soon. For now, use the universal installer or Cargo.
 
-\`\`\`bash
-# Add Terraphim tap
-brew tap terraphim/terraphim
-
-# Install server
-brew install terraphim-server
-
-# Install TUI/REPL
-brew install terraphim-agent
-\`\`\`
+```bash
+# Universal installer (recommended)
+curl -fsSL https://raw.githubusercontent.com/terraphim/terraphim-ai/main/scripts/install.sh | bash
+```
 
 ### Cargo (Rust)
 
 Install using Cargo, Rust's package manager.
 
-\`\`\`bash
-# Install REPL with interactive TUI (11 commands)
-cargo install terraphim-repl
+```bash
+# Install agent with interactive TUI
+cargo install terraphim-agent
 
-# Install CLI for automation (8 commands)
+# Install CLI for automation
 cargo install terraphim-cli
-\`\`\`
-
-### npm (Node.js)
-
-Install the autocomplete package with knowledge graph support.
-
-\`\`\`bash
-npm install @terraphim/autocomplete
-\`\`\`
-
-### PyPI (Python)
-
-Install the high-performance text processing library.
-
-\`\`\`bash
-pip install terraphim-automata
-\`\`\`
+```
 
 ## Platform-Specific Guides
 
@@ -77,49 +55,46 @@ sudo mv terraphim_server /usr/local/bin/
 
 #### Build from Source
 
-\`\`\`bash
+```bash
 # Clone the repository
 git clone https://github.com/terraphim/terraphim-ai.git
 cd terraphim-ai
 
-# Build the workspace
-cargo build --workspace --release
+# Build the default crate (server)
+cargo build --release
 
 # Install (optional)
 sudo cp target/release/terraphim_server /usr/local/bin/
 sudo cp target/release/terraphim-agent /usr/local/bin/
-\`\`\`
+```
 
 ### macOS
 
 #### Binary Download
 
-\`\`\`bash
-# Download using Homebrew (recommended)
-brew install terraphim-server terraphim-agent
-
+```bash
 # Or download manually
 curl -L https://github.com/terraphim/terraphim-ai/releases/latest/download/terraphim_server-darwin-x86_64.tar.gz -o terraphim_server.tar.gz
 tar -xzf terraphim_server.tar.gz
 sudo mv terraphim_server /usr/local/bin/
-\`\`\`
+```
 
 #### Build from Source
 
 Requires Xcode command line tools.
 
-\`\`\`bash
+```bash
 # Clone the repository
 git clone https://github.com/terraphim/terraphim-ai.git
 cd terraphim-ai
 
-# Build the workspace
-cargo build --workspace --release
+# Build the default crate (server)
+cargo build --release
 
 # Install (optional)
 sudo cp target/release/terraphim_server /usr/local/bin/
 sudo cp target/release/terraphim-agent /usr/local/bin/
-\`\`\`
+```
 
 ### Windows
 
@@ -133,34 +108,22 @@ Download the latest release from GitHub and extract to a directory in your PATH.
 
 Requires [Rust for Windows](https://rustup.rs/).
 
-\`\`\`powershell
+```powershell
 # Clone the repository
 git clone https://github.com/terraphim/terraphim-ai.git
 cd terraphim-ai
 
-# Build the workspace
-cargo build --workspace --release
+# Build the default crate (server)
+cargo build --release
 
-# The binaries will be in target\\release\\
-\`\`\`
-
-## Docker
-
-Run Terraphim in a Docker container.
-
-\`\`\`bash
-# Pull the latest image
-docker pull terraphim/terraphim-ai:latest
-
-# Run the server
-docker run -p 8080:8080 terraphim/terraphim-ai:latest
-\`\`\`
+# The binaries will be in target\release\
+```
 
 ## Verification
 
 After installation, verify that Terraphim is working:
 
-\`\`\`bash
+```bash
 # Check version
 terraphim-server --version
 terraphim-agent --version
@@ -168,9 +131,9 @@ terraphim-agent --version
 # Start the server
 terraphim-server
 
-# In another terminal, use the REPL
-terraphim-repl
-\`\`\`
+# In another terminal, use the agent
+terraphim-agent
+```
 
 ## Troubleshooting
 

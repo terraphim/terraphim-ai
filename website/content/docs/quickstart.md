@@ -19,25 +19,19 @@ Choose your preferred installation method:
 curl -fsSL https://raw.githubusercontent.com/terraphim/terraphim-ai/main/scripts/install.sh | bash
 \`\`\`
 
-### Option B: Homebrew (macOS/Linux)
+### Option B: Homebrew (Coming Soon)
 
-\`\`\`bash
-# Add Terraphim tap
-brew tap terraphim/terraphim
-
-# Install both server and CLI tools
-brew install terraphim-server terraphim-agent
-\`\`\`
+Homebrew support is not yet available. Use the universal installer or Cargo instead.
 
 ### Option C: Cargo
 
-\`\`\`bash
-# Install REPL with interactive TUI (11 commands)
-cargo install terraphim-repl
+```bash
+# Install agent with interactive TUI
+cargo install terraphim-agent
 
-# Install CLI for automation (8 commands)
+# Install CLI for automation
 cargo install terraphim-cli
-\`\`\`
+```
 
 [Need more options?](/docs/installation)
 
@@ -58,18 +52,18 @@ You should see output like:
 [INFO] Knowledge graph initialized
 \`\`\`
 
-## Step 3: Use REPL
+## Step 3: Use the Agent
 
-In a new terminal, start the interactive REPL (Read-Eval-Print Loop):
+In a new terminal, start the interactive agent:
 
-\`\`\`bash
-terraphim-repl
-\`\`\`
+```bash
+terraphim-agent
+```
 
 You'll see a welcome message and can start typing commands:
 
-\`\`\`
-Terraphim AI REPL v1.5.2
+```
+Terraphim AI Agent v1.5.2
 Type 'help' for available commands
 
 > search rust async
@@ -80,13 +74,13 @@ Role set to: Engineer (optimizing for technical depth)
 
 > search patterns
 Found 8 results for 'patterns'
-\`\`\`
+```
 
-## Common REPL Commands
+## Common Agent Commands
 
 Here are the most useful commands to get started:
 
-\`\`\`bash
+```bash
 > search <query>              # Search knowledge graph
 > role <name>                 # Set search role (engineer, architect, etc.)
 > connect <term1> <term2>    # Link two terms in knowledge graph
@@ -94,7 +88,7 @@ Here are the most useful commands to get started:
 > export <format>              # Export knowledge graph (json, csv)
 > status                      # Show server status and statistics
 > help                        # Show all available commands
-\`\`\`
+```
 
 ## Step 4: Import Your Content
 
@@ -164,12 +158,12 @@ terraphim-cli search "rust error handling" --role engineer
 
 Here's a complete example workflow:
 
-\`\`\`bash
+```bash
 # 1. Start the server (in one terminal)
 terraphim-server &
 
 # 2. Import your codebase (in another terminal)
-terraphim-repl
+terraphim-agent
 > import ~/my-project/src/
 
 # 3. Search for information
@@ -183,7 +177,7 @@ terraphim-repl
 
 # 6. Export results
 > export json > search-results.json
-\`\`\`
+```
 
 ## Next Steps
 
