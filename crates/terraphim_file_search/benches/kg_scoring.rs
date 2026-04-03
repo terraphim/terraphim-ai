@@ -28,7 +28,7 @@ fn make_thesaurus(terms: &[&str]) -> Thesaurus {
     for (i, &term) in terms.iter().enumerate() {
         let key = NormalizedTermValue::from(term.to_string());
         let nt = NormalizedTerm {
-            id: i.to_string(),
+            id: i as u64,
             value: NormalizedTermValue::from(term.to_string()),
             display_value: None,
             url: None,

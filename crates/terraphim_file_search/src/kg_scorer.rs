@@ -62,9 +62,9 @@ impl ExternalScorer for KgPathScorer {
             }
         };
 
-        let unique_ids: AHashSet<&str> = matches
+        let unique_ids: AHashSet<u64> = matches
             .iter()
-            .map(|m| m.normalized_term.id.as_str())
+            .map(|m| m.normalized_term.id)
             .collect();
 
         let unique_count = unique_ids.len() as i32;
@@ -99,7 +99,7 @@ mod tests {
     fn make_term(id: &str, value: &str) -> (NormalizedTermValue, NormalizedTerm) {
         let key = NormalizedTermValue::from(value.to_string());
         let term = NormalizedTerm {
-            id: id.to_string(),
+            id: id.parse::<u64>().unwrap_or(0),
             value: NormalizedTermValue::from(value.to_string()),
             display_value: None,
             url: None,

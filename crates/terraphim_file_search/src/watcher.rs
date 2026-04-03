@@ -155,11 +155,11 @@ mod tests {
     /// that `load_thesaurus_from_json` can parse it.
     ///
     /// ```json
-    /// {"name":"test","data":{"rust":{"id":"1","nterm":"rust","url":null}}}
+    /// {"name":"test","data":{"rust":{"id":1,"nterm":"rust","url":null}}}
     /// ```
     fn write_thesaurus_json(dir: &Path, filename: &str, key: &str, nterm: &str) {
         let content = format!(
-            r#"{{"name":"test","data":{{"{key}":{{"id":"1","nterm":"{nterm}","url":null}}}}}}"#,
+            r#"{{"name":"test","data":{{"{key}":{{"id":1,"nterm":"{nterm}","url":null}}}}}}"#,
             key = key,
             nterm = nterm,
         );

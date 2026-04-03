@@ -21,7 +21,7 @@ fn thesaurus_with_terms(name: &str, terms: &[(&str, &str)]) -> Thesaurus {
     for (id, val) in terms {
         let key = NormalizedTermValue::from(val.to_string());
         let term = NormalizedTerm {
-            id: id.to_string(),
+            id: id.parse::<u64>().unwrap_or(0),
             value: NormalizedTermValue::from(val.to_string()),
             display_value: None,
             url: None,
