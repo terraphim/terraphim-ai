@@ -37,6 +37,7 @@ pub mod dual_mode;
 pub mod error;
 pub mod flow;
 pub mod handoff;
+pub mod learning;
 pub mod mention;
 pub mod metrics_persistence;
 pub mod mode;
