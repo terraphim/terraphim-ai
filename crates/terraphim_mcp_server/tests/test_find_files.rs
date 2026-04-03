@@ -54,7 +54,7 @@ async fn find_files_no_scorer_returns_results() {
 
     // At least the summary line
     assert!(
-        result.content.len() >= 1,
+        !result.content.is_empty(),
         "expected at least one content item"
     );
 
@@ -164,7 +164,7 @@ async fn grep_files_returns_content_matches() {
 
     // At least the summary line
     assert!(
-        result.content.len() >= 1,
+        !result.content.is_empty(),
         "expected at least one content item"
     );
 
