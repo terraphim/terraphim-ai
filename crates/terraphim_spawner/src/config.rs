@@ -147,13 +147,18 @@ impl AgentConfig {
     /// Infer required API keys from CLI command.
     ///
     /// Note: codex uses OAuth (ChatGPT login) and does not require OPENAI_API_KEY.
+    /// Note: opencode manages its own provider auth via its config file
+    /// (supports Moonshot/Kimi, Anthropic, etc.) — not just OpenAI.
     fn infer_api_keys(cli_command: &str) -> Vec<String> {
         match Self::cli_name(cli_command) {
             // Claude CLI uses OAuth (browser flow), not API keys.
             // Do NOT require ANTHROPIC_API_KEY -- it poisons Claude CLI
             // by forcing API-key auth mode with an invalid value.
             "claude" | "claude-code" => Vec::new(),
-            "opencode" => vec!["OPENAI_API_KEY".to_string()],
+            // opencode handles its own auth via ~/.config/opencode/opencode.json.
+            // It supports multiple providers (Kimi, Anthropic, OpenAI, etc.)
+            // each with their own auth mechanism. Do NOT gate on OPENAI_API_KEY.
+            "opencode" => Vec::new(),
             _ => Vec::new(),
         }
     }
@@ -270,8 +275,12 @@ mod tests {
             "claude uses OAuth, should not require API key"
         );
 
+        // opencode manages its own provider auth -- should return empty
         let keys = AgentConfig::infer_api_keys("opencode");
-        assert!(keys.contains(&"OPENAI_API_KEY".to_string()));
+        assert!(
+            keys.is_empty(),
+            "opencode manages its own auth, should not require API key"
+        );
 
         let keys = AgentConfig::infer_api_keys("unknown");
         assert!(keys.is_empty());
@@ -284,7 +293,10 @@ mod tests {
         assert!(keys.is_empty(), "claude via full path uses OAuth");
 
         let keys = AgentConfig::infer_api_keys("/home/alex/.bun/bin/opencode");
-        assert!(keys.contains(&"OPENAI_API_KEY".to_string()));
+        assert!(
+            keys.is_empty(),
+            "opencode via full path manages its own auth"
+        );
     }
 
     #[test]
