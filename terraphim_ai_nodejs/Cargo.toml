@@ -26,8 +26,9 @@ ahash = "0.8.12"
 serde = { workspace = true }
 
 [dev-dependencies]
-tempfile = "3.27"
 
+[dev-dependencies.tempfile]
+workspace = true
 [build-dependencies]
 napi-build = "2.3.1"
 

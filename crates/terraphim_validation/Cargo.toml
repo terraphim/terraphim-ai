@@ -44,7 +44,8 @@ hex = "0.4"
 ring = { version = "0.17", optional = true }
 
 # Testing and assertions
-tempfile = "3.27"
+tempfile = { workspace = true }
+
 assert_cmd = "2.0"
 predicates = "3.0"
 urlencoding = "2.1"

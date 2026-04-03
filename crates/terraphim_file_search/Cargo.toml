@@ -18,7 +18,8 @@ fff-search = { git = "https://github.com/AlexMikhalev/fff.nvim.git", branch = "f
 
 ahash = "0.8"
 parking_lot = "0.12"
-tracing = "0.1"
+tracing = { workspace = true }
+
 notify = "8"
 notify-debouncer-full = "0.6"
 
@@ -29,7 +30,8 @@ zlob = ["fff-search/zlob"]
 [dev-dependencies]
 tokio = { workspace = true }
 criterion = { version = "0.5", features = ["html_reports"] }
-tempfile = "3"
+tempfile = { workspace = true }
+
 
 [[bench]]
 name = "kg_scoring"
