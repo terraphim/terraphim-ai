@@ -18,6 +18,14 @@ fff-search = { path = "../../../projects/terraphim/fff-core-fork/crates/fff-core
 ahash = "0.8"
 parking_lot = "0.12"
 tracing = "0.1"
+notify = "8"
+notify-debouncer-full = "0.6"
 
 [dev-dependencies]
 tokio = { workspace = true }
+criterion = { version = "0.5", features = ["html_reports"] }
+tempfile = "3"
+
+[[bench]]
+name = "kg_scoring"
+harness = false
