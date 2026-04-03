@@ -15,11 +15,16 @@ readme = "../../README.md"
 terraphim_automata = { path = "../terraphim_automata" }
 terraphim_types = { path = "../terraphim_types" }
 fff-search = { git = "https://github.com/AlexMikhalev/fff.nvim.git", branch = "feat/external-scorer" }
+
 ahash = "0.8"
 parking_lot = "0.12"
 tracing = "0.1"
 notify = "8"
 notify-debouncer-full = "0.6"
+
+[features]
+default = []
+zlob = ["fff-search/zlob"]
 
 [dev-dependencies]
 tokio = { workspace = true }
