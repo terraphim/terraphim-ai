@@ -18,9 +18,23 @@
 **AVOID:**
 - Per-issue depth tracking (remove, cursor makes it unnecessary)
 - Complex deduplication logic
-- Webhook-driven mentions (Issue #149, deferred)
+- Webhook-driven mentions (Issue #149, deferred — requires HTTP server in ADF)
+- **Gitea Notifications API** (`/notifications`) — evaluated and rejected: doesn't include comment bodies, aggregates by issue not comment, requires N extra API calls to parse `@adf:` patterns. See comparison below.
 - Processed HashSet persistence (cursor replaces it)
 - Custom SQLite table for cursor (use existing KV store)
+
+### Approach Comparison (evaluated Apr 3 2026)
+
+| | Repo comments API | Notifications API | Webhooks |
+|---|---|---|---|
+| **API calls/tick** | 1 | 1 + N (fetch bodies) | 0 (push) |
+| **Comment body** | Included ✅ | Not included ❌ | Included ✅ |
+| **Cursor** | `since` param ✅ | mark-as-read ✅ | N/A |
+| **Replay safe** | Yes (cursor) | Yes (read state) | Misses offline events |
+| **Setup** | None | User subscription | HTTP endpoint in ADF |
+| **Winner** | ✅ **This one** | ❌ Too many calls | ❌ Too complex |
+
+The repo-wide comments endpoint (`GET /repos/{owner}/{repo}/issues/comments?since=&limit=50`) gives full comment bodies with `@adf:` patterns in a single call. Confirmed working on Gitea 1.26.0.
 
 ---
 
