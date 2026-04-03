@@ -1122,6 +1122,7 @@ impl AgentOrchestrator {
         };
 
         if comments.is_empty() {
+            cursor.save().await;
             self.mention_cursor = Some(cursor);
             return;
         }
