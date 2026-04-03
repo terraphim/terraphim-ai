@@ -59,7 +59,7 @@ pub use dispatcher::{DispatchTask, Dispatcher, DispatcherStats};
 pub use dual_mode::DualModeOrchestrator;
 pub use error::OrchestratorError;
 pub use handoff::{HandoffBuffer, HandoffContext, HandoffLedger};
-pub use mention::{parse_mentions, resolve_mention, DetectedMention, MentionTracker};
+pub use mention::{parse_mentions, resolve_mention, DetectedMention, MentionCursor, MentionTracker};
 pub use metrics_persistence::{
     InMemoryMetricsPersistence, MetricsPersistence, MetricsPersistenceConfig,
     MetricsPersistenceError, PersistedAgentMetrics,
@@ -122,6 +122,7 @@ struct ManagedAgent {
     restart_count: u32,
     /// Broadcast receiver for draining output events to nightwatch.
     output_rx: broadcast::Receiver<OutputEvent>,
+    spawned_by_mention: bool,
 }
 
 /// The main orchestrator that runs the dark factory.
@@ -165,7 +166,7 @@ pub struct AgentOrchestrator {
     #[allow(dead_code)]
     active_flows: HashMap<String, tokio::task::JoinHandle<flow::state::FlowRunState>>,
     /// Tracker for processed @adf: mentions (dedup + depth limiting).
-    mention_tracker: MentionTracker,
+    mention_cursor: Option<MentionCursor>,
     /// Monotonically increasing tick counter for poll_modulo gating.
     tick_count: u64,
 }
@@ -239,13 +240,7 @@ impl AgentOrchestrator {
         // Initialize output poster if Gitea config is provided
         let output_poster = config.gitea.as_ref().map(OutputPoster::new);
 
-        // Initialize mention tracker with configured depth limit (default 3)
-        let max_mention_depth = config
-            .mentions
-            .as_ref()
-            .map(|m| m.max_mention_depth)
-            .unwrap_or(3);
-        let mention_tracker = MentionTracker::new(max_mention_depth);
+        // MentionCursor loaded lazily on first poll (async)
 
         Ok(Self {
             config,
@@ -270,7 +265,7 @@ impl AgentOrchestrator {
             last_run_commits: HashMap::new(),
             pre_check_tracker: None,
             active_flows: HashMap::new(),
-            mention_tracker,
+            mention_cursor: None,
             tick_count: 0,
         })
     }
@@ -767,6 +762,7 @@ impl AgentOrchestrator {
                 started_at: Instant::now(),
                 restart_count,
                 output_rx,
+                spawned_by_mention: false,
             },
         );
 
@@ -1052,6 +1048,11 @@ impl AgentOrchestrator {
     /// Skipped when no mention configuration is present or when the Gitea tracker
     /// is not configured. Uses `tick_count % poll_modulo` to avoid polling on
     /// every reconciliation tick.
+    /// Cursor-based mention polling: single API call, no replay on restart.
+    ///
+    /// Uses repo-wide comments endpoint with `since` cursor. On first run
+    /// (no persisted cursor), cursor is set to `now` to skip all historical
+    /// mentions — preventing the mention replay storm.
     async fn poll_mentions(&mut self) {
         let mention_cfg = match self.config.mentions.clone() {
             Some(cfg) => cfg,
@@ -1071,6 +1072,27 @@ impl AgentOrchestrator {
             return;
         }
 
+        // Count currently active mention-spawned agents
+        let active_mention_agents = self.active_agents.values()
+            .filter(|a| a.spawned_by_mention)
+            .count() as u32;
+        if active_mention_agents >= mention_cfg.max_concurrent_mention_agents {
+            tracing::debug!(
+                active = active_mention_agents,
+                max = mention_cfg.max_concurrent_mention_agents,
+                "mention agents at capacity, skipping poll"
+            );
+            return;
+        }
+
+        // Lazy-load cursor on first poll
+        let mut cursor = match self.mention_cursor.take() {
+            Some(c) => c,
+            None => mention::MentionCursor::load_or_now().await,
+        };
+        cursor.dispatches_this_tick = 0;
+
+        // Create Gitea tracker for repo-wide comment polling
         let tracker_cfg = terraphim_tracker::GiteaConfig {
             base_url: gitea_cfg.base_url.clone(),
             token: gitea_cfg.token.clone(),
@@ -1084,90 +1106,104 @@ impl AgentOrchestrator {
             Ok(t) => t,
             Err(e) => {
                 tracing::warn!(error = %e, "failed to create GiteaTracker for mention polling");
+                self.mention_cursor = Some(cursor);
                 return;
             }
         };
 
+        // Single API call: all comments since cursor
+        let comments = match tracker.fetch_repo_comments(Some(&cursor.last_seen_at), Some(50)).await {
+            Ok(c) => c,
+            Err(e) => {
+                tracing::warn!(error = %e, "failed to fetch repo comments for mention polling");
+                self.mention_cursor = Some(cursor);
+                return;
+            }
+        };
+
+        if comments.is_empty() {
+            self.mention_cursor = Some(cursor);
+            return;
+        }
+
         let agents = self.config.agents.clone();
         let persona_registry = self.persona_registry.clone();
+        let max_dispatches = mention_cfg.max_dispatches_per_tick;
 
-        for &issue_number in &mention_cfg.watch_issues {
-            if self.mention_tracker.depth_exceeded(issue_number) {
-                tracing::debug!(issue = issue_number, "mention depth exceeded, skipping");
-                continue;
+        for comment in &comments {
+            if cursor.dispatches_this_tick >= max_dispatches {
+                tracing::debug!(
+                    dispatched = cursor.dispatches_this_tick,
+                    max = max_dispatches,
+                    "max dispatches per tick reached"
+                );
+                break;
             }
 
-            match tracker.fetch_comments(issue_number, None).await {
-                Ok(comments) => {
-                    for comment in &comments {
-                        let detected = mention::parse_mentions(
-                            comment,
-                            issue_number,
-                            &agents,
-                            &persona_registry,
-                        );
+            let detected = mention::parse_mentions(
+                comment,
+                comment.issue_number,
+                &agents,
+                &persona_registry,
+            );
 
-                        for m in detected {
-                            if self.mention_tracker.is_processed(&m) {
-                                continue;
-                            }
+            for m in detected {
+                if cursor.dispatches_this_tick >= max_dispatches {
+                    break;
+                }
 
-                            tracing::info!(
-                                agent = %m.agent_name,
-                                issue = m.issue_number,
-                                comment_id = m.comment_id,
-                                "dispatching mention-driven task"
-                            );
+                tracing::info!(
+                    agent = %m.agent_name,
+                    issue = m.issue_number,
+                    comment_id = m.comment_id,
+                    "dispatching mention-driven task"
+                );
 
-                            // Spawn the mentioned agent
-                            if let Some(def) =
-                                agents.iter().find(|a| a.name == m.agent_name).cloned()
-                            {
-                                let mut mention_def = def.clone();
-                                // Append mention context
-                                mention_def.task = format!(
-                                    "{}
+                // Spawn the mentioned agent
+                if let Some(def) = agents.iter().find(|a| a.name == m.agent_name).cloned() {
+                    let mut mention_def = def.clone();
+                    // Append mention context
+                    mention_def.task = format!(
+                        "{}
 
 ## Mention Context
 Triggered by @adf:{} mention in issue #{} (comment {}).
 Comment: {}",
-                                    def.task,
-                                    m.agent_name,
-                                    m.issue_number,
-                                    m.comment_id,
-                                    if m.comment_body.len() > 500 {
-                                        &m.comment_body[..500]
-                                    } else {
-                                        &m.comment_body
-                                    }
-                                );
-                                // Post output back to the same issue
-                                mention_def.gitea_issue = Some(m.issue_number);
-
-                                if let Err(e) = self.spawn_agent(&mention_def).await {
-                                    tracing::error!(
-                                        agent = %m.agent_name,
-                                        issue = m.issue_number,
-                                        error = %e,
-                                        "failed to spawn mentioned agent"
-                                    );
-                                }
-                            }
-
-                            self.mention_tracker.mark_processed(&m);
-                            self.mention_tracker.increment_depth(issue_number);
+                        def.task,
+                        m.agent_name,
+                        m.issue_number,
+                        m.comment_id,
+                        if m.comment_body.len() > 500 {
+                            &m.comment_body[..500]
+                        } else {
+                            &m.comment_body
                         }
+                    );
+                    // Post output back to the same issue
+                    mention_def.gitea_issue = Some(m.issue_number);
+
+                    if let Err(e) = self.spawn_agent(&mention_def).await {
+                        tracing::error!(
+                            agent = %m.agent_name,
+                            issue = m.issue_number,
+                            error = %e,
+                            "failed to spawn mentioned agent"
+                        );
+                    } else if let Some(agent) = self.active_agents.get_mut(&mention_def.name) {
+                        agent.spawned_by_mention = true;
                     }
                 }
-                Err(e) => {
-                    tracing::warn!(
-                        issue = issue_number,
-                        error = %e,
-                        "failed to fetch comments for mention polling"
-                    );
-                }
+
+                cursor.dispatches_this_tick += 1;
             }
+
+            // Advance cursor past this comment's timestamp
+            cursor.advance_to(&comment.created_at);
         }
+
+        // Persist cursor for next poll / restart
+        cursor.save().await;
+        self.mention_cursor = Some(cursor);
     }
 
     /// Periodic reconciliation: detect exits, check cron, evaluate drift, drain output.
