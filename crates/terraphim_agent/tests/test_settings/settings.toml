@@ -1,0 +1,16 @@
+# Test settings for terraphim_agent integration tests
+server_hostname = "127.0.0.1:8000"
+api_endpoint = "http://localhost:8000/api"
+initialized = false
+default_data_path = "/tmp/terraphim_test_data"
+role_config = "/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_agent/tests/test_config.json"
+
+[profiles.sqlite]
+type = "sqlite"
+datadir = "/tmp/terraphim_test_data/sqlite"
+connection_string = "/tmp/terraphim_test_data/sqlite/terraphim.db"
+table = "terraphim_kv"
+
+[profiles.dashmap]
+type = "dashmap"
+root = "/tmp/terraphim_test_data/dashmap"

@@ -12,14 +12,21 @@ repository = "https://github.com/terraphim/terraphim-ai"
 terraphim_types = { path = "../terraphim_types", version = "1.0.0" }
 
 # Core dependencies
-serde = { version = "1.0", features = ["derive"] }
+serde = { workspace = true, features = ["derive"] }
+
 serde_yaml = "0.9"
-thiserror = "1.0"
-tracing = "0.1"
-chrono = { version = "0.4", features = ["serde"] }
-tokio = { version = "1.0", features = ["full"] }
-async-trait = "0.1"
-uuid = { version = "1.21", features = ["v4", "serde"] }
+thiserror = { workspace = true }
+
+tracing = { workspace = true }
+
+chrono = { workspace = true, features = ["serde"] }
+
+tokio = { workspace = true, features = ["full"] }
+
+async-trait = { workspace = true }
+
+uuid = { workspace = true, features = ["v4", "serde"] }
+
 dirs = "5.0"
 
 # Optional persistence support
@@ -40,7 +47,8 @@ file-watch = ["dep:notify"]
 
 [dev-dependencies]
 tokio-test = "0.4"
-tempfile = "3.27"
+tempfile = { workspace = true }
+
 tracing-test = "0.2"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 serial_test = "3.2"

@@ -86,13 +86,14 @@ full = ["full-db", "openrouter", "ollama", "grepapp", "ai-assistant", "mcp", "wo
 [dev-dependencies]
 serial_test = "3.3.1"
 terraphim_agent = { path = "../crates/terraphim_agent", version = "1.0.0" }
-tempfile = "3.27.0"
 urlencoding = "2.1.3"
 tokio = { workspace = true }
 reqwest = { workspace = true }
 axum-test = "19"
 futures-util = "0.3"
 
+[dev-dependencies.tempfile]
+workspace = true
 [package.metadata.deb]
 maintainer = "Terraphim Contributors <team@terraphim.ai>"
 copyright = "2024, Terraphim Contributors"
