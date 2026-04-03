@@ -220,7 +220,7 @@ jobs:
           components: clippy
 
       - name: Clippy Check
-        run: cargo clippy --workspace --all-targets -- -D warnings
+        run: cargo clippy --workspace --all-targets --features zlob -- -D warnings
         env:
           RUST_BACKTRACE: 1
 
@@ -274,10 +274,10 @@ jobs:
       - name: Check compilation
         run: |
           # Quick compilation check without building all binaries
-          cargo check --workspace
+          cargo check --workspace --features zlob
           # Check key binaries compile
           cargo check --package terraphim_server
-          cargo check --package terraphim_mcp_server
+          cargo check --package terraphim_mcp_server --features zlob
 
   # Frontend linting and type checking
   frontend-check:
@@ -384,8 +384,8 @@ jobs:
 
       - name: Run unit tests
         run: |
-          # Run unit tests (rocksdb feature disabled in CI)
-          cargo test --workspace --lib --bins -- --test-threads=2
+          # Run unit tests (rocksdb feature disabled in CI, zlob enabled for fff-search)
+          cargo test --workspace --lib --bins --features zlob -- --test-threads=2
 
   # WASM build verification
   wasm-build:
