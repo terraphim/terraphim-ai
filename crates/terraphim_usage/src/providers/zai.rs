@@ -6,6 +6,7 @@ use serde::Deserialize;
 struct ZaiApiResponse {
     code: i64,
     data: ZaiUsageData,
+    #[allow(dead_code)]
     success: bool,
 }
 
@@ -23,7 +24,9 @@ struct ZaiLimit {
     usage: i64,
     #[serde(rename = "currentValue")]
     current_value: i64,
+    #[allow(dead_code)]
     remaining: i64,
+    #[allow(dead_code)]
     percentage: i64,
     #[serde(rename = "nextResetTime")]
     next_reset_time: Option<i64>,
@@ -40,8 +43,10 @@ struct ZaiUsageDetail {
 
 #[derive(Debug, Deserialize)]
 struct ZaiSubscription {
+    #[allow(dead_code)]
     code: i64,
     data: Vec<ZaiSubscriptionItem>,
+    #[allow(dead_code)]
     success: bool,
 }
 
@@ -50,6 +55,7 @@ struct ZaiSubscriptionItem {
     #[serde(rename = "productName")]
     product_name: String,
     #[serde(rename = "nextRenewTime")]
+    #[allow(dead_code)]
     next_renew_time: Option<String>,
 }
 

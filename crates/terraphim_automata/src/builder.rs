@@ -159,9 +159,8 @@ fn index_inner(name: String, messages: Vec<Message>) -> Thesaurus {
                 let concept_with_display = match current_concept {
                     Some(ref cwd) => {
                         // Create NormalizedTerm with display_value preserving original case
-                        let nterm =
-                            NormalizedTerm::new(cwd.concept.id.clone(), cwd.concept.value.clone())
-                                .with_display_value(cwd.display_name.clone());
+                        let nterm = NormalizedTerm::new(cwd.concept.id, cwd.concept.value.clone())
+                            .with_display_value(cwd.display_name.clone());
                         thesaurus.insert(cwd.concept.value.clone(), nterm.clone());
                         cwd
                     }
@@ -173,7 +172,7 @@ fn index_inner(name: String, messages: Vec<Message>) -> Thesaurus {
                 for synonym in synonyms {
                     // Synonyms also get the same display_value (the concept's original name)
                     let nterm = NormalizedTerm::new(
-                        concept_with_display.concept.id.clone(),
+                        concept_with_display.concept.id,
                         concept_with_display.concept.value.clone(),
                     )
                     .with_display_value(concept_with_display.display_name.clone());

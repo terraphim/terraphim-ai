@@ -20,9 +20,10 @@ which = "6.0"
 terraphim_persistence = { path = "../terraphim_persistence", optional = true }
 terraphim_types = { path = "../terraphim_types" }
 terraphim_settings = { path = "../terraphim_settings" }
+opendal = { version = "0.54", optional = true }
 
 [features]
 default = ["persistence", "providers"]
-persistence = ["dep:terraphim_persistence"]  # Enable storage via terraphim_persistence
+persistence = ["dep:terraphim_persistence", "dep:opendal"]  # Enable storage via terraphim_persistence
 cli = ["dep:clap", "dep:colored", "dep:indicatif"]  # Enable CLI commands
 providers = ["dep:reqwest"]  # Enable external provider API fetchers
