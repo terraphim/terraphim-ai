@@ -14,7 +14,7 @@ readme = "../../README.md"
 [dependencies]
 terraphim_automata = { path = "../terraphim_automata" }
 terraphim_types = { path = "../terraphim_types" }
-fff-search = { path = "../../../projects/terraphim/fff-core-fork/crates/fff-core" }
+fff-search = { git = "https://github.com/AlexMikhalev/fff.nvim.git", branch = "feat/external-scorer" }
 ahash = "0.8"
 parking_lot = "0.12"
 tracing = "0.1"
