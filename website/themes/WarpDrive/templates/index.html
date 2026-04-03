@@ -501,13 +501,108 @@
 <!-- ---- INSTALL ---- -->
 <section class="install" id="install" aria-label="Installation">
   <div class="install-inner">
-    <p class="install-comment">// one command. no sign-up. no API key.</p>
-    <div class="install-block">
-      <div class="command-line">
-        <span class="prompt-symbol">$</span>
-        <span class="prompt-text">curl -fsSL https://raw.githubusercontent.com/terraphim/terraphim-ai/main/scripts/install.sh | bash</span>
-        <button class="copy-btn" data-copy="curl -fsSL https://raw.githubusercontent.com/terraphim/terraphim-ai/main/scripts/install.sh | bash">copy</button>
+    <div class="section-overline">
+      <i class="fa-solid fa-download" aria-hidden="true"></i>
+      Get Started
+    </div>
+    <h2 class="section-title">Install Terraphim</h2>
+    <p class="section-subtitle">One command. No sign-up. No API key. Choose your platform.</p>
+
+    <div class="install-methods">
+      <div class="install-method">
+        <div class="install-method-header">
+          <i class="fa-brands fa-apple" aria-hidden="true"></i>
+          <h3>macOS</h3>
+        </div>
+        <div class="install-block">
+          <div class="command-line">
+            <span class="prompt-symbol">$</span>
+            <span class="prompt-text">brew install terraphim/tap/terraphim</span>
+            <button class="copy-btn" data-copy="brew install terraphim/tap/terraphim" aria-label="Copy command">copy</button>
+          </div>
+        </div>
       </div>
+
+      <div class="install-method">
+        <div class="install-method-header">
+          <i class="fa-brands fa-linux" aria-hidden="true"></i>
+          <h3>Linux</h3>
+        </div>
+        <div class="install-block">
+          <div class="command-line">
+            <span class="prompt-symbol">$</span>
+            <span class="prompt-text">curl -fsSL https://raw.githubusercontent.com/terraphim/terraphim-ai/main/scripts/install.sh | bash</span>
+            <button class="copy-btn" data-copy="curl -fsSL https://raw.githubusercontent.com/terraphim/terraphim-ai/main/scripts/install.sh | bash" aria-label="Copy command">copy</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="install-method">
+        <div class="install-method-header">
+          <i class="fa-brands fa-rust" aria-hidden="true"></i>
+          <h3>Cargo</h3>
+        </div>
+        <div class="install-block">
+          <div class="command-line">
+            <span class="prompt-symbol">$</span>
+            <span class="prompt-text">cargo install terraphim</span>
+            <button class="copy-btn" data-copy="cargo install terraphim" aria-label="Copy command">copy</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="install-method">
+        <div class="install-method-header">
+          <i class="fa-brands fa-npm" aria-hidden="true"></i>
+          <h3>NPM</h3>
+        </div>
+        <div class="install-block">
+          <div class="command-line">
+            <span class="prompt-symbol">$</span>
+            <span class="prompt-text">npx terraphim-ai</span>
+            <button class="copy-btn" data-copy="npx terraphim-ai" aria-label="Copy command">copy</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="install-method">
+        <div class="install-method-header">
+          <i class="fa-brands fa-python" aria-hidden="true"></i>
+          <h3>Python</h3>
+        </div>
+        <div class="install-block">
+          <div class="command-line">
+            <span class="prompt-symbol">$</span>
+            <span class="prompt-text">pip install terraphim</span>
+            <button class="copy-btn" data-copy="pip install terraphim" aria-label="Copy command">copy</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="install-method">
+        <div class="install-method-header">
+          <i class="fa-brands fa-windows" aria-hidden="true"></i>
+          <h3>Windows</h3>
+        </div>
+        <div class="install-block">
+          <div class="command-line">
+            <span class="prompt-symbol">&gt;</span>
+            <span class="prompt-text">winget install terraphim.terraphim</span>
+            <button class="copy-btn" data-copy="winget install terraphim.terraphim" aria-label="Copy command">copy</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="install-cta">
+      <a href="https://github.com/terraphim/terraphim-ai/releases/latest" class="btn btn-primary">
+        <i class="fa-solid fa-download" aria-hidden="true"></i>
+        Download v{{ config.extra.version | default(value="1.16.0") }}
+      </a>
+      <a href="https://github.com/terraphim/terraphim-ai" class="btn btn-ghost">
+        <i class="fa-brands fa-github" aria-hidden="true"></i>
+        View on GitHub
+      </a>
     </div>
   </div>
 </section>

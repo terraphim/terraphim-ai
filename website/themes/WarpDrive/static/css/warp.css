@@ -399,6 +399,11 @@ main {
 .section-inner {
   max-width: 1100px;
   margin: 0 auto;
+  text-align: center;
+}
+
+.section-inner .section-subtitle {
+  margin-inline: auto;
 }
 
 .section-overline {
@@ -434,6 +439,7 @@ main {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  text-align: left;
 }
 
 .waypoint {
@@ -496,6 +502,7 @@ main {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  text-align: left;
 }
 
 .system-card {
@@ -605,6 +612,7 @@ main {
   flex-direction: column;
   gap: 1rem;
   margin-top: 1rem;
+  text-align: left;
 }
 
 .indicator-panel {
@@ -673,9 +681,15 @@ main {
 .comparison-inner {
   max-width: 900px;
   margin: 0 auto;
+  text-align: center;
+}
+
+.comparison-inner .section-subtitle {
+  margin-inline: auto;
 }
 
 .comparison-table {
+  text-align: left;
   width: 100%;
   border-collapse: collapse;
   font-family: 'JetBrains Mono', monospace;
@@ -752,6 +766,7 @@ main {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  text-align: left;
 }
 
 .role-card {
@@ -821,6 +836,7 @@ main {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  text-align: left;
 }
 
 .deploy-card {
@@ -897,9 +913,62 @@ main {
 }
 
 .install-inner {
-  max-width: 600px;
+  max-width: 900px;
   margin: 0 auto;
   text-align: center;
+}
+
+.install-inner .section-subtitle {
+  margin-inline: auto;
+}
+
+.install-methods {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+  margin-bottom: 2rem;
+  text-align: left;
+}
+
+.install-method {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1rem 1.25rem;
+}
+
+.install-method-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.install-method-header i {
+  font-size: 1.1rem;
+  color: var(--warp-blue);
+  width: 1.5rem;
+  text-align: center;
+}
+
+.install-method-header h3 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-bright);
+  margin: 0;
+}
+
+.install-method .install-block {
+  padding: 0.75rem 1rem;
+}
+
+.install-cta {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-top: 1.5rem;
 }
 
 .install-comment {
@@ -1844,6 +1913,10 @@ main { padding-top: 52px; }
     align-items: center;
     text-align: center;
   }
+
+  .install-methods {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 /* ============================================================
@@ -1883,6 +1956,10 @@ main { padding-top: 52px; }
   .comparison-table { font-size: 0.9rem; }
   .comparison-table thead th { font-size: 0.75rem; }
 
+  .install-methods {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
   /* TOC sidebar on desktop */
   .article-layout {
     display: grid;
@@ -1907,7 +1984,7 @@ main { padding-top: 52px; }
 
   .toc-sidebar-title {
     font-family: 'Space Grotesk', sans-serif;
-    font-size: 0.7rem;
+    font-size: 0.8rem;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.08em;
@@ -1923,7 +2000,7 @@ main { padding-top: 52px; }
   .toc-sidebar li { margin-bottom: 0.25rem; }
 
   .toc-sidebar a {
-    font-size: 0.7rem;
+    font-size: 0.8rem;
     color: var(--text-dim);
     text-decoration: none;
     transition: color var(--transition);
@@ -1972,7 +2049,7 @@ main { padding-top: 52px; }
   .waypoint h3 { font-size: 1.1rem; }
   .waypoint p { font-size: 0.95rem; }
 
-  .comparison { max-width: 1000px; }
+  .comparison { max-width: 1000px; margin-inline: auto; }
   .comparison-table { font-size: 1rem; }
   .comparison-table thead th { font-size: 0.8rem; }
   .comparison-table tbody td.cell-centre { font-size: 1.15rem; }
