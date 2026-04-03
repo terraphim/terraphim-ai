@@ -1,0 +1,82 @@
+{% macro social_links(social_config) %}
+<div class="footer-links">
+  {% if social_config.github %}
+  <a href="https://github.com/{{ social_config.github }}" target="_blank" rel="noopener">
+    <i class="fa-brands fa-github" aria-hidden="true"></i> GitHub
+  </a>
+  {% endif %}
+
+  {% if social_config.discord %}
+  <a href="https://discord.gg/{{ social_config.discord }}" target="_blank" rel="noopener">
+    <i class="fa-brands fa-discord" aria-hidden="true"></i> Discord
+  </a>
+  {% endif %}
+
+  {% if social_config.twitter %}
+  <a href="https://twitter.com/{{ social_config.twitter }}" target="_blank" rel="noopener">
+    <i class="fa-brands fa-x-twitter" aria-hidden="true"></i> Twitter
+  </a>
+  {% endif %}
+
+  {% if social_config.linkedin %}
+  <a href="https://www.linkedin.com/in/{{ social_config.linkedin }}" target="_blank" rel="noopener">
+    <i class="fa-brands fa-linkedin" aria-hidden="true"></i> LinkedIn
+  </a>
+  {% endif %}
+
+  {% if social_config.reddit %}
+  <a href="https://www.reddit.com/r/{{ social_config.reddit }}" target="_blank" rel="noopener">
+    <i class="fa-brands fa-reddit" aria-hidden="true"></i> Reddit
+  </a>
+  {% endif %}
+
+  {% if social_config.email %}
+  <a href="mailto:{{ social_config.email }}">
+    <i class="fa-solid fa-envelope" aria-hidden="true"></i> Email
+  </a>
+  {% endif %}
+
+  {% if config.generate_feeds %}
+  <a href="{{ config.base_url }}/{{ config.feed_filenames.0 }}" target="_blank" rel="noopener">
+    <i class="fa-solid fa-rss" aria-hidden="true"></i> RSS
+  </a>
+  {% endif %}
+</div>
+{% endmacro %}
+
+{% macro page_meta(page) %}
+<div class="article-meta">
+  {% if page.date %}
+  <span><i class="fa-regular fa-calendar" aria-hidden="true"></i> {{ page.date | date(format='%d %B %Y') }}</span>
+  {% endif %}
+  {% if page.reading_time %}
+  <span><i class="fa-regular fa-clock" aria-hidden="true"></i> {{ page.reading_time }} min read</span>
+  {% endif %}
+  {% if page.word_count %}
+  <span><i class="fa-solid fa-pen" aria-hidden="true"></i> {{ page.word_count }} words</span>
+  {% endif %}
+</div>
+{% endmacro %}
+
+{% macro post_card_meta(page) %}
+<div class="post-card-meta">
+  {% if page.date %}
+  <span><i class="fa-regular fa-calendar" aria-hidden="true"></i> {{ page.date | date(format='%d %b %Y') }}</span>
+  {% endif %}
+  {% if page.reading_time %}
+  <span><i class="fa-regular fa-clock" aria-hidden="true"></i> {{ page.reading_time }} min</span>
+  {% endif %}
+</div>
+{% endmacro %}
+
+{% macro render_tags(tags) %}
+{% for tag in tags %}
+<a class="tag-pill tag" href="{{ get_taxonomy_url(kind='tags', name=tag) }}">{{ tag }}</a>
+{% endfor %}
+{% endmacro %}
+
+{% macro render_categories(categories) %}
+{% for category in categories %}
+<a class="tag-pill category" href="{{ get_taxonomy_url(kind='categories', name=category) }}">{{ category }}</a>
+{% endfor %}
+{% endmacro %}

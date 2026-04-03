@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block title %}
+{{ config.title }} | {{ page.title }}
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-inner">
+    <h1 class="section-title">{{ page.title }}</h1>
+    {% if page.description %}
+    <p class="section-subtitle">{{ page.description }}</p>
+    {% endif %}
+  </div>
+</div>
+
+{% if page.extra.toc %}
+<div class="article-layout">
+  <div class="article-container">
+    <article class="article-box">
+      {{ macros::page_meta(page=page) }}
+      {% if page.taxonomies.categories or page.taxonomies.tags %}
+      <div class="post-card-tags" style="margin-bottom: 1.5rem;">
+        {% if page.taxonomies.categories %}
+        {{ macros::render_categories(categories=page.taxonomies.categories) }}
+        {% endif %}
+        {% if page.taxonomies.tags %}
+        {{ macros::render_tags(tags=page.taxonomies.tags) }}
+        {% endif %}
+      </div>
+      {% endif %}
+      <div class="prose">
+        {{ page.content | safe }}
+      </div>
+    </article>
+  </div>
+  <aside class="toc-sidebar">
+    <p class="toc-sidebar-title">Contents</p>
+    <ul>
+      {% for h1 in page.toc %}
+      <li>
+        <a id="link-{{ h1.id }}" class="{% if loop.first %}is-active{% endif %}" href="{{ h1.permalink | safe }}">{{ h1.title }}</a>
+        {% if h1.children %}
+        <ul>
+          {% for h2 in h1.children %}
+          <li><a id="link-{{ h2.id }}" href="{{ h2.permalink | safe }}">{{ h2.title }}</a></li>
+          {% endfor %}
+        </ul>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+  </aside>
+</div>
+{% else %}
+<div class="article-container">
+  <article class="article-box">
+    {{ macros::page_meta(page=page) }}
+    {% if page.taxonomies.categories or page.taxonomies.tags %}
+    <div class="post-card-tags" style="margin-bottom: 1.5rem;">
+      {% if page.taxonomies.categories %}
+      {{ macros::render_categories(categories=page.taxonomies.categories) }}
+      {% endif %}
+      {% if page.taxonomies.tags %}
+      {{ macros::render_tags(tags=page.taxonomies.tags) }}
+      {% endif %}
+    </div>
+    {% endif %}
+    <div class="prose">
+      {{ page.content | safe }}
+    </div>
+  </article>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block pagination %}
+{% if page.earlier or page.later or page.lighter or page.heavier %}
+<div class="post-pagination">
+  {% if page.later %}
+  <a href="{{ page.later.permalink }}">
+    <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+    {{ page.later.title }}
+  </a>
+  {% endif %}
+  {% if page.earlier %}
+  <a href="{{ page.earlier.permalink }}">
+    {{ page.earlier.title }}
+    <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+  </a>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

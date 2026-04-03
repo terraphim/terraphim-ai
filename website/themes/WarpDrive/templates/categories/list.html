@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}
+{{ config.title }} | Categories
+{% endblock title %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-inner">
+    <div class="section-overline">
+      <i class="fa-solid fa-cubes" aria-hidden="true"></i>
+      Taxonomy
+    </div>
+    <h1 class="section-title">Categories</h1>
+    <p class="section-subtitle">{{ terms | length }} categories in total</p>
+  </div>
+</div>
+
+<div class="post-list">
+  {% for term in terms %}
+  <a class="post-card" href="{{ get_taxonomy_url(kind='categories', name=term.name) }}" style="text-decoration: none;">
+    <h2 class="post-card-title" style="display: flex; justify-content: space-between; align-items: center;">
+      <span style="color: var(--text-bright);">
+        <i class="fa-solid fa-cube" aria-hidden="true" style="color: var(--amber); margin-right: 0.5rem;"></i>
+        {{ term.name }}
+      </span>
+      <span class="tag-pill category">{{ term.pages | length }} posts</span>
+    </h2>
+  </a>
+  {% endfor %}
+</div>
+{% endblock content %}
