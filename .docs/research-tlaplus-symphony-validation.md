@@ -366,99 +366,133 @@ reconcile -> find_stalled_issues -> abort + schedule_retry
 
 ## Proposed TLA+ Spec Structure
 
+### Module 1: SymphonyOrchestrator
+
 ```
 ---- MODULE SymphonyOrchestrator ----
 EXTENDS Integers, FiniteSets, Sequences
 
 CONSTANTS
-    IssueIDs,        \* e.g. {"i1", "i2", "i3"}
-    MaxConcurrent,   \* e.g. 2
-    MaxRetries,      \* e.g. 3
-    TerminalStates,  \* e.g. {"Done", "Closed"}
-    ActiveStates,    \* e.g. {"Todo", "InProgress"}
-    Dependencies     \* e.g. [i3 |-> {i1, i2}] -- i3 blocked by i1 and i2
+    IssueIDs, MaxConcurrent, MaxRetries,
+    TerminalStates, ActiveStates, Deps
 
 VARIABLES
-    issueState,      \* [IssueIDs -> {"Todo", "InProgress", "Done", ...}]
-    running,         \* SUBSET IssueIDs
-    claimed,         \* SUBSET IssueIDs
-    retrying,        \* [IssueIDs -> 0..MaxRetries] (partial function)
-    completed        \* SUBSET IssueIDs
+    issueState, running, claimed, retrying, completed, shutdownFlag
 
-\* === Actions ===
+\* 9 actions mapping to tokio::select! branches + environment
+PollDispatch(i), WorkerCompleteOK(i), WorkerFail(i),
+RetryFire(i), RetryGiveUp(i), ReconcileTerminal(i),
+ReconcileStall(i), Shutdown, TrackerStateChange(i, s)
 
-PollDispatch(i) ==    \* Dispatch eligible issue i
-    /\ i \notin running
-    /\ i \notin claimed
-    /\ issueState[i] \in ActiveStates
-    /\ issueState[i] \notin TerminalStates
-    /\ Cardinality(running) < MaxConcurrent
-    /\ \* Blocker rule: if Todo, all deps must be terminal
-       (issueState[i] = "Todo" =>
-           \A d \in Dependencies[i]: issueState[d] \in TerminalStates)
-    /\ running' = running \cup {i}
-    /\ claimed' = claimed \cup {i}
-    /\ UNCHANGED <<issueState, retrying, completed>>
+\* 7 safety invariants
+NoDoubleDispatch, SlotBound, ClaimedCoversRunning,
+ClaimedCoversRetrying, NoTerminalRunning, RetryBound, DepRule
 
-WorkerComplete(i) ==  \* Worker finishes successfully
-    /\ i \in running
-    /\ running' = running \ {i}
-    /\ completed' = completed \cup {i}
-    /\ issueState' = [issueState EXCEPT ![i] = "Done"]
-    /\ claimed' = claimed \ {i}
-    /\ UNCHANGED <<retrying>>
-
-WorkerFail(i) ==      \* Worker fails, schedule retry
-    /\ i \in running
-    /\ running' = running \ {i}
-    /\ retrying' = retrying @@ (i :> 1)
-    /\ UNCHANGED <<issueState, claimed, completed>>
-
-RetryFire(i) ==       \* Retry timer fires
-    /\ i \in DOMAIN retrying
-    /\ retrying[i] < MaxRetries
-    /\ Cardinality(running) < MaxConcurrent
-    /\ running' = running \cup {i}
-    /\ retrying' = [retrying EXCEPT ![i] = @ + 1]  \* or remove
-    /\ UNCHANGED <<issueState, claimed, completed>>
-
-RetryGiveUp(i) ==     \* Retry exhausted
-    /\ i \in DOMAIN retrying
-    /\ retrying[i] >= MaxRetries
-    /\ claimed' = claimed \ {i}
-    /\ retrying' = [d \in DOMAIN retrying \ {i} |-> retrying[d]]
-    /\ UNCHANGED <<issueState, running, completed>>
-
-\* === Invariants (Safety) ===
-
-NoDoubleDispatch == \A i \in IssueIDs:
-    ~(i \in running /\ i \in DOMAIN retrying /\ retrying[i] > 0)
-
-SlotBound == Cardinality(running) <= MaxConcurrent
-
-ClaimedCovers == running \subseteq claimed
-
-NoTerminalRunning == \A i \in running: issueState[i] \notin TerminalStates
-
-\* === Liveness ===
-
-EventualDispatch == \A i \in IssueIDs:
-    (issueState[i] \in ActiveStates /\
-     \A d \in Dependencies[i]: issueState[d] \in TerminalStates)
-    ~> (i \in completed)
-
+\* 2 liveness properties
+EventualDispatch, NoRetryStarvation
 ====
+```
+
+### Module 2: AgentSupervisor
+
+```
+---- MODULE AgentSupervisor ----
+EXTENDS Integers, FiniteSets, Sequences
+
+CONSTANTS
+    AgentPids,         \* e.g. {"a1", "a2", "a3"}
+    MaxRestarts,       \* e.g. 2
+    TimeWindow,        \* modelled as discrete steps (e.g. 5)
+    Strategy           \* "OneForOne" | "OneForAll" | "RestForOne"
+
+VARIABLES
+    children,          \* [AgentPids -> {"Running", "Failed", "Restarting", "Stopped"}]
+    restartHistory,    \* Seq of restart timestamps (modelled as step numbers)
+    step,              \* monotonic step counter (simulates time)
+    escalated          \* BOOLEAN -- supervisor has escalated to parent
+
+\* Actions
+AgentFails(a), RestartOneForOne(a), RestartOneForAll,
+RestartFromAgent(a), Escalate, Tick
+
+\* Safety invariants
+RestartIntensityBound, NoRestartAfterEscalation
+
+\* Liveness
+EventualRecoveryOrEscalation
+====
+```
+
+### Module 3: MessagingDelivery
+
+```
+---- MODULE MessagingDelivery ----
+EXTENDS Integers, FiniteSets, Sequences
+
+CONSTANTS
+    MessageIDs,         \* e.g. {"m1", "m2", "m3"}
+    AgentPids,          \* e.g. {"a1", "a2"}
+    MaxRetries,         \* e.g. 3
+    MaxMailboxSize,     \* e.g. 5
+    Guarantee           \* "AtMostOnce" | "AtLeastOnce" | "ExactlyOnce"
+
+VARIABLES
+    deliveryStatus,     \* [MessageIDs -> {"Pending", "InTransit", "Delivered", "Failed", "Acked"}]
+    attempts,           \* [MessageIDs -> 0..MaxRetries]
+    mailbox,            \* [AgentPids -> Seq(MessageIDs)]
+    routingTable,       \* [AgentPids -> BOOLEAN]
+    dedupCache          \* SUBSET MessageIDs
+
+\* Actions
+Send(m, dest), Deliver(m, dest), DeliveryFails(m),
+RetryDelivery(m, dest), RegisterAgent(a)
+
+\* Safety invariants
+MailboxBound, RetryBound, NoBackwardTransition, ExactlyOnceNoDuplicates
+
+\* Liveness
+EventualDelivery
+====
+```
+
+### Repository Layout
+
+```
+terraphim/tlaplus-ts/
+  specs/
+    symphony/
+      SymphonyOrchestrator.tla
+      SymphonyOrchestrator.cfg
+      MC_SymphonyOrchestrator.tla
+    supervisor/
+      AgentSupervisor.tla
+      AgentSupervisor.cfg
+      MC_AgentSupervisor.tla
+    messaging/
+      MessagingDelivery.tla
+      MessagingDelivery.cfg
+      MC_MessagingDelivery.tla
+  test/
+    symphony/
+      tlc-safety.test.ts
+      tlc-liveness.test.ts
+    supervisor/
+      tlc-safety.test.ts
+    messaging/
+      tlc-safety.test.ts
+      tlc-liveness.test.ts
 ```
 
 ## Next Steps
 
 If approved:
 1. **Spike**: Clone tlaplus-ts on bigbox, verify `bun test` passes
-2. **Write TLA+ spec**: Start with Phase 1 (dispatch + complete + claim lifecycle)
-3. **Run TLC**: Use tlaplus-ts TLC bridge to model-check with 3 issues, 2 agents
-4. **Iterate**: Add retry, reconcile, dependency properties
-5. **CI integration**: Add TLC verification as optional CI job
-6. **Proceed to Phase 2 (Design)**: Create implementation plan for the spec and test harness
+2. **Module 1 (Symphony)**: Write SymphonyOrchestrator.tla phases 1a-1d
+3. **Module 2 (Supervisor)**: Write AgentSupervisor.tla phases 2a-2c
+4. **Module 3 (Messaging)**: Write MessagingDelivery.tla phases 3a-3c
+5. **Cross-layer composition**: Optional Phase 4 if individual modules pass
+6. **CI integration**: Add TLC verification as optional CI job
+7. **Proceed to Phase 2 (Design)**: Update implementation plan for multi-module approach
 
 ## Appendix
 
