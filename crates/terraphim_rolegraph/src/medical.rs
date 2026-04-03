@@ -260,14 +260,14 @@ impl MedicalRoleGraph {
         for &condition_id in conditions {
             let is_contraindicated =
                 // drug -> condition
-                self.outgoing_edges.get(&drug_id).map_or(false, |edges| {
+                self.outgoing_edges.get(&drug_id).is_some_and(|edges| {
                     edges
                         .iter()
                         .any(|&(t, et)| t == condition_id && et == MedicalEdgeType::Contraindicates)
                 })
                 ||
                 // condition -> drug
-                self.outgoing_edges.get(&condition_id).map_or(false, |edges| {
+                self.outgoing_edges.get(&condition_id).is_some_and(|edges| {
                     edges
                         .iter()
                         .any(|&(t, et)| t == drug_id && et == MedicalEdgeType::Contraindicates)

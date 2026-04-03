@@ -210,6 +210,7 @@ mod tests {
             fallback_model: None,
             grace_period_secs: None,
             max_cpu_seconds: None,
+            pre_check: None,
             gitea_issue: None,
         }
     }
