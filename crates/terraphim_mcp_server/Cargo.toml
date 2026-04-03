@@ -14,8 +14,10 @@ base64 = "0.21"
 clap = { version = "4.5", features = ["derive"] }
 rmcp = { version = "0.9.0", features = ["server", "transport-sse-server", "transport-io"] }
 serde_json = "1.0"
+fff-search = { git = "https://github.com/AlexMikhalev/fff.nvim.git", branch = "feat/external-scorer" }
 terraphim_automata = { path = "../terraphim_automata" }
 terraphim_config = { path = "../terraphim_config" }
+terraphim_file_search = { path = "../terraphim_file_search" }
 terraphim_hooks = { path = "../terraphim_hooks" }
 terraphim_rolegraph = { path = "../terraphim_rolegraph" }
 terraphim_service = { path = "../terraphim_service" }
@@ -29,6 +31,7 @@ axum = { version = "0.8" }
 
 [features]
 openrouter = ["terraphim_config/openrouter"]
+zlob = ["fff-search/zlob", "terraphim_file_search/zlob"]
 
 [dev-dependencies]
 ahash = "0.8"
@@ -42,5 +45,6 @@ terraphim_automata = { path = "../terraphim_automata" }  # For AutomataPath
 terraphim_config = { path = "../terraphim_config" }
 terraphim_middleware = { path = "../terraphim_middleware" }  # For Logseq builder
 terraphim_persistence = { path = "../terraphim_persistence", features = ["memory"] }
+terraphim_file_search = { path = "../terraphim_file_search" }
 terraphim_test_utils = { path = "../terraphim_test_utils" }
 env_logger = "0.11"
