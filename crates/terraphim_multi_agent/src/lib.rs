@@ -6,7 +6,7 @@
 //! ## Core Concepts
 //!
 //! - **Role-as-Agent**: Each Terraphim Role configuration becomes an autonomous agent
-//! - **Rig Integration**: Professional LLM management with built-in token/cost tracking
+//! - **rust-genai Integration**: Multi-provider LLM support with OpenRouter, Ollama, etc.
 //! - **Knowledge Graph Intelligence**: Agents use rolegraph/automata for capabilities
 //! - **Individual Evolution**: Each agent has own memory/tasks/lessons tracking
 //! - **Multi-Agent Coordination**: Discovery, communication, and collaboration
@@ -18,7 +18,7 @@
 //!   Role Config + Rig Agent + Knowledge Graph + Individual Evolution
 //! }
 //!
-//! AgentRegistry {
+//! KnowledgeGraphAgentRegistry (from terraphim_agent_registry) {
 //!   Discovery + Capability Mapping + Load Balancing + Task Routing
 //! }
 //!
@@ -40,9 +40,16 @@ pub mod vm_execution;
 // pub mod simple_llm_client; // Disabled - uses rig-core
 pub mod pool;
 pub mod pool_manager;
-pub mod registry;
 pub mod tracking;
 pub mod workflows;
+
+// Re-export KG-backed registry from terraphim_agent_registry (consolidated implementation)
+pub use terraphim_agent_registry::{
+    AgentCapability, AgentDiscoveryQuery, AgentDiscoveryResult, AgentMetadata, AgentPid,
+    AgentRegistry as KnowledgeGraphAgentRegistry, AgentRole, AgentStatus, CapabilityMetrics,
+    KnowledgeGraphIntegration, RegistryBuilder, RegistryConfig, RegistryError, RegistryResult,
+    RegistryStatistics, SimilarityThresholds, SupervisorId,
+};
 
 pub use agent::*;
 pub use agents::*;
@@ -56,7 +63,6 @@ pub use prompt_sanitizer::*;
 // pub use simple_llm_client::*; // Disabled - uses rig-core
 pub use pool::*;
 pub use pool_manager::*;
-pub use registry::*;
 pub use tracking::*;
 pub use workflows::*;
 
