@@ -1,6 +1,5 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use std::hint::black_box;
-use std::sync::Arc;
 use tokio::runtime::Runtime;
 
 use terraphim_multi_agent::{test_utils::create_test_agent_simple, CommandInput, CommandType};
