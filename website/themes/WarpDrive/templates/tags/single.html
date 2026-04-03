@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}
+{{ config.title }} | Tag: {{ term.name }}
+{% endblock title %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-inner">
+    <div class="section-overline">
+      <i class="fa-solid fa-tag" aria-hidden="true"></i>
+      Tag
+    </div>
+    <h1 class="section-title">{{ term.name }}</h1>
+  </div>
+</div>
+
+<div class="post-list">
+  {% if paginator %}
+  {% set pages = paginator.pages %}
+  {% else %}
+  {% set pages = term.pages %}
+  {% endif %}
+
+  {% for page in pages %}
+  <article class="post-card">
+    <h2 class="post-card-title">
+      <a href="{{ page.permalink }}">{{ page.title }}</a>
+    </h2>
+    {{ macros::post_card_meta(page=page) }}
+    {% if page.summary %}
+    <div class="post-card-summary">{{ page.summary | safe }}</div>
+    {% elif page.description %}
+    <p class="post-card-summary">{{ page.description }}</p>
+    {% endif %}
+    <a class="post-card-read-more" href="{{ page.permalink }}">
+      Read More <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+    </a>
+    {% if page.taxonomies.categories %}
+    <div class="post-card-tags">
+      {{ macros::render_categories(categories=page.taxonomies.categories) }}
+    </div>
+    {% endif %}
+  </article>
+  {% endfor %}
+</div>
+{% endblock content %}

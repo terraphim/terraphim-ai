@@ -1,0 +1,6 @@
+name = "WarpDrive"
+description = "Mobile-first dark theme with OKLCH colour system, canvas warp tunnel, and Space Grotesk typography. Designed for Terraphim AI."
+license = "Apache-2.0"
+min_version = "0.18.0"
+
+[extra]
