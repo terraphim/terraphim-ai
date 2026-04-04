@@ -26,28 +26,31 @@ pub struct GiteaTracker {
 
 /// Gitea API issue response.
 #[derive(Debug, Deserialize)]
-struct GiteaIssue {
-    id: u64,
-    number: u64,
-    title: String,
-    body: Option<String>,
-    state: String,
-    html_url: Option<String>,
-    created_at: Option<String>,
-    updated_at: Option<String>,
-    labels: Option<Vec<GiteaLabel>>,
+pub struct GiteaIssue {
+    pub id: u64,
+    pub number: u64,
+    pub title: String,
+    pub body: Option<String>,
+    pub state: String,
+    pub html_url: Option<String>,
+    pub created_at: Option<String>,
+    pub updated_at: Option<String>,
+    pub labels: Option<Vec<GiteaLabel>>,
 }
 
 /// Gitea label.
 #[derive(Debug, Deserialize)]
-struct GiteaLabel {
-    name: String,
+pub struct GiteaLabel {
+    pub name: String,
 }
 
 /// Gitea issue comment from the API.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IssueComment {
     pub id: u64,
+    /// Issue number (extracted from issue_url for repo-wide API, filled by caller for per-issue API).
+    #[serde(default)]
+    pub issue_number: u64,
     pub body: String,
     pub user: CommentUser,
     pub created_at: String,
@@ -234,6 +237,60 @@ impl GiteaTracker {
         response.json().await.map_err(TrackerError::Http)
     }
 
+    /// Create a new Gitea issue.
+    pub async fn create_issue(
+        &self,
+        title: &str,
+        body: &str,
+        _labels: &[&str],
+    ) -> Result<GiteaIssue> {
+        let url = format!(
+            "{}/api/v1/repos/{}/{}/issues",
+            self.config.base_url, self.config.owner, self.config.repo
+        );
+        let response = self
+            .build_request(reqwest::Method::POST, &url)
+            .json(&serde_json::json!({
+                "title": title,
+                "body": body,
+            }))
+            .send()
+            .await?;
+        if !response.status().is_success() {
+            let status = response.status();
+            let text = response.text().await.unwrap_or_default();
+            return Err(TrackerError::Api {
+                message: format!("Gitea create_issue error {}: {}", status, text),
+            });
+        }
+        response.json().await.map_err(TrackerError::Http)
+    }
+
+    /// Search open issues by keyword in title.
+    /// Returns issue numbers whose titles contain the given keyword.
+    pub async fn search_issues_by_title(&self, keyword: &str) -> Result<Vec<u64>> {
+        let url = format!(
+            "{}/api/v1/repos/{}/{}/issues?state=open&q={}&type=issues",
+            self.config.base_url,
+            self.config.owner,
+            self.config.repo,
+            urlencoding::encode(keyword)
+        );
+        let response = self
+            .build_request(reqwest::Method::GET, &url)
+            .send()
+            .await?;
+        if !response.status().is_success() {
+            let status = response.status();
+            let text = response.text().await.unwrap_or_default();
+            return Err(TrackerError::Api {
+                message: format!("Gitea search issues error {}: {}", status, text),
+            });
+        }
+        let issues: Vec<GiteaIssue> = response.json().await.map_err(TrackerError::Http)?;
+        Ok(issues.into_iter().map(|i| i.number).collect())
+    }
+
     /// Fetch comments on a Gitea issue, optionally filtering by `since` timestamp.
     pub async fn fetch_comments(
         &self,
@@ -262,6 +319,89 @@ impl GiteaTracker {
             });
         }
         response.json().await.map_err(TrackerError::Http)
+    }
+
+    /// Fetch comments across all issues in the repo, optionally filtering by `since` timestamp.
+    ///
+    /// This is the repo-wide endpoint that returns comments from all issues,
+    /// which is more efficient than polling each issue individually.
+    ///
+    /// # API Endpoint
+    ///
+    /// `GET /api/v1/repos/{owner}/{repo}/issues/comments?since={since}&limit={limit}`
+    ///
+    /// # Response
+    ///
+    /// Each comment includes an `issue_url` field from which the issue number
+    /// can be extracted.
+    pub async fn fetch_repo_comments(
+        &self,
+        since: Option<&str>,
+        limit: Option<u32>,
+    ) -> Result<Vec<IssueComment>> {
+        let mut url = format!(
+            "{}/api/v1/repos/{}/{}/issues/comments",
+            self.config.base_url, self.config.owner, self.config.repo
+        );
+        let mut params = Vec::new();
+        if let Some(since_ts) = since {
+            params.push(format!("since={}", since_ts));
+        }
+        if let Some(limit_val) = limit {
+            params.push(format!("limit={}", limit_val));
+        }
+        if !params.is_empty() {
+            url.push('?');
+            url.push_str(&params.join("&"));
+        }
+
+        let response = self
+            .build_request(reqwest::Method::GET, &url)
+            .send()
+            .await?;
+        if !response.status().is_success() {
+            let status = response.status();
+            let text = response.text().await.unwrap_or_default();
+            return Err(TrackerError::Api {
+                message: format!("Gitea repo comments GET error {}: {}", status, text),
+            });
+        }
+
+        // Parse response and extract issue numbers from issue_url
+        let raw_comments: Vec<RepoComment> = response.json().await.map_err(TrackerError::Http)?;
+        Ok(raw_comments.into_iter().map(|rc| rc.into()).collect())
+    }
+}
+
+/// Raw comment from repo-wide API (includes issue_url instead of issue number).
+#[derive(Debug, Clone, serde::Deserialize)]
+struct RepoComment {
+    id: u64,
+    issue_url: String,
+    user: CommentUser,
+    body: String,
+    created_at: String,
+    updated_at: String,
+}
+
+impl From<RepoComment> for IssueComment {
+    fn from(rc: RepoComment) -> Self {
+        // Extract issue number from issue_url like "/api/v1/repos/owner/repo/issues/123"
+        let issue_number = rc
+            .issue_url
+            .rsplit('/')
+            .next()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(0);
+
+        IssueComment {
+            id: rc.id,
+            issue_number,
+            body: rc.body,
+            user: rc.user,
+            created_at: rc.created_at,
+            updated_at: rc.updated_at,
+        }
     }
 }
 

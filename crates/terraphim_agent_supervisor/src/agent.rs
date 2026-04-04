@@ -133,9 +133,10 @@ impl SupervisedAgentInfo {
         matches!(self.status, AgentStatus::Failed(_))
     }
 
-    /// Get uptime duration
-    pub fn uptime(&self) -> chrono::Duration {
-        Utc::now() - self.start_time
+    /// Get uptime duration.
+    /// The `now` parameter enables deterministic testing of uptime calculations.
+    pub fn uptime(&self, now: DateTime<Utc>) -> chrono::Duration {
+        now - self.start_time
     }
 }
 

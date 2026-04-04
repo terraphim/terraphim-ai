@@ -6,8 +6,10 @@
 
 use crate::config::AgentDefinition;
 use crate::persona::PersonaRegistry;
+use chrono::{DateTime, SecondsFormat, Utc};
 use regex::Regex;
-use std::collections::{HashMap, HashSet};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::sync::LazyLock;
 use terraphim_tracker::IssueComment;
 
@@ -33,6 +35,148 @@ pub struct DetectedMention {
     pub comment_body: String,
     pub mentioner: String,
     pub timestamp: String,
+}
+
+// ---------------------------------------------------------------------------
+// MentionCursor: Persistent cursor for repo-wide comment polling
+// ---------------------------------------------------------------------------
+
+/// Persistent cursor for mention polling.
+///
+/// Stored via `terraphim_persistence` as JSON at key `adf/mention_cursor`.
+/// The cursor tracks the `created_at` timestamp of the last processed comment,
+/// ensuring we never replay historical mentions on restart.
+///
+/// # Startup Guard
+///
+/// If no cursor exists (first run), we create one set to `now` to skip
+/// all historical mentions. This prevents the "mention replay storm" bug.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MentionCursor {
+    /// ISO 8601 timestamp of the last processed comment.
+    pub last_seen_at: String,
+    /// Counter of dispatches in current tick (reset each poll cycle).
+    #[serde(skip)]
+    pub dispatches_this_tick: u32,
+    /// Set of comment IDs already dispatched (persisted to prevent re-dispatch on restart).
+    #[serde(default)]
+    pub processed_comment_ids: std::collections::HashSet<u64>,
+}
+
+impl MentionCursor {
+    /// Create a cursor set to "now" (skip all historical mentions).
+    pub fn now() -> Self {
+        Self {
+            last_seen_at: Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true),
+            dispatches_this_tick: 0,
+            processed_comment_ids: std::collections::HashSet::new(),
+        }
+    }
+
+    /// Check if a comment has already been dispatched.
+    pub fn is_processed(&self, comment_id: u64) -> bool {
+        self.processed_comment_ids.contains(&comment_id)
+    }
+
+    /// Mark a comment as processed.
+    pub fn mark_processed(&mut self, comment_id: u64) {
+        self.processed_comment_ids.insert(comment_id);
+        // Cap the set to prevent unbounded growth (keep last 10000 entries).
+        if self.processed_comment_ids.len() > 10_000 {
+            // Remove oldest entries by keeping a fresh set (no ordering in HashSet,
+            // so just drain half). In practice this set grows slowly.
+            let to_remove: Vec<u64> = self
+                .processed_comment_ids
+                .iter()
+                .take(5_000)
+                .copied()
+                .collect();
+            for id in to_remove {
+                self.processed_comment_ids.remove(&id);
+            }
+        }
+    }
+
+    /// Load from persistence or create "now" cursor.
+    ///
+    /// On first run (no persisted cursor), returns a cursor set to the
+    /// current time, effectively skipping all historical mentions.
+    /// Get the SQLite operator for persistent storage.
+    async fn sqlite_op() -> Option<opendal::Operator> {
+        let storage = terraphim_persistence::DeviceStorage::instance()
+            .await
+            .ok()?;
+        let (op, _) = storage.ops.get("sqlite")?;
+        Some(op.clone())
+    }
+
+    pub async fn load_or_now() -> Self {
+        let key = "adf/mention_cursor";
+
+        if let Some(op) = Self::sqlite_op().await {
+            if let Ok(bs) = op.read(key).await {
+                if let Ok(cursor) = serde_json::from_slice::<Self>(&bs.to_vec()) {
+                    tracing::info!(
+                        last_seen_at = %cursor.last_seen_at,
+                        "loaded MentionCursor from persistence"
+                    );
+                    return cursor;
+                }
+                tracing::warn!("failed to deserialize MentionCursor, starting fresh");
+            } else {
+                tracing::info!("no persisted MentionCursor found, starting fresh");
+            }
+        } else {
+            tracing::warn!("DeviceStorage sqlite not available, using in-memory cursor");
+        }
+
+        Self::now()
+    }
+
+    /// Save to persistence.
+    pub async fn save(&self) {
+        let key = "adf/mention_cursor";
+
+        if let Some(op) = Self::sqlite_op().await {
+            if let Ok(json) = serde_json::to_string(self) {
+                if let Err(e) = op.write(key, json).await {
+                    tracing::warn!(?e, "failed to save MentionCursor");
+                } else {
+                    tracing::debug!(last_seen_at = %self.last_seen_at, "saved MentionCursor");
+                }
+            } else {
+                tracing::warn!("failed to serialize MentionCursor");
+            }
+        } else {
+            tracing::warn!("DeviceStorage sqlite not available, cursor not persisted");
+        }
+    }
+
+    /// Advance cursor past a comment's timestamp.
+    ///
+    /// Converts any RFC3339-ish timestamp to UTC Z format for Gitea compat.
+    pub fn advance_to(&mut self, timestamp: &str) {
+        // Parse any RFC3339 timestamp and convert to UTC Z format
+        if let Ok(parsed) = DateTime::parse_from_rfc3339(timestamp) {
+            let utc = parsed.with_timezone(&Utc);
+            let utc_str = utc.to_rfc3339_opts(SecondsFormat::Secs, true);
+
+            // Only advance if newer than current cursor
+            if let Ok(current) = DateTime::parse_from_rfc3339(&self.last_seen_at) {
+                if utc > current.with_timezone(&Utc) {
+                    self.last_seen_at = utc_str;
+                }
+            } else {
+                self.last_seen_at = utc_str;
+            }
+        }
+    }
+}
+
+impl Default for MentionCursor {
+    fn default() -> Self {
+        Self::now()
+    }
 }
 
 /// Resolve a raw mention to an agent name.
@@ -140,47 +284,41 @@ pub fn parse_mentions(
     mentions
 }
 
-/// Tracks processed mentions to prevent re-triggers and infinite loops.
+/// Tracks dispatch counts per issue for flood protection.
+///
+/// With cursor-based polling, we no longer need the `processed` HashSet —
+/// the cursor ensures we never see the same comment twice. This struct
+/// now only tracks per-issue dispatch counts to prevent one noisy issue
+/// from spawning too many agents.
 pub struct MentionTracker {
-    processed: HashSet<(u64, u64, String)>,
-    max_depth: u32,
-    depth_counters: HashMap<u64, u32>,
+    max_dispatches_per_issue: u32,
+    dispatches_per_issue: HashMap<u64, u32>,
 }
 
 impl MentionTracker {
-    pub fn new(max_depth: u32) -> Self {
+    pub fn new(max_dispatches_per_issue: u32) -> Self {
         Self {
-            processed: HashSet::new(),
-            max_depth,
-            depth_counters: HashMap::new(),
+            max_dispatches_per_issue,
+            dispatches_per_issue: HashMap::new(),
         }
     }
 
-    pub fn is_processed(&self, mention: &DetectedMention) -> bool {
-        self.processed.contains(&(
-            mention.issue_number,
-            mention.comment_id,
-            mention.agent_name.clone(),
-        ))
-    }
-
-    pub fn mark_processed(&mut self, mention: &DetectedMention) {
-        self.processed.insert((
-            mention.issue_number,
-            mention.comment_id,
-            mention.agent_name.clone(),
-        ));
-    }
-
-    pub fn depth_exceeded(&self, issue_number: u64) -> bool {
-        self.depth_counters
+    /// Check if an issue has exceeded its dispatch limit.
+    pub fn limit_exceeded(&self, issue_number: u64) -> bool {
+        self.dispatches_per_issue
             .get(&issue_number)
-            .map(|&d| d >= self.max_depth)
+            .map(|&d| d >= self.max_dispatches_per_issue)
             .unwrap_or(false)
     }
 
-    pub fn increment_depth(&mut self, issue_number: u64) {
-        *self.depth_counters.entry(issue_number).or_insert(0) += 1;
+    /// Record a dispatch for an issue.
+    pub fn record_dispatch(&mut self, issue_number: u64) {
+        *self.dispatches_per_issue.entry(issue_number).or_insert(0) += 1;
+    }
+
+    /// Reset dispatch counts (call at start of new poll cycle if desired).
+    pub fn reset(&mut self) {
+        self.dispatches_per_issue.clear();
     }
 }
 
@@ -281,6 +419,7 @@ mod tests {
             user: terraphim_tracker::CommentUser {
                 login: login.into(),
             },
+            issue_number: 0, // filled by caller via parse_mentions arg
             created_at: "2026-03-30T00:00:00Z".into(),
             updated_at: "2026-03-30T00:00:00Z".into(),
         }
@@ -374,33 +513,49 @@ mod tests {
     }
 
     #[test]
-    fn test_mention_tracker_dedup() {
-        let mut tracker = MentionTracker::new(3);
-        let mention = DetectedMention {
-            issue_number: 42,
-            comment_id: 1,
-            raw_mention: "vigil".into(),
-            agent_name: "security-sentinel".into(),
-            resolution: MentionResolution::PersonaName {
-                persona: "vigil".into(),
-            },
-            comment_body: "test".into(),
-            mentioner: "alice".into(),
-            timestamp: "2026-03-30T00:00:00Z".into(),
-        };
-
-        assert!(!tracker.is_processed(&mention));
-        tracker.mark_processed(&mention);
-        assert!(tracker.is_processed(&mention));
+    fn test_mention_cursor_now() {
+        let cursor = MentionCursor::now();
+        // Should be set to approximately now
+        let parsed = chrono::DateTime::parse_from_rfc3339(&cursor.last_seen_at);
+        assert!(parsed.is_ok());
+        assert_eq!(cursor.dispatches_this_tick, 0);
     }
 
     #[test]
-    fn test_mention_depth_limit() {
+    fn test_mention_cursor_advance() {
+        let mut cursor = MentionCursor::now();
+        cursor.last_seen_at = "2026-04-03T10:00:00Z".to_string();
+
+        // Should advance to newer timestamp
+        cursor.advance_to("2026-04-03T12:00:00Z");
+        assert_eq!(cursor.last_seen_at, "2026-04-03T12:00:00Z");
+
+        // Should NOT advance to older timestamp
+        cursor.advance_to("2026-04-03T08:00:00Z");
+        assert_eq!(cursor.last_seen_at, "2026-04-03T12:00:00Z");
+    }
+
+    #[test]
+    fn test_mention_tracker_issue_limit() {
         let mut tracker = MentionTracker::new(3);
-        assert!(!tracker.depth_exceeded(42));
-        tracker.increment_depth(42);
-        tracker.increment_depth(42);
-        tracker.increment_depth(42);
-        assert!(tracker.depth_exceeded(42));
+        assert!(!tracker.limit_exceeded(42));
+        tracker.record_dispatch(42);
+        tracker.record_dispatch(42);
+        tracker.record_dispatch(42);
+        assert!(tracker.limit_exceeded(42));
+
+        // Different issue should not be affected
+        assert!(!tracker.limit_exceeded(99));
+    }
+
+    #[test]
+    fn test_mention_tracker_reset() {
+        let mut tracker = MentionTracker::new(2);
+        tracker.record_dispatch(42);
+        tracker.record_dispatch(42);
+        assert!(tracker.limit_exceeded(42));
+
+        tracker.reset();
+        assert!(!tracker.limit_exceeded(42));
     }
 }

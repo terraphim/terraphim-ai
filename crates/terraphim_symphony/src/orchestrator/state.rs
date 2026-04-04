@@ -187,9 +187,8 @@ pub struct RetrySnapshot {
 
 impl OrchestratorRuntimeState {
     /// Create a snapshot of the current state for observability.
-    pub fn snapshot(&self) -> StateSnapshot {
-        let now = Utc::now();
-
+    /// The `now` parameter enables deterministic testing of elapsed time calculations.
+    pub fn snapshot(&self, now: DateTime<Utc>) -> StateSnapshot {
         let running: Vec<RunningSnapshot> = self
             .running
             .iter()
@@ -276,7 +275,7 @@ mod tests {
     #[test]
     fn empty_state_snapshot() {
         let state = OrchestratorRuntimeState::new(30_000, 10);
-        let snap = state.snapshot();
+        let snap = state.snapshot(Utc::now());
         assert_eq!(snap.counts.running, 0);
         assert_eq!(snap.counts.retrying, 0);
         assert!(snap.rate_limits.is_none());
