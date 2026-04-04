@@ -39,6 +39,12 @@ toml = "0.8"
 handlebars = "6.3"
 regex = "1"
 
+# Webhook server
+axum = "0.8"
+hmac = "0.12"
+sha2 = "0.10"
+hex = "0.4"
+
 # Persistence layer for shared learnings
 opendal = { version = "0.54", default-features = false }
 terraphim_persistence = { path = "../terraphim_persistence", version = "1.4.10", features = ["sqlite"] }
