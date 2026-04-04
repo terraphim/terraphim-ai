@@ -50,3 +50,9 @@ tempfile = "3.27"
 [[bin]]
 name = "adf"
 path = "src/bin/adf.rs"
+
+# Webhook server for real-time mention dispatch
+axum = "0.8"
+hmac = "0.12"
+sha2 = "0.10"
+hex = "0.4"
