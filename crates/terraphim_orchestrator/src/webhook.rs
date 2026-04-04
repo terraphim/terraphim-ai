@@ -21,6 +21,7 @@ struct GiteaWebhookPayload {
     action: String,
     comment: GiteaComment,
     issue: GiteaIssue,
+    #[allow(dead_code)]
     repository: GiteaRepository,
 }
 
@@ -28,24 +29,30 @@ struct GiteaWebhookPayload {
 struct GiteaComment {
     id: u64,
     body: String,
+    #[allow(dead_code)]
     user: GiteaUser,
+    #[allow(dead_code)]
     created_at: String,
 }
 
 #[derive(Debug, Deserialize)]
 struct GiteaUser {
+    #[allow(dead_code)]
     login: String,
 }
 
 #[derive(Debug, Deserialize)]
 struct GiteaIssue {
     number: u64,
+    #[allow(dead_code)]
     title: String,
+    #[allow(dead_code)]
     state: String,
 }
 
 #[derive(Debug, Deserialize)]
 struct GiteaRepository {
+    #[allow(dead_code)]
     full_name: String,
 }
 

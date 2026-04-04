@@ -78,6 +78,9 @@ pub struct OrchestratorConfig {
     /// Mention-driven dispatch configuration.
     #[serde(default)]
     pub mentions: Option<MentionConfig>,
+    /// Webhook configuration for real-time mention dispatch.
+    #[serde(default)]
+    pub webhook: Option<WebhookConfig>,
     /// Path to persona role configuration JSON for terraphim-agent.
     #[serde(default)]
     pub role_config_path: Option<PathBuf>,
@@ -126,6 +129,21 @@ fn default_max_dispatches_per_tick() -> u32 {
 
 fn default_max_concurrent_mention_agents() -> u32 {
     5
+}
+
+/// Configuration for the webhook server.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WebhookConfig {
+    /// Bind address for the webhook server (default "0.0.0.0:9090").
+    #[serde(default = "default_webhook_bind")]
+    pub bind: String,
+    /// Shared secret for HMAC signature verification.
+    /// Must match the secret configured in Gitea webhook settings.
+    pub secret: Option<String>,
+}
+
+fn default_webhook_bind() -> String {
+    "0.0.0.0:9090".to_string()
 }
 
 /// Lightweight reference to an SFIA skill code and level.
