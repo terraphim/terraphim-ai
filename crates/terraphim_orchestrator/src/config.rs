@@ -49,6 +49,10 @@ pub struct OrchestratorConfig {
     /// Maximum number of restarts per Safety agent before giving up.
     #[serde(default = "default_max_restart_count")]
     pub max_restart_count: u32,
+    /// Disk usage percentage threshold (0-100) above which agent spawning is refused.
+    /// Set to 100 to disable the guard. Default: 90.
+    #[serde(default = "default_disk_usage_threshold")]
+    pub disk_usage_threshold: u8,
     /// Reconciliation tick interval in seconds.
     #[serde(default = "default_tick_interval")]
     pub tick_interval_secs: u64,
@@ -74,9 +78,9 @@ pub struct OrchestratorConfig {
     /// Mention-driven dispatch configuration.
     #[serde(default)]
     pub mentions: Option<MentionConfig>,
-    /// Webhook configuration for real-time mention dispatch.
+    /// Path to persona role configuration JSON for terraphim-agent.
     #[serde(default)]
-    pub webhook: Option<WebhookConfig>,
+    pub role_config_path: Option<PathBuf>,
 }
 
 /// Configuration for posting agent output to Gitea issues.
@@ -125,21 +129,6 @@ fn default_max_concurrent_mention_agents() -> u32 {
 }
 
 /// Lightweight reference to an SFIA skill code and level.
-/// Configuration for the webhook server.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WebhookConfig {
-    /// Bind address for the webhook server (default "0.0.0.0:9090").
-    #[serde(default = "default_webhook_bind")]
-    pub bind: String,
-    /// Shared secret for HMAC signature verification.
-    /// Must match the secret configured in Gitea webhook settings.
-    pub secret: Option<String>,
-}
-
-fn default_webhook_bind() -> String {
-    "0.0.0.0:9090".to_string()
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SfiaSkillRef {
     pub code: String,
@@ -476,6 +465,10 @@ fn default_max_restart_count() -> u32 {
     10
 }
 
+fn default_disk_usage_threshold() -> u8 {
+    90
+}
+
 fn default_tick_interval() -> u64 {
     30
 }
@@ -749,11 +742,11 @@ task = "t"
         let example_path =
             std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("orchestrator.example.toml");
         let config = OrchestratorConfig::from_file(&example_path).unwrap();
-        assert_eq!(config.agents.len(), 3);
+        assert_eq!(config.agents.len(), 14);
         assert_eq!(config.agents[0].layer, AgentLayer::Safety);
-        assert_eq!(config.agents[1].layer, AgentLayer::Core);
-        assert_eq!(config.agents[2].layer, AgentLayer::Growth);
-        assert!(config.agents[1].schedule.is_some());
+        assert_eq!(config.agents[1].layer, AgentLayer::Safety);
+        assert_eq!(config.agents[2].layer, AgentLayer::Core);
+        assert!(config.agents[2].schedule.is_some());
     }
 
     #[test]

@@ -40,8 +40,8 @@ pub struct GiteaIssue {
 
 /// Gitea label.
 #[derive(Debug, Deserialize)]
-struct GiteaLabel {
-    name: String,
+pub struct GiteaLabel {
+    pub name: String,
 }
 
 /// Gitea issue comment from the API.
@@ -242,7 +242,7 @@ impl GiteaTracker {
         &self,
         title: &str,
         body: &str,
-        labels: &[&str],
+        _labels: &[&str],
     ) -> Result<GiteaIssue> {
         let url = format!(
             "{}/api/v1/repos/{}/{}/issues",
@@ -252,8 +252,7 @@ impl GiteaTracker {
             .build_request(reqwest::Method::POST, &url)
             .json(&serde_json::json!({
                 "title": title,
-                "body": body
-
+                "body": body,
             }))
             .send()
             .await?;

@@ -1,62 +1,353 @@
 # orchestrator.example.toml -- AI Dark Factory Agent Fleet
 #
 # Copy to orchestrator.toml and adjust paths for your environment.
-# This configures 3 agents (one per layer) for initial deployment.
+# Full 13-agent fleet with persona-specific knowledge graphs,
+# terraphim-agent pre-checks, and disciplined engineering skill chains.
 
-working_dir = "/Users/alex/projects/terraphim/terraphim-ai"
+working_dir = "/opt/ai-dark-factory/workspace"
+persona_data_dir = "/opt/ai-dark-factory/personas"
+skill_data_dir = "/opt/ai-dark-factory/skills"
+role_config_path = "/opt/ai-dark-factory/persona_roles_config.json"
 
 [nightwatch]
-eval_interval_secs = 300        # 5 minutes
-minor_threshold = 0.10          # 10-20% drift = Minor (log warning)
-moderate_threshold = 0.20       # 20-40% drift = Moderate (reload config)
-severe_threshold = 0.40         # 40-70% drift = Severe (restart agent)
-critical_threshold = 0.70       # >70% drift = Critical (pause + escalate)
+eval_interval_secs = 300
+minor_threshold = 0.10
+moderate_threshold = 0.20
+severe_threshold = 0.40
+critical_threshold = 0.70
 
 [compound_review]
-schedule = "0 2 * * *"          # 2 AM daily
-max_duration_secs = 1800        # 30 minutes
-repo_path = "/Users/alex/projects/terraphim/terraphim-ai"
-create_prs = false              # Dry run for first 2 weeks
+schedule = "0 2 * * *"
+max_duration_secs = 1800
+repo_path = "/opt/ai-dark-factory/workspace"
+create_prs = false
 
-# --- Safety Layer (always running) ---
+# =============================================================================
+# SAFETY LAYER (always running)
+# =============================================================================
 
 [[agents]]
 name = "security-sentinel"
 layer = "Safety"
-cli_tool = "codex"
-task = "Continuously scan for CVEs and security vulnerabilities in dependencies. Run cargo audit and report findings."
-# model = "o3"                    # Optional: explicit model override. Omit to use keyword routing.
-capabilities = ["security", "vulnerability-scanning"]
-max_memory_bytes = 2147483648   # 2GB
-# budget_monthly_cents = 5000  # $50/month (omit for subscription CLIs)
+cli_tool = "claude"
+persona = "vigil"
+terraphim_role = "Vigil Security"
+skill_chain = ["disciplined-verification", "disciplined-validation"]
+task = """Continuously scan for CVEs and security vulnerabilities in dependencies.
+Run cargo audit, check for OWASP Top 10 issues, and report findings.
 
-# --- Core Layer (scheduled) ---
+## Domain Knowledge Search
+When you need security context, use:
+  terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "<query>" --role "Vigil Security"
+"""
+capabilities = ["security", "vulnerability-scanning", "supply-chain"]
+max_memory_bytes = 2147483648
+
+[agents.pre_check]
+kind = "shell"
+script = """terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "CVE vulnerability dependency audit supply chain" --role "Vigil Security" --limit 5 2>/dev/null || echo '[]'"""
+timeout_secs = 30
+
+[[agents]]
+name = "drift-detector"
+layer = "Safety"
+cli_tool = "claude"
+persona = "echo"
+terraphim_role = "Echo QA"
+skill_chain = ["disciplined-verification", "disciplined-validation"]
+task = """Monitor for configuration drift, test failures, and quality regressions.
+Compare current state against known-good baselines and report deviations.
+
+## Domain Knowledge Search
+When you need QA context, use:
+  terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "<query>" --role "Echo QA"
+"""
+capabilities = ["drift-detection", "quality-monitoring", "regression-detection"]
+max_memory_bytes = 2147483648
+
+[agents.pre_check]
+kind = "shell"
+script = """terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "regression drift quality baseline test failure" --role "Echo QA" --limit 5 2>/dev/null || echo '[]'"""
+timeout_secs = 30
+
+# =============================================================================
+# CORE LAYER (scheduled)
+# =============================================================================
+
+[[agents]]
+name = "implementation-swarm"
+layer = "Core"
+cli_tool = "claude"
+persona = "ferrox"
+terraphim_role = "Ferrox Rust"
+skill_chain = ["disciplined-research", "disciplined-design", "disciplined-implementation", "disciplined-verification", "disciplined-validation"]
+task = """Implement approved features and fixes from the issue tracker.
+Follow TDD, write idiomatic Rust, ensure all tests pass before completion.
+
+## Domain Knowledge Search
+When you need Rust context, use:
+  terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "<query>" --role "Ferrox Rust"
+"""
+schedule = "0 1 * * *"
+capabilities = ["implementation", "rust-development", "tdd"]
+
+[agents.pre_check]
+kind = "shell"
+script = """terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "implementation async ownership error handling" --role "Ferrox Rust" --limit 5 2>/dev/null || echo '[]'"""
+timeout_secs = 30
+
+[[agents]]
+name = "product-development"
+layer = "Core"
+cli_tool = "claude"
+persona = "ferrox"
+terraphim_role = "Ferrox Rust"
+skill_chain = ["disciplined-research", "disciplined-design", "disciplined-implementation", "disciplined-verification", "disciplined-validation"]
+task = """Develop new product features based on roadmap priorities.
+Focus on user-facing functionality, integration points, and API design.
+
+## Domain Knowledge Search
+When you need Rust context, use:
+  terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "<query>" --role "Ferrox Rust"
+"""
+schedule = "0 2 * * *"
+capabilities = ["product-development", "feature-implementation", "api-design"]
+
+[agents.pre_check]
+kind = "shell"
+script = """terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "feature api service integration" --role "Ferrox Rust" --limit 5 2>/dev/null || echo '[]'"""
+timeout_secs = 30
+
+[[agents]]
+name = "meta-coordinator"
+layer = "Core"
+cli_tool = "claude"
+persona = "carthos"
+terraphim_role = "Carthos Architecture"
+skill_chain = ["disciplined-research", "disciplined-verification"]
+task = """Coordinate agent activities, review architectural decisions, ensure
+bounded contexts are respected, and maintain system coherence.
+
+## Domain Knowledge Search
+When you need architecture context, use:
+  terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "<query>" --role "Carthos Architecture"
+"""
+schedule = "0 0 * * *"
+capabilities = ["coordination", "architecture-review", "system-design"]
+
+[agents.pre_check]
+kind = "shell"
+script = """terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "bounded context architecture decision API design" --role "Carthos Architecture" --limit 5 2>/dev/null || echo '[]'"""
+timeout_secs = 30
+
+[[agents]]
+name = "spec-validator"
+layer = "Core"
+cli_tool = "claude"
+persona = "carthos"
+terraphim_role = "Carthos Architecture"
+skill_chain = ["disciplined-research", "disciplined-verification"]
+task = """Validate specifications and design documents against implementation.
+Ensure requirements traceability and design consistency.
+
+## Domain Knowledge Search
+When you need architecture context, use:
+  terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "<query>" --role "Carthos Architecture"
+"""
+schedule = "0 4 * * *"
+capabilities = ["specification-validation", "requirements-traceability", "design-review"]
+
+[agents.pre_check]
+kind = "shell"
+script = """terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "specification requirement invariant domain model" --role "Carthos Architecture" --limit 5 2>/dev/null || echo '[]'"""
+timeout_secs = 30
+
+[[agents]]
+name = "compliance-watchdog"
+layer = "Core"
+cli_tool = "claude"
+persona = "vigil"
+terraphim_role = "Vigil Security"
+skill_chain = ["disciplined-research", "disciplined-verification"]
+task = """Monitor compliance with security policies, coding standards, and
+regulatory requirements. Flag violations and suggest remediation.
+
+## Domain Knowledge Search
+When you need security/compliance context, use:
+  terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "<query>" --role "Vigil Security"
+"""
+schedule = "0 5 * * *"
+capabilities = ["compliance", "policy-enforcement", "standards-checking"]
+
+[agents.pre_check]
+kind = "shell"
+script = """terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "compliance policy secrets credential authentication" --role "Vigil Security" --limit 5 2>/dev/null || echo '[]'"""
+timeout_secs = 30
 
 [[agents]]
 name = "upstream-synchronizer"
 layer = "Core"
-cli_tool = "codex"
-task = "Sync with upstream repositories. Check for new releases of key dependencies."
-schedule = "0 3 * * *"          # 3 AM daily
-capabilities = ["sync", "dependency-management"]
+cli_tool = "claude"
+persona = "conduit"
+terraphim_role = "Conduit DevOps"
+skill_chain = ["disciplined-implementation", "disciplined-verification"]
+task = """Sync with upstream repositories. Check for new releases of key
+dependencies, update lockfiles, and verify compatibility.
 
-# --- Growth Layer (on-demand) ---
+## Domain Knowledge Search
+When you need DevOps context, use:
+  terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "<query>" --role "Conduit DevOps"
+"""
+schedule = "0 3 * * *"
+capabilities = ["sync", "dependency-management", "upstream-tracking"]
+
+[agents.pre_check]
+kind = "shell"
+script = """terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "deployment dependency container infrastructure" --role "Conduit DevOps" --limit 5 2>/dev/null || echo '[]'"""
+timeout_secs = 30
 
 [[agents]]
-name = "code-reviewer"
+name = "documentation-generator"
+layer = "Core"
+cli_tool = "claude"
+persona = "mneme"
+terraphim_role = "Mneme Knowledge"
+skill_chain = ["disciplined-implementation", "disciplined-verification"]
+task = """Generate and maintain documentation. Update API docs, README files,
+and knowledge base entries based on recent code changes.
+
+## Domain Knowledge Search
+When you need knowledge management context, use:
+  terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "<query>" --role "Mneme Knowledge"
+"""
+schedule = "0 6 * * *"
+capabilities = ["documentation", "knowledge-management", "api-docs"]
+
+[agents.pre_check]
+kind = "shell"
+script = """terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "documentation knowledge management learning pattern" --role "Mneme Knowledge" --limit 5 2>/dev/null || echo '[]'"""
+timeout_secs = 30
+
+# =============================================================================
+# GROWTH LAYER (on-demand / scheduled)
+# =============================================================================
+
+[[agents]]
+name = "compound-review"
 layer = "Growth"
 cli_tool = "claude"
-task = "Review the latest PR for code quality, security issues, and adherence to project conventions."
-capabilities = ["code-review", "architecture"]
+persona = "carthos"
+terraphim_role = "Carthos Architecture"
+skill_chain = ["disciplined-research", "disciplined-verification"]
+task = """Perform compound reviews of recent changes across the codebase.
+Identify cross-cutting concerns, architectural drift, and integration issues.
 
-# --- Flow DAG Examples ---
+## Domain Knowledge Search
+When you need architecture context, use:
+  terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "<query>" --role "Carthos Architecture"
+"""
+schedule = "0 2 * * *"
+capabilities = ["code-review", "architecture-review", "cross-cutting-analysis"]
 
-# Example: Compound Review v2 using Flow DAG
-# This replaces the legacy compound_review with a multi-step DAG workflow
+[agents.pre_check]
+kind = "shell"
+script = """terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "architecture review quality attribute trade-off" --role "Carthos Architecture" --limit 5 2>/dev/null || echo '[]'"""
+timeout_secs = 30
+
+[[agents]]
+name = "browser-qa"
+layer = "Growth"
+cli_tool = "claude"
+persona = "lux"
+terraphim_role = "Lux Frontend"
+skill_chain = ["disciplined-research", "disciplined-verification"]
+task = """Test frontend features in the browser. Verify accessibility,
+responsive design, and visual consistency across viewports.
+
+## Domain Knowledge Search
+When you need frontend context, use:
+  terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "<query>" --role "Lux Frontend"
+"""
+capabilities = ["browser-testing", "accessibility-audit", "visual-qa"]
+
+[agents.pre_check]
+kind = "shell"
+script = """terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "accessibility component responsive visual Svelte" --role "Lux Frontend" --limit 5 2>/dev/null || echo '[]'"""
+timeout_secs = 30
+
+[[agents]]
+name = "merge-coordinator"
+layer = "Growth"
+cli_tool = "claude"
+persona = "conduit"
+terraphim_role = "Conduit DevOps"
+skill_chain = ["disciplined-research", "disciplined-verification"]
+task = """Coordinate merge activities, resolve conflicts, and ensure CI/CD
+pipelines pass before merging PRs to main.
+
+## Domain Knowledge Search
+When you need DevOps context, use:
+  terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "<query>" --role "Conduit DevOps"
+"""
+capabilities = ["merge-coordination", "ci-cd", "conflict-resolution"]
+
+[agents.pre_check]
+kind = "shell"
+script = """terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "deployment pipeline CI merge release" --role "Conduit DevOps" --limit 5 2>/dev/null || echo '[]'"""
+timeout_secs = 30
+
+[[agents]]
+name = "market-analyst"
+layer = "Growth"
+cli_tool = "claude"
+persona = "meridian"
+terraphim_role = "Meridian Research"
+skill_chain = ["disciplined-research"]
+task = """Research market trends, competitive landscape, and user needs.
+Produce insights for product roadmap decisions.
+
+## Domain Knowledge Search
+When you need market research context, use:
+  terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "<query>" --role "Meridian Research"
+"""
+schedule = "0 7 * * *"
+capabilities = ["market-research", "competitive-analysis", "user-research"]
+
+[agents.pre_check]
+kind = "shell"
+script = """terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "market research product strategy competitive analysis" --role "Meridian Research" --limit 5 2>/dev/null || echo '[]'"""
+timeout_secs = 30
+
+[[agents]]
+name = "knowledge-curator"
+layer = "Growth"
+cli_tool = "claude"
+persona = "mneme"
+terraphim_role = "Mneme Knowledge"
+skill_chain = ["disciplined-research"]
+task = """Curate and improve the knowledge graph. Identify gaps in domain
+terminology, add new synonyms, and maintain KG quality.
+
+## Domain Knowledge Search
+When you need knowledge management context, use:
+  terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "<query>" --role "Mneme Knowledge"
+"""
+schedule = "0 8 * * *"
+capabilities = ["knowledge-curation", "kg-maintenance", "terminology-management"]
+
+[agents.pre_check]
+kind = "shell"
+script = """terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "knowledge graph learning pattern decision framework" --role "Mneme Knowledge" --limit 5 2>/dev/null || echo '[]'"""
+timeout_secs = 30
+
+# =============================================================================
+# FLOW DAG -- Compound Review v2
+# =============================================================================
+
 [[flows]]
 name = "compound-review-v2"
-schedule = "0 2 * * *"          # 2 AM daily
-repo_path = "/Users/alex/projects/terraphim/terraphim-ai"
+schedule = "0 2 * * *"
+repo_path = "/opt/ai-dark-factory/workspace"
 base_branch = "main"
 timeout_secs = 7200
 
@@ -79,8 +370,8 @@ on_fail = "skip_failed"
 [[flows.steps]]
 name = "check-security"
 kind = "agent"
-cli_tool = "opencode"
-model = "kimi-for-coding/k2p5"
+cli_tool = "claude"
+model = "sonnet"
 task = "Perform a security audit on the changed code. Look for injection vulnerabilities, unsafe deserialization, and authentication bypasses."
 timeout_secs = 600
 on_fail = "continue"

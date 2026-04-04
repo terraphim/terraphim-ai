@@ -48,7 +48,6 @@ pub mod persona;
 pub mod scheduler;
 pub mod scope;
 
-pub mod webhook;
 pub use compound::{CompoundReviewResult, CompoundReviewWorkflow, ReviewGroupDef, SwarmConfig};
 pub use concurrency::{ConcurrencyController, FairnessPolicy, ModeQuotas};
 pub use config::{
@@ -172,8 +171,6 @@ pub struct AgentOrchestrator {
     active_flows: HashMap<String, tokio::task::JoinHandle<flow::state::FlowRunState>>,
     /// Tracker for processed @adf: mentions (dedup + depth limiting).
     mention_cursor: Option<MentionCursor>,
-    /// Receiver for webhook dispatch requests.
-    webhook_dispatch_rx: Option<tokio::sync::mpsc::Receiver<webhook::WebhookDispatch>>,
     /// Monotonically increasing tick counter for poll_modulo gating.
     tick_count: u64,
 }
@@ -259,7 +256,16 @@ impl AgentOrchestrator {
             active_agents: HashMap::new(),
             rate_limiter: RateLimitTracker::default(),
             shutdown_requested: false,
-            restart_counts: HashMap::new(),
+            restart_counts: {
+                #[cfg(not(test))]
+                {
+                    Self::load_restart_counts()
+                }
+                #[cfg(test)]
+                {
+                    HashMap::new()
+                }
+            },
             restart_cooldowns: HashMap::new(),
             last_tick_time: chrono::Utc::now(),
             handoff_buffer,
@@ -273,9 +279,52 @@ impl AgentOrchestrator {
             pre_check_tracker: None,
             active_flows: HashMap::new(),
             mention_cursor: None,
-            webhook_dispatch_rx: None,
             tick_count: 0,
         })
+    }
+
+    /// Load persisted restart counts from a JSON file in the working directory.
+    /// Returns empty HashMap if file doesn't exist or can't be parsed.
+    fn load_restart_counts() -> HashMap<String, u32> {
+        let path = std::env::temp_dir().join("adf_restart_counts.json");
+        match std::fs::read_to_string(&path) {
+            Ok(json) => serde_json::from_str(&json).unwrap_or_default(),
+            Err(_) => HashMap::new(),
+        }
+    }
+
+    /// Persist restart counts so they survive orchestrator restarts.
+    fn save_restart_counts(&self) {
+        // Skip persistence in test builds to avoid cross-test contamination
+        #[cfg(test)]
+        return;
+        #[cfg(not(test))]
+        {
+            let path = std::env::temp_dir().join("adf_restart_counts.json");
+            if let Ok(json) = serde_json::to_string(&self.restart_counts) {
+                if let Err(e) = std::fs::write(&path, json) {
+                    warn!(error = %e, "failed to persist restart counts");
+                }
+            }
+        }
+    }
+
+    /// Check disk usage percentage for the root filesystem.
+    /// Returns None if the check fails (non-Linux, command error, etc.).
+    fn check_disk_usage_percent() -> Option<u8> {
+        let output = std::process::Command::new("df")
+            .args(["--output=pcent", "/"])
+            .output()
+            .ok()?;
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        // Output format: "Use%\n 86%\n"
+        for line in stdout.lines().skip(1) {
+            let trimmed = line.trim().trim_end_matches('%');
+            if let Ok(pct) = trimmed.parse::<u8>() {
+                return Some(pct);
+            }
+        }
+        None
     }
 
     /// Create from a TOML config file path.
@@ -308,37 +357,6 @@ impl AgentOrchestrator {
             "safety agents spawned, entering reconciliation loop"
         );
 
-        // Start webhook server if configured
-        if let Some(ref webhook_cfg) = self.config.webhook {
-            let (dispatch_tx, dispatch_rx) = tokio::sync::mpsc::channel(64);
-            self.webhook_dispatch_rx = Some(dispatch_rx);
-
-            let agent_names: Vec<String> =
-                self.config.agents.iter().map(|a| a.name.clone()).collect();
-            let state = webhook::WebhookState {
-                agent_names,
-                persona_registry: Arc::new(self.persona_registry.clone()),
-                dispatch_tx,
-                secret: webhook_cfg.secret.clone(),
-            };
-
-            let router = webhook::webhook_router(state);
-            let bind = webhook_cfg.bind.clone();
-
-            tokio::spawn(async move {
-                let listener = match tokio::net::TcpListener::bind(&bind).await {
-                    Ok(l) => l,
-                    Err(e) => {
-                        tracing::error!(error = %e, bind = %bind, "failed to bind webhook server");
-                        return;
-                    }
-                };
-                tracing::info!(bind = %bind, "webhook server listening");
-                if let Err(e) = axum::serve(listener, router).await {
-                    tracing::error!(error = %e, "webhook server error");
-                }
-            });
-        }
         // Reconciliation tick interval
         let mut tick = tokio::time::interval(Duration::from_secs(self.config.tick_interval_secs));
 
@@ -358,15 +376,6 @@ impl AgentOrchestrator {
                 }
                 _ = tick.tick() => {
                     self.reconcile_tick().await;
-                }
-                Some(dispatch) = async {
-                    if let Some(rx) = &mut self.webhook_dispatch_rx {
-                        rx.recv().await
-                    } else {
-                        std::future::pending().await
-                    }
-                } => {
-                    self.handle_webhook_dispatch(dispatch).await;
                 }
             }
         }
@@ -598,6 +607,25 @@ impl AgentOrchestrator {
     /// Otherwise, route the task prompt through the RoutingEngine to select
     /// a model based on keyword matching.
     async fn spawn_agent(&mut self, def: &AgentDefinition) -> Result<(), OrchestratorError> {
+        // === DISK SPACE GUARD ===
+        let threshold = self.config.disk_usage_threshold;
+        if threshold < 100 {
+            if let Some(usage) = Self::check_disk_usage_percent() {
+                if usage >= threshold {
+                    error!(
+                        agent = %def.name,
+                        disk_usage_percent = usage,
+                        threshold,
+                        "refusing to spawn agent: disk usage above threshold"
+                    );
+                    return Err(OrchestratorError::Config(format!(
+                        "disk usage {}% >= {}% threshold, refusing to spawn {}",
+                        usage, threshold, def.name
+                    )));
+                }
+            }
+        }
+
         // === PRE-CHECK GATE ===
         let pre_check_result = self.run_pre_check(def).await;
         let findings = match pre_check_result {
@@ -1101,124 +1129,6 @@ impl AgentOrchestrator {
     /// Uses repo-wide comments endpoint with `since` cursor. On first run
     /// (no persisted cursor), cursor is set to `now` to skip all historical
     /// mentions — preventing the mention replay storm.
-
-    /// Handle a dispatch request received from the webhook endpoint.
-    /// This is the webhook equivalent of poll_mentions but immediate.
-    async fn handle_webhook_dispatch(&mut self, dispatch: webhook::WebhookDispatch) {
-        // Rate limiting: check concurrent mention-spawned agents
-        let mention_cfg = match self.config.mentions.as_ref() {
-            Some(cfg) => cfg,
-            None => return,
-        };
-
-        let active_mention_agents = self
-            .active_agents
-            .values()
-            .filter(|a| a.spawned_by_mention)
-            .count() as u32;
-
-        if active_mention_agents >= mention_cfg.max_concurrent_mention_agents {
-            warn!(
-                active = active_mention_agents,
-                max = mention_cfg.max_concurrent_mention_agents,
-                "webhook dispatch rejected: mention agents at capacity"
-            );
-            return;
-        }
-
-        let agents = self.config.agents.clone();
-
-        match dispatch {
-            webhook::WebhookDispatch::SpawnAgent {
-                agent_name,
-                issue_number,
-                comment_id,
-                context,
-            } => {
-                info!(
-                    agent = %agent_name,
-                    issue = issue_number,
-                    comment_id = comment_id,
-                    "webhook: dispatching agent spawn"
-                );
-
-                if let Some(def) = agents.iter().find(|a| a.name == agent_name).cloned() {
-                    let mut mention_def = def.clone();
-                    mention_def.task = format!(
-                        "{}\n\n## Mention Context\nTriggered by @adf:{} webhook in issue #{} (comment {}).\nContext: {}",
-                        def.task, agent_name, issue_number, comment_id, context
-                    );
-                    mention_def.gitea_issue = Some(issue_number);
-
-                    if let Err(e) = self.spawn_agent(&mention_def).await {
-                        error!(agent = %agent_name, issue = issue_number, error = %e, "webhook: failed to spawn agent");
-                    } else if let Some(agent) = self.active_agents.get_mut(&mention_def.name) {
-                        agent.spawned_by_mention = true;
-                    }
-                }
-            }
-            webhook::WebhookDispatch::SpawnPersona {
-                persona_name,
-                issue_number,
-                comment_id,
-                context,
-            } => {
-                if let Some((agent_name, _)) = mention::resolve_mention(
-                    &persona_name,
-                    &agents,
-                    &self.persona_registry,
-                    &context,
-                ) {
-                    info!(
-                        persona = %persona_name,
-                        agent = %agent_name,
-                        issue = issue_number,
-                        "webhook: dispatching persona-resolved agent"
-                    );
-
-                    if let Some(def) = agents.iter().find(|a| a.name == agent_name).cloned() {
-                        let mut mention_def = def.clone();
-                        mention_def.task = format!(
-                            "{}\n\n## Mention Context\nTriggered by @adf:{} persona webhook in issue #{} (comment {}).\nContext: {}",
-                            def.task, persona_name, issue_number, comment_id, context
-                        );
-                        mention_def.gitea_issue = Some(issue_number);
-
-                        if let Err(e) = self.spawn_agent(&mention_def).await {
-                            error!(agent = %agent_name, issue = issue_number, error = %e, "webhook: failed to spawn agent");
-                        } else if let Some(agent) = self.active_agents.get_mut(&mention_def.name) {
-                            agent.spawned_by_mention = true;
-                        }
-                    }
-                }
-            }
-            webhook::WebhookDispatch::CompoundReview {
-                issue_number,
-                comment_id,
-            } => {
-                info!(
-                    issue = issue_number,
-                    comment_id = comment_id,
-                    "webhook: compound review triggered"
-                );
-                self.handle_schedule_event(ScheduleEvent::CompoundReview)
-                    .await;
-
-                // Post acknowledgment via existing output_poster
-                if let Some(ref poster) = self.output_poster {
-                    let ack_body = format!(
-                        "## Compound Review Triggered (webhook)\n\n\
-                        Manual trigger received from issue #{} comment {}.\n\
-                        Running 6-agent review swarm now...",
-                        issue_number, comment_id
-                    );
-                    if let Err(e) = poster.post_raw(issue_number, &ack_body).await {
-                        warn!(error = %e, "failed to post compound review acknowledgment");
-                    }
-                }
-            }
-        }
-    }
     async fn poll_mentions(&mut self) {
         let mention_cfg = match self.config.mentions.clone() {
             Some(cfg) => cfg,
@@ -1320,6 +1230,17 @@ impl AgentOrchestrator {
                     "max dispatches per tick reached"
                 );
                 break;
+            }
+
+            // Skip already-processed comments (persisted dedup across restarts)
+            if cursor.is_processed(comment.id) {
+                tracing::debug!(
+                    comment_id = comment.id,
+                    issue = comment.issue_number,
+                    "skipping already-processed comment"
+                );
+                cursor.advance_to(&comment.created_at);
+                continue;
             }
 
             // Parse ADF commands using terraphim-automata Aho-Corasick
@@ -1451,13 +1372,47 @@ impl AgentOrchestrator {
                 }
             }
 
-            // Advance cursor past this comment's timestamp
+            // Mark comment as processed and advance cursor
+            cursor.mark_processed(comment.id);
             cursor.advance_to(&comment.created_at);
         }
 
         // Persist cursor for next poll / restart
         cursor.save().await;
         self.mention_cursor = Some(cursor);
+    }
+
+    /// Sanitise finding text for use in issue title.
+    /// Strips JSON syntax characters that break title parsing.
+    fn sanitise_for_title(input: &str) -> String {
+        let mut result = String::with_capacity(input.len());
+        for ch in input.chars() {
+            match ch {
+                '{' | '}' | '[' | ']' | '"' => result.push(' '),
+                '\n' | '\r' => result.push(' '),
+                _ => result.push(ch),
+            }
+        }
+        let trimmed = result.split_whitespace().collect::<Vec<_>>().join(" ");
+        if trimmed.len() > 80 {
+            trimmed[..77].to_string() + "..."
+        } else {
+            trimmed
+        }
+    }
+
+    /// Sanitise finding text for use in issue body (markdown).
+    /// Escapes markdown special characters that could break rendering.
+    fn sanitise_for_body(input: &str) -> String {
+        let mut result = String::with_capacity(input.len());
+        for ch in input.chars() {
+            match ch {
+                '`' => result.push_str("``"),
+                '*' | '_' | '[' | ']' => result.push('\\'),
+                _ => result.push(ch),
+            }
+        }
+        result
     }
 
     /// File a Gitea issue for a compound review finding.
@@ -1508,14 +1463,10 @@ impl AgentOrchestrator {
         let title = format!(
             "[Compound Review] {}: {}",
             sev_str,
-            if finding.finding.len() > 80 {
-                format!("{}...", &finding.finding[..77])
-            } else {
-                finding.finding.clone()
-            }
+            Self::sanitise_for_title(&finding.finding)
         );
 
-        let mut body = format!("## Automated Finding from Compound Review\n\n",);
+        let mut body = "## Automated Finding from Compound Review\n\n".to_string();
         body.push_str(&format!("- **Severity**: {}\n", sev_str));
         if !finding.file.is_empty() {
             body.push_str(&format!(
@@ -1533,16 +1484,22 @@ impl AgentOrchestrator {
             finding.confidence * 100.0
         ));
         body.push_str(&format!("- **Review ID**: {}\n\n", result.correlation_id));
-        body.push_str(&format!("### Finding\n\n{}\n\n", finding.finding));
+        body.push_str(&format!(
+            "### Finding\n\n{}\n\n",
+            Self::sanitise_for_body(&finding.finding)
+        ));
         if let Some(ref suggestion) = finding.suggestion {
             if !suggestion.is_empty() {
-                body.push_str(&format!("### Suggested Fix\n\n{}\n", suggestion));
+                body.push_str(&format!(
+                    "### Suggested Fix\n\n{}\n",
+                    Self::sanitise_for_body(suggestion)
+                ));
             }
         }
 
-        let sev_label = sev_str.to_lowercase();
-        let labels = vec!["compound-review", sev_label.as_str()];
-        match poster.tracker().create_issue(&title, &body, &labels).await {
+        // Skip labels for now - Gitea API has issues with label format
+        // TODO: Fix labels format for Gitea API
+        match poster.tracker().create_issue(&title, &body, &[]).await {
             Ok(issue) => {
                 info!(
                     issue_number = issue.number,
@@ -1581,7 +1538,7 @@ impl AgentOrchestrator {
         };
 
         // Build a targeted fix prompt
-        let mut prompt = format!("Fix this CRITICAL finding from compound review:\n\n");
+        let mut prompt = "Fix this CRITICAL finding from compound review:\n\n".to_string();
         if !finding.file.is_empty() {
             prompt.push_str(&format!(
                 "File: {}{}\n",
@@ -1955,12 +1912,16 @@ impl AgentOrchestrator {
                 }
                 // Handle exit based on layer (similar to handle_agent_exit but for timeout)
                 if managed.definition.layer == AgentLayer::Safety {
-                    let count = self.restart_counts.entry(name.clone()).or_insert(0);
-                    *count += 1;
+                    {
+                        let count = self.restart_counts.entry(name.clone()).or_insert(0);
+                        *count += 1;
+                    }
                     self.restart_cooldowns.insert(name.clone(), Instant::now());
+                    self.save_restart_counts();
+                    let restart_count = self.restart_counts.get(&name).copied().unwrap_or(0);
                     info!(
                         agent = %name,
-                        restart_count = *count,
+                        restart_count,
                         "safety agent timed out, will restart after cooldown"
                     );
                 } else {
@@ -2023,15 +1984,20 @@ impl AgentOrchestrator {
     ) {
         match def.layer {
             AgentLayer::Safety => {
-                let count = self.restart_counts.entry(name.to_string()).or_insert(0);
-                *count += 1;
+                {
+                    let count = self.restart_counts.entry(name.to_string()).or_insert(0);
+                    *count += 1;
+                }
                 self.restart_cooldowns
                     .insert(name.to_string(), Instant::now());
-                if *count <= self.config.max_restart_count {
+                // Persist restart counts so they survive orchestrator restarts
+                self.save_restart_counts();
+                let restart_count = self.restart_counts.get(name).copied().unwrap_or(0);
+                if restart_count <= self.config.max_restart_count {
                     info!(
                         agent = %name,
                         exit_status = %status,
-                        restart_count = *count,
+                        restart_count,
                         cooldown_secs = self.config.restart_cooldown_secs,
                         "safety agent exited, will restart after cooldown"
                     );
@@ -2039,9 +2005,9 @@ impl AgentOrchestrator {
                     error!(
                         agent = %name,
                         exit_status = %status,
-                        restart_count = *count,
+                        restart_count,
                         max = self.config.max_restart_count,
-                        "safety agent exceeded max restarts, not restarting"
+                        "safety agent exceeded max restarts, permanently stopped"
                     );
                 }
             }
@@ -2502,6 +2468,7 @@ mod tests {
             ],
             restart_cooldown_secs: 60,
             max_restart_count: 10,
+            disk_usage_threshold: 100, // disable disk guard in tests
             tick_interval_secs: 30,
             handoff_buffer_ttl_secs: None,
             persona_data_dir: None,
@@ -2510,7 +2477,7 @@ mod tests {
             flow_state_dir: None,
             gitea: None,
             mentions: None,
-            webhook: None,
+            role_config_path: None,
         }
     }
 
@@ -2682,6 +2649,7 @@ task = "test"
             }],
             restart_cooldown_secs: 0, // instant restart for testing
             max_restart_count: 3,
+            disk_usage_threshold: 100, // disable disk guard in tests
             tick_interval_secs: 1,
             handoff_buffer_ttl_secs: None,
             persona_data_dir: None,
@@ -2690,7 +2658,7 @@ task = "test"
             flow_state_dir: None,
             gitea: None,
             mentions: None,
-            webhook: None,
+            role_config_path: None,
         }
     }
 
