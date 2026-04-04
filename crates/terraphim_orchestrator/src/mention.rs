@@ -58,6 +58,9 @@ pub struct MentionCursor {
     /// Counter of dispatches in current tick (reset each poll cycle).
     #[serde(skip)]
     pub dispatches_this_tick: u32,
+    /// Set of comment IDs already dispatched (persisted to prevent re-dispatch on restart).
+    #[serde(default)]
+    pub processed_comment_ids: std::collections::HashSet<u64>,
 }
 
 impl MentionCursor {
@@ -66,6 +69,31 @@ impl MentionCursor {
         Self {
             last_seen_at: Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true),
             dispatches_this_tick: 0,
+            processed_comment_ids: std::collections::HashSet::new(),
+        }
+    }
+
+    /// Check if a comment has already been dispatched.
+    pub fn is_processed(&self, comment_id: u64) -> bool {
+        self.processed_comment_ids.contains(&comment_id)
+    }
+
+    /// Mark a comment as processed.
+    pub fn mark_processed(&mut self, comment_id: u64) {
+        self.processed_comment_ids.insert(comment_id);
+        // Cap the set to prevent unbounded growth (keep last 10000 entries).
+        if self.processed_comment_ids.len() > 10_000 {
+            // Remove oldest entries by keeping a fresh set (no ordering in HashSet,
+            // so just drain half). In practice this set grows slowly.
+            let to_remove: Vec<u64> = self
+                .processed_comment_ids
+                .iter()
+                .take(5_000)
+                .copied()
+                .collect();
+            for id in to_remove {
+                self.processed_comment_ids.remove(&id);
+            }
         }
     }
 

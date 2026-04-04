@@ -155,7 +155,7 @@ impl CompoundReviewResult {
         let verdict = if self.pass { "✅ PASS" } else { "❌ NO-GO" };
         let duration_secs = self.duration.as_secs();
 
-        let mut report = format!("## Compound Review\n\n",);
+        let mut report = "## Compound Review\n\n".to_string();
         report.push_str(&format!(
             "**Verdict: {}** | Duration: {}s | Agents: {} ({} failed)\n\n",
             verdict, duration_secs, self.agents_run, self.agents_failed
@@ -191,7 +191,7 @@ impl CompoundReviewResult {
                     f.confidence * 100.0
                 ));
             }
-            report.push_str("\n");
+            report.push('\n');
         } else {
             report.push_str("**No findings.**\n\n");
         }

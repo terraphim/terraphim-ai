@@ -49,6 +49,10 @@ pub struct OrchestratorConfig {
     /// Maximum number of restarts per Safety agent before giving up.
     #[serde(default = "default_max_restart_count")]
     pub max_restart_count: u32,
+    /// Disk usage percentage threshold (0-100) above which agent spawning is refused.
+    /// Set to 100 to disable the guard. Default: 90.
+    #[serde(default = "default_disk_usage_threshold")]
+    pub disk_usage_threshold: u8,
     /// Reconciliation tick interval in seconds.
     #[serde(default = "default_tick_interval")]
     pub tick_interval_secs: u64,
@@ -459,6 +463,10 @@ fn default_restart_cooldown() -> u64 {
 
 fn default_max_restart_count() -> u32 {
     10
+}
+
+fn default_disk_usage_threshold() -> u8 {
+    90
 }
 
 fn default_tick_interval() -> u64 {

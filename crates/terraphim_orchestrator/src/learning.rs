@@ -769,7 +769,7 @@ impl SharedLearningStore {
         let path = PathBuf::from(format!("/tmp/adf-context-{agent_name}.md"));
         tokio::fs::write(&path, content)
             .await
-            .map_err(|e| LearningError::Io(e))?;
+            .map_err(LearningError::Io)?;
         info!("Wrote context file for {agent_name} at {path:?}");
         Ok(path)
     }
