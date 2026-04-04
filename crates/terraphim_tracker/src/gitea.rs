@@ -252,8 +252,8 @@ impl GiteaTracker {
             .build_request(reqwest::Method::POST, &url)
             .json(&serde_json::json!({
                 "title": title,
-                "body": body,
-                "labels": labels,
+                "body": body
+                
             }))
             .send()
             .await?;
