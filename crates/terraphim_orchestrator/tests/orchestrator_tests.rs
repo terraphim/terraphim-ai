@@ -118,6 +118,7 @@ fn test_config() -> OrchestratorConfig {
         flow_state_dir: None,
         gitea: None,
         mentions: None,
+        webhook: None,
     }
 }
 

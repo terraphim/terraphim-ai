@@ -76,6 +76,7 @@ pub enum WebhookDispatch {
 }
 
 /// Shared state for the webhook handler.
+#[derive(Clone)]
 pub struct WebhookState {
     pub agent_names: Vec<String>,
     pub persona_registry: std::sync::Arc<PersonaRegistry>,
@@ -210,7 +211,7 @@ fn verify_signature(secret: &str, body: &[u8], signature: &str) -> bool {
     let expected = result.into_bytes();
 
     // Strip "sha256=" prefix if present
-    let sig_bytes = match hex::decode(signature.strip_prefix("sha256=").unwrap_or(signature)) {
+    let sig_bytes: Vec<u8> = match hex::decode(signature.strip_prefix("sha256=").unwrap_or(signature)) {
         Ok(b) => b,
         Err(_) => return false,
     };

@@ -317,7 +317,7 @@ impl AgentOrchestrator {
             let agent_names: Vec<String> = self.config.agents.iter().map(|a| a.name.clone()).collect();
             let state = webhook::WebhookState {
                 agent_names,
-                persona_registry: self.persona_registry.clone(),
+                persona_registry: Arc::new(self.persona_registry.clone()),
                 dispatch_tx,
                 secret: webhook_cfg.secret.clone(),
             };
@@ -2509,6 +2509,7 @@ mod tests {
             flow_state_dir: None,
             gitea: None,
             mentions: None,
+            webhook: None,
         }
     }
 
@@ -2688,6 +2689,7 @@ task = "test"
             flow_state_dir: None,
             gitea: None,
             mentions: None,
+            webhook: None,
         }
     }
 
