@@ -74,6 +74,9 @@ pub struct OrchestratorConfig {
     /// Mention-driven dispatch configuration.
     #[serde(default)]
     pub mentions: Option<MentionConfig>,
+    /// Webhook configuration for real-time mention dispatch.
+    #[serde(default)]
+    pub webhook: Option<WebhookConfig>,
 }
 
 /// Configuration for posting agent output to Gitea issues.
@@ -122,6 +125,21 @@ fn default_max_concurrent_mention_agents() -> u32 {
 }
 
 /// Lightweight reference to an SFIA skill code and level.
+/// Configuration for the webhook server.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WebhookConfig {
+    /// Bind address for the webhook server (default "0.0.0.0:9090").
+    #[serde(default = "default_webhook_bind")]
+    pub bind: String,
+    /// Shared secret for HMAC signature verification.
+    /// Must match the secret configured in Gitea webhook settings.
+    pub secret: Option<String>,
+}
+
+fn default_webhook_bind() -> String {
+    "0.0.0.0:9090".to_string()
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SfiaSkillRef {
     pub code: String,

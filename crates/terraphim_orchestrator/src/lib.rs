@@ -48,6 +48,7 @@ pub mod persona;
 pub mod scheduler;
 pub mod scope;
 
+pub mod webhook;
 pub use compound::{CompoundReviewResult, CompoundReviewWorkflow, ReviewGroupDef, SwarmConfig};
 pub use concurrency::{ConcurrencyController, FairnessPolicy, ModeQuotas};
 pub use config::{
@@ -171,6 +172,8 @@ pub struct AgentOrchestrator {
     active_flows: HashMap<String, tokio::task::JoinHandle<flow::state::FlowRunState>>,
     /// Tracker for processed @adf: mentions (dedup + depth limiting).
     mention_cursor: Option<MentionCursor>,
+    /// Receiver for webhook dispatch requests.
+    webhook_dispatch_rx: Option<tokio::sync::mpsc::Receiver<webhook::WebhookDispatch>>,
     /// Monotonically increasing tick counter for poll_modulo gating.
     tick_count: u64,
 }
@@ -270,6 +273,7 @@ impl AgentOrchestrator {
             pre_check_tracker: None,
             active_flows: HashMap::new(),
             mention_cursor: None,
+            webhook_dispatch_rx: None,
             tick_count: 0,
         })
     }
@@ -304,6 +308,37 @@ impl AgentOrchestrator {
             "safety agents spawned, entering reconciliation loop"
         );
 
+
+        // Start webhook server if configured
+        if let Some(ref webhook_cfg) = self.config.webhook {
+            let (dispatch_tx, dispatch_rx) = tokio::sync::mpsc::channel(64);
+            self.webhook_dispatch_rx = Some(dispatch_rx);
+
+            let agent_names: Vec<String> = self.config.agents.iter().map(|a| a.name.clone()).collect();
+            let state = webhook::WebhookState {
+                agent_names,
+                persona_registry: self.persona_registry.clone(),
+                dispatch_tx,
+                secret: webhook_cfg.secret.clone(),
+            };
+
+            let router = webhook::webhook_router(state);
+            let bind = webhook_cfg.bind.clone();
+
+            tokio::spawn(async move {
+                let listener = match tokio::net::TcpListener::bind(&bind).await {
+                    Ok(l) => l,
+                    Err(e) => {
+                        tracing::error!(error = %e, bind = %bind, "failed to bind webhook server");
+                        return;
+                    }
+                };
+                tracing::info!(bind = %bind, "webhook server listening");
+                if let Err(e) = axum::serve(listener, router).await {
+                    tracing::error!(error = %e, "webhook server error");
+                }
+            });
+        }
         // Reconciliation tick interval
         let mut tick = tokio::time::interval(Duration::from_secs(self.config.tick_interval_secs));
 
@@ -323,6 +358,15 @@ impl AgentOrchestrator {
                 }
                 _ = tick.tick() => {
                     self.reconcile_tick().await;
+                }
+                Some(dispatch) = async {
+                    if let Some(rx) = &mut self.webhook_dispatch_rx {
+                        rx.recv().await
+                    } else {
+                        std::future::pending().await
+                    }
+                } => {
+                    self.handle_webhook_dispatch(dispatch).await;
                 }
             }
         }
@@ -1057,6 +1101,123 @@ impl AgentOrchestrator {
     /// Uses repo-wide comments endpoint with `since` cursor. On first run
     /// (no persisted cursor), cursor is set to `now` to skip all historical
     /// mentions — preventing the mention replay storm.
+
+    /// Handle a dispatch request received from the webhook endpoint.
+    /// This is the webhook equivalent of poll_mentions but immediate.
+    async fn handle_webhook_dispatch(&mut self, dispatch: webhook::WebhookDispatch) {
+        // Rate limiting: check concurrent mention-spawned agents
+        let mention_cfg = match self.config.mentions.as_ref() {
+            Some(cfg) => cfg,
+            None => return,
+        };
+
+        let active_mention_agents = self
+            .active_agents
+            .values()
+            .filter(|a| a.spawned_by_mention)
+            .count() as u32;
+
+        if active_mention_agents >= mention_cfg.max_concurrent_mention_agents {
+            warn!(
+                active = active_mention_agents,
+                max = mention_cfg.max_concurrent_mention_agents,
+                "webhook dispatch rejected: mention agents at capacity"
+            );
+            return;
+        }
+
+        let agents = self.config.agents.clone();
+
+        match dispatch {
+            webhook::WebhookDispatch::SpawnAgent {
+                agent_name,
+                issue_number,
+                comment_id,
+                context,
+            } => {
+                info!(
+                    agent = %agent_name,
+                    issue = issue_number,
+                    comment_id = comment_id,
+                    "webhook: dispatching agent spawn"
+                );
+
+                if let Some(def) = agents.iter().find(|a| a.name == agent_name).cloned() {
+                    let mut mention_def = def.clone();
+                    mention_def.task = format!(
+                        "{}\n\n## Mention Context\nTriggered by @adf:{} webhook in issue #{} (comment {}).\nContext: {}",
+                        def.task, agent_name, issue_number, comment_id, context
+                    );
+                    mention_def.gitea_issue = Some(issue_number);
+
+                    if let Err(e) = self.spawn_agent(&mention_def).await {
+                        error!(agent = %agent_name, issue = issue_number, error = %e, "webhook: failed to spawn agent");
+                    } else if let Some(agent) = self.active_agents.get_mut(&mention_def.name) {
+                        agent.spawned_by_mention = true;
+                    }
+                }
+            }
+            webhook::WebhookDispatch::SpawnPersona {
+                persona_name,
+                issue_number,
+                comment_id,
+                context,
+            } => {
+                if let Some((agent_name, _)) = mention::resolve_mention(
+                    &persona_name,
+                    &agents,
+                    &self.persona_registry,
+                    &context,
+                ) {
+                    info!(
+                        persona = %persona_name,
+                        agent = %agent_name,
+                        issue = issue_number,
+                        "webhook: dispatching persona-resolved agent"
+                    );
+
+                    if let Some(def) = agents.iter().find(|a| a.name == agent_name).cloned() {
+                        let mut mention_def = def.clone();
+                        mention_def.task = format!(
+                            "{}\n\n## Mention Context\nTriggered by @adf:{} persona webhook in issue #{} (comment {}).\nContext: {}",
+                            def.task, persona_name, issue_number, comment_id, context
+                        );
+                        mention_def.gitea_issue = Some(issue_number);
+
+                        if let Err(e) = self.spawn_agent(&mention_def).await {
+                            error!(agent = %agent_name, issue = issue_number, error = %e, "webhook: failed to spawn agent");
+                        } else if let Some(agent) = self.active_agents.get_mut(&mention_def.name) {
+                            agent.spawned_by_mention = true;
+                        }
+                    }
+                }
+            }
+            webhook::WebhookDispatch::CompoundReview {
+                issue_number,
+                comment_id,
+            } => {
+                info!(
+                    issue = issue_number,
+                    comment_id = comment_id,
+                    "webhook: compound review triggered"
+                );
+                self.handle_schedule_event(ScheduleEvent::CompoundReview).await;
+
+                // Post acknowledgment via existing output_poster
+                if let Some(ref poster) = self.output_poster {
+                    let ack_body = format!(
+                        "## Compound Review Triggered (webhook)\n\n\
+                        Manual trigger received from issue #{} comment {}.\n\
+                        Running 6-agent review swarm now...",
+                        issue_number, comment_id
+                    );
+                    if let Err(e) = poster.post_raw(issue_number, &ack_body).await {
+                        warn!(error = %e, "failed to post compound review acknowledgment");
+                    }
+                }
+            }
+        }
+    }
     async fn poll_mentions(&mut self) {
         let mention_cfg = match self.config.mentions.clone() {
             Some(cfg) => cfg,
