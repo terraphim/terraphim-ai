@@ -1,0 +1,742 @@
+# Implementation Plan: TLA+ Formal Validation of the Agent Dispatch Framework (ADF)
+
+**Status**: Draft (v2 -- expanded to full ADF scope)
+**Research Doc**: `.docs/research-tlaplus-symphony-validation.md`
+**Author**: Terraphim AI
+**Date**: 2026-04-04
+**Estimated Effort**: 5 days
+
+## Overview
+
+### Summary
+Write three TLA+ formal specifications covering the Agent Dispatch Framework's three concurrency layers: (1) Symphony orchestrator dispatch/retry/reconciliation, (2) OTP-style agent supervisor with restart strategies, and (3) messaging delivery guarantees. Run TLC model checking via the existing `terraphim/tlaplus-ts` TypeScript bindings and integrate into CI. Each module proves layer-specific safety and liveness properties independently, with optional cross-layer composition.
+
+### Approach
+Write TLA+ `.tla` files directly (no DSL generation). Use `tlaplus-ts` TLCBridge to invoke TLC from vitest tests. Three independent modules with bounded models. Incremental build: Module 1 (Symphony) across 4 phases, Module 2 (Supervisor) across 3 phases, Module 3 (Messaging) across 3 phases, plus optional cross-layer composition.
+
+### Scope
+**In Scope:**
+1. **Module 1 (Symphony)**: Dispatch, complete, fail, retry, reconcile, shutdown state machine
+2. **Module 2 (Supervisor)**: OneForOne/OneForAll/RestForOne restart strategies, restart intensity bound, escalation
+3. **Module 3 (Messaging)**: AtMostOnce/AtLeastOnce/ExactlyOnce delivery, mailbox bounds, deduplication
+4. Safety invariants: 7 Symphony + 2 Supervisor + 4 Messaging = 13 total
+5. Liveness properties: 2 Symphony + 1 Supervisor + 1 Messaging = 4 total
+6. TypeScript test harness per module using tlaplus-ts TLCBridge
+7. TLC model configuration (.cfg files) per module
+
+**Out of Scope:**
+- Runner internals (Claude Code / Codex session protocol)
+- Workspace filesystem operations
+- Agent event processing (observability only)
+- Token counting and rate limit tracking
+- Config hot-reload / watcher
+- Per-state concurrency limits (simplify to global limit)
+- PageRank sort order (affects dispatch priority, not correctness)
+- Goal alignment algorithms (sequential KG analysis)
+- Task decomposition KG logic (no concurrent mutation hazards)
+- Agent evolution/learning (write-once-read-many pattern)
+- LLM client calls (external, orthogonal)
+
+**Avoid At All Cost** (5/25 elimination):
+- Generating TLA+ from Rust code automatically (over-engineering)
+- Modelling network failure modes in the tracker API (adds state explosion without verifying orchestrator logic)
+- Modelling real time / wallclock (TLA+ stuttering handles fairness; timing is irrelevant to safety)
+- Building a custom TLC output parser (tlaplus-ts bridge already does this)
+- Attempting to verify the tlaplus-ts library itself (trust it as infrastructure)
+
+## Architecture
+
+### Component Diagram
+```
+specs/
+  symphony/
+    SymphonyOrchestrator.tla     -- Symphony dispatch/retry/reconcile spec
+    SymphonyOrchestrator.cfg     -- TLC config (constants, invariants, properties)
+    MC_SymphonyOrchestrator.tla  -- Model-checking wrapper (concrete constants)
+  supervisor/
+    AgentSupervisor.tla          -- OTP-style supervisor restart spec
+    AgentSupervisor.cfg          -- TLC config
+    MC_AgentSupervisor.tla       -- Model-checking wrapper
+  messaging/
+    MessagingDelivery.tla        -- Delivery guarantee spec
+    MessagingDelivery.cfg        -- TLC config
+    MC_MessagingDelivery.tla     -- Model-checking wrapper
+test/
+  symphony/
+    tlc-safety.test.ts           -- vitest: Symphony safety invariants
+    tlc-liveness.test.ts         -- vitest: Symphony liveness properties
+  supervisor/
+    tlc-safety.test.ts           -- vitest: Supervisor safety invariants
+  messaging/
+    tlc-safety.test.ts           -- vitest: Messaging safety invariants
+    tlc-liveness.test.ts         -- vitest: Messaging liveness properties
+```
+
+All files live in the `terraphim/tlaplus-ts` Gitea repository (extending the existing project).
+
+### Key Design Decisions
+
+| Decision | Rationale | Alternatives Rejected |
+|----------|-----------|----------------------|
+| Write raw .tla files | Maximum TLC compatibility; TLA+ toolbox support; no translation layer | TypeScript DSL -> TLA+ (adds fragile codegen) |
+| Model `claimed` as explicit set | Matches Rust `HashSet<String>` in state.rs; enables claim-leak invariants | Derive from running+retrying (hides bugs in claim management) |
+| Model retry as counter per issue | Simpler than modelling timer handles; captures attempt exhaustion | Model with sequence of events (over-complex) |
+| Separate continuation vs failure retry | Rust code treats Normal exit differently (attempt=1, is_continuation=true) | Single retry path (misses the continuation-retry subtlety) |
+| Use `SUBSET IssueIDs` for running | TLC can enumerate all subsets for small |IssueIDs| (2^3 = 8) | Partial functions (harder TLC symmetry) |
+| Three independent modules | Each layer has distinct state spaces; composition is optional | Single monolithic spec (state explosion from cross-product) |
+| Model supervisor time as discrete steps | TLA+ cannot model real time; step counter captures ordering | Real-valued time (infinite state space) |
+| Parameterise supervisor by Strategy constant | Test all three strategies with same spec; TLC explores each | Separate specs per strategy (code duplication) |
+
+### Eliminated Options (Essentialism)
+
+| Option Rejected | Why Rejected | Risk of Including |
+|-----------------|--------------|-------------------|
+| Auto-generate TLA+ from Rust AST | Enormous implementation effort; spec would mirror code bugs | 2+ weeks of work for marginal value |
+| Model per-state concurrency limits | Adds a dimension per state; global limit suffices for core properties | State explosion from extra dimension |
+| Model stall detection timing | Continuous time doesn't map to TLA+; stall is just "environment aborts worker" | Infinite state space from real-valued time |
+| Equivalence checking (tla-precheck style) | Requires maintaining a parallel TypeScript state machine | Double the maintenance for one codebase |
+| Model agent events | Events update observability metadata only; no scheduling decisions | Irrelevant state transitions inflate model |
+
+### Simplicity Check
+
+> **What if this could be easy?**
+
+Write three `.tla` files, each mapping 1:1 to one ADF concurrency layer's event handlers. Run TLC independently on each. If any fails, TLC gives a counterexample trace showing exactly how the bug manifests. Three small specs are simpler than one large one because each layer's state space is independent.
+
+The simplest design: three spec files, three config files, five test files. No code generation, no DSLs, no frameworks.
+
+**Nothing Speculative Checklist**:
+- [x] No features the user didn't request
+- [x] No abstractions "in case we need them later"
+- [x] No flexibility "just in case"
+- [x] No error handling for scenarios that cannot occur
+- [x] No premature optimisation
+
+## TLA+ State Machine Design
+
+### State Variables
+
+```tla
+VARIABLES
+    issueState,    \* [IssueIDs -> States]  -- tracker state per issue
+    running,       \* SUBSET IssueIDs       -- currently executing
+    claimed,       \* SUBSET IssueIDs       -- claimed (running + retrying)
+    retrying,      \* [IssueIDs -> Nat]     -- retry attempt counter (partial fn)
+    completed,     \* SUBSET IssueIDs       -- bookkeeping
+    shutdownFlag   \* BOOLEAN               -- graceful shutdown requested
+```
+
+### Constants
+
+```tla
+CONSTANTS
+    IssueIDs,        \* {"i1", "i2", "i3"}
+    MaxConcurrent,   \* 2
+    MaxRetries,      \* 3
+    ActiveStates,    \* {"Todo"}
+    TerminalStates,  \* {"Done", "Closed"}
+    Deps             \* [IssueIDs -> SUBSET IssueIDs]  e.g. [i1 |-> {}, i2 |-> {}, i3 |-> {i1, i2}]
+```
+
+### Actions (8 total, mapping to Rust event handlers)
+
+| # | Action | Rust Source | Pre-conditions | Post-conditions |
+|---|--------|-------------|----------------|-----------------|
+| 1 | `PollDispatch(i)` | `on_tick` + `dispatch_issue` | i not claimed, active state, slots available, blockers terminal | running' + claimed' includes i |
+| 2 | `WorkerCompleteOK(i)` | `on_worker_exit` Normal branch | i in running | running' removes i, completed' adds i, continuation retry scheduled |
+| 3 | `WorkerFail(i)` | `on_worker_exit` Failed branch | i in running | running' removes i, retrying' adds i with attempt+1 |
+| 4 | `RetryFire(i)` | `on_retry_timer` issue found | i in retrying, attempts < max, slots available | running' adds i, retrying' removes i |
+| 5 | `RetryGiveUp(i)` | `on_retry_timer` not found OR exhausted | i in retrying, attempts >= max OR issue gone | claimed' removes i, retrying' removes i |
+| 6 | `ReconcileTerminal(i)` | `reconcile` TerminateAndCleanup | i in running, issueState[i] terminal | running' removes i, claimed' removes i |
+| 7 | `ReconcileStall(i)` | `reconcile` find_stalled | i in running, stall detected | running' removes i, retrying' adds i |
+| 8 | `Shutdown` | ctrl-c handler | shutdownFlag = FALSE | all running/retrying cleared, shutdownFlag = TRUE |
+
+Plus an **environment action** for external state changes:
+| 9 | `TrackerStateChange(i, s)` | External (Gitea) | issueState[i] != s | issueState' updates i to s |
+
+### Invariants (Safety Properties)
+
+```tla
+\* INV1: No issue is simultaneously running AND in the retry queue
+NoDoubleDispatch == \A i \in IssueIDs:
+    ~(i \in running /\ i \in DOMAIN retrying)
+
+\* INV2: Number of running issues never exceeds MaxConcurrent
+SlotBound == Cardinality(running) <= MaxConcurrent
+
+\* INV3: Every running issue is claimed
+ClaimedCoversRunning == running \subseteq claimed
+
+\* INV4: Every retrying issue is claimed
+ClaimedCoversRetrying == {i \in DOMAIN retrying : TRUE} \subseteq claimed
+
+\* INV5: No running issue has a terminal tracker state
+NoTerminalRunning == \A i \in running:
+    issueState[i] \notin TerminalStates
+
+\* INV6: Retry attempts are bounded
+RetryBound == \A i \in DOMAIN retrying:
+    retrying[i] <= MaxRetries
+
+\* INV7: Dependency rule -- no running todo issue has non-terminal deps
+DepRule == \A i \in running:
+    (issueState[i] = "Todo") =>
+        \A d \in Deps[i]: issueState[d] \in TerminalStates
+
+\* Combined safety invariant for TLC
+SafetyInvariant ==
+    /\ NoDoubleDispatch
+    /\ SlotBound
+    /\ ClaimedCoversRunning
+    /\ ClaimedCoversRetrying
+    /\ NoTerminalRunning
+    /\ RetryBound
+    /\ DepRule
+```
+
+### Liveness Properties (Temporal)
+
+```tla
+\* PROP1: Every eligible issue is eventually dispatched or completed
+\* (weak fairness on PollDispatch needed)
+EventualDispatch == \A i \in IssueIDs:
+    [](issueState[i] \in ActiveStates /\ i \notin claimed /\
+       \A d \in Deps[i]: issueState[d] \in TerminalStates)
+    ~> (i \in completed \/ i \in running)
+
+\* PROP2: No issue is stuck in retry forever
+NoRetryStarvation == \A i \in IssueIDs:
+    [](i \in DOMAIN retrying) ~> (i \notin DOMAIN retrying)
+```
+
+### Known Bug Discovery
+
+During design, I identified a likely bug in the Rust code at `orchestrator/mod.rs:496-501`:
+
+```rust
+// In on_worker_exit, Failed branch:
+let current_attempt = self.state.running.get(&exit.issue_id) // BUG: running.remove() already called at line 452
+    .and_then(|e| e.retry_attempt)
+    .unwrap_or(0);
+```
+
+The `running.remove(issue_id)` at line 452 executes before the match, so `self.state.running.get(&exit.issue_id)` will always return `None`, making `current_attempt` always `0`. This means every failure retry starts at attempt 1, never incrementing. The TLA+ model should capture the INTENDED behaviour (incrementing attempts) and separately verify the Rust code matches.
+
+## Module 2: Agent Supervisor TLA+ Design
+
+### State Variables
+
+```tla
+VARIABLES
+    children,        \* [AgentPids -> {"Running", "Failed", "Stopped"}]
+    restartLog,      \* Seq(Nat) -- sequence of step numbers when restarts occurred
+    step,            \* Nat -- monotonic step counter (discrete time)
+    escalated        \* BOOLEAN -- supervisor has escalated to parent
+```
+
+### Constants
+
+```tla
+CONSTANTS
+    AgentPids,       \* {"a1", "a2", "a3"}
+    MaxRestarts,     \* 2
+    TimeWindow,      \* 5 (discrete steps)
+    Strategy         \* "OneForOne" | "OneForAll" | "RestForOne"
+```
+
+### Actions (6 total, mapping to supervisor.rs handlers)
+
+| # | Action | Rust Source | Pre-conditions | Post-conditions |
+|---|--------|-------------|----------------|-----------------|
+| 1 | `AgentFails(a)` | `handle_agent_exit` | children[a] = "Running" | children[a]' = "Failed" |
+| 2 | `RestartOneForOne(a)` | `restart_agent` (OneForOne) | children[a] = "Failed", not escalated, intensity ok | children[a]' = "Running", log updated |
+| 3 | `RestartOneForAll` | `restart_all_agents` (OneForAll) | some child failed, not escalated, intensity ok | all children' = "Running", log updated |
+| 4 | `RestartFromAgent(a)` | `restart_from_agent` (RestForOne) | children[a] = "Failed", not escalated, intensity ok | a and later children' = "Running", log updated |
+| 5 | `Escalate` | intensity exceeded | recent restarts >= MaxRestarts | escalated' = TRUE, all children' = "Stopped" |
+| 6 | `Tick` | time passes | always | step' = step + 1 |
+
+### Invariants (Safety)
+
+```tla
+\* INV-S1: Restart intensity is never exceeded
+RestartIntensityBound ==
+    LET recent == SelectSeq(restartLog, LAMBDA t: step - t < TimeWindow)
+    IN Len(recent) <= MaxRestarts
+
+\* INV-S2: No restarts after escalation
+NoRestartAfterEscalation ==
+    escalated => \A a \in AgentPids: children[a] \in {"Stopped", "Failed"}
+```
+
+### Liveness
+
+```tla
+\* PROP-S1: Every failed agent is eventually restarted or supervisor escalates
+EventualRecoveryOrEscalation == \A a \in AgentPids:
+    [](children[a] = "Failed") ~> (children[a] = "Running" \/ escalated)
+```
+
+## Module 3: Messaging Delivery TLA+ Design
+
+### State Variables
+
+```tla
+VARIABLES
+    status,          \* [MessageIDs -> {"Pending", "InTransit", "Delivered", "Failed", "Acked"}]
+    attempts,        \* [MessageIDs -> 0..MaxRetries]
+    mailbox,         \* [AgentPids -> Seq(MessageIDs)]
+    registered,      \* [AgentPids -> BOOLEAN]
+    dedupSeen        \* SUBSET MessageIDs (for ExactlyOnce)
+```
+
+### Constants
+
+```tla
+CONSTANTS
+    MessageIDs,      \* {"m1", "m2", "m3"}
+    AgentPids,       \* {"a1", "a2"}
+    MaxRetries,      \* 3
+    MaxMailbox,      \* 5
+    Guarantee        \* "AtMostOnce" | "AtLeastOnce" | "ExactlyOnce"
+```
+
+### Actions (5 total, mapping to delivery.rs + router.rs)
+
+| # | Action | Rust Source | Pre-conditions | Post-conditions |
+|---|--------|-------------|----------------|-----------------|
+| 1 | `Send(m, dest)` | `route_message` | status[m] = "Pending", dest registered, mailbox not full | status[m]' = "InTransit", mailbox[dest] appended |
+| 2 | `Deliver(m, dest)` | `record_delivery` | status[m] = "InTransit", m in mailbox | status[m]' = "Delivered" (or skip if dedup) |
+| 3 | `DeliveryFails(m)` | timeout/network | status[m] = "InTransit" | status[m]' = "Failed" |
+| 4 | `RetryDelivery(m, dest)` | `get_retry_candidates` | status[m] = "Failed", not AtMostOnce, attempts < max | status[m]' = "InTransit", attempts incremented |
+| 5 | `RegisterAgent(a)` | `register_agent` | registered[a] = FALSE | registered[a]' = TRUE |
+
+### Invariants (Safety)
+
+```tla
+\* INV-M1: Mailbox never exceeds capacity
+MailboxBound == \A a \in AgentPids: Len(mailbox[a]) <= MaxMailbox
+
+\* INV-M2: Retry attempts are bounded
+MsgRetryBound == \A m \in MessageIDs: attempts[m] <= MaxRetries
+
+\* INV-M3: Delivery status never goes backwards
+NoBackwardTransition == \A m \in MessageIDs:
+    status[m] = "Delivered" => status'[m] \in {"Delivered", "Acked"}
+
+\* INV-M4: ExactlyOnce -- no message delivered to multiple agents
+ExactlyOnceNoDuplicates ==
+    Guarantee = "ExactlyOnce" =>
+        \A m \in MessageIDs:
+            Cardinality({a \in AgentPids : m \in Range(mailbox[a])}) <= 1
+```
+
+### Liveness
+
+```tla
+\* PROP-M1: Every sent message is eventually delivered or retry exhausted
+EventualDelivery ==
+    Guarantee # "AtMostOnce" =>
+        \A m \in MessageIDs:
+            [](status[m] = "Pending") ~>
+                (status[m] = "Delivered" \/ attempts[m] >= MaxRetries)
+```
+
+## File Changes
+
+### New Files (in terraphim/tlaplus-ts repo)
+
+| File | Purpose |
+|------|---------|
+| `specs/symphony/SymphonyOrchestrator.tla` | Symphony dispatch/retry/reconcile spec |
+| `specs/symphony/SymphonyOrchestrator.cfg` | TLC model config (constants, invariants) |
+| `specs/symphony/MC_SymphonyOrchestrator.tla` | Model-checking wrapper with concrete constants |
+| `specs/supervisor/AgentSupervisor.tla` | OTP-style supervisor restart spec |
+| `specs/supervisor/AgentSupervisor.cfg` | TLC model config |
+| `specs/supervisor/MC_AgentSupervisor.tla` | Model-checking wrapper |
+| `specs/messaging/MessagingDelivery.tla` | Delivery guarantee spec |
+| `specs/messaging/MessagingDelivery.cfg` | TLC model config |
+| `specs/messaging/MC_MessagingDelivery.tla` | Model-checking wrapper |
+| `test/symphony/tlc-safety.test.ts` | vitest: Symphony safety invariants |
+| `test/symphony/tlc-liveness.test.ts` | vitest: Symphony liveness properties |
+| `test/supervisor/tlc-safety.test.ts` | vitest: Supervisor safety invariants |
+| `test/messaging/tlc-safety.test.ts` | vitest: Messaging safety invariants |
+| `test/messaging/tlc-liveness.test.ts` | vitest: Messaging liveness properties |
+| `specs/README.md` | Spec documentation and property catalogue |
+
+### Modified Files (in terraphim/tlaplus-ts repo)
+
+| File | Changes |
+|------|---------|
+| `package.json` | Add `test:specs`, `test:symphony`, `test:supervisor`, `test:messaging` scripts |
+
+### No Deleted Files
+
+## Test Strategy
+
+### TLC Model Checking Tests
+
+**Module 1 -- Symphony:**
+
+| Test | File | Properties Checked |
+|------|------|--------------------|
+| `safety with 3 issues 2 agents` | `test/symphony/tlc-safety.test.ts` | All 7 safety invariants |
+| `safety with 2 issues 1 agent` | `test/symphony/tlc-safety.test.ts` | Same invariants (smoke test) |
+| `liveness with 3 issues 2 agents` | `test/symphony/tlc-liveness.test.ts` | EventualDispatch, NoRetryStarvation |
+| `dependency cascade 3 issues` | `test/symphony/tlc-safety.test.ts` | DepRule with i3 blocked by i1 and i2 |
+
+**Module 2 -- Supervisor:**
+
+| Test | File | Properties Checked |
+|------|------|--------------------|
+| `OneForOne restart intensity` | `test/supervisor/tlc-safety.test.ts` | RestartIntensityBound, NoRestartAfterEscalation |
+| `OneForAll restart storm` | `test/supervisor/tlc-safety.test.ts` | RestartIntensityBound (3 children, all restart) |
+| `RestForOne cascading restart` | `test/supervisor/tlc-safety.test.ts` | RestartIntensityBound, correct subset restarted |
+
+**Module 3 -- Messaging:**
+
+| Test | File | Properties Checked |
+|------|------|--------------------|
+| `AtLeastOnce delivery with retries` | `test/messaging/tlc-safety.test.ts` | MailboxBound, MsgRetryBound |
+| `ExactlyOnce deduplication` | `test/messaging/tlc-safety.test.ts` | ExactlyOnceNoDuplicates |
+| `eventual delivery under AtLeastOnce` | `test/messaging/tlc-liveness.test.ts` | EventualDelivery |
+
+### Test Configuration
+
+```typescript
+// tlc-safety.test.ts
+import { TLCBridge } from '../src/bridge/index.js';
+
+describe('Symphony Orchestrator Safety', () => {
+  it('verifies safety invariants with 3 issues 2 agents', async () => {
+    const bridge = new TLCBridge();
+    const result = await bridge.check(
+      'specs/symphony/SymphonyOrchestrator.tla',
+      'specs/symphony/SymphonyOrchestrator.cfg',
+      { workers: 4, deadlockDetection: true }
+    );
+    expect(result.outcome).toBe('no_error');
+    expect(result.violations).toHaveLength(0);
+  }, 300_000); // 5 minute timeout for TLC
+});
+```
+
+### Expected TLC Output
+
+For a passing model: `Model checking completed. No error has been found.`
+For an invariant violation: counterexample trace showing the sequence of actions leading to violation.
+
+## Implementation Steps
+
+### Step 1: Verify tlaplus-ts Toolchain (Spike)
+**Files:** None (verification only)
+**Description:** Clone `terraphim/tlaplus-ts` on bigbox, run `bun install && bun test`, confirm TLCBridge works with a trivial spec.
+**Tests:** Existing tlaplus-ts test suite passes
+**Estimated:** 1 hour
+
+### Step 2: Core Spec -- Dispatch + Complete + Claim (Phase 1)
+**Files:** `specs/symphony/SymphonyOrchestrator.tla`, `specs/symphony/SymphonyOrchestrator.cfg`
+**Description:** Write the TLA+ spec with 3 actions: `PollDispatch`, `WorkerCompleteOK`, `TrackerStateChange`. Define `NoDoubleDispatch`, `SlotBound`, `ClaimedCoversRunning` invariants. No retry or reconciliation yet.
+**Tests:** Manual TLC run via CLI: `tlaplus check specs/symphony/SymphonyOrchestrator.tla --config specs/symphony/SymphonyOrchestrator.cfg`
+**Dependencies:** Step 1
+**Estimated:** 3 hours
+
+Key TLA+ code:
+```tla
+Init ==
+    /\ issueState = [i \in IssueIDs |-> "Todo"]
+    /\ running = {}
+    /\ claimed = {}
+    /\ completed = {}
+    /\ retrying = <<>>  \* empty function
+    /\ shutdownFlag = FALSE
+
+PollDispatch(i) ==
+    /\ ~shutdownFlag
+    /\ i \notin claimed
+    /\ issueState[i] \in ActiveStates
+    /\ issueState[i] \notin TerminalStates
+    /\ Cardinality(running) < MaxConcurrent
+    /\ (issueState[i] = "Todo" =>
+        \A d \in Deps[i]: issueState[d] \in TerminalStates)
+    /\ running' = running \cup {i}
+    /\ claimed' = claimed \cup {i}
+    /\ UNCHANGED <<issueState, retrying, completed, shutdownFlag>>
+```
+
+### Step 3: Add Retry + Failure (Phase 2)
+**Files:** `specs/symphony/SymphonyOrchestrator.tla` (extend)
+**Description:** Add `WorkerFail`, `RetryFire`, `RetryGiveUp` actions. Add `RetryBound`, `ClaimedCoversRetrying` invariants. Model continuation retry on Normal completion.
+**Tests:** TLC run with retry-specific scenarios
+**Dependencies:** Step 2
+**Estimated:** 3 hours
+
+Key addition:
+```tla
+WorkerFail(i) ==
+    /\ i \in running
+    /\ running' = running \ {i}
+    /\ LET attempt == IF i \in DOMAIN retrying THEN retrying[i] + 1 ELSE 1
+       IN retrying' = [j \in (DOMAIN retrying \cup {i}) |->
+                         IF j = i THEN attempt ELSE retrying[j]]
+    /\ UNCHANGED <<issueState, claimed, completed, shutdownFlag>>
+```
+
+### Step 4: Add Reconciliation + Shutdown (Phase 2 continued)
+**Files:** `specs/symphony/SymphonyOrchestrator.tla` (extend)
+**Description:** Add `ReconcileTerminal`, `ReconcileStall`, `Shutdown` actions. Add `NoTerminalRunning` invariant.
+**Tests:** TLC run including reconciliation paths
+**Dependencies:** Step 3
+**Estimated:** 2 hours
+
+### Step 5: Add Dependency Blocking (Phase 3)
+**Files:** `specs/symphony/SymphonyOrchestrator.tla` (extend), `specs/symphony/MC_SymphonyOrchestrator.tla`
+**Description:** Wire up `Deps` constant. Add `DepRule` invariant. Create MC wrapper with concrete dependency graph: i3 depends on {i1, i2}.
+**Tests:** TLC with dependency scenario; verify i3 cannot dispatch until i1 and i2 are Done
+**Dependencies:** Step 4
+**Estimated:** 2 hours
+
+### Step 6: Add Liveness Properties (Phase 4)
+**Files:** `specs/symphony/SymphonyOrchestrator.tla` (extend), `specs/symphony/SymphonyOrchestrator.cfg` (add PROPERTIES)
+**Description:** Add `EventualDispatch` and `NoRetryStarvation` temporal properties. Add weak fairness constraints on `PollDispatch` and `RetryFire`.
+**Tests:** TLC liveness check (may need `-lncheck` flag)
+**Dependencies:** Step 5
+**Estimated:** 3 hours
+
+### Step 7: TypeScript Test Harness
+**Files:** `test/symphony/tlc-safety.test.ts`, `test/symphony/tlc-liveness.test.ts`, `package.json`
+**Description:** Write vitest tests that invoke TLCBridge. Assert `result.outcome === 'no_error'` and `result.violations.length === 0`.
+**Tests:** `bun test test/symphony/`
+**Dependencies:** Step 6
+**Estimated:** 2 hours
+
+### Step 8: Supervisor Spec -- OneForOne + Intensity (Module 2, Phase 2a)
+**Files:** `specs/supervisor/AgentSupervisor.tla`, `specs/supervisor/AgentSupervisor.cfg`
+**Description:** Write the TLA+ spec with `AgentFails`, `RestartOneForOne`, `Escalate`, `Tick` actions. Define `RestartIntensityBound` and `NoRestartAfterEscalation` invariants. Constants: Strategy = "OneForOne".
+**Tests:** TLC run via CLI with 3 agents, 2 max restarts, time window 5
+**Dependencies:** Step 1
+**Estimated:** 3 hours
+
+Key TLA+ code:
+```tla
+Init ==
+    /\ children = [a \in AgentPids |-> "Running"]
+    /\ restartLog = <<>>
+    /\ step = 0
+    /\ escalated = FALSE
+
+RestartOneForOne(a) ==
+    /\ Strategy = "OneForOne"
+    /\ children[a] = "Failed"
+    /\ ~escalated
+    /\ LET recent == SelectSeq(restartLog, LAMBDA t: step - t < TimeWindow)
+       IN Len(recent) < MaxRestarts
+    /\ children' = [children EXCEPT ![a] = "Running"]
+    /\ restartLog' = Append(restartLog, step)
+    /\ UNCHANGED <<step, escalated>>
+```
+
+### Step 9: Supervisor Spec -- OneForAll + RestForOne (Module 2, Phase 2b)
+**Files:** `specs/supervisor/AgentSupervisor.tla` (extend)
+**Description:** Add `RestartOneForAll` and `RestartFromAgent` actions. Create MC wrappers for each strategy variant.
+**Tests:** TLC with Strategy = "OneForAll" and Strategy = "RestForOne"
+**Dependencies:** Step 8
+**Estimated:** 2 hours
+
+### Step 10: Supervisor Test Harness
+**Files:** `test/supervisor/tlc-safety.test.ts`, `specs/supervisor/MC_AgentSupervisor.tla`
+**Description:** Write vitest tests for all three strategy variants. Each test instantiates MC wrapper with appropriate Strategy constant.
+**Tests:** `bun test test/supervisor/`
+**Dependencies:** Step 9
+**Estimated:** 2 hours
+
+### Step 11: Messaging Spec -- Delivery + Retry (Module 3, Phase 3a)
+**Files:** `specs/messaging/MessagingDelivery.tla`, `specs/messaging/MessagingDelivery.cfg`
+**Description:** Write the TLA+ spec with `Send`, `Deliver`, `DeliveryFails`, `RetryDelivery`, `RegisterAgent` actions. Define `MailboxBound` and `MsgRetryBound` invariants. Test with Guarantee = "AtLeastOnce".
+**Tests:** TLC run with 3 messages, 2 agents, max mailbox 5
+**Dependencies:** Step 1
+**Estimated:** 3 hours
+
+Key TLA+ code:
+```tla
+Init ==
+    /\ status = [m \in MessageIDs |-> "Pending"]
+    /\ attempts = [m \in MessageIDs |-> 0]
+    /\ mailbox = [a \in AgentPids |-> <<>>]
+    /\ registered = [a \in AgentPids |-> TRUE]
+    /\ dedupSeen = {}
+
+Send(m, dest) ==
+    /\ status[m] = "Pending"
+    /\ registered[dest]
+    /\ Len(mailbox[dest]) < MaxMailbox
+    /\ status' = [status EXCEPT ![m] = "InTransit"]
+    /\ mailbox' = [mailbox EXCEPT ![dest] = Append(@, m)]
+    /\ UNCHANGED <<attempts, registered, dedupSeen>>
+```
+
+### Step 12: Messaging Spec -- ExactlyOnce Dedup (Module 3, Phase 3b)
+**Files:** `specs/messaging/MessagingDelivery.tla` (extend)
+**Description:** Add ExactlyOnce deduplication logic to `Deliver` action. Add `ExactlyOnceNoDuplicates` invariant.
+**Tests:** TLC with Guarantee = "ExactlyOnce"
+**Dependencies:** Step 11
+**Estimated:** 2 hours
+
+### Step 13: Messaging Liveness + Test Harness (Module 3, Phase 3c)
+**Files:** `specs/messaging/MessagingDelivery.tla` (extend), `test/messaging/tlc-safety.test.ts`, `test/messaging/tlc-liveness.test.ts`
+**Description:** Add `EventualDelivery` liveness property with weak fairness on `Send` and `RetryDelivery`. Write vitest tests for all guarantee modes.
+**Tests:** `bun test test/messaging/`
+**Dependencies:** Step 12
+**Estimated:** 3 hours
+
+### Step 14: Documentation
+**Files:** `specs/README.md`
+**Description:** Document all three modules: spec structure, property catalogue, how to run, how to extend, bounded model parameters, and the known bug discovery.
+**Dependencies:** Steps 7, 10, 13
+**Estimated:** 1 hour
+
+## TLC Configuration
+
+### Safety Config (`SymphonyOrchestrator.cfg`)
+```
+CONSTANTS
+    IssueIDs = {i1, i2, i3}
+    MaxConcurrent = 2
+    MaxRetries = 3
+    ActiveStates = {"Todo"}
+    TerminalStates = {"Done", "Closed"}
+    Deps = (i1 :> {} @@ i2 :> {} @@ i3 :> {i1, i2})
+
+INIT Init
+NEXT Next
+
+INVARIANTS
+    SafetyInvariant
+
+CHECK_DEADLOCK TRUE
+```
+
+### Liveness Config (additional)
+```
+PROPERTIES
+    EventualDispatch
+    NoRetryStarvation
+
+\* Fairness: all dispatch and retry actions are weakly fair
+CONSTRAINT
+    Cardinality(completed) <= Cardinality(IssueIDs)
+```
+
+### Supervisor Safety Config (`AgentSupervisor.cfg`)
+```
+CONSTANTS
+    AgentPids = {a1, a2, a3}
+    MaxRestarts = 2
+    TimeWindow = 5
+    Strategy = "OneForOne"
+
+INIT Init
+NEXT Next
+
+INVARIANTS
+    RestartIntensityBound
+    NoRestartAfterEscalation
+
+CHECK_DEADLOCK FALSE
+```
+
+Note: Three .cfg variants needed (one per strategy). MC wrapper parameterises Strategy.
+
+### Messaging Safety Config (`MessagingDelivery.cfg`)
+```
+CONSTANTS
+    MessageIDs = {m1, m2, m3}
+    AgentPids = {a1, a2}
+    MaxRetries = 3
+    MaxMailbox = 5
+    Guarantee = "AtLeastOnce"
+
+INIT Init
+NEXT Next
+
+INVARIANTS
+    MailboxBound
+    MsgRetryBound
+
+CHECK_DEADLOCK FALSE
+```
+
+### Messaging ExactlyOnce Config (variant)
+```
+CONSTANTS
+    Guarantee = "ExactlyOnce"
+
+INVARIANTS
+    ExactlyOnceNoDuplicates
+```
+
+## Dependencies
+
+### New Dependencies
+| Package | Version | Justification |
+|---------|---------|---------------|
+| None | -- | tlaplus-ts already has TLCBridge, vitest, tree-sitter |
+
+### External Requirements
+| Tool | Version | Location |
+|------|---------|----------|
+| JDK | 11+ | bigbox: pre-installed |
+| TLC | 1.8.0+ | Downloaded by TLCBridge or manual install |
+
+## Performance Considerations
+
+### Expected TLC Performance
+
+**Module 1 -- Symphony:**
+| Model | Issues | Agents | Max Retries | Est. States | Est. Time |
+|-------|--------|--------|-------------|-------------|-----------|
+| Smoke | 2 | 1 | 2 | ~10^4 | < 10s |
+| Standard | 3 | 2 | 3 | ~10^6 | < 2 min |
+| Extended | 4 | 3 | 3 | ~10^8 | < 30 min |
+
+**Module 2 -- Supervisor:**
+| Model | Children | MaxRestarts | TimeWindow | Strategy | Est. States | Est. Time |
+|-------|----------|-------------|------------|----------|-------------|-----------|
+| Smoke | 2 | 1 | 3 | OneForOne | ~10^3 | < 5s |
+| Standard | 3 | 2 | 5 | all three | ~10^5 | < 30s |
+
+**Module 3 -- Messaging:**
+| Model | Messages | Agents | MaxRetries | MaxMailbox | Guarantee | Est. States | Est. Time |
+|-------|----------|--------|------------|------------|-----------|-------------|-----------|
+| Smoke | 2 | 2 | 2 | 3 | AtLeastOnce | ~10^4 | < 10s |
+| Standard | 3 | 2 | 3 | 5 | all three | ~10^6 | < 2 min |
+
+### Mitigation for State Explosion
+- Start with smoke model per module, graduate to standard
+- Use symmetry sets if TLC supports it for IssueIDs/AgentPids/MessageIDs
+- Constrain `completed` cardinality as state-space bound (Symphony)
+- Constrain `step` upper bound (Supervisor, e.g. step <= 20)
+- Run modules independently; cross-layer composition only if individual modules pass quickly
+
+## Rollback Plan
+
+All changes are in the separate `terraphim/tlaplus-ts` repository. No changes to Symphony Rust code. If verification reveals bugs in the Rust code, those are filed as Gitea issues against `terraphim/terraphim-ai`.
+
+## Open Items
+
+| Item | Status | Owner |
+|------|--------|-------|
+| Verify tlaplus-ts clone works on bigbox | Pending | Step 1 |
+| Confirm TLCBridge handles liveness output | Pending | Steps 6, 13 |
+| File Gitea issue for retry attempt bug (mod.rs:496-501) | Pending | After Step 3 |
+| Verify TLC supports SelectSeq for restart log filtering | Pending | Step 8 |
+| Confirm bounded mailbox semantics match Rust `mpsc::UnboundedSender` + manual check | Pending | Step 11 |
+
+## Approval
+
+- [ ] Research document approved (v2 -- ADF scope)
+- [ ] Implementation plan reviewed (v2 -- 3 modules)
+- [ ] File structure agreed (specs/symphony, specs/supervisor, specs/messaging)
+- [ ] Safety invariants catalogue complete (13 total: 7 + 2 + 4)
+- [ ] Liveness properties catalogue complete (4 total: 2 + 1 + 1)
+- [ ] Module boundaries agreed (independent, optional composition)
+- [ ] Human approval received

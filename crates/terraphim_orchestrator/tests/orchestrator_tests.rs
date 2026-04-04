@@ -34,6 +34,7 @@ fn test_config() -> OrchestratorConfig {
             worktree_root: PathBuf::from("/tmp/test-orchestrator/.worktrees"),
             base_branch: "main".to_string(),
             max_concurrent_agents: 3,
+            ..Default::default()
         },
         workflow: None,
         agents: vec![
@@ -109,6 +110,7 @@ fn test_config() -> OrchestratorConfig {
         ],
         restart_cooldown_secs: 60,
         max_restart_count: 10,
+        disk_usage_threshold: 100, // disable disk guard in tests
         tick_interval_secs: 30,
         handoff_buffer_ttl_secs: None,
         persona_data_dir: None,
@@ -117,6 +119,7 @@ fn test_config() -> OrchestratorConfig {
         flow_state_dir: None,
         gitea: None,
         mentions: None,
+        role_config_path: None,
     }
 }
 
@@ -292,13 +295,17 @@ fn test_example_config_creates_orchestrator() {
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("orchestrator.example.toml");
     let config = OrchestratorConfig::from_file(&example_path).unwrap();
 
-    assert_eq!(config.agents.len(), 3);
+    assert_eq!(config.agents.len(), 14);
     assert_eq!(config.agents[0].layer, AgentLayer::Safety);
-    assert_eq!(config.agents[1].layer, AgentLayer::Core);
-    assert_eq!(config.agents[2].layer, AgentLayer::Growth);
+    assert_eq!(config.agents[1].layer, AgentLayer::Safety);
+    assert_eq!(config.agents[2].layer, AgentLayer::Core);
 
     let orch = AgentOrchestrator::new(config);
-    assert!(orch.is_ok());
+    assert!(
+        orch.is_ok(),
+        "Orchestrator creation failed: {:?}",
+        orch.err()
+    );
 }
 
 /// Integration test: error variants produce correct error messages.

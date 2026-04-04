@@ -82,4 +82,28 @@ impl OutputPoster {
             }
         }
     }
+
+    /// Post raw markdown as a comment on the given Gitea issue.
+    pub async fn post_raw(&self, issue_number: u64, body: &str) -> Result<(), String> {
+        match self.tracker.post_comment(issue_number, body).await {
+            Ok(comment) => {
+                tracing::info!(
+                    issue = issue_number,
+                    comment_id = comment.id,
+                    "posted raw comment to Gitea"
+                );
+                Ok(())
+            }
+            Err(e) => {
+                let msg = format!("failed to post comment to issue {}: {}", issue_number, e);
+                tracing::error!("{}", msg);
+                Err(msg)
+            }
+        }
+    }
+
+    /// Get a reference to the underlying GiteaTracker.
+    pub fn tracker(&self) -> &terraphim_tracker::GiteaTracker {
+        &self.tracker
+    }
 }

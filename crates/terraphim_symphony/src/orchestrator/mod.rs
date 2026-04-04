@@ -129,7 +129,7 @@ impl SymphonyOrchestrator {
 
     /// Get a snapshot of the current state.
     pub fn snapshot(&self) -> StateSnapshot {
-        self.state.snapshot()
+        self.state.snapshot(Utc::now())
     }
 
     /// Handle a poll tick.
@@ -669,7 +669,7 @@ impl SymphonyOrchestrator {
     async fn reconcile(&mut self) {
         // Part A: Stall detection
         let stall_timeout = self.config.codex_stall_timeout_ms();
-        let stalled = reconcile::find_stalled_issues(&self.state, stall_timeout);
+        let stalled = reconcile::find_stalled_issues(&self.state, stall_timeout, Utc::now());
         for issue_id in stalled {
             if let Some(entry) = self.state.running.remove(&issue_id) {
                 warn!(
