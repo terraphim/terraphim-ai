@@ -18,7 +18,8 @@ terraphim_rolegraph = { path = "../terraphim_rolegraph", version = "1.0.0" }
 terraphim_automata = { path = "../terraphim_automata", version = "1.0.0", features = ["tokio-runtime"] }
 terraphim_types = { path = "../terraphim_types", version = "1.0.0" }
 terraphim_persistence = { path = "../terraphim_persistence", version = "1.0.0" }
-haystack_jmap = { path = "../haystack_jmap", version = "1.0.0" }
+# NOTE: haystack_jmap not published to crates.io yet
+# haystack_jmap = { path = "../haystack_jmap", version = "1.0.0", optional = true }
 # NOTE: Atomic Data Server commented out for crates.io publishing (not published yet)
 # terraphim_atomic_client = { path = "../terraphim_atomic_client", version = "1.0.0", features = ["native"], optional = true }
 grepapp_haystack = { path = "../haystack_grepapp", version = "1.0.0", optional = true }
@@ -65,6 +66,8 @@ default = []
 # atomic = ["dep:terraphim_atomic_client"]
 atomic = []
 grepapp = ["dep:grepapp_haystack"]
+# NOTE: jmap feature disabled - haystack_jmap not published to crates.io yet
+jmap = []
 # Enable AI coding assistant session haystack (Claude Code, OpenCode, Cursor, Aider, Codex)
 ai-assistant = ["terraphim-session-analyzer", "jiff", "home"]
 # Enable openrouter integration
