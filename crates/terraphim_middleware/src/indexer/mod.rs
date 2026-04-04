@@ -9,9 +9,11 @@ mod ripgrep;
 use crate::haystack::AiAssistantHaystackIndexer;
 #[cfg(feature = "grepapp")]
 use crate::haystack::GrepAppHaystackIndexer;
+#[cfg(feature = "jmap")]
+use crate::haystack::JmapHaystackIndexer;
 use crate::haystack::{
-    ClickUpHaystackIndexer, JmapHaystackIndexer, McpHaystackIndexer, PerplexityHaystackIndexer,
-    QueryRsHaystackIndexer, QuickwitHaystackIndexer,
+    ClickUpHaystackIndexer, McpHaystackIndexer, PerplexityHaystackIndexer, QueryRsHaystackIndexer,
+    QuickwitHaystackIndexer,
 };
 pub use ripgrep::RipgrepIndexer;
 
@@ -132,9 +134,20 @@ pub async fn search_haystacks(
                 quickwit.index(needle, haystack).await?
             }
             ServiceType::Jmap => {
-                // Search emails via JMAP protocol
-                let jmap = JmapHaystackIndexer;
-                jmap.index(needle, haystack).await?
+                #[cfg(feature = "jmap")]
+                {
+                    // Search emails via JMAP protocol
+                    let jmap = JmapHaystackIndexer;
+                    jmap.index(needle, haystack).await?
+                }
+                #[cfg(not(feature = "jmap"))]
+                {
+                    log::warn!(
+                        "JMAP haystack support not enabled. Skipping haystack: {}",
+                        haystack.location
+                    );
+                    Index::new()
+                }
             }
         };
 

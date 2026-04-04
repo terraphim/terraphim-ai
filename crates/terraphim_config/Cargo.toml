@@ -1,6 +1,6 @@
 [package]
 name = "terraphim_config"
-version = "1.4.10"
+version = "1.15.0"
 edition.workspace = true
 authors = ["Terraphim Contributors"]
 description = "Terraphim configuration"
