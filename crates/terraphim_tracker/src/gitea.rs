@@ -367,21 +367,41 @@ impl GiteaTracker {
             });
         }
 
-        // Parse response and extract issue numbers from issue_url
-        let raw_comments: Vec<RepoComment> = response.json().await.map_err(TrackerError::Http)?;
+        // Parse response with diagnostic logging on failure
+        let text = response.text().await.map_err(TrackerError::Http)?;
+        let raw_comments: Vec<RepoComment> = match serde_json::from_str(&text) {
+            Ok(c) => c,
+            Err(e) => {
+                tracing::warn!(
+                    error = %e,
+                    body_preview = &text[..text.len().min(200)],
+                    "failed to deserialise repo comments"
+                );
+                return Err(TrackerError::Api {
+                    message: format!("repo comments deserialisation failed: {e}"),
+                });
+            }
+        };
         Ok(raw_comments.into_iter().map(|rc| rc.into()).collect())
     }
 }
 
 /// Raw comment from repo-wide API (includes issue_url instead of issue number).
+///
+/// Fields use `Option<String>` because Gitea may return `null` for system
+/// comments (missing `issue_url`), deleted comments (null `body`), etc.
 #[derive(Debug, Clone, serde::Deserialize)]
 struct RepoComment {
     id: u64,
-    issue_url: String,
+    #[serde(default)]
+    issue_url: Option<String>,
     user: CommentUser,
-    body: String,
-    created_at: String,
-    updated_at: String,
+    #[serde(default)]
+    body: Option<String>,
+    #[serde(default)]
+    created_at: Option<String>,
+    #[serde(default)]
+    updated_at: Option<String>,
 }
 
 impl From<RepoComment> for IssueComment {
@@ -389,6 +409,8 @@ impl From<RepoComment> for IssueComment {
         // Extract issue number from issue_url like "/api/v1/repos/owner/repo/issues/123"
         let issue_number = rc
             .issue_url
+            .as_deref()
+            .unwrap_or("")
             .rsplit('/')
             .next()
             .and_then(|s| s.parse().ok())
@@ -397,10 +419,10 @@ impl From<RepoComment> for IssueComment {
         IssueComment {
             id: rc.id,
             issue_number,
-            body: rc.body,
+            body: rc.body.unwrap_or_default(),
             user: rc.user,
-            created_at: rc.created_at,
-            updated_at: rc.updated_at,
+            created_at: rc.created_at.unwrap_or_default(),
+            updated_at: rc.updated_at.unwrap_or_default(),
         }
     }
 }
@@ -616,6 +638,82 @@ mod tests {
         let tracker = make_tracker(&mock_server.uri());
         let result = tracker.fetch_comments(404, None).await;
         assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_fetch_repo_comments() {
+        let mock_server = MockServer::start().await;
+        let comments_json = serde_json::json!([
+            {
+                "id": 100,
+                "issue_url": "https://example.com/api/v1/repos/testowner/testrepo/issues/5",
+                "body": "Hello @adf:security-sentinel",
+                "user": {"login": "root"},
+                "created_at": "2026-04-04T10:00:00Z",
+                "updated_at": "2026-04-04T10:00:00Z"
+            },
+            {
+                "id": 101,
+                "issue_url": "https://example.com/api/v1/repos/testowner/testrepo/issues/7",
+                "body": null,
+                "user": {"login": "system"},
+                "created_at": "2026-04-04T11:00:00Z",
+                "updated_at": "2026-04-04T11:00:00Z"
+            }
+        ]);
+        Mock::given(method("GET"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/comments"))
+            .and(query_param("since", "2026-04-04T00:00:00Z"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&comments_json))
+            .mount(&mock_server)
+            .await;
+
+        let tracker = make_tracker(&mock_server.uri());
+        let result = tracker
+            .fetch_repo_comments(Some("2026-04-04T00:00:00Z"), Some(50))
+            .await;
+        assert!(
+            result.is_ok(),
+            "fetch_repo_comments failed: {:?}",
+            result.err()
+        );
+        let comments = result.unwrap();
+        assert_eq!(comments.len(), 2);
+        assert_eq!(comments[0].issue_number, 5);
+        assert_eq!(comments[1].issue_number, 7);
+        assert!(comments[0].body.contains("@adf:security-sentinel"));
+        assert_eq!(comments[1].body, ""); // null body defaults to empty
+    }
+
+    #[tokio::test]
+    async fn test_fetch_repo_comments_missing_fields() {
+        let mock_server = MockServer::start().await;
+        // Simulate comments with missing optional fields
+        let comments_json = serde_json::json!([
+            {
+                "id": 200,
+                "user": {"login": "bot"},
+                "created_at": "2026-04-04T12:00:00Z",
+                "updated_at": "2026-04-04T12:00:00Z"
+            }
+        ]);
+        Mock::given(method("GET"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/comments"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&comments_json))
+            .mount(&mock_server)
+            .await;
+
+        let tracker = make_tracker(&mock_server.uri());
+        let result = tracker.fetch_repo_comments(None, None).await;
+        assert!(
+            result.is_ok(),
+            "should handle missing issue_url and body: {:?}",
+            result.err()
+        );
+        let comments = result.unwrap();
+        assert_eq!(comments.len(), 1);
+        assert_eq!(comments[0].issue_number, 0); // no issue_url -> default 0
+        assert_eq!(comments[0].body, ""); // missing body -> default empty
     }
 
     #[tokio::test]
