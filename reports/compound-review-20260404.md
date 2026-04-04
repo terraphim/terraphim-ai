@@ -41,15 +41,15 @@ Findings
 Verdict: GO
 - Rationale: Architectural direction remains coherent with ADRs; no critical regressions observed in the high-signal PRs. ADRs provide sufficient guardrails for layering, dependencies, CLI, feature gating, and bootstrap concerns. The changes appear to be incremental and aligned with the project’s governance model.
 - Caveats: Some PRs mention gated behavior without visible test updates in the summary; ensure CI runs cover gated paths and update tests/docs as needed. If any PR touches startup paths, validate startup-time invariants and error handling.
-- Merge Gate: Per instruction, if GO and PR context is present, trigger the merge gate by tagging in the comment below.
+- Merge Gate: GO. Trigger the merge gate as PR context is present and the gate requires coordination for PR merges.
 
 Actionable Next Steps
 - Run UBS on changed crates to surface potential issues (if not already run in CI).
 - Ensure tests cover gated/feature-flag scenarios (ADR-004) and document results.
 - If any critical issues are found in UBS, revert or patch promptly with follow-up PRs.
-"""
-Note: This document is a companion to the PR review process and may be updated as CI and UBS results accrue.
-"""
+
+Notes
+- This document complements the PR review process and may be updated as CI and UBS results accrue.
 
 Appendix
 - ADR references: ADR-001, ADR-002, ADR-003, ADR-004, ADR-005
