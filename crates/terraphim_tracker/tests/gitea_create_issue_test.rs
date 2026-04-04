@@ -17,11 +17,14 @@ async fn test_create_issue_with_labels() {
     let repo = env::var("GITEA_REPO").unwrap_or_else(|_| "test-repo".to_string());
 
     let client = reqwest::Client::new();
-    
+
     // Test 1: Empty labels array
     println!("Test 1: Empty labels array");
     let resp = client
-        .post(format!("{}/api/v1/repos/{}/{}/issues", base_url, owner, repo))
+        .post(format!(
+            "{}/api/v1/repos/{}/{}/issues",
+            base_url, owner, repo
+        ))
         .header("Authorization", format!("token {}", token))
         .header("Content-Type", "application/json")
         .json(&serde_json::json!({
@@ -32,16 +35,19 @@ async fn test_create_issue_with_labels() {
         .send()
         .await
         .expect("Failed to send request");
-    
+
     let status = resp.status();
     let body = resp.text().await.unwrap_or_default();
     println!("  Status: {}", status);
     println!("  Body: {}", body);
-    
+
     // Test 2: String labels array
     println!("\nTest 2: String labels array");
     let resp = client
-        .post(format!("{}/api/v1/repos/{}/{}/issues", base_url, owner, repo))
+        .post(format!(
+            "{}/api/v1/repos/{}/{}/issues",
+            base_url, owner, repo
+        ))
         .header("Authorization", format!("token {}", token))
         .header("Content-Type", "application/json")
         .json(&serde_json::json!({
@@ -52,16 +58,19 @@ async fn test_create_issue_with_labels() {
         .send()
         .await
         .expect("Failed to send request");
-    
+
     let status = resp.status();
     let body = resp.text().await.unwrap_or_default();
     println!("  Status: {}", status);
     println!("  Body: {}", body);
-    
+
     // Test 3: No labels field
     println!("\nTest 3: No labels field");
     let resp = client
-        .post(format!("{}/api/v1/repos/{}/{}/issues", base_url, owner, repo))
+        .post(format!(
+            "{}/api/v1/repos/{}/{}/issues",
+            base_url, owner, repo
+        ))
         .header("Authorization", format!("token {}", token))
         .header("Content-Type", "application/json")
         .json(&serde_json::json!({
@@ -71,16 +80,19 @@ async fn test_create_issue_with_labels() {
         .send()
         .await
         .expect("Failed to send request");
-    
+
     let status = resp.status();
     let body = resp.text().await.unwrap_or_default();
     println!("  Status: {}", status);
     println!("  Body: {}", body);
-    
+
     // Test 4: Integer labels (to see error)
     println!("\nTest 4: Integer labels (expected to fail)");
     let resp = client
-        .post(format!("{}/api/v1/repos/{}/{}/issues", base_url, owner, repo))
+        .post(format!(
+            "{}/api/v1/repos/{}/{}/issues",
+            base_url, owner, repo
+        ))
         .header("Authorization", format!("token {}", token))
         .header("Content-Type", "application/json")
         .json(&serde_json::json!({
@@ -91,7 +103,7 @@ async fn test_create_issue_with_labels() {
         .send()
         .await
         .expect("Failed to send request");
-    
+
     let status = resp.status();
     let body = resp.text().await.unwrap_or_default();
     println!("  Status: {}", status);
@@ -103,7 +115,7 @@ async fn test_create_issue_with_labels() {
 #[ignore = "requires live Gitea instance"]
 async fn test_tracker_create_issue() {
     use terraphim_tracker::gitea::{GiteaConfig, GiteaTracker};
-    
+
     let base_url = env::var("GITEA_URL").expect("GITEA_URL not set");
     let token = env::var("GITEA_TOKEN").expect("GITEA_TOKEN not set");
     let owner = env::var("GITEA_OWNER").unwrap_or_else(|_| "terraphim".to_string());
@@ -120,30 +132,40 @@ async fn test_tracker_create_issue() {
     };
 
     let tracker = GiteaTracker::new(config).expect("Failed to create tracker");
-    
+
     // Test with string labels
     println!("Testing create_issue with string labels...");
-    let result = tracker.create_issue(
-        "Test from tracker - string labels",
-        "This is a test issue created by GiteaTracker",
-        &["test", "automation"],
-    ).await;
-    
+    let result = tracker
+        .create_issue(
+            "Test from tracker - string labels",
+            "This is a test issue created by GiteaTracker",
+            &["test", "automation"],
+        )
+        .await;
+
     match result {
-        Ok(issue) => println!("✅ Success! Created issue #{}: {}", issue.number, issue.title),
+        Ok(issue) => println!(
+            "✅ Success! Created issue #{}: {}",
+            issue.number, issue.title
+        ),
         Err(e) => println!("❌ Failed: {}", e),
     }
-    
+
     // Test with empty labels
     println!("\nTesting create_issue with empty labels...");
-    let result = tracker.create_issue(
-        "Test from tracker - empty labels",
-        "This is a test issue with no labels",
-        &[],
-    ).await;
-    
+    let result = tracker
+        .create_issue(
+            "Test from tracker - empty labels",
+            "This is a test issue with no labels",
+            &[],
+        )
+        .await;
+
     match result {
-        Ok(issue) => println!("✅ Success! Created issue #{}: {}", issue.number, issue.title),
+        Ok(issue) => println!(
+            "✅ Success! Created issue #{}: {}",
+            issue.number, issue.title
+        ),
         Err(e) => println!("❌ Failed: {}", e),
     }
 }
