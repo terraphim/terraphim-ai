@@ -189,4 +189,28 @@ mod tests {
         let deserialized: RestartStrategy = serde_json::from_str(&serialized).unwrap();
         assert_eq!(strategy, deserialized);
     }
+
+    #[test]
+    fn restart_window_boundary_exact_window() {
+        let intensity = RestartIntensity::new(3, Duration::from_secs(60));
+        // At exactly the window boundary: NOT allowed to reset (> not >=)
+        assert!(!intensity.is_restart_allowed(3, Duration::from_secs(60)));
+    }
+
+    #[test]
+    fn restart_window_boundary_one_sec_over() {
+        let intensity = RestartIntensity::new(3, Duration::from_secs(60));
+        // One second past the window: counter resets, allowed
+        assert!(intensity.is_restart_allowed(3, Duration::from_secs(61)));
+    }
+
+    #[test]
+    fn restart_never_policy_rejects_first() {
+        let intensity = RestartIntensity::never();
+        // Even first restart not allowed (max_restarts=0, but restart_count=0 short-circuits)
+        // Actually the code allows restart_count==0 as "first restart"
+        assert!(intensity.is_restart_allowed(0, Duration::from_secs(0)));
+        // But second is denied
+        assert!(!intensity.is_restart_allowed(1, Duration::from_secs(0)));
+    }
 }

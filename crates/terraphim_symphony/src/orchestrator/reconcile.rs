@@ -3,7 +3,7 @@
 //! Handles stall detection and tracker state refresh for running issues.
 
 use crate::orchestrator::state::OrchestratorRuntimeState;
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use tracing::{debug, info, warn};
 
 /// Result of reconciling a single running entry.
@@ -22,17 +22,19 @@ pub enum ReconcileAction {
 /// Check a single running entry for stall.
 ///
 /// Returns `Some(StallDetected)` if the session has stalled, `None` otherwise.
+/// The `now` parameter enables deterministic testing of stall detection boundaries.
 pub fn check_stall(
-    last_event_timestamp: Option<chrono::DateTime<Utc>>,
-    started_at: chrono::DateTime<Utc>,
+    last_event_timestamp: Option<DateTime<Utc>>,
+    started_at: DateTime<Utc>,
     stall_timeout_ms: i64,
+    now: DateTime<Utc>,
 ) -> Option<ReconcileAction> {
     if stall_timeout_ms <= 0 {
         return None; // Stall detection disabled
     }
 
     let reference_time = last_event_timestamp.unwrap_or(started_at);
-    let elapsed_ms = (Utc::now() - reference_time).num_milliseconds();
+    let elapsed_ms = (now - reference_time).num_milliseconds();
 
     if elapsed_ms > stall_timeout_ms {
         debug!(elapsed_ms, stall_timeout_ms, "session stall detected");
@@ -75,7 +77,12 @@ pub fn determine_action(
 }
 
 /// Collect stalled issue IDs from the runtime state.
-pub fn find_stalled_issues(state: &OrchestratorRuntimeState, stall_timeout_ms: i64) -> Vec<String> {
+/// The `now` parameter enables deterministic testing of stall detection boundaries.
+pub fn find_stalled_issues(
+    state: &OrchestratorRuntimeState,
+    stall_timeout_ms: i64,
+    now: DateTime<Utc>,
+) -> Vec<String> {
     if stall_timeout_ms <= 0 {
         return vec![];
     }
@@ -88,6 +95,7 @@ pub fn find_stalled_issues(state: &OrchestratorRuntimeState, stall_timeout_ms: i
                 entry.session.last_timestamp,
                 entry.started_at,
                 stall_timeout_ms,
+                now,
             )
             .is_some()
             {
@@ -135,33 +143,65 @@ mod tests {
 
     #[test]
     fn stall_detection_disabled_when_zero() {
-        let result = check_stall(None, Utc::now(), 0);
+        let now = Utc::now();
+        let result = check_stall(None, now, 0, now);
         assert!(result.is_none());
     }
 
     #[test]
     fn stall_detection_disabled_when_negative() {
-        let result = check_stall(None, Utc::now(), -1);
+        let now = Utc::now();
+        let result = check_stall(None, now, -1, now);
         assert!(result.is_none());
     }
 
     #[test]
     fn no_stall_when_recent_event() {
-        let result = check_stall(Some(Utc::now()), Utc::now(), 300_000);
+        let now = Utc::now();
+        let result = check_stall(Some(now), now, 300_000, now);
         assert!(result.is_none());
     }
 
     #[test]
     fn stall_detected_when_old_event() {
-        let old = Utc::now() - chrono::Duration::seconds(600);
-        let result = check_stall(Some(old), Utc::now(), 300_000);
+        let now = Utc::now();
+        let old = now - chrono::Duration::seconds(600);
+        let result = check_stall(Some(old), now, 300_000, now);
         assert!(matches!(result, Some(ReconcileAction::StallDetected)));
     }
 
     #[test]
     fn stall_uses_started_at_when_no_events() {
-        let old_start = Utc::now() - chrono::Duration::seconds(600);
-        let result = check_stall(None, old_start, 300_000);
+        let now = Utc::now();
+        let old_start = now - chrono::Duration::seconds(600);
+        let result = check_stall(None, old_start, 300_000, now);
         assert!(matches!(result, Some(ReconcileAction::StallDetected)));
+    }
+
+    #[test]
+    fn stall_boundary_exact_threshold_no_stall() {
+        let started = Utc::now();
+        let now = started + chrono::Duration::milliseconds(300_000);
+        let result = check_stall(None, started, 300_000, now);
+        // Exactly at threshold: elapsed == stall_timeout, not > stall_timeout
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn stall_boundary_one_ms_over_threshold() {
+        let started = Utc::now();
+        let now = started + chrono::Duration::milliseconds(300_001);
+        let result = check_stall(None, started, 300_000, now);
+        assert!(matches!(result, Some(ReconcileAction::StallDetected)));
+    }
+
+    #[test]
+    fn stall_uses_last_event_over_started_at() {
+        let started = Utc::now();
+        let last_event = started + chrono::Duration::seconds(100);
+        // 200s after last_event, well within 300s timeout
+        let now = last_event + chrono::Duration::seconds(200);
+        let result = check_stall(Some(last_event), started, 300_000, now);
+        assert!(result.is_none());
     }
 }

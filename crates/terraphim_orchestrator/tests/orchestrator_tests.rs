@@ -34,6 +34,7 @@ fn test_config() -> OrchestratorConfig {
             worktree_root: PathBuf::from("/tmp/test-orchestrator/.worktrees"),
             base_branch: "main".to_string(),
             max_concurrent_agents: 3,
+            ..Default::default()
         },
         workflow: None,
         agents: vec![

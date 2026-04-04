@@ -314,7 +314,7 @@ Prompt."#;
     let state =
         OrchestratorRuntimeState::new(config.poll_interval_ms(), config.max_concurrent_agents());
 
-    let snapshot = state.snapshot();
+    let snapshot = state.snapshot(chrono::Utc::now());
     println!(
         "Snapshot: {}",
         serde_json::to_string_pretty(&snapshot).unwrap()
@@ -412,7 +412,7 @@ async fn full_end_to_end_chain() {
     println!("  Prompt rendered ({} chars)", prompt.len());
 
     // -- 7. State snapshot --
-    let snapshot = state.snapshot();
+    let snapshot = state.snapshot(chrono::Utc::now());
     let snapshot_json = serde_json::to_string_pretty(&snapshot).unwrap();
     println!("[7/7] State snapshot:");
     println!("{}", snapshot_json);

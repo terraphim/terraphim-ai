@@ -29,6 +29,9 @@ uuid = { version = "1.0", features = ["v4", "serde"] }
 # Scheduling
 cron = "0.13"
 
+# Command parsing via terraphim-automata
+terraphim_automata = { path = "../terraphim_automata", version = "1.4.10" }
+
 # Config parsing
 toml = "0.8"
 

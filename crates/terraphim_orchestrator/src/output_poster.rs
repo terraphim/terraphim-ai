@@ -84,11 +84,7 @@ impl OutputPoster {
     }
 
     /// Post raw markdown as a comment on the given Gitea issue.
-    pub async fn post_raw(
-        &self,
-        issue_number: u64,
-        body: &str,
-    ) -> Result<(), String> {
+    pub async fn post_raw(&self, issue_number: u64, body: &str) -> Result<(), String> {
         match self.tracker.post_comment(issue_number, body).await {
             Ok(comment) => {
                 tracing::info!(
