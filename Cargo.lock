@@ -9041,13 +9041,17 @@ name = "terraphim_orchestrator"
 version = "1.8.0"
 dependencies = [
  "async-trait",
+ "axum 0.8.8",
  "chrono",
  "cron",
  "handlebars",
+ "hex",
+ "hmac",
  "opendal",
  "regex",
  "serde",
  "serde_json",
+ "sha2",
  "tempfile",
  "terraphim_automata",
  "terraphim_persistence",
