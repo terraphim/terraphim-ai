@@ -49,6 +49,10 @@ pub struct OrchestratorConfig {
     /// Maximum number of restarts per Safety agent before giving up.
     #[serde(default = "default_max_restart_count")]
     pub max_restart_count: u32,
+    /// Disk usage percentage threshold (0-100) above which agent spawning is refused.
+    /// Set to 100 to disable the guard. Default: 90.
+    #[serde(default = "default_disk_usage_threshold")]
+    pub disk_usage_threshold: u8,
     /// Reconciliation tick interval in seconds.
     #[serde(default = "default_tick_interval")]
     pub tick_interval_secs: u64,
@@ -74,6 +78,9 @@ pub struct OrchestratorConfig {
     /// Mention-driven dispatch configuration.
     #[serde(default)]
     pub mentions: Option<MentionConfig>,
+    /// Path to persona role configuration JSON for terraphim-agent.
+    #[serde(default)]
+    pub role_config_path: Option<PathBuf>,
 }
 
 /// Configuration for posting agent output to Gitea issues.
@@ -88,15 +95,21 @@ pub struct GiteaOutputConfig {
 /// Configuration for mention-driven dispatch.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MentionConfig {
-    /// Issue numbers to watch for @adf: mentions.
+    /// DEPRECATED: Issue numbers to watch. Ignored when cursor polling is active.
     #[serde(default)]
     pub watch_issues: Vec<u64>,
-    /// Maximum dispatch depth per issue to prevent infinite loops.
+    /// DEPRECATED: Max dispatch depth per issue. Replaced by max_dispatches_per_tick.
     #[serde(default = "default_max_mention_depth")]
     pub max_mention_depth: u32,
     /// Poll every N reconciliation ticks (default 2).
     #[serde(default = "default_poll_modulo")]
     pub poll_modulo: u64,
+    /// Max mentions to dispatch per poll tick (default 3).
+    #[serde(default = "default_max_dispatches_per_tick")]
+    pub max_dispatches_per_tick: u32,
+    /// Max concurrent mention-spawned agents (default 5).
+    #[serde(default = "default_max_concurrent_mention_agents")]
+    pub max_concurrent_mention_agents: u32,
 }
 
 fn default_max_mention_depth() -> u32 {
@@ -105,6 +118,14 @@ fn default_max_mention_depth() -> u32 {
 
 fn default_poll_modulo() -> u64 {
     2
+}
+
+fn default_max_dispatches_per_tick() -> u32 {
+    3
+}
+
+fn default_max_concurrent_mention_agents() -> u32 {
+    5
 }
 
 /// Lightweight reference to an SFIA skill code and level.
@@ -276,6 +297,18 @@ pub struct CompoundReviewConfig {
     /// Model override for compound review agents.
     #[serde(default)]
     pub model: Option<String>,
+    /// Gitea issue number to post compound review summaries.
+    #[serde(default)]
+    pub gitea_issue: Option<u64>,
+    /// Auto-file Gitea issues for CRITICAL and HIGH severity findings.
+    #[serde(default)]
+    pub auto_file_issues: bool,
+    /// Spawn remediation agents for CRITICAL findings.
+    #[serde(default)]
+    pub auto_remediate: bool,
+    /// Map of finding categories to remediation agent names.
+    #[serde(default)]
+    pub remediation_agents: std::collections::HashMap<String, String>,
 }
 
 fn default_max_duration() -> u64 {
@@ -292,6 +325,27 @@ fn default_base_branch() -> String {
 
 fn default_max_concurrent_agents() -> usize {
     3
+}
+
+impl Default for CompoundReviewConfig {
+    fn default() -> Self {
+        Self {
+            schedule: "0 2 * * *".to_string(),
+            max_duration_secs: default_max_duration(),
+            repo_path: PathBuf::from("."),
+            create_prs: false,
+            worktree_root: default_worktree_root(),
+            base_branch: default_base_branch(),
+            max_concurrent_agents: default_max_concurrent_agents(),
+            cli_tool: None,
+            provider: None,
+            model: None,
+            gitea_issue: None,
+            auto_file_issues: false,
+            auto_remediate: false,
+            remediation_agents: std::collections::HashMap::new(),
+        }
+    }
 }
 
 /// Workflow configuration for issue-driven mode.
@@ -409,6 +463,10 @@ fn default_restart_cooldown() -> u64 {
 
 fn default_max_restart_count() -> u32 {
     10
+}
+
+fn default_disk_usage_threshold() -> u8 {
+    90
 }
 
 fn default_tick_interval() -> u64 {
@@ -684,11 +742,11 @@ task = "t"
         let example_path =
             std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("orchestrator.example.toml");
         let config = OrchestratorConfig::from_file(&example_path).unwrap();
-        assert_eq!(config.agents.len(), 3);
+        assert_eq!(config.agents.len(), 14);
         assert_eq!(config.agents[0].layer, AgentLayer::Safety);
-        assert_eq!(config.agents[1].layer, AgentLayer::Core);
-        assert_eq!(config.agents[2].layer, AgentLayer::Growth);
-        assert!(config.agents[1].schedule.is_some());
+        assert_eq!(config.agents[1].layer, AgentLayer::Safety);
+        assert_eq!(config.agents[2].layer, AgentLayer::Core);
+        assert!(config.agents[2].schedule.is_some());
     }
 
     #[test]

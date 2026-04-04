@@ -111,3 +111,9 @@ skills/
 .windsurf/
 .zencoder/
 skills-lock.json
+
+# Playwright test artifacts
+.playwright-mcp/
+
+# Pi session logs
+pi-session-*.html

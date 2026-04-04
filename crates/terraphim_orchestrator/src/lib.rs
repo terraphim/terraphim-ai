@@ -28,6 +28,7 @@
 //! # }
 //! ```
 
+pub mod adf_commands;
 pub mod compound;
 pub mod concurrency;
 pub mod config;
@@ -37,6 +38,7 @@ pub mod dual_mode;
 pub mod error;
 pub mod flow;
 pub mod handoff;
+pub mod learning;
 pub mod mention;
 pub mod metrics_persistence;
 pub mod mode;
@@ -58,7 +60,9 @@ pub use dispatcher::{DispatchTask, Dispatcher, DispatcherStats};
 pub use dual_mode::DualModeOrchestrator;
 pub use error::OrchestratorError;
 pub use handoff::{HandoffBuffer, HandoffContext, HandoffLedger};
-pub use mention::{parse_mentions, resolve_mention, DetectedMention, MentionTracker};
+pub use mention::{
+    parse_mentions, resolve_mention, DetectedMention, MentionCursor, MentionTracker,
+};
 pub use metrics_persistence::{
     InMemoryMetricsPersistence, MetricsPersistence, MetricsPersistenceConfig,
     MetricsPersistenceError, PersistedAgentMetrics,
@@ -72,6 +76,7 @@ pub use nightwatch::{
 pub use output_poster::OutputPoster;
 pub use persona::{MetapromptRenderError, MetapromptRenderer, PersonaRegistry};
 pub use scheduler::{ScheduleEvent, TimeScheduler};
+use terraphim_symphony::runner::protocol::{FindingSeverity, ReviewFinding};
 
 use chrono::Timelike;
 use std::collections::HashMap;
@@ -86,7 +91,7 @@ use terraphim_spawner::health::{CircuitBreaker, HealthStatus};
 use terraphim_spawner::output::OutputEvent;
 use terraphim_spawner::{AgentHandle, AgentSpawner, ResourceLimits, SpawnRequest};
 use tokio::sync::broadcast;
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 /// Result of evaluating a pre-check strategy before spawning an agent.
 #[derive(Debug, Clone)]
@@ -121,6 +126,7 @@ struct ManagedAgent {
     restart_count: u32,
     /// Broadcast receiver for draining output events to nightwatch.
     output_rx: broadcast::Receiver<OutputEvent>,
+    spawned_by_mention: bool,
 }
 
 /// The main orchestrator that runs the dark factory.
@@ -164,7 +170,7 @@ pub struct AgentOrchestrator {
     #[allow(dead_code)]
     active_flows: HashMap<String, tokio::task::JoinHandle<flow::state::FlowRunState>>,
     /// Tracker for processed @adf: mentions (dedup + depth limiting).
-    mention_tracker: MentionTracker,
+    mention_cursor: Option<MentionCursor>,
     /// Monotonically increasing tick counter for poll_modulo gating.
     tick_count: u64,
 }
@@ -238,13 +244,7 @@ impl AgentOrchestrator {
         // Initialize output poster if Gitea config is provided
         let output_poster = config.gitea.as_ref().map(OutputPoster::new);
 
-        // Initialize mention tracker with configured depth limit (default 3)
-        let max_mention_depth = config
-            .mentions
-            .as_ref()
-            .map(|m| m.max_mention_depth)
-            .unwrap_or(3);
-        let mention_tracker = MentionTracker::new(max_mention_depth);
+        // MentionCursor loaded lazily on first poll (async)
 
         Ok(Self {
             config,
@@ -256,7 +256,16 @@ impl AgentOrchestrator {
             active_agents: HashMap::new(),
             rate_limiter: RateLimitTracker::default(),
             shutdown_requested: false,
-            restart_counts: HashMap::new(),
+            restart_counts: {
+                #[cfg(not(test))]
+                {
+                    Self::load_restart_counts()
+                }
+                #[cfg(test)]
+                {
+                    HashMap::new()
+                }
+            },
             restart_cooldowns: HashMap::new(),
             last_tick_time: chrono::Utc::now(),
             handoff_buffer,
@@ -269,9 +278,54 @@ impl AgentOrchestrator {
             last_run_commits: HashMap::new(),
             pre_check_tracker: None,
             active_flows: HashMap::new(),
-            mention_tracker,
+            mention_cursor: None,
             tick_count: 0,
         })
+    }
+
+    /// Load persisted restart counts from a JSON file in the working directory.
+    /// Returns empty HashMap if file doesn't exist or can't be parsed.
+    #[allow(dead_code)]
+    fn load_restart_counts() -> HashMap<String, u32> {
+        let path = std::env::temp_dir().join("adf_restart_counts.json");
+        match std::fs::read_to_string(&path) {
+            Ok(json) => serde_json::from_str(&json).unwrap_or_default(),
+            Err(_) => HashMap::new(),
+        }
+    }
+
+    /// Persist restart counts so they survive orchestrator restarts.
+    fn save_restart_counts(&self) {
+        // Skip persistence in test builds to avoid cross-test contamination
+        #[cfg(test)]
+        return;
+        #[cfg(not(test))]
+        {
+            let path = std::env::temp_dir().join("adf_restart_counts.json");
+            if let Ok(json) = serde_json::to_string(&self.restart_counts) {
+                if let Err(e) = std::fs::write(&path, json) {
+                    warn!(error = %e, "failed to persist restart counts");
+                }
+            }
+        }
+    }
+
+    /// Check disk usage percentage for the root filesystem.
+    /// Returns None if the check fails (non-Linux, command error, etc.).
+    fn check_disk_usage_percent() -> Option<u8> {
+        let output = std::process::Command::new("df")
+            .args(["--output=pcent", "/"])
+            .output()
+            .ok()?;
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        // Output format: "Use%\n 86%\n"
+        for line in stdout.lines().skip(1) {
+            let trimmed = line.trim().trim_end_matches('%');
+            if let Ok(pct) = trimmed.parse::<u8>() {
+                return Some(pct);
+            }
+        }
+        None
     }
 
     /// Create from a TOML config file path.
@@ -554,6 +608,25 @@ impl AgentOrchestrator {
     /// Otherwise, route the task prompt through the RoutingEngine to select
     /// a model based on keyword matching.
     async fn spawn_agent(&mut self, def: &AgentDefinition) -> Result<(), OrchestratorError> {
+        // === DISK SPACE GUARD ===
+        let threshold = self.config.disk_usage_threshold;
+        if threshold < 100 {
+            if let Some(usage) = Self::check_disk_usage_percent() {
+                if usage >= threshold {
+                    error!(
+                        agent = %def.name,
+                        disk_usage_percent = usage,
+                        threshold,
+                        "refusing to spawn agent: disk usage above threshold"
+                    );
+                    return Err(OrchestratorError::Config(format!(
+                        "disk usage {}% >= {}% threshold, refusing to spawn {}",
+                        usage, threshold, def.name
+                    )));
+                }
+            }
+        }
+
         // === PRE-CHECK GATE ===
         let pre_check_result = self.run_pre_check(def).await;
         let findings = match pre_check_result {
@@ -766,6 +839,7 @@ impl AgentOrchestrator {
                 started_at: Instant::now(),
                 restart_count,
                 output_rx,
+                spawned_by_mention: false,
             },
         );
 
@@ -1051,6 +1125,11 @@ impl AgentOrchestrator {
     /// Skipped when no mention configuration is present or when the Gitea tracker
     /// is not configured. Uses `tick_count % poll_modulo` to avoid polling on
     /// every reconciliation tick.
+    /// Cursor-based mention polling: single API call, no replay on restart.
+    ///
+    /// Uses repo-wide comments endpoint with `since` cursor. On first run
+    /// (no persisted cursor), cursor is set to `now` to skip all historical
+    /// mentions — preventing the mention replay storm.
     async fn poll_mentions(&mut self) {
         let mention_cfg = match self.config.mentions.clone() {
             Some(cfg) => cfg,
@@ -1070,6 +1149,29 @@ impl AgentOrchestrator {
             return;
         }
 
+        // Count currently active mention-spawned agents
+        let active_mention_agents = self
+            .active_agents
+            .values()
+            .filter(|a| a.spawned_by_mention)
+            .count() as u32;
+        if active_mention_agents >= mention_cfg.max_concurrent_mention_agents {
+            tracing::debug!(
+                active = active_mention_agents,
+                max = mention_cfg.max_concurrent_mention_agents,
+                "mention agents at capacity, skipping poll"
+            );
+            return;
+        }
+
+        // Lazy-load cursor on first poll
+        let mut cursor = match self.mention_cursor.take() {
+            Some(c) => c,
+            None => mention::MentionCursor::load_or_now().await,
+        };
+        cursor.dispatches_this_tick = 0;
+
+        // Create Gitea tracker for repo-wide comment polling
         let tracker_cfg = terraphim_tracker::GiteaConfig {
             base_url: gitea_cfg.base_url.clone(),
             token: gitea_cfg.token.clone(),
@@ -1083,88 +1185,509 @@ impl AgentOrchestrator {
             Ok(t) => t,
             Err(e) => {
                 tracing::warn!(error = %e, "failed to create GiteaTracker for mention polling");
+                self.mention_cursor = Some(cursor);
                 return;
             }
         };
 
+        // Single API call: all comments since cursor
+        let comments = match tracker
+            .fetch_repo_comments(Some(&cursor.last_seen_at), Some(50))
+            .await
+        {
+            Ok(c) => c,
+            Err(e) => {
+                tracing::warn!(error = %e, "failed to fetch repo comments for mention polling");
+                self.mention_cursor = Some(cursor);
+                return;
+            }
+        };
+
+        if comments.is_empty() {
+            cursor.save().await;
+            self.mention_cursor = Some(cursor);
+            return;
+        }
+
         let agents = self.config.agents.clone();
         let persona_registry = self.persona_registry.clone();
+        let max_dispatches = mention_cfg.max_dispatches_per_tick;
 
-        for &issue_number in &mention_cfg.watch_issues {
-            if self.mention_tracker.depth_exceeded(issue_number) {
-                tracing::debug!(issue = issue_number, "mention depth exceeded, skipping");
+        // Build ADF command parser with known agents and personas
+        let agent_names: Vec<String> = agents.iter().map(|a| a.name.clone()).collect();
+        let persona_names: Vec<String> = persona_registry
+            .persona_names()
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect();
+        let command_parser =
+            crate::adf_commands::AdfCommandParser::new(&agent_names, &persona_names);
+
+        for comment in &comments {
+            if cursor.dispatches_this_tick >= max_dispatches {
+                tracing::debug!(
+                    dispatched = cursor.dispatches_this_tick,
+                    max = max_dispatches,
+                    "max dispatches per tick reached"
+                );
+                break;
+            }
+
+            // Skip already-processed comments (persisted dedup across restarts)
+            if cursor.is_processed(comment.id) {
+                tracing::debug!(
+                    comment_id = comment.id,
+                    issue = comment.issue_number,
+                    "skipping already-processed comment"
+                );
+                cursor.advance_to(&comment.created_at);
                 continue;
             }
 
-            match tracker.fetch_comments(issue_number, None).await {
-                Ok(comments) => {
-                    for comment in &comments {
-                        let detected = mention::parse_mentions(
-                            comment,
-                            issue_number,
-                            &agents,
-                            &persona_registry,
+            // Parse ADF commands using terraphim-automata Aho-Corasick
+            let commands =
+                command_parser.parse_commands(&comment.body, comment.issue_number, comment.id);
+
+            for cmd in commands {
+                if cursor.dispatches_this_tick >= max_dispatches {
+                    break;
+                }
+
+                match cmd {
+                    crate::adf_commands::AdfCommand::CompoundReview {
+                        issue_number,
+                        comment_id,
+                    } => {
+                        info!(
+                            issue = issue_number,
+                            comment_id = comment_id,
+                            "compound review triggered via @adf:compound-review mention"
                         );
 
-                        for m in detected {
-                            if self.mention_tracker.is_processed(&m) {
-                                continue;
-                            }
+                        // Trigger compound review
+                        self.handle_schedule_event(ScheduleEvent::CompoundReview)
+                            .await;
 
-                            tracing::info!(
-                                agent = %m.agent_name,
-                                issue = m.issue_number,
-                                comment_id = m.comment_id,
-                                "dispatching mention-driven task"
+                        // Post acknowledgment
+                        if let Some(ref poster) = self.output_poster {
+                            let ack_body = format!(
+                                "## 🔍 Compound Review Triggered\n\n\
+                                Manual trigger received from issue #{} comment {}.\n\
+                                Running 6-agent review swarm now...\n\n\
+                                _Results will be posted to issue #{} when complete._",
+                                issue_number,
+                                comment_id,
+                                self.config.compound_review.gitea_issue.unwrap_or(108)
                             );
+                            if let Err(e) = poster.post_raw(issue_number, &ack_body).await {
+                                warn!(error = %e, "failed to post compound review acknowledgment");
+                            }
+                        }
 
-                            // Spawn the mentioned agent
-                            if let Some(def) =
-                                agents.iter().find(|a| a.name == m.agent_name).cloned()
+                        cursor.dispatches_this_tick += 1;
+                    }
+                    crate::adf_commands::AdfCommand::SpawnAgent {
+                        agent_name,
+                        issue_number,
+                        comment_id,
+                        context,
+                    } => {
+                        info!(
+                            agent = %agent_name,
+                            issue = issue_number,
+                            comment_id = comment_id,
+                            "dispatching mention-driven agent via terraphim-automata parser"
+                        );
+
+                        if let Some(def) = agents.iter().find(|a| a.name == agent_name).cloned() {
+                            let mut mention_def = def.clone();
+                            mention_def.task = format!(
+                                "{}\n\n## Mention Context\nTriggered by @adf:{} mention in issue #{} (comment {}).\nContext: {}",
+                                def.task,
+                                agent_name,
+                                issue_number,
+                                comment_id,
+                                context
+                            );
+                            mention_def.gitea_issue = Some(issue_number);
+
+                            if let Err(e) = self.spawn_agent(&mention_def).await {
+                                tracing::error!(agent = %agent_name, issue = issue_number, error = %e, "failed to spawn agent");
+                            } else if let Some(agent) =
+                                self.active_agents.get_mut(&mention_def.name)
                             {
-                                let mut mention_def = def.clone();
-                                // Append mention context
-                                mention_def.task = format!(
-                                    "{}
-
-## Mention Context
-Triggered by @adf:{} mention in issue #{} (comment {}).
-Comment: {}",
-                                    def.task,
-                                    m.agent_name,
-                                    m.issue_number,
-                                    m.comment_id,
-                                    if m.comment_body.len() > 500 {
-                                        &m.comment_body[..500]
-                                    } else {
-                                        &m.comment_body
-                                    }
-                                );
-                                // Post output back to the same issue
-                                mention_def.gitea_issue = Some(m.issue_number);
-
-                                if let Err(e) = self.spawn_agent(&mention_def).await {
-                                    tracing::error!(
-                                        agent = %m.agent_name,
-                                        issue = m.issue_number,
-                                        error = %e,
-                                        "failed to spawn mentioned agent"
-                                    );
-                                }
+                                agent.spawned_by_mention = true;
                             }
 
-                            self.mention_tracker.mark_processed(&m);
-                            self.mention_tracker.increment_depth(issue_number);
+                            cursor.dispatches_this_tick += 1;
                         }
                     }
+                    crate::adf_commands::AdfCommand::SpawnPersona {
+                        persona_name,
+                        issue_number,
+                        comment_id,
+                        context,
+                    } => {
+                        // Resolve persona to agent
+                        if let Some((agent_name, _)) = mention::resolve_mention(
+                            &persona_name,
+                            &agents,
+                            &persona_registry,
+                            &context,
+                        ) {
+                            info!(
+                                persona = %persona_name,
+                                agent = %agent_name,
+                                issue = issue_number,
+                                "dispatching persona-resolved agent via terraphim-automata parser"
+                            );
+
+                            if let Some(def) = agents.iter().find(|a| a.name == agent_name).cloned()
+                            {
+                                let mut mention_def = def.clone();
+                                mention_def.task = format!(
+                                    "{}\n\n## Mention Context\nTriggered by @adf:{} persona mention in issue #{} (comment {}).\nContext: {}",
+                                    def.task,
+                                    persona_name,
+                                    issue_number,
+                                    comment_id,
+                                    context
+                                );
+                                mention_def.gitea_issue = Some(issue_number);
+
+                                if let Err(e) = self.spawn_agent(&mention_def).await {
+                                    tracing::error!(agent = %agent_name, issue = issue_number, error = %e, "failed to spawn agent");
+                                } else if let Some(agent) =
+                                    self.active_agents.get_mut(&mention_def.name)
+                                {
+                                    agent.spawned_by_mention = true;
+                                }
+
+                                cursor.dispatches_this_tick += 1;
+                            }
+                        }
+                    }
+                    crate::adf_commands::AdfCommand::Unknown { raw } => {
+                        warn!(raw = %raw, "unknown ADF command");
+                    }
                 }
-                Err(e) => {
-                    tracing::warn!(
-                        issue = issue_number,
-                        error = %e,
-                        "failed to fetch comments for mention polling"
-                    );
+            }
+
+            // Mark comment as processed and advance cursor
+            cursor.mark_processed(comment.id);
+            cursor.advance_to(&comment.created_at);
+        }
+
+        // Persist cursor for next poll / restart
+        cursor.save().await;
+        self.mention_cursor = Some(cursor);
+    }
+
+    /// Sanitise finding text for use in issue title.
+    /// Strips JSON syntax characters that break title parsing.
+    fn sanitise_for_title(input: &str) -> String {
+        let mut result = String::with_capacity(input.len());
+        for ch in input.chars() {
+            match ch {
+                '{' | '}' | '[' | ']' | '"' => result.push(' '),
+                '\n' | '\r' => result.push(' '),
+                _ => result.push(ch),
+            }
+        }
+        let trimmed = result.split_whitespace().collect::<Vec<_>>().join(" ");
+        if trimmed.len() > 80 {
+            trimmed[..77].to_string() + "..."
+        } else {
+            trimmed
+        }
+    }
+
+    /// Sanitise finding text for use in issue body (markdown).
+    /// Escapes markdown special characters that could break rendering.
+    fn sanitise_for_body(input: &str) -> String {
+        let mut result = String::with_capacity(input.len());
+        for ch in input.chars() {
+            match ch {
+                '`' => result.push_str("``"),
+                '*' | '_' | '[' | ']' => result.push('\\'),
+                _ => result.push(ch),
+            }
+        }
+        result
+    }
+
+    /// File a Gitea issue for a compound review finding.
+    ///
+    /// Deduplicates by searching for existing open issues with similar titles
+    /// before creating a new one.
+    async fn file_finding_issue(
+        &self,
+        poster: &OutputPoster,
+        result: &CompoundReviewResult,
+        finding: &ReviewFinding,
+    ) -> Result<(), String> {
+        use terraphim_symphony::runner::protocol::FindingSeverity;
+
+        let sev_str = match finding.severity {
+            FindingSeverity::Critical => "CRITICAL",
+            FindingSeverity::High => "HIGH",
+            FindingSeverity::Medium => "MEDIUM",
+            FindingSeverity::Low => "LOW",
+            FindingSeverity::Info => "INFO",
+        };
+
+        // Build a short keyword from the finding for dedup search
+        let dedup_keyword = if finding.finding.len() > 40 {
+            &finding.finding[..40]
+        } else {
+            &finding.finding
+        };
+
+        // Dedup: check if an open issue with similar title already exists
+        match poster.tracker().search_issues_by_title(dedup_keyword).await {
+            Ok(existing) if !existing.is_empty() => {
+                info!(
+                    severity = %sev_str,
+                    existing_issues = existing.len(),
+                    keyword = %dedup_keyword,
+                    "skipping finding issue (already filed)"
+                );
+                return Ok(());
+            }
+            Err(e) => {
+                // Dedup search failed — proceed with filing (fail-open)
+                warn!(error = %e, "dedup search failed, proceeding to file issue");
+            }
+            _ => {}
+        }
+
+        let title = format!(
+            "[Compound Review] {}: {}",
+            sev_str,
+            Self::sanitise_for_title(&finding.finding)
+        );
+
+        let mut body = "## Automated Finding from Compound Review\n\n".to_string();
+        body.push_str(&format!("- **Severity**: {}\n", sev_str));
+        if !finding.file.is_empty() {
+            body.push_str(&format!(
+                "- **File**: {}{}\n",
+                finding.file,
+                if finding.line > 0 {
+                    format!(":{}", finding.line)
+                } else {
+                    String::new()
                 }
+            ));
+        }
+        body.push_str(&format!(
+            "- **Confidence**: {:.0}%\n",
+            finding.confidence * 100.0
+        ));
+        body.push_str(&format!("- **Review ID**: {}\n\n", result.correlation_id));
+        body.push_str(&format!(
+            "### Finding\n\n{}\n\n",
+            Self::sanitise_for_body(&finding.finding)
+        ));
+        if let Some(ref suggestion) = finding.suggestion {
+            if !suggestion.is_empty() {
+                body.push_str(&format!(
+                    "### Suggested Fix\n\n{}\n",
+                    Self::sanitise_for_body(suggestion)
+                ));
+            }
+        }
+
+        // Skip labels for now - Gitea API has issues with label format
+        // TODO: Fix labels format for Gitea API
+        match poster.tracker().create_issue(&title, &body, &[]).await {
+            Ok(issue) => {
+                info!(
+                    issue_number = issue.number,
+                    severity = %sev_str,
+                    title = %title,
+                    "filed finding issue"
+                );
+                Ok(())
+            }
+            Err(e) => Err(format!("failed to create issue '{}': {}", title, e)),
+        }
+    }
+
+    /// Spawn a remediation agent for a CRITICAL finding.
+    ///
+    /// Looks up the finding's category in `compound_review.remediation_agents`
+    /// to determine which agent to spawn. If no mapping exists, logs and skips.
+    async fn spawn_remediation_agent(&mut self, finding: &ReviewFinding) -> Result<(), String> {
+        let category_key = format!("{:?}", finding.category).to_lowercase();
+        let agent_name = self
+            .config
+            .compound_review
+            .remediation_agents
+            .get(&category_key)
+            .cloned();
+
+        let agent_name = match agent_name {
+            Some(name) => name,
+            None => {
+                debug!(
+                    category = %category_key,
+                    "no remediation agent mapped for category, skipping"
+                );
+                return Ok(());
+            }
+        };
+
+        // Build a targeted fix prompt
+        let mut prompt = "Fix this CRITICAL finding from compound review:\n\n".to_string();
+        if !finding.file.is_empty() {
+            prompt.push_str(&format!(
+                "File: {}{}\n",
+                finding.file,
+                if finding.line > 0 {
+                    format!(":{}", finding.line)
+                } else {
+                    String::new()
+                }
+            ));
+        }
+        prompt.push_str(&format!(
+            "Severity: CRITICAL\nFinding: {}\n",
+            finding.finding
+        ));
+        if let Some(ref suggestion) = finding.suggestion {
+            if !suggestion.is_empty() {
+                prompt.push_str(&format!("Suggested approach: {}\n", suggestion));
+            }
+        }
+        prompt.push_str(
+            "\nInstructions:\n\
+1. Read the relevant file(s)\n\
+2. Implement the fix\n\
+3. Run cargo build && cargo test to verify\n\
+4. Commit your changes\n",
+        );
+
+        // Look up the agent definition
+        let agent_def = self
+            .config
+            .agents
+            .iter()
+            .find(|a| a.name == agent_name)
+            .cloned();
+
+        let agent_def = match agent_def {
+            Some(def) => def,
+            None => {
+                warn!(
+                    agent = %agent_name,
+                    "remediation agent not found in fleet config, skipping"
+                );
+                return Ok(());
+            }
+        };
+
+        // Spawn using the existing agent infrastructure
+        // Build a modified agent def with our custom task prompt
+        let mut fix_def = agent_def;
+        fix_def.task = prompt;
+        fix_def.pre_check = None; // Skip pre-check for remediation
+
+        let spawned = self.spawn_agent(&fix_def).await;
+
+        match spawned {
+            Ok(_) => {
+                info!(
+                    agent = %agent_name,
+                    file = %finding.file,
+                    "spawned remediation agent for CRITICAL finding"
+                );
+                Ok(())
+            }
+            Err(e) => Err(format!(
+                "failed to spawn remediation agent '{}': {}",
+                agent_name, e
+            )),
+        }
+    }
+
+    /// Attempt to commit any uncommitted working tree changes made by an agent.
+    ///
+    /// This runs `git add -A && git diff --cached --quiet` to check if there
+    /// are changes, then commits with a standard message. Failures are logged
+    /// but not propagated — agent work is best-effort.
+    async fn try_commit_agent_work(&self, agent_name: &str) {
+        let working_dir = &self.config.working_dir;
+
+        // Stage all changes
+        let add = tokio::process::Command::new("git")
+            .args(["add", "-A"])
+            .current_dir(working_dir)
+            .output()
+            .await;
+
+        if let Err(e) = add {
+            tracing::debug!(agent = %agent_name, error = %e, "git add failed, skipping commit");
+            return;
+        }
+
+        // Check if there are staged changes
+        let diff_check = tokio::process::Command::new("git")
+            .args(["diff", "--cached", "--quiet"])
+            .current_dir(working_dir)
+            .status()
+            .await;
+
+        match diff_check {
+            Ok(status) if status.success() => {
+                // No changes to commit
+                return;
+            }
+            Ok(_) => { /* changes exist */ }
+            Err(e) => {
+                tracing::debug!(agent = %agent_name, error = %e, "git diff failed, skipping commit");
+                return;
+            }
+        }
+
+        // Get current branch for commit message
+        let branch = tokio::process::Command::new("git")
+            .args(["branch", "--show-current"])
+            .current_dir(working_dir)
+            .output()
+            .await;
+
+        let branch_name = match branch {
+            Ok(output) => String::from_utf8_lossy(&output.stdout).trim().to_string(),
+            Err(_) => "unknown".to_string(),
+        };
+
+        let msg = format!("feat({agent_name}): agent work [auto-commit]");
+
+        let commit = tokio::process::Command::new("git")
+            .args(["commit", "-m", &msg])
+            .current_dir(working_dir)
+            .output()
+            .await;
+
+        match commit {
+            Ok(output) if output.status.success() => {
+                tracing::info!(
+                    agent = %agent_name,
+                    branch = %branch_name,
+                    "auto-committed agent working tree changes"
+                );
+            }
+            Ok(output) => {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                tracing::debug!(
+                    agent = %agent_name,
+                    stderr = %stderr,
+                    "git commit failed"
+                );
+            }
+            Err(e) => {
+                tracing::warn!(agent = %agent_name, error = %e, "failed to run git commit");
             }
         }
     }
@@ -1390,12 +1913,16 @@ Comment: {}",
                 }
                 // Handle exit based on layer (similar to handle_agent_exit but for timeout)
                 if managed.definition.layer == AgentLayer::Safety {
-                    let count = self.restart_counts.entry(name.clone()).or_insert(0);
-                    *count += 1;
+                    {
+                        let count = self.restart_counts.entry(name.clone()).or_insert(0);
+                        *count += 1;
+                    }
                     self.restart_cooldowns.insert(name.clone(), Instant::now());
+                    self.save_restart_counts();
+                    let restart_count = self.restart_counts.get(&name).copied().unwrap_or(0);
                     info!(
                         agent = %name,
-                        restart_count = *count,
+                        restart_count,
                         "safety agent timed out, will restart after cooldown"
                     );
                 } else {
@@ -1441,6 +1968,11 @@ Comment: {}",
         for (name, def, status) in exited {
             self.active_agents.remove(&name);
             self.handle_agent_exit(&name, &def, status);
+
+            // Auto-commit any working tree changes the agent made
+            if status.success() {
+                self.try_commit_agent_work(&name).await;
+            }
         }
     }
 
@@ -1453,15 +1985,20 @@ Comment: {}",
     ) {
         match def.layer {
             AgentLayer::Safety => {
-                let count = self.restart_counts.entry(name.to_string()).or_insert(0);
-                *count += 1;
+                {
+                    let count = self.restart_counts.entry(name.to_string()).or_insert(0);
+                    *count += 1;
+                }
                 self.restart_cooldowns
                     .insert(name.to_string(), Instant::now());
-                if *count <= self.config.max_restart_count {
+                // Persist restart counts so they survive orchestrator restarts
+                self.save_restart_counts();
+                let restart_count = self.restart_counts.get(name).copied().unwrap_or(0);
+                if restart_count <= self.config.max_restart_count {
                     info!(
                         agent = %name,
                         exit_status = %status,
-                        restart_count = *count,
+                        restart_count,
                         cooldown_secs = self.config.restart_cooldown_secs,
                         "safety agent exited, will restart after cooldown"
                     );
@@ -1469,9 +2006,9 @@ Comment: {}",
                     error!(
                         agent = %name,
                         exit_status = %status,
-                        restart_count = *count,
+                        restart_count,
                         max = self.config.max_restart_count,
-                        "safety agent exceeded max restarts, not restarting"
+                        "safety agent exceeded max restarts, permanently stopped"
                     );
                 }
             }
@@ -1563,12 +2100,26 @@ Comment: {}",
 
         // Also check compound review schedule
         if let Some(compound_sched) = self.scheduler.compound_review_schedule() {
+            debug!(
+                last_tick = %self.last_tick_time,
+                now = %now,
+                "checking compound review schedule"
+            );
+
+            // Get next fire times for debugging
+            let upcoming: Vec<_> = compound_sched.after(&self.last_tick_time).take(3).collect();
+            debug!(upcoming = ?upcoming, "compound schedule upcoming times");
+
             let should_fire = compound_sched
                 .after(&self.last_tick_time)
                 .take_while(|t| *t <= now)
                 .next()
                 .is_some();
+
+            debug!(should_fire = should_fire, "compound review fire check");
+
             if should_fire {
+                info!("compound review schedule fired, starting review");
                 self.handle_schedule_event(ScheduleEvent::CompoundReview)
                     .await;
             }
@@ -1662,6 +2213,42 @@ Comment: {}",
                             duration = ?result.duration,
                             "compound review completed"
                         );
+
+                        // 1. Post structured summary to Gitea
+                        if let (Some(ref poster), Some(issue)) =
+                            (&self.output_poster, self.config.compound_review.gitea_issue)
+                        {
+                            let report = result.format_report();
+                            if let Err(e) = poster.post_raw(issue, &report).await {
+                                warn!(error = %e, "failed to post compound review summary");
+                            }
+
+                            // 2. Auto-file issues for CRITICAL/HIGH findings
+                            if self.config.compound_review.auto_file_issues {
+                                let actionable = result.actionable_findings();
+                                for finding in actionable {
+                                    if let Err(e) =
+                                        self.file_finding_issue(poster, &result, finding).await
+                                    {
+                                        warn!(error = %e, "failed to file finding issue");
+                                    }
+                                }
+                            }
+
+                            // 3. Trigger remediation agents for CRITICAL findings
+                            if self.config.compound_review.auto_remediate {
+                                let critical: Vec<_> = result
+                                    .findings
+                                    .iter()
+                                    .filter(|f| f.severity == FindingSeverity::Critical)
+                                    .collect();
+                                for finding in critical {
+                                    if let Err(e) = self.spawn_remediation_agent(finding).await {
+                                        warn!(error = %e, "failed to spawn remediation agent");
+                                    }
+                                }
+                            }
+                        }
                     }
                     Err(e) => {
                         error!(error = %e, "compound review failed");
@@ -1829,6 +2416,7 @@ mod tests {
                 worktree_root: std::path::PathBuf::from("/tmp/test-orchestrator/.worktrees"),
                 base_branch: "main".to_string(),
                 max_concurrent_agents: 3,
+                ..Default::default()
             },
             workflow: None,
             agents: vec![
@@ -1881,6 +2469,7 @@ mod tests {
             ],
             restart_cooldown_secs: 60,
             max_restart_count: 10,
+            disk_usage_threshold: 100, // disable disk guard in tests
             tick_interval_secs: 30,
             handoff_buffer_ttl_secs: None,
             persona_data_dir: None,
@@ -1889,6 +2478,7 @@ mod tests {
             flow_state_dir: None,
             gitea: None,
             mentions: None,
+            role_config_path: None,
         }
     }
 
@@ -2032,6 +2622,7 @@ task = "test"
                 worktree_root: std::path::PathBuf::from("/tmp/.worktrees"),
                 base_branch: "main".to_string(),
                 max_concurrent_agents: 3,
+                ..Default::default()
             },
             workflow: None,
             agents: vec![AgentDefinition {
@@ -2059,6 +2650,7 @@ task = "test"
             }],
             restart_cooldown_secs: 0, // instant restart for testing
             max_restart_count: 3,
+            disk_usage_threshold: 100, // disable disk guard in tests
             tick_interval_secs: 1,
             handoff_buffer_ttl_secs: None,
             persona_data_dir: None,
@@ -2067,6 +2659,7 @@ task = "test"
             flow_state_dir: None,
             gitea: None,
             mentions: None,
+            role_config_path: None,
         }
     }
 
