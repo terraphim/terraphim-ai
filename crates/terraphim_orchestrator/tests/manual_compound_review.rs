@@ -1,6 +1,7 @@
 //! Manual compound review trigger.
 //! Usage: cargo test -p terraphim_orchestrator --test manual_compound_review -- --nocapture
 
+use std::path::PathBuf;
 use terraphim_orchestrator::compound::CompoundReviewWorkflow;
 use terraphim_orchestrator::config::CompoundReviewConfig;
 
@@ -9,14 +10,14 @@ async fn manual_compound_review() {
     let config = CompoundReviewConfig {
         schedule: "0 2 * * *".to_string(),
         max_duration_secs: 1800,
-        repo_path: "/home/alex/terraphim-ai".into(),
+        repo_path: PathBuf::from("/home/alex/terraphim-ai"),
         base_branch: "main".to_string(),
         create_prs: false,
-        worktree_root: "/home/alex/terraphim-ai/.worktrees".into(),
-        cli_tool: "/home/alex/.bun/bin/opencode".to_string(),
-        provider: "kimi-for-coding".to_string(),
-        model: "k2p5".to_string(),
-        groups: vec![],
+        worktree_root: PathBuf::from("/home/alex/terraphim-ai/.worktrees"),
+        max_concurrent_agents: 6,
+        cli_tool: Some("/home/alex/.bun/bin/opencode".to_string()),
+        provider: Some("kimi-for-coding".to_string()),
+        model: Some("k2p5".to_string()),
     };
 
     let workflow = CompoundReviewWorkflow::from_compound_config(config);
