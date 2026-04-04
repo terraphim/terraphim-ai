@@ -1298,6 +1298,39 @@ impl AgentOrchestrator {
         self.mention_cursor = Some(cursor);
     }
 
+    /// Sanitise finding text for use in issue title.
+    /// Strips JSON syntax characters that break title parsing.
+    fn sanitise_for_title(input: &str) -> String {
+        let mut result = String::with_capacity(input.len());
+        for ch in input.chars() {
+            match ch {
+                '{' | '}' | '[' | ']' | '"' => result.push(' '),
+                '\n' | '\r' => result.push(' '),
+                _ => result.push(ch),
+            }
+        }
+        let trimmed = result.split_whitespace().collect::<Vec<_>>().join(" ");
+        if trimmed.len() > 80 {
+            trimmed[..77].to_string() + "..."
+        } else {
+            trimmed
+        }
+    }
+
+    /// Sanitise finding text for use in issue body (markdown).
+    /// Escapes markdown special characters that could break rendering.
+    fn sanitise_for_body(input: &str) -> String {
+        let mut result = String::with_capacity(input.len());
+        for ch in input.chars() {
+            match ch {
+                '`' => result.push_str("``"),
+                '*' | '_' | '[' | ']' => result.push('\\'),
+                _ => result.push(ch),
+            }
+        }
+        result
+    }
+
     /// File a Gitea issue for a compound review finding.
     ///
     /// Deduplicates by searching for existing open issues with similar titles
@@ -1346,11 +1379,7 @@ impl AgentOrchestrator {
         let title = format!(
             "[Compound Review] {}: {}",
             sev_str,
-            if finding.finding.len() > 80 {
-                format!("{}...", &finding.finding[..77])
-            } else {
-                finding.finding.clone()
-            }
+            Self::sanitise_for_title(&finding.finding)
         );
 
         let mut body = format!("## Automated Finding from Compound Review\n\n",);
@@ -1371,10 +1400,16 @@ impl AgentOrchestrator {
             finding.confidence * 100.0
         ));
         body.push_str(&format!("- **Review ID**: {}\n\n", result.correlation_id));
-        body.push_str(&format!("### Finding\n\n{}\n\n", finding.finding));
+        body.push_str(&format!(
+            "### Finding\n\n{}\n\n",
+            Self::sanitise_for_body(&finding.finding)
+        ));
         if let Some(ref suggestion) = finding.suggestion {
             if !suggestion.is_empty() {
-                body.push_str(&format!("### Suggested Fix\n\n{}\n", suggestion));
+                body.push_str(&format!(
+                    "### Suggested Fix\n\n{}\n",
+                    Self::sanitise_for_body(suggestion)
+                ));
             }
         }
 
