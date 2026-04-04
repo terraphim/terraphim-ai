@@ -3197,9 +3197,49 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
         assert!(orch.is_ok(), "orchestrator should initialize with flows");
 
         let orch = orch.unwrap();
-        assert!(
-            orch.active_flows.is_empty(),
-            "active_flows should be empty initially"
-        );
+            assert!(
+                orch.active_flows.is_empty(),
+                "active_flows should be empty initially"
+            );
+    }
+
+    // ==================== Sanitisation Tests ====================
+
+    #[test]
+    fn test_sanitise_for_title_strips_json_braces() {
+        let input = r#"{"type":"tool_use","timestamp":1775313676859}"#;
+        let result = AgentOrchestrator::sanitise_for_title(input);
+        assert!(!result.contains('{'), "title should not contain open brace");
+        assert!(!result.contains('}'), "title should not contain close brace");
+        assert!(!result.contains('['), "title should not contain open bracket");
+        assert!(!result.contains(']'), "title should not contain close bracket");
+    }
+
+    #[test]
+    fn test_sanitise_for_title_strips_quotes() {
+        let input = r#"JSON "quoted" text"#;
+        let result = AgentOrchestrator::sanitise_for_title(input);
+        assert!(!result.contains('"'), "title should not contain quotes");
+    }
+
+    #[test]
+    fn test_sanitise_for_title_truncates_long_input() {
+        let input = "This is a very long finding text that should be truncated because it exceeds eighty characters limit";
+        let result = AgentOrchestrator::sanitise_for_title(input);
+        assert!(result.len() <= 80, "title should be at most 80 chars, got {}", result.len());
+    }
+
+    #[test]
+    fn test_sanitise_for_body_escapes_backticks() {
+        let input = "Use `code` here";
+        let result = AgentOrchestrator::sanitise_for_body(input);
+        assert!(result.contains("``"), "body should escape backticks");
+    }
+
+    #[test]
+    fn test_sanitise_for_body_escapes_markdown_chars() {
+        let input = "Text with *asterisks* and [brackets]";
+        let result = AgentOrchestrator::sanitise_for_body(input);
+        assert!(result.contains('\\'), "body should contain backslash, got: {}", result);
     }
 }
