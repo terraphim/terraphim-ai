@@ -285,9 +285,10 @@ impl MessageEnvelope {
         self.attempts >= self.delivery_options.max_retries
     }
 
-    /// Check if message has expired
-    pub fn is_expired(&self) -> bool {
-        let elapsed = Utc::now() - self.created_at;
+    /// Check if message has expired.
+    /// The `now` parameter enables deterministic testing of expiry boundaries.
+    pub fn is_expired(&self, now: DateTime<Utc>) -> bool {
+        let elapsed = now - self.created_at;
         elapsed.to_std().unwrap_or(Duration::ZERO) > self.delivery_options.timeout
     }
 }
@@ -386,7 +387,7 @@ mod tests {
         assert_eq!(envelope.from, Some(from));
         assert_eq!(envelope.attempts, 0);
         assert!(!envelope.max_retries_exceeded());
-        assert!(!envelope.is_expired());
+        assert!(!envelope.is_expired(Utc::now()));
 
         // Test attempt increment
         envelope.increment_attempts();
@@ -409,5 +410,56 @@ mod tests {
 
         assert_eq!(msg.from, Some(from));
         assert_eq!(msg.payload.data, "test");
+    }
+
+    #[test]
+    fn message_not_expired_before_timeout() {
+        let options = DeliveryOptions {
+            timeout: Duration::from_secs(30),
+            ..Default::default()
+        };
+        let envelope = MessageEnvelope::new(
+            AgentPid::new(),
+            "test".to_string(),
+            serde_json::Value::String("payload".to_string()),
+            options,
+        );
+        // 29 seconds later: not expired
+        let now = envelope.created_at + chrono::Duration::seconds(29);
+        assert!(!envelope.is_expired(now));
+    }
+
+    #[test]
+    fn message_not_expired_at_exact_boundary() {
+        let options = DeliveryOptions {
+            timeout: Duration::from_secs(30),
+            ..Default::default()
+        };
+        let envelope = MessageEnvelope::new(
+            AgentPid::new(),
+            "test".to_string(),
+            serde_json::Value::String("payload".to_string()),
+            options,
+        );
+        // Exactly 30 seconds: not expired (> not >=)
+        let now = envelope.created_at + chrono::Duration::seconds(30);
+        assert!(!envelope.is_expired(now));
+    }
+
+    #[test]
+    fn message_expired_one_ms_over_timeout() {
+        let options = DeliveryOptions {
+            timeout: Duration::from_secs(30),
+            ..Default::default()
+        };
+        let envelope = MessageEnvelope::new(
+            AgentPid::new(),
+            "test".to_string(),
+            serde_json::Value::String("payload".to_string()),
+            options,
+        );
+        // 30 seconds + 1ms: expired
+        let now = envelope.created_at + chrono::Duration::milliseconds(30_001);
+        assert!(envelope.is_expired(now));
     }
 }

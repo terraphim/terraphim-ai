@@ -5,7 +5,9 @@ use tokio::sync::mpsc;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
-use terraphim_symphony::runner::protocol::{FindingCategory, FindingSeverity, ReviewAgentOutput, ReviewFinding};
+use terraphim_symphony::runner::protocol::{
+    FindingCategory, FindingSeverity, ReviewAgentOutput, ReviewFinding,
+};
 
 use crate::config::CompoundReviewConfig;
 use crate::error::OrchestratorError;
@@ -153,9 +155,7 @@ impl CompoundReviewResult {
         let verdict = if self.pass { "✅ PASS" } else { "❌ NO-GO" };
         let duration_secs = self.duration.as_secs();
 
-        let mut report = format!(
-            "## Compound Review\n\n",
-        );
+        let mut report = format!("## Compound Review\n\n",);
         report.push_str(&format!(
             "**Verdict: {}** | Duration: {}s | Agents: {} ({} failed)\n\n",
             verdict, duration_secs, self.agents_run, self.agents_failed
@@ -163,10 +163,7 @@ impl CompoundReviewResult {
 
         // Findings table
         if !self.findings.is_empty() {
-            report.push_str(&format!(
-                "### Findings ({})\n\n",
-                self.findings.len()
-            ));
+            report.push_str(&format!("### Findings ({})\n\n", self.findings.len()));
             report.push_str("| Severity | File | Finding | Conf |\n");
             report.push_str("|----------|------|---------|------|\n");
             for f in &self.findings {
@@ -188,7 +185,10 @@ impl CompoundReviewResult {
                 };
                 report.push_str(&format!(
                     "| {} | {} | {} | {:.0}% |\n",
-                    sev, file_loc, finding_text, f.confidence * 100.0
+                    sev,
+                    file_loc,
+                    finding_text,
+                    f.confidence * 100.0
                 ));
             }
             report.push_str("\n");
@@ -202,7 +202,10 @@ impl CompoundReviewResult {
             let status = if output.pass { "✅" } else { "❌" };
             report.push_str(&format!(
                 "- {} {}: {} finding(s) — {}\n",
-                status, output.agent, output.findings.len(), output.summary
+                status,
+                output.agent,
+                output.findings.len(),
+                output.summary
             ));
         }
 
@@ -560,7 +563,6 @@ fn extract_review_output(
     agent_name: &str,
     category: FindingCategory,
 ) -> ReviewAgentOutput {
-
     // Step 1: Unwrap opencode JSON protocol if present.
     // opencode --format json wraps all output as:
     //   {"type":"text","part":{"type":"text","text":"..."}}
@@ -609,8 +611,10 @@ fn extract_review_output(
     let _lower = unwrapped.to_lowercase();
     for line in unwrapped.lines() {
         let line_lower = line.to_lowercase();
-        if line_lower.contains("critical") || line_lower.contains("vulnerability")
-            || line_lower.contains("cve-") || line_lower.contains("rustsec-")
+        if line_lower.contains("critical")
+            || line_lower.contains("vulnerability")
+            || line_lower.contains("cve-")
+            || line_lower.contains("rustsec-")
         {
             let severity = if line_lower.contains("critical") {
                 FindingSeverity::Critical
@@ -676,7 +680,8 @@ fn unwrap_opencode_protocol(stdout: &str) -> String {
         if let Ok(val) = serde_json::from_str::<Value>(trimmed) {
             // opencode protocol: {"type":"text","part":{"type":"text","text":"..."}}
             if val.is_object() {
-                if let Some(text) = val.get("part")
+                if let Some(text) = val
+                    .get("part")
                     .and_then(|p| p.get("text"))
                     .and_then(|t| t.as_str())
                 {

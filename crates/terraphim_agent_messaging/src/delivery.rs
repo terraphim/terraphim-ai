@@ -256,9 +256,10 @@ impl DeliveryManager {
         let mut candidates = Vec::new();
         let records = self.delivery_records.read().await;
         let pending = self.pending_deliveries.lock().await;
+        let now = Utc::now();
 
         for (message_id, record) in records.iter() {
-            if self.should_retry(record) {
+            if self.should_retry(record, now) {
                 if let Some(envelope) = pending.get(message_id) {
                     let mut retry_envelope = envelope.clone();
                     retry_envelope.attempts = record.attempts;
@@ -270,14 +271,15 @@ impl DeliveryManager {
         candidates
     }
 
-    /// Check if a message should be retried
-    fn should_retry(&self, record: &DeliveryRecord) -> bool {
+    /// Check if a message should be retried.
+    /// The `now` parameter enables deterministic testing of ack timeout boundaries.
+    fn should_retry(&self, record: &DeliveryRecord, now: DateTime<Utc>) -> bool {
         match record.status {
             DeliveryStatus::Failed(_) => record.attempts < self.config.max_retries,
             DeliveryStatus::InTransit => {
                 // Check if acknowledgment timeout has passed
                 if let Some(last_attempt) = record.last_attempt {
-                    let elapsed = Utc::now() - last_attempt;
+                    let elapsed = now - last_attempt;
                     elapsed.to_std().unwrap_or(Duration::ZERO) > self.config.acknowledgment_timeout
                 } else {
                     false
