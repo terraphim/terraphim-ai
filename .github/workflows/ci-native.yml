@@ -39,7 +39,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
         with:
-          clean: false
+          clean: true
           fetch-depth: 0
 
       - name: Clean target directory
@@ -90,7 +90,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
         with:
-          clean: false
+          clean: true
 
       - name: Install build dependencies
         run: |
