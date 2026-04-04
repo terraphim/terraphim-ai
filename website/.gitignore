@@ -1,7 +1,0 @@
-# Zola
-/public
-/zola.cache
-
-# 1Password Environment
-.env.1password
-.env
