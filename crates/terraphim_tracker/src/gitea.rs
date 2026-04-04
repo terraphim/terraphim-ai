@@ -40,8 +40,8 @@ pub struct GiteaIssue {
 
 /// Gitea label.
 #[derive(Debug, Deserialize)]
-struct GiteaLabel {
-    name: String,
+pub struct GiteaLabel {
+    pub name: String,
 }
 
 /// Gitea issue comment from the API.
