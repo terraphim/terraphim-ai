@@ -1676,6 +1676,19 @@ impl AgentOrchestrator {
                     title = %title,
                     "filed finding issue"
                 );
+                // Trigger implementation-swarm via mention comment so
+                // mention polling dispatches the agent automatically.
+                let trigger = format!(
+                    "@adf:implementation-swarm please implement this finding for issue #{}",
+                    issue.number
+                );
+                if let Err(e) = poster.tracker().post_comment(issue.number, &trigger).await {
+                    warn!(
+                        issue_number = issue.number,
+                        error = %e,
+                        "failed to post implementation trigger comment"
+                    );
+                }
                 Ok(())
             }
             Err(e) => Err(format!("failed to create issue '{}': {}", title, e)),
