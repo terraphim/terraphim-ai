@@ -75,7 +75,9 @@ impl MentionCursor {
     /// current time, effectively skipping all historical mentions.
     /// Get the SQLite operator for persistent storage.
     async fn sqlite_op() -> Option<opendal::Operator> {
-        let storage = terraphim_persistence::DeviceStorage::instance().await.ok()?;
+        let storage = terraphim_persistence::DeviceStorage::instance()
+            .await
+            .ok()?;
         let (op, _) = storage.ops.get("sqlite")?;
         Some(op.clone())
     }
@@ -389,7 +391,7 @@ mod tests {
             user: terraphim_tracker::CommentUser {
                 login: login.into(),
             },
-            issue_number: 0,  // filled by caller via parse_mentions arg
+            issue_number: 0, // filled by caller via parse_mentions arg
             created_at: "2026-03-30T00:00:00Z".into(),
             updated_at: "2026-03-30T00:00:00Z".into(),
         }

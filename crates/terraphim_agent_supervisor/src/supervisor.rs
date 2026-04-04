@@ -215,7 +215,7 @@ impl AgentSupervisor {
         }
 
         // Check if restart is allowed
-        if !self.should_restart(&agent_id, &reason).await? {
+        if !self.should_restart(&agent_id, &reason, Utc::now()).await? {
             log::info!("Not restarting agent {} due to policy", agent_id);
             // Remove the failed agent
             self.stop_agent(&agent_id).await?;
@@ -238,11 +238,13 @@ impl AgentSupervisor {
         Ok(())
     }
 
-    /// Check if agent should be restarted based on policy
+    /// Check if agent should be restarted based on policy.
+    /// The `now` parameter enables deterministic testing of restart window boundaries.
     async fn should_restart(
         &self,
         agent_id: &AgentPid,
         reason: &ExitReason,
+        now: DateTime<Utc>,
     ) -> SupervisionResult<bool> {
         // Don't restart on normal shutdown
         if matches!(reason, ExitReason::Normal | ExitReason::Shutdown) {
@@ -260,7 +262,7 @@ impl AgentSupervisor {
 
         // Check restart intensity - use time since first restart if available, otherwise time since start
         let time_since_first_restart = if let Some(first_restart) = agent_info.last_restart {
-            let duration = Utc::now() - first_restart;
+            let duration = now - first_restart;
             Duration::from_secs(duration.num_seconds().max(0) as u64)
         } else {
             // No previous restarts, so this would be the first
