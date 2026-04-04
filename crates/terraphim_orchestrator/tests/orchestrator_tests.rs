@@ -118,6 +118,7 @@ fn test_config() -> OrchestratorConfig {
         flow_state_dir: None,
         gitea: None,
         mentions: None,
+        role_config_path: None,
     }
 }
 
@@ -293,13 +294,17 @@ fn test_example_config_creates_orchestrator() {
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("orchestrator.example.toml");
     let config = OrchestratorConfig::from_file(&example_path).unwrap();
 
-    assert_eq!(config.agents.len(), 3);
+    assert_eq!(config.agents.len(), 14);
     assert_eq!(config.agents[0].layer, AgentLayer::Safety);
-    assert_eq!(config.agents[1].layer, AgentLayer::Core);
-    assert_eq!(config.agents[2].layer, AgentLayer::Growth);
+    assert_eq!(config.agents[1].layer, AgentLayer::Safety);
+    assert_eq!(config.agents[2].layer, AgentLayer::Core);
 
     let orch = AgentOrchestrator::new(config);
-    assert!(orch.is_ok());
+    assert!(
+        orch.is_ok(),
+        "Orchestrator creation failed: {:?}",
+        orch.err()
+    );
 }
 
 /// Integration test: error variants produce correct error messages.

@@ -1,0 +1,284 @@
+{
+  "id": "Server",
+  "global_shortcut": "Ctrl+Shift+P",
+  "roles": {
+    "Vigil Security": {
+      "shortname": "VigilSec",
+      "name": "Vigil Security",
+      "relevance_function": "terraphim-graph",
+      "terraphim_it": true,
+      "theme": "darkly",
+      "kg": {
+        "automata_path": null,
+        "knowledge_graph_local": {
+          "input_type": "markdown",
+          "path": "data/kg/vigil"
+        },
+        "public": true,
+        "publish": false
+      },
+      "haystacks": [
+        {
+          "location": "crates/",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": false,
+      "llm_system_prompt": "You are Vigil, a Principal Security Engineer (SFIA L5). You specialise in vulnerability management, threat modelling, supply chain security, and cryptographic best practices. Always consider OWASP Top 10, CVE databases, and defence-in-depth principles.",
+      "extra": {}
+    },
+    "Ferrox Rust": {
+      "shortname": "FerroxRust",
+      "name": "Ferrox Rust",
+      "relevance_function": "terraphim-graph",
+      "terraphim_it": true,
+      "theme": "darkly",
+      "kg": {
+        "automata_path": null,
+        "knowledge_graph_local": {
+          "input_type": "markdown",
+          "path": "data/kg/ferrox"
+        },
+        "public": true,
+        "publish": false
+      },
+      "haystacks": [
+        {
+          "location": "crates/",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": false,
+      "llm_system_prompt": "You are Ferrox, a Senior Rust Engineer (SFIA L5). You specialise in ownership, async/await patterns with tokio, type system design, performance optimisation, and idiomatic Rust. Always enforce memory safety and zero-cost abstractions.",
+      "extra": {}
+    },
+    "Carthos Architecture": {
+      "shortname": "CarthosArch",
+      "name": "Carthos Architecture",
+      "relevance_function": "terraphim-graph",
+      "terraphim_it": true,
+      "theme": "darkly",
+      "kg": {
+        "automata_path": null,
+        "knowledge_graph_local": {
+          "input_type": "markdown",
+          "path": "data/kg/carthos"
+        },
+        "public": true,
+        "publish": false
+      },
+      "haystacks": [
+        {
+          "location": "crates/",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        },
+        {
+          "location": "docs/",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": false,
+      "llm_system_prompt": "You are Carthos, a Domain Architect (SFIA L5). You specialise in bounded contexts, DDD, system design patterns, API design, and architecture decision records. Always consider quality attributes and trade-offs.",
+      "extra": {}
+    },
+    "Lux Frontend": {
+      "shortname": "LuxFE",
+      "name": "Lux Frontend",
+      "relevance_function": "terraphim-graph",
+      "terraphim_it": true,
+      "theme": "lumen",
+      "kg": {
+        "automata_path": null,
+        "knowledge_graph_local": {
+          "input_type": "markdown",
+          "path": "data/kg/lux"
+        },
+        "public": true,
+        "publish": false
+      },
+      "haystacks": [
+        {
+          "location": "desktop/",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": false,
+      "llm_system_prompt": "You are Lux, a TypeScript Engineer (SFIA L4). You specialise in accessibility, Svelte component design, responsive layout, and visual design systems. Always prioritise WCAG compliance and user experience.",
+      "extra": {}
+    },
+    "Echo QA": {
+      "shortname": "EchoQA",
+      "name": "Echo QA",
+      "relevance_function": "terraphim-graph",
+      "terraphim_it": true,
+      "theme": "darkly",
+      "kg": {
+        "automata_path": null,
+        "knowledge_graph_local": {
+          "input_type": "markdown",
+          "path": "data/kg/echo"
+        },
+        "public": true,
+        "publish": false
+      },
+      "haystacks": [
+        {
+          "location": "crates/",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        },
+        {
+          "location": "tests/",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": false,
+      "llm_system_prompt": "You are Echo, a QA Twin Maintainer (SFIA L4). You specialise in testing strategy, CI/CD testing, quality metrics, regression analysis, and test automation. Always ensure coverage and test reliability.",
+      "extra": {}
+    },
+    "Conduit DevOps": {
+      "shortname": "ConduitOps",
+      "name": "Conduit DevOps",
+      "relevance_function": "terraphim-graph",
+      "terraphim_it": true,
+      "theme": "darkly",
+      "kg": {
+        "automata_path": null,
+        "knowledge_graph_local": {
+          "input_type": "markdown",
+          "path": "data/kg/conduit"
+        },
+        "public": true,
+        "publish": false
+      },
+      "haystacks": [
+        {
+          "location": ".github/",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        },
+        {
+          "location": "scripts/",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": false,
+      "llm_system_prompt": "You are Conduit, a DevOps Engineer (SFIA L4). You specialise in deployment strategies, monitoring, infrastructure management, container orchestration, and incident response. Always prioritise reliability and observability.",
+      "extra": {}
+    },
+    "Meridian Research": {
+      "shortname": "MeridianRes",
+      "name": "Meridian Research",
+      "relevance_function": "terraphim-graph",
+      "terraphim_it": true,
+      "theme": "darkly",
+      "kg": {
+        "automata_path": null,
+        "knowledge_graph_local": {
+          "input_type": "markdown",
+          "path": "data/kg/meridian"
+        },
+        "public": true,
+        "publish": false
+      },
+      "haystacks": [
+        {
+          "location": "docs/",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": false,
+      "llm_system_prompt": "You are Meridian, a Market Researcher (SFIA L4). You specialise in market analysis, product strategy, user research, competitive analysis, and business requirements. Always ground recommendations in evidence and data.",
+      "extra": {}
+    },
+    "Mneme Knowledge": {
+      "shortname": "MnemeKG",
+      "name": "Mneme Knowledge",
+      "relevance_function": "terraphim-graph",
+      "terraphim_it": true,
+      "theme": "darkly",
+      "kg": {
+        "automata_path": null,
+        "knowledge_graph_local": {
+          "input_type": "markdown",
+          "path": "data/kg/mneme"
+        },
+        "public": true,
+        "publish": false
+      },
+      "haystacks": [
+        {
+          "location": "docs/",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        },
+        {
+          "location": "data/",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": false,
+      "llm_system_prompt": "You are Mneme, a Meta-Learning Agent (SFIA L5). You specialise in knowledge management, learning patterns, decision frameworks, and organisational learning. Always seek patterns across experiences and capture reusable insights.",
+      "extra": {}
+    }
+  },
+  "default_role": "Vigil Security",
+  "selected_role": "Vigil Security"
+}
