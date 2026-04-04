@@ -21,7 +21,6 @@ struct GiteaWebhookPayload {
     action: String,
     comment: GiteaComment,
     issue: GiteaIssue,
-    #[allow(dead_code)]
     repository: GiteaRepository,
 }
 
@@ -29,30 +28,24 @@ struct GiteaWebhookPayload {
 struct GiteaComment {
     id: u64,
     body: String,
-    #[allow(dead_code)]
     user: GiteaUser,
-    #[allow(dead_code)]
     created_at: String,
 }
 
 #[derive(Debug, Deserialize)]
 struct GiteaUser {
-    #[allow(dead_code)]
     login: String,
 }
 
 #[derive(Debug, Deserialize)]
 struct GiteaIssue {
     number: u64,
-    #[allow(dead_code)]
     title: String,
-    #[allow(dead_code)]
     state: String,
 }
 
 #[derive(Debug, Deserialize)]
 struct GiteaRepository {
-    #[allow(dead_code)]
     full_name: String,
 }
 
@@ -127,6 +120,18 @@ async fn handle_gitea_webhook(
         }
     };
 
+    info!(
+        repo = %payload.repository.full_name,
+        issue = payload.issue.number,
+        issue_title = %payload.issue.title,
+        issue_state = %payload.issue.state,
+        comment_id = payload.comment.id,
+        author = %payload.comment.user.login,
+        created_at = %payload.comment.created_at,
+        action = %payload.action,
+        "received webhook event"
+    );
+
     // 3. Only handle created comments (ignore edited/deleted)
     if payload.action != "created" {
         return StatusCode::OK;
@@ -152,6 +157,7 @@ async fn handle_gitea_webhook(
     }
 
     // 5. Dispatch each command to the orchestrator
+    let mut commands_dispatched: u32 = 0;
     for cmd in commands {
         let dispatch = match cmd {
             crate::adf_commands::AdfCommand::SpawnAgent {
@@ -193,11 +199,15 @@ async fn handle_gitea_webhook(
             warn!(error = %e, "failed to send webhook dispatch to orchestrator");
             return StatusCode::SERVICE_UNAVAILABLE;
         }
+        commands_dispatched += 1;
     }
 
     info!(
+        repo = %payload.repository.full_name,
         issue = payload.issue.number,
         comment_id = payload.comment.id,
+        author = %payload.comment.user.login,
+        commands = commands_dispatched,
         "webhook dispatch complete"
     );
     StatusCode::ACCEPTED
