@@ -26,16 +26,16 @@ pub struct GiteaTracker {
 
 /// Gitea API issue response.
 #[derive(Debug, Deserialize)]
-struct GiteaIssue {
-    id: u64,
-    number: u64,
-    title: String,
-    body: Option<String>,
-    state: String,
-    html_url: Option<String>,
-    created_at: Option<String>,
-    updated_at: Option<String>,
-    labels: Option<Vec<GiteaLabel>>,
+pub struct GiteaIssue {
+    pub id: u64,
+    pub number: u64,
+    pub title: String,
+    pub body: Option<String>,
+    pub state: String,
+    pub html_url: Option<String>,
+    pub created_at: Option<String>,
+    pub updated_at: Option<String>,
+    pub labels: Option<Vec<GiteaLabel>>,
 }
 
 /// Gitea label.
@@ -235,6 +235,61 @@ impl GiteaTracker {
             });
         }
         response.json().await.map_err(TrackerError::Http)
+    }
+
+    /// Create a new Gitea issue.
+    pub async fn create_issue(
+        &self,
+        title: &str,
+        body: &str,
+        labels: &[&str],
+    ) -> Result<GiteaIssue> {
+        let url = format!(
+            "{}/api/v1/repos/{}/{}/issues",
+            self.config.base_url, self.config.owner, self.config.repo
+        );
+        let response = self
+            .build_request(reqwest::Method::POST, &url)
+            .json(&serde_json::json!({
+                "title": title,
+                "body": body,
+                "labels": labels,
+            }))
+            .send()
+            .await?;
+        if !response.status().is_success() {
+            let status = response.status();
+            let text = response.text().await.unwrap_or_default();
+            return Err(TrackerError::Api {
+                message: format!("Gitea create_issue error {}: {}", status, text),
+            });
+        }
+        response.json().await.map_err(TrackerError::Http)
+    }
+
+    /// Search open issues by keyword in title.
+    /// Returns issue numbers whose titles contain the given keyword.
+    pub async fn search_issues_by_title(&self, keyword: &str) -> Result<Vec<u64>> {
+        let url = format!(
+            "{}/api/v1/repos/{}/{}/issues?state=open&q={}&type=issues",
+            self.config.base_url,
+            self.config.owner,
+            self.config.repo,
+            urlencoding::encode(keyword)
+        );
+        let response = self
+            .build_request(reqwest::Method::GET, &url)
+            .send()
+            .await?;
+        if !response.status().is_success() {
+            let status = response.status();
+            let text = response.text().await.unwrap_or_default();
+            return Err(TrackerError::Api {
+                message: format!("Gitea search issues error {}: {}", status, text),
+            });
+        }
+        let issues: Vec<GiteaIssue> = response.json().await.map_err(TrackerError::Http)?;
+        Ok(issues.into_iter().map(|i| i.number).collect())
     }
 
     /// Fetch comments on a Gitea issue, optionally filtering by `since` timestamp.

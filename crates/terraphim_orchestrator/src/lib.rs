@@ -48,6 +48,7 @@ pub mod scheduler;
 pub mod scope;
 
 pub use compound::{CompoundReviewResult, CompoundReviewWorkflow, ReviewGroupDef, SwarmConfig};
+use terraphim_symphony::runner::protocol::{FindingSeverity, ReviewFinding};
 pub use concurrency::{ConcurrencyController, FairnessPolicy, ModeQuotas};
 pub use config::{
     AgentDefinition, AgentLayer, CompoundReviewConfig, ConcurrencyConfig, GiteaOutputConfig,
@@ -87,7 +88,7 @@ use terraphim_spawner::health::{CircuitBreaker, HealthStatus};
 use terraphim_spawner::output::OutputEvent;
 use terraphim_spawner::{AgentHandle, AgentSpawner, ResourceLimits, SpawnRequest};
 use tokio::sync::broadcast;
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 /// Result of evaluating a pre-check strategy before spawning an agent.
 #[derive(Debug, Clone)]
@@ -1207,6 +1208,222 @@ Comment: {}",
         self.mention_cursor = Some(cursor);
     }
 
+    /// File a Gitea issue for a compound review finding.
+    ///
+    /// Deduplicates by searching for existing open issues with similar titles
+    /// before creating a new one.
+    async fn file_finding_issue(
+        &self,
+        poster: &OutputPoster,
+        result: &CompoundReviewResult,
+        finding: &ReviewFinding,
+    ) -> Result<(), String> {
+        use terraphim_symphony::runner::protocol::FindingSeverity;
+
+        let sev_str = match finding.severity {
+            FindingSeverity::Critical => "CRITICAL",
+            FindingSeverity::High => "HIGH",
+            FindingSeverity::Medium => "MEDIUM",
+            FindingSeverity::Low => "LOW",
+            FindingSeverity::Info => "INFO",
+        };
+
+        // Build a short keyword from the finding for dedup search
+        let dedup_keyword = if finding.finding.len() > 40 {
+            &finding.finding[..40]
+        } else {
+            &finding.finding
+        };
+
+        // Dedup: check if an open issue with similar title already exists
+        match poster.tracker().search_issues_by_title(dedup_keyword).await {
+            Ok(existing) if !existing.is_empty() => {
+                info!(
+                    severity = %sev_str,
+                    existing_issues = existing.len(),
+                    keyword = %dedup_keyword,
+                    "skipping finding issue (already filed)"
+                );
+                return Ok(());
+            }
+            Err(e) => {
+                // Dedup search failed — proceed with filing (fail-open)
+                warn!(error = %e, "dedup search failed, proceeding to file issue");
+            }
+            _ => {}
+        }
+
+        let title = format!(
+            "[Compound Review] {}: {}",
+            sev_str,
+            if finding.finding.len() > 80 {
+                format!("{}...", &finding.finding[..77])
+            } else {
+                finding.finding.clone()
+            }
+        );
+
+        let mut body = format!(
+            "## Automated Finding from Compound Review\n\n",
+        );
+        body.push_str(&format!(
+            "- **Severity**: {}\n",
+            sev_str
+        ));
+        if !finding.file.is_empty() {
+            body.push_str(&format!(
+                "- **File**: {}{}\n",
+                finding.file,
+                if finding.line > 0 {
+                    format!(":{}", finding.line)
+                } else {
+                    String::new()
+                }
+            ));
+        }
+        body.push_str(&format!(
+            "- **Confidence**: {:.0}%\n",
+            finding.confidence * 100.0
+        ));
+        body.push_str(&format!(
+            "- **Review ID**: {}\n\n",
+            result.correlation_id
+        ));
+        body.push_str(&format!(
+            "### Finding\n\n{}\n\n",
+            finding.finding
+        ));
+        if let Some(ref suggestion) = finding.suggestion {
+            if !suggestion.is_empty() {
+                body.push_str(&format!(
+                    "### Suggested Fix\n\n{}\n",
+                    suggestion
+                ));
+            }
+        }
+
+        let sev_label = sev_str.to_lowercase();
+        let labels = vec!["compound-review", sev_label.as_str()];
+        match poster.tracker().create_issue(&title, &body, &labels).await {
+            Ok(issue) => {
+                info!(
+                    issue_number = issue.number,
+                    severity = %sev_str,
+                    title = %title,
+                    "filed finding issue"
+                );
+                Ok(())
+            }
+            Err(e) => {
+                Err(format!("failed to create issue '{}': {}", title, e))
+            }
+        }
+    }
+
+    /// Spawn a remediation agent for a CRITICAL finding.
+    ///
+    /// Looks up the finding's category in `compound_review.remediation_agents`
+    /// to determine which agent to spawn. If no mapping exists, logs and skips.
+    async fn spawn_remediation_agent(
+        &mut self,
+        finding: &ReviewFinding,
+    ) -> Result<(), String> {
+        let category_key = format!("{:?}", finding.category).to_lowercase();
+        let agent_name = self
+            .config
+            .compound_review
+            .remediation_agents
+            .get(&category_key)
+            .cloned();
+
+        let agent_name = match agent_name {
+            Some(name) => name,
+            None => {
+                debug!(
+                    category = %category_key,
+                    "no remediation agent mapped for category, skipping"
+                );
+                return Ok(());
+            }
+        };
+
+        // Build a targeted fix prompt
+        let mut prompt = format!(
+            "Fix this CRITICAL finding from compound review:\n\n"
+        );
+        if !finding.file.is_empty() {
+            prompt.push_str(&format!(
+                "File: {}{}\n",
+                finding.file,
+                if finding.line > 0 {
+                    format!(":{}", finding.line)
+                } else {
+                    String::new()
+                }
+            ));
+        }
+        prompt.push_str(&format!(
+            "Severity: CRITICAL\nFinding: {}\n",
+            finding.finding
+        ));
+        if let Some(ref suggestion) = finding.suggestion {
+            if !suggestion.is_empty() {
+                prompt.push_str(&format!(
+                    "Suggested approach: {}\n",
+                    suggestion
+                ));
+            }
+        }
+        prompt.push_str(
+            "\nInstructions:\n\
+1. Read the relevant file(s)\n\
+2. Implement the fix\n\
+3. Run cargo build && cargo test to verify\n\
+4. Commit your changes\n",
+        );
+
+        // Look up the agent definition
+        let agent_def = self
+            .config
+            .agents
+            .iter()
+            .find(|a| a.name == agent_name)
+            .cloned();
+
+        let agent_def = match agent_def {
+            Some(def) => def,
+            None => {
+                warn!(
+                    agent = %agent_name,
+                    "remediation agent not found in fleet config, skipping"
+                );
+                return Ok(());
+            }
+        };
+
+        // Spawn using the existing agent infrastructure
+        // Build a modified agent def with our custom task prompt
+        let mut fix_def = agent_def;
+        fix_def.task = prompt;
+        fix_def.pre_check = None; // Skip pre-check for remediation
+
+        let spawned = self.spawn_agent(&fix_def).await;
+
+        match spawned {
+            Ok(_) => {
+                info!(
+                    agent = %agent_name,
+                    file = %finding.file,
+                    "spawned remediation agent for CRITICAL finding"
+                );
+                Ok(())
+            }
+            Err(e) => {
+                Err(format!("failed to spawn remediation agent '{}': {}", agent_name, e))
+            }
+        }
+    }
+
     /// Attempt to commit any uncommitted working tree changes made by an agent.
     ///
     /// This runs `git add -A && git diff --cached --quiet` to check if there
@@ -1786,6 +2003,47 @@ Comment: {}",
                             duration = ?result.duration,
                             "compound review completed"
                         );
+
+                        // 1. Post structured summary to Gitea
+                        if let (Some(ref poster), Some(issue)) = (
+                            &self.output_poster,
+                            self.config.compound_review.gitea_issue,
+                        ) {
+                            let report = result.format_report();
+                            if let Err(e) = poster.post_raw(issue, &report).await {
+                                warn!(error = %e, "failed to post compound review summary");
+                            }
+
+                            // 2. Auto-file issues for CRITICAL/HIGH findings
+                            if self.config.compound_review.auto_file_issues {
+                                let actionable = result.actionable_findings();
+                                for finding in actionable {
+                                    if let Err(e) = self
+                                        .file_finding_issue(poster, &result, finding)
+                                        .await
+                                    {
+                                        warn!(error = %e, "failed to file finding issue");
+                                    }
+                                }
+                            }
+
+                            // 3. Trigger remediation agents for CRITICAL findings
+                            if self.config.compound_review.auto_remediate {
+                                let critical: Vec<_> = result
+                                    .findings
+                                    .iter()
+                                    .filter(|f| f.severity == FindingSeverity::Critical)
+                                    .collect();
+                                for finding in critical {
+                                    if let Err(e) = self
+                                        .spawn_remediation_agent(finding)
+                                        .await
+                                    {
+                                        warn!(error = %e, "failed to spawn remediation agent");
+                                    }
+                                }
+                            }
+                        }
                     }
                     Err(e) => {
                         error!(error = %e, "compound review failed");
@@ -1953,6 +2211,7 @@ mod tests {
                 worktree_root: std::path::PathBuf::from("/tmp/test-orchestrator/.worktrees"),
                 base_branch: "main".to_string(),
                 max_concurrent_agents: 3,
+                ..Default::default()
             },
             workflow: None,
             agents: vec![
@@ -2156,6 +2415,7 @@ task = "test"
                 worktree_root: std::path::PathBuf::from("/tmp/.worktrees"),
                 base_branch: "main".to_string(),
                 max_concurrent_agents: 3,
+                ..Default::default()
             },
             workflow: None,
             agents: vec![AgentDefinition {

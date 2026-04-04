@@ -147,6 +147,82 @@ pub struct CompoundReviewResult {
     pub agents_failed: usize,
 }
 
+impl CompoundReviewResult {
+    /// Format a structured markdown summary suitable for posting as a Gitea comment.
+    pub fn format_report(&self) -> String {
+        let verdict = if self.pass { "✅ PASS" } else { "❌ NO-GO" };
+        let duration_secs = self.duration.as_secs();
+
+        let mut report = format!(
+            "## Compound Review\n\n",
+        );
+        report.push_str(&format!(
+            "**Verdict: {}** | Duration: {}s | Agents: {} ({} failed)\n\n",
+            verdict, duration_secs, self.agents_run, self.agents_failed
+        ));
+
+        // Findings table
+        if !self.findings.is_empty() {
+            report.push_str(&format!(
+                "### Findings ({})\n\n",
+                self.findings.len()
+            ));
+            report.push_str("| Severity | File | Finding | Conf |\n");
+            report.push_str("|----------|------|---------|------|\n");
+            for f in &self.findings {
+                let sev = format!("{:?}", f.severity);
+                let file_loc = if !f.file.is_empty() {
+                    if f.line > 0 {
+                        format!("{}:{}", f.file, f.line)
+                    } else {
+                        f.file.clone()
+                    }
+                } else {
+                    "-".to_string()
+                };
+                // Truncate finding text
+                let finding_text = if f.finding.len() > 120 {
+                    format!("{}...", &f.finding[..117])
+                } else {
+                    f.finding.clone()
+                };
+                report.push_str(&format!(
+                    "| {} | {} | {} | {:.0}% |\n",
+                    sev, file_loc, finding_text, f.confidence * 100.0
+                ));
+            }
+            report.push_str("\n");
+        } else {
+            report.push_str("**No findings.**\n\n");
+        }
+
+        // Per-agent summary
+        report.push_str("### Per-Agent Summary\n\n");
+        for output in &self.agent_outputs {
+            let status = if output.pass { "✅" } else { "❌" };
+            report.push_str(&format!(
+                "- {} {}: {} finding(s) — {}\n",
+                status, output.agent, output.findings.len(), output.summary
+            ));
+        }
+
+        report
+    }
+
+    /// Extract CRITICAL and HIGH findings suitable for issue filing.
+    pub fn actionable_findings(&self) -> Vec<&ReviewFinding> {
+        self.findings
+            .iter()
+            .filter(|f| {
+                matches!(
+                    f.severity,
+                    FindingSeverity::Critical | FindingSeverity::High
+                )
+            })
+            .collect()
+    }
+}
+
 /// Nightly compound review workflow with 6-agent swarm.
 ///
 /// Dispatches review agents in parallel, collects findings,
@@ -993,6 +1069,7 @@ Done!"#;
             cli_tool: None,
             provider: None,
             model: None,
+            ..Default::default()
         };
 
         let swarm_config = SwarmConfig::from_compound_config(&compound_config);
@@ -1179,6 +1256,7 @@ Done!"#;
             cli_tool: Some("/home/alex/.bun/bin/opencode".to_string()),
             provider: Some("opencode-go".to_string()),
             model: Some("glm-5".to_string()),
+            ..Default::default()
         };
         let swarm = SwarmConfig::from_compound_config(&config);
         for group in &swarm.groups {
@@ -1200,6 +1278,7 @@ Done!"#;
             cli_tool: None,
             provider: None,
             model: None,
+            ..Default::default()
         };
         let swarm = SwarmConfig::from_compound_config(&config);
         // Should use default groups unchanged
@@ -1220,6 +1299,7 @@ Done!"#;
             cli_tool: None,
             provider: None,
             model: None,
+            ..Default::default()
         };
         let swarm = SwarmConfig::from_compound_config(&config);
         assert_eq!(swarm.timeout, Duration::from_secs(900));
