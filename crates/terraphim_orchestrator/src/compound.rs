@@ -697,6 +697,43 @@ fn unwrap_opencode_protocol(stdout: &str) -> String {
                     result.push('\n');
                     continue;
                 }
+                // Format other opencode protocol messages (tool_use, tool_result, etc.)
+                // as brief summaries instead of keeping raw JSON. Raw payloads contain
+                // file content that triggers false positives in the heuristic scanner.
+                if let Some(msg_type) = val.get("type").and_then(|t| t.as_str()) {
+                    has_protocol = true;
+                    let tool_name = val
+                        .get("part")
+                        .and_then(|p| p.get("tool"))
+                        .and_then(|t| t.as_str())
+                        .unwrap_or("unknown");
+                    let status = val
+                        .get("part")
+                        .and_then(|p| p.get("state"))
+                        .and_then(|s| s.get("status"))
+                        .and_then(|s| s.as_str())
+                        .unwrap_or("");
+                    let input_path = val
+                        .get("part")
+                        .and_then(|p| p.get("state"))
+                        .and_then(|s| s.get("input"))
+                        .and_then(|i| {
+                            i.get("filePath")
+                                .or_else(|| i.get("path"))
+                                .or_else(|| i.get("command"))
+                        })
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+                    if input_path.is_empty() {
+                        result.push_str(&format!("[{}: {}]\n", msg_type, tool_name));
+                    } else {
+                        result.push_str(&format!(
+                            "[{}: {} {} {}]\n",
+                            msg_type, tool_name, input_path, status
+                        ));
+                    }
+                    continue;
+                }
             }
         }
 
@@ -1289,6 +1326,52 @@ Done!"#;
         // Should use default groups unchanged
         assert_eq!(swarm.groups[0].cli_tool, "opencode");
         assert!(swarm.groups[0].model.is_none());
+    }
+
+    // ==================== Opencode Protocol Unwrap Tests ====================
+
+    #[test]
+    fn test_unwrap_opencode_protocol_formats_tool_use() {
+        // Reproduce issue #303: tool_use messages with file content containing
+        // "critical" were kept as raw JSON, causing the heuristic scanner to
+        // create bogus CRITICAL findings from protocol payloads.
+        // Now tool_use is formatted as a brief summary instead.
+        let protocol_output = r#"{"type":"text","part":{"type":"text","text":"Starting review..."}}
+{"type":"tool_use","timestamp":1775340045267,"sessionID":"ses_abc","part":{"id":"prt_123","tool":"read","state":{"status":"completed","input":{"filePath":"/tmp/test.rs"},"output":"fn critical_path() { }"}}}
+{"type":"text","part":{"type":"text","text":"Review complete. No issues found."}}"#;
+
+        let unwrapped = unwrap_opencode_protocol(protocol_output);
+        // Raw payload content must not leak through
+        assert!(
+            !unwrapped.contains("critical_path"),
+            "tool_use payload content should not leak through"
+        );
+        // Tool call should be formatted as a brief summary
+        assert!(
+            unwrapped.contains("[tool_use: read /tmp/test.rs completed]"),
+            "tool_use should be formatted as summary, got: {}",
+            unwrapped
+        );
+        assert!(unwrapped.contains("Starting review..."));
+        assert!(unwrapped.contains("Review complete."));
+    }
+
+    #[test]
+    fn test_extract_review_output_no_false_critical_from_tool_use() {
+        // End-to-end: opencode output with tool_use containing "critical"
+        // should NOT produce synthetic CRITICAL findings.
+        let protocol_output = r#"{"type":"text","part":{"type":"text","text":"Reviewing code..."}}
+{"type":"tool_use","part":{"tool":"read","state":{"output":"FindingSeverity::Critical is used here"}}}
+{"type":"text","part":{"type":"text","text":"All looks good, no issues."}}"#;
+
+        let output =
+            extract_review_output(protocol_output, "test-agent", FindingCategory::Security);
+        // Should NOT have any findings -- the "Critical" was inside a tool_use payload
+        assert_eq!(
+            output.findings.len(),
+            0,
+            "tool_use payloads must not generate synthetic findings"
+        );
     }
 
     #[test]
