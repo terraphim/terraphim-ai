@@ -74,6 +74,9 @@ pub struct OrchestratorConfig {
     /// Mention-driven dispatch configuration.
     #[serde(default)]
     pub mentions: Option<MentionConfig>,
+    /// Path to persona role configuration JSON for terraphim-agent.
+    #[serde(default)]
+    pub role_config_path: Option<PathBuf>,
 }
 
 /// Configuration for posting agent output to Gitea issues.
@@ -731,11 +734,11 @@ task = "t"
         let example_path =
             std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("orchestrator.example.toml");
         let config = OrchestratorConfig::from_file(&example_path).unwrap();
-        assert_eq!(config.agents.len(), 3);
+        assert_eq!(config.agents.len(), 14);
         assert_eq!(config.agents[0].layer, AgentLayer::Safety);
-        assert_eq!(config.agents[1].layer, AgentLayer::Core);
-        assert_eq!(config.agents[2].layer, AgentLayer::Growth);
-        assert!(config.agents[1].schedule.is_some());
+        assert_eq!(config.agents[1].layer, AgentLayer::Safety);
+        assert_eq!(config.agents[2].layer, AgentLayer::Core);
+        assert!(config.agents[2].schedule.is_some());
     }
 
     #[test]

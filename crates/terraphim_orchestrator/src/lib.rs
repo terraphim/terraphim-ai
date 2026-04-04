@@ -1378,9 +1378,9 @@ impl AgentOrchestrator {
             }
         }
 
-        let sev_label = sev_str.to_lowercase();
-        let labels = vec!["compound-review", sev_label.as_str()];
-        match poster.tracker().create_issue(&title, &body, &labels).await {
+        // Skip labels for now - Gitea API has issues with label format
+        // TODO: Fix labels format for Gitea API
+        match poster.tracker().create_issue(&title, &body, &[]).await {
             Ok(issue) => {
                 info!(
                     issue_number = issue.number,
@@ -2348,6 +2348,7 @@ mod tests {
             flow_state_dir: None,
             gitea: None,
             mentions: None,
+            role_config_path: None,
         }
     }
 
@@ -2527,6 +2528,7 @@ task = "test"
             flow_state_dir: None,
             gitea: None,
             mentions: None,
+            role_config_path: None,
         }
     }
 
