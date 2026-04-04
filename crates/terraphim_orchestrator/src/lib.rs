@@ -2152,14 +2152,16 @@ impl AgentOrchestrator {
     ) {
         match def.layer {
             AgentLayer::Safety => {
-                {
+                // Only count non-zero exits toward restart limit.
+                // A successful exit (code 0) means the agent completed its task;
+                // punishing it for succeeding makes no sense.
+                if !status.success() {
                     let count = self.restart_counts.entry(name.to_string()).or_insert(0);
                     *count += 1;
+                    self.save_restart_counts();
                 }
                 self.restart_cooldowns
                     .insert(name.to_string(), Instant::now());
-                // Persist restart counts so they survive orchestrator restarts
-                self.save_restart_counts();
                 let restart_count = self.restart_counts.get(name).copied().unwrap_or(0);
                 if restart_count <= self.config.max_restart_count {
                     info!(
@@ -2854,11 +2856,11 @@ task = "test"
             "exited agent should be removed from active_agents"
         );
 
-        // Restart count should be recorded
+        // Successful exit (code 0) should NOT increment restart count
         assert_eq!(
-            orch.restart_counts.get("echo-safety").copied(),
-            Some(1),
-            "restart count should be incremented"
+            orch.restart_counts.get("echo-safety").copied().unwrap_or(0),
+            0,
+            "successful exit should not increment restart count"
         );
     }
 
@@ -2929,10 +2931,13 @@ task = "test"
     async fn test_max_restart_count_respected() {
         let mut config = test_config_fast_lifecycle();
         config.max_restart_count = 2;
+        // Use a command that exits non-zero so restart_count increments
+        config.agents[0].cli_tool = "false".to_string();
+        config.agents[0].task = String::new();
         let mut orch = AgentOrchestrator::new(config).unwrap();
         let def = orch.config.agents[0].clone();
 
-        // Cycle through max_restart_count + 1 exits
+        // Cycle through max_restart_count + 1 exits (all non-zero)
         for i in 0..3 {
             orch.spawn_agent(&def).await.unwrap();
             tokio::time::sleep(Duration::from_millis(100)).await;
@@ -2944,7 +2949,7 @@ task = "test"
             );
         }
 
-        // After 3 exits, restart count = 3, max = 2
+        // After 3 non-zero exits, restart count = 3, max = 2
         // restart_pending should NOT restart (count > max)
         orch.restart_pending_safety_agents().await;
         assert!(
@@ -2952,6 +2957,38 @@ task = "test"
             "agent should not restart after exceeding max_restart_count"
         );
         assert_eq!(orch.restart_counts.get("echo-safety").copied(), Some(3));
+    }
+
+    #[tokio::test]
+    async fn test_successful_exit_does_not_increment_restart_count() {
+        let config = test_config_fast_lifecycle();
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+        let def = orch.config.agents[0].clone(); // echo "safety watch" -> exit 0
+
+        // Spawn and let it exit successfully multiple times
+        for _ in 0..5 {
+            orch.spawn_agent(&def).await.unwrap();
+            tokio::time::sleep(Duration::from_millis(100)).await;
+            orch.poll_agent_exits().await;
+        }
+
+        // Exit code 0 should never increment restart_count
+        assert_eq!(
+            orch.restart_counts.get("echo-safety").copied().unwrap_or(0),
+            0,
+            "successful exits (code 0) must not increment restart_count"
+        );
+
+        // Agent should still be eligible for restart
+        orch.restart_cooldowns.insert(
+            "echo-safety".to_string(),
+            Instant::now() - Duration::from_secs(999),
+        );
+        orch.restart_pending_safety_agents().await;
+        assert!(
+            orch.active_agents.contains_key("echo-safety"),
+            "agent with only successful exits should always be restartable"
+        );
     }
 
     #[tokio::test]
@@ -3003,10 +3040,11 @@ task = "test"
             orch.active_agents.contains_key("echo-safety"),
             "safety agent should be restarted by reconcile_tick"
         );
+        // echo exits with code 0, so restart_count stays at 0
         assert_eq!(
-            orch.restart_counts.get("echo-safety").copied(),
-            Some(1),
-            "restart count should be 1 after first exit+restart cycle"
+            orch.restart_counts.get("echo-safety").copied().unwrap_or(0),
+            0,
+            "successful exit should not increment restart count"
         );
     }
 
