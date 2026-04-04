@@ -1207,6 +1207,87 @@ Comment: {}",
         self.mention_cursor = Some(cursor);
     }
 
+    /// Attempt to commit any uncommitted working tree changes made by an agent.
+    ///
+    /// This runs `git add -A && git diff --cached --quiet` to check if there
+    /// are changes, then commits with a standard message. Failures are logged
+    /// but not propagated — agent work is best-effort.
+    async fn try_commit_agent_work(&self, agent_name: &str) {
+        let working_dir = &self.config.working_dir;
+
+        // Stage all changes
+        let add = tokio::process::Command::new("git")
+            .args(["add", "-A"])
+            .current_dir(working_dir)
+            .output()
+            .await;
+
+        if let Err(e) = add {
+            tracing::debug!(agent = %agent_name, error = %e, "git add failed, skipping commit");
+            return;
+        }
+
+        // Check if there are staged changes
+        let diff_check = tokio::process::Command::new("git")
+            .args(["diff", "--cached", "--quiet"])
+            .current_dir(working_dir)
+            .status()
+            .await;
+
+        match diff_check {
+            Ok(status) if status.success() => {
+                // No changes to commit
+                return;
+            }
+            Ok(_) => { /* changes exist */ }
+            Err(e) => {
+                tracing::debug!(agent = %agent_name, error = %e, "git diff failed, skipping commit");
+                return;
+            }
+        }
+
+        // Get current branch for commit message
+        let branch = tokio::process::Command::new("git")
+            .args(["branch", "--show-current"])
+            .current_dir(working_dir)
+            .output()
+            .await;
+
+        let branch_name = match branch {
+            Ok(output) => String::from_utf8_lossy(&output.stdout).trim().to_string(),
+            Err(_) => "unknown".to_string(),
+        };
+
+        let msg = format!("feat({agent_name}): agent work [auto-commit]");
+
+        let commit = tokio::process::Command::new("git")
+            .args(["commit", "-m", &msg])
+            .current_dir(working_dir)
+            .output()
+            .await;
+
+        match commit {
+            Ok(output) if output.status.success() => {
+                tracing::info!(
+                    agent = %agent_name,
+                    branch = %branch_name,
+                    "auto-committed agent working tree changes"
+                );
+            }
+            Ok(output) => {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                tracing::debug!(
+                    agent = %agent_name,
+                    stderr = %stderr,
+                    "git commit failed"
+                );
+            }
+            Err(e) => {
+                tracing::warn!(agent = %agent_name, error = %e, "failed to run git commit");
+            }
+        }
+    }
+
     /// Periodic reconciliation: detect exits, check cron, evaluate drift, drain output.
     async fn reconcile_tick(&mut self) {
         // Check wall-clock timeouts and respawn with fallback
@@ -1479,6 +1560,11 @@ Comment: {}",
         for (name, def, status) in exited {
             self.active_agents.remove(&name);
             self.handle_agent_exit(&name, &def, status);
+
+            // Auto-commit any working tree changes the agent made
+            if status.success() {
+                self.try_commit_agent_work(&name).await;
+            }
         }
     }
 

@@ -5,7 +5,7 @@ use tokio::sync::mpsc;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
-use terraphim_symphony::runner::protocol::{FindingCategory, ReviewAgentOutput, ReviewFinding};
+use terraphim_symphony::runner::protocol::{FindingCategory, FindingSeverity, ReviewAgentOutput, ReviewFinding};
 
 use crate::config::CompoundReviewConfig;
 use crate::error::OrchestratorError;
@@ -482,16 +482,23 @@ async fn run_single_agent(
 fn extract_review_output(
     stdout: &str,
     agent_name: &str,
-    _category: FindingCategory,
+    category: FindingCategory,
 ) -> ReviewAgentOutput {
-    // Try to find JSON objects in stdout
-    for line in stdout.lines() {
+
+    // Step 1: Unwrap opencode JSON protocol if present.
+    // opencode --format json wraps all output as:
+    //   {"type":"text","part":{"type":"text","text":"..."}}
+    // We extract the inner text content and concatenate it.
+    let unwrapped = unwrap_opencode_protocol(stdout);
+
+    // Step 2: Scan for ReviewAgentOutput JSON
+    for line in unwrapped.lines() {
         let trimmed = line.trim();
         if trimmed.is_empty() {
             continue;
         }
 
-        // Try to parse as ReviewAgentOutput
+        // Try to parse as ReviewAgentOutput directly
         if let Ok(output) = serde_json::from_str::<ReviewAgentOutput>(trimmed) {
             return output;
         }
@@ -516,17 +523,111 @@ fn extract_review_output(
         }
     }
 
-    // Fallback: try to parse entire stdout as JSON
-    if let Ok(output) = serde_json::from_str::<ReviewAgentOutput>(stdout) {
+    // Step 3: Fallback — try to parse entire unwrapped output as JSON
+    if let Ok(output) = serde_json::from_str::<ReviewAgentOutput>(&unwrapped) {
         return output;
     }
 
-    // No parseable output means agent did not produce a valid review
+    // Step 4: Heuristic — if output contains finding-like keywords, create synthetic findings
+    let mut findings = vec![];
+    let _lower = unwrapped.to_lowercase();
+    for line in unwrapped.lines() {
+        let line_lower = line.to_lowercase();
+        if line_lower.contains("critical") || line_lower.contains("vulnerability")
+            || line_lower.contains("cve-") || line_lower.contains("rustsec-")
+        {
+            let severity = if line_lower.contains("critical") {
+                FindingSeverity::Critical
+            } else if line_lower.contains("high") {
+                FindingSeverity::High
+            } else {
+                FindingSeverity::Medium
+            };
+            findings.push(ReviewFinding {
+                file: String::new(),
+                line: 0,
+                severity,
+                category,
+                finding: line.trim().to_string(),
+                confidence: 0.7,
+                suggestion: None,
+            });
+        }
+    }
+
+    if !findings.is_empty() {
+        let count = findings.len();
+        return ReviewAgentOutput {
+            agent: agent_name.to_string(),
+            findings,
+            summary: format!("Extracted {} findings from unstructured output", count),
+            pass: false,
+        };
+    }
+
+    // No parseable output
     ReviewAgentOutput {
         agent: agent_name.to_string(),
         findings: vec![],
-        summary: "No structured output found in agent response".to_string(),
+        summary: format!(
+            "No structured output found in agent response. Output length: {} chars",
+            unwrapped.len()
+        ),
         pass: false,
+    }
+}
+
+/// Unwrap opencode JSON protocol lines into plain text.
+///
+/// opencode `--format json` outputs lines like:
+///   {"type":"text","part":{"type":"text","text":"actual content here"}}
+///   {"type":"tool_use","part":{"tool":"write",...}}
+///
+/// This function extracts all `text` content from these protocol messages
+/// and returns the concatenated plain text.
+fn unwrap_opencode_protocol(stdout: &str) -> String {
+    use serde_json::Value;
+
+    let mut result = String::new();
+    let mut has_protocol = false;
+
+    for line in stdout.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        if let Ok(val) = serde_json::from_str::<Value>(trimmed) {
+            // opencode protocol: {"type":"text","part":{"type":"text","text":"..."}}
+            if val.is_object() {
+                if let Some(text) = val.get("part")
+                    .and_then(|p| p.get("text"))
+                    .and_then(|t| t.as_str())
+                {
+                    has_protocol = true;
+                    result.push_str(text);
+                    result.push('\n');
+                    continue;
+                }
+                // Also check direct "text" field
+                if let Some(text) = val.get("text").and_then(|t| t.as_str()) {
+                    has_protocol = true;
+                    result.push_str(text);
+                    result.push('\n');
+                    continue;
+                }
+            }
+        }
+
+        // Not protocol JSON — keep as-is
+        result.push_str(trimmed);
+        result.push('\n');
+    }
+
+    if has_protocol {
+        result
+    } else {
+        stdout.to_string()
     }
 }
 

@@ -159,12 +159,12 @@
     <div class="footer-coord">Applied Knowledge Systems Ltd // Apache 2.0 // All data processed locally</div>
   </footer>
 
-  <script src="{{ get_url(path='js/warp-tunnel.js') }}"></script>
+  <script src="{{ get_url(path='js/warp-tunnel.js', cachebust=true) }}"></script>
   {% if config.build_search_index %}
-  <script src="{{ get_url(path='elasticlunr.min.js') }}"></script>
-  <script src="{{ get_url(path='search_index.' ~ lang ~ '.js') }}"></script>
+  <script src="{{ get_url(path='elasticlunr.min.js', cachebust=true) }}"></script>
+  <script src="{{ get_url(path='search_index.' ~ lang ~ '.js', cachebust=true) }}"></script>
   {% endif %}
-  <script src="{{ get_url(path='js/site.js') }}"></script>
+  <script src="{{ get_url(path='js/site.js', cachebust=true) }}"></script>
 
   {% block custom_js %}
   {% endblock %}
