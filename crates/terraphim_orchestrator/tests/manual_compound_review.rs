@@ -23,9 +23,10 @@ async fn manual_compound_review() {
     let result = workflow.run("HEAD", "main").await.unwrap();
 
     println!("\n===== COMPOUND REVIEW RESULT =====");
+    println!("Correlation ID: {}", result.correlation_id);
     println!("Agents run: {}", result.agents_run);
     println!("Agents failed: {}", result.agents_failed);
-    println!("Total findings: {}", result.total_findings);
+    println!("Total findings: {}", result.findings.len());
     println!("Pass: {}", result.pass);
     println!("Duration: {:.1}s", result.duration.as_secs_f64());
 
@@ -43,4 +44,5 @@ async fn manual_compound_review() {
     }
 
     assert!(result.agents_run > 0, "Should have run agents");
+    assert!(result.findings.len() > 0, "Should have found issues in 8800 lines of changes");
 }
