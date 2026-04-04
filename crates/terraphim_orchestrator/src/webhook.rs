@@ -4,13 +4,7 @@
 //! Gitea sends POST requests on issue comment events, which are parsed
 //! for @adf: commands and dispatched immediately.
 
-use axum::{
-    body::Bytes,
-    extract::State,
-    http::StatusCode,
-    routing::post,
-    Router,
-};
+use axum::{body::Bytes, extract::State, http::StatusCode, routing::post, Router};
 use hmac::{Hmac, Mac};
 use serde::Deserialize;
 use sha2::Sha256;
@@ -204,23 +198,20 @@ async fn handle_gitea_webhook(
 
 /// Verify HMAC-SHA256 signature.
 fn verify_signature(secret: &str, body: &[u8], signature: &str) -> bool {
-    let mut mac = HmacSha256::new_from_slice(secret.as_bytes())
-        .expect("HMAC can take key of any size");
+    let mut mac =
+        HmacSha256::new_from_slice(secret.as_bytes()).expect("HMAC can take key of any size");
     mac.update(body);
     let result = mac.finalize();
     let expected = result.into_bytes();
 
     // Strip "sha256=" prefix if present
-    let sig_bytes: Vec<u8> = match hex::decode(signature.strip_prefix("sha256=").unwrap_or(signature)) {
-        Ok(b) => b,
-        Err(_) => return false,
-    };
+    let sig_bytes: Vec<u8> =
+        match hex::decode(signature.strip_prefix("sha256=").unwrap_or(signature)) {
+            Ok(b) => b,
+            Err(_) => return false,
+        };
 
-    expected.len() == sig_bytes.len()
-        && expected
-            .iter()
-            .zip(sig_bytes.iter())
-            .all(|(a, b)| a == b)
+    expected.len() == sig_bytes.len() && expected.iter().zip(sig_bytes.iter()).all(|(a, b)| a == b)
 }
 
 #[cfg(test)]

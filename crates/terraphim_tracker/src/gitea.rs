@@ -253,7 +253,7 @@ impl GiteaTracker {
             .json(&serde_json::json!({
                 "title": title,
                 "body": body
-                
+
             }))
             .send()
             .await?;

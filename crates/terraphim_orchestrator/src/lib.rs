@@ -308,13 +308,13 @@ impl AgentOrchestrator {
             "safety agents spawned, entering reconciliation loop"
         );
 
-
         // Start webhook server if configured
         if let Some(ref webhook_cfg) = self.config.webhook {
             let (dispatch_tx, dispatch_rx) = tokio::sync::mpsc::channel(64);
             self.webhook_dispatch_rx = Some(dispatch_rx);
 
-            let agent_names: Vec<String> = self.config.agents.iter().map(|a| a.name.clone()).collect();
+            let agent_names: Vec<String> =
+                self.config.agents.iter().map(|a| a.name.clone()).collect();
             let state = webhook::WebhookState {
                 agent_names,
                 persona_registry: Arc::new(self.persona_registry.clone()),
@@ -1201,7 +1201,8 @@ impl AgentOrchestrator {
                     comment_id = comment_id,
                     "webhook: compound review triggered"
                 );
-                self.handle_schedule_event(ScheduleEvent::CompoundReview).await;
+                self.handle_schedule_event(ScheduleEvent::CompoundReview)
+                    .await;
 
                 // Post acknowledgment via existing output_poster
                 if let Some(ref poster) = self.output_poster {
