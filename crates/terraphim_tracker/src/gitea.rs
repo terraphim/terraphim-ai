@@ -242,7 +242,7 @@ impl GiteaTracker {
         &self,
         title: &str,
         body: &str,
-        labels: &[&str],
+        _labels: &[&str],
     ) -> Result<GiteaIssue> {
         let url = format!(
             "{}/api/v1/repos/{}/{}/issues",
