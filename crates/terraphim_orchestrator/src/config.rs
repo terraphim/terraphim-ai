@@ -290,6 +290,18 @@ pub struct CompoundReviewConfig {
     /// Model override for compound review agents.
     #[serde(default)]
     pub model: Option<String>,
+    /// Gitea issue number to post compound review summaries.
+    #[serde(default)]
+    pub gitea_issue: Option<u64>,
+    /// Auto-file Gitea issues for CRITICAL and HIGH severity findings.
+    #[serde(default)]
+    pub auto_file_issues: bool,
+    /// Spawn remediation agents for CRITICAL findings.
+    #[serde(default)]
+    pub auto_remediate: bool,
+    /// Map of finding categories to remediation agent names.
+    #[serde(default)]
+    pub remediation_agents: std::collections::HashMap<String, String>,
 }
 
 fn default_max_duration() -> u64 {
@@ -306,6 +318,27 @@ fn default_base_branch() -> String {
 
 fn default_max_concurrent_agents() -> usize {
     3
+}
+
+impl Default for CompoundReviewConfig {
+    fn default() -> Self {
+        Self {
+            schedule: "0 2 * * *".to_string(),
+            max_duration_secs: default_max_duration(),
+            repo_path: PathBuf::from("."),
+            create_prs: false,
+            worktree_root: default_worktree_root(),
+            base_branch: default_base_branch(),
+            max_concurrent_agents: default_max_concurrent_agents(),
+            cli_tool: None,
+            provider: None,
+            model: None,
+            gitea_issue: None,
+            auto_file_issues: false,
+            auto_remediate: false,
+            remediation_agents: std::collections::HashMap::new(),
+        }
+    }
 }
 
 /// Workflow configuration for issue-driven mode.
