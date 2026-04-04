@@ -296,7 +296,7 @@ fn test_example_config_creates_orchestrator() {
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("orchestrator.example.toml");
     let config = OrchestratorConfig::from_file(&example_path).unwrap();
 
-    assert_eq!(config.agents.len(), 15);
+    assert_eq!(config.agents.len(), 16);
     assert_eq!(config.agents[0].layer, AgentLayer::Safety);
     assert_eq!(config.agents[1].layer, AgentLayer::Safety);
     assert_eq!(config.agents[2].layer, AgentLayer::Core);
