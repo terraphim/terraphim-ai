@@ -39,6 +39,14 @@ Run cargo audit, check for OWASP Top 10 issues, and report findings.
 ## Domain Knowledge Search
 When you need security context, use:
   terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "<query>" --role "Vigil Security"
+
+## MANDATORY: Post verdict to Gitea
+Post your security verdict to the relevant Gitea issue.
+- PASS if no critical security issues found
+- FAIL if critical vulnerabilities or issues found
+
+Post verdict with @adf:merge-coordinator trigger.
+Replace ISSUE_NUMBER with the issue from mention context, or the default tracking issue if no mention context.
 """
 capabilities = ["security", "vulnerability-scanning", "supply-chain"]
 max_memory_bytes = 2147483648
@@ -97,6 +105,9 @@ task = """Run comprehensive test suite and quality analysis:
 Post your verdict to the relevant Gitea issue. Use:
 - PASS if all tests pass and no critical quality issues
 - FAIL if tests fail or critical quality issues found
+
+Post verdict with @adf:merge-coordinator trigger.
+Replace ISSUE_NUMBER with the issue from mention context, or the default tracking issue if no mention context.
 
 ## Domain Knowledge Search
 When you need QA context, use:
@@ -204,6 +215,14 @@ Ensure requirements traceability and design consistency.
 ## Domain Knowledge Search
 When you need architecture context, use:
   terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "<query>" --role "Carthos Architecture"
+
+## MANDATORY: Post verdict to Gitea
+Post your spec validation verdict to the relevant Gitea issue.
+- PASS if specs match implementation
+- FAIL if spec violations found
+
+Post verdict with @adf:merge-coordinator trigger.
+Replace ISSUE_NUMBER with the issue from mention context, or the default tracking issue if no mention context.
 """
 schedule = "0 4 * * *"
 capabilities = ["specification-validation", "requirements-traceability", "design-review"]
@@ -226,6 +245,14 @@ regulatory requirements. Flag violations and suggest remediation.
 ## Domain Knowledge Search
 When you need security/compliance context, use:
   terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "<query>" --role "Vigil Security"
+
+## MANDATORY: Post verdict to Gitea
+Post your compliance verdict to the relevant Gitea issue.
+- PASS if no compliance issues found
+- FAIL if compliance violations found
+
+Post verdict with @adf:merge-coordinator trigger.
+Replace ISSUE_NUMBER with the issue from mention context, or the default tracking issue if no mention context.
 """
 schedule = "0 5 * * *"
 capabilities = ["compliance", "policy-enforcement", "standards-checking"]
@@ -306,6 +333,28 @@ script = """terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.j
 timeout_secs = 30
 
 [[agents]]
+name = "quality-coordinator"
+layer = "Growth"
+cli_tool = "claude"
+persona = "carthos"
+terraphim_role = "Carthos Architecture"
+skill_chain = ["disciplined-research", "disciplined-verification"]
+task = """Run compound code review for the issue referenced in Mention Context.
+Post verdict as "compound-review verdict: GO" or "compound-review verdict: NO-GO".
+
+If GO, trigger the 4 remaining reviewers via @adf: mentions:
+@adf:test-guardian, @adf:security-sentinel, @adf:spec-validator, @adf:compliance-watchdog.
+
+Replace ISSUE_NUMBER with the issue from mention context.
+"""
+capabilities = ["code-review", "quality-gate", "review-coordination"]
+
+[agents.pre_check]
+kind = "shell"
+script = """terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "code review quality gate architecture" --role "Carthos Architecture" --limit 5 2>/dev/null || echo '[]'"""
+timeout_secs = 30
+
+[[agents]]
 name = "browser-qa"
 layer = "Growth"
 cli_tool = "claude"
@@ -333,12 +382,15 @@ cli_tool = "claude"
 persona = "conduit"
 terraphim_role = "Conduit DevOps"
 skill_chain = ["disciplined-research", "disciplined-verification"]
-task = """Coordinate merge activities, resolve conflicts, and ensure CI/CD
-pipelines pass before merging PRs to main.
+task = """Evaluate whether all 5 required code reviews have been posted on a Gitea issue,
+and if all reviews are positive, merge the linked PR.
 
-## Domain Knowledge Search
-When you need DevOps context, use:
-  terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "<query>" --role "Conduit DevOps"
+Required reviewers: compound-review, test-guardian, spec-validator, compliance-watchdog, security-sentinel.
+Read all comments, parse verdicts (GO/PASS = positive, NO-GO/FAIL = negative).
+If all 5 passed: merge PR and close issue.
+If any missing or failed: post status summary and wait.
+
+Replace ISSUE_NUMBER with the issue from mention context.
 """
 capabilities = ["merge-coordination", "ci-cd", "conflict-resolution"]
 
