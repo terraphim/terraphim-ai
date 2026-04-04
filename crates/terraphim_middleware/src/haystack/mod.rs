@@ -3,6 +3,7 @@ pub mod ai_assistant;
 pub mod clickup;
 #[cfg(feature = "grepapp")]
 pub mod grep_app;
+#[cfg(feature = "jmap")]
 pub mod jmap;
 pub mod mcp;
 pub mod perplexity;
@@ -13,6 +14,7 @@ pub use ai_assistant::AiAssistantHaystackIndexer;
 pub use clickup::ClickUpHaystackIndexer;
 #[cfg(feature = "grepapp")]
 pub use grep_app::GrepAppHaystackIndexer;
+#[cfg(feature = "jmap")]
 pub use jmap::JmapHaystackIndexer;
 pub use mcp::McpHaystackIndexer;
 pub use perplexity::PerplexityHaystackIndexer;
