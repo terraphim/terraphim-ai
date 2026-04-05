@@ -69,6 +69,17 @@ pub enum WebhookDispatch {
     },
 }
 
+impl WebhookDispatch {
+    /// Extract the comment_id from any dispatch variant.
+    pub fn comment_id(&self) -> u64 {
+        match self {
+            Self::SpawnAgent { comment_id, .. } => *comment_id,
+            Self::SpawnPersona { comment_id, .. } => *comment_id,
+            Self::CompoundReview { comment_id, .. } => *comment_id,
+        }
+    }
+}
+
 /// Shared state for the webhook handler.
 #[derive(Clone)]
 pub struct WebhookState {
