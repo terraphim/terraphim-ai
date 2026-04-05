@@ -1226,8 +1226,11 @@ impl AgentOrchestrator {
 
                     if let Err(e) = self.spawn_agent(&mention_def).await {
                         error!(agent = %agent_name, issue = issue_number, error = %e, "webhook: failed to spawn agent");
-                    } else if let Some(agent) = self.active_agents.get_mut(&mention_def.name) {
-                        agent.spawned_by_mention = true;
+                    } else {
+                        if let Some(agent) = self.active_agents.get_mut(&mention_def.name) {
+                            agent.spawned_by_mention = true;
+                        }
+                        self.assign_issue_to_agent(&agent_name, issue_number).await;
                     }
                 }
             }
@@ -1260,8 +1263,11 @@ impl AgentOrchestrator {
 
                         if let Err(e) = self.spawn_agent(&mention_def).await {
                             error!(agent = %agent_name, issue = issue_number, error = %e, "webhook: failed to spawn agent");
-                        } else if let Some(agent) = self.active_agents.get_mut(&mention_def.name) {
-                            agent.spawned_by_mention = true;
+                        } else {
+                            if let Some(agent) = self.active_agents.get_mut(&mention_def.name) {
+                                agent.spawned_by_mention = true;
+                            }
+                            self.assign_issue_to_agent(&agent_name, issue_number).await;
                         }
                     }
                 }
@@ -1480,10 +1486,11 @@ impl AgentOrchestrator {
 
                             if let Err(e) = self.spawn_agent(&mention_def).await {
                                 tracing::error!(agent = %agent_name, issue = issue_number, error = %e, "failed to spawn agent");
-                            } else if let Some(agent) =
-                                self.active_agents.get_mut(&mention_def.name)
-                            {
-                                agent.spawned_by_mention = true;
+                            } else {
+                                if let Some(agent) = self.active_agents.get_mut(&mention_def.name) {
+                                    agent.spawned_by_mention = true;
+                                }
+                                self.assign_issue_to_agent(&agent_name, issue_number).await;
                             }
 
                             cursor.dispatches_this_tick += 1;
@@ -1524,10 +1531,13 @@ impl AgentOrchestrator {
 
                                 if let Err(e) = self.spawn_agent(&mention_def).await {
                                     tracing::error!(agent = %agent_name, issue = issue_number, error = %e, "failed to spawn agent");
-                                } else if let Some(agent) =
-                                    self.active_agents.get_mut(&mention_def.name)
-                                {
-                                    agent.spawned_by_mention = true;
+                                } else {
+                                    if let Some(agent) =
+                                        self.active_agents.get_mut(&mention_def.name)
+                                    {
+                                        agent.spawned_by_mention = true;
+                                    }
+                                    self.assign_issue_to_agent(&agent_name, issue_number).await;
                                 }
 
                                 cursor.dispatches_this_tick += 1;
@@ -1548,6 +1558,30 @@ impl AgentOrchestrator {
         // Persist cursor for next poll / restart
         cursor.save().await;
         self.mention_cursor = Some(cursor);
+    }
+
+    /// Assign a Gitea issue to the agent that is about to work on it.
+    async fn assign_issue_to_agent(&self, agent_name: &str, issue_number: u64) {
+        if issue_number == 0 {
+            return;
+        }
+        if let Some(ref poster) = self.output_poster {
+            let tracker = poster.tracker_for(agent_name);
+            if let Err(e) = tracker.assign_issue(issue_number, &[agent_name]).await {
+                warn!(
+                    agent = %agent_name,
+                    issue = issue_number,
+                    error = %e,
+                    "failed to assign issue to agent"
+                );
+            } else {
+                info!(
+                    agent = %agent_name,
+                    issue = issue_number,
+                    "assigned issue to agent"
+                );
+            }
+        }
     }
 
     /// Sanitise finding text for use in issue title.
