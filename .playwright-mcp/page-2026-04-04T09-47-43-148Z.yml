@@ -1,0 +1,129 @@
+- generic [active] [ref=e1]:
+  - link "Skip to main content" [ref=e2] [cursor=pointer]:
+    - /url: "#main"
+  - banner "Site navigation" [ref=e3]:
+    - generic [ref=e4]:
+      - link "Terraphim Terraphim" [ref=e5] [cursor=pointer]:
+        - /url: http://127.0.0.1:1414
+        - img "Terraphim" [ref=e6]
+        - generic [ref=e7]: Terraphim
+      - navigation "Main navigation" [ref=e8]:
+        - link "Home" [ref=e9] [cursor=pointer]:
+          - /url: http://127.0.0.1:1414/
+        - link "Posts" [ref=e10] [cursor=pointer]:
+          - /url: http://127.0.0.1:1414/posts
+        - link "Docs" [ref=e11] [cursor=pointer]:
+          - /url: https://docs.terraphim.ai
+        - link "Tags" [ref=e12] [cursor=pointer]:
+          - /url: http://127.0.0.1:1414/tags
+        - link "Categories" [ref=e13] [cursor=pointer]:
+          - /url: http://127.0.0.1:1414/categories
+        - link "Donate" [ref=e14] [cursor=pointer]:
+          - /url: http://127.0.0.1:1414/docs/donate
+      - generic [ref=e15]:
+        - generic "System online" [ref=e16]
+        - generic [ref=e17]: v1.16.0
+      - button "Search" [ref=e18] [cursor=pointer]:
+        - generic [ref=e19]: 
+  - text:  
+  - main [ref=e20]:
+    - generic [ref=e22]:
+      - generic [ref=e23]:
+        - generic [ref=e24]: 
+        - text: Posts
+      - heading "Posts" [level=1] [ref=e25]
+      - paragraph [ref=e26]: Blog posts accumulated over the time.
+    - generic [ref=e27]:
+      - article [ref=e28]:
+        - heading "Teaching AI Coding Agents with Knowledge Graph Hooks" [level=2] [ref=e29]:
+          - link "Teaching AI Coding Agents with Knowledge Graph Hooks" [ref=e30] [cursor=pointer]:
+            - /url: http://127.0.0.1:1414/posts/teaching-ai-agents-with-knowledge-graphs/
+        - generic [ref=e31]:
+          - generic [ref=e32]:
+            - generic [ref=e33]: 
+            - text: 28 Dec 2025
+          - generic [ref=e34]:
+            - generic [ref=e35]: 
+            - text: 5 min
+        - paragraph [ref=e37]: How we use Aho-Corasick automata and knowledge graphs to automatically enforce coding standards across AI coding agents like Claude Code, Cursor, and Aider.
+        - link "Read More" [ref=e38] [cursor=pointer]:
+          - /url: http://127.0.0.1:1414/posts/teaching-ai-agents-with-knowledge-graphs/
+          - text: Read More
+          - generic [ref=e39]: 
+        - generic [ref=e40]:
+          - link "Technical" [ref=e41] [cursor=pointer]:
+            - /url: http://127.0.0.1:1414/categories/technical/
+          - link "Terraphim" [ref=e42] [cursor=pointer]:
+            - /url: http://127.0.0.1:1414/tags/terraphim/
+          - link "ai" [ref=e43] [cursor=pointer]:
+            - /url: http://127.0.0.1:1414/tags/ai/
+          - link "hooks" [ref=e44] [cursor=pointer]:
+            - /url: http://127.0.0.1:1414/tags/hooks/
+          - link "knowledge-graph" [ref=e45] [cursor=pointer]:
+            - /url: http://127.0.0.1:1414/tags/knowledge-graph/
+          - link "claude-code" [ref=e46] [cursor=pointer]:
+            - /url: http://127.0.0.1:1414/tags/claude-code/
+          - link "developer-tools" [ref=e47] [cursor=pointer]:
+            - /url: http://127.0.0.1:1414/tags/developer-tools/
+          - link "bun" [ref=e48] [cursor=pointer]:
+            - /url: http://127.0.0.1:1414/tags/bun/
+          - link "anthropic" [ref=e49] [cursor=pointer]:
+            - /url: http://127.0.0.1:1414/tags/anthropic/
+      - article [ref=e50]:
+        - heading "Announcing Terraphim AI" [level=2] [ref=e51]:
+          - link "Announcing Terraphim AI" [ref=e52] [cursor=pointer]:
+            - /url: http://127.0.0.1:1414/posts/post-0/
+        - generic [ref=e53]:
+          - generic [ref=e54]:
+            - generic [ref=e55]: 
+            - text: 12 Aug 2023
+          - generic [ref=e56]:
+            - generic [ref=e57]: 
+            - text: 1 min
+        - link "Read More" [ref=e58] [cursor=pointer]:
+          - /url: http://127.0.0.1:1414/posts/post-0/
+          - text: Read More
+          - generic [ref=e59]: 
+        - generic [ref=e60]:
+          - link "Announcements" [ref=e61] [cursor=pointer]:
+            - /url: http://127.0.0.1:1414/categories/announcements/
+          - link "Terraphim" [ref=e62] [cursor=pointer]:
+            - /url: http://127.0.0.1:1414/tags/terraphim/
+          - link "ai" [ref=e63] [cursor=pointer]:
+            - /url: http://127.0.0.1:1414/tags/ai/
+          - link "announcement" [ref=e64] [cursor=pointer]:
+            - /url: http://127.0.0.1:1414/tags/announcement/
+  - text: ×
+  - contentinfo [ref=e65]:
+    - generic [ref=e66]: Terraphim AI
+    - generic [ref=e67]: Privacy-Preserving AI Assistant
+    - generic [ref=e68]:
+      - link "GitHub" [ref=e69] [cursor=pointer]:
+        - /url: https://github.com/terraphim
+        - generic [ref=e70]: 
+        - text: GitHub
+      - link "Discord" [ref=e71] [cursor=pointer]:
+        - /url: https://discord.gg/VPJXB6BGuY
+        - generic [ref=e72]: 
+        - text: Discord
+      - link "Twitter" [ref=e73] [cursor=pointer]:
+        - /url: https://twitter.com/alex_mikhalev
+        - generic [ref=e74]: 
+        - text: Twitter
+      - link "LinkedIn" [ref=e75] [cursor=pointer]:
+        - /url: https://www.linkedin.com/in/alexmikhalev
+        - generic [ref=e76]: 
+        - text: LinkedIn
+      - link "Reddit" [ref=e77] [cursor=pointer]:
+        - /url: https://www.reddit.com/r/TerraphimAI
+        - generic [ref=e78]: 
+        - text: Reddit
+      - link "Email" [ref=e79] [cursor=pointer]:
+        - /url: mailto:alex@terraphim.ai
+        - generic [ref=e80]: 
+        - text: Email
+      - link "RSS" [ref=e81] [cursor=pointer]:
+        - /url: http://127.0.0.1:1414/rss.xml
+        - generic [ref=e82]: 
+        - text: RSS
+    - generic [ref=e83]: Applied Knowledge Systems Ltd // Apache 2.0 // All data processed locally
