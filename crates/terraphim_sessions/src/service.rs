@@ -10,6 +10,9 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
+#[cfg(feature = "index")]
+use crate::index::SessionIndex;
+
 /// Session service for unified session management
 pub struct SessionService {
     /// Connector registry
@@ -20,6 +23,9 @@ pub struct SessionService {
     auto_import: bool,
     /// Whether auto-import has been attempted
     auto_import_attempted: Arc<RwLock<bool>>,
+    /// Optional full-text search index
+    #[cfg(feature = "index")]
+    index: Arc<RwLock<Option<SessionIndex>>>,
 }
 
 impl SessionService {
@@ -31,6 +37,8 @@ impl SessionService {
             cache: Arc::new(RwLock::new(HashMap::new())),
             auto_import: true,
             auto_import_attempted: Arc::new(RwLock::new(false)),
+            #[cfg(feature = "index")]
+            index: Arc::new(RwLock::new(None)),
         }
     }
 
@@ -42,6 +50,8 @@ impl SessionService {
             cache: Arc::new(RwLock::new(HashMap::new())),
             auto_import: true,
             auto_import_attempted: Arc::new(RwLock::new(false)),
+            #[cfg(feature = "index")]
+            index: Arc::new(RwLock::new(None)),
         }
     }
 
@@ -153,6 +163,17 @@ impl SessionService {
         let mut cache = self.cache.write().await;
         for session in &sessions {
             cache.insert(session.id.clone(), session.clone());
+        }
+        drop(cache);
+
+        // Update index if enabled
+        #[cfg(feature = "index")]
+        {
+            let index_guard = self.index.read().await;
+            if let Some(_index) = index_guard.as_ref() {
+                let mut index = SessionIndex::new()?;
+                index.index_sessions(&sessions)?;
+            }
         }
 
         Ok(sessions)
@@ -315,6 +336,68 @@ impl SessionService {
             .cloned()
             .collect()
     }
+
+    /// Initialize the full-text search index
+    #[cfg(feature = "index")]
+    pub async fn init_index(&self) -> Result<()> {
+        let mut index_guard = self.index.write().await;
+        if index_guard.is_none() {
+            *index_guard = Some(SessionIndex::new()?);
+            tracing::info!("Session index initialized");
+        }
+        Ok(())
+    }
+
+    /// Initialize the full-text search index with custom configuration
+    #[cfg(feature = "index")]
+    pub async fn init_index_with_config(&self, config: crate::index::IndexConfig) -> Result<()> {
+        let mut index_guard = self.index.write().await;
+        if index_guard.is_none() {
+            *index_guard = Some(SessionIndex::with_config(config)?);
+            tracing::info!("Session index initialized with custom config");
+        }
+        Ok(())
+    }
+
+    /// Build the index from all cached sessions
+    #[cfg(feature = "index")]
+    pub async fn build_index(&self) -> Result<usize> {
+        let cache = self.cache.read().await;
+        let sessions: Vec<Session> = cache.values().cloned().collect();
+        drop(cache);
+
+        let mut index_guard = self.index.write().await;
+        if let Some(ref mut index) = index_guard.as_mut() {
+            index.index_sessions(&sessions)
+        } else {
+            anyhow::bail!("Index not initialized. Call init_index() first.")
+        }
+    }
+
+    /// Search sessions using the full-text index (if enabled)
+    #[cfg(feature = "index")]
+    pub async fn search_indexed(&self, query: &str, limit: usize) -> Vec<crate::index::SearchResult> {
+        let index_guard = self.index.read().await;
+        if let Some(ref index) = index_guard.as_ref() {
+            index.search(query, limit)
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// Get index document count
+    #[cfg(feature = "index")]
+    pub async fn index_document_count(&self) -> usize {
+        let index_guard = self.index.read().await;
+        index_guard.as_ref().map(|i| i.document_count()).unwrap_or(0)
+    }
+
+    /// Check if index is initialized
+    #[cfg(feature = "index")]
+    pub async fn is_index_initialized(&self) -> bool {
+        let index_guard = self.index.read().await;
+        index_guard.is_some()
+    }
 }
 
 impl Default for SessionService {
@@ -330,6 +413,8 @@ impl Clone for SessionService {
             cache: Arc::new(RwLock::new(HashMap::new())),
             auto_import: self.auto_import,
             auto_import_attempted: Arc::new(RwLock::new(false)),
+            #[cfg(feature = "index")]
+            index: Arc::new(RwLock::new(None)),
         }
     }
 }

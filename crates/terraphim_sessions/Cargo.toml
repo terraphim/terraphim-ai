@@ -23,8 +23,11 @@ tsa-full = ["terraphim-session-analyzer", "terraphim-session-analyzer/connectors
 # Enable terraphim knowledge graph enrichment
 enrichment = ["terraphim_automata", "terraphim_rolegraph", "terraphim_types"]
 
+# Enable full-text search index using fff-search
+index = ["fff-search"]
+
 # All features
-full = ["tsa-full", "enrichment"]
+full = ["tsa-full", "enrichment", "index"]
 
 [dependencies]
 # Core dependencies
@@ -52,6 +55,9 @@ terraphim-session-analyzer = { version = "1.6.0", path = "../terraphim-session-a
 terraphim_automata = { version = ">=1.4.10", path = "../terraphim_automata", optional = true }
 terraphim_rolegraph = { version = ">=1.4.10", path = "../terraphim_rolegraph", optional = true }
 terraphim_types = { version = ">=1.4.10", path = "../terraphim_types", optional = true }
+
+# Full-text search index
+fff-search = { git = "https://github.com/AlexMikhalev/fff.nvim.git", branch = "feat/external-scorer", optional = true }
 
 [dev-dependencies]
 tempfile = "3.27"

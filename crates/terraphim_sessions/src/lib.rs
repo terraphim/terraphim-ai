@@ -31,6 +31,9 @@ pub mod connector;
 pub mod model;
 pub mod service;
 
+#[cfg(feature = "index")]
+pub mod index;
+
 #[cfg(feature = "terraphim-session-analyzer")]
 pub mod cla;
 
@@ -49,6 +52,9 @@ pub use enrichment::{
     ConceptMatch, ConceptOccurrence, EnrichmentConfig, EnrichmentResult, SessionConcepts,
     SessionEnricher, find_related_sessions, search_by_concept,
 };
+
+#[cfg(feature = "index")]
+pub use index::{IndexConfig, SearchResult, SessionDocument, SessionIndex};
 
 /// Crate version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
