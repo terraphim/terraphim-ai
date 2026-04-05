@@ -27,6 +27,7 @@ repl-web-advanced = ["repl-web"]  # Advanced web operations (screenshot, PDF, sc
 update-tests = []
 # Session history search - enabled for local development
 repl-sessions = ["repl", "dep:terraphim_sessions"]
+shared-learning = []
 
 [lints.rust]
 # repl-sessions feature is now enabled for local development
@@ -58,8 +59,6 @@ chrono = { workspace = true }
 strsim = "0.11"  # For edit distance / fuzzy matching in forgiving CLI
 uuid = { workspace = true }
 dialoguer = "0.12"  # Interactive CLI prompts for onboarding wizard
-# TODO: shared_learning needs refactor to use terraphim_persistence instead of direct sqlx
-# sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "chrono"] }
 
 # REPL dependencies - only compiled with features
 rustyline = { version = "17.0", optional = true }
