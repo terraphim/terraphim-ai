@@ -78,9 +78,16 @@ pub struct OrchestratorConfig {
     /// Mention-driven dispatch configuration.
     #[serde(default)]
     pub mentions: Option<MentionConfig>,
+    /// Webhook configuration for real-time mention dispatch.
+    #[serde(default)]
+    pub webhook: Option<WebhookConfig>,
     /// Path to persona role configuration JSON for terraphim-agent.
     #[serde(default)]
     pub role_config_path: Option<PathBuf>,
+    /// Quickwit log shipping configuration (only available with quickwit feature).
+    #[cfg(feature = "quickwit")]
+    #[serde(default)]
+    pub quickwit: Option<QuickwitConfig>,
 }
 
 /// Configuration for posting agent output to Gitea issues.
@@ -90,17 +97,15 @@ pub struct GiteaOutputConfig {
     pub token: String,
     pub owner: String,
     pub repo: String,
+    /// Path to JSON file mapping agent names to Gitea API tokens.
+    /// When present, agents post comments under their own Gitea user.
+    #[serde(default)]
+    pub agent_tokens_path: Option<PathBuf>,
 }
 
 /// Configuration for mention-driven dispatch.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MentionConfig {
-    /// DEPRECATED: Issue numbers to watch. Ignored when cursor polling is active.
-    #[serde(default)]
-    pub watch_issues: Vec<u64>,
-    /// DEPRECATED: Max dispatch depth per issue. Replaced by max_dispatches_per_tick.
-    #[serde(default = "default_max_mention_depth")]
-    pub max_mention_depth: u32,
     /// Poll every N reconciliation ticks (default 2).
     #[serde(default = "default_poll_modulo")]
     pub poll_modulo: u64,
@@ -112,10 +117,6 @@ pub struct MentionConfig {
     pub max_concurrent_mention_agents: u32,
 }
 
-fn default_max_mention_depth() -> u32 {
-    3
-}
-
 fn default_poll_modulo() -> u64 {
     2
 }
@@ -125,6 +126,80 @@ fn default_max_dispatches_per_tick() -> u32 {
 }
 
 fn default_max_concurrent_mention_agents() -> u32 {
+    5
+}
+
+/// Configuration for the webhook server.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WebhookConfig {
+    /// Bind address for the webhook server (default "0.0.0.0:9090").
+    #[serde(default = "default_webhook_bind")]
+    pub bind: String,
+    /// Shared secret for HMAC signature verification.
+    /// Must match the secret configured in Gitea webhook settings.
+    pub secret: Option<String>,
+}
+
+fn default_webhook_bind() -> String {
+    "0.0.0.0:9090".to_string()
+}
+
+/// Quickwit log shipping configuration.
+#[cfg(feature = "quickwit")]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QuickwitConfig {
+    /// Whether Quickwit logging is enabled.
+    #[serde(default = "default_quickwit_enabled")]
+    pub enabled: bool,
+    /// Quickwit API endpoint.
+    #[serde(default = "default_quickwit_endpoint")]
+    pub endpoint: String,
+    /// Index ID for log ingestion.
+    #[serde(default = "default_quickwit_index_id")]
+    pub index_id: String,
+    /// Maximum documents per batch.
+    #[serde(default = "default_quickwit_batch_size")]
+    pub batch_size: usize,
+    /// Seconds between forced flushes.
+    #[serde(default = "default_quickwit_flush_interval_secs")]
+    pub flush_interval_secs: u64,
+}
+
+#[cfg(feature = "quickwit")]
+impl Default for QuickwitConfig {
+    fn default() -> Self {
+        Self {
+            enabled: default_quickwit_enabled(),
+            endpoint: default_quickwit_endpoint(),
+            index_id: default_quickwit_index_id(),
+            batch_size: default_quickwit_batch_size(),
+            flush_interval_secs: default_quickwit_flush_interval_secs(),
+        }
+    }
+}
+
+#[cfg(feature = "quickwit")]
+fn default_quickwit_enabled() -> bool {
+    false
+}
+
+#[cfg(feature = "quickwit")]
+fn default_quickwit_endpoint() -> String {
+    "http://127.0.0.1:7280".to_string()
+}
+
+#[cfg(feature = "quickwit")]
+fn default_quickwit_index_id() -> String {
+    "adf-logs".to_string()
+}
+
+#[cfg(feature = "quickwit")]
+fn default_quickwit_batch_size() -> usize {
+    100
+}
+
+#[cfg(feature = "quickwit")]
+fn default_quickwit_flush_interval_secs() -> u64 {
     5
 }
 
@@ -742,7 +817,7 @@ task = "t"
         let example_path =
             std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("orchestrator.example.toml");
         let config = OrchestratorConfig::from_file(&example_path).unwrap();
-        assert_eq!(config.agents.len(), 14);
+        assert_eq!(config.agents.len(), 16);
         assert_eq!(config.agents[0].layer, AgentLayer::Safety);
         assert_eq!(config.agents[1].layer, AgentLayer::Safety);
         assert_eq!(config.agents[2].layer, AgentLayer::Core);

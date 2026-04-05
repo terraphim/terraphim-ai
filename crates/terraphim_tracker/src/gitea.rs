@@ -266,6 +266,69 @@ impl GiteaTracker {
         response.json().await.map_err(TrackerError::Http)
     }
 
+    /// Assign a Gitea issue to one or more users.
+    ///
+    /// Uses the authenticated user's token, so when called with a per-agent
+    /// tracker the issue is assigned to that agent's Gitea user.
+    pub async fn assign_issue(&self, issue_number: u64, assignees: &[&str]) -> Result<()> {
+        let url = format!(
+            "{}/api/v1/repos/{}/{}/issues/{}",
+            self.config.base_url, self.config.owner, self.config.repo, issue_number
+        );
+        let response = self
+            .build_request(reqwest::Method::PATCH, &url)
+            .json(&serde_json::json!({"assignees": assignees}))
+            .send()
+            .await?;
+        if !response.status().is_success() {
+            let status = response.status();
+            let text = response.text().await.unwrap_or_default();
+            return Err(TrackerError::Api {
+                message: format!(
+                    "Gitea assign_issue error {} on issue {}: {}",
+                    status, issue_number, text
+                ),
+            });
+        }
+        Ok(())
+    }
+
+    /// Fetch the list of assignee logins for a Gitea issue.
+    ///
+    /// Returns an empty vec if the issue has no assignees or on error.
+    pub async fn fetch_issue_assignees(&self, issue_number: u64) -> Result<Vec<String>> {
+        let url = format!(
+            "{}/api/v1/repos/{}/{}/issues/{}",
+            self.config.base_url, self.config.owner, self.config.repo, issue_number
+        );
+        let response = self
+            .build_request(reqwest::Method::GET, &url)
+            .send()
+            .await?;
+        if !response.status().is_success() {
+            let status = response.status();
+            let text = response.text().await.unwrap_or_default();
+            return Err(TrackerError::Api {
+                message: format!(
+                    "Gitea fetch_issue_assignees error {} on issue {}: {}",
+                    status, issue_number, text
+                ),
+            });
+        }
+        // Parse just the assignees array from the issue JSON
+        let body: serde_json::Value = response.json().await.map_err(TrackerError::Http)?;
+        let assignees = body
+            .get("assignees")
+            .and_then(|a| a.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|u| u.get("login").and_then(|l| l.as_str()).map(String::from))
+                    .collect()
+            })
+            .unwrap_or_default();
+        Ok(assignees)
+    }
+
     /// Search open issues by keyword in title.
     /// Returns issue numbers whose titles contain the given keyword.
     pub async fn search_issues_by_title(&self, keyword: &str) -> Result<Vec<u64>> {
@@ -367,21 +430,41 @@ impl GiteaTracker {
             });
         }
 
-        // Parse response and extract issue numbers from issue_url
-        let raw_comments: Vec<RepoComment> = response.json().await.map_err(TrackerError::Http)?;
+        // Parse response with diagnostic logging on failure
+        let text = response.text().await.map_err(TrackerError::Http)?;
+        let raw_comments: Vec<RepoComment> = match serde_json::from_str(&text) {
+            Ok(c) => c,
+            Err(e) => {
+                tracing::warn!(
+                    error = %e,
+                    body_preview = &text[..text.len().min(200)],
+                    "failed to deserialise repo comments"
+                );
+                return Err(TrackerError::Api {
+                    message: format!("repo comments deserialisation failed: {e}"),
+                });
+            }
+        };
         Ok(raw_comments.into_iter().map(|rc| rc.into()).collect())
     }
 }
 
 /// Raw comment from repo-wide API (includes issue_url instead of issue number).
+///
+/// Fields use `Option<String>` because Gitea may return `null` for system
+/// comments (missing `issue_url`), deleted comments (null `body`), etc.
 #[derive(Debug, Clone, serde::Deserialize)]
 struct RepoComment {
     id: u64,
-    issue_url: String,
+    #[serde(default)]
+    issue_url: Option<String>,
     user: CommentUser,
-    body: String,
-    created_at: String,
-    updated_at: String,
+    #[serde(default)]
+    body: Option<String>,
+    #[serde(default)]
+    created_at: Option<String>,
+    #[serde(default)]
+    updated_at: Option<String>,
 }
 
 impl From<RepoComment> for IssueComment {
@@ -389,6 +472,8 @@ impl From<RepoComment> for IssueComment {
         // Extract issue number from issue_url like "/api/v1/repos/owner/repo/issues/123"
         let issue_number = rc
             .issue_url
+            .as_deref()
+            .unwrap_or("")
             .rsplit('/')
             .next()
             .and_then(|s| s.parse().ok())
@@ -397,10 +482,10 @@ impl From<RepoComment> for IssueComment {
         IssueComment {
             id: rc.id,
             issue_number,
-            body: rc.body,
+            body: rc.body.unwrap_or_default(),
             user: rc.user,
-            created_at: rc.created_at,
-            updated_at: rc.updated_at,
+            created_at: rc.created_at.unwrap_or_default(),
+            updated_at: rc.updated_at.unwrap_or_default(),
         }
     }
 }
@@ -619,6 +704,82 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_fetch_repo_comments() {
+        let mock_server = MockServer::start().await;
+        let comments_json = serde_json::json!([
+            {
+                "id": 100,
+                "issue_url": "https://example.com/api/v1/repos/testowner/testrepo/issues/5",
+                "body": "Hello @adf:security-sentinel",
+                "user": {"login": "root"},
+                "created_at": "2026-04-04T10:00:00Z",
+                "updated_at": "2026-04-04T10:00:00Z"
+            },
+            {
+                "id": 101,
+                "issue_url": "https://example.com/api/v1/repos/testowner/testrepo/issues/7",
+                "body": null,
+                "user": {"login": "system"},
+                "created_at": "2026-04-04T11:00:00Z",
+                "updated_at": "2026-04-04T11:00:00Z"
+            }
+        ]);
+        Mock::given(method("GET"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/comments"))
+            .and(query_param("since", "2026-04-04T00:00:00Z"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&comments_json))
+            .mount(&mock_server)
+            .await;
+
+        let tracker = make_tracker(&mock_server.uri());
+        let result = tracker
+            .fetch_repo_comments(Some("2026-04-04T00:00:00Z"), Some(50))
+            .await;
+        assert!(
+            result.is_ok(),
+            "fetch_repo_comments failed: {:?}",
+            result.err()
+        );
+        let comments = result.unwrap();
+        assert_eq!(comments.len(), 2);
+        assert_eq!(comments[0].issue_number, 5);
+        assert_eq!(comments[1].issue_number, 7);
+        assert!(comments[0].body.contains("@adf:security-sentinel"));
+        assert_eq!(comments[1].body, ""); // null body defaults to empty
+    }
+
+    #[tokio::test]
+    async fn test_fetch_repo_comments_missing_fields() {
+        let mock_server = MockServer::start().await;
+        // Simulate comments with missing optional fields
+        let comments_json = serde_json::json!([
+            {
+                "id": 200,
+                "user": {"login": "bot"},
+                "created_at": "2026-04-04T12:00:00Z",
+                "updated_at": "2026-04-04T12:00:00Z"
+            }
+        ]);
+        Mock::given(method("GET"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/comments"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&comments_json))
+            .mount(&mock_server)
+            .await;
+
+        let tracker = make_tracker(&mock_server.uri());
+        let result = tracker.fetch_repo_comments(None, None).await;
+        assert!(
+            result.is_ok(),
+            "should handle missing issue_url and body: {:?}",
+            result.err()
+        );
+        let comments = result.unwrap();
+        assert_eq!(comments.len(), 1);
+        assert_eq!(comments[0].issue_number, 0); // no issue_url -> default 0
+        assert_eq!(comments[0].body, ""); // missing body -> default empty
+    }
+
+    #[tokio::test]
     async fn test_issue_comment_deserialisation() {
         let json = r#"{
             "id": 100,
@@ -631,5 +792,101 @@ mod tests {
         assert_eq!(comment.id, 100);
         assert!(comment.body.contains("@adf:security-sentinel"));
         assert_eq!(comment.user.login, "root");
+    }
+
+    #[tokio::test]
+    async fn test_assign_issue_success() {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("PATCH"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/42"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": 100,
+                "number": 42,
+                "title": "Test",
+                "state": "open"
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let tracker = make_tracker(&mock_server.uri());
+        let result = tracker.assign_issue(42, &["quality-coordinator"]).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_assign_issue_error() {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("PATCH"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/99"))
+            .respond_with(ResponseTemplate::new(403).set_body_string("forbidden"))
+            .mount(&mock_server)
+            .await;
+
+        let tracker = make_tracker(&mock_server.uri());
+        let result = tracker.assign_issue(99, &["unknown-agent"]).await;
+        assert!(result.is_err());
+        let err_str = format!("{}", result.unwrap_err());
+        assert!(
+            err_str.contains("403"),
+            "Expected 403 in error: {}",
+            err_str
+        );
+    }
+
+    #[tokio::test]
+    async fn test_fetch_issue_assignees_returns_logins() {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/42"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": 100,
+                "number": 42,
+                "title": "Test issue",
+                "state": "open",
+                "assignees": [
+                    {"id": 1, "login": "security-sentinel"},
+                    {"id": 2, "login": "test-guardian"}
+                ]
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let tracker = make_tracker(&mock_server.uri());
+        let assignees = tracker.fetch_issue_assignees(42).await.unwrap();
+        assert_eq!(assignees, vec!["security-sentinel", "test-guardian"]);
+    }
+
+    #[tokio::test]
+    async fn test_fetch_issue_assignees_empty() {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/99"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": 200,
+                "number": 99,
+                "title": "Unassigned issue",
+                "state": "open",
+                "assignees": []
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let tracker = make_tracker(&mock_server.uri());
+        let assignees = tracker.fetch_issue_assignees(99).await.unwrap();
+        assert!(assignees.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_fetch_issue_assignees_error() {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/404"))
+            .respond_with(ResponseTemplate::new(404).set_body_string("not found"))
+            .mount(&mock_server)
+            .await;
+
+        let tracker = make_tracker(&mock_server.uri());
+        let result = tracker.fetch_issue_assignees(404).await;
+        assert!(result.is_err());
     }
 }
