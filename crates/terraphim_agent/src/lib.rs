@@ -1,9 +1,8 @@
 pub mod client;
 pub mod onboarding;
 pub mod service;
-// TODO: shared_learning needs refactor to use terraphim_persistence instead of direct sqlx
-// #[cfg(feature = "shared-learning")]
-// pub mod shared_learning;
+#[cfg(feature = "shared-learning")]
+pub mod shared_learning;
 pub mod tui_backend;
 
 // Robot mode - always available for AI agent integration
