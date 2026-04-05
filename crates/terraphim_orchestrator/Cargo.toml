@@ -7,6 +7,10 @@ description = "AI Dark Factory orchestrator wiring spawner, router, supervisor i
 license = "Apache-2.0"
 repository = "https://github.com/terraphim/terraphim-ai"
 
+[features]
+default = []
+quickwit = ["dep:reqwest"]
+
 [dependencies]
 # Terraphim internal crates
 terraphim_spawner = { path = "../terraphim_spawner", version = "1.0.0" }
@@ -35,6 +39,9 @@ toml = "0.8"
 # Template rendering
 handlebars = "6.3"
 regex = "1"
+
+# Quickwit integration (optional)
+reqwest = { workspace = true, optional = true }
 
 [dev-dependencies]
 tokio-test = "0.4"
