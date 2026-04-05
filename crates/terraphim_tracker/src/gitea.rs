@@ -266,6 +266,33 @@ impl GiteaTracker {
         response.json().await.map_err(TrackerError::Http)
     }
 
+    /// Assign a Gitea issue to one or more users.
+    ///
+    /// Uses the authenticated user's token, so when called with a per-agent
+    /// tracker the issue is assigned to that agent's Gitea user.
+    pub async fn assign_issue(&self, issue_number: u64, assignees: &[&str]) -> Result<()> {
+        let url = format!(
+            "{}/api/v1/repos/{}/{}/issues/{}",
+            self.config.base_url, self.config.owner, self.config.repo, issue_number
+        );
+        let response = self
+            .build_request(reqwest::Method::PATCH, &url)
+            .json(&serde_json::json!({"assignees": assignees}))
+            .send()
+            .await?;
+        if !response.status().is_success() {
+            let status = response.status();
+            let text = response.text().await.unwrap_or_default();
+            return Err(TrackerError::Api {
+                message: format!(
+                    "Gitea assign_issue error {} on issue {}: {}",
+                    status, issue_number, text
+                ),
+            });
+        }
+        Ok(())
+    }
+
     /// Search open issues by keyword in title.
     /// Returns issue numbers whose titles contain the given keyword.
     pub async fn search_issues_by_title(&self, keyword: &str) -> Result<Vec<u64>> {
@@ -729,5 +756,44 @@ mod tests {
         assert_eq!(comment.id, 100);
         assert!(comment.body.contains("@adf:security-sentinel"));
         assert_eq!(comment.user.login, "root");
+    }
+
+    #[tokio::test]
+    async fn test_assign_issue_success() {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("PATCH"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/42"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": 100,
+                "number": 42,
+                "title": "Test",
+                "state": "open"
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let tracker = make_tracker(&mock_server.uri());
+        let result = tracker.assign_issue(42, &["quality-coordinator"]).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_assign_issue_error() {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("PATCH"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/99"))
+            .respond_with(ResponseTemplate::new(403).set_body_string("forbidden"))
+            .mount(&mock_server)
+            .await;
+
+        let tracker = make_tracker(&mock_server.uri());
+        let result = tracker.assign_issue(99, &["unknown-agent"]).await;
+        assert!(result.is_err());
+        let err_str = format!("{}", result.unwrap_err());
+        assert!(
+            err_str.contains("403"),
+            "Expected 403 in error: {}",
+            err_str
+        );
     }
 }
