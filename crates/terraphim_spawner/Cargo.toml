@@ -12,9 +12,12 @@ repository = "https://github.com/terraphim/terraphim-ai"
 terraphim_types = { path = "../terraphim_types", version = "1.0.0" }
 
 # Core dependencies
-tokio = { version = "1.0", features = ["full"] }
-thiserror = "1.0"
-tracing = "0.1"
+tokio = { workspace = true, features = ["full"] }
+
+thiserror = { workspace = true }
+
+tracing = { workspace = true }
+
 regex = "1.10"
 
 # Process management
@@ -23,4 +26,4 @@ nix = { version = "0.27", features = ["process", "signal", "resource"] }
 [dev-dependencies]
 proptest = "1.4"
 tokio-test = "0.4"
-tempfile = "3.27"
+tempfile = { workspace = true }

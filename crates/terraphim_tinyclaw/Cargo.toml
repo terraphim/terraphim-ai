@@ -37,7 +37,8 @@ chrono = { workspace = true }
 uuid = { workspace = true }
 
 # Logging
-tracing = "0.1"
+tracing = { workspace = true }
+
 log = { workspace = true }
 env_logger = "0.11"
 
@@ -77,7 +78,8 @@ voice = ["dep:whisper-rs", "dep:symphonia", "dep:hound"]
 
 [dev-dependencies]
 tokio-test = "0.4"
-tempfile = "3"
+tempfile = { workspace = true }
+
 criterion = { version = "0.8", features = ["async_tokio"] }
 
 [[bench]]
