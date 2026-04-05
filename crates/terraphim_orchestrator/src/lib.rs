@@ -47,7 +47,8 @@ pub mod output_poster;
 pub mod persona;
 pub mod scheduler;
 pub mod scope;
-pub mod webhook;
+#[cfg(feature = "quickwit")]
+pub mod quickwit;
 
 pub use compound::{CompoundReviewResult, CompoundReviewWorkflow, ReviewGroupDef, SwarmConfig};
 pub use concurrency::{ConcurrencyController, FairnessPolicy, ModeQuotas};
@@ -56,6 +57,8 @@ pub use config::{
     MentionConfig, NightwatchConfig, OrchestratorConfig, PreCheckStrategy, TrackerConfig,
     TrackerStates, WebhookConfig, WorkflowConfig,
 };
+#[cfg(feature = "quickwit")]
+pub use config::QuickwitConfig;
 pub use cost_tracker::{AgentMetrics, BudgetVerdict, CostSnapshot, CostTracker, ExecutionMetrics};
 pub use dispatcher::{DispatchTask, Dispatcher, DispatcherStats};
 pub use dual_mode::DualModeOrchestrator;
@@ -176,6 +179,8 @@ pub struct AgentOrchestrator {
     webhook_dispatch_rx: Option<tokio::sync::mpsc::Receiver<webhook::WebhookDispatch>>,
     /// Monotonically increasing tick counter for poll_modulo gating.
     tick_count: u64,
+    #[cfg(feature = "quickwit")]
+    quickwit_sink: Option<quickwit::QuickwitSink>,
 }
 
 /// Validate agent name for safe use in file paths.
@@ -284,6 +289,8 @@ impl AgentOrchestrator {
             mention_cursor: None,
             webhook_dispatch_rx: None,
             tick_count: 0,
+            #[cfg(feature = "quickwit")]
+            quickwit_sink: None,
         })
     }
 
@@ -598,6 +605,16 @@ impl AgentOrchestrator {
         &mut self.cost_tracker
     }
 
+    #[cfg(feature = "quickwit")]
+    pub fn set_quickwit_sink(&mut self, sink: quickwit::QuickwitSink) {
+        self.quickwit_sink = Some(sink);
+    }
+
+    #[cfg(feature = "quickwit")]
+    pub fn quickwit_config(&self) -> Option<&QuickwitConfig> {
+        self.config.quickwit.as_ref()
+    }
+
     /// Load skill chain content from SKILL.md files for the given agent definition.
     ///
     /// Reads each skill named in `def.skill_chain` from `{skill_data_dir}/{name}/SKILL.md`.
@@ -909,6 +926,21 @@ impl AgentOrchestrator {
         // === RECORD COMMIT FOR GIT-DIFF STRATEGY ===
         if let Ok(head) = self.get_current_head().await {
             self.last_run_commits.insert(def.name.clone(), head);
+        }
+
+        #[cfg(feature = "quickwit")]
+        if let Some(ref sink) = self.quickwit_sink {
+            let doc = quickwit::LogDocument {
+                timestamp: chrono::Utc::now().to_rfc3339(),
+                level: "INFO".into(),
+                agent_name: def.name.clone(),
+                layer: format!("{:?}", def.layer),
+                source: "orchestrator".into(),
+                message: "agent spawned".into(),
+                model: def.model.clone(),
+                ..Default::default()
+            };
+            let _ = sink.send(doc).await;
         }
 
         Ok(())
@@ -2259,6 +2291,29 @@ impl AgentOrchestrator {
                     warn!(agent = %name, issue = issue, error = %e, "failed to post output to Gitea");
                 }
             }
+
+            #[cfg(feature = "quickwit")]
+            if let Some(ref sink) = self.quickwit_sink {
+                let exit_code = status.code();
+                let level = if exit_code.unwrap_or(1) == 0 { "INFO" } else { "WARN" };
+                let wall_time_secs = self
+                    .active_agents
+                    .get(name)
+                    .map(|m| m.started_at.elapsed().as_secs_f64());
+                let doc = quickwit::LogDocument {
+                    timestamp: chrono::Utc::now().to_rfc3339(),
+                    level: level.into(),
+                    agent_name: name.clone(),
+                    layer: format!("{:?}", def.layer),
+                    source: "orchestrator".into(),
+                    message: "agent exited".into(),
+                    model: def.model.clone(),
+                    exit_code,
+                    wall_time_secs,
+                    ..Default::default()
+                };
+                let _ = sink.send(doc).await;
+            }
         }
 
         // Process natural exits
@@ -2446,6 +2501,34 @@ impl AgentOrchestrator {
         }
         for (name, event) in &events {
             self.nightwatch.observe(name, event);
+            #[cfg(feature = "quickwit")]
+            if let Some(ref sink) = self.quickwit_sink {
+                let (level, source, line) = match event {
+                    crate::OutputEvent::Stdout { line, .. } => ("INFO", "stdout", line.as_str()),
+                    crate::OutputEvent::Stderr { line, .. } => ("WARN", "stderr", line.as_str()),
+                    _ => continue,
+                };
+                let layer = self
+                    .active_agents
+                    .get(name)
+                    .map(|m| format!("{:?}", m.definition.layer))
+                    .unwrap_or_default();
+                let model = self
+                    .active_agents
+                    .get(name)
+                    .and_then(|m| m.definition.model.clone());
+                let doc = quickwit::LogDocument {
+                    timestamp: chrono::Utc::now().to_rfc3339(),
+                    level: level.into(),
+                    agent_name: name.clone(),
+                    layer,
+                    source: source.into(),
+                    message: line.to_owned(),
+                    model,
+                    ..Default::default()
+                };
+                let _ = sink.try_send(doc);
+            }
         }
     }
 
