@@ -155,9 +155,8 @@ impl AgentConfig {
             // Do NOT require ANTHROPIC_API_KEY -- it poisons Claude CLI
             // by forcing API-key auth mode with an invalid value.
             "claude" | "claude-code" => Vec::new(),
-            // opencode handles its own auth via ~/.config/opencode/opencode.json.
-            // It supports multiple providers (Kimi, Anthropic, OpenAI, etc.)
-            // each with their own auth mechanism. Do NOT gate on OPENAI_API_KEY.
+            // opencode manages its own per-provider auth (kimi, glm, etc.).
+            // Do NOT require OPENAI_API_KEY -- it blocks non-OpenAI providers.
             "opencode" => Vec::new(),
             _ => Vec::new(),
         }
@@ -277,10 +276,7 @@ mod tests {
 
         // opencode manages its own provider auth -- should return empty
         let keys = AgentConfig::infer_api_keys("opencode");
-        assert!(
-            keys.is_empty(),
-            "opencode manages its own auth, should not require API key"
-        );
+        assert!(keys.is_empty(), "opencode manages its own per-provider auth");
 
         let keys = AgentConfig::infer_api_keys("unknown");
         assert!(keys.is_empty());
@@ -293,10 +289,7 @@ mod tests {
         assert!(keys.is_empty(), "claude via full path uses OAuth");
 
         let keys = AgentConfig::infer_api_keys("/home/alex/.bun/bin/opencode");
-        assert!(
-            keys.is_empty(),
-            "opencode via full path manages its own auth"
-        );
+        assert!(keys.is_empty(), "opencode via full path manages its own auth");
     }
 
     #[test]
