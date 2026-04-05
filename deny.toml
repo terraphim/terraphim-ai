@@ -25,11 +25,6 @@ ignore = [
     # dotenv unmaintained - used by atlassian_haystack
     # TODO: Replace with dotenvy
     "RUSTSEC-2021-0141",
-    # rustls-webpki CRL revocation bypass - transitive dep via serenity -> tokio-rustls -> rustls 0.22.x
-    # Fix requires upgrading rustls 0.22.x to 0.23.x, which needs serenity/tokio-tungstenite updates
-    # Limited impact: attacker would need to compromise a trusted issuing authority
-    # TODO: Remove once serenity updates to rustls 0.23.x
-    "RUSTSEC-2026-0049",
     # term_size unmaintained - transitive dep via terraphim_validation
     # TODO: Replace with terminal_size
     "RUSTSEC-2020-0163",
@@ -46,6 +41,7 @@ allow = [
     "GPL-3.0-or-later",
     "AGPL-3.0-or-later",
     "CDLA-Permissive-2.0",
+    "bzip2-1.0.6",
 ]
 confidence-threshold = 0.8
 
