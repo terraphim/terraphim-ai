@@ -15,7 +15,6 @@ exclude = [
     "desktop/src-tauri",
     # Planned future use, not needed for workspace builds
     "crates/terraphim_build_args",
-    "crates/terraphim-markdown-parser",
     # Unused haystack providers (kept for future integration)
     "crates/haystack_atlassian",
     "crates/haystack_discourse",

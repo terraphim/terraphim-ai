@@ -86,16 +86,12 @@ pub fn parse_markdown_directives_dir(root: &Path) -> crate::Result<MarkdownDirec
 
 /// Extract the first `# Heading` from a markdown file at the given path.
 ///
-/// Reads the file and returns `Some(heading)` if an H1 heading is found,
-/// `None` if the file cannot be read or has no heading.
+/// Reads the file and delegates to `terraphim_markdown_parser::extract_first_heading`
+/// for proper AST-based heading extraction. Returns `None` if the file cannot be read
+/// or has no H1 heading.
 pub fn extract_heading_from_path(path: &Path) -> Option<String> {
     let content = fs::read_to_string(path).ok()?;
-    content
-        .lines()
-        .map(|l| l.trim())
-        .find(|l| l.starts_with("# "))
-        .map(|l| l.trim_start_matches("# ").trim().to_string())
-        .filter(|h| !h.is_empty())
+    terraphim_markdown_parser::extract_first_heading(&content)
 }
 
 fn parse_markdown_directives_content(
@@ -109,20 +105,13 @@ fn parse_markdown_directives_content(
     let mut priority: Option<u8> = None;
     let mut trigger: Option<String> = None;
     let mut pinned: bool = false;
-    let mut heading: Option<String> = None;
+
+    // Use AST parser for proper heading extraction (handles inline code, emphasis, etc.)
+    let heading = terraphim_markdown_parser::extract_first_heading(content);
 
     for (idx, line) in content.lines().enumerate() {
         let trimmed = line.trim();
         if trimmed.is_empty() {
-            continue;
-        }
-
-        // Extract first `# Heading` (H1 only), preserving original case.
-        if heading.is_none() && trimmed.starts_with("# ") {
-            let h = trimmed.trim_start_matches("# ").trim();
-            if !h.is_empty() {
-                heading = Some(h.to_string());
-            }
             continue;
         }
 
