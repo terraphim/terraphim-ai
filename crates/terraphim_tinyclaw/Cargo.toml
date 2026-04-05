@@ -56,7 +56,9 @@ clap = { version = "4", features = ["derive"] }
 
 # Channel adapters (feature-gated)
 teloxide = { version = "0.17", optional = true, features = ["macros"] }
-serenity = { version = "0.12", optional = true }
+serenity = { git = "https://github.com/serenity-rs/serenity.git", branch = "next", optional = true }
+# Force tokio-tungstenite to newer version to fix RUSTSEC-2026-0049
+tokio-tungstenite = { version = "0.28", optional = true }
 slack-morphism = { version = "2", optional = true, features = ["hyper"] }
 # Note: matrix-sdk disabled due to sqlite dependency conflict with terraphim_persistence
 # Re-enable when matrix-sdk updates to rusqlite 0.32+ or when conflict resolved
@@ -70,7 +72,7 @@ hound = { version = "3.5", optional = true }
 [features]
 default = ["telegram", "discord"]
 telegram = ["dep:teloxide"]
-discord = ["dep:serenity"]
+discord = ["dep:serenity", "dep:tokio-tungstenite"]
 slack = ["dep:slack-morphism"]
 voice = ["dep:whisper-rs", "dep:symphonia", "dep:hound"]
 # matrix = ["dep:matrix-sdk"]

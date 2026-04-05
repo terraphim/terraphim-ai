@@ -60,6 +60,11 @@ rustls-webpki = "0.103.10"
 [patch.crates-io]
 genai = { git = "https://github.com/terraphim/rust-genai.git", branch = "merge-upstream-20251103" }
 self_update = { git = "https://github.com/AlexMikhalev/self_update.git", branch = "update-zipsign-api-v0.2" }
+# Security: Patch tokio-tungstenite to use rustls 0.23+ for RUSTSEC-2026-0049
+tokio-tungstenite = { git = "https://github.com/snapview/tokio-tungstenite.git", tag = "v0.28.0" }
+# Security: Patch rustls-webpki to fix RUSTSEC-2026-0049
+# Using git source to force version override
+rustls-webpki = { git = "https://github.com/rustls/webpki.git", tag = "v/0.103.10" }
 
 [profile.release]
 panic = "unwind"

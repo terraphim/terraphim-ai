@@ -50,7 +50,7 @@ impl Channel for DiscordChannel {
             impl EventHandler for Handler {
                 async fn message(&self, _ctx: Context, msg: DiscordMessage) {
                     // Ignore bot messages
-                    if msg.author.bot {
+                    if msg.author.bot() {
                         return;
                     }
 
@@ -71,7 +71,7 @@ impl Channel for DiscordChannel {
 
                     let chat_id = msg.channel_id.to_string();
                     let inbound =
-                        InboundMessage::new("discord", &sender_id, &chat_id, &msg.content);
+                        InboundMessage::new("discord", &sender_id, &chat_id, msg.content.as_str());
                     if let Err(e) = self.inbound_tx.send(inbound).await {
                         log::error!("Failed to forward Discord message to bus: {}", e);
                     }
@@ -94,10 +94,10 @@ impl Channel for DiscordChannel {
                     | GatewayIntents::DIRECT_MESSAGES
                     | GatewayIntents::MESSAGE_CONTENT;
 
-                let handler = Handler {
+                let handler = Arc::new(Handler {
                     inbound_tx,
                     allow_from,
-                };
+                });
 
                 let mut client = match Client::builder(&token, intents)
                     .event_handler(handler)
