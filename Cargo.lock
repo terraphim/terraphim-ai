@@ -4209,6 +4209,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "markdown"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a5cab8f2cadc416a82d2e783a1946388b31654d391d1c7d92cc1f03e295b1deb"
+dependencies = [
+ "unicode-id",
+]
+
+[[package]]
 name = "markup5ever"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6322,7 +6331,6 @@ dependencies = [
  "js-sys",
  "log",
  "mime",
- "mime_guess",
  "once_cell",
  "percent-encoding",
  "pin-project-lite",
@@ -7310,7 +7318,7 @@ dependencies = [
  "mime_guess",
  "parking_lot 0.12.5",
  "percent-encoding",
- "reqwest 0.11.27",
+ "reqwest 0.12.28",
  "rustc-hash 2.1.2",
  "secrecy",
  "serde",
@@ -8495,6 +8503,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "terraphim-markdown-parser"
+version = "1.0.0"
+dependencies = [
+ "markdown",
+ "terraphim_types",
+ "thiserror 1.0.69",
+ "ulid",
+]
+
+[[package]]
 name = "terraphim-session-analyzer"
 version = "1.16.0"
 dependencies = [
@@ -8745,6 +8763,7 @@ dependencies = [
  "serde_json",
  "strsim",
  "tempfile",
+ "terraphim-markdown-parser",
  "terraphim_types",
  "thiserror 1.0.69",
  "tokio",
@@ -10324,6 +10343,12 @@ name = "unicode-bidi"
 version = "0.3.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5c1cb5db39152898a79168971543b1cb5020dff7fe43c8dc468b0885f5e29df5"
+
+[[package]]
+name = "unicode-id"
+version = "0.3.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "70ba288e709927c043cbe476718d37be306be53fb1fafecd0dbe36d072be2580"
 
 [[package]]
 name = "unicode-ident"

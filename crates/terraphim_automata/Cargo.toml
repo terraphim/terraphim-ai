@@ -14,6 +14,7 @@ readme = "README.md"
 
 [dependencies]
 terraphim_types = { path = "../terraphim_types", version = "1.0.0" }
+terraphim-markdown-parser = { path = "../terraphim-markdown-parser", version = "1.0.0" }
 
 ahash = { version = "0.8.6", features = ["serde"] }
 aho-corasick = "1.0.2"
