@@ -376,20 +376,26 @@ impl SessionService {
 
     /// Search sessions using the full-text index (if enabled)
     #[cfg(feature = "index")]
-    pub async fn search_indexed(&self, query: &str, limit: usize) -> Vec<crate::index::SearchResult> {
+    pub async fn search_indexed(
+        &self,
+        query: &str,
+        limit: usize,
+    ) -> Vec<crate::index::SearchResult> {
         let index_guard = self.index.read().await;
-        if let Some(ref index) = index_guard.as_ref() {
-            index.search(query, limit)
-        } else {
-            Vec::new()
-        }
+        index_guard
+            .as_ref()
+            .map(|idx| idx.search(query, limit))
+            .unwrap_or_default()
     }
 
     /// Get index document count
     #[cfg(feature = "index")]
     pub async fn index_document_count(&self) -> usize {
         let index_guard = self.index.read().await;
-        index_guard.as_ref().map(|i| i.document_count()).unwrap_or(0)
+        index_guard
+            .as_ref()
+            .map(|i| i.document_count())
+            .unwrap_or(0)
     }
 
     /// Check if index is initialized

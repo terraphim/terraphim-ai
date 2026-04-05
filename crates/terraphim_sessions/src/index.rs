@@ -388,101 +388,12 @@ mod tests {
         let session3 =
             create_test_session("s3", "Rust CLI Tools", "Building CLI apps with Rust clap");
 
-        // DEBUG: Print the searchable text for each session
-        let doc1 = SessionDocument::from_session(&session1);
-        let doc2 = SessionDocument::from_session(&session2);
-        let doc3 = SessionDocument::from_session(&session3);
-
-        println!("DEBUG s1 searchable_text: {:?}", doc1.searchable_text());
-        println!("DEBUG s2 searchable_text: {:?}", doc2.searchable_text());
-        println!("DEBUG s3 searchable_text: {:?}", doc3.searchable_text());
-
         index.index_session(&session1).unwrap();
         index.index_session(&session2).unwrap();
         index.index_session(&session3).unwrap();
 
         // Search for "rust" - should find s1 and s3
-        let query = "rust";
-        let query_lower = query.to_lowercase();
-        let query_terms: Vec<&str> = query_lower.split_whitespace().collect();
-
-        println!("\nDEBUG: Scoring for query terms: {:?}", query_terms);
-
-        // DEBUG: Score each document individually
-        for (id, doc) in index.documents.iter() {
-            let text = doc.searchable_text().to_lowercase();
-            let mut score: i32 = 0;
-
-            println!("\n=== Scoring document: {} ===", id);
-            println!("  Searchable text (lowercase): {:?}", text);
-
-            for term in &query_terms {
-                println!("  Checking term: {:?}", term);
-
-                // Title match
-                if let Some(title) = &doc.title {
-                    let title_lower = title.to_lowercase();
-                    if title_lower.contains(term) {
-                        score += 20;
-                        println!("    -> Title contains term: +20 (score: {})", score);
-                        if title_lower == *term {
-                            score += 30;
-                            println!("    -> Exact title match: +30 (score: {})", score);
-                        }
-                    }
-                }
-
-                // Content match
-                let matches = text.matches(term).count() as i32;
-                if matches > 0 {
-                    let added = matches * 5;
-                    score += added;
-                    println!(
-                        "    -> Content matches '{}': {} occurrences x 5 = +{} (score: {})",
-                        term, matches, added, score
-                    );
-                }
-
-                // Source match
-                if doc.source.to_lowercase().contains(term) {
-                    score += 10;
-                    println!("    -> Source contains term: +10 (score: {})", score);
-                }
-
-                // Tool match
-                for tool in &doc.tools {
-                    if tool.to_lowercase().contains(term) {
-                        score += 15;
-                        println!(
-                            "    -> Tool '{}' contains term: +15 (score: {})",
-                            tool, score
-                        );
-                    }
-                }
-            }
-
-            // Recent boost
-            if let Some(ts) = doc.timestamp {
-                let now = jiff::Timestamp::now().as_millisecond();
-                let age_days = (now - ts) / (1000 * 60 * 60 * 24);
-                if age_days < 30 {
-                    score += 5;
-                    println!("    -> Recent boost: +5 (score: {})", score);
-                }
-            }
-
-            println!("  FINAL SCORE for {}: {}", id, score);
-        }
-
         let results = index.search("rust", 10);
-        println!("\nDEBUG: Search results for 'rust':");
-        for r in &results {
-            println!(
-                "  {}: score={}, title={:?}",
-                r.session_id, r.score, r.document.title
-            );
-        }
-
         let result_ids: std::collections::HashSet<_> =
             results.iter().map(|r| r.session_id.as_str()).collect();
 
