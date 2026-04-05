@@ -1602,12 +1602,25 @@ impl AgentOrchestrator {
         if issue_number == 0 {
             return false;
         }
+
+        // Fast local check: if agent is already running, skip immediately.
+        // This prevents races where the Gitea API returns stale assignee data
+        // because a concurrent dispatch path just assigned the issue milliseconds ago.
+        if self.active_agents.contains_key(agent_name) {
+            warn!(
+                agent = %agent_name,
+                issue = issue_number,
+                "skipping dispatch: agent already active (local guard)"
+            );
+            return true;
+        }
+
         let Some(ref poster) = self.output_poster else {
             return false;
         };
         let tracker = poster.tracker_for(agent_name);
 
-        // Check current assignees
+        // Remote check: if agent is assigned in Gitea but not active (crash recovery)
         match tracker.fetch_issue_assignees(issue_number).await {
             Ok(assignees) => {
                 if assignees.iter().any(|a| a == agent_name) {
