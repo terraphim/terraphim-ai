@@ -7,6 +7,10 @@ description = "AI Dark Factory orchestrator wiring spawner, router, supervisor i
 license = "Apache-2.0"
 repository = "https://github.com/terraphim/terraphim-ai"
 
+[features]
+default = []
+quickwit = ["dep:reqwest"]
+
 [dependencies]
 # Terraphim internal crates
 terraphim_spawner = { path = "../terraphim_spawner", version = "1.0.0" }
@@ -48,6 +52,9 @@ hex = "0.4"
 # Persistence layer for shared learnings
 opendal = { version = "0.54", default-features = false }
 terraphim_persistence = { path = "../terraphim_persistence", version = "1.4.10", features = ["sqlite"] }
+
+# Quickwit integration (optional)
+reqwest = { workspace = true, optional = true }
 
 [dev-dependencies]
 tokio-test = "0.4"

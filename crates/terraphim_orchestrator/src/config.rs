@@ -84,6 +84,10 @@ pub struct OrchestratorConfig {
     /// Path to persona role configuration JSON for terraphim-agent.
     #[serde(default)]
     pub role_config_path: Option<PathBuf>,
+    /// Quickwit log shipping configuration (only available with quickwit feature).
+    #[cfg(feature = "quickwit")]
+    #[serde(default)]
+    pub quickwit: Option<QuickwitConfig>,
 }
 
 /// Configuration for posting agent output to Gitea issues.
@@ -138,6 +142,65 @@ pub struct WebhookConfig {
 
 fn default_webhook_bind() -> String {
     "0.0.0.0:9090".to_string()
+}
+
+/// Quickwit log shipping configuration.
+#[cfg(feature = "quickwit")]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QuickwitConfig {
+    /// Whether Quickwit logging is enabled.
+    #[serde(default = "default_quickwit_enabled")]
+    pub enabled: bool,
+    /// Quickwit API endpoint.
+    #[serde(default = "default_quickwit_endpoint")]
+    pub endpoint: String,
+    /// Index ID for log ingestion.
+    #[serde(default = "default_quickwit_index_id")]
+    pub index_id: String,
+    /// Maximum documents per batch.
+    #[serde(default = "default_quickwit_batch_size")]
+    pub batch_size: usize,
+    /// Seconds between forced flushes.
+    #[serde(default = "default_quickwit_flush_interval_secs")]
+    pub flush_interval_secs: u64,
+}
+
+#[cfg(feature = "quickwit")]
+impl Default for QuickwitConfig {
+    fn default() -> Self {
+        Self {
+            enabled: default_quickwit_enabled(),
+            endpoint: default_quickwit_endpoint(),
+            index_id: default_quickwit_index_id(),
+            batch_size: default_quickwit_batch_size(),
+            flush_interval_secs: default_quickwit_flush_interval_secs(),
+        }
+    }
+}
+
+#[cfg(feature = "quickwit")]
+fn default_quickwit_enabled() -> bool {
+    false
+}
+
+#[cfg(feature = "quickwit")]
+fn default_quickwit_endpoint() -> String {
+    "http://127.0.0.1:7280".to_string()
+}
+
+#[cfg(feature = "quickwit")]
+fn default_quickwit_index_id() -> String {
+    "adf-logs".to_string()
+}
+
+#[cfg(feature = "quickwit")]
+fn default_quickwit_batch_size() -> usize {
+    100
+}
+
+#[cfg(feature = "quickwit")]
+fn default_quickwit_flush_interval_secs() -> u64 {
+    5
 }
 
 /// Lightweight reference to an SFIA skill code and level.
