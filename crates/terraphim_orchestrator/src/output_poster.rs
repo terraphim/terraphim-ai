@@ -104,7 +104,7 @@ impl OutputPoster {
     }
 
     /// Get the tracker for a specific agent, falling back to the default.
-    fn tracker_for(&self, agent_name: &str) -> &GiteaTracker {
+    pub fn tracker_for(&self, agent_name: &str) -> &GiteaTracker {
         self.agent_trackers
             .get(agent_name)
             .unwrap_or(&self.default_tracker)
