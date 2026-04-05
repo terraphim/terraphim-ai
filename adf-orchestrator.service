@@ -1,0 +1,45 @@
+[Unit]
+Description=AI Dark Factory Orchestrator
+Documentation=https://git.terraphim.cloud/terraphim/terraphim-ai
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=alex
+Group=alex
+WorkingDirectory=/opt/ai-dark-factory
+
+# Source login profile for PATH, GITEA_TOKEN, GITEA_URL, then exec ADF.
+# The login shell ensures ~/.cargo/bin, ~/.local/bin, ~/bin, ~/.bun/bin
+# are all on PATH -- needed by child agents (opencode, gtr, cargo, etc.).
+ExecStart=/bin/bash -lc 'exec /usr/local/bin/adf orchestrator.toml'
+
+# ADF manages its own child processes; give them time to finish on stop.
+# SIGTERM lets ADF drain gracefully, SIGKILL after 90s if stuck.
+TimeoutStopSec=90
+KillMode=mixed
+KillSignal=SIGTERM
+
+# Restart on failure with back-off.
+Restart=on-failure
+RestartSec=30
+
+# Logging to journald.
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=adf
+
+# Resource guards -- ADF spawns many child agents so be generous.
+# Limit total tree to 16GB RAM and 400% CPU (4 cores).
+MemoryMax=16G
+CPUQuota=400%
+
+# Mild hardening -- ADF needs full HOME access for repos, worktrees,
+# agent toolchains, and .profile env vars.
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/opt/ai-dark-factory /home/alex /tmp /var/log
+
+[Install]
+WantedBy=multi-user.target

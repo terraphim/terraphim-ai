@@ -1,0 +1,255 @@
+version: "3"
+
+networks:
+  gitea:
+    external: false
+
+services:
+  server:
+    image: git.terraphim.cloud/terraphim/gitea:1.26.0
+    container_name: gitea
+    environment:
+      - USER_UID=1000
+      - USER_GID=1000
+      - GITEA__database__DB_TYPE=postgres
+      - GITEA__database__HOST=db:5432
+      - GITEA__database__NAME=gitea
+      - GITEA__database__USER=gitea
+      - GITEA__database__PASSWD=ZCzGDZiV2BE_Rh6@nKhp
+      # Security hardening - all repos private by default
+      - GITEA__repository__FORCE_PRIVATE=true
+      - GITEA__repository__DEFAULT_PRIVATE=private
+      - GITEA__repository__DEFAULT_PUSH_CREATE_PRIVATE=true
+      - GITEA__openid__ENABLE_OPENID_SIGNIN=false
+      - GITEA__openid__ENABLE_OPENID_SIGNUP=false
+      - GITEA__actions__ENABLE=true
+      - GITEA__repository__LFS_START_SERVER=true
+      - GITEA__repository__LFS_CONTENT_PATH=/data/lfs
+      - GITEA__storage__type=minio
+      - GITEA__storage__MINIO_ACCESS_KEY_ID=22b80e3bae08bfcba33bb8309303a88b119a9615
+      - GITEA__storage__MINIO_SECRET_ACCESS_KEY=52f759853b6b76eed0bbe51ca68a9688119aa44676c7d2e3472ba2cd10725dbd3733d6170b8e9f31
+      - GITEA__storage__MINIO_BUCKET=gitea
+      - GITEA__storage__MINIO_LOCATION=us-east-1
+      # Use Tailscale IP for internal S3 access
+      - GITEA__storage__MINIO_ENDPOINT=http://s3storage:8333
+      - GITEA__storage__MINIO_INSECURE_SKIP_VERIFY=false
+      - GITEA__storage__MINIO_USE_SSL=false
+      # Robot API Configuration (Gitea 1.26.0+)
+      - GITEA__issue_graph__ENABLED=true
+      - GITEA__issue_graph__DAMPING_FACTOR=0.85
+      - GITEA__issue_graph__ITERATIONS=100
+      - GITEA__issue_graph__PAGERANK_CACHE_TTL=300
+      - GITEA__issue_graph__AUDIT_LOG=true
+      - GITEA__issue_graph__STRICT_MODE=false
+      - GITEA__webhook__ALLOWED_HOST_LIST=172.18.0.1,localhost,git.terraphim.cloud
+      - GITEA__storage__SERVE_DIRECT=true
+    restart: always
+    # Restart policy: always restart unless explicitly stopped
+    deploy:
+      restart_policy:
+        condition: always
+        delay: 5s
+        max_attempts: 10
+        window: 120s
+    networks:
+      - gitea
+    volumes:
+      - ./gitea:/data
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      # Gitea HTTP - localhost only (accessed via Caddy reverse proxy)
+      - "127.0.0.1:3000:3000"
+      # Gitea SSH - exposed on all interfaces
+      - "222:22"
+    depends_on:
+      db:
+        condition: service_healthy
+      s3:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/api/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    # Resource limits to prevent OOM
+    mem_limit: 2g
+    memswap_limit: 2g
+    cpus: '2.0'
+
+  db:
+    image: postgres:15
+    restart: always
+    deploy:
+      restart_policy:
+        condition: always
+        delay: 5s
+        max_attempts: 10
+        window: 120s
+    environment:
+      - POSTGRES_USER=gitea
+      - POSTGRES_PASSWORD=ZCzGDZiV2BE_Rh6@nKhp
+      - POSTGRES_DB=gitea
+    networks:
+      - gitea
+    volumes:
+      - ./postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gitea -d gitea"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    # Resource limits
+    mem_limit: 1g
+    cpus: '1.0'
+
+  master:
+    image: chrislusf/seaweedfs
+    restart: always
+    deploy:
+      restart_policy:
+        condition: always
+        delay: 5s
+        max_attempts: 10
+        window: 120s
+    command: "master -ip=master -ip.bind=0.0.0.0 -metricsPort=9324"
+    networks:
+      - gitea
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9333/cluster/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    # Resource limits
+    mem_limit: 512m
+    cpus: '0.5'
+
+  volume:
+    image: chrislusf/seaweedfs
+    restart: always
+    deploy:
+      restart_policy:
+        condition: always
+        delay: 5s
+        max_attempts: 10
+        window: 120s
+    command: 'volume -mserver="master:9333" -ip.bind=0.0.0.0 -port=8080 -metricsPort=9325'
+    depends_on:
+      master:
+        condition: service_healthy
+    volumes:
+      - ./seaweedfs:/data
+    networks:
+      - gitea
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8080/status || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    # Resource limits
+    mem_limit: 1g
+    cpus: '0.5'
+
+  filer:
+    image: chrislusf/seaweedfs
+    restart: always
+    deploy:
+      restart_policy:
+        condition: always
+        delay: 5s
+        max_attempts: 10
+        window: 120s
+    command: 'filer -master="master:9333" -ip.bind=0.0.0.0 -metricsPort=9326'
+    tty: true
+    stdin_open: true
+    depends_on:
+      master:
+        condition: service_healthy
+      volume:
+        condition: service_started
+    volumes:
+      - ./seaweedfs_filter:/data
+    networks:
+      - gitea
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8888/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    # Resource limits
+    mem_limit: 512m
+    cpus: '0.5'
+
+  s3:
+    image: chrislusf/seaweedfs
+    container_name: s3storage
+    hostname: s3storage
+    restart: always
+    deploy:
+      restart_policy:
+        condition: always
+        delay: 5s
+        max_attempts: 10
+        window: 120s
+    ports:
+      # Bind to Tailscale interface only (100.106.66.7)
+      # Accessible only within Tailscale network, not public internet
+      - "100.106.66.7:8333:8333"
+      - "100.106.66.7:9327:9327"
+    command: 's3 -config=/etc/seaweedfs/s3.json -filer="filer:8888" -ip.bind=0.0.0.0 -metricsPort=9327'
+    depends_on:
+      master:
+        condition: service_healthy
+      volume:
+        condition: service_started
+      filer:
+        condition: service_healthy
+    volumes:
+      - ./s3_config.json:/etc/seaweedfs/s3.json
+    networks:
+      - gitea
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8333/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    # Resource limits
+    mem_limit: 512m
+    cpus: '0.5'
+
+  prometheus:
+    image: prom/prometheus:v2.21.0
+    restart: always
+    deploy:
+      restart_policy:
+        condition: always
+        delay: 5s
+        max_attempts: 10
+        window: 120s
+    ports:
+      # Bind to Tailscale interface only (100.106.66.7)
+      # Accessible only within Tailscale network, not public internet
+      - "100.106.66.7:9000:9090"
+    volumes:
+      - ./prometheus:/etc/prometheus
+    command: --web.enable-lifecycle --config.file=/etc/prometheus/prometheus.yml
+    depends_on:
+      s3:
+        condition: service_healthy
+    networks:
+      - gitea
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:9090/-/healthy || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    # Resource limits
+    mem_limit: 512m
+    cpus: '0.5'

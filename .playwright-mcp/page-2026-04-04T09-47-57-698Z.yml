@@ -1,0 +1,192 @@
+- generic [active] [ref=e1]:
+  - link "Skip to main content" [ref=e2] [cursor=pointer]:
+    - /url: "#main"
+  - banner "Site navigation" [ref=e3]:
+    - generic [ref=e4]:
+      - link "Terraphim Terraphim" [ref=e5] [cursor=pointer]:
+        - /url: http://127.0.0.1:1414
+        - img "Terraphim" [ref=e6]
+        - generic [ref=e7]: Terraphim
+      - navigation "Main navigation" [ref=e8]:
+        - link "Home" [ref=e9] [cursor=pointer]:
+          - /url: http://127.0.0.1:1414/
+        - link "Posts" [ref=e10] [cursor=pointer]:
+          - /url: http://127.0.0.1:1414/posts
+        - link "Docs" [ref=e11] [cursor=pointer]:
+          - /url: https://docs.terraphim.ai
+        - link "Tags" [ref=e12] [cursor=pointer]:
+          - /url: http://127.0.0.1:1414/tags
+        - link "Categories" [ref=e13] [cursor=pointer]:
+          - /url: http://127.0.0.1:1414/categories
+        - link "Donate" [ref=e14] [cursor=pointer]:
+          - /url: http://127.0.0.1:1414/docs/donate
+      - generic [ref=e15]:
+        - generic "System online" [ref=e16]
+        - generic [ref=e17]: v1.16.0
+      - button "Search" [ref=e18] [cursor=pointer]:
+        - generic [ref=e19]: 
+  - text:  
+  - main [ref=e20]:
+    - generic [ref=e22]:
+      - heading "Quickstart" [level=1] [ref=e23]
+      - paragraph [ref=e24]: Get started with Terraphim AI in 5 minutes
+    - article [ref=e26]:
+      - generic [ref=e27]:
+        - generic [ref=e28]:
+          - generic [ref=e29]: 
+          - text: 27 January 2026
+        - generic [ref=e30]:
+          - generic [ref=e31]: 
+          - text: 3 min read
+        - generic [ref=e32]:
+          - generic [ref=e33]: 
+          - text: 404 words
+      - generic [ref=e34]:
+        - heading "Quickstart Guide" [level=1] [ref=e35]
+        - paragraph [ref=e36]: Get up and running with Terraphim AI in just 5 minutes.
+        - 'heading "Step 1: Install Terraphim" [level=2] [ref=e37]'
+        - paragraph [ref=e38]: "Choose your preferred installation method:"
+        - 'heading "Option A: Universal Installer (Recommended)" [level=3] [ref=e39]'
+        - paragraph [ref=e40]: "```bash"
+        - heading "Single command installation with platform detection" [level=1] [ref=e41]
+        - paragraph [ref=e42]: "curl -fsSL https://raw.githubusercontent.com/terraphim/terraphim-ai/main/scripts/install.sh | bash ```"
+        - 'heading "Option B: Homebrew (Coming Soon)" [level=3] [ref=e43]'
+        - paragraph [ref=e44]: Homebrew support is not yet available. Use the universal installer or Cargo instead.
+        - 'heading "Option C: Cargo" [level=3] [ref=e45]'
+        - code [ref=e47]: "# Install agent with interactive TUI cargo install terraphim-agent # Install CLI for automation cargo install terraphim-cli"
+        - paragraph [ref=e48]:
+          - link "Need more options?" [ref=e49] [cursor=pointer]:
+            - /url: /docs/installation
+        - 'heading "Step 2: Start Server" [level=2] [ref=e50]'
+        - paragraph [ref=e51]: Terraphim server provides HTTP API and knowledge graph backend.
+        - paragraph [ref=e52]: "```bash terraphim-server ```"
+        - paragraph [ref=e53]: "By default, server runs on `http://localhost:8080`."
+        - paragraph [ref=e54]: "You should see output like: ``` [INFO] Terraphim Server v1.5.2 starting... [INFO] Server listening on http://localhost:8080 [INFO] Knowledge graph initialized ```"
+        - 'heading "Step 3: Use the Agent" [level=2] [ref=e55]'
+        - paragraph [ref=e56]: "In a new terminal, start the interactive agent:"
+        - code [ref=e58]: terraphim-agent
+        - paragraph [ref=e59]: "You'll see a welcome message and can start typing commands:"
+        - code [ref=e61]: "Terraphim AI Agent v1.5.2 Type 'help' for available commands > search rust async Found 12 results for 'rust async' > role engineer Role set to: Engineer (optimizing for technical depth) > search patterns Found 8 results for 'patterns'"
+        - heading "Common Agent Commands" [level=2] [ref=e62]
+        - paragraph [ref=e63]: "Here are the most useful commands to get started:"
+        - code [ref=e65]: "> search <query> # Search knowledge graph > role <name> # Set search role (engineer, architect, etc.) > connect <term1> <term2> # Link two terms in knowledge graph > import <file> # Import markdown file into knowledge graph > export <format> # Export knowledge graph (json, csv) > status # Show server status and statistics > help # Show all available commands"
+        - 'heading "Step 4: Import Your Content" [level=2] [ref=e66]'
+        - paragraph [ref=e67]: "Import your markdown files or documentation:"
+        - paragraph [ref=e68]: "```bash"
+        - heading "Import a single file" [level=1] [ref=e69]
+        - paragraph [ref=e70]: import ~/notes/project-a.md
+        - heading "Import entire directory" [level=1] [ref=e71]
+        - paragraph [ref=e72]: "import ~/Documents/knowledge-base/ ```"
+        - 'heading "Step 5: Configure Data Sources" [level=2] [ref=e73]'
+        - paragraph [ref=e74]: "Configure Terraphim to search different sources:"
+        - paragraph [ref=e75]: "```bash"
+        - heading "Search GitHub repositories" [level=1] [ref=e76]
+        - paragraph [ref=e77]: source add github https://github.com/terraphim/terraphim-ai
+        - heading "Search StackOverflow" [level=1] [ref=e78]
+        - paragraph [ref=e79]: source add stackoverflow rust tokio
+        - heading "Search local filesystem" [level=1] [ref=e80]
+        - paragraph [ref=e81]: "source add filesystem ~/code/ --recursive ```"
+        - 'heading "Step 6: Explore Features" [level=2] [ref=e82]'
+        - heading "Semantic Search" [level=3] [ref=e83]
+        - paragraph [ref=e84]: "```bash"
+        - blockquote [ref=e85]:
+          - paragraph [ref=e86]: "search how to implement async channels in rust ```"
+        - heading "Role-Based Filtering" [level=3] [ref=e87]
+        - paragraph [ref=e88]: "```bash"
+        - blockquote [ref=e89]:
+          - paragraph [ref=e90]: "role architect search system design patterns ```"
+        - heading "Knowledge Graph Exploration" [level=3] [ref=e91]
+        - paragraph [ref=e92]: "```bash"
+        - blockquote [ref=e93]:
+          - paragraph [ref=e94]: "connect tokio async show tokio ```"
+        - heading "CLI Automation" [level=2] [ref=e95]
+        - paragraph [ref=e96]: "For automation and scripting, use the CLI instead of REPL:"
+        - paragraph [ref=e97]: "```bash"
+        - heading "Search and get JSON output" [level=1] [ref=e98]
+        - paragraph [ref=e99]: terraphim-cli search "async patterns" --format json
+        - heading "Import files programmatically" [level=1] [ref=e100]
+        - paragraph [ref=e101]: terraphim-cli import ~/notes/*.md --recursive
+        - heading "Set role and search" [level=1] [ref=e102]
+        - paragraph [ref=e103]: "terraphim-cli search \"rust error handling\" --role engineer ```"
+        - heading "Example Workflow" [level=2] [ref=e104]
+        - paragraph [ref=e105]: "Here's a complete example workflow:"
+        - code [ref=e107]: "# 1. Start the server (in one terminal) terraphim-server & # 2. Import your codebase (in another terminal) terraphim-agent > import ~/my-project/src/ # 3. Search for information > search error handling patterns # 4. Set role for better results > role senior-engineer # 5. Search again with role context > search error handling patterns # 6. Export results > export json > search-results.json"
+        - heading "Next Steps" [level=2] [ref=e108]
+        - list [ref=e109]:
+          - listitem [ref=e110]:
+            - link "Full Documentation" [ref=e111] [cursor=pointer]:
+              - /url: https://docs.terraphim.ai
+            - text: "- Comprehensive user guide and API reference"
+          - listitem [ref=e112]:
+            - link "Installation Guide" [ref=e113] [cursor=pointer]:
+              - /url: /docs/installation
+            - text: "- More installation options and troubleshooting"
+          - listitem [ref=e114]:
+            - link "Configuration Guide" [ref=e115] [cursor=pointer]:
+              - /url: /docs/terraphim_config
+            - text: "- Customize Terraphim to your needs"
+          - listitem [ref=e116]:
+            - link "Contribution Guide" [ref=e117] [cursor=pointer]:
+              - /url: /docs/contribution
+            - text: "- Contribute to Terraphim development"
+          - listitem [ref=e118]:
+            - link "Community" [ref=e119] [cursor=pointer]:
+              - /url: https://discord.gg/VPJXB6BGuY
+            - text: "- Join our Discord for support"
+        - heading "Getting Help" [level=2] [ref=e120]
+        - paragraph [ref=e121]: "If you run into issues:"
+        - list [ref=e122]:
+          - listitem [ref=e123]:
+            - text: Check
+            - link "troubleshooting section" [ref=e124] [cursor=pointer]:
+              - /url: https://docs.terraphim.ai/troubleshooting.html
+          - listitem [ref=e125]:
+            - text: Search existing
+            - link "GitHub issues" [ref=e126] [cursor=pointer]:
+              - /url: https://github.com/terraphim/terraphim-ai/issues
+          - listitem [ref=e127]:
+            - link "Create a new issue" [ref=e128] [cursor=pointer]:
+              - /url: https://github.com/terraphim/terraphim-ai/issues/new
+          - listitem [ref=e129]:
+            - text: Join
+            - link "Discord community" [ref=e130] [cursor=pointer]:
+              - /url: https://discord.gg/VPJXB6BGuY
+            - text: for support
+          - listitem [ref=e131]:
+            - text: Contact us at
+            - link "alex@terraphim.ai" [ref=e132] [cursor=pointer]:
+              - /url: mailto:alex@terraphim.ai
+  - text: ×
+  - contentinfo [ref=e133]:
+    - generic [ref=e134]: Terraphim AI
+    - generic [ref=e135]: Privacy-Preserving AI Assistant
+    - generic [ref=e136]:
+      - link "GitHub" [ref=e137] [cursor=pointer]:
+        - /url: https://github.com/terraphim
+        - generic [ref=e138]: 
+        - text: GitHub
+      - link "Discord" [ref=e139] [cursor=pointer]:
+        - /url: https://discord.gg/VPJXB6BGuY
+        - generic [ref=e140]: 
+        - text: Discord
+      - link "Twitter" [ref=e141] [cursor=pointer]:
+        - /url: https://twitter.com/alex_mikhalev
+        - generic [ref=e142]: 
+        - text: Twitter
+      - link "LinkedIn" [ref=e143] [cursor=pointer]:
+        - /url: https://www.linkedin.com/in/alexmikhalev
+        - generic [ref=e144]: 
+        - text: LinkedIn
+      - link "Reddit" [ref=e145] [cursor=pointer]:
+        - /url: https://www.reddit.com/r/TerraphimAI
+        - generic [ref=e146]: 
+        - text: Reddit
+      - link "Email" [ref=e147] [cursor=pointer]:
+        - /url: mailto:alex@terraphim.ai
+        - generic [ref=e148]: 
+        - text: Email
+      - link "RSS" [ref=e149] [cursor=pointer]:
+        - /url: http://127.0.0.1:1414/rss.xml
+        - generic [ref=e150]: 
+        - text: RSS
+    - generic [ref=e151]: Applied Knowledge Systems Ltd // Apache 2.0 // All data processed locally

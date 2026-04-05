@@ -1,0 +1,199 @@
+- generic [active] [ref=e1]:
+  - link "Skip to main content" [ref=e2] [cursor=pointer]:
+    - /url: "#main"
+  - banner "Site navigation" [ref=e3]:
+    - generic [ref=e4]:
+      - link "Terraphim Terraphim" [ref=e5] [cursor=pointer]:
+        - /url: http://127.0.0.1:1414
+        - img "Terraphim" [ref=e6]
+        - generic [ref=e7]: Terraphim
+      - navigation "Main navigation" [ref=e8]:
+        - link "Home" [ref=e9] [cursor=pointer]:
+          - /url: http://127.0.0.1:1414/
+        - link "Posts" [ref=e10] [cursor=pointer]:
+          - /url: http://127.0.0.1:1414/posts
+        - link "Docs" [ref=e11] [cursor=pointer]:
+          - /url: https://docs.terraphim.ai
+        - link "Tags" [ref=e12] [cursor=pointer]:
+          - /url: http://127.0.0.1:1414/tags
+        - link "Categories" [ref=e13] [cursor=pointer]:
+          - /url: http://127.0.0.1:1414/categories
+        - link "Donate" [ref=e14] [cursor=pointer]:
+          - /url: http://127.0.0.1:1414/docs/donate
+      - generic [ref=e15]:
+        - generic "System online" [ref=e16]
+        - generic [ref=e17]: v1.16.0
+      - button "Search" [ref=e18] [cursor=pointer]:
+        - generic [ref=e19]: 
+  - text:  
+  - main [ref=e20]:
+    - generic [ref=e22]:
+      - heading "Installation" [level=1] [ref=e23]
+      - paragraph [ref=e24]: Install Terraphim AI on Linux, macOS, or Windows using your preferred method
+    - article [ref=e26]:
+      - generic [ref=e27]:
+        - generic [ref=e28]:
+          - generic [ref=e29]: 
+          - text: 27 January 2026
+        - generic [ref=e30]:
+          - generic [ref=e31]: 
+          - text: 2 min read
+        - generic [ref=e32]:
+          - generic [ref=e33]: 
+          - text: 294 words
+      - generic [ref=e34]:
+        - heading "Installation" [level=1] [ref=e35]
+        - paragraph [ref=e36]: Choose the installation method that best suits your needs and platform.
+        - heading "Quick Install (Recommended)" [level=2] [ref=e37]
+        - paragraph [ref=e38]: The universal installer automatically detects your platform and installs the appropriate version.
+        - code [ref=e40]: curl -fsSL https://raw.githubusercontent.com/terraphim/terraphim-ai/main/scripts/install.sh | bash
+        - heading "Package Managers" [level=2] [ref=e41]
+        - heading "Homebrew (macOS/Linux)" [level=3] [ref=e42]
+        - code [ref=e44]: brew tap terraphim/terraphim && brew install terraphim-ai
+        - paragraph [ref=e45]:
+          - text: This installs
+          - code [ref=e46]: terraphim-agent
+          - text: ","
+          - code [ref=e47]: terraphim-cli
+          - text: ", and"
+          - code [ref=e48]: terraphim_server
+          - text: .
+        - heading "Cargo (Rust)" [level=3] [ref=e49]
+        - paragraph [ref=e50]: Install using Cargo, Rust's package manager.
+        - code [ref=e52]: "# Install agent with interactive TUI cargo install terraphim-agent # Install CLI for automation cargo install terraphim-cli"
+        - heading "Debian/Ubuntu" [level=3] [ref=e53]
+        - paragraph [ref=e54]:
+          - text: Download the
+          - code [ref=e55]: .deb
+          - text: "package from the latest release:"
+        - code [ref=e57]: curl -LO https://github.com/terraphim/terraphim-ai/releases/latest/download/terraphim-agent_1.15.0-1_amd64.deb sudo dpkg -i terraphim-agent_1.15.0-1_amd64.deb
+        - heading "Platform-Specific Guides" [level=2] [ref=e58]
+        - heading "Linux" [level=3] [ref=e59]
+        - heading "Binary Download" [level=4] [ref=e60]
+        - paragraph [ref=e61]: "Download the latest release from GitHub:"
+        - code [ref=e63]: "# x86_64 (GNU) curl -LO https://github.com/terraphim/terraphim-ai/releases/latest/download/terraphim-agent-1.15.0-x86_64-unknown-linux-gnu.tar.gz tar -xzf terraphim-agent-1.15.0-x86_64-unknown-linux-gnu.tar.gz sudo mv terraphim-agent terraphim-cli terraphim_server /usr/local/bin/ # x86_64 (MUSL / static) curl -LO https://github.com/terraphim/terraphim-ai/releases/latest/download/terraphim-agent-1.15.0-x86_64-unknown-linux-musl.tar.gz # ARM64 (MUSL) curl -LO https://github.com/terraphim/terraphim-ai/releases/latest/download/terraphim-agent-1.15.0-aarch64-unknown-linux-musl.tar.gz # ARMv7 (MUSL) curl -LO https://github.com/terraphim/terraphim-ai/releases/latest/download/terraphim-agent-1.15.0-armv7-unknown-linux-musleabihf.tar.gz"
+        - heading "Build from Source" [level=4] [ref=e64]
+        - code [ref=e66]: "# Clone the repository git clone https://github.com/terraphim/terraphim-ai.git cd terraphim-ai # Build all binaries cargo build --release # Install sudo cp target/release/terraphim_server /usr/local/bin/ sudo cp target/release/terraphim-agent /usr/local/bin/ sudo cp target/release/terraphim-cli /usr/local/bin/"
+        - heading "macOS" [level=3] [ref=e67]
+        - heading "Binary Download" [level=4] [ref=e68]
+        - code [ref=e70]: "# Apple Silicon (ARM64) curl -LO https://github.com/terraphim/terraphim-ai/releases/latest/download/terraphim-agent-1.15.0-aarch64-apple-darwin.tar.gz tar -xzf terraphim-agent-1.15.0-aarch64-apple-darwin.tar.gz sudo mv terraphim-agent terraphim-cli terraphim_server /usr/local/bin/ # Intel (x86_64) curl -LO https://github.com/terraphim/terraphim-ai/releases/latest/download/terraphim-agent-1.15.0-x86_64-apple-darwin.tar.gz # Universal (Fat binary) curl -LO https://github.com/terraphim/terraphim-ai/releases/latest/download/terraphim-agent-1.15.0-universal-apple-darwin.tar.gz"
+        - heading "Build from Source" [level=4] [ref=e71]
+        - paragraph [ref=e72]: Requires Xcode command line tools.
+        - code [ref=e74]: git clone https://github.com/terraphim/terraphim-ai.git cd terraphim-ai cargo build --release sudo cp target/release/terraphim_server /usr/local/bin/ sudo cp target/release/terraphim-agent /usr/local/bin/ sudo cp target/release/terraphim-cli /usr/local/bin/
+        - heading "Windows" [level=3] [ref=e75]
+        - heading "Binary Download" [level=4] [ref=e76]
+        - code [ref=e78]: "# Download and extract curl -LO https://github.com/terraphim/terraphim-ai/releases/latest/download/terraphim-agent-1.15.0-x86_64-pc-windows-msvc.zip"
+        - paragraph [ref=e79]: Extract the zip and add the directory to your PATH.
+        - list [ref=e80]:
+          - listitem [ref=e81]:
+            - link "Download for Windows x64" [ref=e82] [cursor=pointer]:
+              - /url: https://github.com/terraphim/terraphim-ai/releases/latest
+        - heading "Build from Source" [level=4] [ref=e83]
+        - paragraph [ref=e84]:
+          - text: Requires
+          - link "Rust for Windows" [ref=e85] [cursor=pointer]:
+            - /url: https://rustup.rs/
+          - text: .
+        - code [ref=e87]: "git clone https://github.com/terraphim/terraphim-ai.git cd terraphim-ai cargo build --release # Binaries will be in target\\release\\"
+        - heading "Library Bindings" [level=2] [ref=e88]
+        - heading "npm (Node.js / Bun)" [level=3] [ref=e89]
+        - paragraph [ref=e90]:
+          - text: The
+          - code [ref=e91]: "@terraphim/autocomplete"
+          - text: package provides NAPI bindings for autocomplete and knowledge graph functions.
+        - code [ref=e93]: npm install @terraphim/autocomplete
+        - heading "Python (PyPI)" [level=3] [ref=e94]
+        - paragraph [ref=e95]:
+          - text: The
+          - code [ref=e96]: terraphim-automata
+          - text: package provides PyO3 bindings for text matching and autocomplete.
+        - code [ref=e98]: pip install terraphim-automata
+        - heading "Browser Extensions" [level=3] [ref=e99]
+        - paragraph [ref=e100]: "Two browser extensions are available for developer-mode installation:"
+        - list [ref=e101]:
+          - listitem [ref=e102]:
+            - strong [ref=e103]: Terraphim Sidebar
+            - text: "-- knowledge graph search panel"
+          - listitem [ref=e104]:
+            - strong [ref=e105]: Terraphim Autocomplete
+            - text: "-- autocomplete suggestions in text fields"
+        - paragraph [ref=e106]: "Install from source:"
+        - code [ref=e108]: git clone https://github.com/terraphim/terraphim-ai.git cd terraphim-ai/browser_extensions
+        - paragraph [ref=e109]:
+          - text: Then load unpacked in Chrome at
+          - code [ref=e110]: chrome://extensions
+          - text: (enable Developer Mode). Coming to the Chrome Web Store soon.
+        - paragraph [ref=e111]:
+          - text: See
+          - link "browser_extensions/INSTALL.md" [ref=e112] [cursor=pointer]:
+            - /url: https://github.com/terraphim/terraphim-ai/tree/main/browser_extensions
+          - text: for detailed instructions.
+        - heading "Verification" [level=2] [ref=e113]
+        - paragraph [ref=e114]: "After installation, verify that Terraphim is working:"
+        - code [ref=e116]: "# Check version terraphim-agent --version # terraphim-agent 1.15.0 terraphim-cli --version # terraphim-cli 1.15.0 # Start the server terraphim_server # In another terminal, use the agent terraphim-agent"
+        - heading "Troubleshooting" [level=2] [ref=e117]
+        - heading "Permission Denied" [level=3] [ref=e118]
+        - paragraph [ref=e119]: "If you get a permission denied error, make the binary executable:"
+        - code [ref=e121]: chmod +x /usr/local/bin/terraphim_server chmod +x /usr/local/bin/terraphim-agent chmod +x /usr/local/bin/terraphim-cli
+        - heading "Command Not Found" [level=3] [ref=e122]
+        - paragraph [ref=e123]: "Ensure that the installation directory is in your PATH:"
+        - code [ref=e125]: "# For bash echo 'export PATH=$PATH:/usr/local/bin' >> ~/.bashrc source ~/.bashrc # For zsh echo 'export PATH=$PATH:/usr/local/bin' >> ~/.zshrc source ~/.zshrc"
+        - heading "Rust Version Issues" [level=3] [ref=e126]
+        - paragraph [ref=e127]: "Ensure that you have a recent Rust version:"
+        - code [ref=e129]: "rustc --version # Should be 1.75.0 or later rustup update stable"
+        - heading "Next Steps" [level=2] [ref=e130]
+        - list [ref=e131]:
+          - listitem [ref=e132]:
+            - link "Quickstart Guide" [ref=e133] [cursor=pointer]:
+              - /url: /docs/quickstart
+            - text: "-- Get up and running in 5 minutes"
+          - listitem [ref=e134]:
+            - link "Configuration Guide" [ref=e135] [cursor=pointer]:
+              - /url: /docs/terraphim_config
+            - text: "-- Customise Terraphim to your needs"
+          - listitem [ref=e136]:
+            - link "Discord Community" [ref=e137] [cursor=pointer]:
+              - /url: https://discord.gg/VPJXB6BGuY
+            - text: "-- Join our Discord for support"
+          - listitem [ref=e138]:
+            - link "Discourse Forum" [ref=e139] [cursor=pointer]:
+              - /url: https://terraphim.discourse.group
+            - text: "-- Community discussions and Q&A"
+  - text: ×
+  - contentinfo [ref=e140]:
+    - generic [ref=e141]: Terraphim AI
+    - generic [ref=e142]: Privacy-Preserving AI Assistant
+    - generic [ref=e143]:
+      - link "GitHub" [ref=e144] [cursor=pointer]:
+        - /url: https://github.com/terraphim
+        - generic [ref=e145]: 
+        - text: GitHub
+      - link "Discord" [ref=e146] [cursor=pointer]:
+        - /url: https://discord.gg/VPJXB6BGuY
+        - generic [ref=e147]: 
+        - text: Discord
+      - link "Discourse" [ref=e148] [cursor=pointer]:
+        - /url: https://terraphim.discourse.group
+        - generic [ref=e149]: 
+        - text: Discourse
+      - link "Twitter" [ref=e150] [cursor=pointer]:
+        - /url: https://twitter.com/alex_mikhalev
+        - generic [ref=e151]: 
+        - text: Twitter
+      - link "LinkedIn" [ref=e152] [cursor=pointer]:
+        - /url: https://www.linkedin.com/in/alexmikhalev
+        - generic [ref=e153]: 
+        - text: LinkedIn
+      - link "Reddit" [ref=e154] [cursor=pointer]:
+        - /url: https://www.reddit.com/r/TerraphimAI
+        - generic [ref=e155]: 
+        - text: Reddit
+      - link "Email" [ref=e156] [cursor=pointer]:
+        - /url: mailto:alex@terraphim.ai
+        - generic [ref=e157]: 
+        - text: Email
+      - link "RSS" [ref=e158] [cursor=pointer]:
+        - /url: http://127.0.0.1:1414/rss.xml
+        - generic [ref=e159]: 
+        - text: RSS
+    - generic [ref=e160]: Applied Knowledge Systems Ltd // Apache 2.0 // All data processed locally

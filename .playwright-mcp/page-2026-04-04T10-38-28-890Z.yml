@@ -1,0 +1,582 @@
+- generic [active] [ref=e1]:
+  - link "Skip to main content" [ref=e2] [cursor=pointer]:
+    - /url: "#main"
+  - banner "Site navigation" [ref=e3]:
+    - generic [ref=e4]:
+      - link "Terraphim Terraphim" [ref=e5] [cursor=pointer]:
+        - /url: http://127.0.0.1:1414
+        - img "Terraphim" [ref=e6]
+        - generic [ref=e7]: Terraphim
+      - navigation "Main navigation" [ref=e8]:
+        - link "Home" [ref=e9] [cursor=pointer]:
+          - /url: http://127.0.0.1:1414/
+        - link "Releases" [ref=e10] [cursor=pointer]:
+          - /url: http://127.0.0.1:1414/releases
+        - link "Quickstart" [ref=e11] [cursor=pointer]:
+          - /url: http://127.0.0.1:1414/docs/quickstart
+        - link "Docs" [ref=e12] [cursor=pointer]:
+          - /url: https://docs.terraphim.ai
+        - link "Install" [ref=e13] [cursor=pointer]:
+          - /url: http://127.0.0.1:1414/docs/installation
+        - link "Donate" [ref=e14] [cursor=pointer]:
+          - /url: http://127.0.0.1:1414/docs/donate
+      - generic [ref=e15]:
+        - generic "System online" [ref=e16]
+        - generic [ref=e17]: v1.16.0
+      - button "Search" [ref=e18] [cursor=pointer]:
+        - generic [ref=e19]: 
+  - text:  
+  - main [ref=e20]:
+    - generic [ref=e21]:
+      - img [ref=e22]
+      - generic [ref=e23]:
+        - generic [ref=e24]: 
+        - text: Local-First Knowledge Navigation
+      - heading "Navigate Your Knowledge at Warp Speed" [level=1] [ref=e25]:
+        - text: Navigate Your
+        - text: Knowledge at
+        - text: Warp Speed
+      - paragraph [ref=e26]: Terraphim is a local-first knowledge graph search engine built in Rust and WebAssembly. Your data never leaves your machine. Aho-Corasick pattern matching across role-based knowledge graphs, at native speed.
+      - generic [ref=e27]:
+        - link "Download v1.15.0" [ref=e28] [cursor=pointer]:
+          - /url: https://github.com/terraphim/terraphim-ai/releases/tag/v1.15.0
+          - generic [ref=e29]: 
+          - text: Download v1.15.0
+        - link "Quickstart" [ref=e30] [cursor=pointer]:
+          - /url: http://127.0.0.1:1414/docs/quickstart
+          - generic [ref=e31]: 
+          - text: Quickstart
+        - link "GitHub" [ref=e32] [cursor=pointer]:
+          - /url: https://github.com/terraphim/terraphim-ai
+          - generic [ref=e33]: 
+          - text: GitHub
+      - generic [ref=e34]:
+        - generic [ref=e35]: Scroll to charge
+        - generic [ref=e36]:
+          - generic [ref=e37]: 
+          - generic [ref=e38]: 
+          - generic [ref=e39]: 
+    - region "Hyperdrive status" [ref=e40]:
+      - generic [ref=e41]:
+        - generic [ref=e42]:
+          - generic [ref=e43]: 
+          - heading "Hyperdrive Charge" [level=2] [ref=e44]
+          - generic [ref=e45]: 0%
+        - generic [ref=e58]:
+          - generic [ref=e59]:
+            - generic [ref=e60]: Search Latency
+            - generic [ref=e61]: < 1ms
+          - generic [ref=e62]:
+            - generic [ref=e63]: Pattern Engine
+            - generic [ref=e64]: Aho-Corasick
+          - generic [ref=e65]:
+            - generic [ref=e66]: Runtime
+            - generic [ref=e67]: WASM + Native
+          - generic [ref=e68]:
+            - generic [ref=e69]: Workspace Crates
+            - generic [ref=e70]: 52+
+          - generic [ref=e71]:
+            - generic [ref=e72]: Telemetry
+            - generic [ref=e73]: Zero
+    - region "Core capabilities" [ref=e74]:
+      - generic [ref=e75]:
+        - generic [ref=e76]:
+          - generic [ref=e77]: 
+          - text: Navigation Waypoints
+        - heading "Core Capabilities" [level=2] [ref=e78]
+        - paragraph [ref=e79]: Each waypoint represents a fundamental capability of the Terraphim navigation system.
+        - generic [ref=e80]:
+          - article [ref=e81]:
+            - generic [ref=e82]:
+              - generic [ref=e84]: 
+              - generic [ref=e85]:
+                - text: WP-001
+                - heading "Local-First Architecture" [level=3] [ref=e86]
+            - paragraph [ref=e87]: Your data never leaves your machine. All indexing, searching, and graph traversal happens entirely on-device. No cloud dependency, no data exfiltration, no telemetry.
+          - article [ref=e88]:
+            - generic [ref=e89]:
+              - generic [ref=e91]: 
+              - generic [ref=e92]:
+                - text: WP-002
+                - heading "Knowledge Graph Engine" [level=3] [ref=e93]
+            - paragraph [ref=e94]: Build and traverse interconnected knowledge graphs with Aho-Corasick multi-pattern matching. Thousands of patterns matched simultaneously in a single pass.
+          - article [ref=e95]:
+            - generic [ref=e96]:
+              - generic [ref=e98]: 
+              - generic [ref=e99]:
+                - text: WP-003
+                - heading "MCP Server Integration" [level=3] [ref=e100]
+            - paragraph [ref=e101]: Native Model Context Protocol server. Connect your AI assistant to local knowledge graphs. KG-boosted file search, token tracking, and role-based context enrichment.
+          - article [ref=e102]:
+            - generic [ref=e103]:
+              - generic [ref=e105]: 
+              - generic [ref=e106]:
+                - text: WP-004
+                - heading "Rust/WASM Performance" [level=3] [ref=e107]
+            - paragraph [ref=e108]: Written in Rust, compiled to WebAssembly. Sub-millisecond search latency. Memory-safe, thread-safe, running at near-native speed in your browser or desktop.
+          - article [ref=e109]:
+            - generic [ref=e110]:
+              - generic [ref=e112]: 
+              - generic [ref=e113]:
+                - text: WP-005
+                - heading "Hooks System" [level=3] [ref=e114]
+            - paragraph [ref=e115]: Pre and post tool-use hooks for AI coding assistants. Capture failed commands, inject knowledge graph context, and automate learning from development sessions.
+          - article [ref=e116]:
+            - generic [ref=e117]:
+              - generic [ref=e119]: 
+              - generic [ref=e120]:
+                - text: WP-006
+                - heading "KG-Boosted File Search" [level=3] [ref=e121]
+            - paragraph [ref=e122]: File search augmented with knowledge graph context. Find files not just by name but by their semantic relationship to your domain concepts and role-specific vocabulary.
+    - region "Feature comparison" [ref=e123]:
+      - generic [ref=e124]:
+        - generic [ref=e125]:
+          - generic [ref=e126]: 
+          - text: Honest Comparison
+        - heading "What You Keep vs What They Take" [level=2] [ref=e127]
+        - paragraph [ref=e128]: "Feature-by-feature: Terraphim (local) vs typical cloud search products."
+        - table [ref=e129]:
+          - rowgroup [ref=e130]:
+            - row "Capability Terraphim Cloud" [ref=e131]:
+              - columnheader "Capability" [ref=e132]
+              - columnheader "Terraphim" [ref=e133]
+              - columnheader "Cloud" [ref=e134]
+          - rowgroup [ref=e135]:
+            - row "Runs on your hardware Yes No" [ref=e136]:
+              - cell "Runs on your hardware" [ref=e137]
+              - cell "Yes" [ref=e138]:
+                - generic "Yes" [ref=e139]: 
+              - cell "No" [ref=e140]:
+                - generic "No" [ref=e141]: 
+            - row "Data stays on device Yes No" [ref=e142]:
+              - cell "Data stays on device" [ref=e143]
+              - cell "Yes" [ref=e144]:
+                - generic "Yes" [ref=e145]: 
+              - cell "No" [ref=e146]:
+                - generic "No" [ref=e147]: 
+            - row "Works offline Yes No" [ref=e148]:
+              - cell "Works offline" [ref=e149]
+              - cell "Yes" [ref=e150]:
+                - generic "Yes" [ref=e151]: 
+              - cell "No" [ref=e152]:
+                - generic "No" [ref=e153]: 
+            - row "Zero telemetry Yes No" [ref=e154]:
+              - cell "Zero telemetry" [ref=e155]
+              - cell "Yes" [ref=e156]:
+                - generic "Yes" [ref=e157]: 
+              - cell "No" [ref=e158]:
+                - generic "No" [ref=e159]: 
+            - row "No account required Yes No" [ref=e160]:
+              - cell "No account required" [ref=e161]
+              - cell "Yes" [ref=e162]:
+                - generic "Yes" [ref=e163]: 
+              - cell "No" [ref=e164]:
+                - generic "No" [ref=e165]: 
+            - row "No API key Yes No" [ref=e166]:
+              - cell "No API key" [ref=e167]
+              - cell "Yes" [ref=e168]:
+                - generic "Yes" [ref=e169]: 
+              - cell "No" [ref=e170]:
+                - generic "No" [ref=e171]: 
+            - row "Open source Yes No" [ref=e172]:
+              - cell "Open source" [ref=e173]
+              - cell "Yes" [ref=e174]:
+                - generic "Yes" [ref=e175]: 
+              - cell "No" [ref=e176]:
+                - generic "No" [ref=e177]: 
+            - row "Knowledge graphs Yes Partial" [ref=e178]:
+              - cell "Knowledge graphs" [ref=e179]
+              - cell "Yes" [ref=e180]:
+                - generic "Yes" [ref=e181]: 
+              - cell "Partial" [ref=e182]:
+                - generic "Partial" [ref=e183]: 
+            - row "MCP integration Yes Partial" [ref=e184]:
+              - cell "MCP integration" [ref=e185]
+              - cell "Yes" [ref=e186]:
+                - generic "Yes" [ref=e187]: 
+              - cell "Partial" [ref=e188]:
+                - generic "Partial" [ref=e189]: 
+            - row "Role-based profiles Yes No" [ref=e190]:
+              - cell "Role-based profiles" [ref=e191]
+              - cell "Yes" [ref=e192]:
+                - generic "Yes" [ref=e193]: 
+              - cell "No" [ref=e194]:
+                - generic "No" [ref=e195]: 
+            - row "Multi-source indexing Yes Yes" [ref=e196]:
+              - cell "Multi-source indexing" [ref=e197]
+              - cell "Yes" [ref=e198]:
+                - generic "Yes" [ref=e199]: 
+              - cell "Yes" [ref=e200]:
+                - generic "Yes" [ref=e201]: 
+            - row "Token usage tracking Yes Partial" [ref=e202]:
+              - cell "Token usage tracking" [ref=e203]
+              - cell "Yes" [ref=e204]:
+                - generic "Yes" [ref=e205]: 
+              - cell "Partial" [ref=e206]:
+                - generic "Partial" [ref=e207]: 
+            - row "Vendor lock-in No Yes" [ref=e208]:
+              - cell "Vendor lock-in" [ref=e209]
+              - cell "No" [ref=e210]:
+                - generic "No" [ref=e211]: 
+              - cell "Yes" [ref=e212]:
+                - generic "Yes" [ref=e213]: 
+            - row "Recurring subscription No Yes" [ref=e214]:
+              - cell "Recurring subscription" [ref=e215]
+              - cell "No" [ref=e216]:
+                - generic "No" [ref=e217]: 
+              - cell "Yes" [ref=e218]:
+                - generic "Yes" [ref=e219]: 
+          - rowgroup [ref=e220]:
+            - row "Tally 12 / 2 3 / 11" [ref=e221]:
+              - cell "Tally" [ref=e222]
+              - cell "12 / 2" [ref=e223]
+              - cell "3 / 11" [ref=e224]
+        - generic [ref=e225]:
+          - generic [ref=e226]: 
+          - text: = yes
+          - generic [ref=e227]: 
+          - text: = no
+          - generic [ref=e228]: 
+          - text: "= partial // rows 13-14: lower is better"
+    - region "System readouts" [ref=e229]:
+      - generic [ref=e230]:
+        - generic [ref=e231]:
+          - generic [ref=e232]: 
+          - text: System Readouts
+        - heading "Ship Systems" [level=2] [ref=e233]
+        - paragraph [ref=e234]: Core subsystem status and performance metrics.
+        - generic [ref=e235]:
+          - generic [ref=e236]:
+            - generic [ref=e237]:
+              - generic [ref=e238]:
+                - generic [ref=e239]: 
+                - heading "Computation Core" [level=3] [ref=e240]
+                - generic [ref=e241]: Online
+              - generic [ref=e242]:
+                - paragraph [ref=e243]: Rust/WASM computation core. Aho-Corasick automata compiled once, reused across searches. O(n) time complexity regardless of pattern count.
+                - generic [ref=e244]:
+                  - generic [ref=e245]: CPU Load
+                  - generic [ref=e248]: 12%
+                - generic [ref=e249]:
+                  - generic [ref=e250]: WASM Heap
+                  - generic [ref=e253]: 24 MB
+                - generic [ref=e254]:
+                  - generic [ref=e255]: Automata
+                  - generic [ref=e258]: Compiled
+            - generic [ref=e259]:
+              - generic [ref=e260]:
+                - generic [ref=e261]: 
+                - heading "Memory Subsystem" [level=3] [ref=e262]
+                - generic [ref=e263]: Online
+              - generic [ref=e264]:
+                - paragraph [ref=e265]: Knowledge graphs in efficient compressed representations. Rust's zero-cost abstractions. No garbage collector, deterministic allocation.
+                - generic [ref=e266]:
+                  - generic [ref=e267]: Graph Nodes
+                  - generic [ref=e270]: 14,230
+                - generic [ref=e271]:
+                  - generic [ref=e272]: Edges
+                  - generic [ref=e275]: 38,912
+                - generic [ref=e276]:
+                  - generic [ref=e277]: Patterns
+                  - generic [ref=e280]: 2,847
+            - generic [ref=e281]:
+              - generic [ref=e282]:
+                - generic [ref=e283]: 
+                - heading "Privacy Shield" [level=3] [ref=e284]
+                - generic [ref=e285]: Secure
+              - generic [ref=e286]:
+                - paragraph [ref=e287]: All operations execute locally. No network requests for search, indexing, or graph operations. Your knowledge stays on your device.
+                - generic [ref=e288]:
+                  - generic [ref=e289]: Network
+                  - generic [ref=e291]: 0 calls
+                - generic [ref=e292]:
+                  - generic [ref=e293]: Exported
+                  - generic [ref=e295]: 0 bytes
+                - generic [ref=e296]:
+                  - generic [ref=e297]: Telemetry
+                  - generic [ref=e299]: Disabled
+          - generic [ref=e300]:
+            - generic [ref=e301]:
+              - generic [ref=e302]:
+                - generic [ref=e303]: 
+                - text: Subsystem Status
+              - generic [ref=e304]:
+                - generic [ref=e306]: Search Index
+                - generic [ref=e307]: Ready
+              - generic [ref=e308]:
+                - generic [ref=e310]: Graph Engine
+                - generic [ref=e311]: Active
+              - generic [ref=e312]:
+                - generic [ref=e314]: MCP Server
+                - generic [ref=e315]: Loaded
+              - generic [ref=e316]:
+                - generic [ref=e318]: Aho-Corasick
+                - generic [ref=e319]: Compiled
+              - generic [ref=e320]:
+                - generic [ref=e322]: Token Tracker
+                - generic [ref=e323]: Active
+              - generic [ref=e324]:
+                - generic [ref=e326]: Role Configs
+                - generic [ref=e327]: 3 active
+            - generic [ref=e328]:
+              - generic [ref=e329]:
+                - generic [ref=e330]: 
+                - text: Performance Log
+              - generic [ref=e331]:
+                - generic [ref=e333]: Last search
+                - generic [ref=e334]: 0.3ms
+              - generic [ref=e335]:
+                - generic [ref=e337]: Graph query
+                - generic [ref=e338]: 0.8ms
+              - generic [ref=e339]:
+                - generic [ref=e341]: Index build
+                - generic [ref=e342]: 142ms
+              - generic [ref=e343]:
+                - generic [ref=e345]: Startup
+                - generic [ref=e346]: 89ms
+            - generic [ref=e347]:
+              - generic [ref=e348]:
+                - generic [ref=e349]: 
+                - text: Security Audit
+              - generic [ref=e350]:
+                - generic [ref=e352]: Data at rest
+                - generic [ref=e353]: Local
+              - generic [ref=e354]:
+                - generic [ref=e356]: Network access
+                - generic [ref=e357]: None
+              - generic [ref=e358]:
+                - generic [ref=e360]: Third-party
+                - generic [ref=e361]: None
+              - generic [ref=e362]:
+                - generic [ref=e364]: Open source
+                - generic [ref=e365]: "Yes"
+    - region "Knowledge graph roles" [ref=e366]:
+      - generic [ref=e367]:
+        - generic [ref=e368]:
+          - generic [ref=e369]: 
+          - text: Crew Stations
+        - heading "Role-Based Knowledge Graphs" [level=2] [ref=e370]
+        - paragraph [ref=e371]: Each role brings its own vocabulary, relationships, and domain expertise.
+        - generic [ref=e372]:
+          - article [ref=e373]:
+            - generic [ref=e374]:
+              - generic [ref=e376]: 
+              - heading "System Operator" [level=3] [ref=e377]
+            - paragraph [ref=e378]: Infrastructure and operations focused. Monitors system health, manages deployments, navigates operational knowledge spanning runbooks, incident reports, and system documentation.
+            - generic [ref=e379]:
+              - generic [ref=e380]: Infrastructure
+              - generic [ref=e381]: Monitoring
+              - generic [ref=e382]: Runbooks
+              - generic [ref=e383]: Incidents
+          - article [ref=e384]:
+            - generic [ref=e385]:
+              - generic [ref=e387]: 
+              - heading "Engineer" [level=3] [ref=e388]
+            - paragraph [ref=e389]: Design and development focused. Traverses codebases, API documentation, architecture decision records, and technical specifications through domain-specific pattern matching.
+            - generic [ref=e390]:
+              - generic [ref=e391]: Architecture
+              - generic [ref=e392]: APIs
+              - generic [ref=e393]: Code
+              - generic [ref=e394]: Specifications
+          - article [ref=e395]:
+            - generic [ref=e396]:
+              - generic [ref=e398]: 
+              - heading "Analyst" [level=3] [ref=e399]
+            - paragraph [ref=e400]: Research and intelligence focused. Navigates across datasets, reports, and analytical frameworks. Discovers hidden connections between concepts using multi-pattern graph queries.
+            - generic [ref=e401]:
+              - generic [ref=e402]: Research
+              - generic [ref=e403]: Reports
+              - generic [ref=e404]: Datasets
+              - generic [ref=e405]: Intelligence
+    - region "Deployment targets" [ref=e406]:
+      - generic [ref=e407]:
+        - generic [ref=e408]:
+          - generic [ref=e409]: 
+          - text: Launch Platforms
+        - heading "Deploy Everywhere" [level=2] [ref=e410]
+        - paragraph [ref=e411]: One engine. Multiple deployment targets. Always local-first.
+        - generic [ref=e412]:
+          - article [ref=e413]:
+            - generic [ref=e415]: 
+            - generic [ref=e416]:
+              - heading "Desktop Application" [level=3] [ref=e417]
+              - paragraph [ref=e418]:
+                - text: Native desktop app built with Tauri. Full system integration, file system access, offline-first operation.
+                - link "Separate repository" [ref=e419] [cursor=pointer]:
+                  - /url: https://github.com/terraphim/terraphim-ai-desktop
+                - text: .
+              - text: Tauri
+          - article [ref=e420]:
+            - generic [ref=e422]: 
+            - generic [ref=e423]:
+              - heading "Browser Extension" [level=3] [ref=e424]
+              - paragraph [ref=e425]:
+                - text: Knowledge graph search in your browser. WASM-powered, runs entirely in the extension sandbox. Coming to Chrome Web Store.
+                - link "Install now" [ref=e426] [cursor=pointer]:
+                  - /url: https://github.com/terraphim/terraphim-ai/tree/main/browser_extensions/INSTALL.md
+                - text: .
+              - text: WASM
+          - article [ref=e427]:
+            - generic [ref=e429]: 
+            - generic [ref=e430]:
+              - heading "Command Line" [level=3] [ref=e431]
+              - paragraph [ref=e432]: Full CLI for pipeline integration, scripting, and terminal-first workflows. Native Rust binary, no runtime dependencies.
+              - text: Rust CLI
+          - article [ref=e433]:
+            - generic [ref=e435]: 
+            - generic [ref=e436]:
+              - heading "HTTP Server" [level=3] [ref=e437]
+              - paragraph [ref=e438]: REST API server for search, configuration, chat, and document management. Integrates with Confluence, Jira, Discourse, email, and local files.
+              - text: REST API
+    - region "Installation" [ref=e439]:
+      - generic [ref=e440]:
+        - generic [ref=e441]:
+          - generic [ref=e442]: 
+          - text: Get Started
+        - heading "Install Terraphim" [level=2] [ref=e443]
+        - paragraph [ref=e444]: One command. No sign-up. No API key. Choose your platform.
+        - generic [ref=e445]:
+          - generic [ref=e446]:
+            - generic [ref=e447]:
+              - generic [ref=e448]: 
+              - generic [ref=e449]:
+                - text: "Detected:"
+                - strong [ref=e450]: macOS (Apple Silicon)
+            - link "Download v1.15.0" [ref=e451] [cursor=pointer]:
+              - /url: https://github.com/terraphim/terraphim-ai/releases/download/v1.15.0/terraphim-agent-1.15.0-aarch64-apple-darwin.tar.gz
+              - generic [ref=e452]: 
+              - generic [ref=e453]: Download v1.15.0
+          - group [ref=e454]:
+            - generic "All platforms" [ref=e455] [cursor=pointer]
+            - text:        
+        - generic [ref=e456]:
+          - generic [ref=e457]:
+            - heading "Install the Application" [level=3] [ref=e458]:
+              - generic [ref=e459]: 
+              - text: Install the Application
+            - generic [ref=e460]:
+              - generic [ref=e461]:
+                - generic [ref=e462]:
+                  - generic [ref=e463]: 
+                  - heading "Quick Install" [level=4] [ref=e464]
+                - generic [ref=e466]:
+                  - generic [ref=e467]: $
+                  - generic [ref=e468]: curl -fsSL https://raw.githubusercontent.com/terraphim/terraphim-ai/main/scripts/install.sh | bash
+                  - button "Copy command" [ref=e469] [cursor=pointer]: copy
+              - generic [ref=e470]:
+                - generic [ref=e471]:
+                  - generic [ref=e472]: 
+                  - heading "Homebrew" [level=4] [ref=e473]
+                - generic [ref=e475]:
+                  - generic [ref=e476]: $
+                  - generic [ref=e477]: brew tap terraphim/terraphim && brew install terraphim-ai
+                  - button "Copy command" [ref=e478] [cursor=pointer]: copy
+              - generic [ref=e479]:
+                - generic [ref=e480]:
+                  - generic [ref=e481]: 
+                  - heading "Cargo" [level=4] [ref=e482]
+                - generic [ref=e483]:
+                  - generic [ref=e484]:
+                    - generic [ref=e485]: $
+                    - generic [ref=e486]: cargo install terraphim-agent
+                    - button "Copy command" [ref=e487] [cursor=pointer]: copy
+                  - generic [ref=e488]:
+                    - generic [ref=e489]: $
+                    - generic [ref=e490]: cargo install terraphim-cli
+                    - button "Copy command" [ref=e491] [cursor=pointer]: copy
+              - generic [ref=e492]:
+                - generic [ref=e493]:
+                  - generic [ref=e494]: 
+                  - heading "Windows" [level=4] [ref=e495]
+                - generic [ref=e496]:
+                  - generic [ref=e497]:
+                    - generic [ref=e498]: ">"
+                    - generic [ref=e499]: curl -fsSL https://raw.githubusercontent.com/terraphim/terraphim-ai/main/scripts/install.sh | bash
+                    - button "Copy command" [ref=e500] [cursor=pointer]: copy
+                  - paragraph [ref=e501]:
+                    - text: Requires WSL. Or
+                    - link "download the .zip directly" [ref=e502] [cursor=pointer]:
+                      - /url: https://github.com/terraphim/terraphim-ai/releases/download/v1.15.0/terraphim-agent-1.15.0-x86_64-pc-windows-msvc.zip
+                    - text: .
+          - generic [ref=e503]:
+            - heading "Library Bindings" [level=3] [ref=e504]:
+              - generic [ref=e505]: 
+              - text: Library Bindings
+            - paragraph [ref=e506]: Embed Terraphim's autocomplete and knowledge graph engine in your own applications.
+            - generic [ref=e507]:
+              - generic [ref=e508]:
+                - generic [ref=e509]:
+                  - generic [ref=e510]: 
+                  - heading "Node.js / Bun" [level=4] [ref=e511]
+                - generic [ref=e512]:
+                  - generic [ref=e513]:
+                    - generic [ref=e514]: $
+                    - generic [ref=e515]: npm install @terraphim/autocomplete
+                    - button "Copy command" [ref=e516] [cursor=pointer]: copy
+                  - paragraph [ref=e517]: Native NAPI bindings for autocomplete and knowledge graph search.
+              - generic [ref=e518]:
+                - generic [ref=e519]:
+                  - generic [ref=e520]: 
+                  - heading "Python" [level=4] [ref=e521]
+                - generic [ref=e522]:
+                  - generic [ref=e523]:
+                    - generic [ref=e524]: $
+                    - generic [ref=e525]: pip install terraphim-automata
+                    - button "Copy command" [ref=e526] [cursor=pointer]: copy
+                  - paragraph [ref=e527]: PyO3 bindings for text matching and autocomplete. Python 3.9+.
+              - generic [ref=e528]:
+                - generic [ref=e529]:
+                  - generic [ref=e530]: 
+                  - heading "Browser Extension" [level=4] [ref=e531]
+                - paragraph [ref=e533]:
+                  - text: WASM-powered knowledge graph search in your browser. Coming to Chrome Web Store.
+                  - link "Install in developer mode" [ref=e534] [cursor=pointer]:
+                    - /url: https://github.com/terraphim/terraphim-ai/tree/main/browser_extensions/INSTALL.md
+                  - text: .
+        - generic [ref=e535]:
+          - link "Download v1.15.0" [ref=e536] [cursor=pointer]:
+            - /url: https://github.com/terraphim/terraphim-ai/releases/tag/v1.15.0
+            - generic [ref=e537]: 
+            - text: Download v1.15.0
+          - link "Installation Guide" [ref=e538] [cursor=pointer]:
+            - /url: http://127.0.0.1:1414/docs/installation
+            - generic [ref=e539]: 
+            - text: Installation Guide
+  - text: ×
+  - contentinfo [ref=e540]:
+    - generic [ref=e541]: Terraphim AI
+    - generic [ref=e542]: Privacy-Preserving AI Assistant
+    - generic [ref=e543]:
+      - link "GitHub" [ref=e544] [cursor=pointer]:
+        - /url: https://github.com/terraphim
+        - generic [ref=e545]: 
+        - text: GitHub
+      - link "Discord" [ref=e546] [cursor=pointer]:
+        - /url: https://discord.gg/VPJXB6BGuY
+        - generic [ref=e547]: 
+        - text: Discord
+      - link "Discourse" [ref=e548] [cursor=pointer]:
+        - /url: https://terraphim.discourse.group
+        - generic [ref=e549]: 
+        - text: Discourse
+      - link "Twitter" [ref=e550] [cursor=pointer]:
+        - /url: https://twitter.com/alex_mikhalev
+        - generic [ref=e551]: 
+        - text: Twitter
+      - link "LinkedIn" [ref=e552] [cursor=pointer]:
+        - /url: https://www.linkedin.com/in/alexmikhalev
+        - generic [ref=e553]: 
+        - text: LinkedIn
+      - link "Reddit" [ref=e554] [cursor=pointer]:
+        - /url: https://www.reddit.com/r/TerraphimAI
+        - generic [ref=e555]: 
+        - text: Reddit
+      - link "Email" [ref=e556] [cursor=pointer]:
+        - /url: mailto:alex@terraphim.ai
+        - generic [ref=e557]: 
+        - text: Email
+      - link "RSS" [ref=e558] [cursor=pointer]:
+        - /url: http://127.0.0.1:1414/rss.xml
+        - generic [ref=e559]: 
+        - text: RSS
+    - generic [ref=e560]: Applied Knowledge Systems Ltd // Apache 2.0 // All data processed locally
