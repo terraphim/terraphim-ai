@@ -293,6 +293,42 @@ impl GiteaTracker {
         Ok(())
     }
 
+    /// Fetch the list of assignee logins for a Gitea issue.
+    ///
+    /// Returns an empty vec if the issue has no assignees or on error.
+    pub async fn fetch_issue_assignees(&self, issue_number: u64) -> Result<Vec<String>> {
+        let url = format!(
+            "{}/api/v1/repos/{}/{}/issues/{}",
+            self.config.base_url, self.config.owner, self.config.repo, issue_number
+        );
+        let response = self
+            .build_request(reqwest::Method::GET, &url)
+            .send()
+            .await?;
+        if !response.status().is_success() {
+            let status = response.status();
+            let text = response.text().await.unwrap_or_default();
+            return Err(TrackerError::Api {
+                message: format!(
+                    "Gitea fetch_issue_assignees error {} on issue {}: {}",
+                    status, issue_number, text
+                ),
+            });
+        }
+        // Parse just the assignees array from the issue JSON
+        let body: serde_json::Value = response.json().await.map_err(TrackerError::Http)?;
+        let assignees = body
+            .get("assignees")
+            .and_then(|a| a.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|u| u.get("login").and_then(|l| l.as_str()).map(String::from))
+                    .collect()
+            })
+            .unwrap_or_default();
+        Ok(assignees)
+    }
+
     /// Search open issues by keyword in title.
     /// Returns issue numbers whose titles contain the given keyword.
     pub async fn search_issues_by_title(&self, keyword: &str) -> Result<Vec<u64>> {
@@ -795,5 +831,62 @@ mod tests {
             "Expected 403 in error: {}",
             err_str
         );
+    }
+
+    #[tokio::test]
+    async fn test_fetch_issue_assignees_returns_logins() {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/42"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": 100,
+                "number": 42,
+                "title": "Test issue",
+                "state": "open",
+                "assignees": [
+                    {"id": 1, "login": "security-sentinel"},
+                    {"id": 2, "login": "test-guardian"}
+                ]
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let tracker = make_tracker(&mock_server.uri());
+        let assignees = tracker.fetch_issue_assignees(42).await.unwrap();
+        assert_eq!(assignees, vec!["security-sentinel", "test-guardian"]);
+    }
+
+    #[tokio::test]
+    async fn test_fetch_issue_assignees_empty() {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/99"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": 200,
+                "number": 99,
+                "title": "Unassigned issue",
+                "state": "open",
+                "assignees": []
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let tracker = make_tracker(&mock_server.uri());
+        let assignees = tracker.fetch_issue_assignees(99).await.unwrap();
+        assert!(assignees.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_fetch_issue_assignees_error() {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/404"))
+            .respond_with(ResponseTemplate::new(404).set_body_string("not found"))
+            .mount(&mock_server)
+            .await;
+
+        let tracker = make_tracker(&mock_server.uri());
+        let result = tracker.fetch_issue_assignees(404).await;
+        assert!(result.is_err());
     }
 }
