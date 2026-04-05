@@ -124,6 +124,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Register LLM providers for keyword-based model selection
     register_providers(&mut orchestrator);
 
+    #[cfg(feature = "quickwit")]
+    {
+        if let Some(qw_config) = orchestrator.quickwit_config().cloned() {
+            if qw_config.enabled {
+                let sink = terraphim_orchestrator::quickwit::QuickwitSink::new(
+                    qw_config.endpoint.clone(),
+                    qw_config.index_id.clone(),
+                    qw_config.batch_size,
+                    qw_config.flush_interval_secs,
+                );
+                orchestrator.set_quickwit_sink(sink);
+                tracing::info!(
+                    endpoint = %qw_config.endpoint,
+                    index = %qw_config.index_id,
+                    "Quickwit logging enabled"
+                );
+            }
+        }
+    }
+
     // Handle SIGTERM/SIGINT for graceful shutdown
     let shutdown_flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
     let flag = shutdown_flag.clone();
