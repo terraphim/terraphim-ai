@@ -109,7 +109,7 @@ fi
 # - useless_vec, items_after_test_module, module_inception: test organization
 # - bool_comparison, nonminimal_bool: test boolean expressions
 # - redundant_clone: performance not critical in tests
-if timeout 1200 cargo clippy --workspace --all-targets --message-format=short -- \
+if timeout 1200 cargo clippy --workspace --all-targets --features zlob --message-format=short -- \
     -D clippy::all \
     -A clippy::nursery -A clippy::pedantic \
     -A dead_code -A unused \

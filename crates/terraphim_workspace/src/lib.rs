@@ -266,7 +266,7 @@ impl WorkspaceManager {
         tracing::debug!(hook = hook_name, cwd = %cwd.display(), "running hook");
 
         let mut cmd = Command::new("sh");
-        cmd.arg("-lc")
+        cmd.arg("-c")
             .arg(script)
             .current_dir(cwd)
             .stdout(std::process::Stdio::piped())
