@@ -29,16 +29,23 @@ home = { version = "0.5", optional = true }
 
 ahash = { version = "0.8.8", features = ["serde"] }
 cached = { version = "0.56.0", features = ["async", "serde", "ahash"] }
-log = "0.4"
-serde = { version = "1.0.149", features = ["derive"] }
-serde_json = "1.0.110"
-thiserror = "1.0.56"
-tokio = { version = "1.15.0", features = ["full"] }
+log = { workspace = true }
+
+serde = { workspace = true, features = ["derive"] }
+
+serde_json = { workspace = true }
+
+thiserror = { workspace = true }
+
+tokio = { workspace = true, features = ["full"] }
+
 html2md = "0.2.15"
-async-trait = "0.1.73"
+async-trait = { workspace = true }
+
 url = "2.5"
 urlencoding = "2.1"
-reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+reqwest = { workspace = true, features = ["json", "rustls-tls"] }
+
 scraper = "0.25.0"
 reqwest-eventsource = { version = "0.5", optional = true }
 mcp-client = { version = "0.1", optional = true }
@@ -49,15 +56,18 @@ rmcp = { version = "0.9", features = ["client", "transport-child-process"], opti
 terraphim_persistence = { path = "../terraphim_persistence", features = ["memory"] }
 terraphim_settings = { path = "../terraphim_settings" }
 terraphim_test_utils = { path = "../terraphim_test_utils" }
-tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+
 futures = "0.3"
 test-log = { version = "0.2.19", features = ["trace"] }
 serial_test = "3.3"
-uuid = { version = "1.21.0", features = ["v4"] }
+uuid = { workspace = true, features = ["v4"] }
+
 dotenvy = "0.15.7"
 walkdir = "2.4.0"
 env_logger = "0.11"
-tempfile = "3.27"
+tempfile = { workspace = true }
+
 
 [features]
 default = []

@@ -14,5 +14,6 @@ readme = "../../README.md"
 [dependencies]
 markdown = "1.0.0-alpha.21"
 terraphim_types = { path = "../terraphim_types", version = "1.0.0" }
-thiserror = "1.0"
+thiserror = { workspace = true }
+
 ulid = { version = "1.0.0", features = ["serde", "uuid"] }
