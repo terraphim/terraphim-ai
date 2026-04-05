@@ -4,9 +4,9 @@
 //! Provides async log shipping to Quickwit search engine.
 
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
+
 use tokio::sync::mpsc;
-use tracing::{error, warn};
+use tracing::warn;
 
 /// Log document structure for Quickwit ingestion
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -142,6 +142,13 @@ impl QuickwitSink {
     /// Returns an error if the channel is closed
     pub async fn send(&self, doc: LogDocument) -> Result<(), QuickwitError> {
         self.tx.send(doc).await.map_err(|e| e.into())
+    }
+
+    /// Send a log document without awaiting (for sync contexts)
+    pub fn try_send(&self, doc: LogDocument) -> Result<(), QuickwitError> {
+        self.tx
+            .try_send(doc)
+            .map_err(|e| QuickwitError::SendError(e.to_string()))
     }
 
     /// Shutdown the sink, flushing any pending documents
