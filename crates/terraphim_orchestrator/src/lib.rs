@@ -304,6 +304,7 @@ impl AgentOrchestrator {
 
     /// Load persisted restart counts from a JSON file in the working directory.
     /// Returns empty HashMap if file doesn't exist or can't be parsed.
+    #[cfg(not(test))]
     fn load_restart_counts() -> HashMap<String, u32> {
         let path = std::env::temp_dir().join("adf_restart_counts.json");
         match std::fs::read_to_string(&path) {

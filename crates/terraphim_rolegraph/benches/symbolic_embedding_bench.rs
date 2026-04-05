@@ -4,7 +4,7 @@
 //! and similarity queries at various scales.
 
 use ahash::{AHashMap, AHashSet};
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use terraphim_rolegraph::symbolic_embeddings::SymbolicEmbeddingIndex;
 use terraphim_types::MedicalNodeType;
 
