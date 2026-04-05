@@ -1,0 +1,264 @@
+//! Gitea webhook handler for real-time mention dispatch.
+//!
+//! Replaces poll-based mention detection with push-based webhook delivery.
+//! Gitea sends POST requests on issue comment events, which are parsed
+//! for @adf: commands and dispatched immediately.
+
+use axum::{body::Bytes, extract::State, http::StatusCode, routing::post, Router};
+use hmac::{Hmac, Mac};
+use serde::Deserialize;
+use sha2::Sha256;
+use tracing::{info, warn};
+
+use crate::adf_commands::AdfCommandParser;
+use crate::persona::PersonaRegistry;
+
+type HmacSha256 = Hmac<Sha256>;
+
+/// Gitea webhook payload for issue_comment events.
+#[derive(Debug, Deserialize)]
+struct GiteaWebhookPayload {
+    action: String,
+    comment: GiteaComment,
+    issue: GiteaIssue,
+    repository: GiteaRepository,
+}
+
+#[derive(Debug, Deserialize)]
+struct GiteaComment {
+    id: u64,
+    body: String,
+    user: GiteaUser,
+    created_at: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct GiteaUser {
+    login: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct GiteaIssue {
+    number: u64,
+    title: String,
+    state: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct GiteaRepository {
+    full_name: String,
+}
+
+/// A dispatch request sent from the webhook handler to the orchestrator.
+pub enum WebhookDispatch {
+    SpawnAgent {
+        agent_name: String,
+        issue_number: u64,
+        comment_id: u64,
+        context: String,
+    },
+    SpawnPersona {
+        persona_name: String,
+        issue_number: u64,
+        comment_id: u64,
+        context: String,
+    },
+    CompoundReview {
+        issue_number: u64,
+        comment_id: u64,
+    },
+}
+
+/// Shared state for the webhook handler.
+#[derive(Clone)]
+pub struct WebhookState {
+    pub agent_names: Vec<String>,
+    pub persona_registry: std::sync::Arc<PersonaRegistry>,
+    pub dispatch_tx: tokio::sync::mpsc::Sender<WebhookDispatch>,
+    pub secret: Option<String>,
+}
+
+/// Create the webhook router.
+pub fn webhook_router(state: WebhookState) -> Router {
+    Router::new()
+        .route("/webhooks/gitea", post(handle_gitea_webhook))
+        .with_state(state)
+}
+
+/// Handle incoming Gitea webhook.
+async fn handle_gitea_webhook(
+    State(state): State<WebhookState>,
+    headers: axum::http::HeaderMap,
+    body: Bytes,
+) -> StatusCode {
+    // 1. Validate HMAC signature if secret is configured
+    if let Some(ref secret) = state.secret {
+        let sig_header = headers
+            .get("X-Gitea-Signature")
+            .or_else(|| headers.get("X-Hub-Signature-256"));
+
+        match sig_header.and_then(|h| h.to_str().ok()) {
+            Some(sig) => {
+                if !verify_signature(secret, &body, sig) {
+                    warn!("webhook signature verification failed");
+                    return StatusCode::UNAUTHORIZED;
+                }
+            }
+            None => {
+                warn!("webhook secret configured but no signature header present");
+                return StatusCode::BAD_REQUEST;
+            }
+        }
+    }
+
+    // 2. Parse payload
+    let payload: GiteaWebhookPayload = match serde_json::from_slice(&body) {
+        Ok(p) => p,
+        Err(e) => {
+            warn!(error = %e, "failed to parse webhook payload");
+            return StatusCode::BAD_REQUEST;
+        }
+    };
+
+    info!(
+        repo = %payload.repository.full_name,
+        issue = payload.issue.number,
+        issue_title = %payload.issue.title,
+        issue_state = %payload.issue.state,
+        comment_id = payload.comment.id,
+        author = %payload.comment.user.login,
+        created_at = %payload.comment.created_at,
+        action = %payload.action,
+        "received webhook event"
+    );
+
+    // 3. Only handle created comments (ignore edited/deleted)
+    if payload.action != "created" {
+        return StatusCode::OK;
+    }
+
+    // 4. Extract @adf: commands using existing parser
+    let persona_names: Vec<String> = state
+        .persona_registry
+        .persona_names()
+        .into_iter()
+        .map(|s| s.to_string())
+        .collect();
+    let parser = AdfCommandParser::new(&state.agent_names, &persona_names);
+
+    let commands = parser.parse_commands(
+        &payload.comment.body,
+        payload.issue.number,
+        payload.comment.id,
+    );
+
+    if commands.is_empty() {
+        return StatusCode::OK;
+    }
+
+    // 5. Dispatch each command to the orchestrator
+    let mut commands_dispatched: u32 = 0;
+    for cmd in commands {
+        let dispatch = match cmd {
+            crate::adf_commands::AdfCommand::SpawnAgent {
+                agent_name,
+                issue_number,
+                comment_id,
+                context,
+            } => WebhookDispatch::SpawnAgent {
+                agent_name,
+                issue_number,
+                comment_id,
+                context,
+            },
+            crate::adf_commands::AdfCommand::SpawnPersona {
+                persona_name,
+                issue_number,
+                comment_id,
+                context,
+            } => WebhookDispatch::SpawnPersona {
+                persona_name,
+                issue_number,
+                comment_id,
+                context,
+            },
+            crate::adf_commands::AdfCommand::CompoundReview {
+                issue_number,
+                comment_id,
+            } => WebhookDispatch::CompoundReview {
+                issue_number,
+                comment_id,
+            },
+            crate::adf_commands::AdfCommand::Unknown { raw } => {
+                warn!(raw = %raw, "unknown ADF command from webhook");
+                continue;
+            }
+        };
+
+        if let Err(e) = state.dispatch_tx.send(dispatch).await {
+            warn!(error = %e, "failed to send webhook dispatch to orchestrator");
+            return StatusCode::SERVICE_UNAVAILABLE;
+        }
+        commands_dispatched += 1;
+    }
+
+    info!(
+        repo = %payload.repository.full_name,
+        issue = payload.issue.number,
+        comment_id = payload.comment.id,
+        author = %payload.comment.user.login,
+        commands = commands_dispatched,
+        "webhook dispatch complete"
+    );
+    StatusCode::ACCEPTED
+}
+
+/// Verify HMAC-SHA256 signature.
+fn verify_signature(secret: &str, body: &[u8], signature: &str) -> bool {
+    let mut mac =
+        HmacSha256::new_from_slice(secret.as_bytes()).expect("HMAC can take key of any size");
+    mac.update(body);
+    let result = mac.finalize();
+    let expected = result.into_bytes();
+
+    // Strip "sha256=" prefix if present
+    let sig_bytes: Vec<u8> =
+        match hex::decode(signature.strip_prefix("sha256=").unwrap_or(signature)) {
+            Ok(b) => b,
+            Err(_) => return false,
+        };
+
+    expected.len() == sig_bytes.len() && expected.iter().zip(sig_bytes.iter()).all(|(a, b)| a == b)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_verify_signature_valid() {
+        let secret = "test-secret";
+        let body = b"hello world";
+        let mut mac = HmacSha256::new_from_slice(secret.as_bytes()).unwrap();
+        mac.update(body);
+        let result = mac.finalize();
+        let sig = hex::encode(result.into_bytes());
+        assert!(verify_signature(secret, body, &sig));
+    }
+
+    #[test]
+    fn test_verify_signature_invalid() {
+        assert!(!verify_signature("secret", b"body", "deadbeef"));
+    }
+
+    #[test]
+    fn test_verify_signature_with_prefix() {
+        let secret = "test-secret";
+        let body = b"hello world";
+        let mut mac = HmacSha256::new_from_slice(secret.as_bytes()).unwrap();
+        mac.update(body);
+        let result = mac.finalize();
+        let sig = format!("sha256={}", hex::encode(result.into_bytes()));
+        assert!(verify_signature(secret, body, &sig));
+    }
+}
