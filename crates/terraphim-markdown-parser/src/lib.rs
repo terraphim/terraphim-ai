@@ -10,6 +10,52 @@ use ulid::Ulid;
 
 pub const TERRAPHIM_BLOCK_ID_PREFIX: &str = "terraphim:block-id:";
 
+/// Extract the first H1 heading from markdown content using AST parsing.
+///
+/// Returns the heading text with original case preserved, or `None` if no
+/// `# Heading` is found. Only matches depth-1 headings (`#`, not `##`).
+pub fn extract_first_heading(content: &str) -> Option<String> {
+    let ast = markdown::to_mdast(content, &ParseOptions::gfm()).ok()?;
+    find_first_h1(&ast)
+}
+
+/// Walk the AST to find the first depth-1 heading and collect its text content.
+fn find_first_h1(node: &Node) -> Option<String> {
+    match node {
+        Node::Heading(h) if h.depth == 1 => {
+            let text = collect_text_content(&h.children);
+            if text.is_empty() { None } else { Some(text) }
+        }
+        _ => {
+            if let Some(children) = children(node) {
+                for child in children {
+                    if let Some(heading) = find_first_h1(child) {
+                        return Some(heading);
+                    }
+                }
+            }
+            None
+        }
+    }
+}
+
+/// Recursively collect all text content from AST nodes.
+fn collect_text_content(nodes: &[Node]) -> String {
+    let mut text = String::new();
+    for node in nodes {
+        match node {
+            Node::Text(t) => text.push_str(&t.value),
+            Node::InlineCode(c) => text.push_str(&c.value),
+            other => {
+                if let Some(children) = children(other) {
+                    text.push_str(&collect_text_content(children));
+                }
+            }
+        }
+    }
+    text
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BlockKind {
     Paragraph,
@@ -554,5 +600,35 @@ mod tests {
         let input = "- item\n\nPara\n";
         let normalized = normalize_markdown(input).unwrap();
         assert!(normalized.blocks.len() >= 2);
+    }
+
+    #[test]
+    fn extract_first_heading_h1() {
+        let input = "# Bun Package Manager\n\nsynonyms:: npm, yarn\n";
+        assert_eq!(
+            extract_first_heading(input),
+            Some("Bun Package Manager".to_string())
+        );
+    }
+
+    #[test]
+    fn extract_first_heading_skips_h2() {
+        let input = "## Not This\n\n# This One\n";
+        assert_eq!(extract_first_heading(input), Some("This One".to_string()));
+    }
+
+    #[test]
+    fn extract_first_heading_none_when_absent() {
+        let input = "Just some text\n\n## Only H2\n";
+        assert_eq!(extract_first_heading(input), None);
+    }
+
+    #[test]
+    fn extract_first_heading_with_inline_code() {
+        let input = "# The `bun` Runtime\n";
+        assert_eq!(
+            extract_first_heading(input),
+            Some("The bun Runtime".to_string())
+        );
     }
 }

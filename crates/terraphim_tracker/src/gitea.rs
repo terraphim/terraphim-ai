@@ -79,7 +79,11 @@ impl GiteaTracker {
     }
 
     /// Build request with authentication.
-    pub(crate) fn build_request(&self, method: reqwest::Method, url: &str) -> reqwest::RequestBuilder {
+    pub(crate) fn build_request(
+        &self,
+        method: reqwest::Method,
+        url: &str,
+    ) -> reqwest::RequestBuilder {
         self.client
             .request(method, url)
             .header("Authorization", format!("token {}", self.config.token))
