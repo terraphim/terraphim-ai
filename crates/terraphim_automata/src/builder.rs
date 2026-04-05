@@ -196,11 +196,17 @@ fn concept_from_path(path: PathBuf) -> Result<ConceptWithDisplay> {
     let stem = path.file_stem().ok_or(BuilderError::Indexation(format!(
         "No file stem in path {path:?}"
     )))?;
-    let original_name = stem.to_string_lossy().to_string();
-    let concept = Concept::from(original_name.clone());
+    let stem_name = stem.to_string_lossy().to_string();
+
+    // Use heading from markdown directives (parsed when the file is first read).
+    // Falls back to file stem if directives are unavailable for this path.
+    let display_name = crate::markdown_directives::extract_heading_from_path(&path)
+        .unwrap_or_else(|| stem_name.clone());
+
+    let concept = Concept::from(stem_name);
     Ok(ConceptWithDisplay {
         concept,
-        display_name: original_name,
+        display_name,
     })
 }
 

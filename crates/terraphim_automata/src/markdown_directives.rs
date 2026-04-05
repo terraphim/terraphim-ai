@@ -84,6 +84,20 @@ pub fn parse_markdown_directives_dir(root: &Path) -> crate::Result<MarkdownDirec
     })
 }
 
+/// Extract the first `# Heading` from a markdown file at the given path.
+///
+/// Reads the file and returns `Some(heading)` if an H1 heading is found,
+/// `None` if the file cannot be read or has no heading.
+pub fn extract_heading_from_path(path: &Path) -> Option<String> {
+    let content = fs::read_to_string(path).ok()?;
+    content
+        .lines()
+        .map(|l| l.trim())
+        .find(|l| l.starts_with("# "))
+        .map(|l| l.trim_start_matches("# ").trim().to_string())
+        .filter(|h| !h.is_empty())
+}
+
 fn parse_markdown_directives_content(
     path: &Path,
     content: &str,
@@ -95,10 +109,20 @@ fn parse_markdown_directives_content(
     let mut priority: Option<u8> = None;
     let mut trigger: Option<String> = None;
     let mut pinned: bool = false;
+    let mut heading: Option<String> = None;
 
     for (idx, line) in content.lines().enumerate() {
         let trimmed = line.trim();
         if trimmed.is_empty() {
+            continue;
+        }
+
+        // Extract first `# Heading` (H1 only), preserving original case.
+        if heading.is_none() && trimmed.starts_with("# ") {
+            let h = trimmed.trim_start_matches("# ").trim();
+            if !h.is_empty() {
+                heading = Some(h.to_string());
+            }
             continue;
         }
 
@@ -216,6 +240,7 @@ fn parse_markdown_directives_content(
         priority,
         trigger,
         pinned,
+        heading,
     }
 }
 
@@ -378,5 +403,56 @@ mod tests {
         let result = parse_markdown_directives_dir(dir.path()).unwrap();
         let directives = result.directives.get("test").unwrap();
         assert_eq!(directives.trigger, None);
+    }
+
+    #[test]
+    fn extracts_heading_from_markdown() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("bun.md");
+        fs::write(
+            &path,
+            "# Bun Package Manager\n\nsynonyms:: npm, yarn, pnpm\n",
+        )
+        .unwrap();
+
+        let result = parse_markdown_directives_dir(dir.path()).unwrap();
+        let directives = result.directives.get("bun").unwrap();
+        assert_eq!(directives.heading, Some("Bun Package Manager".to_string()));
+        assert_eq!(
+            directives.synonyms,
+            vec!["npm".to_string(), "yarn".to_string(), "pnpm".to_string()]
+        );
+    }
+
+    #[test]
+    fn heading_none_when_absent() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("noheading.md");
+        fs::write(&path, "synonyms:: alpha, beta\n").unwrap();
+
+        let result = parse_markdown_directives_dir(dir.path()).unwrap();
+        let directives = result.directives.get("noheading").unwrap();
+        assert_eq!(directives.heading, None);
+    }
+
+    #[test]
+    fn extract_heading_from_path_works() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("test.md");
+        fs::write(&path, "# My Heading\n\nSome content\n").unwrap();
+
+        assert_eq!(
+            extract_heading_from_path(&path),
+            Some("My Heading".to_string())
+        );
+    }
+
+    #[test]
+    fn extract_heading_from_path_returns_none_without_heading() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("test.md");
+        fs::write(&path, "Just content\n").unwrap();
+
+        assert_eq!(extract_heading_from_path(&path), None);
     }
 }

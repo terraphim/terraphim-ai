@@ -412,6 +412,9 @@ pub struct MarkdownDirectives {
     pub trigger: Option<String>,
     #[serde(default)]
     pub pinned: bool,
+    /// First `# Heading` from the markdown file, preserving original case.
+    #[serde(default)]
+    pub heading: Option<String>,
 }
 
 /// The central document type representing indexed and searchable content.
