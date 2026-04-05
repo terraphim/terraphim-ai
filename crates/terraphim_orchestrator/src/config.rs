@@ -93,6 +93,10 @@ pub struct GiteaOutputConfig {
     pub token: String,
     pub owner: String,
     pub repo: String,
+    /// Path to JSON file mapping agent names to Gitea API tokens.
+    /// When present, agents post comments under their own Gitea user.
+    #[serde(default)]
+    pub agent_tokens_path: Option<PathBuf>,
 }
 
 /// Configuration for mention-driven dispatch.
