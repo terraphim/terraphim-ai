@@ -78,19 +78,16 @@ pub struct OrchestratorConfig {
     /// Mention-driven dispatch configuration.
     #[serde(default)]
     pub mentions: Option<MentionConfig>,
-<<<<<<< HEAD
     /// Webhook configuration for real-time mention dispatch.
     #[serde(default)]
     pub webhook: Option<WebhookConfig>,
     /// Path to persona role configuration JSON for terraphim-agent.
     #[serde(default)]
     pub role_config_path: Option<PathBuf>,
-=======
     /// Quickwit log shipping configuration (only available with quickwit feature).
     #[cfg(feature = "quickwit")]
     #[serde(default)]
     pub quickwit: Option<QuickwitConfig>,
->>>>>>> b581e28b (feat: add QuickwitSink module and config for ADF log shipping)
 }
 
 /// Configuration for posting agent output to Gitea issues.
@@ -124,7 +121,6 @@ fn default_poll_modulo() -> u64 {
     2
 }
 
-<<<<<<< HEAD
 fn default_max_dispatches_per_tick() -> u32 {
     3
 }

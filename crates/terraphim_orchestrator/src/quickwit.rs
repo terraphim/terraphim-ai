@@ -164,11 +164,7 @@ impl QuickwitSink {
     /// Flush a batch of documents to Quickwit
     ///
     /// Fire-and-forget: errors are logged but not propagated
-    async fn flush_batch(
-        client: &reqwest::Client,
-        url: &str,
-        buffer: &mut Vec<LogDocument>,
-    ) {
+    async fn flush_batch(client: &reqwest::Client, url: &str, buffer: &mut Vec<LogDocument>) {
         if buffer.is_empty() {
             return;
         }
