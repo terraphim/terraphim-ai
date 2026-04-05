@@ -45,15 +45,20 @@ pub mod mode;
 pub mod nightwatch;
 pub mod output_poster;
 pub mod persona;
+#[cfg(feature = "quickwit")]
+pub mod quickwit;
 pub mod scheduler;
 pub mod scope;
+pub mod webhook;
 
 pub use compound::{CompoundReviewResult, CompoundReviewWorkflow, ReviewGroupDef, SwarmConfig};
 pub use concurrency::{ConcurrencyController, FairnessPolicy, ModeQuotas};
+#[cfg(feature = "quickwit")]
+pub use config::QuickwitConfig;
 pub use config::{
     AgentDefinition, AgentLayer, CompoundReviewConfig, ConcurrencyConfig, GiteaOutputConfig,
     MentionConfig, NightwatchConfig, OrchestratorConfig, PreCheckStrategy, TrackerConfig,
-    TrackerStates, WorkflowConfig,
+    TrackerStates, WebhookConfig, WorkflowConfig,
 };
 pub use cost_tracker::{AgentMetrics, BudgetVerdict, CostSnapshot, CostTracker, ExecutionMetrics};
 pub use dispatcher::{DispatchTask, Dispatcher, DispatcherStats};
@@ -171,8 +176,12 @@ pub struct AgentOrchestrator {
     active_flows: HashMap<String, tokio::task::JoinHandle<flow::state::FlowRunState>>,
     /// Tracker for processed @adf: mentions (dedup + depth limiting).
     mention_cursor: Option<MentionCursor>,
+    /// Receiver for webhook dispatch requests.
+    webhook_dispatch_rx: Option<tokio::sync::mpsc::Receiver<webhook::WebhookDispatch>>,
     /// Monotonically increasing tick counter for poll_modulo gating.
     tick_count: u64,
+    #[cfg(feature = "quickwit")]
+    quickwit_sink: Option<quickwit::QuickwitSink>,
 }
 
 /// Validate agent name for safe use in file paths.
@@ -279,13 +288,15 @@ impl AgentOrchestrator {
             pre_check_tracker: None,
             active_flows: HashMap::new(),
             mention_cursor: None,
+            webhook_dispatch_rx: None,
             tick_count: 0,
+            #[cfg(feature = "quickwit")]
+            quickwit_sink: None,
         })
     }
 
     /// Load persisted restart counts from a JSON file in the working directory.
     /// Returns empty HashMap if file doesn't exist or can't be parsed.
-    #[allow(dead_code)]
     fn load_restart_counts() -> HashMap<String, u32> {
         let path = std::env::temp_dir().join("adf_restart_counts.json");
         match std::fs::read_to_string(&path) {
@@ -358,6 +369,38 @@ impl AgentOrchestrator {
             "safety agents spawned, entering reconciliation loop"
         );
 
+        // Start webhook server if configured
+        if let Some(ref webhook_cfg) = self.config.webhook {
+            let (dispatch_tx, dispatch_rx) = tokio::sync::mpsc::channel(64);
+            self.webhook_dispatch_rx = Some(dispatch_rx);
+
+            let agent_names: Vec<String> =
+                self.config.agents.iter().map(|a| a.name.clone()).collect();
+            let state = webhook::WebhookState {
+                agent_names,
+                persona_registry: Arc::new(self.persona_registry.clone()),
+                dispatch_tx,
+                secret: webhook_cfg.secret.clone(),
+            };
+
+            let router = webhook::webhook_router(state);
+            let bind = webhook_cfg.bind.clone();
+
+            tokio::spawn(async move {
+                let listener = match tokio::net::TcpListener::bind(&bind).await {
+                    Ok(l) => l,
+                    Err(e) => {
+                        error!(bind = %bind, error = %e, "failed to bind webhook server");
+                        return;
+                    }
+                };
+                info!(bind = %bind, "webhook server listening");
+                if let Err(e) = axum::serve(listener, router).await {
+                    error!(error = %e, "webhook server error");
+                }
+            });
+        }
+
         // Reconciliation tick interval
         let mut tick = tokio::time::interval(Duration::from_secs(self.config.tick_interval_secs));
 
@@ -366,6 +409,34 @@ impl AgentOrchestrator {
             if self.shutdown_requested {
                 info!("shutdown requested, stopping reconciliation loop");
                 break;
+            }
+
+            // Drain any pending webhook dispatches before select
+            let pending_dispatches: Vec<_> = if let Some(ref mut rx) = self.webhook_dispatch_rx {
+                let mut batch = Vec::new();
+                while let Ok(dispatch) = rx.try_recv() {
+                    batch.push(dispatch);
+                }
+                batch
+            } else {
+                Vec::new()
+            };
+            // Collect comment_ids for cursor marking (belt-and-suspenders dedup)
+            let webhook_comment_ids: Vec<u64> =
+                pending_dispatches.iter().map(|d| d.comment_id()).collect();
+            for dispatch in pending_dispatches {
+                self.handle_webhook_dispatch(dispatch).await;
+            }
+            // Mark webhook-dispatched comments in the mention cursor so the
+            // poller skips them without needing another Gitea API call.
+            if !webhook_comment_ids.is_empty() {
+                let cursor = self
+                    .mention_cursor
+                    .get_or_insert_with(mention::MentionCursor::now);
+                for cid in webhook_comment_ids {
+                    cursor.mark_processed(cid);
+                }
+                cursor.save().await;
             }
 
             tokio::select! {
@@ -533,6 +604,16 @@ impl AgentOrchestrator {
     /// Get a mutable reference to the cost tracker.
     pub fn cost_tracker_mut(&mut self) -> &mut CostTracker {
         &mut self.cost_tracker
+    }
+
+    #[cfg(feature = "quickwit")]
+    pub fn set_quickwit_sink(&mut self, sink: quickwit::QuickwitSink) {
+        self.quickwit_sink = Some(sink);
+    }
+
+    #[cfg(feature = "quickwit")]
+    pub fn quickwit_config(&self) -> Option<&QuickwitConfig> {
+        self.config.quickwit.as_ref()
     }
 
     /// Load skill chain content from SKILL.md files for the given agent definition.
@@ -848,6 +929,21 @@ impl AgentOrchestrator {
             self.last_run_commits.insert(def.name.clone(), head);
         }
 
+        #[cfg(feature = "quickwit")]
+        if let Some(ref sink) = self.quickwit_sink {
+            let doc = quickwit::LogDocument {
+                timestamp: chrono::Utc::now().to_rfc3339(),
+                level: "INFO".into(),
+                agent_name: def.name.clone(),
+                layer: format!("{:?}", def.layer),
+                source: "orchestrator".into(),
+                message: "agent spawned".into(),
+                model: def.model.clone(),
+                ..Default::default()
+            };
+            let _ = sink.send(doc).await;
+        }
+
         Ok(())
     }
 
@@ -1127,6 +1223,134 @@ impl AgentOrchestrator {
     /// every reconciliation tick.
     /// Cursor-based mention polling: single API call, no replay on restart.
     ///
+    /// Handle a dispatch request received from the webhook endpoint.
+    /// This is the webhook equivalent of poll_mentions but immediate.
+    async fn handle_webhook_dispatch(&mut self, dispatch: webhook::WebhookDispatch) {
+        // Rate limiting: check concurrent mention-spawned agents
+        let mention_cfg = match self.config.mentions.as_ref() {
+            Some(cfg) => cfg,
+            None => return,
+        };
+
+        let active_mention_agents = self
+            .active_agents
+            .values()
+            .filter(|a| a.spawned_by_mention)
+            .count() as u32;
+
+        if active_mention_agents >= mention_cfg.max_concurrent_mention_agents {
+            warn!(
+                active = active_mention_agents,
+                max = mention_cfg.max_concurrent_mention_agents,
+                "webhook dispatch rejected: mention agents at capacity"
+            );
+            return;
+        }
+
+        let agents = self.config.agents.clone();
+
+        match dispatch {
+            webhook::WebhookDispatch::SpawnAgent {
+                agent_name,
+                issue_number,
+                comment_id,
+                context,
+            } => {
+                info!(
+                    agent = %agent_name,
+                    issue = issue_number,
+                    comment_id = comment_id,
+                    "webhook: dispatching agent spawn"
+                );
+
+                if let Some(def) = agents.iter().find(|a| a.name == agent_name).cloned() {
+                    // Dedup: check Gitea assignment + active_agents before spawning
+                    if self.should_skip_dispatch(&agent_name, issue_number).await {
+                        return;
+                    }
+
+                    let mut mention_def = def.clone();
+                    mention_def.task = format!(
+                        "{}\n\n## Mention Context\nTriggered by @adf:{} webhook in issue #{} (comment {}).\nContext: {}",
+                        def.task, agent_name, issue_number, comment_id, context
+                    );
+                    mention_def.gitea_issue = Some(issue_number);
+
+                    if let Err(e) = self.spawn_agent(&mention_def).await {
+                        error!(agent = %agent_name, issue = issue_number, error = %e, "webhook: failed to spawn agent");
+                    } else if let Some(agent) = self.active_agents.get_mut(&mention_def.name) {
+                        agent.spawned_by_mention = true;
+                    }
+                }
+            }
+            webhook::WebhookDispatch::SpawnPersona {
+                persona_name,
+                issue_number,
+                comment_id,
+                context,
+            } => {
+                if let Some((agent_name, _)) = mention::resolve_mention(
+                    &persona_name,
+                    &agents,
+                    &self.persona_registry,
+                    &context,
+                ) {
+                    info!(
+                        persona = %persona_name,
+                        agent = %agent_name,
+                        issue = issue_number,
+                        "webhook: dispatching persona-resolved agent"
+                    );
+
+                    if let Some(def) = agents.iter().find(|a| a.name == agent_name).cloned() {
+                        // Dedup: check Gitea assignment + active_agents before spawning
+                        if self.should_skip_dispatch(&agent_name, issue_number).await {
+                            return;
+                        }
+
+                        let mut mention_def = def.clone();
+                        mention_def.task = format!(
+                            "{}\n\n## Mention Context\nTriggered by @adf:{} persona webhook in issue #{} (comment {}).\nContext: {}",
+                            def.task, persona_name, issue_number, comment_id, context
+                        );
+                        mention_def.gitea_issue = Some(issue_number);
+
+                        if let Err(e) = self.spawn_agent(&mention_def).await {
+                            error!(agent = %agent_name, issue = issue_number, error = %e, "webhook: failed to spawn agent");
+                        } else if let Some(agent) = self.active_agents.get_mut(&mention_def.name) {
+                            agent.spawned_by_mention = true;
+                        }
+                    }
+                }
+            }
+            webhook::WebhookDispatch::CompoundReview {
+                issue_number,
+                comment_id,
+            } => {
+                info!(
+                    issue = issue_number,
+                    comment_id = comment_id,
+                    "webhook: compound review triggered"
+                );
+                self.handle_schedule_event(ScheduleEvent::CompoundReview)
+                    .await;
+
+                // Post acknowledgment via existing output_poster
+                if let Some(ref poster) = self.output_poster {
+                    let ack_body = format!(
+                        "## Compound Review Triggered (webhook)\n\n\
+                        Manual trigger received from issue #{} comment {}.\n\
+                        Running 6-agent review swarm now...",
+                        issue_number, comment_id
+                    );
+                    if let Err(e) = poster.post_raw(issue_number, &ack_body).await {
+                        warn!(error = %e, "failed to post compound review acknowledgment");
+                    }
+                }
+            }
+        }
+    }
+
     /// Uses repo-wide comments endpoint with `since` cursor. On first run
     /// (no persisted cursor), cursor is set to `now` to skip all historical
     /// mentions — preventing the mention replay storm.
@@ -1300,6 +1524,12 @@ impl AgentOrchestrator {
                         );
 
                         if let Some(def) = agents.iter().find(|a| a.name == agent_name).cloned() {
+                            // Dedup: check Gitea assignment + active_agents before spawning
+                            if self.should_skip_dispatch(&agent_name, issue_number).await {
+                                cursor.dispatches_this_tick += 1;
+                                continue;
+                            }
+
                             let mut mention_def = def.clone();
                             mention_def.task = format!(
                                 "{}\n\n## Mention Context\nTriggered by @adf:{} mention in issue #{} (comment {}).\nContext: {}",
@@ -1344,6 +1574,12 @@ impl AgentOrchestrator {
 
                             if let Some(def) = agents.iter().find(|a| a.name == agent_name).cloned()
                             {
+                                // Dedup: check Gitea assignment + active_agents before spawning
+                                if self.should_skip_dispatch(&agent_name, issue_number).await {
+                                    cursor.dispatches_this_tick += 1;
+                                    continue;
+                                }
+
                                 let mut mention_def = def.clone();
                                 mention_def.task = format!(
                                     "{}\n\n## Mention Context\nTriggered by @adf:{} persona mention in issue #{} (comment {}).\nContext: {}",
@@ -1381,6 +1617,89 @@ impl AgentOrchestrator {
         // Persist cursor for next poll / restart
         cursor.save().await;
         self.mention_cursor = Some(cursor);
+    }
+
+    /// Check if an agent is already assigned to this issue and currently active.
+    ///
+    /// Returns `true` if dispatch should be **skipped** (duplicate), `false` if
+    /// dispatch should proceed. When dispatch proceeds, the issue is assigned
+    /// to the agent as a side-effect.
+    ///
+    /// The dedup logic:
+    /// - If the issue is already assigned to the agent AND the agent is currently
+    ///   in `active_agents` -> skip (duplicate dispatch).
+    /// - If assigned but agent is NOT active -> allow (agent crashed, re-dispatch).
+    /// - If not assigned -> allow (first dispatch) and assign.
+    async fn should_skip_dispatch(&self, agent_name: &str, issue_number: u64) -> bool {
+        if issue_number == 0 {
+            return false;
+        }
+
+        // Fast local check: if agent is already running, skip immediately.
+        // This prevents races where the Gitea API returns stale assignee data
+        // because a concurrent dispatch path just assigned the issue milliseconds ago.
+        if self.active_agents.contains_key(agent_name) {
+            warn!(
+                agent = %agent_name,
+                issue = issue_number,
+                "skipping dispatch: agent already active (local guard)"
+            );
+            return true;
+        }
+
+        let Some(ref poster) = self.output_poster else {
+            return false;
+        };
+        let tracker = poster.tracker_for(agent_name);
+
+        // Remote check: if agent is assigned in Gitea but not active (crash recovery)
+        match tracker.fetch_issue_assignees(issue_number).await {
+            Ok(assignees) => {
+                if assignees.iter().any(|a| a == agent_name) {
+                    // Already assigned -- check if agent is actively running
+                    if self.active_agents.contains_key(agent_name) {
+                        warn!(
+                            agent = %agent_name,
+                            issue = issue_number,
+                            "skipping duplicate dispatch: agent already assigned and active"
+                        );
+                        return true;
+                    }
+                    // Assigned but not active (crashed or completed) -- allow re-dispatch
+                    info!(
+                        agent = %agent_name,
+                        issue = issue_number,
+                        "agent assigned but not active, allowing re-dispatch"
+                    );
+                }
+            }
+            Err(e) => {
+                // Fail open: if we can't check assignees, allow dispatch
+                warn!(
+                    agent = %agent_name,
+                    issue = issue_number,
+                    error = %e,
+                    "failed to fetch assignees, allowing dispatch (fail-open)"
+                );
+            }
+        }
+
+        // Assign the issue to the agent
+        if let Err(e) = tracker.assign_issue(issue_number, &[agent_name]).await {
+            warn!(
+                agent = %agent_name,
+                issue = issue_number,
+                error = %e,
+                "failed to assign issue to agent"
+            );
+        } else {
+            info!(
+                agent = %agent_name,
+                issue = issue_number,
+                "assigned issue to agent"
+            );
+        }
+        false
     }
 
     /// Sanitise finding text for use in issue title.
@@ -1508,6 +1827,19 @@ impl AgentOrchestrator {
                     title = %title,
                     "filed finding issue"
                 );
+                // Trigger implementation-swarm via mention comment so
+                // mention polling dispatches the agent automatically.
+                let trigger = format!(
+                    "@adf:implementation-swarm please implement this finding for issue #{}",
+                    issue.number
+                );
+                if let Err(e) = poster.tracker().post_comment(issue.number, &trigger).await {
+                    warn!(
+                        issue_number = issue.number,
+                        error = %e,
+                        "failed to post implementation trigger comment"
+                    );
+                }
                 Ok(())
             }
             Err(e) => Err(format!("failed to create issue '{}': {}", title, e)),
@@ -1960,6 +2292,33 @@ impl AgentOrchestrator {
                     warn!(agent = %name, issue = issue, error = %e, "failed to post output to Gitea");
                 }
             }
+
+            #[cfg(feature = "quickwit")]
+            if let Some(ref sink) = self.quickwit_sink {
+                let exit_code = status.code();
+                let level = if exit_code.unwrap_or(1) == 0 {
+                    "INFO"
+                } else {
+                    "WARN"
+                };
+                let wall_time_secs = self
+                    .active_agents
+                    .get(name)
+                    .map(|m| m.started_at.elapsed().as_secs_f64());
+                let doc = quickwit::LogDocument {
+                    timestamp: chrono::Utc::now().to_rfc3339(),
+                    level: level.into(),
+                    agent_name: name.clone(),
+                    layer: format!("{:?}", def.layer),
+                    source: "orchestrator".into(),
+                    message: "agent exited".into(),
+                    model: def.model.clone(),
+                    exit_code,
+                    wall_time_secs,
+                    ..Default::default()
+                };
+                let _ = sink.send(doc).await;
+            }
         }
 
         // Process natural exits
@@ -1985,14 +2344,16 @@ impl AgentOrchestrator {
     ) {
         match def.layer {
             AgentLayer::Safety => {
-                {
+                // Only count non-zero exits toward restart limit.
+                // A successful exit (code 0) means the agent completed its task;
+                // punishing it for succeeding makes no sense.
+                if !status.success() {
                     let count = self.restart_counts.entry(name.to_string()).or_insert(0);
                     *count += 1;
+                    self.save_restart_counts();
                 }
                 self.restart_cooldowns
                     .insert(name.to_string(), Instant::now());
-                // Persist restart counts so they survive orchestrator restarts
-                self.save_restart_counts();
                 let restart_count = self.restart_counts.get(name).copied().unwrap_or(0);
                 if restart_count <= self.config.max_restart_count {
                     info!(
@@ -2145,6 +2506,34 @@ impl AgentOrchestrator {
         }
         for (name, event) in &events {
             self.nightwatch.observe(name, event);
+            #[cfg(feature = "quickwit")]
+            if let Some(ref sink) = self.quickwit_sink {
+                let (level, source, line) = match event {
+                    crate::OutputEvent::Stdout { line, .. } => ("INFO", "stdout", line.as_str()),
+                    crate::OutputEvent::Stderr { line, .. } => ("WARN", "stderr", line.as_str()),
+                    _ => continue,
+                };
+                let layer = self
+                    .active_agents
+                    .get(name)
+                    .map(|m| format!("{:?}", m.definition.layer))
+                    .unwrap_or_default();
+                let model = self
+                    .active_agents
+                    .get(name)
+                    .and_then(|m| m.definition.model.clone());
+                let doc = quickwit::LogDocument {
+                    timestamp: chrono::Utc::now().to_rfc3339(),
+                    level: level.into(),
+                    agent_name: name.clone(),
+                    layer,
+                    source: source.into(),
+                    message: line.to_owned(),
+                    model,
+                    ..Default::default()
+                };
+                let _ = sink.try_send(doc);
+            }
         }
     }
 
@@ -2478,6 +2867,7 @@ mod tests {
             flow_state_dir: None,
             gitea: None,
             mentions: None,
+            webhook: None,
             role_config_path: None,
         }
     }
@@ -2659,6 +3049,7 @@ task = "test"
             flow_state_dir: None,
             gitea: None,
             mentions: None,
+            webhook: None,
             role_config_path: None,
         }
     }
@@ -2685,11 +3076,11 @@ task = "test"
             "exited agent should be removed from active_agents"
         );
 
-        // Restart count should be recorded
+        // Successful exit (code 0) should NOT increment restart count
         assert_eq!(
-            orch.restart_counts.get("echo-safety").copied(),
-            Some(1),
-            "restart count should be incremented"
+            orch.restart_counts.get("echo-safety").copied().unwrap_or(0),
+            0,
+            "successful exit should not increment restart count"
         );
     }
 
@@ -2760,10 +3151,13 @@ task = "test"
     async fn test_max_restart_count_respected() {
         let mut config = test_config_fast_lifecycle();
         config.max_restart_count = 2;
+        // Use a command that exits non-zero so restart_count increments
+        config.agents[0].cli_tool = "false".to_string();
+        config.agents[0].task = String::new();
         let mut orch = AgentOrchestrator::new(config).unwrap();
         let def = orch.config.agents[0].clone();
 
-        // Cycle through max_restart_count + 1 exits
+        // Cycle through max_restart_count + 1 exits (all non-zero)
         for i in 0..3 {
             orch.spawn_agent(&def).await.unwrap();
             tokio::time::sleep(Duration::from_millis(100)).await;
@@ -2775,7 +3169,7 @@ task = "test"
             );
         }
 
-        // After 3 exits, restart count = 3, max = 2
+        // After 3 non-zero exits, restart count = 3, max = 2
         // restart_pending should NOT restart (count > max)
         orch.restart_pending_safety_agents().await;
         assert!(
@@ -2783,6 +3177,38 @@ task = "test"
             "agent should not restart after exceeding max_restart_count"
         );
         assert_eq!(orch.restart_counts.get("echo-safety").copied(), Some(3));
+    }
+
+    #[tokio::test]
+    async fn test_successful_exit_does_not_increment_restart_count() {
+        let config = test_config_fast_lifecycle();
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+        let def = orch.config.agents[0].clone(); // echo "safety watch" -> exit 0
+
+        // Spawn and let it exit successfully multiple times
+        for _ in 0..5 {
+            orch.spawn_agent(&def).await.unwrap();
+            tokio::time::sleep(Duration::from_millis(100)).await;
+            orch.poll_agent_exits().await;
+        }
+
+        // Exit code 0 should never increment restart_count
+        assert_eq!(
+            orch.restart_counts.get("echo-safety").copied().unwrap_or(0),
+            0,
+            "successful exits (code 0) must not increment restart_count"
+        );
+
+        // Agent should still be eligible for restart
+        orch.restart_cooldowns.insert(
+            "echo-safety".to_string(),
+            Instant::now() - Duration::from_secs(999),
+        );
+        orch.restart_pending_safety_agents().await;
+        assert!(
+            orch.active_agents.contains_key("echo-safety"),
+            "agent with only successful exits should always be restartable"
+        );
     }
 
     #[tokio::test]
@@ -2834,10 +3260,11 @@ task = "test"
             orch.active_agents.contains_key("echo-safety"),
             "safety agent should be restarted by reconcile_tick"
         );
+        // echo exits with code 0, so restart_count stays at 0
         assert_eq!(
-            orch.restart_counts.get("echo-safety").copied(),
-            Some(1),
-            "restart count should be 1 after first exit+restart cycle"
+            orch.restart_counts.get("echo-safety").copied().unwrap_or(0),
+            0,
+            "successful exit should not increment restart count"
         );
     }
 
@@ -3200,6 +3627,63 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
         assert!(
             orch.active_flows.is_empty(),
             "active_flows should be empty initially"
+        );
+    }
+
+    // ==================== Sanitisation Tests ====================
+
+    #[test]
+    fn test_sanitise_for_title_strips_json_braces() {
+        let input = r#"{"type":"tool_use","timestamp":1775313676859}"#;
+        let result = AgentOrchestrator::sanitise_for_title(input);
+        assert!(!result.contains('{'), "title should not contain open brace");
+        assert!(
+            !result.contains('}'),
+            "title should not contain close brace"
+        );
+        assert!(
+            !result.contains('['),
+            "title should not contain open bracket"
+        );
+        assert!(
+            !result.contains(']'),
+            "title should not contain close bracket"
+        );
+    }
+
+    #[test]
+    fn test_sanitise_for_title_strips_quotes() {
+        let input = r#"JSON "quoted" text"#;
+        let result = AgentOrchestrator::sanitise_for_title(input);
+        assert!(!result.contains('"'), "title should not contain quotes");
+    }
+
+    #[test]
+    fn test_sanitise_for_title_truncates_long_input() {
+        let input = "This is a very long finding text that should be truncated because it exceeds eighty characters limit";
+        let result = AgentOrchestrator::sanitise_for_title(input);
+        assert!(
+            result.len() <= 80,
+            "title should be at most 80 chars, got {}",
+            result.len()
+        );
+    }
+
+    #[test]
+    fn test_sanitise_for_body_escapes_backticks() {
+        let input = "Use `code` here";
+        let result = AgentOrchestrator::sanitise_for_body(input);
+        assert!(result.contains("``"), "body should escape backticks");
+    }
+
+    #[test]
+    fn test_sanitise_for_body_escapes_markdown_chars() {
+        let input = "Text with *asterisks* and [brackets]";
+        let result = AgentOrchestrator::sanitise_for_body(input);
+        assert!(
+            result.contains('\\'),
+            "body should contain backslash, got: {}",
+            result
         );
     }
 }
