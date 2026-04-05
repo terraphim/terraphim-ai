@@ -56,6 +56,12 @@ log = "0.4"
 genai = { git = "https://github.com/terraphim/rust-genai.git", branch = "merge-upstream-20251103" }
 self_update = { git = "https://github.com/AlexMikhalev/self_update.git", branch = "update-zipsign-api-v0.2" }
 
+# Security patch: Upgrade serenity to resolve RUSTSEC-2026-0049
+# serenity 0.12.5 uses tokio-tungstenite 0.21.0 -> rustls 0.22.4 -> rustls-webpki 0.102.8 (VULNERABLE)
+# serenity next branch uses tokio-tungstenite 0.28.0 which removes the vulnerable rustls dependency
+# Issue #370: https://git.terraphim.cloud/terraphim/terraphim-ai/issues/370
+serenity = { git = "https://github.com/serenity-rs/serenity", branch = "next" }
+
 [profile.release]
 panic = "unwind"
 lto = false
