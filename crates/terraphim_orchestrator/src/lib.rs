@@ -413,8 +413,22 @@ impl AgentOrchestrator {
             } else {
                 Vec::new()
             };
+            // Collect comment_ids for cursor marking (belt-and-suspenders dedup)
+            let webhook_comment_ids: Vec<u64> =
+                pending_dispatches.iter().map(|d| d.comment_id()).collect();
             for dispatch in pending_dispatches {
                 self.handle_webhook_dispatch(dispatch).await;
+            }
+            // Mark webhook-dispatched comments in the mention cursor so the
+            // poller skips them without needing another Gitea API call.
+            if !webhook_comment_ids.is_empty() {
+                let cursor = self
+                    .mention_cursor
+                    .get_or_insert_with(mention::MentionCursor::now);
+                for cid in webhook_comment_ids {
+                    cursor.mark_processed(cid);
+                }
+                cursor.save().await;
             }
 
             tokio::select! {
@@ -1217,6 +1231,11 @@ impl AgentOrchestrator {
                 );
 
                 if let Some(def) = agents.iter().find(|a| a.name == agent_name).cloned() {
+                    // Dedup: check Gitea assignment + active_agents before spawning
+                    if self.should_skip_dispatch(&agent_name, issue_number).await {
+                        return;
+                    }
+
                     let mut mention_def = def.clone();
                     mention_def.task = format!(
                         "{}\n\n## Mention Context\nTriggered by @adf:{} webhook in issue #{} (comment {}).\nContext: {}",
@@ -1226,11 +1245,8 @@ impl AgentOrchestrator {
 
                     if let Err(e) = self.spawn_agent(&mention_def).await {
                         error!(agent = %agent_name, issue = issue_number, error = %e, "webhook: failed to spawn agent");
-                    } else {
-                        if let Some(agent) = self.active_agents.get_mut(&mention_def.name) {
-                            agent.spawned_by_mention = true;
-                        }
-                        self.assign_issue_to_agent(&agent_name, issue_number).await;
+                    } else if let Some(agent) = self.active_agents.get_mut(&mention_def.name) {
+                        agent.spawned_by_mention = true;
                     }
                 }
             }
@@ -1254,6 +1270,11 @@ impl AgentOrchestrator {
                     );
 
                     if let Some(def) = agents.iter().find(|a| a.name == agent_name).cloned() {
+                        // Dedup: check Gitea assignment + active_agents before spawning
+                        if self.should_skip_dispatch(&agent_name, issue_number).await {
+                            return;
+                        }
+
                         let mut mention_def = def.clone();
                         mention_def.task = format!(
                             "{}\n\n## Mention Context\nTriggered by @adf:{} persona webhook in issue #{} (comment {}).\nContext: {}",
@@ -1263,11 +1284,8 @@ impl AgentOrchestrator {
 
                         if let Err(e) = self.spawn_agent(&mention_def).await {
                             error!(agent = %agent_name, issue = issue_number, error = %e, "webhook: failed to spawn agent");
-                        } else {
-                            if let Some(agent) = self.active_agents.get_mut(&mention_def.name) {
-                                agent.spawned_by_mention = true;
-                            }
-                            self.assign_issue_to_agent(&agent_name, issue_number).await;
+                        } else if let Some(agent) = self.active_agents.get_mut(&mention_def.name) {
+                            agent.spawned_by_mention = true;
                         }
                     }
                 }
@@ -1473,6 +1491,12 @@ impl AgentOrchestrator {
                         );
 
                         if let Some(def) = agents.iter().find(|a| a.name == agent_name).cloned() {
+                            // Dedup: check Gitea assignment + active_agents before spawning
+                            if self.should_skip_dispatch(&agent_name, issue_number).await {
+                                cursor.dispatches_this_tick += 1;
+                                continue;
+                            }
+
                             let mut mention_def = def.clone();
                             mention_def.task = format!(
                                 "{}\n\n## Mention Context\nTriggered by @adf:{} mention in issue #{} (comment {}).\nContext: {}",
@@ -1486,11 +1510,10 @@ impl AgentOrchestrator {
 
                             if let Err(e) = self.spawn_agent(&mention_def).await {
                                 tracing::error!(agent = %agent_name, issue = issue_number, error = %e, "failed to spawn agent");
-                            } else {
-                                if let Some(agent) = self.active_agents.get_mut(&mention_def.name) {
-                                    agent.spawned_by_mention = true;
-                                }
-                                self.assign_issue_to_agent(&agent_name, issue_number).await;
+                            } else if let Some(agent) =
+                                self.active_agents.get_mut(&mention_def.name)
+                            {
+                                agent.spawned_by_mention = true;
                             }
 
                             cursor.dispatches_this_tick += 1;
@@ -1518,6 +1541,12 @@ impl AgentOrchestrator {
 
                             if let Some(def) = agents.iter().find(|a| a.name == agent_name).cloned()
                             {
+                                // Dedup: check Gitea assignment + active_agents before spawning
+                                if self.should_skip_dispatch(&agent_name, issue_number).await {
+                                    cursor.dispatches_this_tick += 1;
+                                    continue;
+                                }
+
                                 let mut mention_def = def.clone();
                                 mention_def.task = format!(
                                     "{}\n\n## Mention Context\nTriggered by @adf:{} persona mention in issue #{} (comment {}).\nContext: {}",
@@ -1531,13 +1560,10 @@ impl AgentOrchestrator {
 
                                 if let Err(e) = self.spawn_agent(&mention_def).await {
                                     tracing::error!(agent = %agent_name, issue = issue_number, error = %e, "failed to spawn agent");
-                                } else {
-                                    if let Some(agent) =
-                                        self.active_agents.get_mut(&mention_def.name)
-                                    {
-                                        agent.spawned_by_mention = true;
-                                    }
-                                    self.assign_issue_to_agent(&agent_name, issue_number).await;
+                                } else if let Some(agent) =
+                                    self.active_agents.get_mut(&mention_def.name)
+                                {
+                                    agent.spawned_by_mention = true;
                                 }
 
                                 cursor.dispatches_this_tick += 1;
@@ -1560,28 +1586,74 @@ impl AgentOrchestrator {
         self.mention_cursor = Some(cursor);
     }
 
-    /// Assign a Gitea issue to the agent that is about to work on it.
-    async fn assign_issue_to_agent(&self, agent_name: &str, issue_number: u64) {
+    /// Check if an agent is already assigned to this issue and currently active.
+    ///
+    /// Returns `true` if dispatch should be **skipped** (duplicate), `false` if
+    /// dispatch should proceed. When dispatch proceeds, the issue is assigned
+    /// to the agent as a side-effect.
+    ///
+    /// The dedup logic:
+    /// - If the issue is already assigned to the agent AND the agent is currently
+    ///   in `active_agents` -> skip (duplicate dispatch).
+    /// - If assigned but agent is NOT active -> allow (agent crashed, re-dispatch).
+    /// - If not assigned -> allow (first dispatch) and assign.
+    async fn should_skip_dispatch(&self, agent_name: &str, issue_number: u64) -> bool {
         if issue_number == 0 {
-            return;
+            return false;
         }
-        if let Some(ref poster) = self.output_poster {
-            let tracker = poster.tracker_for(agent_name);
-            if let Err(e) = tracker.assign_issue(issue_number, &[agent_name]).await {
+        let Some(ref poster) = self.output_poster else {
+            return false;
+        };
+        let tracker = poster.tracker_for(agent_name);
+
+        // Check current assignees
+        match tracker.fetch_issue_assignees(issue_number).await {
+            Ok(assignees) => {
+                if assignees.iter().any(|a| a == agent_name) {
+                    // Already assigned -- check if agent is actively running
+                    if self.active_agents.contains_key(agent_name) {
+                        warn!(
+                            agent = %agent_name,
+                            issue = issue_number,
+                            "skipping duplicate dispatch: agent already assigned and active"
+                        );
+                        return true;
+                    }
+                    // Assigned but not active (crashed or completed) -- allow re-dispatch
+                    info!(
+                        agent = %agent_name,
+                        issue = issue_number,
+                        "agent assigned but not active, allowing re-dispatch"
+                    );
+                }
+            }
+            Err(e) => {
+                // Fail open: if we can't check assignees, allow dispatch
                 warn!(
                     agent = %agent_name,
                     issue = issue_number,
                     error = %e,
-                    "failed to assign issue to agent"
-                );
-            } else {
-                info!(
-                    agent = %agent_name,
-                    issue = issue_number,
-                    "assigned issue to agent"
+                    "failed to fetch assignees, allowing dispatch (fail-open)"
                 );
             }
         }
+
+        // Assign the issue to the agent
+        if let Err(e) = tracker.assign_issue(issue_number, &[agent_name]).await {
+            warn!(
+                agent = %agent_name,
+                issue = issue_number,
+                error = %e,
+                "failed to assign issue to agent"
+            );
+        } else {
+            info!(
+                agent = %agent_name,
+                issue = issue_number,
+                "assigned issue to agent"
+            );
+        }
+        false
     }
 
     /// Sanitise finding text for use in issue title.
