@@ -43,7 +43,8 @@ terraphim_router = { path = "../terraphim_router", version = "1.0.0", optional =
 env_logger = "0.11"
 
 # Optional tracing support for structured logging
-tracing = { version = "0.1", optional = true }
+tracing = { workspace = true, optional = true }
+
 tracing-subscriber = { version = "0.3", features = ["env-filter"], optional = true }
 
 [features]
@@ -60,6 +61,7 @@ terraphim_settings = { path = "../terraphim_settings", version = "1.0.0" }
 terraphim_test_utils = { path = "../terraphim_test_utils" }
 anyhow = { workspace = true }
 serial_test = "3.3"
-tempfile = "3"
+tempfile = { workspace = true }
+
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-tracing = "0.1"
+tracing = { workspace = true }

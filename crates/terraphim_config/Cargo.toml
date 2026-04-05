@@ -26,7 +26,6 @@ terraphim_settings = { path = "../terraphim_settings", version = "1.0.0" }
 
 opendal = { version = "0.54", features = [
     "services-dashmap",
-    "services-sled",
 ] }
 tokio = { version = "1.35.1", features = [
     "full",
@@ -34,24 +33,31 @@ tokio = { version = "1.35.1", features = [
     "macros",
     "rt-multi-thread",
 ] }
-log = "0.4"
-tracing = { version = "0.1" }
+log = { workspace = true }
+
+tracing = { workspace = true }
+
 tracing-subscriber = { version = "0.3", features = [
     "env-filter",
     "tracing-log",
 ] }
-serde = { version = "1.0.182", features = ["derive"] }
-serde_json = "1.0.104"
+serde = { workspace = true, features = ["derive"] }
+
+serde_json = { workspace = true }
+
 toml = "0.8"
-async-trait = "0.1.74"
+async-trait = { workspace = true }
+
 ahash = { version = "0.8.8", features = ["serde"] }
 dirs = "6.0"
 regex = "1"
-anyhow = "1"
+anyhow = { workspace = true }
+
 url = { version = "2.5.8", features = ["serde"] }
 async-once-cell = "0.5.3"
 ulid = { version = "1.0.0", features = ["serde", "uuid"] }
-thiserror = "1.0.53"
+thiserror = { workspace = true }
+
 schemars = { version = "0.8.22", features = ["derive"] }
 tsify = { version = "0.5", features = ["js"], optional = true }
 wasm-bindgen = { version = "0.2", optional = true }
@@ -62,7 +68,8 @@ typescript = ["tsify", "wasm-bindgen"]
 openrouter = []
 
 [dev-dependencies]
-tempfile = "3.27.0"
+tempfile = { workspace = true }
+
 env_logger = "0.11"
 terraphim_multi_agent = { path = "../terraphim_multi_agent" }
 terraphim_test_utils = { path = "../terraphim_test_utils" }

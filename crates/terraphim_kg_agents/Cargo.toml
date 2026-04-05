@@ -7,14 +7,21 @@ license = "MIT OR Apache-2.0"
 
 [dependencies]
 # Core dependencies
-async-trait = "0.1"
-log = "0.4"
+async-trait = { workspace = true }
+
+log = { workspace = true }
+
 rand = "0.9"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-thiserror = "1.0"
-tokio = { version = "1.0", features = ["full"] }
-uuid = { version = "1.21", features = ["v4"] }
+serde = { workspace = true, features = ["derive"] }
+
+serde_json = { workspace = true }
+
+thiserror = { workspace = true }
+
+tokio = { workspace = true, features = ["full"] }
+
+uuid = { workspace = true, features = ["v4"] }
+
 
 # Terraphim dependencies
 terraphim_agent_registry = { path = "../terraphim_agent_registry" }

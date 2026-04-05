@@ -36,7 +36,8 @@ chrono = { workspace = true, features = ["serde"] }
 uuid = { workspace = true }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
-tracing = "0.1"
+tracing = { workspace = true }
+
 
 # Time handling (same as CLA)
 jiff = { version = "0.2", features = ["serde"] }
@@ -54,5 +55,6 @@ terraphim_rolegraph = { version = ">=1.4.10", path = "../terraphim_rolegraph", o
 terraphim_types = { version = ">=1.4.10", path = "../terraphim_types", optional = true }
 
 [dev-dependencies]
-tempfile = "3.27"
+tempfile = { workspace = true }
+
 tokio-test = "0.4"

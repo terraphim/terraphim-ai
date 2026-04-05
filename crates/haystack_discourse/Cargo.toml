@@ -11,11 +11,16 @@ repository = "https://github.com/terraphim/discourse_haystack"
 haystack_core = { path = "../haystack_core" }
 terraphim_types = { path = "../terraphim_types" }
 clap = { version = "4.5.60", features = ["derive", "env"] }
-reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
-tokio = { version = "1.35.0", features = ["full"] }
-serde = { version = "1.0.193", features = ["derive"] }
-serde_json = "1.0.108"
-anyhow = "1.0.102"
+reqwest = { workspace = true, features = ["json", "rustls-tls"] }
+
+tokio = { workspace = true, features = ["full"] }
+
+serde = { workspace = true, features = ["derive"] }
+
+serde_json = { workspace = true }
+
+anyhow = { workspace = true }
+
 url = "2.5.8"
 
 [dev-dependencies]
