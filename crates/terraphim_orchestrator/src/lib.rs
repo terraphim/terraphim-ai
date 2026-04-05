@@ -45,20 +45,21 @@ pub mod mode;
 pub mod nightwatch;
 pub mod output_poster;
 pub mod persona;
-pub mod scheduler;
-pub mod scope;
 #[cfg(feature = "quickwit")]
 pub mod quickwit;
+pub mod scheduler;
+pub mod scope;
+pub mod webhook;
 
 pub use compound::{CompoundReviewResult, CompoundReviewWorkflow, ReviewGroupDef, SwarmConfig};
 pub use concurrency::{ConcurrencyController, FairnessPolicy, ModeQuotas};
+#[cfg(feature = "quickwit")]
+pub use config::QuickwitConfig;
 pub use config::{
     AgentDefinition, AgentLayer, CompoundReviewConfig, ConcurrencyConfig, GiteaOutputConfig,
     MentionConfig, NightwatchConfig, OrchestratorConfig, PreCheckStrategy, TrackerConfig,
     TrackerStates, WebhookConfig, WorkflowConfig,
 };
-#[cfg(feature = "quickwit")]
-pub use config::QuickwitConfig;
 pub use cost_tracker::{AgentMetrics, BudgetVerdict, CostSnapshot, CostTracker, ExecutionMetrics};
 pub use dispatcher::{DispatchTask, Dispatcher, DispatcherStats};
 pub use dual_mode::DualModeOrchestrator;
@@ -2295,7 +2296,11 @@ impl AgentOrchestrator {
             #[cfg(feature = "quickwit")]
             if let Some(ref sink) = self.quickwit_sink {
                 let exit_code = status.code();
-                let level = if exit_code.unwrap_or(1) == 0 { "INFO" } else { "WARN" };
+                let level = if exit_code.unwrap_or(1) == 0 {
+                    "INFO"
+                } else {
+                    "WARN"
+                };
                 let wall_time_secs = self
                     .active_agents
                     .get(name)

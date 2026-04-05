@@ -276,7 +276,10 @@ mod tests {
 
         // opencode manages its own provider auth -- should return empty
         let keys = AgentConfig::infer_api_keys("opencode");
-        assert!(keys.is_empty(), "opencode manages its own per-provider auth");
+        assert!(
+            keys.is_empty(),
+            "opencode manages its own per-provider auth"
+        );
 
         let keys = AgentConfig::infer_api_keys("unknown");
         assert!(keys.is_empty());
@@ -289,7 +292,10 @@ mod tests {
         assert!(keys.is_empty(), "claude via full path uses OAuth");
 
         let keys = AgentConfig::infer_api_keys("/home/alex/.bun/bin/opencode");
-        assert!(keys.is_empty(), "opencode via full path manages its own auth");
+        assert!(
+            keys.is_empty(),
+            "opencode via full path manages its own auth"
+        );
     }
 
     #[test]
