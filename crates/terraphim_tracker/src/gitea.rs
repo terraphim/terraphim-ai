@@ -21,7 +21,7 @@ pub struct GiteaConfig {
 /// Gitea REST API client.
 pub struct GiteaTracker {
     client: Client,
-    config: GiteaConfig,
+    pub(crate) config: GiteaConfig,
 }
 
 /// Gitea API issue response.
@@ -79,7 +79,7 @@ impl GiteaTracker {
     }
 
     /// Build request with authentication.
-    fn build_request(&self, method: reqwest::Method, url: &str) -> reqwest::RequestBuilder {
+    pub(crate) fn build_request(&self, method: reqwest::Method, url: &str) -> reqwest::RequestBuilder {
         self.client
             .request(method, url)
             .header("Authorization", format!("token {}", self.config.token))
