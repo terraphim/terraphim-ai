@@ -29,6 +29,7 @@
 //! ```
 
 pub mod adf_commands;
+pub mod agent_run_record;
 pub mod compound;
 pub mod concurrency;
 pub mod config;
@@ -51,6 +52,9 @@ pub mod scheduler;
 pub mod scope;
 pub mod webhook;
 
+pub use agent_run_record::{
+    AgentRunRecord, ExitClass, ExitClassification, ExitClassifier, RunTrigger,
+};
 pub use compound::{CompoundReviewResult, CompoundReviewWorkflow, ReviewGroupDef, SwarmConfig};
 pub use concurrency::{ConcurrencyController, FairnessPolicy, ModeQuotas};
 #[cfg(feature = "quickwit")]
@@ -182,6 +186,8 @@ pub struct AgentOrchestrator {
     tick_count: u64,
     #[cfg(feature = "quickwit")]
     quickwit_sink: Option<quickwit::QuickwitSink>,
+    /// Classifier for structured agent exit classification using KG-boosted matching.
+    exit_classifier: ExitClassifier,
 }
 
 /// Validate agent name for safe use in file paths.
@@ -292,6 +298,7 @@ impl AgentOrchestrator {
             tick_count: 0,
             #[cfg(feature = "quickwit")]
             quickwit_sink: None,
+            exit_classifier: ExitClassifier::new(),
         })
     }
 
@@ -2265,22 +2272,75 @@ impl AgentOrchestrator {
 
         // Drain output from exiting agents BEFORE removing them
         for (name, def, status) in &exited {
-            // Drain remaining output events
+            // Drain remaining output events, separating stdout and stderr
+            let mut stdout_lines: Vec<String> = Vec::new();
+            let mut stderr_lines: Vec<String> = Vec::new();
             let mut output_lines: Vec<String> = Vec::new();
             if let Some(managed) = self.active_agents.get_mut(name) {
                 while let Ok(event) = managed.output_rx.try_recv() {
                     self.nightwatch.observe(name, &event);
                     match &event {
                         crate::OutputEvent::Stdout { line, .. } => {
+                            stdout_lines.push(line.clone());
                             output_lines.push(line.clone());
                         }
                         crate::OutputEvent::Stderr { line, .. } => {
+                            stderr_lines.push(line.clone());
                             output_lines.push(format!("[stderr] {}", line));
                         }
                         _ => {}
                     }
                 }
             }
+
+            // Classify the exit using KG-boosted pattern matching
+            let classification =
+                self.exit_classifier
+                    .classify(status.code(), &stdout_lines, &stderr_lines);
+
+            let wall_time_secs = self
+                .active_agents
+                .get(name)
+                .map(|m| m.started_at.elapsed().as_secs_f64())
+                .unwrap_or(0.0);
+
+            let trigger = if self
+                .active_agents
+                .get(name)
+                .is_some_and(|m| m.spawned_by_mention)
+            {
+                RunTrigger::Mention
+            } else {
+                RunTrigger::Cron
+            };
+
+            let record = AgentRunRecord {
+                run_id: uuid::Uuid::new_v4(),
+                agent_name: name.clone(),
+                started_at: chrono::Utc::now()
+                    - chrono::Duration::milliseconds((wall_time_secs * 1000.0) as i64),
+                ended_at: chrono::Utc::now(),
+                exit_code: status.code(),
+                exit_class: classification.exit_class,
+                model_used: def.model.clone(),
+                was_fallback: false,
+                wall_time_secs,
+                output_summary: AgentRunRecord::summarise_output(&stdout_lines),
+                error_summary: AgentRunRecord::summarise_errors(&stderr_lines),
+                trigger,
+                matched_patterns: classification.matched_patterns.clone(),
+                confidence: classification.confidence,
+            };
+
+            info!(
+                agent = %name,
+                exit_code = ?status.code(),
+                exit_class = %record.exit_class,
+                confidence = record.confidence,
+                matched_patterns = ?record.matched_patterns,
+                wall_time_secs = record.wall_time_secs,
+                "agent exit classified"
+            );
 
             // Post output to Gitea if configured
             if let (Some(poster), Some(issue)) = (&self.output_poster, def.gitea_issue) {
@@ -2301,20 +2361,21 @@ impl AgentOrchestrator {
                 } else {
                     "WARN"
                 };
-                let wall_time_secs = self
-                    .active_agents
-                    .get(name)
-                    .map(|m| m.started_at.elapsed().as_secs_f64());
                 let doc = quickwit::LogDocument {
                     timestamp: chrono::Utc::now().to_rfc3339(),
                     level: level.into(),
                     agent_name: name.clone(),
                     layer: format!("{:?}", def.layer),
                     source: "orchestrator".into(),
-                    message: "agent exited".into(),
+                    message: format!("agent exited: {}", record.exit_class),
                     model: def.model.clone(),
                     exit_code,
-                    wall_time_secs,
+                    wall_time_secs: Some(record.wall_time_secs),
+                    extra: Some(serde_json::json!({
+                        "exit_class": record.exit_class.to_string(),
+                        "confidence": record.confidence,
+                        "matched_patterns": record.matched_patterns,
+                    })),
                     ..Default::default()
                 };
                 let _ = sink.send(doc).await;
