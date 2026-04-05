@@ -50,6 +50,11 @@ thiserror = "1.0"
 anyhow = "1.0"
 log = "0.4"
 
+# Security: Force rustls 0.23+ to fix RUSTSEC-2026-0049
+rustls = { version = "0.23", default-features = false }
+# Security: Force rustls-webpki 0.103.10+ to fix RUSTSEC-2026-0049 (CRL validation bypass)
+rustls-webpki = "0.103.10"
+
 # LLM Router integration
 
 [patch.crates-io]
