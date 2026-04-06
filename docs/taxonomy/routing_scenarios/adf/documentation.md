@@ -12,8 +12,8 @@ synonyms:: documentation, readme, changelog, API docs, docstring, rustdoc,
 
 trigger:: documentation generation and technical writing tasks
 
-route:: minimax, minimax-m2.5-free
-action:: opencode run -m {{ model }} "{{ prompt }}"
+route:: minimax, minimax-coding-plan/MiniMax-M2.5
+action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"
 
 route:: anthropic, claude-sonnet-4-6
 action:: /home/alex/.local/bin/claude --model {{ model }} -p "{{ prompt }}" --max-turns 30

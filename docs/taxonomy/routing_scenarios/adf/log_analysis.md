@@ -12,7 +12,7 @@ synonyms:: log analysis, error pattern, incident, observability, log-analyst,
 trigger:: log analysis and incident investigation using Quickwit structured logs
 
 route:: kimi, kimi-for-coding/k2p5
-action:: opencode run -m {{ model }} "{{ prompt }}"
+action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"
 
-route:: openai, gpt-5-nano
-action:: opencode run -m {{ model }} "{{ prompt }}"
+route:: minimax, opencode-go/minimax-m2.5
+action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"

@@ -13,7 +13,7 @@ synonyms:: merge, PR review, approve, verdict, merge coordinator,
 trigger:: pull request merge coordination and approval verdict collection
 
 route:: kimi, kimi-for-coding/k2p5
-action:: opencode run -m {{ model }} "{{ prompt }}"
+action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"
 
 route:: anthropic, claude-sonnet-4-6
 action:: /home/alex/.local/bin/claude --model {{ model }} -p "{{ prompt }}" --max-turns 30

@@ -13,7 +13,7 @@ synonyms:: implement, build, code, fix, refactor, feature, PR, coding task,
 trigger:: code implementation and feature development tasks in Rust
 
 route:: kimi, kimi-for-coding/k2p5
-action:: opencode run -m {{ model }} "{{ prompt }}"
+action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"
 
 route:: anthropic, claude-sonnet-4-6
 action:: /home/alex/.local/bin/claude --model {{ model }} -p "{{ prompt }}" --max-turns 50
