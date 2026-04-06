@@ -28,45 +28,12 @@ impl Config {
         // Load .env file if present
         dotenvy::dotenv().ok();
 
-        // Print all environment variables for debugging
-        println!("Reading environment variables...");
-        for (key, value) in std::env::vars() {
-            if key.starts_with("ATOMIC_") {
-                println!(
-                    "Found env var: {} = {}",
-                    key,
-                    if key.contains("SECRET") {
-                        "[REDACTED]"
-                    } else {
-                        &value
-                    }
-                );
-            }
-        }
-
         let server_url = std::env::var("ATOMIC_SERVER_URL")
             .map_err(|_| AtomicError::Parse("ATOMIC_SERVER_URL not set".to_string()))?;
 
-        let agent = match std::env::var("ATOMIC_SERVER_SECRET") {
-            Ok(secret) => {
-                println!("Found ATOMIC_SERVER_SECRET, length: {}", secret.len());
-                // Try to create an agent from the secret
-                match Agent::from_base64(&secret) {
-                    Ok(agent) => {
-                        println!("Agent created successfully with subject: {}", agent.subject);
-                        Some(agent)
-                    }
-                    Err(e) => {
-                        eprintln!("Failed to create agent from secret: {}", e);
-                        None
-                    }
-                }
-            }
-            Err(e) => {
-                eprintln!("ATOMIC_SERVER_SECRET not set: {}", e);
-                None
-            }
-        };
+        let agent = std::env::var("ATOMIC_SERVER_SECRET")
+            .ok()
+            .and_then(|secret| Agent::from_base64(&secret).ok());
 
         Ok(Self { server_url, agent })
     }
