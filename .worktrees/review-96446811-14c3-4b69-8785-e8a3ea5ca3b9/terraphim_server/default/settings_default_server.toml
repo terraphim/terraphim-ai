@@ -1,0 +1,68 @@
+server_hostname = "${TERRAPHIM_SERVER_HOSTNAME:-127.0.0.1:8000}"
+api_endpoint="${TERRAPHIM_SERVER_API_ENDPOINT:-http://localhost:8000/api}"
+initialized = "${TERRAPHIM_INITIALIZED:-false}"
+
+[profiles.s3]
+type = "s3"
+bucket = "test"
+region = "${TERRAPHIM_PROFILE_S3_REGION:-us-east-1}"
+endpoint = "${TERRAPHIM_PROFILE_S3_ENDPOINT:-http://rpi4node3:8333/}"
+access_key_id = "${AWS_ACCESS_KEY_ID}"
+secret_access_key = "${AWS_SECRET_ACCESS_KEY}"
+
+[profiles.sled]
+type = "sled"
+datadir= "/tmp/opendal/sled"
+
+[profiles.dash]
+type = "dashmap"
+root = "/tmp/dashmaptest"
+
+# Optional database backends - uncomment if RocksDB feature is enabled
+# [profiles.rock]
+# type = "rocksdb"
+# datadir = "/tmp/opendal/rocksdb"
+
+[profiles.memory]
+type = "memory"
+
+[profiles.atomicserver]
+endpoint = "${TERRAPHIM_PROFILE_ATOMICSERVER}"
+type = "atomicserver"
+private_key = "${TERRAPHIM_PROFILE_ATOMICSERVER_PRIVATE_KEY}"
+public_key = "${TERRAPHIM_PROFILE_ATOMICSERVER_PUBLIC_KEY}"
+parent_resource_id="${TERRAPHIM_PROFILE_ATOMICSERVER}"
+
+# Default role configuration - basic settings for simple usage
+[roles.Default]
+shortname = "Default"
+name = "Default"
+relevance_function = "title-scorer"
+terraphim_it = false
+theme = "spacelab"
+
+[[roles.Default.haystacks]]
+location = "docs/src"
+service = "Ripgrep"
+read_only = true
+
+[roles.Default.haystacks.extra_parameters]
+
+# Example role for ClickUp (requires env CLICKUP_API_TOKEN and CLICKUP_TEAM_ID)
+[roles.ClickUp]
+shortname = "ClickUp"
+name = "ClickUp"
+relevance_function = "title-scorer"
+terraphim_it = false
+theme = "lumen"
+
+[[roles.ClickUp.haystacks]]
+location = "clickup"
+service = "ClickUp"
+read_only = true
+
+[roles.ClickUp.haystacks.extra_parameters]
+team_id = "${CLICKUP_TEAM_ID}"
+include_closed = "true"
+subtasks = "true"
+page = "0"

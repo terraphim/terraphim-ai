@@ -1,0 +1,18 @@
+{
+  "name": "terrraphim-automata-wasm",
+  "type": "module",
+  "collaborators": [
+    "AlexMikhalev <alex@metacortex.engineer>"
+  ],
+  "version": "0.1.0",
+  "files": [
+    "terrraphim_automata_wasm_bg.wasm",
+    "terrraphim_automata_wasm.js",
+    "terrraphim_automata_wasm.d.ts"
+  ],
+  "main": "terrraphim_automata_wasm.js",
+  "types": "terrraphim_automata_wasm.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}

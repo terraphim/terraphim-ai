@@ -1,0 +1,116 @@
+# Test Configuration for Terraphim Firecracker
+# Optimized for testing and development
+
+[general]
+log_level = "debug"
+max_concurrent_operations = 3
+health_check_interval = 10
+enable_metrics = true
+
+[pool]
+min_pool_size = 2
+max_pool_size = 10
+target_pool_size = 5
+prewarming_strategy = "Minimal"
+prewarming_timeout = 10
+prewarming_concurrency = 1
+allocation_strategy = "FirstAvailable"
+maintenance_interval = 300
+health_check_interval = 10
+max_maintenance_concurrency = 2
+enable_auto_scaling = false
+scale_up_threshold = 0.8
+scale_down_threshold = 0.3
+scale_up_step = 2
+scale_down_step = 1
+
+[performance]
+optimization_level = "Standard"
+target_boot_time = 5000
+fast_boot_time = 3000
+prewarmed_boot_time = 1000
+instant_boot_time = 200
+enable_memory_prewarming = false
+enable_filesystem_prewarming = false
+enable_network_prewarming = false
+enable_cpu_cache_prewarming = false
+enable_jit_prewarming = false
+enable_allocator_prewarming = false
+enable_boot_time_tracking = true
+enable_memory_usage_tracking = true
+enable_cpu_usage_tracking = true
+enable_network_latency_tracking = false
+
+[firecracker]
+firecracker_binary = "/usr/local/bin/firecracker"
+jailer_binary = "/usr/local/bin/jailer"
+base_dir = "/tmp/firecracker-test"
+socket_dir = "/tmp/firecracker-test/sockets"
+log_dir = "/tmp/firecracker-test/logs"
+default_vcpus = 1
+default_memory_mb = 256
+default_boot_timeout = 15
+kernel_path = "/tmp/firecracker-test/vmlinux"
+kernel_args = "console=ttyS0 noapic reboot=k panic=1 pci=off nomodules quiet"
+rootfs_path = "/tmp/firecracker-test/rootfs.ext4"
+rootfs_readonly = true
+network_interface = "tap0"
+network_bridge = "br0"
+enable_network = false
+enable_jailer = false
+jailer_uid = 1000
+jailer_gid = 1000
+jailer_chroot_base = "/tmp/jailer-test"
+
+[storage]
+storage_type = "Memory"
+max_memory_vms = 20
+cleanup_interval = 60
+max_vm_age = 1800
+storage_dir = "/tmp/terraphim-firecracker-test"
+backup_enabled = false
+backup_interval = 600
+
+[monitoring]
+metrics_port = 9091
+metrics_endpoint = "/metrics"
+enable_prometheus = false
+health_port = 8081
+health_endpoint = "/health"
+enable_profiling = false
+profiling_port = 6061
+profiling_endpoint = "/debug/pprof"
+log_format = "text"
+log_file = "/tmp/terraphim-firecracker-test.log"
+max_log_size = "10MB"
+max_log_files = 3
+
+[security]
+enable_authentication = false
+# pragma: allowlist secret
+api_key_required = false # pragma: allowlist secret
+enable_rate_limiting = false
+rate_limit_requests_per_minute = 60
+rate_limit_burst = 10
+enable_tls = false
+cert_file = ""
+key_file = ""
+
+[experimental]
+enable_snapshot_restore = false
+enable_live_migration = false
+enable_nested_virtualization = false
+enable_custom_kernel_args = false
+enable_aggressive_memory_optimization = false
+enable_cpu_pinning = false
+enable_huge_pages = false
+enable_io_uring = false
+
+[development]
+debug_mode = true
+enable_debug_logs = true
+mock_firecracker = true
+skip_prewarming = true
+test_mode = true
+test_vm_count = 3
+test_boot_timeout = 30

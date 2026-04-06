@@ -1,0 +1,26 @@
+{
+  "id": "Server",
+  "global_shortcut": "Ctrl+Shift+D",
+  "roles": {
+    "Default": {
+      "shortname": "Default",
+      "name": "Default",
+      "relevance_function": "title-scorer",
+      "terraphim_it": false,
+      "theme": "spacelab",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "extra": {}
+    }
+  },
+  "default_role": "Default",
+  "selected_role": "Default"
+}
