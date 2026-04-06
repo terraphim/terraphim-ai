@@ -101,7 +101,7 @@ fn parse_markdown_directives_content(
 ) -> MarkdownDirectives {
     let mut doc_type: Option<DocumentType> = None;
     let mut synonyms: Vec<String> = Vec::new();
-    let mut route: Option<RouteDirective> = None;
+    let mut routes: Vec<RouteDirective> = Vec::new();
     let mut priority: Option<u8> = None;
     let mut trigger: Option<String> = None;
     let mut pinned: bool = false;
@@ -152,9 +152,6 @@ fn parse_markdown_directives_content(
         }
 
         if lower.starts_with("route::") || lower.starts_with("routing::") {
-            if route.is_some() {
-                continue;
-            }
             let prefix_len = if lower.starts_with("route::") {
                 "route::".len()
             } else {
@@ -172,10 +169,29 @@ fn parse_markdown_directives_content(
                     message: format!("Invalid route directive '{}'", value),
                 });
             } else {
-                route = Some(RouteDirective {
+                routes.push(RouteDirective {
                     provider: provider.to_ascii_lowercase(),
                     model: model.to_string(),
+                    action: None,
                 });
+            }
+            continue;
+        }
+
+        if lower.starts_with("action::") {
+            let value = trimmed["action::".len()..].trim();
+            if !value.is_empty() {
+                // Attach action to the most recently parsed route
+                if let Some(last_route) = routes.last_mut() {
+                    last_route.action = Some(value.to_string());
+                } else {
+                    warnings.push(MarkdownDirectiveWarning {
+                        path: path.to_path_buf(),
+                        line: Some(idx + 1),
+                        message: "action:: directive without a preceding route:: directive"
+                            .to_string(),
+                    });
+                }
             }
             continue;
         }
@@ -214,6 +230,9 @@ fn parse_markdown_directives_content(
         }
     }
 
+    // Primary route is the first in the list (backward compatible)
+    let route = routes.first().cloned();
+
     let doc_type = doc_type.unwrap_or_else(|| {
         if route.is_some() {
             DocumentType::ConfigDocument
@@ -226,6 +245,7 @@ fn parse_markdown_directives_content(
         doc_type,
         synonyms,
         route,
+        routes,
         priority,
         trigger,
         pinned,
@@ -278,6 +298,7 @@ mod tests {
             Some(RouteDirective {
                 provider: "openai".to_string(),
                 model: "gpt-4o".to_string(),
+                action: None,
             })
         );
         assert_eq!(directives.priority, Some(80));
@@ -422,6 +443,69 @@ mod tests {
         let result = parse_markdown_directives_dir(dir.path()).unwrap();
         let directives = result.directives.get("noheading").unwrap();
         assert_eq!(directives.heading, None);
+    }
+
+    #[test]
+    fn parses_multiple_routes_with_actions() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("implementation.md");
+        fs::write(
+            &path,
+            r#"# Implementation Routing
+
+priority:: 50
+
+synonyms:: implement, build, code
+
+route:: kimi, kimi-for-coding/k2p5
+action:: opencode -m {{ model }} -p "{{ prompt }}"
+
+route:: anthropic, claude-sonnet-4-6
+action:: claude --model {{ model }} -p "{{ prompt }}" --max-turns 50
+"#,
+        )
+        .unwrap();
+
+        let result = parse_markdown_directives_dir(dir.path()).unwrap();
+        let directives = result.directives.get("implementation").unwrap();
+
+        // Primary route (backward compatible)
+        assert_eq!(directives.route.as_ref().unwrap().provider, "kimi");
+        assert_eq!(
+            directives.route.as_ref().unwrap().model,
+            "kimi-for-coding/k2p5"
+        );
+
+        // All routes
+        assert_eq!(directives.routes.len(), 2);
+        assert_eq!(directives.routes[0].provider, "kimi");
+        assert_eq!(
+            directives.routes[0].action.as_deref(),
+            Some(r#"opencode -m {{ model }} -p "{{ prompt }}""#)
+        );
+        assert_eq!(directives.routes[1].provider, "anthropic");
+        assert_eq!(directives.routes[1].model, "claude-sonnet-4-6");
+        assert_eq!(
+            directives.routes[1].action.as_deref(),
+            Some(r#"claude --model {{ model }} -p "{{ prompt }}" --max-turns 50"#)
+        );
+
+        assert!(result.warnings.is_empty());
+    }
+
+    #[test]
+    fn action_without_route_warns() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("orphan_action.md");
+        fs::write(&path, r#"action:: opencode -m foo -p "{{ prompt }}""#).unwrap();
+
+        let result = parse_markdown_directives_dir(dir.path()).unwrap();
+        assert_eq!(result.warnings.len(), 1);
+        assert!(
+            result.warnings[0]
+                .message
+                .contains("without a preceding route")
+        );
     }
 
     #[test]

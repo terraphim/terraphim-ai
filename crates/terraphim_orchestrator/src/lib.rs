@@ -39,6 +39,7 @@ pub mod dual_mode;
 pub mod error;
 pub mod flow;
 pub mod handoff;
+pub mod kg_router;
 pub mod learning;
 pub mod mention;
 pub mod metrics_persistence;
@@ -46,6 +47,7 @@ pub mod mode;
 pub mod nightwatch;
 pub mod output_poster;
 pub mod persona;
+pub mod provider_probe;
 #[cfg(feature = "quickwit")]
 pub mod quickwit;
 pub mod scheduler;
@@ -136,6 +138,8 @@ struct ManagedAgent {
     /// Broadcast receiver for draining output events to nightwatch.
     output_rx: broadcast::Receiver<OutputEvent>,
     spawned_by_mention: bool,
+    /// Git worktree path for workspace isolation (None = shared working_dir).
+    worktree_path: Option<PathBuf>,
 }
 
 /// The main orchestrator that runs the dark factory.
@@ -188,6 +192,10 @@ pub struct AgentOrchestrator {
     quickwit_sink: Option<quickwit::QuickwitSink>,
     /// Classifier for structured agent exit classification using KG-boosted matching.
     exit_classifier: ExitClassifier,
+    /// KG-driven model router loaded from taxonomy markdown files.
+    kg_router: Option<kg_router::KgRouter>,
+    /// Per-provider health tracking with circuit breakers.
+    provider_health: provider_probe::ProviderHealthMap,
 }
 
 /// Validate agent name for safe use in file paths.
@@ -259,6 +267,32 @@ impl AgentOrchestrator {
         // Initialize output poster if Gitea config is provided
         let output_poster = config.gitea.as_ref().map(OutputPoster::new);
 
+        // Initialize KG router from taxonomy directory if configured
+        let kg_router = config.routing.as_ref().and_then(|routing_config| {
+            match kg_router::KgRouter::load(&routing_config.taxonomy_path) {
+                Ok(router) => {
+                    info!(
+                        path = %routing_config.taxonomy_path.display(),
+                        rules = router.rule_count(),
+                        "KG model router loaded"
+                    );
+                    Some(router)
+                }
+                Err(e) => {
+                    warn!(error = %e, "KG router failed to load, using static model config");
+                    None
+                }
+            }
+        });
+
+        let probe_ttl = config
+            .routing
+            .as_ref()
+            .map(|r| r.probe_ttl_secs)
+            .unwrap_or(300);
+        let provider_health =
+            provider_probe::ProviderHealthMap::new(std::time::Duration::from_secs(probe_ttl));
+
         // MentionCursor loaded lazily on first poll (async)
 
         Ok(Self {
@@ -299,6 +333,8 @@ impl AgentOrchestrator {
             #[cfg(feature = "quickwit")]
             quickwit_sink: None,
             exit_classifier: ExitClassifier::new(),
+            kg_router,
+            provider_health,
         })
     }
 
@@ -362,6 +398,31 @@ impl AgentOrchestrator {
             "starting orchestrator with {} agent definitions",
             self.config.agents.len()
         );
+
+        // D-2: Run provider probes on startup if configured
+        if self
+            .config
+            .routing
+            .as_ref()
+            .is_some_and(|r| r.probe_on_startup)
+        {
+            if let Some(ref kg_router) = self.kg_router {
+                info!("running startup provider probe via KG action:: templates");
+                self.provider_health.probe_all(kg_router).await;
+
+                // Save probe results if directory configured
+                if let Some(ref dir) = self
+                    .config
+                    .routing
+                    .as_ref()
+                    .and_then(|r| r.probe_results_dir.clone())
+                {
+                    if let Err(e) = self.provider_health.save_results(dir).await {
+                        warn!(error = %e, "failed to save probe results");
+                    }
+                }
+            }
+        }
 
         // Spawn Safety-layer agents immediately
         let immediate = self.scheduler.immediate_agents();
@@ -742,31 +803,84 @@ impl AgentOrchestrator {
             .unwrap_or(&def.cli_tool);
         let supports_model_flag = matches!(cli_name, "claude" | "claude-code" | "opencode");
 
-        let model = if let Some(m) = &def.model {
-            info!(agent = %def.name, model = %m, "using explicit model");
-            Some(m.clone())
-        } else if supports_model_flag {
-            // Route the task prompt to find the best model
-            let context = terraphim_router::RoutingContext::default();
-            match self.router.route(&def.task, &context) {
-                Ok(decision) => {
-                    if let terraphim_types::capability::ProviderType::Llm { model_id, .. } =
-                        &decision.provider.provider_type
-                    {
+        // Track KG decision for CLI override (set inside the routing block below)
+        let mut kg_cli_override: Option<String> = None;
+
+        #[allow(clippy::manual_let_else)]
+        let model = if supports_model_flag {
+            // KG routing first (phase-aware tier selection from markdown rules).
+            // Takes priority over static model config so tier routing controls selection.
+            let unhealthy = self.provider_health.unhealthy_providers();
+            let kg_decision = self.kg_router.as_ref().and_then(|router| {
+                let decision = router.route_agent(&def.task)?;
+                // If primary provider is unhealthy, try fallback routes
+                if !unhealthy.is_empty() {
+                    if let Some(healthy_route) = decision.first_healthy_route(&unhealthy) {
                         info!(
                             agent = %def.name,
-                            model = %model_id,
-                            confidence = decision.confidence,
-                            "model selected via keyword routing"
+                            concept = %decision.matched_concept,
+                            provider = %healthy_route.provider,
+                            model = %healthy_route.model,
+                            skipped_unhealthy = ?unhealthy,
+                            "KG routed to fallback (primary unhealthy)"
                         );
-                        Some(model_id.clone())
-                    } else {
-                        None
+                        return Some(kg_router::KgRouteDecision {
+                            provider: healthy_route.provider.clone(),
+                            model: healthy_route.model.clone(),
+                            action: healthy_route.action.clone(),
+                            confidence: decision.confidence * 0.9,
+                            matched_concept: decision.matched_concept,
+                            priority: decision.priority,
+                            fallback_routes: decision.fallback_routes,
+                        });
                     }
                 }
-                Err(_) => {
-                    info!(agent = %def.name, "no model matched via routing, using CLI default");
-                    None
+                Some(decision)
+            });
+
+            if let Some(ref kg) = kg_decision {
+                info!(
+                    agent = %def.name,
+                    concept = %kg.matched_concept,
+                    provider = %kg.provider,
+                    model = %kg.model,
+                    confidence = kg.confidence,
+                    "model selected via KG tier routing"
+                );
+                // Extract CLI tool from action template (first word = CLI path)
+                if let Some(ref action) = kg.action {
+                    if let Some(cli) = action.split_whitespace().next() {
+                        kg_cli_override = Some(cli.to_string());
+                    }
+                }
+                Some(kg.model.clone())
+            } else if let Some(m) = &def.model {
+                // Static config fallback when KG has no match
+                info!(agent = %def.name, model = %m, "using static model (no KG tier match)");
+                Some(m.clone())
+            } else {
+                // Fall back to keyword routing engine
+                let context = terraphim_router::RoutingContext::default();
+                match self.router.route(&def.task, &context) {
+                    Ok(decision) => {
+                        if let terraphim_types::capability::ProviderType::Llm { model_id, .. } =
+                            &decision.provider.provider_type
+                        {
+                            info!(
+                                agent = %def.name,
+                                model = %model_id,
+                                confidence = decision.confidence,
+                                "model selected via keyword routing"
+                            );
+                            Some(model_id.clone())
+                        } else {
+                            None
+                        }
+                    }
+                    Err(_) => {
+                        info!(agent = %def.name, "no model matched, using CLI default");
+                        None
+                    }
                 }
             }
         } else {
@@ -790,7 +904,14 @@ impl AgentOrchestrator {
             model
         };
 
-        info!(agent = %def.name, layer = ?def.layer, cli = %def.cli_tool, model = ?model, "spawning agent");
+        // If KG routing selected a different CLI tool (e.g., claude instead of opencode),
+        // use the KG-selected CLI to match the routed model.
+        let effective_cli = kg_cli_override
+            .as_deref()
+            .unwrap_or(&def.cli_tool)
+            .to_string();
+
+        info!(agent = %def.name, layer = ?def.layer, cli = %effective_cli, model = ?model, "spawning agent");
 
         // Compose persona-enriched task prompt
         let (composed_task, persona_found) = if let Some(ref persona_name) = def.persona {
@@ -848,14 +969,27 @@ impl AgentOrchestrator {
         let use_stdin =
             persona_found || !skill_content.is_empty() || composed_task.len() > STDIN_THRESHOLD;
 
-        // Build primary Provider from the agent definition for the spawner
+        // Create isolated git worktree for implementation-tier agents that modify code.
+        // Review-tier agents (haiku) are read-only and don't need isolation.
+        let needs_isolation = model.as_ref().map(|m| !m.contains("haiku")).unwrap_or(true);
+        let worktree_path = if needs_isolation {
+            self.create_agent_worktree(&def.name).await
+        } else {
+            None
+        };
+        let agent_working_dir = worktree_path
+            .as_ref()
+            .unwrap_or(&self.config.working_dir)
+            .clone();
+
+        // Build primary Provider from the agent definition for the spawner.
         let primary_provider = terraphim_types::capability::Provider {
             id: def.name.clone(),
             name: def.name.clone(),
             provider_type: terraphim_types::capability::ProviderType::Agent {
                 agent_id: def.name.clone(),
-                cli_command: def.cli_tool.clone(),
-                working_dir: self.config.working_dir.clone(),
+                cli_command: effective_cli.clone(),
+                working_dir: agent_working_dir.clone(),
             },
             capabilities: vec![],
             cost_level: terraphim_types::capability::CostLevel::Cheap,
@@ -871,7 +1005,7 @@ impl AgentOrchestrator {
                 provider_type: terraphim_types::capability::ProviderType::Agent {
                     agent_id: format!("{}-fallback", def.name),
                     cli_command: fallback_cli.clone(),
-                    working_dir: self.config.working_dir.clone(),
+                    working_dir: agent_working_dir.clone(),
                 },
                 capabilities: vec![],
                 cost_level: terraphim_types::capability::CostLevel::Cheap,
@@ -929,6 +1063,7 @@ impl AgentOrchestrator {
                 restart_count,
                 output_rx,
                 spawned_by_mention: false,
+                worktree_path,
             },
         );
 
@@ -1951,14 +2086,101 @@ impl AgentOrchestrator {
         }
     }
 
+    /// Create a git worktree for an agent to work in isolation.
+    ///
+    /// Returns the worktree path if successful, None if worktree creation fails
+    /// (fail-open: agent uses shared working_dir instead).
+    async fn create_agent_worktree(&self, agent_name: &str) -> Option<PathBuf> {
+        let worktree_root = PathBuf::from("/tmp/adf-worktrees");
+        if let Err(e) = tokio::fs::create_dir_all(&worktree_root).await {
+            warn!(agent = %agent_name, error = %e, "failed to create worktree root");
+            return None;
+        }
+
+        let id = uuid::Uuid::new_v4().to_string()[..8].to_string();
+        let worktree_path = worktree_root.join(format!("{agent_name}-{id}"));
+
+        let output = tokio::process::Command::new("git")
+            .args([
+                "worktree",
+                "add",
+                "--detach",
+                &worktree_path.to_string_lossy(),
+                "HEAD",
+            ])
+            .current_dir(&self.config.working_dir)
+            .output()
+            .await;
+
+        match output {
+            Ok(o) if o.status.success() => {
+                info!(
+                    agent = %agent_name,
+                    path = %worktree_path.display(),
+                    "created isolated git worktree"
+                );
+                Some(worktree_path)
+            }
+            Ok(o) => {
+                let stderr = String::from_utf8_lossy(&o.stderr);
+                warn!(
+                    agent = %agent_name,
+                    error = %stderr.chars().take(200).collect::<String>(),
+                    "git worktree add failed, using shared working_dir"
+                );
+                None
+            }
+            Err(e) => {
+                warn!(agent = %agent_name, error = %e, "git worktree command failed");
+                None
+            }
+        }
+    }
+
+    /// Remove a git worktree after an agent finishes.
+    async fn remove_agent_worktree(&self, agent_name: &str, worktree_path: &Path) {
+        // Force-remove even if there are uncommitted changes (they were already
+        // committed by try_commit_agent_work or are intentionally discarded).
+        let output = tokio::process::Command::new("git")
+            .args([
+                "worktree",
+                "remove",
+                "--force",
+                &worktree_path.to_string_lossy(),
+            ])
+            .current_dir(&self.config.working_dir)
+            .output()
+            .await;
+
+        match output {
+            Ok(o) if o.status.success() => {
+                info!(
+                    agent = %agent_name,
+                    path = %worktree_path.display(),
+                    "removed agent worktree"
+                );
+            }
+            Ok(o) => {
+                let stderr = String::from_utf8_lossy(&o.stderr);
+                warn!(
+                    agent = %agent_name,
+                    path = %worktree_path.display(),
+                    error = %stderr.chars().take(200).collect::<String>(),
+                    "git worktree remove failed"
+                );
+            }
+            Err(e) => {
+                warn!(agent = %agent_name, error = %e, "git worktree remove command failed");
+            }
+        }
+    }
+
     /// Attempt to commit any uncommitted working tree changes made by an agent.
     ///
     /// This runs `git add -A && git diff --cached --quiet` to check if there
     /// are changes, then commits with a standard message. Failures are logged
     /// but not propagated — agent work is best-effort.
-    async fn try_commit_agent_work(&self, agent_name: &str) {
-        let working_dir = &self.config.working_dir;
-
+    async fn try_commit_agent_work(&self, agent_name: &str, working_dir: &Path) {
         // Stage all changes
         let add = tokio::process::Command::new("git")
             .args(["add", "-A"])
@@ -2104,7 +2326,27 @@ impl AgentOrchestrator {
         // 11. Poll for @adf: mentions in watched issues
         self.poll_mentions().await;
 
-        // 12. Update last_tick_time and increment tick counter
+        // 12. D-4: Hot-reload KG routing rules if markdown files changed
+        if let Some(ref mut router) = self.kg_router {
+            router.reload_if_changed();
+        }
+
+        // 13. D-2: Re-probe providers if cached results are stale
+        if self.provider_health.is_stale() {
+            if let Some(ref kg_router) = self.kg_router {
+                self.provider_health.probe_all(kg_router).await;
+                if let Some(ref dir) = self
+                    .config
+                    .routing
+                    .as_ref()
+                    .and_then(|r| r.probe_results_dir.clone())
+                {
+                    let _ = self.provider_health.save_results(dir.as_path()).await;
+                }
+            }
+        }
+
+        // 14. Update last_tick_time and increment tick counter
         self.last_tick_time = chrono::Utc::now();
         self.tick_count = self.tick_count.wrapping_add(1);
     }
@@ -2343,6 +2585,19 @@ impl AgentOrchestrator {
                 "agent exit classified"
             );
 
+            // D-3: Feed exit classification into provider health circuit breaker
+            if let Some(ref provider) = def.provider {
+                match record.exit_class {
+                    ExitClass::ModelError | ExitClass::RateLimit => {
+                        self.provider_health.record_failure(provider);
+                    }
+                    ExitClass::Success | ExitClass::EmptySuccess => {
+                        self.provider_health.record_success(provider);
+                    }
+                    _ => {} // Other exit classes don't affect provider health
+                }
+            }
+
             // Post output to Gitea if configured
             if let (Some(poster), Some(issue)) = (&self.output_poster, def.gitea_issue) {
                 let exit_code = status.code();
@@ -2385,14 +2640,25 @@ impl AgentOrchestrator {
 
         // Process natural exits
 
-        // NOW remove from active_agents and handle exits
+        // NOW remove from active_agents and handle exits.
+        // Capture worktree_path before removing so we can commit + clean up.
         for (name, def, status) in exited {
+            let worktree_path = self
+                .active_agents
+                .get(&name)
+                .and_then(|m| m.worktree_path.clone());
             self.active_agents.remove(&name);
             self.handle_agent_exit(&name, &def, status);
 
-            // Auto-commit any working tree changes the agent made
+            // Auto-commit in the agent's working directory (worktree or shared)
+            let commit_dir = worktree_path.as_deref().unwrap_or(&self.config.working_dir);
             if status.success() {
-                self.try_commit_agent_work(&name).await;
+                self.try_commit_agent_work(&name, commit_dir).await;
+            }
+
+            // Clean up the worktree after committing
+            if let Some(ref wt) = worktree_path {
+                self.remove_agent_worktree(&name, wt).await;
             }
         }
     }
@@ -2931,6 +3197,7 @@ mod tests {
             mentions: None,
             webhook: None,
             role_config_path: None,
+            routing: None,
         }
     }
 
@@ -3113,6 +3380,7 @@ task = "test"
             mentions: None,
             webhook: None,
             role_config_path: None,
+            routing: None,
         }
     }
 

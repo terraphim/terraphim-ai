@@ -396,6 +396,9 @@ pub enum DocumentType {
 pub struct RouteDirective {
     pub provider: String,
     pub model: String,
+    /// CLI action template with `{{ model }}` and `{{ prompt }}` placeholders.
+    #[serde(default)]
+    pub action: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -404,8 +407,13 @@ pub struct MarkdownDirectives {
     pub doc_type: DocumentType,
     #[serde(default)]
     pub synonyms: Vec<String>,
+    /// Primary route (first in the list). Kept for backward compatibility.
     #[serde(default)]
     pub route: Option<RouteDirective>,
+    /// All routes in priority order (primary first, fallbacks after).
+    /// Each route may have an `action::` template for CLI invocation.
+    #[serde(default)]
+    pub routes: Vec<RouteDirective>,
     #[serde(default)]
     pub priority: Option<u8>,
     #[serde(default)]

@@ -121,6 +121,7 @@ fn test_config() -> OrchestratorConfig {
         mentions: None,
         webhook: None,
         role_config_path: None,
+        routing: None,
     }
 }
 
