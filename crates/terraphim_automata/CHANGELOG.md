@@ -68,12 +68,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Thesaurus loading (local and remote)
   - WASM browser integration
 - README with quick start guide
-- WASM example project in `wasm-test/`
+- WASM package project in `wasm/`
 
 ### WASM Support
 - Full browser compatibility
 - TypeScript type definitions
-- Example integration at `wasm-test/`
+- Example integration at `wasm/`
 - Compatible with Chrome 57+, Firefox 52+, Safari 11+
 - ~200KB compressed bundle size (release build)
 

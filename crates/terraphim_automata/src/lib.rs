@@ -103,7 +103,7 @@
 //! wasm-pack build --target web --features wasm
 //! ```
 //!
-//! See the [WASM example](wasm-test/) for browser usage.
+//! See the [WASM package](wasm/) for browser usage.
 
 pub use self::builder::{Logseq, ThesaurusBuilder};
 pub mod autocomplete;
