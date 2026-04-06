@@ -288,8 +288,20 @@ impl AgentOrchestrator {
             .as_ref()
             .map(|r| r.probe_ttl_secs)
             .unwrap_or(300);
-        let provider_health =
+        let mut provider_health =
             provider_probe::ProviderHealthMap::new(std::time::Duration::from_secs(probe_ttl));
+
+        // Phase 7: Meta-coordinator bootstrap -- load prior benchmark results so
+        // routing decisions are informed even before the first live probe runs.
+        if let Some(dir) = config
+            .routing
+            .as_ref()
+            .and_then(|r| r.probe_results_dir.as_deref())
+        {
+            provider_health.load_from_file(dir);
+            let summary = provider_health.routing_summary();
+            info!("meta-coordinator routing bootstrap:\n{summary}");
+        }
 
         // MentionCursor loaded lazily on first poll (async)
 
@@ -2238,12 +2250,19 @@ impl AgentOrchestrator {
                     .as_ref()
                     .and_then(|r| r.probe_results_dir.clone())
                 {
-                    let _ = self.provider_health.save_results(&dir).await;
+                    let _ = self.provider_health.save_results(dir).await;
                 }
             }
         }
 
-        // 14. Update last_tick_time and increment tick counter
+        // 14. Phase 7: Meta-coordinator routing oversight -- log summary every 60 ticks
+        //     (~10 minutes with default 10s tick) to give operators visibility.
+        if self.tick_count % 60 == 0 && !self.provider_health.results().is_empty() {
+            let summary = self.provider_health.routing_summary();
+            info!("meta-coordinator routing oversight:\n{summary}");
+        }
+
+        // 15. Update last_tick_time and increment tick counter
         self.last_tick_time = chrono::Utc::now();
         self.tick_count = self.tick_count.wrapping_add(1);
     }

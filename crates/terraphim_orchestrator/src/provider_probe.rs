@@ -13,7 +13,7 @@ use tracing::{info, warn};
 use crate::kg_router::KgRouter;
 
 /// Result of probing a single provider+model combination.
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ProbeResult {
     pub provider: String,
     pub model: String,
@@ -25,7 +25,7 @@ pub struct ProbeResult {
 }
 
 /// Status of a probe attempt.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ProbeStatus {
     Success,
@@ -246,6 +246,99 @@ impl ProviderHealthMap {
     /// Get the latest probe results.
     pub fn results(&self) -> &[ProbeResult] {
         &self.results
+    }
+
+    /// Load probe results from a JSON file (pi-benchmark compatible format).
+    ///
+    /// Used by the meta-coordinator to bootstrap health state from a previous
+    /// benchmark run stored at `dir/latest.json`. Circuit breakers are updated
+    /// from the loaded results so routing decisions are meaningful before the
+    /// first live probe completes.
+    pub fn load_from_file(&mut self, dir: &std::path::Path) {
+        let path = dir.join("latest.json");
+        match std::fs::read_to_string(&path) {
+            Ok(json) => match serde_json::from_str::<Vec<ProbeResult>>(&json) {
+                Ok(results) => {
+                    info!(
+                        path = %path.display(),
+                        results = results.len(),
+                        "meta-coordinator: loaded prior benchmark results"
+                    );
+                    // Update circuit breakers from loaded results
+                    for result in &results {
+                        let breaker = self
+                            .breakers
+                            .entry(result.provider.clone())
+                            .or_insert_with(|| CircuitBreaker::new(self.cb_config.clone()));
+                        match result.status {
+                            ProbeStatus::Success => breaker.record_success(),
+                            ProbeStatus::Error | ProbeStatus::Timeout => breaker.record_failure(),
+                        }
+                    }
+                    self.results = results;
+                    // Mark as loaded (not stale) so we don't immediately re-probe
+                    self.probed_at = Some(Instant::now());
+                }
+                Err(e) => {
+                    warn!(path = %path.display(), error = %e, "meta-coordinator: failed to parse benchmark JSON");
+                }
+            },
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                info!(path = %path.display(), "meta-coordinator: no prior benchmark results (first run)");
+            }
+            Err(e) => {
+                warn!(path = %path.display(), error = %e, "meta-coordinator: failed to read benchmark file");
+            }
+        }
+    }
+
+    /// Generate a routing summary table from current probe results.
+    ///
+    /// Returns a human-readable Markdown table sorted by latency (fastest first).
+    /// Providers with no probe results are omitted. Used by the meta-coordinator
+    /// for periodic routing oversight logging.
+    pub fn routing_summary(&self) -> String {
+        if self.results.is_empty() {
+            return "No probe results available.".to_string();
+        }
+
+        let mut lines = vec![
+            "| Provider | Model | Status | Latency (ms) |".to_string(),
+            "|----------|-------|--------|--------------|".to_string(),
+        ];
+
+        let mut sorted = self.results.clone();
+        // Sort: success first, then by latency ascending; timeouts/errors last
+        sorted.sort_by(|a, b| {
+            let a_ok = a.status == ProbeStatus::Success;
+            let b_ok = b.status == ProbeStatus::Success;
+            match (a_ok, b_ok) {
+                (true, false) => std::cmp::Ordering::Less,
+                (false, true) => std::cmp::Ordering::Greater,
+                _ => a
+                    .latency_ms
+                    .unwrap_or(u64::MAX)
+                    .cmp(&b.latency_ms.unwrap_or(u64::MAX)),
+            }
+        });
+
+        for r in &sorted {
+            let status = match r.status {
+                ProbeStatus::Success => "ok",
+                ProbeStatus::Error => "err",
+                ProbeStatus::Timeout => "timeout",
+            };
+            let latency = r
+                .latency_ms
+                .map(|ms| ms.to_string())
+                .unwrap_or_else(|| "-".to_string());
+            lines.push(format!(
+                "| {} | {} | {} | {} |",
+                r.provider, r.model, status, latency
+            ));
+        }
+
+        lines.join("\n")
     }
 
     /// Save probe results to a JSON file (pi-benchmark compatible format).
@@ -487,5 +580,93 @@ mod tests {
         ];
         // One model succeeded -> provider is healthy
         assert!(map.is_healthy("minimax"));
+    }
+
+    #[test]
+    fn routing_summary_empty_returns_message() {
+        let map = ProviderHealthMap::new(Duration::from_secs(300));
+        assert_eq!(map.routing_summary(), "No probe results available.");
+    }
+
+    #[test]
+    fn routing_summary_contains_providers() {
+        let mut map = ProviderHealthMap::new(Duration::from_secs(300));
+        map.results = vec![
+            ProbeResult {
+                provider: "anthropic".to_string(),
+                model: "claude-sonnet-4-6".to_string(),
+                cli_tool: "claude".to_string(),
+                status: ProbeStatus::Success,
+                latency_ms: Some(12876),
+                error: None,
+                timestamp: "2026-04-06T19:00:00Z".to_string(),
+            },
+            ProbeResult {
+                provider: "kimi".to_string(),
+                model: "kimi-for-coding/k2p5".to_string(),
+                cli_tool: "opencode".to_string(),
+                status: ProbeStatus::Timeout,
+                latency_ms: Some(30001),
+                error: Some("timeout after 30s".to_string()),
+                timestamp: "2026-04-06T19:00:00Z".to_string(),
+            },
+        ];
+        let summary = map.routing_summary();
+        assert!(
+            summary.contains("anthropic"),
+            "summary should contain anthropic"
+        );
+        assert!(summary.contains("kimi"), "summary should contain kimi");
+        assert!(summary.contains("ok"), "summary should contain ok status");
+        assert!(
+            summary.contains("timeout"),
+            "summary should contain timeout status"
+        );
+        // Success should sort before timeout
+        let anthropic_pos = summary.find("anthropic").unwrap();
+        let kimi_pos = summary.find("kimi").unwrap();
+        assert!(
+            anthropic_pos < kimi_pos,
+            "successful providers should sort before timeouts"
+        );
+    }
+
+    #[test]
+    fn load_from_file_nonexistent_dir_is_noop() {
+        let mut map = ProviderHealthMap::new(Duration::from_secs(300));
+        map.load_from_file(std::path::Path::new(
+            "/nonexistent/path/that/does/not/exist",
+        ));
+        // Should remain empty, not panic
+        assert!(map.results.is_empty());
+        assert!(map.is_stale());
+    }
+
+    #[test]
+    fn load_from_file_roundtrip() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let results = vec![ProbeResult {
+            provider: "anthropic".to_string(),
+            model: "claude-sonnet-4-6".to_string(),
+            cli_tool: "claude".to_string(),
+            status: ProbeStatus::Success,
+            latency_ms: Some(12876),
+            error: None,
+            timestamp: "2026-04-06T19:00:00Z".to_string(),
+        }];
+        let json = serde_json::to_string_pretty(&results).unwrap();
+        std::fs::write(dir.path().join("latest.json"), &json).unwrap();
+
+        let mut map = ProviderHealthMap::new(Duration::from_secs(300));
+        map.load_from_file(dir.path());
+
+        assert_eq!(map.results.len(), 1);
+        assert_eq!(map.results[0].provider, "anthropic");
+        assert!(
+            map.is_healthy("anthropic"),
+            "loaded success should mark provider healthy"
+        );
+        // Should not be stale after loading (no need for immediate re-probe)
+        assert!(!map.is_stale(), "freshly loaded map should not be stale");
     }
 }
