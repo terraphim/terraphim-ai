@@ -439,17 +439,17 @@ action:: opencode -m {{ model }} -p "{{ prompt }}"
     }
 
     #[test]
-    fn loads_real_adf_taxonomy_with_multi_routes() {
+    fn loads_real_adf_taxonomy_3_tiers() {
         let taxonomy = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../docs/taxonomy/routing_scenarios/adf");
         if !taxonomy.exists() {
-            return; // Skip if taxonomy not present
+            return;
         }
 
         let router = KgRouter::load(&taxonomy).unwrap();
-        assert_eq!(router.rule_count(), 10, "expected 10 ADF routing rules");
+        assert_eq!(router.rule_count(), 3, "expected 3 tier files");
 
-        // Every rule should have at least 2 routes (primary + fallback)
+        // Every route should have an action template
         for route_directive in router.all_routes() {
             assert!(
                 route_directive.action.is_some(),
@@ -459,31 +459,38 @@ action:: opencode -m {{ model }} -p "{{ prompt }}"
             );
         }
 
-        // Test a known match
-        let decision = router.route_agent("run cargo audit for CVE").unwrap();
-        assert_eq!(
-            decision.matched_concept, "security_audit",
-            "expected security_audit match"
-        );
-        assert!(
-            decision.fallback_routes.len() >= 4,
-            "security_audit should have primary + 3 fallbacks (kimi, anthropic, zai, openai)"
-        );
-
-        // Test reasoning match (highest priority)
-        let decision = router
-            .route_agent("strategic planning for meta-coordination")
+        // Planning tier (priority 80)
+        let d = router
+            .route_agent("create a plan for strategic planning")
             .unwrap();
-        assert_eq!(decision.matched_concept, "reasoning");
-        assert_eq!(decision.priority, 80);
+        assert_eq!(d.matched_concept, "planning_tier");
+        assert_eq!(d.priority, 80);
+        assert_eq!(d.provider, "anthropic");
+        assert!(d.model.contains("opus"));
+
+        // Review tier (priority 60) -- "verify" triggers review
+        let d = router.route_agent("verify and validate results").unwrap();
+        assert_eq!(d.matched_concept, "review_tier");
+        assert_eq!(d.priority, 60);
+        assert_eq!(d.provider, "anthropic");
+        assert!(d.model.contains("haiku"));
+
+        // Implementation tier (priority 50) -- "implement" triggers coding
+        let d = router.route_agent("implement the new feature").unwrap();
+        assert_eq!(d.matched_concept, "implementation_tier");
+        assert_eq!(d.priority, 50);
+        assert_eq!(d.provider, "anthropic");
+        assert!(d.model.contains("sonnet"));
     }
 
-    /// End-to-end test: simulate ADF agent dispatch routing for every real agent.
+    /// End-to-end: simulate ADF agent dispatch with phase-aware 3-tier routing.
     ///
-    /// Uses task keyword summaries from orchestrator.toml to verify each agent
-    /// gets routed to the expected provider+model via KG synonym matching.
+    /// Each agent's task keywords determine its tier:
+    /// - PLANNING (opus): strategic planning, architecture design, create a plan
+    /// - REVIEW (haiku): verify, validate, check results, compliance check
+    /// - IMPLEMENTATION (sonnet/kimi): implement, code, test, security audit
     #[test]
-    fn e2e_all_adf_agents_route_correctly() {
+    fn e2e_all_adf_agents_route_to_correct_tier() {
         let taxonomy = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../docs/taxonomy/routing_scenarios/adf");
         if !taxonomy.exists() {
@@ -492,108 +499,116 @@ action:: opencode -m {{ model }} -p "{{ prompt }}"
 
         let router = KgRouter::load(&taxonomy).unwrap();
 
-        // Agent name -> (task keywords, expected concept, expected primary provider)
+        // (agent, task keywords, expected tier, expected primary provider)
         let agents: Vec<(&str, &str, &str, &str)> = vec![
-            (
-                "security-sentinel",
-                "security audit cargo audit CVE vulnerability scan",
-                "security_audit",
-                "kimi",
-            ),
+            // PLANNING TIER (opus)
             (
                 "meta-coordinator",
-                "strategic planning meta-coordination cross-agent triage",
-                "reasoning",
+                "create a plan for strategic planning and cross-agent coordination",
+                "planning_tier",
+                "anthropic",
+            ),
+            (
+                "product-development",
+                "create a plan for product roadmap and feature prioritisation",
+                "planning_tier",
+                "anthropic",
+            ),
+            // REVIEW TIER (haiku)
+            (
+                "spec-validator",
+                "verify and validate outputs, check results pass fail quality gate",
+                "review_tier",
+                "anthropic",
+            ),
+            (
+                "quality-coordinator",
+                "review code quality and verify test results for PR approval",
+                "review_tier",
                 "anthropic",
             ),
             (
                 "compliance-watchdog",
-                "compliance check security review OWASP",
-                "security_audit",
-                "kimi",
-            ),
-            (
-                "drift-detector",
-                "drift detection security review vulnerability assessment",
-                "security_audit",
-                "kimi",
-            ),
-            (
-                "product-development",
-                "product roadmap feature prioritisation user story",
-                "product_planning",
+                "verify compliance and check audit results against standards",
+                "review_tier",
                 "anthropic",
             ),
             (
-                "spec-validator",
-                "spec validation code review quality assessment",
-                "code_review",
+                "drift-detector",
+                "check drift detection and validate system state",
+                "review_tier",
+                "anthropic",
+            ),
+            (
+                "merge-coordinator",
+                "review merge verdict and evaluate GO NO-GO for PR approval",
+                "review_tier",
+                "anthropic",
+            ),
+            // IMPLEMENTATION TIER (sonnet)
+            (
+                "security-sentinel",
+                "security audit cargo audit CVE vulnerability scan",
+                "implementation_tier",
                 "anthropic",
             ),
             (
                 "test-guardian",
-                "test QA regression integration test browser test",
-                "testing",
-                "kimi",
-            ),
-            (
-                "documentation-generator",
-                "documentation readme changelog API docs rustdoc",
-                "documentation",
-                "minimax",
+                "test QA regression integration test cargo test",
+                "implementation_tier",
+                "anthropic",
             ),
             (
                 "implementation-swarm",
                 "implement build code fix refactor feature PR",
-                "implementation",
-                "kimi",
+                "implementation_tier",
+                "anthropic",
             ),
             (
-                "merge-coordinator",
-                "merge PR review approve verdict merge coordinator",
-                "merge_review",
-                "kimi",
+                "documentation-generator",
+                "documentation readme changelog API docs technical writing",
+                "implementation_tier",
+                "anthropic",
             ),
             (
                 "browser-qa",
-                "browser test QA regression end-to-end",
-                "testing",
-                "kimi",
+                "test QA browser test end-to-end regression",
+                "implementation_tier",
+                "anthropic",
             ),
             (
                 "log-analyst",
-                "log analysis error pattern incident observability quickwit",
-                "log_analysis",
-                "kimi",
+                "log analysis error pattern incident observability",
+                "implementation_tier",
+                "anthropic",
             ),
         ];
 
         let mut all_passed = true;
-        for (agent, task, expected_concept, expected_provider) in &agents {
+        for (agent, task, expected_tier, expected_provider) in &agents {
             match router.route_agent(task) {
                 Some(decision) => {
-                    let concept_ok = decision.matched_concept == *expected_concept;
+                    let tier_ok = decision.matched_concept == *expected_tier;
                     let provider_ok = decision.provider == *expected_provider;
-                    if !concept_ok || !provider_ok {
+                    if !tier_ok || !provider_ok {
                         eprintln!(
                             "MISMATCH {}: got {}:{}/{} (expected {}:{})",
                             agent,
                             decision.matched_concept,
                             decision.provider,
                             decision.model,
-                            expected_concept,
+                            expected_tier,
                             expected_provider,
                         );
                         all_passed = false;
                     } else {
                         eprintln!(
-                            "OK {}: {} -> {}/{} (pri={}, fallbacks={})",
+                            "OK {}: {} -> {}/{} (pri={})",
                             agent,
                             decision.matched_concept,
                             decision.provider,
                             decision.model,
                             decision.priority,
-                            decision.fallback_routes.len(),
                         );
                     }
                 }
@@ -603,6 +618,6 @@ action:: opencode -m {{ model }} -p "{{ prompt }}"
                 }
             }
         }
-        assert!(all_passed, "some agents did not route as expected");
+        assert!(all_passed, "some agents did not route to correct tier");
     }
 }

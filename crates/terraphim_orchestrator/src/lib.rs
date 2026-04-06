@@ -801,12 +801,9 @@ impl AgentOrchestrator {
             .unwrap_or(&def.cli_tool);
         let supports_model_flag = matches!(cli_name, "claude" | "claude-code" | "opencode");
 
-        let model = if let Some(m) = &def.model {
-            info!(agent = %def.name, model = %m, "using explicit model");
-            Some(m.clone())
-        } else if supports_model_flag {
-            // Try KG routing first (pattern match against synonyms from markdown rules),
-            // then fall back to keyword routing from RoutingEngine.
+        let model = if supports_model_flag {
+            // KG routing first (phase-aware tier selection from markdown rules).
+            // Takes priority over static model config so tier routing controls selection.
             let unhealthy = self.provider_health.unhealthy_providers();
             let kg_decision = self.kg_router.as_ref().and_then(|router| {
                 let decision = router.route_agent(&def.task)?;
@@ -842,11 +839,15 @@ impl AgentOrchestrator {
                     provider = %kg.provider,
                     model = %kg.model,
                     confidence = kg.confidence,
-                    "model selected via KG routing"
+                    "model selected via KG tier routing"
                 );
                 Some(kg.model.clone())
+            } else if let Some(m) = &def.model {
+                // Static config fallback when KG has no match
+                info!(agent = %def.name, model = %m, "using static model (no KG tier match)");
+                Some(m.clone())
             } else {
-                // Fall back to existing keyword routing
+                // Fall back to keyword routing engine
                 let context = terraphim_router::RoutingContext::default();
                 match self.router.route(&def.task, &context) {
                     Ok(decision) => {
@@ -857,7 +858,7 @@ impl AgentOrchestrator {
                                 agent = %def.name,
                                 model = %model_id,
                                 confidence = decision.confidence,
-                                "model selected via keyword routing (KG had no match)"
+                                "model selected via keyword routing"
                             );
                             Some(model_id.clone())
                         } else {
@@ -865,7 +866,7 @@ impl AgentOrchestrator {
                         }
                     }
                     Err(_) => {
-                        info!(agent = %def.name, "no model matched via routing, using CLI default");
+                        info!(agent = %def.name, "no model matched, using CLI default");
                         None
                     }
                 }
