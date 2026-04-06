@@ -397,6 +397,31 @@ impl AgentOrchestrator {
             self.config.agents.len()
         );
 
+        // D-2: Run provider probes on startup if configured
+        if self
+            .config
+            .routing
+            .as_ref()
+            .is_some_and(|r| r.probe_on_startup)
+        {
+            if let Some(ref kg_router) = self.kg_router {
+                info!("running startup provider probe via KG action:: templates");
+                self.provider_health.probe_all(kg_router).await;
+
+                // Save probe results if directory configured
+                if let Some(ref dir) = self
+                    .config
+                    .routing
+                    .as_ref()
+                    .and_then(|r| r.probe_results_dir.clone())
+                {
+                    if let Err(e) = self.provider_health.save_results(dir).await {
+                        warn!(error = %e, "failed to save probe results");
+                    }
+                }
+            }
+        }
+
         // Spawn Safety-layer agents immediately
         let immediate = self.scheduler.immediate_agents();
         for agent_def in &immediate {
@@ -2180,7 +2205,27 @@ impl AgentOrchestrator {
         // 11. Poll for @adf: mentions in watched issues
         self.poll_mentions().await;
 
-        // 12. Update last_tick_time and increment tick counter
+        // 12. D-4: Hot-reload KG routing rules if markdown files changed
+        if let Some(ref mut router) = self.kg_router {
+            router.reload_if_changed();
+        }
+
+        // 13. D-2: Re-probe providers if cached results are stale
+        if self.provider_health.is_stale() {
+            if let Some(ref kg_router) = self.kg_router {
+                self.provider_health.probe_all(kg_router).await;
+                if let Some(ref dir) = self
+                    .config
+                    .routing
+                    .as_ref()
+                    .and_then(|r| r.probe_results_dir.clone())
+                {
+                    let _ = self.provider_health.save_results(&dir).await;
+                }
+            }
+        }
+
+        // 14. Update last_tick_time and increment tick counter
         self.last_tick_time = chrono::Utc::now();
         self.tick_count = self.tick_count.wrapping_add(1);
     }
@@ -2418,6 +2463,19 @@ impl AgentOrchestrator {
                 wall_time_secs = record.wall_time_secs,
                 "agent exit classified"
             );
+
+            // D-3: Feed exit classification into provider health circuit breaker
+            if let Some(ref provider) = def.provider {
+                match record.exit_class {
+                    ExitClass::ModelError | ExitClass::RateLimit => {
+                        self.provider_health.record_failure(provider);
+                    }
+                    ExitClass::Success | ExitClass::EmptySuccess => {
+                        self.provider_health.record_success(provider);
+                    }
+                    _ => {} // Other exit classes don't affect provider health
+                }
+            }
 
             // Post output to Gitea if configured
             if let (Some(poster), Some(issue)) = (&self.output_poster, def.gitea_issue) {

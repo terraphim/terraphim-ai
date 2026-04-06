@@ -254,14 +254,12 @@ async fn probe_single(provider: &str, model: &str, action_template: Option<&str>
     let start = Instant::now();
     let timeout = Duration::from_secs(30);
 
+    // Use sh -c to handle quoted arguments correctly (same pattern as
+    // CommandStep::Shell in terraphim_tinyclaw).
     let result = tokio::time::timeout(timeout, async {
-        let parts: Vec<&str> = action.split_whitespace().collect();
-        if parts.is_empty() {
-            return Err("empty action command".to_string());
-        }
-
-        let output = tokio::process::Command::new(parts[0])
-            .args(&parts[1..])
+        let output = tokio::process::Command::new("sh")
+            .arg("-c")
+            .arg(&action)
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
             .spawn()
