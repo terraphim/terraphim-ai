@@ -477,4 +477,132 @@ action:: opencode -m {{ model }} -p "{{ prompt }}"
         assert_eq!(decision.matched_concept, "reasoning");
         assert_eq!(decision.priority, 80);
     }
+
+    /// End-to-end test: simulate ADF agent dispatch routing for every real agent.
+    ///
+    /// Uses task keyword summaries from orchestrator.toml to verify each agent
+    /// gets routed to the expected provider+model via KG synonym matching.
+    #[test]
+    fn e2e_all_adf_agents_route_correctly() {
+        let taxonomy = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../docs/taxonomy/routing_scenarios/adf");
+        if !taxonomy.exists() {
+            return;
+        }
+
+        let router = KgRouter::load(&taxonomy).unwrap();
+
+        // Agent name -> (task keywords, expected concept, expected primary provider)
+        let agents: Vec<(&str, &str, &str, &str)> = vec![
+            (
+                "security-sentinel",
+                "security audit cargo audit CVE vulnerability scan",
+                "security_audit",
+                "kimi",
+            ),
+            (
+                "meta-coordinator",
+                "strategic planning meta-coordination cross-agent triage",
+                "reasoning",
+                "anthropic",
+            ),
+            (
+                "compliance-watchdog",
+                "compliance check security review OWASP",
+                "security_audit",
+                "kimi",
+            ),
+            (
+                "drift-detector",
+                "drift detection security review vulnerability assessment",
+                "security_audit",
+                "kimi",
+            ),
+            (
+                "product-development",
+                "product roadmap feature prioritisation user story",
+                "product_planning",
+                "anthropic",
+            ),
+            (
+                "spec-validator",
+                "architecture review spec validation code review quality",
+                "code_review",
+                "anthropic",
+            ),
+            (
+                "test-guardian",
+                "test QA regression integration test browser test",
+                "testing",
+                "kimi",
+            ),
+            (
+                "documentation-generator",
+                "documentation readme changelog API docs rustdoc",
+                "documentation",
+                "minimax",
+            ),
+            (
+                "implementation-swarm",
+                "implement build code fix refactor feature PR",
+                "implementation",
+                "kimi",
+            ),
+            (
+                "merge-coordinator",
+                "merge PR review approve verdict merge coordinator",
+                "merge_review",
+                "kimi",
+            ),
+            (
+                "browser-qa",
+                "browser test QA regression end-to-end",
+                "testing",
+                "kimi",
+            ),
+            (
+                "log-analyst",
+                "log analysis error pattern incident observability quickwit",
+                "log_analysis",
+                "kimi",
+            ),
+        ];
+
+        let mut all_passed = true;
+        for (agent, task, expected_concept, expected_provider) in &agents {
+            match router.route_agent(task) {
+                Some(decision) => {
+                    let concept_ok = decision.matched_concept == *expected_concept;
+                    let provider_ok = decision.provider == *expected_provider;
+                    if !concept_ok || !provider_ok {
+                        eprintln!(
+                            "MISMATCH {}: got {}:{}/{} (expected {}:{})",
+                            agent,
+                            decision.matched_concept,
+                            decision.provider,
+                            decision.model,
+                            expected_concept,
+                            expected_provider,
+                        );
+                        all_passed = false;
+                    } else {
+                        eprintln!(
+                            "OK {}: {} -> {}/{} (pri={}, fallbacks={})",
+                            agent,
+                            decision.matched_concept,
+                            decision.provider,
+                            decision.model,
+                            decision.priority,
+                            decision.fallback_routes.len(),
+                        );
+                    }
+                }
+                None => {
+                    eprintln!("NO MATCH {}: task={}", agent, task);
+                    all_passed = false;
+                }
+            }
+        }
+        assert!(all_passed, "some agents did not route as expected");
+    }
 }

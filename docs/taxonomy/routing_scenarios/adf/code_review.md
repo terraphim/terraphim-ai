@@ -7,8 +7,8 @@ and assess architectural coherence across multiple crates.
 priority:: 70
 
 synonyms:: code review, architecture review, spec validation, quality assessment,
-  quality coordinator, design review, PR review quality, code quality,
-  architectural analysis, spec-validator, compliance review
+synonyms:: quality coordinator, design review, PR review quality, code quality,
+synonyms:: architectural analysis, spec-validator, compliance review
 
 trigger:: thorough code review requiring architectural reasoning and quality judgement
 

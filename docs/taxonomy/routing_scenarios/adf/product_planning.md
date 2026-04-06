@@ -7,8 +7,8 @@ creating clear, actionable product artefacts.
 priority:: 60
 
 synonyms:: product, roadmap, feature prioritisation, user story, product owner,
-  product development, backlog, sprint planning, product requirements,
-  feature request, product vision, user need, market fit
+synonyms:: product development, backlog, sprint planning, product requirements,
+synonyms:: feature request, product vision, user need, market fit
 
 trigger:: product planning and feature prioritisation for development roadmap
 

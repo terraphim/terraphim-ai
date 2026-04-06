@@ -6,8 +6,8 @@ Needs reliable models that can run test suites, interpret failures, and suggest 
 priority:: 55
 
 synonyms:: test, QA, regression, integration test, browser test, test guardian,
-  cargo test, test failure, test suite, unit test, end-to-end, e2e test,
-  browser-qa, test coverage, test fix, flaky test
+synonyms:: cargo test, test failure, test suite, unit test, end-to-end, e2e test,
+synonyms:: browser-qa, test coverage, test fix, flaky test
 
 trigger:: test execution, failure analysis, and quality assurance tasks
 

@@ -7,8 +7,8 @@ with strong code generation and Rust expertise.
 priority:: 50
 
 synonyms:: implement, build, code, fix, refactor, feature, PR, coding task,
-  implementation swarm, new feature, bug fix, patch, enhancement, migration,
-  scaffold, boilerplate, cargo build, compilation fix, lint fix
+synonyms:: implementation swarm, new feature, bug fix, patch, enhancement, migration,
+synonyms:: scaffold, boilerplate, cargo build, compilation fix, lint fix
 
 trigger:: code implementation and feature development tasks in Rust
 

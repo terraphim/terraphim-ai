@@ -6,8 +6,8 @@ Processes structured log data from Quickwit and identifies anomalies or recurrin
 priority:: 45
 
 synonyms:: log analysis, error pattern, incident, observability, log-analyst,
-  quickwit, log search, error rate, anomaly detection, structured logging,
-  trace analysis, metrics analysis, alerting, monitoring
+synonyms:: quickwit, log search, error rate, anomaly detection, structured logging,
+synonyms:: trace analysis, metrics analysis, alerting, monitoring
 
 trigger:: log analysis and incident investigation using Quickwit structured logs
 

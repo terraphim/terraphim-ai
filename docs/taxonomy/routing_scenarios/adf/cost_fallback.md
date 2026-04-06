@@ -7,8 +7,8 @@ bulk operations, and non-urgent work.
 priority:: 30
 
 synonyms:: cheap, budget, low priority, background, batch, economy,
-  cost-effective, non-urgent, bulk, deferred, low cost,
-  background processing, batch mode, overnight
+synonyms:: cost-effective, non-urgent, bulk, deferred, low cost,
+synonyms:: background processing, batch mode, overnight
 
 trigger:: low-priority batch processing where cost minimisation is the primary concern
 

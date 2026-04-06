@@ -7,8 +7,8 @@ Best served by models with good prose generation at low cost.
 priority:: 40
 
 synonyms:: documentation, readme, changelog, API docs, docstring, rustdoc,
-  documentation generator, technical writing, release notes, contributing guide,
-  architecture docs, user guide, mdbook
+synonyms:: documentation generator, technical writing, release notes, contributing guide,
+synonyms:: architecture docs, user guide, mdbook
 
 trigger:: documentation generation and technical writing tasks
 

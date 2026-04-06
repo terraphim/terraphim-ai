@@ -7,8 +7,9 @@ Security tasks are time-sensitive and benefit from rapid turnaround.
 priority:: 60
 
 synonyms:: security audit, vulnerability scan, compliance check, CVE, cargo audit,
-  security sentinel, drift detector, security review, OWASP, threat model,
-  dependency audit, supply chain, advisory, rustsec, vulnerability assessment
+synonyms:: security sentinel, drift detector, drift detection, security review, OWASP,
+synonyms:: threat model, dependency audit, supply chain, advisory, rustsec,
+synonyms:: vulnerability assessment
 
 trigger:: automated security scanning and vulnerability detection in Rust codebase
 

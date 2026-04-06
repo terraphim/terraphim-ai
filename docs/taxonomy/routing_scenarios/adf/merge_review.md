@@ -7,8 +7,8 @@ the final merge/reject decision. Needs reliable, fast execution.
 priority:: 65
 
 synonyms:: merge, PR review, approve, verdict, merge coordinator,
-  merge gate, approval, pull request merge, review verdict,
-  merge decision, PR approval, review chain, go no-go
+synonyms:: merge gate, approval, pull request merge, review verdict,
+synonyms:: merge decision, PR approval, review chain, go no-go
 
 trigger:: pull request merge coordination and approval verdict collection
 
