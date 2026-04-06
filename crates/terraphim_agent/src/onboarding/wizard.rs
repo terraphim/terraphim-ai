@@ -23,6 +23,7 @@ pub enum SetupResult {
         /// The template that was applied
         template: ConfigTemplate,
         /// Custom path if provided
+        #[allow(dead_code)]
         custom_path: Option<String>,
         /// The built role
         role: Role,

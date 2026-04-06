@@ -12,25 +12,22 @@ license = "Apache-2.0"
 readme = "../../README.md"
 
 [features]
-default = ["repl-interactive"]
+default = ["repl-interactive", "llm"]
+server = ["dep:reqwest", "dep:urlencoding"]
+llm = ["terraphim_service/ollama", "terraphim_service/llm_router"]
 repl = ["dep:rustyline", "dep:colored", "dep:comfy-table"]
 repl-interactive = ["repl"]
-# NOTE: repl-sessions re-enabled for local development (path dependency)
-repl-full = ["repl", "repl-chat", "repl-mcp", "repl-file", "repl-custom", "repl-web", "repl-interactive", "repl-sessions"]
-repl-chat = ["repl"]  # Chat functionality
-repl-mcp = ["repl"]   # MCP tools integration
-repl-file = ["repl"]  # Enhanced file operations
-repl-custom = ["repl"]  # Markdown-defined custom commands
-repl-web = ["repl"]   # Web operations and configuration
-repl-web-advanced = ["repl-web"]  # Advanced web operations (screenshot, PDF, scraping)
-# Update tests - gated because they require built release binary and network access
+repl-full = ["repl", "repl-chat", "repl-mcp", "repl-file", "repl-custom", "repl-web", "repl-interactive", "repl-sessions", "llm", "server"]
+repl-chat = ["repl", "llm"]
+repl-mcp = ["repl"]
+repl-file = ["repl"]
+repl-custom = ["repl"]
+repl-web = ["repl"]
+repl-web-advanced = ["repl-web"]
+firecracker = ["repl"]
 update-tests = []
-# Session history search - enabled for local development
 repl-sessions = ["repl", "dep:terraphim_sessions"]
 shared-learning = []
-
-[lints.rust]
-# repl-sessions feature is now enabled for local development
 
 [dependencies]
 anyhow = { workspace = true }
@@ -43,12 +40,12 @@ futures = "0.3"
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = "0.9"
-reqwest = { workspace = true }
+reqwest = { workspace = true, optional = true }
 tracing = { workspace = true }
 
 tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
 log = { workspace = true }
-urlencoding = "2.1"
+urlencoding = { version = "2.1", optional = true }
 ahash = "0.8"
 terraphim_update = { path = "../terraphim_update", version = "1.0.0" }
 pulldown-cmark = { version = "0.13", default-features = false, features = ["html"] }
@@ -70,7 +67,7 @@ terraphim_settings = { path = "../terraphim_settings", version = "1.0.0" }
 terraphim_persistence = { path = "../terraphim_persistence", version = "1.0.0" }
 terraphim_config = { path = "../terraphim_config", version = "1.0.0" }
 terraphim_automata = { path = "../terraphim_automata", version = "1.0.0" }
-terraphim_service = { path = "../terraphim_service", version = "1.0.0" }
+terraphim_service = { path = "../terraphim_service", version = "1.0.0", default-features = false }
 terraphim_middleware = { path = "../terraphim_middleware", version = "1.0.0" }
 terraphim_rolegraph = { path = "../terraphim_rolegraph", version = "1.0.0" }
 terraphim_hooks = { path = "../terraphim_hooks", version = "1.0.0" }

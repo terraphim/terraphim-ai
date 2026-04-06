@@ -1,3 +1,5 @@
+#![cfg(feature = "firecracker")]
+
 use std::str::FromStr;
 use terraphim_agent::repl::commands::*;
 

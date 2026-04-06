@@ -1,3 +1,4 @@
+#[cfg(feature = "server")]
 pub mod client;
 pub mod onboarding;
 pub mod service;
@@ -20,6 +21,7 @@ pub mod repl;
 #[cfg(feature = "repl-custom")]
 pub mod commands;
 
+#[cfg(feature = "server")]
 pub use client::*;
 
 // Re-export robot mode types

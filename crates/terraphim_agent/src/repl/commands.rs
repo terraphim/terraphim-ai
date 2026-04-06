@@ -23,13 +23,13 @@ pub enum ReplCommand {
         top_k: Option<usize>,
     },
 
-    // Chat commands (requires 'repl-chat' feature)
-    #[cfg(feature = "repl-chat")]
+    // Chat commands (requires 'llm' feature)
+    #[cfg(feature = "llm")]
     Chat {
         message: Option<String>,
     },
 
-    #[cfg(feature = "repl-chat")]
+    #[cfg(feature = "llm")]
     Summarize {
         target: String,
     },
@@ -75,7 +75,8 @@ pub enum ReplCommand {
         subcommand: WebSubcommand,
     },
 
-    // VM commands
+    // VM commands (requires 'firecracker' feature)
+    #[cfg(feature = "firecracker")]
     Vm {
         subcommand: VmSubcommand,
     },
@@ -192,6 +193,7 @@ pub enum SessionsSubcommand {
     ByFile { file_path: String, json: bool },
 }
 
+#[cfg(feature = "firecracker")]
 #[derive(Debug, Clone, PartialEq)]
 pub enum VmSubcommand {
     List,
@@ -458,7 +460,7 @@ impl FromStr for ReplCommand {
                 Ok(ReplCommand::Graph { top_k })
             }
 
-            #[cfg(feature = "repl-chat")]
+            #[cfg(feature = "llm")]
             "chat" => {
                 let message = if parts.len() > 1 {
                     Some(parts[1..].join(" "))
@@ -468,12 +470,12 @@ impl FromStr for ReplCommand {
                 Ok(ReplCommand::Chat { message })
             }
 
-            #[cfg(not(feature = "repl-chat"))]
+            #[cfg(not(feature = "llm"))]
             "chat" => Err(anyhow!(
-                "Chat feature not enabled. Rebuild with --features repl-chat"
+                "Chat feature not enabled. Rebuild with --features llm"
             )),
 
-            #[cfg(feature = "repl-chat")]
+            #[cfg(feature = "llm")]
             "summarize" => {
                 if parts.len() < 2 {
                     return Err(anyhow!(
@@ -485,9 +487,9 @@ impl FromStr for ReplCommand {
                 })
             }
 
-            #[cfg(not(feature = "repl-chat"))]
+            #[cfg(not(feature = "llm"))]
             "summarize" => Err(anyhow!(
-                "Summarize feature not enabled. Rebuild with --features repl-chat"
+                "Summarize feature not enabled. Rebuild with --features llm"
             )),
 
             #[cfg(feature = "repl-mcp")]
@@ -865,6 +867,12 @@ impl FromStr for ReplCommand {
                 "Web operations not enabled. Rebuild with --features repl-web"
             )),
 
+            #[cfg(not(feature = "firecracker"))]
+            "vm" => Err(anyhow!(
+                "VM commands not enabled. Rebuild with --features firecracker"
+            )),
+
+            #[cfg(feature = "firecracker")]
             "vm" => {
                 if parts.len() < 2 {
                     return Err(anyhow!("VM command requires a subcommand"));
@@ -1376,7 +1384,7 @@ impl ReplCommand {
             "clear",
         ];
 
-        #[cfg(feature = "repl-chat")]
+        #[cfg(feature = "llm")]
         {
             commands.extend_from_slice(&["chat", "summarize"]);
         }
@@ -1441,9 +1449,9 @@ impl ReplCommand {
                 "/web <subcommand> [args] - Web operations (get, post, scrape, screenshot, pdf, form, api, status, cancel, history, config)",
             ),
 
-            #[cfg(feature = "repl-chat")]
+            #[cfg(feature = "llm")]
             "chat" => Some("/chat [message] - Interactive chat with AI"),
-            #[cfg(feature = "repl-chat")]
+            #[cfg(feature = "llm")]
             "summarize" => Some("/summarize <doc-id|text> - Summarize content"),
 
             #[cfg(feature = "repl-mcp")]

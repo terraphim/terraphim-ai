@@ -3,6 +3,7 @@ use std::sync::Arc;
 use terraphim_config::{Config, ConfigBuilder, ConfigId, ConfigState};
 use terraphim_persistence::Persistable;
 use terraphim_service::TerraphimService;
+#[cfg(feature = "llm")]
 use terraphim_service::llm::{ChatOptions, build_llm_from_role};
 use terraphim_settings::{DeviceSettings, Error as DeviceSettingsError};
 use terraphim_types::{Document, Layer, NormalizedTermValue, RoleName, SearchQuery, Thesaurus};
@@ -330,6 +331,7 @@ impl TuiService {
     }
 
     /// Generate chat response using LLM
+    #[cfg(feature = "llm")]
     pub async fn chat(
         &self,
         role_name: &RoleName,
@@ -460,7 +462,7 @@ impl TuiService {
     }
 
     /// Summarize content using available AI services
-    #[cfg_attr(not(feature = "repl-chat"), allow(dead_code))]
+    #[cfg(feature = "llm")]
     pub async fn summarize(&self, role_name: &RoleName, content: &str) -> Result<String> {
         // For now, use the chat method with a summarization prompt
         let prompt = format!("Please summarize the following content:\n\n{}", content);

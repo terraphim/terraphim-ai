@@ -5,7 +5,9 @@ use super::commands::SessionsSubcommand;
 use super::commands::{
     ConfigSubcommand, ReplCommand, RobotSubcommand, RoleSubcommand, UpdateSubcommand,
 };
-use crate::{client::ApiClient, service::TuiService};
+#[cfg(feature = "server")]
+use crate::client::ApiClient;
+use crate::service::TuiService;
 
 // Import robot module types
 use crate::robot::{ExitCode, SelfDocumentation};
@@ -24,6 +26,7 @@ use colored::Colorize;
 
 pub struct ReplHandler {
     service: Option<TuiService>,
+    #[cfg(feature = "server")]
     api_client: Option<ApiClient>,
     current_role: String,
     #[cfg(feature = "repl-mcp")]
@@ -40,6 +43,7 @@ impl ReplHandler {
 
         Self {
             service: Some(service),
+            #[cfg(feature = "server")]
             api_client: None,
             current_role: "Default".to_string(),
             #[cfg(feature = "repl-mcp")]
@@ -47,6 +51,7 @@ impl ReplHandler {
         }
     }
 
+    #[cfg(feature = "server")]
     pub fn new_server(api_client: ApiClient) -> Self {
         Self {
             service: None,
@@ -218,7 +223,7 @@ impl ReplHandler {
         println!("  {} - Manage roles", "/role [list|select]".yellow());
         println!("  {} - Show knowledge graph", "/graph".yellow());
 
-        #[cfg(feature = "repl-chat")]
+        #[cfg(feature = "llm")]
         {
             println!("  {} - Chat with AI", "/chat [message]".yellow());
             println!("  {} - Summarize content", "/summarize <target>".yellow());
@@ -282,12 +287,12 @@ impl ReplHandler {
                 self.handle_clear().await?;
             }
 
-            #[cfg(feature = "repl-chat")]
+            #[cfg(feature = "llm")]
             ReplCommand::Chat { message } => {
                 self.handle_chat(message).await?;
             }
 
-            #[cfg(feature = "repl-chat")]
+            #[cfg(feature = "llm")]
             ReplCommand::Summarize { target } => {
                 self.handle_summarize(target).await?;
             }
@@ -327,6 +332,7 @@ impl ReplHandler {
                 self.handle_web(subcommand).await?;
             }
 
+            #[cfg(feature = "firecracker")]
             ReplCommand::Vm { subcommand } => {
                 self.handle_vm(subcommand).await?;
             }
@@ -409,7 +415,9 @@ impl ReplHandler {
                         results.len().to_string().green()
                     );
                 }
-            } else if let Some(api_client) = &self.api_client {
+            }
+            #[cfg(feature = "server")]
+            if let Some(api_client) = &self.api_client {
                 // Server mode - use current role if no role specified
                 use terraphim_types::{Layer, NormalizedTermValue, RoleName, SearchQuery};
 
@@ -480,7 +488,9 @@ impl ReplHandler {
                     let config = service.get_config().await;
                     let config_json = serde_json::to_string_pretty(&config)?;
                     println!("{}", config_json);
-                } else if let Some(api_client) = &self.api_client {
+                }
+                #[cfg(feature = "server")]
+                if let Some(api_client) = &self.api_client {
                     match api_client.get_config().await {
                         Ok(response) => {
                             let config_json = serde_json::to_string_pretty(&response.config)?;
@@ -521,7 +531,9 @@ impl ReplHandler {
                             println!("  {} {}", marker.green(), role);
                         }
                     }
-                } else if let Some(api_client) = &self.api_client {
+                }
+                #[cfg(feature = "server")]
+                if let Some(api_client) = &self.api_client {
                     match api_client.get_config().await {
                         Ok(response) => {
                             println!("{}", "Available roles:".bold());
@@ -549,36 +561,39 @@ impl ReplHandler {
                 }
             }
             RoleSubcommand::Select { name } => {
-                // Try to find role by name or shortname
-                let resolved_name = if let Some(service) = &self.service {
+                #[cfg_attr(not(feature = "server"), allow(unused_mut))]
+                let mut resolved_name = if let Some(service) = &self.service {
                     service
                         .find_role_by_name_or_shortname(&name)
                         .await
                         .map(|r| r.to_string())
-                } else if let Some(api_client) = &self.api_client {
-                    // For API mode, fetch config and resolve shortname client-side
-                    match api_client.get_config().await {
-                        Ok(cfg) => {
-                            let query_lower = name.to_lowercase();
-                            cfg.config
-                                .roles
-                                .iter()
-                                .find(|(n, _)| n.to_string().to_lowercase() == query_lower)
-                                .or_else(|| {
-                                    cfg.config.roles.iter().find(|(_, role)| {
-                                        role.shortname
-                                            .as_ref()
-                                            .map(|s| s.to_lowercase() == query_lower)
-                                            .unwrap_or(false)
-                                    })
-                                })
-                                .map(|(n, _)| n.to_string())
-                        }
-                        Err(_) => None,
-                    }
                 } else {
                     None
                 };
+                #[cfg(feature = "server")]
+                if resolved_name.is_none() {
+                    if let Some(api_client) = &self.api_client {
+                        resolved_name = match api_client.get_config().await {
+                            Ok(cfg) => {
+                                let query_lower = name.to_lowercase();
+                                cfg.config
+                                    .roles
+                                    .iter()
+                                    .find(|(n, _)| n.to_string().to_lowercase() == query_lower)
+                                    .or_else(|| {
+                                        cfg.config.roles.iter().find(|(_, role)| {
+                                            role.shortname
+                                                .as_ref()
+                                                .map(|s| s.to_lowercase() == query_lower)
+                                                .unwrap_or(false)
+                                        })
+                                    })
+                                    .map(|(n, _)| n.to_string())
+                            }
+                            Err(_) => None,
+                        };
+                    }
+                }
 
                 let actual_name = match resolved_name {
                     Some(n) => n,
@@ -621,7 +636,10 @@ impl ReplHandler {
             for (i, concept) in concepts.iter().enumerate() {
                 println!("  {}. {}", (i + 1).to_string().yellow(), concept);
             }
-        } else if let Some(api_client) = &self.api_client {
+        }
+
+        #[cfg(feature = "server")]
+        if let Some(api_client) = &self.api_client {
             match api_client.rolegraph(Some(&self.current_role)).await {
                 Ok(response) => {
                     let mut nodes = response.nodes;
@@ -673,7 +691,7 @@ impl ReplHandler {
         Ok(())
     }
 
-    #[cfg(feature = "repl-chat")]
+    #[cfg(feature = "llm")]
     async fn handle_chat(&self, message: Option<String>) -> Result<()> {
         #[cfg(feature = "repl")]
         {
@@ -694,8 +712,9 @@ impl ReplHandler {
                             println!("{} Chat failed: {}", "❌".bold(), e.to_string().red());
                         }
                     }
-                } else if let Some(api_client) = &self.api_client {
-                    // Server mode chat
+                }
+                #[cfg(feature = "server")]
+                if let Some(api_client) = &self.api_client {
                     match api_client.chat(&self.current_role, &msg, None).await {
                         Ok(response) => {
                             println!("\n{} {}\n", "🤖".bold(), "Response:".bold());
@@ -720,7 +739,7 @@ impl ReplHandler {
         Ok(())
     }
 
-    #[cfg(feature = "repl-chat")]
+    #[cfg(feature = "llm")]
     async fn handle_summarize(&self, target: String) -> Result<()> {
         #[cfg(feature = "repl")]
         {
@@ -744,8 +763,9 @@ impl ReplHandler {
                         );
                     }
                 }
-            } else if let Some(api_client) = &self.api_client {
-                // Server mode summarization - create a temporary document
+            }
+            #[cfg(feature = "server")]
+            if let Some(api_client) = &self.api_client {
                 use terraphim_types::{Document, DocumentType};
 
                 let doc = Document {
@@ -1181,6 +1201,7 @@ impl ReplHandler {
         Ok(())
     }
 
+    #[cfg(feature = "firecracker")]
     async fn handle_vm(&self, subcommand: super::commands::VmSubcommand) -> Result<()> {
         #[cfg(feature = "repl")]
         {
@@ -2459,6 +2480,7 @@ pub async fn run_repl_offline_mode() -> Result<()> {
     handler.run().await
 }
 
+#[cfg(feature = "server")]
 /// Run REPL in server mode
 pub async fn run_repl_server_mode(server_url: &str) -> Result<()> {
     let api_client = ApiClient::new(server_url.to_string());

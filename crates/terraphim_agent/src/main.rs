@@ -21,7 +21,11 @@ use serde::Serialize;
 use terraphim_persistence::Persistable;
 use tokio::runtime::Runtime;
 
+#[cfg(feature = "server")]
 mod client;
+
+mod tui_backend;
+
 mod guard_patterns;
 mod onboarding;
 mod service;
@@ -36,6 +40,7 @@ mod learnings;
 #[cfg(feature = "repl")]
 mod repl;
 
+#[cfg(feature = "server")]
 use client::{ApiClient, SearchResponse};
 use service::TuiService;
 use terraphim_types::{
@@ -70,11 +75,13 @@ fn show_usage_info() {
     println!("  terraphim-agent help         # Show command-specific help");
 }
 
+#[cfg(feature = "server")]
 fn resolve_tui_server_url(explicit: Option<&str>) -> String {
     let env_server = std::env::var("TERRAPHIM_SERVER").ok();
     resolve_tui_server_url_with_env(explicit, env_server.as_deref())
 }
 
+#[cfg(feature = "server")]
 fn resolve_tui_server_url_with_env(explicit: Option<&str>, env_server: Option<&str>) -> String {
     explicit
         .map(ToOwned::to_owned)
@@ -82,6 +89,7 @@ fn resolve_tui_server_url_with_env(explicit: Option<&str>, env_server: Option<&s
         .unwrap_or_else(|| "http://localhost:8000".to_string())
 }
 
+#[cfg(feature = "server")]
 fn tui_server_requirement_error(url: &str, cause: &anyhow::Error) -> anyhow::Error {
     anyhow::anyhow!(
         "Fullscreen TUI requires a running Terraphim server at {}. \
@@ -92,6 +100,7 @@ fn tui_server_requirement_error(url: &str, cause: &anyhow::Error) -> anyhow::Err
     )
 }
 
+#[cfg(feature = "server")]
 fn ensure_tui_server_reachable(
     runtime: &tokio::runtime::Runtime,
     api: &ApiClient,
@@ -561,6 +570,7 @@ enum Command {
         top_k: usize,
     },
     /// Chat with the AI using a specific role
+    #[cfg(feature = "llm")]
     Chat {
         #[arg(long)]
         role: Option<String>,
@@ -870,31 +880,55 @@ fn main() -> Result<()> {
                 std::process::exit(0);
             }
 
-            if cli.server {
-                run_tui_server_mode(&cli.server_url, cli.transparent)
-            } else {
-                // Run TUI mode - it will create its own runtime
+            #[cfg(feature = "server")]
+            {
+                if cli.server {
+                    run_tui_server_mode(&cli.server_url, cli.transparent)
+                } else {
+                    run_tui_offline_mode(cli.transparent)
+                }
+            }
+            #[cfg(not(feature = "server"))]
+            {
+                if cli.server {
+                    eprintln!(
+                        "TUI server mode requires the 'server' feature. Use offline mode instead."
+                    );
+                    return Err(anyhow::anyhow!("TUI server mode requires server feature"));
+                }
                 run_tui_offline_mode(cli.transparent)
             }
         }
 
         #[cfg(feature = "repl")]
-        Some(Command::Repl { server, server_url }) => {
+        Some(Command::Repl { server, .. }) => {
             let rt = Runtime::new()?;
-            if server {
-                rt.block_on(repl::run_repl_server_mode(&server_url))
-            } else {
-                rt.block_on(repl::run_repl_offline_mode())
+            #[cfg(feature = "server")]
+            {
+                if server {
+                    return rt.block_on(repl::run_repl_server_mode("http://localhost:8000"));
+                }
             }
+            #[cfg(not(feature = "server"))]
+            {
+                if server {
+                    eprintln!(
+                        "REPL server mode requires the 'server' feature. Starting in offline mode instead."
+                    );
+                }
+            }
+            rt.block_on(repl::run_repl_offline_mode())
         }
 
         Some(command) => {
             let rt = Runtime::new()?;
-            if cli.server {
-                rt.block_on(run_server_command(command, &cli.server_url, output))
-            } else {
-                rt.block_on(run_offline_command(command, output, cli.config))
+            #[cfg(feature = "server")]
+            {
+                if cli.server {
+                    return rt.block_on(run_server_command(command, &cli.server_url, output));
+                }
             }
+            rt.block_on(run_offline_command(command, output, cli.config))
         }
     }
 }
@@ -904,6 +938,7 @@ fn run_tui_offline_mode(transparent: bool) -> Result<()> {
     run_tui(None, transparent)
 }
 
+#[allow(dead_code)]
 fn run_tui_server_mode(server_url: &str, transparent: bool) -> Result<()> {
     run_tui(Some(server_url.to_string()), transparent)
 }
@@ -1285,6 +1320,7 @@ async fn run_offline_command(
             }
             Ok(())
         }
+        #[cfg(feature = "llm")]
         Command::Chat {
             role,
             prompt,
@@ -2067,6 +2103,7 @@ async fn run_learn_command(sub: LearnSub) -> Result<()> {
     }
 }
 
+#[cfg(feature = "server")]
 async fn run_server_command(
     command: Command,
     server_url: &str,
@@ -2260,6 +2297,7 @@ async fn run_server_command(
             }
             Ok(())
         }
+        #[cfg(feature = "llm")]
         Command::Chat {
             role,
             prompt,
@@ -2728,6 +2766,7 @@ fn run_tui(server_url: Option<String>, transparent: bool) -> Result<()> {
     }
 }
 
+#[allow(unused_variables)]
 fn ui_loop(
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
     server_url: Option<String>,
@@ -2741,19 +2780,27 @@ fn ui_loop(
     let mut current_role = String::from("Terraphim Engineer"); // Default to Terraphim Engineer
     let mut selected_result_index = 0;
     let mut view_mode = ViewMode::Search;
-    let effective_url = resolve_tui_server_url(server_url.as_deref());
-    let api = ApiClient::new(effective_url.clone());
-
-    // Create a tokio runtime for this TUI session
-    // We need a local runtime because we're in a synchronous function (terminal event loop)
     let rt = tokio::runtime::Runtime::new()?;
-    ensure_tui_server_reachable(&rt, &api, &effective_url)?;
+
+    #[cfg(feature = "server")]
+    let backend = {
+        let effective_url = resolve_tui_server_url(server_url.as_deref());
+        let api = ApiClient::new(effective_url.clone());
+        ensure_tui_server_reachable(&rt, &api, &effective_url)?;
+        crate::tui_backend::TuiBackend::Remote(api)
+    };
+
+    #[cfg(not(feature = "server"))]
+    let backend = {
+        let service = rt.block_on(async { TuiService::new(None).await })?;
+        crate::tui_backend::TuiBackend::Local(service)
+    };
 
     // Initialize terms from rolegraph (selected role)
-    if let Ok(cfg) = rt.block_on(async { api.get_config().await }) {
-        current_role = cfg.config.selected_role.to_string();
-        if let Ok(rg) = rt.block_on(async { api.rolegraph(Some(current_role.as_str())).await }) {
-            terms = rg.nodes.into_iter().map(|n| n.label).collect();
+    if let Ok(cfg) = rt.block_on(async { backend.get_config().await }) {
+        current_role = cfg.selected_role.to_string();
+        if let Ok(rg) = rt.block_on(async { backend.get_rolegraph_terms(&current_role).await }) {
+            terms = rg;
         }
     }
 
@@ -2850,175 +2897,151 @@ fn ui_loop(
         if event::poll(std::time::Duration::from_millis(50))? {
             if let Event::Key(key) = event::read()? {
                 match view_mode {
-                    ViewMode::Search => {
-                        match map_search_key_event(key) {
-                            TuiAction::Quit => break,
-                            TuiAction::SearchOrOpen => {
-                                let query = input.trim().to_string();
-                                let api = api.clone();
+                    ViewMode::Search => match map_search_key_event(key) {
+                        TuiAction::Quit => break,
+                        TuiAction::SearchOrOpen => {
+                            let query = input.trim().to_string();
+                            let backend = backend.clone();
+                            let role = current_role.clone();
+                            if !query.is_empty() {
+                                if let Ok(docs) = rt.block_on(async move {
+                                    let q = SearchQuery {
+                                        search_term: NormalizedTermValue::from(query.as_str()),
+                                        search_terms: None,
+                                        operator: None,
+                                        skip: Some(0),
+                                        limit: Some(10),
+                                        role: Some(RoleName::new(&role)),
+                                        layer: Layer::default(),
+                                    };
+                                    backend.search(&q).await
+                                }) {
+                                    let lines: Vec<String> = docs
+                                        .iter()
+                                        .map(|d| {
+                                            format!("{} {}", d.rank.unwrap_or_default(), d.title)
+                                        })
+                                        .collect();
+                                    results = lines;
+                                    detailed_results = docs;
+                                    selected_result_index = 0;
+                                }
+                            } else if selected_result_index < detailed_results.len() {
+                                view_mode = ViewMode::ResultDetail;
+                            }
+                        }
+                        TuiAction::MoveUp => {
+                            selected_result_index = selected_result_index.saturating_sub(1);
+                        }
+                        TuiAction::MoveDown => {
+                            if selected_result_index + 1 < results.len() {
+                                selected_result_index += 1;
+                            }
+                        }
+                        TuiAction::Autocomplete => {
+                            let query = input.trim();
+                            if !query.is_empty() {
+                                let backend = backend.clone();
                                 let role = current_role.clone();
-                                if !query.is_empty() {
-                                    if let Ok((lines, docs)) = rt.block_on(async move {
-                                        let q = SearchQuery {
-                                            search_term: NormalizedTermValue::from(query.as_str()),
-                                            search_terms: None,
-                                            operator: None,
-                                            skip: Some(0),
-                                            limit: Some(10),
-                                            role: Some(RoleName::new(&role)),
-                                            layer: Layer::default(),
-                                        };
-                                        let resp = api.search(&q).await?;
-                                        let lines: Vec<String> = resp
-                                            .results
-                                            .iter()
-                                            .map(|d| {
-                                                format!(
-                                                    "{} {}",
-                                                    d.rank.unwrap_or_default(),
-                                                    d.title
-                                                )
-                                            })
-                                            .collect();
-                                        let docs = resp.results;
-                                        Ok::<(Vec<String>, Vec<Document>), anyhow::Error>((
-                                            lines, docs,
-                                        ))
-                                    }) {
-                                        results = lines;
-                                        detailed_results = docs;
-                                        selected_result_index = 0;
+                                if let Ok(autocomplete_resp) =
+                                    rt.block_on(
+                                        async move { backend.autocomplete(&role, query).await },
+                                    )
+                                {
+                                    suggestions = autocomplete_resp.into_iter().take(5).collect();
+                                }
+                            }
+                        }
+                        TuiAction::SwitchRole => {
+                            let backend = backend.clone();
+                            if let Ok(cfg) = rt.block_on(async { backend.get_config().await }) {
+                                let roles: Vec<String> =
+                                    cfg.roles.keys().map(|k| k.to_string()).collect();
+                                if !roles.is_empty() {
+                                    if let Some(current_idx) =
+                                        roles.iter().position(|r| r == &current_role)
+                                    {
+                                        let next_idx = (current_idx + 1) % roles.len();
+                                        current_role = roles[next_idx].clone();
+                                        if let Ok(rg) = rt.block_on(async {
+                                            backend.get_rolegraph_terms(&current_role).await
+                                        }) {
+                                            terms = rg;
+                                        }
                                     }
-                                } else if selected_result_index < detailed_results.len() {
-                                    view_mode = ViewMode::ResultDetail;
                                 }
                             }
-                            TuiAction::MoveUp => {
-                                selected_result_index = selected_result_index.saturating_sub(1);
-                            }
-                            TuiAction::MoveDown => {
-                                if selected_result_index + 1 < results.len() {
-                                    selected_result_index += 1;
-                                }
-                            }
-                            TuiAction::Autocomplete => {
-                                // Real autocomplete from API
-                                let query = input.trim();
-                                if !query.is_empty() {
-                                    let api = api.clone();
+                        }
+                        TuiAction::SummarizeSelection => {
+                            #[cfg(feature = "llm")]
+                            {
+                                if selected_result_index < detailed_results.len() {
+                                    let doc = detailed_results[selected_result_index].clone();
+                                    let backend = backend.clone();
                                     let role = current_role.clone();
-                                    if let Ok(autocomplete_resp) = rt.block_on(async move {
-                                        api.get_autocomplete(&role, query).await
+                                    if let Ok(Some(summary_text)) = rt.block_on(async move {
+                                        backend.summarize(&doc, Some(&role)).await
                                     }) {
-                                        suggestions = autocomplete_resp
-                                            .suggestions
-                                            .into_iter()
-                                            .take(5)
-                                            .map(|s| s.text)
-                                            .collect();
+                                        if selected_result_index < results.len() {
+                                            results[selected_result_index] =
+                                                format!("SUMMARY: {}", summary_text);
+                                        }
                                     }
                                 }
                             }
-                            TuiAction::SwitchRole => {
-                                // Switch role
-                                let api = api.clone();
-                                if let Ok(cfg) = rt.block_on(async { api.get_config().await }) {
-                                    let roles: Vec<String> =
-                                        cfg.config.roles.keys().map(|k| k.to_string()).collect();
-                                    if !roles.is_empty() {
-                                        if let Some(current_idx) =
-                                            roles.iter().position(|r| r == &current_role)
+                        }
+                        TuiAction::Backspace => {
+                            input.pop();
+                            update_local_suggestions(&input, &terms, &mut suggestions);
+                        }
+                        TuiAction::InsertChar(c) => {
+                            input.push(c);
+                            update_local_suggestions(&input, &terms, &mut suggestions);
+                        }
+                        TuiAction::None | TuiAction::BackToSearch | TuiAction::SummarizeDetail => {}
+                    },
+                    ViewMode::ResultDetail => match map_detail_key_event(key) {
+                        TuiAction::BackToSearch => {
+                            view_mode = ViewMode::Search;
+                        }
+                        TuiAction::SummarizeDetail => {
+                            #[cfg(feature = "llm")]
+                            {
+                                if selected_result_index < detailed_results.len() {
+                                    let doc = detailed_results[selected_result_index].clone();
+                                    let backend = backend.clone();
+                                    let role = current_role.clone();
+                                    if let Ok(Some(summary_text)) = rt.block_on(async move {
+                                        backend.summarize(&doc, Some(&role)).await
+                                    }) {
+                                        let original_body = if detailed_results
+                                            [selected_result_index]
+                                            .body
+                                            .is_empty()
                                         {
-                                            let next_idx = (current_idx + 1) % roles.len();
-                                            current_role = roles[next_idx].clone();
-                                            // Update terms for new role
-                                            if let Ok(rg) = rt.block_on(async {
-                                                api.rolegraph(Some(&current_role)).await
-                                            }) {
-                                                terms =
-                                                    rg.nodes.into_iter().map(|n| n.label).collect();
-                                            }
-                                        }
+                                            "No content"
+                                        } else {
+                                            &detailed_results[selected_result_index].body
+                                        };
+                                        detailed_results[selected_result_index].body = format!(
+                                            "SUMMARY:\n{}\n\nORIGINAL:\n{}",
+                                            summary_text, original_body
+                                        );
                                     }
                                 }
                             }
-                            TuiAction::SummarizeSelection => {
-                                // Summarize current selection
-                                if selected_result_index < detailed_results.len() {
-                                    let doc = detailed_results[selected_result_index].clone();
-                                    let api = api.clone();
-                                    let role = current_role.clone();
-                                    if let Ok(summary) = rt.block_on(async move {
-                                        api.summarize_document(&doc, Some(&role)).await
-                                    }) {
-                                        if let Some(summary_text) = summary.summary {
-                                            // Replace result with summary for display
-                                            if selected_result_index < results.len() {
-                                                results[selected_result_index] =
-                                                    format!("SUMMARY: {}", summary_text);
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            TuiAction::Backspace => {
-                                input.pop();
-                                update_local_suggestions(&input, &terms, &mut suggestions);
-                            }
-                            TuiAction::InsertChar(c) => {
-                                input.push(c);
-                                update_local_suggestions(&input, &terms, &mut suggestions);
-                            }
-                            TuiAction::None
-                            | TuiAction::BackToSearch
-                            | TuiAction::SummarizeDetail => {}
                         }
-                    }
-                    ViewMode::ResultDetail => {
-                        match map_detail_key_event(key) {
-                            TuiAction::BackToSearch => {
-                                view_mode = ViewMode::Search;
-                            }
-                            TuiAction::SummarizeDetail => {
-                                // Summarize current document in detail view
-                                if selected_result_index < detailed_results.len() {
-                                    let doc = detailed_results[selected_result_index].clone();
-                                    let api = api.clone();
-                                    let role = current_role.clone();
-                                    if let Ok(summary) = rt.block_on(async move {
-                                        api.summarize_document(&doc, Some(&role)).await
-                                    }) {
-                                        if let Some(summary_text) = summary.summary {
-                                            // Update the document body with summary
-                                            let original_body = if detailed_results
-                                                [selected_result_index]
-                                                .body
-                                                .is_empty()
-                                            {
-                                                "No content"
-                                            } else {
-                                                &detailed_results[selected_result_index].body
-                                            };
-                                            detailed_results[selected_result_index].body = format!(
-                                                "SUMMARY:\n{}\n\nORIGINAL:\n{}",
-                                                summary_text, original_body
-                                            );
-                                        }
-                                    }
-                                }
-                            }
-                            TuiAction::Quit => break,
-                            TuiAction::None
-                            | TuiAction::SearchOrOpen
-                            | TuiAction::MoveUp
-                            | TuiAction::MoveDown
-                            | TuiAction::Autocomplete
-                            | TuiAction::SwitchRole
-                            | TuiAction::SummarizeSelection
-                            | TuiAction::Backspace
-                            | TuiAction::InsertChar(_) => {}
-                        }
-                    }
+                        TuiAction::Quit => break,
+                        TuiAction::None
+                        | TuiAction::SearchOrOpen
+                        | TuiAction::MoveUp
+                        | TuiAction::MoveDown
+                        | TuiAction::Autocomplete
+                        | TuiAction::SwitchRole
+                        | TuiAction::SummarizeSelection
+                        | TuiAction::Backspace
+                        | TuiAction::InsertChar(_) => {}
+                    },
                 }
             }
         }
