@@ -31,7 +31,7 @@ exclude = [
 default-members = ["terraphim_server"]
 
 [workspace.package]
-version = "1.16.10"
+version = "1.16.11"
 edition = "2024"
 
 [workspace.dependencies]
