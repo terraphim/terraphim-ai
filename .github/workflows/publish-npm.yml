@@ -353,7 +353,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: terraphim_ai_nodejs
-        run: npm install --omit=optional
+        run: npm install --omit=optional --ignore-scripts
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
