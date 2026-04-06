@@ -392,7 +392,7 @@ jobs:
 
           if [[ "$VERSION_TO_USE" != "" ]]; then
             echo "📝 Updating version to $VERSION_TO_USE"
-            npm version $VERSION_TO_USE --no-git-tag-version
+            npm pkg set version=$VERSION_TO_USE
           fi
 
       - name: Configure npm for GitHub Packages
