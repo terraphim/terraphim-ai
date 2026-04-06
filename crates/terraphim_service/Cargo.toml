@@ -1,6 +1,6 @@
 [package]
 name = "terraphim_service"
-version = "1.16.3"
+version = "1.16.5"
 edition.workspace = true
 authors = ["Terraphim Contributors"]
 description = "Terraphim service for handling user requests and responses."
