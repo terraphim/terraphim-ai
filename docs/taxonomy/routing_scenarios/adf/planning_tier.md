@@ -8,11 +8,10 @@ Maps to ZDP phases: disciplined-research, disciplined-design.
 
 priority:: 80
 
-synonyms:: strategic planning, architecture design, system design, research
-synonyms:: discovery, requirements analysis, feasibility study, risk assessment
-synonyms:: product vision, roadmap planning, technical strategy, design decision
-synonyms:: create a plan, design the, architect, specification, blueprint
-synonyms:: meta-coordination, cross-agent coordination, triage, resource allocation
+synonyms:: strategic planning, architecture design, system design
+synonyms:: create a plan, design new architecture, roadmap planning
+synonyms:: product vision, technical strategy, feasibility study
+synonyms:: meta-coordination, cross-agent coordination, resource allocation
 synonyms:: disciplined-research, disciplined-design
 
 trigger:: tasks requiring deep reasoning, architecture decisions, or strategic planning
