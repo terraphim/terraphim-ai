@@ -217,7 +217,27 @@ fn validate_agent_name(name: &str) -> Result<(), OrchestratorError> {
 impl AgentOrchestrator {
     /// Create a new orchestrator from configuration.
     pub fn new(config: OrchestratorConfig) -> Result<Self, OrchestratorError> {
-        let spawner = AgentSpawner::new().with_working_dir(&config.working_dir);
+        // Set CARGO_TARGET_DIR so worktree agents share the main build cache,
+        // and RUSTC_WRAPPER=sccache for cross-worktree compilation caching.
+        let mut spawn_env = std::collections::HashMap::new();
+        let target_dir = config.working_dir.join("target");
+        spawn_env.insert(
+            "CARGO_TARGET_DIR".to_string(),
+            target_dir.to_string_lossy().to_string(),
+        );
+        if std::process::Command::new("sccache")
+            .arg("--version")
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .is_ok()
+        {
+            spawn_env.insert("RUSTC_WRAPPER".to_string(), "sccache".to_string());
+            info!("sccache detected, enabling shared compilation cache for worktrees");
+        }
+        let spawner = AgentSpawner::new()
+            .with_working_dir(&config.working_dir)
+            .with_env_vars(spawn_env);
         let router = RoutingEngine::new();
         let nightwatch = NightwatchMonitor::new(config.nightwatch.clone());
         let scheduler = TimeScheduler::new(&config.agents, Some(&config.compound_review.schedule))?;
