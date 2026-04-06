@@ -22,10 +22,9 @@ on:
         default: 'pypi'
   push:
     tags:
+      - 'v*'
       - 'python-v*'
       - 'pypi-v*'
-  release:
-    types: [published]
 
 permissions:
   contents: write
@@ -65,7 +64,7 @@ jobs:
       - name: Validate version format
         run: |
           if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == refs/tags/* ]]; then
-            VERSION=$(echo "${{ github.ref }}" | sed 's/refs\/tags\/python-v//;s/refs\/tags\/pypi-v//')
+            VERSION=$(echo "${{ github.ref }}" | sed 's#refs/tags/python-v##; s#refs/tags/pypi-v##; s#refs/tags/v##')
             if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
               echo "Invalid version format: $VERSION"
               exit 1
@@ -277,6 +276,8 @@ jobs:
               VERSION=${GITHUB_REF#refs/tags/python-v}
             elif [[ "${{ github.ref }}" == refs/tags/pypi-v* ]]; then
               VERSION=${GITHUB_REF#refs/tags/pypi-v}
+            elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+              VERSION=${GITHUB_REF#refs/tags/v}
             fi
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT

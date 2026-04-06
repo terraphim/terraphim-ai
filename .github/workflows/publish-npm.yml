@@ -19,9 +19,8 @@ on:
         default: 'latest'
   push:
     tags:
+      - 'v*'
       - 'nodejs-v*'
-  release:
-    types: [published]
 
 permissions:
   contents: write
@@ -56,7 +55,7 @@ jobs:
       - name: Validate version format
         run: |
           if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == refs/tags/* ]]; then
-            VERSION=$(echo "${{ github.ref }}" | sed 's/refs\/tags\/nodejs-v//')
+            VERSION=$(echo "${{ github.ref }}" | sed 's#refs/tags/nodejs-v##; s#refs/tags/v##')
             if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
               echo "Invalid version format: $VERSION"
               exit 1
@@ -394,7 +393,7 @@ jobs:
               NPM_TAG="${{ inputs.tag }}"
             fi
           elif [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == refs/tags/* ]]; then
-            VERSION_TAG=$(echo "${{ github.ref }}" | sed 's/refs\/tags\/nodejs-v//')
+            VERSION_TAG=$(echo "${{ github.ref }}" | sed 's#refs/tags/nodejs-v##; s#refs/tags/v##')
             if [[ "$VERSION_TAG" =~ -beta$ ]]; then
               NPM_TAG="beta"
             elif [[ "$VERSION_TAG" =~ -alpha$ ]]; then
