@@ -9,6 +9,7 @@
 //! for loading rules.
 
 use std::path::{Path, PathBuf};
+use std::time::SystemTime;
 
 use terraphim_automata::markdown_directives::parse_markdown_directives_dir;
 use terraphim_types::{
@@ -76,6 +77,8 @@ pub struct KgRouter {
     thesaurus: Thesaurus,
     /// Path being watched
     taxonomy_path: PathBuf,
+    /// Latest mtime of any file in the taxonomy directory (for change detection).
+    last_mtime: Option<SystemTime>,
 }
 
 impl std::fmt::Debug for KgRouter {
@@ -150,10 +153,13 @@ impl KgRouter {
             "KG router loaded"
         );
 
+        let last_mtime = Self::dir_mtime(&taxonomy_path);
+
         Ok(Self {
             rules,
             thesaurus,
             taxonomy_path,
+            last_mtime,
         })
     }
 
@@ -231,8 +237,45 @@ impl KgRouter {
         let reloaded = Self::load(&self.taxonomy_path)?;
         self.rules = reloaded.rules;
         self.thesaurus = reloaded.thesaurus;
+        self.last_mtime = reloaded.last_mtime;
         info!(path = %self.taxonomy_path.display(), "KG router reloaded");
         Ok(())
+    }
+
+    /// Reload rules only if any file in the taxonomy directory has been modified.
+    ///
+    /// Checks the latest mtime of all `.md` files against the cached mtime.
+    /// Returns `true` if a reload was performed.
+    pub fn reload_if_changed(&mut self) -> bool {
+        let current_mtime = Self::dir_mtime(&self.taxonomy_path);
+        if current_mtime != self.last_mtime {
+            match self.reload() {
+                Ok(()) => {
+                    info!(path = %self.taxonomy_path.display(), "KG routing rules hot-reloaded");
+                    return true;
+                }
+                Err(e) => {
+                    warn!(error = %e, "KG router hot-reload failed, keeping old rules");
+                }
+            }
+        }
+        false
+    }
+
+    /// Get the latest mtime of any `.md` file in a directory.
+    fn dir_mtime(path: &Path) -> Option<SystemTime> {
+        std::fs::read_dir(path)
+            .ok()?
+            .filter_map(|e| e.ok())
+            .filter(|e| {
+                e.path()
+                    .extension()
+                    .and_then(|ext| ext.to_str())
+                    .map(|ext| ext == "md")
+                    .unwrap_or(false)
+            })
+            .filter_map(|e| e.metadata().ok()?.modified().ok())
+            .max()
     }
 
     /// Get the taxonomy path.
@@ -303,16 +346,21 @@ action:: claude --model {{ model }} -p "{{ prompt }}"
         write_rule(
             dir.path(),
             "implementation",
-            "priority:: 50\nsynonyms:: code review\nroute:: kimi, k2p5\n",
+            "priority:: 50\nsynonyms:: implement, build, review code\nroute:: kimi, k2p5\n",
         );
         write_rule(
             dir.path(),
             "code_review",
-            "priority:: 70\nsynonyms:: code review\nroute:: anthropic, opus\n",
+            "priority:: 70\nsynonyms:: code review, architecture review\nroute:: anthropic, opus\n",
         );
 
         let router = KgRouter::load(dir.path()).unwrap();
-        let decision = router.route_agent("do a code review").unwrap();
+        // "code review" matches code_review rule (priority 70)
+        // "review code" would match implementation rule (priority 50)
+        // code_review's higher priority should win
+        let decision = router
+            .route_agent("do a code review of the architecture")
+            .unwrap();
 
         assert_eq!(decision.provider, "anthropic");
         assert_eq!(decision.matched_concept, "code_review");
