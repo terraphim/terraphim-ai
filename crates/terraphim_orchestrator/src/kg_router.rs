@@ -437,4 +437,44 @@ action:: opencode -m {{ model }} -p "{{ prompt }}"
         assert_eq!(router.rule_count(), 1);
         assert!(router.route_agent("check CVE").is_some());
     }
+
+    #[test]
+    fn loads_real_adf_taxonomy_with_multi_routes() {
+        let taxonomy = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../docs/taxonomy/routing_scenarios/adf");
+        if !taxonomy.exists() {
+            return; // Skip if taxonomy not present
+        }
+
+        let router = KgRouter::load(&taxonomy).unwrap();
+        assert_eq!(router.rule_count(), 10, "expected 10 ADF routing rules");
+
+        // Every rule should have at least 2 routes (primary + fallback)
+        for route_directive in router.all_routes() {
+            assert!(
+                route_directive.action.is_some(),
+                "route {}/{} missing action:: template",
+                route_directive.provider,
+                route_directive.model
+            );
+        }
+
+        // Test a known match
+        let decision = router.route_agent("run cargo audit for CVE").unwrap();
+        assert_eq!(
+            decision.matched_concept, "security_audit",
+            "expected security_audit match"
+        );
+        assert!(
+            decision.fallback_routes.len() >= 2,
+            "security_audit should have primary + fallback"
+        );
+
+        // Test reasoning match (highest priority)
+        let decision = router
+            .route_agent("strategic planning for meta-coordination")
+            .unwrap();
+        assert_eq!(decision.matched_concept, "reasoning");
+        assert_eq!(decision.priority, 80);
+    }
 }
