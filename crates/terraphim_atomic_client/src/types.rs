@@ -49,7 +49,6 @@ impl Config {
 
         let agent = match std::env::var("ATOMIC_SERVER_SECRET") {
             Ok(secret) => {
-                println!("Found ATOMIC_SERVER_SECRET, length: {}", secret.len());
                 // Try to create an agent from the secret
                 match Agent::from_base64(&secret) {
                     Ok(agent) => {
