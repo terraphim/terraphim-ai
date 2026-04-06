@@ -147,11 +147,29 @@ jobs:
         run: ${{ matrix.settings.build }}
         if: ${{ !matrix.settings.cross }}
 
+      - name: Collect built binaries
+        run: |
+          set -euo pipefail
+          mkdir -p dist-bindings
+
+          mapfile -t NODE_FILES < <(find . -maxdepth 5 -type f -name "*.node")
+          if [[ ${#NODE_FILES[@]} -eq 0 ]]; then
+            echo "No .node binaries were produced"
+            exit 1
+          fi
+
+          for file in "${NODE_FILES[@]}"; do
+            cp "$file" dist-bindings/
+          done
+
+          echo "Collected binaries:"
+          ls -la dist-bindings/
+
       - name: Upload artifact
         uses: actions/upload-artifact@v5
         with:
           name: bindings-${{ matrix.settings.target }}
-          path: "*.node"
+          path: "dist-bindings/*.node"
           if-no-files-found: error
 
   test-universal:
