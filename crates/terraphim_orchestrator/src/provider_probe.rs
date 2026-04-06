@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
 use terraphim_spawner::health::{CircuitBreaker, CircuitBreakerConfig, CircuitState, HealthStatus};
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 use crate::kg_router::KgRouter;
 
@@ -305,7 +305,9 @@ async fn probe_single(provider: &str, model: &str, action_template: Option<&str>
         .to_string();
 
     let start = Instant::now();
-    let timeout = Duration::from_secs(30);
+    let timeout = Duration::from_secs(60);
+
+    debug!(provider, model, action = %action, "running probe command");
 
     // Prepend common tool directories to PATH so CLI tools (opencode, claude,
     // cargo, gtr) are found without sourcing .profile (which may have errors).
@@ -379,7 +381,7 @@ async fn probe_single(provider: &str, model: &str, action_template: Option<&str>
                 cli_tool,
                 status: ProbeStatus::Timeout,
                 latency_ms: Some(latency_ms),
-                error: Some("timeout after 30s".to_string()),
+                error: Some("timeout after 60s".to_string()),
                 timestamp,
             }
         }
