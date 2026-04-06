@@ -801,6 +801,10 @@ impl AgentOrchestrator {
             .unwrap_or(&def.cli_tool);
         let supports_model_flag = matches!(cli_name, "claude" | "claude-code" | "opencode");
 
+        // Track KG decision for CLI override (set inside the routing block below)
+        let mut kg_cli_override: Option<String> = None;
+
+        #[allow(clippy::manual_let_else)]
         let model = if supports_model_flag {
             // KG routing first (phase-aware tier selection from markdown rules).
             // Takes priority over static model config so tier routing controls selection.
@@ -832,7 +836,7 @@ impl AgentOrchestrator {
                 Some(decision)
             });
 
-            if let Some(kg) = kg_decision {
+            if let Some(ref kg) = kg_decision {
                 info!(
                     agent = %def.name,
                     concept = %kg.matched_concept,
@@ -841,6 +845,12 @@ impl AgentOrchestrator {
                     confidence = kg.confidence,
                     "model selected via KG tier routing"
                 );
+                // Extract CLI tool from action template (first word = CLI path)
+                if let Some(ref action) = kg.action {
+                    if let Some(cli) = action.split_whitespace().next() {
+                        kg_cli_override = Some(cli.to_string());
+                    }
+                }
                 Some(kg.model.clone())
             } else if let Some(m) = &def.model {
                 // Static config fallback when KG has no match
@@ -892,7 +902,14 @@ impl AgentOrchestrator {
             model
         };
 
-        info!(agent = %def.name, layer = ?def.layer, cli = %def.cli_tool, model = ?model, "spawning agent");
+        // If KG routing selected a different CLI tool (e.g., claude instead of opencode),
+        // use the KG-selected CLI to match the routed model.
+        let effective_cli = kg_cli_override
+            .as_deref()
+            .unwrap_or(&def.cli_tool)
+            .to_string();
+
+        info!(agent = %def.name, layer = ?def.layer, cli = %effective_cli, model = ?model, "spawning agent");
 
         // Compose persona-enriched task prompt
         let (composed_task, persona_found) = if let Some(ref persona_name) = def.persona {
@@ -950,13 +967,13 @@ impl AgentOrchestrator {
         let use_stdin =
             persona_found || !skill_content.is_empty() || composed_task.len() > STDIN_THRESHOLD;
 
-        // Build primary Provider from the agent definition for the spawner
+        // Build primary Provider from the agent definition for the spawner.
         let primary_provider = terraphim_types::capability::Provider {
             id: def.name.clone(),
             name: def.name.clone(),
             provider_type: terraphim_types::capability::ProviderType::Agent {
                 agent_id: def.name.clone(),
-                cli_command: def.cli_tool.clone(),
+                cli_command: effective_cli.clone(),
                 working_dir: self.config.working_dir.clone(),
             },
             capabilities: vec![],
