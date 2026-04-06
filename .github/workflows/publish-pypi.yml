@@ -251,18 +251,27 @@ jobs:
       - name: Install 1Password CLI
         uses: 1password/install-cli-action@v2
 
-      - name: Authenticate with 1Password
-        run: |
-          echo "${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}" | op account add --service-account-token
-
       - name: Get PyPI token from 1Password (or use secret)
         id: token
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
         run: |
-          TOKEN=$(op read "op://TerraphimPlatform/pypi.token/password" 2>/dev/null || echo "")
+          TOKEN=""
+
+          if [[ -n "${OP_SERVICE_ACCOUNT_TOKEN}" ]]; then
+            TOKEN=$(op read "op://TerraphimPlatform/pypi.token/password" 2>/dev/null || true)
+          fi
+
           if [[ -z "$TOKEN" ]]; then
-            echo "⚠️  PyPI token not found in 1Password, using GitHub secret"
+            echo "PyPI token not found in 1Password, using GitHub secret"
             TOKEN="${{ secrets.PYPI_API_TOKEN }}"
           fi
+
+          if [[ -z "$TOKEN" ]]; then
+            echo "No PyPI token available from 1Password or GitHub secrets"
+            exit 1
+          fi
+
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
 
       - name: Determine version
@@ -319,6 +328,9 @@ jobs:
       - name: Verify published packages
         if: inputs.dry_run != 'true'
         run: |
+          PACKAGE_NAME="terraphim-automata"
+          PACKAGE_VERSION="${{ steps.version.outputs.version }}"
+
           # Try to install from PyPI (or TestPyPI)
           if [[ "${{ inputs.repository }}" == "testpypi" ]]; then
             python -m pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ "$PACKAGE_NAME==$PACKAGE_VERSION" || echo "⚠️  Package not yet visible on TestPyPI"
