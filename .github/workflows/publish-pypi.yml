@@ -343,8 +343,10 @@ jobs:
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/') && inputs.dry_run != 'true'
         uses: softprops/action-gh-release@v2
+        continue-on-error: true
         with:
           name: "terraphim-automata ${{ github.ref_name }}"
+          token: ${{ secrets.GITHUB_TOKEN }}
           body: |
             ## Python Package Release
 
@@ -382,8 +384,6 @@ jobs:
             🤖 Generated on: $(date)
           draft: false
           prerelease: ${{ contains(github.ref, '-alpha') || contains(github.ref, '-beta') || contains(github.ref, '-rc') }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Notify completion
         if: inputs.dry_run != 'true'

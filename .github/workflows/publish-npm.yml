@@ -472,12 +472,11 @@ jobs:
 
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/') && inputs.dry_run != 'true'
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v2
+        continue-on-error: true
         with:
-          tag_name: ${{ github.ref }}
-          release_name: "@terraphim/autocomplete ${{ github.ref_name }}"
+          name: "@terraphim/autocomplete ${{ github.ref_name }}"
+          token: ${{ secrets.GITHUB_TOKEN }}
           body: |
             ## Node.js Package Release
 
