@@ -254,11 +254,12 @@ async fn probe_single(provider: &str, model: &str, action_template: Option<&str>
     let start = Instant::now();
     let timeout = Duration::from_secs(30);
 
-    // Use sh -c to handle quoted arguments correctly (same pattern as
-    // CommandStep::Shell in terraphim_tinyclaw).
+    // Use bash -lc (login shell) to pick up user PATH (~/.local/bin,
+    // ~/.bun/bin, ~/.cargo/bin) where CLI tools like opencode and claude live.
+    // Same reason the systemd service uses bash -lc for ExecStart.
     let result = tokio::time::timeout(timeout, async {
-        let output = tokio::process::Command::new("sh")
-            .arg("-c")
+        let output = tokio::process::Command::new("bash")
+            .arg("-lc")
             .arg(&action)
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
