@@ -84,10 +84,37 @@ pub struct OrchestratorConfig {
     /// Path to persona role configuration JSON for terraphim-agent.
     #[serde(default)]
     pub role_config_path: Option<PathBuf>,
+    /// KG-driven model routing configuration.
+    #[serde(default)]
+    pub routing: Option<RoutingConfig>,
     /// Quickwit log shipping configuration (only available with quickwit feature).
     #[cfg(feature = "quickwit")]
     #[serde(default)]
     pub quickwit: Option<QuickwitConfig>,
+}
+
+/// Configuration for KG-driven model routing.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RoutingConfig {
+    /// Path to directory containing KG routing rule markdown files.
+    pub taxonomy_path: PathBuf,
+    /// Provider probe TTL in seconds (default: 300 = 5 minutes).
+    #[serde(default = "default_probe_ttl")]
+    pub probe_ttl_secs: u64,
+    /// Directory for saving probe results JSON (default: ~/.terraphim/benchmark-results).
+    #[serde(default)]
+    pub probe_results_dir: Option<PathBuf>,
+    /// Run provider probes on startup (default: true).
+    #[serde(default = "default_true_routing")]
+    pub probe_on_startup: bool,
+}
+
+fn default_probe_ttl() -> u64 {
+    300
+}
+
+fn default_true_routing() -> bool {
+    true
 }
 
 /// Configuration for posting agent output to Gitea issues.

@@ -244,6 +244,14 @@ impl KgRouter {
     pub fn rule_count(&self) -> usize {
         self.rules.len()
     }
+
+    /// Iterate all unique route directives across all rules (for probing).
+    pub fn all_routes(&self) -> Vec<&RouteDirective> {
+        self.rules
+            .iter()
+            .flat_map(|r| r.directives.routes.iter())
+            .collect()
+    }
 }
 
 #[derive(Debug, thiserror::Error)]

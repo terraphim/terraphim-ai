@@ -47,6 +47,7 @@ pub mod mode;
 pub mod nightwatch;
 pub mod output_poster;
 pub mod persona;
+pub mod provider_probe;
 #[cfg(feature = "quickwit")]
 pub mod quickwit;
 pub mod scheduler;
@@ -189,6 +190,10 @@ pub struct AgentOrchestrator {
     quickwit_sink: Option<quickwit::QuickwitSink>,
     /// Classifier for structured agent exit classification using KG-boosted matching.
     exit_classifier: ExitClassifier,
+    /// KG-driven model router loaded from taxonomy markdown files.
+    kg_router: Option<kg_router::KgRouter>,
+    /// Per-provider health tracking with circuit breakers.
+    provider_health: provider_probe::ProviderHealthMap,
 }
 
 /// Validate agent name for safe use in file paths.
@@ -260,6 +265,32 @@ impl AgentOrchestrator {
         // Initialize output poster if Gitea config is provided
         let output_poster = config.gitea.as_ref().map(OutputPoster::new);
 
+        // Initialize KG router from taxonomy directory if configured
+        let kg_router = config.routing.as_ref().and_then(|routing_config| {
+            match kg_router::KgRouter::load(&routing_config.taxonomy_path) {
+                Ok(router) => {
+                    info!(
+                        path = %routing_config.taxonomy_path.display(),
+                        rules = router.rule_count(),
+                        "KG model router loaded"
+                    );
+                    Some(router)
+                }
+                Err(e) => {
+                    warn!(error = %e, "KG router failed to load, using static model config");
+                    None
+                }
+            }
+        });
+
+        let probe_ttl = config
+            .routing
+            .as_ref()
+            .map(|r| r.probe_ttl_secs)
+            .unwrap_or(300);
+        let provider_health =
+            provider_probe::ProviderHealthMap::new(std::time::Duration::from_secs(probe_ttl));
+
         // MentionCursor loaded lazily on first poll (async)
 
         Ok(Self {
@@ -300,6 +331,8 @@ impl AgentOrchestrator {
             #[cfg(feature = "quickwit")]
             quickwit_sink: None,
             exit_classifier: ExitClassifier::new(),
+            kg_router,
+            provider_health,
         })
     }
 
@@ -747,27 +780,69 @@ impl AgentOrchestrator {
             info!(agent = %def.name, model = %m, "using explicit model");
             Some(m.clone())
         } else if supports_model_flag {
-            // Route the task prompt to find the best model
-            let context = terraphim_router::RoutingContext::default();
-            match self.router.route(&def.task, &context) {
-                Ok(decision) => {
-                    if let terraphim_types::capability::ProviderType::Llm { model_id, .. } =
-                        &decision.provider.provider_type
-                    {
+            // Try KG routing first (pattern match against synonyms from markdown rules),
+            // then fall back to keyword routing from RoutingEngine.
+            let unhealthy = self.provider_health.unhealthy_providers();
+            let kg_decision = self.kg_router.as_ref().and_then(|router| {
+                let decision = router.route_agent(&def.task)?;
+                // If primary provider is unhealthy, try fallback routes
+                if !unhealthy.is_empty() {
+                    if let Some(healthy_route) = decision.first_healthy_route(&unhealthy) {
                         info!(
                             agent = %def.name,
-                            model = %model_id,
-                            confidence = decision.confidence,
-                            "model selected via keyword routing"
+                            concept = %decision.matched_concept,
+                            provider = %healthy_route.provider,
+                            model = %healthy_route.model,
+                            skipped_unhealthy = ?unhealthy,
+                            "KG routed to fallback (primary unhealthy)"
                         );
-                        Some(model_id.clone())
-                    } else {
-                        None
+                        return Some(kg_router::KgRouteDecision {
+                            provider: healthy_route.provider.clone(),
+                            model: healthy_route.model.clone(),
+                            action: healthy_route.action.clone(),
+                            confidence: decision.confidence * 0.9,
+                            matched_concept: decision.matched_concept,
+                            priority: decision.priority,
+                            fallback_routes: decision.fallback_routes,
+                        });
                     }
                 }
-                Err(_) => {
-                    info!(agent = %def.name, "no model matched via routing, using CLI default");
-                    None
+                Some(decision)
+            });
+
+            if let Some(kg) = kg_decision {
+                info!(
+                    agent = %def.name,
+                    concept = %kg.matched_concept,
+                    provider = %kg.provider,
+                    model = %kg.model,
+                    confidence = kg.confidence,
+                    "model selected via KG routing"
+                );
+                Some(kg.model.clone())
+            } else {
+                // Fall back to existing keyword routing
+                let context = terraphim_router::RoutingContext::default();
+                match self.router.route(&def.task, &context) {
+                    Ok(decision) => {
+                        if let terraphim_types::capability::ProviderType::Llm { model_id, .. } =
+                            &decision.provider.provider_type
+                        {
+                            info!(
+                                agent = %def.name,
+                                model = %model_id,
+                                confidence = decision.confidence,
+                                "model selected via keyword routing (KG had no match)"
+                            );
+                            Some(model_id.clone())
+                        } else {
+                            None
+                        }
+                    }
+                    Err(_) => {
+                        info!(agent = %def.name, "no model matched via routing, using CLI default");
+                        None
+                    }
                 }
             }
         } else {
@@ -2932,6 +3007,7 @@ mod tests {
             mentions: None,
             webhook: None,
             role_config_path: None,
+            routing: None,
         }
     }
 
@@ -3114,6 +3190,7 @@ task = "test"
             mentions: None,
             webhook: None,
             role_config_path: None,
+            routing: None,
         }
     }
 
