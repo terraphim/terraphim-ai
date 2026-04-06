@@ -254,13 +254,22 @@ async fn probe_single(provider: &str, model: &str, action_template: Option<&str>
     let start = Instant::now();
     let timeout = Duration::from_secs(30);
 
-    // Use bash -lc (login shell) to pick up user PATH (~/.local/bin,
-    // ~/.bun/bin, ~/.cargo/bin) where CLI tools like opencode and claude live.
-    // Same reason the systemd service uses bash -lc for ExecStart.
+    // Prepend common tool directories to PATH so CLI tools (opencode, claude,
+    // cargo, gtr) are found without sourcing .profile (which may have errors).
+    let home = std::env::var("HOME").unwrap_or_else(|_| "/home/alex".to_string());
+    let path_prefix =
+        format!("{home}/.local/bin:{home}/.bun/bin:{home}/bin:{home}/.cargo/bin:{home}/go/bin",);
     let result = tokio::time::timeout(timeout, async {
         let output = tokio::process::Command::new("bash")
-            .arg("-lc")
+            .arg("-c")
             .arg(&action)
+            .env(
+                "PATH",
+                format!(
+                    "{path_prefix}:{}",
+                    std::env::var("PATH").unwrap_or_default()
+                ),
+            )
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
             .spawn()
