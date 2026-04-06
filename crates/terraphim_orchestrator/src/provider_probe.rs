@@ -141,7 +141,21 @@ impl ProviderHealthMap {
     }
 
     /// Get health status for a provider.
+    ///
+    /// Uses **probe results first**: if the latest probe for this provider
+    /// failed or timed out, it's unhealthy regardless of circuit breaker state.
+    /// Falls back to circuit breaker for providers not recently probed.
     pub fn provider_health(&self, provider: &str) -> HealthStatus {
+        // Check latest probe results (most authoritative)
+        if let Some(status) = self.latest_probe_status(provider) {
+            return match status {
+                ProbeStatus::Success => HealthStatus::Healthy,
+                ProbeStatus::Error => HealthStatus::Unhealthy,
+                ProbeStatus::Timeout => HealthStatus::Unhealthy,
+            };
+        }
+
+        // Fall back to circuit breaker for unprobed providers
         match self.breakers.get(provider) {
             Some(breaker) => match breaker.state() {
                 CircuitState::Closed => HealthStatus::Healthy,
@@ -153,20 +167,59 @@ impl ProviderHealthMap {
     }
 
     /// Check if a provider is healthy enough to dispatch to.
+    ///
+    /// A provider is healthy if its latest probe succeeded OR it wasn't probed
+    /// and the circuit breaker allows requests.
     pub fn is_healthy(&self, provider: &str) -> bool {
-        match self.breakers.get(provider) {
-            Some(breaker) => breaker.should_allow(),
-            None => true,
-        }
+        matches!(
+            self.provider_health(provider),
+            HealthStatus::Healthy | HealthStatus::Degraded
+        )
     }
 
-    /// List all unhealthy provider names.
+    /// List all unhealthy provider names (from probe results + circuit breakers).
     pub fn unhealthy_providers(&self) -> Vec<String> {
-        self.breakers
+        let mut unhealthy: Vec<String> = Vec::new();
+
+        // From probe results: any provider with failed/timeout probe
+        for result in &self.results {
+            if result.status != ProbeStatus::Success && !unhealthy.contains(&result.provider) {
+                unhealthy.push(result.provider.clone());
+            }
+        }
+
+        // From circuit breakers: any open circuit not already in list
+        for (name, breaker) in &self.breakers {
+            if !breaker.should_allow() && !unhealthy.contains(name) {
+                unhealthy.push(name.clone());
+            }
+        }
+
+        unhealthy
+    }
+
+    /// Get the latest probe status for a provider (best result across all models).
+    fn latest_probe_status(&self, provider: &str) -> Option<ProbeStatus> {
+        let provider_results: Vec<_> = self
+            .results
             .iter()
-            .filter(|(_, b)| !b.should_allow())
-            .map(|(name, _)| name.clone())
-            .collect()
+            .filter(|r| r.provider == provider)
+            .collect();
+
+        if provider_results.is_empty() {
+            return None;
+        }
+
+        // If ANY model for this provider succeeded, provider is healthy
+        if provider_results
+            .iter()
+            .any(|r| r.status == ProbeStatus::Success)
+        {
+            Some(ProbeStatus::Success)
+        } else {
+            // All models failed -- use the "least bad" status
+            Some(provider_results[0].status)
+        }
     }
 
     /// Record a success for a provider (e.g., from ExitClassifier).
@@ -366,6 +419,73 @@ mod tests {
         let mut map = ProviderHealthMap::new(Duration::from_secs(300));
         map.record_failure("kimi");
         map.record_success("kimi");
+        // No probe results, so falls back to circuit breaker
         assert!(map.is_healthy("kimi"));
+    }
+
+    #[test]
+    fn probe_timeout_marks_unhealthy_immediately() {
+        let mut map = ProviderHealthMap::new(Duration::from_secs(300));
+        // Simulate a probe that timed out
+        map.results = vec![ProbeResult {
+            provider: "kimi".to_string(),
+            model: "kimi-for-coding/k2p5".to_string(),
+            cli_tool: "opencode".to_string(),
+            status: ProbeStatus::Timeout,
+            latency_ms: Some(30000),
+            error: Some("timeout".to_string()),
+            timestamp: String::new(),
+        }];
+        // Should be unhealthy even though circuit breaker has 0 failures
+        assert!(!map.is_healthy("kimi"));
+        assert_eq!(map.provider_health("kimi"), HealthStatus::Unhealthy);
+        assert!(map.unhealthy_providers().contains(&"kimi".to_string()));
+    }
+
+    #[test]
+    fn probe_success_overrides_circuit_breaker_failures() {
+        let mut map = ProviderHealthMap::new(Duration::from_secs(300));
+        // Circuit breaker has failures but probe succeeded
+        for _ in 0..3 {
+            map.record_failure("kimi");
+        }
+        map.results = vec![ProbeResult {
+            provider: "kimi".to_string(),
+            model: "kimi-for-coding/k2p5".to_string(),
+            cli_tool: "opencode".to_string(),
+            status: ProbeStatus::Success,
+            latency_ms: Some(5000),
+            error: None,
+            timestamp: String::new(),
+        }];
+        // Probe success is authoritative
+        assert!(map.is_healthy("kimi"));
+    }
+
+    #[test]
+    fn mixed_model_results_any_success_means_healthy() {
+        let mut map = ProviderHealthMap::new(Duration::from_secs(300));
+        map.results = vec![
+            ProbeResult {
+                provider: "minimax".to_string(),
+                model: "opencode-go/minimax-m2.5".to_string(),
+                cli_tool: "opencode".to_string(),
+                status: ProbeStatus::Timeout,
+                latency_ms: Some(30000),
+                error: Some("timeout".to_string()),
+                timestamp: String::new(),
+            },
+            ProbeResult {
+                provider: "minimax".to_string(),
+                model: "minimax-coding-plan/MiniMax-M2.5".to_string(),
+                cli_tool: "opencode".to_string(),
+                status: ProbeStatus::Success,
+                latency_ms: Some(10000),
+                error: None,
+                timestamp: String::new(),
+            },
+        ];
+        // One model succeeded -> provider is healthy
+        assert!(map.is_healthy("minimax"));
     }
 }
