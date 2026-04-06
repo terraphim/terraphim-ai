@@ -73,9 +73,11 @@ jobs:
       - name: Build wasm package
         run: wasm-pack build --release --target web
 
-      - name: Set npm package version
+      - name: Set npm package metadata
         working-directory: crates/terraphim_automata/wasm-test/pkg
-        run: npm version "${{ steps.version.outputs.version }}" --no-git-tag-version
+        run: |
+          npm pkg set name='@terraphim/automata-wasm'
+          npm version "${{ steps.version.outputs.version }}" --no-git-tag-version
 
       - name: Prepare npm token
         env:

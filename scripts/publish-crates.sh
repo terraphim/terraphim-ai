@@ -46,6 +46,7 @@ CRATES=(
   "terraphim_types"
   "terraphim_settings"
   "terraphim_persistence"
+  "terraphim-markdown-parser"
   "terraphim_automata"
   "terraphim_config"
   "terraphim_rolegraph"
