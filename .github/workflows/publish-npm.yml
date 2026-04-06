@@ -444,7 +444,7 @@ jobs:
             echo "Tag: ${{ steps.strategy.outputs.npm_tag }}"
 
             # Publish to GitHub Packages
-            npm publish --access public --tag ${{ steps.strategy.outputs.npm_tag }}
+            npm publish --ignore-scripts --access public --tag ${{ steps.strategy.outputs.npm_tag }}
 
             echo "Package published successfully!"
             echo "Install with: npm install @terraphim/autocomplete --registry=https://npm.pkg.github.com"
