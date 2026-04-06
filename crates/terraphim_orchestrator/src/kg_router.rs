@@ -466,8 +466,8 @@ action:: opencode -m {{ model }} -p "{{ prompt }}"
             "expected security_audit match"
         );
         assert!(
-            decision.fallback_routes.len() >= 2,
-            "security_audit should have primary + fallback"
+            decision.fallback_routes.len() >= 4,
+            "security_audit should have primary + 3 fallbacks (kimi, anthropic, zai, openai)"
         );
 
         // Test reasoning match (highest priority)
@@ -526,7 +526,7 @@ action:: opencode -m {{ model }} -p "{{ prompt }}"
             ),
             (
                 "spec-validator",
-                "architecture review spec validation code review quality",
+                "spec validation code review quality assessment",
                 "code_review",
                 "anthropic",
             ),

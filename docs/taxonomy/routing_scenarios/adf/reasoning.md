@@ -18,3 +18,9 @@ action:: /home/alex/.local/bin/claude --model {{ model }} -p "{{ prompt }}" --ma
 
 route:: anthropic, claude-haiku-4-5
 action:: /home/alex/.local/bin/claude --model {{ model }} -p "{{ prompt }}" --max-turns 30
+
+route:: zai, zai-coding-plan/glm-5
+action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"
+
+route:: openai, openai/gpt-5.4
+action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"

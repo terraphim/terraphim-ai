@@ -17,3 +17,9 @@ action:: /home/alex/.local/bin/claude --model {{ model }} -p "{{ prompt }}" --ma
 
 route:: kimi, kimi-for-coding/k2p5
 action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"
+
+route:: zai, zai-coding-plan/glm-5
+action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"
+
+route:: openai, openai/gpt-5.4
+action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"

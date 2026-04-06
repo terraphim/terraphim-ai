@@ -17,3 +17,9 @@ action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ promp
 
 route:: anthropic, claude-sonnet-4-6
 action:: /home/alex/.local/bin/claude --model {{ model }} -p "{{ prompt }}" --max-turns 30
+
+route:: zai, zai-coding-plan/glm-5-turbo
+action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"
+
+route:: openai, openai/gpt-5.4-mini
+action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"
