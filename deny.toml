@@ -28,11 +28,6 @@ ignore = [
     # term_size unmaintained - transitive dep via terraphim_validation
     # TODO: Replace with terminal_size
     "RUSTSEC-2020-0163",
-    # rustls-webpki CRL revocation bypass - transitive dep via serenity -> hyper-rustls -> rustls 0.21.x
-    # serenity 0.12 pins hyper-rustls 0.24 which pins rustls 0.21; cannot override without serenity upgrade
-    # Disabled by default: discord removed from tinyclaw default features
-    # TODO: Remove once serenity 0.13+ releases with rustls 0.23+ support
-    "RUSTSEC-2026-0049",
 ]
 
 [licenses]
@@ -68,4 +63,5 @@ allow-registry = ["https://github.com/rust-lang/crates.io-index"]
 allow-git = [
     "https://github.com/terraphim/rust-genai.git",
     "https://github.com/AlexMikhalev/self_update.git",
+    "https://github.com/serenity-rs/serenity.git",
 ]
