@@ -226,7 +226,7 @@ jobs:
 
   publish-pypi:
     name: Publish to PyPI
-    runs-on: [self-hosted, Linux, terraphim, production, docker]
+    runs-on: ubuntu-latest
     environment: production
     # Note: build-sdist is optional due to maturin bug, wheels are sufficient
     needs: [build, test]

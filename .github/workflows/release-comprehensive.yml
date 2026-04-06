@@ -500,6 +500,7 @@ jobs:
     steps:
       - name: Trigger terraphim-ai-desktop release workflow
         uses: actions/github-script@v7
+        continue-on-error: true
         with:
           github-token: ${{ secrets.DESKTOP_REPO_TOKEN }}
           script: |
