@@ -81,10 +81,23 @@ jobs:
           npm pkg set publishConfig.registry='https://npm.pkg.github.com'
           npm version "${{ steps.version.outputs.version }}" --no-git-tag-version
 
+      - name: Prepare package token
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+        run: |
+          TOKEN=""
+          if command -v op >/dev/null 2>&1; then
+            TOKEN=$(op read "op://TerraphimPlatform/npm.token/password" 2>/dev/null || true)
+          fi
+          if [[ -z "$TOKEN" ]]; then
+            TOKEN="${{ secrets.GITHUB_TOKEN }}"
+          fi
+          echo "NPM_TOKEN=$TOKEN" >> "$GITHUB_ENV"
+
       - name: Publish wasm package
         working-directory: crates/terraphim_automata/wasm-test/pkg
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ env.NPM_TOKEN }}
         run: |
           NPM_TAG="${{ inputs.tag }}"
           if [[ -z "$NPM_TAG" ]]; then
