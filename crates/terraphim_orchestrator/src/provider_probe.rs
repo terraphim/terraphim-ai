@@ -199,8 +199,7 @@ impl ProviderHealthMap {
     pub async fn save_results(&self, dir: &std::path::Path) -> std::io::Result<()> {
         tokio::fs::create_dir_all(dir).await?;
 
-        let json = serde_json::to_string_pretty(&self.results)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        let json = serde_json::to_string_pretty(&self.results).map_err(std::io::Error::other)?;
 
         let timestamp = chrono::Utc::now().format("%Y-%m-%d-%H%M%S");
         let timestamped = dir.join(format!("{timestamp}.json"));

@@ -288,7 +288,7 @@ reconcile -> find_stalled_issues -> abort + schedule_retry
 
 2. **The tlaplus-ts library is complete and production-ready** -- all 8 issues closed, includes AST types, parser, evaluator, formatter, TLC bridge, and CLI. Created on 2026-03-14, last updated 2026-03-17.
 
-3. **The `tla-precheck` approach (kingbootoshi/tla-precheck)** demonstrates a compelling pattern: generate TLA+ from a DSL, run TLC for exhaustive state exploration, then validate that the TypeScript implementation matches the spec. We can adapt this: write the TLA+ spec manually (modelling the Rust orchestrator), then use tlaplus-ts to run TLC and assert properties.
+3. **The `tla-precheck` approach (kingbootoshi/tla-precheck)** demonstrates a compelling pattern: generate TLA+ from a DSL, run TLC for exhaustive state exploration, then validate that the TypeScript implementation matches the spec. We can adapt this: write the TLA+ spec manually (modelling the Rust ADF), then use tlaplus-ts to run TLC and assert properties.
 
 4. **Critical state invariants are already documented in the Rust code** via dispatch eligibility checks. These translate directly to TLA+ invariants:
    - `NoDoubleDispatch == \A i \in IssueIDs: ~(i \in DOMAIN running /\ i \in DOMAIN retrying)`
@@ -412,14 +412,65 @@ VARIABLES
     escalated          \* BOOLEAN -- supervisor has escalated to parent
 
 \* Actions
-AgentFails(a), RestartOneForOne(a), RestartOneForAll,
-RestartFromAgent(a), Escalate, Tick
+AgentFails(a) ==
+    /\ children[a] = "Running"
+    /\ children' = [children EXCEPT ![a] = "Failed"]
+    /\ UNCHANGED <<restartHistory, step, escalated>>
+
+RestartOneForOne(a) ==
+    /\ Strategy = "OneForOne"
+    /\ children[a] = "Failed"
+    /\ ~escalated
+    /\ LET recent == {t \in restartHistory : step - t < TimeWindow}
+       IN Cardinality(recent) < MaxRestarts
+    /\ children' = [children EXCEPT ![a] = "Running"]
+    /\ restartHistory' = Append(restartHistory, step)
+    /\ UNCHANGED <<step, escalated>>
+
+RestartOneForAll ==
+    /\ Strategy = "OneForAll"
+    /\ \E a \in AgentPids: children[a] = "Failed"
+    /\ ~escalated
+    /\ LET recent == {t \in restartHistory : step - t < TimeWindow}
+       IN Cardinality(recent) < MaxRestarts
+    /\ children' = [a \in AgentPids |-> "Running"]
+    /\ restartHistory' = Append(restartHistory, step)
+    /\ UNCHANGED <<step, escalated>>
+
+RestartFromAgent(a) ==
+    /\ Strategy = "RestForOne"
+    /\ children[a] = "Failed"
+    /\ ~escalated
+    /\ LET recent == {t \in restartHistory : step - t < TimeWindow}
+       IN Cardinality(recent) < MaxRestarts
+    \* Restart a and all agents "after" a (modelled via ordering)
+    /\ children' = [b \in AgentPids |->
+        IF b = a \/ b > a THEN "Running" ELSE children[b]]
+    /\ restartHistory' = Append(restartHistory, step)
+    /\ UNCHANGED <<step, escalated>>
+
+Escalate ==
+    /\ ~escalated
+    /\ LET recent == {t \in restartHistory : step - t < TimeWindow}
+       IN Cardinality(recent) >= MaxRestarts
+    /\ escalated' = TRUE
+    /\ children' = [a \in AgentPids |-> "Stopped"]
+    /\ UNCHANGED <<restartHistory, step>>
+
+Tick == step' = step + 1 /\ UNCHANGED <<children, restartHistory, escalated>>
 
 \* Safety invariants
-RestartIntensityBound, NoRestartAfterEscalation
+RestartIntensityBound ==
+    LET recent == {t \in restartHistory : step - t < TimeWindow}
+    IN Cardinality(recent) <= MaxRestarts
+
+NoRestartAfterEscalation ==
+    escalated => \A a \in AgentPids: children[a] # "Restarting"
 
 \* Liveness
-EventualRecoveryOrEscalation
+EventualRecoveryOrEscalation == \A a \in AgentPids:
+    [](children[a] = "Failed") ~> (children[a] = "Running" \/ escalated)
+
 ====
 ```
 
@@ -440,18 +491,67 @@ VARIABLES
     deliveryStatus,     \* [MessageIDs -> {"Pending", "InTransit", "Delivered", "Failed", "Acked"}]
     attempts,           \* [MessageIDs -> 0..MaxRetries]
     mailbox,            \* [AgentPids -> Seq(MessageIDs)]
-    routingTable,       \* [AgentPids -> BOOLEAN]
-    dedupCache          \* SUBSET MessageIDs
+    routingTable,       \* [AgentPids -> BOOLEAN]  (registered or not)
+    dedupCache          \* SUBSET MessageIDs  (seen message IDs for ExactlyOnce)
 
 \* Actions
-Send(m, dest), Deliver(m, dest), DeliveryFails(m),
-RetryDelivery(m, dest), RegisterAgent(a)
+Send(m, dest) ==
+    /\ deliveryStatus[m] = "Pending"
+    /\ routingTable[dest] = TRUE
+    /\ Len(mailbox[dest]) < MaxMailboxSize
+    /\ deliveryStatus' = [deliveryStatus EXCEPT ![m] = "InTransit"]
+    /\ mailbox' = [mailbox EXCEPT ![dest] = Append(@, m)]
+    /\ UNCHANGED <<attempts, routingTable, dedupCache>>
+
+Deliver(m, dest) ==
+    /\ deliveryStatus[m] = "InTransit"
+    /\ m \in Range(mailbox[dest])
+    /\ IF Guarantee = "ExactlyOnce" /\ m \in dedupCache
+       THEN /\ UNCHANGED <<deliveryStatus, mailbox, attempts, routingTable, dedupCache>>
+       ELSE /\ deliveryStatus' = [deliveryStatus EXCEPT ![m] = "Delivered"]
+            /\ dedupCache' = IF Guarantee = "ExactlyOnce"
+                             THEN dedupCache \cup {m} ELSE dedupCache
+            /\ UNCHANGED <<attempts, mailbox, routingTable>>
+
+DeliveryFails(m) ==
+    /\ deliveryStatus[m] = "InTransit"
+    /\ deliveryStatus' = [deliveryStatus EXCEPT ![m] = "Failed"]
+    /\ UNCHANGED <<attempts, mailbox, routingTable, dedupCache>>
+
+RetryDelivery(m, dest) ==
+    /\ deliveryStatus[m] = "Failed"
+    /\ Guarantee # "AtMostOnce"  \* AtMostOnce never retries
+    /\ attempts[m] < MaxRetries
+    /\ attempts' = [attempts EXCEPT ![m] = @ + 1]
+    /\ deliveryStatus' = [deliveryStatus EXCEPT ![m] = "InTransit"]
+    /\ UNCHANGED <<mailbox, routingTable, dedupCache>>
+
+RegisterAgent(a) ==
+    /\ routingTable[a] = FALSE
+    /\ routingTable' = [routingTable EXCEPT ![a] = TRUE]
+    /\ UNCHANGED <<deliveryStatus, attempts, mailbox, dedupCache>>
 
 \* Safety invariants
-MailboxBound, RetryBound, NoBackwardTransition, ExactlyOnceNoDuplicates
+MailboxBound == \A a \in AgentPids: Len(mailbox[a]) <= MaxMailboxSize
+
+RetryBound == \A m \in MessageIDs: attempts[m] <= MaxRetries
+
+NoBackwardTransition == \A m \in MessageIDs:
+    deliveryStatus[m] = "Delivered" =>
+        deliveryStatus'[m] \in {"Delivered", "Acked"}
+
+ExactlyOnceNoDuplicates ==
+    Guarantee = "ExactlyOnce" =>
+        \A m \in MessageIDs:
+            Cardinality({a \in AgentPids : m \in Range(mailbox[a])}) <= 1
 
 \* Liveness
-EventualDelivery
+EventualDelivery ==
+    Guarantee # "AtMostOnce" =>
+        \A m \in MessageIDs:
+            [](deliveryStatus[m] = "Pending") ~>
+                (deliveryStatus[m] = "Delivered" \/ attempts[m] >= MaxRetries)
+
 ====
 ```
 
@@ -487,12 +587,11 @@ terraphim/tlaplus-ts/
 
 If approved:
 1. **Spike**: Clone tlaplus-ts on bigbox, verify `bun test` passes
-2. **Module 1 (Symphony)**: Write SymphonyOrchestrator.tla phases 1a-1d
-3. **Module 2 (Supervisor)**: Write AgentSupervisor.tla phases 2a-2c
-4. **Module 3 (Messaging)**: Write MessagingDelivery.tla phases 3a-3c
-5. **Cross-layer composition**: Optional Phase 4 if individual modules pass
-6. **CI integration**: Add TLC verification as optional CI job
-7. **Proceed to Phase 2 (Design)**: Update implementation plan for multi-module approach
+2. **Write TLA+ spec**: Start with Phase 1 (dispatch + complete + claim lifecycle)
+3. **Run TLC**: Use tlaplus-ts TLC bridge to model-check with 3 issues, 2 agents
+4. **Iterate**: Add retry, reconcile, dependency properties
+5. **CI integration**: Add TLC verification as optional CI job
+6. **Proceed to Phase 2 (Design)**: Create implementation plan for the spec and test harness
 
 ## Appendix
 
