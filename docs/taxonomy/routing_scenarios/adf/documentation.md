@@ -1,0 +1,19 @@
+# Documentation Routing
+
+Documentation generation, README updates, changelog entries, API docs,
+and technical writing. Lower priority since documentation is less time-sensitive.
+Best served by models with good prose generation at low cost.
+
+priority:: 40
+
+synonyms:: documentation, readme, changelog, API docs, docstring, rustdoc,
+  documentation generator, technical writing, release notes, contributing guide,
+  architecture docs, user guide, mdbook
+
+trigger:: documentation generation and technical writing tasks
+
+route:: minimax, minimax-m2.5-free
+action:: opencode -m minimax-m2.5-free -p "{{ prompt }}"
+
+route:: anthropic, claude-sonnet-4-6
+action:: /home/alex/.local/bin/claude --model claude-sonnet-4-6 -p "{{ prompt }}" --max-turns 30

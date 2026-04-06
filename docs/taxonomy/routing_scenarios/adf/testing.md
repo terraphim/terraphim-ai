@@ -1,0 +1,18 @@
+# Testing Routing
+
+Test execution, QA, regression testing, integration testing, and browser-based testing.
+Needs reliable models that can run test suites, interpret failures, and suggest fixes.
+
+priority:: 55
+
+synonyms:: test, QA, regression, integration test, browser test, test guardian,
+  cargo test, test failure, test suite, unit test, end-to-end, e2e test,
+  browser-qa, test coverage, test fix, flaky test
+
+trigger:: test execution, failure analysis, and quality assurance tasks
+
+route:: kimi, kimi-for-coding/k2p5
+action:: opencode -m kimi-for-coding/k2p5 -p "{{ prompt }}"
+
+route:: anthropic, claude-sonnet-4-6
+action:: /home/alex/.local/bin/claude --model claude-sonnet-4-6 -p "{{ prompt }}" --max-turns 50
