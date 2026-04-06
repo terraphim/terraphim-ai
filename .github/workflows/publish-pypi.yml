@@ -312,7 +312,7 @@ jobs:
           PYPI_TOKEN: ${{ steps.token.outputs.token }}
         run: |
           # Prepare script arguments
-          ARGS="--version ${{ steps.version.outputs.version }} --token $PYPI_TOKEN"
+          ARGS="--version ${{ steps.version.outputs.version }} --token $PYPI_TOKEN --use-existing-dist"
 
           if [[ "${{ inputs.dry_run }}" == "true" ]]; then
             ARGS="$ARGS --dry-run"
