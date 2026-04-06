@@ -46,7 +46,7 @@ jobs:
           cache-dependency-path: terraphim_ai_nodejs/yarn.lock
 
       - name: Install dependencies
-        run: yarn install --frozen-lockfile --ignore-optional
+        run: npm install --omit=optional
 
       - name: Check package.json validity
         run: |
@@ -122,7 +122,7 @@ jobs:
 
       - name: Install dependencies
         if: ${{ !matrix.settings.cross }}
-        run: yarn install --frozen-lockfile --ignore-optional
+        run: npm install --omit=optional
 
       - name: Build cross-compilation docker image
         if: ${{ matrix.settings.cross }}
@@ -141,7 +141,7 @@ jobs:
             -e CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc \
             -e CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++ \
             terraphim-nodejs-builder \
-            bash -c "yarn install --frozen-lockfile --ignore-optional && ${{ matrix.settings.build }}"
+            bash -c "npm install --omit=optional && ${{ matrix.settings.build }}"
 
       - name: Build
         run: ${{ matrix.settings.build }}
@@ -184,7 +184,7 @@ jobs:
           cache-dependency-path: terraphim_ai_nodejs/yarn.lock
 
       - name: Install dependencies
-        run: yarn install --frozen-lockfile --ignore-optional
+        run: npm install --omit=optional
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -236,7 +236,7 @@ jobs:
           cache-dependency-path: terraphim_ai_nodejs/yarn.lock
 
       - name: Install dependencies
-        run: yarn install --frozen-lockfile --ignore-optional
+        run: npm install --omit=optional
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -285,7 +285,7 @@ jobs:
           cache-dependency-path: terraphim_ai_nodejs/yarn.lock
 
       - name: Install dependencies
-        run: yarn install --frozen-lockfile --ignore-optional
+        run: npm install --omit=optional
 
       - name: Download macOS x64 artifact
         uses: actions/download-artifact@v4
@@ -334,7 +334,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: terraphim_ai_nodejs
-        run: yarn install --frozen-lockfile --ignore-optional
+        run: npm install --omit=optional
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
