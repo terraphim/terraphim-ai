@@ -12,9 +12,7 @@ use thiserror::Error;
 use tokio::sync::RwLock;
 use tracing::{debug, info};
 
-use crate::shared_learning::types::{
-    LearningSource, SharedLearning, TrustLevel,
-};
+use crate::shared_learning::types::{LearningSource, SharedLearning, TrustLevel};
 
 #[derive(Error, Debug)]
 pub enum StoreError {
@@ -179,6 +177,7 @@ impl Bm25Scorer {
     }
 }
 
+#[allow(dead_code)]
 pub struct SharedLearningStore {
     storage: Arc<DeviceStorage>,
     index: RwLock<HashMap<String, SharedLearning>>,
@@ -262,7 +261,10 @@ impl SharedLearningStore {
 
             if let Some((existing_id, score)) = best_match {
                 if score >= self.config.similarity_threshold {
-                    debug!("Merging with existing learning {} (score={:.3})", existing_id, score);
+                    debug!(
+                        "Merging with existing learning {} (score={:.3})",
+                        existing_id, score
+                    );
                     self.merge_learning(&existing_id, &learning).await?;
                     return Ok(StoreResult::Merged(existing_id));
                 }
@@ -626,7 +628,10 @@ mod tests {
 
         store.insert(learning).await.unwrap();
 
-        let suggestions = store.suggest("git push problems", "test-agent", 5).await.unwrap();
+        let suggestions = store
+            .suggest("git push problems", "test-agent", 5)
+            .await
+            .unwrap();
         assert!(!suggestions.is_empty());
         assert_eq!(suggestions[0].title, "Git Push Error");
     }

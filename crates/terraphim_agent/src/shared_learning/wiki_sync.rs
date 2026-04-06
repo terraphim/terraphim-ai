@@ -130,12 +130,18 @@ impl GiteaWikiClient {
         if exists {
             // Update existing page
             self.update_wiki_page(&page_name, &content).await?;
-            info!("Updated wiki page for learning {}: {}", learning.id, page_name);
+            info!(
+                "Updated wiki page for learning {}: {}",
+                learning.id, page_name
+            );
             Ok(SyncResult::Updated(page_name))
         } else {
             // Create new page
             self.create_wiki_page(&page_name, &content).await?;
-            info!("Created wiki page for learning {}: {}", learning.id, page_name);
+            info!(
+                "Created wiki page for learning {}: {}",
+                learning.id, page_name
+            );
             Ok(SyncResult::Created(page_name))
         }
     }
@@ -155,7 +161,9 @@ impl GiteaWikiClient {
                 page_name,
             ])
             .output()
-            .map_err(|e| WikiSyncError::GiteaRobot(format!("Failed to execute gitea-robot: {}", e)))?;
+            .map_err(|e| {
+                WikiSyncError::GiteaRobot(format!("Failed to execute gitea-robot: {}", e))
+            })?;
 
         if output.status.success() {
             Ok(true)
@@ -170,11 +178,7 @@ impl GiteaWikiClient {
     }
 
     /// Create a new wiki page
-    async fn create_wiki_page(
-        &self,
-        page_name: &str,
-        content: &str,
-    ) -> Result<(), WikiSyncError> {
+    async fn create_wiki_page(&self, page_name: &str, content: &str) -> Result<(), WikiSyncError> {
         let output = Command::new(&self.config.robot_path)
             .env("GITEA_URL", &self.config.gitea_url)
             .env("GITEA_TOKEN", &self.config.token)
@@ -192,7 +196,9 @@ impl GiteaWikiClient {
                 &format!("Add shared learning: {}", page_name),
             ])
             .output()
-            .map_err(|e| WikiSyncError::GiteaRobot(format!("Failed to execute gitea-robot: {}", e)))?;
+            .map_err(|e| {
+                WikiSyncError::GiteaRobot(format!("Failed to execute gitea-robot: {}", e))
+            })?;
 
         if output.status.success() {
             Ok(())
@@ -207,11 +213,7 @@ impl GiteaWikiClient {
     }
 
     /// Update an existing wiki page
-    async fn update_wiki_page(
-        &self,
-        page_name: &str,
-        content: &str,
-    ) -> Result<(), WikiSyncError> {
+    async fn update_wiki_page(&self, page_name: &str, content: &str) -> Result<(), WikiSyncError> {
         let output = Command::new(&self.config.robot_path)
             .env("GITEA_URL", &self.config.gitea_url)
             .env("GITEA_TOKEN", &self.config.token)
@@ -229,7 +231,9 @@ impl GiteaWikiClient {
                 &format!("Update shared learning: {}", page_name),
             ])
             .output()
-            .map_err(|e| WikiSyncError::GiteaRobot(format!("Failed to execute gitea-robot: {}", e)))?;
+            .map_err(|e| {
+                WikiSyncError::GiteaRobot(format!("Failed to execute gitea-robot: {}", e))
+            })?;
 
         if output.status.success() {
             Ok(())
@@ -258,7 +262,9 @@ impl GiteaWikiClient {
                 page_name,
             ])
             .output()
-            .map_err(|e| WikiSyncError::GiteaRobot(format!("Failed to execute gitea-robot: {}", e)))?;
+            .map_err(|e| {
+                WikiSyncError::GiteaRobot(format!("Failed to execute gitea-robot: {}", e))
+            })?;
 
         if output.status.success() {
             info!("Deleted wiki page: {}", page_name);
@@ -299,7 +305,9 @@ impl GiteaWikiClient {
                 &self.config.repo,
             ])
             .output()
-            .map_err(|e| WikiSyncError::GiteaRobot(format!("Failed to execute gitea-robot: {}", e)))?;
+            .map_err(|e| {
+                WikiSyncError::GiteaRobot(format!("Failed to execute gitea-robot: {}", e))
+            })?;
 
         if output.status.success() {
             let stdout = String::from_utf8_lossy(&output.stdout);
@@ -317,10 +325,12 @@ impl GiteaWikiClient {
 }
 
 /// Sync service that periodically syncs learnings to Gitea wiki
+#[allow(dead_code)]
 pub struct WikiSyncService {
     client: GiteaWikiClient,
 }
 
+#[allow(dead_code)]
 impl WikiSyncService {
     /// Create new sync service
     pub fn new(client: GiteaWikiClient) -> Self {
@@ -357,6 +367,7 @@ impl WikiSyncService {
 }
 
 /// Report of a wiki sync operation
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct WikiSyncReport {
     pub created: usize,
@@ -367,6 +378,7 @@ pub struct WikiSyncReport {
     pub results: Vec<(String, Result<SyncResult, WikiSyncError>)>,
 }
 
+#[allow(dead_code)]
 impl WikiSyncReport {
     /// Check if all operations were successful
     pub fn all_success(&self) -> bool {
