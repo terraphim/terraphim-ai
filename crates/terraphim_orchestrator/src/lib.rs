@@ -2341,7 +2341,7 @@ impl AgentOrchestrator {
                     .as_ref()
                     .and_then(|r| r.probe_results_dir.clone())
                 {
-                    let _ = self.provider_health.save_results(&dir).await;
+                    let _ = self.provider_health.save_results(dir.as_path()).await;
                 }
             }
         }
