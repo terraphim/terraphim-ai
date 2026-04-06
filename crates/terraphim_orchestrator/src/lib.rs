@@ -138,6 +138,8 @@ struct ManagedAgent {
     /// Broadcast receiver for draining output events to nightwatch.
     output_rx: broadcast::Receiver<OutputEvent>,
     spawned_by_mention: bool,
+    /// Git worktree path for workspace isolation (None = shared working_dir).
+    worktree_path: Option<PathBuf>,
 }
 
 /// The main orchestrator that runs the dark factory.
@@ -967,6 +969,19 @@ impl AgentOrchestrator {
         let use_stdin =
             persona_found || !skill_content.is_empty() || composed_task.len() > STDIN_THRESHOLD;
 
+        // Create isolated git worktree for implementation-tier agents that modify code.
+        // Review-tier agents (haiku) are read-only and don't need isolation.
+        let needs_isolation = model.as_ref().map(|m| !m.contains("haiku")).unwrap_or(true);
+        let worktree_path = if needs_isolation {
+            self.create_agent_worktree(&def.name).await
+        } else {
+            None
+        };
+        let agent_working_dir = worktree_path
+            .as_ref()
+            .unwrap_or(&self.config.working_dir)
+            .clone();
+
         // Build primary Provider from the agent definition for the spawner.
         let primary_provider = terraphim_types::capability::Provider {
             id: def.name.clone(),
@@ -974,7 +989,7 @@ impl AgentOrchestrator {
             provider_type: terraphim_types::capability::ProviderType::Agent {
                 agent_id: def.name.clone(),
                 cli_command: effective_cli.clone(),
-                working_dir: self.config.working_dir.clone(),
+                working_dir: agent_working_dir.clone(),
             },
             capabilities: vec![],
             cost_level: terraphim_types::capability::CostLevel::Cheap,
@@ -990,7 +1005,7 @@ impl AgentOrchestrator {
                 provider_type: terraphim_types::capability::ProviderType::Agent {
                     agent_id: format!("{}-fallback", def.name),
                     cli_command: fallback_cli.clone(),
-                    working_dir: self.config.working_dir.clone(),
+                    working_dir: agent_working_dir.clone(),
                 },
                 capabilities: vec![],
                 cost_level: terraphim_types::capability::CostLevel::Cheap,
@@ -1048,6 +1063,7 @@ impl AgentOrchestrator {
                 restart_count,
                 output_rx,
                 spawned_by_mention: false,
+                worktree_path,
             },
         );
 
@@ -2070,14 +2086,101 @@ impl AgentOrchestrator {
         }
     }
 
+    /// Create a git worktree for an agent to work in isolation.
+    ///
+    /// Returns the worktree path if successful, None if worktree creation fails
+    /// (fail-open: agent uses shared working_dir instead).
+    async fn create_agent_worktree(&self, agent_name: &str) -> Option<PathBuf> {
+        let worktree_root = PathBuf::from("/tmp/adf-worktrees");
+        if let Err(e) = tokio::fs::create_dir_all(&worktree_root).await {
+            warn!(agent = %agent_name, error = %e, "failed to create worktree root");
+            return None;
+        }
+
+        let id = uuid::Uuid::new_v4().to_string()[..8].to_string();
+        let worktree_path = worktree_root.join(format!("{agent_name}-{id}"));
+
+        let output = tokio::process::Command::new("git")
+            .args([
+                "worktree",
+                "add",
+                "--detach",
+                &worktree_path.to_string_lossy(),
+                "HEAD",
+            ])
+            .current_dir(&self.config.working_dir)
+            .output()
+            .await;
+
+        match output {
+            Ok(o) if o.status.success() => {
+                info!(
+                    agent = %agent_name,
+                    path = %worktree_path.display(),
+                    "created isolated git worktree"
+                );
+                Some(worktree_path)
+            }
+            Ok(o) => {
+                let stderr = String::from_utf8_lossy(&o.stderr);
+                warn!(
+                    agent = %agent_name,
+                    error = %stderr.chars().take(200).collect::<String>(),
+                    "git worktree add failed, using shared working_dir"
+                );
+                None
+            }
+            Err(e) => {
+                warn!(agent = %agent_name, error = %e, "git worktree command failed");
+                None
+            }
+        }
+    }
+
+    /// Remove a git worktree after an agent finishes.
+    async fn remove_agent_worktree(&self, agent_name: &str, worktree_path: &Path) {
+        // Force-remove even if there are uncommitted changes (they were already
+        // committed by try_commit_agent_work or are intentionally discarded).
+        let output = tokio::process::Command::new("git")
+            .args([
+                "worktree",
+                "remove",
+                "--force",
+                &worktree_path.to_string_lossy(),
+            ])
+            .current_dir(&self.config.working_dir)
+            .output()
+            .await;
+
+        match output {
+            Ok(o) if o.status.success() => {
+                info!(
+                    agent = %agent_name,
+                    path = %worktree_path.display(),
+                    "removed agent worktree"
+                );
+            }
+            Ok(o) => {
+                let stderr = String::from_utf8_lossy(&o.stderr);
+                warn!(
+                    agent = %agent_name,
+                    path = %worktree_path.display(),
+                    error = %stderr.chars().take(200).collect::<String>(),
+                    "git worktree remove failed"
+                );
+            }
+            Err(e) => {
+                warn!(agent = %agent_name, error = %e, "git worktree remove command failed");
+            }
+        }
+    }
+
     /// Attempt to commit any uncommitted working tree changes made by an agent.
     ///
     /// This runs `git add -A && git diff --cached --quiet` to check if there
     /// are changes, then commits with a standard message. Failures are logged
     /// but not propagated — agent work is best-effort.
-    async fn try_commit_agent_work(&self, agent_name: &str) {
-        let working_dir = &self.config.working_dir;
-
+    async fn try_commit_agent_work(&self, agent_name: &str, working_dir: &Path) {
         // Stage all changes
         let add = tokio::process::Command::new("git")
             .args(["add", "-A"])
@@ -2537,14 +2640,25 @@ impl AgentOrchestrator {
 
         // Process natural exits
 
-        // NOW remove from active_agents and handle exits
+        // NOW remove from active_agents and handle exits.
+        // Capture worktree_path before removing so we can commit + clean up.
         for (name, def, status) in exited {
+            let worktree_path = self
+                .active_agents
+                .get(&name)
+                .and_then(|m| m.worktree_path.clone());
             self.active_agents.remove(&name);
             self.handle_agent_exit(&name, &def, status);
 
-            // Auto-commit any working tree changes the agent made
+            // Auto-commit in the agent's working directory (worktree or shared)
+            let commit_dir = worktree_path.as_deref().unwrap_or(&self.config.working_dir);
             if status.success() {
-                self.try_commit_agent_work(&name).await;
+                self.try_commit_agent_work(&name, commit_dir).await;
+            }
+
+            // Clean up the worktree after committing
+            if let Some(ref wt) = worktree_path {
+                self.remove_agent_worktree(&name, wt).await;
             }
         }
     }
