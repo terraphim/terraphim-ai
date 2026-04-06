@@ -7,8 +7,10 @@
 //!
 //! Uses ratatui's TestBackend for TUI rendering tests without mocks.
 
+#[cfg(feature = "firecracker")]
+use terraphim_agent::repl::commands::VmSubcommand;
 use terraphim_agent::repl::commands::{
-    ConfigSubcommand, ReplCommand, RobotSubcommand, RoleSubcommand, UpdateSubcommand, VmSubcommand,
+    ConfigSubcommand, ReplCommand, RobotSubcommand, RoleSubcommand, UpdateSubcommand,
 };
 
 /// Test that the REPL command parser correctly parses basic commands
@@ -657,6 +659,7 @@ fn test_command_help_retrieval() {
 }
 
 /// Test VM command parsing
+#[cfg(feature = "firecracker")]
 #[test]
 fn test_repl_vm_command_parsing() {
     let cmd: Result<ReplCommand, _> = "/vm list".parse();

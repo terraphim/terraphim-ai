@@ -20,4 +20,7 @@ pub mod chat;
 pub mod mcp_tools;
 
 #[cfg(feature = "repl")]
-pub use handler::{run_repl_offline_mode, run_repl_server_mode};
+pub use handler::run_repl_offline_mode;
+
+#[cfg(all(feature = "repl", feature = "server"))]
+pub use handler::run_repl_server_mode;

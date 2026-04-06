@@ -177,6 +177,7 @@ impl Bm25Scorer {
     }
 }
 
+#[allow(dead_code)]
 pub struct SharedLearningStore {
     storage: Arc<DeviceStorage>,
     index: RwLock<HashMap<String, SharedLearning>>,
