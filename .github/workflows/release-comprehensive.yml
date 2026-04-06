@@ -543,19 +543,40 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      - name: Download all artifacts
+      - name: Download binary artifacts
         uses: actions/download-artifact@v4
         id: download
+        with:
+          pattern: binaries-*
+        continue-on-error: true
+
+      - name: Download Debian package artifacts
+        uses: actions/download-artifact@v4
+        id: download_debian
+        with:
+          name: debian-packages
         continue-on-error: true
 
       - name: Retry artifact download if needed
-        if: steps.download.outcome == 'failure'
+        if: steps.download.outcome == 'failure' || steps.download_debian.outcome == 'failure'
         run: |
           echo "Artifact download failed, retrying with gh CLI..."
           for attempt in 1 2 3; do
             echo "Download attempt $attempt..."
             sleep 30
-            gh run download ${{ github.run_id }} --dir . && break
+
+            rm -rf binaries-* debian-packages
+
+            gh run download ${{ github.run_id }} --dir . -n debian-packages
+
+            gh api \
+              repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts \
+              --jq '.artifacts[].name' \
+              | grep '^binaries-' \
+              | while read artifact_name; do
+                  gh run download ${{ github.run_id }} --dir . -n "$artifact_name"
+                done && break
+
             if [ $attempt -eq 3 ]; then
               echo "Failed to download artifacts after 3 attempts"
               exit 1
@@ -826,10 +847,10 @@ jobs:
 
   publish-crates:
     name: Publish Rust crates to crates.io
-    needs: create-release
+    needs: verify-versions
     runs-on: ubuntu-latest
     # Use always() to run even if some upstream jobs failed, but only for version tags
-    if: always() && startsWith(github.ref, 'refs/tags/v') && needs.create-release.result == 'success'
+    if: always() && startsWith(github.ref, 'refs/tags/v') && needs.verify-versions.result == 'success'
     # NOTE: environment removed to avoid approval requirements
 
     steps:

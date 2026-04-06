@@ -1,0 +1,107 @@
+name: Publish WASM Package
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (semantic version)'
+        required: true
+        type: string
+      dry_run:
+        description: 'Run in dry-run mode only'
+        required: false
+        type: boolean
+        default: true
+      tag:
+        description: 'npm tag (latest, beta, next)'
+        required: false
+        type: string
+        default: latest
+  push:
+    tags:
+      - 'v*'
+      - 'wasm-v*'
+
+permissions:
+  contents: read
+
+jobs:
+  publish-wasm:
+    name: Build and publish wasm package
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: crates/terraphim_automata/wasm-test
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+          registry-url: https://registry.npmjs.org
+
+      - name: Install wasm-pack
+        uses: jetli/wasm-pack-action@v0.4.0
+        with:
+          version: latest
+
+      - name: Determine publish version
+        id: version
+        run: |
+          VERSION="${{ inputs.version }}"
+          if [[ -z "$VERSION" ]]; then
+            if [[ "${{ github.ref }}" == refs/tags/wasm-v* ]]; then
+              VERSION=${GITHUB_REF#refs/tags/wasm-v}
+            elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+              VERSION=${GITHUB_REF#refs/tags/v}
+            fi
+          fi
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid version format: $VERSION"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Build wasm package
+        run: wasm-pack build --release --target web
+
+      - name: Set npm package version
+        working-directory: crates/terraphim_automata/wasm-test/pkg
+        run: npm version "${{ steps.version.outputs.version }}" --no-git-tag-version
+
+      - name: Prepare npm token
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+        run: |
+          if command -v op >/dev/null 2>&1; then
+            TOKEN=$(op read "op://TerraphimPlatform/npm.token/password" 2>/dev/null || true)
+            if [[ -n "$TOKEN" ]]; then
+              echo "NPM_TOKEN=$TOKEN" >> "$GITHUB_ENV"
+            fi
+          fi
+          if [[ -z "${NPM_TOKEN:-}" ]]; then
+            echo "NPM_TOKEN=${{ secrets.NPM_TOKEN }}" >> "$GITHUB_ENV"
+          fi
+
+      - name: Publish wasm package
+        working-directory: crates/terraphim_automata/wasm-test/pkg
+        env:
+          NODE_AUTH_TOKEN: ${{ env.NPM_TOKEN }}
+        run: |
+          NPM_TAG="${{ inputs.tag }}"
+          if [[ -z "$NPM_TAG" ]]; then
+            NPM_TAG=latest
+          fi
+          if [[ "${{ inputs.dry_run }}" == "true" ]]; then
+            npm publish --dry-run --access public --tag "$NPM_TAG"
+          else
+            npm publish --access public --tag "$NPM_TAG"
+          fi
