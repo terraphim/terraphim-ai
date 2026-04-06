@@ -46,7 +46,8 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: '20'
-          registry-url: https://registry.npmjs.org
+          registry-url: https://npm.pkg.github.com
+          scope: '@terraphim'
 
       - name: Install wasm-pack
         uses: jetli/wasm-pack-action@v0.4.0
@@ -77,33 +78,20 @@ jobs:
         working-directory: crates/terraphim_automata/wasm-test/pkg
         run: |
           npm pkg set name='@terraphim/automata-wasm'
+          npm pkg set publishConfig.registry='https://npm.pkg.github.com'
           npm version "${{ steps.version.outputs.version }}" --no-git-tag-version
-
-      - name: Prepare npm token
-        env:
-          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
-        run: |
-          if command -v op >/dev/null 2>&1; then
-            TOKEN=$(op read "op://TerraphimPlatform/npm.token/password" 2>/dev/null || true)
-            if [[ -n "$TOKEN" ]]; then
-              echo "NPM_TOKEN=$TOKEN" >> "$GITHUB_ENV"
-            fi
-          fi
-          if [[ -z "${NPM_TOKEN:-}" ]]; then
-            echo "NPM_TOKEN=${{ secrets.NPM_TOKEN }}" >> "$GITHUB_ENV"
-          fi
 
       - name: Publish wasm package
         working-directory: crates/terraphim_automata/wasm-test/pkg
         env:
-          NODE_AUTH_TOKEN: ${{ env.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           NPM_TAG="${{ inputs.tag }}"
           if [[ -z "$NPM_TAG" ]]; then
             NPM_TAG=latest
           fi
           if [[ "${{ inputs.dry_run }}" == "true" ]]; then
-            npm publish --dry-run --access public --tag "$NPM_TAG"
+            npm publish --dry-run --tag "$NPM_TAG"
           else
-            npm publish --access public --tag "$NPM_TAG"
+            npm publish --tag "$NPM_TAG"
           fi
