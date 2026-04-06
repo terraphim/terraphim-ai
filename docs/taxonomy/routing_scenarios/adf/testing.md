@@ -12,7 +12,7 @@ synonyms:: test, QA, regression, integration test, browser test, test guardian,
 trigger:: test execution, failure analysis, and quality assurance tasks
 
 route:: kimi, kimi-for-coding/k2p5
-action:: opencode -m kimi-for-coding/k2p5 -p "{{ prompt }}"
+action:: opencode run -m {{ model }} "{{ prompt }}"
 
 route:: anthropic, claude-sonnet-4-6
-action:: /home/alex/.local/bin/claude --model claude-sonnet-4-6 -p "{{ prompt }}" --max-turns 50
+action:: /home/alex/.local/bin/claude --model {{ model }} -p "{{ prompt }}" --max-turns 50

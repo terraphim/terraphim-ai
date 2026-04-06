@@ -13,7 +13,7 @@ synonyms:: security audit, vulnerability scan, compliance check, CVE, cargo audi
 trigger:: automated security scanning and vulnerability detection in Rust codebase
 
 route:: kimi, kimi-for-coding/k2p5
-action:: opencode -m kimi-for-coding/k2p5 -p "{{ prompt }}"
+action:: opencode run -m {{ model }} "{{ prompt }}"
 
 route:: anthropic, claude-sonnet-4-6
-action:: /home/alex/.local/bin/claude --model claude-sonnet-4-6 -p "{{ prompt }}" --max-turns 30
+action:: /home/alex/.local/bin/claude --model {{ model }} -p "{{ prompt }}" --max-turns 30

@@ -13,7 +13,7 @@ synonyms:: code review, architecture review, spec validation, quality assessment
 trigger:: thorough code review requiring architectural reasoning and quality judgement
 
 route:: anthropic, claude-opus-4-6
-action:: /home/alex/.local/bin/claude --model claude-opus-4-6 -p "{{ prompt }}" --max-turns 50
+action:: /home/alex/.local/bin/claude --model {{ model }} -p "{{ prompt }}" --max-turns 50
 
 route:: kimi, kimi-for-coding/k2p5
-action:: opencode -m kimi-for-coding/k2p5 -p "{{ prompt }}"
+action:: opencode run -m {{ model }} "{{ prompt }}"

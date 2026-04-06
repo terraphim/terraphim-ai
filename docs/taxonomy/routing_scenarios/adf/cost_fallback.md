@@ -13,7 +13,7 @@ synonyms:: cheap, budget, low priority, background, batch, economy,
 trigger:: low-priority batch processing where cost minimisation is the primary concern
 
 route:: openai, gpt-5-nano
-action:: opencode -m gpt-5-nano -p "{{ prompt }}"
+action:: opencode run -m {{ model }} "{{ prompt }}"
 
 route:: minimax, minimax-m2.5-free
-action:: opencode -m minimax-m2.5-free -p "{{ prompt }}"
+action:: opencode run -m {{ model }} "{{ prompt }}"

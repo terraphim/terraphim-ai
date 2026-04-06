@@ -14,7 +14,7 @@ synonyms:: meta-coordination, strategic planning, architecture review,
 trigger:: high-level strategic reasoning and cross-agent coordination decisions
 
 route:: anthropic, claude-opus-4-6
-action:: /home/alex/.local/bin/claude --model claude-opus-4-6 -p "{{ prompt }}" --max-turns 50
+action:: /home/alex/.local/bin/claude --model {{ model }} -p "{{ prompt }}" --max-turns 50
 
 route:: anthropic, claude-haiku-4-5
-action:: /home/alex/.local/bin/claude --model claude-haiku-4-5 -p "{{ prompt }}" --max-turns 30
+action:: /home/alex/.local/bin/claude --model {{ model }} -p "{{ prompt }}" --max-turns 30
