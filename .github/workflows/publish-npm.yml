@@ -383,9 +383,16 @@ jobs:
           ls -la npm/
 
           # Update package.json version if needed
+          VERSION_TO_USE=""
           if [[ "${{ inputs.version }}" != "" ]]; then
-            echo "📝 Updating version to ${{ inputs.version }}"
-            npm version ${{ inputs.version }} --no-git-tag-version
+            VERSION_TO_USE="${{ inputs.version }}"
+          elif [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == refs/tags/* ]]; then
+            VERSION_TO_USE=$(echo "${{ github.ref }}" | sed 's#refs/tags/nodejs-v##; s#refs/tags/v##')
+          fi
+
+          if [[ "$VERSION_TO_USE" != "" ]]; then
+            echo "📝 Updating version to $VERSION_TO_USE"
+            npm version $VERSION_TO_USE --no-git-tag-version
           fi
 
       - name: Configure npm for GitHub Packages
