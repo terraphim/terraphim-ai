@@ -325,10 +325,12 @@ impl GiteaWikiClient {
 }
 
 /// Sync service that periodically syncs learnings to Gitea wiki
+#[allow(dead_code)]
 pub struct WikiSyncService {
     client: GiteaWikiClient,
 }
 
+#[allow(dead_code)]
 impl WikiSyncService {
     /// Create new sync service
     pub fn new(client: GiteaWikiClient) -> Self {
@@ -365,6 +367,7 @@ impl WikiSyncService {
 }
 
 /// Report of a wiki sync operation
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct WikiSyncReport {
     pub created: usize,
@@ -375,6 +378,7 @@ pub struct WikiSyncReport {
     pub results: Vec<(String, Result<SyncResult, WikiSyncError>)>,
 }
 
+#[allow(dead_code)]
 impl WikiSyncReport {
     /// Check if all operations were successful
     pub fn all_success(&self) -> bool {
