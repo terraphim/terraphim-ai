@@ -39,6 +39,7 @@ pub mod dual_mode;
 pub mod error;
 pub mod flow;
 pub mod handoff;
+pub mod kg_router;
 pub mod learning;
 pub mod mention;
 pub mod metrics_persistence;
