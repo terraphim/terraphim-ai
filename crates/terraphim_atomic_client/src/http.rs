@@ -137,12 +137,7 @@ pub mod wasm {
             let auth_headers = get_authentication_headers(agent, subject, "GET")?;
             for (key, value) in auth_headers.iter() {
                 headers
-                    .append(
-                        key.as_str(),
-                        value.to_str().map_err(|e| {
-                            AtomicError::Api(format!("Invalid header value: {:?}", e))
-                        })?,
-                    )
+                    .append(key.as_str(), value.as_str())
                     .map_err(|e| AtomicError::Api(format!("Failed to append header: {:?}", e)))?;
             }
         }

@@ -47,7 +47,7 @@
   "author": "Terraphim Contributors <info@terraphim.ai>",
   "license": "MIT",
   "devDependencies": {
-    "@napi-rs/cli": "^2.18.4",
+    "@napi-rs/cli": "^3.6.0",
     "ava": "^6.0.1"
   },
   "ava": {
@@ -76,11 +76,11 @@
     "README.md"
   ],
   "optionalDependencies": {
-    "@terraphim/autocomplete-linux-x64-gnu": "1.0.0",
     "@terraphim/autocomplete-darwin-arm64": "1.0.0",
+    "@terraphim/autocomplete-darwin-universal": "1.0.0",
     "@terraphim/autocomplete-linux-arm64-gnu": "1.0.0",
+    "@terraphim/autocomplete-linux-x64-gnu": "1.0.0",
     "@terraphim/autocomplete-win32-arm64-msvc": "1.0.0",
-    "@terraphim/autocomplete-win32-x64-msvc": "1.0.0",
-    "@terraphim/autocomplete-darwin-universal": "1.0.0"
+    "@terraphim/autocomplete-win32-x64-msvc": "1.0.0"
   }
 }

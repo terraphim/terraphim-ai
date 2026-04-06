@@ -28,7 +28,7 @@ wasm-bindgen-futures = "0.4.37"
 serde_derive = "^1.0.59"
 
 [dependencies.serde]
-workspace = true
+version = "1.0"
 features = ["derive"]
 [dependencies.web-sys]
 version = "0.3.64"
