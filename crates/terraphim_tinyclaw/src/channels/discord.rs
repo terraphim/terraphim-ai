@@ -1,4 +1,8 @@
-//! Discord channel adapter using serenity.
+//! Discord channel adapter stub.
+//!
+//! Discord support is currently disabled pending serenity 0.13+ (rustls 0.23+).
+//! serenity 0.12 transitively pulls rustls-webpki 0.102.8 (RUSTSEC-2026-0049).
+//! Re-enable once serenity 0.13+ is released with clean rustls 0.23 support.
 
 use crate::bus::{MessageBus, OutboundMessage};
 use crate::channel::Channel;
@@ -7,7 +11,7 @@ use async_trait::async_trait;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-/// Discord channel adapter.
+/// Discord channel adapter (stubbed; serenity removed to fix RUSTSEC-2026-0049).
 pub struct DiscordChannel {
     config: DiscordConfig,
     running: Arc<AtomicBool>,
@@ -29,134 +33,25 @@ impl Channel for DiscordChannel {
         "discord"
     }
 
-    async fn start(&self, bus: Arc<MessageBus>) -> anyhow::Result<()> {
-        log::info!("Discord channel starting");
-        self.running.store(true, Ordering::SeqCst);
-
-        #[cfg(feature = "discord")]
-        {
-            use crate::bus::InboundMessage;
-            use serenity::async_trait as serenity_async_trait;
-            use serenity::model::channel::Message as DiscordMessage;
-            use serenity::model::gateway::Ready;
-            use serenity::prelude::*;
-
-            struct Handler {
-                inbound_tx: tokio::sync::mpsc::Sender<InboundMessage>,
-                allow_from: Vec<String>,
-            }
-
-            #[serenity_async_trait]
-            impl EventHandler for Handler {
-                async fn message(&self, _ctx: Context, msg: DiscordMessage) {
-                    // Ignore bot messages
-                    if msg.author.bot {
-                        return;
-                    }
-
-                    let sender_id = msg.author.id.to_string();
-                    let username = msg.author.name.clone();
-
-                    // Check allowlist ("*" allows all)
-                    if !crate::channel::is_sender_allowed(&self.allow_from, &sender_id)
-                        && !crate::channel::is_sender_allowed(&self.allow_from, &username)
-                    {
-                        log::warn!(
-                            "Discord: rejected message from unauthorized user: {} ({})",
-                            sender_id,
-                            username
-                        );
-                        return;
-                    }
-
-                    let chat_id = msg.channel_id.to_string();
-                    let inbound =
-                        InboundMessage::new("discord", &sender_id, &chat_id, &msg.content);
-                    if let Err(e) = self.inbound_tx.send(inbound).await {
-                        log::error!("Failed to forward Discord message to bus: {}", e);
-                    }
-                }
-
-                async fn ready(&self, _ctx: Context, ready: Ready) {
-                    log::info!("Discord bot connected as {}", ready.user.name);
-                }
-            }
-
-            let token = self.config.token.clone();
-            let allow_from = self.config.allow_from.clone();
-            let inbound_tx = bus.inbound_sender();
-            let running = self.running.clone();
-
-            log::info!("Discord bot starting");
-
-            tokio::spawn(async move {
-                let intents = GatewayIntents::GUILD_MESSAGES
-                    | GatewayIntents::DIRECT_MESSAGES
-                    | GatewayIntents::MESSAGE_CONTENT;
-
-                let handler = Handler {
-                    inbound_tx,
-                    allow_from,
-                };
-
-                let mut client = match Client::builder(&token, intents)
-                    .event_handler(handler)
-                    .await
-                {
-                    Ok(c) => c,
-                    Err(e) => {
-                        log::error!("Failed to create Discord client: {}", e);
-                        running.store(false, Ordering::SeqCst);
-                        return;
-                    }
-                };
-
-                if let Err(e) = client.start().await {
-                    log::error!("Discord client error: {}", e);
-                }
-                running.store(false, Ordering::SeqCst);
-            });
-
-            Ok(())
-        }
-
-        #[cfg(not(feature = "discord"))]
-        {
-            let _ = bus;
-            anyhow::bail!("Discord feature not enabled")
-        }
+    async fn start(&self, _bus: Arc<MessageBus>) -> anyhow::Result<()> {
+        anyhow::bail!(
+            "Discord support is disabled: serenity 0.12 carries RUSTSEC-2026-0049 \
+             (rustls-webpki CRL bypass). Re-enable once serenity 0.13+ with \
+             rustls 0.23+ support is released."
+        )
     }
 
     async fn stop(&self) -> anyhow::Result<()> {
-        log::info!("Discord channel stopping");
         self.running.store(false, Ordering::SeqCst);
         Ok(())
     }
 
-    async fn send(&self, msg: OutboundMessage) -> anyhow::Result<()> {
-        #[cfg(feature = "discord")]
-        {
-            use serenity::http::Http;
-
-            let http = Http::new(&self.config.token);
-            let channel_id = msg.chat_id.parse::<u64>()?;
-
-            // Discord supports markdown natively, but chunk if too long
-            let chunks = crate::format::chunk_message(&msg.content, 2000);
-
-            for chunk in chunks {
-                serenity::model::id::ChannelId::from(channel_id)
-                    .say(&http, &chunk)
-                    .await?;
-            }
-            Ok(())
-        }
-
-        #[cfg(not(feature = "discord"))]
-        {
-            let _ = msg;
-            anyhow::bail!("Discord feature not enabled")
-        }
+    async fn send(&self, _msg: OutboundMessage) -> anyhow::Result<()> {
+        anyhow::bail!(
+            "Discord support is disabled: serenity 0.12 carries RUSTSEC-2026-0049 \
+             (rustls-webpki CRL bypass). Re-enable once serenity 0.13+ with \
+             rustls 0.23+ support is released."
+        )
     }
 
     fn is_running(&self) -> bool {
