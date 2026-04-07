@@ -376,8 +376,12 @@ fn test_chat_command() -> Result<()> {
     }
 
     // Test chat with role - accept exit code 1 if no LLM configured
-    let (_stdout, stderr, code) =
-        run_tui_command(&["chat", "Test message with role", "--role", "Terraphim Engineer"])?;
+    let (_stdout, stderr, code) = run_tui_command(&[
+        "chat",
+        "Test message with role",
+        "--role",
+        "Terraphim Engineer",
+    ])?;
 
     assert!(
         code == 0 || stderr.to_lowercase().contains("no llm configured"),
