@@ -147,7 +147,6 @@ COPY crates/terraphim_rolegraph crates/terraphim_rolegraph/
 COPY crates/terraphim_rolegraph_py crates/terraphim_rolegraph_py/ 2>/dev/null || true
 COPY crates/terraphim_server crates/terraphim_server/
 COPY crates/terraphim_sessions crates/terraphim_sessions/
-COPY crates/terraphim_tui crates/terraphim_tui/
 COPY crates/terraphim_types crates/terraphim_types/
 COPY crates/haystack_*/ crates/
 COPY terraphim_server ./terraphim_server
@@ -159,7 +158,7 @@ RUN . /root/.profile && \
     cargo build --release --target=$RUST_TARGET \
     --package terraphim_server \
     --package terraphim_mcp_server \
-    --package terraphim_tui
+    --package terraphim_agent
 
 # Test the binaries
 RUN . /root/.profile && \
