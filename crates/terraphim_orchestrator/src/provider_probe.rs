@@ -413,10 +413,11 @@ async fn probe_single(provider: &str, model: &str, action_template: Option<&str>
         format!("{home}/.local/bin:{home}/.bun/bin:{home}/bin:{home}/.cargo/bin:{home}/go/bin",);
 
     // Spawn the child *outside* the timeout so we can kill it if it hangs.
-    // Use process_group(0) so the child gets its own process group -- on
-    // timeout we kill the entire group (bash + opencode + node children).
-    let spawn_result = tokio::process::Command::new("bash")
-        .arg("-c")
+    // Use pre_exec(setsid) to create a new session -- on timeout we kill the
+    // entire session (bash + opencode + node children) via killpg on the
+    // session leader's PID (which equals its PGID after setsid).
+    let mut cmd = tokio::process::Command::new("bash");
+    cmd.arg("-c")
         .arg(&action)
         .env(
             "PATH",
@@ -426,9 +427,16 @@ async fn probe_single(provider: &str, model: &str, action_template: Option<&str>
             ),
         )
         .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .process_group(0)
-        .spawn();
+        .stderr(std::process::Stdio::piped());
+    // SAFETY: setsid is async-signal-safe per POSIX.
+    #[cfg(unix)]
+    unsafe {
+        cmd.pre_exec(|| {
+            nix::unistd::setsid().map_err(std::io::Error::other)?;
+            Ok(())
+        });
+    }
+    let spawn_result = cmd.spawn();
 
     let mut child = match spawn_result {
         Ok(c) => c,
