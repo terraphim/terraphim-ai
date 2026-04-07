@@ -541,17 +541,28 @@ async fn probe_single(provider: &str, model: &str, action_template: Option<&str>
         }
         Err(_) => {
             // Timeout -- kill the child and all its descendants to prevent
-            // zombie opencode/node processes.  The tree is typically:
-            //   bash -> node (bun shim) -> .opencode
-            // Use a bash script that walks /proc to find all descendants.
+            // zombie opencode/node processes.  First kill children, then the
+            // direct child.  bash -> node (bun shim) -> .opencode
             if let Some(pid) = child.id() {
-                let _ = std::process::Command::new("bash")
+                // Collect all descendant PIDs before killing anything,
+                // otherwise reparenting breaks the parent chain.
+                let desc = std::process::Command::new("bash")
                     .arg("-c")
                     .arg(format!(
-                        "kill_tree() {{ for c in $(pgrep -P $1); do kill_tree $c; done; kill -9 $1 2>/dev/null; }}; kill_tree {pid}"
+                        "collect() {{ echo $1; for c in $(pgrep -P $1 2>/dev/null); do collect $c; done; }}; collect {pid}"
                     ))
                     .output();
-                debug!(pid, "killed probe process tree");
+                if let Ok(output) = desc {
+                    let pids = String::from_utf8_lossy(&output.stdout);
+                    for p in pids.lines().rev() {
+                        if let Ok(p) = p.trim().parse::<i32>() {
+                            unsafe {
+                                nix::libc::kill(p, nix::libc::SIGKILL);
+                            }
+                        }
+                    }
+                    debug!(pid, descendants = %pids.lines().count(), "killed probe process tree");
+                }
             }
             let _ = child.kill().await;
             warn!(
