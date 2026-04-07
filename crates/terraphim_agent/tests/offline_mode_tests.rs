@@ -24,7 +24,7 @@ fn run_server_command(args: &[&str]) -> Result<(String, String, i32)> {
     cmd_args.extend_from_slice(args);
 
     let mut cmd = Command::new("cargo");
-    cmd.args(["run", "-p", "terraphim_agent", "--"])
+    cmd.args(["run", "-p", "terraphim_agent", "--features", "server", "--"])
         .args(cmd_args);
 
     let output = cmd.output()?;
@@ -366,13 +366,14 @@ async fn test_server_mode_connection_failure() -> Result<()> {
 async fn test_server_mode_with_custom_url() -> Result<()> {
     // Test server mode with custom URL
     let mut cmd = Command::new("cargo");
-    cmd.args(["run", "-p", "terraphim_agent", "--"]).args([
-        "--server",
-        "--server-url",
-        "http://localhost:9999",
-        "config",
-        "show",
-    ]);
+    cmd.args(["run", "-p", "terraphim_agent", "--features", "server", "--"])
+        .args([
+            "--server",
+            "--server-url",
+            "http://localhost:9999",
+            "config",
+            "show",
+        ]);
 
     let output = cmd.output()?;
     let stderr = String::from_utf8_lossy(&output.stderr);

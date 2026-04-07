@@ -31,6 +31,7 @@
 //!     limit: Some(10),
 //!     role: Some(RoleName::new("engineer")),
 //!     layer: Layer::default(),
+//!     include_pinned: false,
 //! };
 //!
 //! // Multi-term AND query
@@ -981,6 +982,7 @@ pub fn extract_first_paragraph(body: &str) -> String {
 ///     limit: Some(10),
 ///     role: Some(RoleName::new("data_scientist")),
 ///     layer: Layer::default(),
+///     include_pinned: false,
 /// };
 /// ```
 ///
@@ -1018,6 +1020,9 @@ pub struct SearchQuery {
     /// Output layer for controlling result detail (1=minimal, 2=summary, 3=full)
     #[serde(default)]
     pub layer: Layer,
+    /// Include pinned KG entries in results even if they don't match the query
+    #[serde(default)]
+    pub include_pinned: bool,
 }
 
 impl SearchQuery {
@@ -1071,6 +1076,7 @@ impl SearchQuery {
             limit: None,
             role,
             layer: Layer::default(),
+            include_pinned: false,
         }
     }
 }
@@ -2536,6 +2542,7 @@ mod tests {
             limit: Some(10),
             role: Some(RoleName::new("test")),
             layer: Layer::default(),
+            include_pinned: false,
         };
 
         assert!(!single_query.is_multi_term_query());
@@ -2600,6 +2607,7 @@ mod tests {
             limit: Some(10),
             role: Some(RoleName::new("test_role")),
             layer: Layer::default(),
+            include_pinned: false,
         };
 
         let json = serde_json::to_string(&query).unwrap();
@@ -3013,6 +3021,7 @@ mod tests {
             limit: None,
             role: None,
             layer: Layer::Two,
+            include_pinned: false,
         };
 
         let json = serde_json::to_string(&query).unwrap();

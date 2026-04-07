@@ -92,6 +92,7 @@ async fn terraphim_graph_falls_back_to_lexical_when_graph_returns_empty() {
         skip: None,
         limit: None,
         layer: Default::default(),
+        include_pinned: false,
     };
 
     let results = service.search(&query).await.expect("search succeeds");

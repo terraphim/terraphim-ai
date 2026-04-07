@@ -573,8 +573,8 @@ cargo install wasm-pack
 - ✅ Compatible with Chrome 57+, Firefox 52+, Safari 11+
 
 **Example WASM directory:**
-- `crates/terraphim_automata/wasm-test/` - Complete WASM example with tests
-- See `crates/terraphim_automata/wasm-test/README.md` for detailed usage
+- `crates/terraphim_automata/wasm/` - Publishable WASM package with validation tests
+- See `crates/terraphim_automata/wasm/README.md` for detailed usage
 
 ### Testing
 ```bash
