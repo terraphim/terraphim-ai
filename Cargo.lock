@@ -9082,6 +9082,7 @@ dependencies = [
  "handlebars",
  "hex",
  "hmac",
+ "nix 0.27.1",
  "opendal",
  "regex",
  "reqwest 0.12.28",

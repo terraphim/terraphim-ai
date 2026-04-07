@@ -544,37 +544,48 @@ async fn probe_single(provider: &str, model: &str, action_template: Option<&str>
             // zombie opencode/node processes.  First kill children, then the
             // direct child.  bash -> node (bun shim) -> .opencode
             let child_pid = child.id();
+            warn!(
+                provider, model,
+                child_pid = ?child_pid,
+                "probe timeout: entering kill sequence"
+            );
             // Kill descendant tree if we still have the PID.
             if let Some(pid) = child_pid {
+                warn!(provider, model, pid, "killing descendants of probe child");
                 // Collect all descendant PIDs before killing anything,
                 // otherwise reparenting breaks the parent chain.
-                let desc = std::process::Command::new("bash")
+                match std::process::Command::new("bash")
                     .arg("-c")
                     .arg(format!(
                         "collect() {{ echo $1; for c in $(pgrep -P $1 2>/dev/null); do collect $c; done; }}; collect {pid}"
                     ))
-                    .output();
-                if let Ok(output) = desc {
-                    let pids = String::from_utf8_lossy(&output.stdout);
-                    for p in pids.lines().rev() {
-                        if let Ok(p) = p.trim().parse::<i32>() {
-                            unsafe {
-                                nix::libc::kill(p, nix::libc::SIGKILL);
+                    .output()
+                {
+                    Ok(output) => {
+                        let pids_raw = String::from_utf8_lossy(&output.stdout);
+                        let pids: Vec<&str> = pids_raw.lines().collect();
+                        warn!(provider, model, pid, count = pids.len(), pids = ?pids, "collected descendant PIDs");
+                        for p in pids.iter().rev() {
+                            if let Ok(p) = p.trim().parse::<i32>() {
+                                let ret = unsafe { nix::libc::kill(p, nix::libc::SIGKILL) };
+                                warn!(target_pid = p, ret, "sent SIGKILL to probe descendant");
                             }
                         }
                     }
-                    info!(pid, descendants = %pids.lines().count(), "killed probe process tree");
+                    Err(e) => {
+                        warn!(provider, model, error = %e, "failed to collect descendant PIDs");
+                    }
                 }
             } else {
                 // child.id() is None -- process already reaped by tokio.
                 // Fall back to killing by command pattern.
+                warn!(
+                    provider,
+                    model, "child.id()=None, falling back to pkill by pattern"
+                );
                 let _ = std::process::Command::new("pkill")
                     .args(["-9", "-f", &format!("opencode.*{model}.*echo hello")])
                     .output();
-                info!(
-                    provider,
-                    model, "killed timed-out probe by command pattern (child.id()=None)"
-                );
             }
             let _ = child.kill().await;
             warn!(
