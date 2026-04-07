@@ -69,6 +69,7 @@ impl TestFixtures {
             skip: Some(0),
             limit: Some(10),
             layer: Layer::default(),
+            include_pinned: false,
         }
     }
 

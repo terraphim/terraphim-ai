@@ -1025,6 +1025,7 @@ impl TerraphimService {
             skip: None,
             role: None,
             layer: Layer::default(),
+            include_pinned: false,
         };
 
         let documents = self.search(&search_query).await?;
@@ -1400,6 +1401,7 @@ impl TerraphimService {
                 skip: None,
                 limit: None,
                 layer: Layer::default(),
+                include_pinned: false,
             })
             .await?;
         Ok(documents)
@@ -3095,6 +3097,7 @@ mod tests {
             skip: None,
             role: Some(role_name),
             layer: Layer::default(),
+            include_pinned: false,
         };
 
         // Test that Atomic Data URLs are skipped during persistence lookup
@@ -3209,6 +3212,7 @@ mod tests {
             skip: None,
             role: Some(role_name),
             layer: Layer::default(),
+            include_pinned: false,
         };
 
         let result = service.search(&search_query).await;

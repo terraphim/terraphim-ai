@@ -121,6 +121,7 @@ async fn test_weighted_haystack_ranking() {
         limit: None,
         role: Some(RoleName::from("Test Role")),
         layer: Layer::default(),
+        include_pinned: false,
     };
     // Perform search which should apply haystack weights
     let search_result = service.search(&search_query).await.expect("Search failed");
@@ -232,6 +233,7 @@ async fn test_default_weight_handling() {
         limit: None,
         role: Some(RoleName::from("Test Role")),
         layer: Layer::default(),
+        include_pinned: false,
     };
 
     let search_result = service.search(&search_query).await.expect("Search failed");

@@ -277,6 +277,7 @@ async fn search_via_server(
         limit: Some(20),
         role: Some(RoleName::new(role)),
         layer: Layer::default(),
+        include_pinned: false,
     };
 
     let response = client.search(&search_query).await?;
@@ -299,6 +300,8 @@ fn search_via_cli(server_url: &str, query: &str, role: &str) -> Result<(Vec<Docu
             "run",
             "-p",
             "terraphim_agent",
+            "--features",
+            "server",
             "--",
             "--server",
             "--server-url",
