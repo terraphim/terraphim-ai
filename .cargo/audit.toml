@@ -10,4 +10,10 @@
 # RSA timing sidechannel (RUSTSEC-2023-0071) - transitive from sqlx-mysql via opendal
 # No fixed version available yet. We don't use MySQL features directly.
 # Severity: Medium (5.9). Low risk for our use case.
-ignore = ["RUSTSEC-2024-0370", "RUSTSEC-2023-0071"]
+# RUSTSEC-2026-0049 - rustls-webpki CRL matching logic flaw
+# Dependency chain: terraphim_tinyclaw -> serenity -> rustls 0.22.4 -> rustls-webpki 0.102.8
+# serenity is an OPTIONAL dependency behind the `discord` feature flag.
+# The `discord` feature is NOT enabled by default. Production builds do not include serenity.
+# Risk: Zero for default/production deployments. Will be resolved when serenity upgrades
+# its rustls dependency to 0.23+ (serenity 0.12.5 is currently the latest stable release).
+ignore = ["RUSTSEC-2024-0370", "RUSTSEC-2023-0071", "RUSTSEC-2026-0049"]
