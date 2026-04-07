@@ -1,0 +1,104 @@
+warning[parse-error]: error parsing SPDX license expression
+   ┌─ /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/html2md-0.2.15/Cargo.toml:29:12
+   │
+29 │ license = "GPL-3.0+"
+   │            ─────── a deprecated license identifier was used
+   │
+   ├ html2md v0.2.15
+     └── terraphim_middleware v1.16.9
+         ├── terraphim_agent v1.16.9
+         │   ├── (dev) terraphim_agent v1.16.9 (*)
+         │   └── (dev) terraphim_server v1.16.9
+         │       └── terraphim_validation v0.1.0
+         ├── (dev) terraphim_mcp_server v1.0.0
+         ├── terraphim_server v1.16.9 (*)
+         └── terraphim_service v1.16.9
+             ├── terraphim-cli v1.16.9
+             ├── terraphim_agent v1.16.9 (*)
+             ├── terraphim_ai_nodejs v1.0.0
+             ├── terraphim_mcp_server v1.0.0 (*)
+             ├── terraphim_multi_agent v1.0.0
+             │   ├── (dev) terraphim_config v1.15.0
+             │   │   ├── terraphim-cli v1.16.9 (*)
+             │   │   ├── terraphim_agent v1.16.9 (*)
+             │   │   ├── terraphim_ai_nodejs v1.0.0 (*)
+             │   │   ├── (dev) terraphim_mcp_server v1.0.0 (*)
+             │   │   ├── terraphim_middleware v1.16.9 (*)
+             │   │   ├── terraphim_multi_agent v1.0.0 (*)
+             │   │   ├── (dev) terraphim_persistence v1.15.0
+             │   │   │   ├── terraphim-cli v1.16.9 (*)
+             │   │   │   ├── terraphim_agent v1.16.9 (*)
+             │   │   │   ├── terraphim_agent_evolution v1.0.0
+             │   │   │   │   └── terraphim_multi_agent v1.0.0 (*)
+             │   │   │   ├── terraphim_agent_supervisor v1.0.0
+             │   │   │   │   ├── terraphim_agent_messaging v1.0.0
+             │   │   │   │   │   └── terraphim_agent_registry v1.0.0
+             │   │   │   │   │       ├── terraphim_goal_alignment v1.0.0
+             │   │   │   │   │       ├── terraphim_kg_agents v1.0.0
+             │   │   │   │   │       └── terraphim_multi_agent v1.0.0 (*)
+             │   │   │   │   ├── terraphim_agent_registry v1.0.0 (*)
+             │   │   │   │   ├── terraphim_kg_agents v1.0.0 (*)
+             │   │   │   │   └── terraphim_kg_orchestration v1.0.0
+             │   │   │   ├── terraphim_ai_nodejs v1.0.0 (*)
+             │   │   │   ├── terraphim_config v1.15.0 (*)
+             │   │   │   ├── (dev) terraphim_mcp_server v1.0.0 (*)
+             │   │   │   ├── (dev) terraphim_middleware v1.16.9 (*)
+             │   │   │   ├── terraphim_multi_agent v1.0.0 (*)
+             │   │   │   ├── terraphim_orchestrator v1.8.0
+             │   │   │   ├── (dev) terraphim_router v1.8.0
+             │   │   │   │   ├── terraphim_orchestrator v1.8.0 (*)
+             │   │   │   │   └── terraphim_service v1.16.9 (*)
+             │   │   │   ├── terraphim_server v1.16.9 (*)
+             │   │   │   ├── terraphim_service v1.16.9 (*)
+             │   │   │   └── terraphim_usage v1.16.9
+             │   │   │       └── terraphim-cli v1.16.9 (*)
+             │   │   ├── terraphim_server v1.16.9 (*)
+             │   │   ├── terraphim_service v1.16.9 (*)
+             │   │   └── terraphim_validation v0.1.0 (*)
+             │   ├── (dev) terraphim_multi_agent v1.0.0 (*)
+             │   ├── (dev) terraphim_persistence v1.15.0 (*)
+             │   └── terraphim_server v1.16.9 (*)
+             └── terraphim_server v1.16.9 (*)
+
+warning[no-license-field]: license expression was not specified in manifest for crate 'terraphim_ccusage = 1.16.9'
+ ├ terraphim_ccusage v1.16.9
+
+warning[unlicensed]: a valid license expression could not be retrieved for the crate
+  ┌─ path+file:///home/alex/terraphim-ai/crates/terraphim_ccusage#1.16.9-synthesized.toml:2:9
+  │
+2 │ name = "terraphim_ccusage"
+  │         ━━━━━━━━━━━━━━━━━
+  │
+  ├ terraphim_ccusage v1.16.9 (*)
+
+error[unlicensed]: terraphim_ccusage = 1.16.9 is unlicensed
+ ├ terraphim_ccusage v1.16.9 (*)
+
+warning[no-license-field]: license expression was not specified in manifest for crate 'terraphim_usage = 1.16.9'
+ ├ terraphim_usage v1.16.9
+   └── terraphim-cli v1.16.9
+
+warning[unlicensed]: a valid license expression could not be retrieved for the crate
+  ┌─ path+file:///home/alex/terraphim-ai/crates/terraphim_usage#1.16.9-synthesized.toml:2:9
+  │
+2 │ name = "terraphim_usage"
+  │         ━━━━━━━━━━━━━━━
+  │
+  ├ terraphim_usage v1.16.9 (*)
+
+error[unlicensed]: terraphim_usage = 1.16.9 is unlicensed
+ ├ terraphim_usage v1.16.9 (*)
+
+warning[license-not-encountered]: license was not encountered
+   ┌─ /home/alex/terraphim-ai/deny.toml:44:25
+   │
+44 │     "BSL-1.0", "0BSD", "OpenSSL",
+   │                         ━━━━━━━ unmatched license allowance
+
+warning[license-not-encountered]: license was not encountered
+   ┌─ /home/alex/terraphim-ai/deny.toml:43:43
+   │
+43 │     "MPL-2.0", "CC0-1.0", "Unicode-3.0", "Unicode-DFS-2016",
+   │                                           ━━━━━━━━━━━━━━━━ unmatched license allowance
+
+licenses FAILED

@@ -1,0 +1,260 @@
+warning[yanked]: detected yanked crate (try `cargo update -p fastrand`)
+    ┌─ /home/alex/terraphim-ai/Cargo.lock:192:1
+    │
+192 │ fastrand 2.4.0 registry+https://github.com/rust-lang/crates.io-index
+    │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ yanked version
+    │
+    ├ fastrand v2.4.0
+      ├── backon v1.6.0
+      │   └── opendal v0.54.1
+      │       ├── terraphim_config v1.15.0
+      │       │   ├── terraphim-cli v1.16.9
+      │       │   ├── terraphim_agent v1.16.9
+      │       │   │   ├── (dev) terraphim_agent v1.16.9 (*)
+      │       │   │   └── (dev) terraphim_server v1.16.9
+      │       │   │       └── terraphim_validation v0.1.0
+      │       │   ├── terraphim_ai_nodejs v1.0.0
+      │       │   ├── (dev) terraphim_mcp_server v1.0.0
+      │       │   ├── terraphim_middleware v1.16.9
+      │       │   │   ├── terraphim_agent v1.16.9 (*)
+      │       │   │   ├── (dev) terraphim_mcp_server v1.0.0 (*)
+      │       │   │   ├── terraphim_server v1.16.9 (*)
+      │       │   │   └── terraphim_service v1.16.9
+      │       │   │       ├── terraphim-cli v1.16.9 (*)
+      │       │   │       ├── terraphim_agent v1.16.9 (*)
+      │       │   │       ├── terraphim_ai_nodejs v1.0.0 (*)
+      │       │   │       ├── terraphim_mcp_server v1.0.0 (*)
+      │       │   │       ├── terraphim_multi_agent v1.0.0
+      │       │   │       │   ├── (dev) terraphim_config v1.15.0 (*)
+      │       │   │       │   ├── (dev) terraphim_multi_agent v1.0.0 (*)
+      │       │   │       │   ├── (dev) terraphim_persistence v1.15.0
+      │       │   │       │   │   ├── terraphim-cli v1.16.9 (*)
+      │       │   │       │   │   ├── terraphim_agent v1.16.9 (*)
+      │       │   │       │   │   ├── terraphim_agent_evolution v1.0.0
+      │       │   │       │   │   │   └── terraphim_multi_agent v1.0.0 (*)
+      │       │   │       │   │   ├── terraphim_agent_supervisor v1.0.0
+      │       │   │       │   │   │   ├── terraphim_agent_messaging v1.0.0
+      │       │   │       │   │   │   │   └── terraphim_agent_registry v1.0.0
+      │       │   │       │   │   │   │       ├── terraphim_goal_alignment v1.0.0
+      │       │   │       │   │   │   │       ├── terraphim_kg_agents v1.0.0
+      │       │   │       │   │   │   │       └── terraphim_multi_agent v1.0.0 (*)
+      │       │   │       │   │   │   ├── terraphim_agent_registry v1.0.0 (*)
+      │       │   │       │   │   │   ├── terraphim_kg_agents v1.0.0 (*)
+      │       │   │       │   │   │   └── terraphim_kg_orchestration v1.0.0
+      │       │   │       │   │   ├── terraphim_ai_nodejs v1.0.0 (*)
+      │       │   │       │   │   ├── terraphim_config v1.15.0 (*)
+      │       │   │       │   │   ├── (dev) terraphim_mcp_server v1.0.0 (*)
+      │       │   │       │   │   ├── (dev) terraphim_middleware v1.16.9 (*)
+      │       │   │       │   │   ├── terraphim_multi_agent v1.0.0 (*)
+      │       │   │       │   │   ├── terraphim_orchestrator v1.8.0
+      │       │   │       │   │   ├── (dev) terraphim_router v1.8.0
+      │       │   │       │   │   │   ├── terraphim_orchestrator v1.8.0 (*)
+      │       │   │       │   │   │   └── terraphim_service v1.16.9 (*)
+      │       │   │       │   │   ├── terraphim_server v1.16.9 (*)
+      │       │   │       │   │   ├── terraphim_service v1.16.9 (*)
+      │       │   │       │   │   └── terraphim_usage v1.16.9
+      │       │   │       │   │       └── terraphim-cli v1.16.9 (*)
+      │       │   │       │   └── terraphim_server v1.16.9 (*)
+      │       │   │       └── terraphim_server v1.16.9 (*)
+      │       │   ├── terraphim_multi_agent v1.0.0 (*)
+      │       │   ├── (dev) terraphim_persistence v1.15.0 (*)
+      │       │   ├── terraphim_server v1.16.9 (*)
+      │       │   ├── terraphim_service v1.16.9 (*)
+      │       │   └── terraphim_validation v0.1.0 (*)
+      │       ├── terraphim_orchestrator v1.8.0 (*)
+      │       ├── terraphim_persistence v1.15.0 (*)
+      │       ├── terraphim_service v1.16.9 (*)
+      │       └── terraphim_usage v1.16.9 (*)
+      ├── phf_generator v0.13.1
+      │   ├── phf_codegen v0.13.1
+      │   │   ├── (build) selectors v0.33.0
+      │   │   │   └── scraper v0.25.0
+      │   │   │       └── terraphim_middleware v1.16.9 (*)
+      │   │   └── (build) web_atoms v0.2.3
+      │   │       └── markup5ever v0.36.1
+      │   │           └── html5ever v0.36.1
+      │   │               └── scraper v0.25.0 (*)
+      │   ├── phf_macros v0.13.1
+      │   │   └── phf v0.13.1
+      │   │       ├── cssparser v0.36.0
+      │   │       │   ├── scraper v0.25.0 (*)
+      │   │       │   └── selectors v0.33.0 (*)
+      │   │       ├── selectors v0.33.0 (*)
+      │   │       └── web_atoms v0.2.3 (*)
+      │   └── string_cache_codegen v0.6.1
+      │       └── (build) web_atoms v0.2.3 (*)
+      ├── self-replace v1.5.0
+      │   └── self_update v0.42.0
+      │       └── terraphim_update v1.5.0
+      │           ├── terraphim-cli v1.16.9 (*)
+      │           └── terraphim_agent v1.16.9 (*)
+      ├── tempfile v3.27.0
+      │   ├── dialoguer v0.12.0
+      │   │   ├── terraphim-session-analyzer v1.16.9
+      │   │   │   └── terraphim_sessions v1.16.9
+      │   │   │       └── terraphim_agent v1.16.9 (*)
+      │   │   ├── terraphim_agent v1.16.9 (*)
+      │   │   └── terraphim_update v1.5.0 (*)
+      │   ├── insta v1.47.2
+      │   │   ├── (dev) terraphim-session-analyzer v1.16.9 (*)
+      │   │   └── (dev) terraphim_agent v1.16.9 (*)
+      │   ├── native-tls v0.2.18
+      │   │   ├── hyper-tls v0.6.0
+      │   │   │   └── reqwest v0.12.28
+      │   │   │       ├── genai v0.4.4-WIP
+      │   │   │       │   └── terraphim_multi_agent v1.0.0 (*)
+      │   │   │       ├── grepapp_haystack v1.16.9
+      │   │   │       ├── haystack_jmap v1.0.0
+      │   │   │       ├── opendal v0.54.1 (*)
+      │   │   │       ├── reqwest-eventsource v0.6.0
+      │   │   │       │   ├── genai v0.4.4-WIP (*)
+      │   │   │       │   └── terraphim_tinyclaw v1.16.9
+      │   │   │       ├── self_update v0.42.0 (*)
+      │   │   │       ├── teloxide-core v0.13.0
+      │   │   │       │   └── teloxide v0.17.0
+      │   │   │       │       └── terraphim_tinyclaw v1.16.9 (*)
+      │   │   │       ├── terraphim-firecracker v0.1.0
+      │   │   │       ├── terraphim_agent v1.16.9 (*)
+      │   │   │       ├── terraphim_atomic_client v1.0.0
+      │   │   │       ├── terraphim_automata v1.15.0
+      │   │   │       │   ├── terraphim-cli v1.16.9 (*)
+      │   │   │       │   ├── terraphim_agent v1.16.9 (*)
+      │   │   │       │   ├── terraphim_agent_registry v1.0.0 (*)
+      │   │   │       │   ├── terraphim_ai_nodejs v1.0.0 (*)
+      │   │   │       │   ├── terraphim_config v1.15.0 (*)
+      │   │   │       │   ├── terraphim_file_search v1.16.9
+      │   │   │       │   │   └── (dev) terraphim_mcp_server v1.0.0 (*)
+      │   │   │       │   ├── terraphim_goal_alignment v1.0.0 (*)
+      │   │   │       │   ├── terraphim_hooks v1.4.10
+      │   │   │       │   │   ├── terraphim-cli v1.16.9 (*)
+      │   │   │       │   │   ├── terraphim_agent v1.16.9 (*)
+      │   │   │       │   │   └── terraphim_mcp_server v1.0.0 (*)
+      │   │   │       │   ├── terraphim_kg_agents v1.0.0 (*)
+      │   │   │       │   ├── terraphim_kg_linter v0.1.0
+      │   │   │       │   ├── terraphim_kg_orchestration v1.0.0 (*)
+      │   │   │       │   ├── (dev) terraphim_mcp_server v1.0.0 (*)
+      │   │   │       │   ├── terraphim_middleware v1.16.9 (*)
+      │   │   │       │   ├── terraphim_multi_agent v1.0.0 (*)
+      │   │   │       │   ├── terraphim_orchestrator v1.8.0 (*)
+      │   │   │       │   ├── terraphim_rolegraph v1.15.0
+      │   │   │       │   │   ├── terraphim-cli v1.16.9 (*)
+      │   │   │       │   │   ├── terraphim_agent v1.16.9 (*)
+      │   │   │       │   │   ├── terraphim_agent_registry v1.0.0 (*)
+      │   │   │       │   │   ├── terraphim_ai_nodejs v1.0.0 (*)
+      │   │   │       │   │   ├── terraphim_config v1.15.0 (*)
+      │   │   │       │   │   ├── terraphim_goal_alignment v1.0.0 (*)
+      │   │   │       │   │   ├── terraphim_kg_agents v1.0.0 (*)
+      │   │   │       │   │   ├── terraphim_kg_orchestration v1.0.0 (*)
+      │   │   │       │   │   ├── terraphim_mcp_server v1.0.0 (*)
+      │   │   │       │   │   ├── terraphim_middleware v1.16.9 (*)
+      │   │   │       │   │   ├── terraphim_multi_agent v1.0.0 (*)
+      │   │   │       │   │   ├── terraphim_server v1.16.9 (*)
+      │   │   │       │   │   ├── terraphim_service v1.16.9 (*)
+      │   │   │       │   │   └── terraphim_task_decomposition v1.0.0
+      │   │   │       │   │       ├── terraphim_kg_agents v1.0.0 (*)
+      │   │   │       │   │       └── terraphim_kg_orchestration v1.0.0 (*)
+      │   │   │       │   ├── terraphim_server v1.16.9 (*)
+      │   │   │       │   ├── terraphim_service v1.16.9 (*)
+      │   │   │       │   └── terraphim_task_decomposition v1.0.0 (*)
+      │   │   │       ├── terraphim_middleware v1.16.9 (*)
+      │   │   │       ├── terraphim_multi_agent v1.0.0 (*)
+      │   │   │       ├── (dev) terraphim_server v1.16.9 (*)
+      │   │   │       ├── terraphim_service v1.16.9 (*)
+      │   │   │       ├── terraphim_symphony v1.13.0
+      │   │   │       │   └── terraphim_orchestrator v1.8.0 (*)
+      │   │   │       ├── terraphim_tinyclaw v1.16.9 (*)
+      │   │   │       ├── terraphim_tracker v1.13.0
+      │   │   │       │   ├── terraphim_orchestrator v1.8.0 (*)
+      │   │   │       │   └── terraphim_symphony v1.13.0 (*)
+      │   │   │       ├── terraphim_usage v1.16.9 (*)
+      │   │   │       └── terraphim_validation v0.1.0 (*)
+      │   │   ├── reqwest v0.12.28 (*)
+      │   │   └── tokio-native-tls v0.3.1
+      │   │       ├── hyper-tls v0.6.0 (*)
+      │   │       └── reqwest v0.12.28 (*)
+      │   ├── proptest v1.11.0
+      │   │   ├── (dev) terraphim-session-analyzer v1.16.9 (*)
+      │   │   ├── (dev) terraphim_rolegraph v1.15.0 (*)
+      │   │   ├── (dev) terraphim_router v1.8.0 (*)
+      │   │   └── (dev) terraphim_spawner v1.8.0
+      │   │       ├── terraphim_orchestrator v1.8.0 (*)
+      │   │       └── (dev) terraphim_router v1.8.0 (*)
+      │   ├── rusty-fork v0.3.1
+      │   │   └── proptest v1.11.0 (*)
+      │   ├── self-replace v1.5.0 (*)
+      │   ├── self_update v0.42.0 (*)
+      │   ├── (dev) terraphim-cli v1.16.9 (*)
+      │   ├── (dev) terraphim-firecracker v0.1.0 (*)
+      │   ├── (dev) terraphim-session-analyzer v1.16.9 (*)
+      │   ├── (dev) terraphim_agent v1.16.9 (*)
+      │   ├── (dev) terraphim_agent_messaging v1.0.0 (*)
+      │   ├── (dev) terraphim_agent_registry v1.0.0 (*)
+      │   ├── (dev) terraphim_agent_supervisor v1.0.0 (*)
+      │   ├── (dev) terraphim_ai_nodejs v1.0.0 (*)
+      │   ├── (dev) terraphim_automata v1.15.0 (*)
+      │   ├── (dev) terraphim_config v1.15.0 (*)
+      │   ├── (dev) terraphim_file_search v1.16.9 (*)
+      │   ├── (dev) terraphim_goal_alignment v1.0.0 (*)
+      │   ├── (dev) terraphim_hooks v1.4.10 (*)
+      │   ├── (dev) terraphim_kg_linter v0.1.0 (*)
+      │   ├── (dev) terraphim_kg_orchestration v1.0.0 (*)
+      │   ├── (dev) terraphim_mcp_server v1.0.0 (*)
+      │   ├── (dev) terraphim_middleware v1.16.9 (*)
+      │   ├── (dev) terraphim_multi_agent v1.0.0 (*)
+      │   ├── (dev) terraphim_onepassword_cli v1.0.0
+      │   ├── (dev) terraphim_orchestrator v1.8.0 (*)
+      │   ├── (dev) terraphim_persistence v1.15.0 (*)
+      │   ├── (dev) terraphim_rolegraph v1.15.0 (*)
+      │   ├── (dev) terraphim_router v1.8.0 (*)
+      │   ├── (dev) terraphim_server v1.16.9 (*)
+      │   ├── (dev) terraphim_service v1.16.9 (*)
+      │   ├── (dev) terraphim_sessions v1.16.9 (*)
+      │   ├── (dev) terraphim_settings v1.15.0
+      │   │   ├── terraphim-cli v1.16.9 (*)
+      │   │   ├── terraphim_agent v1.16.9 (*)
+      │   │   ├── terraphim_ai_nodejs v1.0.0 (*)
+      │   │   ├── terraphim_config v1.15.0 (*)
+      │   │   ├── (dev) terraphim_middleware v1.16.9 (*)
+      │   │   ├── terraphim_persistence v1.15.0 (*)
+      │   │   ├── terraphim_server v1.16.9 (*)
+      │   │   ├── (dev) terraphim_service v1.16.9 (*)
+      │   │   └── terraphim_usage v1.16.9 (*)
+      │   ├── (dev) terraphim_spawner v1.8.0 (*)
+      │   ├── (dev) terraphim_task_decomposition v1.0.0 (*)
+      │   ├── (dev) terraphim_tinyclaw v1.16.9 (*)
+      │   ├── terraphim_update v1.5.0 (*)
+      │   ├── terraphim_validation v0.1.0 (*)
+      │   └── terraphim_workspace v1.13.0
+      └── terraphim-firecracker v0.1.0 (*)
+
+warning[advisory-not-detected]: advisory was not encountered
+   ┌─ /home/alex/terraphim-ai/deny.toml:27:6
+   │
+27 │     "RUSTSEC-2021-0141",
+   │      ━━━━━━━━━━━━━━━━━ no crate matched advisory criteria
+
+warning[advisory-not-detected]: advisory was not encountered
+   ┌─ /home/alex/terraphim-ai/deny.toml:18:6
+   │
+18 │     "RUSTSEC-2021-0145",
+   │      ━━━━━━━━━━━━━━━━━ no crate matched advisory criteria
+
+warning[advisory-not-detected]: advisory was not encountered
+   ┌─ /home/alex/terraphim-ai/deny.toml:16:6
+   │
+16 │     "RUSTSEC-2023-0071",
+   │      ━━━━━━━━━━━━━━━━━ no crate matched advisory criteria
+
+warning[advisory-not-detected]: advisory was not encountered
+   ┌─ /home/alex/terraphim-ai/deny.toml:21:6
+   │
+21 │     "RUSTSEC-2024-0375",
+   │      ━━━━━━━━━━━━━━━━━ no crate matched advisory criteria
+
+warning[advisory-not-detected]: advisory was not encountered
+   ┌─ /home/alex/terraphim-ai/deny.toml:35:6
+   │
+35 │     "RUSTSEC-2026-0049",
+   │      ━━━━━━━━━━━━━━━━━ no crate matched advisory criteria
+
+advisories ok
