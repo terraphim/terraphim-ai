@@ -544,6 +544,10 @@ async fn probe_single(provider: &str, model: &str, action_template: Option<&str>
             // zombie opencode/node processes.  First kill children, then the
             // direct child.  bash -> node (bun shim) -> .opencode
             let child_pid = child.id();
+            // Use eprintln to bypass tracing subscriber -- diagnostic only.
+            eprintln!(
+                "PROBE_DIAG: timeout Err branch entered for {provider}/{model}, child_pid={child_pid:?}"
+            );
             warn!(
                 provider, model,
                 child_pid = ?child_pid,
@@ -587,7 +591,9 @@ async fn probe_single(provider: &str, model: &str, action_template: Option<&str>
                     .args(["-9", "-f", &format!("opencode.*{model}.*echo hello")])
                     .output();
             }
+            eprintln!("PROBE_DIAG: about to child.kill() for {provider}/{model}");
             let _ = child.kill().await;
+            eprintln!("PROBE_DIAG: child.kill() done for {provider}/{model}");
             warn!(
                 provider,
                 model,
