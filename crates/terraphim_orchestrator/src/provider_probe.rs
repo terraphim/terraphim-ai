@@ -31,6 +31,8 @@ pub enum ProbeStatus {
     Success,
     Error,
     Timeout,
+    /// Provider returned a quota/rate-limit error (may include reset time).
+    RateLimit,
 }
 
 /// Cached provider availability map with TTL-based refresh.
@@ -124,7 +126,9 @@ impl ProviderHealthMap {
 
             match result.status {
                 ProbeStatus::Success => breaker.record_success(),
-                ProbeStatus::Error | ProbeStatus::Timeout => breaker.record_failure(),
+                ProbeStatus::Error | ProbeStatus::Timeout | ProbeStatus::RateLimit => {
+                    breaker.record_failure()
+                }
             }
         }
 
@@ -156,8 +160,9 @@ impl ProviderHealthMap {
         {
             return match result.status {
                 ProbeStatus::Success => HealthStatus::Healthy,
-                ProbeStatus::Error => HealthStatus::Unhealthy,
-                ProbeStatus::Timeout => HealthStatus::Unhealthy,
+                ProbeStatus::Error | ProbeStatus::Timeout | ProbeStatus::RateLimit => {
+                    HealthStatus::Unhealthy
+                }
             };
         }
 
@@ -397,7 +402,7 @@ async fn probe_single(provider: &str, model: &str, action_template: Option<&str>
         .to_string();
 
     let start = Instant::now();
-    let timeout = Duration::from_secs(60);
+    let timeout_dur = Duration::from_secs(30);
 
     debug!(provider, model, action = %action, "running probe command");
 
@@ -406,42 +411,80 @@ async fn probe_single(provider: &str, model: &str, action_template: Option<&str>
     let home = std::env::var("HOME").unwrap_or_else(|_| "/home/alex".to_string());
     let path_prefix =
         format!("{home}/.local/bin:{home}/.bun/bin:{home}/bin:{home}/.cargo/bin:{home}/go/bin",);
-    let result = tokio::time::timeout(timeout, async {
-        let output = tokio::process::Command::new("bash")
-            .arg("-c")
-            .arg(&action)
-            .env(
-                "PATH",
-                format!(
-                    "{path_prefix}:{}",
-                    std::env::var("PATH").unwrap_or_default()
-                ),
-            )
-            .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::piped())
-            .spawn()
-            .map_err(|e| format!("spawn failed: {e}"))?
-            .wait_with_output()
+
+    // Spawn the child *outside* the timeout so we can kill it if it hangs.
+    let spawn_result = tokio::process::Command::new("bash")
+        .arg("-c")
+        .arg(&action)
+        .env(
+            "PATH",
+            format!(
+                "{path_prefix}:{}",
+                std::env::var("PATH").unwrap_or_default()
+            ),
+        )
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn();
+
+    let mut child = match spawn_result {
+        Ok(c) => c,
+        Err(e) => {
+            return ProbeResult {
+                provider: provider.to_string(),
+                model: model.to_string(),
+                cli_tool,
+                status: ProbeStatus::Error,
+                latency_ms: Some(0),
+                error: Some(format!("spawn failed: {e}")),
+                timestamp,
+            };
+        }
+    };
+
+    // Take ownership of stderr pipe before awaiting (so we can still kill child on timeout).
+    let stderr_pipe = child.stderr.take();
+    let stdout_pipe = child.stdout.take();
+
+    let result = tokio::time::timeout(timeout_dur, async {
+        let status = child
+            .wait()
             .await
             .map_err(|e| format!("wait failed: {e}"))?;
 
-        if output.status.success() {
-            Ok(())
+        // Read captured output after process exits.
+        let stderr_bytes = if let Some(mut pipe) = stderr_pipe {
+            let mut buf = Vec::new();
+            tokio::io::AsyncReadExt::read_to_end(&mut pipe, &mut buf)
+                .await
+                .unwrap_or(0);
+            buf
         } else {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            Err(format!(
-                "exit {}: {}",
-                output.status,
-                stderr.chars().take(200).collect::<String>()
-            ))
-        }
+            Vec::new()
+        };
+        let stdout_bytes = if let Some(mut pipe) = stdout_pipe {
+            let mut buf = Vec::new();
+            tokio::io::AsyncReadExt::read_to_end(&mut pipe, &mut buf)
+                .await
+                .unwrap_or(0);
+            buf
+        } else {
+            Vec::new()
+        };
+
+        let output = std::process::Output {
+            status,
+            stdout: stdout_bytes,
+            stderr: stderr_bytes,
+        };
+        Ok::<_, String>(output)
     })
     .await;
 
     let latency_ms = start.elapsed().as_millis() as u64;
 
     match result {
-        Ok(Ok(())) => {
+        Ok(Ok(output)) if output.status.success() => {
             info!(provider, model, latency_ms, "probe success");
             ProbeResult {
                 provider: provider.to_string(),
@@ -453,31 +496,117 @@ async fn probe_single(provider: &str, model: &str, action_template: Option<&str>
                 timestamp,
             }
         }
+        Ok(Ok(output)) => {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            let stderr_str: String = stderr.chars().take(500).collect();
+
+            // Detect quota/rate-limit errors and extract reset time if present.
+            let is_rate_limit = is_rate_limit_error(&stderr_str);
+            let status = if is_rate_limit {
+                let reset_info = extract_quota_reset(&stderr_str);
+                warn!(
+                    provider,
+                    model,
+                    latency_ms,
+                    reset = reset_info.as_deref().unwrap_or("unknown"),
+                    "probe rate-limited (quota exceeded)"
+                );
+                ProbeStatus::RateLimit
+            } else {
+                warn!(provider, model, error = %stderr_str, "probe failed");
+                ProbeStatus::Error
+            };
+
+            ProbeResult {
+                provider: provider.to_string(),
+                model: model.to_string(),
+                cli_tool,
+                status,
+                latency_ms: Some(latency_ms),
+                error: Some(format!("exit {}: {}", output.status, stderr_str)),
+                timestamp,
+            }
+        }
         Ok(Err(e)) => {
-            warn!(provider, model, error = %e, "probe failed");
+            warn!(provider, model, error = %e, "probe wait failed");
             ProbeResult {
                 provider: provider.to_string(),
                 model: model.to_string(),
                 cli_tool,
                 status: ProbeStatus::Error,
                 latency_ms: Some(latency_ms),
-                error: Some(e),
+                error: Some(format!("wait failed: {e}")),
                 timestamp,
             }
         }
         Err(_) => {
-            warn!(provider, model, "probe timed out after 30s");
+            // Timeout -- kill the child process to prevent zombies.
+            if let Err(e) = child.kill().await {
+                warn!(provider, model, error = %e, "failed to kill timed-out probe process");
+            }
+            warn!(
+                provider,
+                model,
+                timeout_secs = timeout_dur.as_secs(),
+                "probe timed out"
+            );
             ProbeResult {
                 provider: provider.to_string(),
                 model: model.to_string(),
                 cli_tool,
                 status: ProbeStatus::Timeout,
                 latency_ms: Some(latency_ms),
-                error: Some("timeout after 60s".to_string()),
+                error: Some(format!("timeout after {}s", timeout_dur.as_secs())),
                 timestamp,
             }
         }
     }
+}
+
+/// Check if stderr indicates a quota or rate-limit error.
+fn is_rate_limit_error(stderr: &str) -> bool {
+    let lower = stderr.to_lowercase();
+    lower.contains("rate limit")
+        || lower.contains("rate_limit")
+        || lower.contains("quota exceeded")
+        || lower.contains("insufficient_quota")
+        || lower.contains("too many requests")
+        || lower.contains("429")
+        || lower.contains("quota")
+        || lower.contains("token limit")
+}
+
+/// Try to extract quota reset time from stderr.
+///
+/// Looks for patterns like:
+/// - "resets at 2026-04-07T16:00:00Z"
+/// - "retry after 3600"
+/// - "Please retry after ..."
+/// - "reset in 45 minutes"
+/// - "Retry-After: 3600"
+fn extract_quota_reset(stderr: &str) -> Option<String> {
+    let lower = stderr.to_lowercase();
+
+    // "resets at <datetime>" or "reset at <datetime>"
+    if let Some(idx) = lower.find("reset") {
+        let after = &stderr[idx..];
+        // Grab the rest of the line
+        let line = after.lines().next().unwrap_or(after);
+        if line.len() > 6 {
+            return Some(line.trim().to_string());
+        }
+    }
+
+    // "retry after <value>" or "Retry-After: <value>"
+    if let Some(idx) = lower.find("retry") {
+        let after = &stderr[idx..];
+        let line = after.lines().next().unwrap_or(after);
+        if line.len() > 6 {
+            return Some(line.trim().to_string());
+        }
+    }
+
+    None
 }
 
 #[cfg(test)]
