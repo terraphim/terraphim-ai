@@ -413,6 +413,8 @@ async fn probe_single(provider: &str, model: &str, action_template: Option<&str>
         format!("{home}/.local/bin:{home}/.bun/bin:{home}/bin:{home}/.cargo/bin:{home}/go/bin",);
 
     // Spawn the child *outside* the timeout so we can kill it if it hangs.
+    // Use process_group(0) so the child gets its own process group -- on
+    // timeout we kill the entire group (bash + opencode + node children).
     let spawn_result = tokio::process::Command::new("bash")
         .arg("-c")
         .arg(&action)
@@ -425,6 +427,7 @@ async fn probe_single(provider: &str, model: &str, action_template: Option<&str>
         )
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
+        .process_group(0)
         .spawn();
 
     let mut child = match spawn_result {
@@ -540,10 +543,17 @@ async fn probe_single(provider: &str, model: &str, action_template: Option<&str>
             }
         }
         Err(_) => {
-            // Timeout -- kill the child process to prevent zombies.
-            if let Err(e) = child.kill().await {
-                warn!(provider, model, error = %e, "failed to kill timed-out probe process");
+            // Timeout -- kill the entire process group to prevent zombies.
+            // The child was spawned with process_group(0), so its pgid == pid.
+            // Shell out to `kill` to signal the whole process group.
+            #[cfg(unix)]
+            if let Some(pid) = child.id() {
+                let _ = std::process::Command::new("kill")
+                    .args(["-9", "--", &format!("-{pid}")])
+                    .output();
             }
+            // Also call child.kill() for the direct child handle cleanup.
+            let _ = child.kill().await;
             warn!(
                 provider,
                 model,
