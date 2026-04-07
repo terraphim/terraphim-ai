@@ -267,8 +267,12 @@ fn test_config_management() -> Result<()> {
     println!("✅ Config show completed and validated");
 
     // Test config set (selected_role) with valid role
-    let (stdout, stderr, code) =
-        run_tui_command(&["config", "set", "selected_role", "Terraphim Engineer"])?;
+    let (stdout, stderr, code) = run_tui_command(&[
+        "config",
+        "set",
+        "selected_role",
+        "Terraphim Engineer", // Use a role that exists
+    ])?;
 
     if code == 0 {
         let clean_output = extract_clean_output(&stdout);
