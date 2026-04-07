@@ -603,6 +603,12 @@ impl RoleGraph {
     //     //     sorted_vector_by_rank_weighted.push((document_id, weighted_rank));
     //     // }
     // }
+
+    /// Returns the pinned node IDs for this role graph.
+    pub fn get_pinned_node_ids(&self) -> &[u64] {
+        &self.pinned_node_ids
+    }
+
     ///   Performs a query on the graph using the query string.
     ///
     /// Returns a list of document IDs ranked and weighted by the weighted mean
