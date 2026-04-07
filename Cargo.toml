@@ -27,6 +27,11 @@ exclude = [
     "crates/terraphim_github_runner",
     "crates/terraphim_github_runner_server",
     "terraphim_firecracker",
+    # Security: serenity 0.12 (discord feature) pulls in rustls-webpki 0.102.8 (RUSTSEC-2026-0049)
+    # serenity 0.12.5 is the latest stable; no 0.13+ available on crates.io that fixes this.
+    # Discord integration is an optional feature not used in production. Build separately:
+    #   cd crates/terraphim_tinyclaw && cargo build --features discord
+    "crates/terraphim_tinyclaw",
 ]
 default-members = ["terraphim_server"]
 
