@@ -111,6 +111,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Enforce terraphim_agent server-mode feature contract
+        run: ./scripts/ci-guard-terraphim-agent-server-mode.sh
+
       - name: Download fresh frontend assets
         uses: actions/download-artifact@v4
         with:

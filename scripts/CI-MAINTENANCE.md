@@ -63,6 +63,29 @@ The CI system consists of:
 
 ## Script Maintenance
 
+### terraphim_agent Server-Mode Feature Contract
+
+The repository enforces this contract with:
+
+```bash
+./scripts/ci-guard-terraphim-agent-server-mode.sh
+```
+
+Contract:
+- In `crates/terraphim_agent/tests/*`, any subprocess invocation of `cargo run -p terraphim_agent` that includes `--server` must include `--features server` in the same Cargo command.
+
+CI integration:
+- `.github/workflows/ci-pr.yml`
+- `.github/workflows/ci-main.yml`
+
+Local maintenance workflow for this contract:
+
+```bash
+./scripts/ci-guard-terraphim-agent-server-mode.sh
+cargo check -p terraphim_agent --tests --features server
+cargo test -p terraphim_agent --test cross_mode_consistency_test --features server
+```
+
 ### When to Update Scripts
 
 1. **Dependency Updates:** When Rust, Node.js, or system dependencies need updates

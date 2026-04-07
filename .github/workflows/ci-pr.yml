@@ -287,6 +287,9 @@ jobs:
             ${{ runner.os }}-cargo-pr-
             ${{ runner.os }}-cargo-
 
+      - name: Enforce terraphim_agent server-mode feature contract
+        run: ./scripts/ci-guard-terraphim-agent-server-mode.sh
+
       - name: Check compilation
         run: |
           # Quick compilation check without building all binaries
@@ -343,7 +346,7 @@ jobs:
 
       - name: Type check
         working-directory: desktop
-        run: yarn check
+        run: yarn run check
 
   # Quick unit tests for changed code
   rust-tests:
