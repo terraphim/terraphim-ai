@@ -28,6 +28,7 @@ mod logical_operators_integration_tests {
             limit: Some(10),
             role: Some(RoleName::from("Default")),
             layer: Layer::default(),
+            include_pinned: false,
         };
 
         // Test that the search executes without error
@@ -62,6 +63,7 @@ mod logical_operators_integration_tests {
             limit: Some(10),
             role: Some(RoleName::from("Default")),
             layer: Layer::default(),
+            include_pinned: false,
         };
 
         let result = service.search(&query).await;
@@ -90,6 +92,7 @@ mod logical_operators_integration_tests {
             limit: Some(10),
             role: Some(RoleName::from("Default")),
             layer: Layer::default(),
+            include_pinned: false,
         };
 
         let result = service.search(&query).await;
@@ -118,6 +121,7 @@ mod logical_operators_integration_tests {
             limit: Some(10),
             role: Some(RoleName::from("Default")),
             layer: Layer::default(),
+            include_pinned: false,
         };
 
         let result = service.search(&query).await;
@@ -145,6 +149,7 @@ mod logical_operators_integration_tests {
             limit: Some(10),
             role: Some(RoleName::from("Default")),
             layer: Layer::default(),
+            include_pinned: false,
         };
 
         let result = service.search(&query).await;
@@ -175,6 +180,7 @@ mod logical_operators_integration_tests {
             limit: Some(10),
             role: Some(RoleName::from("Default")),
             layer: Layer::default(),
+            include_pinned: false,
         };
 
         let result = service.search(&query).await;
@@ -204,6 +210,7 @@ mod logical_operators_integration_tests {
             limit: Some(3),
             role: Some(RoleName::from("Default")),
             layer: Layer::default(),
+            include_pinned: false,
         };
 
         let result1 = service.search(&query1).await;
@@ -222,6 +229,7 @@ mod logical_operators_integration_tests {
             limit: Some(3),
             role: Some(RoleName::from("Default")),
             layer: Layer::default(),
+            include_pinned: false,
         };
 
         let result2 = service.search(&query2).await;
@@ -257,6 +265,7 @@ mod logical_operators_integration_tests {
                 limit: Some(5),
                 role: Some(RoleName::from(role_name)),
                 layer: Layer::default(),
+                include_pinned: false,
             };
 
             let result = service.search(&query).await;

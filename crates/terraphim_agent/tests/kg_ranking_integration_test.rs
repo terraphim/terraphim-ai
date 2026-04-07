@@ -277,6 +277,7 @@ async fn search_via_server(
         limit: Some(20),
         role: Some(RoleName::new(role)),
         layer: Layer::default(),
+        include_pinned: false,
     };
 
     let response = client.search(&search_query).await?;

@@ -1150,6 +1150,21 @@ impl ConfigState {
                 );
                 vec![]
             })
+        } else if search_query.include_pinned {
+            // Use trigger fallback path which supports include_pinned
+            role.query_graph_with_trigger_fallback(
+                search_query.search_term.as_str(),
+                search_query.skip,
+                search_query.limit,
+                true,
+            )
+            .unwrap_or_else(|e| {
+                log::error!(
+                    "Error while searching graph with trigger fallback for documents: {:?}",
+                    e
+                );
+                vec![]
+            })
         } else {
             // Use single-term search (backward compatibility)
             role.query_graph(
