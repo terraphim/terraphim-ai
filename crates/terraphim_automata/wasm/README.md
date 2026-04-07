@@ -1,6 +1,6 @@
-# Terraphim Automata WASM Test
+# Terraphim Automata WASM
 
-This directory contains WASM bindings and tests for `terraphim_automata`, demonstrating browser-compatible autocomplete functionality.
+This directory contains the publishable WebAssembly bindings for `terraphim_automata`, including browser-compatible autocomplete functionality and lightweight validation tests.
 
 ## Prerequisites
 
@@ -57,7 +57,7 @@ wasm-pack test --headless --chrome
             build_index_from_json,
             autocomplete,
             version
-        } from './pkg/terraphim_automata_wasm_test.js';
+        } from './pkg/terraphim_automata_wasm.js';
 
         await init();
         console.log(version());
@@ -100,7 +100,7 @@ wasm-pack test --headless --chrome
 Initialize the WASM module. Must be called before using other functions.
 
 ### `version(): string`
-Returns the version information.
+Returns the terraphim_automata version information.
 
 ### `build_index_from_json(json_str: string): Uint8Array`
 Build an autocomplete index from a JSON thesaurus string.
