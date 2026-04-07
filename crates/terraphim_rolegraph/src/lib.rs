@@ -562,25 +562,25 @@ impl RoleGraph {
         false
     }
 
-    /// Currently I don't need this functionality,
-    /// but it's commonly referred as "training" if you are writing graph embeddings, see FAIR or [Cleora](https://arxiv.org/pdf/2102.02302)
-    /// Currently I like rank based integers better - they map directly into UI grid but f64 based ranking may be useful for R&D
-    /// See normalization step in https://github.com/BurntSushi/imdb-rename
-    /// This method performs several key operations to process and rank
-    /// documents:
-    /// - Utilizes node rank as a weight for an edge, and edge rank as a weight
-    ///   for an document ID, creating a hierarchical weighting system.
-    /// - Creates a hashmap to store outputs with document_id and rank, aiming
-    ///   to deduplicate documents in the output.
-    /// - Normalizes the output rank from 1 to the total number of records,
-    ///   ensuring a consistent ranking scale across documents.
-    /// - Pre-sorts document IDs by rank using a BTreeMap, facilitating
-    ///   efficient access and manipulation based on rank.
-    /// - Calculates the overall weighted average by computing the weighted
-    ///   average of node rank, edge rank, and document rank. This calculation
-    ///   involves summing the products of each weight with its corresponding
-    ///   rank and dividing by the sum of the weights for each node, edge, and
-    ///   document.
+    // Currently I don't need this functionality,
+    // but it's commonly referred as "training" if you are writing graph embeddings, see FAIR or [Cleora](https://arxiv.org/pdf/2102.02302)
+    // Currently I like rank based integers better - they map directly into UI grid but f64 based ranking may be useful for R&D
+    // See normalization step in https://github.com/BurntSushi/imdb-rename
+    // This method performs several key operations to process and rank
+    // documents:
+    // - Utilizes node rank as a weight for an edge, and edge rank as a weight
+    //   for an document ID, creating a hierarchical weighting system.
+    // - Creates a hashmap to store outputs with document_id and rank, aiming
+    //   to deduplicate documents in the output.
+    // - Normalizes the output rank from 1 to the total number of records,
+    //   ensuring a consistent ranking scale across documents.
+    // - Pre-sorts document IDs by rank using a BTreeMap, facilitating
+    //   efficient access and manipulation based on rank.
+    // - Calculates the overall weighted average by computing the weighted
+    //   average of node rank, edge rank, and document rank. This calculation
+    //   involves summing the products of each weight with its corresponding
+    //   rank and dividing by the sum of the weights for each node, edge, and
+    //   document.
     // YAGNI: at the moment I don't need it, so parked
     // pub fn normalize(&mut self) {
     //     let node_len = self.nodes.len() as u32;
@@ -603,6 +603,12 @@ impl RoleGraph {
     //     //     sorted_vector_by_rank_weighted.push((document_id, weighted_rank));
     //     // }
     // }
+
+    /// Returns the pinned node IDs for this role graph.
+    pub fn get_pinned_node_ids(&self) -> &[u64] {
+        &self.pinned_node_ids
+    }
+
     ///   Performs a query on the graph using the query string.
     ///
     /// Returns a list of document IDs ranked and weighted by the weighted mean

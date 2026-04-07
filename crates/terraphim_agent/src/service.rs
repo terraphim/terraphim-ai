@@ -269,6 +269,7 @@ impl TuiService {
             limit,
             role: Some(role.clone()),
             layer: Layer::default(),
+            include_pinned: false,
         };
 
         let mut service = self.service.lock().await;

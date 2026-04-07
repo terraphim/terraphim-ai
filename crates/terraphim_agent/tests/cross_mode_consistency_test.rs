@@ -245,6 +245,7 @@ async fn search_via_server(
         limit: Some(10),
         role: Some(RoleName::new(role)),
         layer: Layer::default(),
+        include_pinned: false,
     };
 
     let response = client.search(&search_query).await?;
@@ -263,13 +264,21 @@ async fn search_via_server(
     Ok(results)
 }
 
-/// Search via CLI mode (command execution)
+/// Search via CLI mode (command execution).
+///
+/// Passes `--features server` so that the `#[cfg(feature = "server")]` guard
+/// in main.rs is compiled in and `--server --server-url <url>` is honoured.
+/// Without this feature, the guard is elided and the CLI silently falls back
+/// to offline mode, loading the user's local config and returning 0 results.
 fn search_via_cli(server_url: &str, query: &str, role: &str) -> Result<Vec<NormalizedResult>> {
+    let workspace_root = get_workspace_root()?;
     let output = Command::new("cargo")
         .args([
             "run",
             "-p",
             "terraphim_agent",
+            "--features",
+            "server",
             "--",
             "--server",
             "--server-url",
@@ -279,6 +288,7 @@ fn search_via_cli(server_url: &str, query: &str, role: &str) -> Result<Vec<Norma
             "--role",
             role,
         ])
+        .current_dir(&workspace_root)
         .output()?;
 
     if !output.status.success() {
