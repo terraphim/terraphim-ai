@@ -305,17 +305,18 @@ jobs:
           targets: wasm32-unknown-unknown
 
       - name: Install wasm-pack
-        uses: jetli/wasm-pack-action@v0.4.0
-        with:
-          version: 'latest'
+        run: |
+          if ! command -v wasm-pack >/dev/null 2>&1; then
+            cargo install wasm-pack --locked
+          fi
 
       - name: Build WASM for web
         run: |
           ./scripts/build-wasm.sh web release
 
           # Show WASM artifacts
-          ls -la crates/terraphim_automata/wasm-test/pkg/
-          du -sh crates/terraphim_automata/wasm-test/pkg/*.wasm
+          ls -la crates/terraphim_automata/wasm/pkg/
+          du -sh crates/terraphim_automata/wasm/pkg/*.wasm
 
       - name: Build WASM for Node.js
         run: |
@@ -325,7 +326,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: wasm-package
-          path: crates/terraphim_automata/wasm-test/pkg/
+          path: crates/terraphim_automata/wasm/pkg/
           retention-days: ${{ needs.setup.outputs.is-release == 'true' && '90' || '30' }}
 
   # Docker image build

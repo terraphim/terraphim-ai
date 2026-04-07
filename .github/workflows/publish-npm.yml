@@ -147,11 +147,31 @@ jobs:
         run: ${{ matrix.settings.build }}
         if: ${{ !matrix.settings.cross }}
 
+      - name: Collect built binaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist-bindings
+
+          NODE_COUNT=0
+          while IFS= read -r file; do
+            cp "$file" dist-bindings/
+            NODE_COUNT=$((NODE_COUNT + 1))
+          done < <(find . -type f -name "*.node")
+
+          if [[ "$NODE_COUNT" -eq 0 ]]; then
+            echo "No .node binaries were produced"
+            exit 1
+          fi
+
+          echo "Collected binaries:"
+          ls -la dist-bindings/
+
       - name: Upload artifact
         uses: actions/upload-artifact@v5
         with:
           name: bindings-${{ matrix.settings.target }}
-          path: "*.node"
+          path: terraphim_ai_nodejs/dist-bindings
           if-no-files-found: error
 
   test-universal:
@@ -333,7 +353,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: terraphim_ai_nodejs
-        run: npm install --omit=optional
+        run: npm install --omit=optional --ignore-scripts
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -363,9 +383,16 @@ jobs:
           ls -la npm/
 
           # Update package.json version if needed
+          VERSION_TO_USE=""
           if [[ "${{ inputs.version }}" != "" ]]; then
-            echo "📝 Updating version to ${{ inputs.version }}"
-            npm version ${{ inputs.version }} --no-git-tag-version
+            VERSION_TO_USE="${{ inputs.version }}"
+          elif [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == refs/tags/* ]]; then
+            VERSION_TO_USE=$(echo "${{ github.ref }}" | sed 's#refs/tags/nodejs-v##; s#refs/tags/v##')
+          fi
+
+          if [[ "$VERSION_TO_USE" != "" ]]; then
+            echo "📝 Updating version to $VERSION_TO_USE"
+            npm pkg set version=$VERSION_TO_USE
           fi
 
       - name: Configure npm for GitHub Packages
@@ -424,7 +451,7 @@ jobs:
             echo "Tag: ${{ steps.strategy.outputs.npm_tag }}"
 
             # Publish to GitHub Packages
-            npm publish --access public --tag ${{ steps.strategy.outputs.npm_tag }}
+            npm publish --ignore-scripts --access public --tag ${{ steps.strategy.outputs.npm_tag }}
 
             echo "Package published successfully!"
             echo "Install with: npm install @terraphim/autocomplete --registry=https://npm.pkg.github.com"
@@ -452,12 +479,11 @@ jobs:
 
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/') && inputs.dry_run != 'true'
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v2
+        continue-on-error: true
         with:
-          tag_name: ${{ github.ref }}
-          release_name: "@terraphim/autocomplete ${{ github.ref_name }}"
+          name: "@terraphim/autocomplete ${{ github.ref_name }}"
+          token: ${{ secrets.GITHUB_TOKEN }}
           body: |
             ## Node.js Package Release
 
