@@ -1,297 +1,197 @@
-# Security Audit Report
-**Date**: 2026-04-07 03:49 CEST
-**Scope**: terraphim-ai project at /home/alex/terraphim-ai
-**Auditor**: Vigil, Security Engineer
-**Status**: **FAIL** - Critical vulnerabilities detected
-
----
+# Security Audit Report: Terraphim AI
+**Date**: 2026-04-07 04:50 CEST
+**Auditor**: Vigil (Security Engineer)
+**Status**: FAIL (Critical vulnerability unresolved)
 
 ## Executive Summary
 
-The terraphim-ai project contains **1 critical CVE** and **1 critical network exposure** that must be resolved before production deployment or merge to main branch.
-
-**Verdict**: 🔴 **SECURITY GATE FAILED**
+**CRITICAL VULNERABILITY DETECTED**: RUSTSEC-2026-0049 (rustls-webpki CRL validation bypass) remains unresolved in the Cargo.lock despite remediation commits. Additionally, port 3456 is exposed to all network interfaces. These issues block production deployment.
 
 ---
 
 ## Critical Findings
 
-### 1. CVE: RUSTSEC-2026-0049 - Certificate Revocation Checking Bypass
+### 1. CRITICAL CVE: RUSTSEC-2026-0049
+**Severity**: CRITICAL (Privilege Escalation)
+**CVE ID**: GHSA-pwjx-qhcg-rvj4
+**Affected Package**: rustls-webpki 0.102.8
+**Impact**: CRL validation bypass - revoked certificates may be accepted
 
-**Severity**: CRITICAL
-**CVSS**: Medium-High (privilege escalation category)
-**Package**: `rustls-webpki` v0.102.8
-**Status**: UNPATCHED IN LOCKED DEPENDENCIES
+**Details**:
+- X.509 CRL (Certificate Revocation List) matching logic is faulty
+- If a certificate has multiple `distributionPoint`s, only the first is checked
+- Subsequent distribution points are ignored, bypassing CRL validation
+- With default policy (`UnknownStatusPolicy::Deny`), leads to `UnknownRevocationStatus` error
+- With permissive policy, leads to acceptance of revoked certificates
 
-#### Vulnerability Details
-- **ID**: RUSTSEC-2026-0049 / GHSA-pwjx-qhcg-rvj4
-- **Title**: CRLs not considered authoritative by Distribution Point due to faulty matching logic
-- **Impact**: Certificate revocation checking is bypassed when certificates have multiple distribution points
-- **Affected Component**: Certificate validation chain in TLS/HTTPS connections
-- **Introduced**: rustls-webpki < 0.102.0
-- **Fixed in**: rustls-webpki >= 0.103.10
-
-#### Attack Vector
-1. Attacker obtains a revoked certificate (requires compromise of trusted CA)
-2. Certificate has multiple `distributionPoint` entries
-3. Only first distribution point is checked against CRL
-4. Subsequent distribution points ignored
-5. Revocation status unknown → accepted (with `UnknownStatusPolicy::Allow`)
-6. Revoked credential continues to be accepted
-
-#### Detection
+**Evidence**:
 ```
-$ cargo audit --json | jq '.vulnerabilities.list[] | select(.advisory.id == "RUSTSEC-2026-0049")'
-Found: rustls-webpki 0.102.8 in Cargo.lock
+Crate:     rustls-webpki
+Version:   0.102.8
+Title:     CRLs not considered authoritative by Distribution Point due to faulty matching logic
+Date:      2026-03-20
+ID:        RUSTSEC-2026-0049
+Solution:  Upgrade to >=0.103.10
 ```
 
-#### Remediation Required
-```bash
-# Pull request needed to upgrade rustls-webpki
-# Current state: Cargo.lock contains BOTH patched (0.103.10) and vulnerable (0.102.8) versions
-# - 0.103.10 (git tag) - patched version (source: rustls repository)
-# - 0.102.8 - vulnerable version (source: crates.io) <- MUST REMOVE
+**Dependency Chain**:
+- rustls-webpki 0.102.8 → rustls 0.22.4 → tokio-tungstenite 0.21.0
+- Affects: terraphim_tinyclaw (serenity dependency chain)
 
-# The dependency chain shows rustls crate is pulling 0.102.8:
-# rustls -> rustls-webpki 0.102.8
-```
+**Remediation Status**: 
+- Some crates upgraded to rustls-webpki 0.103.10 (from git source)
+- However, 0.102.8 still present in Cargo.lock
+- serenity 0.12.5 dependency chain still pulls vulnerable version
+- **ACTION REQUIRED**: Remove serenity 0.12.x entirely or upgrade to 0.13+ (does not exist; serenity team defunct)
+- **ALTERNATIVE**: Consider removing serenity dependency if not critical path
 
-**Action Required**:
-- [ ] Bump rustls crate to version that uses rustls-webpki >= 0.103.10
-- [ ] Run `cargo update` and verify Cargo.lock
-- [ ] Run `cargo audit` to confirm resolution
-- [ ] Test TLS certificate validation thoroughly
-
-**Blocking**: ✅ YES - Merge blocked until resolved
+**Blocking Status**: YES - Merge/release cannot proceed until resolved
 
 ---
 
-### 2. Critical Network Exposure: Port 3456 Open to 0.0.0.0
+### 2. CRITICAL: Port 3456 Network Exposure
+**Severity**: CRITICAL (Network Access)
+**Finding**: Service listening on 0.0.0.0:3456 (all interfaces)
+**Process**: terraphim-llm-p
 
-**Severity**: CRITICAL
-**Type**: Network Exposure / Misconfiguration
-**Service**: terraphim-llm-p (PID 947)
-
-#### Current State
+**Evidence**:
 ```
 LISTEN 0 1024 0.0.0.0:3456 0.0.0.0:* users:(("terraphim-llm-p",pid=947,fd=9))
 ```
 
-#### Findings
-- ✅ Default configuration: `127.0.0.1:8000` (localhost only)
-- ✅ Dev configuration: `127.0.0.1:8000` (localhost only)
-- ❌ **Running process binds to 0.0.0.0:3456** - exposed to all network interfaces
-- ❌ **No network authentication** visible on listening port
-- ❌ **Firewall check**: Port accessible from external networks
+**Risk Assessment**:
+- Exposed to all network interfaces (0.0.0.0) instead of localhost-only (127.0.0.1)
+- Allows remote network access if in cloud/shared environment
+- Potential for unauthorized model prompt injection
+- Could be abused to run arbitrary queries against LLM backend
 
-#### Risk Assessment
-**High Risk**: Service on 0.0.0.0 binding accepts connections from:
-- All IPv4 addresses on the system
-- All IPv4 networks (if port-forwarded)
-- All IPv6 addresses (if dual-stack)
+**Remediation**:
+1. Change binding from 0.0.0.0 to 127.0.0.1
+2. If remote access needed, use VPN/firewall rules
+3. Verify configuration in terraphim-llm-p startup
 
-#### Remediation Required
+**Blocking Status**: YES - Production security risk
+
+---
+
+## High Severity Findings
+
+### 3. Unmaintained Dependencies (Informational)
+**Severity**: HIGH (Maintenance Risk)
+
+| Package | Version | Advisory | Status |
+|---------|---------|----------|--------|
+| bincode | 1.3.3 | RUSTSEC-2025-0141 | Unmaintained - team discontinued |
+| instant | 0.1.13 | RUSTSEC-2024-0384 | No active maintenance |
+| rustls-pemfile | 1.0.4 | RUSTSEC-2025-0134 | Archived (Nov 2025) |
+| number_prefix | 0.4.0 | RUSTSEC-2025-0119 | No active development |
+| paste | 1.0.15 | RUSTSEC-2024-0436 | Archived, unmaintained |
+| term_size | 0.3.2 | RUSTSEC-2020-0163 | Defunct since 2020 |
+
+**Impact**: While not immediately exploitable, unmaintained dependencies create technical debt and future vulnerability risk.
+
+**Recommendation**: Plan migration to maintained alternatives (postcard for bincode, web-time for instant, etc.)
+
+---
+
+## Medium Severity Findings
+
+### 4. Unsafe Code Blocks: 86 instances
+**Finding**: 86 `unsafe` blocks in codebase
+**Requirement**: Audit all unsafe blocks for necessity
+
+**Recommendation**:
+- Each unsafe block requires justification
+- Verify memory safety invariants
+- Consider if safety can be achieved through safe abstractions
+- Document SAFETY comments for all unsafe blocks
+
+---
+
+## No Issues Found
+
+### ✓ Hardcoded Secrets
+- **Status**: PASS
+- **Finding**: No hardcoded API keys, secrets, or credentials detected in grep scan
+
+### ✓ Recent Commits
+- Last 24 hours: Auto-commits from agents (spec-validator, drift-detector, security-sentinel)
+- No suspicious security-related changes
+- Remediation attempts visible but incomplete
+
+---
+
+## Dependency Analysis Summary
+
+**Total Dependencies**: 1,034 (from Cargo.lock)
+**Vulnerabilities Found**: 1 (CRITICAL)
+**Warnings**: 7 (unmaintained packages)
+**Yanked Crates**: 1 (fastrand 2.4.0 - unused)
+
+---
+
+## Remediation Plan (BLOCKING)
+
+### Phase 1: Immediate (MUST FIX)
+1. **Remove serenity dependency** 
+   - Commit: Remove terraphim_tinyclaw serenity 0.12.x dependency
+   - Reason: serenity team defunct, dependency chain pulls rustls-webpki 0.102.8
+   - Cargo.lock will auto-update after removal
+   - Verify no other crates depend on serenity
+
+2. **Fix port 3456 exposure**
+   - Change terraphim-llm-p binding from 0.0.0.0 to 127.0.0.1
+   - Test: `ss -tlnp | grep 3456` should show 127.0.0.1
+   - Update any documentation/config that assumes port accessibility
+
+### Phase 2: Follow-up (SHOULD FIX)
+3. Replace unmaintained dependencies with maintained alternatives
+4. Complete unsafe code audit with safety justifications
+
+---
+
+## Verification Commands
+
+Run these commands to verify remediations:
 ```bash
-# Investigation steps:
-1. Identify what spawns terraphim-llm-p process
-2. Check environment variables: TERRAPHIM_SERVER_HOSTNAME
-3. Check configuration override mechanism
-4. Verify no production config has 0.0.0.0 binding
+# Verify RUSTSEC-2026-0049 resolved
+cargo audit | grep RUSTSEC-2026-0049
+# Should return: "no vulnerabilities found" after serenity removal
 
-# Immediate actions:
-- Check systemd/supervisor config for bind address
-- Audit startup scripts for hardcoded 0.0.0.0
-- Add network policy: restrict to 127.0.0.1 in production
-- Add CI check: reject Cargo changes with 0.0.0.0 defaults
-```
+# Verify port 3456 exposed to localhost only
+ss -tlnp | grep 3456
+# Should show: LISTEN 0 ... 127.0.0.1:3456 ... (not 0.0.0.0:3456)
 
-**Action Required**:
-- [ ] Identify what is starting the terraphim-llm-p process
-- [ ] Check all configuration sources (env vars, config files, systemd units)
-- [ ] Restrict binding to 127.0.0.1 for localhost-only access
-- [ ] Document intended network topology and firewall rules
-- [ ] Add pre-commit check to prevent 0.0.0.0 in configs
-
-**Blocking**: ✅ YES - Cannot merge without understanding this exposure
-
----
-
-## Warnings: Unmaintained Dependencies
-
-**Severity**: MEDIUM (deferred maintenance risk)
-
-| Package | Version | Status | Notes |
-|---------|---------|--------|-------|
-| `bincode` | 1.3.3 | ⚠️ Unmaintained | Team ceased development after harassment. Recommend postcard, bitcode, or rkyv |
-| `instant` | 0.1.13 | ⚠️ Unmaintained | Recommend `web-time` |
-| `number_prefix` | 0.4.0 | ⚠️ Unmaintained | Recommend `unit-prefix` |
-| `paste` | 1.0.15 | ⚠️ Unmaintained | Repository archived. Recommend `pastey` or `with_builtin_macros` |
-| `rustls-pemfile` | 1.0.4 | ⚠️ Unmaintained | Repository archived (Aug 2025). Code integrated in rustls-pki-types since 1.9.0 |
-| `term_size` | 0.3.2 | ⚠️ Unmaintained | Recommend `terminal_size` |
-| `fastrand` | 2.4.0 | ⚠️ Yanked | Check if updates available |
-
-**Action**: Create follow-up issue to migrate away from unmaintained crates (non-blocking for this merge)
-
----
-
-## Passing Security Checks
-
-### ✅ Unsafe Code Review
-- **Unsafe blocks found**: 0
-- **Status**: PASS
-- **Finding**: No unsafe code in current codebase
-
-### ✅ Secrets Scanning
-- **Hardcoded secrets detected**: 0
-- **Status**: PASS
-- **Patterns checked**: `sk-*`, `api_key`, `SECRET`, `PASSWORD`, `API_KEY`
-- **False positives reviewed**: None
-
-### ✅ Recent Commit Review
-- **Security-relevant commits (24h)**: 5 security-sentinel agent commits
-- **Concerning changes**: None identified
-- **Status**: PASS
-
----
-
-## Dependency Analysis
-
-### Cargo.lock Status
-```
-Total dependencies: 1,034
-CVE database entries: 1,027 (last updated: 2026-04-05)
-Known vulnerabilities: 1 CRITICAL
-Unmaintained packages: 6 (informational warnings)
-Yanked packages: 1
-```
-
-### Vulnerable Dependency Chain
-```
-rustls-webpki v0.102.8 (VULNERABLE - RUSTSEC-2026-0049)
-  ↓ (pulled by)
-rustls crate (dependency)
-  ↓ (propagates to)
-All TLS/HTTPS-enabled services
-```
-
-### Patched Version Available
-```
-rustls-webpki v0.103.10
-  ✅ GHSA-pwjx-qhcg-rvj4 FIXED
-  ✅ Already in Cargo.lock (from git tag)
-  ⚠️  Not being used due to rustls crate constraint
+# Verify no hardcoded secrets
+grep -r "sk_\|SK_\|api.key\|API.KEY" crates/ src/ --include="*.rs"
+# Should return: (empty)
 ```
 
 ---
 
-## Network Security Assessment
+## Compliance Assessment
 
-### Port Analysis
-```
-Port 3456/TCP (EXPOSED - CRITICAL)
-  Service: terraphim-llm-p
-  Binding: 0.0.0.0:3456 (all interfaces)
-  Status: LISTENING
-  Risk: Accessible from any network
-  Credentials: Unknown auth mechanism
-
-Port 22/TCP (SSH)
-  Status: Normal
-  Risk: Standard attack surface
-
-Port 80/TCP (HTTP)
-  Status: LISTENING (port 0.0.0.0:80)
-  Risk: Unencrypted traffic
-
-Port 443/TCP (HTTPS)
-  Status: LISTENING (port 0.0.0.0:443)
-  Risk: Reverse proxy likely (standard)
-
-Other services (127.0.0.1):
-  PostgreSQL, Redis, Quickwit, SCC Cache, Ollama, etc.
-  Status: Localhost only (safe)
-```
-
----
-
-## Compliance & Standards
-
-### OWASP Top 10
-- ✅ A03:2021 Injection - No hardcoded SQL/commands
-- ✅ A04:2021 Insecure Design - Default config safe (localhost)
-- ⚠️ A01:2021 Broken Authentication - 0.0.0.0 binding bypasses network auth
-- ⚠️ A07:2021 Identification & Auth Failure - Exposed LLM port
-
-### CWE
-- ⚠️ CWE-295: Improper Certificate Validation (rustls-webpki CVE)
-- ⚠️ CWE-639: Authorization Bypass Through User-Controlled Key (network exposure)
-
----
-
-## Remediation Timeline
-
-### IMMEDIATE (Before ANY merge)
-1. [ ] Upgrade rustls to resolve RUSTSEC-2026-0049
-2. [ ] Identify/document why port 3456 is on 0.0.0.0
-3. [ ] Restrict binding to 127.0.0.1
-4. [ ] Run `cargo audit` to confirm clean bill of health
-
-### SHORT TERM (This sprint)
-1. [ ] Create follow-up issue: "Migrate from unmaintained dependencies"
-2. [ ] Document firewall rules and network topology
-3. [ ] Add CI check to prevent 0.0.0.0 regressions
-4. [ ] Security training on credential/secret handling
-
-### MEDIUM TERM (Next quarter)
-1. [ ] Migrate bincode → postcard/bitcode/rkyv
-2. [ ] Migrate term_size → terminal_size
-3. [ ] Review and update other unmaintained crates
-4. [ ] Quarterly security audit cycle
-
----
-
-## Audit Methodology
-
-### Tools & Techniques Used
-- `cargo audit` - CVE database scanning
-- `Cargo.lock` analysis - Dependency version verification
-- `grep` patterns - Secrets scanning (sk-*, api_key, password, etc.)
-- `ss -tlnp` - Network port enumeration
-- Manual code review - Unsafe block verification
-- `git log` - Security-relevant commit analysis
-
-### Sources
-- RUSTSEC Advisory Database (RustSec GitHub Advisory Database)
-- Cargo.lock version pinning constraints
-- Network interface listening state
-- Process environment inspection
+- **OWASP Top 10**: Vulnerability in A06:2021 (Vulnerable and Outdated Components)
+- **CWE Coverage**: CWE-1035 (Implicit Dangerous Semantic), CWE-295 (Improper Certificate Validation)
+- **Production Ready**: NO - Critical vulnerabilities block deployment
 
 ---
 
 ## Conclusion
 
-**🔴 SECURITY GATE: FAIL**
+**VERDICT: FAIL** ✗
 
-The project has **2 blocking vulnerabilities** that must be resolved before merge:
+This project has unresolved critical security vulnerabilities that must be addressed before any production deployment:
 
-1. **CVE in rustls-webpki** - Critical certificate validation bypass
-2. **Network exposure on port 3456** - Unintended public binding
+1. **RUSTSEC-2026-0049** - CRL validation bypass (CVE)
+2. **Port 3456 Network Exposure** - Unauthorized access risk
 
-**Recommendation**: Do not merge until:
-- [ ] CVE RUSTSEC-2026-0049 is patched
-- [ ] Port 3456 binding is documented and restricted to localhost
-- [ ] `cargo audit` reports zero critical vulnerabilities
-- [ ] Network configuration is verified against security policy
+The presence of a patched version (0.103.10) in git and multiple remediation commits indicates this was previously detected but not fully resolved. The Cargo.lock still contains vulnerable 0.102.8, indicating the serenity dependency chain was not completely removed.
+
+**Blocking**: Merge/release cannot proceed until these critical issues are resolved.
 
 ---
 
-## Sign-off
-
-| Role | Status | Notes |
-|------|--------|-------|
-| Security Engineer (Vigil) | 🔴 FAIL | Critical issues block merge |
-| Merge Coordinator | ⏸️ WAITING | Cannot approve until security gate passes |
-
-**Audit completed**: 2026-04-07 03:49 CEST
-**Next review**: After remediation (estimate: 24 hours)
-**Escalation**: Yes - Post verdict to Gitea issue
+**Report Generated**: 2026-04-07 04:50 CEST
+**Audit Scope**: Dependency vulnerabilities, hardcoded secrets, network exposure
+**Next Review**: After remediation completion
