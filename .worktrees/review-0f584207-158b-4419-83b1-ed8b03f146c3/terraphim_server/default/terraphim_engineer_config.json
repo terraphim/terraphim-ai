@@ -1,0 +1,226 @@
+{
+  "id": "Server",
+  "global_shortcut": "Ctrl+Shift+T",
+  "roles": {
+    "Terraphim Engineer": {
+      "shortname": "TerraEng",
+      "name": "Terraphim Engineer",
+      "relevance_function": "terraphim-graph",
+      "terraphim_it": true,
+      "theme": "lumen",
+      "kg": {
+        "automata_path": null,
+        "knowledge_graph_local": {
+          "input_type": "markdown",
+          "path": "docs/src/kg"
+        },
+        "public": true,
+        "publish": true
+      },
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": true,
+      "llm_system_prompt": "You are an expert Terraphim Engineer specializing in knowledge graphs, semantic search, and AI-powered information retrieval. Focus on understanding context, relationships between concepts, and providing comprehensive technical documentation summaries.",
+      "extra": {}
+    },
+    "Quickwit Logs": {
+      "shortname": "QuickwitLogs",
+      "name": "Quickwit Logs",
+      "relevance_function": "bm25",
+      "terraphim_it": false,
+      "theme": "darkly",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "http://localhost:7280",
+          "service": "Quickwit",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {
+            "max_hits": "100",
+            "sort_by": "-timestamp"
+          }
+        }
+      ],
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": false,
+      "llm_system_prompt": "You are an expert in log analysis and observability. Help analyze log data, identify patterns, and troubleshoot issues from Quickwit search results.",
+      "extra": {}
+    },
+    "Default": {
+      "shortname": "Default",
+      "name": "Default",
+      "relevance_function": "title-scorer",
+      "terraphim_it": false,
+      "theme": "spacelab",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": true,
+      "llm_system_prompt": "You are a helpful AI assistant specializing in general documentation and technical content. Provide clear, concise summaries that capture the key information and main points of the content.",
+      "extra": {}
+    },
+    "BusinessAnalyst": {
+      "shortname": "BizAnalyst",
+      "name": "Business Analyst",
+      "relevance_function": "terraphim-graph",
+      "terraphim_it": false,
+      "theme": "lumen",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": true,
+      "llm_system_prompt": "You are a Business Analyst. Your role is to analyze requirements, document processes, and bridge business and technical teams. Provide clear, structured analysis with focus on stakeholder needs, process improvements, and actionable recommendations.",
+      "extra": {}
+    },
+    "QAEngineer": {
+      "shortname": "QAEng",
+      "name": "QA Engineer",
+      "relevance_function": "bm25",
+      "terraphim_it": false,
+      "theme": "spacelab",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": true,
+      "llm_system_prompt": "You are a QA Engineer. Your role is to ensure software quality through testing, bug reporting, and quality processes. Be thorough and detail-oriented in your analysis. Focus on edge cases, test coverage, and clear reproduction steps.",
+      "extra": {}
+    },
+    "BackendArchitect": {
+      "shortname": "BackendArch",
+      "name": "Backend Architect",
+      "relevance_function": "terraphim-graph",
+      "terraphim_it": false,
+      "theme": "lumen",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": true,
+      "llm_system_prompt": "You are a Backend Architect. Your role is to design system architecture, component structure, database schema, and technology integration. Focus on scalability, performance, and maintainability.",
+      "extra": {}
+    },
+    "ProductManager": {
+      "shortname": "PM",
+      "name": "Product Manager",
+      "relevance_function": "bm25",
+      "terraphim_it": false,
+      "theme": "spacelab",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": true,
+      "llm_system_prompt": "You are a Product Manager. Your role is to create detailed development plans with tasks, priorities, estimated timelines, and milestones. Focus on user needs, market fit, and delivering value.",
+      "extra": {}
+    },
+    "DevelopmentAgent": {
+      "shortname": "DevAgent",
+      "name": "Development Agent",
+      "relevance_function": "terraphim-graph",
+      "terraphim_it": false,
+      "theme": "lumen",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": true,
+      "llm_system_prompt": "You are a Development Agent. Your role is to generate core application code including backend APIs, frontend components, and database setup. Focus on clean code, best practices, and efficient implementation.",
+      "extra": {}
+    },
+    "DevOpsEngineer": {
+      "shortname": "DevOpsEng",
+      "name": "DevOps Engineer",
+      "relevance_function": "bm25",
+      "terraphim_it": false,
+      "theme": "darkly",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": true,
+      "llm_system_prompt": "You are a DevOps Engineer. Your role is to manage deployment, infrastructure, CI/CD pipelines, and operational excellence. Focus on automation, monitoring, reliability, and security.",
+      "extra": {}
+    }
+  },
+  "default_role": "Terraphim Engineer",
+  "selected_role": "Terraphim Engineer"
+}

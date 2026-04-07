@@ -1,0 +1,39 @@
+[package]
+name = "terraphim-firecracker"
+version = "0.1.0"
+edition.workspace = true
+authors = ["Terraphim AI Team"]
+description = "Sub-2 second VM boot optimization system for Terraphim AI coding assistant"
+license = "AGPL-3.0-or-later"
+
+[lib]
+name = "terraphim_firecracker"
+path = "src/lib.rs"
+
+[dependencies]
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+log.workspace = true
+uuid.workspace = true
+reqwest.workspace = true
+chrono.workspace = true
+async-trait.workspace = true
+thiserror.workspace = true
+env_logger = "0.11"
+clap = { version = "4.5", features = ["derive"] }
+config = "0.15"
+parking_lot = "0.12"
+dashmap = "6.1"
+futures = "0.3"
+fastrand = "2.0"
+toml = "0.8"
+
+[dev-dependencies]
+tempfile = "3.27"
+test-log = "0.2"
+
+[[bin]]
+name = "terraphim-vm-manager"
+path = "src/main.rs"
