@@ -412,11 +412,8 @@ async fn probe_single(provider: &str, model: &str, action_template: Option<&str>
     let path_prefix =
         format!("{home}/.local/bin:{home}/.bun/bin:{home}/bin:{home}/.cargo/bin:{home}/go/bin",);
 
-    // Spawn via `setsid bash -c '...'` so the entire process tree (bash,
-    // node, opencode) lives in its own session.  On timeout we kill the
-    // session leader's PGID, which takes out all descendants.
-    let spawn_result = tokio::process::Command::new("setsid")
-        .arg("bash")
+    // Spawn the child *outside* the timeout so we can kill it if it hangs.
+    let spawn_result = tokio::process::Command::new("bash")
         .arg("-c")
         .arg(&action)
         .env(
@@ -543,18 +540,19 @@ async fn probe_single(provider: &str, model: &str, action_template: Option<&str>
             }
         }
         Err(_) => {
-            // Timeout -- kill the entire process group to prevent zombies.
-            // The child was spawned with process_group(0), so its pgid == pid.
-            #[cfg(unix)]
+            // Timeout -- kill the child and all its descendants to prevent
+            // zombie opencode/node processes.  The tree is typically:
+            //   bash -> node (bun shim) -> .opencode
+            // Use a bash script that walks /proc to find all descendants.
             if let Some(pid) = child.id() {
-                use nix::sys::signal::{killpg, Signal};
-                use nix::unistd::Pid;
-                match killpg(Pid::from_raw(pid as i32), Signal::SIGKILL) {
-                    Ok(()) => debug!(pid, "killed probe process group"),
-                    Err(e) => warn!(pid, error = %e, "failed to kill probe process group"),
-                }
+                let _ = std::process::Command::new("bash")
+                    .arg("-c")
+                    .arg(format!(
+                        "kill_tree() {{ for c in $(pgrep -P $1); do kill_tree $c; done; kill -9 $1 2>/dev/null; }}; kill_tree {pid}"
+                    ))
+                    .output();
+                debug!(pid, "killed probe process tree");
             }
-            // Also call child.kill() for the direct child handle cleanup.
             let _ = child.kill().await;
             warn!(
                 provider,
