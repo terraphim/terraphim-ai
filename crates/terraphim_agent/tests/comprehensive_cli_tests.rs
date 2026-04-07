@@ -107,7 +107,7 @@ fn test_search_with_role_and_limit() -> Result<()> {
 
     // Test search with specific role
     let (stdout, stderr, code) =
-        run_tui_command(&["search", "system", "--role", "Default", "--limit", "8"])?;
+        run_tui_command(&["search", "system", "--role", "Terraphim Engineer", "--limit", "8"])?;
 
     assert!(
         code == 0 || code == 1,
@@ -265,12 +265,12 @@ fn test_config_management() -> Result<()> {
         "config",
         "set",
         "selected_role",
-        "Default", // Use a role that exists
+        "Terraphim Engineer", // Use a role that exists
     ])?;
 
     if code == 0 {
         let clean_output = extract_clean_output(&stdout);
-        if clean_output.contains("updated selected_role to Default") {
+        if clean_output.contains("updated selected_role to Terraphim Engineer") {
             println!("✅ Config set completed successfully");
         } else {
             println!("⚠️ Config set succeeded but output format may have changed");
