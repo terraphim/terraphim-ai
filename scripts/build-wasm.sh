@@ -12,11 +12,11 @@ echo -e "${BLUE}Building Terraphim Automata WASM module...${NC}"
 # Check if wasm-pack is installed
 if ! command -v wasm-pack &> /dev/null; then
     echo "wasm-pack is not installed. Installing..."
-    cargo install wasm-pack
+    cargo install wasm-pack --locked
 fi
 
-# Navigate to wasm-test directory
-cd "$(dirname "$0")/../crates/terraphim_automata/wasm-test"
+# Navigate to the publishable WASM package directory
+cd "$(dirname "$0")/../crates/terraphim_automata/wasm"
 
 # Parse arguments
 TARGET="${1:-web}"
@@ -39,19 +39,19 @@ case "$BUILD_TYPE" in
 esac
 
 echo -e "${GREEN}✓ Build complete!${NC}"
-echo "Output directory: crates/terraphim_automata/wasm-test/pkg"
+echo "Output directory: crates/terraphim_automata/wasm/pkg"
 
 # Show file sizes
-if [ -f "pkg/terraphim_automata_wasm_test_bg.wasm" ]; then
-    WASM_SIZE=$(du -h pkg/terraphim_automata_wasm_test_bg.wasm | cut -f1)
+if [ -f "pkg/terraphim_automata_wasm_bg.wasm" ]; then
+    WASM_SIZE=$(du -h pkg/terraphim_automata_wasm_bg.wasm | cut -f1)
     echo -e "WASM file size: ${BLUE}${WASM_SIZE}${NC}"
 
     if command -v gzip &> /dev/null; then
-        GZIP_SIZE=$(gzip -c pkg/terraphim_automata_wasm_test_bg.wasm | wc -c | awk '{print $1/1024 "K"}')
+        GZIP_SIZE=$(gzip -c pkg/terraphim_automata_wasm_bg.wasm | wc -c | awk '{print $1/1024 "K"}')
         echo -e "Gzipped size: ${BLUE}${GZIP_SIZE}${NC}"
     fi
 fi
 
 echo -e "\n${GREEN}Usage:${NC}"
-echo "  Web:     import init from './pkg/terraphim_automata_wasm_test.js'"
-echo "  Node.js: const wasm = require('./pkg/terraphim_automata_wasm_test.js')"
+echo "  Web:     import init from './pkg/terraphim_automata_wasm.js'"
+echo "  Node.js: const wasm = require('./pkg/terraphim_automata_wasm.js')"

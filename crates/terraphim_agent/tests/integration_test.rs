@@ -59,6 +59,7 @@ async fn test_api_client_search() {
         limit: Some(5),
         role: Some(RoleName::new("Terraphim Engineer")),
         layer: Layer::default(),
+        include_pinned: false,
     };
 
     let result = client.search(&query).await;
@@ -205,6 +206,7 @@ async fn test_search_with_different_roles() {
             limit: Some(3),
             role: Some(RoleName::new(role_name)),
             layer: Layer::default(),
+            include_pinned: false,
         };
 
         let result = client.search(&query).await;
@@ -247,6 +249,7 @@ async fn test_search_pagination() {
         limit: Some(2),
         role: Some(RoleName::new("Default")),
         layer: Layer::default(),
+        include_pinned: false,
     };
 
     let result1 = client.search(&query1).await;
@@ -261,6 +264,7 @@ async fn test_search_pagination() {
         limit: Some(2),
         role: Some(RoleName::new("Default")),
         layer: Layer::default(),
+        include_pinned: false,
     };
 
     let result2 = client.search(&query2).await;
@@ -454,6 +458,7 @@ async fn test_api_error_handling() {
         limit: Some(0), // Invalid limit
         role: Some(RoleName::new("NonExistentRole")),
         layer: Layer::default(),
+        include_pinned: false,
     };
 
     let result = client.search(&query).await;

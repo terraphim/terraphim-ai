@@ -1,15 +1,15 @@
-use wasm_bindgen::prelude::*;
 use terraphim_automata::{
     autocomplete::{autocomplete_search, build_autocomplete_index},
     load_thesaurus_from_json,
 };
+use wasm_bindgen::prelude::*;
 
 // Initialize panic hook for better error messages in the browser
 #[wasm_bindgen(start)]
 pub fn init() {
     console_error_panic_hook::set_once();
     wasm_logger::init(wasm_logger::Config::default());
-    log::info!("Terraphim Automata WASM module initialized");
+    log::info!("Terraphim Automata WASM bindings initialized");
 }
 
 /// Build an autocomplete index from a JSON thesaurus string
@@ -43,7 +43,11 @@ pub fn build_index_from_json(json_str: &str) -> Result<Vec<u8>, JsValue> {
 /// # Returns
 /// JSON array of autocomplete results
 #[wasm_bindgen]
-pub fn autocomplete(index_bytes: &[u8], query: &str, max_results: usize) -> Result<String, JsValue> {
+pub fn autocomplete(
+    index_bytes: &[u8],
+    query: &str,
+    max_results: usize,
+) -> Result<String, JsValue> {
     let index = terraphim_automata::deserialize_autocomplete_index(index_bytes)
         .map_err(|e| JsValue::from_str(&format!("Failed to deserialize index: {}", e)))?;
 

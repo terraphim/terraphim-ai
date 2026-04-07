@@ -103,7 +103,7 @@ fn run_server_command(server_url: &str, args: &[&str]) -> Result<(String, String
     cmd_args.extend_from_slice(args);
 
     let mut cmd = Command::new("cargo");
-    cmd.args(["run", "-p", "terraphim_agent", "--"])
+    cmd.args(["run", "-p", "terraphim_agent", "--features", "server", "--"])
         .args(&cmd_args);
 
     let output = cmd.output()?;
