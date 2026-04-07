@@ -433,6 +433,7 @@ impl ReplHandler {
                     limit,
                     role: role_name,
                     layer: Layer::default(),
+                    include_pinned: false,
                 };
 
                 match api_client.search(&search_query).await {

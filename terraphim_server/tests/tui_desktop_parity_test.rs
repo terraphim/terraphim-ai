@@ -130,6 +130,7 @@ async fn test_tui_vs_direct_api_search_parity() {
         limit: Some(limit),
         role: Some(RoleName::new(test_role)),
         layer: Layer::default(),
+        include_pinned: false,
     };
 
     let tui_result = tui_client.search(&tui_query).await;
@@ -368,6 +369,7 @@ async fn test_search_consistency_across_interfaces() {
             limit: Some(3),
             role: Some(RoleName::new(test_role)),
             layer: Layer::default(),
+            include_pinned: false,
         };
 
         let mut results = Vec::new();
@@ -423,6 +425,7 @@ async fn test_pagination_parity() {
         limit: Some(limit),
         role: Some(RoleName::new(role)),
         layer: Layer::default(),
+        include_pinned: false,
     };
 
     let tui_page1 = tui_client.search(&page1_query).await;
@@ -448,6 +451,7 @@ async fn test_pagination_parity() {
         limit: Some(limit),
         role: Some(RoleName::new(role)),
         layer: Layer::default(),
+        include_pinned: false,
     };
 
     let tui_page2 = tui_client.search(&page2_query).await;
@@ -508,6 +512,7 @@ async fn test_error_handling_parity() {
         limit: Some(5),
         role: Some(RoleName::new("NonExistentRole")),
         layer: Layer::default(),
+        include_pinned: false,
     };
 
     let tui_result = tui_client.search(&invalid_query).await;

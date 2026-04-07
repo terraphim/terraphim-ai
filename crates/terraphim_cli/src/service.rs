@@ -258,6 +258,18 @@ impl CliService {
         role: &RoleName,
         limit: Option<usize>,
     ) -> Result<Vec<Document>> {
+        self.search_with_options(search_term, role, limit, false)
+            .await
+    }
+
+    /// Search documents with full options including include_pinned
+    pub async fn search_with_options(
+        &self,
+        search_term: &str,
+        role: &RoleName,
+        limit: Option<usize>,
+        include_pinned: bool,
+    ) -> Result<Vec<Document>> {
         let query = SearchQuery {
             search_term: NormalizedTermValue::from(search_term),
             search_terms: None,
@@ -266,10 +278,44 @@ impl CliService {
             limit,
             role: Some(role.clone()),
             layer: Layer::default(),
+            include_pinned,
         };
 
         let mut service = self.service.lock().await;
         Ok(service.search(&query).await?)
+    }
+
+    /// List KG entries for a role, optionally filtered to pinned entries only.
+    ///
+    /// Returns a list of `(node_id, term)` pairs. When `pinned_only` is true,
+    /// only entries whose node ID appears in the role graph's pinned list are returned.
+    pub async fn list_kg_entries(
+        &self,
+        role_name: &RoleName,
+        pinned_only: bool,
+    ) -> Result<Vec<serde_json::Value>> {
+        if let Some(rolegraph_sync) = self.config_state.roles.get(role_name) {
+            let rolegraph = rolegraph_sync.lock().await;
+            let pinned_ids: std::collections::HashSet<u64> =
+                rolegraph.get_pinned_node_ids().iter().copied().collect();
+
+            let entries: Vec<serde_json::Value> = rolegraph
+                .ac_reverse_nterm
+                .iter()
+                .filter(|(node_id, _)| !pinned_only || pinned_ids.contains(node_id))
+                .map(|(node_id, term)| {
+                    serde_json::json!({
+                        "node_id": node_id,
+                        "term": term.to_string(),
+                        "pinned": pinned_ids.contains(node_id),
+                    })
+                })
+                .collect();
+
+            Ok(entries)
+        } else {
+            Ok(Vec::new())
+        }
     }
 
     /// Get thesaurus for a specific role
