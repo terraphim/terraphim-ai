@@ -140,6 +140,8 @@ struct ManagedAgent {
     spawned_by_mention: bool,
     /// Git worktree path for workspace isolation (None = shared working_dir).
     worktree_path: Option<PathBuf>,
+    /// KG-routed model selected at spawn time (None = CLI default). Used for logging.
+    routed_model: Option<String>,
 }
 
 /// The main orchestrator that runs the dark factory.
@@ -1084,6 +1086,7 @@ impl AgentOrchestrator {
                 output_rx,
                 spawned_by_mention: false,
                 worktree_path,
+                routed_model: model.clone(),
             },
         );
 
@@ -1101,7 +1104,7 @@ impl AgentOrchestrator {
                 layer: format!("{:?}", def.layer),
                 source: "orchestrator".into(),
                 message: "agent spawned".into(),
-                model: def.model.clone(),
+                model: model.clone(),
                 ..Default::default()
             };
             let _ = sink.send(doc).await;
@@ -2567,6 +2570,11 @@ impl AgentOrchestrator {
                 .map(|m| m.started_at.elapsed().as_secs_f64())
                 .unwrap_or(0.0);
 
+            let routed_model = self
+                .active_agents
+                .get(name)
+                .and_then(|m| m.routed_model.clone());
+
             let trigger = if self
                 .active_agents
                 .get(name)
@@ -2585,7 +2593,7 @@ impl AgentOrchestrator {
                 ended_at: chrono::Utc::now(),
                 exit_code: status.code(),
                 exit_class: classification.exit_class,
-                model_used: def.model.clone(),
+                model_used: routed_model.clone().or_else(|| def.model.clone()),
                 was_fallback: false,
                 wall_time_secs,
                 output_summary: AgentRunRecord::summarise_output(&stdout_lines),
@@ -2644,7 +2652,7 @@ impl AgentOrchestrator {
                     layer: format!("{:?}", def.layer),
                     source: "orchestrator".into(),
                     message: format!("agent exited: {}", record.exit_class),
-                    model: def.model.clone(),
+                    model: routed_model.clone().or_else(|| def.model.clone()),
                     exit_code,
                     wall_time_secs: Some(record.wall_time_secs),
                     extra: Some(serde_json::json!({
@@ -2866,10 +2874,11 @@ impl AgentOrchestrator {
                     .get(name)
                     .map(|m| format!("{:?}", m.definition.layer))
                     .unwrap_or_default();
-                let model = self
-                    .active_agents
-                    .get(name)
-                    .and_then(|m| m.definition.model.clone());
+                let model = self.active_agents.get(name).and_then(|m| {
+                    m.routed_model
+                        .clone()
+                        .or_else(|| m.definition.model.clone())
+                });
                 let doc = quickwit::LogDocument {
                     timestamp: chrono::Utc::now().to_rfc3339(),
                     level: level.into(),
