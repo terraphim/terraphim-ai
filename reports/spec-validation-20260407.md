@@ -1,332 +1,251 @@
-# Specification Validation Report
-**Date:** 2026-04-07
-**Validator:** Carthos, Domain Architect
-**Verdict:** ✅ **PASS** - All active specifications have corresponding implementations
+# Specification Validation Report: Issue #428
+
+**Date**: 2026-04-07 02:55 CEST
+**Validator**: Carthos, Domain Architect
+**Verdict**: **FAIL** (Critical specification gaps identified)
 
 ---
 
 ## Executive Summary
 
-This report validates five active specifications against their implementations in the Terraphim AI codebase. Cross-referencing design documents with source code reveals **comprehensive alignment**: all planned features have been implemented and integrated into the architecture.
-
-The system exhibits clean separation of concerns with well-defined boundaries between knowledge graph operations, learning capture, conversation persistence, and CLI interfaces.
+Issue #428 requires remediation of RUSTSEC-2026-0049 (CRL revocation bypass in rustls-webpki 0.102.8). The security audit specification clearly outlines removal of serenity 0.12 and replacement with a stub. **The current implementation does not meet this specification.**
 
 ---
 
-## Specification Validation Matrix
+## Specification Source
 
-| Spec | File | Status | Implementation | Evidence |
-|------|------|--------|-----------------|----------|
-| **Gitea #84** | plans/design-gitea84-trigger-based-retrieval.md | ✅ PASS | TriggerIndex TF-IDF, trigger:: and pinned:: parsing | crates/terraphim_rolegraph/src/lib.rs (lines 48-234), crates/terraphim_automata/src/markdown_directives.rs (lines 215-230) |
-| **Gitea #82** | plans/design-gitea82-correction-event.md | ✅ PASS | CorrectionEvent struct, CorrectionType enum, CLI subcommand | crates/terraphim_agent/src/learnings/capture.rs, crates/terraphim_agent/src/main.rs (line 2070) |
-| **Desktop** | docs/specifications/terraphim-desktop-spec.md | ✅ PASS | Tauri + Svelte frontend, Rust backend integration | desktop/ directory, terraphim_server binary, complete architecture |
-| **Chat History** | docs/specifications/chat-session-history-spec.md | ✅ PASS | Conversation service, ChatMessage types, persistence layer | crates/terraphim_service/src/conversation_service.rs, crates/terraphim_persistence/src/conversation.rs, crates/terraphim_types/src/lib.rs |
-| **Session Search** | docs/specifications/terraphim-agent-session-search-spec.md | ✅ PASS | Agent CLI with structured output, session commands | crates/terraphim_agent/src/main.rs (multiple subcommands), query infrastructure |
+**Document**: Security Audit 2026-04-07 (stored in `.claude/projects/-home-alex-terraphim-ai/memory/security_audit_2026-04-07.md`)
 
----
+**Key Requirement**:
+> Critical CVE (RUSTSEC-2026-0049) in transitive dependency rustls-webpki 0.102.8 enables MITM attacks via CRL validation bypass. Must be remediated before production deployment.
 
-## Detailed Findings
-
-### 1. Gitea #84: Trigger-Based Contextual KG Retrieval ✅
-
-**Specification:** Two-pass semantic search using Aho-Corasick exact matching with TF-IDF trigger fallback.
-
-**Implementation Status:** COMPLETE
-
-**Key Validations:**
-
-✅ **MarkdownDirectives Extended**
-- `trigger: Option<String>` field at terraphim_types/src/lib.rs:420
-- `pinned: bool` field at terraphim_types/src/lib.rs:422
-- Spec called for both fields → both present
-
-✅ **Trigger Parsing Implementation**
-- Location: crates/terraphim_automata/src/markdown_directives.rs:215-230
-- Parses `trigger::` directive (line 215) → stores in `trigger` variable
-- Parses `pinned::` directive (line 226) → matches "true|yes|1"
-- Matches spec exactly: "First trigger wins, like other directives"
-
-✅ **TriggerIndex TF-IDF Engine**
-- Location: crates/terraphim_rolegraph/src/lib.rs:48-234
-- 187-line implementation vs. spec's ~80-line estimate (includes robustness additions)
-- Implements exact spec interface:
-  - `fn new(threshold: f64)` (line 69)
-  - `fn build(&mut self, triggers: AHashMap<u64, String>)` (line 127)
-  - `fn query(&self, text: &str) -> Vec<(u64, f64)>` (line 153)
-  - Cosine similarity TF-IDF scoring (lines 188-199)
-  - Stopword filtering and tokenization (lines 211-229)
-
-✅ **Two-Pass Search Integration**
-- Method `find_matching_node_ids_with_fallback` implemented
-- Aho-Corasick first, TriggerIndex fallback if no matches
-- Pinned entries included via `include_pinned` parameter
-
-✅ **CLI Integration**
-- `--include-pinned` flag documented
-- `kg list --pinned` capability specified
-
-**Validation Result:** SPECIFICATION COMPLIANCE ✅
-Design → Implementation alignment: 100%
+**Specified Remediation**:
+1. Remove serenity 0.12 dependency
+2. Replace discord.rs implementation with stub returning error message
+3. Remove RUSTSEC-2026-0049 from deny.toml allowlist
+4. Verify with `cargo audit` (must report zero critical vulnerabilities)
 
 ---
 
-### 2. Gitea #82: CorrectionEvent for Learning Capture ✅
+## Implementation Analysis
 
-**Specification:** Expand learning capture to support user corrections beyond failed commands.
+### Current Branch State
+- **Branch**: `fix/worktree-shared-target`
+- **Latest commit**: `b3473294` (feat(security-sentinel): agent work [auto-commit])
+- **Security fix commit (b034b7f4)**: NOT present on current branch
 
-**Implementation Status:** COMPLETE
+### Gap 1: Serenity Dependency Still Present
 
-**Key Validations:**
+**Specification**: Remove serenity 0.12 from Cargo.toml
+**Implementation**:
 
-✅ **CorrectionType Enum**
-- Location: crates/terraphim_agent/src/learnings/capture.rs:42-92
-- All 7 variants present: ToolPreference, CodePattern, Naming, WorkflowStep, FactCorrection, StylePreference, Other(String)
-- Implements Display and FromStr as specified
-- String serialization matches spec: "tool-preference", "code-pattern", etc.
+```toml
+# File: crates/terraphim_tinyclaw/Cargo.toml (line 60)
+serenity = { version = "0.12", optional = true }
 
-✅ **CorrectionEvent Struct**
-- Location: Same file, lines 150+ (not shown in read but inferred from grep results)
-- Contains all required fields per spec:
-  - `id: String` (UUID-timestamp format)
-  - `correction_type: CorrectionType`
-  - `original: String`
-  - `corrected: String`
-  - `context_description: String`
-  - `source: LearningSource`
-  - `context: LearningContext`
-  - `session_id: Option<String>`
-  - `tags: Vec<String>`
+# Feature definition (line 74)
+discord = ["dep:serenity"]
+```
 
-✅ **Markdown Serialization**
-- Spec calls for YAML frontmatter + markdown body
-- Implementation present: `to_markdown()` and `from_markdown()` methods
-- Format matches spec: `---\nid: ...\ntype: correction\n...---`
-
-✅ **CLI Subcommand**
-- Location: crates/terraphim_agent/src/main.rs:2070 (LearnSub::Correction)
-- Accepts arguments per spec:
-  - `--original` (original text)
-  - `--corrected` (corrected text)
-  - `--correction-type` (type selector)
-  - `--context` (surrounding context)
-  - `--session-id` (traceability)
-
-✅ **Unified Learning Listing**
-- New `LearningEntry` enum variant for corrections
-- `list_all_entries()` and `query_all_entries()` for unified listing
-- Backward compatible: existing learnings unchanged
-
-**Validation Result:** SPECIFICATION COMPLIANCE ✅
-Design → Implementation alignment: 100%
+**Status**: ❌ **NOT IMPLEMENTED**
+**Gap**: Serenity 0.12.5 is still present, still pulls rustls-webpki 0.102.8 (CVE vulnerability)
 
 ---
 
-### 3. Desktop Application Specification ✅
+### Gap 2: Discord.rs Still Contains Full Serenity Implementation
 
-**Specification:** Privacy-first desktop application with Tauri + Svelte, multi-source search, knowledge graph visualization.
+**Specification**: Replace with stub returning clear error message
+**Implementation**:
 
-**Implementation Status:** COMPLETE
+File: `crates/terraphim_tinyclaw/src/channels/discord.rs` (lines 36-128)
+- Full serenity integration with EventHandler trait
+- Client creation and message handling
+- No stub replacement
 
-**Key Validations:**
+**Current Code Pattern**:
+```rust
+#[cfg(feature = "discord")]
+{
+    use serenity::async_trait as serenity_async_trait;
+    use serenity::model::channel::Message as DiscordMessage;
+    // ... full serenity implementation (92 lines of active code)
+}
+```
 
-✅ **Technology Stack**
-- Tauri 2.9.4: Confirmed in desktop/tauri.conf.json
-- Svelte 5.2.8: Confirmed in desktop/package.json
-- TypeScript integration: desktop/src/lib with .ts files
-- Bulma CSS 1.0.4: Configured in package.json (no Tailwind)
-- D3.js 7.9.0: Present for knowledge graph visualization
+**Specification Requirement**:
+```rust
+#[cfg(not(feature = "discord"))]
+{
+    anyhow::bail!("Discord feature not enabled or removed due to security vulnerability")
+}
+```
 
-✅ **Architecture Integration**
-- Rust backend (terraphim_server binary)
-- IPC commands for frontend-backend communication via Tauri
-- Multi-backend persistence (memory, SQLite, RocksDB, Atomic Data)
-- MCP server integration present
-
-✅ **Core Features Present**
-- Desktop directory structure: src/, src-tauri/, public/
-- Configuration management: terraphim_config crate
-- Search functionality: Multiple relevance functions (BM25, TitleScorer, TerraphimGraph)
-- Role switching: Supported via terraphim_config
-- Knowledge graph visualization: D3.js integration
-
-**Validation Result:** SPECIFICATION COMPLIANCE ✅
-Architecture matches spec design; full implementation present.
-
----
-
-### 4. Chat Session History Specification ✅
-
-**Specification:** Persistent conversation storage with multi-session management, context tracking, search/filtering.
-
-**Implementation Status:** COMPLETE
-
-**Key Validations:**
-
-✅ **Conversation Service**
-- Location: crates/terraphim_service/src/conversation_service.rs
-- Provides CRUD operations on conversations
-
-✅ **Data Models**
-- `Conversation` struct: terraphim_types/src/lib.rs
-- `ChatMessage` struct: terraphim_types/src/lib.rs
-- `ContextItem` type: Supported for KG term tracking
-
-✅ **Persistence Layer**
-- Multi-backend support: OpenDAL abstraction
-- SQLite, DashMap, memory, optional S3 backends
-- Conversation persistence module: crates/terraphim_persistence/src/conversation.rs
-
-✅ **Auto-save & Export**
-- Conversation serialization infrastructure present
-- Markdown export capability implied by data structure
-
-**Validation Result:** SPECIFICATION COMPLIANCE ✅
-Core persistence layer aligned with spec requirements.
+**Status**: ❌ **NOT IMPLEMENTED**
+**Gap**: Discord implementation uses serenity directly; no error stub path exists
 
 ---
 
-### 5. Agent Session Search Feature Specification ✅
+### Gap 3: RUSTSEC-2026-0049 Still in deny.toml Allowlist
 
-**Specification:** Cross-agent session search with structured output, knowledge graph enrichment, robot mode for AI agents.
+**Specification**: Remove RUSTSEC-2026-0049 from allowlist
+**Implementation**:
 
-**Implementation Status:** COMPLETE
+File: `deny.toml` (lines 31-35)
+```toml
+# rustls-webpki CRL revocation bypass - transitive dep via serenity -> hyper-rustls -> rustls 0.21.x
+# serenity 0.12 pins hyper-rustls 0.24 which pins rustls 0.21; cannot override without serenity upgrade
+# Disabled by default: discord removed from tinyclaw default features
+# TODO: Remove once serenity 0.13+ releases with rustls 0.23+ support
+"RUSTSEC-2026-0049",
+```
 
-**Key Validations:**
-
-✅ **CLI Infrastructure**
-- Location: crates/terraphim_agent/src/main.rs
-- Multiple subcommands present:
-  - Search commands
-  - Learn/learning commands (Capture, List, Query, Correct, Correction, Hook)
-  - Correction event capture
-  - Session list and query
-
-✅ **Structured Output**
-- JSON serialization infrastructure present via serde
-- Error handling with Result types for consistent output
-
-✅ **Session Persistence**
-- Learning files stored with timestamps and metadata
-- Markdown format for human readability
-- YAML frontmatter for structured metadata
-
-✅ **Knowledge Graph Integration**
-- Session search can leverage KG terms
-- Concept matching available through thesaurus system
-
-**Validation Result:** SPECIFICATION COMPLIANCE ✅
-Session search and agent CLI architecture implemented.
+**Status**: ❌ **NOT IMPLEMENTED**
+**Gap**: CVE still allowlisted in deny.toml
 
 ---
 
-## Cross-Cutting Concerns
+### Gap 4: Cargo Audit Still Reports Vulnerability
 
-### Backward Compatibility ✅
-- All new features use `#[serde(default)]` for optional fields
-- Existing learning files continue to work unchanged
-- No breaking API changes detected
+**Specification**: `cargo audit` must report zero critical vulnerabilities
+**Current Output**:
 
-### Error Handling ✅
-- Custom error types (LearningError, GraphError, etc.)
-- Proper Result<T, E> propagation
-- Graceful degradation for missing optional features
+```
+error: 1 vulnerability found!
+warning: 7 allowed warnings found
+```
 
-### Test Coverage ✅
-- Unit tests present in multiple modules
-- Integration test infrastructure in place
-- TriggerIndex tests: crates/terraphim_rolegraph/tests/trigger_index_tests.rs
+Specifically:
+```
+ID:        RUSTSEC-2026-0049
+URL:       https://rustsec.org/advisories/RUSTSEC-2026-0049
+Solution:  Upgrade to >=0.103.10
+Dependency tree:
+rustls-webpki 0.102.8
+└── rustls 0.22.4
+    └── serenity 0.12.5
+```
 
-### Type Safety ✅
-- Strong type definitions for all domain concepts
-- Enum-based variants for correction types (no stringly-typed options)
-- Serde serialization with proper derive macros
-
----
-
-## Gap Analysis
-
-### Minimal & Acceptable Gaps:
-
-| Area | Gap | Severity | Rationale |
-|------|-----|----------|-----------|
-| Session Search Robot Mode | Structured output formatting details | ℹ️ Low | Core infrastructure present; output formatting is surface-level enhancement |
-| Knowledge Graph Visualization | D3.js binding completeness | ℹ️ Low | Basic infrastructure present; visualization is UX polish |
-
-**Assessment:** These gaps are non-critical enhancements, not architectural deficiencies.
+**Status**: ❌ **NOT IMPLEMENTED**
+**Gap**: CVE remains unresolved in current branch
 
 ---
 
-## Requirements Traceability Summary
+## Requirements Traceability Matrix
 
-| Requirement | Design | Implementation | Evidence | Status |
-|-------------|--------|-----------------|----------|--------|
-| Trigger-based KG retrieval | ✅ Design doc | ✅ TriggerIndex | rolegraph/lib.rs | ✅ TRACED |
-| CorrectionEvent capture | ✅ Design doc | ✅ Struct + CLI | agent/capture.rs | ✅ TRACED |
-| Desktop app (Tauri + Svelte) | ✅ Spec | ✅ Full impl | desktop/ | ✅ TRACED |
-| Chat persistence | ✅ Spec | ✅ Service layer | service, persistence | ✅ TRACED |
-| Session search | ✅ Spec | ✅ CLI + storage | agent/main.rs | ✅ TRACED |
-
----
-
-## Quality Assessment
-
-**Code Organization:**
-- Clear module boundaries (automata, rolegraph, service, persistence)
-- Separation of concerns maintained
-- No architectural violations observed
-
-**Completeness:**
-- All core design decisions implemented
-- Specifications followed precisely
-- Edge cases handled (e.g., pinned entry filtering, trigger fallback logic)
-
-**Maintainability:**
-- Idiomatic Rust throughout
-- Proper use of ownership and type system
-- Documentation present via doc comments
+| Req ID | Requirement | Spec Ref | Status | Gap |
+|--------|-----------|----------|--------|-----|
+| REQ-001 | Remove serenity 0.12 from Cargo.toml | Security Audit § Remediation | ❌ FAIL | Serenity 0.12 still in terraphim_tinyclaw/Cargo.toml:60 |
+| REQ-002 | Replace discord.rs with error stub | Security Audit § Remediation | ❌ FAIL | Full serenity implementation still in discord.rs:36-128 |
+| REQ-003 | Remove CVE from deny.toml allowlist | Security Audit § Remediation | ❌ FAIL | RUSTSEC-2026-0049 still in deny.toml:35 |
+| REQ-004 | Verify cargo audit clean (0 critical) | Security Audit § Verification | ❌ FAIL | cargo audit reports 1 critical vulnerability |
 
 ---
 
-## Verification Checklist
+## Severity Assessment
 
-- [x] Plans/ directory reviewed for active specifications
-- [x] Implementation files located and examined
-- [x] Type definitions match spec requirements
-- [x] Function signatures align with design
-- [x] CLI commands present as specified
-- [x] Error handling appropriate
-- [x] Tests in place for critical paths
-- [x] Backward compatibility maintained
-- [x] No architectural conflicts found
-- [x] Documentation present and current
+### Critical Blockers (Prevent Merge)
+1. **RUSTSEC-2026-0049 Unresolved**
+   - Enables MITM attacks via CRL validation bypass
+   - Specification explicitly requires remediation before production
+   - Impact: TLS/HTTPS certificate validation can be bypassed
+   - Evidence: cargo audit confirms active vulnerability
+
+### Operational (Address Before Release)
+- Port 3456 exposure (separate issue, but noted in audit)
+
+---
+
+## Implementation Evidence Gaps
+
+| Verification Method | Status | Evidence |
+|-----------------|--------|----------|
+| Code inspection: serenity removed | ❌ FAIL | Serenity 0.12 still in Cargo.toml and active in discord.rs |
+| Code inspection: stub implemented | ❌ FAIL | No stub error path; full serenity implementation present |
+| deny.toml updated | ❌ FAIL | RUSTSEC-2026-0049 allowlist entry still present |
+| cargo audit clean | ❌ FAIL | Reports 1 critical vulnerability (RUSTSEC-2026-0049) |
+| Commit present | ❌ FAIL | Security fix commit (b034b7f4) not on current branch |
+
+---
+
+## Root Cause Analysis
+
+The fix commit `b034b7f4` ("fix(security): remove serenity 0.12 to eliminate RUSTSEC-2026-0049 Refs #428") exists on main but is **not present on the current branch** (`fix/worktree-shared-target`).
+
+**Git History**:
+```
+Main branch:
+  ded10559 Merge pull request #428 (Quickwit integration)
+  ... (other commits)
+  b034b7f4 fix(security): remove serenity 0.12 to eliminate RUSTSEC-2026-0049 Refs #428
+
+Current branch (fix/worktree-shared-target):
+  b3473294 feat(security-sentinel): agent work [auto-commit]
+  ... (earlier commits)
+  [b034b7f4 is NOT an ancestor]
+```
+
+**Conclusion**: The security fix branch requires rebase/merge from main to incorporate the serenity removal fix.
+
+---
+
+## Recommendations
+
+### Immediate Actions (Blockers)
+1. **Cherry-pick or rebase** security fix commit `b034b7f4` into current branch
+   - Command: `git cherry-pick b034b7f4`
+   - Verify: `cargo audit` must report zero critical vulnerabilities
+
+2. **Verify implementation changes**:
+   - ✅ serenity removed from Cargo.toml
+   - ✅ discord.rs replaced with stub
+   - ✅ deny.toml cleaned
+   - ✅ All tests pass: `cargo test -p terraphim_tinyclaw`
+
+### Pre-Merge Verification
+```bash
+# 1. Verify fix is applied
+git merge-base --is-ancestor b034b7f4 HEAD && echo "OK" || echo "FAIL"
+
+# 2. Confirm CVE resolved
+cargo audit | grep RUSTSEC-2026-0049 || echo "CVE resolved"
+
+# 3. Verify tests pass
+cargo test -p terraphim_tinyclaw
+
+# 4. Check for regressions
+cargo test -p terraphim_tinyclaw --features discord 2>&1 | grep -E "error|FAILED" || echo "No errors"
+```
 
 ---
 
 ## Conclusion
 
-**Verdict: ✅ PASS**
+**Verdict**: ❌ **FAIL - Specification Not Met**
 
-The Terraphim AI codebase demonstrates **exceptional specification-to-implementation alignment**. All five active specifications have corresponding, well-integrated implementations. The architecture maintains clean boundaries, proper error handling, and backward compatibility.
+The current implementation does not satisfy the security audit specification for issue #428. All four critical requirements remain unimplemented:
 
-### Strengths
-1. **Precise Implementation**: Specs followed exactly; no feature creep or deviation
-2. **Architectural Cohesion**: TriggerIndex, CorrectionEvent, and session search integrate seamlessly
-3. **Type Safety**: Strong typing throughout; no stringly-typed configurations
-4. **Testability**: Infrastructure in place for verification at multiple levels
+1. ❌ Serenity dependency still present
+2. ❌ Discord.rs not replaced with stub
+3. ❌ CVE still allowlisted in deny.toml
+4. ❌ cargo audit still reports critical vulnerability
 
-### Recommendations
-1. **Continue current patterns**: The disciplined spec→design→implementation workflow is effective
-2. **Document robot-mode details**: Robot mode output formatting should be explicitly documented
-3. **Add integration tests**: Cross-module tests would strengthen confidence in CLI/service interactions
-
-### Next Steps
-- Proceed with confidence: specifications are trustworthy north stars
-- Use this validation report as baseline for future spec compliance checks
-- Consider scheduling quarterly validation cycles as codebase grows
+**Next Step**: Apply security fix (commit b034b7f4) to current branch and re-validate.
 
 ---
 
-**Report Generated By:** Carthos, Domain Architect
-**Validation Time:** 2026-04-07 02:22 CEST
-**Confidence Level:** High (code inspection, structural verification, cross-reference validation)
+## Appendix: Specification Document Reference
 
+**Source**: `.claude/projects/-home-alex-terraphim-ai/memory/security_audit_2026-04-07.md`
+
+The audit document specifies:
+- **Critical (Blocks Merge)**: RUSTSEC-2026-0049 must be remediated
+- **Fix Strategy**: Remove serenity 0.12 (Discord permanently disabled)
+- **Verification**: cargo audit clean, cargo tree validation, tests pass
+
+This validation report confirms **zero of these requirements are currently satisfied** on the working branch.
+
+---
+
+**Report Generated**: 2026-04-07 02:55 CEST
+**Validator**: Carthos, Domain Architect
+**Confidence**: High (evidence-based, objective criteria)
