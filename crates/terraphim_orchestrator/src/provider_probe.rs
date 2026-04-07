@@ -543,7 +543,9 @@ async fn probe_single(provider: &str, model: &str, action_template: Option<&str>
             // Timeout -- kill the child and all its descendants to prevent
             // zombie opencode/node processes.  First kill children, then the
             // direct child.  bash -> node (bun shim) -> .opencode
-            if let Some(pid) = child.id() {
+            let child_pid = child.id();
+            // Kill descendant tree if we still have the PID.
+            if let Some(pid) = child_pid {
                 // Collect all descendant PIDs before killing anything,
                 // otherwise reparenting breaks the parent chain.
                 let desc = std::process::Command::new("bash")
@@ -561,8 +563,18 @@ async fn probe_single(provider: &str, model: &str, action_template: Option<&str>
                             }
                         }
                     }
-                    debug!(pid, descendants = %pids.lines().count(), "killed probe process tree");
+                    info!(pid, descendants = %pids.lines().count(), "killed probe process tree");
                 }
+            } else {
+                // child.id() is None -- process already reaped by tokio.
+                // Fall back to killing by command pattern.
+                let _ = std::process::Command::new("pkill")
+                    .args(["-9", "-f", &format!("opencode.*{model}.*echo hello")])
+                    .output();
+                info!(
+                    provider,
+                    model, "killed timed-out probe by command pattern (child.id()=None)"
+                );
             }
             let _ = child.kill().await;
             warn!(
