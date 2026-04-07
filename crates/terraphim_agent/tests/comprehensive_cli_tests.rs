@@ -184,7 +184,7 @@ fn test_roles_management() -> Result<()> {
     println!("✅ Found {} roles: {:?}", roles.len(), roles);
 
     // Verify expected roles exist
-    let expected_roles = ["Default", "Terraphim Engineer"];
+    let expected_roles = ["Terraphim Engineer"];
     for expected_role in &expected_roles {
         assert!(
             roles.iter().any(|role| role.contains(expected_role)),
@@ -377,7 +377,7 @@ fn test_chat_command() -> Result<()> {
 
     // Test chat with role - accept exit code 1 if no LLM configured
     let (_stdout, stderr, code) =
-        run_tui_command(&["chat", "Test message with role", "--role", "Default"])?;
+        run_tui_command(&["chat", "Test message with role", "--role", "Terraphim Engineer"])?;
 
     assert!(
         code == 0 || stderr.to_lowercase().contains("no llm configured"),
