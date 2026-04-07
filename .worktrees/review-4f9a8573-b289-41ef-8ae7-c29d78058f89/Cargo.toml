@@ -1,0 +1,96 @@
+
+[workspace]
+resolver = "2"
+members = ["crates/*", "terraphim_server", "terraphim_firecracker", "terraphim_ai_nodejs"]
+# Note: terraphim_usage and terraphim_ccusage are new crates in crates/*
+exclude = [
+    # Experimental crates
+    "crates/terraphim_agent_application",
+    "crates/terraphim_truthforge",
+    "crates/terraphim_automata_py",
+    # Python bindings (need `maturin develop`)
+    "crates/terraphim_automata_py",
+    "crates/terraphim_rolegraph_py",
+    # Desktop built separately via Tauri CLI
+    "desktop/src-tauri",
+    # Planned future use, not needed for workspace builds
+    "crates/terraphim_build_args",
+    # Unused haystack providers (kept for future integration)
+    "crates/haystack_atlassian",
+    "crates/haystack_discourse",
+    # Superseded by terraphim_agent
+    "crates/terraphim_repl",
+    # Symphony orchestrator (build separately: cd crates/terraphim_symphony && cargo build)
+    "crates/terraphim_symphony",
+    # Firecracker-based crates (private git dependency fcctl-core)
+    "crates/terraphim_rlm",
+    "crates/terraphim_github_runner",
+    "crates/terraphim_github_runner_server",
+    "terraphim_firecracker",
+]
+default-members = ["terraphim_server"]
+
+[workspace.package]
+version = "1.16.9"
+edition = "2024"
+
+[workspace.dependencies]
+# OpenRouter AI integration dependencies
+tokio = { version = "1.0", features = ["full"] }
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+
+# Direct HTTP LLM client approach (removed rig-core)
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+uuid = { version = "1.21", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+async-trait = "0.1"
+thiserror = "1.0"
+anyhow = "1.0"
+log = "0.4"
+tracing = "0.1"
+tempfile = "3.27"
+
+# Security: Force rustls 0.23+ to fix RUSTSEC-2026-0049
+rustls = { version = "0.23", default-features = false }
+# Security: Force rustls-webpki 0.103.10+ to fix RUSTSEC-2026-0049 (CRL validation bypass)
+rustls-webpki = "0.103.10"
+
+# LLM Router integration
+
+[patch.crates-io]
+genai = { git = "https://github.com/terraphim/rust-genai.git", branch = "merge-upstream-20251103" }
+self_update = { git = "https://github.com/AlexMikhalev/self_update.git", branch = "update-zipsign-api-v0.2" }
+# Security: Patch tokio-tungstenite to use rustls 0.23+ for RUSTSEC-2026-0049
+tokio-tungstenite = { git = "https://github.com/snapview/tokio-tungstenite.git", tag = "v0.28.0" }
+# Security: Patch rustls-webpki to fix RUSTSEC-2026-0049
+# Using git source to force version override
+rustls-webpki = { git = "https://github.com/rustls/webpki.git", tag = "v/0.103.10" }
+
+[profile.release]
+panic = "unwind"
+lto = false
+codegen-units = 1
+opt-level = 3
+
+[profile.release-lto]
+inherits = "release"
+lto = true
+codegen-units = 1
+opt-level = 3
+panic = "abort"
+
+# CI-optimized profiles for faster builds with less disk usage
+[profile.ci]
+inherits = "dev"
+incremental = false
+codegen-units = 16
+split-debuginfo = "off"
+debug = false
+strip = true
+
+[profile.ci-release]
+inherits = "release"
+lto = "thin"
+codegen-units = 8
+strip = "symbols"

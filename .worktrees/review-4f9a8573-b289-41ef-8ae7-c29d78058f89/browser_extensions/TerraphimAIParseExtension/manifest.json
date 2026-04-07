@@ -1,0 +1,48 @@
+{
+    "name": "Terraphim AI parse it",
+    "description": "Use Knowledge Graph from Terraphim AI to parse text in a tab and replace known text with links to concepts",
+    "version": "1.0.0",
+    "manifest_version": 3,
+    "side_panel": {
+        "default_path": "sidepanel.html"
+      },
+    "permissions": [
+        "webRequest",
+        "scripting",
+        "activeTab",
+        "clipboardRead",
+        "clipboardWrite",
+        "tabs",
+        "contextMenus",
+        "sidePanel",
+        "storage"
+    ],
+    "host_permissions": [
+        "http://localhost/*",
+        "https://*.terraphim.cloud/*",
+        "https://*.amazonaws.com/*",
+        "https://api.cloudflare.com/*"
+    ],
+    "options_ui": {
+        "page": "options.html",
+        "open_in_tab": true
+    },
+    "action": {
+        "default_title": "Terraphim AI parse it",
+        "default_popup": "popup.html"
+    },
+    "background": {
+        "service_worker": "background.js"
+    },
+    "content_security_policy": {
+        "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';"
+    },
+    "commands": {
+        "_execute_action": {
+            "suggested_key": {
+                "default": "Ctrl+Shift+T",
+                "mac": "Command+Shift+T"
+            }
+        }
+    }
+}

@@ -1,0 +1,114 @@
+{
+  "id": "Server",
+  "global_shortcut": "Ctrl+Shift+L",
+  "roles": {
+    "Default": {
+      "shortname": "Default",
+      "name": "Default",
+      "relevance_function": "title-scorer",
+      "terraphim_it": false,
+      "theme": "default",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "extra": {}
+    },
+    "Gemma Rust Engineer": {
+      "shortname": "GemmaRust",
+      "name": "Gemma Rust Engineer",
+      "relevance_function": "terraphim-graph",
+      "terraphim_it": true,
+      "theme": "cosmo",
+      "kg": {
+        "automata_path": null,
+        "knowledge_graph_local": {
+          "input_type": "markdown",
+          "path": "docs/src/kg"
+        },
+        "public": true,
+        "publish": true
+      },
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "extra": {
+        "llm_provider": "ollama",
+        "llm_model": "gemma3:270m",
+        "llm_base_url": "http://127.0.0.1:11434",
+        "llm_auto_summarize": true,
+        "llm_description": "Local Ollama instance with gemma3:270m for fast Rust-focused development"
+      }
+    },
+    "Gemma AI Assistant": {
+      "shortname": "GemmaAI",
+      "name": "Gemma AI Assistant",
+      "relevance_function": "terraphim-graph",
+      "terraphim_it": true,
+      "theme": "lumen",
+      "kg": {
+        "automata_path": null,
+        "knowledge_graph_local": {
+          "input_type": "markdown",
+          "path": "docs/src/kg"
+        },
+        "public": true,
+        "publish": true
+      },
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "extra": {
+        "llm_provider": "ollama",
+        "llm_model": "gemma3:270m",
+        "llm_base_url": "http://127.0.0.1:11434",
+        "llm_auto_summarize": true,
+        "llm_description": "AI-powered assistant using local gemma3:270m with knowledge graph integration"
+      }
+    },
+    "Gemma Developer": {
+      "shortname": "GemmaDev",
+      "name": "Gemma Developer",
+      "relevance_function": "bm25",
+      "terraphim_it": false,
+      "theme": "spacelab",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "extra": {
+        "llm_provider": "ollama",
+        "llm_model": "gemma3:270m",
+        "llm_base_url": "http://127.0.0.1:11434",
+        "llm_auto_summarize": true,
+        "llm_description": "Developer-focused role with BM25 scoring and gemma3:270m for fast responses"
+      }
+    }
+  },
+  "default_role": "Gemma Rust Engineer",
+  "selected_role": "Gemma Rust Engineer"
+}
