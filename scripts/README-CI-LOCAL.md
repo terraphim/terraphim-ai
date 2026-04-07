@@ -26,6 +26,12 @@ The local CI testing scripts mirror the GitHub Actions workflows, allowing you t
 | `ci-quick-check.sh` | Fast subset for pre-commit validation | Before each commit |
 | `ci-pr-validation.sh [pr-number]` | Full PR validation with detailed reporting | PR preparation |
 
+### Contract Guard Scripts
+
+| Script | Purpose | Contract |
+|--------|---------|----------|
+| `ci-guard-terraphim-agent-server-mode.sh` | Validates test subprocess command construction | Any `cargo run -p terraphim_agent` invocation that passes `--server` must also pass `--features server` |
+
 ## Quick Start
 
 ### 1. Pre-commit Validation (Fast)
@@ -33,6 +39,9 @@ The local CI testing scripts mirror the GitHub Actions workflows, allowing you t
 ```bash
 # Quick checks that run in < 2 minutes
 ./scripts/ci-quick-check.sh
+
+# Server-mode terraphim_agent contract check
+./scripts/ci-guard-terraphim-agent-server-mode.sh
 ```
 
 ### 2. Full Local Validation
@@ -40,7 +49,20 @@ The local CI testing scripts mirror the GitHub Actions workflows, allowing you t
 ```bash
 # Run all CI checks (mirrors GitHub Actions)
 ./scripts/ci-run-all.sh
+
+# Optionally run targeted guard before pushing workflow/test edits
+./scripts/ci-guard-terraphim-agent-server-mode.sh
 ```
+
+## terraphim_agent Server-Mode Contract
+
+When tests spawn `terraphim_agent` in server mode via Cargo (`--server`), they must compile with the server feature enabled in the same subprocess invocation:
+
+```bash
+cargo run -p terraphim_agent --features server -- --server --server-url http://localhost:8000 ...
+```
+
+This prevents accidental execution of server-mode paths without the required feature set during CI and local runs.
 
 ### 3. PR Validation with Report
 

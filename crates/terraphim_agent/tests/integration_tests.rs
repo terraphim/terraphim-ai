@@ -123,7 +123,7 @@ fn run_server_command(server_url: &str, args: &[&str]) -> Result<(String, String
         .unwrap_or(300);
 
     let mut cmd = Command::new("cargo");
-    cmd.args(["run", "-p", "terraphim_agent", "--"])
+    cmd.args(["run", "-p", "terraphim_agent", "--features", "server", "--"])
         .args(&cmd_args)
         .env("TERRAPHIM_CLIENT_TIMEOUT", format!("{}", timeout_secs));
 
