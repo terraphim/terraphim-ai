@@ -545,12 +545,14 @@ async fn probe_single(provider: &str, model: &str, action_template: Option<&str>
         Err(_) => {
             // Timeout -- kill the entire process group to prevent zombies.
             // The child was spawned with process_group(0), so its pgid == pid.
-            // Shell out to `kill` to signal the whole process group.
             #[cfg(unix)]
             if let Some(pid) = child.id() {
-                let _ = std::process::Command::new("kill")
-                    .args(["-9", "--", &format!("-{pid}")])
-                    .output();
+                use nix::sys::signal::{killpg, Signal};
+                use nix::unistd::Pid;
+                match killpg(Pid::from_raw(pid as i32), Signal::SIGKILL) {
+                    Ok(()) => debug!(pid, "killed probe process group"),
+                    Err(e) => warn!(pid, error = %e, "failed to kill probe process group"),
+                }
             }
             // Also call child.kill() for the direct child handle cleanup.
             let _ = child.kill().await;

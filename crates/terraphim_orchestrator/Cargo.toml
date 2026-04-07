@@ -44,6 +44,9 @@ cron = "0.13"
 # Command parsing via terraphim-automata
 terraphim_automata = { path = "../terraphim_automata", version = "1.4.10" }
 
+# Process group management (probe timeout kill)
+nix = { version = "0.27", features = ["signal"] }
+
 # Config parsing
 toml = "0.8"
 
