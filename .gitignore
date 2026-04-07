@@ -111,14 +111,13 @@ skills/
 .windsurf/
 .zencoder/
 skills-lock.json
-<<<<<<< HEAD
 
 # Playwright test artifacts
 .playwright-mcp/
 
 # Pi session logs
 pi-session-*.html
-=======
 *.html
-*.html
->>>>>>> 1891f2a9 (chore: add infrastructure scripts, docs, and gitignore entry)
+
+# Git worktree agent scratch directories
+.worktrees/
