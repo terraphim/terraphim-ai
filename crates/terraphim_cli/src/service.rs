@@ -251,17 +251,6 @@ impl CliService {
         Ok(())
     }
 
-    /// Search documents with a specific role
-    pub async fn search(
-        &self,
-        search_term: &str,
-        role: &RoleName,
-        limit: Option<usize>,
-    ) -> Result<Vec<Document>> {
-        self.search_with_options(search_term, role, limit, false)
-            .await
-    }
-
     /// Search documents with full options including include_pinned
     pub async fn search_with_options(
         &self,
