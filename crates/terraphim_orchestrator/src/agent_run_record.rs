@@ -180,12 +180,19 @@ pub struct AgentRunRecord {
 }
 
 impl AgentRunRecord {
-    /// Truncate text to max_len characters.
+    /// Truncate text to at most max_len bytes, respecting UTF-8 character boundaries.
+    ///
+    /// Avoids panicking when `max_len` falls inside a multi-byte character.
     fn truncate(text: &str, max_len: usize) -> String {
         if text.len() <= max_len {
             text.to_string()
         } else {
-            format!("{}...", &text[..max_len])
+            // Walk back from max_len to find a valid UTF-8 character boundary.
+            let mut boundary = max_len;
+            while boundary > 0 && !text.is_char_boundary(boundary) {
+                boundary -= 1;
+            }
+            format!("{}...", &text[..boundary])
         }
     }
 
@@ -839,6 +846,44 @@ mod tests {
         let lines: Vec<String> = (0..100).map(|i| format!("line {}", i)).collect();
         let summary = AgentRunRecord::summarise_output(&lines);
         assert!(summary.len() <= 504); // 500 + "..."
+    }
+
+    #[test]
+    fn truncate_does_not_panic_on_multibyte_utf8() {
+        // Each emoji is 4 bytes; placing 125 of them gives 500 bytes.
+        // Truncating at 500 bytes must not split inside a 4-byte codepoint.
+        let emoji_str: String = "😀".repeat(200); // 800 bytes total
+        let result = AgentRunRecord::truncate(&emoji_str, 500);
+        // Must be valid UTF-8 and end with "..."
+        assert!(result.ends_with("..."), "result should end with '...'");
+        assert!(
+            std::str::from_utf8(result.as_bytes()).is_ok(),
+            "must be valid UTF-8"
+        );
+    }
+
+    #[test]
+    fn truncate_does_not_panic_on_multibyte_utf8_at_boundary() {
+        // 3-byte UTF-8 sequences (e.g. CJK characters). Place a boundary mid-char.
+        let cjk_str: String = "中".repeat(200); // each '中' is 3 bytes, 600 bytes total
+        let result = AgentRunRecord::truncate(&cjk_str, 500); // 500 is not a multiple of 3
+        assert!(result.ends_with("..."));
+        assert!(std::str::from_utf8(result.as_bytes()).is_ok());
+    }
+
+    #[test]
+    fn truncate_short_text_unchanged() {
+        let s = "hello";
+        let result = AgentRunRecord::truncate(s, 500);
+        assert_eq!(result, "hello");
+    }
+
+    #[test]
+    fn summarise_output_with_unicode_does_not_panic() {
+        // Mix of multi-byte sequences to stress the truncation path
+        let lines: Vec<String> = (0..50).map(|i| format!("emoji {} 🔥", i)).collect();
+        let summary = AgentRunRecord::summarise_output(&lines);
+        assert!(std::str::from_utf8(summary.as_bytes()).is_ok());
     }
 
     #[tokio::test]
