@@ -13,11 +13,11 @@ echo -e "${BLUE}Testing Terraphim Automata WASM module...${NC}"
 # Check if wasm-pack is installed
 if ! command -v wasm-pack &> /dev/null; then
     echo "wasm-pack is not installed. Installing..."
-    cargo install wasm-pack
+    cargo install wasm-pack --locked
 fi
 
-# Navigate to wasm-test directory
-cd "$(dirname "$0")/../crates/terraphim_automata/wasm-test"
+# Navigate to the publishable WASM package directory
+cd "$(dirname "$0")/../crates/terraphim_automata/wasm"
 
 # Parse arguments
 BROWSER="${1:-chrome}"
