@@ -159,7 +159,7 @@ const results = fuzzy_autocomplete_search(index, "rast", 0.8, 5);
 console.log("Matches:", results);
 ```
 
-See [wasm-test/](wasm-test/) for a complete example.
+See [wasm/](wasm/) for the publishable WebAssembly package and browser example.
 
 ## Cargo Features
 

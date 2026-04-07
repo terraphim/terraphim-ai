@@ -101,6 +101,7 @@ mod logical_operators_fix_validation_tests {
             limit: Some(10),
             role: Some(RoleName::from("Default")),
             layer: Layer::default(),
+            include_pinned: false,
         };
 
         // Test get_all_terms to ensure no duplication
@@ -160,6 +161,7 @@ mod logical_operators_fix_validation_tests {
             limit: Some(10),
             role: Some(RoleName::from("Default")),
             layer: Layer::default(),
+            include_pinned: false,
         };
 
         // Test get_all_terms to ensure no duplication
@@ -225,6 +227,7 @@ mod logical_operators_fix_validation_tests {
             limit: Some(10),
             role: Some(RoleName::from("Default")),
             layer: Layer::default(),
+            include_pinned: false,
         };
 
         // Test get_all_terms for single term
@@ -303,6 +306,7 @@ mod logical_operators_fix_validation_tests {
             limit: Some(10),
             role: Some(RoleName::from("Default")),
             layer: Layer::default(),
+            include_pinned: false,
         };
 
         let result = service
@@ -341,6 +345,7 @@ mod logical_operators_fix_validation_tests {
             limit: Some(10),
             role: Some(RoleName::from("Default")),
             layer: Layer::default(),
+            include_pinned: false,
         };
 
         // Test get_all_terms
@@ -383,6 +388,7 @@ mod logical_operators_fix_validation_tests {
             limit: Some(10),
             role: Some(RoleName::from("Default")),
             layer: Layer::default(),
+            include_pinned: false,
         };
 
         // Test get_all_terms

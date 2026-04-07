@@ -309,6 +309,7 @@ Rust has a vibrant community with excellent documentation, tutorials, and exampl
         skip: None,
         role: Some(role_name.clone()),
         layer: Layer::default(),
+        include_pinned: false,
     };
 
     let results = service
