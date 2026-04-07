@@ -159,7 +159,9 @@ fn default_max_concurrent_mention_agents() -> u32 {
 /// Configuration for the webhook server.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WebhookConfig {
-    /// Bind address for the webhook server (default "0.0.0.0:9090").
+    /// Bind address for the webhook server (default "127.0.0.1:9090").
+    /// Use 127.0.0.1 (localhost) to avoid exposing the webhook endpoint to all network interfaces.
+    /// Set to "0.0.0.0:9090" explicitly if external access is required.
     #[serde(default = "default_webhook_bind")]
     pub bind: String,
     /// Shared secret for HMAC signature verification.
@@ -168,7 +170,7 @@ pub struct WebhookConfig {
 }
 
 fn default_webhook_bind() -> String {
-    "0.0.0.0:9090".to_string()
+    "127.0.0.1:9090".to_string()
 }
 
 /// Quickwit log shipping configuration.

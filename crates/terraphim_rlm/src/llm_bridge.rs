@@ -89,9 +89,10 @@ pub struct BatchedQueryResponse {
 /// LLM Bridge server configuration.
 #[derive(Debug, Clone)]
 pub struct LlmBridgeConfig {
-    /// Port to listen on (for VM access).
+    /// Port to listen on.
     pub port: u16,
-    /// Bind address (typically "0.0.0.0" for VM access).
+    /// Bind address. Defaults to "127.0.0.1" to avoid exposing the bridge to all interfaces.
+    /// Set to "0.0.0.0" explicitly when the bridge needs to be accessible from VMs or remote hosts.
     pub bind_addr: String,
     /// Maximum concurrent queries in a batch.
     pub max_batch_size: usize,
@@ -103,7 +104,7 @@ impl Default for LlmBridgeConfig {
     fn default() -> Self {
         Self {
             port: 8080,
-            bind_addr: "0.0.0.0".to_string(),
+            bind_addr: "127.0.0.1".to_string(),
             max_batch_size: 10,
             request_timeout_ms: 30_000,
         }
