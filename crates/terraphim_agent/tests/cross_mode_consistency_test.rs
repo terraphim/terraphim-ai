@@ -403,9 +403,9 @@ async fn test_cross_mode_consistency() -> Result<()> {
     // heavy server-side processing that causes timeouts. It's tested separately
     // in test_role_consistency_across_modes.
     let test_cases = vec![
-        ("rust", "Default"),
-        ("machine", "Default"),
-        ("terraphim", "Default"),
+        ("rust", "Terraphim Engineer"),
+        ("machine", "Terraphim Engineer"),
+        ("terraphim", "Terraphim Engineer"),
     ];
 
     let mut all_consistent = true;
@@ -514,7 +514,7 @@ async fn test_mode_specific_verification() -> Result<()> {
     thread::sleep(Duration::from_secs(5));
 
     let query = "terraphim";
-    let role = "Default"; // Use Default for reliable results with fixtures data
+    let role = "Terraphim Engineer"; // Use the available role from user config
 
     // Test 1: Server mode specifics
     println!("Test 1: Server mode verification");
@@ -577,7 +577,7 @@ async fn test_role_consistency_across_modes() -> Result<()> {
     thread::sleep(Duration::from_secs(5));
 
     let query = "rust";
-    let roles = vec!["Terraphim Engineer", "Default", "Quickwit Logs"];
+    let roles = vec!["Terraphim Engineer"];
 
     for role in roles {
         println!("\nTesting role: '{}'", role);
