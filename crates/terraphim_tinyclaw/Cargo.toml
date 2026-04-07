@@ -57,7 +57,9 @@ clap = { version = "4", features = ["derive"] }
 
 # Channel adapters (feature-gated)
 teloxide = { version = "0.17", optional = true, features = ["macros"] }
-serenity = { version = "0.12", optional = true }
+# serenity removed: RUSTSEC-2026-0049 - rustls-webpki CRL bypass via serenity 0.12 -> rustls 0.22.
+# Discord feature is stubbed pending serenity 0.13+ with rustls 0.23 support.
+# See: https://git.terraphim.cloud/terraphim/terraphim-ai/issues/363
 slack-morphism = { version = "2", optional = true, features = ["hyper"] }
 # Note: matrix-sdk disabled due to sqlite dependency conflict with terraphim_persistence
 # Re-enable when matrix-sdk updates to rusqlite 0.32+ or when conflict resolved
@@ -71,7 +73,8 @@ hound = { version = "3.5", optional = true }
 [features]
 default = ["telegram"]
 telegram = ["dep:teloxide"]
-discord = ["dep:serenity"]
+# discord feature is a stub: serenity removed to fix RUSTSEC-2026-0049
+discord = []
 slack = ["dep:slack-morphism"]
 voice = ["dep:whisper-rs", "dep:symphonia", "dep:hound"]
 # matrix = ["dep:matrix-sdk"]
