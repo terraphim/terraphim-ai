@@ -60,6 +60,7 @@ async fn mcp_live_haystack_smoke() {
         operator: None,
         search_terms: None,
         layer: Default::default(),
+        include_pinned: false,
     };
 
     let result = search_haystacks(config_state, query)

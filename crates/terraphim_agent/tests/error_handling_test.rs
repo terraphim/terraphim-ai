@@ -93,6 +93,7 @@ async fn test_malformed_server_response() {
         limit: Some(100000), // Extremely large limit
         role: Some(RoleName::new("Default")),
         layer: Layer::default(),
+        include_pinned: false,
     };
 
     let result = client.search(&extreme_query).await;
@@ -139,6 +140,7 @@ async fn test_invalid_role_handling() {
         limit: Some(5),
         role: Some(RoleName::new("CompleteLyInvalidRoleName12345")),
         layer: Layer::default(),
+        include_pinned: false,
     };
 
     let result = client.search(&invalid_query).await;
@@ -203,6 +205,7 @@ async fn test_empty_and_special_character_queries() {
             limit: Some(5),
             role: Some(RoleName::new("Default")),
             layer: Layer::default(),
+            include_pinned: false,
         };
 
         let result = client.search(&search_query).await;
@@ -257,6 +260,7 @@ async fn test_concurrent_request_handling() {
                 limit: Some(3),
                 role: Some(RoleName::new("Default")),
                 layer: Layer::default(),
+                include_pinned: false,
             };
             client_clone.search(&query).await
         });
@@ -522,6 +526,7 @@ async fn test_graceful_degradation() {
                     limit: Some(1),
                     role: Some(RoleName::new("Default")),
                     layer: Layer::default(),
+                    include_pinned: false,
                 };
                 client
                     .search(&query)

@@ -219,6 +219,14 @@ jobs:
         with:
           components: clippy
 
+      - name: Setup sccache
+        uses: mozilla-actions/sccache-action@v0.0.9
+
+      - name: Configure sccache
+        run: |
+          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+
       - name: Clippy Check
         run: cargo clippy --workspace --all-targets --features zlob -- -D warnings
         env:
@@ -258,6 +266,14 @@ jobs:
         with:
           components: rustfmt, clippy
 
+      - name: Setup sccache
+        uses: mozilla-actions/sccache-action@v0.0.9
+
+      - name: Configure sccache
+        run: |
+          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+
       - name: Cache Cargo registry and index
         uses: actions/cache@v4
         with:
@@ -270,6 +286,9 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-pr-
             ${{ runner.os }}-cargo-
+
+      - name: Enforce terraphim_agent server-mode feature contract
+        run: ./scripts/ci-guard-terraphim-agent-server-mode.sh
 
       - name: Check compilation
         run: |
@@ -327,7 +346,7 @@ jobs:
 
       - name: Type check
         working-directory: desktop
-        run: yarn check
+        run: yarn run check
 
   # Quick unit tests for changed code
   rust-tests:
@@ -367,6 +386,14 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
+
+      - name: Setup sccache
+        uses: mozilla-actions/sccache-action@v0.0.9
+
+      - name: Configure sccache
+        run: |
+          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
 
       - name: Cache Cargo registry and index
         uses: actions/cache@v4
@@ -421,10 +448,19 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
 
+      - name: Setup sccache
+        uses: mozilla-actions/sccache-action@v0.0.9
+
+      - name: Configure sccache
+        run: |
+          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+
       - name: Install wasm-pack
-        uses: jetli/wasm-pack-action@v0.4.0
-        with:
-          version: 'latest'
+        run: |
+          if ! command -v wasm-pack >/dev/null 2>&1; then
+            cargo install wasm-pack --locked
+          fi
 
       - name: Build WASM
         run: |

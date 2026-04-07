@@ -63,6 +63,21 @@ enum RolesSub {
     },
 }
 
+/// KG subcommands
+#[derive(Subcommand)]
+enum KgSub {
+    /// List knowledge graph entries
+    List {
+        /// Show only pinned entries
+        #[arg(long)]
+        pinned: bool,
+
+        /// Role to use
+        #[arg(long)]
+        role: Option<String>,
+    },
+}
+
 #[derive(Subcommand)]
 enum Commands {
     /// Search for documents
@@ -77,6 +92,10 @@ enum Commands {
         /// Maximum number of results
         #[arg(long, short = 'n')]
         limit: Option<usize>,
+
+        /// Include pinned KG entries in results even if they don't match the query
+        #[arg(long)]
+        include_pinned: bool,
     },
 
     /// Show configuration
@@ -190,6 +209,12 @@ enum Commands {
     Rollback {
         /// Version to rollback to
         version: String,
+    },
+
+    /// Knowledge graph management
+    Kg {
+        #[command(subcommand)]
+        sub: KgSub,
     },
 
     /// Show AI coding usage across all providers
@@ -335,9 +360,12 @@ async fn main() -> Result<()> {
 
     // Execute command
     let result = match cli.command {
-        Some(Commands::Search { query, role, limit }) => {
-            handle_search(&service, query, role, limit).await
-        }
+        Some(Commands::Search {
+            query,
+            role,
+            limit,
+            include_pinned,
+        }) => handle_search(&service, query, role, limit, include_pinned).await,
         Some(Commands::Config) => handle_config(&service).await,
         Some(Commands::Roles { sub }) => match sub {
             RolesSub::List => handle_roles_list(&service).await,
@@ -380,6 +408,9 @@ async fn main() -> Result<()> {
         Some(Commands::CheckUpdate) => handle_check_update().await,
         Some(Commands::Update) => handle_update().await,
         Some(Commands::Rollback { version }) => handle_rollback(&version).await,
+        Some(Commands::Kg { sub }) => match sub {
+            KgSub::List { pinned, role } => handle_kg_list(&service, role, pinned).await,
+        },
         #[cfg(feature = "usage")]
         Some(Commands::Usage { action }) => handle_usage(action).await,
         Some(Commands::Completions { .. }) => unreachable!(), // Handled above
@@ -430,6 +461,7 @@ async fn handle_search(
     query: String,
     role: Option<String>,
     limit: Option<usize>,
+    include_pinned: bool,
 ) -> Result<serde_json::Value> {
     let role_name = if let Some(role) = role {
         terraphim_types::RoleName::new(&role)
@@ -437,7 +469,9 @@ async fn handle_search(
         service.get_selected_role().await
     };
 
-    let documents = service.search(&query, &role_name, limit).await?;
+    let documents = service
+        .search_with_options(&query, &role_name, limit, include_pinned)
+        .await?;
 
     // Apply limit client-side since the service may return more results
     let documents = if let Some(max) = limit {
@@ -465,6 +499,27 @@ async fn handle_search(
     };
 
     Ok(serde_json::to_value(result)?)
+}
+
+async fn handle_kg_list(
+    service: &CliService,
+    role: Option<String>,
+    pinned_only: bool,
+) -> Result<serde_json::Value> {
+    let role_name = if let Some(role) = role {
+        terraphim_types::RoleName::new(&role)
+    } else {
+        service.get_selected_role().await
+    };
+
+    let entries = service.list_kg_entries(&role_name, pinned_only).await?;
+
+    Ok(serde_json::json!({
+        "role": role_name.to_string(),
+        "pinned_only": pinned_only,
+        "entries": entries,
+        "count": entries.len(),
+    }))
 }
 
 async fn handle_config(service: &CliService) -> Result<serde_json::Value> {

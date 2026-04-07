@@ -1,9 +1,11 @@
 [package]
-name = "terraphim-automata-wasm-test"
+name = "terraphim-automata-wasm"
 version = "1.0.0"
 edition = "2021"
 authors = ["Terraphim Contributors"]
-description = "WASM test and example for terraphim_automata"
+description = "WebAssembly bindings for terraphim_automata"
+license = "Apache-2.0"
+repository = "https://github.com/terraphim/terraphim-ai"
 
 # Standalone package, not part of parent workspace
 [workspace]

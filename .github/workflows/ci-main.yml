@@ -111,6 +111,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Enforce terraphim_agent server-mode feature contract
+        run: ./scripts/ci-guard-terraphim-agent-server-mode.sh
+
       - name: Download fresh frontend assets
         uses: actions/download-artifact@v4
         with:
@@ -137,6 +140,14 @@ jobs:
         with:
           components: rustfmt, clippy
           targets: ${{ matrix.target }}
+
+      - name: Setup sccache
+        uses: mozilla-actions/sccache-action@v0.0.9
+
+      - name: Configure sccache
+        run: |
+          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
 
       - name: Cache Cargo registry and dependencies (self-hosted)
         uses: actions/cache@v4
@@ -304,18 +315,27 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
 
+      - name: Setup sccache
+        uses: mozilla-actions/sccache-action@v0.0.9
+
+      - name: Configure sccache
+        run: |
+          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+
       - name: Install wasm-pack
-        uses: jetli/wasm-pack-action@v0.4.0
-        with:
-          version: 'latest'
+        run: |
+          if ! command -v wasm-pack >/dev/null 2>&1; then
+            cargo install wasm-pack --locked
+          fi
 
       - name: Build WASM for web
         run: |
           ./scripts/build-wasm.sh web release
 
           # Show WASM artifacts
-          ls -la crates/terraphim_automata/wasm-test/pkg/
-          du -sh crates/terraphim_automata/wasm-test/pkg/*.wasm
+          ls -la crates/terraphim_automata/wasm/pkg/
+          du -sh crates/terraphim_automata/wasm/pkg/*.wasm
 
       - name: Build WASM for Node.js
         run: |
@@ -325,7 +345,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: wasm-package
-          path: crates/terraphim_automata/wasm-test/pkg/
+          path: crates/terraphim_automata/wasm/pkg/
           retention-days: ${{ needs.setup.outputs.is-release == 'true' && '90' || '30' }}
 
   # Docker image build
