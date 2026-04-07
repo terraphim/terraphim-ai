@@ -14,6 +14,7 @@ set -euo pipefail
 #   -d, --dry-run            Dry run mode (validate only)
 #   -r, --repository REPO    Repository: pypi or testpypi (default: pypi)
 #   -t, --token TOKEN        PyPI API token
+#   --use-existing-dist      Skip builds and publish existing dist artifacts
 #   -h, --help               Show help message
 #
 # Examples:
@@ -40,6 +41,7 @@ DRY_RUN=false
 VERSION=""
 REPOSITORY="pypi"
 TOKEN=""
+USE_EXISTING_DIST=false
 PACKAGE_DIR="crates/terraphim_automata_py"
 
 # Logging functions
@@ -84,6 +86,10 @@ parse_args() {
       -t|--token)
         TOKEN="$2"
         shift 2
+        ;;
+      --use-existing-dist)
+        USE_EXISTING_DIST=true
+        shift
         ;;
       -h|--help)
         show_help
@@ -213,6 +219,23 @@ build_distributions() {
 
   # Show built distributions
   log_info "Built distributions:"
+  ls -lh "$PACKAGE_DIR/dist/"
+}
+
+ensure_existing_distributions() {
+  log_info "Using existing distributions from $PACKAGE_DIR/dist"
+
+  if [[ ! -d "$PACKAGE_DIR/dist" ]]; then
+    log_error "Distribution directory not found: $PACKAGE_DIR/dist"
+    exit 1
+  fi
+
+  if ! ls "$PACKAGE_DIR/dist"/* >/dev/null 2>&1; then
+    log_error "No distribution files found in $PACKAGE_DIR/dist"
+    exit 1
+  fi
+
+  log_info "Existing distributions:"
   ls -lh "$PACKAGE_DIR/dist/"
 }
 
@@ -350,8 +373,12 @@ main() {
     fi
   fi
 
-  # Build distributions
-  build_distributions
+  # Build distributions (or use prebuilt artifacts)
+  if [[ "$USE_EXISTING_DIST" == "true" ]]; then
+    ensure_existing_distributions
+  else
+    build_distributions
+  fi
 
   # Validate
   validate_distributions

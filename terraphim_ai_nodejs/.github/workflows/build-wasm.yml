@@ -145,12 +145,12 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: wasm-package
-          path: wasm-test
+          path: wasm-package-test
 
       - name: Test Node.js WASM
         if: matrix.settings.test == 'node'
         run: |
-          cd wasm-test
+          cd wasm-package-test
           npm pack
           npm install terraphim-automata-wasm-*.tgz
 
@@ -178,7 +178,7 @@ jobs:
       - name: Test Browser WASM
         if: matrix.settings.test == 'browser'
         run: |
-          cd wasm-test
+          cd wasm-package-test
 
           # Install test dependencies
           npm install --save-dev puppeteer
@@ -199,7 +199,7 @@ jobs:
               <!DOCTYPE html>
               <html>
               <head>
-                <title>WASM Test</title>
+                <title>WASM Browser Check</title>
               </head>
               <body>
                 <script>

@@ -64,8 +64,12 @@ unknown-registry = "warn"
 unknown-git = "warn"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
 
-# Allow specific git sources for our forks
+# Allow specific git sources for our forks and security patches
 allow-git = [
     "https://github.com/terraphim/rust-genai.git",
     "https://github.com/AlexMikhalev/self_update.git",
+    # Security patch: tokio-tungstenite v0.28.0 pulls in rustls 0.23+ avoiding RUSTSEC-2026-0049
+    "https://github.com/snapview/tokio-tungstenite.git",
+    # Security patch: rustls-webpki 0.103.10 to fix RUSTSEC-2026-0049 (used by newer rustls)
+    "https://github.com/rustls/webpki.git",
 ]

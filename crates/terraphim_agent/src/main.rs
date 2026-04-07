@@ -1191,6 +1191,7 @@ async fn run_offline_command(
                     operator: operator.map(|op| op.into()),
                     skip: Some(0),
                     limit: Some(limit),
+                    include_pinned: false,
                     role: Some(role_name.clone()),
                     layer: Layer::default(),
                 };
@@ -2142,6 +2143,7 @@ async fn run_server_command(
                     limit: Some(limit),
                     role: Some(role_name),
                     layer: Layer::default(),
+                    include_pinned: false,
                 }
             } else {
                 // Single term query (backward compatibility)
@@ -2153,6 +2155,7 @@ async fn run_server_command(
                     limit: Some(limit),
                     role: Some(role_name),
                     layer: Layer::default(),
+                    include_pinned: false,
                 }
             };
 
@@ -2913,6 +2916,7 @@ fn ui_loop(
                                         limit: Some(10),
                                         role: Some(RoleName::new(&role)),
                                         layer: Layer::default(),
+                                        include_pinned: false,
                                     };
                                     backend.search(&q).await
                                 }) {
