@@ -300,6 +300,8 @@ fn search_via_cli(server_url: &str, query: &str, role: &str) -> Result<(Vec<Docu
             "run",
             "-p",
             "terraphim_agent",
+            "--features",
+            "server",
             "--",
             "--server",
             "--server-url",
