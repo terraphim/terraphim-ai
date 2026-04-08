@@ -775,33 +775,50 @@ impl AgentOrchestrator {
         self.config.quickwit.as_ref()
     }
 
-    /// Load skill chain content from SKILL.md files for the given agent definition.
+    /// Load skill chain content from skill definition files for the given agent definition.
     ///
     /// Reads each skill named in `def.skill_chain` from `{skill_data_dir}/{name}/SKILL.md`.
-    /// Returns a formatted string with all skill contents, or empty string if no skills
-    /// or no skill_data_dir is configured.
+    /// If that path is missing, it falls back to `skill.md` and well-known HOME skill roots
+    /// (`~/.opencode/skills`, then `~/.claude/skills`). Returns a formatted string with all
+    /// skill contents, or empty string if no skills can be loaded.
     fn load_skill_chain_content(&self, def: &AgentDefinition) -> String {
         if def.skill_chain.is_empty() {
             return String::new();
         }
-        let skills_dir = match &self.config.skill_data_dir {
-            Some(dir) => dir.clone(),
-            None => {
-                // Default: ~/.claude/skills (resolve HOME from env)
-                match std::env::var("HOME") {
-                    Ok(home) => std::path::PathBuf::from(home)
-                        .join(".claude")
-                        .join("skills"),
-                    Err(_) => return String::new(),
-                }
-            }
-        };
+
+        let home_dir = std::env::var("HOME").ok().map(std::path::PathBuf::from);
+        let skill_roots =
+            Self::skill_roots(self.config.skill_data_dir.as_deref(), home_dir.as_deref());
+
+        if skill_roots.is_empty() {
+            return String::new();
+        }
 
         let mut sections = Vec::new();
         for skill_name in &def.skill_chain {
-            let skill_path = skills_dir.join(skill_name).join("SKILL.md");
-            match std::fs::read_to_string(&skill_path) {
-                Ok(content) => {
+            let mut selected_path = None;
+            let mut content = None;
+
+            for root in &skill_roots {
+                let skill_dir = root.join(skill_name);
+                let candidates = [skill_dir.join("SKILL.md"), skill_dir.join("skill.md")];
+                for candidate in candidates {
+                    match std::fs::read_to_string(&candidate) {
+                        Ok(raw) => {
+                            selected_path = Some(candidate);
+                            content = Some(raw);
+                            break;
+                        }
+                        Err(_) => continue,
+                    }
+                }
+                if content.is_some() {
+                    break;
+                }
+            }
+
+            match content {
+                Some(content) => {
                     // Strip YAML frontmatter (between --- markers) to keep just instructions
                     let body = if let Some(after_prefix) = content.strip_prefix("---") {
                         if let Some(end) = after_prefix.find("---") {
@@ -816,16 +833,29 @@ impl AgentOrchestrator {
                     info!(
                         agent = %def.name,
                         skill = %skill_name,
+                        path = %selected_path
+                            .as_ref()
+                            .map(|p| p.display().to_string())
+                            .unwrap_or_else(|| "unknown".to_string()),
                         bytes = body.len(),
                         "loaded skill content"
                     );
                 }
-                Err(e) => {
+                None => {
+                    let tried: Vec<String> = skill_roots
+                        .iter()
+                        .flat_map(|root| {
+                            let skill_dir = root.join(skill_name);
+                            [
+                                skill_dir.join("SKILL.md").display().to_string(),
+                                skill_dir.join("skill.md").display().to_string(),
+                            ]
+                        })
+                        .collect();
                     warn!(
                         agent = %def.name,
                         skill = %skill_name,
-                        path = %skill_path.display(),
-                        error = %e,
+                        tried = ?tried,
                         "failed to load skill, skipping"
                     );
                 }
@@ -840,6 +870,30 @@ impl AgentOrchestrator {
             "\n\n## Active Skills\n\nApply the following skill instructions to your work:\n\n{}\n",
             sections.join("\n\n---\n\n")
         )
+    }
+
+    fn skill_roots(
+        configured: Option<&std::path::Path>,
+        home_dir: Option<&std::path::Path>,
+    ) -> Vec<std::path::PathBuf> {
+        let mut roots = Vec::new();
+
+        if let Some(dir) = configured {
+            roots.push(dir.to_path_buf());
+        }
+
+        if let Some(home) = home_dir {
+            for root in [
+                home.join(".opencode").join("skills"),
+                home.join(".claude").join("skills"),
+            ] {
+                if !roots.iter().any(|existing| existing == &root) {
+                    roots.push(root);
+                }
+            }
+        }
+
+        roots
     }
 
     /// Spawn an agent from its definition.
@@ -3228,6 +3282,7 @@ fn has_matching_changes(changed_files: &[String], watch_paths: &[String]) -> boo
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tempfile::TempDir;
 
     fn test_config() -> OrchestratorConfig {
         OrchestratorConfig {
@@ -3435,6 +3490,40 @@ task = "test"
         assert_eq!(status.name, "test");
         assert!(status.running);
         assert_eq!(status.drift_score, Some(0.05));
+    }
+
+    #[test]
+    fn test_load_skill_chain_content_supports_lowercase_skill_md() {
+        let skill_root = TempDir::new().unwrap();
+        let skill_dir = skill_root.path().join("business-scenario-design");
+        std::fs::create_dir_all(&skill_dir).unwrap();
+        std::fs::write(skill_dir.join("skill.md"), "Lowercase skill content").unwrap();
+
+        let mut config = test_config();
+        config.skill_data_dir = Some(skill_root.path().to_path_buf());
+        let orch = AgentOrchestrator::new(config).unwrap();
+
+        let mut def = orch.config.agents[0].clone();
+        def.skill_chain = vec!["business-scenario-design".to_string()];
+
+        let loaded = orch.load_skill_chain_content(&def);
+        assert!(loaded.contains("### Skill: business-scenario-design"));
+        assert!(loaded.contains("Lowercase skill content"));
+    }
+
+    #[test]
+    fn test_load_skill_chain_content_falls_back_to_home_skill_roots() {
+        let home_dir = TempDir::new().unwrap();
+        let configured_skill_root = TempDir::new().unwrap();
+
+        let roots = AgentOrchestrator::skill_roots(
+            Some(configured_skill_root.path()),
+            Some(home_dir.path()),
+        );
+
+        assert_eq!(roots[0], configured_skill_root.path());
+        assert!(roots.iter().any(|path| path.ends_with(".opencode/skills")));
+        assert!(roots.iter().any(|path| path.ends_with(".claude/skills")));
     }
 
     /// Helper: create a config with a single Safety echo agent and short cooldown.
