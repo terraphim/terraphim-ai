@@ -181,8 +181,9 @@ jobs:
 
       - name: Build release binaries
         run: |
-          # Build workspace with default features (no rocksdb for faster CI)
-          cargo build --release --target ${{ matrix.target }} --workspace
+          # Build workspace. zlob feature required: fff-search build.rs
+          # panics when CI=true unless zlob is explicitly enabled.
+          cargo build --release --target ${{ matrix.target }} --workspace --features zlob
 
           # Verify key binaries exist
           ls -la target/${{ matrix.target }}/release/terraphim*
@@ -210,8 +211,9 @@ jobs:
 
       - name: Run tests
         run: |
-          # Run unit and integration tests (exclude integration-signing which requires zipsign CLI)
-          cargo test --release --target ${{ matrix.target }} --workspace --features "self_update/signatures"
+          # Run unit and integration tests (exclude integration-signing which requires zitsign CLI)
+          # zlob feature required: fff-search build.rs panics when CI=true without zlob.
+          cargo test --release --target ${{ matrix.target }} --workspace --features "self_update/signatures,zlob"
 
       - name: Upload binary artifacts
         uses: actions/upload-artifact@v4
