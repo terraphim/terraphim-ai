@@ -49,6 +49,10 @@ pub struct OrchestratorConfig {
     /// Maximum number of restarts per Safety agent before giving up.
     #[serde(default = "default_max_restart_count")]
     pub max_restart_count: u32,
+    /// Time window for restart budget accounting for Safety agents.
+    /// Restart counts older than this window are ignored.
+    #[serde(default = "default_restart_budget_window")]
+    pub restart_budget_window_secs: u64,
     /// Disk usage percentage threshold (0-100) above which agent spawning is refused.
     /// Set to 100 to disable the guard. Default: 90.
     #[serde(default = "default_disk_usage_threshold")]
@@ -567,6 +571,10 @@ fn default_max_restart_count() -> u32 {
     10
 }
 
+fn default_restart_budget_window() -> u64 {
+    43_200
+}
+
 fn default_disk_usage_threshold() -> u8 {
     90
 }
@@ -810,6 +818,7 @@ task = "t"
         let config = OrchestratorConfig::from_toml(toml_str).unwrap();
         assert_eq!(config.restart_cooldown_secs, 60);
         assert_eq!(config.max_restart_count, 10);
+        assert_eq!(config.restart_budget_window_secs, 43_200);
         assert_eq!(config.tick_interval_secs, 30);
     }
 
@@ -819,6 +828,7 @@ task = "t"
 working_dir = "/tmp"
 restart_cooldown_secs = 120
 max_restart_count = 5
+restart_budget_window_secs = 3600
 tick_interval_secs = 15
 
 [nightwatch]
@@ -836,6 +846,7 @@ task = "t"
         let config = OrchestratorConfig::from_toml(toml_str).unwrap();
         assert_eq!(config.restart_cooldown_secs, 120);
         assert_eq!(config.max_restart_count, 5);
+        assert_eq!(config.restart_budget_window_secs, 3600);
         assert_eq!(config.tick_interval_secs, 15);
     }
 

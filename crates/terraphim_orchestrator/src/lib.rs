@@ -142,6 +142,13 @@ struct ManagedAgent {
     worktree_path: Option<PathBuf>,
 }
 
+#[cfg(not(test))]
+#[derive(Debug, Default, serde::Serialize, serde::Deserialize)]
+struct PersistedRestartState {
+    counts: HashMap<String, u32>,
+    last_failure_unix_secs: HashMap<String, i64>,
+}
+
 /// The main orchestrator that runs the dark factory.
 pub struct AgentOrchestrator {
     config: OrchestratorConfig,
@@ -155,6 +162,8 @@ pub struct AgentOrchestrator {
     shutdown_requested: bool,
     /// Total restart count per agent (persists across agent lifecycle).
     restart_counts: HashMap<String, u32>,
+    /// Last non-zero exit timestamp per agent (unix seconds), used for budget windowing.
+    restart_last_failure_unix_secs: HashMap<String, i64>,
     /// Last exit time per agent (for cooldown enforcement).
     restart_cooldowns: HashMap<String, Instant>,
     /// Timestamp of the last reconciliation tick (for cron comparison).
@@ -313,6 +322,9 @@ impl AgentOrchestrator {
         let provider_health =
             provider_probe::ProviderHealthMap::new(std::time::Duration::from_secs(probe_ttl));
 
+        #[cfg(not(test))]
+        let restart_state = Self::load_restart_state();
+
         // MentionCursor loaded lazily on first poll (async)
 
         Ok(Self {
@@ -328,7 +340,17 @@ impl AgentOrchestrator {
             restart_counts: {
                 #[cfg(not(test))]
                 {
-                    Self::load_restart_counts()
+                    restart_state.counts.clone()
+                }
+                #[cfg(test)]
+                {
+                    HashMap::new()
+                }
+            },
+            restart_last_failure_unix_secs: {
+                #[cfg(not(test))]
+                {
+                    restart_state.last_failure_unix_secs.clone()
                 }
                 #[cfg(test)]
                 {
@@ -358,31 +380,77 @@ impl AgentOrchestrator {
         })
     }
 
-    /// Load persisted restart counts from a JSON file in the working directory.
-    /// Returns empty HashMap if file doesn't exist or can't be parsed.
+    /// Load persisted restart state from a JSON file in the temp directory.
+    /// Falls back to the legacy `HashMap<String, u32>` format for compatibility.
     #[cfg(not(test))]
-    fn load_restart_counts() -> HashMap<String, u32> {
+    fn load_restart_state() -> PersistedRestartState {
         let path = std::env::temp_dir().join("adf_restart_counts.json");
         match std::fs::read_to_string(&path) {
-            Ok(json) => serde_json::from_str(&json).unwrap_or_default(),
-            Err(_) => HashMap::new(),
+            Ok(json) => {
+                if let Ok(state) = serde_json::from_str::<PersistedRestartState>(&json) {
+                    state
+                } else if let Ok(counts) = serde_json::from_str::<HashMap<String, u32>>(&json) {
+                    PersistedRestartState {
+                        counts,
+                        last_failure_unix_secs: HashMap::new(),
+                    }
+                } else {
+                    PersistedRestartState::default()
+                }
+            }
+            Err(_) => PersistedRestartState::default(),
         }
     }
 
-    /// Persist restart counts so they survive orchestrator restarts.
-    fn save_restart_counts(&self) {
+    /// Persist restart state so it survives orchestrator restarts.
+    fn save_restart_state(&self) {
         // Skip persistence in test builds to avoid cross-test contamination
         #[cfg(test)]
         return;
         #[cfg(not(test))]
         {
             let path = std::env::temp_dir().join("adf_restart_counts.json");
-            if let Ok(json) = serde_json::to_string(&self.restart_counts) {
+            let state = PersistedRestartState {
+                counts: self.restart_counts.clone(),
+                last_failure_unix_secs: self.restart_last_failure_unix_secs.clone(),
+            };
+            if let Ok(json) = serde_json::to_string(&state) {
                 if let Err(e) = std::fs::write(&path, json) {
-                    warn!(error = %e, "failed to persist restart counts");
+                    warn!(error = %e, "failed to persist restart state");
                 }
             }
         }
+    }
+
+    fn restart_budget_window_secs(&self) -> i64 {
+        self.config.restart_budget_window_secs as i64
+    }
+
+    fn current_restart_count(&mut self, name: &str) -> u32 {
+        let now = chrono::Utc::now().timestamp();
+        let window = self.restart_budget_window_secs();
+        let last_failure = self.restart_last_failure_unix_secs.get(name).copied();
+        if let Some(last) = last_failure {
+            if now.saturating_sub(last) > window {
+                self.restart_counts.remove(name);
+                self.restart_last_failure_unix_secs.remove(name);
+                self.save_restart_state();
+            }
+        }
+        self.restart_counts.get(name).copied().unwrap_or(0)
+    }
+
+    fn increment_restart_count(&mut self, name: &str) -> u32 {
+        let _ = self.current_restart_count(name);
+        let next_count = {
+            let count = self.restart_counts.entry(name.to_string()).or_insert(0);
+            *count += 1;
+            *count
+        };
+        self.restart_last_failure_unix_secs
+            .insert(name.to_string(), chrono::Utc::now().timestamp());
+        self.save_restart_state();
+        next_count
     }
 
     /// Check disk usage percentage for the root filesystem.
@@ -2515,13 +2583,8 @@ impl AgentOrchestrator {
                 }
                 // Handle exit based on layer (similar to handle_agent_exit but for timeout)
                 if managed.definition.layer == AgentLayer::Safety {
-                    {
-                        let count = self.restart_counts.entry(name.clone()).or_insert(0);
-                        *count += 1;
-                    }
+                    let restart_count = self.increment_restart_count(&name);
                     self.restart_cooldowns.insert(name.clone(), Instant::now());
-                    self.save_restart_counts();
-                    let restart_count = self.restart_counts.get(&name).copied().unwrap_or(0);
                     info!(
                         agent = %name,
                         restart_count,
@@ -2696,18 +2759,16 @@ impl AgentOrchestrator {
                 // A successful exit (code 0) means the agent completed its task;
                 // punishing it for succeeding makes no sense.
                 if !status.success() {
-                    let count = self.restart_counts.entry(name.to_string()).or_insert(0);
-                    *count += 1;
-                    self.save_restart_counts();
+                    let restart_count = self.increment_restart_count(name);
                     self.restart_cooldowns
                         .insert(name.to_string(), Instant::now());
-                    let restart_count = self.restart_counts.get(name).copied().unwrap_or(0);
                     if restart_count <= self.config.max_restart_count {
                         info!(
                             agent = %name,
                             exit_status = %status,
                             restart_count,
                             cooldown_secs = self.config.restart_cooldown_secs,
+                            window_secs = self.config.restart_budget_window_secs,
                             "safety agent failed, will restart after cooldown"
                         );
                     } else {
@@ -2720,10 +2781,13 @@ impl AgentOrchestrator {
                         );
                     }
                 } else {
+                    self.restart_cooldowns
+                        .insert(name.to_string(), Instant::now());
                     info!(
                         agent = %name,
                         exit_status = %status,
-                        "safety agent completed successfully"
+                        cooldown_secs = self.config.restart_cooldown_secs,
+                        "safety agent completed successfully, will restart after cooldown"
                     );
                 }
             }
@@ -2740,6 +2804,18 @@ impl AgentOrchestrator {
     async fn restart_pending_safety_agents(&mut self) {
         let cooldown = Duration::from_secs(self.config.restart_cooldown_secs);
         let max_restarts = self.config.max_restart_count;
+
+        // Age out stale restart counters before restart eligibility checks.
+        let safety_names: Vec<String> = self
+            .config
+            .agents
+            .iter()
+            .filter(|def| def.layer == AgentLayer::Safety)
+            .map(|def| def.name.clone())
+            .collect();
+        for name in &safety_names {
+            let _ = self.current_restart_count(name);
+        }
 
         // Find Safety agents that need restarting
         let to_restart: Vec<AgentDefinition> = self
@@ -3212,6 +3288,7 @@ mod tests {
             ],
             restart_cooldown_secs: 60,
             max_restart_count: 10,
+            restart_budget_window_secs: 43_200,
             disk_usage_threshold: 100, // disable disk guard in tests
             tick_interval_secs: 30,
             handoff_buffer_ttl_secs: None,
@@ -3395,6 +3472,7 @@ task = "test"
             }],
             restart_cooldown_secs: 0, // instant restart for testing
             max_restart_count: 3,
+            restart_budget_window_secs: 43_200,
             disk_usage_threshold: 100, // disable disk guard in tests
             tick_interval_secs: 1,
             handoff_buffer_ttl_secs: None,
@@ -3533,6 +3611,26 @@ task = "test"
             "agent should not restart after exceeding max_restart_count"
         );
         assert_eq!(orch.restart_counts.get("echo-safety").copied(), Some(3));
+    }
+
+    #[test]
+    fn test_restart_count_ages_out_after_budget_window() {
+        let mut config = test_config_fast_lifecycle();
+        config.restart_budget_window_secs = 1;
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        orch.restart_counts.insert("echo-safety".to_string(), 3);
+        orch.restart_last_failure_unix_secs.insert(
+            "echo-safety".to_string(),
+            chrono::Utc::now().timestamp() - 5,
+        );
+
+        let count = orch.current_restart_count("echo-safety");
+        assert_eq!(count, 0);
+        assert!(!orch.restart_counts.contains_key("echo-safety"));
+        assert!(!orch
+            .restart_last_failure_unix_secs
+            .contains_key("echo-safety"));
     }
 
     #[tokio::test]
