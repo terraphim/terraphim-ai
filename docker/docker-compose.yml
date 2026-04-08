@@ -32,10 +32,14 @@ services:
     container_name: terraphim-ollama
     restart: unless-stopped
     ports:
-      - "11434:11434"
+      # Bind only to localhost to prevent unintended public exposure of the AI inference engine.
+      # Internal docker-compose services use the terraphim-network and do not need host port access.
+      - "127.0.0.1:11434:11434"
     volumes:
       - ./ollama:/root/.ollama
     environment:
+      # OLLAMA_HOST binds the container's listener on all interfaces for intra-container networking.
+      # External access is restricted by the port binding above (127.0.0.1 only).
       - OLLAMA_HOST=0.0.0.0
     networks:
       - terraphim-network
