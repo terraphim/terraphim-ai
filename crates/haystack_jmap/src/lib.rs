@@ -243,11 +243,6 @@ impl JMAPClient {
             )],
         };
 
-        log::debug!(
-            "JMAP search request: {}",
-            serde_json::to_string_pretty(&request)?
-        );
-
         let response = self
             .client
             .post(&self.session.api_url)

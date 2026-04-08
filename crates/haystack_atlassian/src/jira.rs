@@ -100,8 +100,6 @@ pub async fn get_issue(
 
     let status = response.status();
     let response_text = response.text().await?;
-    eprintln!("DEBUG: Response status: {}", status);
-    eprintln!("DEBUG: Response body: {}", response_text);
 
     if !status.is_success() {
         return Err(anyhow::anyhow!(
@@ -142,14 +140,6 @@ pub async fn search(
     }
 
     let fields: Vec<&str> = fields.split(',').collect();
-    let search_request = SearchRequest {
-        jql,
-        fields,
-        max_results: limit,
-    };
-
-    eprintln!("DEBUG: Request URL: {}", url);
-    eprintln!("DEBUG: Request body: {:?}", search_request);
 
     let response = client
         .post(&url)
@@ -160,8 +150,6 @@ pub async fn search(
 
     let status = response.status();
     let response_text = response.text().await?;
-    eprintln!("DEBUG: Response status: {}", status);
-    eprintln!("DEBUG: Response body: {}", response_text);
 
     if !status.is_success() {
         return Err(anyhow::anyhow!(
