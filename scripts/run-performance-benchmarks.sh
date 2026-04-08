@@ -143,7 +143,7 @@ run_rust_benchmarks() {
 
     # Run rolegraph benchmarks
     log_info "Running rolegraph benchmarks..."
-    if cargo bench --bench rolegraph --manifest-path crates/terraphim_rolegraph/Cargo.toml; then
+    if cargo bench --bench throughput --manifest-path crates/terraphim_rolegraph/Cargo.toml; then
         log_success "Rolegraph benchmarks completed"
     else
         log_warn "Rolegraph benchmarks failed"
@@ -151,10 +151,10 @@ run_rust_benchmarks() {
 
     # Run multi-agent benchmarks
     log_info "Running multi-agent benchmarks..."
-    if cargo bench --bench agent_operations --manifest-path crates/terraphim_multi_agent/Cargo.toml; then
+    if cargo bench --bench agent_operations --manifest-path crates/terraphim_multi_agent/Cargo.toml 2>/dev/null; then
         log_success "Multi-agent benchmarks completed"
     else
-        log_warn "Multi-agent benchmarks failed"
+        log_warn "Multi-agent benchmarks failed (may not exist)"
     fi
 }
 
