@@ -71,6 +71,7 @@ impl HookResult {
 }
 
 /// Unified replacement service using Terraphim knowledge graphs.
+#[derive(Debug, Clone)]
 pub struct ReplacementService {
     thesaurus: Thesaurus,
     link_type: AutomataLinkType,
