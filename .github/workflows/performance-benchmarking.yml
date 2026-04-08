@@ -178,9 +178,15 @@ jobs:
       with:
         script: |
           const fs = require('fs');
+          const { execSync } = require('child_process');
 
-          // Find the benchmark report
-          const reportPath = require('glob').sync('benchmark-results/*/benchmark_report.md')[0];
+          // Find the benchmark report using shell (glob npm module not available in runner)
+          let reportPath;
+          try {
+            reportPath = execSync('find benchmark-results -name "benchmark_report.md" | head -1', { encoding: 'utf8' }).trim();
+          } catch (e) {
+            reportPath = null;
+          }
 
           if (reportPath && fs.existsSync(reportPath)) {
             const report = fs.readFileSync(reportPath, 'utf8');
@@ -190,17 +196,17 @@ jobs:
             const sloCompliance = sloMatch ? sloMatch[1] : 'N/A';
 
           const comment = [
-            "## 🚀 Performance Benchmark Results",
+            "## Performance Benchmark Results",
             "",
             `**SLO Compliance:** ${sloCompliance}%`,
             "",
             "### Key Findings:",
             report.includes('violations')
-              ? '⚠️ Some performance thresholds were not met'
-              : '✅ All performance requirements satisfied',
+              ? 'Some performance thresholds were not met'
+              : 'All performance requirements satisfied',
             "",
-            `[View full report](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})`,
-          ].join("\\n");
+            `[View full report](https://github.com/terraphim/terraphim-ai/actions/runs/${process.env.GITHUB_RUN_ID})`,
+          ].join("\n");
 
             github.rest.issues.createComment({
               issue_number: context.issue.number,
@@ -259,9 +265,6 @@ jobs:
         git config --global user.email 'github-actions[bot]@users.noreply.github.com'
 
         git add benchmark-results/baseline.json
-        git commit -m "chore: update performance baseline
-
-Auto-updated from CI run: ${{ github.run_id }}
-SLO Compliance: ${{ needs.performance-benchmarks.outputs.slo-compliance }}%" || echo "No changes to commit"
+        git commit -m "chore: update performance baseline from run ${{ github.run_id }}" || echo "No changes to commit"
 
         git push origin main
