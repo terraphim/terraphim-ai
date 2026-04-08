@@ -38,7 +38,10 @@ pub mod cla;
 pub mod enrichment;
 
 // Re-exports for convenience
-pub use connector::{ConnectorRegistry, ConnectorStatus, ImportOptions, SessionConnector};
+pub use connector::{
+    CodexConnector, ConnectorRegistry, ConnectorStatus, ImportOptions, OpenCodeConnector,
+    SessionConnector,
+};
 pub use model::{
     ContentBlock, FileAccess, FileOperation, Message, MessageRole, Session, SessionMetadata,
 };
