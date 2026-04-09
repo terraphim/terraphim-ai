@@ -253,7 +253,7 @@ pub fn generate_rationale(result: &PolicyResult) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::control_plane::telemetry::{ModelUsage, TokenBreakdown};
+    use crate::control_plane::telemetry::ModelUsage;
     use std::path::PathBuf;
     use terraphim_types::capability::{CostLevel, Latency, Provider, ProviderType};
 
