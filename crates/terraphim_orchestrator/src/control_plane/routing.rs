@@ -21,6 +21,8 @@ pub struct DispatchContext {
     pub cli_tool: String,
     /// Agent layer (Safety, Core, Growth).
     pub layer: crate::config::AgentLayer,
+    /// Workflow session identity (opencode session ID or Gitea issue reference).
+    pub session_id: Option<String>,
 }
 
 /// A candidate route option.
@@ -353,6 +355,7 @@ mod tests {
             static_model: None,
             cli_tool: cli_tool.to_string(),
             layer: crate::config::AgentLayer::Core,
+            session_id: None,
         }
     }
 
@@ -367,6 +370,7 @@ mod tests {
             static_model: Some(static_model.to_string()),
             cli_tool: "opencode".to_string(),
             layer: crate::config::AgentLayer::Core,
+            session_id: None,
         }
     }
 
@@ -435,6 +439,7 @@ mod tests {
             static_model: Some("some-model".to_string()),
             cli_tool: "codex".to_string(), // Unsupported
             layer: crate::config::AgentLayer::Core,
+            session_id: None,
         };
         let decision = engine.decide_route(&ctx);
 
@@ -502,12 +507,14 @@ mod tests {
             static_model: Some("model-id".to_string()),
             cli_tool: "claude".to_string(),
             layer: crate::config::AgentLayer::Safety,
+            session_id: Some("sess-123".to_string()),
         };
 
         assert_eq!(ctx.agent_name, "test-agent");
         assert_eq!(ctx.task, "Do something");
         assert_eq!(ctx.static_model, Some("model-id".to_string()));
         assert_eq!(ctx.cli_tool, "claude");
+        assert_eq!(ctx.session_id, Some("sess-123".to_string()));
     }
 
     #[test]
