@@ -6,10 +6,16 @@
 //! - Provider/model health status
 //! - Static configuration fallbacks
 //! - Keyword routing fallbacks
+//! - Live telemetry (throughput, latency, subscription limits)
+//! - Session and weekly usage consumption
 //!
-//! The design follows the extraction pattern: existing spawn_agent routing logic
-//! is moved here without behaviour changes, creating a seam for future enhancements.
+//! Telemetry is captured from CLI tool output streams (opencode/claude JSON)
+//! and stored durably via terraphim_persistence.
 
+pub mod output_parser;
+pub mod policy;
 pub mod routing;
+pub mod telemetry;
 
 pub use routing::{DispatchContext, RouteCandidate, RoutingDecision, RoutingDecisionEngine};
+pub use telemetry::{CompletionEvent, TelemetryStore};
