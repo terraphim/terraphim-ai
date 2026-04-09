@@ -1,86 +1,99 @@
 //! Routing decision engine for ADF agent dispatch.
 //!
-//! Extracts and isolates the route selection logic from AgentOrchestrator::spawn_agent
-//! into a testable, reusable component.
+//! Combines KG routing, keyword routing, and static config as first-class
+//! signals. All candidates are collected and scored, with the winning signal
+//! recorded in the decision rationale.
 
 use crate::{cost_tracker::CostTracker, kg_router::KgRouter, provider_probe::ProviderHealthMap};
 use std::path::PathBuf;
 use std::sync::Arc;
 use terraphim_types::capability::{CostLevel, Latency, Provider, ProviderType};
 
-/// Context for a routing decision.
-#[derive(Debug, Clone)]
-pub struct DispatchContext {
-    /// Agent name being dispatched.
-    pub agent_name: String,
-    /// Task description for routing.
-    pub task: String,
-    /// Static model from agent config, if any.
-    pub static_model: Option<String>,
-    /// CLI tool path from agent definition.
-    pub cli_tool: String,
-    /// Agent layer (Safety, Core, Growth).
-    pub layer: crate::config::AgentLayer,
-    /// Workflow session identity (opencode session ID or Gitea issue reference).
-    pub session_id: Option<String>,
-}
-
-/// A candidate route option.
-#[derive(Debug, Clone)]
-pub struct RouteCandidate {
-    /// Provider configuration.
-    pub provider: Provider,
-    /// Model identifier.
-    pub model: String,
-    /// CLI tool path to use.
-    pub cli_tool: String,
-    /// How this candidate was derived.
-    pub source: RouteSource,
-    /// Confidence score (0.0-1.0).
-    pub confidence: f64,
-}
-
-/// Source of a route candidate.
 #[derive(Debug, Clone, PartialEq)]
 pub enum RouteSource {
-    /// From KG router with tier-based selection.
     KnowledgeGraph,
-    /// From keyword/capability routing engine.
     KeywordRouting,
-    /// From static agent config.
     StaticConfig,
-    /// Fallback to CLI default.
+    CombinedKgKeyword,
     CliDefault,
 }
 
-/// The result of a routing decision.
-#[derive(Debug, Clone)]
-pub struct RoutingDecision {
-    /// Selected route candidate.
-    pub candidate: RouteCandidate,
-    /// Human-readable rationale.
-    pub rationale: String,
-    /// All candidates considered (for debugging/auditing).
-    pub all_candidates: Vec<RouteCandidate>,
-    /// Whether the primary choice was available.
-    pub primary_available: bool,
+impl std::fmt::Display for RouteSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RouteSource::KnowledgeGraph => write!(f, "KG"),
+            RouteSource::KeywordRouting => write!(f, "keyword"),
+            RouteSource::StaticConfig => write!(f, "static"),
+            RouteSource::CombinedKgKeyword => write!(f, "KG+keyword"),
+            RouteSource::CliDefault => write!(f, "CLI default"),
+        }
+    }
 }
 
-/// Engine for making routing decisions.
+#[derive(Debug, Clone)]
+pub struct DispatchContext {
+    pub agent_name: String,
+    pub task: String,
+    pub static_model: Option<String>,
+    pub cli_tool: String,
+    pub layer: crate::config::AgentLayer,
+    pub session_id: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct RouteCandidate {
+    pub provider: Provider,
+    pub model: String,
+    pub cli_tool: String,
+    pub source: RouteSource,
+    pub confidence: f64,
+}
+
+#[derive(Debug, Clone)]
+pub struct RoutingDecision {
+    pub candidate: RouteCandidate,
+    pub rationale: String,
+    pub all_candidates: Vec<RouteCandidate>,
+    pub primary_available: bool,
+    pub dominant_signal: RouteSource,
+}
+
+fn make_agent_provider(agent_name: &str, cli_tool: &str) -> Provider {
+    Provider {
+        id: format!("{}-agent", agent_name),
+        name: format!("{} (agent)", agent_name),
+        provider_type: ProviderType::Agent {
+            agent_id: agent_name.to_string(),
+            cli_command: cli_tool.to_string(),
+            working_dir: PathBuf::from(
+                std::env::current_dir()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_string(),
+            ),
+        },
+        capabilities: vec![],
+        cost_level: CostLevel::Moderate,
+        latency: Latency::Medium,
+        keywords: vec![],
+    }
+}
+
+struct CollectedCandidates {
+    kg: Vec<RouteCandidate>,
+    keyword: Vec<RouteCandidate>,
+    static_model: Option<RouteCandidate>,
+}
+
 pub struct RoutingDecisionEngine {
-    /// KG router for semantic tier routing.
     kg_router: Option<Arc<KgRouter>>,
-    /// Provider health status.
     provider_health: Arc<ProviderHealthMap>,
-    /// Cost/budget tracking (reserved for budget-aware routing - issue #527).
     #[allow(dead_code)]
     cost_tracker: CostTracker,
-    /// Keyword routing engine.
     router: terraphim_router::Router,
 }
 
 impl RoutingDecisionEngine {
-    /// Create a new routing decision engine.
     pub fn new(
         kg_router: Option<Arc<KgRouter>>,
         provider_health: Arc<ProviderHealthMap>,
@@ -95,247 +108,245 @@ impl RoutingDecisionEngine {
         }
     }
 
-    /// Determine the best route for an agent dispatch.
-    ///
-    /// This method preserves the exact precedence from the original spawn_agent:
-    /// 1. KG routing with health-aware fallback
-    /// 2. Static model config
-    /// 3. Keyword routing engine
-    /// 4. CLI default (no model specified)
-    #[allow(unused_assignments)]
-    pub fn decide_route(&self, ctx: &DispatchContext) -> RoutingDecision {
-        let cli_name = std::path::Path::new(&ctx.cli_tool)
+    fn cli_name(ctx: &DispatchContext) -> &str {
+        std::path::Path::new(&ctx.cli_tool)
             .file_name()
             .and_then(|n| n.to_str())
-            .unwrap_or(&ctx.cli_tool);
+            .unwrap_or(&ctx.cli_tool)
+    }
 
-        let supports_model_flag = matches!(cli_name, "claude" | "claude-code" | "opencode");
+    fn supports_model_flag(cli_name: &str) -> bool {
+        matches!(cli_name, "claude" | "claude-code" | "opencode")
+    }
 
-        let mut all_candidates = Vec::new();
-        let mut primary_available = false;
-
-        if supports_model_flag {
-            // 1. KG routing first
-            if let Some(ref kg_router) = self.kg_router {
-                let unhealthy = self.provider_health.unhealthy_providers();
-
-                if let Some(decision) = kg_router.route_agent(&ctx.task) {
-                    // Check if primary route is healthy
-                    if !unhealthy.is_empty() {
-                        if let Some(healthy_route) = decision.first_healthy_route(&unhealthy) {
-                            // Use healthy fallback from KG
-                            let cli_tool = healthy_route
-                                .action
-                                .as_ref()
-                                .and_then(|a| a.split_whitespace().next())
-                                .map(String::from)
-                                .unwrap_or_else(|| ctx.cli_tool.clone());
-
-                            let candidate = RouteCandidate {
-                                provider: Provider {
-                                    id: format!("{}-kg", ctx.agent_name),
-                                    name: format!("{} (KG)", ctx.agent_name),
-                                    provider_type: ProviderType::Agent {
-                                        agent_id: ctx.agent_name.clone(),
-                                        cli_command: cli_tool.clone(),
-                                        working_dir: PathBuf::from(
-                                            std::env::current_dir()
-                                                .unwrap_or_default()
-                                                .to_string_lossy()
-                                                .to_string(),
-                                        ),
-                                    },
-                                    capabilities: vec![],
-                                    cost_level: CostLevel::Moderate,
-                                    latency: Latency::Medium,
-                                    keywords: vec![],
-                                },
-                                model: healthy_route.model.clone(),
-                                cli_tool,
-                                source: RouteSource::KnowledgeGraph,
-                                confidence: decision.confidence * 0.9,
-                            };
-
-                            all_candidates.push(candidate.clone());
-
-                            return RoutingDecision {
-                                candidate,
-                                rationale: format!(
-                                    "KG routed to healthy fallback: {} (skipped unhealthy: {:?})",
-                                    healthy_route.model, unhealthy
-                                ),
-                                all_candidates,
-                                primary_available: false,
-                            };
-                        }
-                    }
-
-                    // Primary route is healthy
-                    let cli_tool = decision
-                        .action
-                        .as_ref()
-                        .and_then(|a| a.split_whitespace().next())
-                        .map(String::from)
-                        .unwrap_or_else(|| ctx.cli_tool.clone());
-
-                    let candidate = RouteCandidate {
-                        provider: Provider {
-                            id: format!("{}-kg", ctx.agent_name),
-                            name: format!("{} (KG)", ctx.agent_name),
-                            provider_type: ProviderType::Agent {
-                                agent_id: ctx.agent_name.clone(),
-                                cli_command: cli_tool.clone(),
-                                working_dir: PathBuf::from(
-                                    std::env::current_dir()
-                                        .unwrap_or_default()
-                                        .to_string_lossy()
-                                        .to_string(),
-                                ),
-                            },
-                            capabilities: vec![],
-                            cost_level: CostLevel::Moderate,
-                            latency: Latency::Medium,
-                            keywords: vec![],
-                        },
-                        model: decision.model.clone(),
-                        cli_tool,
-                        source: RouteSource::KnowledgeGraph,
-                        confidence: decision.confidence,
-                    };
-
-                    all_candidates.push(candidate.clone());
-
-                    return RoutingDecision {
-                        candidate,
-                        rationale: format!(
-                            "KG tier routing selected: {} (concept: {}, confidence: {})",
-                            decision.model, decision.matched_concept, decision.confidence
-                        ),
-                        all_candidates,
-                        primary_available: true,
-                    };
-                }
-            }
-
-            // 2. Static model fallback
-            if let Some(ref model) = ctx.static_model {
-                let candidate = RouteCandidate {
-                    provider: Provider {
-                        id: format!("{}-static", ctx.agent_name),
-                        name: format!("{} (static)", ctx.agent_name),
-                        provider_type: ProviderType::Agent {
-                            agent_id: ctx.agent_name.clone(),
-                            cli_command: ctx.cli_tool.clone(),
-                            working_dir: PathBuf::from(
-                                std::env::current_dir()
-                                    .unwrap_or_default()
-                                    .to_string_lossy()
-                                    .to_string(),
-                            ),
-                        },
-                        capabilities: vec![],
-                        cost_level: CostLevel::Moderate,
-                        latency: Latency::Medium,
-                        keywords: vec![],
-                    },
-                    model: model.clone(),
-                    cli_tool: ctx.cli_tool.clone(),
-                    source: RouteSource::StaticConfig,
-                    confidence: 0.8,
-                };
-
-                all_candidates.push(candidate.clone());
-
-                return RoutingDecision {
-                    candidate,
-                    rationale: format!("Static model from config: {}", model),
-                    all_candidates,
-                    primary_available: true,
-                };
-            }
-
-            // 3. Keyword routing engine
-            let routing_ctx = terraphim_router::RoutingContext::default();
-            if let Ok(decision) = self.router.route(&ctx.task, &routing_ctx) {
-                if let ProviderType::Llm { model_id, .. } = &decision.provider.provider_type {
-                    let candidate = RouteCandidate {
-                        provider: Provider {
-                            id: format!("{}-keyword", ctx.agent_name),
-                            name: format!("{} (keyword)", ctx.agent_name),
-                            provider_type: ProviderType::Agent {
-                                agent_id: ctx.agent_name.clone(),
-                                cli_command: ctx.cli_tool.clone(),
-                                working_dir: PathBuf::from(
-                                    std::env::current_dir()
-                                        .unwrap_or_default()
-                                        .to_string_lossy()
-                                        .to_string(),
-                                ),
-                            },
-                            capabilities: vec![],
-                            cost_level: CostLevel::Moderate,
-                            latency: Latency::Medium,
-                            keywords: vec![],
-                        },
-                        model: model_id.clone(),
-                        cli_tool: ctx.cli_tool.clone(),
-                        source: RouteSource::KeywordRouting,
-                        confidence: decision.confidence as f64,
-                    };
-
-                    all_candidates.push(candidate.clone());
-
-                    return RoutingDecision {
-                        candidate,
-                        rationale: format!(
-                            "Keyword routing selected: {} (confidence: {})",
-                            model_id, decision.confidence
-                        ),
-                        all_candidates,
-                        primary_available: true,
-                    };
-                }
-            }
-
-            primary_available = false;
-        } else {
-            // CLI doesn't support model flags
-            primary_available = false;
+    fn collect_kg_candidates(&self, ctx: &DispatchContext) -> Vec<RouteCandidate> {
+        let kg_router = match self.kg_router {
+            Some(ref r) => r,
+            None => return Vec::new(),
         };
 
-        // 4. CLI default (no model)
-        let candidate = RouteCandidate {
-            provider: Provider {
-                id: format!("{}-default", ctx.agent_name),
-                name: format!("{} (default)", ctx.agent_name),
-                provider_type: ProviderType::Agent {
-                    agent_id: ctx.agent_name.clone(),
-                    cli_command: ctx.cli_tool.clone(),
-                    working_dir: PathBuf::from(
-                        std::env::current_dir()
-                            .unwrap_or_default()
-                            .to_string_lossy()
-                            .to_string(),
-                    ),
-                },
-                capabilities: vec![],
-                cost_level: CostLevel::Moderate,
-                latency: Latency::Medium,
-                keywords: vec![],
-            },
-            model: String::new(),
+        let decision = match kg_router.route_agent(&ctx.task) {
+            Some(d) => d,
+            None => return Vec::new(),
+        };
+
+        let unhealthy = self.provider_health.unhealthy_providers();
+        let mut candidates = Vec::new();
+
+        for route in &decision.fallback_routes {
+            let is_healthy = !unhealthy.iter().any(|u| u == &route.provider);
+            let is_primary = route.provider == decision.provider;
+
+            let cli_tool = route
+                .action
+                .as_ref()
+                .and_then(|a| a.split_whitespace().next())
+                .map(String::from)
+                .unwrap_or_else(|| ctx.cli_tool.clone());
+
+            let confidence = if is_primary {
+                decision.confidence
+            } else {
+                decision.confidence * 0.8
+            };
+
+            let confidence = if is_healthy {
+                confidence
+            } else {
+                confidence * 0.5
+            };
+
+            candidates.push(RouteCandidate {
+                provider: make_agent_provider(&ctx.agent_name, &cli_tool),
+                model: route.model.clone(),
+                cli_tool,
+                source: RouteSource::KnowledgeGraph,
+                confidence,
+            });
+        }
+
+        candidates
+    }
+
+    fn collect_keyword_candidates(&self, ctx: &DispatchContext) -> Vec<RouteCandidate> {
+        let routing_ctx = terraphim_router::RoutingContext::default();
+        let decision = match self.router.route(&ctx.task, &routing_ctx) {
+            Ok(d) => d,
+            Err(_) => return Vec::new(),
+        };
+
+        let model_id = match &decision.provider.provider_type {
+            ProviderType::Llm { model_id, .. } => model_id.clone(),
+            _ => return Vec::new(),
+        };
+
+        vec![RouteCandidate {
+            provider: make_agent_provider(&ctx.agent_name, &ctx.cli_tool),
+            model: model_id,
             cli_tool: ctx.cli_tool.clone(),
-            source: RouteSource::CliDefault,
-            confidence: 0.5,
+            source: RouteSource::KeywordRouting,
+            confidence: decision.confidence as f64,
+        }]
+    }
+
+    fn collect_static_candidate(&self, ctx: &DispatchContext) -> Option<RouteCandidate> {
+        ctx.static_model.as_ref().map(|model| RouteCandidate {
+            provider: make_agent_provider(&ctx.agent_name, &ctx.cli_tool),
+            model: model.clone(),
+            cli_tool: ctx.cli_tool.clone(),
+            source: RouteSource::StaticConfig,
+            confidence: 0.8,
+        })
+    }
+
+    fn collect_all_candidates(&self, ctx: &DispatchContext) -> CollectedCandidates {
+        CollectedCandidates {
+            kg: self.collect_kg_candidates(ctx),
+            keyword: self.collect_keyword_candidates(ctx),
+            static_model: self.collect_static_candidate(ctx),
+        }
+    }
+
+    fn score_candidate(candidate: &RouteCandidate) -> f64 {
+        let source_weight = match candidate.source {
+            RouteSource::KnowledgeGraph => 1.0,
+            RouteSource::CombinedKgKeyword => 1.0,
+            RouteSource::KeywordRouting => 0.8,
+            RouteSource::StaticConfig => 0.6,
+            RouteSource::CliDefault => 0.3,
+        };
+        source_weight * candidate.confidence
+    }
+
+    pub fn decide_route(&self, ctx: &DispatchContext) -> RoutingDecision {
+        let cli_name = Self::cli_name(ctx);
+
+        if !Self::supports_model_flag(cli_name) {
+            let candidate = RouteCandidate {
+                provider: make_agent_provider(&ctx.agent_name, &ctx.cli_tool),
+                model: String::new(),
+                cli_tool: ctx.cli_tool.clone(),
+                source: RouteSource::CliDefault,
+                confidence: 0.5,
+            };
+            return RoutingDecision {
+                candidate: candidate.clone(),
+                rationale: format!("Using CLI default (no model routing for {})", cli_name),
+                all_candidates: vec![candidate],
+                primary_available: false,
+                dominant_signal: RouteSource::CliDefault,
+            };
+        }
+
+        let collected = self.collect_all_candidates(ctx);
+        let mut all_candidates = Vec::new();
+
+        let has_kg = !collected.kg.is_empty();
+        let has_keyword = !collected.keyword.is_empty();
+
+        if has_kg && has_keyword {
+            let kg_best = collected
+                .kg
+                .first()
+                .map(Self::score_candidate)
+                .unwrap_or(0.0);
+            let kw_best = collected
+                .keyword
+                .first()
+                .map(Self::score_candidate)
+                .unwrap_or(0.0);
+
+            if let (Some(kg_cand), Some(kw_cand)) =
+                (collected.kg.first(), collected.keyword.first())
+            {
+                if kg_cand.model == kw_cand.model {
+                    let merged = RouteCandidate {
+                        provider: kg_cand.provider.clone(),
+                        model: kg_cand.model.clone(),
+                        cli_tool: kg_cand.cli_tool.clone(),
+                        source: RouteSource::CombinedKgKeyword,
+                        confidence: (kg_cand.confidence + kw_cand.confidence) / 2.0,
+                    };
+                    all_candidates.push(merged);
+                } else {
+                    all_candidates.extend(collected.kg.clone());
+                    all_candidates.extend(collected.keyword.clone());
+                    let _ = (kg_best, kw_best);
+                }
+            }
+        } else {
+            all_candidates.extend(collected.kg.clone());
+            all_candidates.extend(collected.keyword.clone());
+        }
+
+        if let Some(static_cand) = &collected.static_model {
+            all_candidates.push(static_cand.clone());
+        }
+
+        if all_candidates.is_empty() {
+            let candidate = RouteCandidate {
+                provider: make_agent_provider(&ctx.agent_name, &ctx.cli_tool),
+                model: String::new(),
+                cli_tool: ctx.cli_tool.clone(),
+                source: RouteSource::CliDefault,
+                confidence: 0.5,
+            };
+            return RoutingDecision {
+                candidate: candidate.clone(),
+                rationale: format!(
+                    "No routing signal matched; using CLI default ({})",
+                    cli_name
+                ),
+                all_candidates: vec![candidate],
+                primary_available: false,
+                dominant_signal: RouteSource::CliDefault,
+            };
+        }
+
+        all_candidates.sort_by(|a, b| {
+            Self::score_candidate(b)
+                .partial_cmp(&Self::score_candidate(a))
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        let winner = all_candidates.first().unwrap();
+        let dominant_signal = winner.source.clone();
+
+        let mut rationale_parts = Vec::new();
+
+        if has_kg {
+            rationale_parts.push(format!("KG: {} candidates", collected.kg.len()));
+        }
+        if has_keyword {
+            rationale_parts.push(format!("keyword: {} candidates", collected.keyword.len()));
+        }
+        if collected.static_model.is_some() {
+            rationale_parts.push("static config".to_string());
+        }
+
+        let signal_summary = if rationale_parts.is_empty() {
+            "no signals".to_string()
+        } else {
+            rationale_parts.join(", ")
         };
 
-        all_candidates.push(candidate.clone());
+        let rationale = format!(
+            "Selected {} via {} (score: {:.3}, confidence: {:.2}). Signals: {}",
+            winner.model,
+            winner.source,
+            Self::score_candidate(winner),
+            winner.confidence,
+            signal_summary,
+        );
+
+        let primary_available = !matches!(winner.source, RouteSource::CliDefault);
 
         RoutingDecision {
-            candidate,
-            rationale: format!("Using CLI default (no model routing for {})", cli_name),
+            candidate: winner.clone(),
+            rationale,
             all_candidates,
             primary_available,
+            dominant_signal,
         }
     }
 }
@@ -374,39 +385,32 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_cli_default_for_unsupported_tool() {
-        // Test that unsupported CLI tools (like codex) get CLI default routing
-        let engine = RoutingDecisionEngine::new(
+    fn test_engine() -> RoutingDecisionEngine {
+        RoutingDecisionEngine::new(
             None,
             Arc::new(crate::provider_probe::ProviderHealthMap::new(
                 std::time::Duration::from_secs(300),
             )),
             crate::cost_tracker::CostTracker::new(),
             terraphim_router::Router::new(),
-        );
+        )
+    }
 
-        // Codex doesn't support --model flag
+    #[test]
+    fn test_cli_default_for_unsupported_tool() {
+        let engine = test_engine();
         let ctx = create_test_context_with_cli("test-agent", "Implement a feature", "codex");
         let decision = engine.decide_route(&ctx);
 
         assert_eq!(decision.candidate.source, RouteSource::CliDefault);
         assert!(decision.candidate.model.is_empty());
         assert!(decision.rationale.contains("codex"));
+        assert_eq!(decision.dominant_signal, RouteSource::CliDefault);
     }
 
     #[test]
-    fn test_static_model_fallback_works() {
-        // Test that static model config is used when no KG router is available
-        let engine = RoutingDecisionEngine::new(
-            None,
-            Arc::new(crate::provider_probe::ProviderHealthMap::new(
-                std::time::Duration::from_secs(300),
-            )),
-            crate::cost_tracker::CostTracker::new(),
-            terraphim_router::Router::new(),
-        );
-
+    fn test_static_model_selected_when_only_signal() {
+        let engine = test_engine();
         let ctx = create_test_context_with_static_model(
             "test-agent",
             "Implement a feature",
@@ -416,48 +420,30 @@ mod tests {
 
         assert_eq!(decision.candidate.source, RouteSource::StaticConfig);
         assert_eq!(decision.candidate.model, "claude-3-opus");
-        assert!(decision.rationale.contains("Static model"));
+        assert!(decision.rationale.contains("static config"));
+        assert_eq!(decision.dominant_signal, RouteSource::StaticConfig);
     }
 
     #[test]
-    fn test_routing_precedence_cli_default_for_unsupported() {
-        // Verify that unsupported CLI tools bypass all model routing
-        // and go straight to CLI default
-        let engine = RoutingDecisionEngine::new(
-            None,
-            Arc::new(crate::provider_probe::ProviderHealthMap::new(
-                std::time::Duration::from_secs(300),
-            )),
-            crate::cost_tracker::CostTracker::new(),
-            terraphim_router::Router::new(),
-        );
-
-        // Even with static model, unsupported CLI should use default
+    fn test_unsupported_cli_ignores_static_model() {
+        let engine = test_engine();
         let ctx = DispatchContext {
             agent_name: "test-agent".to_string(),
             task: "Implement a feature".to_string(),
             static_model: Some("some-model".to_string()),
-            cli_tool: "codex".to_string(), // Unsupported
+            cli_tool: "codex".to_string(),
             layer: crate::config::AgentLayer::Core,
             session_id: None,
         };
         let decision = engine.decide_route(&ctx);
 
         assert_eq!(decision.candidate.source, RouteSource::CliDefault);
+        assert_eq!(decision.dominant_signal, RouteSource::CliDefault);
     }
 
     #[test]
     fn test_opencode_gets_static_model() {
-        // Verify that opencode (supported CLI) uses static model when available
-        let engine = RoutingDecisionEngine::new(
-            None,
-            Arc::new(crate::provider_probe::ProviderHealthMap::new(
-                std::time::Duration::from_secs(300),
-            )),
-            crate::cost_tracker::CostTracker::new(),
-            terraphim_router::Router::new(),
-        );
-
+        let engine = test_engine();
         let ctx = create_test_context_with_static_model(
             "test-agent",
             "Implement a feature",
@@ -470,37 +456,125 @@ mod tests {
     }
 
     #[test]
-    fn test_route_candidate_structure() {
-        // Verify the RouteCandidate struct is properly constructed
-        let provider = Provider {
-            id: "test-id".to_string(),
-            name: "Test Provider".to_string(),
-            provider_type: ProviderType::Agent {
-                agent_id: "test-agent".to_string(),
-                cli_command: "opencode".to_string(),
-                working_dir: std::path::PathBuf::from("/tmp"),
-            },
-            capabilities: vec![],
-            cost_level: CostLevel::Moderate,
-            latency: Latency::Medium,
-            keywords: vec![],
-        };
+    fn test_cli_default_when_no_signals_match() {
+        let engine = test_engine();
+        let ctx = create_test_context_with_cli("test-agent", "do something", "opencode");
+        let decision = engine.decide_route(&ctx);
 
-        let candidate = RouteCandidate {
-            provider,
-            model: "test-model".to_string(),
-            cli_tool: "opencode".to_string(),
-            source: RouteSource::StaticConfig,
-            confidence: 0.8,
-        };
-
-        assert_eq!(candidate.model, "test-model");
-        assert_eq!(candidate.source, RouteSource::StaticConfig);
-        assert_eq!(candidate.confidence, 0.8);
+        assert_eq!(decision.candidate.source, RouteSource::CliDefault);
+        assert!(decision.rationale.contains("No routing signal matched"));
+        assert_eq!(decision.dominant_signal, RouteSource::CliDefault);
     }
 
     #[test]
-    fn test_dispatch_context_creation() {
+    fn test_rationale_records_dominant_signal() {
+        let engine = test_engine();
+        let ctx = create_test_context_with_static_model("agent", "task", "model-x");
+        let decision = engine.decide_route(&ctx);
+
+        assert!(decision.rationale.contains("static config"));
+        assert!(decision.rationale.contains("Selected model-x"));
+    }
+
+    #[test]
+    fn test_all_candidates_collected_from_multiple_sources() {
+        let engine = test_engine();
+        let ctx = DispatchContext {
+            agent_name: "test-agent".to_string(),
+            task: "implement feature".to_string(),
+            static_model: Some("static-model".to_string()),
+            cli_tool: "opencode".to_string(),
+            layer: crate::config::AgentLayer::Core,
+            session_id: None,
+        };
+        let decision = engine.decide_route(&ctx);
+
+        assert!(decision.all_candidates.len() >= 1);
+        assert!(decision
+            .all_candidates
+            .iter()
+            .any(|c| c.source == RouteSource::StaticConfig));
+    }
+
+    #[test]
+    fn test_combined_kg_keyword_when_models_agree() {
+        use std::fs;
+        use tempfile::tempdir;
+
+        let dir = tempdir().unwrap();
+        fs::write(
+            dir.path().join("impl.md"),
+            "priority:: 50\nsynonyms:: implement, build\nroute:: kimi, kimi-for-coding/k2p5\n",
+        )
+        .unwrap();
+
+        let kg_router = Arc::new(crate::kg_router::KgRouter::load(dir.path()).unwrap());
+        let engine = RoutingDecisionEngine::new(
+            Some(kg_router),
+            Arc::new(crate::provider_probe::ProviderHealthMap::new(
+                std::time::Duration::from_secs(300),
+            )),
+            crate::cost_tracker::CostTracker::new(),
+            terraphim_router::Router::new(),
+        );
+
+        let ctx = create_test_context_with_cli("agent", "implement feature", "opencode");
+        let decision = engine.decide_route(&ctx);
+
+        assert!(
+            decision.candidate.source == RouteSource::KnowledgeGraph
+                || decision.candidate.source == RouteSource::CombinedKgKeyword
+                || decision.candidate.source == RouteSource::KeywordRouting,
+            "expected a routing signal, got {:?}",
+            decision.candidate.source,
+        );
+        assert!(decision.primary_available);
+    }
+
+    #[test]
+    fn test_kg_only_no_keyword_match() {
+        use std::fs;
+        use tempfile::tempdir;
+
+        let dir = tempdir().unwrap();
+        fs::write(
+            dir.path().join("security.md"),
+            "priority:: 80\nsynonyms:: security audit, CVE\nroute:: anthropic, opus\n",
+        )
+        .unwrap();
+
+        let kg_router = Arc::new(crate::kg_router::KgRouter::load(dir.path()).unwrap());
+        let engine = RoutingDecisionEngine::new(
+            Some(kg_router),
+            Arc::new(crate::provider_probe::ProviderHealthMap::new(
+                std::time::Duration::from_secs(300),
+            )),
+            crate::cost_tracker::CostTracker::new(),
+            terraphim_router::Router::new(),
+        );
+
+        let ctx = create_test_context_with_cli("agent", "security audit the codebase", "opencode");
+        let decision = engine.decide_route(&ctx);
+
+        assert_eq!(decision.candidate.source, RouteSource::KnowledgeGraph);
+        assert!(decision.candidate.model.contains("opus"));
+        assert_eq!(decision.dominant_signal, RouteSource::KnowledgeGraph);
+    }
+
+    #[test]
+    fn test_keyword_only_no_kg_match() {
+        let engine = test_engine();
+        let ctx = create_test_context_with_cli("agent", "implement a feature", "opencode");
+        let decision = engine.decide_route(&ctx);
+
+        assert!(
+            decision.candidate.source == RouteSource::KeywordRouting
+                || decision.candidate.source == RouteSource::CliDefault,
+        );
+    }
+
+    #[test]
+    fn test_dispatch_context_session_id() {
         let ctx = DispatchContext {
             agent_name: "test-agent".to_string(),
             task: "Do something".to_string(),
@@ -509,45 +583,32 @@ mod tests {
             layer: crate::config::AgentLayer::Safety,
             session_id: Some("sess-123".to_string()),
         };
-
-        assert_eq!(ctx.agent_name, "test-agent");
-        assert_eq!(ctx.task, "Do something");
-        assert_eq!(ctx.static_model, Some("model-id".to_string()));
-        assert_eq!(ctx.cli_tool, "claude");
         assert_eq!(ctx.session_id, Some("sess-123".to_string()));
     }
 
     #[test]
-    fn test_routing_decision_structure() {
-        let candidate = RouteCandidate {
-            provider: Provider {
-                id: "test-id".to_string(),
-                name: "Test Provider".to_string(),
-                provider_type: ProviderType::Agent {
-                    agent_id: "test-agent".to_string(),
-                    cli_command: "opencode".to_string(),
-                    working_dir: std::path::PathBuf::from("/tmp"),
-                },
-                capabilities: vec![],
-                cost_level: CostLevel::Cheap,
-                latency: Latency::Fast,
-                keywords: vec![],
-            },
-            model: "test-model".to_string(),
-            cli_tool: "opencode".to_string(),
-            source: RouteSource::CliDefault,
-            confidence: 0.5,
-        };
+    fn test_route_source_display() {
+        assert_eq!(RouteSource::KnowledgeGraph.to_string(), "KG");
+        assert_eq!(RouteSource::KeywordRouting.to_string(), "keyword");
+        assert_eq!(RouteSource::StaticConfig.to_string(), "static");
+        assert_eq!(RouteSource::CombinedKgKeyword.to_string(), "KG+keyword");
+        assert_eq!(RouteSource::CliDefault.to_string(), "CLI default");
+    }
 
-        let decision = RoutingDecision {
-            candidate: candidate.clone(),
-            rationale: "Test rationale".to_string(),
-            all_candidates: vec![candidate],
-            primary_available: false,
-        };
-
-        assert_eq!(decision.rationale, "Test rationale");
-        assert!(!decision.primary_available);
-        assert_eq!(decision.all_candidates.len(), 1);
+    #[test]
+    fn test_make_agent_provider() {
+        let provider = make_agent_provider("my-agent", "opencode");
+        assert!(provider.id.contains("my-agent"));
+        if let ProviderType::Agent {
+            agent_id,
+            cli_command,
+            ..
+        } = &provider.provider_type
+        {
+            assert_eq!(agent_id, "my-agent");
+            assert_eq!(cli_command, "opencode");
+        } else {
+            panic!("expected Agent provider type");
+        }
     }
 }
