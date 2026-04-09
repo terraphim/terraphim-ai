@@ -2,9 +2,11 @@
 //!
 //! Combines KG routing, keyword routing, and static config as first-class
 //! signals. All candidates are collected and scored, with the winning signal
-//! recorded in the decision rationale.
+//! recorded in the decision rationale. Budget pressure biases route selection
+//! toward cheaper models when an agent's spend approaches its limit.
 
-use crate::{cost_tracker::CostTracker, kg_router::KgRouter, provider_probe::ProviderHealthMap};
+use crate::cost_tracker::{BudgetVerdict, CostTracker};
+use crate::{kg_router::KgRouter, provider_probe::ProviderHealthMap};
 use std::path::PathBuf;
 use std::sync::Arc;
 use terraphim_types::capability::{CostLevel, Latency, Provider, ProviderType};
@@ -26,6 +28,39 @@ impl std::fmt::Display for RouteSource {
             RouteSource::StaticConfig => write!(f, "static"),
             RouteSource::CombinedKgKeyword => write!(f, "KG+keyword"),
             RouteSource::CliDefault => write!(f, "CLI default"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum BudgetPressure {
+    NoPressure,
+    NearExhaustion,
+    Exhausted,
+}
+
+impl BudgetPressure {
+    pub fn from_verdict(verdict: &BudgetVerdict) -> Self {
+        match verdict {
+            BudgetVerdict::Exhausted { .. } => BudgetPressure::Exhausted,
+            BudgetVerdict::NearExhaustion { .. } => BudgetPressure::NearExhaustion,
+            _ => BudgetPressure::NoPressure,
+        }
+    }
+
+    pub fn cost_penalty(&self, cost_level: &CostLevel) -> f64 {
+        match self {
+            BudgetPressure::NoPressure => 0.0,
+            BudgetPressure::NearExhaustion => match cost_level {
+                CostLevel::Cheap => 0.0,
+                CostLevel::Moderate => 0.15,
+                CostLevel::Expensive => 0.35,
+            },
+            BudgetPressure::Exhausted => match cost_level {
+                CostLevel::Cheap => 0.10,
+                CostLevel::Moderate => 0.40,
+                CostLevel::Expensive => 0.70,
+            },
         }
     }
 }
@@ -56,6 +91,8 @@ pub struct RoutingDecision {
     pub all_candidates: Vec<RouteCandidate>,
     pub primary_available: bool,
     pub dominant_signal: RouteSource,
+    pub budget_pressure: BudgetPressure,
+    pub budget_influenced: bool,
 }
 
 fn make_agent_provider(agent_name: &str, cli_tool: &str) -> Provider {
@@ -88,7 +125,6 @@ struct CollectedCandidates {
 pub struct RoutingDecisionEngine {
     kg_router: Option<Arc<KgRouter>>,
     provider_health: Arc<ProviderHealthMap>,
-    #[allow(dead_code)]
     cost_tracker: CostTracker,
     router: terraphim_router::Router,
 }
@@ -117,6 +153,10 @@ impl RoutingDecisionEngine {
 
     fn supports_model_flag(cli_name: &str) -> bool {
         matches!(cli_name, "claude" | "claude-code" | "opencode")
+    }
+
+    fn budget_pressure(&self, agent_name: &str) -> BudgetPressure {
+        BudgetPressure::from_verdict(&self.cost_tracker.check(agent_name))
     }
 
     fn collect_kg_candidates(&self, ctx: &DispatchContext) -> Vec<RouteCandidate> {
@@ -207,7 +247,7 @@ impl RoutingDecisionEngine {
         }
     }
 
-    fn score_candidate(candidate: &RouteCandidate) -> f64 {
+    fn score_candidate(candidate: &RouteCandidate, pressure: BudgetPressure) -> f64 {
         let source_weight = match candidate.source {
             RouteSource::KnowledgeGraph => 1.0,
             RouteSource::CombinedKgKeyword => 1.0,
@@ -215,11 +255,14 @@ impl RoutingDecisionEngine {
             RouteSource::StaticConfig => 0.6,
             RouteSource::CliDefault => 0.3,
         };
-        source_weight * candidate.confidence
+        let base = source_weight * candidate.confidence;
+        let penalty = pressure.cost_penalty(&candidate.provider.cost_level);
+        base * (1.0 - penalty)
     }
 
     pub fn decide_route(&self, ctx: &DispatchContext) -> RoutingDecision {
         let cli_name = Self::cli_name(ctx);
+        let pressure = self.budget_pressure(&ctx.agent_name);
 
         if !Self::supports_model_flag(cli_name) {
             let candidate = RouteCandidate {
@@ -235,6 +278,8 @@ impl RoutingDecisionEngine {
                 all_candidates: vec![candidate],
                 primary_available: false,
                 dominant_signal: RouteSource::CliDefault,
+                budget_pressure: pressure,
+                budget_influenced: false,
             };
         }
 
@@ -245,17 +290,6 @@ impl RoutingDecisionEngine {
         let has_keyword = !collected.keyword.is_empty();
 
         if has_kg && has_keyword {
-            let kg_best = collected
-                .kg
-                .first()
-                .map(Self::score_candidate)
-                .unwrap_or(0.0);
-            let kw_best = collected
-                .keyword
-                .first()
-                .map(Self::score_candidate)
-                .unwrap_or(0.0);
-
             if let (Some(kg_cand), Some(kw_cand)) =
                 (collected.kg.first(), collected.keyword.first())
             {
@@ -271,7 +305,6 @@ impl RoutingDecisionEngine {
                 } else {
                     all_candidates.extend(collected.kg.clone());
                     all_candidates.extend(collected.keyword.clone());
-                    let _ = (kg_best, kw_best);
                 }
             }
         } else {
@@ -300,17 +333,37 @@ impl RoutingDecisionEngine {
                 all_candidates: vec![candidate],
                 primary_available: false,
                 dominant_signal: RouteSource::CliDefault,
+                budget_pressure: pressure,
+                budget_influenced: false,
             };
         }
 
-        all_candidates.sort_by(|a, b| {
-            Self::score_candidate(b)
-                .partial_cmp(&Self::score_candidate(a))
+        let no_pressure_scores: Vec<f64> = all_candidates
+            .iter()
+            .map(|c| Self::score_candidate(c, BudgetPressure::NoPressure))
+            .collect();
+        let pressured_scores: Vec<f64> = all_candidates
+            .iter()
+            .map(|c| Self::score_candidate(c, pressure))
+            .collect();
+
+        let mut indexed: Vec<usize> = (0..all_candidates.len()).collect();
+        indexed.sort_by(|&a, &b| {
+            pressured_scores[b]
+                .partial_cmp(&pressured_scores[a])
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
 
-        let winner = all_candidates.first().unwrap();
+        let winner_idx = indexed[0];
+        let winner = &all_candidates[winner_idx];
         let dominant_signal = winner.source.clone();
+
+        let budget_influenced = pressure != BudgetPressure::NoPressure
+            && no_pressure_scores.iter().enumerate().any(|(i, &s)| {
+                let was_winner = s >= no_pressure_scores[winner_idx];
+                let now_loses = pressured_scores[i] < pressured_scores[winner_idx];
+                was_winner && now_loses
+            });
 
         let mut rationale_parts = Vec::new();
 
@@ -330,14 +383,18 @@ impl RoutingDecisionEngine {
             rationale_parts.join(", ")
         };
 
-        let rationale = format!(
+        let mut rationale = format!(
             "Selected {} via {} (score: {:.3}, confidence: {:.2}). Signals: {}",
             winner.model,
             winner.source,
-            Self::score_candidate(winner),
+            pressured_scores[winner_idx],
             winner.confidence,
             signal_summary,
         );
+
+        if budget_influenced {
+            rationale.push_str(". Budget pressure biased selection toward cheaper model");
+        }
 
         let primary_available = !matches!(winner.source, RouteSource::CliDefault);
 
@@ -347,6 +404,8 @@ impl RoutingDecisionEngine {
             all_candidates,
             primary_available,
             dominant_signal,
+            budget_pressure: pressure,
+            budget_influenced,
         }
     }
 }
@@ -391,7 +450,41 @@ mod tests {
             Arc::new(crate::provider_probe::ProviderHealthMap::new(
                 std::time::Duration::from_secs(300),
             )),
-            crate::cost_tracker::CostTracker::new(),
+            CostTracker::new(),
+            terraphim_router::Router::new(),
+        )
+    }
+
+    fn test_engine_with_agent_budget(
+        agent_name: &str,
+        budget_cents: Option<u64>,
+    ) -> RoutingDecisionEngine {
+        let mut ct = CostTracker::new();
+        ct.register(agent_name, budget_cents);
+        RoutingDecisionEngine::new(
+            None,
+            Arc::new(crate::provider_probe::ProviderHealthMap::new(
+                std::time::Duration::from_secs(300),
+            )),
+            ct,
+            terraphim_router::Router::new(),
+        )
+    }
+
+    fn test_engine_with_spent(
+        agent_name: &str,
+        budget_cents: Option<u64>,
+        spend_usd: f64,
+    ) -> RoutingDecisionEngine {
+        let mut ct = CostTracker::new();
+        ct.register(agent_name, budget_cents);
+        ct.record_cost(agent_name, spend_usd);
+        RoutingDecisionEngine::new(
+            None,
+            Arc::new(crate::provider_probe::ProviderHealthMap::new(
+                std::time::Duration::from_secs(300),
+            )),
+            ct,
             terraphim_router::Router::new(),
         )
     }
@@ -406,6 +499,8 @@ mod tests {
         assert!(decision.candidate.model.is_empty());
         assert!(decision.rationale.contains("codex"));
         assert_eq!(decision.dominant_signal, RouteSource::CliDefault);
+        assert_eq!(decision.budget_pressure, BudgetPressure::NoPressure);
+        assert!(!decision.budget_influenced);
     }
 
     #[test]
@@ -514,7 +609,7 @@ mod tests {
             Arc::new(crate::provider_probe::ProviderHealthMap::new(
                 std::time::Duration::from_secs(300),
             )),
-            crate::cost_tracker::CostTracker::new(),
+            CostTracker::new(),
             terraphim_router::Router::new(),
         );
 
@@ -549,7 +644,7 @@ mod tests {
             Arc::new(crate::provider_probe::ProviderHealthMap::new(
                 std::time::Duration::from_secs(300),
             )),
-            crate::cost_tracker::CostTracker::new(),
+            CostTracker::new(),
             terraphim_router::Router::new(),
         );
 
@@ -610,5 +705,119 @@ mod tests {
         } else {
             panic!("expected Agent provider type");
         }
+    }
+
+    #[test]
+    fn test_budget_pressure_no_pressure_for_uncapped() {
+        let engine = test_engine();
+        let ctx = create_test_context_with_static_model("test-agent", "task", "model-x");
+        let decision = engine.decide_route(&ctx);
+
+        assert_eq!(decision.budget_pressure, BudgetPressure::NoPressure);
+        assert!(!decision.budget_influenced);
+    }
+
+    #[test]
+    fn test_budget_pressure_near_exhaustion_detected() {
+        let engine = test_engine_with_spent("test-agent", Some(10000), 85.0);
+        let ctx = create_test_context_with_static_model("test-agent", "task", "model-x");
+        let decision = engine.decide_route(&ctx);
+
+        assert_eq!(decision.budget_pressure, BudgetPressure::NearExhaustion);
+    }
+
+    #[test]
+    fn test_budget_pressure_exhausted_detected() {
+        let engine = test_engine_with_spent("test-agent", Some(10000), 100.0);
+        let ctx = create_test_context_with_static_model("test-agent", "task", "model-x");
+        let decision = engine.decide_route(&ctx);
+
+        assert_eq!(decision.budget_pressure, BudgetPressure::Exhausted);
+    }
+
+    #[test]
+    fn test_budget_pressure_penalty_calculation() {
+        let no_pressure = BudgetPressure::NoPressure;
+        assert_eq!(no_pressure.cost_penalty(&CostLevel::Cheap), 0.0);
+        assert_eq!(no_pressure.cost_penalty(&CostLevel::Moderate), 0.0);
+        assert_eq!(no_pressure.cost_penalty(&CostLevel::Expensive), 0.0);
+
+        let near = BudgetPressure::NearExhaustion;
+        assert_eq!(near.cost_penalty(&CostLevel::Cheap), 0.0);
+        assert!((near.cost_penalty(&CostLevel::Moderate) - 0.15).abs() < 0.001);
+        assert!((near.cost_penalty(&CostLevel::Expensive) - 0.35).abs() < 0.001);
+
+        let exhausted = BudgetPressure::Exhausted;
+        assert!((exhausted.cost_penalty(&CostLevel::Cheap) - 0.10).abs() < 0.001);
+        assert!((exhausted.cost_penalty(&CostLevel::Moderate) - 0.40).abs() < 0.001);
+        assert!((exhausted.cost_penalty(&CostLevel::Expensive) - 0.70).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_budget_influences_rationale_when_pressure() {
+        let engine = test_engine_with_spent("test-agent", Some(10000), 85.0);
+        let ctx = create_test_context_with_static_model("test-agent", "task", "model-x");
+        let decision = engine.decide_route(&ctx);
+
+        assert_eq!(decision.budget_pressure, BudgetPressure::NearExhaustion);
+    }
+
+    #[test]
+    fn test_budget_verdict_conversion() {
+        assert_eq!(
+            BudgetPressure::from_verdict(&BudgetVerdict::Uncapped),
+            BudgetPressure::NoPressure
+        );
+        assert_eq!(
+            BudgetPressure::from_verdict(&BudgetVerdict::WithinBudget),
+            BudgetPressure::NoPressure
+        );
+        assert_eq!(
+            BudgetPressure::from_verdict(&BudgetVerdict::NearExhaustion {
+                spent_cents: 80,
+                budget_cents: 100
+            }),
+            BudgetPressure::NearExhaustion
+        );
+        assert_eq!(
+            BudgetPressure::from_verdict(&BudgetVerdict::Exhausted {
+                spent_cents: 100,
+                budget_cents: 100
+            }),
+            BudgetPressure::Exhausted
+        );
+    }
+
+    #[test]
+    fn test_score_candidate_with_budget_pressure() {
+        let candidate = RouteCandidate {
+            provider: Provider {
+                id: "test".to_string(),
+                name: "test".to_string(),
+                provider_type: ProviderType::Agent {
+                    agent_id: "test".to_string(),
+                    cli_command: "opencode".to_string(),
+                    working_dir: PathBuf::from("/tmp"),
+                },
+                capabilities: vec![],
+                cost_level: CostLevel::Expensive,
+                latency: Latency::Medium,
+                keywords: vec![],
+            },
+            model: "opus".to_string(),
+            cli_tool: "opencode".to_string(),
+            source: RouteSource::KnowledgeGraph,
+            confidence: 0.9,
+        };
+
+        let score_no_pressure =
+            RoutingDecisionEngine::score_candidate(&candidate, BudgetPressure::NoPressure);
+        let score_near =
+            RoutingDecisionEngine::score_candidate(&candidate, BudgetPressure::NearExhaustion);
+        let score_exhausted =
+            RoutingDecisionEngine::score_candidate(&candidate, BudgetPressure::Exhausted);
+
+        assert!(score_no_pressure > score_near);
+        assert!(score_near > score_exhausted);
     }
 }
