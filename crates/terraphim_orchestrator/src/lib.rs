@@ -33,6 +33,7 @@ pub mod agent_run_record;
 pub mod compound;
 pub mod concurrency;
 pub mod config;
+pub mod control_plane;
 pub mod cost_tracker;
 pub mod dispatcher;
 pub mod dual_mode;
