@@ -70,7 +70,8 @@ pub struct RoutingDecisionEngine {
     kg_router: Option<Arc<KgRouter>>,
     /// Provider health status.
     provider_health: Arc<ProviderHealthMap>,
-    /// Cost/budget tracking.
+    /// Cost/budget tracking (reserved for budget-aware routing - issue #527).
+    #[allow(dead_code)]
     cost_tracker: CostTracker,
     /// Keyword routing engine.
     router: terraphim_router::Router,
@@ -99,6 +100,7 @@ impl RoutingDecisionEngine {
     /// 2. Static model config
     /// 3. Keyword routing engine
     /// 4. CLI default (no model specified)
+    #[allow(unused_assignments)]
     pub fn decide_route(&self, ctx: &DispatchContext) -> RoutingDecision {
         let cli_name = std::path::Path::new(&ctx.cli_tool)
             .file_name()
@@ -108,9 +110,8 @@ impl RoutingDecisionEngine {
         let supports_model_flag = matches!(cli_name, "claude" | "claude-code" | "opencode");
 
         let mut all_candidates = Vec::new();
-        let mut primary_available = true;
+        let mut primary_available = false;
 
-        // Try model routing only if CLI supports --model flag
         if supports_model_flag {
             // 1. KG routing first
             if let Some(ref kg_router) = self.kg_router {
@@ -340,16 +341,6 @@ impl RoutingDecisionEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn create_test_context(agent_name: &str, task: &str) -> DispatchContext {
-        DispatchContext {
-            agent_name: agent_name.to_string(),
-            task: task.to_string(),
-            static_model: None,
-            cli_tool: "opencode".to_string(),
-            layer: crate::config::AgentLayer::Core,
-        }
-    }
 
     fn create_test_context_with_cli(
         agent_name: &str,
