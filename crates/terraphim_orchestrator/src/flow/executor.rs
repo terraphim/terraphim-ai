@@ -59,17 +59,24 @@ impl FlowExecutor {
 
         match result {
             Ok(Ok(output)) => {
+                let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+                let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+
+                // Parse token usage from combined output
+                let combined_output = format!("{} {}", stdout, stderr);
+                let token_usage = crate::flow::token_parser::parse_token_usage(&combined_output);
+
                 let mut envelope = StepEnvelope {
                     step_name: step.name.clone(),
                     started_at,
                     finished_at: Utc::now(),
                     exit_code: output.status.code().unwrap_or(-1),
-                    stdout: String::from_utf8_lossy(&output.stdout).to_string(),
-                    stderr: String::from_utf8_lossy(&output.stderr).to_string(),
-                    cost_usd: None,
+                    stdout,
+                    stderr,
+                    cost_usd: token_usage.cost_usd,
                     session_id: None,
-                    input_tokens: None,
-                    output_tokens: None,
+                    input_tokens: token_usage.input_tokens,
+                    output_tokens: token_usage.output_tokens,
                     stdout_file: None,
                 };
                 envelope.truncate_output();
@@ -261,18 +268,24 @@ impl FlowExecutor {
             }
         }
 
+        // Parse token usage from combined output
+        let stdout = stdout_lines.join("\n");
+        let stderr = stderr_lines.join("\n");
+        let combined_output = format!("{} {}", stdout, stderr);
+        let token_usage = crate::flow::token_parser::parse_token_usage(&combined_output);
+
         // Build envelope with captured output
         let mut envelope = StepEnvelope {
             step_name: step.name.clone(),
             started_at,
             finished_at,
             exit_code,
-            stdout: stdout_lines.join("\n"),
-            stderr: stderr_lines.join("\n"),
-            cost_usd: None,
+            stdout,
+            stderr,
+            cost_usd: token_usage.cost_usd,
             session_id: None,
-            input_tokens: None,
-            output_tokens: None,
+            input_tokens: token_usage.input_tokens,
+            output_tokens: token_usage.output_tokens,
             stdout_file: None,
         };
 

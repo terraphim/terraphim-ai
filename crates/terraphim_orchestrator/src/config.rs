@@ -339,6 +339,18 @@ pub struct NightwatchConfig {
     /// Hour (0-23) when nightwatch evaluation ends. Default: 24 (always active).
     #[serde(default = "default_active_end_hour")]
     pub active_end_hour: u8,
+    /// Weight for error rate in drift calculation (default: 0.35).
+    #[serde(default = "default_error_weight")]
+    pub error_weight: f64,
+    /// Weight for command success rate in drift calculation (default: 0.25).
+    #[serde(default = "default_success_weight")]
+    pub success_weight: f64,
+    /// Weight for health score in drift calculation (default: 0.20).
+    #[serde(default = "default_health_weight")]
+    pub health_weight: f64,
+    /// Weight for budget exhaustion in drift calculation (default: 0.20).
+    #[serde(default = "default_budget_weight")]
+    pub budget_weight: f64,
 }
 
 impl Default for NightwatchConfig {
@@ -351,6 +363,10 @@ impl Default for NightwatchConfig {
             critical_threshold: default_critical_threshold(),
             active_start_hour: 0,
             active_end_hour: default_active_end_hour(),
+            error_weight: default_error_weight(),
+            success_weight: default_success_weight(),
+            health_weight: default_health_weight(),
+            budget_weight: default_budget_weight(),
         }
     }
 }
@@ -372,6 +388,18 @@ fn default_critical_threshold() -> f64 {
 }
 fn default_active_end_hour() -> u8 {
     24
+}
+fn default_error_weight() -> f64 {
+    0.35
+}
+fn default_success_weight() -> f64 {
+    0.25
+}
+fn default_health_weight() -> f64 {
+    0.20
+}
+fn default_budget_weight() -> f64 {
+    0.20
 }
 
 /// Compound review settings.
