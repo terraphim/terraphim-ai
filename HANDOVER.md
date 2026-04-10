@@ -1,14 +1,15 @@
-# Handover: 2026-04-10 -- Operational Skill Store Phases A-J
+# Handover: 2026-04-10 -- Operational Skill Store Complete (Phases A-J + D3)
 
-**Branch**: main
-**Commits**: 13 ahead of origin/main (c56a67d8)
+**Branch**: main (clean, in sync with origin/main at `20da10ac`)
 **Previous Handover**: 2026-03-10 - Agent Workflows E2E Implementation Complete
 
 ## Session Summary
 
-Implemented Phases A-J of the Operational Skill Store plan for `terraphim-agent` learning and correction system. Started from release readiness check, found 3 test failures, fixed them, then executed full disciplined research + design + implementation + verification pipeline across 10 phases using parallel subagents with right-side-of-v verification after each phase.
+Implemented the full Operational Skill Store plan for `terraphim-agent`: disciplined research across 20+ open issues, 10-phase design plan, parallel implementation with subagents, right-side-of-v verification after each phase, PRs merged on both GitHub and Gitea, 8 issues closed.
 
-## Commits (13)
+## What Was Done
+
+### 15 commits (all merged to main via 2 PRs)
 
 | Commit | Phase | Issue | Description |
 |--------|-------|-------|-------------|
@@ -25,6 +26,40 @@ Implemented Phases A-J of the Operational Skill Store plan for `terraphim-agent`
 | `0a7ecd50` | F | #695 | feat(learn): self-healing health monitoring |
 | `2d1aef19` | E+G | #599,#727 | feat(learn): multi-hook + shared learning CLI |
 | `c56a67d8` | J | Gitea #515-517 | feat(hooks): KG-based command validation |
+| `5f587874` | D1 fix | #693 | fix(learn): surface procedures in learn list/query |
+| `0c403844` | D3 | #693 | feat(learn): session-based auto-capture |
+
+### PRs (all merged)
+
+| PR | Platform | Status |
+|----|----------|--------|
+| #781 | GitHub | MERGED -- Phases A-J + D1 fix |
+| #783 | GitHub | MERGED -- D3 session auto-capture |
+| #533 | Gitea | MERGED -- Phases A-J + D1 fix |
+| #535 | Gitea | MERGED -- D3 session auto-capture |
+
+### Issues Closed
+
+| Issue | Platform | Title |
+|-------|----------|-------|
+| #480 | GitHub + Gitea | Secret redaction in hook passthrough |
+| #578 | GitHub | Search --robot/--format flags |
+| #693 | GitHub | Procedural memory (Phase 1 success capture) |
+| #773 | GitHub | Integration test role name mismatches |
+| #515 | Gitea | PreToolUse validation pipeline |
+| #516 | Gitea | KG command pattern matching |
+| #517 | Gitea | Wire validation into Claude Code pipeline |
+
+### Issues Progressed (not closed)
+
+| Issue | Platform | Title | Status |
+|-------|----------|-------|--------|
+| #692 | GitHub | Epic: Operational Skill Store | Phases A-J complete, H+I deferred |
+| #694 | GitHub | Procedure replay engine | Implemented + verified |
+| #695 | GitHub | Self-healing procedures | Implemented + verified |
+| #599 | GitHub | Multi-hook pipeline | Implemented + verified |
+| #703 | GitHub | Entity annotation | Implemented + verified |
+| #727 | GitHub | Agent evolution (partial) | Shared learning CLI wired |
 
 ## New CLI Surface
 
@@ -33,6 +68,7 @@ terraphim-agent learn procedure list/show/record/add-step
 terraphim-agent learn procedure success/failure
 terraphim-agent learn procedure replay ID [--dry-run]
 terraphim-agent learn procedure health/enable/disable
+terraphim-agent learn procedure from-session SESSION_ID [--title "T"]  (--features repl-sessions)
 terraphim-agent learn query PATTERN [--semantic]
 terraphim-agent learn shared list/promote/import/stats  (--features shared-learning)
 terraphim-agent search QUERY [--robot] [--format json|json-compact]
@@ -46,56 +82,40 @@ terraphim-agent search QUERY [--robot] [--format json|json-compact]
 - `crates/terraphim_agent/tests/robot_search_output_regression_tests.rs` -- 5 search tests
 - `crates/terraphim_agent/tests/shared_learning_cli_tests.rs` -- 7 shared learning tests
 - `plans/learning-correction-system-plan.md` -- research and design plan
+- `plans/d3-session-auto-capture-plan.md` -- D3 design plan
 
 ## Key Changes to Existing Code
 
-- `learnings/procedure.rs` -- un-gated from `#[cfg(test)]`, added HealthStatus/ProcedureHealthReport/health_check()/set_disabled()
-- `learnings/capture.rs` -- added ImportanceScore, entities field, annotate_with_entities(), query_all_entries_semantic()
-- `learnings/hook.rs` -- added LearnHookType, multi-hook routing, correction pattern parsing
-- `learnings/redaction.rs` -- wired into hook passthrough, removed dead_code on contains_secrets()
-- `terraphim_types/src/procedure.rs` -- added `disabled: bool` with serde(default)
+- `learnings/procedure.rs` -- un-gated from `#[cfg(test)]`, added HealthStatus, health_check(), set_disabled(), from_session_commands(), extract_bash_commands_from_session()
+- `learnings/capture.rs` -- ImportanceScore, entities field, Procedure variant in LearningEntry, annotate_with_entities(), query_all_entries_semantic(), procedures loaded in list_all_entries()
+- `learnings/hook.rs` -- LearnHookType, multi-hook routing, correction pattern parsing
+- `learnings/redaction.rs` -- wired into hook passthrough
+- `terraphim_types/src/procedure.rs` -- disabled field with serde(default)
 
 ## What's Working
 
-- All unit tests: 151 lib tests pass
-- All integration tests: procedure (12), search (27), learn (3), shared learning (7), replace (14)
+- All tests pass: 151 lib, 12 procedure, 22 search, 14 replace, 5 robot output, 3 learn, 7 shared learning
 - Every phase verified through right-side-of-v with traceability matrices
-- cargo clippy clean (no errors, only pre-existing dead_code warnings)
+- cargo clippy clean (no errors)
+- Both remotes in sync
 
-## Open PRs
-
-- GitHub: https://github.com/terraphim/terraphim-ai/pull/781
-- Gitea: https://git.terraphim.cloud/terraphim/terraphim-ai/pulls/533
-
-Branch `feat/operational-skill-store-phases-a-f` is up to date with all 13 commits on both remotes.
-
-## Issues Updated
-
-- GitHub: #480, #578, #599, #692, #693, #694, #695, #703, #727, #773
-- Gitea: #480, #451, #485, #515, #516, #517
-
-## Deferred Work
+## What's Deferred
 
 ### Phase H: Graduated Guard (#704)
-- Three-tier execution model (allow/sandbox/deny)
-- Requires Firecracker/secure-exec integration
-- L complexity, infrastructure-heavy
+Three-tier execution (allow/sandbox/deny) with Firecracker integration. L complexity.
 
 ### Phase I: Agent Evolution (#727-730)
-- Wire terraphim_agent_evolution into ADF with real LLM adapters
-- 4 issues: #727 (full), #728, #729, #730
-- L complexity, 8-12 days estimated
+Wire terraphim_agent_evolution into ADF with real LLM adapters. 4 issues, L complexity.
 
-### Phase J remaining: Gitea #451
-- LLM hooks unwired in agent.rs (spec-validator remediation)
-- Needs terraphim_validation crate work
+### Gitea #451: LLM hooks unwired in agent.rs
+Needs terraphim_validation crate work.
 
 ## Known Issues
 
-1. `cross_mode_consistency_test` -- 3 pre-existing failures, not caused by this session
-2. Byte-level string truncation at main.rs:1297 on multi-byte UTF-8 -- LOW severity
-3. `crates/terraphim_agent/docs/src/kg/test_ranking_kg.md` -- untracked test fixture, can be deleted
-4. `process_hook_input()` in hook.rs is dead code (replaced by `process_hook_input_with_type()`)
+1. `cross_mode_consistency_test` -- 3 pre-existing failures (server vs CLI result count mismatch)
+2. Byte-level string truncation at main.rs search snippet (120 chars) can panic on multi-byte UTF-8 -- LOW
+3. `process_hook_input()` in hook.rs is dead code (replaced by `process_hook_input_with_type()`)
+4. `crates/terraphim_agent/docs/src/kg/test_ranking_kg.md` -- untracked test fixture, can be deleted
 
 ## Test Commands
 
