@@ -30,7 +30,7 @@ mod procedure;
 pub(crate) mod redaction;
 mod replay;
 
-pub use procedure::ProcedureStore;
+pub use procedure::{HealthStatus, ProcedureHealthReport, ProcedureStore};
 pub use replay::{ReplayResult, StepOutcome, replay_procedure};
 
 pub use capture::{
