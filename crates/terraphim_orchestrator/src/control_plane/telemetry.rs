@@ -139,6 +139,22 @@ impl ModelUsage {
     }
 }
 
+/// Serializable snapshot of telemetry state for persistence across restarts.
+///
+/// Contains aggregated model performances (not individual events) to keep
+/// the persisted payload small and relevant for routing decisions.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TelemetrySummary {
+    /// Unique identifier for this summary (always "telemetry_summary").
+    pub id: String,
+    /// Aggregated model performances at time of export.
+    pub model_performances: Vec<ModelPerformanceSnapshot>,
+    /// Rolling window duration in seconds.
+    pub window_secs: u64,
+    /// Timestamp when this summary was exported.
+    pub exported_at: DateTime<Utc>,
+}
+
 /// In-memory telemetry store backed by terraphim_persistence.
 ///
 /// Stores rolling completion events and exposes performance/usage snapshots
@@ -324,6 +340,87 @@ impl TelemetryStore {
         }
         snapshots
     }
+
+    /// Export a serialisable summary of current telemetry state.
+    ///
+    /// Used for persistence across orchestrator restarts.
+    pub async fn export_summary(&self) -> TelemetrySummary {
+        let performances = self.all_model_performances().await;
+        let window_secs = self.inner.read().await.window_secs;
+
+        TelemetrySummary {
+            id: "telemetry_summary".to_string(),
+            model_performances: performances,
+            window_secs,
+            exported_at: Utc::now(),
+        }
+    }
+
+    /// Import a previously exported summary, restoring model performance data.
+    ///
+    /// Restores subscription limit flags and synthesises representative completion
+    /// events from the aggregated snapshot so that throughput/latency metrics
+    /// survive orchestrator restarts.
+    pub async fn import_summary(&self, summary: TelemetrySummary) {
+        let mut inner = self.inner.write().await;
+        let now = Utc::now();
+        let window_secs = inner.window_secs;
+        let cutoff = now - chrono::Duration::seconds(window_secs as i64);
+
+        for perf in &summary.model_performances {
+            if let Some(expires) = perf.subscription_limit_expires_at {
+                if now < expires {
+                    inner
+                        .subscription_limits
+                        .insert(perf.model.clone(), expires);
+                }
+            }
+
+            if let Some(event_time) = perf.last_event_at {
+                if event_time >= cutoff && perf.successful_completions > 0 {
+                    let synthetic_count = perf.successful_completions.min(10);
+                    let events = inner.events.entry(perf.model.clone()).or_default();
+                    for i in 0..synthetic_count {
+                        let spread = chrono::Duration::seconds(
+                            (window_secs as i64 * i as i64) / synthetic_count.max(1) as i64,
+                        );
+                        events.push(CompletionEvent {
+                            model: perf.model.clone(),
+                            session_id: String::new(),
+                            completed_at: event_time - spread,
+                            latency_ms: perf.avg_latency_ms as u64,
+                            success: true,
+                            tokens: TokenBreakdown::default(),
+                            cost_usd: 0.0,
+                            error: None,
+                        });
+                    }
+                }
+
+                if event_time >= cutoff {
+                    for _ in 0..perf.failed_completions.min(3) {
+                        let events = inner.events.entry(perf.model.clone()).or_default();
+                        events.push(CompletionEvent {
+                            model: perf.model.clone(),
+                            session_id: String::new(),
+                            completed_at: event_time,
+                            latency_ms: 0,
+                            success: false,
+                            tokens: TokenBreakdown::default(),
+                            cost_usd: 0.0,
+                            error: Some("recovered failure".to_string()),
+                        });
+                    }
+                }
+            }
+        }
+
+        tracing::info!(
+            model_count = summary.model_performances.len(),
+            exported_at = %summary.exported_at,
+            "Imported telemetry summary"
+        );
+    }
 }
 
 /// Check if an error message indicates a subscription limit.
@@ -416,6 +513,99 @@ mod tests {
         let perf = store.model_performance("unknown").await;
         assert_eq!(perf.successful_completions, 0);
         assert!(!perf.subscription_limit_reached);
+    }
+
+    #[tokio::test]
+    async fn test_import_summary_restores_events() {
+        let store = TelemetryStore::new(3600);
+        let now = Utc::now();
+
+        store
+            .record(CompletionEvent {
+                model: "model-a".to_string(),
+                session_id: "sess-1".to_string(),
+                completed_at: now,
+                latency_ms: 200,
+                success: true,
+                tokens: TokenBreakdown {
+                    total: 1000,
+                    input: 800,
+                    output: 200,
+                    ..Default::default()
+                },
+                cost_usd: 0.01,
+                error: None,
+            })
+            .await;
+
+        let original_perf = store.model_performance("model-a").await;
+        assert_eq!(original_perf.successful_completions, 1);
+
+        let summary = store.export_summary().await;
+
+        let restored = TelemetryStore::new(3600);
+        restored.import_summary(summary).await;
+
+        let restored_perf = restored.model_performance("model-a").await;
+        assert!(restored_perf.successful_completions > 0);
+        assert!(restored_perf.avg_latency_ms > 0.0);
+    }
+
+    #[tokio::test]
+    async fn test_import_summary_restores_subscription_limits() {
+        let store = TelemetryStore::new(3600);
+        let now = Utc::now();
+
+        store
+            .record(CompletionEvent {
+                model: "model-b".to_string(),
+                session_id: "sess-2".to_string(),
+                completed_at: now,
+                latency_ms: 100,
+                success: false,
+                tokens: TokenBreakdown::default(),
+                cost_usd: 0.0,
+                error: Some("weekly session limit reached".to_string()),
+            })
+            .await;
+
+        let summary = store.export_summary().await;
+
+        let restored = TelemetryStore::new(3600);
+        restored.import_summary(summary).await;
+
+        let perf = restored.model_performance("model-b").await;
+        assert!(perf.subscription_limit_reached);
+    }
+
+    #[tokio::test]
+    async fn test_import_summary_prunes_stale_data() {
+        let _store = TelemetryStore::new(3600);
+        let old_time = Utc::now() - chrono::Duration::seconds(7200);
+
+        let summary = TelemetrySummary {
+            id: "telemetry_summary".to_string(),
+            model_performances: vec![ModelPerformanceSnapshot {
+                model: "stale-model".to_string(),
+                successful_completions: 5,
+                failed_completions: 0,
+                window_secs: 3600,
+                throughput: 0.001,
+                avg_latency_ms: 500.0,
+                success_rate: 1.0,
+                last_event_at: Some(old_time),
+                subscription_limit_reached: false,
+                subscription_limit_expires_at: None,
+            }],
+            window_secs: 3600,
+            exported_at: old_time,
+        };
+
+        let restored = TelemetryStore::new(3600);
+        restored.import_summary(summary).await;
+
+        let perf = restored.model_performance("stale-model").await;
+        assert_eq!(perf.successful_completions, 0);
     }
 
     #[test]
