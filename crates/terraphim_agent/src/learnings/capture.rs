@@ -2097,4 +2097,183 @@ mod tests {
         // No corrections since all commands succeeded
         assert!(corrections.is_empty());
     }
+
+    #[test]
+    fn test_annotate_with_thesaurus_finds_entities() {
+        use terraphim_types::{NormalizedTerm, NormalizedTermValue, Thesaurus};
+
+        let mut thesaurus = Thesaurus::new("test_kg".to_string());
+
+        // Add "bun" concept with synonym "npm"
+        let bun_term = NormalizedTerm::new(1, NormalizedTermValue::from("bun"))
+            .with_display_value("bun".to_string());
+        thesaurus.insert(NormalizedTermValue::from("bun"), bun_term.clone());
+        thesaurus.insert(NormalizedTermValue::from("npm"), bun_term);
+
+        // Add "cargo" concept
+        let cargo_term = NormalizedTerm::new(2, NormalizedTermValue::from("cargo"))
+            .with_display_value("cargo".to_string());
+        thesaurus.insert(NormalizedTermValue::from("cargo"), cargo_term);
+
+        let entities =
+            annotate_with_thesaurus("npm install failed, try cargo build instead", thesaurus);
+
+        assert!(!entities.is_empty(), "Should find at least one entity");
+        assert!(
+            entities.contains(&"bun".to_string()),
+            "Should find 'bun' entity (via 'npm' synonym). Found: {:?}",
+            entities
+        );
+        assert!(
+            entities.contains(&"cargo".to_string()),
+            "Should find 'cargo' entity. Found: {:?}",
+            entities
+        );
+    }
+
+    #[test]
+    fn test_annotate_with_thesaurus_deduplicates() {
+        use terraphim_types::{NormalizedTerm, NormalizedTermValue, Thesaurus};
+
+        let mut thesaurus = Thesaurus::new("test_kg".to_string());
+        let term = NormalizedTerm::new(1, NormalizedTermValue::from("rust"))
+            .with_display_value("rust".to_string());
+        thesaurus.insert(NormalizedTermValue::from("rust"), term);
+
+        // Text mentions "rust" twice
+        let entities = annotate_with_thesaurus("rust is great, rust is fast", thesaurus);
+
+        // Should only appear once
+        assert_eq!(
+            entities.len(),
+            1,
+            "Should deduplicate entities. Found: {:?}",
+            entities
+        );
+        assert_eq!(entities[0], "rust");
+    }
+
+    #[test]
+    fn test_annotate_with_empty_thesaurus() {
+        let thesaurus = terraphim_types::Thesaurus::new("empty".to_string());
+        let entities = annotate_with_thesaurus("some text", thesaurus);
+        assert!(entities.is_empty());
+    }
+
+    #[test]
+    fn test_captured_learning_entities_roundtrip() {
+        let learning = CapturedLearning::new(
+            "npm install".to_string(),
+            "EACCES: permission denied".to_string(),
+            1,
+            LearningSource::Project,
+        )
+        .with_entities(vec!["bun".to_string(), "npm_install".to_string()]);
+
+        let md = learning.to_markdown();
+        assert!(
+            md.contains("entities:"),
+            "Markdown should contain entities section"
+        );
+        assert!(md.contains("  - bun"), "Markdown should contain bun entity");
+        assert!(
+            md.contains("  - npm_install"),
+            "Markdown should contain npm_install entity"
+        );
+
+        let parsed = CapturedLearning::from_markdown(&md).unwrap();
+        assert_eq!(
+            parsed.entities.len(),
+            2,
+            "Parsed entities should have 2 items"
+        );
+        assert_eq!(parsed.entities[0], "bun");
+        assert_eq!(parsed.entities[1], "npm_install");
+    }
+
+    #[test]
+    fn test_captured_learning_no_entities_backward_compat() {
+        // Simulate a legacy markdown file without entities field
+        let md = "---\n\
+                   id: test-123\n\
+                   command: git push\n\
+                   exit_code: 1\n\
+                   source: Project\n\
+                   captured_at: 2025-01-01T00:00:00+00:00\n\
+                   working_dir: /tmp\n\
+                   ---\n\n\
+                   ## Command\n\n\
+                   `git push`\n\n\
+                   ## Error Output\n\n\
+                   ```\nremote: rejected\n```\n";
+
+        let parsed = CapturedLearning::from_markdown(md).unwrap();
+        assert!(
+            parsed.entities.is_empty(),
+            "Legacy files without entities should parse with empty entities"
+        );
+    }
+
+    #[test]
+    fn test_semantic_query_matches_by_entity() {
+        let temp_dir = TempDir::new().unwrap();
+        let storage = temp_dir.path().join("learnings");
+        fs::create_dir(&storage).unwrap();
+
+        // Create a learning with entities
+        let learning = CapturedLearning::new(
+            "some-obscure-command".to_string(),
+            "failed to connect".to_string(),
+            1,
+            LearningSource::Project,
+        )
+        .with_entities(vec!["docker".to_string(), "networking".to_string()])
+        .with_tags(vec!["learning".to_string()]);
+
+        fs::write(
+            storage.join("learning-entity-test.md"),
+            learning.to_markdown(),
+        )
+        .unwrap();
+
+        // Regular query should not find it by entity name
+        let regular = query_all_entries(&storage, "docker", false).unwrap();
+        assert!(
+            regular.is_empty(),
+            "Regular query should not match on entity name alone"
+        );
+
+        // Semantic query should find it via entity match
+        let semantic = query_all_entries_semantic(&storage, "docker", false, true).unwrap();
+        assert_eq!(
+            semantic.len(),
+            1,
+            "Semantic query should find entry by entity name"
+        );
+    }
+
+    #[test]
+    fn test_learning_entry_entities_accessor() {
+        let learning = CapturedLearning::new(
+            "cmd".to_string(),
+            "err".to_string(),
+            1,
+            LearningSource::Project,
+        )
+        .with_entities(vec!["entity1".to_string()]);
+
+        let entry = LearningEntry::Learning(learning);
+        assert_eq!(entry.entities(), &["entity1".to_string()]);
+
+        // Correction entries have no entities
+        let correction = CorrectionEvent::new(
+            CorrectionType::Naming,
+            "old".to_string(),
+            "new".to_string(),
+            "ctx".to_string(),
+            LearningSource::Project,
+        );
+        let entry2 = LearningEntry::Correction(correction);
+        assert!(entry2.entities().is_empty());
+    }
 }
