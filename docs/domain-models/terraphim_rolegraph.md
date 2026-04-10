@@ -239,7 +239,7 @@ impl RoleGraph {
 
         // Find matching nodes via Aho-Corasick
         let matches = self.find_matching_node_ids(&document.body);
-        
+
         // Create indexed document with connections
         let indexed_doc = IndexedDocument {
             document,
@@ -370,7 +370,7 @@ impl TriggerIndex {
         let mut doc_freq: AHashMap<String, usize> = AHashMap::new();
         for (node_id, trigger_text) in &triggers {
             let tokens: Vec<String> = self.tokenise(trigger_text);
-            let unique: ahash::AHashSet<&str> = 
+            let unique: ahash::AHashSet<&str> =
                 tokens.iter().map(|s| s.as_str()).collect();
             for token in &unique {
                 *doc_freq.entry(token.to_string()).or_insert(0) += 1;
@@ -637,13 +637,13 @@ mod tests {
     #[test]
     fn test_trigger_index() {
         let mut index = TriggerIndex::new(0.3);
-        
+
         let mut triggers = AHashMap::new();
         triggers.insert(1, "rust programming language".to_string());
         triggers.insert(2, "python scripting".to_string());
 
         index.build(triggers);
-        
+
         let results = index.query("programming scripts");
         assert!(results.len() >= 1);
     }
