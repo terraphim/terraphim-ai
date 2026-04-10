@@ -859,6 +859,14 @@ enum ProcedureSub {
         /// Procedure ID
         id: String,
     },
+    /// Replay a stored procedure (execute its steps in order)
+    Replay {
+        /// Procedure ID
+        id: String,
+        /// Print steps without executing them
+        #[arg(long, default_value_t = false)]
+        dry_run: bool,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -2298,6 +2306,77 @@ async fn run_learn_command(sub: LearnSub) -> Result<()> {
                     store.update_confidence(&id, false)?;
                     println!("Recorded failure for procedure '{}'.", id);
                     Ok(())
+                }
+                ProcedureSub::Replay { id, dry_run } => {
+                    let procedure = store.find_by_id(&id)?;
+                    match procedure {
+                        None => {
+                            eprintln!("Procedure '{}' not found.", id);
+                            std::process::exit(1);
+                        }
+                        Some(proc) => {
+                            // Check minimum confidence threshold
+                            if proc.confidence.total_executions() > 0 && proc.confidence.score < 0.5
+                            {
+                                eprintln!(
+                                    "Procedure '{}' has low confidence ({:.0}%). \
+                                     Use --dry-run to preview, or record more successes first.",
+                                    id,
+                                    proc.confidence.score * 100.0,
+                                );
+                                std::process::exit(1);
+                            }
+
+                            println!(
+                                "Replaying procedure '{}' ({} steps){}",
+                                proc.title,
+                                proc.step_count(),
+                                if dry_run { " [DRY RUN]" } else { "" },
+                            );
+
+                            let result = learnings::replay_procedure(&proc, dry_run)?;
+
+                            // Print outcomes
+                            for (ordinal, outcome) in &result.outcomes {
+                                match outcome {
+                                    learnings::StepOutcome::Success { stdout } => {
+                                        println!("  step {}: OK", ordinal);
+                                        if !stdout.trim().is_empty() && stdout != "(dry-run)" {
+                                            for line in stdout.lines() {
+                                                println!("    | {}", line);
+                                            }
+                                        }
+                                    }
+                                    learnings::StepOutcome::Failed { stderr, exit_code } => {
+                                        println!("  step {}: FAILED (exit {})", ordinal, exit_code);
+                                        if !stderr.trim().is_empty() {
+                                            for line in stderr.lines() {
+                                                println!("    | {}", line);
+                                            }
+                                        }
+                                    }
+                                    learnings::StepOutcome::Skipped { reason } => {
+                                        println!("  step {}: SKIPPED ({})", ordinal, reason);
+                                    }
+                                }
+                            }
+
+                            // Update confidence based on result (skip for dry-run)
+                            if !dry_run {
+                                store.update_confidence(&id, result.overall_success)?;
+                                if result.overall_success {
+                                    println!("Replay completed successfully.");
+                                } else {
+                                    println!("Replay failed.");
+                                    std::process::exit(1);
+                                }
+                            } else {
+                                println!("Dry run completed.");
+                            }
+
+                            Ok(())
+                        }
+                    }
                 }
             }
         }
