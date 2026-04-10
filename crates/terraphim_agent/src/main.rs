@@ -37,6 +37,9 @@ mod robot;
 // Learning capture for failed commands
 mod learnings;
 
+// KG-based command validation for PreToolUse hook pipeline
+mod kg_validation;
+
 #[cfg(feature = "repl")]
 mod repl;
 
@@ -1803,20 +1806,36 @@ async fn run_offline_command(
                                 }
                             }
 
+                            // KG validation: find patterns with known alternatives
+                            let kg_validation = kg_validation::validate_command_against_kg(command);
+
                             // Get thesaurus and perform replacement
                             let thesaurus = service.get_thesaurus(&role_name).await?;
                             let replacement_service =
                                 terraphim_hooks::ReplacementService::new(thesaurus);
                             let hook_result = replacement_service.replace_fail_open(command);
 
-                            // If replacement occurred, output modified input
-                            if hook_result.replacements > 0 {
+                            // If replacement occurred or KG validation has findings, output modified input
+                            if hook_result.replacements > 0 || kg_validation.has_findings {
                                 let mut output = input_value.clone();
-                                if let Some(tool_input) = output.get_mut("tool_input") {
-                                    if let Some(obj) = tool_input.as_object_mut() {
+                                if hook_result.replacements > 0 {
+                                    if let Some(tool_input) = output.get_mut("tool_input") {
+                                        if let Some(obj) = tool_input.as_object_mut() {
+                                            obj.insert(
+                                                "command".to_string(),
+                                                serde_json::Value::String(
+                                                    hook_result.result.clone(),
+                                                ),
+                                            );
+                                        }
+                                    }
+                                }
+                                if kg_validation.has_findings {
+                                    if let Some(obj) = output.as_object_mut() {
                                         obj.insert(
-                                            "command".to_string(),
-                                            serde_json::Value::String(hook_result.result.clone()),
+                                            "validations".to_string(),
+                                            serde_json::to_value(&kg_validation)
+                                                .unwrap_or_default(),
                                         );
                                     }
                                 }
