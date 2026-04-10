@@ -805,6 +805,57 @@ enum LearnSub {
         #[arg(value_enum)]
         agent: learnings::AgentType,
     },
+    /// Manage captured procedures (recorded command sequences)
+    Procedure {
+        #[command(subcommand)]
+        sub: ProcedureSub,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum ProcedureSub {
+    /// List stored procedures (most recent first)
+    List {
+        /// Number of recent procedures to show
+        #[arg(long, default_value_t = 10)]
+        recent: usize,
+    },
+    /// Show full details of a procedure
+    Show {
+        /// Procedure ID
+        id: String,
+    },
+    /// Create a new empty procedure
+    Record {
+        /// Procedure title
+        title: String,
+        /// Optional description
+        #[arg(long)]
+        description: Option<String>,
+    },
+    /// Add a step to an existing procedure
+    AddStep {
+        /// Procedure ID
+        id: String,
+        /// Command to execute in this step
+        command: String,
+        /// Precondition that must hold before this step
+        #[arg(long)]
+        precondition: Option<String>,
+        /// Postcondition that should hold after this step
+        #[arg(long)]
+        postcondition: Option<String>,
+    },
+    /// Record a successful execution of a procedure
+    Success {
+        /// Procedure ID
+        id: String,
+    },
+    /// Record a failed execution of a procedure
+    Failure {
+        /// Procedure ID
+        id: String,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -2133,6 +2184,114 @@ async fn run_learn_command(sub: LearnSub) -> Result<()> {
             .map_err(|e| e.into()),
         LearnSub::InstallHook { agent } => {
             learnings::install_hook(agent).await.map_err(|e| e.into())
+        }
+        LearnSub::Procedure { sub } => {
+            let procedures_path = config.global_dir.join("procedures.jsonl");
+            let store = learnings::ProcedureStore::new(procedures_path);
+
+            match sub {
+                ProcedureSub::List { recent } => {
+                    let all = store.load_all()?;
+                    if all.is_empty() {
+                        println!("No procedures found.");
+                    } else {
+                        let display_count = recent.min(all.len());
+                        println!("Procedures ({} of {}):", display_count, all.len());
+                        for proc in all.iter().rev().take(recent) {
+                            println!(
+                                "  [{}] {} -- {} steps, confidence {:.0}% ({}/{})",
+                                proc.id,
+                                proc.title,
+                                proc.step_count(),
+                                proc.confidence.score * 100.0,
+                                proc.confidence.success_count,
+                                proc.confidence.total_executions(),
+                            );
+                        }
+                    }
+                    Ok(())
+                }
+                ProcedureSub::Show { id } => {
+                    match store.find_by_id(&id)? {
+                        Some(proc) => {
+                            println!("Procedure: {}", proc.title);
+                            println!("ID: {}", proc.id);
+                            println!("Description: {}", proc.description);
+                            println!(
+                                "Confidence: {:.0}% ({} successes, {} failures)",
+                                proc.confidence.score * 100.0,
+                                proc.confidence.success_count,
+                                proc.confidence.failure_count,
+                            );
+                            println!("Created: {}", proc.created_at);
+                            println!("Updated: {}", proc.updated_at);
+                            if !proc.tags.is_empty() {
+                                println!("Tags: {}", proc.tags.join(", "));
+                            }
+                            if let Some(ref session) = proc.source_session {
+                                println!("Source session: {}", session);
+                            }
+                            println!("Steps ({}):", proc.step_count());
+                            for step in &proc.steps {
+                                println!("  {}. {}", step.ordinal, step.command);
+                                if let Some(ref pre) = step.precondition {
+                                    println!("     pre: {}", pre);
+                                }
+                                if let Some(ref post) = step.postcondition {
+                                    println!("     post: {}", post);
+                                }
+                            }
+                        }
+                        None => {
+                            eprintln!("Procedure '{}' not found.", id);
+                        }
+                    }
+                    Ok(())
+                }
+                ProcedureSub::Record { title, description } => {
+                    use uuid::Uuid;
+                    let id = Uuid::new_v4().to_string();
+                    let desc = description.unwrap_or_default();
+                    let procedure =
+                        terraphim_types::procedure::CapturedProcedure::new(id.clone(), title, desc);
+                    store.save(&procedure)?;
+                    println!("Created procedure: {}", id);
+                    Ok(())
+                }
+                ProcedureSub::AddStep {
+                    id,
+                    command,
+                    precondition,
+                    postcondition,
+                } => {
+                    let mut proc = store
+                        .find_by_id(&id)?
+                        .ok_or_else(|| anyhow::anyhow!("Procedure '{}' not found", id))?;
+                    let ordinal = proc.step_count() as u32 + 1;
+                    proc.add_step(terraphim_types::procedure::ProcedureStep {
+                        ordinal,
+                        command,
+                        precondition,
+                        postcondition,
+                        working_dir: None,
+                        privileged: false,
+                        tags: vec![],
+                    });
+                    store.save(&proc)?;
+                    println!("Added step {} to procedure '{}'.", ordinal, id);
+                    Ok(())
+                }
+                ProcedureSub::Success { id } => {
+                    store.update_confidence(&id, true)?;
+                    println!("Recorded success for procedure '{}'.", id);
+                    Ok(())
+                }
+                ProcedureSub::Failure { id } => {
+                    store.update_confidence(&id, false)?;
+                    println!("Recorded failure for procedure '{}'.", id);
+                    Ok(())
+                }
+            }
         }
     }
 }
