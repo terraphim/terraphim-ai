@@ -48,16 +48,16 @@ Compliance audit identifies 1 critical vulnerability, 3 license violations, and 
 1. **[CRITICAL]** Upgrade rustls-webpki >=0.103.10
    - Run: `cargo upgrade rustls-webpki@0.103.10`
    - Verify: `cargo audit` shows 0 vulnerabilities
-   
+
 2. **[CRITICAL]** Add license field to terraphim_ccusage/Cargo.toml
    - Add: `license = "Apache-2.0"` (or appropriate license)
-   
+
 3. **[CRITICAL]** Add license field to terraphim_usage/Cargo.toml
    - Add: `license = "Apache-2.0"` (or appropriate license)
-   
+
 4. **[HIGH]** Fix deprecated SPDX identifier in html2md
    - This is external dependency - consider workaround or upgrade
-   
+
 5. **[LOW]** Remove secret length disclosure from atomic_client
    - Delete line 52 or replace with secure logging
 
