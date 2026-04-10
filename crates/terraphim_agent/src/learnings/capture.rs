@@ -723,7 +723,9 @@ const KG_SYNONYMS_KEYWORD: &str = "synonyms";
 ///
 /// Reads all `*.md` files in `kg_dir`, extracts the file stem as the concept
 /// name, and parses `synonyms:: a, b, c` lines to populate synonyms.
-fn build_kg_thesaurus_from_dir(kg_dir: &std::path::Path) -> Option<terraphim_types::Thesaurus> {
+pub(crate) fn build_kg_thesaurus_from_dir(
+    kg_dir: &std::path::Path,
+) -> Option<terraphim_types::Thesaurus> {
     use terraphim_types::{NormalizedTerm, NormalizedTermValue, Thesaurus};
 
     if !kg_dir.is_dir() {
@@ -810,7 +812,7 @@ fn build_kg_thesaurus_from_dir(kg_dir: &std::path::Path) -> Option<terraphim_typ
 ///
 /// Tries the current working directory first, then walks up parent directories
 /// looking for `docs/src/kg/`.
-fn find_kg_dir() -> Option<PathBuf> {
+pub(crate) fn find_kg_dir() -> Option<PathBuf> {
     let cwd = std::env::current_dir().ok()?;
 
     // Walk up from cwd looking for docs/src/kg
