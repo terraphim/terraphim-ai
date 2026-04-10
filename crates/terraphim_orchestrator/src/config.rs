@@ -111,6 +111,9 @@ pub struct RoutingConfig {
     /// Run provider probes on startup (default: true).
     #[serde(default = "default_true_routing")]
     pub probe_on_startup: bool,
+    /// Use RoutingDecisionEngine instead of inline model selection (default: false).
+    #[serde(default)]
+    pub use_routing_engine: bool,
 }
 
 fn default_probe_ttl() -> u64 {
