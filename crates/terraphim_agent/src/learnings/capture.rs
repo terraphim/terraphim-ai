@@ -6,6 +6,7 @@
 
 use std::fs;
 use std::path::PathBuf;
+use std::sync::OnceLock;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use chrono::{DateTime, Utc};
@@ -141,6 +142,8 @@ pub struct CapturedLearning {
     pub context: LearningContext,
     /// Tags for categorization
     pub tags: Vec<String>,
+    /// Knowledge graph entities matched in the command/error text
+    pub entities: Vec<String>,
 }
 
 impl CapturedLearning {
@@ -164,6 +167,7 @@ impl CapturedLearning {
             source,
             context: LearningContext::default(),
             tags: Vec::new(),
+            entities: Vec::new(),
         }
     }
 
@@ -184,6 +188,12 @@ impl CapturedLearning {
     /// Add tags.
     pub fn with_tags(mut self, tags: Vec<String>) -> Self {
         self.tags = tags;
+        self
+    }
+
+    /// Set knowledge graph entities.
+    pub fn with_entities(mut self, entities: Vec<String>) -> Self {
+        self.entities = entities;
         self
     }
 
@@ -219,6 +229,13 @@ impl CapturedLearning {
             md.push_str("tags:\n");
             for tag in &self.tags {
                 md.push_str(&format!("  - {}\n", tag));
+            }
+        }
+
+        if !self.entities.is_empty() {
+            md.push_str("entities:\n");
+            for entity in &self.entities {
+                md.push_str(&format!("  - {}\n", entity));
             }
         }
 
@@ -267,9 +284,25 @@ impl CapturedLearning {
         let full_chain = None;
         let mut correction = None;
         let mut error_output = String::new();
-        let tags = Vec::new();
+        let mut tags = Vec::new();
+        let mut entities = Vec::new();
+        // Track which list we are currently parsing (tags or entities)
+        let mut current_list: Option<&str> = None;
 
         for line in frontmatter.lines() {
+            let trimmed = line.trim();
+            // Check for YAML list item (e.g., "  - value")
+            if let Some(item) = trimmed.strip_prefix("- ") {
+                match current_list {
+                    Some("tags") => tags.push(item.trim().to_string()),
+                    Some("entities") => entities.push(item.trim().to_string()),
+                    _ => {}
+                }
+                continue;
+            }
+            // Reset current list when we hit a non-list line
+            current_list = None;
+
             if let Some((key, value)) = line.split_once(':') {
                 let key = key.trim();
                 let value = value.trim();
@@ -294,6 +327,8 @@ impl CapturedLearning {
                     "hostname" => hostname = Some(value.to_string()),
                     "failing_subcommand" => failing_subcommand = Some(value.to_string()),
                     "correction" => correction = Some(value.to_string()),
+                    "tags" => current_list = Some("tags"),
+                    "entities" => current_list = Some("entities"),
                     _ => {}
                 }
             }
@@ -323,6 +358,7 @@ impl CapturedLearning {
                 user: None,
             },
             tags,
+            entities,
         })
     }
 }
@@ -541,6 +577,180 @@ fn extract_section_text(body: &str, heading: &str) -> Option<String> {
     if text.is_empty() { None } else { Some(text) }
 }
 
+/// Global cache for the KG thesaurus used by entity annotation.
+/// Built once from `docs/src/kg/*.md` files and reused across captures.
+static KG_THESAURUS: OnceLock<Option<terraphim_types::Thesaurus>> = OnceLock::new();
+
+/// Default KG directory relative to workspace root.
+const DEFAULT_KG_SUBDIR: &str = "docs/src/kg";
+
+/// Synonyms delimiter used in KG markdown files (Logseq format).
+const KG_SYNONYMS_DELIMITER: &str = "::";
+const KG_SYNONYMS_KEYWORD: &str = "synonyms";
+
+/// Build a thesaurus synchronously from KG markdown files.
+///
+/// Reads all `*.md` files in `kg_dir`, extracts the file stem as the concept
+/// name, and parses `synonyms:: a, b, c` lines to populate synonyms.
+fn build_kg_thesaurus_from_dir(kg_dir: &std::path::Path) -> Option<terraphim_types::Thesaurus> {
+    use terraphim_types::{NormalizedTerm, NormalizedTermValue, Thesaurus};
+
+    if !kg_dir.is_dir() {
+        log::debug!(
+            "KG directory does not exist: {:?}, skipping entity annotation",
+            kg_dir
+        );
+        return None;
+    }
+
+    let entries: Vec<_> = match fs::read_dir(kg_dir) {
+        Ok(rd) => rd.flatten().collect(),
+        Err(e) => {
+            log::warn!("Cannot read KG directory {:?}: {}", kg_dir, e);
+            return None;
+        }
+    };
+
+    let mut thesaurus = Thesaurus::new("kg_entities".to_string());
+    let mut concept_id: u64 = 1;
+
+    for entry in entries {
+        let path = entry.path();
+        if path.extension().map(|e| e == "md").unwrap_or(false) {
+            let stem = match path.file_stem() {
+                Some(s) => s.to_string_lossy().to_string(),
+                None => continue,
+            };
+
+            // Read file content to find synonyms lines
+            let content = match fs::read_to_string(&path) {
+                Ok(c) => c,
+                Err(_) => continue,
+            };
+
+            let display_name = stem.clone();
+            let normalized_value = NormalizedTermValue::from(stem.to_lowercase());
+            let nterm = NormalizedTerm::new(concept_id, normalized_value.clone())
+                .with_display_value(display_name.clone());
+
+            // Insert the concept itself
+            thesaurus.insert(normalized_value, nterm.clone());
+
+            // Parse synonyms lines
+            for line in content.lines() {
+                if let Some((keyword, synonyms_str)) = line.split_once(KG_SYNONYMS_DELIMITER) {
+                    let keyword = keyword.trim().to_lowercase();
+                    if keyword != KG_SYNONYMS_KEYWORD {
+                        continue;
+                    }
+                    for synonym in synonyms_str.split(',') {
+                        let synonym = synonym.trim();
+                        if !synonym.is_empty() {
+                            let syn_nterm = NormalizedTerm::new(
+                                concept_id,
+                                NormalizedTermValue::from(stem.to_lowercase()),
+                            )
+                            .with_display_value(display_name.clone());
+                            thesaurus
+                                .insert(NormalizedTermValue::new(synonym.to_string()), syn_nterm);
+                        }
+                    }
+                }
+            }
+
+            concept_id += 1;
+        }
+    }
+
+    if thesaurus.is_empty() {
+        log::debug!("KG thesaurus is empty after building from {:?}", kg_dir);
+        return None;
+    }
+
+    log::info!(
+        "Built KG thesaurus with {} entries from {:?}",
+        thesaurus.len(),
+        kg_dir
+    );
+    Some(thesaurus)
+}
+
+/// Determine the KG directory path.
+///
+/// Tries the current working directory first, then walks up parent directories
+/// looking for `docs/src/kg/`.
+fn find_kg_dir() -> Option<PathBuf> {
+    let cwd = std::env::current_dir().ok()?;
+
+    // Walk up from cwd looking for docs/src/kg
+    let mut dir = cwd.as_path();
+    loop {
+        let candidate = dir.join(DEFAULT_KG_SUBDIR);
+        if candidate.is_dir() {
+            return Some(candidate);
+        }
+        dir = dir.parent()?;
+    }
+}
+
+/// Annotate text with KG entities using Aho-Corasick matching.
+///
+/// Returns a deduplicated list of matched entity display names.
+/// If the KG thesaurus is unavailable, returns an empty Vec (non-blocking).
+pub fn annotate_with_entities(text: &str) -> Vec<String> {
+    let thesaurus_opt = KG_THESAURUS.get_or_init(|| {
+        let kg_dir = find_kg_dir()?;
+        build_kg_thesaurus_from_dir(&kg_dir)
+    });
+
+    let thesaurus = match thesaurus_opt {
+        Some(t) => t.clone(),
+        None => return Vec::new(),
+    };
+
+    match terraphim_automata::matcher::find_matches(text, thesaurus, false) {
+        Ok(matches) => {
+            let mut seen = std::collections::HashSet::new();
+            let mut entities = Vec::new();
+            for m in matches {
+                let display = m.normalized_term.display().to_string();
+                if seen.insert(display.clone()) {
+                    entities.push(display);
+                }
+            }
+            entities
+        }
+        Err(e) => {
+            log::warn!("Entity annotation failed: {}", e);
+            Vec::new()
+        }
+    }
+}
+
+/// Annotate text with entities using a provided thesaurus.
+///
+/// This is useful for testing or when a pre-built thesaurus is available.
+#[allow(dead_code)]
+pub fn annotate_with_thesaurus(text: &str, thesaurus: terraphim_types::Thesaurus) -> Vec<String> {
+    match terraphim_automata::matcher::find_matches(text, thesaurus, false) {
+        Ok(matches) => {
+            let mut seen = std::collections::HashSet::new();
+            let mut entities = Vec::new();
+            for m in matches {
+                let display = m.normalized_term.display().to_string();
+                if seen.insert(display.clone()) {
+                    entities.push(display);
+                }
+            }
+            entities
+        }
+        Err(e) => {
+            log::warn!("Entity annotation failed: {}", e);
+            Vec::new()
+        }
+    }
+}
+
 /// Capture a failed command as a learning document.
 ///
 /// This function:
@@ -595,6 +805,9 @@ pub fn capture_failed_command(
         LearningSource::Global
     };
 
+    // Annotate with KG entities before moving strings (non-blocking: empty on failure)
+    let annotation_text = format!("{} {}", actual_command, redacted_error);
+
     // Create learning
     let mut learning =
         CapturedLearning::new(actual_command.clone(), redacted_error, exit_code, source);
@@ -605,10 +818,10 @@ pub fn capture_failed_command(
             learning = learning.with_failing_subcommand(actual_command, chain.clone());
         }
     }
-
-    // Auto-suggest correction (future: query existing learnings)
-    // For now, this is a placeholder for the auto-suggest feature
-    // TODO: Implement auto-suggest using terraphim_automata::find_matches
+    let entities = annotate_with_entities(&annotation_text);
+    if !entities.is_empty() {
+        learning = learning.with_entities(entities);
+    }
 
     // Add default tags
     let tags = vec!["learning".to_string(), format!("exit-{}", exit_code)];
@@ -857,6 +1070,14 @@ impl LearningEntry {
         }
     }
 
+    /// Knowledge graph entities (only present on Learning entries).
+    pub fn entities(&self) -> &[String] {
+        match self {
+            LearningEntry::Learning(l) => &l.entities,
+            LearningEntry::Correction(_) => &[],
+        }
+    }
+
     /// Correction text if any.
     pub fn correction_text(&self) -> Option<&str> {
         match self {
@@ -926,6 +1147,85 @@ pub fn query_all_entries(
             } else {
                 text.to_lowercase().contains(&pattern_lower)
             }
+        })
+        .collect();
+
+    Ok(filtered)
+}
+
+/// Query all entries by pattern, optionally including entity-based matching.
+///
+/// When `semantic` is true, the query pattern is also matched against
+/// the `entities` field of learning entries using KG annotation.
+pub fn query_all_entries_semantic(
+    storage_dir: &PathBuf,
+    pattern: &str,
+    exact: bool,
+    semantic: bool,
+) -> Result<Vec<LearningEntry>, LearningError> {
+    if !semantic {
+        return query_all_entries(storage_dir, pattern, exact);
+    }
+
+    let all = list_all_entries(storage_dir, usize::MAX)?;
+    let pattern_lower = pattern.to_lowercase();
+
+    // Also annotate the query pattern with entities for semantic matching
+    let query_entities = annotate_with_entities(pattern);
+
+    let filtered: Vec<_> = all
+        .into_iter()
+        .filter(|entry| {
+            // Text-based match (same as non-semantic)
+            let text = match entry {
+                LearningEntry::Learning(l) => {
+                    format!("{} {}", l.command, l.error_output)
+                }
+                LearningEntry::Correction(c) => {
+                    format!("{} {} {}", c.original, c.corrected, c.context_description)
+                }
+            };
+            let text_match = if exact {
+                text.contains(pattern)
+            } else {
+                text.to_lowercase().contains(&pattern_lower)
+            };
+
+            if text_match {
+                return true;
+            }
+
+            // Entity-based match: check if any entity in the entry matches
+            // the query pattern or the query's own entities
+            let entry_entities = entry.entities();
+            if entry_entities.is_empty() {
+                return false;
+            }
+
+            // Direct pattern match against entity names
+            let entity_text_match = entry_entities.iter().any(|e| {
+                if exact {
+                    e == pattern
+                } else {
+                    e.to_lowercase().contains(&pattern_lower)
+                        || pattern_lower.contains(&e.to_lowercase())
+                }
+            });
+
+            if entity_text_match {
+                return true;
+            }
+
+            // Cross-entity match: query entities overlap with entry entities
+            if !query_entities.is_empty() {
+                let entry_entity_set: std::collections::HashSet<String> =
+                    entry_entities.iter().map(|e| e.to_lowercase()).collect();
+                return query_entities
+                    .iter()
+                    .any(|qe| entry_entity_set.contains(&qe.to_lowercase()));
+            }
+
+            false
         })
         .collect();
 
