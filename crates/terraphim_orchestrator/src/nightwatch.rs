@@ -209,6 +209,10 @@ pub struct DriftMetrics {
     pub command_success_rate: f64,
     /// Process health from HealthStatus observations.
     pub health_score: f64,
+    /// Cost efficiency (tokens per dollar, 0.0 if no cost data).
+    pub cost_efficiency: f64,
+    /// Budget exhaustion rate (spent / budget, 1.0 if uncapped).
+    pub budget_exhaustion_rate: f64,
     /// Number of samples in the evaluation window.
     pub sample_count: u64,
 }
@@ -263,12 +267,25 @@ struct AgentMetricAccumulator {
     error_lines: u64,
     health_checks: u64,
     healthy_checks: u64,
+    /// Total cost observed for this agent (USD).
+    total_cost_usd: f64,
+    /// Total tokens observed for this agent.
+    total_tokens: u64,
+    /// Budget cap for this agent (None = uncapped).
+    budget_cents: Option<u64>,
 }
 
 impl AgentMetricAccumulator {
     fn drift_metrics(&self) -> DriftMetrics {
         if self.total_lines == 0 && self.health_checks == 0 {
-            return DriftMetrics::default();
+            return DriftMetrics {
+                error_rate: 0.0,
+                command_success_rate: 1.0,
+                health_score: 1.0,
+                cost_efficiency: 0.0,
+                budget_exhaustion_rate: 0.0, // No budget exhaustion when no samples
+                sample_count: 0,
+            };
         }
 
         let error_rate = if self.total_lines > 0 {
@@ -289,10 +306,29 @@ impl AgentMetricAccumulator {
             1.0
         };
 
+        // Calculate cost efficiency (tokens per dollar)
+        let cost_efficiency = if self.total_cost_usd > 0.0 {
+            self.total_tokens as f64 / self.total_cost_usd
+        } else {
+            0.0
+        };
+
+        // Calculate budget exhaustion rate
+        // 0.0 = no spend or uncapped, 1.0 = 100% of budget spent
+        let budget_exhaustion_rate = match self.budget_cents {
+            Some(cents) if cents > 0 => {
+                let spent_cents = (self.total_cost_usd * 100.0) as u64;
+                spent_cents as f64 / cents as f64
+            }
+            _ => 0.0, // Uncapped agents have 0 exhaustion (no limit to hit)
+        };
+
         DriftMetrics {
             error_rate,
             command_success_rate,
             health_score,
+            cost_efficiency,
+            budget_exhaustion_rate,
             sample_count: self.total_lines + self.health_checks,
         }
     }
@@ -302,6 +338,9 @@ impl AgentMetricAccumulator {
         self.error_lines = 0;
         self.health_checks = 0;
         self.healthy_checks = 0;
+        self.total_cost_usd = 0.0;
+        self.total_tokens = 0;
+        // budget_cents is preserved during reset
     }
 }
 
@@ -368,6 +407,28 @@ impl NightwatchMonitor {
         }
     }
 
+    /// Feed cost and token usage data into the monitor.
+    /// This enables cost-based drift detection for nightshift decisions.
+    pub fn observe_cost(
+        &mut self,
+        agent_name: &str,
+        cost_usd: f64,
+        input_tokens: u64,
+        output_tokens: u64,
+        budget_cents: Option<u64>,
+    ) {
+        let acc = self
+            .agent_metrics
+            .entry(agent_name.to_string())
+            .or_default();
+        acc.total_cost_usd += cost_usd;
+        acc.total_tokens += input_tokens + output_tokens;
+        // Only update budget if not already set (first call wins)
+        if acc.budget_cents.is_none() {
+            acc.budget_cents = budget_cents;
+        }
+    }
+
     /// Get the next drift alert (async, used in select!).
     pub async fn next_alert(&mut self) -> DriftAlert {
         self.alert_rx
@@ -381,7 +442,7 @@ impl NightwatchMonitor {
         let mut alerts = Vec::new();
         for (name, acc) in &self.agent_metrics {
             let metrics = acc.drift_metrics();
-            let score = Self::calculate_drift(&metrics);
+            let score = self.calculate_drift(&metrics);
             let level = self.classify_drift(score);
             if level > CorrectionLevel::Normal {
                 let action = Self::recommended_action(level, name);
@@ -406,7 +467,7 @@ impl NightwatchMonitor {
     pub fn drift_score(&self, agent_name: &str) -> Option<DriftScore> {
         self.agent_metrics.get(agent_name).map(|acc| {
             let metrics = acc.drift_metrics();
-            let score = Self::calculate_drift(&metrics);
+            let score = self.calculate_drift(&metrics);
             let level = self.classify_drift(score);
             DriftScore {
                 agent_name: agent_name.to_string(),
@@ -423,7 +484,7 @@ impl NightwatchMonitor {
             .iter()
             .map(|(name, acc)| {
                 let metrics = acc.drift_metrics();
-                let score = Self::calculate_drift(&metrics);
+                let score = self.calculate_drift(&metrics);
                 let level = self.classify_drift(score);
                 DriftScore {
                     agent_name: name.clone(),
@@ -444,20 +505,37 @@ impl NightwatchMonitor {
 
     /// Calculate drift as weighted average of metric deviations.
     /// Returns 0.0 when no samples have been collected.
-    fn calculate_drift(metrics: &DriftMetrics) -> f64 {
+    /// Includes budget exhaustion in calculation - agents near budget limits
+    /// are flagged for potential replacement (nightshift consideration).
+    /// Weights are configurable via NightwatchConfig.
+    fn calculate_drift(&self, metrics: &DriftMetrics) -> f64 {
         if metrics.sample_count == 0 {
             return 0.0;
         }
 
-        let error_weight = 0.4;
-        let success_weight = 0.3;
-        let health_weight = 0.3;
+        // Use configurable weights from config
+        let error_weight = self.config.error_weight;
+        let success_weight = self.config.success_weight;
+        let health_weight = self.config.health_weight;
+        let budget_weight = self.config.budget_weight;
 
         let error_drift = metrics.error_rate;
         let success_drift = 1.0 - metrics.command_success_rate;
         let health_drift = 1.0 - metrics.health_score;
 
-        error_weight * error_drift + success_weight * success_drift + health_weight * health_drift
+        // Budget exhaustion contributes to drift when near/exceeding limits
+        // >80% budget usage starts contributing significantly
+        // Uncapped agents have budget_exhaustion_rate = 0.0 (no limit to exhaust)
+        let budget_drift = if metrics.budget_exhaustion_rate > 0.8 {
+            (metrics.budget_exhaustion_rate - 0.8) * 5.0 // Scale 0.8-1.0 to 0.0-1.0
+        } else {
+            0.0
+        };
+
+        error_weight * error_drift
+            + success_weight * success_drift
+            + health_weight * health_drift
+            + budget_weight * budget_drift
     }
 
     /// Classify a drift score into a correction level.
@@ -613,9 +691,10 @@ mod tests {
         monitor.observe_health("agent-b", HealthStatus::Healthy);
 
         let ds = monitor.drift_score("agent-b").unwrap();
-        // error_rate=0.15, success=0.85, health=1.0
-        // drift = 0.4*0.15 + 0.3*0.15 + 0.3*0.0 = 0.105
-        assert_eq!(ds.level, CorrectionLevel::Minor);
+        // error_rate=0.15, success=0.85, health=1.0, budget=0.0
+        // drift = 0.35*0.15 + 0.25*0.15 + 0.20*0.0 + 0.20*0.0 = 0.09
+        // With new weights, 0.09 is just below minor threshold (0.10)
+        assert_eq!(ds.level, CorrectionLevel::Normal);
     }
 
     #[test]
@@ -631,9 +710,10 @@ mod tests {
         monitor.observe_health("agent-c", HealthStatus::Healthy);
 
         let ds = monitor.drift_score("agent-c").unwrap();
-        // error_rate=0.30, success=0.70, health=1.0
-        // drift = 0.4*0.30 + 0.3*0.30 + 0.3*0.0 = 0.21
-        assert_eq!(ds.level, CorrectionLevel::Moderate);
+        // error_rate=0.30, success=0.70, health=1.0, budget=0.0
+        // drift = 0.35*0.30 + 0.25*0.30 + 0.20*0.0 + 0.20*0.0 = 0.18
+        // 0.18 is now Minor (below moderate threshold of 0.20)
+        assert_eq!(ds.level, CorrectionLevel::Minor);
     }
 
     #[test]
