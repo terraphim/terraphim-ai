@@ -168,3 +168,76 @@ fn search_format_json_compact_emits_parseable_json_contract() -> Result<()> {
     assert_search_output_contract(&json, query, limit);
     Ok(())
 }
+
+#[test]
+#[serial]
+fn search_robot_json_includes_description_and_body_fields() -> Result<()> {
+    let query = "terraphim";
+    let (stdout, stderr, code) = run_agent_command(&["--robot", "search", query, "--limit", "3"])?;
+
+    assert_eq!(
+        code, 0,
+        "search in --robot mode should succeed; stderr={}",
+        stderr
+    );
+
+    let json = parse_first_json_object(&stdout)?;
+    let results = json
+        .get("results")
+        .and_then(Value::as_array)
+        .expect("search output should contain array field 'results'");
+
+    // Verify that description and body fields are accepted by the schema
+    // (they may be null/absent for some documents due to skip_serializing_if)
+    for result in results {
+        let obj = result.as_object().expect("each result should be an object");
+        // description is optional (may be absent due to skip_serializing_if)
+        if let Some(desc) = obj.get("description") {
+            assert!(
+                desc.is_string() || desc.is_null(),
+                "description should be a string or null"
+            );
+        }
+        // body is optional (may be absent due to skip_serializing_if)
+        if let Some(body) = obj.get("body") {
+            assert!(
+                body.is_string() || body.is_null(),
+                "body should be a string or null"
+            );
+        }
+    }
+    Ok(())
+}
+
+#[test]
+#[serial]
+fn search_format_json_compact_produces_single_line_output() -> Result<()> {
+    let query = "terraphim";
+    let (stdout, stderr, code) =
+        run_agent_command(&["--format", "json-compact", "search", query, "--limit", "2"])?;
+
+    assert_eq!(
+        code, 0,
+        "search in --format json-compact mode should succeed; stderr={}",
+        stderr
+    );
+
+    // Find the JSON object in stdout (skip any non-JSON preamble lines)
+    let json_line = stdout
+        .lines()
+        .find(|line| line.trim_start().starts_with('{'))
+        .expect("should find a JSON line in stdout");
+
+    // Compact JSON should be a single line containing the full object
+    let parsed: Value = serde_json::from_str(json_line)
+        .expect("compact JSON output should be parseable from a single line");
+    assert!(
+        parsed.get("query").is_some(),
+        "compact JSON should contain query field"
+    );
+    assert!(
+        parsed.get("results").is_some(),
+        "compact JSON should contain results field"
+    );
+    Ok(())
+}

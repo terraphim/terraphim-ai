@@ -6,6 +6,7 @@
 
 use std::fs;
 use std::path::PathBuf;
+use std::sync::OnceLock;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use chrono::{DateTime, Utc};
@@ -92,6 +93,77 @@ impl std::str::FromStr for CorrectionType {
     }
 }
 
+/// Importance score for a captured learning.
+///
+/// Helps prioritize learnings for review and surface the most
+/// impactful patterns. The `total` field is a weighted sum of
+/// the individual factors.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImportanceScore {
+    /// Severity based on exit code (0.0-1.0).
+    /// Higher exit codes and signals map to higher severity.
+    pub error_severity: f64,
+    /// Number of times a similar error has been observed.
+    pub repetition_count: u32,
+    /// Recency factor (0.0-1.0). 1.0 = just captured, decays over time.
+    pub recency: f64,
+    /// Whether a user has provided a correction for this error pattern.
+    pub has_correction: bool,
+    /// Weighted composite score.
+    pub total: f64,
+}
+
+impl ImportanceScore {
+    /// Calculate importance from individual factors.
+    ///
+    /// Weights:
+    ///   error_severity  * 0.3
+    ///   repetition      * 0.3  (capped contribution at repetition_count=10)
+    ///   recency         * 0.2
+    ///   has_correction  * 0.2
+    pub fn calculate(
+        exit_code: i32,
+        repetition_count: u32,
+        recency: f64,
+        has_correction: bool,
+    ) -> Self {
+        let error_severity = Self::severity_from_exit_code(exit_code);
+        let rep_factor = (repetition_count as f64 / 10.0).min(1.0);
+        let correction_factor = if has_correction { 1.0 } else { 0.0 };
+
+        let total =
+            error_severity * 0.3 + rep_factor * 0.3 + recency * 0.2 + correction_factor * 0.2;
+
+        Self {
+            error_severity,
+            repetition_count,
+            recency,
+            has_correction,
+            total,
+        }
+    }
+
+    /// Map exit code to a severity in 0.0-1.0.
+    ///
+    /// - 0        => 0.0 (success, should not appear)
+    /// - 1        => 0.3 (generic failure)
+    /// - 2        => 0.4 (misuse)
+    /// - 126..=127 => 0.6 (cannot execute / not found)
+    /// - 128+     => 0.8 (killed by signal)
+    /// - negative => 1.0 (abnormal)
+    fn severity_from_exit_code(code: i32) -> f64 {
+        match code {
+            0 => 0.0,
+            1 => 0.3,
+            2 => 0.4,
+            3..=125 => 0.5,
+            126..=127 => 0.6,
+            128.. => 0.8,
+            _ => 1.0, // negative
+        }
+    }
+}
+
 /// Context information for a captured learning.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LearningContext {
@@ -141,6 +213,11 @@ pub struct CapturedLearning {
     pub context: LearningContext,
     /// Tags for categorization
     pub tags: Vec<String>,
+    /// Knowledge graph entities matched in the command/error text
+    pub entities: Vec<String>,
+    /// Importance score (None for backward compatibility with older files)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub importance: Option<ImportanceScore>,
 }
 
 impl CapturedLearning {
@@ -164,6 +241,8 @@ impl CapturedLearning {
             source,
             context: LearningContext::default(),
             tags: Vec::new(),
+            entities: Vec::new(),
+            importance: None,
         }
     }
 
@@ -184,6 +263,18 @@ impl CapturedLearning {
     /// Add tags.
     pub fn with_tags(mut self, tags: Vec<String>) -> Self {
         self.tags = tags;
+        self
+    }
+
+    /// Set knowledge graph entities.
+    pub fn with_entities(mut self, entities: Vec<String>) -> Self {
+        self.entities = entities;
+        self
+    }
+
+    /// Set importance score.
+    pub fn with_importance(mut self, importance: ImportanceScore) -> Self {
+        self.importance = Some(importance);
         self
     }
 
@@ -220,6 +311,27 @@ impl CapturedLearning {
             for tag in &self.tags {
                 md.push_str(&format!("  - {}\n", tag));
             }
+        }
+
+        if !self.entities.is_empty() {
+            md.push_str("entities:\n");
+            for entity in &self.entities {
+                md.push_str(&format!("  - {}\n", entity));
+            }
+        }
+
+        if let Some(ref imp) = self.importance {
+            md.push_str(&format!("importance_total: {:.4}\n", imp.total));
+            md.push_str(&format!("importance_severity: {:.4}\n", imp.error_severity));
+            md.push_str(&format!(
+                "importance_repetition: {}\n",
+                imp.repetition_count
+            ));
+            md.push_str(&format!("importance_recency: {:.4}\n", imp.recency));
+            md.push_str(&format!(
+                "importance_has_correction: {}\n",
+                imp.has_correction
+            ));
         }
 
         md.push_str("---\n\n");
@@ -267,9 +379,31 @@ impl CapturedLearning {
         let full_chain = None;
         let mut correction = None;
         let mut error_output = String::new();
-        let tags = Vec::new();
+        let mut tags = Vec::new();
+        let mut entities = Vec::new();
+        // Importance score fields (optional, for backward compat)
+        let mut imp_total: Option<f64> = None;
+        let mut imp_severity: Option<f64> = None;
+        let mut imp_repetition: Option<u32> = None;
+        let mut imp_recency: Option<f64> = None;
+        let mut imp_has_correction: Option<bool> = None;
+        // Track which list we are currently parsing (tags or entities)
+        let mut current_list: Option<&str> = None;
 
         for line in frontmatter.lines() {
+            let trimmed = line.trim();
+            // Check for YAML list item (e.g., "  - value")
+            if let Some(item) = trimmed.strip_prefix("- ") {
+                match current_list {
+                    Some("tags") => tags.push(item.trim().to_string()),
+                    Some("entities") => entities.push(item.trim().to_string()),
+                    _ => {}
+                }
+                continue;
+            }
+            // Reset current list when we hit a non-list line
+            current_list = None;
+
             if let Some((key, value)) = line.split_once(':') {
                 let key = key.trim();
                 let value = value.trim();
@@ -294,6 +428,13 @@ impl CapturedLearning {
                     "hostname" => hostname = Some(value.to_string()),
                     "failing_subcommand" => failing_subcommand = Some(value.to_string()),
                     "correction" => correction = Some(value.to_string()),
+                    "importance_total" => imp_total = value.parse().ok(),
+                    "importance_severity" => imp_severity = value.parse().ok(),
+                    "importance_repetition" => imp_repetition = value.parse().ok(),
+                    "importance_recency" => imp_recency = value.parse().ok(),
+                    "importance_has_correction" => imp_has_correction = value.parse().ok(),
+                    "tags" => current_list = Some("tags"),
+                    "entities" => current_list = Some("entities"),
                     _ => {}
                 }
             }
@@ -306,6 +447,30 @@ impl CapturedLearning {
                 error_output = after_start[..end].to_string();
             }
         }
+
+        // Reconstruct importance if all fields are present
+        let importance = match (
+            imp_total,
+            imp_severity,
+            imp_repetition,
+            imp_recency,
+            imp_has_correction,
+        ) {
+            (
+                Some(total),
+                Some(error_severity),
+                Some(repetition_count),
+                Some(recency),
+                Some(has_correction),
+            ) => Some(ImportanceScore {
+                error_severity,
+                repetition_count,
+                recency,
+                has_correction,
+                total,
+            }),
+            _ => None,
+        };
 
         Some(Self {
             id,
@@ -323,6 +488,8 @@ impl CapturedLearning {
                 user: None,
             },
             tags,
+            entities,
+            importance,
         })
     }
 }
@@ -541,6 +708,210 @@ fn extract_section_text(body: &str, heading: &str) -> Option<String> {
     if text.is_empty() { None } else { Some(text) }
 }
 
+/// Global cache for the KG thesaurus used by entity annotation.
+/// Built once from `docs/src/kg/*.md` files and reused across captures.
+static KG_THESAURUS: OnceLock<Option<terraphim_types::Thesaurus>> = OnceLock::new();
+
+/// Default KG directory relative to workspace root.
+const DEFAULT_KG_SUBDIR: &str = "docs/src/kg";
+
+/// Synonyms delimiter used in KG markdown files (Logseq format).
+const KG_SYNONYMS_DELIMITER: &str = "::";
+const KG_SYNONYMS_KEYWORD: &str = "synonyms";
+
+/// Build a thesaurus synchronously from KG markdown files.
+///
+/// Reads all `*.md` files in `kg_dir`, extracts the file stem as the concept
+/// name, and parses `synonyms:: a, b, c` lines to populate synonyms.
+pub(crate) fn build_kg_thesaurus_from_dir(
+    kg_dir: &std::path::Path,
+) -> Option<terraphim_types::Thesaurus> {
+    use terraphim_types::{NormalizedTerm, NormalizedTermValue, Thesaurus};
+
+    if !kg_dir.is_dir() {
+        log::debug!(
+            "KG directory does not exist: {:?}, skipping entity annotation",
+            kg_dir
+        );
+        return None;
+    }
+
+    let entries: Vec<_> = match fs::read_dir(kg_dir) {
+        Ok(rd) => rd.flatten().collect(),
+        Err(e) => {
+            log::warn!("Cannot read KG directory {:?}: {}", kg_dir, e);
+            return None;
+        }
+    };
+
+    let mut thesaurus = Thesaurus::new("kg_entities".to_string());
+    let mut concept_id: u64 = 1;
+
+    for entry in entries {
+        let path = entry.path();
+        if path.extension().map(|e| e == "md").unwrap_or(false) {
+            let stem = match path.file_stem() {
+                Some(s) => s.to_string_lossy().to_string(),
+                None => continue,
+            };
+
+            // Read file content to find synonyms lines
+            let content = match fs::read_to_string(&path) {
+                Ok(c) => c,
+                Err(_) => continue,
+            };
+
+            let display_name = stem.clone();
+            let normalized_value = NormalizedTermValue::from(stem.to_lowercase());
+            let nterm = NormalizedTerm::new(concept_id, normalized_value.clone())
+                .with_display_value(display_name.clone());
+
+            // Insert the concept itself
+            thesaurus.insert(normalized_value, nterm.clone());
+
+            // Parse synonyms lines
+            for line in content.lines() {
+                if let Some((keyword, synonyms_str)) = line.split_once(KG_SYNONYMS_DELIMITER) {
+                    let keyword = keyword.trim().to_lowercase();
+                    if keyword != KG_SYNONYMS_KEYWORD {
+                        continue;
+                    }
+                    for synonym in synonyms_str.split(',') {
+                        let synonym = synonym.trim();
+                        if !synonym.is_empty() {
+                            let syn_nterm = NormalizedTerm::new(
+                                concept_id,
+                                NormalizedTermValue::from(stem.to_lowercase()),
+                            )
+                            .with_display_value(display_name.clone());
+                            thesaurus
+                                .insert(NormalizedTermValue::new(synonym.to_string()), syn_nterm);
+                        }
+                    }
+                }
+            }
+
+            concept_id += 1;
+        }
+    }
+
+    if thesaurus.is_empty() {
+        log::debug!("KG thesaurus is empty after building from {:?}", kg_dir);
+        return None;
+    }
+
+    log::info!(
+        "Built KG thesaurus with {} entries from {:?}",
+        thesaurus.len(),
+        kg_dir
+    );
+    Some(thesaurus)
+}
+
+/// Determine the KG directory path.
+///
+/// Tries the current working directory first, then walks up parent directories
+/// looking for `docs/src/kg/`.
+pub(crate) fn find_kg_dir() -> Option<PathBuf> {
+    let cwd = std::env::current_dir().ok()?;
+
+    // Walk up from cwd looking for docs/src/kg
+    let mut dir = cwd.as_path();
+    loop {
+        let candidate = dir.join(DEFAULT_KG_SUBDIR);
+        if candidate.is_dir() {
+            return Some(candidate);
+        }
+        dir = dir.parent()?;
+    }
+}
+
+/// Annotate text with KG entities using Aho-Corasick matching.
+///
+/// Returns a deduplicated list of matched entity display names.
+/// If the KG thesaurus is unavailable, returns an empty Vec (non-blocking).
+pub fn annotate_with_entities(text: &str) -> Vec<String> {
+    let thesaurus_opt = KG_THESAURUS.get_or_init(|| {
+        let kg_dir = find_kg_dir()?;
+        build_kg_thesaurus_from_dir(&kg_dir)
+    });
+
+    let thesaurus = match thesaurus_opt {
+        Some(t) => t.clone(),
+        None => return Vec::new(),
+    };
+
+    match terraphim_automata::matcher::find_matches(text, thesaurus, false) {
+        Ok(matches) => {
+            let mut seen = std::collections::HashSet::new();
+            let mut entities = Vec::new();
+            for m in matches {
+                let display = m.normalized_term.display().to_string();
+                if seen.insert(display.clone()) {
+                    entities.push(display);
+                }
+            }
+            entities
+        }
+        Err(e) => {
+            log::warn!("Entity annotation failed: {}", e);
+            Vec::new()
+        }
+    }
+}
+
+/// Annotate text with entities using a provided thesaurus.
+///
+/// This is useful for testing or when a pre-built thesaurus is available.
+#[allow(dead_code)]
+pub fn annotate_with_thesaurus(text: &str, thesaurus: terraphim_types::Thesaurus) -> Vec<String> {
+    match terraphim_automata::matcher::find_matches(text, thesaurus, false) {
+        Ok(matches) => {
+            let mut seen = std::collections::HashSet::new();
+            let mut entities = Vec::new();
+            for m in matches {
+                let display = m.normalized_term.display().to_string();
+                if seen.insert(display.clone()) {
+                    entities.push(display);
+                }
+            }
+            entities
+        }
+        Err(e) => {
+            log::warn!("Entity annotation failed: {}", e);
+            Vec::new()
+        }
+    }
+}
+
+/// Count how many existing learnings have a similar command.
+///
+/// Two commands are considered similar if they share the same base
+/// executable (first whitespace-delimited token).
+fn count_similar_failures(storage_dir: &PathBuf, command: &str) -> u32 {
+    let base = command.split_whitespace().next().unwrap_or(command);
+    let learnings = match list_learnings(storage_dir, usize::MAX) {
+        Ok(l) => l,
+        Err(_) => return 0,
+    };
+    learnings
+        .iter()
+        .filter(|l| l.command.split_whitespace().next().unwrap_or(&l.command) == base)
+        .count() as u32
+}
+
+/// Check if any existing learning has a correction for a similar command.
+fn has_correction_for_similar(storage_dir: &PathBuf, command: &str) -> bool {
+    let base = command.split_whitespace().next().unwrap_or(command);
+    let learnings = match list_learnings(storage_dir, usize::MAX) {
+        Ok(l) => l,
+        Err(_) => return false,
+    };
+    learnings.iter().any(|l| {
+        l.correction.is_some() && l.command.split_whitespace().next().unwrap_or(&l.command) == base
+    })
+}
+
 /// Capture a failed command as a learning document.
 ///
 /// This function:
@@ -595,6 +966,9 @@ pub fn capture_failed_command(
         LearningSource::Global
     };
 
+    // Annotate with KG entities before moving strings (non-blocking: empty on failure)
+    let annotation_text = format!("{} {}", actual_command, redacted_error);
+
     // Create learning
     let mut learning =
         CapturedLearning::new(actual_command.clone(), redacted_error, exit_code, source);
@@ -602,13 +976,19 @@ pub fn capture_failed_command(
     // Set full chain if different from actual command
     if let Some(ref chain) = full_chain {
         if *chain != actual_command {
-            learning = learning.with_failing_subcommand(actual_command, chain.clone());
+            learning = learning.with_failing_subcommand(actual_command.clone(), chain.clone());
         }
     }
+    let entities = annotate_with_entities(&annotation_text);
+    if !entities.is_empty() {
+        learning = learning.with_entities(entities);
+    }
 
-    // Auto-suggest correction (future: query existing learnings)
-    // For now, this is a placeholder for the auto-suggest feature
-    // TODO: Implement auto-suggest using terraphim_automata::find_matches
+    // Calculate importance score
+    let repetition_count = count_similar_failures(&storage_dir, &actual_command);
+    let has_correction = has_correction_for_similar(&storage_dir, &actual_command);
+    let importance = ImportanceScore::calculate(exit_code, repetition_count, 1.0, has_correction);
+    learning = learning.with_importance(importance);
 
     // Add default tags
     let tags = vec!["learning".to_string(), format!("exit-{}", exit_code)];
@@ -820,6 +1200,7 @@ pub fn correct_learning(
 pub enum LearningEntry {
     Learning(CapturedLearning),
     Correction(CorrectionEvent),
+    Procedure(terraphim_types::procedure::CapturedProcedure),
 }
 
 impl LearningEntry {
@@ -827,6 +1208,7 @@ impl LearningEntry {
         match self {
             LearningEntry::Learning(l) => &l.source,
             LearningEntry::Correction(c) => &c.source,
+            LearningEntry::Procedure(_) => &LearningSource::Global,
         }
     }
 
@@ -835,6 +1217,7 @@ impl LearningEntry {
         match self {
             LearningEntry::Learning(l) => &l.id,
             LearningEntry::Correction(c) => &c.id,
+            LearningEntry::Procedure(p) => &p.id,
         }
     }
 
@@ -842,6 +1225,9 @@ impl LearningEntry {
         match self {
             LearningEntry::Learning(l) => l.context.captured_at,
             LearningEntry::Correction(c) => c.context.captured_at,
+            LearningEntry::Procedure(p) => chrono::DateTime::parse_from_rfc3339(&p.created_at)
+                .map(|dt| dt.with_timezone(&chrono::Utc))
+                .unwrap_or_else(|_| chrono::Utc::now()),
         }
     }
 
@@ -854,6 +1240,22 @@ impl LearningEntry {
             LearningEntry::Correction(c) => {
                 format!("[{}] {} -> {}", c.correction_type, c.original, c.corrected)
             }
+            LearningEntry::Procedure(p) => {
+                format!(
+                    "[proc] {} ({} steps, {:.0}% confidence)",
+                    p.title,
+                    p.step_count(),
+                    p.confidence.score * 100.0
+                )
+            }
+        }
+    }
+
+    /// Knowledge graph entities (only present on Learning entries).
+    pub fn entities(&self) -> &[String] {
+        match self {
+            LearningEntry::Learning(l) => &l.entities,
+            LearningEntry::Correction(_) | LearningEntry::Procedure(_) => &[],
         }
     }
 
@@ -862,6 +1264,15 @@ impl LearningEntry {
         match self {
             LearningEntry::Learning(l) => l.correction.as_deref(),
             LearningEntry::Correction(c) => Some(&c.corrected),
+            LearningEntry::Procedure(_) => None,
+        }
+    }
+
+    /// Importance score (only present on Learning entries with scoring).
+    pub fn importance(&self) -> Option<&ImportanceScore> {
+        match self {
+            LearningEntry::Learning(l) => l.importance.as_ref(),
+            LearningEntry::Correction(_) | LearningEntry::Procedure(_) => None,
         }
     }
 }
@@ -893,7 +1304,46 @@ pub fn list_all_entries(
         }
     }
 
-    entries.sort_by_key(|b| std::cmp::Reverse(b.captured_at()));
+    // Also load procedures from procedures.jsonl if it exists
+    let procedures_path = storage_dir.join("procedures.jsonl");
+    if procedures_path.exists() {
+        if let Ok(content) = fs::read_to_string(&procedures_path) {
+            for line in content.lines() {
+                let line = line.trim();
+                if line.is_empty() {
+                    continue;
+                }
+                if let Ok(proc) =
+                    serde_json::from_str::<terraphim_types::procedure::CapturedProcedure>(line)
+                {
+                    entries.push(LearningEntry::Procedure(proc));
+                }
+            }
+        }
+    }
+
+    // Sort by importance score (descending), then by captured_at (descending).
+    // Entries without importance (corrections, legacy learnings) sort after scored ones.
+    entries.sort_by(|a, b| {
+        let imp_a = match a {
+            LearningEntry::Learning(l) => l.importance.as_ref().map(|i| i.total),
+            _ => None,
+        };
+        let imp_b = match b {
+            LearningEntry::Learning(l) => l.importance.as_ref().map(|i| i.total),
+            _ => None,
+        };
+        // Higher importance first; if equal or both None, more recent first
+        match (imp_b, imp_a) {
+            (Some(ib), Some(ia)) => ib
+                .partial_cmp(&ia)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| b.captured_at().cmp(&a.captured_at())),
+            (Some(_), None) => std::cmp::Ordering::Less,
+            (None, Some(_)) => std::cmp::Ordering::Greater,
+            (None, None) => b.captured_at().cmp(&a.captured_at()),
+        }
+    });
     if entries.len() > limit {
         entries.truncate(limit);
     }
@@ -920,12 +1370,99 @@ pub fn query_all_entries(
                 LearningEntry::Correction(c) => {
                     format!("{} {} {}", c.original, c.corrected, c.context_description)
                 }
+                LearningEntry::Procedure(p) => {
+                    let steps: Vec<&str> = p.steps.iter().map(|s| s.command.as_str()).collect();
+                    format!("{} {} {}", p.title, p.description, steps.join(" "))
+                }
             };
             if exact {
                 text.contains(pattern)
             } else {
                 text.to_lowercase().contains(&pattern_lower)
             }
+        })
+        .collect();
+
+    Ok(filtered)
+}
+
+/// Query all entries by pattern, optionally including entity-based matching.
+///
+/// When `semantic` is true, the query pattern is also matched against
+/// the `entities` field of learning entries using KG annotation.
+pub fn query_all_entries_semantic(
+    storage_dir: &PathBuf,
+    pattern: &str,
+    exact: bool,
+    semantic: bool,
+) -> Result<Vec<LearningEntry>, LearningError> {
+    if !semantic {
+        return query_all_entries(storage_dir, pattern, exact);
+    }
+
+    let all = list_all_entries(storage_dir, usize::MAX)?;
+    let pattern_lower = pattern.to_lowercase();
+
+    // Also annotate the query pattern with entities for semantic matching
+    let query_entities = annotate_with_entities(pattern);
+
+    let filtered: Vec<_> = all
+        .into_iter()
+        .filter(|entry| {
+            // Text-based match (same as non-semantic)
+            let text = match entry {
+                LearningEntry::Learning(l) => {
+                    format!("{} {}", l.command, l.error_output)
+                }
+                LearningEntry::Correction(c) => {
+                    format!("{} {} {}", c.original, c.corrected, c.context_description)
+                }
+                LearningEntry::Procedure(p) => {
+                    let steps: Vec<&str> = p.steps.iter().map(|s| s.command.as_str()).collect();
+                    format!("{} {} {}", p.title, p.description, steps.join(" "))
+                }
+            };
+            let text_match = if exact {
+                text.contains(pattern)
+            } else {
+                text.to_lowercase().contains(&pattern_lower)
+            };
+
+            if text_match {
+                return true;
+            }
+
+            // Entity-based match: check if any entity in the entry matches
+            // the query pattern or the query's own entities
+            let entry_entities = entry.entities();
+            if entry_entities.is_empty() {
+                return false;
+            }
+
+            // Direct pattern match against entity names
+            let entity_text_match = entry_entities.iter().any(|e| {
+                if exact {
+                    e == pattern
+                } else {
+                    e.to_lowercase().contains(&pattern_lower)
+                        || pattern_lower.contains(&e.to_lowercase())
+                }
+            });
+
+            if entity_text_match {
+                return true;
+            }
+
+            // Cross-entity match: query entities overlap with entry entities
+            if !query_entities.is_empty() {
+                let entry_entity_set: std::collections::HashSet<String> =
+                    entry_entities.iter().map(|e| e.to_lowercase()).collect();
+                return query_entities
+                    .iter()
+                    .any(|qe| entry_entity_set.contains(&qe.to_lowercase()));
+            }
+
+            false
         })
         .collect();
 
@@ -943,6 +1480,9 @@ fn score_entry_relevance(entry: &LearningEntry, context_keywords: &[String]) -> 
         }
         LearningEntry::Correction(c) => {
             format!("{} {} {}", c.original, c.corrected, c.context_description)
+        }
+        LearningEntry::Procedure(p) => {
+            format!("{} {}", p.title, p.description)
         }
     }
     .to_lowercase();
@@ -975,6 +1515,9 @@ impl ScoredEntry {
                     "[{}] {} -> {} - {}",
                     c.correction_type, c.original, c.corrected, c.id
                 )
+            }
+            LearningEntry::Procedure(p) => {
+                format!("[proc] {} ({} steps) - {}", p.title, p.step_count(), p.id)
             }
         }
     }
@@ -1796,5 +2339,378 @@ mod tests {
         let corrections = auto_extract_corrections(&transcript_path).unwrap();
         // No corrections since all commands succeeded
         assert!(corrections.is_empty());
+    }
+
+    #[test]
+    fn test_annotate_with_thesaurus_finds_entities() {
+        use terraphim_types::{NormalizedTerm, NormalizedTermValue, Thesaurus};
+
+        let mut thesaurus = Thesaurus::new("test_kg".to_string());
+
+        // Add "bun" concept with synonym "npm"
+        let bun_term = NormalizedTerm::new(1, NormalizedTermValue::from("bun"))
+            .with_display_value("bun".to_string());
+        thesaurus.insert(NormalizedTermValue::from("bun"), bun_term.clone());
+        thesaurus.insert(NormalizedTermValue::from("npm"), bun_term);
+
+        // Add "cargo" concept
+        let cargo_term = NormalizedTerm::new(2, NormalizedTermValue::from("cargo"))
+            .with_display_value("cargo".to_string());
+        thesaurus.insert(NormalizedTermValue::from("cargo"), cargo_term);
+
+        let entities =
+            annotate_with_thesaurus("npm install failed, try cargo build instead", thesaurus);
+
+        assert!(!entities.is_empty(), "Should find at least one entity");
+        assert!(
+            entities.contains(&"bun".to_string()),
+            "Should find 'bun' entity (via 'npm' synonym). Found: {:?}",
+            entities
+        );
+        assert!(
+            entities.contains(&"cargo".to_string()),
+            "Should find 'cargo' entity. Found: {:?}",
+            entities
+        );
+    }
+
+    #[test]
+    fn test_annotate_with_thesaurus_deduplicates() {
+        use terraphim_types::{NormalizedTerm, NormalizedTermValue, Thesaurus};
+
+        let mut thesaurus = Thesaurus::new("test_kg".to_string());
+        let term = NormalizedTerm::new(1, NormalizedTermValue::from("rust"))
+            .with_display_value("rust".to_string());
+        thesaurus.insert(NormalizedTermValue::from("rust"), term);
+
+        // Text mentions "rust" twice
+        let entities = annotate_with_thesaurus("rust is great, rust is fast", thesaurus);
+
+        // Should only appear once
+        assert_eq!(
+            entities.len(),
+            1,
+            "Should deduplicate entities. Found: {:?}",
+            entities
+        );
+        assert_eq!(entities[0], "rust");
+    }
+
+    #[test]
+    fn test_annotate_with_empty_thesaurus() {
+        let thesaurus = terraphim_types::Thesaurus::new("empty".to_string());
+        let entities = annotate_with_thesaurus("some text", thesaurus);
+        assert!(entities.is_empty());
+    }
+
+    #[test]
+    fn test_captured_learning_entities_roundtrip() {
+        let learning = CapturedLearning::new(
+            "npm install".to_string(),
+            "EACCES: permission denied".to_string(),
+            1,
+            LearningSource::Project,
+        )
+        .with_entities(vec!["bun".to_string(), "npm_install".to_string()]);
+
+        let md = learning.to_markdown();
+        assert!(
+            md.contains("entities:"),
+            "Markdown should contain entities section"
+        );
+        assert!(md.contains("  - bun"), "Markdown should contain bun entity");
+        assert!(
+            md.contains("  - npm_install"),
+            "Markdown should contain npm_install entity"
+        );
+
+        let parsed = CapturedLearning::from_markdown(&md).unwrap();
+        assert_eq!(
+            parsed.entities.len(),
+            2,
+            "Parsed entities should have 2 items"
+        );
+        assert_eq!(parsed.entities[0], "bun");
+        assert_eq!(parsed.entities[1], "npm_install");
+    }
+
+    #[test]
+    fn test_captured_learning_no_entities_backward_compat() {
+        // Simulate a legacy markdown file without entities field
+        let md = "---\n\
+                   id: test-123\n\
+                   command: git push\n\
+                   exit_code: 1\n\
+                   source: Project\n\
+                   captured_at: 2025-01-01T00:00:00+00:00\n\
+                   working_dir: /tmp\n\
+                   ---\n\n\
+                   ## Command\n\n\
+                   `git push`\n\n\
+                   ## Error Output\n\n\
+                   ```\nremote: rejected\n```\n";
+
+        let parsed = CapturedLearning::from_markdown(md).unwrap();
+        assert!(
+            parsed.entities.is_empty(),
+            "Legacy files without entities should parse with empty entities"
+        );
+    }
+
+    #[test]
+    fn test_semantic_query_matches_by_entity() {
+        let temp_dir = TempDir::new().unwrap();
+        let storage = temp_dir.path().join("learnings");
+        fs::create_dir(&storage).unwrap();
+
+        // Create a learning with entities
+        let learning = CapturedLearning::new(
+            "some-obscure-command".to_string(),
+            "failed to connect".to_string(),
+            1,
+            LearningSource::Project,
+        )
+        .with_entities(vec!["docker".to_string(), "networking".to_string()])
+        .with_tags(vec!["learning".to_string()]);
+
+        fs::write(
+            storage.join("learning-entity-test.md"),
+            learning.to_markdown(),
+        )
+        .unwrap();
+
+        // Regular query should not find it by entity name
+        let regular = query_all_entries(&storage, "docker", false).unwrap();
+        assert!(
+            regular.is_empty(),
+            "Regular query should not match on entity name alone"
+        );
+
+        // Semantic query should find it via entity match
+        let semantic = query_all_entries_semantic(&storage, "docker", false, true).unwrap();
+        assert_eq!(
+            semantic.len(),
+            1,
+            "Semantic query should find entry by entity name"
+        );
+    }
+
+    #[test]
+    fn test_learning_entry_entities_accessor() {
+        let learning = CapturedLearning::new(
+            "cmd".to_string(),
+            "err".to_string(),
+            1,
+            LearningSource::Project,
+        )
+        .with_entities(vec!["entity1".to_string()]);
+
+        let entry = LearningEntry::Learning(learning);
+        assert_eq!(entry.entities(), &["entity1".to_string()]);
+
+        // Correction entries have no entities
+        let correction = CorrectionEvent::new(
+            CorrectionType::Naming,
+            "old".to_string(),
+            "new".to_string(),
+            "ctx".to_string(),
+            LearningSource::Project,
+        );
+        let entry2 = LearningEntry::Correction(correction);
+        assert!(entry2.entities().is_empty());
+    }
+
+    #[test]
+    fn test_importance_score_calculate_basic() {
+        let score = ImportanceScore::calculate(1, 0, 1.0, false);
+        // exit_code 1 => severity 0.3
+        // repetition 0 => factor 0.0
+        // recency 1.0
+        // no correction
+        // total = 0.3*0.3 + 0.0*0.3 + 1.0*0.2 + 0.0*0.2 = 0.09 + 0 + 0.2 + 0 = 0.29
+        assert!((score.total - 0.29).abs() < 0.001);
+        assert_eq!(score.repetition_count, 0);
+        assert!(!score.has_correction);
+    }
+
+    #[test]
+    fn test_importance_score_severity_levels() {
+        // exit 0 => 0.0
+        assert!((ImportanceScore::calculate(0, 0, 0.0, false).error_severity).abs() < 0.001);
+        // exit 1 => 0.3
+        assert!((ImportanceScore::calculate(1, 0, 0.0, false).error_severity - 0.3).abs() < 0.001);
+        // exit 2 => 0.4
+        assert!((ImportanceScore::calculate(2, 0, 0.0, false).error_severity - 0.4).abs() < 0.001);
+        // exit 127 => 0.6 (command not found)
+        assert!(
+            (ImportanceScore::calculate(127, 0, 0.0, false).error_severity - 0.6).abs() < 0.001
+        );
+        // exit 137 => 0.8 (killed by signal)
+        assert!(
+            (ImportanceScore::calculate(137, 0, 0.0, false).error_severity - 0.8).abs() < 0.001
+        );
+        // exit -1 => 1.0 (abnormal)
+        assert!((ImportanceScore::calculate(-1, 0, 0.0, false).error_severity - 1.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_importance_score_repetition_increases_total() {
+        let score_0 = ImportanceScore::calculate(1, 0, 1.0, false);
+        let score_5 = ImportanceScore::calculate(1, 5, 1.0, false);
+        let score_10 = ImportanceScore::calculate(1, 10, 1.0, false);
+        let score_20 = ImportanceScore::calculate(1, 20, 1.0, false);
+
+        assert!(score_5.total > score_0.total);
+        assert!(score_10.total > score_5.total);
+        // Capped at 10 repetitions
+        assert!((score_20.total - score_10.total).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_importance_score_correction_increases_total() {
+        let without = ImportanceScore::calculate(1, 0, 1.0, false);
+        let with = ImportanceScore::calculate(1, 0, 1.0, true);
+        assert!(with.total > without.total);
+        assert!((with.total - without.total - 0.2).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_importance_roundtrip_via_markdown() {
+        let learning = CapturedLearning::new(
+            "bad-cmd".to_string(),
+            "not found".to_string(),
+            127,
+            LearningSource::Project,
+        )
+        .with_importance(ImportanceScore::calculate(127, 3, 0.8, true));
+
+        let md = learning.to_markdown();
+        let parsed = CapturedLearning::from_markdown(&md).unwrap();
+
+        let imp = parsed
+            .importance
+            .expect("importance should survive roundtrip");
+        assert!((imp.error_severity - 0.6).abs() < 0.001);
+        assert_eq!(imp.repetition_count, 3);
+        assert!((imp.recency - 0.8).abs() < 0.001);
+        assert!(imp.has_correction);
+        assert!(imp.total > 0.0);
+    }
+
+    #[test]
+    fn test_importance_backward_compat_missing_fields() {
+        // Old-format markdown without importance fields
+        let md = "---\nid: test-123\ncommand: old-cmd\nexit_code: 1\nsource: Project\n---\n\n## Command\n\n`old-cmd`\n\n## Error Output\n\n```\nsome error\n```\n";
+        let parsed = CapturedLearning::from_markdown(md).unwrap();
+        assert!(parsed.importance.is_none());
+    }
+
+    #[test]
+    fn test_capture_failed_command_sets_importance() {
+        let temp_dir = TempDir::new().unwrap();
+        let config = LearningCaptureConfig::new(
+            temp_dir.path().join("learnings"),
+            temp_dir.path().join("global"),
+        );
+
+        let path =
+            capture_failed_command("git push --force", "remote: rejected", 1, &config).unwrap();
+        let content = fs::read_to_string(&path).unwrap();
+        let learning = CapturedLearning::from_markdown(&content).unwrap();
+
+        let imp = learning
+            .importance
+            .expect("capture should set importance score");
+        assert_eq!(imp.repetition_count, 0); // first time
+        assert!((imp.recency - 1.0).abs() < 0.001); // just captured
+        assert!(!imp.has_correction);
+    }
+
+    #[test]
+    fn test_capture_failed_command_increments_repetition() {
+        let temp_dir = TempDir::new().unwrap();
+        let config = LearningCaptureConfig::new(
+            temp_dir.path().join("learnings"),
+            temp_dir.path().join("global"),
+        );
+
+        // First capture
+        capture_failed_command("git push --force", "rejected", 1, &config).unwrap();
+
+        // Second capture of same base command
+        let path2 =
+            capture_failed_command("git push origin main", "rejected again", 1, &config).unwrap();
+        let content2 = fs::read_to_string(&path2).unwrap();
+        let learning2 = CapturedLearning::from_markdown(&content2).unwrap();
+
+        let imp2 = learning2.importance.expect("should have importance");
+        assert_eq!(imp2.repetition_count, 1); // one previous failure
+    }
+
+    #[test]
+    fn test_list_all_entries_sorts_by_importance() {
+        let temp_dir = TempDir::new().unwrap();
+        let storage = temp_dir.path().join("learnings");
+        fs::create_dir(&storage).unwrap();
+
+        // Create a low-importance learning (exit 1, no repetitions)
+        let low = CapturedLearning::new(
+            "cmd-low".to_string(),
+            "minor error".to_string(),
+            1,
+            LearningSource::Project,
+        )
+        .with_importance(ImportanceScore::calculate(1, 0, 0.5, false));
+
+        // Create a high-importance learning (exit 137, repeated, has correction)
+        let high = CapturedLearning::new(
+            "cmd-high".to_string(),
+            "killed".to_string(),
+            137,
+            LearningSource::Project,
+        )
+        .with_importance(ImportanceScore::calculate(137, 5, 1.0, true));
+
+        fs::write(storage.join("learning-low.md"), low.to_markdown()).unwrap();
+        fs::write(storage.join("learning-high.md"), high.to_markdown()).unwrap();
+
+        let entries = list_all_entries(&storage, 10).unwrap();
+        assert_eq!(entries.len(), 2);
+
+        // High importance should come first
+        match &entries[0] {
+            LearningEntry::Learning(l) => assert_eq!(l.command, "cmd-high"),
+            _ => panic!("Expected learning entry"),
+        }
+        match &entries[1] {
+            LearningEntry::Learning(l) => assert_eq!(l.command, "cmd-low"),
+            _ => panic!("Expected learning entry"),
+        }
+    }
+
+    #[test]
+    fn test_learning_entry_importance_accessor() {
+        let learning = CapturedLearning::new(
+            "cmd".to_string(),
+            "err".to_string(),
+            1,
+            LearningSource::Project,
+        )
+        .with_importance(ImportanceScore::calculate(1, 2, 0.9, false));
+
+        let entry = LearningEntry::Learning(learning);
+        let imp = entry.importance().expect("should have importance");
+        assert_eq!(imp.repetition_count, 2);
+
+        // Correction entries have no importance
+        let correction = CorrectionEvent::new(
+            CorrectionType::Naming,
+            "old".to_string(),
+            "new".to_string(),
+            "ctx".to_string(),
+            LearningSource::Project,
+        );
+        let entry2 = LearningEntry::Correction(correction);
+        assert!(entry2.importance().is_none());
     }
 }
