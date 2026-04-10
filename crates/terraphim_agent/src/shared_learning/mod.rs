@@ -23,5 +23,5 @@ mod types;
 mod wiki_sync;
 
 pub use store::{SharedLearningStore, StoreConfig};
-pub use types::{SharedLearning, TrustLevel};
+pub use types::{LearningSource as SharedLearningSource, SharedLearning, TrustLevel};
 pub use wiki_sync::{GiteaWikiClient, WikiSyncError};
