@@ -43,6 +43,8 @@ pub use capture::{
     CapturedLearning, ImportanceScore, LearningContext, LearningError, annotate_with_entities,
     annotate_with_thesaurus, query_all_entries,
 };
+// Re-export KG thesaurus building utilities for use by hook validation pipeline
+pub(crate) use capture::{build_kg_thesaurus_from_dir, find_kg_dir};
 
 #[allow(unused_imports)]
 pub use redaction::redact_secrets;
