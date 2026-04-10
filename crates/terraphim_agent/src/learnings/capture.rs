@@ -1200,6 +1200,7 @@ pub fn correct_learning(
 pub enum LearningEntry {
     Learning(CapturedLearning),
     Correction(CorrectionEvent),
+    Procedure(terraphim_types::procedure::CapturedProcedure),
 }
 
 impl LearningEntry {
@@ -1207,6 +1208,7 @@ impl LearningEntry {
         match self {
             LearningEntry::Learning(l) => &l.source,
             LearningEntry::Correction(c) => &c.source,
+            LearningEntry::Procedure(_) => &LearningSource::Global,
         }
     }
 
@@ -1215,6 +1217,7 @@ impl LearningEntry {
         match self {
             LearningEntry::Learning(l) => &l.id,
             LearningEntry::Correction(c) => &c.id,
+            LearningEntry::Procedure(p) => &p.id,
         }
     }
 
@@ -1222,6 +1225,9 @@ impl LearningEntry {
         match self {
             LearningEntry::Learning(l) => l.context.captured_at,
             LearningEntry::Correction(c) => c.context.captured_at,
+            LearningEntry::Procedure(p) => chrono::DateTime::parse_from_rfc3339(&p.created_at)
+                .map(|dt| dt.with_timezone(&chrono::Utc))
+                .unwrap_or_else(|_| chrono::Utc::now()),
         }
     }
 
@@ -1234,6 +1240,14 @@ impl LearningEntry {
             LearningEntry::Correction(c) => {
                 format!("[{}] {} -> {}", c.correction_type, c.original, c.corrected)
             }
+            LearningEntry::Procedure(p) => {
+                format!(
+                    "[proc] {} ({} steps, {:.0}% confidence)",
+                    p.title,
+                    p.step_count(),
+                    p.confidence.score * 100.0
+                )
+            }
         }
     }
 
@@ -1241,7 +1255,7 @@ impl LearningEntry {
     pub fn entities(&self) -> &[String] {
         match self {
             LearningEntry::Learning(l) => &l.entities,
-            LearningEntry::Correction(_) => &[],
+            LearningEntry::Correction(_) | LearningEntry::Procedure(_) => &[],
         }
     }
 
@@ -1250,6 +1264,7 @@ impl LearningEntry {
         match self {
             LearningEntry::Learning(l) => l.correction.as_deref(),
             LearningEntry::Correction(c) => Some(&c.corrected),
+            LearningEntry::Procedure(_) => None,
         }
     }
 
@@ -1257,7 +1272,7 @@ impl LearningEntry {
     pub fn importance(&self) -> Option<&ImportanceScore> {
         match self {
             LearningEntry::Learning(l) => l.importance.as_ref(),
-            LearningEntry::Correction(_) => None,
+            LearningEntry::Correction(_) | LearningEntry::Procedure(_) => None,
         }
     }
 }
@@ -1284,6 +1299,24 @@ pub fn list_all_entries(
                     }
                 } else if let Some(learning) = CapturedLearning::from_markdown(&content) {
                     entries.push(LearningEntry::Learning(learning));
+                }
+            }
+        }
+    }
+
+    // Also load procedures from procedures.jsonl if it exists
+    let procedures_path = storage_dir.join("procedures.jsonl");
+    if procedures_path.exists() {
+        if let Ok(content) = fs::read_to_string(&procedures_path) {
+            for line in content.lines() {
+                let line = line.trim();
+                if line.is_empty() {
+                    continue;
+                }
+                if let Ok(proc) =
+                    serde_json::from_str::<terraphim_types::procedure::CapturedProcedure>(line)
+                {
+                    entries.push(LearningEntry::Procedure(proc));
                 }
             }
         }
@@ -1337,6 +1370,10 @@ pub fn query_all_entries(
                 LearningEntry::Correction(c) => {
                     format!("{} {} {}", c.original, c.corrected, c.context_description)
                 }
+                LearningEntry::Procedure(p) => {
+                    let steps: Vec<&str> = p.steps.iter().map(|s| s.command.as_str()).collect();
+                    format!("{} {} {}", p.title, p.description, steps.join(" "))
+                }
             };
             if exact {
                 text.contains(pattern)
@@ -1379,6 +1416,10 @@ pub fn query_all_entries_semantic(
                 }
                 LearningEntry::Correction(c) => {
                     format!("{} {} {}", c.original, c.corrected, c.context_description)
+                }
+                LearningEntry::Procedure(p) => {
+                    let steps: Vec<&str> = p.steps.iter().map(|s| s.command.as_str()).collect();
+                    format!("{} {} {}", p.title, p.description, steps.join(" "))
                 }
             };
             let text_match = if exact {
@@ -1440,6 +1481,9 @@ fn score_entry_relevance(entry: &LearningEntry, context_keywords: &[String]) -> 
         LearningEntry::Correction(c) => {
             format!("{} {} {}", c.original, c.corrected, c.context_description)
         }
+        LearningEntry::Procedure(p) => {
+            format!("{} {}", p.title, p.description)
+        }
     }
     .to_lowercase();
 
@@ -1471,6 +1515,9 @@ impl ScoredEntry {
                     "[{}] {} -> {} - {}",
                     c.correction_type, c.original, c.corrected, c.id
                 )
+            }
+            LearningEntry::Procedure(p) => {
+                format!("[proc] {} ({} steps) - {}", p.title, p.step_count(), p.id)
             }
         }
     }
