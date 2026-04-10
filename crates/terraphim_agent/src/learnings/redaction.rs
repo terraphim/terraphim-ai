@@ -103,7 +103,6 @@ fn strip_env_vars(text: &str) -> String {
 /// Check if text contains potential secrets.
 ///
 /// This is a quick check that can be used before capture to warn users.
-#[allow(dead_code)]
 pub fn contains_secrets(text: &str) -> bool {
     // Check for common secret patterns
     let patterns = [
