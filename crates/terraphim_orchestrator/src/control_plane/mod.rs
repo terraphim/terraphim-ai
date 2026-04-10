@@ -16,6 +16,7 @@ pub mod output_parser;
 pub mod policy;
 pub mod routing;
 pub mod telemetry;
+pub mod telemetry_persist;
 
 pub use routing::{DispatchContext, RouteCandidate, RoutingDecision, RoutingDecisionEngine};
-pub use telemetry::{CompletionEvent, TelemetryStore};
+pub use telemetry::{CompletionEvent, TelemetryStore, TelemetrySummary};
