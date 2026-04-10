@@ -26,7 +26,7 @@
 pub(crate) mod capture;
 mod hook;
 mod install;
-mod procedure;
+pub(crate) mod procedure;
 pub(crate) mod redaction;
 mod replay;
 

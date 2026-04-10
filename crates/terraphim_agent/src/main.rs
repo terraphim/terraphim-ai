@@ -917,6 +917,15 @@ enum ProcedureSub {
         /// Procedure ID
         id: String,
     },
+    /// Auto-capture a procedure from a session's Bash commands
+    #[cfg(feature = "repl-sessions")]
+    FromSession {
+        /// Session ID to extract commands from
+        session_id: String,
+        /// Optional title (auto-generated from first command if not provided)
+        #[arg(long)]
+        title: Option<String>,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -2508,6 +2517,55 @@ async fn run_learn_command(sub: LearnSub) -> Result<()> {
                     store.set_disabled(&id, true)?;
                     println!("Procedure '{}' disabled.", id);
                     Ok(())
+                }
+                #[cfg(feature = "repl-sessions")]
+                ProcedureSub::FromSession { session_id, title } => {
+                    use terraphim_sessions::SessionService;
+
+                    let service = SessionService::new();
+
+                    // Load cached sessions from disk
+                    let cache_path = get_session_cache_path();
+                    if cache_path.exists() {
+                        if let Ok(data) = std::fs::read_to_string(&cache_path) {
+                            if let Ok(cached) =
+                                serde_json::from_str::<Vec<terraphim_sessions::Session>>(&data)
+                            {
+                                service.load_sessions(cached).await;
+                            }
+                        }
+                    }
+
+                    let session = service.get_session(&session_id).await;
+                    match session {
+                        Some(sess) => {
+                            let commands =
+                                learnings::procedure::extract_bash_commands_from_session(&sess);
+                            if commands.is_empty() {
+                                println!("No Bash commands found in session '{}'.", session_id);
+                                return Ok(());
+                            }
+                            let total_cmds = commands.len();
+                            let mut procedure =
+                                learnings::procedure::from_session_commands(commands, title);
+                            procedure.source_session = Some(session_id.clone());
+                            let step_count = procedure.step_count();
+
+                            let saved = store.save_with_dedup(procedure)?;
+                            println!(
+                                "Created procedure '{}' (ID: {}) with {} steps from {} commands.",
+                                saved.title, saved.id, step_count, total_cmds
+                            );
+                            Ok(())
+                        }
+                        None => {
+                            eprintln!(
+                                "Session '{}' not found. Try running 'sessions list' first to import sessions.",
+                                session_id
+                            );
+                            std::process::exit(1);
+                        }
+                    }
                 }
             }
         }
