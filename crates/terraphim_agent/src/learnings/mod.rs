@@ -28,7 +28,7 @@ mod hook;
 mod install;
 #[cfg(test)]
 mod procedure;
-mod redaction;
+pub(crate) mod redaction;
 
 pub use capture::{
     CorrectionType, LearningSource, capture_correction, capture_failed_command, correct_learning,
