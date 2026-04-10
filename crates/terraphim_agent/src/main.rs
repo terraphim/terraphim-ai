@@ -486,6 +486,10 @@ struct SearchDocumentOutput {
     title: String,
     url: String,
     rank: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    body: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -1216,13 +1220,42 @@ async fn run_offline_command(
                             title: doc.title.clone(),
                             url: doc.url.clone(),
                             rank: doc.rank,
+                            description: doc.description.clone(),
+                            body: if doc.body.is_empty() {
+                                None
+                            } else {
+                                Some(doc.body.clone())
+                            },
                         })
                         .collect(),
                 };
                 print_json_output(&payload, output.mode)?;
             } else {
                 for doc in results.iter() {
-                    println!("- {}\t{}", doc.rank.unwrap_or_default(), doc.title);
+                    let snippet = doc
+                        .description
+                        .as_deref()
+                        .or(if doc.body.is_empty() {
+                            None
+                        } else {
+                            Some(doc.body.as_str())
+                        })
+                        .map(|s| {
+                            let trimmed = s.trim();
+                            if trimmed.len() > 120 {
+                                format!("{}...", &trimmed[..120])
+                            } else {
+                                trimmed.to_string()
+                            }
+                        });
+                    println!("[{}] {}", doc.rank.unwrap_or_default(), doc.title);
+                    if !doc.url.is_empty() {
+                        println!("    {}", doc.url);
+                    }
+                    if let Some(snip) = snippet {
+                        println!("    {}", snip);
+                    }
+                    println!();
                 }
             }
             Ok(())
@@ -2195,13 +2228,42 @@ async fn run_server_command(
                             title: doc.title.clone(),
                             url: doc.url.clone(),
                             rank: doc.rank,
+                            description: doc.description.clone(),
+                            body: if doc.body.is_empty() {
+                                None
+                            } else {
+                                Some(doc.body.clone())
+                            },
                         })
                         .collect(),
                 };
                 print_json_output(&payload, output.mode)?;
             } else {
                 for doc in res.results.iter() {
-                    println!("- {}\t{}", doc.rank.unwrap_or_default(), doc.title);
+                    let snippet = doc
+                        .description
+                        .as_deref()
+                        .or(if doc.body.is_empty() {
+                            None
+                        } else {
+                            Some(doc.body.as_str())
+                        })
+                        .map(|s| {
+                            let trimmed = s.trim();
+                            if trimmed.len() > 120 {
+                                format!("{}...", &trimmed[..120])
+                            } else {
+                                trimmed.to_string()
+                            }
+                        });
+                    println!("[{}] {}", doc.rank.unwrap_or_default(), doc.title);
+                    if !doc.url.is_empty() {
+                        println!("    {}", doc.url);
+                    }
+                    if let Some(snip) = snippet {
+                        println!("    {}", snip);
+                    }
+                    println!();
                 }
             }
             Ok(())
