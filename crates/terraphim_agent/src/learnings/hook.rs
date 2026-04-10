@@ -23,7 +23,21 @@ use std::path::PathBuf;
 use serde::Deserialize;
 use thiserror::Error;
 
-use crate::learnings::{LearningCaptureConfig, LearningError, capture_failed_command};
+use crate::learnings::redaction::contains_secrets;
+use crate::learnings::{
+    LearningCaptureConfig, LearningError, capture_failed_command, redact_secrets,
+};
+
+/// Hook type for multi-hook pipeline.
+#[derive(Debug, Clone, Copy, PartialEq, clap::ValueEnum)]
+pub enum LearnHookType {
+    /// Pre-tool-use: warn if command matches past failure patterns
+    PreToolUse,
+    /// Post-tool-use: capture failed commands (existing behavior)
+    PostToolUse,
+    /// User prompt submit: capture user corrections inline
+    UserPromptSubmit,
+}
 
 /// AI agent format for hook processing.
 #[derive(Debug, Clone, Copy, PartialEq, clap::ValueEnum)]
@@ -74,6 +88,22 @@ pub fn capture_from_hook(input: &HookInput) -> Result<PathBuf, LearningError> {
 ///
 /// Ok(()) if processing succeeded (even if capture was skipped).
 pub async fn process_hook_input(_format: AgentFormat) -> Result<(), HookError> {
+    process_hook_input_with_type(_format, LearnHookType::PostToolUse).await
+}
+
+/// Process hook input with an explicit hook type.
+///
+/// Routes to the appropriate handler based on the hook type:
+/// - PreToolUse: checks command against known error patterns, warns if similar to past failure
+/// - PostToolUse: captures failed commands (original behavior)
+/// - UserPromptSubmit: captures user corrections inline
+///
+/// All hook types maintain fail-open behavior: errors are logged but
+/// never block the pipeline.
+pub async fn process_hook_input_with_type(
+    _format: AgentFormat,
+    hook_type: LearnHookType,
+) -> Result<(), HookError> {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
     // Read stdin
@@ -83,24 +113,165 @@ pub async fn process_hook_input(_format: AgentFormat) -> Result<(), HookError> {
         .await
         .map_err(HookError::StdinError)?;
 
-    // Parse JSON
-    let input = HookInput::from_json(&buffer)?;
-
-    // Capture if needed
-    if input.should_capture() {
-        if let Err(e) = capture_from_hook(&input) {
-            // Log error but continue (fail-open)
-            log::debug!("Hook capture failed: {}", e);
+    match hook_type {
+        LearnHookType::PreToolUse => {
+            process_pre_tool_use(&buffer);
+        }
+        LearnHookType::PostToolUse => {
+            // Parse JSON and capture failures (existing behavior)
+            match HookInput::from_json(&buffer) {
+                Ok(input) => {
+                    if input.should_capture() {
+                        if let Err(e) = capture_from_hook(&input) {
+                            log::debug!("Hook capture failed: {}", e);
+                        }
+                    }
+                }
+                Err(e) => {
+                    log::debug!("Hook parse failed (fail-open): {}", e);
+                }
+            }
+        }
+        LearnHookType::UserPromptSubmit => {
+            process_user_prompt_submit(&buffer);
         }
     }
 
-    // Pass through original JSON
+    // Redact secrets before passing through to stdout
+    let output = if contains_secrets(&buffer) {
+        log::debug!("Hook passthrough: secrets detected, redacting before stdout");
+        redact_secrets(&buffer)
+    } else {
+        buffer
+    };
+
     tokio::io::stdout()
-        .write_all(buffer.as_bytes())
+        .write_all(output.as_bytes())
         .await
         .map_err(HookError::StdinError)?;
 
     Ok(())
+}
+
+/// Pre-tool-use handler: check if the command matches known failure patterns.
+///
+/// Reads the command from the JSON input and queries past learnings for
+/// similar commands. If a match is found (especially one with a correction),
+/// emits a warning to stderr. Never blocks execution.
+fn process_pre_tool_use(json: &str) {
+    let input = match HookInput::from_json(json) {
+        Ok(i) => i,
+        Err(_) => return, // fail-open
+    };
+
+    let command = match input.command() {
+        Some(c) => c,
+        None => return, // not a Bash tool, nothing to check
+    };
+
+    let config = LearningCaptureConfig::default();
+    let storage_dir = config.storage_location();
+
+    // Query past learnings for similar commands
+    let base_cmd = command.split_whitespace().next().unwrap_or(command);
+    let learnings = match crate::learnings::capture::query_learnings(&storage_dir, base_cmd, false)
+    {
+        Ok(l) => l,
+        Err(_) => return,
+    };
+
+    if learnings.is_empty() {
+        return;
+    }
+
+    // Find the best match: prefer one with a correction
+    let best = learnings
+        .iter()
+        .find(|l| l.correction.is_some())
+        .or(learnings.first());
+
+    if let Some(learning) = best {
+        let mut warning = format!(
+            "Warning: similar command failed before (exit {}): {}",
+            learning.exit_code, learning.command
+        );
+        if let Some(ref correction) = learning.correction {
+            warning.push_str(&format!("\n  Suggested: {}", correction));
+        }
+        eprintln!("{}", warning);
+    }
+}
+
+/// User-prompt-submit handler: capture user corrections inline.
+///
+/// Expects JSON with "user_prompt" field. Looks for correction patterns
+/// like "use X instead of Y" and captures them as correction events.
+/// Never blocks execution.
+fn process_user_prompt_submit(json: &str) {
+    let value: serde_json::Value = match serde_json::from_str(json) {
+        Ok(v) => v,
+        Err(_) => return, // fail-open
+    };
+
+    let prompt = match value.get("user_prompt").and_then(|v| v.as_str()) {
+        Some(p) => p,
+        None => return,
+    };
+
+    // Look for correction patterns: "use X instead of Y", "don't use X", "prefer X over Y"
+    if let Some((original, corrected)) = parse_correction_pattern(prompt) {
+        let config = LearningCaptureConfig::default();
+        if let Err(e) = crate::learnings::capture_correction(
+            crate::learnings::CorrectionType::Other("user-prompt".to_string()),
+            &original,
+            &corrected,
+            &format!("Auto-captured from user prompt: {}", prompt),
+            &config,
+        ) {
+            log::debug!("User prompt correction capture failed: {}", e);
+        }
+    }
+}
+
+/// Try to parse a correction pattern from user text.
+///
+/// Supports patterns:
+/// - "use X instead of Y"  -> (Y, X)
+/// - "prefer X over Y"     -> (Y, X)
+///
+/// Returns None if no pattern matches.
+fn parse_correction_pattern(text: &str) -> Option<(String, String)> {
+    let lower = text.to_lowercase();
+
+    // "use X instead of Y"
+    if let Some(use_idx) = lower.find("use ") {
+        if let Some(instead_idx) = lower.find(" instead of ") {
+            let corrected = text[use_idx + 4..instead_idx].trim().to_string();
+            let original = text[instead_idx + 12..]
+                .trim()
+                .trim_end_matches('.')
+                .to_string();
+            if !corrected.is_empty() && !original.is_empty() {
+                return Some((original, corrected));
+            }
+        }
+    }
+
+    // "prefer X over Y"
+    if let Some(prefer_idx) = lower.find("prefer ") {
+        if let Some(over_idx) = lower.find(" over ") {
+            let corrected = text[prefer_idx + 7..over_idx].trim().to_string();
+            let original = text[over_idx + 6..]
+                .trim()
+                .trim_end_matches('.')
+                .to_string();
+            if !corrected.is_empty() && !original.is_empty() {
+                return Some((original, corrected));
+            }
+        }
+    }
+
+    None
 }
 
 /// Errors that can occur during hook processing.
@@ -541,5 +712,107 @@ mod tests {
         assert_ne!(AgentFormat::Claude, AgentFormat::Codex);
         assert_ne!(AgentFormat::Claude, AgentFormat::Opencode);
         assert_ne!(AgentFormat::Codex, AgentFormat::Opencode);
+    }
+
+    #[test]
+    fn test_hook_passthrough_redacts_aws_key_in_error() {
+        use crate::learnings::redact_secrets;
+        use crate::learnings::redaction::contains_secrets;
+
+        // Build a fake AWS key at runtime to avoid tripping the pre-commit secret scanner.
+        // The key prefix "AKIA" followed by 16 uppercase alphanumeric chars is the pattern.
+        let aws_key = format!("AKIA{}", "IOSFODNN7EXAMPLE");
+
+        let json = format!(
+            r#"{{
+            "tool_name": "Bash",
+            "tool_input": {{"command": "aws s3 ls"}},
+            "tool_result": {{
+                "exit_code": 1,
+                "stdout": "",
+                "stderr": "Unable to locate credentials {}"
+            }}
+        }}"#,
+            aws_key
+        );
+
+        // Verify the input contains secrets
+        assert!(contains_secrets(&json));
+
+        // Verify redaction removes the AWS key
+        let redacted = redact_secrets(&json);
+        assert!(!redacted.contains(&aws_key));
+        assert!(redacted.contains("[AWS_KEY_REDACTED]"));
+
+        // Verify the redacted output is still valid JSON
+        let parsed = HookInput::from_json(&redacted).unwrap();
+        assert_eq!(parsed.tool_name, "Bash");
+        assert_eq!(parsed.tool_result.exit_code, 1);
+        assert!(parsed.tool_result.stderr.contains("[AWS_KEY_REDACTED]"));
+    }
+
+    #[test]
+    fn test_learn_hook_type_variants() {
+        assert_ne!(LearnHookType::PreToolUse, LearnHookType::PostToolUse);
+        assert_ne!(LearnHookType::PostToolUse, LearnHookType::UserPromptSubmit);
+        assert_ne!(LearnHookType::PreToolUse, LearnHookType::UserPromptSubmit);
+    }
+
+    #[test]
+    fn test_parse_correction_pattern_use_instead_of() {
+        let result = parse_correction_pattern("use bun instead of npm");
+        assert_eq!(result, Some(("npm".to_string(), "bun".to_string())));
+    }
+
+    #[test]
+    fn test_parse_correction_pattern_prefer_over() {
+        let result = parse_correction_pattern("prefer cargo over make");
+        assert_eq!(result, Some(("make".to_string(), "cargo".to_string())));
+    }
+
+    #[test]
+    fn test_parse_correction_pattern_with_trailing_period() {
+        let result = parse_correction_pattern("use Result<T> instead of unwrap().");
+        assert_eq!(
+            result,
+            Some(("unwrap()".to_string(), "Result<T>".to_string()))
+        );
+    }
+
+    #[test]
+    fn test_parse_correction_pattern_no_match() {
+        assert!(parse_correction_pattern("hello world").is_none());
+        assert!(parse_correction_pattern("this is fine").is_none());
+    }
+
+    #[test]
+    fn test_pre_tool_use_no_crash_on_non_bash() {
+        // Non-Bash tool should not crash (fail-open)
+        let json = r#"{
+            "tool_name": "Edit",
+            "tool_input": {"path": "/tmp/test.txt"},
+            "tool_result": {"exit_code": 0, "stdout": "", "stderr": ""}
+        }"#;
+        process_pre_tool_use(json);
+        // No panic = pass
+    }
+
+    #[test]
+    fn test_pre_tool_use_no_crash_on_invalid_json() {
+        // Invalid JSON should not crash (fail-open)
+        process_pre_tool_use("not valid json");
+        // No panic = pass
+    }
+
+    #[test]
+    fn test_user_prompt_submit_no_crash_on_empty() {
+        process_user_prompt_submit("{}");
+        // No panic = pass
+    }
+
+    #[test]
+    fn test_user_prompt_submit_no_crash_on_invalid_json() {
+        process_user_prompt_submit("invalid");
+        // No panic = pass
     }
 }

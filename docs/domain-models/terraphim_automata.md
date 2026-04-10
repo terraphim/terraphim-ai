@@ -579,7 +579,7 @@ fn extract_paragraph_around_match(
     context_lines: usize
 ) -> String {
     let lines: Vec<&str> = content.lines().collect();
-    
+
     let match_line_idx = content[..mat.start()]
         .matches(char::is_whitespace)
         .count();
