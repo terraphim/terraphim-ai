@@ -492,5 +492,4 @@ main() {
 }
 
 # Run main function
-main "$@"</content>
-<parameter name="filePath">scripts/run-performance-benchmarks.sh
+main "$@"

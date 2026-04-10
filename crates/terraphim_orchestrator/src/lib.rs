@@ -33,6 +33,7 @@ pub mod agent_run_record;
 pub mod compound;
 pub mod concurrency;
 pub mod config;
+pub mod control_plane;
 pub mod cost_tracker;
 pub mod dispatcher;
 pub mod dual_mode;
@@ -2456,6 +2457,22 @@ impl AgentOrchestrator {
                         tracing::info!(flow = %name, status = ?state.status, "flow completed");
                         if let Some(ref dir) = self.config.flow_state_dir {
                             let _ = state.save_to_file(dir);
+                        }
+                        // Feed cost data from step envelopes into nightwatch for drift detection
+                        for envelope in &state.step_envelopes {
+                            if let (Some(cost), Some(input), Some(output)) = (
+                                envelope.cost_usd,
+                                envelope.input_tokens,
+                                envelope.output_tokens,
+                            ) {
+                                self.nightwatch.observe_cost(
+                                    &format!("flow-{}", name),
+                                    cost,
+                                    input,
+                                    output,
+                                    None, // Flows don't have individual budgets yet
+                                );
+                            }
                         }
                     }
                     Err(e) => {
