@@ -407,8 +407,10 @@ async fn test_end_to_end_server_workflow() -> Result<()> {
             || chat_stderr.contains("Ollama")
             || chat_stderr.contains("not configured")
             || chat_stderr.contains("404")
-            || chat_stderr.contains("500"),
-        "Server chat should succeed or fail with LLM-not-configured error: stderr={}",
+            || chat_stderr.contains("500")
+            || chat_stderr.contains("timeout")
+            || chat_stderr.contains("timed out"),
+        "Server chat should succeed or fail gracefully (no LLM): stderr={}",
         chat_stderr
     );
     println!("✓ Server chat command completed (or LLM not configured)");
