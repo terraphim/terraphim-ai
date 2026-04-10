@@ -766,6 +766,9 @@ enum LearnSub {
         /// Show global learnings instead of project
         #[arg(long, default_value_t = false)]
         global: bool,
+        /// Enable semantic matching via KG entities
+        #[arg(long, default_value_t = false)]
+        semantic: bool,
     },
     /// Add correction to an existing learning
     Correct {
@@ -2047,7 +2050,7 @@ async fn run_offline_command(
 async fn run_learn_command(sub: LearnSub) -> Result<()> {
     use learnings::{
         CorrectionType, LearningCaptureConfig, capture_correction, capture_failed_command,
-        correct_learning, list_all_entries, query_all_entries,
+        correct_learning, list_all_entries,
     };
     let config = LearningCaptureConfig::default();
 
@@ -2110,6 +2113,7 @@ async fn run_learn_command(sub: LearnSub) -> Result<()> {
             pattern,
             exact,
             global,
+            semantic,
         } => {
             let storage_loc = config.storage_location();
             let storage_dir = if global {
@@ -2117,7 +2121,7 @@ async fn run_learn_command(sub: LearnSub) -> Result<()> {
             } else {
                 &storage_loc
             };
-            match query_all_entries(storage_dir, &pattern, exact) {
+            match learnings::query_all_entries_semantic(storage_dir, &pattern, exact, semantic) {
                 Ok(entries) => {
                     if entries.is_empty() {
                         println!("No learnings matching '{}'.", pattern);
@@ -2131,6 +2135,10 @@ async fn run_learn_command(sub: LearnSub) -> Result<()> {
                             println!("  {} {}", source_indicator, entry.summary());
                             if let Some(correction) = entry.correction_text() {
                                 println!("     Correction: {}", correction);
+                            }
+                            let entities = entry.entities();
+                            if !entities.is_empty() {
+                                println!("     Entities: {}", entities.join(", "));
                             }
                         }
                     }

@@ -33,11 +33,14 @@ pub use procedure::ProcedureStore;
 
 pub use capture::{
     CorrectionType, LearningSource, capture_correction, capture_failed_command, correct_learning,
-    list_all_entries, query_all_entries,
+    list_all_entries, query_all_entries_semantic,
 };
-// Re-export for testing - not used by CLI yet
+// Re-export for testing and external use
 #[allow(unused_imports)]
-pub use capture::{CapturedLearning, LearningContext, LearningError};
+pub use capture::{
+    CapturedLearning, LearningContext, LearningError, annotate_with_entities,
+    annotate_with_thesaurus, query_all_entries,
+};
 
 #[allow(unused_imports)]
 pub use redaction::redact_secrets;
