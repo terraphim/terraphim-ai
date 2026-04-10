@@ -867,6 +867,18 @@ enum ProcedureSub {
         #[arg(long, default_value_t = false)]
         dry_run: bool,
     },
+    /// Show health status of all procedures (auto-disables critically failing ones)
+    Health,
+    /// Enable a previously disabled procedure
+    Enable {
+        /// Procedure ID
+        id: String,
+    },
+    /// Disable a procedure (prevents replay)
+    Disable {
+        /// Procedure ID
+        id: String,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -2239,6 +2251,9 @@ async fn run_learn_command(sub: LearnSub) -> Result<()> {
                                 proc.confidence.success_count,
                                 proc.confidence.failure_count,
                             );
+                            if proc.disabled {
+                                println!("Status: DISABLED");
+                            }
                             println!("Created: {}", proc.created_at);
                             println!("Updated: {}", proc.updated_at);
                             if !proc.tags.is_empty() {
@@ -2315,6 +2330,15 @@ async fn run_learn_command(sub: LearnSub) -> Result<()> {
                             std::process::exit(1);
                         }
                         Some(proc) => {
+                            // Check if procedure is disabled
+                            if proc.disabled {
+                                eprintln!(
+                                    "Procedure '{}' is disabled. Use 'learn procedure enable {}' to re-enable it.",
+                                    id, id,
+                                );
+                                std::process::exit(1);
+                            }
+
                             // Check minimum confidence threshold
                             if proc.confidence.total_executions() > 0 && proc.confidence.score < 0.5
                             {
@@ -2377,6 +2401,56 @@ async fn run_learn_command(sub: LearnSub) -> Result<()> {
                             Ok(())
                         }
                     }
+                }
+                ProcedureSub::Health => {
+                    let reports = store.health_check()?;
+                    if reports.is_empty() {
+                        println!("No procedures found.");
+                    } else {
+                        println!(
+                            "{:<38} {:<12} {:<8} {:<6} {:<9}",
+                            "ID", "STATUS", "RATE", "RUNS", "DISABLED"
+                        );
+                        println!("{}", "-".repeat(73));
+                        for report in &reports {
+                            println!(
+                                "{:<38} {:<12} {:<8.0}% {:<6} {:<9}",
+                                report.id,
+                                report.status.to_string(),
+                                report.success_rate * 100.0,
+                                report.total_executions,
+                                if report.auto_disabled
+                                    || store
+                                        .find_by_id(&report.id)?
+                                        .map(|p| p.disabled)
+                                        .unwrap_or(false)
+                                {
+                                    "yes"
+                                } else {
+                                    "no"
+                                },
+                            );
+                        }
+                        let auto_disabled_count =
+                            reports.iter().filter(|r| r.auto_disabled).count();
+                        if auto_disabled_count > 0 {
+                            println!(
+                                "\n{} procedure(s) auto-disabled due to critical failure rate.",
+                                auto_disabled_count,
+                            );
+                        }
+                    }
+                    Ok(())
+                }
+                ProcedureSub::Enable { id } => {
+                    store.set_disabled(&id, false)?;
+                    println!("Procedure '{}' enabled.", id);
+                    Ok(())
+                }
+                ProcedureSub::Disable { id } => {
+                    store.set_disabled(&id, true)?;
+                    println!("Procedure '{}' disabled.", id);
+                    Ok(())
                 }
             }
         }

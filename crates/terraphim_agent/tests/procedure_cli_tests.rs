@@ -330,3 +330,117 @@ fn procedure_replay_nonexistent_fails() {
     let (_, _stderr, success) = run_procedure_cmd(&binary, &["replay", "nonexistent-id"], &home);
     assert!(!success, "replay of nonexistent procedure should fail");
 }
+
+#[test]
+fn procedure_health_shows_critical_after_failures() {
+    let binary = agent_binary();
+    let tmp = tempfile::tempdir().expect("create temp dir");
+    let home = tmp.path().to_string_lossy().to_string();
+
+    // Record a procedure
+    let (stdout, _, _) = run_procedure_cmd(&binary, &["record", "Fragile procedure"], &home);
+    let id = stdout
+        .trim()
+        .strip_prefix("Created procedure: ")
+        .unwrap()
+        .to_string();
+
+    // Record 5 failures (enough for auto-disable)
+    for _ in 0..5 {
+        let (_, _, success) = run_procedure_cmd(&binary, &["failure", &id], &home);
+        assert!(success);
+    }
+
+    // Run health check
+    let (stdout, _stderr, success) = run_procedure_cmd(&binary, &["health"], &home);
+    assert!(
+        success,
+        "health command should succeed, stderr: {}",
+        _stderr
+    );
+    assert!(
+        stdout.contains("Critical"),
+        "expected Critical status, got: {}",
+        stdout
+    );
+    assert!(
+        stdout.contains("auto-disabled"),
+        "expected auto-disabled message, got: {}",
+        stdout
+    );
+}
+
+#[test]
+fn procedure_disable_prevents_replay() {
+    let binary = agent_binary();
+    let tmp = tempfile::tempdir().expect("create temp dir");
+    let home = tmp.path().to_string_lossy().to_string();
+
+    // Record a procedure with a step
+    let (stdout, _, _) = run_procedure_cmd(&binary, &["record", "Disable test"], &home);
+    let id = stdout
+        .trim()
+        .strip_prefix("Created procedure: ")
+        .unwrap()
+        .to_string();
+
+    run_procedure_cmd(&binary, &["add-step", &id, "echo hello"], &home);
+
+    // Disable it
+    let (stdout, _, success) = run_procedure_cmd(&binary, &["disable", &id], &home);
+    assert!(success, "disable should succeed");
+    assert!(
+        stdout.contains("disabled"),
+        "expected disabled message, got: {}",
+        stdout
+    );
+
+    // Attempt replay -- should be refused
+    let (_, stderr, success) = run_procedure_cmd(&binary, &["replay", &id], &home);
+    assert!(!success, "replay of disabled procedure should fail");
+    assert!(
+        stderr.contains("disabled"),
+        "expected disabled error, got stderr: {}",
+        stderr
+    );
+}
+
+#[test]
+fn procedure_enable_allows_replay() {
+    let binary = agent_binary();
+    let tmp = tempfile::tempdir().expect("create temp dir");
+    let home = tmp.path().to_string_lossy().to_string();
+
+    // Record a procedure with a step
+    let (stdout, _, _) = run_procedure_cmd(&binary, &["record", "Enable test"], &home);
+    let id = stdout
+        .trim()
+        .strip_prefix("Created procedure: ")
+        .unwrap()
+        .to_string();
+
+    run_procedure_cmd(&binary, &["add-step", &id, "echo hello"], &home);
+
+    // Disable then re-enable
+    run_procedure_cmd(&binary, &["disable", &id], &home);
+    let (stdout, _, success) = run_procedure_cmd(&binary, &["enable", &id], &home);
+    assert!(success, "enable should succeed");
+    assert!(
+        stdout.contains("enabled"),
+        "expected enabled message, got: {}",
+        stdout
+    );
+
+    // Replay should work now
+    let (stdout, _stderr, success) = run_procedure_cmd(&binary, &["replay", &id], &home);
+    assert!(
+        success,
+        "replay of re-enabled procedure should succeed, stderr: {}",
+        _stderr
+    );
+    assert!(
+        stdout.contains("Replay completed successfully"),
+        "expected success message, got: {}",
+        stdout
+    );
+}
