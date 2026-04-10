@@ -23,7 +23,10 @@ use std::path::PathBuf;
 use serde::Deserialize;
 use thiserror::Error;
 
-use crate::learnings::{LearningCaptureConfig, LearningError, capture_failed_command};
+use crate::learnings::redaction::contains_secrets;
+use crate::learnings::{
+    LearningCaptureConfig, LearningError, capture_failed_command, redact_secrets,
+};
 
 /// AI agent format for hook processing.
 #[derive(Debug, Clone, Copy, PartialEq, clap::ValueEnum)]
@@ -94,9 +97,16 @@ pub async fn process_hook_input(_format: AgentFormat) -> Result<(), HookError> {
         }
     }
 
-    // Pass through original JSON
+    // Redact secrets before passing through to stdout
+    let output = if contains_secrets(&buffer) {
+        log::debug!("Hook passthrough: secrets detected, redacting before stdout");
+        redact_secrets(&buffer)
+    } else {
+        buffer
+    };
+
     tokio::io::stdout()
-        .write_all(buffer.as_bytes())
+        .write_all(output.as_bytes())
         .await
         .map_err(HookError::StdinError)?;
 
@@ -541,5 +551,42 @@ mod tests {
         assert_ne!(AgentFormat::Claude, AgentFormat::Codex);
         assert_ne!(AgentFormat::Claude, AgentFormat::Opencode);
         assert_ne!(AgentFormat::Codex, AgentFormat::Opencode);
+    }
+
+    #[test]
+    fn test_hook_passthrough_redacts_aws_key_in_error() {
+        use crate::learnings::redact_secrets;
+        use crate::learnings::redaction::contains_secrets;
+
+        // Build a fake AWS key at runtime to avoid tripping the pre-commit secret scanner.
+        // The key prefix "AKIA" followed by 16 uppercase alphanumeric chars is the pattern.
+        let aws_key = format!("AKIA{}", "IOSFODNN7EXAMPLE");
+
+        let json = format!(
+            r#"{{
+            "tool_name": "Bash",
+            "tool_input": {{"command": "aws s3 ls"}},
+            "tool_result": {{
+                "exit_code": 1,
+                "stdout": "",
+                "stderr": "Unable to locate credentials {}"
+            }}
+        }}"#,
+            aws_key
+        );
+
+        // Verify the input contains secrets
+        assert!(contains_secrets(&json));
+
+        // Verify redaction removes the AWS key
+        let redacted = redact_secrets(&json);
+        assert!(!redacted.contains(&aws_key));
+        assert!(redacted.contains("[AWS_KEY_REDACTED]"));
+
+        // Verify the redacted output is still valid JSON
+        let parsed = HookInput::from_json(&redacted).unwrap();
+        assert_eq!(parsed.tool_name, "Bash");
+        assert_eq!(parsed.tool_result.exit_code, 1);
+        assert!(parsed.tool_result.stderr.contains("[AWS_KEY_REDACTED]"));
     }
 }
