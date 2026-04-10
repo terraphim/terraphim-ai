@@ -398,7 +398,7 @@ impl TerraphimService {
     pub async fn get_llm_client(&self) -> Result<LlmClient> {
         let config_guard = self.config_state.config.lock().await;
         let role = config_guard.get_role(&query.role)?;
-        
+
         // Initialise LLM client if needed
         // Return cached or new client
     }
@@ -418,7 +418,7 @@ impl TerraphimService {
         request: SummarisationRequest
     ) -> Result<SummarisationResult> {
         let client = self.get_llm_client().await?;
-        
+
         // Build context from documents
         // Call LLM for summarisation
         // Parse and return result
@@ -557,7 +557,7 @@ impl ConfigState {
 impl TerraphimService {
     pub async fn get_llm_client(&self) -> Result<LlmClient> {
         let client_guard = self.config_state.llm_client.lock().await;
-        
+
         if let Some(client) = client_guard.as_ref() {
             return Ok(client.clone());
         }
@@ -626,7 +626,7 @@ mod tests {
         let query = create_test_query();
 
         service.build_thesaurus(&query).await.unwrap();
-        
+
         let role = service.get_role("test").await.unwrap();
         assert!(!role.thesaurus.is_empty());
     }

@@ -1,192 +1,111 @@
-# Handover: 2026-03-10 - Agent Workflows E2E Implementation Complete
+# Handover: 2026-04-10 -- Operational Skill Store Phases A-J
 
 **Branch**: main
-**Upstream**: ab685db4 (6 commits ahead of previous)
-**Previous Handover**: 2026-03-03 - Phase A+B Implementation Complete
+**Commits**: 13 ahead of origin/main (c56a67d8)
+**Previous Handover**: 2026-03-10 - Agent Workflows E2E Implementation Complete
 
----
+## Session Summary
 
-## 1. Progress Summary
+Implemented Phases A-J of the Operational Skill Store plan for `terraphim-agent` learning and correction system. Started from release readiness check, found 3 test failures, fixed them, then executed full disciplined research + design + implementation + verification pipeline across 10 phases using parallel subagents with right-side-of-v verification after each phase.
 
-### Tasks Completed This Session
+## Commits (13)
 
-1. **Phase 3 Implementation Complete** - Agent Workflows End-to-End Demonstration
-   - Created `shared/workflow-types.js` with type definitions for all workflow patterns
-   - Updated `shared/api-client.js` with real API integration for all 5 workflow endpoints
-   - Updated `shared/websocket-client.js` with unsubscribe capability
-   - Updated all 5 workflow examples to call real backend APIs instead of mock data
-   - Integrated WebSocket real-time updates across all examples
-   - Replaced all emoji with FontAwesome icons per CLAUDE.md guidelines
+| Commit | Phase | Issue | Description |
+|--------|-------|-------|-------------|
+| `2963fc1a` | -- | -- | fix(kg): lowercase bun heading for replace tests |
+| `93f1d557` | -- | #773 | fix(tests): integration test role names + chat tolerance |
+| `a3d5681a` | -- | -- | fix(tests): request timeout tolerance |
+| `283c7b33` | Plan | -- | docs: learning-correction-system-plan.md |
+| `0a6b8f64` | A2 | #578 | fix(search): --robot/--format flags |
+| `a130fe18` | A1 | #480 | fix(learn): redaction in hook passthrough |
+| `c5fc7de0` | B | #693 | feat(learn): un-gate procedure.rs + CLI |
+| `3c8b6885` | C | #703 | feat(learn): entity annotation via KG |
+| `9c959a13` | C | #703 | test(learn): entity annotation tests |
+| `1f96b3b9` | D | #694 | feat(learn): replay engine + dry-run |
+| `0a7ecd50` | F | #695 | feat(learn): self-healing health monitoring |
+| `2d1aef19` | E+G | #599,#727 | feat(learn): multi-hook + shared learning CLI |
+| `c56a67d8` | J | Gitea #515-517 | feat(hooks): KG-based command validation |
 
-2. **Examples Updated**
-   - `1-prompt-chaining/` - WebSocket integration, real API calls
-   - `2-routing/` - WebSocket integration, real API calls
-   - `3-parallelization/` - WebSocket integration, real API calls, FontAwesome icons
-   - `4-orchestrator-workers/` - WebSocket integration, real API calls, FontAwesome icons
-   - `5-evaluator-optimizer/` - WebSocket integration, real API calls
+## New CLI Surface
 
-3. **Testing Complete**
-   - Verified all examples load correctly in browser
-   - Confirmed API integration works for routing, parallel, and orchestrate workflows
-   - Validated WebSocket connections receive workflow updates
-   - Screenshots captured for visual verification
+```
+terraphim-agent learn procedure list/show/record/add-step
+terraphim-agent learn procedure success/failure
+terraphim-agent learn procedure replay ID [--dry-run]
+terraphim-agent learn procedure health/enable/disable
+terraphim-agent learn query PATTERN [--semantic]
+terraphim-agent learn shared list/promote/import/stats  (--features shared-learning)
+terraphim-agent search QUERY [--robot] [--format json|json-compact]
+```
 
-4. **Commits Pushed to upstream/main**
-   - `c05452f5` feat(agent-workflows): Day 1 foundation - workflow types, API client, WebSocket
-   - `440d5902` feat(agent-workflows): update prompt chaining example for real API integration
-   - `573c099d` feat(agent-workflows): update examples 2-5 for real API integration
-   - `09a3d61b` chore(build): update Cargo.toml and Cargo.lock
+## New Files
 
-### Current Implementation State
+- `crates/terraphim_agent/src/learnings/replay.rs` -- procedure replay engine
+- `crates/terraphim_agent/src/kg_validation.rs` -- KG-based command validation
+- `crates/terraphim_agent/tests/procedure_cli_tests.rs` -- 12 procedure tests
+- `crates/terraphim_agent/tests/robot_search_output_regression_tests.rs` -- 5 search tests
+- `crates/terraphim_agent/tests/shared_learning_cli_tests.rs` -- 7 shared learning tests
+- `plans/learning-correction-system-plan.md` -- research and design plan
 
-**Working:**
-- All 5 workflow examples integrate with real backend APIs
-- WebSocket subscriptions provide real-time workflow status updates
-- FontAwesome icons display correctly in all examples
-- API endpoints tested:
-  - `POST /workflows/routing` - Working
-  - `POST /workflows/parallel` - Working
-  - `POST /workflows/orchestration` - Working
-  - `POST /workflows/prompt_chain` - Working (with valid role)
-  - `POST /workflows/optimization` - Working (with valid role)
+## Key Changes to Existing Code
 
-**Fixed:**
-- All missing roles added to `terraphim_server/default/terraphim_engineer_config.json`:
-  - `BusinessAnalyst` - requirements analysis
-  - `QAEngineer` - quality assurance and testing
-  - `BackendArchitect` - system architecture design
-  - `ProductManager` - development planning
-  - `DevelopmentAgent` - code implementation
-  - `DevOpsEngineer` - deployment and operations
+- `learnings/procedure.rs` -- un-gated from `#[cfg(test)]`, added HealthStatus/ProcedureHealthReport/health_check()/set_disabled()
+- `learnings/capture.rs` -- added ImportanceScore, entities field, annotate_with_entities(), query_all_entries_semantic()
+- `learnings/hook.rs` -- added LearnHookType, multi-hook routing, correction pattern parsing
+- `learnings/redaction.rs` -- wired into hook passthrough, removed dead_code on contains_secrets()
+- `terraphim_types/src/procedure.rs` -- added `disabled: bool` with serde(default)
 
----
+## What's Working
 
-## 2. Technical Context
+- All unit tests: 151 lib tests pass
+- All integration tests: procedure (12), search (27), learn (3), shared learning (7), replace (14)
+- Every phase verified through right-side-of-v with traceability matrices
+- cargo clippy clean (no errors, only pre-existing dead_code warnings)
 
-### Current Branch
+## Open PRs
+
+- GitHub: https://github.com/terraphim/terraphim-ai/pull/781
+- Gitea: https://git.terraphim.cloud/terraphim/terraphim-ai/pulls/533
+
+Branch `feat/operational-skill-store-phases-a-f` is up to date with all 13 commits on both remotes.
+
+## Issues Updated
+
+- GitHub: #480, #578, #599, #692, #693, #694, #695, #703, #727, #773
+- Gitea: #480, #451, #485, #515, #516, #517
+
+## Deferred Work
+
+### Phase H: Graduated Guard (#704)
+- Three-tier execution model (allow/sandbox/deny)
+- Requires Firecracker/secure-exec integration
+- L complexity, infrastructure-heavy
+
+### Phase I: Agent Evolution (#727-730)
+- Wire terraphim_agent_evolution into ADF with real LLM adapters
+- 4 issues: #727 (full), #728, #729, #730
+- L complexity, 8-12 days estimated
+
+### Phase J remaining: Gitea #451
+- LLM hooks unwired in agent.rs (spec-validator remediation)
+- Needs terraphim_validation crate work
+
+## Known Issues
+
+1. `cross_mode_consistency_test` -- 3 pre-existing failures, not caused by this session
+2. Byte-level string truncation at main.rs:1297 on multi-byte UTF-8 -- LOW severity
+3. `crates/terraphim_agent/docs/src/kg/test_ranking_kg.md` -- untracked test fixture, can be deleted
+4. `process_hook_input()` in hook.rs is dead code (replaced by `process_hook_input_with_type()`)
+
+## Test Commands
+
 ```bash
-git branch --show-current
-# main
+cargo test -p terraphim_agent --lib
+cargo test -p terraphim_agent --test procedure_cli_tests
+cargo test -p terraphim_agent --test replace_feature_tests
+cargo test -p terraphim_agent --test enhanced_search_tests
+cargo test -p terraphim_agent --test robot_search_output_regression_tests
+cargo test -p terraphim_agent --test learn_no_service_tests
+cargo test -p terraphim_agent --features shared-learning --test shared_learning_cli_tests
+cargo clippy -p terraphim_agent
 ```
-
-### Recent Commits
-```bash
-git log -7 --oneline
-ab685db4 feat(config): add workflow agent roles to default config
-f222f764 feat(config): add BusinessAnalyst and QAEngineer roles to default config
-05c82d81 docs: update handover and lessons learned for agent workflows
-09a3d61b chore(build): update Cargo.toml and Cargo.lock
-573c099d feat(agent-workflows): update examples 2-5 for real API integration
-440d5902 feat(agent-workflows): update prompt chaining example for real API integration
-c05452f5 feat(agent-workflows): Day 1 foundation - workflow types, API client, WebSocket
-```
-
-### Modified Files (Committed)
-```
-examples/agent-workflows/shared/workflow-types.js        (new)
-examples/agent-workflows/shared/api-client.js            (updated)
-examples/agent-workflows/shared/websocket-client.js      (updated)
-examples/agent-workflows/1-prompt-chaining/app.js        (updated)
-examples/agent-workflows/1-prompt-chaining/index.html    (updated)
-examples/agent-workflows/2-routing/app.js                (updated)
-examples/agent-workflows/2-routing/index.html            (updated)
-examples/agent-workflows/3-parallelization/app.js        (updated)
-examples/agent-workflows/3-parallelization/index.html    (updated)
-examples/agent-workflows/4-orchestrator-workers/app.js   (updated)
-examples/agent-workflows/4-orchestrator-workers/index.html (updated)
-examples/agent-workflows/5-evaluator-optimizer/app.js    (updated)
-examples/agent-workflows/5-evaluator-optimizer/index.html (updated)
-terraphim_server/default/terraphim_engineer_config.json  (updated - added 6 new roles)
-Cargo.toml                                               (updated)
-Cargo.lock                                               (updated)
-HANDOVER.md                                              (updated)
-lessons-learned.md                                       (updated)
-```
-
-### Untracked Files (Design/Research Docs)
-```
-.docs/design-agent-workflows-e2e.md
-.docs/research-agent-workflows.md
-.docs/implementation-plan-2026-03-03.md
-(and other .docs/ files)
-```
-
----
-
-## 3. Next Steps
-
-### Priority 1: Verification Testing (Completed)
-- ✅ All 5 workflow endpoints tested successfully with new roles:
-  - `POST /workflows/prompt-chain` with BusinessAnalyst - Working
-  - `POST /workflows/route` with BusinessAnalyst - Working
-  - `POST /workflows/parallel` with QAEngineer - Working
-  - `POST /workflows/orchestrate` with DevelopmentAgent - Working
-  - `POST /workflows/optimize` with BusinessAnalyst - Working
-
-### Priority 2: Run Full Test Suite
-- Run: `cargo test --workspace --exclude terraphim_agent`
-- Test examples in browser with server running
-- Verify WebSocket message handling under load
-
-### Priority 3: Documentation
-- Create `RUNNING_E2E.md` with instructions for running the complete demo
-- Document the workflow API contract for future reference
-- Update example READMEs with real API integration details
-
----
-
-## 4. Key Implementation Details
-
-### API Client Usage Pattern
-```javascript
-// Initialize API client with server discovery
-const apiClient = new ApiClient();
-await apiClient.init();
-
-// Execute workflow
-const result = await apiClient.executeRouting({
-  prompt: "user input",
-  role: "Terraphim Engineer",
-  llm_config: { ... }
-});
-
-// Subscribe to updates
-const wsClient = new WorkflowWebSocketClient(apiClient.serverUrl);
-await wsClient.connect();
-wsClient.subscribeToWorkflow(result.workflow_id, handleMessage);
-```
-
-### WebSocket Message Format
-```javascript
-{
-  type: 'workflow_update',
-  workflow_id: 'uuid',
-  status: 'running|completed|failed',
-  data: { ... },
-  timestamp: 'ISO8601'
-}
-```
-
-### FontAwesome Icon Mapping
-- Workflow patterns: `fa-link`, `fa-route`, `fa-code-branch`, `fa-network-wired`, `fa-sync-alt`
-- Status: `fa-clock`, `fa-spinner fa-spin`, `fa-check-circle`, `fa-times-circle`
-- UI elements: `fa-bolt`, `fa-bullseye`, `fa-robot`, `fa-brain`, `fa-puzzle-piece`, `fa-chart-line`
-
----
-
-## 5. Files for Reference
-
-- Research Document: `.docs/research-agent-workflows.md`
-- Design Document: `.docs/design-agent-workflows-e2e.md`
-- Implementation Plan: `.docs/implementation-plan-2026-03-03.md`
-
----
-
-## Previous Handover Archive
-
-See `docs/archive/root/HANDOVER.md` for the 2026-03-03 Phase A+B handover.
-
----
-
-**Handover prepared by**: Claude Code (Terraphim AI)
-**Session completed**: 2026-03-10
