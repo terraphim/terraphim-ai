@@ -801,6 +801,9 @@ enum LearnSub {
         /// AI agent format
         #[arg(long, value_enum, default_value = "claude")]
         format: learnings::AgentFormat,
+        /// Hook type for multi-hook pipeline
+        #[arg(long, value_enum, default_value = "post-tool-use")]
+        learn_hook_type: learnings::LearnHookType,
     },
     /// Install hook for AI agent
     InstallHook {
@@ -813,6 +816,38 @@ enum LearnSub {
         #[command(subcommand)]
         sub: ProcedureSub,
     },
+    /// Manage shared learnings with trust levels (L1/L2/L3)
+    #[cfg(feature = "shared-learning")]
+    Shared {
+        #[command(subcommand)]
+        sub: SharedLearningSub,
+    },
+}
+
+#[cfg(feature = "shared-learning")]
+#[derive(Subcommand, Debug)]
+enum SharedLearningSub {
+    /// List shared learnings, optionally filtered by trust level
+    List {
+        /// Filter by trust level: l1, l2, l3
+        #[arg(long)]
+        trust_level: Option<String>,
+        /// Maximum number of learnings to show
+        #[arg(long, default_value_t = 20)]
+        limit: usize,
+    },
+    /// Promote a shared learning to a higher trust level
+    Promote {
+        /// Learning ID
+        id: String,
+        /// Target trust level: l2 or l3
+        #[arg(long)]
+        to: String,
+    },
+    /// Import local captured learnings into the shared learning store at L1
+    Import,
+    /// Show shared learning statistics by trust level
+    Stats,
 }
 
 #[derive(Subcommand, Debug)]
@@ -2207,7 +2242,10 @@ async fn run_learn_command(sub: LearnSub) -> Result<()> {
                 }
             }
         }
-        LearnSub::Hook { format } => learnings::process_hook_input(format)
+        LearnSub::Hook {
+            format,
+            learn_hook_type,
+        } => learnings::process_hook_input_with_type(format, learn_hook_type)
             .await
             .map_err(|e| e.into()),
         LearnSub::InstallHook { agent } => {
@@ -2453,6 +2491,175 @@ async fn run_learn_command(sub: LearnSub) -> Result<()> {
                     Ok(())
                 }
             }
+        }
+        #[cfg(feature = "shared-learning")]
+        LearnSub::Shared { sub } => run_shared_learning_command(sub, &config).await,
+    }
+}
+
+#[cfg(feature = "shared-learning")]
+async fn run_shared_learning_command(
+    sub: SharedLearningSub,
+    config: &learnings::LearningCaptureConfig,
+) -> Result<()> {
+    use terraphim_agent::shared_learning::{
+        SharedLearning, SharedLearningSource, SharedLearningStore, StoreConfig, TrustLevel,
+    };
+
+    let store_config = StoreConfig::default();
+    let store = SharedLearningStore::open(store_config)
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to open shared learning store: {}", e))?;
+
+    match sub {
+        SharedLearningSub::List { trust_level, limit } => {
+            let learnings = if let Some(ref level_str) = trust_level {
+                let level: TrustLevel = level_str.parse().map_err(|e| anyhow::anyhow!("{}", e))?;
+                store
+                    .list_by_trust_level(level)
+                    .await
+                    .map_err(|e| anyhow::anyhow!("{}", e))?
+            } else {
+                store
+                    .list_all()
+                    .await
+                    .map_err(|e| anyhow::anyhow!("{}", e))?
+            };
+
+            if learnings.is_empty() {
+                println!("No shared learnings found.");
+            } else {
+                let display_count = limit.min(learnings.len());
+                println!(
+                    "Shared learnings ({} of {}):",
+                    display_count,
+                    learnings.len()
+                );
+                for learning in learnings.iter().take(limit) {
+                    println!(
+                        "  [{}] {} -- {} ({})",
+                        &learning.id[..learning.id.len().min(12)],
+                        learning.title,
+                        learning.trust_level,
+                        learning.source,
+                    );
+                }
+            }
+            Ok(())
+        }
+        SharedLearningSub::Promote { id, to } => {
+            let target: TrustLevel = to.parse().map_err(|e| anyhow::anyhow!("{}", e))?;
+
+            match target {
+                TrustLevel::L2 => {
+                    store
+                        .promote_to_l2(&id)
+                        .await
+                        .map_err(|e| anyhow::anyhow!("{}", e))?;
+                    println!("Promoted learning {} to L2 (Peer-Validated).", id);
+                }
+                TrustLevel::L3 => {
+                    store
+                        .promote_to_l3(&id)
+                        .await
+                        .map_err(|e| anyhow::anyhow!("{}", e))?;
+                    println!("Promoted learning {} to L3 (Human-Approved).", id);
+                }
+                TrustLevel::L1 => {
+                    return Err(anyhow::anyhow!(
+                        "Cannot promote to L1 -- learnings start at L1. Use l2 or l3."
+                    ));
+                }
+            }
+            Ok(())
+        }
+        SharedLearningSub::Import => {
+            use crate::learnings::list_learnings;
+
+            let storage_loc = config.storage_location();
+            let local_learnings = list_learnings(&storage_loc, usize::MAX).unwrap_or_default();
+
+            if local_learnings.is_empty() {
+                println!("No local learnings found to import.");
+                return Ok(());
+            }
+
+            let mut imported = 0;
+            for local in &local_learnings {
+                let title = if local.command.len() > 60 {
+                    format!("{}...", &local.command[..60])
+                } else {
+                    local.command.clone()
+                };
+
+                let shared = SharedLearning::new(
+                    title,
+                    local.error_output.clone(),
+                    SharedLearningSource::BashHook,
+                    "cli-import".to_string(),
+                )
+                .with_original_command(local.command.clone())
+                .with_error_context(local.error_output.clone())
+                .with_keywords(local.tags.clone());
+
+                if let Some(ref correction) = local.correction {
+                    let shared = shared.with_correction(correction.clone());
+                    store
+                        .insert(shared)
+                        .await
+                        .map_err(|e| anyhow::anyhow!("{}", e))?;
+                } else {
+                    store
+                        .insert(shared)
+                        .await
+                        .map_err(|e| anyhow::anyhow!("{}", e))?;
+                }
+                imported += 1;
+            }
+
+            println!(
+                "Imported {} local learning(s) into shared store at L1.",
+                imported
+            );
+            Ok(())
+        }
+        SharedLearningSub::Stats => {
+            let all = store
+                .list_all()
+                .await
+                .map_err(|e| anyhow::anyhow!("{}", e))?;
+
+            let l1_count = all
+                .iter()
+                .filter(|l| l.trust_level == TrustLevel::L1)
+                .count();
+            let l2_count = all
+                .iter()
+                .filter(|l| l.trust_level == TrustLevel::L2)
+                .count();
+            let l3_count = all
+                .iter()
+                .filter(|l| l.trust_level == TrustLevel::L3)
+                .count();
+
+            println!("Shared Learning Statistics:");
+            println!("  Total: {}", all.len());
+            println!("  L1 (Unverified):      {}", l1_count);
+            println!("  L2 (Peer-Validated):  {}", l2_count);
+            println!("  L3 (Human-Approved):  {}", l3_count);
+
+            if !all.is_empty() {
+                let total_applied: u32 = all.iter().map(|l| l.quality.applied_count).sum();
+                let total_effective: u32 = all.iter().map(|l| l.quality.effective_count).sum();
+                let avg_success = if total_applied > 0 {
+                    (total_effective as f64 / total_applied as f64) * 100.0
+                } else {
+                    0.0
+                };
+                println!("  Total applications:   {}", total_applied);
+                println!("  Avg success rate:     {:.1}%", avg_success);
+            }
+            Ok(())
         }
     }
 }

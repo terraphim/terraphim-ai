@@ -93,6 +93,77 @@ impl std::str::FromStr for CorrectionType {
     }
 }
 
+/// Importance score for a captured learning.
+///
+/// Helps prioritize learnings for review and surface the most
+/// impactful patterns. The `total` field is a weighted sum of
+/// the individual factors.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImportanceScore {
+    /// Severity based on exit code (0.0-1.0).
+    /// Higher exit codes and signals map to higher severity.
+    pub error_severity: f64,
+    /// Number of times a similar error has been observed.
+    pub repetition_count: u32,
+    /// Recency factor (0.0-1.0). 1.0 = just captured, decays over time.
+    pub recency: f64,
+    /// Whether a user has provided a correction for this error pattern.
+    pub has_correction: bool,
+    /// Weighted composite score.
+    pub total: f64,
+}
+
+impl ImportanceScore {
+    /// Calculate importance from individual factors.
+    ///
+    /// Weights:
+    ///   error_severity  * 0.3
+    ///   repetition      * 0.3  (capped contribution at repetition_count=10)
+    ///   recency         * 0.2
+    ///   has_correction  * 0.2
+    pub fn calculate(
+        exit_code: i32,
+        repetition_count: u32,
+        recency: f64,
+        has_correction: bool,
+    ) -> Self {
+        let error_severity = Self::severity_from_exit_code(exit_code);
+        let rep_factor = (repetition_count as f64 / 10.0).min(1.0);
+        let correction_factor = if has_correction { 1.0 } else { 0.0 };
+
+        let total =
+            error_severity * 0.3 + rep_factor * 0.3 + recency * 0.2 + correction_factor * 0.2;
+
+        Self {
+            error_severity,
+            repetition_count,
+            recency,
+            has_correction,
+            total,
+        }
+    }
+
+    /// Map exit code to a severity in 0.0-1.0.
+    ///
+    /// - 0        => 0.0 (success, should not appear)
+    /// - 1        => 0.3 (generic failure)
+    /// - 2        => 0.4 (misuse)
+    /// - 126..=127 => 0.6 (cannot execute / not found)
+    /// - 128+     => 0.8 (killed by signal)
+    /// - negative => 1.0 (abnormal)
+    fn severity_from_exit_code(code: i32) -> f64 {
+        match code {
+            0 => 0.0,
+            1 => 0.3,
+            2 => 0.4,
+            3..=125 => 0.5,
+            126..=127 => 0.6,
+            128.. => 0.8,
+            _ => 1.0, // negative
+        }
+    }
+}
+
 /// Context information for a captured learning.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LearningContext {
@@ -144,6 +215,9 @@ pub struct CapturedLearning {
     pub tags: Vec<String>,
     /// Knowledge graph entities matched in the command/error text
     pub entities: Vec<String>,
+    /// Importance score (None for backward compatibility with older files)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub importance: Option<ImportanceScore>,
 }
 
 impl CapturedLearning {
@@ -168,6 +242,7 @@ impl CapturedLearning {
             context: LearningContext::default(),
             tags: Vec::new(),
             entities: Vec::new(),
+            importance: None,
         }
     }
 
@@ -194,6 +269,12 @@ impl CapturedLearning {
     /// Set knowledge graph entities.
     pub fn with_entities(mut self, entities: Vec<String>) -> Self {
         self.entities = entities;
+        self
+    }
+
+    /// Set importance score.
+    pub fn with_importance(mut self, importance: ImportanceScore) -> Self {
+        self.importance = Some(importance);
         self
     }
 
@@ -237,6 +318,20 @@ impl CapturedLearning {
             for entity in &self.entities {
                 md.push_str(&format!("  - {}\n", entity));
             }
+        }
+
+        if let Some(ref imp) = self.importance {
+            md.push_str(&format!("importance_total: {:.4}\n", imp.total));
+            md.push_str(&format!("importance_severity: {:.4}\n", imp.error_severity));
+            md.push_str(&format!(
+                "importance_repetition: {}\n",
+                imp.repetition_count
+            ));
+            md.push_str(&format!("importance_recency: {:.4}\n", imp.recency));
+            md.push_str(&format!(
+                "importance_has_correction: {}\n",
+                imp.has_correction
+            ));
         }
 
         md.push_str("---\n\n");
@@ -286,6 +381,12 @@ impl CapturedLearning {
         let mut error_output = String::new();
         let mut tags = Vec::new();
         let mut entities = Vec::new();
+        // Importance score fields (optional, for backward compat)
+        let mut imp_total: Option<f64> = None;
+        let mut imp_severity: Option<f64> = None;
+        let mut imp_repetition: Option<u32> = None;
+        let mut imp_recency: Option<f64> = None;
+        let mut imp_has_correction: Option<bool> = None;
         // Track which list we are currently parsing (tags or entities)
         let mut current_list: Option<&str> = None;
 
@@ -327,6 +428,11 @@ impl CapturedLearning {
                     "hostname" => hostname = Some(value.to_string()),
                     "failing_subcommand" => failing_subcommand = Some(value.to_string()),
                     "correction" => correction = Some(value.to_string()),
+                    "importance_total" => imp_total = value.parse().ok(),
+                    "importance_severity" => imp_severity = value.parse().ok(),
+                    "importance_repetition" => imp_repetition = value.parse().ok(),
+                    "importance_recency" => imp_recency = value.parse().ok(),
+                    "importance_has_correction" => imp_has_correction = value.parse().ok(),
                     "tags" => current_list = Some("tags"),
                     "entities" => current_list = Some("entities"),
                     _ => {}
@@ -341,6 +447,30 @@ impl CapturedLearning {
                 error_output = after_start[..end].to_string();
             }
         }
+
+        // Reconstruct importance if all fields are present
+        let importance = match (
+            imp_total,
+            imp_severity,
+            imp_repetition,
+            imp_recency,
+            imp_has_correction,
+        ) {
+            (
+                Some(total),
+                Some(error_severity),
+                Some(repetition_count),
+                Some(recency),
+                Some(has_correction),
+            ) => Some(ImportanceScore {
+                error_severity,
+                repetition_count,
+                recency,
+                has_correction,
+                total,
+            }),
+            _ => None,
+        };
 
         Some(Self {
             id,
@@ -359,6 +489,7 @@ impl CapturedLearning {
             },
             tags,
             entities,
+            importance,
         })
     }
 }
@@ -751,6 +882,34 @@ pub fn annotate_with_thesaurus(text: &str, thesaurus: terraphim_types::Thesaurus
     }
 }
 
+/// Count how many existing learnings have a similar command.
+///
+/// Two commands are considered similar if they share the same base
+/// executable (first whitespace-delimited token).
+fn count_similar_failures(storage_dir: &PathBuf, command: &str) -> u32 {
+    let base = command.split_whitespace().next().unwrap_or(command);
+    let learnings = match list_learnings(storage_dir, usize::MAX) {
+        Ok(l) => l,
+        Err(_) => return 0,
+    };
+    learnings
+        .iter()
+        .filter(|l| l.command.split_whitespace().next().unwrap_or(&l.command) == base)
+        .count() as u32
+}
+
+/// Check if any existing learning has a correction for a similar command.
+fn has_correction_for_similar(storage_dir: &PathBuf, command: &str) -> bool {
+    let base = command.split_whitespace().next().unwrap_or(command);
+    let learnings = match list_learnings(storage_dir, usize::MAX) {
+        Ok(l) => l,
+        Err(_) => return false,
+    };
+    learnings.iter().any(|l| {
+        l.correction.is_some() && l.command.split_whitespace().next().unwrap_or(&l.command) == base
+    })
+}
+
 /// Capture a failed command as a learning document.
 ///
 /// This function:
@@ -815,13 +974,19 @@ pub fn capture_failed_command(
     // Set full chain if different from actual command
     if let Some(ref chain) = full_chain {
         if *chain != actual_command {
-            learning = learning.with_failing_subcommand(actual_command, chain.clone());
+            learning = learning.with_failing_subcommand(actual_command.clone(), chain.clone());
         }
     }
     let entities = annotate_with_entities(&annotation_text);
     if !entities.is_empty() {
         learning = learning.with_entities(entities);
     }
+
+    // Calculate importance score
+    let repetition_count = count_similar_failures(&storage_dir, &actual_command);
+    let has_correction = has_correction_for_similar(&storage_dir, &actual_command);
+    let importance = ImportanceScore::calculate(exit_code, repetition_count, 1.0, has_correction);
+    learning = learning.with_importance(importance);
 
     // Add default tags
     let tags = vec!["learning".to_string(), format!("exit-{}", exit_code)];
@@ -1085,6 +1250,14 @@ impl LearningEntry {
             LearningEntry::Correction(c) => Some(&c.corrected),
         }
     }
+
+    /// Importance score (only present on Learning entries with scoring).
+    pub fn importance(&self) -> Option<&ImportanceScore> {
+        match self {
+            LearningEntry::Learning(l) => l.importance.as_ref(),
+            LearningEntry::Correction(_) => None,
+        }
+    }
 }
 
 /// List all entries (learnings + corrections) from storage.
@@ -1114,7 +1287,28 @@ pub fn list_all_entries(
         }
     }
 
-    entries.sort_by_key(|b| std::cmp::Reverse(b.captured_at()));
+    // Sort by importance score (descending), then by captured_at (descending).
+    // Entries without importance (corrections, legacy learnings) sort after scored ones.
+    entries.sort_by(|a, b| {
+        let imp_a = match a {
+            LearningEntry::Learning(l) => l.importance.as_ref().map(|i| i.total),
+            _ => None,
+        };
+        let imp_b = match b {
+            LearningEntry::Learning(l) => l.importance.as_ref().map(|i| i.total),
+            _ => None,
+        };
+        // Higher importance first; if equal or both None, more recent first
+        match (imp_b, imp_a) {
+            (Some(ib), Some(ia)) => ib
+                .partial_cmp(&ia)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| b.captured_at().cmp(&a.captured_at())),
+            (Some(_), None) => std::cmp::Ordering::Less,
+            (None, Some(_)) => std::cmp::Ordering::Greater,
+            (None, None) => b.captured_at().cmp(&a.captured_at()),
+        }
+    });
     if entries.len() > limit {
         entries.truncate(limit);
     }
@@ -2275,5 +2469,199 @@ mod tests {
         );
         let entry2 = LearningEntry::Correction(correction);
         assert!(entry2.entities().is_empty());
+    }
+
+    #[test]
+    fn test_importance_score_calculate_basic() {
+        let score = ImportanceScore::calculate(1, 0, 1.0, false);
+        // exit_code 1 => severity 0.3
+        // repetition 0 => factor 0.0
+        // recency 1.0
+        // no correction
+        // total = 0.3*0.3 + 0.0*0.3 + 1.0*0.2 + 0.0*0.2 = 0.09 + 0 + 0.2 + 0 = 0.29
+        assert!((score.total - 0.29).abs() < 0.001);
+        assert_eq!(score.repetition_count, 0);
+        assert!(!score.has_correction);
+    }
+
+    #[test]
+    fn test_importance_score_severity_levels() {
+        // exit 0 => 0.0
+        assert!((ImportanceScore::calculate(0, 0, 0.0, false).error_severity).abs() < 0.001);
+        // exit 1 => 0.3
+        assert!((ImportanceScore::calculate(1, 0, 0.0, false).error_severity - 0.3).abs() < 0.001);
+        // exit 2 => 0.4
+        assert!((ImportanceScore::calculate(2, 0, 0.0, false).error_severity - 0.4).abs() < 0.001);
+        // exit 127 => 0.6 (command not found)
+        assert!(
+            (ImportanceScore::calculate(127, 0, 0.0, false).error_severity - 0.6).abs() < 0.001
+        );
+        // exit 137 => 0.8 (killed by signal)
+        assert!(
+            (ImportanceScore::calculate(137, 0, 0.0, false).error_severity - 0.8).abs() < 0.001
+        );
+        // exit -1 => 1.0 (abnormal)
+        assert!((ImportanceScore::calculate(-1, 0, 0.0, false).error_severity - 1.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_importance_score_repetition_increases_total() {
+        let score_0 = ImportanceScore::calculate(1, 0, 1.0, false);
+        let score_5 = ImportanceScore::calculate(1, 5, 1.0, false);
+        let score_10 = ImportanceScore::calculate(1, 10, 1.0, false);
+        let score_20 = ImportanceScore::calculate(1, 20, 1.0, false);
+
+        assert!(score_5.total > score_0.total);
+        assert!(score_10.total > score_5.total);
+        // Capped at 10 repetitions
+        assert!((score_20.total - score_10.total).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_importance_score_correction_increases_total() {
+        let without = ImportanceScore::calculate(1, 0, 1.0, false);
+        let with = ImportanceScore::calculate(1, 0, 1.0, true);
+        assert!(with.total > without.total);
+        assert!((with.total - without.total - 0.2).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_importance_roundtrip_via_markdown() {
+        let learning = CapturedLearning::new(
+            "bad-cmd".to_string(),
+            "not found".to_string(),
+            127,
+            LearningSource::Project,
+        )
+        .with_importance(ImportanceScore::calculate(127, 3, 0.8, true));
+
+        let md = learning.to_markdown();
+        let parsed = CapturedLearning::from_markdown(&md).unwrap();
+
+        let imp = parsed
+            .importance
+            .expect("importance should survive roundtrip");
+        assert!((imp.error_severity - 0.6).abs() < 0.001);
+        assert_eq!(imp.repetition_count, 3);
+        assert!((imp.recency - 0.8).abs() < 0.001);
+        assert!(imp.has_correction);
+        assert!(imp.total > 0.0);
+    }
+
+    #[test]
+    fn test_importance_backward_compat_missing_fields() {
+        // Old-format markdown without importance fields
+        let md = "---\nid: test-123\ncommand: old-cmd\nexit_code: 1\nsource: Project\n---\n\n## Command\n\n`old-cmd`\n\n## Error Output\n\n```\nsome error\n```\n";
+        let parsed = CapturedLearning::from_markdown(md).unwrap();
+        assert!(parsed.importance.is_none());
+    }
+
+    #[test]
+    fn test_capture_failed_command_sets_importance() {
+        let temp_dir = TempDir::new().unwrap();
+        let config = LearningCaptureConfig::new(
+            temp_dir.path().join("learnings"),
+            temp_dir.path().join("global"),
+        );
+
+        let path =
+            capture_failed_command("git push --force", "remote: rejected", 1, &config).unwrap();
+        let content = fs::read_to_string(&path).unwrap();
+        let learning = CapturedLearning::from_markdown(&content).unwrap();
+
+        let imp = learning
+            .importance
+            .expect("capture should set importance score");
+        assert_eq!(imp.repetition_count, 0); // first time
+        assert!((imp.recency - 1.0).abs() < 0.001); // just captured
+        assert!(!imp.has_correction);
+    }
+
+    #[test]
+    fn test_capture_failed_command_increments_repetition() {
+        let temp_dir = TempDir::new().unwrap();
+        let config = LearningCaptureConfig::new(
+            temp_dir.path().join("learnings"),
+            temp_dir.path().join("global"),
+        );
+
+        // First capture
+        capture_failed_command("git push --force", "rejected", 1, &config).unwrap();
+
+        // Second capture of same base command
+        let path2 =
+            capture_failed_command("git push origin main", "rejected again", 1, &config).unwrap();
+        let content2 = fs::read_to_string(&path2).unwrap();
+        let learning2 = CapturedLearning::from_markdown(&content2).unwrap();
+
+        let imp2 = learning2.importance.expect("should have importance");
+        assert_eq!(imp2.repetition_count, 1); // one previous failure
+    }
+
+    #[test]
+    fn test_list_all_entries_sorts_by_importance() {
+        let temp_dir = TempDir::new().unwrap();
+        let storage = temp_dir.path().join("learnings");
+        fs::create_dir(&storage).unwrap();
+
+        // Create a low-importance learning (exit 1, no repetitions)
+        let low = CapturedLearning::new(
+            "cmd-low".to_string(),
+            "minor error".to_string(),
+            1,
+            LearningSource::Project,
+        )
+        .with_importance(ImportanceScore::calculate(1, 0, 0.5, false));
+
+        // Create a high-importance learning (exit 137, repeated, has correction)
+        let high = CapturedLearning::new(
+            "cmd-high".to_string(),
+            "killed".to_string(),
+            137,
+            LearningSource::Project,
+        )
+        .with_importance(ImportanceScore::calculate(137, 5, 1.0, true));
+
+        fs::write(storage.join("learning-low.md"), low.to_markdown()).unwrap();
+        fs::write(storage.join("learning-high.md"), high.to_markdown()).unwrap();
+
+        let entries = list_all_entries(&storage, 10).unwrap();
+        assert_eq!(entries.len(), 2);
+
+        // High importance should come first
+        match &entries[0] {
+            LearningEntry::Learning(l) => assert_eq!(l.command, "cmd-high"),
+            _ => panic!("Expected learning entry"),
+        }
+        match &entries[1] {
+            LearningEntry::Learning(l) => assert_eq!(l.command, "cmd-low"),
+            _ => panic!("Expected learning entry"),
+        }
+    }
+
+    #[test]
+    fn test_learning_entry_importance_accessor() {
+        let learning = CapturedLearning::new(
+            "cmd".to_string(),
+            "err".to_string(),
+            1,
+            LearningSource::Project,
+        )
+        .with_importance(ImportanceScore::calculate(1, 2, 0.9, false));
+
+        let entry = LearningEntry::Learning(learning);
+        let imp = entry.importance().expect("should have importance");
+        assert_eq!(imp.repetition_count, 2);
+
+        // Correction entries have no importance
+        let correction = CorrectionEvent::new(
+            CorrectionType::Naming,
+            "old".to_string(),
+            "new".to_string(),
+            "ctx".to_string(),
+            LearningSource::Project,
+        );
+        let entry2 = LearningEntry::Correction(correction);
+        assert!(entry2.importance().is_none());
     }
 }
