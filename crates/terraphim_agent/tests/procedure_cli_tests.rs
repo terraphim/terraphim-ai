@@ -206,3 +206,127 @@ fn procedure_success_nonexistent_fails() {
     let (_, _stderr, success) = run_procedure_cmd(&binary, &["success", "nonexistent-id"], &home);
     assert!(!success, "success on nonexistent procedure should fail");
 }
+
+#[test]
+fn procedure_replay_dry_run() {
+    let binary = agent_binary();
+    let tmp = tempfile::tempdir().expect("create temp dir");
+    let home = tmp.path().to_string_lossy().to_string();
+
+    // Record a procedure
+    let (stdout, _, _) = run_procedure_cmd(&binary, &["record", "Echo things"], &home);
+    let id = stdout
+        .trim()
+        .strip_prefix("Created procedure: ")
+        .unwrap()
+        .to_string();
+
+    // Add two echo steps
+    run_procedure_cmd(&binary, &["add-step", &id, "echo hello"], &home);
+    run_procedure_cmd(&binary, &["add-step", &id, "echo world"], &home);
+
+    // Replay with --dry-run
+    let (stdout, _stderr, success) =
+        run_procedure_cmd(&binary, &["replay", &id, "--dry-run"], &home);
+    assert!(success, "dry-run replay should succeed");
+    assert!(
+        stdout.contains("[DRY RUN]"),
+        "should indicate dry run, got: {}",
+        stdout
+    );
+    assert!(
+        stdout.contains("step 1: OK"),
+        "step 1 should report OK, got: {}",
+        stdout
+    );
+    assert!(
+        stdout.contains("step 2: OK"),
+        "step 2 should report OK, got: {}",
+        stdout
+    );
+    assert!(
+        stdout.contains("Dry run completed"),
+        "should report dry run completed, got: {}",
+        stdout
+    );
+}
+
+#[test]
+fn procedure_replay_real_execution() {
+    let binary = agent_binary();
+    let tmp = tempfile::tempdir().expect("create temp dir");
+    let home = tmp.path().to_string_lossy().to_string();
+
+    // Record
+    let (stdout, _, _) = run_procedure_cmd(&binary, &["record", "Echo commands"], &home);
+    let id = stdout
+        .trim()
+        .strip_prefix("Created procedure: ")
+        .unwrap()
+        .to_string();
+
+    // Add echo steps
+    run_procedure_cmd(&binary, &["add-step", &id, "echo hello"], &home);
+    run_procedure_cmd(&binary, &["add-step", &id, "echo world"], &home);
+
+    // Replay for real
+    let (stdout, _stderr, success) = run_procedure_cmd(&binary, &["replay", &id], &home);
+    assert!(success, "replay should succeed, stderr: {}", _stderr);
+    assert!(
+        stdout.contains("Replay completed successfully"),
+        "should report success, got: {}",
+        stdout
+    );
+
+    // Verify confidence was updated (1 success recorded)
+    let (stdout, _, _) = run_procedure_cmd(&binary, &["show", &id], &home);
+    assert!(
+        stdout.contains("1 successes"),
+        "should show 1 success after replay, got: {}",
+        stdout
+    );
+}
+
+#[test]
+fn procedure_replay_failure_stops_early() {
+    let binary = agent_binary();
+    let tmp = tempfile::tempdir().expect("create temp dir");
+    let home = tmp.path().to_string_lossy().to_string();
+
+    // Record
+    let (stdout, _, _) = run_procedure_cmd(&binary, &["record", "Failing procedure"], &home);
+    let id = stdout
+        .trim()
+        .strip_prefix("Created procedure: ")
+        .unwrap()
+        .to_string();
+
+    // Add a failing step followed by an echo step
+    run_procedure_cmd(&binary, &["add-step", &id, "false"], &home);
+    run_procedure_cmd(&binary, &["add-step", &id, "echo should-not-run"], &home);
+
+    // Replay -- should fail
+    let (stdout, _stderr, success) = run_procedure_cmd(&binary, &["replay", &id], &home);
+    assert!(!success, "replay with failure should exit non-zero");
+    assert!(
+        stdout.contains("FAILED"),
+        "should report failure, got: {}",
+        stdout
+    );
+    // The second step should not appear as OK
+    assert!(
+        !stdout.contains("step 2: OK"),
+        "step 2 should not have run, got: {}",
+        stdout
+    );
+}
+
+#[test]
+fn procedure_replay_nonexistent_fails() {
+    let binary = agent_binary();
+    let tmp = tempfile::tempdir().expect("create temp dir");
+    let home = tmp.path().to_string_lossy().to_string();
+
+    let (_, _stderr, success) = run_procedure_cmd(&binary, &["replay", "nonexistent-id"], &home);
+    assert!(!success, "replay of nonexistent procedure should fail");
+}

@@ -28,8 +28,10 @@ mod hook;
 mod install;
 mod procedure;
 pub(crate) mod redaction;
+mod replay;
 
 pub use procedure::ProcedureStore;
+pub use replay::{ReplayResult, StepOutcome, replay_procedure};
 
 pub use capture::{
     CorrectionType, LearningSource, capture_correction, capture_failed_command, correct_learning,
