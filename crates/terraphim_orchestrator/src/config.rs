@@ -111,7 +111,16 @@ pub struct RoutingConfig {
     /// Run provider probes on startup (default: true).
     #[serde(default = "default_true_routing")]
     pub probe_on_startup: bool,
-    /// Use RoutingDecisionEngine instead of inline model selection (default: false).
+    /// Use RoutingDecisionEngine instead of inline model selection.
+    ///
+    /// When enabled, `spawn_agent()` delegates model selection to the
+    /// control-plane routing engine which combines KG routing, keyword
+    /// routing, provider health, budget pressure, and live telemetry
+    /// signals (throughput, latency, subscription limits).
+    ///
+    /// Telemetry data is persisted across restarts and restored on startup.
+    ///
+    /// Default: `false` (uses inline model selection logic).
     #[serde(default)]
     pub use_routing_engine: bool,
 }

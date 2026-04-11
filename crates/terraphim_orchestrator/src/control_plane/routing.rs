@@ -7,7 +7,7 @@
 
 use crate::control_plane::telemetry::TelemetryStore;
 use crate::cost_tracker::BudgetVerdict;
-use crate::{kg_router::KgRouter, provider_probe::ProviderHealthMap};
+use crate::kg_router::KgRouter;
 use std::path::PathBuf;
 use std::sync::Arc;
 use terraphim_types::capability::{CostLevel, Latency, Provider, ProviderType};
@@ -126,7 +126,8 @@ struct CollectedCandidates {
 
 pub struct RoutingDecisionEngine {
     kg_router: Option<Arc<KgRouter>>,
-    provider_health: Arc<ProviderHealthMap>,
+    /// Snapshot of unhealthy provider names at construction time.
+    unhealthy_providers: Vec<String>,
     router: terraphim_router::Router,
     telemetry_store: Option<Arc<TelemetryStore>>,
 }
@@ -134,13 +135,13 @@ pub struct RoutingDecisionEngine {
 impl RoutingDecisionEngine {
     pub fn new(
         kg_router: Option<Arc<KgRouter>>,
-        provider_health: Arc<ProviderHealthMap>,
+        unhealthy_providers: Vec<String>,
         router: terraphim_router::Router,
         telemetry_store: Option<Arc<TelemetryStore>>,
     ) -> Self {
         Self {
             kg_router,
-            provider_health,
+            unhealthy_providers,
             router,
             telemetry_store,
         }
@@ -172,7 +173,7 @@ impl RoutingDecisionEngine {
             None => return Vec::new(),
         };
 
-        let unhealthy = self.provider_health.unhealthy_providers();
+        let unhealthy = &self.unhealthy_providers;
         let mut candidates = Vec::new();
 
         for route in &decision.fallback_routes {
@@ -492,14 +493,7 @@ mod tests {
     }
 
     fn test_engine() -> RoutingDecisionEngine {
-        RoutingDecisionEngine::new(
-            None,
-            Arc::new(crate::provider_probe::ProviderHealthMap::new(
-                std::time::Duration::from_secs(300),
-            )),
-            terraphim_router::Router::new(),
-            None,
-        )
+        RoutingDecisionEngine::new(None, Vec::new(), terraphim_router::Router::new(), None)
     }
 
     fn test_engine_with_spent(
@@ -510,14 +504,8 @@ mod tests {
         let mut ct = CostTracker::new();
         ct.register(agent_name, budget_cents);
         ct.record_cost(agent_name, spend_usd);
-        let engine = RoutingDecisionEngine::new(
-            None,
-            Arc::new(crate::provider_probe::ProviderHealthMap::new(
-                std::time::Duration::from_secs(300),
-            )),
-            terraphim_router::Router::new(),
-            None,
-        );
+        let engine =
+            RoutingDecisionEngine::new(None, Vec::new(), terraphim_router::Router::new(), None);
         (engine, ct)
     }
 
@@ -638,9 +626,7 @@ mod tests {
         let kg_router = Arc::new(crate::kg_router::KgRouter::load(dir.path()).unwrap());
         let engine = RoutingDecisionEngine::new(
             Some(kg_router),
-            Arc::new(crate::provider_probe::ProviderHealthMap::new(
-                std::time::Duration::from_secs(300),
-            )),
+            Vec::new(),
             terraphim_router::Router::new(),
             None,
         );
@@ -673,9 +659,7 @@ mod tests {
         let kg_router = Arc::new(crate::kg_router::KgRouter::load(dir.path()).unwrap());
         let engine = RoutingDecisionEngine::new(
             Some(kg_router),
-            Arc::new(crate::provider_probe::ProviderHealthMap::new(
-                std::time::Duration::from_secs(300),
-            )),
+            Vec::new(),
             terraphim_router::Router::new(),
             None,
         );
@@ -851,5 +835,89 @@ mod tests {
 
         assert!(score_no_pressure > score_near);
         assert!(score_near > score_exhausted);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_telemetry_penalises_subscription_limited_model() {
+        use crate::control_plane::telemetry::{CompletionEvent, TelemetryStore, TokenBreakdown};
+
+        let store = TelemetryStore::new(3600);
+        store
+            .record(CompletionEvent {
+                model: "limited-model".to_string(),
+                session_id: "test".to_string(),
+                completed_at: chrono::Utc::now(),
+                latency_ms: 0,
+                success: false,
+                tokens: TokenBreakdown::default(),
+                cost_usd: 0.0,
+                error: Some("weekly session limit reached".to_string()),
+            })
+            .await;
+
+        let engine = RoutingDecisionEngine::new(
+            None,
+            Vec::new(),
+            terraphim_router::Router::new(),
+            Some(Arc::new(store)),
+        );
+
+        let ctx = create_test_context_with_static_model("agent", "task", "limited-model");
+        let decision = engine.decide_route(&ctx, &BudgetVerdict::Uncapped);
+
+        assert!(
+            decision.telemetry_influenced,
+            "telemetry should influence when subscription limited"
+        );
+        assert!(
+            decision.rationale.contains("Telemetry"),
+            "rationale should mention telemetry"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_telemetry_boosts_high_success_model() {
+        use crate::control_plane::telemetry::{CompletionEvent, TelemetryStore, TokenBreakdown};
+
+        let store = TelemetryStore::new(3600);
+        // Record 10 successful completions with good latency
+        for _ in 0..10 {
+            store
+                .record(CompletionEvent {
+                    model: "fast-model".to_string(),
+                    session_id: "test".to_string(),
+                    completed_at: chrono::Utc::now(),
+                    latency_ms: 200,
+                    success: true,
+                    tokens: TokenBreakdown {
+                        total: 500,
+                        input: 400,
+                        output: 100,
+                        ..Default::default()
+                    },
+                    cost_usd: 0.005,
+                    error: None,
+                })
+                .await;
+        }
+
+        let engine = RoutingDecisionEngine::new(
+            None,
+            Vec::new(),
+            terraphim_router::Router::new(),
+            Some(Arc::new(store)),
+        );
+
+        let ctx = create_test_context_with_static_model("agent", "implement feature", "fast-model");
+        let decision = engine.decide_route(&ctx, &BudgetVerdict::Uncapped);
+
+        assert!(
+            decision.telemetry_influenced,
+            "telemetry should influence with high success rate"
+        );
+        assert!(
+            decision.rationale.contains("Telemetry"),
+            "rationale should mention telemetry"
+        );
     }
 }
