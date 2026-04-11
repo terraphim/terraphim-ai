@@ -25,6 +25,13 @@ impl AgentIdentity {
     pub fn resolved_gitea_login(&self) -> &str {
         self.gitea_login.as_deref().unwrap_or(&self.agent_name)
     }
+
+    pub fn accepted_target_names(&self) -> Vec<String> {
+        let mut names = BTreeSet::new();
+        names.insert(self.agent_name.clone());
+        names.insert(self.resolved_gitea_login().to_string());
+        names.into_iter().collect()
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -190,6 +197,10 @@ mod tests {
         let config = ListenerConfig::for_identity("security-sentinel");
         assert_eq!(config.identity.agent_name, "security-sentinel");
         assert_eq!(config.identity.resolved_gitea_login(), "security-sentinel");
+        assert_eq!(
+            config.identity.accepted_target_names(),
+            vec!["security-sentinel".to_string()]
+        );
         assert_eq!(config.poll_interval_secs, 30);
         assert!(config.delegation.exclusive_assignment);
         assert_eq!(config.delegation.max_fanout_depth, 1);
@@ -220,6 +231,68 @@ mod tests {
         let mut config = ListenerConfig::for_identity("security-sentinel");
         config.poll_interval_secs = 0;
         assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn accepted_target_names_include_agent_name_and_login_alias() {
+        let identity = AgentIdentity {
+            agent_name: "security-sentinel".to_string(),
+            gitea_login: Some("security-bot".to_string()),
+            token_path: None,
+        };
+
+        assert_eq!(
+            identity.accepted_target_names(),
+            vec!["security-bot".to_string(), "security-sentinel".to_string()]
+        );
+    }
+
+    #[test]
+    fn retryable_issue_fetch_errors_are_limited_to_transient_statuses() {
+        assert!(ListenerRuntime::should_retry_issue_fetch(
+            &terraphim_tracker::TrackerError::Api {
+                message: "Gitea fetch_issue error 500 on issue 42: boom".to_string(),
+            }
+        ));
+        assert!(ListenerRuntime::should_retry_issue_fetch(
+            &terraphim_tracker::TrackerError::Api {
+                message: "Gitea fetch_issue error 429 on issue 42: rate limited".to_string(),
+            }
+        ));
+        assert!(ListenerRuntime::should_retry_issue_fetch(
+            &terraphim_tracker::TrackerError::Api {
+                message: "Gitea fetch_issue error 408 on issue 42: timeout".to_string(),
+            }
+        ));
+        assert!(!ListenerRuntime::should_retry_issue_fetch(
+            &terraphim_tracker::TrackerError::Api {
+                message: "Gitea fetch_issue error 403 on issue 42: forbidden".to_string(),
+            }
+        ));
+        assert!(!ListenerRuntime::should_retry_issue_fetch(
+            &terraphim_tracker::TrackerError::Api {
+                message: "Gitea fetch_issue error 404 on issue 42: not found".to_string(),
+            }
+        ));
+    }
+
+    #[test]
+    fn retryable_claim_errors_are_limited_to_transient_statuses() {
+        assert!(ListenerRuntime::should_retry_claim_error(
+            &terraphim_tracker::TrackerError::Api {
+                message: "Assignment failed: 500 Internal Server Error".to_string(),
+            }
+        ));
+        assert!(ListenerRuntime::should_retry_claim_error(
+            &terraphim_tracker::TrackerError::Api {
+                message: "Assignment failed: 408 Request Timeout".to_string(),
+            }
+        ));
+        assert!(!ListenerRuntime::should_retry_claim_error(
+            &terraphim_tracker::TrackerError::Api {
+                message: "Assignment failed: 403 Forbidden".to_string(),
+            }
+        ));
     }
 
     #[test]
@@ -347,6 +420,166 @@ mod tests {
             identity: AgentIdentity {
                 agent_name: "security-sentinel".to_string(),
                 gitea_login: Some("security-sentinel".to_string()),
+                token_path: Some(token_path),
+            },
+            gitea: Some(GiteaConnection {
+                base_url: mock_server.uri(),
+                owner: "testowner".to_string(),
+                repo: "testrepo".to_string(),
+                token_path: None,
+            }),
+            claim_strategy: terraphim_tracker::gitea::ClaimStrategy::ApiOnly,
+            poll_interval_secs: 1,
+            notification_rules: vec![],
+            delegation: DelegationPolicy::default(),
+            repo_scope: None,
+        };
+
+        let mut runtime = ListenerRuntime::new(config).unwrap();
+        runtime.poll_once().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn listener_runtime_ignores_self_authored_comments() {
+        let mock_server = MockServer::start().await;
+        let token_dir = tempfile::tempdir().unwrap();
+        let token_path = token_dir.path().join("token.txt");
+        fs::write(&token_path, "test-token").unwrap();
+
+        Mock::given(method("GET"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/comments"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                {
+                    "id": 100,
+                    "issue_url": "https://example.com/api/v1/repos/testowner/testrepo/issues/42",
+                    "body": "Terraphim agent `security-sentinel` accepted `@adf:security-sentinel`",
+                    "user": {"login": "security-sentinel"},
+                    "created_at": "2026-04-04T11:00:00Z",
+                    "updated_at": "2026-04-04T11:00:00Z"
+                }
+            ])))
+            .expect(1)
+            .mount(&mock_server)
+            .await;
+
+        let config = ListenerConfig {
+            identity: AgentIdentity {
+                agent_name: "security-sentinel".to_string(),
+                gitea_login: Some("security-sentinel".to_string()),
+                token_path: Some(token_path),
+            },
+            gitea: Some(GiteaConnection {
+                base_url: mock_server.uri(),
+                owner: "testowner".to_string(),
+                repo: "testrepo".to_string(),
+                token_path: None,
+            }),
+            claim_strategy: terraphim_tracker::gitea::ClaimStrategy::ApiOnly,
+            poll_interval_secs: 1,
+            notification_rules: vec![],
+            delegation: DelegationPolicy::default(),
+            repo_scope: None,
+        };
+
+        let mut runtime = ListenerRuntime::new(config).unwrap();
+        runtime.last_seen_at = "2026-04-04T10:00:00Z".to_string();
+        runtime.poll_once().await.unwrap();
+
+        assert_eq!(runtime.last_seen_at, "2026-04-04T11:00:00+00:00");
+        assert!(runtime.seen_events.is_empty());
+    }
+
+    #[tokio::test]
+    async fn listener_runtime_accepts_agent_name_alias_and_claims_with_gitea_login() {
+        let mock_server = MockServer::start().await;
+        let token_dir = tempfile::tempdir().unwrap();
+        let token_path = token_dir.path().join("token.txt");
+        fs::write(&token_path, "test-token").unwrap();
+
+        let issue_json = serde_json::json!({
+            "id": 42,
+            "number": 42,
+            "title": "Listener target",
+            "body": "Needs attention",
+            "state": "open",
+            "html_url": "https://example.com/issues/42",
+            "created_at": "2026-04-04T10:00:00Z",
+            "updated_at": "2026-04-04T10:00:00Z",
+            "assignees": []
+        });
+
+        Mock::given(method("GET"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/comments"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                {
+                    "id": 100,
+                    "issue_url": "https://example.com/api/v1/repos/testowner/testrepo/issues/42",
+                    "body": "Please check @adf:security-sentinel",
+                    "user": {"login": "alice"},
+                    "created_at": "2026-04-04T11:00:00Z",
+                    "updated_at": "2026-04-04T11:00:00Z"
+                }
+            ])))
+            .mount(&mock_server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/42"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(issue_json))
+            .up_to_n_times(3)
+            .expect(3)
+            .mount(&mock_server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/42"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": 42,
+                "number": 42,
+                "title": "Listener target",
+                "body": "Needs attention",
+                "state": "open",
+                "html_url": "https://example.com/issues/42",
+                "created_at": "2026-04-04T10:00:00Z",
+                "updated_at": "2026-04-04T10:00:00Z",
+                "assignees": [{"login": "security-bot"}]
+            })))
+            .mount(&mock_server)
+            .await;
+
+        Mock::given(method("PATCH"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/42"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": 42,
+                "number": 42,
+                "title": "Listener target",
+                "state": "open",
+                "assignees": [{"login": "security-bot"}]
+            })))
+            .expect(1)
+            .mount(&mock_server)
+            .await;
+
+        Mock::given(method("POST"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/42/comments"))
+            .and(body_string_contains(
+                "`security-bot` accepted `@adf:security-sentinel`",
+            ))
+            .respond_with(ResponseTemplate::new(201).set_body_json(serde_json::json!({
+                "id": 200,
+                "body": "ack",
+                "user": {"login": "security-bot"},
+                "created_at": "2026-04-04T12:00:00Z",
+                "updated_at": "2026-04-04T12:00:00Z"
+            })))
+            .expect(1)
+            .mount(&mock_server)
+            .await;
+
+        let config = ListenerConfig {
+            identity: AgentIdentity {
+                agent_name: "security-sentinel".to_string(),
+                gitea_login: Some("security-bot".to_string()),
                 token_path: Some(token_path),
             },
             gitea: Some(GiteaConnection {
@@ -603,6 +836,373 @@ mod tests {
         runtime.poll_once().await.unwrap();
         assert_eq!(runtime.last_seen_at, "2026-04-04T12:30:00+00:00");
     }
+
+    #[tokio::test]
+    async fn listener_runtime_retries_transient_claim_failures_without_advancing_cursor() {
+        let mock_server = MockServer::start().await;
+        let token_dir = tempfile::tempdir().unwrap();
+        let token_path = token_dir.path().join("token.txt");
+        fs::write(&token_path, "test-token").unwrap();
+
+        Mock::given(method("GET"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/comments"))
+            .and(query_param("limit", "50"))
+            .and(query_param("page", "1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                {
+                    "id": 100,
+                    "issue_url": "https://example.com/api/v1/repos/testowner/testrepo/issues/42",
+                    "body": "Please check @adf:security-sentinel",
+                    "user": {"login": "alice"},
+                    "created_at": "2026-04-04T12:30:00Z",
+                    "updated_at": "2026-04-04T12:30:00Z"
+                }
+            ])))
+            .expect(2)
+            .mount(&mock_server)
+            .await;
+
+        let unassigned_issue = serde_json::json!({
+            "id": 42,
+            "number": 42,
+            "title": "Listener target",
+            "body": "Needs attention",
+            "state": "open",
+            "html_url": "https://example.com/issues/42",
+            "created_at": "2026-04-04T10:00:00Z",
+            "updated_at": "2026-04-04T10:00:00Z",
+            "assignees": []
+        });
+
+        Mock::given(method("GET"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/42"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(unassigned_issue))
+            .up_to_n_times(6)
+            .expect(6)
+            .mount(&mock_server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/42"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": 42,
+                "number": 42,
+                "title": "Listener target",
+                "body": "Needs attention",
+                "state": "open",
+                "html_url": "https://example.com/issues/42",
+                "created_at": "2026-04-04T10:00:00Z",
+                "updated_at": "2026-04-04T10:00:00Z",
+                "assignees": [{"login": "security-sentinel"}]
+            })))
+            .expect(1)
+            .mount(&mock_server)
+            .await;
+
+        Mock::given(method("PATCH"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/42"))
+            .respond_with(ResponseTemplate::new(500).set_body_string("temporary failure"))
+            .up_to_n_times(1)
+            .expect(1)
+            .mount(&mock_server)
+            .await;
+
+        Mock::given(method("PATCH"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/42"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": 42,
+                "number": 42,
+                "title": "Listener target",
+                "state": "open",
+                "assignees": [{"login": "security-sentinel"}]
+            })))
+            .up_to_n_times(1)
+            .expect(1)
+            .mount(&mock_server)
+            .await;
+
+        Mock::given(method("POST"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/42/comments"))
+            .and(body_string_contains("session="))
+            .and(body_string_contains("event="))
+            .respond_with(ResponseTemplate::new(201).set_body_json(serde_json::json!({
+                "id": 200,
+                "body": "ack",
+                "user": {"login": "security-sentinel"},
+                "created_at": "2026-04-04T12:31:00Z",
+                "updated_at": "2026-04-04T12:31:00Z"
+            })))
+            .expect(1)
+            .mount(&mock_server)
+            .await;
+
+        let config = ListenerConfig {
+            identity: AgentIdentity {
+                agent_name: "security-sentinel".to_string(),
+                gitea_login: Some("security-sentinel".to_string()),
+                token_path: Some(token_path),
+            },
+            gitea: Some(GiteaConnection {
+                base_url: mock_server.uri(),
+                owner: "testowner".to_string(),
+                repo: "testrepo".to_string(),
+                token_path: None,
+            }),
+            claim_strategy: terraphim_tracker::gitea::ClaimStrategy::ApiOnly,
+            poll_interval_secs: 1,
+            notification_rules: vec![],
+            delegation: DelegationPolicy::default(),
+            repo_scope: None,
+        };
+
+        let mut runtime = ListenerRuntime::new(config).unwrap();
+        runtime.last_seen_at = "2026-04-04T10:00:00Z".to_string();
+
+        runtime.poll_once().await.unwrap();
+        assert_eq!(runtime.last_seen_at, "2026-04-04T10:00:00Z");
+        assert!(runtime.seen_events.is_empty());
+
+        runtime.poll_once().await.unwrap();
+        assert_eq!(runtime.last_seen_at, "2026-04-04T12:30:00+00:00");
+        assert_eq!(runtime.seen_events.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn listener_runtime_retries_transient_issue_fetch_failures_without_advancing_cursor() {
+        let mock_server = MockServer::start().await;
+        let token_dir = tempfile::tempdir().unwrap();
+        let token_path = token_dir.path().join("token.txt");
+        fs::write(&token_path, "test-token").unwrap();
+
+        Mock::given(method("GET"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/comments"))
+            .and(query_param("limit", "50"))
+            .and(query_param("page", "1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                {
+                    "id": 100,
+                    "issue_url": "https://example.com/api/v1/repos/testowner/testrepo/issues/42",
+                    "body": "Please check @adf:security-sentinel",
+                    "user": {"login": "alice"},
+                    "created_at": "2026-04-04T12:30:00Z",
+                    "updated_at": "2026-04-04T12:30:00Z"
+                }
+            ])))
+            .expect(2)
+            .mount(&mock_server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/42"))
+            .respond_with(ResponseTemplate::new(500).set_body_string("temporary failure"))
+            .up_to_n_times(1)
+            .expect(1)
+            .mount(&mock_server)
+            .await;
+
+        let unassigned_issue = serde_json::json!({
+            "id": 42,
+            "number": 42,
+            "title": "Listener target",
+            "body": "Needs attention",
+            "state": "open",
+            "html_url": "https://example.com/issues/42",
+            "created_at": "2026-04-04T10:00:00Z",
+            "updated_at": "2026-04-04T10:00:00Z",
+            "assignees": []
+        });
+
+        Mock::given(method("GET"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/42"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(unassigned_issue))
+            .up_to_n_times(3)
+            .expect(3)
+            .mount(&mock_server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/42"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": 42,
+                "number": 42,
+                "title": "Listener target",
+                "body": "Needs attention",
+                "state": "open",
+                "html_url": "https://example.com/issues/42",
+                "created_at": "2026-04-04T10:00:00Z",
+                "updated_at": "2026-04-04T10:00:00Z",
+                "assignees": [{"login": "security-sentinel"}]
+            })))
+            .expect(1)
+            .mount(&mock_server)
+            .await;
+
+        Mock::given(method("PATCH"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/42"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": 42,
+                "number": 42,
+                "title": "Listener target",
+                "state": "open",
+                "assignees": [{"login": "security-sentinel"}]
+            })))
+            .expect(1)
+            .mount(&mock_server)
+            .await;
+
+        Mock::given(method("POST"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/42/comments"))
+            .and(body_string_contains("session="))
+            .and(body_string_contains("event="))
+            .respond_with(ResponseTemplate::new(201).set_body_json(serde_json::json!({
+                "id": 200,
+                "body": "ack",
+                "user": {"login": "security-sentinel"},
+                "created_at": "2026-04-04T12:31:00Z",
+                "updated_at": "2026-04-04T12:31:00Z"
+            })))
+            .expect(1)
+            .mount(&mock_server)
+            .await;
+
+        let config = ListenerConfig {
+            identity: AgentIdentity {
+                agent_name: "security-sentinel".to_string(),
+                gitea_login: Some("security-sentinel".to_string()),
+                token_path: Some(token_path),
+            },
+            gitea: Some(GiteaConnection {
+                base_url: mock_server.uri(),
+                owner: "testowner".to_string(),
+                repo: "testrepo".to_string(),
+                token_path: None,
+            }),
+            claim_strategy: terraphim_tracker::gitea::ClaimStrategy::ApiOnly,
+            poll_interval_secs: 1,
+            notification_rules: vec![],
+            delegation: DelegationPolicy::default(),
+            repo_scope: None,
+        };
+
+        let mut runtime = ListenerRuntime::new(config).unwrap();
+        runtime.last_seen_at = "2026-04-04T10:00:00Z".to_string();
+
+        runtime.poll_once().await.unwrap();
+        assert_eq!(runtime.last_seen_at, "2026-04-04T10:00:00Z");
+        assert!(runtime.seen_events.is_empty());
+
+        runtime.poll_once().await.unwrap();
+        assert_eq!(runtime.last_seen_at, "2026-04-04T12:30:00+00:00");
+        assert_eq!(runtime.seen_events.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn listener_runtime_sorts_cross_page_comments_before_advancing_cursor() {
+        let mock_server = MockServer::start().await;
+        let token_dir = tempfile::tempdir().unwrap();
+        let token_path = token_dir.path().join("token.txt");
+        fs::write(&token_path, "test-token").unwrap();
+
+        let page_one: Vec<_> = (1..=50)
+            .map(|id| {
+                serde_json::json!({
+                    "id": id,
+                    "issue_url": null,
+                    "body": "noise",
+                    "user": {"login": "alice"},
+                    "created_at": format!("2026-04-04T12:{:02}:00Z", 30 + (id % 20)),
+                    "updated_at": format!("2026-04-04T12:{:02}:00Z", 30 + (id % 20))
+                })
+            })
+            .collect();
+
+        Mock::given(method("GET"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/comments"))
+            .and(query_param("limit", "50"))
+            .and(query_param("page", "1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(page_one))
+            .expect(1)
+            .mount(&mock_server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/comments"))
+            .and(query_param("limit", "50"))
+            .and(query_param("page", "2"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                {
+                    "id": 100,
+                    "issue_url": "https://example.com/api/v1/repos/testowner/testrepo/issues/42",
+                    "body": "Please check @adf:security-sentinel",
+                    "user": {"login": "alice"},
+                    "created_at": "2026-04-04T12:30:00Z",
+                    "updated_at": "2026-04-04T12:30:00Z"
+                }
+            ])))
+            .expect(1)
+            .mount(&mock_server)
+            .await;
+
+        let issue_json = serde_json::json!({
+            "id": 42,
+            "number": 42,
+            "title": "Listener target",
+            "body": "Needs attention",
+            "state": "open",
+            "html_url": "https://example.com/issues/42",
+            "created_at": "2026-04-04T10:00:00Z",
+            "updated_at": "2026-04-04T10:00:00Z",
+            "assignees": []
+        });
+
+        Mock::given(method("GET"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/42"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(issue_json))
+            .up_to_n_times(3)
+            .expect(3)
+            .mount(&mock_server)
+            .await;
+
+        Mock::given(method("PATCH"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/42"))
+            .respond_with(ResponseTemplate::new(500).set_body_string("temporary failure"))
+            .up_to_n_times(1)
+            .expect(1)
+            .mount(&mock_server)
+            .await;
+
+        let config = ListenerConfig {
+            identity: AgentIdentity {
+                agent_name: "security-sentinel".to_string(),
+                gitea_login: Some("security-sentinel".to_string()),
+                token_path: Some(token_path),
+            },
+            gitea: Some(GiteaConnection {
+                base_url: mock_server.uri(),
+                owner: "testowner".to_string(),
+                repo: "testrepo".to_string(),
+                token_path: None,
+            }),
+            claim_strategy: terraphim_tracker::gitea::ClaimStrategy::ApiOnly,
+            poll_interval_secs: 1,
+            notification_rules: vec![],
+            delegation: DelegationPolicy::default(),
+            repo_scope: None,
+        };
+
+        let mut runtime = ListenerRuntime::new(config).unwrap();
+        runtime.last_seen_at = "2026-04-04T10:00:00Z".to_string();
+
+        runtime.poll_once().await.unwrap();
+        assert_eq!(runtime.last_seen_at, "2026-04-04T10:00:00Z");
+        assert!(runtime.seen_events.is_empty());
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PollDecision {
+    AdvanceCursor,
+    RetryLater,
 }
 
 /// Runtime for a single identity-bound listener.
@@ -610,6 +1210,7 @@ pub struct ListenerRuntime {
     config: ListenerConfig,
     tracker: terraphim_tracker::gitea::GiteaTracker,
     parser: terraphim_orchestrator::adf_commands::AdfCommandParser,
+    accepted_target_names: BTreeSet<String>,
     repo_full_name: String,
     seen_events: std::collections::HashSet<String>,
     last_seen_at: String,
@@ -652,7 +1253,12 @@ impl ListenerRuntime {
                 claim_strategy: config.claim_strategy,
             })?;
 
-        let agent_names = vec![config.identity.resolved_gitea_login().to_string()];
+        let accepted_target_names: BTreeSet<String> = config
+            .identity
+            .accepted_target_names()
+            .into_iter()
+            .collect();
+        let agent_names = accepted_target_names.iter().cloned().collect::<Vec<_>>();
         let parser = terraphim_orchestrator::adf_commands::AdfCommandParser::new(&agent_names, &[]);
 
         Ok(Self {
@@ -660,6 +1266,7 @@ impl ListenerRuntime {
             config,
             tracker,
             parser,
+            accepted_target_names,
             seen_events: std::collections::HashSet::new(),
             last_seen_at: chrono::Utc::now().to_rfc3339(),
         })
@@ -683,6 +1290,7 @@ impl ListenerRuntime {
     pub async fn poll_once(&mut self) -> Result<()> {
         let mut page = 1u32;
         let mut newest_seen_at: Option<chrono::DateTime<chrono::Utc>> = None;
+        let mut should_retry_current_cursor = false;
 
         loop {
             let comments = self
@@ -692,21 +1300,34 @@ impl ListenerRuntime {
             let comment_count = comments.len();
 
             for comment in comments {
-                if let Some(timestamp) = Self::comment_timestamp(&comment) {
-                    newest_seen_at =
-                        Some(newest_seen_at.map_or(timestamp, |current| current.max(timestamp)));
+                let timestamp = Self::comment_timestamp(&comment);
+
+                match self.process_comment(comment).await? {
+                    PollDecision::AdvanceCursor => {
+                        if let Some(timestamp) = timestamp {
+                            newest_seen_at = Some(
+                                newest_seen_at.map_or(timestamp, |current| current.max(timestamp)),
+                            );
+                        }
+                    }
+                    PollDecision::RetryLater => {
+                        should_retry_current_cursor = true;
+                        break;
+                    }
                 }
-                self.process_comment(comment).await?;
             }
 
-            if comment_count < 50 {
+            if should_retry_current_cursor || comment_count < 50 {
                 break;
             }
+
             page += 1;
         }
 
-        if let Some(newest_seen_at) = newest_seen_at {
-            self.last_seen_at = newest_seen_at.to_rfc3339();
+        if !should_retry_current_cursor {
+            if let Some(newest_seen_at) = newest_seen_at {
+                self.last_seen_at = newest_seen_at.to_rfc3339();
+            }
         }
         Ok(())
     }
@@ -726,16 +1347,69 @@ impl ListenerRuntime {
             .map(|timestamp| timestamp.with_timezone(&chrono::Utc))
     }
 
-    async fn process_comment(&mut self, comment: terraphim_tracker::IssueComment) -> Result<()> {
+    fn should_retry_issue_fetch(error: &terraphim_tracker::TrackerError) -> bool {
+        match error {
+            terraphim_tracker::TrackerError::Http(error) => {
+                error.is_timeout() || error.is_connect() || error.is_request() || error.is_body()
+            }
+            terraphim_tracker::TrackerError::Api { message } => {
+                Self::issue_fetch_status_code(message)
+                    .is_some_and(|status| status == 408 || status == 429 || status >= 500)
+            }
+            terraphim_tracker::TrackerError::GraphQLError { .. }
+            | terraphim_tracker::TrackerError::AuthenticationMissing { .. }
+            | terraphim_tracker::TrackerError::ValidationFailed { .. } => false,
+        }
+    }
+
+    fn should_retry_claim_error(error: &terraphim_tracker::TrackerError) -> bool {
+        match error {
+            terraphim_tracker::TrackerError::Http(error) => {
+                error.is_timeout() || error.is_connect() || error.is_request() || error.is_body()
+            }
+            terraphim_tracker::TrackerError::Api { message } => {
+                Self::issue_fetch_status_code(message)
+                    .is_some_and(|status| status == 408 || status == 429 || status >= 500)
+            }
+            terraphim_tracker::TrackerError::GraphQLError { .. }
+            | terraphim_tracker::TrackerError::AuthenticationMissing { .. }
+            | terraphim_tracker::TrackerError::ValidationFailed { .. } => false,
+        }
+    }
+
+    fn issue_fetch_status_code(message: &str) -> Option<u16> {
+        message
+            .split_whitespace()
+            .find_map(|part| part.parse::<u16>().ok())
+    }
+
+    async fn process_comment(
+        &mut self,
+        comment: terraphim_tracker::IssueComment,
+    ) -> Result<PollDecision> {
         if comment.issue_number == 0 {
-            return Ok(());
+            return Ok(PollDecision::AdvanceCursor);
+        }
+
+        if comment.user.login == self.config.identity.resolved_gitea_login() {
+            return Ok(PollDecision::AdvanceCursor);
         }
 
         let issue = match self.tracker.fetch_issue(comment.issue_number).await {
             Ok(issue) => issue,
             Err(e) => {
-                tracing::warn!(issue = comment.issue_number, error = %e, "failed to fetch issue for listener event");
-                return Ok(());
+                let retry = Self::should_retry_issue_fetch(&e);
+                tracing::warn!(
+                    issue = comment.issue_number,
+                    error = %e,
+                    retry,
+                    "failed to fetch issue for listener event"
+                );
+                return Ok(if retry {
+                    PollDecision::RetryLater
+                } else {
+                    PollDecision::AdvanceCursor
+                });
             }
         };
 
@@ -757,26 +1431,47 @@ impl ListenerRuntime {
                 None => continue,
             };
 
-            if event.target_agent_name != self.config.identity.resolved_gitea_login() {
+            if !self
+                .accepted_target_names
+                .contains(&event.target_agent_name)
+            {
                 continue;
             }
 
-            if !self.seen_events.insert(event.event_id.clone()) {
+            if self.seen_events.contains(&event.event_id) {
                 continue;
             }
 
-            let claim = self
+            let claim = match self
                 .tracker
                 .claim_issue(
                     self.config.identity.resolved_gitea_login(),
                     event.issue_number,
                     self.config.claim_strategy,
                 )
-                .await?;
+                .await
+            {
+                Ok(claim) => claim,
+                Err(error) => {
+                    let retry = Self::should_retry_claim_error(&error);
+                    tracing::warn!(
+                        issue = event.issue_number,
+                        error = %error,
+                        retry,
+                        "listener claim failed"
+                    );
+                    return Ok(if retry {
+                        PollDecision::RetryLater
+                    } else {
+                        PollDecision::AdvanceCursor
+                    });
+                }
+            };
 
             match claim {
                 terraphim_tracker::gitea::ClaimResult::Success
                 | terraphim_tracker::gitea::ClaimResult::AlreadyAssigned => {
+                    self.seen_events.insert(event.event_id.clone());
                     let ack = format!(
                         "Terraphim agent `{}` accepted `@adf:{}` on comment #{}. session={} event={}",
                         self.config.identity.resolved_gitea_login(),
@@ -788,6 +1483,7 @@ impl ListenerRuntime {
                     let _ = self.tracker.post_comment(event.issue_number, &ack).await;
                 }
                 terraphim_tracker::gitea::ClaimResult::AssignedToOther { assignee } => {
+                    self.seen_events.insert(event.event_id.clone());
                     tracing::info!(
                         issue = event.issue_number,
                         assignee = %assignee,
@@ -795,21 +1491,24 @@ impl ListenerRuntime {
                     );
                 }
                 terraphim_tracker::gitea::ClaimResult::NotFound => {
+                    self.seen_events.insert(event.event_id.clone());
                     tracing::warn!(
                         issue = event.issue_number,
                         "listener claim target not found"
                     );
                 }
                 terraphim_tracker::gitea::ClaimResult::PermissionDenied { reason } => {
+                    self.seen_events.insert(event.event_id.clone());
                     tracing::warn!(issue = event.issue_number, %reason, "listener claim permission denied");
                 }
                 terraphim_tracker::gitea::ClaimResult::TransientFailure { reason } => {
                     tracing::warn!(issue = event.issue_number, %reason, "listener claim transient failure");
+                    return Ok(PollDecision::RetryLater);
                 }
             }
         }
 
-        Ok(())
+        Ok(PollDecision::AdvanceCursor)
     }
 
     #[allow(dead_code)]
