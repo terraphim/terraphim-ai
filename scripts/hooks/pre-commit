@@ -118,9 +118,9 @@ if command_exists cargo; then
         fi
         print_status "SUCCESS" "Cargo build passed"
 
-        # Run tests (with timeout to avoid hanging)
+        # Run tests (unset git env vars so tests that call git internally work correctly)
         print_status "INFO" "Running Rust tests..."
-        if ! cargo test --workspace --lib >/dev/null 2>&1; then
+        if ! env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE cargo test --workspace --lib >/dev/null 2>&1; then
             print_status "FAIL" "Some tests are failing"
             print_status "INFO" "Run 'cargo test --workspace --lib' to see details"
             exit 1

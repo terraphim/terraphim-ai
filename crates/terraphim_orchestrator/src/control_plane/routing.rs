@@ -263,7 +263,7 @@ impl RoutingDecisionEngine {
         base * (1.0 - penalty)
     }
 
-    pub fn decide_route(
+    pub async fn decide_route(
         &self,
         ctx: &DispatchContext,
         budget_verdict: &BudgetVerdict,
@@ -358,16 +358,10 @@ impl RoutingDecisionEngine {
         // Apply telemetry-based scoring adjustments
         let mut telemetry_influenced = false;
         if let Some(ref store) = self.telemetry_store {
-            let performances: Vec<crate::control_plane::telemetry::ModelPerformanceSnapshot> =
-                tokio::task::block_in_place(|| {
-                    tokio::runtime::Handle::current().block_on(async {
-                        let mut perfs = Vec::new();
-                        for candidate in &all_candidates {
-                            perfs.push(store.model_performance(&candidate.model).await);
-                        }
-                        perfs
-                    })
-                });
+            let mut performances = Vec::with_capacity(all_candidates.len());
+            for candidate in &all_candidates {
+                performances.push(store.model_performance(&candidate.model).await);
+            }
 
             for (i, perf) in performances.iter().enumerate() {
                 if perf.is_subscription_limited() {
@@ -509,11 +503,11 @@ mod tests {
         (engine, ct)
     }
 
-    #[test]
-    fn test_cli_default_for_unsupported_tool() {
+    #[tokio::test]
+    async fn test_cli_default_for_unsupported_tool() {
         let engine = test_engine();
         let ctx = create_test_context_with_cli("test-agent", "Implement a feature", "codex");
-        let decision = engine.decide_route(&ctx, &BudgetVerdict::Uncapped);
+        let decision = engine.decide_route(&ctx, &BudgetVerdict::Uncapped).await;
 
         assert_eq!(decision.candidate.source, RouteSource::CliDefault);
         assert!(decision.candidate.model.is_empty());
@@ -523,15 +517,15 @@ mod tests {
         assert!(!decision.budget_influenced);
     }
 
-    #[test]
-    fn test_static_model_selected_when_only_signal() {
+    #[tokio::test]
+    async fn test_static_model_selected_when_only_signal() {
         let engine = test_engine();
         let ctx = create_test_context_with_static_model(
             "test-agent",
             "Implement a feature",
             "claude-3-opus",
         );
-        let decision = engine.decide_route(&ctx, &BudgetVerdict::Uncapped);
+        let decision = engine.decide_route(&ctx, &BudgetVerdict::Uncapped).await;
 
         assert_eq!(decision.candidate.source, RouteSource::StaticConfig);
         assert_eq!(decision.candidate.model, "claude-3-opus");
@@ -539,8 +533,8 @@ mod tests {
         assert_eq!(decision.dominant_signal, RouteSource::StaticConfig);
     }
 
-    #[test]
-    fn test_unsupported_cli_ignores_static_model() {
+    #[tokio::test]
+    async fn test_unsupported_cli_ignores_static_model() {
         let engine = test_engine();
         let ctx = DispatchContext {
             agent_name: "test-agent".to_string(),
@@ -550,49 +544,49 @@ mod tests {
             layer: crate::config::AgentLayer::Core,
             session_id: None,
         };
-        let decision = engine.decide_route(&ctx, &BudgetVerdict::Uncapped);
+        let decision = engine.decide_route(&ctx, &BudgetVerdict::Uncapped).await;
 
         assert_eq!(decision.candidate.source, RouteSource::CliDefault);
         assert_eq!(decision.dominant_signal, RouteSource::CliDefault);
     }
 
-    #[test]
-    fn test_opencode_gets_static_model() {
+    #[tokio::test]
+    async fn test_opencode_gets_static_model() {
         let engine = test_engine();
         let ctx = create_test_context_with_static_model(
             "test-agent",
             "Implement a feature",
             "kimi-for-coding/k2p5",
         );
-        let decision = engine.decide_route(&ctx, &BudgetVerdict::Uncapped);
+        let decision = engine.decide_route(&ctx, &BudgetVerdict::Uncapped).await;
 
         assert_eq!(decision.candidate.source, RouteSource::StaticConfig);
         assert_eq!(decision.candidate.model, "kimi-for-coding/k2p5");
     }
 
-    #[test]
-    fn test_cli_default_when_no_signals_match() {
+    #[tokio::test]
+    async fn test_cli_default_when_no_signals_match() {
         let engine = test_engine();
         let ctx = create_test_context_with_cli("test-agent", "do something", "opencode");
-        let decision = engine.decide_route(&ctx, &BudgetVerdict::Uncapped);
+        let decision = engine.decide_route(&ctx, &BudgetVerdict::Uncapped).await;
 
         assert_eq!(decision.candidate.source, RouteSource::CliDefault);
         assert!(decision.rationale.contains("No routing signal matched"));
         assert_eq!(decision.dominant_signal, RouteSource::CliDefault);
     }
 
-    #[test]
-    fn test_rationale_records_dominant_signal() {
+    #[tokio::test]
+    async fn test_rationale_records_dominant_signal() {
         let engine = test_engine();
         let ctx = create_test_context_with_static_model("agent", "task", "model-x");
-        let decision = engine.decide_route(&ctx, &BudgetVerdict::Uncapped);
+        let decision = engine.decide_route(&ctx, &BudgetVerdict::Uncapped).await;
 
         assert!(decision.rationale.contains("static config"));
         assert!(decision.rationale.contains("Selected model-x"));
     }
 
-    #[test]
-    fn test_all_candidates_collected_from_multiple_sources() {
+    #[tokio::test]
+    async fn test_all_candidates_collected_from_multiple_sources() {
         let engine = test_engine();
         let ctx = DispatchContext {
             agent_name: "test-agent".to_string(),
@@ -602,7 +596,7 @@ mod tests {
             layer: crate::config::AgentLayer::Core,
             session_id: None,
         };
-        let decision = engine.decide_route(&ctx, &BudgetVerdict::Uncapped);
+        let decision = engine.decide_route(&ctx, &BudgetVerdict::Uncapped).await;
 
         assert!(!decision.all_candidates.is_empty());
         assert!(decision
@@ -611,8 +605,8 @@ mod tests {
             .any(|c| c.source == RouteSource::StaticConfig));
     }
 
-    #[test]
-    fn test_combined_kg_keyword_when_models_agree() {
+    #[tokio::test]
+    async fn test_combined_kg_keyword_when_models_agree() {
         use std::fs;
         use tempfile::tempdir;
 
@@ -632,7 +626,7 @@ mod tests {
         );
 
         let ctx = create_test_context_with_cli("agent", "implement feature", "opencode");
-        let decision = engine.decide_route(&ctx, &BudgetVerdict::Uncapped);
+        let decision = engine.decide_route(&ctx, &BudgetVerdict::Uncapped).await;
 
         assert!(
             decision.candidate.source == RouteSource::KnowledgeGraph
@@ -644,8 +638,8 @@ mod tests {
         assert!(decision.primary_available);
     }
 
-    #[test]
-    fn test_kg_only_no_keyword_match() {
+    #[tokio::test]
+    async fn test_kg_only_no_keyword_match() {
         use std::fs;
         use tempfile::tempdir;
 
@@ -665,18 +659,18 @@ mod tests {
         );
 
         let ctx = create_test_context_with_cli("agent", "security audit the codebase", "opencode");
-        let decision = engine.decide_route(&ctx, &BudgetVerdict::Uncapped);
+        let decision = engine.decide_route(&ctx, &BudgetVerdict::Uncapped).await;
 
         assert_eq!(decision.candidate.source, RouteSource::KnowledgeGraph);
         assert!(decision.candidate.model.contains("opus"));
         assert_eq!(decision.dominant_signal, RouteSource::KnowledgeGraph);
     }
 
-    #[test]
-    fn test_keyword_only_no_kg_match() {
+    #[tokio::test]
+    async fn test_keyword_only_no_kg_match() {
         let engine = test_engine();
         let ctx = create_test_context_with_cli("agent", "implement a feature", "opencode");
-        let decision = engine.decide_route(&ctx, &BudgetVerdict::Uncapped);
+        let decision = engine.decide_route(&ctx, &BudgetVerdict::Uncapped).await;
 
         assert!(
             decision.candidate.source == RouteSource::KeywordRouting
@@ -684,8 +678,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_dispatch_context_session_id() {
+    #[tokio::test]
+    async fn test_dispatch_context_session_id() {
         let ctx = DispatchContext {
             agent_name: "test-agent".to_string(),
             task: "Do something".to_string(),
@@ -697,8 +691,8 @@ mod tests {
         assert_eq!(ctx.session_id, Some("sess-123".to_string()));
     }
 
-    #[test]
-    fn test_route_source_display() {
+    #[tokio::test]
+    async fn test_route_source_display() {
         assert_eq!(RouteSource::KnowledgeGraph.to_string(), "KG");
         assert_eq!(RouteSource::KeywordRouting.to_string(), "keyword");
         assert_eq!(RouteSource::StaticConfig.to_string(), "static");
@@ -706,8 +700,8 @@ mod tests {
         assert_eq!(RouteSource::CliDefault.to_string(), "CLI default");
     }
 
-    #[test]
-    fn test_make_agent_provider() {
+    #[tokio::test]
+    async fn test_make_agent_provider() {
         let provider = make_agent_provider("my-agent", "opencode");
         assert!(provider.id.contains("my-agent"));
         if let ProviderType::Agent {
@@ -723,36 +717,36 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_budget_pressure_no_pressure_for_uncapped() {
+    #[tokio::test]
+    async fn test_budget_pressure_no_pressure_for_uncapped() {
         let engine = test_engine();
         let ctx = create_test_context_with_static_model("test-agent", "task", "model-x");
-        let decision = engine.decide_route(&ctx, &BudgetVerdict::Uncapped);
+        let decision = engine.decide_route(&ctx, &BudgetVerdict::Uncapped).await;
 
         assert_eq!(decision.budget_pressure, BudgetPressure::NoPressure);
         assert!(!decision.budget_influenced);
     }
 
-    #[test]
-    fn test_budget_pressure_near_exhaustion_detected() {
+    #[tokio::test]
+    async fn test_budget_pressure_near_exhaustion_detected() {
         let (engine, ct) = test_engine_with_spent("test-agent", Some(10000), 85.0);
         let ctx = create_test_context_with_static_model("test-agent", "task", "model-x");
-        let decision = engine.decide_route(&ctx, &ct.check("test-agent"));
+        let decision = engine.decide_route(&ctx, &ct.check("test-agent")).await;
 
         assert_eq!(decision.budget_pressure, BudgetPressure::NearExhaustion);
     }
 
-    #[test]
-    fn test_budget_pressure_exhausted_detected() {
+    #[tokio::test]
+    async fn test_budget_pressure_exhausted_detected() {
         let (engine, ct) = test_engine_with_spent("test-agent", Some(10000), 100.0);
         let ctx = create_test_context_with_static_model("test-agent", "task", "model-x");
-        let decision = engine.decide_route(&ctx, &ct.check("test-agent"));
+        let decision = engine.decide_route(&ctx, &ct.check("test-agent")).await;
 
         assert_eq!(decision.budget_pressure, BudgetPressure::Exhausted);
     }
 
-    #[test]
-    fn test_budget_pressure_penalty_calculation() {
+    #[tokio::test]
+    async fn test_budget_pressure_penalty_calculation() {
         let no_pressure = BudgetPressure::NoPressure;
         assert_eq!(no_pressure.cost_penalty(&CostLevel::Cheap), 0.0);
         assert_eq!(no_pressure.cost_penalty(&CostLevel::Moderate), 0.0);
@@ -769,17 +763,17 @@ mod tests {
         assert!((exhausted.cost_penalty(&CostLevel::Expensive) - 0.70).abs() < 0.001);
     }
 
-    #[test]
-    fn test_budget_influences_rationale_when_pressure() {
+    #[tokio::test]
+    async fn test_budget_influences_rationale_when_pressure() {
         let (engine, ct) = test_engine_with_spent("test-agent", Some(10000), 85.0);
         let ctx = create_test_context_with_static_model("test-agent", "task", "model-x");
-        let decision = engine.decide_route(&ctx, &ct.check("test-agent"));
+        let decision = engine.decide_route(&ctx, &ct.check("test-agent")).await;
 
         assert_eq!(decision.budget_pressure, BudgetPressure::NearExhaustion);
     }
 
-    #[test]
-    fn test_budget_verdict_conversion() {
+    #[tokio::test]
+    async fn test_budget_verdict_conversion() {
         assert_eq!(
             BudgetPressure::from_verdict(&BudgetVerdict::Uncapped),
             BudgetPressure::NoPressure
@@ -804,8 +798,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_score_candidate_with_budget_pressure() {
+    #[tokio::test]
+    async fn test_score_candidate_with_budget_pressure() {
         let candidate = RouteCandidate {
             provider: Provider {
                 id: "test".to_string(),
@@ -863,7 +857,7 @@ mod tests {
         );
 
         let ctx = create_test_context_with_static_model("agent", "task", "limited-model");
-        let decision = engine.decide_route(&ctx, &BudgetVerdict::Uncapped);
+        let decision = engine.decide_route(&ctx, &BudgetVerdict::Uncapped).await;
 
         assert!(
             decision.telemetry_influenced,
@@ -909,7 +903,7 @@ mod tests {
         );
 
         let ctx = create_test_context_with_static_model("agent", "implement feature", "fast-model");
-        let decision = engine.decide_route(&ctx, &BudgetVerdict::Uncapped);
+        let decision = engine.decide_route(&ctx, &BudgetVerdict::Uncapped).await;
 
         assert!(
             decision.telemetry_influenced,
