@@ -63,6 +63,7 @@ terraphim_persistence = { path = "../terraphim_persistence", version = "1.4.10",
 
 # Quickwit integration (optional)
 reqwest = { workspace = true, optional = true }
+ulid = "1.2.1"
 
 [dev-dependencies]
 tokio-test = "0.4"

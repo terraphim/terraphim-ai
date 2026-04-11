@@ -7,7 +7,7 @@
 
 use crate::control_plane::telemetry::TelemetryStore;
 use crate::cost_tracker::BudgetVerdict;
-use crate::{kg_router::KgRouter, provider_probe::ProviderHealthMap};
+use crate::kg_router::KgRouter;
 use std::path::PathBuf;
 use std::sync::Arc;
 use terraphim_types::capability::{CostLevel, Latency, Provider, ProviderType};
@@ -126,7 +126,8 @@ struct CollectedCandidates {
 
 pub struct RoutingDecisionEngine {
     kg_router: Option<Arc<KgRouter>>,
-    provider_health: Arc<ProviderHealthMap>,
+    /// Snapshot of unhealthy provider names at construction time.
+    unhealthy_providers: Vec<String>,
     router: terraphim_router::Router,
     telemetry_store: Option<Arc<TelemetryStore>>,
 }
@@ -134,13 +135,13 @@ pub struct RoutingDecisionEngine {
 impl RoutingDecisionEngine {
     pub fn new(
         kg_router: Option<Arc<KgRouter>>,
-        provider_health: Arc<ProviderHealthMap>,
+        unhealthy_providers: Vec<String>,
         router: terraphim_router::Router,
         telemetry_store: Option<Arc<TelemetryStore>>,
     ) -> Self {
         Self {
             kg_router,
-            provider_health,
+            unhealthy_providers,
             router,
             telemetry_store,
         }
@@ -172,7 +173,7 @@ impl RoutingDecisionEngine {
             None => return Vec::new(),
         };
 
-        let unhealthy = self.provider_health.unhealthy_providers();
+        let unhealthy = &self.unhealthy_providers;
         let mut candidates = Vec::new();
 
         for route in &decision.fallback_routes {
@@ -486,14 +487,7 @@ mod tests {
     }
 
     fn test_engine() -> RoutingDecisionEngine {
-        RoutingDecisionEngine::new(
-            None,
-            Arc::new(crate::provider_probe::ProviderHealthMap::new(
-                std::time::Duration::from_secs(300),
-            )),
-            terraphim_router::Router::new(),
-            None,
-        )
+        RoutingDecisionEngine::new(None, Vec::new(), terraphim_router::Router::new(), None)
     }
 
     fn test_engine_with_spent(
@@ -504,14 +498,8 @@ mod tests {
         let mut ct = CostTracker::new();
         ct.register(agent_name, budget_cents);
         ct.record_cost(agent_name, spend_usd);
-        let engine = RoutingDecisionEngine::new(
-            None,
-            Arc::new(crate::provider_probe::ProviderHealthMap::new(
-                std::time::Duration::from_secs(300),
-            )),
-            terraphim_router::Router::new(),
-            None,
-        );
+        let engine =
+            RoutingDecisionEngine::new(None, Vec::new(), terraphim_router::Router::new(), None);
         (engine, ct)
     }
 
@@ -632,9 +620,7 @@ mod tests {
         let kg_router = Arc::new(crate::kg_router::KgRouter::load(dir.path()).unwrap());
         let engine = RoutingDecisionEngine::new(
             Some(kg_router),
-            Arc::new(crate::provider_probe::ProviderHealthMap::new(
-                std::time::Duration::from_secs(300),
-            )),
+            Vec::new(),
             terraphim_router::Router::new(),
             None,
         );
@@ -667,9 +653,7 @@ mod tests {
         let kg_router = Arc::new(crate::kg_router::KgRouter::load(dir.path()).unwrap());
         let engine = RoutingDecisionEngine::new(
             Some(kg_router),
-            Arc::new(crate::provider_probe::ProviderHealthMap::new(
-                std::time::Duration::from_secs(300),
-            )),
+            Vec::new(),
             terraphim_router::Router::new(),
             None,
         );
@@ -867,9 +851,7 @@ mod tests {
 
         let engine = RoutingDecisionEngine::new(
             None,
-            Arc::new(crate::provider_probe::ProviderHealthMap::new(
-                std::time::Duration::from_secs(300),
-            )),
+            Vec::new(),
             terraphim_router::Router::new(),
             Some(Arc::new(store)),
         );
@@ -915,9 +897,7 @@ mod tests {
 
         let engine = RoutingDecisionEngine::new(
             None,
-            Arc::new(crate::provider_probe::ProviderHealthMap::new(
-                std::time::Duration::from_secs(300),
-            )),
+            Vec::new(),
             terraphim_router::Router::new(),
             Some(Arc::new(store)),
         );
