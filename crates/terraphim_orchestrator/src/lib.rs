@@ -143,7 +143,7 @@ struct ManagedAgent {
     worktree_path: Option<PathBuf>,
     /// KG-routed model selected at spawn time (None = CLI default). Used for logging.
     routed_model: Option<String>,
-    /// Session ID for telemetry tracking (format: "{agent_name}-{uuid}").
+    /// Session ID for telemetry tracking (format: "{agent_name}-{ulid}").
     session_id: String,
 }
 
@@ -521,6 +521,9 @@ impl AgentOrchestrator {
                 }
             }
         }
+
+        // Restore persisted telemetry from previous runs
+        self.restore_telemetry().await;
 
         // Spawn Safety-layer agents immediately
         let immediate = self.scheduler.immediate_agents();
@@ -970,13 +973,11 @@ impl AgentOrchestrator {
                 .kg_router
                 .as_ref()
                 .map(|r| std::sync::Arc::new(r.clone()));
-            let provider_health_arc = std::sync::Arc::new(provider_probe::ProviderHealthMap::new(
-                std::time::Duration::from_secs(300),
-            ));
+            let unhealthy = self.provider_health.unhealthy_providers();
             let telemetry_arc = std::sync::Arc::new(self.telemetry_store.clone());
             let engine = control_plane::RoutingDecisionEngine::new(
                 kg_arc,
-                provider_health_arc,
+                unhealthy,
                 terraphim_router::Router::new(),
                 Some(telemetry_arc),
             );
@@ -1259,7 +1260,7 @@ impl AgentOrchestrator {
                 spawned_by_mention: false,
                 worktree_path,
                 routed_model: model.clone(),
-                session_id: format!("{}-{}", def.name, uuid::Uuid::new_v4()),
+                session_id: format!("{}-{}", def.name, ulid::Ulid::new()),
             },
         );
 
@@ -2754,45 +2755,22 @@ impl AgentOrchestrator {
                         crate::OutputEvent::Stdout { line, .. } => {
                             stdout_lines.push(line.clone());
                             output_lines.push(line.clone());
-                            let parsed = match cli_tool.as_str() {
-                                "opencode" => control_plane::output_parser::parse_opencode_line(
-                                    line,
-                                    &session_id,
-                                    &model,
-                                    None,
-                                ),
-                                "claude" => control_plane::output_parser::parse_claude_line(
-                                    line,
-                                    &session_id,
-                                    &model,
-                                ),
-                                _ => control_plane::output_parser::ParsedOutput::Ignored,
-                            };
-                            if let control_plane::output_parser::ParsedOutput::Completion(ce) =
-                                parsed
-                            {
+                            if let Some(ce) = Self::parse_stdout_for_telemetry(
+                                &cli_tool,
+                                line,
+                                &session_id,
+                                &model,
+                            ) {
                                 exit_telemetry.push((name.clone(), ce));
                             }
                         }
                         crate::OutputEvent::Stderr { line, .. } => {
                             stderr_lines.push(line.clone());
                             output_lines.push(format!("[stderr] {}", line));
-                            if let Some(limit_model) =
-                                control_plane::output_parser::parse_stderr_for_limit_errors(line)
+                            if let Some(ce) =
+                                Self::parse_stderr_for_telemetry(line, &session_id, &model)
                             {
-                                exit_telemetry.push((
-                                    name.clone(),
-                                    control_plane::telemetry::CompletionEvent {
-                                        model: limit_model,
-                                        session_id: session_id.clone(),
-                                        completed_at: chrono::Utc::now(),
-                                        latency_ms: 0,
-                                        success: false,
-                                        tokens: control_plane::telemetry::TokenBreakdown::default(),
-                                        cost_usd: 0.0,
-                                        error: Some(line.clone()),
-                                    },
-                                ));
+                                exit_telemetry.push((name.clone(), ce));
                             }
                         }
                         _ => {}
@@ -3149,48 +3127,28 @@ impl AgentOrchestrator {
                         })
                         .unwrap_or_default();
 
-                    let parsed = match cli_tool.as_str() {
-                        "opencode" => control_plane::output_parser::parse_opencode_line(
-                            line,
-                            &session_id,
-                            &model,
-                            None,
-                        ),
-                        "claude" => control_plane::output_parser::parse_claude_line(
-                            line,
-                            &session_id,
-                            &model,
-                        ),
-                        _ => control_plane::output_parser::ParsedOutput::Ignored,
-                    };
-
-                    if let control_plane::output_parser::ParsedOutput::Completion(ce) = parsed {
+                    if let Some(ce) =
+                        Self::parse_stdout_for_telemetry(&cli_tool, line, &session_id, &model)
+                    {
                         completion_events.push((name.clone(), ce));
                     }
                 }
                 OutputEvent::Stderr { line, .. } => {
-                    if let Some(limit_model) =
-                        control_plane::output_parser::parse_stderr_for_limit_errors(line)
-                    {
-                        let session_id = self
-                            .active_agents
-                            .get(name)
-                            .map(|m| m.session_id.clone())
-                            .unwrap_or_default();
-
-                        completion_events.push((
-                            name.clone(),
-                            control_plane::telemetry::CompletionEvent {
-                                model: limit_model,
-                                session_id,
-                                completed_at: chrono::Utc::now(),
-                                latency_ms: 0,
-                                success: false,
-                                tokens: control_plane::telemetry::TokenBreakdown::default(),
-                                cost_usd: 0.0,
-                                error: Some(line.clone()),
-                            },
-                        ));
+                    let (session_id, model) = self
+                        .active_agents
+                        .get(name)
+                        .map(|m| {
+                            (
+                                m.session_id.clone(),
+                                m.routed_model
+                                    .clone()
+                                    .or_else(|| m.definition.model.clone())
+                                    .unwrap_or_default(),
+                            )
+                        })
+                        .unwrap_or_default();
+                    if let Some(ce) = Self::parse_stderr_for_telemetry(line, &session_id, &model) {
+                        completion_events.push((name.clone(), ce));
                     }
                 }
                 _ => {}
@@ -3251,6 +3209,24 @@ impl AgentOrchestrator {
         self.telemetry_store.record_batch(completion_events).await;
     }
 
+    /// Attempt to restore persisted telemetry summary from durable storage.
+    ///
+    /// Best-effort: if no summary exists or loading fails, logs and continues
+    /// with an empty telemetry store. Called once at the start of `run()`.
+    async fn restore_telemetry(&self) {
+        use terraphim_persistence::Persistable;
+        let mut summary = control_plane::TelemetrySummary::new("telemetry_summary".to_string());
+        match summary.load().await {
+            Ok(loaded) => {
+                self.telemetry_store.import_summary(loaded).await;
+                info!("restored persisted telemetry summary");
+            }
+            Err(_) => {
+                info!("no persisted telemetry summary found, starting fresh");
+            }
+        }
+    }
+
     /// Persist telemetry summary to durable storage via fire-and-forget spawn.
     ///
     /// Clones the Arc-backed store and moves both export and save into the
@@ -3264,6 +3240,53 @@ impl AgentOrchestrator {
                 tracing::warn!(error = %e, "failed to persist telemetry summary");
             }
         });
+    }
+
+    /// Parse a stdout line from a CLI tool into a CompletionEvent, if the line
+    /// represents a completed agent session.
+    ///
+    /// Returns `None` for lines that do not carry completion telemetry (tool
+    /// calls, status updates, ignored formats, or unrecognised cli_tool).
+    fn parse_stdout_for_telemetry(
+        cli_tool: &str,
+        line: &str,
+        session_id: &str,
+        model: &str,
+    ) -> Option<control_plane::telemetry::CompletionEvent> {
+        let parsed = match cli_tool {
+            "opencode" => {
+                control_plane::output_parser::parse_opencode_line(line, session_id, model, None)
+            }
+            "claude" => control_plane::output_parser::parse_claude_line(line, session_id, model),
+            _ => control_plane::output_parser::ParsedOutput::Ignored,
+        };
+        match parsed {
+            control_plane::output_parser::ParsedOutput::Completion(ce) => Some(ce),
+            _ => None,
+        }
+    }
+
+    /// Parse a stderr line into a CompletionEvent representing a subscription
+    /// limit error.
+    ///
+    /// Returns `None` when the line does not match any known limit-error
+    /// pattern.
+    fn parse_stderr_for_telemetry(
+        line: &str,
+        session_id: &str,
+        model: &str,
+    ) -> Option<control_plane::telemetry::CompletionEvent> {
+        control_plane::output_parser::parse_stderr_for_limit_errors(line)?;
+        Some(control_plane::telemetry::CompletionEvent {
+            model: model.to_string(),
+            session_id: session_id.to_string(),
+            completed_at: chrono::Utc::now(),
+            latency_ms: 0,
+            success: false,
+            tokens: control_plane::telemetry::TokenBreakdown::default(),
+            cost_usd: 0.0,
+            error: Some(line.to_string()),
+        })
     }
 
     /// Check flow schedules and trigger due flows.
@@ -3500,6 +3523,12 @@ impl AgentOrchestrator {
     pub fn set_last_run_commit(&mut self, agent_name: &str, commit: &str) {
         self.last_run_commits
             .insert(agent_name.to_string(), commit.to_string());
+    }
+
+    /// Test helper: access the telemetry store for assertions.
+    #[doc(hidden)]
+    pub fn telemetry_store(&self) -> &control_plane::TelemetryStore {
+        &self.telemetry_store
     }
 }
 
