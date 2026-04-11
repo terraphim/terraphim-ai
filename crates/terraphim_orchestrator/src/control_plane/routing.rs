@@ -455,22 +455,6 @@ mod tests {
         )
     }
 
-    fn test_engine_with_agent_budget(
-        agent_name: &str,
-        budget_cents: Option<u64>,
-    ) -> RoutingDecisionEngine {
-        let mut ct = CostTracker::new();
-        ct.register(agent_name, budget_cents);
-        RoutingDecisionEngine::new(
-            None,
-            Arc::new(crate::provider_probe::ProviderHealthMap::new(
-                std::time::Duration::from_secs(300),
-            )),
-            ct,
-            terraphim_router::Router::new(),
-        )
-    }
-
     fn test_engine_with_spent(
         agent_name: &str,
         budget_cents: Option<u64>,
@@ -584,7 +568,7 @@ mod tests {
         };
         let decision = engine.decide_route(&ctx);
 
-        assert!(decision.all_candidates.len() >= 1);
+        assert!(!decision.all_candidates.is_empty());
         assert!(decision
             .all_candidates
             .iter()
