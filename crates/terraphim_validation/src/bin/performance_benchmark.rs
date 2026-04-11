@@ -8,8 +8,10 @@
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use std::path::PathBuf;
-use terraphim_validation::performance::benchmarking::{BenchmarkConfig, PerformanceBenchmarker};
+use std::path::{Path, PathBuf};
+use terraphim_validation::performance::benchmarking::{
+    BenchmarkConfig, BenchmarkReport, PerformanceBenchmarker,
+};
 use terraphim_validation::performance::ci_integration::{
     CIPerformanceRunner, CLIInterface, PerformanceGateConfig,
 };
@@ -168,10 +170,15 @@ async fn run_benchmarks(
     if let Some(baseline_path) = baseline {
         if baseline_path.exists() {
             println!("📈 Loading baseline from: {}", baseline_path.display());
-            let baseline_content = tokio::fs::read_to_string(&baseline_path).await?;
-            let baseline_report: terraphim_validation::performance::benchmarking::BenchmarkReport =
-                serde_json::from_str(&baseline_content)?;
-            benchmarker.load_baseline(baseline_report);
+            match load_optional_baseline_report(&baseline_path).await? {
+                Some(baseline_report) => benchmarker.load_baseline(baseline_report),
+                None => {
+                    println!(
+                        "⚠️  Ignoring malformed baseline file: {}",
+                        baseline_path.display()
+                    );
+                }
+            }
         } else {
             println!("⚠️  Baseline file not found: {}", baseline_path.display());
         }
@@ -214,6 +221,21 @@ async fn run_benchmarks(
     }
 
     Ok(())
+}
+
+async fn load_optional_baseline_report(path: &Path) -> Result<Option<BenchmarkReport>> {
+    let baseline_content = tokio::fs::read_to_string(path).await?;
+    parse_optional_baseline_report(&baseline_content)
+}
+
+fn parse_optional_baseline_report(content: &str) -> Result<Option<BenchmarkReport>> {
+    match serde_json::from_str(content) {
+        Ok(report) => Ok(Some(report)),
+        Err(error) => {
+            log::warn!("Ignoring malformed benchmark baseline: {}", error);
+            Ok(None)
+        }
+    }
 }
 
 /// Run CI-integrated benchmarks with performance gates
@@ -421,5 +443,57 @@ async fn validate_performance(
         } else {
             Ok(())
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use terraphim_validation::performance::benchmarking::{SLOCompliance, SystemInfo};
+
+    fn empty_report() -> BenchmarkReport {
+        BenchmarkReport {
+            timestamp: chrono::Utc::now(),
+            config: BenchmarkConfig::default(),
+            results: std::collections::HashMap::new(),
+            slo_compliance: SLOCompliance {
+                overall_compliance: 100.0,
+                violations: vec![],
+                critical_violations: vec![],
+            },
+            system_info: SystemInfo {
+                os: "unknown".to_string(),
+                os_version: "unknown".to_string(),
+                cpu_model: "unknown".to_string(),
+                cpu_cores: 0,
+                total_memory_mb: 0,
+                available_memory_mb: 0,
+                rust_version: "unknown".to_string(),
+                terraphim_version: "unknown".to_string(),
+            },
+            trends: None,
+        }
+    }
+
+    #[test]
+    fn parse_optional_baseline_report_accepts_valid_report() {
+        let json = serde_json::to_string(&empty_report()).unwrap();
+
+        let parsed = parse_optional_baseline_report(&json).unwrap();
+
+        assert!(parsed.is_some());
+        assert_eq!(
+            parsed.unwrap().config.iterations,
+            BenchmarkConfig::default().iterations
+        );
+    }
+
+    #[test]
+    fn parse_optional_baseline_report_ignores_legacy_placeholder() {
+        let parsed =
+            parse_optional_baseline_report(r#"{"timestamp":"2024-01-01T00:00:00Z","results":{}}"#)
+                .unwrap();
+
+        assert!(parsed.is_none());
     }
 }
