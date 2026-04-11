@@ -1372,6 +1372,8 @@ impl AgentOrchestrator {
             active_states: tc.states.active.clone(),
             terminal_states: tc.states.terminal.clone(),
             use_robot_api: tc.use_robot_api,
+            robot_path: std::path::PathBuf::from("/home/alex/go/bin/gitea-robot"),
+            claim_strategy: terraphim_tracker::gitea::ClaimStrategy::PreferRobot,
         };
         match terraphim_tracker::GiteaTracker::new(config) {
             Ok(tracker) => {
@@ -1693,6 +1695,8 @@ impl AgentOrchestrator {
             active_states: vec!["open".to_string()],
             terminal_states: vec!["closed".to_string()],
             use_robot_api: false,
+            robot_path: std::path::PathBuf::from("/home/alex/go/bin/gitea-robot"),
+            claim_strategy: terraphim_tracker::gitea::ClaimStrategy::PreferRobot,
         };
         let tracker = match terraphim_tracker::GiteaTracker::new(tracker_cfg) {
             Ok(t) => t,
