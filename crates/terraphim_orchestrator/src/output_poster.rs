@@ -35,6 +35,8 @@ impl OutputPoster {
             active_states: vec!["open".to_string()],
             terminal_states: vec!["closed".to_string()],
             use_robot_api: false,
+            robot_path: std::path::PathBuf::from("/home/alex/go/bin/gitea-robot"),
+            claim_strategy: terraphim_tracker::gitea::ClaimStrategy::PreferRobot,
         };
         let default_tracker =
             GiteaTracker::new(default_gitea_config).expect("Failed to create default GiteaTracker");
@@ -59,6 +61,11 @@ impl OutputPoster {
                                 active_states: vec!["open".to_string()],
                                 terminal_states: vec!["closed".to_string()],
                                 use_robot_api: false,
+                                robot_path: std::path::PathBuf::from(
+                                    "/home/alex/go/bin/gitea-robot",
+                                ),
+                                claim_strategy:
+                                    terraphim_tracker::gitea::ClaimStrategy::PreferRobot,
                             };
                             match GiteaTracker::new(agent_config) {
                                 Ok(tracker) => {
