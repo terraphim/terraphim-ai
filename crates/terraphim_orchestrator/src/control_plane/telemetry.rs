@@ -155,6 +155,80 @@ pub struct TelemetrySummary {
     pub exported_at: DateTime<Utc>,
 }
 
+/// Compute a [`ModelPerformanceSnapshot`] from raw inner state without acquiring
+/// any locks. Both `model_performance` and `all_model_performances` delegate to
+/// this helper so the snapshot logic lives in exactly one place.
+fn compute_snapshot(
+    inner: &TelemetryStoreInner,
+    model: &str,
+    now: DateTime<Utc>,
+) -> ModelPerformanceSnapshot {
+    let events = inner.events.get(model);
+
+    let (successful, failed, avg_latency) = match events {
+        None => (0u64, 0u64, 0.0),
+        Some(evts) => {
+            let mut success_count = 0u64;
+            let mut fail_count = 0u64;
+            let mut latency_sum = 0.0f64;
+            let mut latency_count = 0u64;
+
+            for e in evts {
+                if e.success {
+                    success_count += 1;
+                    latency_sum += e.latency_ms as f64;
+                    latency_count += 1;
+                } else {
+                    fail_count += 1;
+                }
+            }
+
+            let avg = if latency_count > 0 {
+                latency_sum / latency_count as f64
+            } else {
+                0.0
+            };
+
+            (success_count, fail_count, avg)
+        }
+    };
+
+    let total = successful + failed;
+    let success_rate = if total > 0 {
+        successful as f64 / total as f64
+    } else {
+        0.0
+    };
+    let throughput = if inner.window_secs > 0 {
+        successful as f64 / inner.window_secs as f64
+    } else {
+        0.0
+    };
+
+    let last_event_at = events.and_then(|evts| evts.last().map(|e| e.completed_at));
+
+    let subscription_limit_reached = inner
+        .subscription_limits
+        .get(model)
+        .map(|expires| now < *expires)
+        .unwrap_or(false);
+
+    let subscription_limit_expires_at = inner.subscription_limits.get(model).copied();
+
+    ModelPerformanceSnapshot {
+        model: model.to_string(),
+        successful_completions: successful,
+        failed_completions: failed,
+        window_secs: inner.window_secs,
+        throughput,
+        avg_latency_ms: avg_latency,
+        success_rate,
+        last_event_at,
+        subscription_limit_reached,
+        subscription_limit_expires_at,
+    }
+}
+
 /// In-memory telemetry store backed by terraphim_persistence.
 ///
 /// Stores rolling completion events and exposes performance/usage snapshots
@@ -226,70 +300,7 @@ impl TelemetryStore {
     /// Get performance snapshot for a specific model.
     pub async fn model_performance(&self, model: &str) -> ModelPerformanceSnapshot {
         let inner = self.inner.read().await;
-        let events = inner.events.get(model);
-
-        let (successful, failed, avg_latency) = match events {
-            None => (0u64, 0u64, 0.0),
-            Some(evts) => {
-                let mut success_count = 0u64;
-                let mut fail_count = 0u64;
-                let mut latency_sum = 0.0f64;
-                let mut latency_count = 0u64;
-
-                for e in evts {
-                    if e.success {
-                        success_count += 1;
-                        latency_sum += e.latency_ms as f64;
-                        latency_count += 1;
-                    } else {
-                        fail_count += 1;
-                    }
-                }
-
-                let avg = if latency_count > 0 {
-                    latency_sum / latency_count as f64
-                } else {
-                    0.0
-                };
-
-                (success_count, fail_count, avg)
-            }
-        };
-
-        let total = successful + failed;
-        let success_rate = if total > 0 {
-            successful as f64 / total as f64
-        } else {
-            0.0
-        };
-        let throughput = if inner.window_secs > 0 {
-            successful as f64 / inner.window_secs as f64
-        } else {
-            0.0
-        };
-
-        let last_event_at = events.and_then(|evts| evts.last().map(|e| e.completed_at));
-
-        let subscription_limit_reached = inner
-            .subscription_limits
-            .get(model)
-            .map(|expires| Utc::now() < *expires)
-            .unwrap_or(false);
-
-        let subscription_limit_expires_at = inner.subscription_limits.get(model).copied();
-
-        ModelPerformanceSnapshot {
-            model: model.to_string(),
-            successful_completions: successful,
-            failed_completions: failed,
-            window_secs: inner.window_secs,
-            throughput,
-            avg_latency_ms: avg_latency,
-            success_rate,
-            last_event_at,
-            subscription_limit_reached,
-            subscription_limit_expires_at,
-        }
+        compute_snapshot(&inner, model, Utc::now())
     }
 
     /// Get usage snapshot for a specific session.
@@ -332,13 +343,47 @@ impl TelemetryStore {
     }
 
     /// Get performance snapshots for all known models.
+    ///
+    /// Acquires the read lock exactly once and computes all snapshots in a
+    /// single pass, avoiding the N+1 lock pattern of the previous implementation.
     pub async fn all_model_performances(&self) -> Vec<ModelPerformanceSnapshot> {
-        let models = self.known_models().await;
-        let mut snapshots = Vec::with_capacity(models.len());
-        for model in &models {
-            snapshots.push(self.model_performance(model).await);
+        let inner = self.inner.read().await;
+        let now = Utc::now();
+        inner
+            .events
+            .keys()
+            .map(|m| compute_snapshot(&inner, m, now))
+            .collect()
+    }
+
+    /// Record multiple completion events in a single write-lock acquisition.
+    ///
+    /// Prefer this over calling `record` in a loop when multiple events are
+    /// available at once, to reduce lock contention.
+    pub async fn record_batch(&self, events: Vec<CompletionEvent>) {
+        if events.is_empty() {
+            return;
         }
-        snapshots
+        let mut inner = self.inner.write().await;
+        let now = Utc::now();
+        let cutoff = now - chrono::Duration::seconds(inner.window_secs as i64);
+        for event in events {
+            if let Some(ref error) = event.error {
+                if is_subscription_limit_error(error) {
+                    let expires =
+                        now + chrono::Duration::seconds(inner.subscription_limit_ttl_secs as i64);
+                    inner
+                        .subscription_limits
+                        .insert(event.model.clone(), expires);
+                }
+            }
+            let bucket = inner.events.entry(event.model.clone()).or_default();
+            bucket.push(event);
+        }
+        // Prune all buckets once after inserting all events.
+        for bucket in inner.events.values_mut() {
+            bucket.retain(|e| e.completed_at > cutoff);
+        }
     }
 
     /// Export a serialisable summary of current telemetry state.
