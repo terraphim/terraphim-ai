@@ -3185,17 +3185,24 @@ impl AgentOrchestrator {
     }
 
     /// Record parsed telemetry events into the telemetry store and cost tracker.
+    ///
+    /// Cost accounting is performed per-agent before the batch write so that
+    /// agent-level spend is still tracked individually. The telemetry store
+    /// write uses a single lock acquisition via `record_batch`.
     async fn record_telemetry(
         &self,
         events: Vec<(String, control_plane::telemetry::CompletionEvent)>,
     ) {
-        for (agent_name, event) in events {
-            let cost = event.cost_usd;
-            self.telemetry_store.record(event).await;
-            if cost > 0.0 {
-                self.cost_tracker.record_cost(&agent_name, cost);
+        // Record costs per-agent first (no lock involved).
+        for (agent_name, event) in &events {
+            if event.cost_usd > 0.0 {
+                self.cost_tracker.record_cost(agent_name, event.cost_usd);
             }
         }
+        // Write all events in one lock acquisition.
+        let completion_events: Vec<control_plane::telemetry::CompletionEvent> =
+            events.into_iter().map(|(_, e)| e).collect();
+        self.telemetry_store.record_batch(completion_events).await;
     }
 
     /// Attempt to restore persisted telemetry summary from durable storage.
