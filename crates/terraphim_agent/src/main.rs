@@ -2693,7 +2693,7 @@ async fn run_shared_learning_command(
             Ok(())
         }
         SharedLearningSub::Import => {
-            use crate::learnings::list_learnings;
+            use crate::learnings::capture::list_learnings;
 
             let storage_loc = config.storage_location();
             let local_learnings = list_learnings(&storage_loc, usize::MAX).unwrap_or_default();
