@@ -499,9 +499,7 @@ jobs:
       - name: Run cargo audit
         run: |
           cargo install cargo-audit --no-default-features
-          # Fetch fresh advisory database to handle CVSS format updates
-          cargo audit --fetch || true
-          # Run audit, continuing on advisory DB parse errors (CVSS 4.0 format issue)
+          # Run audit, allowing warnings while keeping the advisory DB fresh.
           cargo audit || echo "::warning::cargo audit found issues or had parsing errors"
 
       - name: Run cargo deny
