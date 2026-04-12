@@ -1,288 +1,162 @@
-# Terraphim Crates Overview
+# Crate Reference
 
-Terraphim is built as a modular Rust project with multiple crates, each serving specific purposes in the knowledge graph and document management system.
+Terraphim AI is a modular Rust workspace comprising 52 crates. Each crate has a single responsibility and can be used independently or composed into larger systems. All crates are available in the [terraphim-ai](https://github.com/terraphim/terraphim-ai) monorepo.
 
-## Core Crates
+## Core Engine
 
-### terraphim_types
-**Purpose**: Central type definitions and shared data structures
-**Key Features**:
-- `Document` struct for document representation
-- `RoleName` and `Role` for role-based access control
-- `SearchQuery` for search operations
-- `NormalizedTermValue` for knowledge graph terms
-- `Thesaurus` for synonym management
-- `Index` and `IndexedDocument` for document indexing
+The foundational crates that power Terraphim's deterministic knowledge graph search.
 
-**Dependencies**: Minimal, serves as foundation for other crates
+| Crate | Description |
+|-------|-------------|
+| **terraphim_automata** | Aho-Corasick automata for searching and processing knowledge graphs. The core matching engine. |
+| **terraphim_rolegraph** | Role-based knowledge graph module. Maps search roles to domain-specific graph views. |
+| **terraphim_types** | Core types crate shared across the entire workspace. |
+| **terraphim_config** | Configuration loading and management for all Terraphim components. |
+| **terraphim_settings** | Settings handling library for runtime preferences and defaults. |
+| **terraphim_service** | Service layer handling user requests and responses for the Terraphim core. |
+| **terraphim_middleware** | Middleware for searching haystacks (pluggable data source backends). |
+| **terraphim-markdown-parser** | Markdown parser for extracting structured content from knowledge base files. |
+| **terraphim_persistence** | Persistence layer with Persistable trait and DeviceStorage backends (memory, SQLite, redb). |
+| **terraphim_build_args** | Build argument management for compile-time feature configuration. |
+| **terraphim_test_utils** | Shared test utilities and fixtures for all Terraphim crates. |
 
-### terraphim_config
-**Purpose**: Configuration management and role-based settings
-**Key Features**:
-- Role-based configuration system
-- Knowledge graph path management
-- Relevance function selection
-- Atomic server integration settings
-- Environment-based configuration loading
+## Binaries and CLIs
 
-**Dependencies**: terraphim_types
+User-facing executables and command-line tools.
 
-### terraphim_persistence
-**Purpose**: Document persistence and storage abstraction
-**Key Features**:
-- Opendal-based storage abstraction
-- Document save/load operations
-- Memory-only storage for testing
-- Atomic Data document integration
-- Cross-platform storage support
+| Crate | Description |
+|-------|-------------|
+| **terraphim_agent** | Terraphim AI Agent CLI with interactive REPL, session search, learning capture, and ASCII graph visualisation. |
+| **terraphim-cli** | CLI tool for semantic knowledge graph search with JSON output for automation and scripting. |
+| **terraphim_server** | HTTP server handling the core logic of Terraphim AI. Provides REST API and knowledge graph backend. |
+| **terraphim_update** | Shared auto-update functionality for all Terraphim AI binaries. |
+| **terraphim_validation** | Release validation system ensuring binary and asset integrity before publishing. |
 
-**Dependencies**: opendal, terraphim_types
+## Agent Orchestration (AI Dark Factory)
 
-## Service Layer
+OTP-inspired agent management system for running autonomous AI coding agents.
 
-### terraphim_service
-**Purpose**: Main service layer for document search and ranking
-**Key Features**:
-- Document search and ranking algorithms
-- BM25, TFIDF, Jaccard, and similarity-based scoring
-- Role-based search configuration
-- Knowledge graph integration
-- OpenRouter AI integration
-- Document preprocessing and enhancement
+| Crate | Description |
+|-------|-------------|
+| **terraphim_orchestrator** | AI Dark Factory orchestrator wiring spawner, router, and supervisor into a reconciliation loop. |
+| **terraphim_spawner** | Agent spawner with health checking, output capture, and lifecycle management. |
+| **terraphim_router** | Unified routing engine for LLM and agent providers (keyword routing, tier selection). |
+| **terraphim_agent_supervisor** | OTP-inspired supervision trees for fault-tolerant AI agent management. |
+| **terraphim_agent_application** | OTP-style application behaviour for the Terraphim agent system. |
+| **terraphim_agent_messaging** | Erlang-style asynchronous message passing system for AI agents. |
+| **terraphim_agent_registry** | Knowledge graph-based agent registry for intelligent agent discovery and capability matching. |
+| **terraphim_agent_evolution** | Agent evolution and self-improvement tracking. |
+| **terraphim_workspace** | Workspace management for agent execution including lifecycle, hooks, and isolation. |
+| **terraphim_multi_agent** | Multi-agent system built on roles with rust-genai integration. |
 
-**Dependencies**: terraphim_types, terraphim_config, terraphim_persistence
+## Knowledge Graph Intelligence
 
-### terraphim_middleware
-**Purpose**: Middleware for document processing and indexing
-**Key Features**:
-- Haystack document indexing
-- Atomic Data integration
-- Document preprocessing
-- Knowledge graph term extraction
-- Role-based document filtering
+Advanced crates for KG-powered reasoning, task planning, and goal management.
 
-**Dependencies**: terraphim_types, terraphim_config
+| Crate | Description |
+|-------|-------------|
+| **terraphim_kg_orchestration** | Knowledge graph-based agent orchestration engine for coordinating multi-agent workflows. |
+| **terraphim_kg_agents** | Specialised knowledge graph-based agent implementations. |
+| **terraphim_kg_linter** | Linter for markdown-based Terraphim KG schemas (commands, types, permissions). |
+| **terraphim_goal_alignment** | Knowledge graph-based goal alignment system for multi-level goal management and conflict resolution. |
+| **terraphim_task_decomposition** | Knowledge graph-based task decomposition for intelligent task analysis and execution planning. |
+| **terraphim_rlm** | Recursive Language Model (RLM) orchestration for structured reasoning chains. |
+| **terraphim_hooks** | Unified hooks infrastructure for knowledge graph-based text replacement and validation. |
+| **terraphim_file_search** | Knowledge-graph scored file search integration. |
 
-## Knowledge Graph & Automata
+## Haystack Integrations
 
-### terraphim_automata
-**Purpose**: Finite state automata for term matching and autocomplete
-**Key Features**:
-- Aho-Corasick algorithm implementation
-- Fuzzy autocomplete with Jaro-Winkler similarity
-- Term matching and replacement
-- WASM-compatible design
-- High-performance text processing
+Pluggable data source connectors for searching external systems.
 
-**Dependencies**: Minimal, focused on text processing
+| Crate | Description |
+|-------|-------------|
+| **haystack_core** | Core traits and types for all Terraphim haystack integrations. |
+| **haystack_atlassian** | Atlassian (Confluence, Jira) integration for searching enterprise knowledge bases. |
+| **haystack_discourse** | Discourse forum integration for fetching posts and messages. |
+| **haystack_grepapp** | Grep.app integration for searching code across GitHub repositories. |
+| **haystack_jmap** | JMAP email protocol integration for searching email (Fastmail, etc.). |
 
-### terraphim_rolegraph
-**Purpose**: Knowledge graph construction and management
-**Key Features**:
-- Graph-based term relationships
-- Node and edge management
-- Rank-based scoring
-- Graph traversal algorithms
-- Knowledge graph serialization
+## Session and Usage Analytics
 
-**Dependencies**: terraphim_types
+Tools for analysing AI coding assistant sessions and tracking usage.
 
-## Client & Integration
+| Crate | Description |
+|-------|-------------|
+| **terraphim_sessions** | Session management for AI coding assistant history. Search across Claude Code, Cursor, and Aider sessions. |
+| **terraphim-session-analyzer** | Analyse AI coding assistant session logs to identify agent usage patterns. |
+| **terraphim_ccusage** | Claude Code usage tracking and cost analysis. |
+| **terraphim_usage** | General usage telemetry and analytics. |
 
-### terraphim_atomic_client
-**Purpose**: Atomic Data protocol client
-**Key Features**:
-- Atomic Data document operations
-- Authentication and authorization
-- Resource management
-- HTTP client implementation
-- WASM compatibility
+## DevOps and Infrastructure
 
-**Dependencies**: reqwest, serde, terraphim_types
+Deployment, CI/CD, and infrastructure management.
 
-### terraphim_mcp_server
-**Purpose**: Model Context Protocol server
-**Key Features**:
-- MCP protocol implementation
-- Resource mapping
-- Desktop integration
-- Cross-platform compatibility
-- Protocol version management
+| Crate | Description |
+|-------|-------------|
+| **terraphim_symphony** | Symphony orchestration service. Reads issues from trackers and dispatches coding agent sessions. |
+| **terraphim_tracker** | Issue tracker abstraction for Gitea and Linear with PageRank-based prioritisation. |
+| **terraphim_github_runner** | GitHub Actions runner with Firecracker sandbox integration. |
+| **terraphim_github_runner_server** | HTTP server for the GitHub Actions runner service. |
+| **terraphim-firecracker** | Sub-2-second VM boot optimisation system for sandboxed agent execution. |
+| **terraphim_mcp_server** | Model Context Protocol (MCP) server exposing Terraphim tools to AI assistants. |
+| **terraphim_onepassword_cli** | 1Password CLI integration for secret management. |
 
-**Dependencies**: serde, tokio
+## Chat and Assistants
 
-## Session Management
+Multi-channel AI assistant interfaces.
 
-### terraphim_sessions
-**Purpose**: AI coding assistant session history management
-**Key Features**:
-- Multi-source session import (Claude Code, Cursor, Aider, OpenCode)
-- Session caching and search
-- Knowledge graph concept enrichment
-- Related session discovery
-- Timeline visualization
-- Export to JSON/Markdown
+| Crate | Description |
+|-------|-------------|
+| **terraphim_tinyclaw** | Multi-channel AI assistant for Telegram, Discord, and CLI. |
 
-**Feature Flags**:
-- `terraphim-session-analyzer` - Enhanced Claude Code parsing via CLA
-- `cla-full` - CLA with Cursor connector support
-- `enrichment` - Knowledge graph concept matching
-- `full` - All features enabled
+## Language Bindings
 
-**Dependencies**: tokio, serde, terraphim_automata (optional)
+Cross-language bindings for using Terraphim from Python, Node.js, and WebAssembly.
 
-### terraphim-session-analyzer
-**Purpose**: Parse and analyze Claude Code session logs
-**Key Features**:
-- JSONL session log parsing from `~/.claude/projects/`
-- Agent type detection and attribution
-- File operation tracking
-- Timeline visualization
-- Export to JSON, CSV, Markdown
-- Real-time session monitoring
-- Knowledge graph integration (optional)
+| Crate | Description |
+|-------|-------------|
+| **terraphim_automata_py** | Python (PyO3) bindings for terraphim_automata. Fast autocomplete and text processing for knowledge graphs. |
+| **terraphim_rolegraph_py** | Python bindings for terraphim_rolegraph. Knowledge graph operations for AI agents. |
+| **terraphim-automata-node-rs** | Node.js (NAPI) bindings for Terraphim's Aho-Corasick matcher. |
+| **terraphim-automata-wasm** | WebAssembly bindings for terraphim_automata. Runs in the browser. |
 
-**Connectors**:
-- `cursor` - Cursor IDE sessions
-- `aider` - Aider chat history
-- `opencode` - OpenCode sessions
-- `codex` - Codex sessions
+## Browser Extensions
 
-**Dependencies**: serde_json, regex, home
+| Crate | Description |
+|-------|-------------|
+| **terrraphim-automata-wasm** (extension) | WASM core for the Terraphim browser extensions (Sidebar and Autocomplete). |
 
-### terraphim_hooks
-**Purpose**: Unified hook infrastructure for AI coding agents
-**Key Features**:
-- ReplacementService for knowledge graph-based text transformation
-- HookResult struct for structured JSON output
-- Binary discovery utilities
-- Fail-open error handling
-- Support for Claude Code PreToolUse and Git hooks
+---
 
-**Usage**:
-- CLI: `terraphim-agent replace` command
-- MCP: `replace_matches` tool
-- Hooks: npm→bun, Claude→Terraphim attribution
+## Quick Install
 
-**Dependencies**: terraphim_automata, terraphim_types, serde
+```bash
+# Install the agent (interactive REPL + session search)
+cargo install terraphim-agent
 
-## Orchestration
+# Install the CLI (JSON output for automation)
+cargo install terraphim-cli
+```
 
-### terraphim_symphony
-**Purpose**: Autonomous agent orchestrator that watches issue trackers and dispatches coding agents
-**Key Features**:
-- Polls Gitea and Linear issue trackers for open issues
-- Dispatches coding agents (Claude Code CLI or Codex app-server) per issue
-- Isolated workspace directories with lifecycle hooks
-- WORKFLOW.md single-file configuration with Liquid prompt templates
-- Exponential backoff retry with configurable cap
-- Stall detection and automatic session termination
-- HTTP dashboard for real-time monitoring (feature-gated)
-- Hot reload of configuration without restart
-- Priority-based dispatch with per-state concurrency limits
+Or use the universal installer:
 
-**Runners**:
-- `CodexSession` -- JSON-RPC over stdio with handshake, multi-turn, and approval flows
-- `ClaudeCodeSession` -- Single-shot `claude -p` invocation with NDJSON event stream parsing
+```bash
+curl -fsSL https://raw.githubusercontent.com/terraphim/terraphim-ai/main/scripts/install.sh | bash
+```
 
-**Dependencies**: tokio, serde, liquid, reqwest, tracing
+## Architecture
 
-**Note**: Excluded from the main workspace; build from `crates/terraphim_symphony/` directory.
+The crate dependency graph follows a layered architecture:
 
-## Build & Configuration
+1. **Types and Config** (bottom): `terraphim_types`, `terraphim_config`, `terraphim_settings`
+2. **Core Engine**: `terraphim_automata`, `terraphim_rolegraph`, `terraphim_persistence`
+3. **Service Layer**: `terraphim_service`, `terraphim_middleware`, haystack integrations
+4. **Agent System**: `terraphim_spawner`, `terraphim_router`, `terraphim_agent_supervisor`
+5. **Orchestration**: `terraphim_orchestrator`, `terraphim_kg_orchestration`, `terraphim_symphony`
+6. **User Interfaces** (top): `terraphim_agent`, `terraphim-cli`, `terraphim_server`, `terraphim_tinyclaw`
 
-### terraphim_build_args
-**Purpose**: Build-time argument processing
-**Key Features**:
-- Environment variable handling
-- Feature flag management
-- Build configuration
-- Cross-platform build support
+## Contributing
 
-**Dependencies**: Minimal build-time utilities
+Each crate has its own `README.md` with specific build instructions and examples. See the [Contribution Guide](./CONTRIBUTE.md) for the overall workflow.
 
-### terraphim_settings
-**Purpose**: Application settings management
-**Key Features**:
-- TOML-based configuration
-- Default settings
-- Environment-specific configurations
-- Settings validation
-
-**Dependencies**: toml, serde
-
-## Node.js Integration
-
-### terraphim_ai_nodejs
-**Purpose**: Node.js bindings for Terraphim
-**Key Features**:
-- Rust-to-Node.js bindings
-- WASM compilation
-- Cross-platform support
-- TypeScript definitions
-- Performance optimization
-
-**Dependencies**: napi-rs, terraphim_service
-
-## Desktop Application
-
-### Desktop (Tauri)
-**Purpose**: Cross-platform desktop application
-**Key Features**:
-- Svelte-based UI
-- Tauri framework integration
-- Native system integration
-- Cross-platform deployment
-- Real-time search interface
-
-**Dependencies**: Tauri, Svelte, terraphim_service
-
-## Architecture Patterns
-
-### Modular Design
-Each crate has a specific responsibility and minimal dependencies:
-- **Core types** in `terraphim_types`
-- **Service logic** in `terraphim_service`
-- **Storage** in `terraphim_persistence`
-- **UI** in desktop application
-
-### Async-First
-Most crates use async/await patterns:
-- `tokio` runtime for concurrency
-- Async I/O operations
-- Non-blocking document processing
-- Concurrent search operations
-
-### WASM Compatibility
-Key crates support WebAssembly:
-- `terraphim_automata` for client-side processing
-- `terraphim_service` for shared logic
-- `terraphim_atomic_client` for browser integration
-
-### Cross-Platform
-Designed for multiple platforms:
-- Desktop (Windows, macOS, Linux)
-- Web browsers (WASM)
-- Node.js environments
-- Server deployments
-
-## Development Workflow
-
-### Adding New Features
-1. **Types**: Start with `terraphim_types` for new data structures
-2. **Core Logic**: Implement in appropriate service crate
-3. **Integration**: Add to `terraphim_service` if needed
-4. **UI**: Update desktop application
-5. **Documentation**: Update this overview
-
-### Testing Strategy
-- **Unit tests**: In each crate
-- **Integration tests**: In `terraphim_service`
-- **E2E tests**: In desktop application
-- **Performance tests**: Benchmarks in relevant crates
-
-### Performance Considerations
-- **Memory efficiency**: Shared types and minimal allocations
-- **Async operations**: Non-blocking I/O throughout
-- **Caching**: Document and configuration caching
-- **Indexing**: Efficient document indexing and search
+Source: [github.com/terraphim/terraphim-ai](https://github.com/terraphim/terraphim-ai)
