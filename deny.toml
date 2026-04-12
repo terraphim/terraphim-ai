@@ -33,6 +33,9 @@ ignore = [
     # Disabled by default: discord removed from tinyclaw default features
     # TODO: Remove once serenity 0.13+ releases with rustls 0.23+ support
     "RUSTSEC-2026-0049",
+    # rand unsound with custom logger + thread_rng - currently transitive via proptest/dev tooling.
+    # TODO: remove once the rand 0.9.3+ upgrade lands across the dependency graph.
+    "RUSTSEC-2026-0097",
 ]
 
 [licenses]
