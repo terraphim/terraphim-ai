@@ -156,13 +156,9 @@ run_rust_benchmarks() {
         log_warn "Rolegraph throughput benchmarks failed"
     fi
 
-    # Run multi-agent benchmarks
-    log_info "Running multi-agent benchmarks..."
-    if cargo bench --bench agent_operations --manifest-path crates/terraphim_multi_agent/Cargo.toml; then
-        log_success "Multi-agent benchmarks completed"
-    else
-        log_warn "Multi-agent benchmarks failed"
-    fi
+    # agent_operations bench excluded: each Criterion iteration calls create_test_agent_simple()
+    # which hardcodes Ollama (http://127.0.0.1:11434, gemma3:270m). On CI this causes 64+ minute
+    # hangs per bench run. Excluded until the bench is refactored to avoid real LLM calls.
 }
 
 # Run custom performance benchmarks
