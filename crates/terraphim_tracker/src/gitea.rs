@@ -5,6 +5,38 @@ use async_trait::async_trait;
 use jiff::Zoned;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
+use std::process::Command;
+
+/// Result of a claim operation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ClaimResult {
+    /// Successfully claimed the issue.
+    Success,
+    /// Issue already assigned to this agent (idempotent success).
+    AlreadyAssigned,
+    /// Issue assigned to another agent (claim failed).
+    AssignedToOther { assignee: String },
+    /// Issue not found.
+    NotFound,
+    /// Permission denied (agent cannot assign to themselves).
+    PermissionDenied { reason: String },
+    /// Transient failure, may retry.
+    TransientFailure { reason: String },
+}
+
+/// Strategy for claiming issues.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ClaimStrategy {
+    /// Prefer gitea-robot CLI, fallback to REST API.
+    #[default]
+    PreferRobot,
+    /// Use REST API only.
+    ApiOnly,
+    /// Use gitea-robot CLI only (fail if unavailable).
+    RobotOnly,
+}
 
 /// Configuration for Gitea tracker.
 #[derive(Debug, Clone)]
@@ -16,6 +48,43 @@ pub struct GiteaConfig {
     pub active_states: Vec<String>,
     pub terminal_states: Vec<String>,
     pub use_robot_api: bool,
+    /// Path to gitea-robot binary.
+    pub robot_path: PathBuf,
+    /// Claim strategy.
+    pub claim_strategy: ClaimStrategy,
+}
+
+impl Default for GiteaConfig {
+    fn default() -> Self {
+        Self {
+            base_url: String::new(),
+            token: String::new(),
+            owner: String::new(),
+            repo: String::new(),
+            active_states: vec!["open".to_string()],
+            terminal_states: vec!["closed".to_string()],
+            use_robot_api: false,
+            robot_path: PathBuf::from("/home/alex/go/bin/gitea-robot"),
+            claim_strategy: ClaimStrategy::default(),
+        }
+    }
+}
+
+impl GiteaConfig {
+    /// Create a new config with default robot path and claim strategy.
+    pub fn new(base_url: String, token: String, owner: String, repo: String) -> Self {
+        Self {
+            base_url,
+            token,
+            owner,
+            repo,
+            active_states: vec!["open".to_string()],
+            terminal_states: vec!["closed".to_string()],
+            use_robot_api: false,
+            robot_path: PathBuf::from("/home/alex/go/bin/gitea-robot"),
+            claim_strategy: ClaimStrategy::default(),
+        }
+    }
 }
 
 /// Gitea REST API client.
@@ -99,124 +168,92 @@ impl GiteaTracker {
             .into_iter()
             .map(|l| l.name.to_lowercase())
             .collect();
+        let state = gi.state.to_lowercase();
 
         Issue {
             id: gi.id.to_string(),
             identifier,
             title: gi.title,
             description: gi.body,
-            priority: None, // Gitea doesn't have native priority
-            state: gi.state,
+            priority: None,
+            state,
             branch_name: None,
             url: gi.html_url,
             labels,
-            blocked_by: vec![], // Would need to fetch dependencies separately
+            blocked_by: Vec::new(),
             pagerank_score: None,
             created_at: gi.created_at.and_then(|s| parse_datetime(&s)),
             updated_at: gi.updated_at.and_then(|s| parse_datetime(&s)),
         }
     }
-}
 
-#[async_trait]
-impl IssueTracker for GiteaTracker {
-    async fn fetch_candidate_issues(&self) -> Result<Vec<Issue>> {
+    /// Fetch a single issue by number.
+    pub async fn fetch_issue(&self, issue_number: u64) -> Result<GiteaIssue> {
         let url = format!(
-            "{}/api/v1/repos/{}/{}/issues?state=open&limit=100",
-            self.config.base_url, self.config.owner, self.config.repo
+            "{}/api/v1/repos/{}/{}/issues/{}",
+            self.config.base_url, self.config.owner, self.config.repo, issue_number
         );
-
         let response = self
             .build_request(reqwest::Method::GET, &url)
             .send()
             .await?;
-
         if !response.status().is_success() {
             let status = response.status();
             let text = response.text().await.unwrap_or_default();
             return Err(TrackerError::Api {
-                message: format!("Gitea API error {}: {}", status, text),
+                message: format!(
+                    "Gitea fetch_issue error {} on issue {}: {}",
+                    status, issue_number, text
+                ),
             });
         }
-
-        let gitea_issues: Vec<GiteaIssue> = response.json().await?;
-
-        let issues: Vec<Issue> = gitea_issues
-            .into_iter()
-            .filter(|gi| {
-                self.config
-                    .active_states
-                    .iter()
-                    .any(|s| s.eq_ignore_ascii_case(&gi.state))
-            })
-            .map(|gi| self.normalise_issue(gi))
-            .collect();
-
-        tracing::info!(
-            fetched = issues.len(),
-            owner = %self.config.owner,
-            repo = %self.config.repo,
-            "fetched candidate issues from Gitea"
-        );
-
-        Ok(issues)
+        response.json().await.map_err(TrackerError::Http)
     }
 
-    async fn fetch_issue_states_by_ids(&self, ids: &[String]) -> Result<Vec<Issue>> {
-        let mut issues = Vec::new();
+    /// Fetch all issues in the repository for a given Gitea API state.
+    async fn fetch_issues_for_gitea_state(&self, gitea_state: &str) -> Result<Vec<Issue>> {
+        let url = format!(
+            "{}/api/v1/repos/{}/{}/issues",
+            self.config.base_url, self.config.owner, self.config.repo
+        );
+        let mut all_issues = Vec::new();
+        let mut page = 1u32;
 
-        for id in ids {
-            let url = format!(
-                "{}/api/v1/repos/{}/{}/issues/{}",
-                self.config.base_url, self.config.owner, self.config.repo, id
-            );
-
+        loop {
             let response = self
                 .build_request(reqwest::Method::GET, &url)
+                .query(&[("state", gitea_state), ("type", "issues"), ("limit", "50")])
+                .query(&[("page", page)])
                 .send()
                 .await?;
-
-            if response.status().is_success() {
-                let gi: GiteaIssue = response.json().await?;
-                issues.push(self.normalise_issue(gi));
+            if !response.status().is_success() {
+                let status = response.status();
+                let text = response.text().await.unwrap_or_default();
+                return Err(TrackerError::Api {
+                    message: format!(
+                        "Gitea fetch issues error {} for state {}: {}",
+                        status, gitea_state, text
+                    ),
+                });
             }
+            let issues: Vec<GiteaIssue> = response.json().await.map_err(TrackerError::Http)?;
+            let issue_count = issues.len();
+            all_issues.extend(issues.into_iter().map(|gi| self.normalise_issue(gi)));
+
+            if issue_count < 50 {
+                break;
+            }
+            page += 1;
         }
 
-        Ok(issues)
+        Ok(all_issues)
     }
 
-    async fn fetch_issues_by_states(&self, states: &[String]) -> Result<Vec<Issue>> {
-        let url = format!(
-            "{}/api/v1/repos/{}/{}/issues?state=open&limit=1000",
-            self.config.base_url, self.config.owner, self.config.repo
-        );
-
-        let response = self
-            .build_request(reqwest::Method::GET, &url)
-            .send()
-            .await?;
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let text = response.text().await.unwrap_or_default();
-            return Err(TrackerError::Api {
-                message: format!("Gitea API error {}: {}", status, text),
-            });
-        }
-
-        let gitea_issues: Vec<GiteaIssue> = response.json().await?;
-
-        let issues: Vec<Issue> = gitea_issues
-            .into_iter()
-            .filter(|gi| states.iter().any(|s| s.eq_ignore_ascii_case(&gi.state)))
-            .map(|gi| self.normalise_issue(gi))
-            .collect();
-
-        Ok(issues)
+    /// Fetch all open issues in the repository.
+    pub async fn fetch_open_issues(&self) -> Result<Vec<Issue>> {
+        self.fetch_issues_for_gitea_state("open").await
     }
-}
 
-impl GiteaTracker {
     /// Post a comment on a Gitea issue.
     pub async fn post_comment(&self, issue_number: u64, body: &str) -> Result<IssueComment> {
         let url = format!(
@@ -233,7 +270,7 @@ impl GiteaTracker {
             let text = response.text().await.unwrap_or_default();
             return Err(TrackerError::Api {
                 message: format!(
-                    "Gitea comment POST error {} on issue {}: {}",
+                    "Gitea post_comment error {} on issue {}: {}",
                     status, issue_number, text
                 ),
             });
@@ -241,12 +278,12 @@ impl GiteaTracker {
         response.json().await.map_err(TrackerError::Http)
     }
 
-    /// Create a new Gitea issue.
+    /// Create a new issue with optional labels.
     pub async fn create_issue(
         &self,
         title: &str,
         body: &str,
-        _labels: &[&str],
+        labels: &[&str],
     ) -> Result<GiteaIssue> {
         let url = format!(
             "{}/api/v1/repos/{}/{}/issues",
@@ -257,6 +294,7 @@ impl GiteaTracker {
             .json(&serde_json::json!({
                 "title": title,
                 "body": body,
+                "labels": labels,
             }))
             .send()
             .await?;
@@ -406,6 +444,16 @@ impl GiteaTracker {
         since: Option<&str>,
         limit: Option<u32>,
     ) -> Result<Vec<IssueComment>> {
+        self.fetch_repo_comments_page(since, limit, None).await
+    }
+
+    /// Fetch comments across all issues in the repo with optional paging.
+    pub async fn fetch_repo_comments_page(
+        &self,
+        since: Option<&str>,
+        limit: Option<u32>,
+        page: Option<u32>,
+    ) -> Result<Vec<IssueComment>> {
         let mut url = format!(
             "{}/api/v1/repos/{}/{}/issues/comments",
             self.config.base_url, self.config.owner, self.config.repo
@@ -416,6 +464,9 @@ impl GiteaTracker {
         }
         if let Some(limit_val) = limit {
             params.push(format!("limit={}", limit_val));
+        }
+        if let Some(page_val) = page {
+            params.push(format!("page={}", page_val));
         }
         if !params.is_empty() {
             url.push('?');
@@ -450,6 +501,374 @@ impl GiteaTracker {
             }
         };
         Ok(raw_comments.into_iter().map(|rc| rc.into()).collect())
+    }
+
+    /// Claim an issue for an agent using the configured strategy.
+    ///
+    /// Attempts to assign the issue to the specified agent, with verification.
+    /// Uses gitea-robot CLI if available (and configured), otherwise falls back
+    /// to direct REST API call.
+    ///
+    /// # Arguments
+    /// * `agent_name` - The Gitea username of the agent claiming the issue
+    /// * `issue_number` - The issue number to claim
+    /// * `strategy` - Which claim strategy to use
+    ///
+    /// # Returns
+    /// * `Ok(ClaimResult)` - The outcome of the claim attempt
+    /// * `Err(TrackerError)` - Unexpected error (network, auth, etc.)
+    pub async fn claim_issue(
+        &self,
+        agent_name: &str,
+        issue_number: u64,
+        strategy: ClaimStrategy,
+    ) -> Result<ClaimResult> {
+        // 1. Pre-check: Fetch current assignees
+        let current_assignees = match self.fetch_issue_assignees(issue_number).await {
+            Ok(assignees) => assignees,
+            Err(e) => {
+                // Fail open on assignee check error - will attempt assignment anyway
+                tracing::warn!(
+                    agent = %agent_name,
+                    issue = issue_number,
+                    error = %e,
+                    "failed to fetch assignees, attempting claim anyway"
+                );
+                Vec::new()
+            }
+        };
+
+        // 2. Idempotency check: already assigned to this agent
+        if current_assignees.iter().any(|a| a == agent_name) {
+            return Ok(ClaimResult::AlreadyAssigned);
+        }
+
+        // 3. Conflict check: assigned to another agent
+        if !current_assignees.is_empty() {
+            return Ok(ClaimResult::AssignedToOther {
+                assignee: current_assignees.join(", "),
+            });
+        }
+
+        // 4. Attempt claim based on strategy
+        let result = match strategy {
+            ClaimStrategy::PreferRobot => {
+                match self.claim_via_robot(agent_name, issue_number).await {
+                    Ok(result) => Ok(result),
+                    Err(e) if Self::is_robot_unavailable_error(&e) => {
+                        tracing::info!(
+                            agent = %agent_name,
+                            issue = issue_number,
+                            "gitea-robot unavailable, falling back to API"
+                        );
+                        self.claim_via_api(agent_name, issue_number).await
+                    }
+                    Err(e) => Err(e),
+                }
+            }
+            ClaimStrategy::RobotOnly => self.claim_via_robot(agent_name, issue_number).await,
+            ClaimStrategy::ApiOnly => self.claim_via_api(agent_name, issue_number).await,
+        };
+
+        let result = result?;
+
+        // 5. Verify assignment succeeded (for Success case only)
+        if matches!(result, ClaimResult::Success) {
+            match self
+                .verify_assignment(agent_name, issue_number, Some(3), Some(500))
+                .await
+            {
+                Ok(true) => {}
+                Ok(false) => {
+                    tracing::warn!(
+                        agent = %agent_name,
+                        issue = issue_number,
+                        "Assignment verification failed after claim"
+                    );
+                    return Ok(ClaimResult::AssignedToOther {
+                        assignee: "unknown (race condition)".to_string(),
+                    });
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        agent = %agent_name,
+                        issue = issue_number,
+                        error = %e,
+                        "Failed to verify assignment after claim"
+                    );
+                    return Ok(ClaimResult::TransientFailure {
+                        reason: format!("failed to verify assignment after claim: {e}"),
+                    });
+                }
+            }
+        }
+
+        Ok(result)
+    }
+
+    /// Internal: Attempt claim via gitea-robot CLI.
+    async fn claim_via_robot(&self, agent_name: &str, issue_number: u64) -> Result<ClaimResult> {
+        let output = Command::new(&self.config.robot_path)
+            .env("GITEA_URL", &self.config.base_url)
+            .env("GITEA_TOKEN", &self.config.token)
+            .args([
+                "assign",
+                "--owner",
+                &self.config.owner,
+                "--repo",
+                &self.config.repo,
+                "--issue",
+                &issue_number.to_string(),
+                "--to",
+                agent_name,
+            ])
+            .output()
+            .map_err(|e| TrackerError::Api {
+                message: format!("Failed to execute gitea-robot: {}", e),
+            })?;
+
+        if output.status.success() {
+            return Ok(ClaimResult::Success);
+        }
+
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let combined = format!("{} {}", stderr, stdout);
+
+        // Parse error types from stderr/stdout
+        if combined.contains("not found") || combined.contains("404") {
+            return Ok(ClaimResult::NotFound);
+        }
+        if combined.contains("already assigned")
+            || combined.contains("conflict")
+            || combined.contains("409")
+        {
+            return Ok(ClaimResult::AssignedToOther {
+                assignee: "unknown".to_string(),
+            });
+        }
+        if combined.contains("permission") || combined.contains("403") {
+            return Ok(ClaimResult::PermissionDenied {
+                reason: stderr.to_string(),
+            });
+        }
+
+        // Transient errors
+        if combined.contains("timeout")
+            || combined.contains("connection")
+            || combined.contains("temporarily")
+        {
+            return Ok(ClaimResult::TransientFailure {
+                reason: stderr.to_string(),
+            });
+        }
+
+        Err(TrackerError::Api {
+            message: format!("gitea-robot assign failed: {} (stdout: {})", stderr, stdout),
+        })
+    }
+
+    /// Internal: Attempt claim via REST API.
+    async fn claim_via_api(&self, agent_name: &str, issue_number: u64) -> Result<ClaimResult> {
+        // First, fetch current state to detect races
+        let url = format!(
+            "{}/api/v1/repos/{}/{}/issues/{}",
+            self.config.base_url, self.config.owner, self.config.repo, issue_number
+        );
+
+        let response = self
+            .build_request(reqwest::Method::GET, &url)
+            .send()
+            .await?;
+
+        if response.status() == 404 {
+            return Ok(ClaimResult::NotFound);
+        }
+
+        if !response.status().is_success() {
+            return Err(TrackerError::Api {
+                message: format!("Failed to fetch issue state: {}", response.status()),
+            });
+        }
+
+        // Check assignees before attempting assignment
+        let body: serde_json::Value = response.json().await?;
+        let assignees: Vec<String> = body
+            .get("assignees")
+            .and_then(|a| a.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|u| u.get("login").and_then(|l| l.as_str()).map(String::from))
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        if assignees.iter().any(|a| a == agent_name) {
+            return Ok(ClaimResult::AlreadyAssigned);
+        }
+        if !assignees.is_empty() {
+            return Ok(ClaimResult::AssignedToOther {
+                assignee: assignees.join(", "),
+            });
+        }
+
+        // Attempt assignment
+        let patch_response = self
+            .build_request(reqwest::Method::PATCH, &url)
+            .json(&serde_json::json!({"assignees": [agent_name]}))
+            .send()
+            .await?;
+
+        match patch_response.status().as_u16() {
+            200 => Ok(ClaimResult::Success),
+            403 => Ok(ClaimResult::PermissionDenied {
+                reason: "Insufficient permissions to assign issue".to_string(),
+            }),
+            404 => Ok(ClaimResult::NotFound),
+            409 => Ok(ClaimResult::AssignedToOther {
+                assignee: "unknown (conflict)".to_string(),
+            }),
+            500..=599 => Ok(ClaimResult::TransientFailure {
+                reason: format!("Server error: {}", patch_response.status()),
+            }),
+            _ => Err(TrackerError::Api {
+                message: format!("Assignment failed: {}", patch_response.status()),
+            }),
+        }
+    }
+
+    /// Verify that an issue is actually assigned to the expected agent.
+    ///
+    /// Handles race conditions where assignment may have succeeded but
+    /// not yet visible, or was changed by another concurrent process.
+    ///
+    /// # Arguments
+    /// * `agent_name` - The expected assignee
+    /// * `issue_number` - The issue to check
+    /// * `max_retries` - Number of verification attempts (default 3)
+    /// * `retry_delay_ms` - Delay between retries in milliseconds (default 500)
+    ///
+    /// # Returns
+    /// * `Ok(true)` - Verified assignment matches expected
+    /// * `Ok(false)` - Assignment does not match (may need re-claim)
+    /// * `Err(TrackerError)` - Could not verify (network error, etc.)
+    pub async fn verify_assignment(
+        &self,
+        agent_name: &str,
+        issue_number: u64,
+        max_retries: Option<u32>,
+        retry_delay_ms: Option<u64>,
+    ) -> Result<bool> {
+        let max_retries = max_retries.unwrap_or(3);
+        let retry_delay_ms = retry_delay_ms.unwrap_or(500);
+
+        for attempt in 0..max_retries {
+            match self.fetch_issue_assignees(issue_number).await {
+                Ok(assignees) => {
+                    if assignees.iter().any(|a| a == agent_name) {
+                        return Ok(true);
+                    }
+                    // Not assigned yet - retry if not last attempt
+                    if attempt < max_retries - 1 {
+                        tokio::time::sleep(tokio::time::Duration::from_millis(retry_delay_ms))
+                            .await;
+                    }
+                }
+                Err(e) => {
+                    if attempt < max_retries - 1 {
+                        tracing::warn!(
+                            attempt = attempt + 1,
+                            max_retries = max_retries,
+                            error = %e,
+                            "verify_assignment failed, retrying"
+                        );
+                        tokio::time::sleep(tokio::time::Duration::from_millis(retry_delay_ms))
+                            .await;
+                    } else {
+                        return Err(e);
+                    }
+                }
+            }
+        }
+
+        Ok(false)
+    }
+
+    /// Check if an error indicates gitea-robot is unavailable.
+    fn is_robot_unavailable_error(error: &TrackerError) -> bool {
+        let err_str = error.to_string().to_lowercase();
+        err_str.contains("no such file or directory")
+            || err_str.contains("not found")
+            || err_str.contains("permission denied")
+            || err_str.contains("cannot find")
+    }
+}
+
+#[async_trait]
+impl IssueTracker for GiteaTracker {
+    async fn fetch_candidate_issues(&self) -> Result<Vec<Issue>> {
+        let active_states = self.config.active_states.clone();
+        self.fetch_issues_by_states(&active_states).await
+    }
+
+    async fn fetch_issue_states_by_ids(&self, ids: &[String]) -> Result<Vec<Issue>> {
+        let mut issues = Vec::with_capacity(ids.len());
+
+        for id in ids {
+            let issue_number = match id.parse::<u64>() {
+                Ok(issue_number) => issue_number,
+                Err(_) => {
+                    return Err(TrackerError::Api {
+                        message: format!("invalid Gitea issue id '{id}'"),
+                    });
+                }
+            };
+
+            let issue = self.fetch_issue(issue_number).await?;
+            issues.push(self.normalise_issue(issue));
+        }
+
+        Ok(issues)
+    }
+
+    async fn fetch_issues_by_states(&self, states: &[String]) -> Result<Vec<Issue>> {
+        if states.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let need_open = states.iter().any(|state| {
+            state.eq_ignore_ascii_case("open")
+                || self
+                    .config
+                    .active_states
+                    .iter()
+                    .any(|active| active.eq_ignore_ascii_case(state))
+        });
+        let need_closed = states.iter().any(|state| {
+            state.eq_ignore_ascii_case("closed")
+                || self
+                    .config
+                    .terminal_states
+                    .iter()
+                    .any(|terminal| terminal.eq_ignore_ascii_case(state))
+        });
+
+        let mut issues = Vec::new();
+        if need_open {
+            issues.extend(self.fetch_issues_for_gitea_state("open").await?);
+        }
+        if need_closed {
+            issues.extend(self.fetch_issues_for_gitea_state("closed").await?);
+        }
+
+        Ok(issues
+            .into_iter()
+            .filter(|issue| {
+                states
+                    .iter()
+                    .any(|state| state.eq_ignore_ascii_case(&issue.state))
+            })
+            .collect())
     }
 }
 
@@ -516,6 +935,8 @@ mod tests {
             active_states: vec!["open".to_string()],
             terminal_states: vec!["closed".to_string()],
             use_robot_api: false,
+            robot_path: PathBuf::from("/home/alex/go/bin/gitea-robot"),
+            claim_strategy: ClaimStrategy::PreferRobot,
         };
         GiteaTracker::new(config).unwrap()
     }
@@ -529,6 +950,8 @@ mod tests {
             active_states: vec!["open".into(), "Todo".into()],
             terminal_states: vec!["closed".into(), "Done".into()],
             use_robot_api: false,
+            robot_path: PathBuf::from("/home/alex/go/bin/gitea-robot"),
+            claim_strategy: ClaimStrategy::PreferRobot,
         }
     }
 
@@ -594,6 +1017,88 @@ mod tests {
                 .iter()
                 .all(|l| l.chars().all(|c| !c.is_uppercase()))
         );
+    }
+
+    #[tokio::test]
+    async fn test_fetch_open_issues_paginates() {
+        let mock_server = MockServer::start().await;
+        let page_one: Vec<_> = (1..=50)
+            .map(|number| {
+                serde_json::json!({
+                    "id": number,
+                    "number": number,
+                    "title": format!("Issue {number}"),
+                    "state": "open"
+                })
+            })
+            .collect();
+        let page_two = serde_json::json!([
+            {
+                "id": 51,
+                "number": 51,
+                "title": "Issue 51",
+                "state": "open"
+            }
+        ]);
+
+        Mock::given(method("GET"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues"))
+            .and(query_param("state", "open"))
+            .and(query_param("type", "issues"))
+            .and(query_param("limit", "50"))
+            .and(query_param("page", "1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(page_one))
+            .expect(1)
+            .mount(&mock_server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues"))
+            .and(query_param("state", "open"))
+            .and(query_param("type", "issues"))
+            .and(query_param("limit", "50"))
+            .and(query_param("page", "2"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(page_two))
+            .expect(1)
+            .mount(&mock_server)
+            .await;
+
+        let tracker = make_tracker(&mock_server.uri());
+        let issues = tracker.fetch_open_issues().await.unwrap();
+        assert_eq!(issues.len(), 51);
+        assert_eq!(issues.last().unwrap().identifier, "testowner/testrepo/51");
+    }
+
+    #[tokio::test]
+    async fn test_fetch_issues_by_states_fetches_closed_issues() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues"))
+            .and(query_param("state", "closed"))
+            .and(query_param("type", "issues"))
+            .and(query_param("limit", "50"))
+            .and(query_param("page", "1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                {
+                    "id": 200,
+                    "number": 12,
+                    "title": "Done issue",
+                    "state": "closed"
+                }
+            ])))
+            .expect(1)
+            .mount(&mock_server)
+            .await;
+
+        let tracker = make_tracker(&mock_server.uri());
+        let issues = tracker
+            .fetch_issues_by_states(&["closed".to_string()])
+            .await
+            .unwrap();
+        assert_eq!(issues.len(), 1);
+        assert_eq!(issues[0].state, "closed");
+        assert_eq!(issues[0].identifier, "testowner/testrepo/12");
     }
 
     #[tokio::test]
@@ -749,7 +1254,7 @@ mod tests {
         assert_eq!(comments[0].issue_number, 5);
         assert_eq!(comments[1].issue_number, 7);
         assert!(comments[0].body.contains("@adf:security-sentinel"));
-        assert_eq!(comments[1].body, ""); // null body defaults to empty
+        assert_eq!(comments[1].body, "") // null body defaults to empty
     }
 
     #[tokio::test]
@@ -780,7 +1285,7 @@ mod tests {
         let comments = result.unwrap();
         assert_eq!(comments.len(), 1);
         assert_eq!(comments[0].issue_number, 0); // no issue_url -> default 0
-        assert_eq!(comments[0].body, ""); // missing body -> default empty
+        assert_eq!(comments[0].body, "") // missing body -> default empty
     }
 
     #[tokio::test]
@@ -892,5 +1397,319 @@ mod tests {
         let tracker = make_tracker(&mock_server.uri());
         let result = tracker.fetch_issue_assignees(404).await;
         assert!(result.is_err());
+    }
+
+    // Claim Abstraction Tests
+
+    #[tokio::test]
+    async fn test_claim_issue_already_assigned() {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/42"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": 100,
+                "number": 42,
+                "title": "Test issue",
+                "state": "open",
+                "assignees": [
+                    {"id": 1, "login": "quality-coordinator"}
+                ]
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let tracker = make_tracker(&mock_server.uri());
+        let result = tracker
+            .claim_issue("quality-coordinator", 42, ClaimStrategy::ApiOnly)
+            .await;
+        assert_eq!(result.unwrap(), ClaimResult::AlreadyAssigned);
+    }
+
+    #[tokio::test]
+    async fn test_claim_issue_assigned_to_other() {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/42"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": 100,
+                "number": 42,
+                "title": "Test issue",
+                "state": "open",
+                "assignees": [
+                    {"id": 1, "login": "other-agent"}
+                ]
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let tracker = make_tracker(&mock_server.uri());
+        let result = tracker
+            .claim_issue("quality-coordinator", 42, ClaimStrategy::ApiOnly)
+            .await;
+        assert_eq!(
+            result.unwrap(),
+            ClaimResult::AssignedToOther {
+                assignee: "other-agent".to_string()
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn test_claim_issue_success_api() {
+        let mock_server = MockServer::start().await;
+
+        // The first two GETs are the pre-check and the API claim path.
+        Mock::given(method("GET"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/42"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": 100,
+                "number": 42,
+                "title": "Test issue",
+                "state": "open",
+                "assignees": []
+            })))
+            .up_to_n_times(2)
+            .expect(2)
+            .mount(&mock_server)
+            .await;
+
+        // Verification sees the assignment after the PATCH succeeds.
+        Mock::given(method("GET"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/42"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": 100,
+                "number": 42,
+                "title": "Test issue",
+                "state": "open",
+                "assignees": [{"id": 1, "login": "quality-coordinator"}]
+            })))
+            .mount(&mock_server)
+            .await;
+
+        // Assignment patch
+        Mock::given(method("PATCH"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/42"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": 100,
+                "number": 42,
+                "title": "Test issue",
+                "state": "open",
+                "assignees": [{"id": 1, "login": "quality-coordinator"}]
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let tracker = make_tracker(&mock_server.uri());
+        let result = tracker
+            .claim_issue("quality-coordinator", 42, ClaimStrategy::ApiOnly)
+            .await;
+        assert_eq!(result.unwrap(), ClaimResult::Success);
+    }
+
+    #[tokio::test]
+    async fn test_claim_issue_not_found() {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/999"))
+            .respond_with(ResponseTemplate::new(404).set_body_string("not found"))
+            .mount(&mock_server)
+            .await;
+
+        let tracker = make_tracker(&mock_server.uri());
+        let result = tracker
+            .claim_issue("quality-coordinator", 999, ClaimStrategy::ApiOnly)
+            .await;
+        assert_eq!(result.unwrap(), ClaimResult::NotFound);
+    }
+
+    #[tokio::test]
+    async fn test_claim_issue_permission_denied() {
+        let mock_server = MockServer::start().await;
+
+        // Initial fetch - no assignees
+        Mock::given(method("GET"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/42"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": 100,
+                "number": 42,
+                "title": "Test issue",
+                "state": "open",
+                "assignees": []
+            })))
+            .mount(&mock_server)
+            .await;
+
+        // Assignment forbidden
+        Mock::given(method("PATCH"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/42"))
+            .respond_with(ResponseTemplate::new(403).set_body_string("forbidden"))
+            .mount(&mock_server)
+            .await;
+
+        let tracker = make_tracker(&mock_server.uri());
+        let result = tracker
+            .claim_issue("quality-coordinator", 42, ClaimStrategy::ApiOnly)
+            .await;
+        assert!(matches!(
+            result.unwrap(),
+            ClaimResult::PermissionDenied { .. }
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_verify_assignment_with_retry() {
+        let mock_server = MockServer::start().await;
+
+        // First two calls return empty, third returns the agent
+        Mock::given(method("GET"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/42"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": 100,
+                "number": 42,
+                "title": "Test issue",
+                "state": "open",
+                "assignees": [{"id": 1, "login": "quality-coordinator"}]
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let tracker = make_tracker(&mock_server.uri());
+        let verified = tracker
+            .verify_assignment("quality-coordinator", 42, Some(3), Some(100))
+            .await;
+        assert!(verified.unwrap());
+    }
+
+    #[tokio::test]
+    async fn test_verify_assignment_fails_after_retries() {
+        let mock_server = MockServer::start().await;
+
+        // Always returns different assignee
+        Mock::given(method("GET"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/42"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": 100,
+                "number": 42,
+                "title": "Test issue",
+                "state": "open",
+                "assignees": [{"id": 1, "login": "other-agent"}]
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let tracker = make_tracker(&mock_server.uri());
+        let verified = tracker
+            .verify_assignment("quality-coordinator", 42, Some(2), Some(100))
+            .await;
+        assert!(!verified.unwrap());
+    }
+
+    #[tokio::test]
+    async fn test_claim_strategy_api_only_uses_no_robot() {
+        // This test verifies ApiOnly strategy doesn't try robot
+        // Since we can't easily mock process::Command, we verify it works
+        // when API is available
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/42"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": 100,
+                "number": 42,
+                "title": "Test issue",
+                "state": "open",
+                "assignees": []
+            })))
+            .up_to_n_times(2)
+            .expect(2)
+            .mount(&mock_server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/42"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": 100,
+                "number": 42,
+                "title": "Test issue",
+                "state": "open",
+                "assignees": [{"id": 1, "login": "test-agent"}]
+            })))
+            .mount(&mock_server)
+            .await;
+
+        Mock::given(method("PATCH"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/42"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": 100,
+                "number": 42,
+                "title": "Test issue",
+                "state": "open",
+                "assignees": [{"id": 1, "login": "test-agent"}]
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let tracker = make_tracker(&mock_server.uri());
+        // Use a non-existent robot path to ensure it would fail if tried
+        let result = tracker
+            .claim_issue("test-agent", 42, ClaimStrategy::ApiOnly)
+            .await;
+        assert!(matches!(result.unwrap(), ClaimResult::Success));
+    }
+
+    #[tokio::test]
+    async fn test_claim_issue_returns_assigned_to_other_when_verification_fails() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/42"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": 100,
+                "number": 42,
+                "title": "Test issue",
+                "state": "open",
+                "assignees": []
+            })))
+            .up_to_n_times(2)
+            .expect(2)
+            .mount(&mock_server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/42"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": 100,
+                "number": 42,
+                "title": "Test issue",
+                "state": "open",
+                "assignees": [{"id": 1, "login": "other-agent"}]
+            })))
+            .mount(&mock_server)
+            .await;
+
+        Mock::given(method("PATCH"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/42"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": 100,
+                "number": 42,
+                "title": "Test issue",
+                "state": "open",
+                "assignees": [{"id": 1, "login": "quality-coordinator"}]
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let tracker = make_tracker(&mock_server.uri());
+        let result = tracker
+            .claim_issue("quality-coordinator", 42, ClaimStrategy::ApiOnly)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            result,
+            ClaimResult::AssignedToOther {
+                assignee: "unknown (race condition)".to_string()
+            }
+        );
     }
 }

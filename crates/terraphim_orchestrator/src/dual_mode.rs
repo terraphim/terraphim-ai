@@ -524,6 +524,7 @@ fn create_tracker(workflow: &WorkflowConfig) -> Result<Box<dyn IssueTracker>, St
                 active_states: workflow.tracker.states.active.clone(),
                 terminal_states: workflow.tracker.states.terminal.clone(),
                 use_robot_api: workflow.tracker.use_robot_api,
+                ..Default::default()
             })
             .map_err(|e| format!("failed to create Gitea tracker: {}", e))?;
 

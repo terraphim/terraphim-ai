@@ -35,6 +35,7 @@ impl OutputPoster {
             active_states: vec!["open".to_string()],
             terminal_states: vec!["closed".to_string()],
             use_robot_api: false,
+            ..Default::default()
         };
         let default_tracker =
             GiteaTracker::new(default_gitea_config).expect("Failed to create default GiteaTracker");
@@ -59,6 +60,7 @@ impl OutputPoster {
                                 active_states: vec!["open".to_string()],
                                 terminal_states: vec!["closed".to_string()],
                                 use_robot_api: false,
+                                ..Default::default()
                             };
                             match GiteaTracker::new(agent_config) {
                                 Ok(tracker) => {

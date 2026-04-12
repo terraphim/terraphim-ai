@@ -1422,6 +1422,7 @@ impl AgentOrchestrator {
             active_states: tc.states.active.clone(),
             terminal_states: tc.states.terminal.clone(),
             use_robot_api: tc.use_robot_api,
+            ..Default::default()
         };
         match terraphim_tracker::GiteaTracker::new(config) {
             Ok(tracker) => {
@@ -1743,6 +1744,7 @@ impl AgentOrchestrator {
             active_states: vec!["open".to_string()],
             terminal_states: vec!["closed".to_string()],
             use_robot_api: false,
+            ..Default::default()
         };
         let tracker = match terraphim_tracker::GiteaTracker::new(tracker_cfg) {
             Ok(t) => t,
