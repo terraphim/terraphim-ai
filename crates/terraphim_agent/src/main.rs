@@ -27,6 +27,7 @@ mod client;
 mod tui_backend;
 
 mod guard_patterns;
+mod listener;
 mod onboarding;
 mod service;
 
@@ -732,6 +733,16 @@ enum Command {
         #[command(subcommand)]
         sub: SessionsSub,
     },
+
+    /// Start listener mode for AI agent communication (offline-only)
+    Listen {
+        /// Agent identity/name for this listener instance
+        #[arg(long, required = true)]
+        identity: String,
+        /// Optional listener configuration JSON file
+        #[arg(long)]
+        config: Option<String>,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -1045,6 +1056,30 @@ fn main() -> Result<()> {
             rt.block_on(repl::run_repl_offline_mode())
         }
 
+        Some(Command::Listen { identity, config }) => {
+            // Listen mode is offline-only - reject --server flag
+            if cli.server {
+                eprintln!("error: listen mode does not support --server flag");
+                eprintln!("The listener runs in offline mode only.");
+                std::process::exit(1);
+            }
+            let listener_config = match config.as_deref() {
+                Some(path) => listener::ListenerConfig::load_from_path(path)?,
+                None => listener::ListenerConfig::for_identity(identity.clone()),
+            };
+            listener_config.validate()?;
+            println!("listener would start with identity: {}", identity);
+            println!(
+                "resolved Gitea login: {}",
+                listener_config.identity.resolved_gitea_login()
+            );
+            println!("poll interval: {}s", listener_config.poll_interval_secs);
+            if listener_config.gitea.is_none() {
+                println!("listener config has no Gitea connection; discovery only");
+                return Ok(());
+            }
+            rt.block_on(listener::run_listener(listener_config))
+        }
         Some(command) => {
             let rt = Runtime::new()?;
             #[cfg(feature = "server")]
@@ -2119,6 +2154,13 @@ async fn run_offline_command(
             }
         }
 
+        Command::Listen { identity, config } => {
+            println!("listener would start with identity: {}", identity);
+            if let Some(path) = config.as_deref() {
+                println!("listener config: {}", path);
+            }
+            Ok(())
+        }
         Command::Interactive => {
             unreachable!("Interactive mode should be handled above")
         }
@@ -3370,6 +3412,11 @@ async fn run_server_command(
                     }
                 }
             })
+        }
+        Command::Listen { .. } => {
+            eprintln!("error: listen mode is not available in server mode");
+            eprintln!("The listener runs in offline mode only.");
+            std::process::exit(1);
         }
     }
 }
