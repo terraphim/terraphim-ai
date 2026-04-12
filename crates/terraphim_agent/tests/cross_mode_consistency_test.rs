@@ -300,27 +300,41 @@ fn search_via_cli(server_url: &str, query: &str, role: &str) -> Result<Vec<Norma
 
     let stdout = String::from_utf8_lossy(&output.stdout);
 
-    // Parse text format output: "- RANK\tTITLE" per line
+    // Parse human output lines. Current CLI output is "[RANK] TITLE",
+    // but keep support for the older "- RANK\tTITLE" form so the test
+    // tracks semantic consistency instead of a presentation detail.
     let results: Vec<NormalizedResult> = stdout
         .lines()
         .filter_map(|line| {
-            // Skip log lines and empty lines
-            if !line.starts_with("- ") {
-                return None;
+            if let Some(rest) = line.strip_prefix("- ") {
+                let parts: Vec<&str> = rest.splitn(2, '\t').collect();
+                if parts.len() >= 2 {
+                    let rank = parts[0].trim().parse::<u64>().ok();
+                    let title = parts[1].trim().to_string();
+                    return Some(NormalizedResult {
+                        id: title.clone(),
+                        title,
+                        rank,
+                    });
+                }
             }
-            let rest = line.strip_prefix("- ")?;
-            // Format is "RANK\tTITLE"
-            let parts: Vec<&str> = rest.splitn(2, '\t').collect();
-            if parts.len() >= 2 {
-                let rank = parts[0].trim().parse::<u64>().ok();
-                let title = parts[1].trim().to_string();
-                Some(NormalizedResult {
-                    id: title.clone(),
-                    title,
-                    rank,
-                })
-            } else {
+
+            let trimmed = line.trim();
+            let closing_bracket = trimmed.find(']')?;
+            let rank_str = trimmed
+                .strip_prefix('[')?
+                .get(..closing_bracket - 1)?
+                .trim();
+            let title = trimmed.get(closing_bracket + 1..)?.trim();
+
+            if title.is_empty() {
                 None
+            } else {
+                Some(NormalizedResult {
+                    id: title.to_string(),
+                    title: title.to_string(),
+                    rank: rank_str.parse::<u64>().ok(),
+                })
             }
         })
         .collect();
