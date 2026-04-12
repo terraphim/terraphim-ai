@@ -12,11 +12,16 @@
 //! Telemetry is captured from CLI tool output streams (opencode/claude JSON)
 //! and stored durably via terraphim_persistence.
 
+pub mod events;
 pub mod output_parser;
 pub mod policy;
 pub mod routing;
 pub mod telemetry;
 pub mod telemetry_persist;
 
+pub use events::{
+    dedup_key, normalize_polled_command, normalize_webhook_dispatch, CommandKind, EventOrigin,
+    NormalizedAgentEvent, WebhookContext,
+};
 pub use routing::{DispatchContext, RouteCandidate, RoutingDecision, RoutingDecisionEngine};
 pub use telemetry::{CompletionEvent, TelemetryStore, TelemetrySummary};

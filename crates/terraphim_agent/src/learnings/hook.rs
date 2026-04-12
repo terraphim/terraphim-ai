@@ -75,22 +75,6 @@ pub fn capture_from_hook(input: &HookInput) -> Result<PathBuf, LearningError> {
     capture_failed_command(command, &error_output, exit_code, &config)
 }
 
-/// Process hook input from stdin.
-///
-/// Reads JSON from stdin, captures failed commands if applicable,
-/// and passes through the original JSON to stdout (fail-open).
-///
-/// # Arguments
-///
-/// * `_format` - The agent format (for future format-specific handling)
-///
-/// # Returns
-///
-/// Ok(()) if processing succeeded (even if capture was skipped).
-pub async fn process_hook_input(_format: AgentFormat) -> Result<(), HookError> {
-    process_hook_input_with_type(_format, LearnHookType::PostToolUse).await
-}
-
 /// Process hook input with an explicit hook type.
 ///
 /// Routes to the appropriate handler based on the hook type:

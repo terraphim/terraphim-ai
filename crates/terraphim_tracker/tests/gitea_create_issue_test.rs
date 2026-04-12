@@ -129,6 +129,8 @@ async fn test_tracker_create_issue() {
         active_states: vec!["open".to_string()],
         terminal_states: vec!["closed".to_string()],
         use_robot_api: false,
+        robot_path: std::path::PathBuf::from("/home/alex/go/bin/gitea-robot"),
+        claim_strategy: terraphim_tracker::gitea::ClaimStrategy::PreferRobot,
     };
 
     let tracker = GiteaTracker::new(config).expect("Failed to create tracker");
