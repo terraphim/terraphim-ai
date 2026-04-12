@@ -24,8 +24,6 @@ pub enum StepOutcome {
 /// Result of replaying an entire procedure.
 #[derive(Debug)]
 pub struct ReplayResult {
-    /// ID of the procedure that was replayed.
-    pub procedure_id: String,
     /// Outcomes for each step, paired with ordinal number.
     pub outcomes: Vec<(u32, StepOutcome)>,
     /// Whether all executed steps succeeded.
@@ -111,7 +109,6 @@ pub fn replay_procedure(
     }
 
     Ok(ReplayResult {
-        procedure_id: procedure.id.clone(),
         outcomes,
         overall_success,
     })
