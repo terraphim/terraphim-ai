@@ -69,12 +69,9 @@ jobs:
 
         echo "Downloading baseline from ref: $BASELINE_REF"
 
-        # Download baseline results from previous run
-        # This assumes you have baseline results stored as artifacts or in a separate repo
-
-        # For now, create an empty baseline if none exists
+        # Baseline results are stored as workflow artifacts from previous main-branch runs.
+        # If none exist yet, skip -- the benchmark runs without comparison.
         mkdir -p benchmark-results
-        echo '{"timestamp":"2024-01-01T00:00:00Z","results":{}}' > benchmark-results/baseline.json
 
     - name: Start Terraphim server
       run: |

@@ -143,7 +143,7 @@ run_rust_benchmarks() {
 
     # Run rolegraph benchmarks (symbolic_embedding_bench and throughput)
     log_info "Running rolegraph benchmarks..."
-    if cargo bench --bench symbolic_embedding_bench --manifest-path crates/terraphim_rolegraph/Cargo.toml; then
+    if cargo bench --bench symbolic_embedding_bench --manifest-path crates/terraphim_rolegraph/Cargo.toml --features medical; then
         log_success "Rolegraph symbolic_embedding benchmarks completed"
     else
         log_warn "Rolegraph symbolic_embedding benchmarks failed"
