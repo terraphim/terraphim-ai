@@ -561,7 +561,9 @@ impl TerraphimUpdater {
         Ok(release)
     }
 
-    /// Download release archive to a temporary file
+    /// Download release archive to a temporary file with fallback support
+    ///
+    /// For Linux x86_64, tries GNU first, then falls back to MUSL if GNU is not available
     fn download_release_archive(
         repo_owner: &str,
         repo_name: &str,
@@ -572,81 +574,130 @@ impl TerraphimUpdater {
         // Normalize binary name (replace underscores with hyphens for GitHub releases)
         let bin_name_in_asset = bin_name.replace('_', "-");
 
-        // Determine current platform
-        let target = Self::get_target_triple()?;
+        // Determine current platform and get list of targets to try (for fallback)
+        let targets = Self::get_target_triples_with_fallback()?;
 
-        // Construct the expected asset name (following self_update conventions)
-        // self_update looks for: {bin_name_in_asset}-{target}
-        let asset_name = format!("{}-{}", bin_name_in_asset, target);
+        // Try each target in order
+        let mut last_error = None;
 
-        // Add .exe extension for Windows
-        let asset_name = if cfg!(windows) {
-            format!("{}.exe", asset_name)
-        } else {
-            asset_name
-        };
+        for target in targets {
+            // Try both raw binary and archive formats
+            let asset_names = Self::get_asset_names(&bin_name_in_asset, &target, version);
 
-        // Construct download URL
-        // GitHub release tags use "v" prefix (e.g., v1.5.2) but self_update strips it
-        let version_tag = if version.starts_with('v') {
-            version.to_string()
-        } else {
-            format!("v{}", version)
-        };
-        let download_url = format!(
-            "https://github.com/{}/{}/releases/download/{}/{}",
-            repo_owner, repo_name, version_tag, asset_name
-        );
+            for asset_name in asset_names {
+                // Construct download URL
+                let version_tag = if version.starts_with('v') {
+                    version.to_string()
+                } else {
+                    format!("v{}", version)
+                };
+                let download_url = format!(
+                    "https://github.com/{}/{}/releases/download/{}/{}",
+                    repo_owner, repo_name, version_tag, asset_name
+                );
 
-        info!("Downloading from: {}", download_url);
+                info!("Trying to download from: {}", download_url);
 
-        // Create temp file for download
-        let temp_file = NamedTempFile::new()?;
-        let download_config = crate::downloader::DownloadConfig {
-            show_progress,
-            ..Default::default()
-        };
+                // Create temp file for download
+                let temp_file = NamedTempFile::new()?;
+                let download_config = crate::downloader::DownloadConfig {
+                    show_progress,
+                    ..Default::default()
+                };
 
-        match crate::downloader::download_with_retry(
-            &download_url,
-            temp_file.path(),
-            Some(download_config),
-        ) {
-            Ok(_) => {
-                info!("Downloaded archive to: {:?}", temp_file.path());
-                Ok(temp_file)
-            }
-            Err(e) => {
-                // Provide helpful error message with available assets
-                Err(anyhow!(
-                    "Failed to download asset '{}'. Available assets can be listed at: https://github.com/{}/{}/releases/tag/{}. Error: {}",
-                    asset_name,
-                    repo_owner,
-                    repo_name,
-                    version,
-                    e
-                ))
+                match crate::downloader::download_with_retry(
+                    &download_url,
+                    temp_file.path(),
+                    Some(download_config),
+                ) {
+                    Ok(_) => {
+                        info!(
+                            "Successfully downloaded {} to: {:?}",
+                            asset_name,
+                            temp_file.path()
+                        );
+                        return Ok(temp_file);
+                    }
+                    Err(e) => {
+                        info!("Failed to download {}: {}", asset_name, e);
+                        last_error = Some((asset_name, e));
+                        // Continue to next asset/target
+                    }
+                }
             }
         }
+
+        // All attempts failed
+        let error_msg = if let Some((asset_name, e)) = last_error {
+            format!(
+                "Failed to download any asset. Last attempt '{}'. Error: {}. Available assets can be listed at: https://github.com/{}/{}/releases/tag/{}",
+                asset_name, e, repo_owner, repo_name, version
+            )
+        } else {
+            format!(
+                "Failed to determine assets to download. Available assets can be listed at: https://github.com/{}/{}/releases/tag/{}",
+                repo_owner, repo_name, version
+            )
+        };
+
+        Err(anyhow!("{}", error_msg))
     }
 
-    /// Get the target triple for the current platform
-    fn get_target_triple() -> Result<String> {
+    /// Get asset names to try for a given target
+    /// Returns asset names in order of preference (archives with signatures first, then raw binaries)
+    fn get_asset_names(bin_name: &str, target: &str, version: &str) -> Vec<String> {
+        let mut assets = Vec::new();
+
+        // Archive name with version comes FIRST (terraphim-agent-1.16.31-x86_64-unknown-linux-gnu.tar.gz)
+        // Archives are signed and preferred for security verification
+        let version_clean = version.trim_start_matches('v');
+        let archive_name = format!("{}-{}-{}.tar.gz", bin_name, version_clean, target);
+        assets.push(archive_name);
+
+        // Raw binary name second (terraphim-agent-x86_64-unknown-linux-gnu)
+        // Raw binaries may not have embedded signatures
+        let raw_name = if cfg!(windows) {
+            format!("{}.exe", target)
+        } else {
+            target.to_string()
+        };
+        assets.push(raw_name);
+
+        // Also try zip for Windows
+        if cfg!(windows) {
+            let zip_name = format!("{}-{}-{}.zip", bin_name, version_clean, target);
+            assets.push(zip_name);
+        }
+
+        assets
+    }
+
+    /// Get the target triples to try for the current platform
+    ///
+    /// For Linux x86_64, returns both GNU and MUSL variants (GNU first, MUSL fallback)
+    fn get_target_triples_with_fallback() -> Result<Vec<String>> {
         use std::env::consts::{ARCH, OS};
 
         let target = format!("{}-{}", ARCH, OS);
 
         // Map Rust targets to common release naming conventions
-        let target = match target.as_str() {
-            "x86_64-linux" => "x86_64-unknown-linux-gnu".to_string(),
-            "aarch64-linux" => "aarch64-unknown-linux-gnu".to_string(),
-            "x86_64-windows" => "x86_64-pc-windows-msvc".to_string(),
-            "x86_64-macos" => "x86_64-apple-darwin".to_string(),
-            "aarch64-macos" => "aarch64-apple-darwin".to_string(),
-            _ => target,
+        // For Linux x86_64, try GNU first, then MUSL as fallback
+        let targets = match target.as_str() {
+            "x86_64-linux" => vec![
+                "x86_64-unknown-linux-gnu".to_string(),
+                "x86_64-unknown-linux-musl".to_string(),
+            ],
+            "aarch64-linux" => vec![
+                "aarch64-unknown-linux-gnu".to_string(),
+                "aarch64-unknown-linux-musl".to_string(),
+            ],
+            "x86_64-windows" => vec!["x86_64-pc-windows-msvc".to_string()],
+            "x86_64-macos" => vec!["x86_64-apple-darwin".to_string()],
+            "aarch64-macos" => vec!["aarch64-apple-darwin".to_string()],
+            _ => vec![target],
         };
 
-        Ok(target)
+        Ok(targets)
     }
 
     /// Install a verified archive to the current binary location
