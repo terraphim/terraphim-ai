@@ -38,6 +38,9 @@ mod robot;
 // Learning capture for failed commands
 mod learnings;
 
+// KG-based command validation for PreToolUse hook pipeline
+mod kg_validation;
+
 #[cfg(feature = "repl")]
 mod repl;
 
@@ -487,6 +490,10 @@ struct SearchDocumentOutput {
     title: String,
     url: String,
     rank: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    body: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -773,6 +780,9 @@ enum LearnSub {
         /// Show global learnings instead of project
         #[arg(long, default_value_t = false)]
         global: bool,
+        /// Enable semantic matching via KG entities
+        #[arg(long, default_value_t = false)]
+        semantic: bool,
     },
     /// Add correction to an existing learning
     Correct {
@@ -805,12 +815,127 @@ enum LearnSub {
         /// AI agent format
         #[arg(long, value_enum, default_value = "claude")]
         format: learnings::AgentFormat,
+        /// Hook type for multi-hook pipeline
+        #[arg(long, value_enum, default_value = "post-tool-use")]
+        learn_hook_type: learnings::LearnHookType,
     },
     /// Install hook for AI agent
     InstallHook {
         /// AI agent to install hook for
         #[arg(value_enum)]
         agent: learnings::AgentType,
+    },
+    /// Manage captured procedures (recorded command sequences)
+    Procedure {
+        #[command(subcommand)]
+        sub: ProcedureSub,
+    },
+    /// Manage shared learnings with trust levels (L1/L2/L3)
+    #[cfg(feature = "shared-learning")]
+    Shared {
+        #[command(subcommand)]
+        sub: SharedLearningSub,
+    },
+}
+
+#[cfg(feature = "shared-learning")]
+#[derive(Subcommand, Debug)]
+enum SharedLearningSub {
+    /// List shared learnings, optionally filtered by trust level
+    List {
+        /// Filter by trust level: l1, l2, l3
+        #[arg(long)]
+        trust_level: Option<String>,
+        /// Maximum number of learnings to show
+        #[arg(long, default_value_t = 20)]
+        limit: usize,
+    },
+    /// Promote a shared learning to a higher trust level
+    Promote {
+        /// Learning ID
+        id: String,
+        /// Target trust level: l2 or l3
+        #[arg(long)]
+        to: String,
+    },
+    /// Import local captured learnings into the shared learning store at L1
+    Import,
+    /// Show shared learning statistics by trust level
+    Stats,
+}
+
+#[derive(Subcommand, Debug)]
+enum ProcedureSub {
+    /// List stored procedures (most recent first)
+    List {
+        /// Number of recent procedures to show
+        #[arg(long, default_value_t = 10)]
+        recent: usize,
+    },
+    /// Show full details of a procedure
+    Show {
+        /// Procedure ID
+        id: String,
+    },
+    /// Create a new empty procedure
+    Record {
+        /// Procedure title
+        title: String,
+        /// Optional description
+        #[arg(long)]
+        description: Option<String>,
+    },
+    /// Add a step to an existing procedure
+    AddStep {
+        /// Procedure ID
+        id: String,
+        /// Command to execute in this step
+        command: String,
+        /// Precondition that must hold before this step
+        #[arg(long)]
+        precondition: Option<String>,
+        /// Postcondition that should hold after this step
+        #[arg(long)]
+        postcondition: Option<String>,
+    },
+    /// Record a successful execution of a procedure
+    Success {
+        /// Procedure ID
+        id: String,
+    },
+    /// Record a failed execution of a procedure
+    Failure {
+        /// Procedure ID
+        id: String,
+    },
+    /// Replay a stored procedure (execute its steps in order)
+    Replay {
+        /// Procedure ID
+        id: String,
+        /// Print steps without executing them
+        #[arg(long, default_value_t = false)]
+        dry_run: bool,
+    },
+    /// Show health status of all procedures (auto-disables critically failing ones)
+    Health,
+    /// Enable a previously disabled procedure
+    Enable {
+        /// Procedure ID
+        id: String,
+    },
+    /// Disable a procedure (prevents replay)
+    Disable {
+        /// Procedure ID
+        id: String,
+    },
+    /// Auto-capture a procedure from a session's Bash commands
+    #[cfg(feature = "repl-sessions")]
+    FromSession {
+        /// Session ID to extract commands from
+        session_id: String,
+        /// Optional title (auto-generated from first command if not provided)
+        #[arg(long)]
+        title: Option<String>,
     },
 }
 
@@ -1251,13 +1376,42 @@ async fn run_offline_command(
                             title: doc.title.clone(),
                             url: doc.url.clone(),
                             rank: doc.rank,
+                            description: doc.description.clone(),
+                            body: if doc.body.is_empty() {
+                                None
+                            } else {
+                                Some(doc.body.clone())
+                            },
                         })
                         .collect(),
                 };
                 print_json_output(&payload, output.mode)?;
             } else {
                 for doc in results.iter() {
-                    println!("- {}\t{}", doc.rank.unwrap_or_default(), doc.title);
+                    let snippet = doc
+                        .description
+                        .as_deref()
+                        .or(if doc.body.is_empty() {
+                            None
+                        } else {
+                            Some(doc.body.as_str())
+                        })
+                        .map(|s| {
+                            let trimmed = s.trim();
+                            if trimmed.len() > 120 {
+                                format!("{}...", &trimmed[..120])
+                            } else {
+                                trimmed.to_string()
+                            }
+                        });
+                    println!("[{}] {}", doc.rank.unwrap_or_default(), doc.title);
+                    if !doc.url.is_empty() {
+                        println!("    {}", doc.url);
+                    }
+                    if let Some(snip) = snippet {
+                        println!("    {}", snip);
+                    }
+                    println!();
                 }
             }
             Ok(())
@@ -1696,20 +1850,36 @@ async fn run_offline_command(
                                 }
                             }
 
+                            // KG validation: find patterns with known alternatives
+                            let kg_validation = kg_validation::validate_command_against_kg(command);
+
                             // Get thesaurus and perform replacement
                             let thesaurus = service.get_thesaurus(&role_name).await?;
                             let replacement_service =
                                 terraphim_hooks::ReplacementService::new(thesaurus);
                             let hook_result = replacement_service.replace_fail_open(command);
 
-                            // If replacement occurred, output modified input
-                            if hook_result.replacements > 0 {
+                            // If replacement occurred or KG validation has findings, output modified input
+                            if hook_result.replacements > 0 || kg_validation.has_findings {
                                 let mut output = input_value.clone();
-                                if let Some(tool_input) = output.get_mut("tool_input") {
-                                    if let Some(obj) = tool_input.as_object_mut() {
+                                if hook_result.replacements > 0 {
+                                    if let Some(tool_input) = output.get_mut("tool_input") {
+                                        if let Some(obj) = tool_input.as_object_mut() {
+                                            obj.insert(
+                                                "command".to_string(),
+                                                serde_json::Value::String(
+                                                    hook_result.result.clone(),
+                                                ),
+                                            );
+                                        }
+                                    }
+                                }
+                                if kg_validation.has_findings {
+                                    if let Some(obj) = output.as_object_mut() {
                                         obj.insert(
-                                            "command".to_string(),
-                                            serde_json::Value::String(hook_result.result.clone()),
+                                            "validations".to_string(),
+                                            serde_json::to_value(&kg_validation)
+                                                .unwrap_or_default(),
                                         );
                                     }
                                 }
@@ -2005,7 +2175,7 @@ async fn run_offline_command(
 async fn run_learn_command(sub: LearnSub) -> Result<()> {
     use learnings::{
         CorrectionType, LearningCaptureConfig, capture_correction, capture_failed_command,
-        correct_learning, list_all_entries, query_all_entries,
+        correct_learning, list_all_entries,
     };
     let config = LearningCaptureConfig::default();
 
@@ -2068,6 +2238,7 @@ async fn run_learn_command(sub: LearnSub) -> Result<()> {
             pattern,
             exact,
             global,
+            semantic,
         } => {
             let storage_loc = config.storage_location();
             let storage_dir = if global {
@@ -2075,7 +2246,7 @@ async fn run_learn_command(sub: LearnSub) -> Result<()> {
             } else {
                 &storage_loc
             };
-            match query_all_entries(storage_dir, &pattern, exact) {
+            match learnings::query_all_entries_semantic(storage_dir, &pattern, exact, semantic) {
                 Ok(entries) => {
                     if entries.is_empty() {
                         println!("No learnings matching '{}'.", pattern);
@@ -2089,6 +2260,10 @@ async fn run_learn_command(sub: LearnSub) -> Result<()> {
                             println!("  {} {}", source_indicator, entry.summary());
                             if let Some(correction) = entry.correction_text() {
                                 println!("     Correction: {}", correction);
+                            }
+                            let entities = entry.entities();
+                            if !entities.is_empty() {
+                                println!("     Entities: {}", entities.join(", "));
                             }
                         }
                     }
@@ -2137,11 +2312,473 @@ async fn run_learn_command(sub: LearnSub) -> Result<()> {
                 }
             }
         }
-        LearnSub::Hook { format } => learnings::process_hook_input(format)
+        LearnSub::Hook {
+            format,
+            learn_hook_type,
+        } => learnings::process_hook_input_with_type(format, learn_hook_type)
             .await
             .map_err(|e| e.into()),
         LearnSub::InstallHook { agent } => {
             learnings::install_hook(agent).await.map_err(|e| e.into())
+        }
+        LearnSub::Procedure { sub } => {
+            let procedures_path = config.global_dir.join("procedures.jsonl");
+            let store = learnings::ProcedureStore::new(procedures_path);
+
+            match sub {
+                ProcedureSub::List { recent } => {
+                    let all = store.load_all()?;
+                    if all.is_empty() {
+                        println!("No procedures found.");
+                    } else {
+                        let display_count = recent.min(all.len());
+                        println!("Procedures ({} of {}):", display_count, all.len());
+                        for proc in all.iter().rev().take(recent) {
+                            println!(
+                                "  [{}] {} -- {} steps, confidence {:.0}% ({}/{})",
+                                proc.id,
+                                proc.title,
+                                proc.step_count(),
+                                proc.confidence.score * 100.0,
+                                proc.confidence.success_count,
+                                proc.confidence.total_executions(),
+                            );
+                        }
+                    }
+                    Ok(())
+                }
+                ProcedureSub::Show { id } => {
+                    match store.find_by_id(&id)? {
+                        Some(proc) => {
+                            println!("Procedure: {}", proc.title);
+                            println!("ID: {}", proc.id);
+                            println!("Description: {}", proc.description);
+                            println!(
+                                "Confidence: {:.0}% ({} successes, {} failures)",
+                                proc.confidence.score * 100.0,
+                                proc.confidence.success_count,
+                                proc.confidence.failure_count,
+                            );
+                            if proc.disabled {
+                                println!("Status: DISABLED");
+                            }
+                            println!("Created: {}", proc.created_at);
+                            println!("Updated: {}", proc.updated_at);
+                            if !proc.tags.is_empty() {
+                                println!("Tags: {}", proc.tags.join(", "));
+                            }
+                            if let Some(ref session) = proc.source_session {
+                                println!("Source session: {}", session);
+                            }
+                            println!("Steps ({}):", proc.step_count());
+                            for step in &proc.steps {
+                                println!("  {}. {}", step.ordinal, step.command);
+                                if let Some(ref pre) = step.precondition {
+                                    println!("     pre: {}", pre);
+                                }
+                                if let Some(ref post) = step.postcondition {
+                                    println!("     post: {}", post);
+                                }
+                            }
+                        }
+                        None => {
+                            eprintln!("Procedure '{}' not found.", id);
+                        }
+                    }
+                    Ok(())
+                }
+                ProcedureSub::Record { title, description } => {
+                    use uuid::Uuid;
+                    let id = Uuid::new_v4().to_string();
+                    let desc = description.unwrap_or_default();
+                    let procedure =
+                        terraphim_types::procedure::CapturedProcedure::new(id.clone(), title, desc);
+                    store.save(&procedure)?;
+                    println!("Created procedure: {}", id);
+                    Ok(())
+                }
+                ProcedureSub::AddStep {
+                    id,
+                    command,
+                    precondition,
+                    postcondition,
+                } => {
+                    let mut proc = store
+                        .find_by_id(&id)?
+                        .ok_or_else(|| anyhow::anyhow!("Procedure '{}' not found", id))?;
+                    let ordinal = proc.step_count() as u32 + 1;
+                    proc.add_step(terraphim_types::procedure::ProcedureStep {
+                        ordinal,
+                        command,
+                        precondition,
+                        postcondition,
+                        working_dir: None,
+                        privileged: false,
+                        tags: vec![],
+                    });
+                    store.save(&proc)?;
+                    println!("Added step {} to procedure '{}'.", ordinal, id);
+                    Ok(())
+                }
+                ProcedureSub::Success { id } => {
+                    store.update_confidence(&id, true)?;
+                    println!("Recorded success for procedure '{}'.", id);
+                    Ok(())
+                }
+                ProcedureSub::Failure { id } => {
+                    store.update_confidence(&id, false)?;
+                    println!("Recorded failure for procedure '{}'.", id);
+                    Ok(())
+                }
+                ProcedureSub::Replay { id, dry_run } => {
+                    let procedure = store.find_by_id(&id)?;
+                    match procedure {
+                        None => {
+                            eprintln!("Procedure '{}' not found.", id);
+                            std::process::exit(1);
+                        }
+                        Some(proc) => {
+                            // Check if procedure is disabled
+                            if proc.disabled {
+                                eprintln!(
+                                    "Procedure '{}' is disabled. Use 'learn procedure enable {}' to re-enable it.",
+                                    id, id,
+                                );
+                                std::process::exit(1);
+                            }
+
+                            // Check minimum confidence threshold
+                            if proc.confidence.total_executions() > 0 && proc.confidence.score < 0.5
+                            {
+                                eprintln!(
+                                    "Procedure '{}' has low confidence ({:.0}%). \
+                                     Use --dry-run to preview, or record more successes first.",
+                                    id,
+                                    proc.confidence.score * 100.0,
+                                );
+                                std::process::exit(1);
+                            }
+
+                            println!(
+                                "Replaying procedure '{}' ({} steps){}",
+                                proc.title,
+                                proc.step_count(),
+                                if dry_run { " [DRY RUN]" } else { "" },
+                            );
+
+                            let result = learnings::replay_procedure(&proc, dry_run)?;
+
+                            // Print outcomes
+                            for (ordinal, outcome) in &result.outcomes {
+                                match outcome {
+                                    learnings::StepOutcome::Success { stdout } => {
+                                        println!("  step {}: OK", ordinal);
+                                        if !stdout.trim().is_empty() && stdout != "(dry-run)" {
+                                            for line in stdout.lines() {
+                                                println!("    | {}", line);
+                                            }
+                                        }
+                                    }
+                                    learnings::StepOutcome::Failed { stderr, exit_code } => {
+                                        println!("  step {}: FAILED (exit {})", ordinal, exit_code);
+                                        if !stderr.trim().is_empty() {
+                                            for line in stderr.lines() {
+                                                println!("    | {}", line);
+                                            }
+                                        }
+                                    }
+                                    learnings::StepOutcome::Skipped { reason } => {
+                                        println!("  step {}: SKIPPED ({})", ordinal, reason);
+                                    }
+                                }
+                            }
+
+                            // Update confidence based on result (skip for dry-run)
+                            if !dry_run {
+                                store.update_confidence(&id, result.overall_success)?;
+                                if result.overall_success {
+                                    println!("Replay completed successfully.");
+                                } else {
+                                    println!("Replay failed.");
+                                    std::process::exit(1);
+                                }
+                            } else {
+                                println!("Dry run completed.");
+                            }
+
+                            Ok(())
+                        }
+                    }
+                }
+                ProcedureSub::Health => {
+                    let reports = store.health_check()?;
+                    if reports.is_empty() {
+                        println!("No procedures found.");
+                    } else {
+                        println!(
+                            "{:<38} {:<12} {:<8} {:<6} {:<9}",
+                            "ID", "STATUS", "RATE", "RUNS", "DISABLED"
+                        );
+                        println!("{}", "-".repeat(73));
+                        for report in &reports {
+                            println!(
+                                "{:<38} {:<12} {:<8.0}% {:<6} {:<9}",
+                                report.id,
+                                report.status.to_string(),
+                                report.success_rate * 100.0,
+                                report.total_executions,
+                                if report.auto_disabled
+                                    || store
+                                        .find_by_id(&report.id)?
+                                        .map(|p| p.disabled)
+                                        .unwrap_or(false)
+                                {
+                                    "yes"
+                                } else {
+                                    "no"
+                                },
+                            );
+                        }
+                        let auto_disabled_count =
+                            reports.iter().filter(|r| r.auto_disabled).count();
+                        if auto_disabled_count > 0 {
+                            println!(
+                                "\n{} procedure(s) auto-disabled due to critical failure rate.",
+                                auto_disabled_count,
+                            );
+                        }
+                    }
+                    Ok(())
+                }
+                ProcedureSub::Enable { id } => {
+                    store.set_disabled(&id, false)?;
+                    println!("Procedure '{}' enabled.", id);
+                    Ok(())
+                }
+                ProcedureSub::Disable { id } => {
+                    store.set_disabled(&id, true)?;
+                    println!("Procedure '{}' disabled.", id);
+                    Ok(())
+                }
+                #[cfg(feature = "repl-sessions")]
+                ProcedureSub::FromSession { session_id, title } => {
+                    use terraphim_sessions::SessionService;
+
+                    let service = SessionService::new();
+
+                    // Load cached sessions from disk
+                    let cache_path = get_session_cache_path();
+                    if cache_path.exists() {
+                        if let Ok(data) = std::fs::read_to_string(&cache_path) {
+                            if let Ok(cached) =
+                                serde_json::from_str::<Vec<terraphim_sessions::Session>>(&data)
+                            {
+                                service.load_sessions(cached).await;
+                            }
+                        }
+                    }
+
+                    let session = service.get_session(&session_id).await;
+                    match session {
+                        Some(sess) => {
+                            let commands =
+                                learnings::procedure::extract_bash_commands_from_session(&sess);
+                            if commands.is_empty() {
+                                println!("No Bash commands found in session '{}'.", session_id);
+                                return Ok(());
+                            }
+                            let total_cmds = commands.len();
+                            let mut procedure =
+                                learnings::procedure::from_session_commands(commands, title);
+                            procedure.source_session = Some(session_id.clone());
+                            let step_count = procedure.step_count();
+
+                            let saved = store.save_with_dedup(procedure)?;
+                            println!(
+                                "Created procedure '{}' (ID: {}) with {} steps from {} commands.",
+                                saved.title, saved.id, step_count, total_cmds
+                            );
+                            Ok(())
+                        }
+                        None => {
+                            eprintln!(
+                                "Session '{}' not found. Try running 'sessions list' first to import sessions.",
+                                session_id
+                            );
+                            std::process::exit(1);
+                        }
+                    }
+                }
+            }
+        }
+        #[cfg(feature = "shared-learning")]
+        LearnSub::Shared { sub } => run_shared_learning_command(sub, &config).await,
+    }
+}
+
+#[cfg(feature = "shared-learning")]
+async fn run_shared_learning_command(
+    sub: SharedLearningSub,
+    config: &learnings::LearningCaptureConfig,
+) -> Result<()> {
+    use terraphim_agent::shared_learning::{
+        SharedLearning, SharedLearningSource, SharedLearningStore, StoreConfig, TrustLevel,
+    };
+
+    let store_config = StoreConfig::default();
+    let store = SharedLearningStore::open(store_config)
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to open shared learning store: {}", e))?;
+
+    match sub {
+        SharedLearningSub::List { trust_level, limit } => {
+            let learnings = if let Some(ref level_str) = trust_level {
+                let level: TrustLevel = level_str.parse().map_err(|e| anyhow::anyhow!("{}", e))?;
+                store
+                    .list_by_trust_level(level)
+                    .await
+                    .map_err(|e| anyhow::anyhow!("{}", e))?
+            } else {
+                store
+                    .list_all()
+                    .await
+                    .map_err(|e| anyhow::anyhow!("{}", e))?
+            };
+
+            if learnings.is_empty() {
+                println!("No shared learnings found.");
+            } else {
+                let display_count = limit.min(learnings.len());
+                println!(
+                    "Shared learnings ({} of {}):",
+                    display_count,
+                    learnings.len()
+                );
+                for learning in learnings.iter().take(limit) {
+                    println!(
+                        "  [{}] {} -- {} ({})",
+                        &learning.id[..learning.id.len().min(12)],
+                        learning.title,
+                        learning.trust_level,
+                        learning.source,
+                    );
+                }
+            }
+            Ok(())
+        }
+        SharedLearningSub::Promote { id, to } => {
+            let target: TrustLevel = to.parse().map_err(|e| anyhow::anyhow!("{}", e))?;
+
+            match target {
+                TrustLevel::L2 => {
+                    store
+                        .promote_to_l2(&id)
+                        .await
+                        .map_err(|e| anyhow::anyhow!("{}", e))?;
+                    println!("Promoted learning {} to L2 (Peer-Validated).", id);
+                }
+                TrustLevel::L3 => {
+                    store
+                        .promote_to_l3(&id)
+                        .await
+                        .map_err(|e| anyhow::anyhow!("{}", e))?;
+                    println!("Promoted learning {} to L3 (Human-Approved).", id);
+                }
+                TrustLevel::L1 => {
+                    return Err(anyhow::anyhow!(
+                        "Cannot promote to L1 -- learnings start at L1. Use l2 or l3."
+                    ));
+                }
+            }
+            Ok(())
+        }
+        SharedLearningSub::Import => {
+            use crate::learnings::list_learnings;
+
+            let storage_loc = config.storage_location();
+            let local_learnings = list_learnings(&storage_loc, usize::MAX).unwrap_or_default();
+
+            if local_learnings.is_empty() {
+                println!("No local learnings found to import.");
+                return Ok(());
+            }
+
+            let mut imported = 0;
+            for local in &local_learnings {
+                let title = if local.command.len() > 60 {
+                    format!("{}...", &local.command[..60])
+                } else {
+                    local.command.clone()
+                };
+
+                let shared = SharedLearning::new(
+                    title,
+                    local.error_output.clone(),
+                    SharedLearningSource::BashHook,
+                    "cli-import".to_string(),
+                )
+                .with_original_command(local.command.clone())
+                .with_error_context(local.error_output.clone())
+                .with_keywords(local.tags.clone());
+
+                if let Some(ref correction) = local.correction {
+                    let shared = shared.with_correction(correction.clone());
+                    store
+                        .insert(shared)
+                        .await
+                        .map_err(|e| anyhow::anyhow!("{}", e))?;
+                } else {
+                    store
+                        .insert(shared)
+                        .await
+                        .map_err(|e| anyhow::anyhow!("{}", e))?;
+                }
+                imported += 1;
+            }
+
+            println!(
+                "Imported {} local learning(s) into shared store at L1.",
+                imported
+            );
+            Ok(())
+        }
+        SharedLearningSub::Stats => {
+            let all = store
+                .list_all()
+                .await
+                .map_err(|e| anyhow::anyhow!("{}", e))?;
+
+            let l1_count = all
+                .iter()
+                .filter(|l| l.trust_level == TrustLevel::L1)
+                .count();
+            let l2_count = all
+                .iter()
+                .filter(|l| l.trust_level == TrustLevel::L2)
+                .count();
+            let l3_count = all
+                .iter()
+                .filter(|l| l.trust_level == TrustLevel::L3)
+                .count();
+
+            println!("Shared Learning Statistics:");
+            println!("  Total: {}", all.len());
+            println!("  L1 (Unverified):      {}", l1_count);
+            println!("  L2 (Peer-Validated):  {}", l2_count);
+            println!("  L3 (Human-Approved):  {}", l3_count);
+
+            if !all.is_empty() {
+                let total_applied: u32 = all.iter().map(|l| l.quality.applied_count).sum();
+                let total_effective: u32 = all.iter().map(|l| l.quality.effective_count).sum();
+                let avg_success = if total_applied > 0 {
+                    (total_effective as f64 / total_applied as f64) * 100.0
+                } else {
+                    0.0
+                };
+                println!("  Total applications:   {}", total_applied);
+                println!("  Avg success rate:     {:.1}%", avg_success);
+            }
+            Ok(())
         }
     }
 }
@@ -2237,13 +2874,42 @@ async fn run_server_command(
                             title: doc.title.clone(),
                             url: doc.url.clone(),
                             rank: doc.rank,
+                            description: doc.description.clone(),
+                            body: if doc.body.is_empty() {
+                                None
+                            } else {
+                                Some(doc.body.clone())
+                            },
                         })
                         .collect(),
                 };
                 print_json_output(&payload, output.mode)?;
             } else {
                 for doc in res.results.iter() {
-                    println!("- {}\t{}", doc.rank.unwrap_or_default(), doc.title);
+                    let snippet = doc
+                        .description
+                        .as_deref()
+                        .or(if doc.body.is_empty() {
+                            None
+                        } else {
+                            Some(doc.body.as_str())
+                        })
+                        .map(|s| {
+                            let trimmed = s.trim();
+                            if trimmed.len() > 120 {
+                                format!("{}...", &trimmed[..120])
+                            } else {
+                                trimmed.to_string()
+                            }
+                        });
+                    println!("[{}] {}", doc.rank.unwrap_or_default(), doc.title);
+                    if !doc.url.is_empty() {
+                        println!("    {}", doc.url);
+                    }
+                    if let Some(snip) = snippet {
+                        println!("    {}", snip);
+                    }
+                    println!();
                 }
             }
             Ok(())
