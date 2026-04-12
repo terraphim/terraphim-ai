@@ -30,6 +30,10 @@ env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
 
+permissions:
+  contents: read
+  issues: write
+
 jobs:
   performance-benchmarks:
     name: Performance Benchmarks
@@ -77,9 +81,50 @@ jobs:
         # Download baseline results from previous run
         # This assumes you have baseline results stored as artifacts or in a separate repo
 
-        # For now, create an empty baseline if none exists
+        # For now, create an empty but schema-valid baseline if none exists
         mkdir -p benchmark-results
-        echo '{"timestamp":"2024-01-01T00:00:00Z","results":{}}' > benchmark-results/baseline.json
+        cat <<'EOF' > benchmark-results/baseline.json
+        {
+          "timestamp": "2024-01-01T00:00:00Z",
+          "config": {
+            "iterations": 1000,
+            "warmup_iterations": 100,
+            "concurrent_users": [1, 5, 10, 25, 50],
+            "data_scales": [1000, 10000, 100000, 1000000],
+            "slos": {
+              "max_startup_time_ms": 5000,
+              "max_api_response_time_ms": 500,
+              "max_search_time_ms": 1000,
+              "max_indexing_time_per_doc_ms": 50,
+              "max_memory_mb": 1024,
+              "max_cpu_idle_percent": 5.0,
+              "max_cpu_load_percent": 80.0,
+              "min_rps": 10.0,
+              "max_concurrent_users": 100,
+              "max_data_scale": 1000000
+            },
+            "monitoring_interval_ms": 1000,
+            "enable_profiling": false
+          },
+          "results": {},
+          "slo_compliance": {
+            "overall_compliance": 100.0,
+            "violations": [],
+            "critical_violations": []
+          },
+          "system_info": {
+            "os": "unknown",
+            "os_version": "unknown",
+            "cpu_model": "unknown",
+            "cpu_cores": 0,
+            "total_memory_mb": 0,
+            "available_memory_mb": 0,
+            "rust_version": "unknown",
+            "terraphim_version": "unknown"
+          },
+          "trends": null
+        }
+        EOF
 
     - name: Start Terraphim server
       run: |
@@ -132,18 +177,18 @@ jobs:
       if: always()
       run: |
         # Create a summary for GitHub Actions
-        if [ -f "benchmark-results/*/benchmark_report.md" ]; then
-          REPORT_FILE=$(find benchmark-results -name "benchmark_report.md" | head -1)
+        REPORT_FILE=$(find benchmark-results -name "benchmark_report.md" | head -1)
+        if [ -n "$REPORT_FILE" ] && [ -f "$REPORT_FILE" ]; then
           echo "## Performance Benchmark Report" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          cat $REPORT_FILE >> $GITHUB_STEP_SUMMARY
+          cat "$REPORT_FILE" >> $GITHUB_STEP_SUMMARY
         fi
 
     - name: Check performance gates
       run: |
         # Check if benchmark results meet performance requirements
-        if [ -f "benchmark-results/*/benchmark_results.json" ]; then
-          RESULTS_FILE=$(find benchmark-results -name "benchmark_results.json" | head -1)
+        RESULTS_FILE=$(find benchmark-results -name "benchmark_results.json" | head -1)
+        if [ -n "$RESULTS_FILE" ] && [ -f "$RESULTS_FILE" ]; then
 
           # Extract SLO compliance percentage
           SLO_COMPLIANCE=$(jq -r '.slo_compliance.overall_compliance // 0' "$RESULTS_FILE")
@@ -174,6 +219,7 @@ jobs:
 
     - name: Comment on PR (if applicable)
       if: github.event_name == 'pull_request' && always()
+      continue-on-error: true
       uses: actions/github-script@v8
       with:
         script: |
