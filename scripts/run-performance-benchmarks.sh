@@ -17,6 +17,8 @@ ITERATIONS=1000
 BASELINE_FILE="${RESULTS_DIR}/baseline.json"
 CONFIG_FILE="${PROJECT_ROOT}/benchmark-config.json"
 VERBOSE=false
+# When true, skips the custom benchmark binary build (set for PR CI to save ~15 min)
+QUICK_BENCH="${TERRAPHIM_QUICK_BENCH:-false}"
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -168,6 +170,12 @@ run_custom_benchmarks() {
     log_info "Running custom performance benchmarks..."
 
     cd "$PROJECT_ROOT"
+
+    # Skip custom benchmark binary when in quick mode (e.g. PR CI)
+    if [ "$QUICK_BENCH" = "true" ]; then
+        log_info "Quick mode: skipping custom benchmark binary build"
+        return
+    fi
 
     # Build the benchmark binary (if it exists)
     if [ -f "crates/terraphim_validation/src/bin/performance_benchmark.rs" ]; then
@@ -324,10 +332,12 @@ run_load_tests() {
     local load_results="$RUN_DIR/load_test_results.txt"
 
     # Test health endpoint with increasing concurrency
+    # Use 10s per level (enough for stable measurements, saves ~100s vs 30s)
+    local wrk_duration="10s"
     for concurrency in 1 5 10 25 50; do
         log_info "Load testing health endpoint with $concurrency concurrent connections..."
 
-        wrk -t$concurrency -c$concurrency -d30s --latency "$SERVER_URL/health" >> "$load_results" 2>&1
+        wrk -t$concurrency -c$concurrency -d${wrk_duration} --latency "$SERVER_URL/health" >> "$load_results" 2>&1
 
         echo "--- Concurrency: $concurrency ---" >> "$load_results"
     done
