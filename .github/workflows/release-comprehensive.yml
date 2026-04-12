@@ -154,6 +154,7 @@ jobs:
         run: cargo install cross
 
       - name: Cache dependencies
+        if: matrix.target != 'x86_64-unknown-linux-gnu'
         uses: Swatinem/rust-cache@v2
         with:
           key: ${{ matrix.target }}
@@ -726,15 +727,34 @@ jobs:
       - name: Calculate universal binary checksums
         id: checksums
         run: |
-          # Extract SHA256 for universal binaries from checksums.txt
+          # Extract SHA256 for all binaries from checksums.txt
+          # macOS universal binaries
           SERVER_SHA=$(grep "terraphim_server-universal-apple-darwin" checksums.txt | awk '{print $1}')
           AGENT_SHA=$(grep "terraphim-agent-universal-apple-darwin" checksums.txt | awk '{print $1}')
 
+          # Linux GNU binaries (for Homebrew)
+          SERVER_LINUX_GNU_SHA=$(grep "terraphim_server-x86_64-unknown-linux-gnu" checksums.txt | grep -v tar.gz | awk '{print $1}')
+          AGENT_LINUX_GNU_SHA=$(grep "terraphim-agent-x86_64-unknown-linux-gnu" checksums.txt | grep -v tar.gz | awk '{print $1}')
+
+          # Fallback to MUSL if GNU not available
+          if [ -z "$SERVER_LINUX_GNU_SHA" ]; then
+            SERVER_LINUX_GNU_SHA=$(grep "terraphim_server-x86_64-unknown-linux-musl" checksums.txt | grep -v tar.gz | awk '{print $1}')
+            echo "⚠️  Using MUSL fallback for server"
+          fi
+          if [ -z "$AGENT_LINUX_GNU_SHA" ]; then
+            AGENT_LINUX_GNU_SHA=$(grep "terraphim-agent-x86_64-unknown-linux-musl" checksums.txt | grep -v tar.gz | awk '{print $1}')
+            echo "⚠️  Using MUSL fallback for agent"
+          fi
+
           echo "server_sha=$SERVER_SHA" >> $GITHUB_OUTPUT
           echo "agent_sha=$AGENT_SHA" >> $GITHUB_OUTPUT
+          echo "server_linux_gnu_sha=$SERVER_LINUX_GNU_SHA" >> $GITHUB_OUTPUT
+          echo "agent_linux_gnu_sha=$AGENT_LINUX_GNU_SHA" >> $GITHUB_OUTPUT
 
           echo "Server universal binary SHA256: $SERVER_SHA"
           echo "Agent universal binary SHA256: $AGENT_SHA"
+          echo "Server Linux GNU SHA256: $SERVER_LINUX_GNU_SHA"
+          echo "Agent Linux GNU SHA256: $AGENT_LINUX_GNU_SHA"
 
       - name: Clone Homebrew tap
         run: |
@@ -748,6 +768,8 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
           SERVER_SHA: ${{ steps.checksums.outputs.server_sha }}
           AGENT_SHA: ${{ steps.checksums.outputs.agent_sha }}
+          SERVER_LINUX_GNU_SHA: ${{ steps.checksums.outputs.server_linux_gnu_sha }}
+          AGENT_LINUX_GNU_SHA: ${{ steps.checksums.outputs.agent_linux_gnu_sha }}
         run: |
           cd homebrew-terraphim
 
@@ -766,7 +788,7 @@ jobs:
 
             on_linux do
               url "https://github.com/terraphim/terraphim-ai/releases/download/v${VERSION}/terraphim_server-x86_64-unknown-linux-gnu"
-              sha256 "LINUX_SHA_PLACEHOLDER"
+              sha256 "${SERVER_LINUX_GNU_SHA}"
             end
 
             def install
@@ -805,7 +827,7 @@ jobs:
 
             on_linux do
               url "https://github.com/terraphim/terraphim-ai/releases/download/v${VERSION}/terraphim-agent-x86_64-unknown-linux-gnu"
-              sha256 "LINUX_SHA_PLACEHOLDER"
+              sha256 "${AGENT_LINUX_GNU_SHA}"
             end
 
             def install
