@@ -74,8 +74,6 @@ impl std::fmt::Display for HealthStatus {
 pub struct ProcedureHealthReport {
     /// Procedure ID
     pub id: String,
-    /// Procedure title
-    pub title: String,
     /// Current health status
     pub status: HealthStatus,
     /// Success rate as a fraction (0.0 - 1.0)
@@ -266,6 +264,7 @@ impl ProcedureStore {
     }
 
     /// Find procedures by title (case-insensitive substring search).
+    #[cfg(test)]
     pub fn find_by_title(&self, query: &str) -> io::Result<Vec<CapturedProcedure>> {
         let all = self.load_all()?;
         let query_lower = query.to_lowercase();
@@ -343,7 +342,6 @@ impl ProcedureStore {
 
             reports.push(ProcedureHealthReport {
                 id: procedure.id.clone(),
-                title: procedure.title.clone(),
                 status,
                 success_rate: score,
                 total_executions: total,
@@ -375,6 +373,7 @@ impl ProcedureStore {
     }
 
     /// Delete a procedure by ID.
+    #[cfg(test)]
     pub fn delete(&self, id: &str) -> io::Result<bool> {
         let mut procedures = self.load_all()?;
         let original_len = procedures.len();

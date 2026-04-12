@@ -141,12 +141,17 @@ run_rust_benchmarks() {
         log_warn "Automata benchmarks failed"
     fi
 
-    # Run rolegraph benchmarks
+    # Run rolegraph benchmarks (symbolic_embedding_bench and throughput)
     log_info "Running rolegraph benchmarks..."
-    if cargo bench --bench rolegraph --manifest-path crates/terraphim_rolegraph/Cargo.toml; then
-        log_success "Rolegraph benchmarks completed"
+    if cargo bench --bench symbolic_embedding_bench --manifest-path crates/terraphim_rolegraph/Cargo.toml; then
+        log_success "Rolegraph symbolic_embedding benchmarks completed"
     else
-        log_warn "Rolegraph benchmarks failed"
+        log_warn "Rolegraph symbolic_embedding benchmarks failed"
+    fi
+    if cargo bench --bench throughput --manifest-path crates/terraphim_rolegraph/Cargo.toml; then
+        log_success "Rolegraph throughput benchmarks completed"
+    else
+        log_warn "Rolegraph throughput benchmarks failed"
     fi
 
     # Run multi-agent benchmarks

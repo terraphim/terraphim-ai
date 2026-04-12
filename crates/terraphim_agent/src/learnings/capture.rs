@@ -1269,6 +1269,7 @@ impl LearningEntry {
     }
 
     /// Importance score (only present on Learning entries with scoring).
+    #[cfg(test)]
     pub fn importance(&self) -> Option<&ImportanceScore> {
         match self {
             LearningEntry::Learning(l) => l.importance.as_ref(),
