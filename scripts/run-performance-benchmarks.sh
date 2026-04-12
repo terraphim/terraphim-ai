@@ -180,7 +180,7 @@ run_custom_benchmarks() {
     # Build the benchmark binary (if it exists)
     if [ -f "crates/terraphim_validation/src/bin/performance_benchmark.rs" ]; then
         log_info "Building performance benchmark binary..."
-        if cargo build --bin performance_benchmark --manifest-path crates/terraphim_validation/Cargo.toml; then
+        if cargo build --release --bin performance_benchmark --manifest-path crates/terraphim_validation/Cargo.toml; then
             log_info "Running custom benchmarks..."
             local baseline_arg=""
             if [ -f "$BASELINE_FILE" ]; then
@@ -192,7 +192,7 @@ run_custom_benchmarks() {
                 verbose_arg="--verbose"
             fi
 
-            ./target/debug/performance_benchmark run \
+            ./target/release/performance_benchmark run \
                 --output-dir "$RUN_DIR" \
                 $baseline_arg \
                 --iterations $ITERATIONS \
