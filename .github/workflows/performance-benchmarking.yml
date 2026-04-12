@@ -33,7 +33,7 @@ env:
 jobs:
   performance-benchmarks:
     name: Performance Benchmarks
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     timeout-minutes: 30
 
     steps:
@@ -55,11 +55,6 @@ jobs:
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
         restore-keys: |
           ${{ runner.os }}-cargo-
-
-    - name: Install system dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y curl jq bc wrk
 
     - name: Download baseline (if comparing)
       if: github.event.inputs.baseline_ref || github.event_name == 'pull_request'
@@ -218,7 +213,7 @@ jobs:
 
   performance-regression-check:
     name: Performance Regression Check
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     needs: performance-benchmarks
     if: always() && needs.performance-benchmarks.result == 'success'
 
@@ -237,7 +232,7 @@ jobs:
 
   update-baseline:
     name: Update Performance Baseline
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     needs: [performance-benchmarks, performance-regression-check]
     if: github.ref == 'refs/heads/main' && needs.performance-regression-check.result == 'success'
 
