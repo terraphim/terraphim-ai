@@ -30,6 +30,10 @@ env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
 
+permissions:
+  contents: read
+  issues: write
+
 jobs:
   performance-benchmarks:
     name: Performance Benchmarks
@@ -173,18 +177,18 @@ jobs:
       if: always()
       run: |
         # Create a summary for GitHub Actions
-        if [ -f "benchmark-results/*/benchmark_report.md" ]; then
-          REPORT_FILE=$(find benchmark-results -name "benchmark_report.md" | head -1)
+        REPORT_FILE=$(find benchmark-results -name "benchmark_report.md" | head -1)
+        if [ -n "$REPORT_FILE" ] && [ -f "$REPORT_FILE" ]; then
           echo "## Performance Benchmark Report" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          cat $REPORT_FILE >> $GITHUB_STEP_SUMMARY
+          cat "$REPORT_FILE" >> $GITHUB_STEP_SUMMARY
         fi
 
     - name: Check performance gates
       run: |
         # Check if benchmark results meet performance requirements
-        if [ -f "benchmark-results/*/benchmark_results.json" ]; then
-          RESULTS_FILE=$(find benchmark-results -name "benchmark_results.json" | head -1)
+        RESULTS_FILE=$(find benchmark-results -name "benchmark_results.json" | head -1)
+        if [ -n "$RESULTS_FILE" ] && [ -f "$RESULTS_FILE" ]; then
 
           # Extract SLO compliance percentage
           SLO_COMPLIANCE=$(jq -r '.slo_compliance.overall_compliance // 0' "$RESULTS_FILE")
@@ -215,6 +219,7 @@ jobs:
 
     - name: Comment on PR (if applicable)
       if: github.event_name == 'pull_request' && always()
+      continue-on-error: true
       uses: actions/github-script@v8
       with:
         script: |
