@@ -130,6 +130,9 @@ pub struct CapturedProcedure {
     pub updated_at: String,
     /// Source session ID if captured from a session
     pub source_session: Option<String>,
+    /// Whether this procedure has been disabled (e.g., by auto-healing)
+    #[serde(default)]
+    pub disabled: bool,
 }
 
 impl CapturedProcedure {
@@ -146,6 +149,7 @@ impl CapturedProcedure {
             created_at: now.clone(),
             updated_at: now,
             source_session: None,
+            disabled: false,
         }
     }
 

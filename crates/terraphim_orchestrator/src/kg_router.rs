@@ -69,6 +69,7 @@ struct RoutingRule {
 ///
 /// Uses the same directive format as the rest of the terraphim KG system:
 /// `route::`, `action::`, `priority::`, `synonyms::`, `trigger::`.
+#[derive(Clone)]
 pub struct KgRouter {
     /// Loaded routing rules indexed by concept name
     rules: Vec<RoutingRule>,

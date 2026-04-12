@@ -23,26 +23,34 @@
 //! println!("Captured learning: {:?}", path);
 //! ```
 
-mod capture;
+pub(crate) mod capture;
 mod hook;
 mod install;
-#[cfg(test)]
-mod procedure;
-mod redaction;
+pub(crate) mod procedure;
+pub(crate) mod redaction;
+mod replay;
+
+pub use procedure::{HealthStatus, ProcedureHealthReport, ProcedureStore};
+pub use replay::{ReplayResult, StepOutcome, replay_procedure};
 
 pub use capture::{
     CorrectionType, LearningSource, capture_correction, capture_failed_command, correct_learning,
-    list_all_entries, query_all_entries,
+    list_all_entries, list_learnings, query_all_entries_semantic,
 };
-// Re-export for testing - not used by CLI yet
+// Re-export for testing and external use
 #[allow(unused_imports)]
-pub use capture::{CapturedLearning, LearningContext, LearningError};
+pub use capture::{
+    CapturedLearning, ImportanceScore, LearningContext, LearningError, annotate_with_entities,
+    annotate_with_thesaurus, query_all_entries,
+};
+// Re-export KG thesaurus building utilities for use by hook validation pipeline
+pub(crate) use capture::{build_kg_thesaurus_from_dir, find_kg_dir};
 
 #[allow(unused_imports)]
 pub use redaction::redact_secrets;
 
 // Hook types for AI agent integration
-pub use hook::{AgentFormat, process_hook_input};
+pub use hook::{AgentFormat, LearnHookType, process_hook_input, process_hook_input_with_type};
 
 // Install types for AI agent hook installation
 pub use install::{AgentType, install_hook};
