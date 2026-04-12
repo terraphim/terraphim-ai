@@ -221,8 +221,10 @@ run_api_benchmarks() {
     local health_times=$(run_endpoint_benchmark "$SERVER_URL/health" 100)
 
     # Search endpoint benchmark
+    # Use the Benchmark role -- it has no llm_provider so no Ollama inference fires.
+    # Using "default" would trigger Ollama for every result, making latency numbers useless.
     log_info "Benchmarking search endpoint..."
-    local search_data='{"query":"rust programming","role":"default"}'
+    local search_data='{"query":"rust programming","role":"Benchmark"}'
     local search_times=$(run_endpoint_benchmark "$SERVER_URL/api/search" 50 "$search_data")
 
     # Config endpoint benchmark

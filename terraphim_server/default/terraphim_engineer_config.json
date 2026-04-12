@@ -219,6 +219,24 @@
       "llm_auto_summarize": true,
       "llm_system_prompt": "You are a DevOps Engineer. Your role is to manage deployment, infrastructure, CI/CD pipelines, and operational excellence. Focus on automation, monitoring, reliability, and security.",
       "extra": {}
+    },
+    "Benchmark": {
+      "shortname": "Benchmark",
+      "name": "Benchmark",
+      "relevance_function": "title-scorer",
+      "terraphim_it": false,
+      "theme": "default",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "extra": {}
     }
   },
   "default_role": "Terraphim Engineer",
