@@ -74,8 +74,6 @@ impl std::fmt::Display for HealthStatus {
 pub struct ProcedureHealthReport {
     /// Procedure ID
     pub id: String,
-    /// Procedure title
-    pub title: String,
     /// Current health status
     pub status: HealthStatus,
     /// Success rate as a fraction (0.0 - 1.0)
@@ -99,22 +97,6 @@ impl ProcedureStore {
     /// Parent directories will be created automatically when saving.
     pub fn new(store_path: PathBuf) -> Self {
         Self { store_path }
-    }
-
-    /// Get the default store path in the user's config directory.
-    ///
-    /// Returns `~/.config/terraphim/learnings/procedures.jsonl` on Unix-like systems,
-    /// or the equivalent config directory on other platforms.
-    ///
-    /// Note: This function is not used internally but is provided as a convenience
-    /// for external callers who want a sensible default path.
-    #[allow(dead_code)]
-    pub fn default_path() -> PathBuf {
-        dirs::config_dir()
-            .unwrap_or_else(|| PathBuf::from("~/.config"))
-            .join("terraphim")
-            .join("learnings")
-            .join("procedures.jsonl")
     }
 
     /// Ensure the parent directory exists.
@@ -266,6 +248,7 @@ impl ProcedureStore {
     }
 
     /// Find procedures by title (case-insensitive substring search).
+    #[cfg(test)]
     pub fn find_by_title(&self, query: &str) -> io::Result<Vec<CapturedProcedure>> {
         let all = self.load_all()?;
         let query_lower = query.to_lowercase();
@@ -343,7 +326,6 @@ impl ProcedureStore {
 
             reports.push(ProcedureHealthReport {
                 id: procedure.id.clone(),
-                title: procedure.title.clone(),
                 status,
                 success_rate: score,
                 total_executions: total,
@@ -375,6 +357,7 @@ impl ProcedureStore {
     }
 
     /// Delete a procedure by ID.
+    #[cfg(test)]
     pub fn delete(&self, id: &str) -> io::Result<bool> {
         let mut procedures = self.load_all()?;
         let original_len = procedures.len();
