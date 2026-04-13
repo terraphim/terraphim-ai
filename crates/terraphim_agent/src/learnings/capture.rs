@@ -1267,14 +1267,6 @@ impl LearningEntry {
             LearningEntry::Procedure(_) => None,
         }
     }
-
-    /// Importance score (only present on Learning entries with scoring).
-    pub fn importance(&self) -> Option<&ImportanceScore> {
-        match self {
-            LearningEntry::Learning(l) => l.importance.as_ref(),
-            LearningEntry::Correction(_) | LearningEntry::Procedure(_) => None,
-        }
-    }
 }
 
 /// List all entries (learnings + corrections) from storage.
@@ -2699,7 +2691,15 @@ mod tests {
         .with_importance(ImportanceScore::calculate(1, 2, 0.9, false));
 
         let entry = LearningEntry::Learning(learning);
-        let imp = entry.importance().expect("should have importance");
+        let imp = match &entry {
+            LearningEntry::Learning(learning) => learning
+                .importance
+                .as_ref()
+                .expect("should have importance"),
+            LearningEntry::Correction(_) | LearningEntry::Procedure(_) => {
+                panic!("expected learning entry")
+            }
+        };
         assert_eq!(imp.repetition_count, 2);
 
         // Correction entries have no importance
@@ -2711,6 +2711,6 @@ mod tests {
             LearningSource::Project,
         );
         let entry2 = LearningEntry::Correction(correction);
-        assert!(entry2.importance().is_none());
+        assert!(matches!(entry2, LearningEntry::Correction(_)));
     }
 }

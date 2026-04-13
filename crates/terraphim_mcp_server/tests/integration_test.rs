@@ -11,12 +11,21 @@ use tokio::process::Command;
 
 async fn setup_server_command() -> Result<Command> {
     // Build the server first to ensure the binary is up-to-date
-    let build_status = Command::new("cargo")
+    let mut build = Command::new("cargo");
+    build
         .arg("build")
         .arg("--package")
-        .arg("terraphim_mcp_server")
-        .status()
-        .await?;
+        .arg("terraphim_mcp_server");
+
+    // CI sets CI=true, and terraphim_mcp_server depends on fff-search whose
+    // build script requires the zlob feature under CI. The top-level main
+    // workflow already runs the workspace tests with zlob enabled, so mirror
+    // that feature contract for this nested build as well.
+    if std::env::var_os("CI").is_some() {
+        build.arg("--features").arg("zlob");
+    }
+
+    let build_status = build.status().await?;
     if !build_status.success() {
         return Err(anyhow::anyhow!("Failed to build terraphim_mcp_server"));
     }
