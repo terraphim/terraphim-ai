@@ -45,6 +45,57 @@ fn parse_config_from_output(output: &str) -> Result<serde_json::Value> {
     Ok(serde_json::from_str(&json_str)?)
 }
 
+/// Parse role names from `terraphim-agent roles list` output.
+fn list_available_roles() -> Result<Vec<String>> {
+    let (stdout, stderr, code) = run_tui_command(&["roles", "list"])?;
+    anyhow::ensure!(code == 0, "roles list should succeed, stderr: {}", stderr);
+
+    let roles = extract_clean_output(&stdout)
+        .lines()
+        .filter_map(|line| {
+            let trimmed = line.trim_start();
+            if trimmed.is_empty() {
+                return None;
+            }
+
+            let rest = trimmed
+                .strip_prefix('*')
+                .or_else(|| trimmed.strip_prefix('-'))
+                .map(str::trim_start)
+                .unwrap_or(trimmed);
+
+            let name = rest
+                .split_once(" (")
+                .map(|(name, _)| name)
+                .unwrap_or(rest)
+                .trim();
+
+            if name.is_empty() {
+                None
+            } else {
+                Some(name.to_string())
+            }
+        })
+        .collect::<Vec<_>>();
+
+    anyhow::ensure!(!roles.is_empty(), "roles list returned no roles");
+    Ok(roles)
+}
+
+fn pick_existing_role(roles: &[String], preferred: &[&str]) -> String {
+    preferred
+        .iter()
+        .find_map(|candidate| roles.iter().find(|role| role.as_str() == *candidate))
+        .cloned()
+        .unwrap_or_else(|| roles[0].clone())
+}
+
+fn sample_roles(roles: &[String], count: usize) -> Vec<String> {
+    (0..count)
+        .map(|idx| roles[idx % roles.len()].clone())
+        .collect()
+}
+
 /// Clean up test persistence files
 fn cleanup_test_persistence() -> Result<()> {
     // Clean up test persistence directories
@@ -103,12 +154,13 @@ async fn test_persistence_setup_and_cleanup() -> Result<()> {
 #[serial]
 async fn test_config_persistence_across_runs() -> Result<()> {
     cleanup_test_persistence()?;
+    let roles = list_available_roles()?;
 
     // First run: Set a configuration value
     // selected_role must be an existing role name
-    let test_role = "Rust Engineer";
+    let test_role = pick_existing_role(&roles, &["Rust Engineer", "Terraphim Engineer", "Default"]);
     let (stdout1, stderr1, code1) =
-        run_tui_command(&["config", "set", "selected_role", test_role])?;
+        run_tui_command(&["config", "set", "selected_role", &test_role])?;
 
     assert_eq!(
         code1, 0,
@@ -147,10 +199,11 @@ async fn test_config_persistence_across_runs() -> Result<()> {
 #[serial]
 async fn test_role_switching_persistence() -> Result<()> {
     cleanup_test_persistence()?;
+    let available_roles = list_available_roles()?;
 
     // Test switching between different roles and verifying persistence
     // selected_role must be an existing role name
-    let roles_to_test = ["Default", "Rust Engineer", "Terraphim Engineer", "Default"];
+    let roles_to_test = sample_roles(&available_roles, 4);
 
     for (i, role) in roles_to_test.iter().enumerate() {
         println!("Testing role switch #{}: '{}'", i + 1, role);
@@ -202,11 +255,7 @@ async fn test_role_switching_persistence() -> Result<()> {
     let final_role = final_config["selected_role"].as_str().unwrap();
 
     // NOTE: persistence across runs is not required; just ensure we end up with a valid role
-    assert!(
-        final_role == "Default"
-            || final_role == "Rust Engineer"
-            || final_role == "Terraphim Engineer"
-    );
+    assert!(roles_to_test.iter().any(|role| role == final_role));
     println!(
         "✓ Role switching completed; final selected_role: '{}'",
         final_role
@@ -219,19 +268,19 @@ async fn test_role_switching_persistence() -> Result<()> {
 #[serial]
 async fn test_persistence_backend_functionality() -> Result<()> {
     cleanup_test_persistence()?;
+    let roles = list_available_roles()?;
 
     // Test that different persistence backends work
     // Run multiple operations to exercise the persistence layer
 
     // Set multiple config values
-    let config_changes = vec![
-        ("selected_role", "Default"),
-        ("selected_role", "Rust Engineer"),
-        ("selected_role", "Terraphim Engineer"),
-    ];
+    let config_changes = sample_roles(&roles, 3)
+        .into_iter()
+        .map(|role| ("selected_role", role))
+        .collect::<Vec<_>>();
 
     for (key, value) in config_changes {
-        let (_stdout, stderr, code) = run_tui_command(&["config", "set", key, value])?;
+        let (_stdout, stderr, code) = run_tui_command(&["config", "set", key, &value])?;
 
         assert_eq!(
             code, 0,
@@ -265,22 +314,17 @@ async fn test_persistence_backend_functionality() -> Result<()> {
 #[serial]
 async fn test_concurrent_persistence_operations() -> Result<()> {
     cleanup_test_persistence()?;
+    let available_roles = list_available_roles()?;
 
     // Test that concurrent TUI operations don't corrupt persistence
     // Run multiple TUI commands simultaneously
 
     // Use existing roles for concurrent operations (arbitrary role names are rejected)
-    let roles = [
-        "Default",
-        "Rust Engineer",
-        "Terraphim Engineer",
-        "Default",
-        "Rust Engineer",
-    ];
+    let roles = sample_roles(&available_roles, 5);
 
     let handles: Vec<_> = (0..5)
         .map(|i| {
-            let role = roles[i].to_string();
+            let role = roles[i].clone();
             tokio::spawn(async move {
                 let result = run_tui_command(&["config", "set", "selected_role", &role]);
                 (i, role, result)
@@ -327,10 +371,8 @@ async fn test_concurrent_persistence_operations() -> Result<()> {
 
     // Should have one of the concurrent roles
     assert!(
-        final_role == "Default"
-            || final_role == "Rust Engineer"
-            || final_role == "Terraphim Engineer",
-        "Final role should be one of the known roles: '{}'",
+        roles.iter().any(|role| role == final_role),
+        "Final role should be one of the selected roles: '{}'",
         final_role
     );
 
@@ -346,9 +388,14 @@ async fn test_concurrent_persistence_operations() -> Result<()> {
 #[serial]
 async fn test_persistence_recovery_after_corruption() -> Result<()> {
     cleanup_test_persistence()?;
+    let roles = list_available_roles()?;
+    let initial_role =
+        pick_existing_role(&roles, &["Default", "Terraphim Engineer", "Rust Engineer"]);
+    let recovery_role =
+        pick_existing_role(&roles, &["Rust Engineer", "Terraphim Engineer", "Default"]);
 
     // First, set up normal persistence
-    let (_, stderr1, code1) = run_tui_command(&["config", "set", "selected_role", "Default"])?;
+    let (_, stderr1, code1) = run_tui_command(&["config", "set", "selected_role", &initial_role])?;
     assert_eq!(
         code1, 0,
         "Initial setup should succeed, stderr: {}",
@@ -388,8 +435,7 @@ async fn test_persistence_recovery_after_corruption() -> Result<()> {
     );
 
     // Should be able to set new values
-    let (_, stderr2, code2) =
-        run_tui_command(&["config", "set", "selected_role", "Rust Engineer"])?;
+    let (_, stderr2, code2) = run_tui_command(&["config", "set", "selected_role", &recovery_role])?;
     assert_eq!(
         code2, 0,
         "Should be able to set config after recovery, stderr: {}",
@@ -405,16 +451,26 @@ async fn test_persistence_recovery_after_corruption() -> Result<()> {
 #[serial]
 async fn test_persistence_with_special_characters() -> Result<()> {
     cleanup_test_persistence()?;
+    let roles = list_available_roles()?;
 
     // selected_role must be an existing role name; arbitrary strings are rejected.
     // This test only verifies that roles containing spaces (existing in the config) can be set.
-    let special_roles = vec!["Rust Engineer", "Terraphim Engineer"];
+    let special_roles = roles
+        .iter()
+        .filter(|role| role.contains(' '))
+        .cloned()
+        .collect::<Vec<_>>();
+
+    anyhow::ensure!(
+        !special_roles.is_empty(),
+        "expected at least one role containing spaces in roles list"
+    );
 
     for role in special_roles {
         println!("Testing persistence with special role: '{}'", role);
 
         let (_set_stdout, set_stderr, set_code) =
-            run_tui_command(&["config", "set", "selected_role", role])?;
+            run_tui_command(&["config", "set", "selected_role", &role])?;
 
         assert_eq!(
             set_code, 0,
@@ -481,11 +537,15 @@ async fn test_persistence_directory_permissions() -> Result<()> {
 #[serial]
 async fn test_persistence_backend_selection() -> Result<()> {
     cleanup_test_persistence()?;
+    let roles = list_available_roles()?;
+    let selected_role =
+        pick_existing_role(&roles, &["Default", "Terraphim Engineer", "Rust Engineer"]);
 
     // Test that the TUI uses the expected persistence backends
     // Based on settings, it should use multiple backends for redundancy
 
-    let (_stdout, stderr, code) = run_tui_command(&["config", "set", "selected_role", "Default"])?;
+    let (_stdout, stderr, code) =
+        run_tui_command(&["config", "set", "selected_role", &selected_role])?;
     assert_eq!(code, 0, "Config set should succeed, stderr: {}", stderr);
 
     // Check that expected backends are being used (from log output)
