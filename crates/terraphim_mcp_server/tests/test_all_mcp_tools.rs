@@ -15,8 +15,13 @@ fn test_all_mcp_tools() {
     println!("Starting comprehensive MCP server test for all tools...");
 
     // Start the MCP server
-    let mut child = Command::new("cargo")
-        .args(["run", "--", "--verbose"])
+    let mut command = Command::new("cargo");
+    command.arg("run");
+    if std::env::var_os("CI").is_some() {
+        command.arg("--features").arg("zlob");
+    }
+    let mut child = command
+        .args(["--", "--verbose"])
         .current_dir(".")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
