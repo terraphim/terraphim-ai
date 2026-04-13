@@ -9,15 +9,24 @@ use terraphim_orchestrator::{
 };
 use uuid::Uuid;
 
-/// Return a deterministic baseline commit for git-diff tests.
-/// Uses the repository root commit so tests work in any clone.
-fn baseline_commit() -> String {
+/// Return a deterministic baseline for git-diff tests.
+/// Prefer the repository root commit, but fall back to the empty tree when the
+/// checkout is shallow and history before HEAD is unavailable.
+fn git_diff_baseline() -> String {
     let output = std::process::Command::new("git")
         .args(["rev-list", "--max-parents=0", "HEAD"])
         .output()
         .expect("git rev-list failed");
     let commits = String::from_utf8_lossy(&output.stdout);
-    commits.lines().next().unwrap_or("").trim().to_string()
+    let baseline = commits.lines().next().unwrap_or("").trim();
+
+    if baseline.is_empty() {
+        // Git's well-known empty tree object works as a stable diff baseline
+        // even when CI checks out a shallow clone without HEAD~1 available.
+        "4b825dc642cb6eb9a060e54bf8d69288fbee4904".to_string()
+    } else {
+        baseline.to_string()
+    }
 }
 
 fn test_config() -> OrchestratorConfig {
@@ -181,7 +190,7 @@ async fn test_orchestrator_compound_review_integration() {
     };
 
     let workflow = CompoundReviewWorkflow::new(swarm_config);
-    let result = workflow.run("HEAD", "HEAD~1").await.unwrap();
+    let result = workflow.run("HEAD", &git_diff_baseline()).await.unwrap();
 
     assert!(
         !result.correlation_id.is_nil(),
@@ -462,7 +471,7 @@ async fn test_git_diff_matching_changes_spawns() {
     let mut orch = AgentOrchestrator::new(config).unwrap();
 
     // Seed with initial commit so there ARE changes
-    let baseline_commit = baseline_commit();
+    let baseline_commit = git_diff_baseline();
     orch.set_last_run_commit("sentinel", &baseline_commit);
 
     let result = orch.spawn_agent_for_test("sentinel").await;
@@ -481,7 +490,7 @@ async fn test_git_diff_non_matching_changes_skips() {
     let mut orch = AgentOrchestrator::new(config).unwrap();
 
     // Seed with initial commit so there ARE changes, but none match the watch path
-    let baseline_commit = baseline_commit();
+    let baseline_commit = git_diff_baseline();
     orch.set_last_run_commit("sentinel", &baseline_commit);
 
     let result = orch.spawn_agent_for_test("sentinel").await;
@@ -608,7 +617,7 @@ async fn test_spawn_agent_skipped_by_git_diff_no_matching() {
     let mut orch = AgentOrchestrator::new(config).unwrap();
 
     // Seed with initial commit so there are diff results
-    let baseline_commit = baseline_commit();
+    let baseline_commit = git_diff_baseline();
     orch.set_last_run_commit("sentinel", &baseline_commit);
 
     let result = orch.spawn_agent_for_test("sentinel").await;
@@ -628,7 +637,7 @@ async fn test_spawn_agent_proceeds_with_git_diff_findings() {
     let mut orch = AgentOrchestrator::new(config).unwrap();
 
     // Use initial commit as baseline -> every file is a change
-    let baseline_commit = baseline_commit();
+    let baseline_commit = git_diff_baseline();
     orch.set_last_run_commit("sentinel", &baseline_commit);
 
     let result = orch.spawn_agent_for_test("sentinel").await;
