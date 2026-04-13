@@ -139,10 +139,22 @@ async fn test_default_selected_role_is_used() -> Result<()> {
 #[serial]
 async fn test_role_override_in_commands() -> Result<()> {
     // Test that --role flag overrides selected_role in config
+    let available_roles = fetch_available_roles()?;
+    ensure!(
+        !available_roles.is_empty(),
+        "Expected at least one role for override test"
+    );
+    let override_role = available_roles[0].clone();
 
     // Search with role override
-    let (search_stdout, search_stderr, search_code) =
-        run_command_and_parse(&["search", "test query", "--role", "Default", "--limit", "3"])?;
+    let (search_stdout, search_stderr, search_code) = run_command_and_parse(&[
+        "search",
+        "test query",
+        "--role",
+        override_role.as_str(),
+        "--limit",
+        "3",
+    ])?;
 
     // Should succeed or fail gracefully (depending on whether role exists)
     assert!(
@@ -158,7 +170,7 @@ async fn test_role_override_in_commands() -> Result<()> {
 
     // Graph with role override
     let (graph_stdout, graph_stderr, graph_code) =
-        run_command_and_parse(&["graph", "--role", "Default", "--top-k", "5"])?;
+        run_command_and_parse(&["graph", "--role", override_role.as_str(), "--top-k", "5"])?;
 
     assert_eq!(
         graph_code, 0,
@@ -173,7 +185,7 @@ async fn test_role_override_in_commands() -> Result<()> {
 
     // Chat with role override
     let (chat_stdout, chat_stderr, chat_code) =
-        run_command_and_parse(&["chat", "test message", "--role", "Default"])?;
+        run_command_and_parse(&["chat", "test message", "--role", override_role.as_str()])?;
 
     // Chat may succeed (with proxy/ollama) or fail gracefully
     // Accept exit code 0 or 1
@@ -188,7 +200,7 @@ async fn test_role_override_in_commands() -> Result<()> {
 
     // Accept: non-empty output, role name in output, error message, or proxy error
     let success = !chat_stdout.trim().is_empty()
-        || combined_output.contains("Default")
+        || combined_output.contains(&override_role)
         || combined_output.contains("No LLM")
         || combined_output.contains("Failed to connect")
         || combined_output.contains("terraphim-llm-proxy");
@@ -416,13 +428,25 @@ async fn test_role_inheritance_in_search() -> Result<()> {
         run_command_and_parse(&["config", "set", "selected_role", test_role.as_str()])?;
     assert_eq!(set_code, 0, "Should set test role");
 
+    let override_role = available_roles
+        .iter()
+        .find(|role| role.as_str() != test_role)
+        .cloned()
+        .unwrap_or_else(|| test_role.clone());
+
     // Search without specifying role (should use selected_role)
     let (search1_stdout, search1_stderr, search1_code) =
         run_command_and_parse(&["search", "test query", "--limit", "2"])?;
 
     // Search with explicit role override
-    let (search2_stdout, search2_stderr, search2_code) =
-        run_command_and_parse(&["search", "test query", "--role", "Default", "--limit", "2"])?;
+    let (search2_stdout, search2_stderr, search2_code) = run_command_and_parse(&[
+        "search",
+        "test query",
+        "--role",
+        override_role.as_str(),
+        "--limit",
+        "2",
+    ])?;
 
     // Both should handle the role appropriately (succeed or fail gracefully)
     assert!(
@@ -442,7 +466,8 @@ async fn test_role_inheritance_in_search() -> Result<()> {
         extract_clean_output(&search1_stdout)
     );
     println!(
-        "Search with role override 'Default': {}",
+        "Search with role override '{}': {}",
+        override_role,
         extract_clean_output(&search2_stdout)
     );
 
@@ -465,13 +490,19 @@ async fn test_extract_command_role_behavior() -> Result<()> {
         run_command_and_parse(&["config", "set", "selected_role", test_role.as_str()])?;
     assert_eq!(set_code, 0, "Should set test role");
 
+    let override_role = available_roles
+        .iter()
+        .find(|role| role.as_str() != test_role)
+        .cloned()
+        .unwrap_or_else(|| test_role.clone());
+
     // Extract without role (should use selected_role)
     let (extract1_stdout, extract1_stderr, extract1_code) =
         run_command_and_parse(&["extract", test_text])?;
 
     // Extract with role override
     let (extract2_stdout, extract2_stderr, extract2_code) =
-        run_command_and_parse(&["extract", test_text, "--role", "Default"])?;
+        run_command_and_parse(&["extract", test_text, "--role", override_role.as_str()])?;
 
     // Extract with exclude term flag
     let (extract3_stdout, extract3_stderr, extract3_code) =
