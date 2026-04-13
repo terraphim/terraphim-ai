@@ -325,7 +325,7 @@ async fn test_end_to_end_server_workflow() -> Result<()> {
         "Server should have roles available"
     );
 
-    let selected_role = server_roles
+    let current_role = server_roles
         .iter()
         .find_map(|line| {
             let trimmed = line.trim();
@@ -341,6 +341,25 @@ async fn test_end_to_end_server_workflow() -> Result<()> {
             )
         })
         .unwrap_or_else(|| "Terraphim Engineer".to_string());
+
+    let selected_role = server_roles
+        .iter()
+        .find_map(|line| {
+            let trimmed = line.trim();
+            if trimmed.starts_with('*') {
+                return None;
+            }
+            let role = trimmed
+                .trim_start_matches('*')
+                .trim()
+                .split_once(" (")
+                .map(|(name, _)| name)
+                .unwrap_or(trimmed)
+                .trim()
+                .to_string();
+            (role != current_role).then_some(role)
+        })
+        .unwrap_or_else(|| current_role.clone());
 
     // 3. Test search with server (may fail in CI due to missing KG data or slow indexing)
     let (search_stdout, search_stderr, search_code) =
