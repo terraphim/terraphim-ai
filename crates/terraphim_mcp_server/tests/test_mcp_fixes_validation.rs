@@ -10,12 +10,17 @@ async fn test_mcp_log_separation_and_tools() -> Result<()> {
     println!("🧪 Testing MCP server log separation and tool availability");
 
     // Build the server first
-    let build_status = Command::new("cargo")
+    let mut build = Command::new("cargo");
+    build
         .arg("build")
         .arg("--package")
-        .arg("terraphim_mcp_server")
-        .status()
-        .await?;
+        .arg("terraphim_mcp_server");
+
+    if std::env::var_os("CI").is_some() {
+        build.arg("--features").arg("zlob");
+    }
+
+    let build_status = build.status().await?;
 
     if !build_status.success() {
         anyhow::bail!("Failed to build terraphim_mcp_server");

@@ -214,8 +214,16 @@ terraphim-agent validate --checklist security "implementation"
 # Get fuzzy suggestions for typos
 terraphim-agent suggest --fuzzy "terraphm" --threshold 0.7
 
-# Unified hook handler
+# Unified hook handler (KG validation + npm->bun replacement)
 terraphim-agent hook --hook-type pre-tool-use --input "$JSON"
+
+# Multi-hook learning pipeline
+# pre-tool-use  -- warns if command matches past failures, suggests KG replacements
+# post-tool-use -- captures failures into learning store (default behavior)
+# user-prompt-submit -- parses "use X instead of Y" correction patterns
+terraphim-agent learn hook --learn-hook-type pre-tool-use --input "$JSON"
+terraphim-agent learn hook --learn-hook-type post-tool-use --input "$JSON"
+terraphim-agent learn hook --learn-hook-type user-prompt-submit --input "$JSON"
 
 # Enable smart commit
 TERRAPHIM_SMART_COMMIT=1 git commit -m "message"
@@ -497,6 +505,12 @@ yarn run tauri build --debug
 # Build with all features (recommended)
 cargo build -p terraphim_tui --features repl-full --release
 
+# Build with session extraction support
+cargo build -p terraphim_tui --features repl-full,repl-sessions --release
+
+# Build with shared learning support
+cargo build -p terraphim_tui --features repl-full,shared-learning --release
+
 # Run minimal version
 cargo run --bin terraphim-agent
 
@@ -506,9 +520,65 @@ cargo run --bin terraphim-agent
 # Available REPL commands:
 # /help           - Show all commands
 # /search "query" - Semantic search
+# /search "query" --robot              - JSON output
+# /search "query" --format json        - JSON with description/body fields
+# /search "query" --format json-compact
 # /chat "message" - AI conversation
 # /commands list  - List available markdown commands
 # /vm list        - VM management with sub-2s boot
+```
+
+### Operational Skill Store (learn subcommands)
+
+```bash
+# List captured learnings sorted by importance
+terraphim-agent learn list
+
+# Query learnings by pattern; --semantic also matches KG entity names
+terraphim-agent learn query "pattern"
+terraphim-agent learn query "pattern" --semantic
+
+# Add correction to a captured learning
+terraphim-agent learn correct <id> "use bun instead"
+
+# Procedural memory -- list stored procedures with confidence scores
+terraphim-agent learn procedure list
+terraphim-agent learn procedure list --recent 10
+
+# Show procedure details and steps
+terraphim-agent learn procedure show <id>
+
+# Create an empty procedure
+terraphim-agent learn procedure record "Deploy to staging" --description "Steps to deploy"
+
+# Add a step to a procedure
+terraphim-agent learn procedure add-step <id> "cargo build --release" \
+  --precondition "tests pass" --postcondition "binary in target/release"
+
+# Update confidence after execution
+terraphim-agent learn procedure success <id>
+terraphim-agent learn procedure failure <id>
+
+# Execute procedure steps (--dry-run skips destructive commands)
+terraphim-agent learn procedure replay <id>
+terraphim-agent learn procedure replay <id> --dry-run
+
+# Show aggregate health (Healthy/Degraded/Critical/Insufficient)
+terraphim-agent learn procedure health
+
+# Enable or disable a procedure
+terraphim-agent learn procedure enable <id>
+terraphim-agent learn procedure disable <id>
+
+# Extract procedure from an AI coding session (requires --features repl-sessions)
+terraphim-agent learn procedure from-session <session-id> --title "Title"
+
+# Shared learning (requires --features shared-learning)
+terraphim-agent learn shared list
+terraphim-agent learn shared list --trust-level l2
+terraphim-agent learn shared promote <id> --to l3
+terraphim-agent learn shared import
+terraphim-agent learn shared stats
 ```
 
 ### Feature Flags
@@ -523,6 +593,12 @@ cargo test --features mcp-rust-sdk
 
 # Build TUI with full REPL
 cargo build -p terraphim_tui --features repl-full
+
+# Build TUI with session extraction (learn procedure from-session)
+cargo build -p terraphim_tui --features repl-full,repl-sessions
+
+# Build TUI with shared learning store
+cargo build -p terraphim_tui --features repl-full,shared-learning
 
 # Build terraphim_automata for WASM
 cargo build -p terraphim_automata --target wasm32-unknown-unknown --features wasm
