@@ -620,7 +620,7 @@ impl AgentOrchestrator {
         }
 
         // Graceful shutdown of all agents
-        self.persist_telemetry().await;
+        self.persist_telemetry();
         self.shutdown_all_agents().await;
         Ok(())
     }
@@ -989,7 +989,7 @@ impl AgentOrchestrator {
                 session_id: None,
             };
             let budget_verdict = self.cost_tracker.check(&def.name);
-            let decision = engine.decide_route(&ctx, &budget_verdict);
+            let decision = engine.decide_route(&ctx, &budget_verdict).await;
             info!(
                 agent = %def.name,
                 rationale = %decision.rationale,
@@ -2571,7 +2571,7 @@ impl AgentOrchestrator {
 
         // 15. Periodic telemetry persistence (every 60 ticks = ~5 min at 5s interval)
         if self.tick_count % 60 == 0 {
-            self.persist_telemetry().await;
+            self.persist_telemetry();
         }
     }
 
@@ -3245,10 +3245,14 @@ impl AgentOrchestrator {
     }
 
     /// Persist telemetry summary to durable storage via fire-and-forget spawn.
-    async fn persist_telemetry(&self) {
-        let summary = self.telemetry_store.export_summary().await;
+    ///
+    /// Clones the Arc-backed store and moves both export and save into the
+    /// spawned task so the reconcile loop is not blocked by the read lock.
+    fn persist_telemetry(&self) {
+        let store = self.telemetry_store.clone();
         tokio::spawn(async move {
             use terraphim_persistence::Persistable;
+            let summary = store.export_summary().await;
             if let Err(e) = summary.save().await {
                 tracing::warn!(error = %e, "failed to persist telemetry summary");
             }
