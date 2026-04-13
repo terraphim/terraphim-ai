@@ -299,8 +299,8 @@ jobs:
     - name: Update baseline
       run: |
         # Copy latest results as new baseline
-        if [ -f "benchmark-results/*/benchmark_results.json" ]; then
-          RESULTS_FILE=$(find benchmark-results -name "benchmark_results.json" | head -1)
+        RESULTS_FILE=$(find benchmark-results -name "benchmark_results.json" | head -1)
+        if [ -n "$RESULTS_FILE" ] && [ -f "$RESULTS_FILE" ]; then
           cp "$RESULTS_FILE" "benchmark-results/baseline.json"
           echo "Updated performance baseline"
         fi
