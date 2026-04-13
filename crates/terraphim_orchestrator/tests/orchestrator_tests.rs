@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
+use serial_test::serial;
 use terraphim_orchestrator::{
     AgentDefinition, AgentLayer, AgentOrchestrator, CompoundReviewConfig, HandoffContext,
     NightwatchConfig, OrchestratorConfig, OrchestratorError, TrackerConfig, TrackerStates,
@@ -486,6 +487,78 @@ async fn test_git_diff_non_matching_changes_skips() {
     let result = orch.spawn_agent_for_test("sentinel").await;
     assert!(result.is_ok());
     assert!(!orch.is_agent_active("sentinel")); // no matching changes
+}
+
+/// Integration test: telemetry summary round-trips through persistence.
+#[tokio::test]
+#[serial]
+async fn test_telemetry_persistence_round_trip() {
+    use terraphim_orchestrator::control_plane::telemetry::TokenBreakdown;
+    use terraphim_orchestrator::control_plane::{
+        CompletionEvent, TelemetryStore, TelemetrySummary,
+    };
+    use terraphim_persistence::{DeviceStorage, Persistable};
+
+    DeviceStorage::init_memory_only().await.unwrap();
+
+    let store = TelemetryStore::new(3600);
+    store
+        .record(CompletionEvent {
+            model: "test-model".to_string(),
+            session_id: "test-session".to_string(),
+            completed_at: chrono::Utc::now(),
+            latency_ms: 150,
+            success: true,
+            tokens: TokenBreakdown {
+                total: 1000,
+                input: 800,
+                output: 200,
+                ..Default::default()
+            },
+            cost_usd: 0.01,
+            error: None,
+        })
+        .await;
+
+    let summary = store.export_summary().await;
+    // Use save() which writes to all available profiles, avoiding profile-name
+    // sensitivity when the global DeviceStorage was already initialised by
+    // another test with dashmap+sqlite rather than memory-only.
+    summary.save().await.unwrap();
+
+    let mut loaded = TelemetrySummary::new("telemetry_summary".to_string());
+    loaded = loaded.load().await.unwrap();
+
+    assert_eq!(loaded.model_performances.len(), 1);
+    assert_eq!(loaded.model_performances[0].model, "test-model");
+    assert_eq!(loaded.model_performances[0].successful_completions, 1);
+
+    // Import into fresh store and verify
+    let restored = TelemetryStore::new(3600);
+    restored.import_summary(loaded).await;
+
+    let perf = restored.model_performance("test-model").await;
+    assert!(perf.successful_completions > 0);
+    assert!(perf.avg_latency_ms > 0.0);
+}
+
+/// Integration test: orchestrator constructs successfully with routing config.
+#[test]
+fn test_orchestrator_with_routing_config() {
+    let mut config = test_config();
+    config.routing = Some(terraphim_orchestrator::config::RoutingConfig {
+        taxonomy_path: std::path::PathBuf::from("/tmp/nonexistent-taxonomy"),
+        probe_ttl_secs: 300,
+        probe_results_dir: None,
+        probe_on_startup: false,
+        use_routing_engine: true,
+    });
+    let orch = AgentOrchestrator::new(config);
+    assert!(
+        orch.is_ok(),
+        "orchestrator should construct with routing config: {:?}",
+        orch.err()
+    );
 }
 
 /// Gitea-issue: no comments on issue -> spawn (Findings).
