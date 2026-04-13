@@ -15,8 +15,13 @@ fn test_tools_list_only() {
     println!("Starting MCP server test for tools list...");
 
     // Start the MCP server
-    let mut child = Command::new("cargo")
-        .args(["run", "--", "--verbose"])
+    let mut command = Command::new("cargo");
+    command.arg("run");
+    if std::env::var_os("CI").is_some() {
+        command.arg("--features").arg("zlob");
+    }
+    let mut child = command
+        .args(["--", "--verbose"])
         .current_dir(".")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
