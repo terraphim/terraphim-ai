@@ -309,6 +309,11 @@ calculate_percentile() {
 
 # Run load testing with wrk (if available)
 run_load_tests() {
+    if [ "$SKIP_API_BENCHMARKS" = true ]; then
+        log_warn "Skipping load tests (server not available)"
+        return
+    fi
+
     if ! command -v wrk &> /dev/null; then
         log_warn "wrk not found, skipping load tests"
         return

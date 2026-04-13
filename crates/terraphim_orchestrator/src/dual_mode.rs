@@ -524,6 +524,8 @@ fn create_tracker(workflow: &WorkflowConfig) -> Result<Box<dyn IssueTracker>, St
                 active_states: workflow.tracker.states.active.clone(),
                 terminal_states: workflow.tracker.states.terminal.clone(),
                 use_robot_api: workflow.tracker.use_robot_api,
+                robot_path: std::path::PathBuf::from("/home/alex/go/bin/gitea-robot"),
+                claim_strategy: terraphim_tracker::gitea::ClaimStrategy::PreferRobot,
             })
             .map_err(|e| format!("failed to create Gitea tracker: {}", e))?;
 

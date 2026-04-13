@@ -22,8 +22,13 @@ fn test_mcp_autocomplete_via_stdio() {
     // Start the MCP server
     // NOTE: Don't pass --verbose here. It can enable non-JSON output on stdout,
     // which breaks stdio JSON-RPC framing.
-    let mut child = Command::new("cargo")
-        .args(["run", "--"])
+    let mut command = Command::new("cargo");
+    command.arg("run");
+    if std::env::var_os("CI").is_some() {
+        command.arg("--features").arg("zlob");
+    }
+    let mut child = command
+        .args(["--"])
         .current_dir(".")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
