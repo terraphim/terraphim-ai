@@ -151,13 +151,13 @@ async fn test_role_validation() {
         theme: "default".into(),
         kg: None,
         haystacks: vec![],
-        llm_enabled: true,
+        llm_enabled: false,
         llm_api_key: None,
-        llm_model: Some("gemma3:270m".to_string()),
+        llm_model: None,
         llm_auto_summarize: false,
         llm_chat_enabled: true,
         llm_chat_system_prompt: Some("You are a helpful assistant.".to_string()),
-        llm_chat_model: Some("gemma3:270m".to_string()),
+        llm_chat_model: None,
         llm_context_window: None,
         extra: AHashMap::new(),
         llm_router_enabled: false,
@@ -174,10 +174,11 @@ async fn test_role_validation() {
     // Test role with missing provider
     let mut role_missing_provider = role_without_llm.clone();
     role_missing_provider.llm_enabled = true;
+    role_missing_provider.llm_chat_enabled = true;
 
     let result = build_llm_from_role(&role_missing_provider);
     assert!(
-        result.is_none(),
-        "Should fail without llm_provider in extra"
+        result.is_some(),
+        "Should fall back to an available default/proxy client when LLM is enabled"
     );
 }

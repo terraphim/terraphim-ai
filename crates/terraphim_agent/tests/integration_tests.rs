@@ -325,6 +325,23 @@ async fn test_end_to_end_server_workflow() -> Result<()> {
         "Server should have roles available"
     );
 
+    let selected_role = server_roles
+        .iter()
+        .find_map(|line| {
+            let trimmed = line.trim();
+            if !trimmed.starts_with('*') {
+                return None;
+            }
+            let role = trimmed.trim_start_matches('*').trim();
+            Some(
+                role.split_once(" (")
+                    .map(|(name, _)| name)
+                    .unwrap_or(role)
+                    .to_string(),
+            )
+        })
+        .unwrap_or_else(|| "Terraphim Engineer".to_string());
+
     // 3. Test search with server (may fail in CI due to missing KG data or slow indexing)
     let (search_stdout, search_stderr, search_code) =
         run_server_command(&server_url, &["search", "integration test", "--limit", "3"])?;
@@ -434,16 +451,12 @@ async fn test_end_to_end_server_workflow() -> Result<()> {
     );
     println!("✓ Server extract command completed");
 
-    // 8. Test config modification on server
-    let (set_stdout, _, set_code) = run_server_command(
-        &server_url,
-        &["config", "set", "selected_role", "Terraphim Engineer"],
-    )?;
-    assert_eq!(set_code, 0, "Server config set should succeed");
-    assert!(
-        extract_clean_output(&set_stdout).contains("updated selected_role to Terraphim Engineer")
-    );
-    println!("✓ Server config modification completed");
+    // 8. Test role selection on server using the dedicated server-mode path
+    let (set_stdout, _, set_code) =
+        run_server_command(&server_url, &["roles", "select", &selected_role])?;
+    assert_eq!(set_code, 0, "Server role select should succeed");
+    assert!(extract_clean_output(&set_stdout).contains(&format!("selected:{}", selected_role)));
+    println!("✓ Server role selection completed");
 
     // Cleanup
     let _ = server.kill();
