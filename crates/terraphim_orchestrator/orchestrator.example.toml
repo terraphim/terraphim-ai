@@ -23,6 +23,21 @@ repo_path = "/opt/ai-dark-factory/workspace"
 create_prs = false
 
 # =============================================================================
+# ROUTING (telemetry-aware model selection)
+# =============================================================================
+# Uncomment to enable KG-driven and telemetry-aware model routing.
+# Requires taxonomy markdown files in the taxonomy_path directory.
+# When use_routing_engine is true, the control-plane routing engine
+# combines KG routing, keyword routing, provider health, budget pressure,
+# and live telemetry signals for model selection.
+#
+# [routing]
+# taxonomy_path = "/opt/ai-dark-factory/kg/routing"
+# probe_ttl_secs = 300
+# probe_on_startup = true
+# use_routing_engine = false
+
+# =============================================================================
 # SAFETY LAYER (always running)
 # =============================================================================
 
