@@ -2,11 +2,19 @@ use std::collections::HashSet;
 use std::ops::Range;
 use std::str::FromStr;
 
-use markdown::ParseOptions;
 use markdown::mdast::Node;
+use markdown::ParseOptions;
 use terraphim_types::{Document, DocumentType};
 use thiserror::Error;
 use ulid::Ulid;
+
+pub mod chunk;
+pub mod heading;
+
+pub use chunk::{chunk_by_headings, ContentChunk};
+pub use heading::{
+    build_heading_tree, classify_sections, HeadingNode, HeadingTree, SectionConfig, SectionType,
+};
 
 pub const TERRAPHIM_BLOCK_ID_PREFIX: &str = "terraphim:block-id:";
 
@@ -24,7 +32,11 @@ fn find_first_h1(node: &Node) -> Option<String> {
     match node {
         Node::Heading(h) if h.depth == 1 => {
             let text = collect_text_content(&h.children);
-            if text.is_empty() { None } else { Some(text) }
+            if text.is_empty() {
+                None
+            } else {
+                Some(text)
+            }
         }
         _ => {
             if let Some(children) = children(node) {
@@ -80,10 +92,11 @@ pub struct Block {
     pub id_span: Range<usize>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct NormalizedMarkdown {
     pub markdown: String,
     pub blocks: Vec<Block>,
+    pub ast: Option<markdown::mdast::Node>,
 }
 
 #[derive(Debug, Error)]
@@ -143,9 +156,11 @@ pub fn ensure_terraphim_block_ids(markdown: &str) -> Result<String, MarkdownPars
 pub fn normalize_markdown(markdown: &str) -> Result<NormalizedMarkdown, MarkdownParserError> {
     let normalized = ensure_terraphim_block_ids(markdown)?;
     let blocks = extract_blocks(&normalized)?;
+    let ast = markdown::to_mdast(&normalized, &ParseOptions::gfm()).ok();
     Ok(NormalizedMarkdown {
         markdown: normalized,
         blocks,
+        ast,
     })
 }
 
