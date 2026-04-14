@@ -2834,7 +2834,7 @@ dependencies = [
 
 [[package]]
 name = "grepapp_haystack"
-version = "1.16.33"
+version = "1.16.34"
 dependencies = [
  "anyhow",
  "haystack_core",
@@ -2971,7 +2971,7 @@ dependencies = [
 
 [[package]]
 name = "haystack_core"
-version = "1.16.33"
+version = "1.16.34"
 dependencies = [
  "terraphim_types",
  "tokio",
@@ -8381,7 +8381,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim-cli"
-version = "1.16.33"
+version = "1.16.34"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -8444,7 +8444,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim-session-analyzer"
-version = "1.16.33"
+version = "1.16.34"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -8483,7 +8483,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_agent"
-version = "1.16.33"
+version = "1.16.34"
 dependencies = [
  "ahash",
  "anyhow",
@@ -8709,7 +8709,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_ccusage"
-version = "1.16.33"
+version = "1.16.34"
 dependencies = [
  "chrono",
  "serde",
@@ -8757,7 +8757,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_file_search"
-version = "1.16.33"
+version = "1.16.34"
 dependencies = [
  "ahash",
  "criterion 0.5.1",
@@ -8914,7 +8914,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_middleware"
-version = "1.16.33"
+version = "1.16.34"
 dependencies = [
  "ahash",
  "async-trait",
@@ -9121,7 +9121,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_server"
-version = "1.16.33"
+version = "1.16.34"
 dependencies = [
  "ahash",
  "anyhow",
@@ -9198,7 +9198,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_sessions"
-version = "1.16.33"
+version = "1.16.34"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -9278,14 +9278,14 @@ dependencies = [
 
 [[package]]
 name = "terraphim_test_utils"
-version = "1.16.33"
+version = "1.16.34"
 dependencies = [
  "rustc_version",
 ]
 
 [[package]]
 name = "terraphim_tinyclaw"
-version = "1.16.33"
+version = "1.16.34"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -9386,7 +9386,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_usage"
-version = "1.16.33"
+version = "1.16.34"
 dependencies = [
  "anyhow",
  "async-trait",
