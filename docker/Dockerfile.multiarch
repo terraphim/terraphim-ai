@@ -124,9 +124,13 @@ RUN . /root/.profile && \
 # Test the binaries
 RUN . /root/.profile && \
     RUST_TARGET=$(cat /tmp/rust-target) && \
-    ./target/$RUST_TARGET/release/terraphim_server --version && \
-    ./target/$RUST_TARGET/release/terraphim_mcp_server --version && \
-    ./target/$RUST_TARGET/release/terraphim-agent --version
+    if echo "$RUST_TARGET" | grep -q "$(uname -m)"; then \
+      ./target/$RUST_TARGET/release/terraphim_server --version && \
+      ./target/$RUST_TARGET/release/terraphim_mcp_server --version && \
+      ./target/$RUST_TARGET/release/terraphim-agent --version; \
+    else \
+      echo "Skipping version check for cross-compiled target: $RUST_TARGET"; \
+    fi
 
 # Move binaries to predictable location
 RUN . /root/.profile && \
