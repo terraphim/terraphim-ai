@@ -21,12 +21,22 @@ fn git_diff_baseline() -> String {
     let baseline = commits.lines().next().unwrap_or("").trim();
 
     if baseline.is_empty() {
-        // Git's well-known empty tree object works as a stable diff baseline
-        // even when CI checks out a shallow clone without HEAD~1 available.
-        "4b825dc642cb6eb9a060e54bf8d69288fbee4904".to_string()
-    } else {
-        baseline.to_string()
+        return "4b825dc642cb6eb9a060e54bf8d69288fbee4904".to_string();
     }
+
+    let head_output = std::process::Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .output()
+        .expect("git rev-parse failed");
+    let head = String::from_utf8_lossy(&head_output.stdout)
+        .trim()
+        .to_string();
+
+    if baseline == head {
+        return "4b825dc642cb6eb9a060e54bf8d69288fbee4904".to_string();
+    }
+
+    baseline.to_string()
 }
 
 fn test_config() -> OrchestratorConfig {
