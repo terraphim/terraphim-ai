@@ -5,9 +5,7 @@ use tokio::sync::mpsc;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
-use terraphim_symphony::runner::protocol::{
-    FindingCategory, FindingSeverity, ReviewAgentOutput, ReviewFinding,
-};
+use terraphim_types::{FindingCategory, FindingSeverity, ReviewAgentOutput, ReviewFinding};
 
 use crate::config::CompoundReviewConfig;
 use crate::error::OrchestratorError;
@@ -376,7 +374,7 @@ impl CompoundReviewWorkflow {
             .iter()
             .flat_map(|o| o.findings.clone())
             .collect();
-        let deduplicated = terraphim_symphony::runner::protocol::deduplicate_findings(all_findings);
+        let deduplicated = terraphim_types::deduplicate_findings(all_findings);
 
         // Determine overall pass/fail
         let pass = agent_outputs.iter().all(|o| o.pass) && failed_count == 0;
@@ -898,7 +896,7 @@ fn default_groups() -> Vec<ReviewGroupDef> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use terraphim_symphony::runner::protocol::FindingSeverity;
+    use terraphim_types::FindingSeverity;
 
     // ==================== Visual File Detection Tests ====================
 
