@@ -105,6 +105,12 @@ pub use procedure::*;
 pub mod persona;
 pub use persona::{CharacteristicDef, PersonaDefinition, PersonaLoadError, SfiaSkillDef};
 
+// Review finding types for multi-agent code review
+pub mod review;
+pub use review::{
+    FindingCategory, FindingSeverity, ReviewAgentOutput, ReviewFinding, deduplicate_findings,
+};
+
 use ahash::AHashMap;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::HashSet;

@@ -154,4 +154,5 @@ desktop/package-lock.json
 crates/terraphim_rlm/
 crates/terraphim_github_runner/
 crates/terraphim_github_runner_server/
-terraphim_firecracker/
+terraphim_firecracker/*
+!terraphim_firecracker/Cargo.toml
