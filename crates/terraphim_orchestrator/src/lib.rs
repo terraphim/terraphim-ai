@@ -88,7 +88,7 @@ pub use nightwatch::{
 pub use output_poster::OutputPoster;
 pub use persona::{MetapromptRenderError, MetapromptRenderer, PersonaRegistry};
 pub use scheduler::{ScheduleEvent, TimeScheduler};
-use terraphim_symphony::runner::protocol::{FindingSeverity, ReviewFinding};
+use terraphim_types::{FindingSeverity, ReviewFinding};
 
 use chrono::Timelike;
 use std::collections::HashMap;
@@ -2089,7 +2089,7 @@ impl AgentOrchestrator {
         result: &CompoundReviewResult,
         finding: &ReviewFinding,
     ) -> Result<(), String> {
-        use terraphim_symphony::runner::protocol::FindingSeverity;
+        use terraphim_types::FindingSeverity;
 
         let sev_str = match finding.severity {
             FindingSeverity::Critical => "CRITICAL",
