@@ -485,7 +485,7 @@ mod tests {
         runtime.last_seen_at = "2026-04-04T10:00:00Z".to_string();
         runtime.poll_once().await.unwrap();
 
-        assert_eq!(runtime.last_seen_at, "2026-04-04T11:00:00+00:00");
+        assert_eq!(runtime.last_seen_at, "2026-04-04T11:00:00Z");
         assert!(runtime.seen_events.is_empty());
     }
 
@@ -834,7 +834,7 @@ mod tests {
         let mut runtime = ListenerRuntime::new(config).unwrap();
         runtime.last_seen_at = "2026-04-04T10:00:00Z".to_string();
         runtime.poll_once().await.unwrap();
-        assert_eq!(runtime.last_seen_at, "2026-04-04T12:30:00+00:00");
+        assert_eq!(runtime.last_seen_at, "2026-04-04T12:30:00Z");
     }
 
     #[tokio::test]
@@ -963,7 +963,7 @@ mod tests {
         assert!(runtime.seen_events.is_empty());
 
         runtime.poll_once().await.unwrap();
-        assert_eq!(runtime.last_seen_at, "2026-04-04T12:30:00+00:00");
+        assert_eq!(runtime.last_seen_at, "2026-04-04T12:30:00Z");
         assert_eq!(runtime.seen_events.len(), 1);
     }
 
@@ -1092,7 +1092,7 @@ mod tests {
         assert!(runtime.seen_events.is_empty());
 
         runtime.poll_once().await.unwrap();
-        assert_eq!(runtime.last_seen_at, "2026-04-04T12:30:00+00:00");
+        assert_eq!(runtime.last_seen_at, "2026-04-04T12:30:00Z");
         assert_eq!(runtime.seen_events.len(), 1);
     }
 
@@ -1268,7 +1268,7 @@ impl ListenerRuntime {
             parser,
             accepted_target_names,
             seen_events: std::collections::HashSet::new(),
-            last_seen_at: chrono::Utc::now().to_rfc3339(),
+            last_seen_at: jiff::Timestamp::now().to_string(),
         })
     }
 
@@ -1289,7 +1289,7 @@ impl ListenerRuntime {
 
     pub async fn poll_once(&mut self) -> Result<()> {
         let mut page = 1u32;
-        let mut newest_seen_at: Option<chrono::DateTime<chrono::Utc>> = None;
+        let mut newest_seen_at: Option<jiff::Timestamp> = None;
         let mut should_retry_current_cursor = false;
 
         loop {
@@ -1326,25 +1326,18 @@ impl ListenerRuntime {
 
         if !should_retry_current_cursor {
             if let Some(newest_seen_at) = newest_seen_at {
-                self.last_seen_at = newest_seen_at.to_rfc3339();
+                self.last_seen_at = newest_seen_at.to_string();
             }
         }
         Ok(())
     }
 
-    fn comment_timestamp(
-        comment: &terraphim_tracker::IssueComment,
-    ) -> Option<chrono::DateTime<chrono::Utc>> {
+    fn comment_timestamp(comment: &terraphim_tracker::IssueComment) -> Option<jiff::Timestamp> {
         comment
             .updated_at
-            .parse::<chrono::DateTime<chrono::FixedOffset>>()
-            .or_else(|_| {
-                comment
-                    .created_at
-                    .parse::<chrono::DateTime<chrono::FixedOffset>>()
-            })
+            .parse::<jiff::Timestamp>()
+            .or_else(|_| comment.created_at.parse::<jiff::Timestamp>())
             .ok()
-            .map(|timestamp| timestamp.with_timezone(&chrono::Utc))
     }
 
     fn should_retry_issue_fetch(error: &terraphim_tracker::TrackerError) -> bool {
