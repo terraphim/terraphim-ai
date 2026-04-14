@@ -110,6 +110,8 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: Enforce terraphim_agent server-mode feature contract
         run: ./scripts/ci-guard-terraphim-agent-server-mode.sh
