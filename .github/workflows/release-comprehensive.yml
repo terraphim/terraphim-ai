@@ -530,7 +530,7 @@ jobs:
     name: Build and push Docker images
     uses: ./.github/workflows/docker-multiarch.yml
     with:
-      platforms: linux/amd64,linux/arm64,linux/arm/v7
+      platforms: linux/amd64,linux/arm64
       ubuntu-versions: '["20.04", "22.04"]'
       push: ${{ !inputs.test_run }}
       tag: ${{ github.ref_name }}
