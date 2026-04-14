@@ -59,6 +59,8 @@ CRATES=(
   "terraphim_middleware"
   "terraphim_update"
   "terraphim_service"
+  "terraphim_tracker"
+  "terraphim_orchestrator"
   "terraphim_agent"
 )
 
