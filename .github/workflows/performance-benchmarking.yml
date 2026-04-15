@@ -305,12 +305,23 @@ jobs:
           echo "Updated performance baseline"
         fi
 
-    - name: Commit baseline update
+    - name: Build headline snapshot for terraphim.ai
+      env:
+        GITHUB_SHA: ${{ github.sha }}
+        WORKFLOW_RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      run: |
+        # Emits benchmark-results/snapshot.json consumed by terraphim.ai's
+        # content/data/benchmarks.json (see Gitea zestic-ai/terraphim-ai #574).
+        # Script is idempotent; falls back to static values when Criterion
+        # parameter labels do not match.
+        bash scripts/update-benchmark-snapshot.sh
+
+    - name: Commit baseline + snapshot update
       run: |
         git config --global user.name 'github-actions[bot]'
         git config --global user.email 'github-actions[bot]@users.noreply.github.com'
 
-        git add benchmark-results/baseline.json
-        git commit -m "chore: update performance baseline from run ${{ github.run_id }}" || echo "No changes to commit"
+        git add benchmark-results/baseline.json benchmark-results/snapshot.json
+        git commit -m "chore: update performance baseline and snapshot from run ${{ github.run_id }}" || echo "No changes to commit"
 
         git push origin main
