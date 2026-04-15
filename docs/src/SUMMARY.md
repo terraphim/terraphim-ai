@@ -26,6 +26,7 @@
 - [Atomic Server Integration](./atomic-server-integration.md)
 - [MCP Integration](./mcp-integration.md)
 - [Claude Code Skills](./claude-code-skills.md)
+- [Command Rewriting How-To](./command-rewriting-howto.md)
 
 ## Symphony
 
