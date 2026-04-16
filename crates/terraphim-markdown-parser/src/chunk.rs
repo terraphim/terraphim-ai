@@ -1,7 +1,7 @@
 use ulid::Ulid;
 
-use crate::heading::{HeadingNode, HeadingTree, SectionType};
 use crate::NormalizedMarkdown;
+use crate::heading::{HeadingNode, HeadingTree, SectionType};
 
 #[derive(Debug, Clone)]
 pub struct ContentChunk {
@@ -129,7 +129,7 @@ fn extract_block_text(block_ids: &[Ulid], normalized: &NormalizedMarkdown) -> St
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::heading::{build_heading_tree, classify_sections, SectionConfig};
+    use crate::heading::{SectionConfig, build_heading_tree, classify_sections};
     use crate::normalize_markdown;
 
     #[test]
