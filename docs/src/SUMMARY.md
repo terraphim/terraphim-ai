@@ -27,6 +27,12 @@
 - [MCP Integration](./mcp-integration.md)
 - [Claude Code Skills](./claude-code-skills.md)
 - [Command Rewriting How-To](./command-rewriting-howto.md)
+- [Learning Compile](./learning-compile.md)
+
+## Agent Capabilities
+
+- [Evaluation Framework](./evaluation-framework.md)
+- [Listener Shell Dispatch](./listener-dispatch.md)
 
 ## How-Tos
 
