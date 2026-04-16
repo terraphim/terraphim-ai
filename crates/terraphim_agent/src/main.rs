@@ -30,6 +30,7 @@ mod guard_patterns;
 mod listener;
 mod onboarding;
 mod service;
+mod shell_dispatch;
 
 // Robot mode and forgiving CLI - always available
 mod forgiving;
