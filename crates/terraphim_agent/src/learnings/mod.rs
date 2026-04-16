@@ -24,6 +24,7 @@
 //! ```
 
 pub(crate) mod capture;
+pub mod compile;
 mod hook;
 mod install;
 pub(crate) mod procedure;
@@ -45,6 +46,10 @@ pub use capture::{
 };
 // Re-export KG thesaurus building utilities for use by hook validation pipeline
 pub(crate) use capture::{build_kg_thesaurus_from_dir, find_kg_dir};
+
+// Re-export compile functions for building thesauruses from corrections
+#[allow(unused_imports)]
+pub use compile::{compile_corrections_to_thesaurus, merge_thesauruses, write_thesaurus_json};
 
 #[allow(unused_imports)]
 pub use redaction::redact_secrets;
