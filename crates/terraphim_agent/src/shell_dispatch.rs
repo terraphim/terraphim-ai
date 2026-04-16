@@ -60,6 +60,8 @@ pub(crate) struct ShellDispatchConfig {
     pub(crate) extra_allowed: Vec<String>,
     pub(crate) working_dir: Option<PathBuf>,
     pub(crate) guard: std::sync::Arc<crate::guard_patterns::CommandGuard>,
+    pub(crate) agent_cli: Option<PathBuf>,
+    pub(crate) agent_model: Option<String>,
 }
 
 impl std::fmt::Debug for ShellDispatchConfig {
@@ -71,6 +73,8 @@ impl std::fmt::Debug for ShellDispatchConfig {
             .field("extra_allowed", &self.extra_allowed)
             .field("working_dir", &self.working_dir)
             .field("guard", &"<CommandGuard>")
+            .field("agent_cli", &self.agent_cli)
+            .field("agent_model", &self.agent_model)
             .finish()
     }
 }
@@ -250,6 +254,76 @@ pub(crate) async fn execute_dispatch(
                 exit_code: -1,
                 stdout: String::new(),
                 stderr: format!("Process timed out after {}s", config.timeout.as_secs()),
+                truncated: false,
+                timed_out: true,
+                duration_ms,
+            })
+        }
+    }
+}
+
+/// Execute an AI coding agent (e.g. opencode) to implement an issue.
+///
+/// Runs `agent_cli run -m <model> --dir <working_dir> <message>` and captures output.
+pub(crate) async fn execute_agent_dispatch(
+    config: &ShellDispatchConfig,
+    context: &str,
+) -> Result<DispatchResult, String> {
+    let agent_cli = config
+        .agent_cli
+        .as_ref()
+        .ok_or("agent_cli not configured in dispatch config")?;
+    let model = config
+        .agent_model
+        .as_deref()
+        .unwrap_or("kimi-for-coding/k2p5");
+
+    let start = Instant::now();
+
+    let mut cmd_args = vec!["run".to_string(), "-m".to_string(), model.to_string()];
+    if let Some(ref dir) = config.working_dir {
+        cmd_args.push("--dir".to_string());
+        cmd_args.push(dir.display().to_string());
+    }
+    cmd_args.push(context.to_string());
+
+    let mut command = tokio::process::Command::new(agent_cli);
+    command
+        .args(&cmd_args)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped());
+
+    if let Some(ref dir) = config.working_dir {
+        command.current_dir(dir);
+    }
+
+    let child = command
+        .spawn()
+        .map_err(|e| format!("failed to spawn agent CLI `{}`: {}", agent_cli.display(), e))?;
+
+    match tokio::time::timeout(config.timeout, child.wait_with_output()).await {
+        Ok(Ok(output)) => {
+            let duration_ms = start.elapsed().as_millis() as u64;
+            let (stdout, stderr, truncated) =
+                truncate_output(&output.stdout, &output.stderr, config.max_output_bytes);
+            Ok(DispatchResult {
+                subcommand: "implement".to_string(),
+                exit_code: output.status.code().unwrap_or(-1),
+                stdout,
+                stderr,
+                truncated,
+                timed_out: false,
+                duration_ms,
+            })
+        }
+        Ok(Err(e)) => Err(format!("agent process error: {}", e)),
+        Err(_) => {
+            let duration_ms = start.elapsed().as_millis() as u64;
+            Ok(DispatchResult {
+                subcommand: "implement".to_string(),
+                exit_code: -1,
+                stdout: String::new(),
+                stderr: format!("Agent timed out after {}s", config.timeout.as_secs()),
                 truncated: false,
                 timed_out: true,
                 duration_ms,
@@ -573,6 +647,8 @@ mod tests {
             extra_allowed: vec![],
             working_dir: None,
             guard: std::sync::Arc::new(crate::guard_patterns::CommandGuard::new()),
+            agent_cli: None,
+            agent_model: None,
         }
     }
 
@@ -656,5 +732,69 @@ mod tests {
             "Guard should allow safe command: {:?}",
             result
         );
+    }
+
+    // ── execute_agent_dispatch tests ──
+
+    #[tokio::test]
+    async fn test_execute_agent_dispatch_not_configured() {
+        let mut config = test_config("/bin/echo");
+        config.agent_cli = None;
+        let result = execute_agent_dispatch(&config, "test message").await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("agent_cli not configured"));
+    }
+
+    #[tokio::test]
+    async fn test_execute_agent_dispatch_success() {
+        let mut config = test_config("/bin/echo");
+        config.agent_cli = Some(PathBuf::from("/bin/echo"));
+        config.agent_model = Some("kimi-for-coding/k2p5".to_string());
+
+        let result = execute_agent_dispatch(&config, "test message").await;
+        assert!(result.is_ok(), "Expected success, got: {:?}", result);
+        let result = result.unwrap();
+        assert_eq!(result.subcommand, "implement");
+        assert_eq!(result.exit_code, 0);
+        assert!(result.stdout.contains("test message"));
+    }
+
+    #[tokio::test]
+    async fn test_execute_agent_dispatch_with_working_dir() {
+        let mut config = test_config("/bin/sh");
+        config.agent_cli = Some(PathBuf::from("/bin/sh"));
+        config.agent_model = Some("test-model".to_string());
+        config.working_dir = Some(PathBuf::from("/tmp"));
+
+        let result = execute_agent_dispatch(&config, "echo hello").await;
+        assert!(result.is_ok(), "Expected success, got: {:?}", result);
+    }
+
+    #[tokio::test]
+    async fn test_execute_agent_dispatch_captures_nonzero_exit() {
+        // Use a script that exits with code 42
+        let mut config = test_config("/bin/sh");
+        config.agent_cli = Some(PathBuf::from("/bin/sh"));
+        config.agent_model = Some("test-model".to_string());
+        config.working_dir = Some(PathBuf::from("/tmp"));
+
+        // The shell will try to run "run" as a command and fail
+        let result = execute_agent_dispatch(&config, "nonexistent_command").await;
+        assert!(result.is_ok());
+        let result = result.unwrap();
+        // Shell returns 127 when command not found, or nonzero on other errors
+        assert!(result.exit_code != 0 || !result.stderr.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_execute_agent_dispatch_default_model() {
+        let mut config = test_config("/bin/echo");
+        config.agent_cli = Some(PathBuf::from("/bin/echo"));
+        // No agent_model set - should use default
+
+        let result = execute_agent_dispatch(&config, "test").await;
+        assert!(result.is_ok());
+        let result = result.unwrap();
+        assert_eq!(result.subcommand, "implement");
     }
 }
