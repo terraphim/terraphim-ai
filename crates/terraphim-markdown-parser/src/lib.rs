@@ -2,8 +2,8 @@ use std::collections::HashSet;
 use std::ops::Range;
 use std::str::FromStr;
 
-use markdown::mdast::Node;
 use markdown::ParseOptions;
+use markdown::mdast::Node;
 use terraphim_types::{Document, DocumentType};
 use thiserror::Error;
 use ulid::Ulid;
@@ -11,9 +11,9 @@ use ulid::Ulid;
 pub mod chunk;
 pub mod heading;
 
-pub use chunk::{chunk_by_headings, ContentChunk};
+pub use chunk::{ContentChunk, chunk_by_headings};
 pub use heading::{
-    build_heading_tree, classify_sections, HeadingNode, HeadingTree, SectionConfig, SectionType,
+    HeadingNode, HeadingTree, SectionConfig, SectionType, build_heading_tree, classify_sections,
 };
 
 pub const TERRAPHIM_BLOCK_ID_PREFIX: &str = "terraphim:block-id:";
@@ -32,11 +32,7 @@ fn find_first_h1(node: &Node) -> Option<String> {
     match node {
         Node::Heading(h) if h.depth == 1 => {
             let text = collect_text_content(&h.children);
-            if text.is_empty() {
-                None
-            } else {
-                Some(text)
-            }
+            if text.is_empty() { None } else { Some(text) }
         }
         _ => {
             if let Some(children) = children(node) {
