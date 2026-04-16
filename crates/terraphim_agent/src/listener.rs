@@ -1,8 +1,10 @@
 use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 use std::fs;
 use std::path::{Path, PathBuf};
+
+use crate::shell_dispatch;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct AgentIdentity {
@@ -84,6 +86,41 @@ impl Default for DelegationPolicy {
     }
 }
 
+/// Configuration for the shell dispatch bridge.
+///
+/// When present in `ListenerConfig`, enables executing terraphim-agent
+/// subcommands from `@adf:` mention context and posting results back
+/// as Gitea comments.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DispatchConfig {
+    /// Path to the terraphim-agent binary. Defaults to the current executable.
+    #[serde(default)]
+    pub agent_binary: Option<PathBuf>,
+    /// Execution timeout in seconds. Defaults to 300 (5 minutes).
+    #[serde(default = "default_dispatch_timeout")]
+    pub timeout_secs: u64,
+    /// Maximum bytes to capture from stdout+stderr. Defaults to 48000.
+    #[serde(default = "default_max_output_bytes")]
+    pub max_output_bytes: usize,
+    /// Extra subcommands to allow beyond the built-in allowlist.
+    #[serde(default)]
+    pub extra_allowed_subcommands: Vec<String>,
+    /// Working directory for the spawned process.
+    #[serde(default)]
+    pub working_dir: Option<PathBuf>,
+    /// Map subcommand -> specialist agent name for delegation routing.
+    #[serde(default)]
+    pub specialist_routes: HashMap<String, String>,
+}
+
+fn default_dispatch_timeout() -> u64 {
+    300
+}
+
+fn default_max_output_bytes() -> usize {
+    48_000
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct GiteaConnection {
     pub base_url: String,
@@ -108,6 +145,10 @@ pub struct ListenerConfig {
     pub delegation: DelegationPolicy,
     #[serde(default)]
     pub repo_scope: Option<String>,
+    /// Shell dispatch configuration. When present, enables executing
+    /// terraphim-agent subcommands from @adf: mention context.
+    #[serde(default)]
+    pub dispatch: Option<DispatchConfig>,
 }
 
 fn default_poll_interval_secs() -> u64 {
@@ -128,6 +169,7 @@ impl ListenerConfig {
                 max_fanout_depth: 1,
             },
             repo_scope: None,
+            dispatch: None,
         }
     }
 
@@ -433,6 +475,7 @@ mod tests {
             notification_rules: vec![],
             delegation: DelegationPolicy::default(),
             repo_scope: None,
+            dispatch: None,
         };
 
         let mut runtime = ListenerRuntime::new(config).unwrap();
@@ -479,6 +522,7 @@ mod tests {
             notification_rules: vec![],
             delegation: DelegationPolicy::default(),
             repo_scope: None,
+            dispatch: None,
         };
 
         let mut runtime = ListenerRuntime::new(config).unwrap();
@@ -593,6 +637,7 @@ mod tests {
             notification_rules: vec![],
             delegation: DelegationPolicy::default(),
             repo_scope: None,
+            dispatch: None,
         };
 
         let mut runtime = ListenerRuntime::new(config).unwrap();
@@ -655,6 +700,7 @@ mod tests {
                 max_fanout_depth: 1,
             },
             repo_scope: None,
+            dispatch: None,
         };
 
         let runtime = ListenerRuntime::new(config).unwrap();
@@ -693,6 +739,7 @@ mod tests {
             notification_rules: vec![],
             delegation: DelegationPolicy::default(),
             repo_scope: None,
+            dispatch: None,
         };
 
         assert!(ListenerRuntime::new(config).is_ok());
@@ -829,6 +876,7 @@ mod tests {
             notification_rules: vec![],
             delegation: DelegationPolicy::default(),
             repo_scope: None,
+            dispatch: None,
         };
 
         let mut runtime = ListenerRuntime::new(config).unwrap();
@@ -953,6 +1001,7 @@ mod tests {
             notification_rules: vec![],
             delegation: DelegationPolicy::default(),
             repo_scope: None,
+            dispatch: None,
         };
 
         let mut runtime = ListenerRuntime::new(config).unwrap();
@@ -1082,6 +1131,7 @@ mod tests {
             notification_rules: vec![],
             delegation: DelegationPolicy::default(),
             repo_scope: None,
+            dispatch: None,
         };
 
         let mut runtime = ListenerRuntime::new(config).unwrap();
@@ -1188,6 +1238,7 @@ mod tests {
             notification_rules: vec![],
             delegation: DelegationPolicy::default(),
             repo_scope: None,
+            dispatch: None,
         };
 
         let mut runtime = ListenerRuntime::new(config).unwrap();
@@ -1214,6 +1265,7 @@ pub struct ListenerRuntime {
     repo_full_name: String,
     seen_events: std::collections::HashSet<String>,
     last_seen_at: String,
+    dispatch_config: Option<shell_dispatch::ShellDispatchConfig>,
 }
 
 impl ListenerRuntime {
@@ -1261,6 +1313,20 @@ impl ListenerRuntime {
         let agent_names = accepted_target_names.iter().cloned().collect::<Vec<_>>();
         let parser = terraphim_orchestrator::adf_commands::AdfCommandParser::new(&agent_names, &[]);
 
+        let dispatch_config = config.dispatch.as_ref().map(|d| {
+            let agent_binary = d.agent_binary.clone().unwrap_or_else(|| {
+                std::env::current_exe().unwrap_or_else(|_| PathBuf::from("terraphim-agent"))
+            });
+            shell_dispatch::ShellDispatchConfig {
+                agent_binary,
+                max_output_bytes: d.max_output_bytes,
+                timeout: std::time::Duration::from_secs(d.timeout_secs),
+                extra_allowed: d.extra_allowed_subcommands.clone(),
+                working_dir: d.working_dir.clone(),
+                guard: std::sync::Arc::new(crate::guard_patterns::CommandGuard::new()),
+            }
+        });
+
         Ok(Self {
             repo_full_name: format!("{}/{}", gitea.owner, gitea.repo),
             config,
@@ -1269,6 +1335,7 @@ impl ListenerRuntime {
             accepted_target_names,
             seen_events: std::collections::HashSet::new(),
             last_seen_at: jiff::Timestamp::now().to_string(),
+            dispatch_config,
         })
     }
 
@@ -1474,6 +1541,103 @@ impl ListenerRuntime {
                         event.event_id,
                     );
                     let _ = self.tracker.post_comment(event.issue_number, &ack).await;
+
+                    // Shell dispatch: parse context and execute subcommand
+                    if let Some(ref dispatch_cfg) = self.dispatch_config {
+                        let extra_allowed = self
+                            .config
+                            .dispatch
+                            .as_ref()
+                            .map(|d| d.extra_allowed_subcommands.clone())
+                            .unwrap_or_default();
+
+                        match shell_dispatch::parse_dispatch_command(&event.context, &extra_allowed)
+                        {
+                            Ok(Some((subcommand, args))) => {
+                                // Check specialist routing
+                                let specialist = self
+                                    .config
+                                    .dispatch
+                                    .as_ref()
+                                    .and_then(|d| d.specialist_routes.get(&subcommand));
+
+                                if let Some(specialist_name) = specialist {
+                                    if self
+                                        .config
+                                        .delegation
+                                        .allowed_specialists
+                                        .contains(specialist_name)
+                                    {
+                                        let note = format!(
+                                            "Routing `{}` to specialist `{}`",
+                                            subcommand, specialist_name
+                                        );
+                                        let _ = self
+                                            .handoff_issue_with_context(
+                                                event.issue_number,
+                                                specialist_name,
+                                                &note,
+                                                Some(&event.session_id),
+                                                Some(&event.event_id),
+                                            )
+                                            .await;
+                                    } else {
+                                        let msg = format!(
+                                            "Cannot route `{}` to `{}`: not in allowed_specialists\n\nsession={} event={}",
+                                            subcommand,
+                                            specialist_name,
+                                            event.session_id,
+                                            event.event_id
+                                        );
+                                        let _ = self
+                                            .tracker
+                                            .post_comment(event.issue_number, &msg)
+                                            .await;
+                                    }
+                                } else {
+                                    // Execute locally
+                                    match shell_dispatch::execute_dispatch(
+                                        dispatch_cfg,
+                                        &subcommand,
+                                        &args,
+                                    )
+                                    .await
+                                    {
+                                        Ok(result) => {
+                                            let reply = shell_dispatch::format_dispatch_result(
+                                                &result,
+                                                &event.target_agent_name,
+                                                &event.session_id,
+                                                &event.event_id,
+                                            );
+                                            let _ = self
+                                                .tracker
+                                                .post_comment(event.issue_number, &reply)
+                                                .await;
+                                        }
+                                        Err(e) => {
+                                            let msg = format!(
+                                                "Dispatch failed for `{}`: {}\n\nsession={} event={}",
+                                                subcommand, e, event.session_id, event.event_id
+                                            );
+                                            let _ = self
+                                                .tracker
+                                                .post_comment(event.issue_number, &msg)
+                                                .await;
+                                        }
+                                    }
+                                }
+                            }
+                            Ok(None) => { /* empty context, claim-only -- no dispatch */ }
+                            Err(e) => {
+                                let msg = format!(
+                                    "Invalid command: {}\n\nsession={} event={}",
+                                    e, event.session_id, event.event_id
+                                );
+                                let _ = self.tracker.post_comment(event.issue_number, &msg).await;
+                            }
+                        }
+                    }
                 }
                 terraphim_tracker::gitea::ClaimResult::AssignedToOther { assignee } => {
                     self.seen_events.insert(event.event_id.clone());
