@@ -207,9 +207,9 @@ pub(crate) async fn execute_dispatch(
 
     let start = Instant::now();
 
-    let mut cmd_args = vec![subcommand.to_string()];
+    // --robot is a top-level CLI flag (before the subcommand), not a subcommand flag
+    let mut cmd_args = vec!["--robot".to_string(), subcommand.to_string()];
     cmd_args.extend(args.iter().cloned());
-    cmd_args.push("--robot".to_string());
 
     let mut command = tokio::process::Command::new(&config.agent_binary);
     command
@@ -579,9 +579,9 @@ mod tests {
     #[tokio::test]
     async fn test_execute_dispatch_captures_stdout() {
         let config = test_config("/bin/echo");
-        // /bin/echo "hello" "--robot" => "hello --robot\n"
+        // /bin/echo "--robot" "hello" => "--robot hello\n"
         let result = execute_dispatch(&config, "hello", &[]).await.unwrap();
-        // echo receives args: "hello", "--robot"
+        // echo receives args: "--robot", "hello"
         assert!(
             result.stdout.contains("hello"),
             "stdout was: {}",
