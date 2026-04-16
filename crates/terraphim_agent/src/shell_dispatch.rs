@@ -176,6 +176,22 @@ pub(crate) async fn execute_dispatch(
     subcommand: &str,
     args: &[String],
 ) -> Result<DispatchResult, String> {
+    // Run guard check on the full command before executing
+    let full_command = std::iter::once(subcommand.to_string())
+        .chain(args.iter().cloned())
+        .collect::<Vec<_>>()
+        .join(" ");
+    let guard = crate::guard_patterns::CommandGuard::new();
+    let guard_result = guard.check(&full_command);
+    if guard_result.decision != crate::guard_patterns::GuardDecision::Allow {
+        return Err(format!(
+            "Guard blocked command `{}`: {} (pattern: {})",
+            full_command,
+            guard_result.reason.unwrap_or_default(),
+            guard_result.pattern.unwrap_or_default(),
+        ));
+    }
+
     let start = Instant::now();
 
     let mut cmd_args = vec![subcommand.to_string()];
@@ -605,5 +621,46 @@ mod tests {
         assert_eq!(s.len(), 100);
         assert_eq!(e.len(), 50);
         assert!(truncated);
+    }
+
+    // ── guard integration tests ──
+
+    #[tokio::test]
+    async fn test_execute_dispatch_blocks_destructive_command() {
+        let config = ShellDispatchConfig {
+            agent_binary: PathBuf::from("/bin/echo"),
+            max_output_bytes: MAX_OUTPUT_BYTES,
+            timeout: Duration::from_secs(5),
+            extra_allowed: vec![],
+            working_dir: None,
+        };
+        // "git reset --hard" should be caught by the guard
+        let result = execute_dispatch(&config, "guard", &["git reset --hard".to_string()]).await;
+        // The guard should block this -- the args contain a destructive pattern
+        // Note: the guard checks the joined command string "guard git reset --hard"
+        // which contains "git reset --hard", a known destructive pattern
+        assert!(
+            result.is_err() || result.as_ref().is_ok_and(|r| r.exit_code != 0),
+            "Guard should block or fail on destructive command pattern, got: {:?}",
+            result
+        );
+    }
+
+    #[tokio::test]
+    async fn test_execute_dispatch_allows_safe_command() {
+        let config = ShellDispatchConfig {
+            agent_binary: PathBuf::from("/bin/echo"),
+            max_output_bytes: MAX_OUTPUT_BYTES,
+            timeout: Duration::from_secs(5),
+            extra_allowed: vec![],
+            working_dir: None,
+        };
+        // "search automata" is safe -- guard should allow
+        let result = execute_dispatch(&config, "search", &["automata".to_string()]).await;
+        assert!(
+            result.is_ok(),
+            "Guard should allow safe command: {:?}",
+            result
+        );
     }
 }
