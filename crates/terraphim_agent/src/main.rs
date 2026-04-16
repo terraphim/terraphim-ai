@@ -1,4 +1,5 @@
 use std::io;
+use std::path::PathBuf;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
@@ -829,6 +830,15 @@ enum LearnSub {
     Procedure {
         #[command(subcommand)]
         sub: ProcedureSub,
+    },
+    /// Compile captured corrections into a thesaurus for the replace command
+    Compile {
+        /// Output path for compiled thesaurus JSON
+        #[arg(long, default_value = "compiled-corrections.json")]
+        output: PathBuf,
+        /// Optional: merge with this curated thesaurus file
+        #[arg(long)]
+        merge_with: Option<PathBuf>,
     },
     /// Manage shared learnings with trust levels (L1/L2/L3)
     #[cfg(feature = "shared-learning")]
@@ -2610,6 +2620,41 @@ async fn run_learn_command(sub: LearnSub) -> Result<()> {
                     }
                 }
             }
+        }
+        LearnSub::Compile { output, merge_with } => {
+            let storage_loc = config.storage_location();
+            let compiled = learnings::compile_corrections_to_thesaurus(&storage_loc)
+                .map_err(|e| anyhow::anyhow!("Failed to compile corrections: {}", e))?;
+
+            let compiled_count = compiled.len();
+
+            let final_thesaurus = if let Some(ref merge_path) = merge_with {
+                let curated_json = std::fs::read_to_string(merge_path).map_err(|e| {
+                    anyhow::anyhow!("Failed to read curated thesaurus {:?}: {}", merge_path, e)
+                })?;
+                let curated: terraphim_types::Thesaurus = serde_json::from_str(&curated_json)
+                    .map_err(|e| {
+                        anyhow::anyhow!("Failed to parse curated thesaurus {:?}: {}", merge_path, e)
+                    })?;
+                let curated_count = curated.len();
+                let merged = learnings::merge_thesauruses(curated, compiled);
+                println!(
+                    "Compiled {} correction(s), merged with {} curated entries -> {} total entries.",
+                    compiled_count,
+                    curated_count,
+                    merged.len()
+                );
+                merged
+            } else {
+                println!("Compiled {} correction(s).", compiled_count);
+                compiled
+            };
+
+            learnings::write_thesaurus_json(&final_thesaurus, &output)
+                .map_err(|e| anyhow::anyhow!("Failed to write thesaurus to {:?}: {}", output, e))?;
+
+            println!("Thesaurus written to: {}", output.display());
+            Ok(())
         }
         #[cfg(feature = "shared-learning")]
         LearnSub::Shared { sub } => run_shared_learning_command(sub, &config).await,
