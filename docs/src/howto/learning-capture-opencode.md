@@ -63,12 +63,9 @@ The hook:
 
 ### Pre-tool-use warnings (automatic)
 
-When you run a command that previously failed, the `tool.execute.before` hook queries past learnings and prints a warning:
+When you run a command that previously failed, the `tool.execute.before` hook queries past learnings. Instead of printing warnings to the terminal (which interrupts the user), hints are silently written to `~/.local/share/terraphim/session-hints.txt` so they can be consumed by the LLM in subsequent turns without cluttering the UI.
 
-```
-[terraphim] Warning: similar command failed before (exit 1): <command>
-  Suggested: <correction if available>
-```
+This design keeps the user interface clean while still surfacing past failures and corrections to the model.
 
 ### Correction (manual)
 
