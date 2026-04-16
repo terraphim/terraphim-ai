@@ -198,7 +198,7 @@ jobs:
             ubuntu.version=${{ matrix.ubuntu-version }}
 
       - name: Build and push to GHCR
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: docker/Dockerfile.multiarch
@@ -216,7 +216,7 @@ jobs:
 
       - name: Build and push to DockerHub
         if: inputs.push && steps.dockerhub-check.outputs.enabled == 'true'
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         continue-on-error: true  # DockerHub is optional, don't fail if unavailable
         with:
           context: .
