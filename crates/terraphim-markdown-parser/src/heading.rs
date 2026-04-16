@@ -1,11 +1,21 @@
 use std::ops::Range;
 
 use markdown::mdast::Node;
+use serde::{Deserialize, Serialize};
 use ulid::Ulid;
 
 use crate::{MarkdownParserError, NormalizedMarkdown, children, collect_text_content};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Strategy used to match a heading title against a `SectionPattern`'s pattern string.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MatchStrategy {
+    /// Match when the heading title starts with the pattern.
+    Prefix,
+    /// Match when the heading title contains the pattern anywhere.
+    Contains,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SectionType {
     Main,
     Sidebar(String),
@@ -24,13 +34,14 @@ impl std::fmt::Display for SectionType {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SectionPattern {
-    pub prefix: String,
+    pub pattern: String,
     pub section_type: SectionType,
+    pub match_strategy: MatchStrategy,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SectionConfig {
     pub rules: Vec<SectionPattern>,
 }
@@ -40,28 +51,36 @@ impl SectionConfig {
         Self {
             rules: vec![
                 SectionPattern {
-                    prefix: "Power Selling".to_string(),
+                    pattern: "Power Selling".to_string(),
                     section_type: SectionType::Sidebar("PowerSelling".to_string()),
+                    match_strategy: MatchStrategy::Prefix,
                 },
                 SectionPattern {
-                    prefix: "Power Player".to_string(),
+                    pattern: "Power Player".to_string(),
                     section_type: SectionType::Sidebar("PowerPlayer".to_string()),
+                    match_strategy: MatchStrategy::Prefix,
                 },
                 SectionPattern {
-                    prefix: "Power Point".to_string(),
+                    pattern: "Power Point".to_string(),
                     section_type: SectionType::Sidebar("PowerPoint".to_string()),
+                    match_strategy: MatchStrategy::Prefix,
                 },
+                // "Selling U" uses Contains because the phrase can appear
+                // mid-title (e.g. "Chapter 3: Selling U -- Your Career").
                 SectionPattern {
-                    prefix: "Selling U".to_string(),
+                    pattern: "Selling U".to_string(),
                     section_type: SectionType::Career,
+                    match_strategy: MatchStrategy::Contains,
                 },
                 SectionPattern {
-                    prefix: "Key Takeaways".to_string(),
+                    pattern: "Key Takeaways".to_string(),
                     section_type: SectionType::Assessment,
+                    match_strategy: MatchStrategy::Prefix,
                 },
                 SectionPattern {
-                    prefix: "Test Your Power Knowledge".to_string(),
+                    pattern: "Test Your Power Knowledge".to_string(),
                     section_type: SectionType::Assessment,
+                    match_strategy: MatchStrategy::Prefix,
                 },
             ],
         }
@@ -70,7 +89,11 @@ impl SectionConfig {
     pub fn classify(&self, title: &str) -> SectionType {
         let title_trimmed = title.trim();
         for rule in &self.rules {
-            if title_trimmed.starts_with(&rule.prefix) {
+            let matched = match rule.match_strategy {
+                MatchStrategy::Prefix => title_trimmed.starts_with(&rule.pattern),
+                MatchStrategy::Contains => title_trimmed.contains(&rule.pattern),
+            };
+            if matched {
                 return rule.section_type.clone();
             }
         }
@@ -328,14 +351,35 @@ mod tests {
     fn custom_section_config() {
         let config = SectionConfig {
             rules: vec![SectionPattern {
-                prefix: "Experiment".to_string(),
+                pattern: "Experiment".to_string(),
                 section_type: SectionType::Sidebar("Lab".to_string()),
+                match_strategy: MatchStrategy::Prefix,
             }],
         };
         assert_eq!(
             config.classify("Experiment 3: Results"),
             SectionType::Sidebar("Lab".to_string())
         );
+        assert_eq!(config.classify("Introduction"), SectionType::Main);
+    }
+
+    #[test]
+    fn match_strategy_contains() {
+        let config = SectionConfig {
+            rules: vec![SectionPattern {
+                pattern: "Selling U".to_string(),
+                section_type: SectionType::Career,
+                match_strategy: MatchStrategy::Contains,
+            }],
+        };
+        // Contains matches mid-title
+        assert_eq!(
+            config.classify("Chapter 3: Selling U -- Your Career"),
+            SectionType::Career,
+        );
+        // Contains also matches at the start
+        assert_eq!(config.classify("Selling U: Careers"), SectionType::Career,);
+        // No match when substring is absent
         assert_eq!(config.classify("Introduction"), SectionType::Main);
     }
 }
