@@ -108,9 +108,15 @@
 pub use self::builder::{Logseq, ThesaurusBuilder};
 pub mod autocomplete;
 pub mod builder;
+pub mod evaluation;
 pub mod markdown_directives;
 pub mod matcher;
 pub mod url_protector;
+
+pub use evaluation::{
+    ClassificationMetrics, EvaluationResult, ExpectedMatch, GroundTruthDocument, SystematicError,
+    TermReport, evaluate, load_ground_truth,
+};
 
 // Medical entity extraction modules (SNOMED CT and UMLS)
 #[cfg(feature = "medical")]
