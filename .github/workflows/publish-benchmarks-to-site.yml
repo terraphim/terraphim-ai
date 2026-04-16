@@ -4,11 +4,8 @@ name: Publish Benchmarks Snapshot to terraphim.ai
 # content/data/benchmarks.json via a pull request.
 #
 # Step 3 of Gitea zestic-ai/terraphim-ai #574.
-# See .docs/design-ship-systems-benchmarks.md (in terraphim.ai repo).
-#
-# Required secret:
-#   TERRAPHIM_AI_SITE_TOKEN - GitHub PAT with contents:write and
-#                             pull-requests:write on terraphim/terraphim.ai.
+# Auth: 1Password injects a GitHub token at runtime on the self-hosted
+# runner (same pattern as deploy-docs.yml). No repo-level PAT secret needed.
 
 on:
   push:
@@ -18,18 +15,24 @@ on:
       - 'benchmark-results/snapshot.json'
   workflow_dispatch:
 
+env:
+  OP_GH_TOKEN: op://TerraphimPlatform/github-site-deploy/credential
+
 permissions:
   contents: read
 
 jobs:
   publish:
     name: Open PR on terraphim/terraphim.ai
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
       - name: Checkout terraphim-ai (source of snapshot)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           path: terraphim-ai
 
@@ -51,11 +54,19 @@ jobs:
           fi
           echo "Snapshot OK ($METRIC_COUNT metrics)"
 
+      - name: Load secrets from 1Password
+        uses: 1password/load-secrets-action@v2
+        with:
+          export-env: true
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          GH_TOKEN: ${{ env.OP_GH_TOKEN }}
+
       - name: Checkout terraphim.ai (destination)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: terraphim/terraphim.ai
-          token: ${{ secrets.TERRAPHIM_AI_SITE_TOKEN }}
+          token: ${{ env.GH_TOKEN }}
           path: terraphim-ai-site
           fetch-depth: 0
 
@@ -109,13 +120,11 @@ jobs:
       - name: Open pull request
         if: steps.diff.outputs.changed == 'true'
         working-directory: terraphim-ai-site
-        env:
-          GH_TOKEN: ${{ secrets.TERRAPHIM_AI_SITE_TOKEN }}
         run: |
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           PR_BODY="Automated snapshot sync from [terraphim-ai@${SHORT_SHA}](https://github.com/${{ github.repository }}/commit/${{ github.sha }}).
 
-          Produced by \`.github/workflows/publish-benchmarks-to-site.yml\` after benchmark-results/snapshot.json changed on terraphim-ai main.
+          Produced by publish-benchmarks-to-site.yml after benchmark-results/snapshot.json changed on terraphim-ai main.
 
           Source workflow run: ${RUN_URL}
 
