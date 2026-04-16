@@ -1,131 +1,168 @@
-# Handover: 2026-04-10 -- Operational Skill Store Complete (Phases A-J + D3)
+# Handover: 2026-04-16 -- Sprint Planning + 4 Feature PRs Merged + Issue Housekeeping
 
-**Branch**: main (clean, in sync with origin/main at `20da10ac`)
-**Previous Handover**: 2026-03-10 - Agent Workflows E2E Implementation Complete
+**Branch**: main (clean, in sync with origin + gitea at `653f1f899`)
+**Previous Handover**: 2026-04-10 - Operational Skill Store Complete (Phases A-J + D3)
 
 ## Session Summary
 
-Implemented the full Operational Skill Store plan for `terraphim-agent`: disciplined research across 20+ open issues, 10-phase design plan, parallel implementation with subagents, right-side-of-v verification after each phase, PRs merged on both GitHub and Gitea, 8 issues closed.
+Full sprint planning, research, design, implementation, verification, validation, and merge cycle. Closed 33 stale issues, migrated 8 Odilo issues to dedicated repo, implemented 4 features across independent workstreams, verified with right-side-of-V agents, and updated documentation on both mdbook and terraphim.ai website.
 
 ## What Was Done
 
-### 15 commits (all merged to main via 2 PRs)
+### Sprint Planning (Disciplined Research + Design)
 
-| Commit | Phase | Issue | Description |
-|--------|-------|-------|-------------|
-| `2963fc1a` | -- | -- | fix(kg): lowercase bun heading for replace tests |
-| `93f1d557` | -- | #773 | fix(tests): integration test role names + chat tolerance |
-| `a3d5681a` | -- | -- | fix(tests): request timeout tolerance |
-| `283c7b33` | Plan | -- | docs: learning-correction-system-plan.md |
-| `0a6b8f64` | A2 | #578 | fix(search): --robot/--format flags |
-| `a130fe18` | A1 | #480 | fix(learn): redaction in hook passthrough |
-| `c5fc7de0` | B | #693 | feat(learn): un-gate procedure.rs + CLI |
-| `3c8b6885` | C | #703 | feat(learn): entity annotation via KG |
-| `9c959a13` | C | #703 | test(learn): entity annotation tests |
-| `1f96b3b9` | D | #694 | feat(learn): replay engine + dry-run |
-| `0a7ecd50` | F | #695 | feat(learn): self-healing health monitoring |
-| `2d1aef19` | E+G | #599,#727 | feat(learn): multi-hook + shared learning CLI |
-| `c56a67d8` | J | Gitea #515-517 | feat(hooks): KG-based command validation |
-| `5f587874` | D1 fix | #693 | fix(learn): surface procedures in learn list/query |
-| `0c403844` | D3 | #693 | feat(learn): session-based auto-capture |
+- Evaluated all open issues across GitHub (82) and Gitea (30+)
+- Cross-checked against Odilo project at `~/projects/zestic-ai/odilo/` -- discovered duplicate issue tracking
+- Created sprint plan: `plans/sprint-2026-04-16-terraphim-ai-design.md`
+- Created listener dispatch design: `plans/design-listener-shell-dispatch.md`
+- User decisions captured via AskUserQuestion: Odilo = active client work, TinyClaw = rethink as Gitea listener, sprint focus = all workstreams equally
 
-### PRs (all merged)
+### 7 PRs Merged (4 feature + 3 dependabot)
 
-| PR | Platform | Status |
-|----|----------|--------|
-| #781 | GitHub | MERGED -- Phases A-J + D1 fix |
-| #783 | GitHub | MERGED -- D3 session auto-capture |
-| #533 | Gitea | MERGED -- Phases A-J + D1 fix |
-| #535 | Gitea | MERGED -- D3 session auto-capture |
+| PR | Commit | Feature | Tests |
+|----|--------|---------|-------|
+| #814 | `993e4e0` | Parser upstream: MatchStrategy, iterative normalize, configurable SectionConfig | 26 |
+| #815 | `9396e35` | Learn compile: corrections-to-thesaurus feedback loop | 9 |
+| #816 | `9fd985d` | Automata evaluation framework: precision/recall/F1 | 14 |
+| #817 | `9196d1f` | Listener shell dispatch: execute subcommands from @adf mentions | 31 |
+| #811 | `d607a82` | Dependabot: actions/github-script 7->9 | -- |
+| #812 | `574ff84` | Dependabot: docker/build-push-action 5->7 | -- |
+| #813 | `4aff773` | Dependabot: docker/metadata-action 5->6 | -- |
 
-### Issues Closed
+### 33 Issues Closed
 
-| Issue | Platform | Title |
-|-------|----------|-------|
-| #480 | GitHub + Gitea | Secret redaction in hook passthrough |
-| #578 | GitHub | Search --robot/--format flags |
-| #693 | GitHub | Procedural memory (Phase 1 success capture) |
-| #773 | GitHub | Integration test role name mismatches |
-| #515 | Gitea | PreToolUse validation pipeline |
-| #516 | Gitea | KG command pattern matching |
-| #517 | Gitea | Wire validation into Claude Code pipeline |
+| Category | Count | Issues |
+|----------|-------|--------|
+| GitHub (implemented) | 12 | #694, #695, #703, #599, #692, #697, #784-787, #730, #638 |
+| GitHub (wontfix) | 2 | #562, #585 |
+| Gitea (Odilo migrated) | 8 | #561, #565-571 |
+| Gitea (ADF remediation) | 10 | #461-463, #468, #490, #494, #497, #499, #501, #504, #506, #507 |
+| Gitea (desktop repo) | 1 | #490 |
 
-### Issues Progressed (not closed)
+### 4 Issues Created (terraphim-ai)
 
-| Issue | Platform | Title | Status |
-|-------|----------|-------|--------|
-| #692 | GitHub | Epic: Operational Skill Store | Phases A-J complete, H+I deferred |
-| #694 | GitHub | Procedure replay engine | Implemented + verified |
-| #695 | GitHub | Self-healing procedures | Implemented + verified |
-| #599 | GitHub | Multi-hook pipeline | Implemented + verified |
-| #703 | GitHub | Entity annotation | Implemented + verified |
-| #727 | GitHub | Agent evolution (partial) | Shared learning CLI wired |
+| # | Title |
+|---|-------|
+| #575 | feat(markdown-parser): upstream MatchStrategy, iterative normalize, configurable SectionConfig |
+| #576 | feat(automata): ground-truth evaluation framework |
+| #577 | feat(listener): shell dispatch bridge |
+| Gitea only | 8 issues migrated to zestic-ai/odilo (#23-30) |
+
+### CI Fix
+
+- `cfee683` -- `cargo fmt` fix for terraphim-markdown-parser (Rust 2024 edition import ordering)
+- `db0809f` -- Removed desktop npm from dependabot config (desktop is separate repo)
+
+### Documentation
+
+- `docs/src/evaluation-framework.md` -- Automata evaluation API docs
+- `docs/src/listener-dispatch.md` -- Gitea dispatch security + config docs
+- `docs/src/learning-compile.md` -- Corrections feedback loop docs
+- `docs/src/SUMMARY.md` -- Added Agent Capabilities section
+- `terraphim.ai/content/capabilities/evaluation.md` -- Website capability page
+- `terraphim.ai/content/capabilities/listener-dispatch.md` -- Website capability page
+- `terraphim.ai/content/capabilities/terraphim-agent.md` -- Updated with new features
+
+### Verification & Validation
+
+All 4 PRs went through right-side-of-V:
+- **Verification**: 3 parallel agents verified implementation against design specs
+- **Validation**: 1 agent validated against user requirements
+- **Result**: GO for all 4 PRs. 80 new tests, 0 regressions, 0 clippy warnings on new code
+- **Minor defects** (all Low): D1 (textbook_default deviation), D817-1 (missing wiremock integration tests), D-1 (export_corrections_as_kg deferred), D-2 (cache invalidation deferred), D-3 (evaluate CLI deferred)
+
+## New Files
+
+### Feature code
+- `crates/terraphim_agent/src/learnings/compile.rs` -- corrections-to-thesaurus compiler (384 lines, 9 tests)
+- `crates/terraphim_agent/src/shell_dispatch.rs` -- shell dispatch bridge (666 lines, 31 tests)
+- `crates/terraphim_automata/src/evaluation.rs` -- evaluation framework (613 lines, 14 tests)
+
+### Modified
+- `crates/terraphim-markdown-parser/src/heading.rs` -- MatchStrategy enum, pattern/match_strategy fields
+- `crates/terraphim-markdown-parser/src/lib.rs` -- iterative normalize_markdown, pub(crate) collect_text_content
+- `crates/terraphim_agent/src/listener.rs` -- DispatchConfig, shell dispatch wiring in process_comment
+- `crates/terraphim_agent/src/main.rs` -- LearnSub::Compile variant, mod shell_dispatch
+
+### Plans
+- `plans/sprint-2026-04-16-terraphim-ai-design.md` -- 2-week sprint plan
+- `plans/design-listener-shell-dispatch.md` -- shell dispatch design
 
 ## New CLI Surface
 
 ```
-terraphim-agent learn procedure list/show/record/add-step
-terraphim-agent learn procedure success/failure
-terraphim-agent learn procedure replay ID [--dry-run]
-terraphim-agent learn procedure health/enable/disable
-terraphim-agent learn procedure from-session SESSION_ID [--title "T"]  (--features repl-sessions)
-terraphim-agent learn query PATTERN [--semantic]
-terraphim-agent learn shared list/promote/import/stats  (--features shared-learning)
-terraphim-agent search QUERY [--robot] [--format json|json-compact]
+terraphim-agent learn compile --output FILE [--merge-with FILE]
 ```
 
-## New Files
+## New Library API
 
-- `crates/terraphim_agent/src/learnings/replay.rs` -- procedure replay engine
-- `crates/terraphim_agent/src/kg_validation.rs` -- KG-based command validation
-- `crates/terraphim_agent/tests/procedure_cli_tests.rs` -- 12 procedure tests
-- `crates/terraphim_agent/tests/robot_search_output_regression_tests.rs` -- 5 search tests
-- `crates/terraphim_agent/tests/shared_learning_cli_tests.rs` -- 7 shared learning tests
-- `plans/learning-correction-system-plan.md` -- research and design plan
-- `plans/d3-session-auto-capture-plan.md` -- D3 design plan
+```rust
+// Evaluation framework
+terraphim_automata::evaluation::evaluate(ground_truth, thesaurus) -> EvaluationResult
+terraphim_automata::evaluation::load_ground_truth(path) -> Vec<GroundTruthDocument>
 
-## Key Changes to Existing Code
+// Learning compile
+learnings::compile::compile_corrections_to_thesaurus(dir) -> Thesaurus
+learnings::compile::merge_thesauruses(curated, compiled) -> Thesaurus
+learnings::compile::write_thesaurus_json(thesaurus, path)
 
-- `learnings/procedure.rs` -- un-gated from `#[cfg(test)]`, added HealthStatus, health_check(), set_disabled(), from_session_commands(), extract_bash_commands_from_session()
-- `learnings/capture.rs` -- ImportanceScore, entities field, Procedure variant in LearningEntry, annotate_with_entities(), query_all_entries_semantic(), procedures loaded in list_all_entries()
-- `learnings/hook.rs` -- LearnHookType, multi-hook routing, correction pattern parsing
-- `learnings/redaction.rs` -- wired into hook passthrough
-- `terraphim_types/src/procedure.rs` -- disabled field with serde(default)
+// Shell dispatch (internal to listener)
+shell_dispatch::parse_dispatch_command(context, extra_allowed)
+shell_dispatch::execute_dispatch(config, subcommand, args)
+shell_dispatch::format_dispatch_result(result, agent, session, event)
+```
 
 ## What's Working
 
-- All tests pass: 151 lib, 12 procedure, 22 search, 14 replace, 5 robot output, 3 learn, 7 shared learning
-- Every phase verified through right-side-of-v with traceability matrices
-- cargo clippy clean (no errors)
-- Both remotes in sync
+- All 80 new tests pass across 4 features
+- Workspace tests green
+- Both remotes (origin + gitea) in sync
+- terraphim.ai website updated with new capabilities
+- Listener dispatch has 3-layer security: allowlist + metachar rejection + CommandGuard
 
-## What's Deferred
+## What's Deferred (tracked as Low-severity defects)
 
-### Phase H: Graduated Guard (#704)
-Three-tier execution (allow/sandbox/deny) with Firecracker integration. L complexity.
+1. `export_corrections_as_kg()` -- Logseq markdown export from corrections
+2. Cache invalidation for SQLite thesaurus when corrections change
+3. `evaluate` CLI subcommand (library API exists, no CLI wrapper yet)
+4. Wiremock integration tests for dispatch-through-listener path
+5. W5b (#727): Wire agent_evolution into orchestrator -- not started this sprint
+6. W4 (#553/#608): Community content -- not started this sprint
 
-### Phase I: Agent Evolution (#727-730)
-Wire terraphim_agent_evolution into ADF with real LLM adapters. 4 issues, L complexity.
+## Odilo Migration
 
-### Gitea #451: LLM hooks unwired in agent.rs
-Needs terraphim_validation crate work.
+8 issues moved from terraphim/terraphim-ai to zestic-ai/odilo:
+- Epic (#561 -> odilo#23), Stages 3-6, Stage 0b, Multi-language, ADR-040
+- Also moved: Stage 0b -> terraphim-ai#576 (reframed as generic eval framework)
+- Also moved: Stage 1 parser work -> terraphim-ai#575 (upstream to canonical crate)
+- Review comment posted on odilo#26 (quality gate -- may belong in terraphim-ai)
 
 ## Known Issues
 
-1. `cross_mode_consistency_test` -- 3 pre-existing failures (server vs CLI result count mismatch)
-2. Byte-level string truncation at main.rs search snippet (120 chars) can panic on multi-byte UTF-8 -- LOW
-3. `process_hook_input()` in hook.rs is dead code (replaced by `process_hook_input_with_type()`)
-4. `crates/terraphim_agent/docs/src/kg/test_ranking_kg.md` -- untracked test fixture, can be deleted
+1. `procedure.rs` has 4 pre-existing dead_code warnings (TRIVIAL_COMMANDS, is_trivial_command, from_session_commands, save_with_dedup) -- blocked by `clippy -D warnings` in CI but only when running without `repl-sessions` feature
+2. Gitea has many stale task branches from ADF bot agents -- cleanup opportunity
+3. `cross_mode_consistency_test` still has known pre-existing failures (server vs CLI)
 
 ## Test Commands
 
 ```bash
-cargo test -p terraphim_agent --lib
-cargo test -p terraphim_agent --test procedure_cli_tests
-cargo test -p terraphim_agent --test replace_feature_tests
-cargo test -p terraphim_agent --test enhanced_search_tests
-cargo test -p terraphim_agent --test robot_search_output_regression_tests
-cargo test -p terraphim_agent --test learn_no_service_tests
-cargo test -p terraphim_agent --features shared-learning --test shared_learning_cli_tests
-cargo clippy -p terraphim_agent
+# Sprint features
+cargo test -p terraphim-markdown-parser                           # 26 tests
+cargo test -p terraphim_agent --bin terraphim-agent -- compile    # 9 tests
+cargo test -p terraphim_automata -- evaluation                    # 14 tests
+cargo test -p terraphim_agent --bin terraphim-agent -- shell_dispatch  # 31 tests
+
+# Full workspace
+cargo test --workspace --lib
+cargo clippy --workspace --all-targets
 ```
+
+## Sprint Plan Remaining (Week 2)
+
+Per `plans/sprint-2026-04-16-terraphim-ai-design.md`:
+
+| Day | Task | Status |
+|-----|------|--------|
+| Day 7 | Deploy Gitea listener, reframe TinyClaw | Not started |
+| Day 8-9 | Wire agent_evolution into orchestrator (#727) | Not started |
+| Day 10 | Community content (#553/#608), sprint retro | Not started |
