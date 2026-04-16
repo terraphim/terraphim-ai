@@ -111,6 +111,14 @@ pub struct DispatchConfig {
     /// Map subcommand -> specialist agent name for delegation routing.
     #[serde(default)]
     pub specialist_routes: HashMap<String, String>,
+    /// Path to an AI coding agent CLI (e.g. opencode) for "implement" dispatch.
+    /// When set and the subcommand is "implement", this binary is invoked
+    /// with `run -m <model> <context>` instead of terraphim-agent.
+    #[serde(default)]
+    pub agent_cli: Option<PathBuf>,
+    /// Model to use with agent_cli (e.g. "kimi-for-coding/k2p5").
+    #[serde(default)]
+    pub agent_model: Option<String>,
 }
 
 fn default_dispatch_timeout() -> u64 {
@@ -1324,6 +1332,8 @@ impl ListenerRuntime {
                 extra_allowed: d.extra_allowed_subcommands.clone(),
                 working_dir: d.working_dir.clone(),
                 guard: std::sync::Arc::new(crate::guard_patterns::CommandGuard::new()),
+                agent_cli: d.agent_cli.clone(),
+                agent_model: d.agent_model.clone(),
             }
         });
 
@@ -1594,8 +1604,49 @@ impl ListenerRuntime {
                                             .post_comment(event.issue_number, &msg)
                                             .await;
                                     }
+                                } else if subcommand == "implement"
+                                    && dispatch_cfg.agent_cli.is_some()
+                                {
+                                    // Dispatch to AI coding agent (opencode)
+                                    let full_context = if args.is_empty() {
+                                        format!(
+                                            "Implement Gitea issue #{} in repo {}",
+                                            event.issue_number, self.repo_full_name
+                                        )
+                                    } else {
+                                        args.join(" ")
+                                    };
+                                    match shell_dispatch::execute_agent_dispatch(
+                                        dispatch_cfg,
+                                        &full_context,
+                                    )
+                                    .await
+                                    {
+                                        Ok(result) => {
+                                            let reply = shell_dispatch::format_dispatch_result(
+                                                &result,
+                                                &event.target_agent_name,
+                                                &event.session_id,
+                                                &event.event_id,
+                                            );
+                                            let _ = self
+                                                .tracker
+                                                .post_comment(event.issue_number, &reply)
+                                                .await;
+                                        }
+                                        Err(e) => {
+                                            let msg = format!(
+                                                "Agent dispatch failed: {}\n\nsession={} event={}",
+                                                e, event.session_id, event.event_id
+                                            );
+                                            let _ = self
+                                                .tracker
+                                                .post_comment(event.issue_number, &msg)
+                                                .await;
+                                        }
+                                    }
                                 } else {
-                                    // Execute locally
+                                    // Execute locally via terraphim-agent
                                     match shell_dispatch::execute_dispatch(
                                         dispatch_cfg,
                                         &subcommand,
