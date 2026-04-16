@@ -14,13 +14,13 @@ use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 /// Maximum bytes captured from stdout+stderr before truncation.
-pub const MAX_OUTPUT_BYTES: usize = 48_000;
+pub(crate) const MAX_OUTPUT_BYTES: usize = 48_000;
 
 /// Default execution timeout in seconds.
-pub const DISPATCH_TIMEOUT_SECS: u64 = 300;
+pub(crate) const DISPATCH_TIMEOUT_SECS: u64 = 300;
 
 /// Subcommands that are safe to execute from an @adf mention.
-pub const ALLOWED_SUBCOMMANDS: &[&str] = &[
+pub(crate) const ALLOWED_SUBCOMMANDS: &[&str] = &[
     "search",
     "extract",
     "replace",
@@ -39,7 +39,7 @@ pub const ALLOWED_SUBCOMMANDS: &[&str] = &[
 
 /// Subcommands explicitly denied to prevent recursion, side effects, or
 /// interactive modes.
-pub const DENIED_SUBCOMMANDS: &[&str] = &[
+pub(crate) const DENIED_SUBCOMMANDS: &[&str] = &[
     "listen",
     "repl",
     "interactive",
@@ -53,24 +53,24 @@ const SHELL_METACHARS: &[char] = &['|', ';', '&', '`', '$', '(', ')', '<', '>'];
 
 /// Configuration for the shell dispatch bridge.
 #[derive(Debug, Clone)]
-pub struct ShellDispatchConfig {
-    pub agent_binary: PathBuf,
-    pub max_output_bytes: usize,
-    pub timeout: Duration,
-    pub extra_allowed: Vec<String>,
-    pub working_dir: Option<PathBuf>,
+pub(crate) struct ShellDispatchConfig {
+    pub(crate) agent_binary: PathBuf,
+    pub(crate) max_output_bytes: usize,
+    pub(crate) timeout: Duration,
+    pub(crate) extra_allowed: Vec<String>,
+    pub(crate) working_dir: Option<PathBuf>,
 }
 
 /// Result of executing a dispatched subcommand.
 #[derive(Debug)]
-pub struct DispatchResult {
-    pub subcommand: String,
-    pub exit_code: i32,
-    pub stdout: String,
-    pub stderr: String,
-    pub truncated: bool,
-    pub timed_out: bool,
-    pub duration_ms: u64,
+pub(crate) struct DispatchResult {
+    pub(crate) subcommand: String,
+    pub(crate) exit_code: i32,
+    pub(crate) stdout: String,
+    pub(crate) stderr: String,
+    pub(crate) truncated: bool,
+    pub(crate) timed_out: bool,
+    pub(crate) duration_ms: u64,
 }
 
 /// Parse a dispatch context string into (subcommand, args).
@@ -80,7 +80,7 @@ pub struct DispatchResult {
 /// - `Ok(Some((subcommand, args)))` if parsing succeeds and the subcommand is allowed.
 /// - `Err(message)` if the context contains shell metacharacters, a denied subcommand,
 ///   or an unknown subcommand.
-pub fn parse_dispatch_command(
+pub(crate) fn parse_dispatch_command(
     context: &str,
     extra_allowed: &[String],
 ) -> Result<Option<(String, Vec<String>)>, String> {
@@ -171,7 +171,7 @@ fn tokenize(input: &str) -> Result<Vec<String>, String> {
 /// Runs `config.agent_binary subcommand [args...] --robot` with stdout/stderr
 /// captured. Applies timeout and output byte cap. On timeout, kills the child
 /// process.
-pub async fn execute_dispatch(
+pub(crate) async fn execute_dispatch(
     config: &ShellDispatchConfig,
     subcommand: &str,
     args: &[String],
@@ -254,7 +254,7 @@ fn truncate_output(
 }
 
 /// Format a dispatch result as a markdown comment for posting to Gitea.
-pub fn format_dispatch_result(
+pub(crate) fn format_dispatch_result(
     result: &DispatchResult,
     agent_name: &str,
     session_id: &str,
