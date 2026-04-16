@@ -110,7 +110,9 @@ The `post_tool_use.sh` script:
 
 ### Pre-tool-use warnings (automatic)
 
-Before each Bash command, `pre_tool_use.sh` runs `terraphim-agent hook --hook-type pre-tool-use --json` which checks the command against past learnings and the role-configured knowledge graph. If it matches a past failure or a recorded correction, Claude Code receives a warning (or a rewritten command, if the `replace` step returned one) via the hook's structured JSON response.
+Before each Bash command, `pre_tool_use.sh` runs `terraphim-agent hook --hook-type pre-tool-use --json` which checks the command against past learnings and the role-configured knowledge graph. If it matches a past failure or a recorded correction, the hint is surfaced to the LLM via the hook's structured JSON response — never directly to the user terminal.
+
+Claude Code and opencode now align on the same UX principle: pre-tool-use hints are for LLM consumption only, keeping the user interface clean while still informing the model about past failures and corrections.
 
 ### Safety guard (automatic)
 
