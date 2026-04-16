@@ -52,13 +52,27 @@ pub(crate) const DENIED_SUBCOMMANDS: &[&str] = &[
 const SHELL_METACHARS: &[char] = &['|', ';', '&', '`', '$', '(', ')', '<', '>'];
 
 /// Configuration for the shell dispatch bridge.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub(crate) struct ShellDispatchConfig {
     pub(crate) agent_binary: PathBuf,
     pub(crate) max_output_bytes: usize,
     pub(crate) timeout: Duration,
     pub(crate) extra_allowed: Vec<String>,
     pub(crate) working_dir: Option<PathBuf>,
+    pub(crate) guard: std::sync::Arc<crate::guard_patterns::CommandGuard>,
+}
+
+impl std::fmt::Debug for ShellDispatchConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ShellDispatchConfig")
+            .field("agent_binary", &self.agent_binary)
+            .field("max_output_bytes", &self.max_output_bytes)
+            .field("timeout", &self.timeout)
+            .field("extra_allowed", &self.extra_allowed)
+            .field("working_dir", &self.working_dir)
+            .field("guard", &"<CommandGuard>")
+            .finish()
+    }
 }
 
 /// Result of executing a dispatched subcommand.
@@ -181,8 +195,7 @@ pub(crate) async fn execute_dispatch(
         .chain(args.iter().cloned())
         .collect::<Vec<_>>()
         .join(" ");
-    let guard = crate::guard_patterns::CommandGuard::new();
-    let guard_result = guard.check(&full_command);
+    let guard_result = config.guard.check(&full_command);
     if guard_result.decision != crate::guard_patterns::GuardDecision::Allow {
         return Err(format!(
             "Guard blocked command `{}`: {} (pattern: {})",
@@ -552,15 +565,20 @@ mod tests {
 
     // ── execute_dispatch tests ──
 
-    #[tokio::test]
-    async fn test_execute_dispatch_captures_stdout() {
-        let config = ShellDispatchConfig {
-            agent_binary: PathBuf::from("/bin/echo"),
+    fn test_config(binary: &str) -> ShellDispatchConfig {
+        ShellDispatchConfig {
+            agent_binary: PathBuf::from(binary),
             max_output_bytes: MAX_OUTPUT_BYTES,
             timeout: Duration::from_secs(5),
             extra_allowed: vec![],
             working_dir: None,
-        };
+            guard: std::sync::Arc::new(crate::guard_patterns::CommandGuard::new()),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_execute_dispatch_captures_stdout() {
+        let config = test_config("/bin/echo");
         // /bin/echo "hello" "--robot" => "hello --robot\n"
         let result = execute_dispatch(&config, "hello", &[]).await.unwrap();
         // echo receives args: "hello", "--robot"
@@ -576,13 +594,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_execute_dispatch_captures_exit_code() {
-        let config = ShellDispatchConfig {
-            agent_binary: PathBuf::from("/bin/false"),
-            max_output_bytes: MAX_OUTPUT_BYTES,
-            timeout: Duration::from_secs(5),
-            extra_allowed: vec![],
-            working_dir: None,
-        };
+        let config = test_config("/bin/false");
         // /bin/false ignores all args and exits 1
         let result = execute_dispatch(&config, "anything", &[]).await.unwrap();
         assert_ne!(result.exit_code, 0);
@@ -590,13 +602,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_execute_dispatch_nonexistent_binary() {
-        let config = ShellDispatchConfig {
-            agent_binary: PathBuf::from("/nonexistent/binary"),
-            max_output_bytes: MAX_OUTPUT_BYTES,
-            timeout: Duration::from_secs(5),
-            extra_allowed: vec![],
-            working_dir: None,
-        };
+        let config = test_config("/nonexistent/binary");
         let err = execute_dispatch(&config, "search", &[]).await.unwrap_err();
         assert!(err.contains("failed to spawn"), "error: {}", err);
     }
@@ -627,13 +633,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_execute_dispatch_blocks_destructive_command() {
-        let config = ShellDispatchConfig {
-            agent_binary: PathBuf::from("/bin/echo"),
-            max_output_bytes: MAX_OUTPUT_BYTES,
-            timeout: Duration::from_secs(5),
-            extra_allowed: vec![],
-            working_dir: None,
-        };
+        let config = test_config("/bin/echo");
         // "git reset --hard" should be caught by the guard
         let result = execute_dispatch(&config, "guard", &["git reset --hard".to_string()]).await;
         // The guard should block this -- the args contain a destructive pattern
@@ -648,13 +648,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_execute_dispatch_allows_safe_command() {
-        let config = ShellDispatchConfig {
-            agent_binary: PathBuf::from("/bin/echo"),
-            max_output_bytes: MAX_OUTPUT_BYTES,
-            timeout: Duration::from_secs(5),
-            extra_allowed: vec![],
-            working_dir: None,
-        };
+        let config = test_config("/bin/echo");
         // "search automata" is safe -- guard should allow
         let result = execute_dispatch(&config, "search", &["automata".to_string()]).await;
         assert!(

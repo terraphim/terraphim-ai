@@ -1323,6 +1323,7 @@ impl ListenerRuntime {
                 timeout: std::time::Duration::from_secs(d.timeout_secs),
                 extra_allowed: d.extra_allowed_subcommands.clone(),
                 working_dir: d.working_dir.clone(),
+                guard: std::sync::Arc::new(crate::guard_patterns::CommandGuard::new()),
             }
         });
 
