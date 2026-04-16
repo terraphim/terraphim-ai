@@ -3,7 +3,7 @@ use std::ops::Range;
 use markdown::mdast::Node;
 use ulid::Ulid;
 
-use crate::{children, collect_text_content, MarkdownParserError, NormalizedMarkdown};
+use crate::{MarkdownParserError, NormalizedMarkdown, children, collect_text_content};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SectionType {
