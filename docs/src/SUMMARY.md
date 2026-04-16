@@ -28,6 +28,11 @@
 - [Claude Code Skills](./claude-code-skills.md)
 - [Command Rewriting How-To](./command-rewriting-howto.md)
 
+## How-Tos
+
+- [Learning Capture for Claude Code](./howto/learning-capture-claude-code.md)
+- [Learning Capture for opencode](./howto/learning-capture-opencode.md)
+
 ## Symphony
 
 - [Symphony Orchestrator](./symphony/README.md)
