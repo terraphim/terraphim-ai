@@ -13,7 +13,8 @@ pub mod heading;
 
 pub use chunk::{ContentChunk, chunk_by_headings};
 pub use heading::{
-    HeadingNode, HeadingTree, SectionConfig, SectionType, build_heading_tree, classify_sections,
+    HeadingNode, HeadingTree, MatchStrategy, SectionConfig, SectionPattern, SectionType,
+    build_heading_tree, classify_sections,
 };
 
 pub const TERRAPHIM_BLOCK_ID_PREFIX: &str = "terraphim:block-id:";
@@ -48,7 +49,7 @@ fn find_first_h1(node: &Node) -> Option<String> {
 }
 
 /// Recursively collect all text content from AST nodes.
-fn collect_text_content(nodes: &[Node]) -> String {
+pub(crate) fn collect_text_content(nodes: &[Node]) -> String {
     let mut text = String::new();
     for node in nodes {
         match node {
@@ -149,12 +150,24 @@ pub fn ensure_terraphim_block_ids(markdown: &str) -> Result<String, MarkdownPars
 }
 
 /// Normalize markdown into canonical Terraphim form and return the extracted blocks.
+///
+/// Uses an iterative fixed-point loop (up to 4 passes) because inserting inline
+/// block IDs into list items can change how the markdown crate re-parses the
+/// result, exposing adjacent paragraphs as root-level paragraphs without block
+/// IDs. Repeating until the output stabilizes ensures every block is tagged.
 pub fn normalize_markdown(markdown: &str) -> Result<NormalizedMarkdown, MarkdownParserError> {
-    let normalized = ensure_terraphim_block_ids(markdown)?;
-    let blocks = extract_blocks(&normalized)?;
-    let ast = markdown::to_mdast(&normalized, &ParseOptions::gfm()).ok();
+    let mut current = ensure_terraphim_block_ids(markdown)?;
+    for _ in 0..4 {
+        let next = ensure_terraphim_block_ids(&current)?;
+        if next == current {
+            break;
+        }
+        current = next;
+    }
+    let blocks = extract_blocks(&current)?;
+    let ast = markdown::to_mdast(&current, &ParseOptions::gfm()).ok();
     Ok(NormalizedMarkdown {
-        markdown: normalized,
+        markdown: current,
         blocks,
         ast,
     })
@@ -640,6 +653,43 @@ mod tests {
         assert_eq!(
             extract_first_heading(input),
             Some("The bun Runtime".to_string())
+        );
+    }
+
+    #[test]
+    fn iterative_normalization_stabilizes() {
+        // After inserting inline block IDs into list items, the markdown parser
+        // may re-parse the result differently, exposing adjacent text as a new
+        // paragraph without a block ID. The iterative loop must handle this.
+        //
+        // This input has a list item immediately followed by a paragraph with
+        // no blank line separating them, which can trigger re-parsing shifts.
+        let input = "- item one\n- item two\n\nA paragraph after the list.\n\nAnother paragraph.\n";
+
+        // Single pass
+        let pass1 = ensure_terraphim_block_ids(input).unwrap();
+
+        // The iterative normalize_markdown must produce a stable result
+        let normalized = normalize_markdown(input).unwrap();
+
+        // Verify stability: running ensure_terraphim_block_ids again should
+        // produce the same output (the fixed-point was reached).
+        let again = ensure_terraphim_block_ids(&normalized.markdown).unwrap();
+        assert_eq!(
+            again, normalized.markdown,
+            "normalization should be stable after normalize_markdown"
+        );
+
+        // All blocks must have IDs: 2 list items + 2 paragraphs = 4
+        let id_count = normalized
+            .markdown
+            .lines()
+            .filter(|l| l.contains("<!-- terraphim:block-id:"))
+            .count();
+        assert!(
+            id_count >= 4,
+            "expected at least 4 block IDs, got {id_count}; pass1 had {} IDs",
+            count_block_ids(&pass1),
         );
     }
 }

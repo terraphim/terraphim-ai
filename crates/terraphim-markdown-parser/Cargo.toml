@@ -13,6 +13,7 @@ readme = "../../README.md"
 
 [dependencies]
 markdown = "1.0.0-alpha.21"
+serde = { workspace = true }
 terraphim_types = { path = "../terraphim_types", version = "1.0.0" }
 thiserror = { workspace = true }
 
