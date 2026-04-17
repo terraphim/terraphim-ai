@@ -1,7 +1,8 @@
-# Handover: 2026-04-16 -- Sprint Planning + 4 Feature PRs Merged + Issue Housekeeping
+# Handover: 2026-04-17 -- FFF Epic #222 Complete + Rust 1.95 Clippy Fixes
 
-**Branch**: main (clean, in sync with origin + gitea at `653f1f899`)
-**Previous Handover**: 2026-04-10 - Operational Skill Store Complete (Phases A-J + D3)
+**Branch**: main (clean, up to date with origin at `0cae8f77f`)
+**Previous Handover**: 2026-04-16 - Sprint Planning + 4 Feature PRs Merged + Issue Housekeeping
+**Full handover**: `.docs/handover-2026-04-17.md`
 
 ## Session Summary
 
