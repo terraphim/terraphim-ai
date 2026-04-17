@@ -38,6 +38,7 @@
 
 - [Learning Capture for Claude Code](./howto/learning-capture-claude-code.md)
 - [Learning Capture for opencode](./howto/learning-capture-opencode.md)
+- [Personal Assistant Role (JMAP + Obsidian)](./howto/personal-assistant-role.md)
 
 ## Symphony
 
