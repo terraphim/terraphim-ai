@@ -214,7 +214,7 @@ impl BackupManager {
 
         let mut backups: Vec<_> = self.backups.values().collect();
 
-        backups.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+        backups.sort_by_key(|b| b.timestamp);
 
         let num_to_remove = backups.len().saturating_sub(self.max_backups);
 
@@ -268,7 +268,7 @@ impl BackupManager {
     pub fn list_backups(&self) -> Vec<String> {
         let mut backups: Vec<_> = self.backups.values().collect();
 
-        backups.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+        backups.sort_by_key(|b| std::cmp::Reverse(b.timestamp));
 
         backups.iter().map(|b| b.version.clone()).collect()
     }

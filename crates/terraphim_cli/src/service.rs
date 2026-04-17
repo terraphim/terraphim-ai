@@ -329,6 +329,7 @@ impl CliService {
 
             // Get nodes and sort by rank (descending)
             let mut nodes: Vec<_> = rolegraph.nodes_map().iter().collect();
+            #[allow(clippy::unnecessary_sort_by)]
             nodes.sort_by(|a, b| b.1.rank.cmp(&a.1.rank));
 
             // Map node IDs to term names and collect top-k

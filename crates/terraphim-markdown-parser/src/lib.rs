@@ -141,7 +141,7 @@ pub fn ensure_terraphim_block_ids(markdown: &str) -> Result<String, MarkdownPars
     }
 
     // Apply edits from the end of the buffer to the beginning so byte offsets stay valid.
-    edits.sort_by(|a, b| b.range.start.cmp(&a.range.start));
+    edits.sort_by_key(|e| std::cmp::Reverse(e.range.start));
     let mut out = markdown.to_string();
     for edit in edits {
         out.replace_range(edit.range, &edit.replacement);

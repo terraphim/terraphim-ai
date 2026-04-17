@@ -528,9 +528,9 @@ impl MarkdownCommandParser {
         }
 
         let mut thesaurus = Thesaurus::new("learned_technical_terms".to_string());
-        let mut term_id = 1u64;
 
-        for (term, normalized_term) in &self.learned_terms {
+        for (idx, (term, normalized_term)) in self.learned_terms.iter().enumerate() {
+            let term_id = (idx as u64) + 1;
             thesaurus.insert(
                 normalized_term.clone(),
                 NormalizedTerm {
@@ -540,7 +540,6 @@ impl MarkdownCommandParser {
                     url: Some(format!("learned-term:{}", term)),
                 },
             );
-            term_id += 1;
         }
 
         Some(thesaurus)

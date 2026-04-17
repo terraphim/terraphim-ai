@@ -214,7 +214,7 @@ impl KnowledgeGraphTaskDecomposer {
                 }
 
                 // Add related concepts to the main list
-                concepts.extend(related_concepts.into_iter());
+                concepts.extend(related_concepts);
                 concepts.sort();
                 concepts.dedup();
 
