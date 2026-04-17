@@ -151,7 +151,8 @@ async fn grep_files_returns_content_matches() {
             "fn new(".to_string(),
             Some(workspace.to_string()),
             Some(10),
-            None, // default output_mode = "content"
+            None,
+            None,
         )
         .await
         .expect("grep_files should succeed");
@@ -207,6 +208,7 @@ async fn grep_files_files_mode_returns_paths() {
             Some(workspace.to_string()),
             Some(5),
             Some("files".to_string()),
+            None,
         )
         .await
         .expect("grep_files should succeed");

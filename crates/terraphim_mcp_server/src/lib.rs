@@ -1,11 +1,10 @@
-use std::sync::Arc;
-
 use anyhow::Result;
 use base64::Engine;
 use fff_search::external_scorer::ExternalScorer;
 use fff_search::{
     ContentCacheBudget, FFFMode, FilePicker, FilePickerOptions, FuzzySearchOptions, GrepMode,
-    GrepSearchOptions, PaginationArgs, QueryParser, grep_search, parse_grep_query,
+    GrepSearchOptions, PaginationArgs, QueryParser, SharedFrecency, grep_search, multi_grep_search,
+    parse_grep_query,
 };
 use rmcp::{
     RoleServer, ServerHandler,
@@ -15,6 +14,7 @@ use rmcp::{
     },
     service::RequestContext,
 };
+use std::sync::Arc;
 use terraphim_automata::builder::json_decode;
 use terraphim_automata::matcher::{extract_paragraphs_from_automata, find_matches};
 use terraphim_automata::{AutocompleteConfig, AutocompleteIndex, AutocompleteResult};
@@ -57,16 +57,30 @@ pub struct McpService {
     autocomplete_index: Arc<tokio::sync::RwLock<Option<AutocompleteIndex>>>,
     /// Optional KG scorer for boosting file search results by path concept matches.
     kg_scorer: Option<Arc<KgPathScorer>>,
+    /// Optional persistent frecency tracker (LMDB-backed) for access-frequency scoring.
+    #[allow(dead_code)]
+    frecency: Option<SharedFrecency>,
 }
 
 impl McpService {
     /// Create a new service instance
     pub fn new(config_state: Arc<ConfigState>) -> Self {
+        let frecency = std::env::var("FFF_FRECENCY_PATH").ok().and_then(|path| {
+            fff_search::FrecencyTracker::new(&path, false)
+                .map(|tracker| {
+                    let shared = SharedFrecency::default();
+                    shared.init(tracker).ok();
+                    shared
+                })
+                .ok()
+        });
+
         Self {
             config_state,
             resource_mapper: Arc::new(TerraphimResourceMapper::new()),
             autocomplete_index: Arc::new(tokio::sync::RwLock::new(None)),
             kg_scorer: None,
+            frecency,
         }
     }
 
@@ -1243,7 +1257,7 @@ impl McpService {
         Ok(CallToolResult::success(contents))
     }
 
-    /// Grep file contents with KG-aware file ordering.
+    /// Grep file contents with KG-aware file ordering and optional cursor pagination.
     ///
     /// Files are sorted by KG path score before searching so that conceptually
     /// relevant files appear first in paginated results.
@@ -1253,10 +1267,22 @@ impl McpService {
         path: Option<String>,
         limit: Option<usize>,
         output_mode: Option<String>,
+        cursor: Option<String>,
     ) -> Result<CallToolResult, ErrorData> {
         let base_path = path.unwrap_or_else(|| ".".to_string());
         let max_results = limit.unwrap_or(50);
         let files_only = output_mode.as_deref() == Some("files");
+
+        let file_offset = cursor
+            .as_deref()
+            .and_then(|c| {
+                base64::engine::general_purpose::URL_SAFE_NO_PAD
+                    .decode(c)
+                    .ok()
+            })
+            .and_then(|bytes| String::from_utf8(bytes).ok())
+            .and_then(|s| s.parse::<usize>().ok())
+            .unwrap_or(0);
 
         let mut picker = FilePicker::new(FilePickerOptions {
             base_path: base_path.clone(),
@@ -1278,7 +1304,6 @@ impl McpService {
             ))]));
         }
 
-        // Sort files: highest KG path score first so grep pages are most relevant first.
         if let Some(scorer) = &self.kg_scorer {
             files.sort_by_key(|f| std::cmp::Reverse(scorer.score(f)));
         }
@@ -1289,7 +1314,7 @@ impl McpService {
             max_file_size: 10 * 1024 * 1024,
             max_matches_per_file: 200,
             smart_case: true,
-            file_offset: 0,
+            file_offset,
             page_limit: max_results,
             mode: GrepMode::PlainText,
             time_budget_ms: 0,
@@ -1301,13 +1326,14 @@ impl McpService {
         let result = grep_search(&files, &fff_query, &options, &budget, None, None, None);
 
         let mut contents = Vec::new();
-        contents.push(Content::text(format!(
+        let header = format!(
             "Found {} matches across {} files (searched {} files under '{}')",
             result.matches.len(),
             result.files_with_matches,
             result.total_files_searched,
             base_path
-        )));
+        );
+        contents.push(Content::text(header));
 
         if files_only {
             let mut seen = std::collections::HashSet::new();
@@ -1330,6 +1356,142 @@ impl McpService {
                     contents.push(Content::text(line));
                 }
             }
+        }
+
+        if result.next_file_offset > 0 {
+            let token = base64::engine::general_purpose::URL_SAFE_NO_PAD
+                .encode(result.next_file_offset.to_string());
+            contents.push(Content::text(format!("next_cursor: {token}")));
+        }
+
+        Ok(CallToolResult::success(contents))
+    }
+
+    /// Multi-pattern grep: search file contents for lines matching ANY of
+    /// multiple patterns (OR logic) using Aho-Corasick. Files are ordered by
+    /// KG path score. Supports cursor-based pagination.
+    pub async fn multi_grep_files(
+        &self,
+        patterns: Vec<String>,
+        path: Option<String>,
+        constraints: Option<String>,
+        limit: Option<usize>,
+        cursor: Option<String>,
+        output_mode: Option<String>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let base_path = path.unwrap_or_else(|| ".".to_string());
+        let max_results = limit.unwrap_or(50);
+        let files_only = output_mode.as_deref() == Some("files");
+
+        if patterns.is_empty() {
+            return Ok(CallToolResult::error(vec![Content::text(
+                "At least one pattern is required".to_string(),
+            )]));
+        }
+
+        let file_offset = cursor
+            .as_deref()
+            .and_then(|c| {
+                base64::engine::general_purpose::URL_SAFE_NO_PAD
+                    .decode(c)
+                    .ok()
+            })
+            .and_then(|bytes| String::from_utf8(bytes).ok())
+            .and_then(|s| s.parse::<usize>().ok())
+            .unwrap_or(0);
+
+        let mut picker = FilePicker::new(FilePickerOptions {
+            base_path: base_path.clone(),
+            mode: FFFMode::Ai,
+            watch: false,
+            warmup_mmap_cache: false,
+            cache_budget: None,
+        })
+        .map_err(|e| ErrorData::internal_error(format!("FilePicker init failed: {e}"), None))?;
+
+        picker
+            .collect_files()
+            .map_err(|e| ErrorData::internal_error(format!("File scan failed: {e}"), None))?;
+
+        let mut files = picker.get_files().to_vec();
+        if files.is_empty() {
+            return Ok(CallToolResult::success(vec![Content::text(format!(
+                "No files found under '{base_path}'"
+            ))]));
+        }
+
+        if let Some(scorer) = &self.kg_scorer {
+            files.sort_by_key(|f| std::cmp::Reverse(scorer.score(f)));
+        }
+
+        let patterns_refs: Vec<&str> = patterns.iter().map(|s| s.as_str()).collect();
+
+        let parser = QueryParser::new(fff_search::AiGrepConfig);
+        let constraint_str = constraints.as_deref().unwrap_or("");
+        let parsed = parser.parse(constraint_str);
+        let parsed_constraints = parsed.constraints.as_slice();
+
+        let budget = ContentCacheBudget::default();
+        let options = GrepSearchOptions {
+            max_file_size: 10 * 1024 * 1024,
+            max_matches_per_file: 200,
+            smart_case: true,
+            file_offset,
+            page_limit: max_results,
+            mode: GrepMode::PlainText,
+            time_budget_ms: 0,
+            before_context: 0,
+            after_context: 0,
+            classify_definitions: false,
+        };
+
+        let result = multi_grep_search(
+            &files,
+            &patterns_refs,
+            parsed_constraints,
+            &options,
+            &budget,
+            None,
+        );
+
+        let mut contents = Vec::new();
+        let header = format!(
+            "Found {} matches across {} files for patterns {:?} (searched {} files under '{}')",
+            result.matches.len(),
+            result.files_with_matches,
+            patterns,
+            result.total_files_searched,
+            base_path
+        );
+        contents.push(Content::text(header));
+
+        if files_only {
+            let mut seen = std::collections::HashSet::new();
+            for m in &result.matches {
+                if let Some(file) = result.files.get(m.file_index) {
+                    if seen.insert(file.relative_path.as_str()) {
+                        contents.push(Content::text(file.relative_path.clone()));
+                    }
+                }
+            }
+        } else {
+            for m in result.matches.iter().take(max_results) {
+                if let Some(file) = result.files.get(m.file_index) {
+                    let line = format!(
+                        "{}:{}:{}",
+                        file.relative_path,
+                        m.line_number,
+                        m.line_content.trim_end()
+                    );
+                    contents.push(Content::text(line));
+                }
+            }
+        }
+
+        if result.next_file_offset > 0 {
+            let token = base64::engine::general_purpose::URL_SAFE_NO_PAD
+                .encode(result.next_file_offset.to_string());
+            contents.push(Content::text(format!("next_cursor: {token}")));
         }
 
         Ok(CallToolResult::success(contents))
@@ -1747,8 +1909,8 @@ impl ServerHandler for McpService {
             },
             Tool {
                 name: "terraphim_grep".into(),
-                title: Some("Grep (KG-ordered)".into()),
-                description: Some("Search file contents with ripgrep-style matching. Files are searched in KG path-score order so conceptually relevant files appear first in paginated results.".into()),
+                title: Some("Grep (KG-ordered, paginated)".into()),
+                description: Some("Search file contents with ripgrep-style matching. Files are searched in KG path-score order so conceptually relevant files appear first. Supports cursor-based pagination for large result sets.".into()),
                 input_schema: Arc::new(serde_json::json!({
                     "type": "object",
                     "properties": {
@@ -1768,9 +1930,54 @@ impl ServerHandler for McpService {
                             "type": "string",
                             "enum": ["content", "files"],
                             "description": "Return 'content' (file:line:text, default) or 'files' (unique file paths only)"
+                        },
+                        "cursor": {
+                            "type": "string",
+                            "description": "Pagination cursor from a previous result's next_cursor field"
                         }
                     },
                     "required": ["query"]
+                }).as_object().unwrap().clone()),
+                output_schema: None,
+                annotations: None,
+                icons: None,
+                meta: None,
+            },
+            Tool {
+                name: "terraphim_multi_grep".into(),
+                title: Some("Multi-Grep (OR patterns, KG-ordered, paginated)".into()),
+                description: Some("Search file contents for lines matching ANY of multiple patterns (OR logic) using Aho-Corasick. Faster than running separate grep calls. Files are KG path-score ordered. Supports cursor pagination.".into()),
+                input_schema: Arc::new(serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "patterns": {
+                            "type": "array",
+                            "items": { "type": "string" },
+                            "description": "Patterns to match (OR logic). Include all naming conventions: snake_case, PascalCase, camelCase."
+                        },
+                        "path": {
+                            "type": "string",
+                            "description": "Directory to search (defaults to current directory)"
+                        },
+                        "constraints": {
+                            "type": "string",
+                            "description": "File constraints (e.g. '*.rs !test/')"
+                        },
+                        "limit": {
+                            "type": "integer",
+                            "description": "Maximum number of matches to return (default 50)"
+                        },
+                        "output_mode": {
+                            "type": "string",
+                            "enum": ["content", "files"],
+                            "description": "Return 'content' (file:line:text, default) or 'files' (unique file paths only)"
+                        },
+                        "cursor": {
+                            "type": "string",
+                            "description": "Pagination cursor from a previous result's next_cursor field"
+                        }
+                    },
+                    "required": ["patterns"]
                 }).as_object().unwrap().clone()),
                 output_schema: None,
                 annotations: None,
@@ -2177,8 +2384,57 @@ impl ServerHandler for McpService {
                     .get("output_mode")
                     .and_then(|v| v.as_str())
                     .map(|s| s.to_string());
+                let cursor = arguments
+                    .get("cursor")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
 
-                self.grep_files(query, path, limit, output_mode).await
+                self.grep_files(query, path, limit, output_mode, cursor)
+                    .await
+            }
+            "terraphim_multi_grep" => {
+                let arguments = request.arguments.unwrap_or_default();
+
+                let patterns: Vec<String> = arguments
+                    .get("patterns")
+                    .and_then(|v| v.as_array())
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                            .collect()
+                    })
+                    .unwrap_or_default();
+
+                if patterns.is_empty() {
+                    return Err(ErrorData::invalid_params(
+                        "Missing or empty 'patterns' parameter".to_string(),
+                        None,
+                    ));
+                }
+
+                let path = arguments
+                    .get("path")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                let constraints = arguments
+                    .get("constraints")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                let limit = arguments
+                    .get("limit")
+                    .and_then(|v| v.as_i64())
+                    .map(|i| i as usize);
+                let cursor = arguments
+                    .get("cursor")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                let output_mode = arguments
+                    .get("output_mode")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+
+                self.multi_grep_files(patterns, path, constraints, limit, cursor, output_mode)
+                    .await
             }
             _ => Err(ErrorData::method_not_found::<
                 rmcp::model::CallToolRequestMethod,
