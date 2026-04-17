@@ -1,3 +1,4 @@
+#![allow(clippy::collapsible_match)]
 //! Goal representation and management
 //!
 //! Provides core goal structures and management functionality for the goal alignment system.
