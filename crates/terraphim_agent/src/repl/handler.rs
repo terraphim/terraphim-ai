@@ -2218,6 +2218,7 @@ impl ReplHandler {
 
                 // Sort by date key
                 let mut sorted: Vec<_> = grouped.into_iter().collect();
+                #[allow(clippy::unnecessary_sort_by)]
                 sorted.sort_by(|a, b| b.0.cmp(&a.0)); // Newest first
 
                 let mut table = Table::new();

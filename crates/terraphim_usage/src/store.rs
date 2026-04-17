@@ -606,6 +606,7 @@ impl UsageStore {
             }
         }
 
+        #[allow(clippy::unnecessary_sort_by)]
         executions.sort_by(|a, b| b.started_at.cmp(&a.started_at));
 
         Ok(executions)
@@ -646,6 +647,7 @@ impl UsageStore {
             }
         }
 
+        #[allow(clippy::unnecessary_sort_by)]
         snapshots.sort_by(|a, b| b.snapshot_at.cmp(&a.snapshot_at));
         snapshots.truncate(limit);
 
