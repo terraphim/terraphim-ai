@@ -720,6 +720,7 @@ pub mod utils {
         // Create a hash from the top words
         let mut hasher = DefaultHasher::new();
         let mut top_words: Vec<_> = word_counts.into_iter().collect::<Vec<_>>();
+        #[allow(clippy::unnecessary_sort_by)]
         top_words.sort_by(|a, b| b.1.cmp(&a.1));
 
         for (word, count) in top_words.into_iter().take(50) {

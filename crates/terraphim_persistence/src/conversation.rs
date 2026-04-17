@@ -267,7 +267,7 @@ impl ConversationPersistence for OpenDALConversationPersistence {
         let mut summaries = index.list();
 
         // Sort by updated_at descending (most recent first)
-        summaries.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+        summaries.sort_by_key(|s| std::cmp::Reverse(s.updated_at));
 
         log::debug!("Found {} conversation summaries", summaries.len());
         Ok(summaries)
