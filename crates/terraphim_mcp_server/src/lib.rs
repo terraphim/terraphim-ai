@@ -1239,6 +1239,7 @@ impl McpService {
                 (base + kg_boost, file.relative_path.as_str())
             })
             .collect();
+        #[allow(clippy::unnecessary_sort_by)]
         scored.sort_by(|a, b| b.0.cmp(&a.0));
 
         let mut contents = Vec::new();
