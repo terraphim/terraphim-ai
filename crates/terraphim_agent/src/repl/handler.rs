@@ -644,6 +644,7 @@ impl ReplHandler {
             match api_client.rolegraph(Some(&self.current_role)).await {
                 Ok(response) => {
                     let mut nodes = response.nodes;
+                    #[allow(clippy::unnecessary_sort_by)]
                     nodes.sort_by(|a, b| b.rank.cmp(&a.rank));
 
                     println!("{} Top {} concepts:", "📊".bold(), k.to_string().cyan());
