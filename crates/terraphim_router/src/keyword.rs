@@ -58,7 +58,7 @@ impl KeywordRouter {
         }
 
         // Sort by priority (higher priority first)
-        matched_keywords.sort_by(|a, b| b.1.cmp(&a.1));
+        matched_keywords.sort_by_key(|(_, priority)| std::cmp::Reverse(*priority));
 
         caps.into_iter().collect()
     }

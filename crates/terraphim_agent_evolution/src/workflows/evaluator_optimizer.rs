@@ -432,6 +432,7 @@ Format your response as a structured evaluation."#,
         }
 
         // Sort by priority (Critical first)
+        #[allow(clippy::unnecessary_sort_by)]
         actions.sort_by(|a, b| b.priority.cmp(&a.priority));
 
         Ok(actions)

@@ -371,7 +371,7 @@ impl AgentContext {
             let remaining: Vec<ContextItem> =
                 non_pinned.into_iter().skip(relevance_count).collect();
             let mut recent = remaining;
-            recent.sort_by(|a, b| b.added_at.cmp(&a.added_at));
+            recent.sort_by_key(|i| std::cmp::Reverse(i.added_at));
             selected.extend(recent.into_iter().take(recency_count));
 
             self.items = pinned.into_iter().chain(selected).collect();

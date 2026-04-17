@@ -126,6 +126,7 @@ pub fn build_autocomplete_index(
     }
 
     // Sort terms lexicographically for FST building
+    #[allow(clippy::unnecessary_sort_by)]
     terms_with_scores.sort_by(|a, b| a.0.cmp(&b.0));
 
     log::debug!("Building FST with {} sorted terms", terms_with_scores.len());

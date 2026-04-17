@@ -114,6 +114,7 @@ impl SkillExecutor {
             }
         }
 
+        #[allow(clippy::unnecessary_sort_by)]
         skills.sort_by(|a, b| a.name.cmp(&b.name));
         Ok(skills)
     }

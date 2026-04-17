@@ -351,6 +351,7 @@ impl Parallelization {
         mut tasks: Vec<ParallelTask>,
     ) -> EvolutionResult<Vec<ParallelTaskResult>> {
         // Sort tasks by priority (Critical first)
+        #[allow(clippy::unnecessary_sort_by)]
         tasks.sort_by(|a, b| b.priority.cmp(&a.priority));
 
         let mut all_results = Vec::new();
@@ -589,6 +590,7 @@ impl Parallelization {
         }
 
         // Content type matching
+        #[allow(clippy::collapsible_match)]
         match expected_type {
             "analysis" => {
                 if output.contains("analyze")
