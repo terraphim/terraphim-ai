@@ -35,6 +35,7 @@ fn build_correction_thesaurus() -> Thesaurus {
     let mut thesaurus = Thesaurus::new("Command Corrections".to_string());
 
     // Git corrections
+    #[allow(clippy::useless_vec)]
     let corrections = vec![
         // Git force push corrections
         (
@@ -118,6 +119,7 @@ fn build_correction_thesaurus() -> Thesaurus {
 fn build_enhanced_correction_thesaurus() -> Thesaurus {
     let mut thesaurus = build_correction_thesaurus();
 
+    #[allow(clippy::useless_vec)]
     let more_corrections = vec![
         // System commands
         (

@@ -47,6 +47,7 @@ use terraphim_types::{
 fn build_initial_thesaurus() -> Thesaurus {
     let mut thesaurus = Thesaurus::new("Initial Learnings".to_string());
 
+    #[allow(clippy::useless_vec)]
     let concepts = vec![
         (
             "active recall",
@@ -86,6 +87,7 @@ fn build_enhanced_thesaurus() -> Thesaurus {
     let mut thesaurus = build_initial_thesaurus();
 
     // Add domain-specific terms that dramatically improve retrieval
+    #[allow(clippy::useless_vec)]
     let ds_concepts = vec![
         (
             "cap theorem",
