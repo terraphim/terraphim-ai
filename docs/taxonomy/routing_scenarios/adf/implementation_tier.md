@@ -21,7 +21,7 @@ synonyms:: disciplined-implementation
 
 trigger:: code writing, review, testing, and mid-complexity development tasks
 
-route:: anthropic, claude-sonnet-4-6
+route:: anthropic, sonnet
 action:: /home/alex/.local/bin/claude --model {{ model }} -p "{{ prompt }}" --max-turns 50
 
 route:: kimi, kimi-for-coding/k2p5
