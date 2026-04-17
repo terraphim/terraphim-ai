@@ -1000,6 +1000,11 @@ impl AgentOrchestrator {
             if decision.candidate.model.is_empty() {
                 None
             } else {
+                // Extract CLI tool override from routing decision so that
+                // anthropic models routed via KG use claude CLI, not opencode.
+                if decision.candidate.cli_tool != def.cli_tool {
+                    kg_cli_override = Some(decision.candidate.cli_tool.clone());
+                }
                 Some(decision.candidate.model)
             }
         } else if supports_model_flag {
