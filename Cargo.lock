@@ -8935,6 +8935,7 @@ dependencies = [
  "env_logger",
  "futures",
  "grepapp_haystack",
+ "haystack_jmap",
  "home",
  "html2md",
  "jiff",

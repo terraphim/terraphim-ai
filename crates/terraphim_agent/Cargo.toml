@@ -29,6 +29,7 @@ update-tests = []
 repl-sessions = ["repl", "dep:terraphim_sessions"]
 shared-learning = ["terraphim_middleware/feedback-loop"]
 cross-agent-injection = ["shared-learning"]
+jmap = ["terraphim_middleware/jmap"]
 
 [dependencies]
 anyhow = { workspace = true }
