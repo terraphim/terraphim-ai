@@ -1,206 +1,171 @@
 # Terraphim System Operator Configuration
 
-This document describes how to set up and use the Terraphim server with the **System Operator** role configuration that uses a **remote knowledge graph** and documents from the [terraphim/system-operator](https://github.com/terraphim/system-operator.git) GitHub repository.
+This document describes how to run Terraphim with the **System Operator** role, which indexes a Logseq-formatted MBSE vocabulary from [terraphim/system-operator](https://github.com/terraphim/system-operator) and ranks results using Terraphim's knowledge graph.
 
-## 🎯 Overview
+The System Operator role is the canonical Logseq-based KG demo. For a local-first companion role that searches personal email and notes, see the [Personal Assistant role how-to](../docs/src/howto/personal-assistant-role.md) -- same engine, different haystacks.
+
+## Overview
 
 The System Operator configuration provides:
 
-- **Remote Knowledge Graph**: Uses pre-built automata from `https://staging-storage.terraphim.io/thesaurus_Default.json`
-- **GitHub Document Integration**: Automatically indexes documents from the system-operator repository
-- **Advanced Search**: TerraphimGraph ranking with knowledge graph-based relevance scoring
-- **System Engineering Focus**: Specialized for MBSE, requirements, architecture, and verification content
+- **Logseq knowledge graph** from a public repository: 1,300+ Logseq markdown pages, ~50 of which carry Terraphim-format `synonyms::` lines.
+- **GitHub document integration**: `setup_system_operator.sh` clones the repository to a durable local path.
+- **TerraphimGraph ranking**: Aho-Corasick automaton built from the synonym files, so queries like `RFP` normalise to `acquisition need` with rank reflecting graph depth.
+- **Systems engineering focus**: MBSE vocabulary around requirements, architecture, verification, validation, life cycle concepts.
 
-## 📋 Prerequisites
+## Prerequisites
 
 - Rust and Cargo installed
-- Git for cloning repositories
-- Internet connection for remote knowledge graph access
-- At least 2GB free disk space for documents
+- Git
+- Internet connection for the initial clone and optional remote-thesaurus fetch
+- ~200 MB free disk space for the repository
 
-## 🚀 Quick Start
+## Quick start
 
-### 1. Setup System Operator Environment
-
-Run the automated setup script:
+### 1. Set up the repository
 
 ```bash
 ./scripts/setup_system_operator.sh
 ```
 
-This script will:
-- Clone the system-operator repository to `/tmp/system_operator`
-- Verify markdown files are available
-- Display configuration information
+This clones `terraphim/system-operator` to `~/.config/terraphim/system_operator` by default (override with `SYSTEM_OPERATOR_DIR=<path>`). The previous default of `/tmp/system_operator` lost the clone on reboot; the new path survives restarts.
 
-### 2. Start the Server
+The script prints the page count, synonym-file count, and the commands for the next step.
+
+### 2. Drive the role via terraphim_server
 
 ```bash
 cargo run --bin terraphim_server -- --config terraphim_server/default/system_operator_config.json
 ```
 
-The server will start on `http://127.0.0.1:8000` by default.
+The server binds `http://127.0.0.1:8000`. Update the config's `knowledge_graph_local.path` and haystack `location` if you chose a non-default `SYSTEM_OPERATOR_DIR`.
 
-### 3. Test the Configuration
+### 3. Drive the role via the terraphim-agent CLI
 
-Run the integration test to verify everything works:
+Add this entry to `~/.config/terraphim/embedded_config.json` under `roles`:
+
+```json
+"System Operator": {
+  "shortname": "SysOps",
+  "name": "System Operator",
+  "relevance_function": "terraphim-graph",
+  "terraphim_it": true,
+  "theme": "superhero",
+  "kg": {
+    "automata_path": null,
+    "knowledge_graph_local": {
+      "input_type": "markdown",
+      "path": "/Users/<you>/.config/terraphim/system_operator/pages"
+    },
+    "public": true,
+    "publish": true
+  },
+  "haystacks": [
+    {
+      "location": "/Users/<you>/.config/terraphim/system_operator/pages",
+      "service": "Ripgrep",
+      "read_only": true
+    }
+  ],
+  "llm_enabled": false
+}
+```
+
+Reload and query:
+
+```bash
+terraphim-agent config reload
+terraphim-agent search --role "System Operator" --limit 5 "RFP"
+terraphim-agent validate --role "System Operator" --connectivity "RFP business analysis life cycle model"
+```
+
+The connectivity check prints the canonical terms each query word matched to -- proof that the KG is actually driving the search.
+
+### 4. Run the integration test
 
 ```bash
 cargo test --test system_operator_integration_test -- --nocapture
 ```
 
-## 📁 Configuration Files
+## Configuration files
 
-### Core Configuration
-- **`terraphim_server/default/system_operator_config.json`** - Main server configuration
-- **`terraphim_server/default/settings_system_operator_server.toml`** - Server settings with S3 profiles
+### Core
 
-### Generated Data
-- **`/tmp/system_operator/pages/`** - ~1,300 markdown files from GitHub repository
-- **Remote KG**: `https://staging-storage.terraphim.io/thesaurus_Default.json`
+- `terraphim_server/default/system_operator_config.json` -- server config
+- `terraphim_server/default/settings_system_operator_server.toml` -- settings with S3 profiles
 
-## 🔧 Configuration Details
+### Generated
 
-### Roles Available
+- `~/.config/terraphim/system_operator/pages/` -- 1,300+ markdown files from the repository
+- Optional remote KG: `https://staging-storage.terraphim.io/thesaurus_Default.json`
 
-1. **System Operator** (Default)
-   - **Relevance Function**: `terraphim-graph`
-   - **Theme**: `superhero` (dark theme)
-   - **Remote KG**: ✅ Enabled
-   - **Local Docs**: ✅ `/tmp/system_operator/pages`
+## Roles in the server config
 
-2. **Engineer**
-   - **Relevance Function**: `terraphim-graph`
-   - **Theme**: `lumen` (light theme)
-   - **Remote KG**: ✅ Enabled
-   - **Local Docs**: ✅ `/tmp/system_operator/pages`
+| Role | Relevance | Theme | KG | Haystack |
+| --- | --- | --- | --- | --- |
+| System Operator (default) | TerraphimGraph | superhero | Logseq KG | Ripgrep over pages/ |
+| Engineer | TerraphimGraph | lumen | Logseq KG | Ripgrep over pages/ |
+| Default | TitleScorer | spacelab | none | Ripgrep over pages/ |
 
-3. **Default**
-   - **Relevance Function**: `title-scorer`
-   - **Theme**: `spacelab`
-   - **Remote KG**: ❌ Disabled
-   - **Local Docs**: ✅ `/tmp/system_operator/pages`
+## Remote thesaurus (optional)
 
-### Remote Knowledge Graph Details
+The server config supports a pre-built automaton at `https://staging-storage.terraphim.io/thesaurus_Default.json` for faster cold starts. The `embedded_config` format expects `automata_path: null` (build locally). Pick one path per role -- do not mix.
 
-- **URL**: `https://staging-storage.terraphim.io/thesaurus_Default.json`
-- **Type**: Pre-built automata with 1,700+ terms
-- **Coverage**: System engineering, MBSE, requirements, architecture
-- **Performance**: Fast loading, no local build required
+## API usage
 
-## 🔍 API Usage Examples
+### Health check
 
-### Health Check
 ```bash
 curl http://127.0.0.1:8000/health
 ```
 
-### Search with System Operator Role
+### Search
+
 ```bash
 curl "http://127.0.0.1:8000/documents/search?q=MBSE&role=System%20Operator&limit=5"
 ```
 
-### Get Configuration
+Try these MBSE queries to exercise the KG:
+
+- `requirements`
+- `architecture`
+- `verification`
+- `RFP` (expands to `acquisition need`)
+- `life cycle model` (expands to `life cycle concepts`)
+
+### Configuration
+
 ```bash
 curl http://127.0.0.1:8000/config
 ```
 
-### Search for Specific Terms
-```bash
-# Requirements management
-curl "http://127.0.0.1:8000/documents/search?q=requirements&role=System%20Operator"
+## Expected performance
 
-# Architecture modeling
-curl "http://127.0.0.1:8000/documents/search?q=architecture&role=System%20Operator"
+- Remote KG load: ~2-3 s
+- Local document indexing: ~5-10 s for 1,300 files
+- Cold start total: ~15 s
+- Warm search: <100 ms per query
+- In-memory index size: ~50 MB
 
-# Verification and validation
-curl "http://127.0.0.1:8000/documents/search?q=verification&role=System%20Operator"
-```
+## Troubleshooting
 
-## 🧪 Testing
+- **Clone failed** -- run `git clone https://github.com/terraphim/system-operator.git ~/.config/terraphim/system_operator` manually.
+- **Remote KG not loading** -- check `curl https://staging-storage.terraphim.io/thesaurus_Default.json`; set `automata_path: null` to build locally from `pages/`.
+- **No search results** -- confirm `pages/` contains markdown, check server logs, ensure the role uses `terraphim-graph`.
+- **Port in use** -- `lsof -i :8000`; start with `--addr 127.0.0.1:8080`.
+- **Debug logging** -- `RUST_LOG=debug cargo run --bin terraphim_server -- --config ...`.
 
-### Run Integration Tests
-```bash
-# Run system operator specific tests
-cargo test --test system_operator_integration_test -- --nocapture
-
-# Run all server tests
-cargo test -p terraphim_server -- --nocapture
-```
-
-### Manual Testing
-1. Start the server
-2. Open `http://127.0.0.1:8000` in browser
-3. Search for terms like "MBSE", "requirements", "system architecture"
-4. Verify results are ranked by knowledge graph relevance
-
-## 📊 Expected Performance
-
-### Startup Time
-- **Remote KG Load**: ~2-3 seconds
-- **Document Indexing**: ~5-10 seconds for 1,300+ files
-- **Total Startup**: ~15 seconds
-
-### Search Performance
-- **Knowledge Graph Search**: <100ms for most queries
-- **Document Count**: 1,300+ markdown files
-- **Index Size**: ~50MB in memory
-
-### Sample Search Results
-
-When searching for "MBSE":
-- Model-Based Systems Engineering documents
-- Adoption strategies and best practices
-- Tool integration approaches
-- Case studies and lessons learned
-
-## 🛠️ Troubleshooting
-
-### Common Issues
-
-1. **Repository Clone Failed**
-   ```bash
-   # Manual clone
-   git clone https://github.com/terraphim/system-operator.git /tmp/system_operator
-   ```
-
-2. **Remote KG Not Loading**
-   - Check internet connection
-   - Verify URL: https://staging-storage.terraphim.io/thesaurus_Default.json
-   - Check firewall settings
-
-3. **No Search Results**
-   - Ensure documents are in `/tmp/system_operator/pages/`
-   - Check server logs for indexing errors
-   - Verify role has `terraphim-graph` relevance function
-
-4. **Server Won't Start**
-   ```bash
-   # Check if port is in use
-   lsof -i :8000
-
-   # Use different port
-   cargo run --bin terraphim_server -- --config terraphim_server/default/system_operator_config.json --addr 127.0.0.1:8080
-   ```
-
-### Debug Mode
-```bash
-RUST_LOG=debug cargo run --bin terraphim_server -- --config terraphim_server/default/system_operator_config.json
-```
-
-## 🔄 Updating Documents
-
-To refresh the system operator documents:
+## Updating documents
 
 ```bash
-cd /tmp/system_operator
-git pull origin main
-# Restart the server to re-index
+git -C ~/.config/terraphim/system_operator pull --ff-only origin main
+# Restart the server (or run `terraphim-agent config reload`) to re-index.
 ```
 
-## 🌐 Production Deployment
+## Production deployment
 
-### Environment Variables
+### Environment variables
+
 ```bash
 export TERRAPHIM_SERVER_HOSTNAME="0.0.0.0:8000"
 export TERRAPHIM_SERVER_API_ENDPOINT="https://your-domain.com/api"
@@ -208,33 +173,32 @@ export AWS_ACCESS_KEY_ID="your-access-key"
 export AWS_SECRET_ACCESS_KEY="your-secret-key"
 ```
 
-### Docker Deployment
-```bash
-# Build with system operator config
-docker build -t terraphim-system-operator .
+### Docker
 
-# Run with mounted documents
+```bash
+docker build -t terraphim-system-operator .
 docker run -p 8000:8000 \
-  -v /tmp/system_operator:/tmp/system_operator:ro \
+  -v ~/.config/terraphim/system_operator:/data/system_operator:ro \
   terraphim-system-operator
 ```
 
-## 📚 Related Documentation
+Adjust the container's config path to match the mount point.
 
-- [Terraphim Configuration Guide](../docs/src/Configuration.md)
-- [Knowledge Graph Documentation](../docs/src/kg/)
-- [API Reference](../docs/src/API.md)
-- [System Operator Repository](https://github.com/terraphim/system-operator)
+## Related
 
-## 🤝 Contributing
+- [Personal Assistant role how-to](../docs/src/howto/personal-assistant-role.md) -- private, per-user companion pattern
+- [Terraphim configuration guide](../docs/src/Configuration.md)
+- [Knowledge graph documentation](../docs/src/kg/)
+- [API reference](../docs/src/API.md)
+- [System Operator repository](https://github.com/terraphim/system-operator)
 
-To improve the system operator configuration:
+## Contributing
 
-1. Fork the repository
-2. Make changes to configuration files
-3. Test with the integration test suite
-4. Submit a pull request
+1. Fork the repository.
+2. Edit configuration files.
+3. Run the integration test suite.
+4. Open a pull request.
 
-## 📄 License
+## Licence
 
-This configuration is part of the Terraphim project and follows the same Apache 2.0 license.
+This configuration is part of the Terraphim project and follows the same Apache-2.0 licence.
