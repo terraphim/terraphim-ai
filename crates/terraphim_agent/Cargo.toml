@@ -28,6 +28,7 @@ firecracker = ["repl"]
 update-tests = []
 repl-sessions = ["repl", "dep:terraphim_sessions"]
 shared-learning = []
+jmap = ["terraphim_middleware/jmap"]
 
 [dependencies]
 anyhow = { workspace = true }
