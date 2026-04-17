@@ -16,7 +16,7 @@ synonyms:: disciplined-research, disciplined-design
 
 trigger:: tasks requiring deep reasoning, architecture decisions, or strategic planning
 
-route:: anthropic, claude-opus-4-6
+route:: anthropic, opus
 action:: /home/alex/.local/bin/claude --model {{ model }} -p "{{ prompt }}" --max-turns 50
 
 route:: openai, openai/gpt-5.4
