@@ -90,6 +90,7 @@ impl RetrievalMetrics {
 fn build_base_thesaurus() -> Thesaurus {
     let mut thesaurus = Thesaurus::new("Domain Expert - Base".to_string());
 
+    #[allow(clippy::useless_vec)]
     let base_concepts = vec![
         (
             "distributed systems",
