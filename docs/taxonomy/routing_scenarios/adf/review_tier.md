@@ -17,7 +17,7 @@ synonyms:: disciplined-verification, disciplined-validation
 
 trigger:: verification, validation, and review tasks that check existing work
 
-route:: anthropic, claude-haiku-4-5
+route:: anthropic, haiku
 action:: /home/alex/.local/bin/claude --model {{ model }} -p "{{ prompt }}" --max-turns 30
 
 route:: openai, openai/gpt-5.4-mini
