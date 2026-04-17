@@ -452,6 +452,7 @@ impl Goal {
         }
 
         // Add constraint-specific validation based on type
+        #[allow(clippy::collapsible_match)]
         match &constraint.constraint_type {
             ConstraintType::Temporal => {
                 // Validate temporal constraint parameters
