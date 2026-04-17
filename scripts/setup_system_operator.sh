@@ -1,72 +1,58 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# Setup script for the Terraphim System Operator demo.
+#
+# Clones the terraphim/system-operator Logseq vault into a durable path
+# under ~/.config/terraphim/system_operator, counts the pages and synonym
+# files, and prints the commands to drive it via terraphim_server and the
+# terraphim-agent CLI.
+#
+# Override the target path with SYSTEM_OPERATOR_DIR=<path> if you want it
+# elsewhere; the previous /tmp default lost the clone on reboot.
 
-# Setup script for Terraphim System Operator with remote knowledge graph
-# This script will:
-# 1. Clone the system-operator repository
-# 2. Set up the server configuration
-# 3. Start the server with the system operator configuration
+set -euo pipefail
 
-set -e
-
-echo "🚀 Setting up Terraphim System Operator with remote knowledge graph..."
-
-# Configuration
-SYSTEM_OPERATOR_DIR="${SYSTEM_OPERATOR_DIR:-/tmp/system_operator}"
+SYSTEM_OPERATOR_DIR="${SYSTEM_OPERATOR_DIR:-$HOME/.config/terraphim/system_operator}"
 CONFIG_FILE="terraphim_server/default/system_operator_config.json"
 SERVER_SETTINGS="terraphim_server/default/settings_system_operator_server.toml"
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+echo "[setup] Target directory: ${SYSTEM_OPERATOR_DIR}"
 
-echo -e "${BLUE}📁 Setting up system operator directory...${NC}"
+mkdir -p "${SYSTEM_OPERATOR_DIR}"
 
-# Create directory if it doesn't exist
-mkdir -p "$SYSTEM_OPERATOR_DIR"
-
-# Clone or update the repository
-if [ -d "$SYSTEM_OPERATOR_DIR/.git" ]; then
-    echo -e "${YELLOW}📦 Repository already exists, updating...${NC}"
-    cd "$SYSTEM_OPERATOR_DIR"
-    git pull origin main
+if [ -d "${SYSTEM_OPERATOR_DIR}/.git" ]; then
+    echo "[setup] Repository exists, updating..."
+    git -C "${SYSTEM_OPERATOR_DIR}" pull --ff-only origin main
 else
-    echo -e "${YELLOW}📦 Cloning system-operator repository...${NC}"
-    git clone https://github.com/terraphim/system-operator.git "$SYSTEM_OPERATOR_DIR"
+    echo "[setup] Cloning system-operator repository..."
+    git clone https://github.com/terraphim/system-operator.git "${SYSTEM_OPERATOR_DIR}"
 fi
 
-# Check if repository was cloned successfully
-if [ ! -d "$SYSTEM_OPERATOR_DIR/pages" ]; then
-    echo -e "${RED}❌ Failed to clone repository or pages directory not found${NC}"
+if [ ! -d "${SYSTEM_OPERATOR_DIR}/pages" ]; then
+    echo "[setup] ERROR: pages/ directory not found after clone." >&2
     exit 1
 fi
 
-# Count files
-FILE_COUNT=$(find "$SYSTEM_OPERATOR_DIR/pages" -name "*.md" | wc -l)
-echo -e "${GREEN}✅ Repository setup complete with $FILE_COUNT markdown files${NC}"
+PAGE_COUNT=$(find "${SYSTEM_OPERATOR_DIR}/pages" -name "*.md" | wc -l | tr -d ' ')
+SYN_COUNT=$(grep -l "^synonyms::" "${SYSTEM_OPERATOR_DIR}/pages/"*.md 2>/dev/null | wc -l | tr -d ' ')
 
-# Get the absolute path to the project root (we're already in the right place)
-PROJECT_ROOT="$(pwd)"
-
-echo -e "${BLUE}⚙️  Server configuration ready:${NC}"
-echo -e "   📄 Config file: $CONFIG_FILE"
-echo -e "   🔧 Settings file: $SERVER_SETTINGS"
-echo -e "   📚 Documents: $SYSTEM_OPERATOR_DIR/pages ($FILE_COUNT files)"
-echo -e "   🌐 Remote KG: https://staging-storage.terraphim.io/thesaurus_Default.json"
-
-echo -e "${GREEN}🎉 Setup complete!${NC}"
-echo -e "${BLUE}To start the server with system operator configuration:${NC}"
-echo -e "   ${YELLOW}cargo run --bin terraphim_server -- --config $CONFIG_FILE${NC}"
-
-echo -e "${BLUE}Available roles in this configuration:${NC}"
-echo -e "   🔧 System Operator (default) - Uses TerraphimGraph with remote KG"
-echo -e "   👷 Engineer - Uses TerraphimGraph with remote KG"
-echo -e "   📝 Default - Uses TitleScorer for basic search"
-
-echo -e "${BLUE}💡 The configuration includes:${NC}"
-echo -e "   ✅ Remote knowledge graph from staging-storage.terraphim.io"
-echo -e "   ✅ Local document indexing from GitHub repository"
-echo -e "   ✅ Read-only document access (safe for production)"
-echo -e "   ✅ Multiple search backends (Ripgrep + TerraphimGraph)"
+echo
+echo "[setup] Repository ready:"
+echo "  - Pages:             ${PAGE_COUNT} markdown files"
+echo "  - Synonym entries:   ${SYN_COUNT} Terraphim-format files"
+echo "  - Config:            ${CONFIG_FILE}"
+echo "  - Settings:          ${SERVER_SETTINGS}"
+echo
+echo "[setup] Drive via terraphim_server:"
+echo "  cargo run --bin terraphim_server -- --config ${CONFIG_FILE}"
+echo
+echo "[setup] Drive via terraphim-agent CLI (after adding the role to"
+echo "        ~/.config/terraphim/embedded_config.json, see how-to docs):"
+echo "  terraphim-agent config reload"
+echo "  terraphim-agent search --role \"System Operator\" --limit 5 \"RFP\""
+echo
+echo "[setup] Available roles in the server config:"
+echo "  - System Operator (default): TerraphimGraph, Logseq KG, MBSE vocabulary"
+echo "  - Engineer:                  TerraphimGraph, same KG, engineering theme"
+echo "  - Default:                   TitleScorer, basic text matching"
+echo
+echo "[setup] Done."
