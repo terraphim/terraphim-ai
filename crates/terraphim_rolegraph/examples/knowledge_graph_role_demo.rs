@@ -1,3 +1,4 @@
+#![allow(clippy::explicit_counter_loop)]
 //! Terraphim Graph Embeddings and Ranking: Complete Demonstration
 //!
 //! This example provides an end-to-end demonstration of:
