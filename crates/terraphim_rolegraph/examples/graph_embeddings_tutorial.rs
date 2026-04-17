@@ -67,8 +67,8 @@ fn build_initial_thesaurus() -> Thesaurus {
         ),
     ];
 
-    let mut id = 1u64;
-    for (concept, synonyms) in concepts {
+    for (i, (concept, synonyms)) in concepts.iter().enumerate() {
+        let id = (i as u64) + 1;
         let term = NormalizedTerm::new(id, NormalizedTermValue::new(concept.to_string()));
         thesaurus.insert(NormalizedTermValue::new(concept.to_string()), term);
 
@@ -76,7 +76,6 @@ fn build_initial_thesaurus() -> Thesaurus {
             let syn_term = NormalizedTerm::new(id, NormalizedTermValue::new(concept.to_string()));
             thesaurus.insert(NormalizedTermValue::new(synonym.to_string()), syn_term);
         }
-        id += 1;
     }
 
     thesaurus
@@ -110,8 +109,8 @@ fn build_enhanced_thesaurus() -> Thesaurus {
         ),
     ];
 
-    let mut id = 6u64; // Continue from initial
-    for (concept, synonyms) in ds_concepts {
+    for (i, (concept, synonyms)) in ds_concepts.iter().enumerate() {
+        let id = (i as u64) + 6;
         let term = NormalizedTerm::new(id, NormalizedTermValue::new(concept.to_string()));
         thesaurus.insert(NormalizedTermValue::new(concept.to_string()), term);
 
@@ -119,7 +118,6 @@ fn build_enhanced_thesaurus() -> Thesaurus {
             let syn_term = NormalizedTerm::new(id, NormalizedTermValue::new(concept.to_string()));
             thesaurus.insert(NormalizedTermValue::new(synonym.to_string()), syn_term);
         }
-        id += 1;
     }
 
     thesaurus

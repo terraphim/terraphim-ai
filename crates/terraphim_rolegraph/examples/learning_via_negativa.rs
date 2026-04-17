@@ -96,8 +96,10 @@ fn build_correction_thesaurus() -> Thesaurus {
         ),
     ];
 
-    let mut id = 1u64;
-    for (correct, wrong_aliases, _primary_wrong, _description) in corrections {
+    for (i, (correct, wrong_aliases, _primary_wrong, _description)) in
+        corrections.iter().enumerate()
+    {
+        let id = (i as u64) + 1;
         // Add the correct command
         let term = NormalizedTerm::new(id, NormalizedTermValue::new(correct.to_string()));
         thesaurus.insert(NormalizedTermValue::new(correct.to_string()), term);
@@ -107,7 +109,6 @@ fn build_correction_thesaurus() -> Thesaurus {
             let wrong_term = NormalizedTerm::new(id, NormalizedTermValue::new(correct.to_string()));
             thesaurus.insert(NormalizedTermValue::new(wrong.to_string()), wrong_term);
         }
-        id += 1;
     }
 
     thesaurus
@@ -159,8 +160,10 @@ fn build_enhanced_correction_thesaurus() -> Thesaurus {
         ),
     ];
 
-    let mut id = 20u64;
-    for (correct, wrong_aliases, _primary_wrong, _description) in more_corrections {
+    for (i, (correct, wrong_aliases, _primary_wrong, _description)) in
+        more_corrections.iter().enumerate()
+    {
+        let id = (i as u64) + 20;
         let term = NormalizedTerm::new(id, NormalizedTermValue::new(correct.to_string()));
         thesaurus.insert(NormalizedTermValue::new(correct.to_string()), term);
 
@@ -168,7 +171,6 @@ fn build_enhanced_correction_thesaurus() -> Thesaurus {
             let wrong_term = NormalizedTerm::new(id, NormalizedTermValue::new(correct.to_string()));
             thesaurus.insert(NormalizedTermValue::new(wrong.to_string()), wrong_term);
         }
-        id += 1;
     }
 
     thesaurus
