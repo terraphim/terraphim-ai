@@ -85,6 +85,7 @@ impl KnowledgeGraphSearch {
             .collect();
 
         // Sort by relevance score (highest first)
+        #[allow(clippy::unnecessary_sort_by)]
         results.sort_by(|a, b| {
             b.relevance_score
                 .partial_cmp(&a.relevance_score)
