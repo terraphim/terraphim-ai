@@ -23,11 +23,8 @@ tsa-full = ["terraphim-session-analyzer", "terraphim-session-analyzer/connectors
 # Enable Aider session connector
 aider-connector = ["dep:regex", "dep:terraphim-markdown-parser"]
 
-# Enable Cline session connector (VS Code extension)
-cline-connector = ["dep:regex", "dep:terraphim-markdown-parser"]
-
 # Enable all extra connectors
-extra-connectors = ["aider-connector", "cline-connector"]
+extra-connectors = ["aider-connector"]
 
 # Enable terraphim knowledge graph enrichment
 enrichment = ["terraphim_automata", "terraphim_rolegraph", "terraphim_types"]
