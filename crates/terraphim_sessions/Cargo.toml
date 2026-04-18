@@ -20,11 +20,20 @@ terraphim-session-analyzer = ["dep:terraphim-session-analyzer"]
 # Enable full TSA features including Cursor support
 tsa-full = ["terraphim-session-analyzer", "terraphim-session-analyzer/connectors"]
 
+# Enable Aider session connector
+aider-connector = ["dep:regex", "dep:terraphim-markdown-parser"]
+
+# Enable Cline session connector (VS Code extension)
+cline-connector = ["dep:regex", "dep:terraphim-markdown-parser"]
+
+# Enable all extra connectors
+extra-connectors = ["aider-connector", "cline-connector"]
+
 # Enable terraphim knowledge graph enrichment
 enrichment = ["terraphim_automata", "terraphim_rolegraph", "terraphim_types"]
 
 # All features
-full = ["tsa-full", "enrichment"]
+full = ["tsa-full", "extra-connectors", "enrichment"]
 
 [dependencies]
 # Core dependencies
@@ -45,13 +54,15 @@ jiff = { version = "0.2", features = ["serde"] }
 # File system
 walkdir = "2.4"
 dirs = "5.0"
-regex = "1.10"
+
+# Feature-gated: regex for Aider/Cline connectors
+regex = { version = "1.10", optional = true }
 
 # Feature-gated: Terraphim Session Analyzer
 terraphim-session-analyzer = { version = "1.6.0", path = "../terraphim-session-analyzer", optional = true }
 
-# Markdown parsing for session content
-terraphim-markdown-parser = { path = "../terraphim-markdown-parser" }
+# Feature-gated: Markdown parsing for Aider/Cline connectors
+terraphim-markdown-parser = { path = "../terraphim-markdown-parser", optional = true }
 
 # Feature-gated: Terraphim enrichment (uses published crates.io versions)
 terraphim_automata = { version = ">=1.4.10", path = "../terraphim_automata", optional = true }
