@@ -101,7 +101,7 @@ use std::sync::{Arc, Mutex};
 use terraphim_router::RoutingEngine;
 use terraphim_spawner::health::{CircuitBreaker, HealthStatus};
 use terraphim_spawner::output::OutputEvent;
-use terraphim_spawner::{AgentHandle, AgentSpawner, ResourceLimits, SpawnRequest};
+use terraphim_spawner::{AgentHandle, AgentSpawner, ResourceLimits, SpawnContext, SpawnRequest};
 use tokio::sync::broadcast;
 use tracing::{debug, error, info, warn};
 
@@ -1241,7 +1241,7 @@ impl AgentOrchestrator {
 
         let handle = self
             .spawner
-            .spawn_with_fallback(&request)
+            .spawn_with_fallback(&request, SpawnContext::global())
             .await
             .map_err(|e| OrchestratorError::SpawnFailed {
                 agent: def.name.clone(),
