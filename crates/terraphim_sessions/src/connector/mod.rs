@@ -3,8 +3,10 @@
 //! This module provides a unified interface for importing sessions
 //! from various AI coding assistants.
 
+mod aider;
 mod native;
 
+pub use aider::AiderConnector;
 pub use native::NativeClaudeConnector;
 
 use crate::model::Session;
@@ -106,6 +108,9 @@ impl ConnectorRegistry {
 
         // Add native Claude Code connector (always available)
         connectors.push(Box::new(NativeClaudeConnector));
+
+        // Add Aider connector (always available)
+        connectors.push(Box::new(AiderConnector));
 
         // Add TSA-based connectors if feature enabled
         #[cfg(feature = "terraphim-session-analyzer")]
