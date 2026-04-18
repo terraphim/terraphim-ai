@@ -45,9 +45,13 @@ jiff = { version = "0.2", features = ["serde"] }
 # File system
 walkdir = "2.4"
 dirs = "5.0"
+regex = "1.10"
 
 # Feature-gated: Terraphim Session Analyzer
 terraphim-session-analyzer = { version = "1.6.0", path = "../terraphim-session-analyzer", optional = true }
+
+# Markdown parsing for session content
+terraphim-markdown-parser = { path = "../terraphim-markdown-parser" }
 
 # Feature-gated: Terraphim enrichment (uses published crates.io versions)
 terraphim_automata = { version = ">=1.4.10", path = "../terraphim_automata", optional = true }
