@@ -17,6 +17,39 @@ use tokio::time::timeout;
 
 use terraphim_types::capability::{ProcessId, Provider};
 
+/// Per-spawn overrides that a caller can pass to AgentSpawner::spawn().
+///
+/// Enables multi-project use: one orchestrator serving many projects can
+/// pass per-project working_dir and env without constructing N spawners.
+#[derive(Debug, Clone, Default)]
+pub struct SpawnContext {
+    /// Working directory for the child process. None -> use spawner default.
+    pub working_dir: Option<PathBuf>,
+    /// Env vars to set on the child process (added to inherited env).
+    pub env_overrides: HashMap<String, String>,
+}
+
+impl SpawnContext {
+    /// Use the spawner's default working_dir and no env overrides.
+    pub fn global() -> Self {
+        Self::default()
+    }
+
+    /// Override working_dir; keep env untouched.
+    pub fn with_working_dir(path: impl Into<PathBuf>) -> Self {
+        Self {
+            working_dir: Some(path.into()),
+            env_overrides: HashMap::new(),
+        }
+    }
+
+    /// Builder-style env addition.
+    pub fn with_env(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+        self.env_overrides.insert(key.into(), value.into());
+        self
+    }
+}
+
 pub mod audit;
 pub mod config;
 pub mod health;
