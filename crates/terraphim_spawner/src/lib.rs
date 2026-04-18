@@ -461,7 +461,8 @@ impl AgentSpawner {
             Some(m) => config.with_model(m),
             None => config,
         };
-        self.spawn_config(provider, &config, task, false, &ctx).await
+        self.spawn_config(provider, &config, task, false, &ctx)
+            .await
     }
 
     /// Spawn an agent from a provider configuration with an optional model,
@@ -497,7 +498,8 @@ impl AgentSpawner {
             Some(m) => config.with_model(m),
             None => config,
         };
-        self.spawn_config(provider, &config, task, use_stdin, ctx).await
+        self.spawn_config(provider, &config, task, use_stdin, ctx)
+            .await
     }
 
     /// Spawn an agent from a provider configuration.
@@ -508,7 +510,8 @@ impl AgentSpawner {
         ctx: SpawnContext,
     ) -> Result<AgentHandle, SpawnerError> {
         let config = AgentConfig::from_provider(provider)?;
-        self.spawn_config(provider, &config, task, false, &ctx).await
+        self.spawn_config(provider, &config, task, false, &ctx)
+            .await
     }
 
     /// Spawn an agent with primary and fallback configuration.
@@ -812,7 +815,9 @@ mod tests {
         let spawner = AgentSpawner::new();
         let provider = create_test_agent_provider();
 
-        let handle = spawner.spawn(&provider, "Hello World", SpawnContext::global()).await;
+        let handle = spawner
+            .spawn(&provider, "Hello World", SpawnContext::global())
+            .await;
 
         // Echo command should succeed
         assert!(handle.is_ok());
@@ -826,7 +831,10 @@ mod tests {
         let spawner = AgentSpawner::new();
         let provider = create_test_agent_provider();
 
-        let mut handle = spawner.spawn(&provider, "done", SpawnContext::global()).await.unwrap();
+        let mut handle = spawner
+            .spawn(&provider, "done", SpawnContext::global())
+            .await
+            .unwrap();
 
         // Echo exits immediately; give it a moment
         tokio::time::sleep(Duration::from_millis(100)).await;
@@ -842,7 +850,10 @@ mod tests {
         let provider = create_sleep_agent_provider();
 
         // Spawn a sleep 60 agent
-        let mut handle = spawner.spawn(&provider, "60", SpawnContext::global()).await.unwrap();
+        let mut handle = spawner
+            .spawn(&provider, "60", SpawnContext::global())
+            .await
+            .unwrap();
 
         // Graceful shutdown with 2s grace period
         let result = handle.shutdown(Duration::from_secs(2)).await;
@@ -866,7 +877,10 @@ mod tests {
         let spawner = AgentSpawner::new();
         let provider = create_test_agent_provider();
 
-        let handle = spawner.spawn(&provider, "hello", SpawnContext::global()).await.unwrap();
+        let handle = spawner
+            .spawn(&provider, "hello", SpawnContext::global())
+            .await
+            .unwrap();
         let mut pool = AgentPool::new(5);
 
         pool.release(handle);
@@ -883,7 +897,10 @@ mod tests {
         let spawner = AgentSpawner::new();
         let provider = create_test_agent_provider();
 
-        let handle = spawner.spawn(&provider, "broadcast test", SpawnContext::global()).await.unwrap();
+        let handle = spawner
+            .spawn(&provider, "broadcast test", SpawnContext::global())
+            .await
+            .unwrap();
         let mut receiver = handle.subscribe_output();
 
         // Give the echo process time to produce output and the capture task to process it
@@ -913,7 +930,9 @@ mod tests {
 
         // Spawn with resource limits -- echo exits fast so this validates
         // that the pre_exec hook with setrlimit doesn't break spawning.
-        let handle = spawner.spawn(&provider, "resource-limited", SpawnContext::global()).await;
+        let handle = spawner
+            .spawn(&provider, "resource-limited", SpawnContext::global())
+            .await;
         assert!(handle.is_ok());
     }
 
@@ -922,7 +941,10 @@ mod tests {
         let spawner = AgentSpawner::new();
         let provider = create_test_agent_provider();
 
-        let handle = spawner.spawn(&provider, "hello", SpawnContext::global()).await.unwrap();
+        let handle = spawner
+            .spawn(&provider, "hello", SpawnContext::global())
+            .await
+            .unwrap();
         let mut pool = AgentPool::new(5);
         pool.release(handle);
 
@@ -992,7 +1014,9 @@ mod tests {
         let provider = create_test_agent_provider();
 
         // Spawn without stdin - prompt should be CLI arg
-        let handle = spawner.spawn(&provider, "arg test", SpawnContext::global()).await;
+        let handle = spawner
+            .spawn(&provider, "arg test", SpawnContext::global())
+            .await;
 
         assert!(handle.is_ok());
 
@@ -1058,7 +1082,12 @@ mod tests {
 
         // Spawn with both model and stdin
         let handle = spawner
-            .spawn_with_model_stdin(&provider, "model test via stdin", Some("test-model"), SpawnContext::global())
+            .spawn_with_model_stdin(
+                &provider,
+                "model test via stdin",
+                Some("test-model"),
+                SpawnContext::global(),
+            )
             .await;
 
         assert!(handle.is_ok());
@@ -1248,11 +1277,7 @@ mod tests {
 
         let spawner = AgentSpawner::new();
         let handle = spawner
-            .spawn(
-                &provider,
-                "ADF_INHERITED_SPAWN_CTX",
-                SpawnContext::global(),
-            )
+            .spawn(&provider, "ADF_INHERITED_SPAWN_CTX", SpawnContext::global())
             .await
             .expect("spawn should succeed");
 
