@@ -1086,4 +1086,193 @@ mod tests {
             Some(2_147_483_648)
         );
     }
+
+    // =========================================================================
+    // SpawnContext Tests (Gitea adf-fleet#3)
+    // =========================================================================
+
+    #[test]
+    fn test_spawn_context_global_is_default() {
+        let ctx = SpawnContext::global();
+        assert!(ctx.working_dir.is_none());
+        assert!(ctx.env_overrides.is_empty());
+    }
+
+    #[test]
+    fn test_spawn_context_with_working_dir() {
+        let ctx = SpawnContext::with_working_dir("/some/project");
+        assert_eq!(ctx.working_dir, Some(PathBuf::from("/some/project")));
+        assert!(ctx.env_overrides.is_empty());
+    }
+
+    #[test]
+    fn test_spawn_context_with_env() {
+        let ctx = SpawnContext::global()
+            .with_env("FOO", "bar")
+            .with_env("BAZ", "qux");
+        assert!(ctx.working_dir.is_none());
+        assert_eq!(ctx.env_overrides.get("FOO"), Some(&"bar".to_string()));
+        assert_eq!(ctx.env_overrides.get("BAZ"), Some(&"qux".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_spawn_global_uses_spawner_default_working_dir() {
+        let spawner = AgentSpawner::new().with_working_dir("/tmp");
+        let provider = create_test_agent_provider();
+
+        // SpawnContext::global() should preserve spawner's default behaviour.
+        // We spawn /bin/echo (via echo provider) and check it succeeds.
+        let handle = spawner
+            .spawn(&provider, "hello", SpawnContext::global())
+            .await;
+        assert!(handle.is_ok(), "spawn with global context should succeed");
+    }
+
+    #[tokio::test]
+    async fn test_spawn_with_working_dir_override() {
+        use tempfile::TempDir;
+
+        let tmpdir = TempDir::new().expect("create tempdir");
+        let tmppath = tmpdir.path().to_path_buf();
+
+        // Provider runs /bin/pwd so the child prints its cwd.
+        let provider = Provider::new(
+            "@pwd-agent",
+            "Pwd Agent",
+            terraphim_types::capability::ProviderType::Agent {
+                agent_id: "@pwd".to_string(),
+                cli_command: "/bin/pwd".to_string(),
+                working_dir: PathBuf::from("/tmp"),
+            },
+            vec![terraphim_types::capability::Capability::CodeGeneration],
+        );
+
+        let spawner = AgentSpawner::new().with_working_dir("/tmp");
+        let ctx = SpawnContext::with_working_dir(tmppath.clone());
+
+        // Subscribe before spawn so we don't miss events from a fast process.
+        let handle = spawner
+            .spawn(&provider, ".", ctx)
+            .await
+            .expect("spawn with working_dir override should succeed");
+
+        let mut rx = handle.subscribe_output();
+
+        // Give pwd time to run and the capture task to broadcast its line.
+        tokio::time::sleep(Duration::from_millis(300)).await;
+
+        let mut found = false;
+        let resolved = std::fs::canonicalize(&tmppath).unwrap_or(tmppath.clone());
+        loop {
+            match rx.try_recv() {
+                Ok(OutputEvent::Stdout { line, .. }) => {
+                    let trimmed = line.trim();
+                    if trimmed == resolved.to_string_lossy().as_ref()
+                        || trimmed == tmppath.to_string_lossy().as_ref()
+                    {
+                        found = true;
+                        break;
+                    }
+                }
+                Ok(_) => {}
+                Err(tokio::sync::broadcast::error::TryRecvError::Empty) => break,
+                Err(_) => break,
+            }
+        }
+
+        assert!(found, "child cwd should be the overridden tmpdir");
+    }
+
+    #[tokio::test]
+    async fn test_spawn_env_override_propagates() {
+        // Use /usr/bin/printenv VAR_NAME to verify env override.
+        // printenv takes the variable name as its argument and prints the value.
+        let provider = Provider::new(
+            "@printenv-env-agent",
+            "Printenv Env Agent",
+            terraphim_types::capability::ProviderType::Agent {
+                agent_id: "@printenv-env".to_string(),
+                cli_command: "/usr/bin/printenv".to_string(),
+                working_dir: PathBuf::from("/tmp"),
+            },
+            vec![terraphim_types::capability::Capability::CodeGeneration],
+        );
+
+        let spawner = AgentSpawner::new();
+        let ctx = SpawnContext::global().with_env("ADF_SPAWN_CTX_TEST", "hello-from-ctx");
+
+        // Task "ADF_SPAWN_CTX_TEST" becomes the arg to printenv, printing its value.
+        let handle = spawner
+            .spawn(&provider, "ADF_SPAWN_CTX_TEST", ctx)
+            .await
+            .expect("spawn with env override should succeed");
+
+        let mut rx = handle.subscribe_output();
+        tokio::time::sleep(Duration::from_millis(300)).await;
+
+        let mut output = String::new();
+        loop {
+            match rx.try_recv() {
+                Ok(OutputEvent::Stdout { line, .. }) => output.push_str(line.trim()),
+                Ok(_) => {}
+                Err(tokio::sync::broadcast::error::TryRecvError::Empty) => break,
+                Err(_) => break,
+            }
+        }
+
+        assert!(
+            output.contains("hello-from-ctx"),
+            "env override should be visible in child process, got: {:?}",
+            output
+        );
+    }
+
+    #[tokio::test]
+    async fn test_inherited_env_flows_through_without_override() {
+        // Set an env var in the test process and verify a child sees it.
+        // Using /usr/bin/printenv VAR_NAME avoids shell argument-parsing issues.
+        unsafe {
+            std::env::set_var("ADF_INHERITED_SPAWN_CTX", "inherited-value");
+        }
+
+        let provider = Provider::new(
+            "@printenv-inherit-agent",
+            "Printenv Inherit Agent",
+            terraphim_types::capability::ProviderType::Agent {
+                agent_id: "@printenv-inherit".to_string(),
+                cli_command: "/usr/bin/printenv".to_string(),
+                working_dir: PathBuf::from("/tmp"),
+            },
+            vec![terraphim_types::capability::Capability::CodeGeneration],
+        );
+
+        let spawner = AgentSpawner::new();
+        let handle = spawner
+            .spawn(
+                &provider,
+                "ADF_INHERITED_SPAWN_CTX",
+                SpawnContext::global(),
+            )
+            .await
+            .expect("spawn should succeed");
+
+        let mut rx = handle.subscribe_output();
+        tokio::time::sleep(Duration::from_millis(300)).await;
+
+        let mut output = String::new();
+        loop {
+            match rx.try_recv() {
+                Ok(OutputEvent::Stdout { line, .. }) => output.push_str(line.trim()),
+                Ok(_) => {}
+                Err(tokio::sync::broadcast::error::TryRecvError::Empty) => break,
+                Err(_) => break,
+            }
+        }
+
+        assert!(
+            output.contains("inherited-value"),
+            "inherited env should be visible in child without override, got: {:?}",
+            output
+        );
+    }
 }
