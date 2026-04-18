@@ -6,8 +6,8 @@
 use std::path::PathBuf;
 
 use crate::connector::{ConnectorStatus, ImportOptions, SessionConnector};
-use crate::model::{ContentBlock, Message, MessageRole, Session, SessionMetadata};
-use anyhow::{Context, Result};
+use crate::model::{Message, MessageRole, Session, SessionMetadata};
+use anyhow::Result;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use regex::Regex;
