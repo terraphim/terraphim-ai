@@ -454,13 +454,14 @@ impl AgentSpawner {
         provider: &Provider,
         task: &str,
         model: Option<&str>,
+        ctx: SpawnContext,
     ) -> Result<AgentHandle, SpawnerError> {
         let config = AgentConfig::from_provider(provider)?;
         let config = match model {
             Some(m) => config.with_model(m),
             None => config,
         };
-        self.spawn_config(provider, &config, task, false).await
+        self.spawn_config(provider, &config, task, false, &ctx).await
     }
 
     /// Spawn an agent from a provider configuration with an optional model,
@@ -470,13 +471,14 @@ impl AgentSpawner {
         provider: &Provider,
         task: &str,
         model: Option<&str>,
+        ctx: SpawnContext,
     ) -> Result<AgentHandle, SpawnerError> {
         let config = AgentConfig::from_provider(provider)?;
         let config = match model {
             Some(m) => config.with_model(m),
             None => config,
         };
-        self.spawn_config(provider, &config, task, true).await
+        self.spawn_config(provider, &config, task, true, &ctx).await
     }
 
     /// Internal: spawn with model, stdin option, and resource limits.
@@ -487,6 +489,7 @@ impl AgentSpawner {
         model: Option<&str>,
         use_stdin: bool,
         resource_limits: ResourceLimits,
+        ctx: &SpawnContext,
     ) -> Result<AgentHandle, SpawnerError> {
         let config = AgentConfig::from_provider(provider)?;
         let config = config.with_resource_limits(resource_limits);
@@ -494,17 +497,18 @@ impl AgentSpawner {
             Some(m) => config.with_model(m),
             None => config,
         };
-        self.spawn_config(provider, &config, task, use_stdin).await
+        self.spawn_config(provider, &config, task, use_stdin, ctx).await
     }
 
-    /// Spawn an agent from a provider configuration
+    /// Spawn an agent from a provider configuration.
     pub async fn spawn(
         &self,
         provider: &Provider,
         task: &str,
+        ctx: SpawnContext,
     ) -> Result<AgentHandle, SpawnerError> {
         let config = AgentConfig::from_provider(provider)?;
-        self.spawn_config(provider, &config, task, false).await
+        self.spawn_config(provider, &config, task, false, &ctx).await
     }
 
     /// Spawn an agent with primary and fallback configuration.
@@ -514,6 +518,7 @@ impl AgentSpawner {
     pub async fn spawn_with_fallback(
         &self,
         request: &SpawnRequest,
+        ctx: SpawnContext,
     ) -> Result<AgentHandle, SpawnerError> {
         // Try primary first with resource limits
         let primary_result = self
@@ -523,6 +528,7 @@ impl AgentSpawner {
                 request.primary_model.as_deref(),
                 request.use_stdin,
                 request.resource_limits.clone(),
+                &ctx,
             )
             .await;
 
@@ -550,6 +556,7 @@ impl AgentSpawner {
                             request.fallback_model.as_deref(),
                             request.use_stdin,
                             request.resource_limits.clone(),
+                            &ctx,
                         )
                         .await;
 
@@ -586,6 +593,7 @@ impl AgentSpawner {
         config: &AgentConfig,
         task: &str,
         use_stdin: bool,
+        ctx: &SpawnContext,
     ) -> Result<AgentHandle, SpawnerError> {
         let _span = tracing::info_span!(
             "spawner.spawn",
@@ -599,7 +607,7 @@ impl AgentSpawner {
 
         // Spawn the agent process
         let process_id = ProcessId::new();
-        let mut child = self.spawn_process(config, task, use_stdin).await?;
+        let mut child = self.spawn_process(config, task, use_stdin, ctx).await?;
 
         // Set up health checking
         let health_checker = HealthChecker::new(process_id, Duration::from_secs(30));
@@ -641,10 +649,13 @@ impl AgentSpawner {
         config: &AgentConfig,
         task: &str,
         use_stdin: bool,
+        ctx: &SpawnContext,
     ) -> Result<Child, SpawnerError> {
-        let working_dir = config
+        // Priority: ctx override > config working_dir > spawner default
+        let working_dir = ctx
             .working_dir
             .as_ref()
+            .or(config.working_dir.as_ref())
             .unwrap_or(&self.default_working_dir);
 
         let mut cmd = Command::new(&config.cli_command);
@@ -659,13 +670,18 @@ impl AgentSpawner {
 
         cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
 
-        // Add environment variables
+        // Add environment variables (spawner defaults, lowest priority)
         for (key, value) in &self.env_vars {
             cmd.env(key, value);
         }
 
         // Add provider-specific env vars
         for (key, value) in &config.env_vars {
+            cmd.env(key, value);
+        }
+
+        // Apply per-call overrides last (highest priority)
+        for (key, value) in &ctx.env_overrides {
             cmd.env(key, value);
         }
 
@@ -796,7 +812,7 @@ mod tests {
         let spawner = AgentSpawner::new();
         let provider = create_test_agent_provider();
 
-        let handle = spawner.spawn(&provider, "Hello World").await;
+        let handle = spawner.spawn(&provider, "Hello World", SpawnContext::global()).await;
 
         // Echo command should succeed
         assert!(handle.is_ok());
@@ -810,7 +826,7 @@ mod tests {
         let spawner = AgentSpawner::new();
         let provider = create_test_agent_provider();
 
-        let mut handle = spawner.spawn(&provider, "done").await.unwrap();
+        let mut handle = spawner.spawn(&provider, "done", SpawnContext::global()).await.unwrap();
 
         // Echo exits immediately; give it a moment
         tokio::time::sleep(Duration::from_millis(100)).await;
@@ -826,7 +842,7 @@ mod tests {
         let provider = create_sleep_agent_provider();
 
         // Spawn a sleep 60 agent
-        let mut handle = spawner.spawn(&provider, "60").await.unwrap();
+        let mut handle = spawner.spawn(&provider, "60", SpawnContext::global()).await.unwrap();
 
         // Graceful shutdown with 2s grace period
         let result = handle.shutdown(Duration::from_secs(2)).await;
@@ -850,7 +866,7 @@ mod tests {
         let spawner = AgentSpawner::new();
         let provider = create_test_agent_provider();
 
-        let handle = spawner.spawn(&provider, "hello").await.unwrap();
+        let handle = spawner.spawn(&provider, "hello", SpawnContext::global()).await.unwrap();
         let mut pool = AgentPool::new(5);
 
         pool.release(handle);
@@ -867,7 +883,7 @@ mod tests {
         let spawner = AgentSpawner::new();
         let provider = create_test_agent_provider();
 
-        let handle = spawner.spawn(&provider, "broadcast test").await.unwrap();
+        let handle = spawner.spawn(&provider, "broadcast test", SpawnContext::global()).await.unwrap();
         let mut receiver = handle.subscribe_output();
 
         // Give the echo process time to produce output and the capture task to process it
@@ -897,7 +913,7 @@ mod tests {
 
         // Spawn with resource limits -- echo exits fast so this validates
         // that the pre_exec hook with setrlimit doesn't break spawning.
-        let handle = spawner.spawn(&provider, "resource-limited").await;
+        let handle = spawner.spawn(&provider, "resource-limited", SpawnContext::global()).await;
         assert!(handle.is_ok());
     }
 
@@ -906,7 +922,7 @@ mod tests {
         let spawner = AgentSpawner::new();
         let provider = create_test_agent_provider();
 
-        let handle = spawner.spawn(&provider, "hello").await.unwrap();
+        let handle = spawner.spawn(&provider, "hello", SpawnContext::global()).await.unwrap();
         let mut pool = AgentPool::new(5);
         pool.release(handle);
 
@@ -941,7 +957,7 @@ mod tests {
 
         // Spawn with stdin delivery - cat will echo the prompt back
         let handle = spawner
-            .spawn_with_model_stdin(&provider, "hello from stdin", None)
+            .spawn_with_model_stdin(&provider, "hello from stdin", None, SpawnContext::global())
             .await;
 
         assert!(handle.is_ok());
@@ -976,7 +992,7 @@ mod tests {
         let provider = create_test_agent_provider();
 
         // Spawn without stdin - prompt should be CLI arg
-        let handle = spawner.spawn(&provider, "arg test").await;
+        let handle = spawner.spawn(&provider, "arg test", SpawnContext::global()).await;
 
         assert!(handle.is_ok());
 
@@ -1011,7 +1027,7 @@ mod tests {
 
         // Spawn with stdin - should complete without error
         let handle = spawner
-            .spawn_with_model_stdin(&provider, &large_prompt, None)
+            .spawn_with_model_stdin(&provider, &large_prompt, None, SpawnContext::global())
             .await;
 
         assert!(
@@ -1042,7 +1058,7 @@ mod tests {
 
         // Spawn with both model and stdin
         let handle = spawner
-            .spawn_with_model_stdin(&provider, "model test via stdin", Some("test-model"))
+            .spawn_with_model_stdin(&provider, "model test via stdin", Some("test-model"), SpawnContext::global())
             .await;
 
         assert!(handle.is_ok());
