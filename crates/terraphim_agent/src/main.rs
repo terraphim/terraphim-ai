@@ -61,6 +61,60 @@ enum LogicalOperatorCli {
     Or,
 }
 
+/// Truncate a snippet at a UTF-8 char boundary, appending "..." when truncated.
+///
+/// Naive `&s[..max]` panics when `max` lands inside a multi-byte char (e.g. typographic
+/// quotes from email subjects). This walks char boundaries and stops at the last one
+/// whose byte index is ≤ max.
+fn truncate_snippet(s: &str, max_bytes: usize) -> String {
+    if s.len() <= max_bytes {
+        return s.to_string();
+    }
+    let cutoff = s
+        .char_indices()
+        .map(|(i, _)| i)
+        .take_while(|&i| i <= max_bytes)
+        .last()
+        .unwrap_or(0);
+    format!("{}...", &s[..cutoff])
+}
+
+#[cfg(test)]
+mod truncate_snippet_tests {
+    use super::truncate_snippet;
+
+    #[test]
+    fn short_string_unchanged() {
+        assert_eq!(truncate_snippet("hello", 120), "hello");
+    }
+
+    #[test]
+    fn ascii_truncated() {
+        let s = "a".repeat(200);
+        let out = truncate_snippet(&s, 120);
+        assert!(out.ends_with("..."));
+        assert_eq!(out.len(), 123);
+    }
+
+    #[test]
+    fn multibyte_does_not_panic() {
+        // Reproduces crates/terraphim_agent/src/main.rs:1414 panic where
+        // `&s[..120]` landed inside a typographic quote (3 bytes: e2 80 9c).
+        let s = "Includes dependencies for llama.cpp, integration with retreival, and CLI/GUI flows; the project positions itself as \u{201C}ultimate open-source RAG app\u{201D} with curated features.";
+        let out = truncate_snippet(s, 120);
+        // Must not panic and must be a valid UTF-8 string ending in "..."
+        assert!(out.ends_with("..."));
+        assert!(out.is_char_boundary(out.len()));
+    }
+
+    #[test]
+    fn cyrillic_safe() {
+        let s = "консенсус ".repeat(20);
+        let out = truncate_snippet(&s, 120);
+        assert!(out.ends_with("..."));
+    }
+}
+
 /// Show helpful usage information when run without a TTY
 fn show_usage_info() {
     println!("Terraphim AI Agent v{}", env!("CARGO_PKG_VERSION"));
@@ -1408,14 +1462,7 @@ async fn run_offline_command(
                         } else {
                             Some(doc.body.as_str())
                         })
-                        .map(|s| {
-                            let trimmed = s.trim();
-                            if trimmed.len() > 120 {
-                                format!("{}...", &trimmed[..120])
-                            } else {
-                                trimmed.to_string()
-                            }
-                        });
+                        .map(|s| truncate_snippet(s.trim(), 120));
                     println!("[{}] {}", doc.rank.unwrap_or_default(), doc.title);
                     if !doc.url.is_empty() {
                         println!("    {}", doc.url);
@@ -2942,14 +2989,7 @@ async fn run_server_command(
                         } else {
                             Some(doc.body.as_str())
                         })
-                        .map(|s| {
-                            let trimmed = s.trim();
-                            if trimmed.len() > 120 {
-                                format!("{}...", &trimmed[..120])
-                            } else {
-                                trimmed.to_string()
-                            }
-                        });
+                        .map(|s| truncate_snippet(s.trim(), 120));
                     println!("[{}] {}", doc.rank.unwrap_or_default(), doc.title);
                     if !doc.url.is_empty() {
                         println!("    {}", doc.url);
