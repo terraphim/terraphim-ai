@@ -37,6 +37,7 @@ axum = { version = "0.8" }
 [features]
 openrouter = ["terraphim_config/openrouter"]
 zlob = ["fff-search/zlob", "terraphim_file_search/zlob"]
+jmap = ["terraphim_middleware/jmap"]
 
 [dev-dependencies]
 ahash = "0.8"
