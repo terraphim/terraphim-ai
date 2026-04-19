@@ -105,6 +105,22 @@ echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":
 
 Inside a fresh Claude Code or opencode session, ask the model to list available tools; both `mcp__terraphim__search` and `mcp__terraphim_pa__search` should appear if the MCP path is configured.
 
+## Auto-routing (CLI and MCP)
+
+Both paths now auto-route the search when no role is specified. The agent scores every configured role's knowledge graph against the query and picks the highest-rank match.
+
+CLI: skip `--role` and the picked role is printed once on stderr:
+
+```
+[auto-route] picked role "System Operator" (score=128, candidates=4); to override, pass --role
+```
+
+stdout (including `--robot` and `--format json` payloads) is unchanged.
+
+MCP: omit the `role` parameter on the `terraphim_search` tool. The CallToolResult prepends one text content of the form `[auto-route] picked role "<name>" (score=<n>, candidates=<m>); pass role parameter to override` so MCP clients can surface the routing decision; the resource contents that follow are unchanged in count and order.
+
+Pass an explicit role to short-circuit auto-routing -- the routing line is suppressed entirely.
+
 ## Three example queries (one per role)
 
 - **Terraphim Engineer**: `/tsearch "Terraphim Engineer" rolegraph` -- returns hits from `~/.config/terraphim/docs/src/`.
