@@ -1,0 +1,21 @@
+[[projects]]
+id = "alpha"
+working_dir = "/tmp/alpha"
+schedule_offset_minutes = 0
+
+[[agents]]
+name = "alpha-watcher"
+layer = "Safety"
+cli_tool = "claude"
+task = "Watch alpha"
+project = "alpha"
+
+[[flows]]
+name = "alpha-flow"
+project = "alpha"
+repo_path = "/tmp/alpha"
+
+[[flows.steps]]
+name = "build"
+kind = "action"
+command = "cargo build"

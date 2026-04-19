@@ -72,6 +72,7 @@ pub struct OrchestratorConfig {
     #[serde(default)]
     pub workflow: Option<WorkflowConfig>,
     /// Agent definitions.
+    #[serde(default)]
     pub agents: Vec<AgentDefinition>,
     /// Seconds to wait before restarting a Safety agent after it exits.
     #[serde(default = "default_restart_cooldown")]

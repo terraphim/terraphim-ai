@@ -1,0 +1,31 @@
+working_dir = "/tmp/terraphim"
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 2 * * *"
+repo_path = "/tmp/repo"
+
+[[projects]]
+id = "alpha"
+working_dir = "/tmp/alpha"
+schedule_offset_minutes = 0
+
+[[projects]]
+id = "beta"
+working_dir = "/tmp/beta"
+schedule_offset_minutes = 5
+
+[[agents]]
+name = "alpha-watcher"
+layer = "Safety"
+cli_tool = "claude"
+task = "Watch alpha"
+project = "alpha"
+
+[[agents]]
+name = "beta-watcher"
+layer = "Safety"
+cli_tool = "claude"
+task = "Watch beta"
+project = "beta"
