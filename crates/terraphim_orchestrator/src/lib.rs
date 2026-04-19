@@ -150,7 +150,17 @@ struct ManagedAgent {
 #[cfg(not(test))]
 #[derive(Debug, Default, serde::Serialize, serde::Deserialize)]
 struct PersistedRestartState {
+    /// project -> agent -> restart count
+    #[serde(default)]
+    counts_by_project: HashMap<String, HashMap<String, u32>>,
+    /// project -> agent -> last failure timestamp (unix seconds)
+    #[serde(default)]
+    last_failure_unix_secs_by_project: HashMap<String, HashMap<String, i64>>,
+    /// Legacy flat map retained for backward-compatible deserialisation.
+    #[serde(default, skip_serializing)]
     counts: HashMap<String, u32>,
+    /// Legacy flat map retained for backward-compatible deserialisation.
+    #[serde(default, skip_serializing)]
     last_failure_unix_secs: HashMap<String, i64>,
 }
 
@@ -165,12 +175,12 @@ pub struct AgentOrchestrator {
     active_agents: HashMap<String, ManagedAgent>,
     rate_limiter: RateLimitTracker,
     shutdown_requested: bool,
-    /// Total restart count per agent (persists across agent lifecycle).
-    restart_counts: HashMap<String, u32>,
-    /// Last non-zero exit timestamp per agent (unix seconds), used for budget windowing.
-    restart_last_failure_unix_secs: HashMap<String, i64>,
-    /// Last exit time per agent (for cooldown enforcement).
-    restart_cooldowns: HashMap<String, Instant>,
+    /// Total restart count per (project, agent) pair (persists across agent lifecycle).
+    restart_counts: HashMap<(String, String), u32>,
+    /// Last non-zero exit timestamp per (project, agent), used for budget windowing.
+    restart_last_failure_unix_secs: HashMap<(String, String), i64>,
+    /// Last exit time per (project, agent) (for cooldown enforcement).
+    restart_cooldowns: HashMap<(String, String), Instant>,
     /// Timestamp of the last reconciliation tick (for cron comparison).
     last_tick_time: chrono::DateTime<chrono::Utc>,
     /// In-memory buffer for handoff contexts with TTL.
@@ -203,7 +213,7 @@ pub struct AgentOrchestrator {
     /// Monotonically increasing tick counter for poll_modulo gating.
     tick_count: u64,
     #[cfg(feature = "quickwit")]
-    quickwit_sink: Option<quickwit::QuickwitSink>,
+    quickwit_sink: Option<quickwit::QuickwitFleetSink>,
     /// Classifier for structured agent exit classification using KG-boosted matching.
     exit_classifier: ExitClassifier,
     /// KG-driven model router loaded from taxonomy markdown files.
@@ -212,6 +222,122 @@ pub struct AgentOrchestrator {
     provider_health: provider_probe::ProviderHealthMap,
     /// Live telemetry store for model performance tracking from CLI output.
     telemetry_store: control_plane::TelemetryStore,
+}
+
+/// Build the composite restart-state key for an agent definition.
+///
+/// Legacy (project-less) agents use [`crate::dispatcher::LEGACY_PROJECT_ID`]
+/// so restart counts never collide across projects once projects are added.
+fn agent_key(def: &AgentDefinition) -> (String, String) {
+    (
+        def.project
+            .clone()
+            .unwrap_or_else(|| crate::dispatcher::LEGACY_PROJECT_ID.to_string()),
+        def.name.clone(),
+    )
+}
+
+/// Build the per-project runtime map consumed by
+/// [`flow::executor::FlowExecutor::with_projects`].
+fn build_flow_project_runtimes(
+    config: &OrchestratorConfig,
+) -> HashMap<String, flow::executor::ProjectRuntime> {
+    config
+        .projects
+        .iter()
+        .map(|p| {
+            (
+                p.id.clone(),
+                flow::executor::ProjectRuntime {
+                    working_dir: p.working_dir.clone(),
+                    gitea_owner: p.gitea.as_ref().map(|g| g.owner.clone()),
+                    gitea_repo: p.gitea.as_ref().map(|g| g.repo.clone()),
+                },
+            )
+        })
+        .collect()
+}
+
+/// Build a [`SpawnContext`] for an agent, resolving per-project working_dir,
+/// Gitea owner/repo, and the project id itself into the child process's
+/// environment (`ADF_PROJECT_ID`, `ADF_WORKING_DIR`, `GITEA_OWNER`,
+/// `GITEA_REPO`). Legacy (project-less) agents use [`SpawnContext::global()`].
+fn build_spawn_context_for_agent(
+    config: &OrchestratorConfig,
+    def: &AgentDefinition,
+) -> SpawnContext {
+    let Some(pid) = def.project.as_deref() else {
+        return SpawnContext::global();
+    };
+    let Some(project) = config.project_by_id(pid) else {
+        return SpawnContext::global();
+    };
+    let working_dir_str = project.working_dir.to_string_lossy().into_owned();
+    let mut ctx = SpawnContext::with_working_dir(project.working_dir.clone())
+        .with_env("ADF_PROJECT_ID", pid)
+        .with_env("ADF_WORKING_DIR", working_dir_str);
+    if let Some(gitea) = project.gitea.as_ref() {
+        ctx = ctx
+            .with_env("GITEA_OWNER", gitea.owner.clone())
+            .with_env("GITEA_REPO", gitea.repo.clone());
+    }
+    ctx
+}
+
+/// Flatten persisted nested maps (project -> agent -> count) and any legacy
+/// flat entries into the in-memory composite key map. Legacy flat entries are
+/// mapped to [`crate::dispatcher::LEGACY_PROJECT_ID`].
+#[cfg(not(test))]
+fn flatten_restart_counts(state: &PersistedRestartState) -> HashMap<(String, String), u32> {
+    let mut out: HashMap<(String, String), u32> = HashMap::new();
+    for (project, per_agent) in &state.counts_by_project {
+        for (agent, count) in per_agent {
+            out.insert((project.clone(), agent.clone()), *count);
+        }
+    }
+    for (agent, count) in &state.counts {
+        out.entry((
+            crate::dispatcher::LEGACY_PROJECT_ID.to_string(),
+            agent.clone(),
+        ))
+        .or_insert(*count);
+    }
+    out
+}
+
+/// Flatten persisted nested maps for last-failure timestamps into the
+/// composite key format.
+#[cfg(not(test))]
+fn flatten_restart_failures(state: &PersistedRestartState) -> HashMap<(String, String), i64> {
+    let mut out: HashMap<(String, String), i64> = HashMap::new();
+    for (project, per_agent) in &state.last_failure_unix_secs_by_project {
+        for (agent, ts) in per_agent {
+            out.insert((project.clone(), agent.clone()), *ts);
+        }
+    }
+    for (agent, ts) in &state.last_failure_unix_secs {
+        out.entry((
+            crate::dispatcher::LEGACY_PROJECT_ID.to_string(),
+            agent.clone(),
+        ))
+        .or_insert(*ts);
+    }
+    out
+}
+
+/// Re-nest composite keyed maps into the persisted `project -> agent -> value`
+/// shape for serialisation.
+#[cfg(not(test))]
+fn nest_by_project<V: Clone>(
+    flat: &HashMap<(String, String), V>,
+) -> HashMap<String, HashMap<String, V>> {
+    let mut out: HashMap<String, HashMap<String, V>> = HashMap::new();
+    for ((project, agent), value) in flat {
+        out.entry(project.clone())
+            .or_default()
+            .insert(agent.clone(), value.clone());
+    }
+    out
 }
 
 /// Validate agent name for safe use in file paths.
@@ -300,8 +426,10 @@ impl AgentOrchestrator {
             None => MetapromptRenderer::new().expect("default template should always compile"),
         };
 
-        // Initialize output poster if Gitea config is provided
-        let output_poster = config.gitea.as_ref().map(OutputPoster::new);
+        // Initialize output poster. In multi-project mode this wires one
+        // tracker per project plus a legacy fallback from `config.gitea`; in
+        // legacy single-project mode it collapses to the top-level config.
+        let output_poster = OutputPoster::from_orchestrator_config(&config);
 
         // Initialize KG router from taxonomy directory if configured
         let kg_router = config.routing.as_ref().and_then(|routing_config| {
@@ -349,7 +477,7 @@ impl AgentOrchestrator {
             restart_counts: {
                 #[cfg(not(test))]
                 {
-                    restart_state.counts.clone()
+                    flatten_restart_counts(&restart_state)
                 }
                 #[cfg(test)]
                 {
@@ -359,7 +487,7 @@ impl AgentOrchestrator {
             restart_last_failure_unix_secs: {
                 #[cfg(not(test))]
                 {
-                    restart_state.last_failure_unix_secs.clone()
+                    flatten_restart_failures(&restart_state)
                 }
                 #[cfg(test)]
                 {
@@ -402,7 +530,7 @@ impl AgentOrchestrator {
                 } else if let Ok(counts) = serde_json::from_str::<HashMap<String, u32>>(&json) {
                     PersistedRestartState {
                         counts,
-                        last_failure_unix_secs: HashMap::new(),
+                        ..Default::default()
                     }
                 } else {
                     PersistedRestartState::default()
@@ -421,8 +549,12 @@ impl AgentOrchestrator {
         {
             let path = std::env::temp_dir().join("adf_restart_counts.json");
             let state = PersistedRestartState {
-                counts: self.restart_counts.clone(),
-                last_failure_unix_secs: self.restart_last_failure_unix_secs.clone(),
+                counts_by_project: nest_by_project(&self.restart_counts),
+                last_failure_unix_secs_by_project: nest_by_project(
+                    &self.restart_last_failure_unix_secs,
+                ),
+                counts: HashMap::new(),
+                last_failure_unix_secs: HashMap::new(),
             };
             if let Ok(json) = serde_json::to_string(&state) {
                 if let Err(e) = std::fs::write(&path, json) {
@@ -436,29 +568,29 @@ impl AgentOrchestrator {
         self.config.restart_budget_window_secs as i64
     }
 
-    fn current_restart_count(&mut self, name: &str) -> u32 {
+    fn current_restart_count(&mut self, key: &(String, String)) -> u32 {
         let now = chrono::Utc::now().timestamp();
         let window = self.restart_budget_window_secs();
-        let last_failure = self.restart_last_failure_unix_secs.get(name).copied();
+        let last_failure = self.restart_last_failure_unix_secs.get(key).copied();
         if let Some(last) = last_failure {
             if now.saturating_sub(last) > window {
-                self.restart_counts.remove(name);
-                self.restart_last_failure_unix_secs.remove(name);
+                self.restart_counts.remove(key);
+                self.restart_last_failure_unix_secs.remove(key);
                 self.save_restart_state();
             }
         }
-        self.restart_counts.get(name).copied().unwrap_or(0)
+        self.restart_counts.get(key).copied().unwrap_or(0)
     }
 
-    fn increment_restart_count(&mut self, name: &str) -> u32 {
-        let _ = self.current_restart_count(name);
+    fn increment_restart_count(&mut self, key: &(String, String)) -> u32 {
+        let _ = self.current_restart_count(key);
         let next_count = {
-            let count = self.restart_counts.entry(name.to_string()).or_insert(0);
+            let count = self.restart_counts.entry(key.clone()).or_insert(0);
             *count += 1;
             *count
         };
         self.restart_last_failure_unix_secs
-            .insert(name.to_string(), chrono::Utc::now().timestamp());
+            .insert(key.clone(), chrono::Utc::now().timestamp());
         self.save_restart_state();
         next_count
     }
@@ -778,13 +910,49 @@ impl AgentOrchestrator {
     }
 
     #[cfg(feature = "quickwit")]
-    pub fn set_quickwit_sink(&mut self, sink: quickwit::QuickwitSink) {
+    pub fn set_quickwit_sink(&mut self, sink: quickwit::QuickwitFleetSink) {
         self.quickwit_sink = Some(sink);
     }
 
     #[cfg(feature = "quickwit")]
     pub fn quickwit_config(&self) -> Option<&QuickwitConfig> {
         self.config.quickwit.as_ref()
+    }
+
+    /// Enumerate per-project Quickwit configurations plus a legacy fallback
+    /// for the top-level config, so the binary can build a
+    /// [`quickwit::QuickwitFleetSink`] covering every project.
+    ///
+    /// Returns `(project_id, QuickwitConfig)` pairs. Projects without a
+    /// per-project Quickwit block inherit the top-level config. The legacy
+    /// single-project path emits a single entry keyed on
+    /// [`crate::dispatcher::LEGACY_PROJECT_ID`].
+    #[cfg(feature = "quickwit")]
+    pub fn quickwit_fleet_configs(&self) -> Vec<(String, QuickwitConfig)> {
+        let mut out: Vec<(String, QuickwitConfig)> = Vec::new();
+
+        for project in &self.config.projects {
+            if let Some(cfg) = project
+                .quickwit
+                .as_ref()
+                .or(self.config.quickwit.as_ref())
+                .cloned()
+            {
+                if cfg.enabled {
+                    out.push((project.id.clone(), cfg));
+                }
+            }
+        }
+
+        if self.config.projects.is_empty() {
+            if let Some(cfg) = self.config.quickwit.as_ref().cloned() {
+                if cfg.enabled {
+                    out.push((crate::dispatcher::LEGACY_PROJECT_ID.to_string(), cfg));
+                }
+            }
+        }
+
+        out
     }
 
     /// Load skill chain content from skill definition files for the given agent definition.
@@ -1239,9 +1407,10 @@ impl AgentOrchestrator {
         }
         request = request.with_resource_limits(limits);
 
+        let spawn_ctx = build_spawn_context_for_agent(&self.config, def);
         let handle = self
             .spawner
-            .spawn_with_fallback(&request, SpawnContext::global())
+            .spawn_with_fallback(&request, spawn_ctx)
             .await
             .map_err(|e| OrchestratorError::SpawnFailed {
                 agent: def.name.clone(),
@@ -1252,7 +1421,11 @@ impl AgentOrchestrator {
         let output_rx = handle.subscribe_output();
 
         // Get the restart count from the orchestrator-level counter
-        let restart_count = self.restart_counts.get(&def.name).copied().unwrap_or(0);
+        let restart_count = self
+            .restart_counts
+            .get(&agent_key(def))
+            .copied()
+            .unwrap_or(0);
 
         self.active_agents.insert(
             def.name.clone(),
@@ -1278,6 +1451,10 @@ impl AgentOrchestrator {
         if let Some(ref sink) = self.quickwit_sink {
             let doc = quickwit::LogDocument {
                 timestamp: chrono::Utc::now().to_rfc3339(),
+                project_id: def
+                    .project
+                    .clone()
+                    .unwrap_or_else(|| crate::dispatcher::LEGACY_PROJECT_ID.to_string()),
                 level: "INFO".into(),
                 agent_name: def.name.clone(),
                 layer: format!("{:?}", def.layer),
@@ -1999,7 +2176,23 @@ impl AgentOrchestrator {
         let Some(ref poster) = self.output_poster else {
             return false;
         };
-        let tracker = poster.tracker_for(agent_name);
+        // Resolve the agent's owning project so the tracker uses the
+        // correct owner/repo (multi-project) or falls back to legacy.
+        let project = self
+            .config
+            .agents
+            .iter()
+            .find(|a| a.name == agent_name)
+            .and_then(|a| a.project.clone())
+            .unwrap_or_else(|| crate::dispatcher::LEGACY_PROJECT_ID.to_string());
+        let Some(tracker) = poster.tracker_for(&project, agent_name) else {
+            warn!(
+                agent = %agent_name,
+                project = %project,
+                "no Gitea tracker for project; treating dispatch as not-duplicate"
+            );
+            return false;
+        };
 
         // Remote check: if agent is assigned in Gitea but not active (crash recovery)
         match tracker.fetch_issue_assignees(issue_number).await {
@@ -2725,8 +2918,9 @@ impl AgentOrchestrator {
                 }
                 // Handle exit based on layer (similar to handle_agent_exit but for timeout)
                 if managed.definition.layer == AgentLayer::Safety {
-                    let restart_count = self.increment_restart_count(&name);
-                    self.restart_cooldowns.insert(name.clone(), Instant::now());
+                    let key = agent_key(&managed.definition);
+                    let restart_count = self.increment_restart_count(&key);
+                    self.restart_cooldowns.insert(key, Instant::now());
                     info!(
                         agent = %name,
                         restart_count,
@@ -2850,14 +3044,26 @@ impl AgentOrchestrator {
                 }
             }
 
-            // Post output to Gitea if configured
+            // Post output to Gitea if configured, routed by the agent's
+            // owning project so multi-project fleets land comments in the
+            // correct owner/repo.
             if let (Some(poster), Some(issue)) = (&self.output_poster, def.gitea_issue) {
                 let exit_code = status.code();
+                let project = def
+                    .project
+                    .clone()
+                    .unwrap_or_else(|| crate::dispatcher::LEGACY_PROJECT_ID.to_string());
                 if let Err(e) = poster
-                    .post_agent_output(name, issue, &output_lines, exit_code)
+                    .post_agent_output_for_project(&project, name, issue, &output_lines, exit_code)
                     .await
                 {
-                    warn!(agent = %name, issue = issue, error = %e, "failed to post output to Gitea");
+                    warn!(
+                        agent = %name,
+                        project = %project,
+                        issue = issue,
+                        error = %e,
+                        "failed to post output to Gitea"
+                    );
                 }
             }
 
@@ -2871,6 +3077,10 @@ impl AgentOrchestrator {
                 };
                 let doc = quickwit::LogDocument {
                     timestamp: chrono::Utc::now().to_rfc3339(),
+                    project_id: def
+                        .project
+                        .clone()
+                        .unwrap_or_else(|| crate::dispatcher::LEGACY_PROJECT_ID.to_string()),
                     level: level.into(),
                     agent_name: name.clone(),
                     layer: format!("{:?}", def.layer),
@@ -2927,15 +3137,15 @@ impl AgentOrchestrator {
         def: &AgentDefinition,
         status: std::process::ExitStatus,
     ) {
+        let key = agent_key(def);
         match def.layer {
             AgentLayer::Safety => {
                 // Only count non-zero exits toward restart limit.
                 // A successful exit (code 0) means the agent completed its task;
                 // punishing it for succeeding makes no sense.
                 if !status.success() {
-                    let restart_count = self.increment_restart_count(name);
-                    self.restart_cooldowns
-                        .insert(name.to_string(), Instant::now());
+                    let restart_count = self.increment_restart_count(&key);
+                    self.restart_cooldowns.insert(key, Instant::now());
                     if restart_count <= self.config.max_restart_count {
                         info!(
                             agent = %name,
@@ -2955,8 +3165,7 @@ impl AgentOrchestrator {
                         );
                     }
                 } else {
-                    self.restart_cooldowns
-                        .insert(name.to_string(), Instant::now());
+                    self.restart_cooldowns.insert(key, Instant::now());
                     info!(
                         agent = %name,
                         exit_status = %status,
@@ -2980,15 +3189,15 @@ impl AgentOrchestrator {
         let max_restarts = self.config.max_restart_count;
 
         // Age out stale restart counters before restart eligibility checks.
-        let safety_names: Vec<String> = self
+        let safety_keys: Vec<(String, String)> = self
             .config
             .agents
             .iter()
             .filter(|def| def.layer == AgentLayer::Safety)
-            .map(|def| def.name.clone())
+            .map(agent_key)
             .collect();
-        for name in &safety_names {
-            let _ = self.current_restart_count(name);
+        for key in &safety_keys {
+            let _ = self.current_restart_count(key);
         }
 
         // Find Safety agents that need restarting
@@ -3005,8 +3214,9 @@ impl AgentOrchestrator {
                 if self.active_agents.contains_key(&def.name) {
                     return false;
                 }
+                let key = agent_key(def);
                 // Must have a restart cooldown entry (meaning it exited)
-                let last_exit = match self.restart_cooldowns.get(&def.name) {
+                let last_exit = match self.restart_cooldowns.get(&key) {
                     Some(t) => t,
                     None => return false,
                 };
@@ -3015,16 +3225,17 @@ impl AgentOrchestrator {
                     return false;
                 }
                 // Must be under max restart count
-                let count = self.restart_counts.get(&def.name).copied().unwrap_or(0);
+                let count = self.restart_counts.get(&key).copied().unwrap_or(0);
                 count <= max_restarts
             })
             .cloned()
             .collect();
 
         for def in to_restart {
+            let key = agent_key(&def);
             info!(
                 agent = %def.name,
-                restart_count = self.restart_counts.get(&def.name).copied().unwrap_or(0),
+                restart_count = self.restart_counts.get(&key).copied().unwrap_or(0),
                 "restarting safety agent after cooldown"
             );
             if let Err(e) = self.spawn_agent(&def).await {
@@ -3171,6 +3382,11 @@ impl AgentOrchestrator {
                     .get(name)
                     .map(|m| format!("{:?}", m.definition.layer))
                     .unwrap_or_default();
+                let project_id = self
+                    .active_agents
+                    .get(name)
+                    .and_then(|m| m.definition.project.clone())
+                    .unwrap_or_else(|| crate::dispatcher::LEGACY_PROJECT_ID.to_string());
                 let model = self.active_agents.get(name).and_then(|m| {
                     m.routed_model
                         .clone()
@@ -3178,6 +3394,7 @@ impl AgentOrchestrator {
                 });
                 let doc = quickwit::LogDocument {
                     timestamp: chrono::Utc::now().to_rfc3339(),
+                    project_id,
                     level: level.into(),
                     agent_name: name.clone(),
                     layer,
@@ -3409,13 +3626,15 @@ impl AgentOrchestrator {
                     .clone()
                     .unwrap_or_else(|| PathBuf::from("/tmp/flow-states"));
                 let working_dir = self.config.compound_review.repo_path.clone();
+                let project_runtimes = build_flow_project_runtimes(&self.config);
                 let flow_def = *flow_def;
                 let flow_name_for_closure = flow_name.clone();
                 // FlowExecutor contains non-Send types (Regex via AgentSpawner),
                 // so we use spawn_blocking + Handle::block_on as a Send-safe bridge.
                 let rt_handle = tokio::runtime::Handle::current();
                 let handle = tokio::task::spawn_blocking(move || {
-                    let executor = flow::executor::FlowExecutor::new(working_dir, flow_state_dir);
+                    let executor = flow::executor::FlowExecutor::new(working_dir, flow_state_dir)
+                        .with_projects(project_runtimes);
                     rt_handle.block_on(async {
                         executor.run(&flow_def, None).await
                             .unwrap_or_else(|e| {
@@ -3554,6 +3773,13 @@ mod tests {
     use super::*;
     use tempfile::TempDir;
 
+    fn legacy_key(name: &str) -> (String, String) {
+        (
+            crate::dispatcher::LEGACY_PROJECT_ID.to_string(),
+            name.to_string(),
+        )
+    }
+
     fn test_config() -> OrchestratorConfig {
         OrchestratorConfig {
             working_dir: std::path::PathBuf::from("/tmp/test-orchestrator"),
@@ -3639,6 +3865,8 @@ mod tests {
             webhook: None,
             role_config_path: None,
             routing: None,
+            #[cfg(feature = "quickwit")]
+            quickwit: None,
             projects: vec![],
             include: vec![],
         }
@@ -3861,6 +4089,8 @@ task = "test"
             webhook: None,
             role_config_path: None,
             routing: None,
+            #[cfg(feature = "quickwit")]
+            quickwit: None,
             projects: vec![],
             include: vec![],
         }
@@ -3890,7 +4120,10 @@ task = "test"
 
         // Successful exit (code 0) should NOT increment restart count
         assert_eq!(
-            orch.restart_counts.get("echo-safety").copied().unwrap_or(0),
+            orch.restart_counts
+                .get(&legacy_key("echo-safety"))
+                .copied()
+                .unwrap_or(0),
             0,
             "successful exit should not increment restart count"
         );
@@ -3990,7 +4223,10 @@ task = "test"
             !orch.active_agents.contains_key("echo-safety"),
             "agent should not restart after exceeding max_restart_count"
         );
-        assert_eq!(orch.restart_counts.get("echo-safety").copied(), Some(3));
+        assert_eq!(
+            orch.restart_counts.get(&legacy_key("echo-safety")).copied(),
+            Some(3)
+        );
     }
 
     #[test]
@@ -3999,18 +4235,18 @@ task = "test"
         config.restart_budget_window_secs = 1;
         let mut orch = AgentOrchestrator::new(config).unwrap();
 
-        orch.restart_counts.insert("echo-safety".to_string(), 3);
+        orch.restart_counts.insert(legacy_key("echo-safety"), 3);
         orch.restart_last_failure_unix_secs.insert(
-            "echo-safety".to_string(),
+            legacy_key("echo-safety"),
             chrono::Utc::now().timestamp() - 5,
         );
 
-        let count = orch.current_restart_count("echo-safety");
+        let count = orch.current_restart_count(&legacy_key("echo-safety"));
         assert_eq!(count, 0);
-        assert!(!orch.restart_counts.contains_key("echo-safety"));
+        assert!(!orch.restart_counts.contains_key(&legacy_key("echo-safety")));
         assert!(!orch
             .restart_last_failure_unix_secs
-            .contains_key("echo-safety"));
+            .contains_key(&legacy_key("echo-safety")));
     }
 
     #[tokio::test]
@@ -4028,14 +4264,17 @@ task = "test"
 
         // Exit code 0 should never increment restart_count
         assert_eq!(
-            orch.restart_counts.get("echo-safety").copied().unwrap_or(0),
+            orch.restart_counts
+                .get(&legacy_key("echo-safety"))
+                .copied()
+                .unwrap_or(0),
             0,
             "successful exits (code 0) must not increment restart_count"
         );
 
         // Agent should still be eligible for restart
         orch.restart_cooldowns.insert(
-            "echo-safety".to_string(),
+            legacy_key("echo-safety"),
             Instant::now() - Duration::from_secs(999),
         );
         orch.restart_pending_safety_agents().await;
@@ -4096,7 +4335,10 @@ task = "test"
         );
         // echo exits with code 0, so restart_count stays at 0
         assert_eq!(
-            orch.restart_counts.get("echo-safety").copied().unwrap_or(0),
+            orch.restart_counts
+                .get(&legacy_key("echo-safety"))
+                .copied()
+                .unwrap_or(0),
             0,
             "successful exit should not increment restart count"
         );
