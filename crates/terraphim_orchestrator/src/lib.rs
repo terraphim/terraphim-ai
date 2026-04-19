@@ -73,7 +73,8 @@ pub use dual_mode::DualModeOrchestrator;
 pub use error::OrchestratorError;
 pub use handoff::{HandoffBuffer, HandoffContext, HandoffLedger};
 pub use mention::{
-    parse_mentions, resolve_mention, DetectedMention, MentionCursor, MentionTracker,
+    parse_mention_tokens, parse_mentions, resolve_mention, resolve_persona_mention,
+    DetectedMention, MentionCursor, MentionTokens, MentionTracker,
 };
 pub use metrics_persistence::{
     InMemoryMetricsPersistence, MetricsPersistence, MetricsPersistenceConfig,
@@ -1823,7 +1824,7 @@ impl AgentOrchestrator {
                 comment_id,
                 context,
             } => {
-                if let Some((agent_name, _)) = mention::resolve_mention(
+                if let Some((agent_name, _)) = mention::resolve_persona_mention(
                     &persona_name,
                     &agents,
                     &self.persona_registry,
@@ -2095,7 +2096,7 @@ impl AgentOrchestrator {
                         context,
                     } => {
                         // Resolve persona to agent
-                        if let Some((agent_name, _)) = mention::resolve_mention(
+                        if let Some((agent_name, _)) = mention::resolve_persona_mention(
                             &persona_name,
                             &agents,
                             &persona_registry,
