@@ -165,21 +165,34 @@ impl SharedLearningStore {
 
     async fn load_all(&self) -> Result<(), StoreError> {
         info!("Loading shared learnings from markdown backend");
-        let all_learnings = self.backend.list_all().await?;
-        let count = all_learnings.len();
+        let all_learnings = self.backend.list_all_with_origin().await?;
+        let discovered = all_learnings.len();
+
+        let mut selected: HashMap<String, (bool, SharedLearning)> = HashMap::new();
+        for (is_shared, learning) in all_learnings {
+            match selected.get(&learning.id) {
+                None => {
+                    selected.insert(learning.id.clone(), (is_shared, learning));
+                }
+                Some((existing_is_shared, _)) => {
+                    if *existing_is_shared && !is_shared {
+                        selected.insert(learning.id.clone(), (is_shared, learning));
+                    }
+                }
+            }
+        }
 
         let mut index = self.index.write().await;
-        for learning in all_learnings {
-            // Simple last-write-wins deduplication. Since list_all() doesn't return
-            // path metadata, we can't prefer canonical over shared copies.
-            // Filesystem order typically lists agent directories before shared,
-            // so canonical copies are usually first. This is a known limitation
-            // that can be improved when list_all() returns path metadata.
+        for (_, learning) in selected.into_values() {
             index.insert(learning.id.clone(), learning);
         }
+        let loaded = index.len();
         drop(index);
 
-        info!("Loaded {} shared learnings into index", count);
+        info!(
+            "Loaded {} shared learnings into index ({} discovered)",
+            loaded, discovered
+        );
         Ok(())
     }
 
@@ -733,8 +746,13 @@ mod tests {
 
         // Save to agent directory (canonical)
         backend.save(&learning).await.unwrap();
-        // Save to shared directory
-        backend.save_to_shared(&learning).await.unwrap();
+
+        // Save a stale variant to shared directory with same ID.
+        // Canonical should win after hydration.
+        let mut stale_shared_copy = learning.clone();
+        stale_shared_copy.title = "Stale Shared Copy".to_string();
+        stale_shared_copy.trust_level = TrustLevel::L1;
+        backend.save_to_shared(&stale_shared_copy).await.unwrap();
 
         // Now open the store - it should deduplicate
         let config = StoreConfig::default()
@@ -746,6 +764,7 @@ mod tests {
         // Should only have 1 entry despite 2 files on disk
         assert_eq!(all.len(), 1);
         assert_eq!(all[0].id, "dedup-test-id");
+        assert_eq!(all[0].title, "Shared Dedup Test");
     }
 
     #[tokio::test]
