@@ -1111,6 +1111,29 @@ impl AgentOrchestrator {
             }
         }
 
+        // === BUDGET GATE ===
+        // Skip spawn entirely if the agent's monthly budget is exhausted.
+        // CostTracker::check is already called during routing (for budget
+        // pressure scoring), but routing only deprioritises cheaper models;
+        // it does not short-circuit dispatch. A fully exhausted agent must
+        // not run at all this cycle.
+        let budget_check = self.cost_tracker.check(&def.name);
+        if budget_check.should_pause() {
+            warn!(
+                agent = %def.name,
+                verdict = %budget_check,
+                "skipping spawn: monthly budget exhausted"
+            );
+            return Ok(());
+        }
+        if budget_check.should_warn() {
+            warn!(
+                agent = %def.name,
+                verdict = %budget_check,
+                "budget near exhaustion; routing will prefer cheaper models"
+            );
+        }
+
         // === PRE-CHECK GATE ===
         let pre_check_result = self.run_pre_check(def).await;
         let findings = match pre_check_result {
@@ -4777,5 +4800,81 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             "body should contain backslash, got: {}",
             result
         );
+    }
+
+    /// An agent whose monthly budget is exhausted must skip spawn entirely.
+    /// `CostTracker::check()` returning `Exhausted` short-circuits
+    /// dispatch before pre-check or routing runs.
+    #[tokio::test]
+    async fn test_spawn_agent_skips_when_budget_exhausted() {
+        let mut config = test_config_fast_lifecycle();
+        config.agents = vec![AgentDefinition {
+            name: "broke-agent".to_string(),
+            layer: AgentLayer::Safety,
+            cli_tool: "echo".to_string(),
+            task: "should not run".to_string(),
+            model: None,
+            schedule: None,
+            capabilities: vec![],
+            max_memory_bytes: None,
+            // $1 monthly budget.
+            budget_monthly_cents: Some(100),
+            provider: None,
+            persona: None,
+            terraphim_role: None,
+            skill_chain: vec![],
+            sfia_skills: vec![],
+            fallback_provider: None,
+            fallback_model: None,
+            grace_period_secs: None,
+            max_cpu_seconds: None,
+            pre_check: None,
+            gitea_issue: None,
+            project: None,
+        }];
+
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        // Blow through the budget before attempting to spawn.
+        let verdict = orch.cost_tracker.record_cost("broke-agent", 2.00);
+        assert!(
+            verdict.should_pause(),
+            "budget must be exhausted: {verdict}"
+        );
+
+        let def = orch.config.agents[0].clone();
+        let result = orch.spawn_agent(&def).await;
+
+        // Spawn should succeed-with-no-op rather than error.
+        assert!(result.is_ok(), "spawn returned error: {:?}", result);
+        // Agent must NOT have been added to active_agents.
+        assert!(
+            !orch.active_agents.contains_key("broke-agent"),
+            "exhausted agent should not have been spawned"
+        );
+    }
+
+    /// An agent with no budget cap (subscription) must spawn normally
+    /// even after recording cost -- `record_cost` returns `Uncapped`.
+    #[tokio::test]
+    async fn test_spawn_agent_runs_when_budget_uncapped() {
+        let mut config = test_config_fast_lifecycle();
+        // Ensure the only agent is uncapped.
+        config.agents[0].budget_monthly_cents = None;
+        config.agents[0].name = "subscription-agent".to_string();
+
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        // Even a large recorded spend must not pause an uncapped agent.
+        let _ = orch
+            .cost_tracker
+            .record_cost("subscription-agent", 9_999.00);
+        let verdict = orch.cost_tracker.check("subscription-agent");
+        assert!(!verdict.should_pause(), "uncapped must never pause");
+
+        let def = orch.config.agents[0].clone();
+        let result = orch.spawn_agent(&def).await;
+        assert!(result.is_ok(), "spawn errored: {:?}", result);
+        assert!(orch.active_agents.contains_key("subscription-agent"));
     }
 }
