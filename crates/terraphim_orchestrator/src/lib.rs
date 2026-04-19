@@ -48,6 +48,7 @@ pub mod mode;
 pub mod nightwatch;
 pub mod output_poster;
 pub mod persona;
+pub mod provider_budget;
 pub mod provider_probe;
 #[cfg(feature = "quickwit")]
 pub mod quickwit;
