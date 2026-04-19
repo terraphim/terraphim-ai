@@ -1,20 +1,22 @@
 //! Tests for `terraphim_service::auto_route::auto_select_role`.
 //!
-//! See `docs/research/design-intent-based-role-auto-routing.md` section 6 for the
-//! T1-T7 cases. These tests construct `Config` + `ConfigState` by hand so they
-//! do not depend on `$JMAP_ACCESS_TOKEN` (cargo runs tests in parallel; reading
-//! the env var would make outcomes non-deterministic). Use `from_env` only at
-//! call sites, never inside unit tests.
+//! See `docs/research/design-auto-route-cold-start.md` section 5 for the
+//! T1'-T11' cases. These tests construct `Config` + `ConfigState` by hand so
+//! they do not depend on `$JMAP_ACCESS_TOKEN` (cargo runs tests in parallel;
+//! reading the env var would make outcomes non-deterministic). Use `from_env`
+//! only at call sites, never inside unit tests.
+//!
+//! Scoring is "distinct canonical concept count" against the role's
+//! thesaurus-driven Aho-Corasick automaton. No document seeding is required;
+//! the prior `insert_document` loop has been dropped to exercise cold-start.
 
 use ahash::AHashMap;
 use std::sync::Arc;
 use terraphim_config::{Config, ConfigId, ConfigState, Haystack, Role, ServiceType};
 use terraphim_rolegraph::{RoleGraph, RoleGraphSync};
-use terraphim_service::auto_route::{
-    AutoRouteContext, AutoRouteReason, JMAP_MISSING_TOKEN_DOWNWEIGHT, auto_select_role,
-};
+use terraphim_service::auto_route::{AutoRouteContext, AutoRouteReason, auto_select_role};
 use terraphim_types::{
-    Document, NormalizedTerm, NormalizedTermValue, RelevanceFunction, RoleName, Thesaurus,
+    NormalizedTerm, NormalizedTermValue, RelevanceFunction, RoleName, Thesaurus,
 };
 use tokio::sync::Mutex;
 
@@ -30,38 +32,11 @@ fn build_thesaurus(name: &str, terms: &[(&str, u64, &str)]) -> Thesaurus {
     t
 }
 
-/// Build a single test document whose body contains the supplied snippet.
-fn make_doc(id: &str, body: &str) -> Document {
-    Document {
-        id: id.to_string(),
-        title: id.to_string(),
-        body: body.to_string(),
-        url: format!("test://{id}"),
-        description: None,
-        rank: None,
-        tags: None,
-        summarization: None,
-        stub: None,
-        source_haystack: None,
-        doc_type: terraphim_types::DocumentType::KgEntry,
-        synonyms: None,
-        route: None,
-        priority: None,
-    }
-}
-
-/// Build a `RoleGraphSync` for `role_name` from a thesaurus and seed documents.
-/// Each document's body is matched against the Aho-Corasick automaton; matched
-/// node-pair edges drive `node.rank` upwards (see `init_or_update_node`).
-async fn build_rolegraph(
-    role_name: &RoleName,
-    thesaurus: Thesaurus,
-    docs: &[Document],
-) -> RoleGraphSync {
-    let mut rg = RoleGraph::new(role_name.clone(), thesaurus).await.unwrap();
-    for doc in docs {
-        rg.insert_document(&doc.id, doc.clone());
-    }
+/// Build a `RoleGraphSync` for `role_name` from a thesaurus alone.
+/// No document seeding -- routing now depends only on the prebuilt
+/// Aho-Corasick automaton (`RoleGraph::new`), not on indexed documents.
+async fn build_rolegraph(role_name: &RoleName, thesaurus: Thesaurus) -> RoleGraphSync {
+    let rg = RoleGraph::new(role_name.clone(), thesaurus).await.unwrap();
     RoleGraphSync::from(rg)
 }
 
@@ -108,23 +83,21 @@ fn assemble(roles: Vec<(Role, RoleGraphSync)>, default: &str, selected: &str) ->
 }
 
 // ---------------------------------------------------------------------------
-// T1: Single role wins clearly
+// T1': Single role wins clearly
 // ---------------------------------------------------------------------------
 #[tokio::test]
 async fn t1_single_role_wins_clearly() {
     let sysop_name = RoleName::new("System Operator");
     let default_name = RoleName::new("Default");
 
-    let sysop_thes = build_thesaurus("sysop", &[("rfp", 1, "rfp")]);
+    let sysop_thes = build_thesaurus(
+        "sysop",
+        &[("rfp", 1, "acquisition need"), ("acquisition", 1, "acquisition need")],
+    );
     let default_thes = build_thesaurus("default", &[("anything", 2, "anything")]);
 
-    // Insert a few docs containing "rfp" so the node accumulates rank.
-    let sysop_docs = vec![
-        make_doc("d1", "rfp considerations and rfp planning"),
-        make_doc("d2", "an rfp summary discusses rfp metadata"),
-    ];
-    let sysop_rg = build_rolegraph(&sysop_name, sysop_thes, &sysop_docs).await;
-    let default_rg = build_rolegraph(&default_name, default_thes, &[]).await;
+    let sysop_rg = build_rolegraph(&sysop_name, sysop_thes).await;
+    let default_rg = build_rolegraph(&default_name, default_thes).await;
 
     let fixture = assemble(
         vec![
@@ -139,30 +112,26 @@ async fn t1_single_role_wins_clearly() {
         selected_role: Some(default_name.clone()),
         jmap_token_present: true,
     };
-    let result = auto_select_role("rfp", &fixture.config, &fixture.state, &ctx).await;
+    let result = auto_select_role("RFP", &fixture.config, &fixture.state, &ctx).await;
 
     assert_eq!(result.role.as_str(), "System Operator");
+    assert_eq!(result.score, 1);
     assert_eq!(result.reason, AutoRouteReason::ScoredWinner);
-    assert!(result.candidates[0].1 > result.candidates[1].1);
 }
 
 // ---------------------------------------------------------------------------
-// T2: Tie -- selected_role wins
+// T2': Tie -- selected_role wins
 // ---------------------------------------------------------------------------
 #[tokio::test]
 async fn t2_tie_selected_role_wins() {
     let a_name = RoleName::new("Personal Assistant");
     let b_name = RoleName::new("Terraphim Engineer");
 
-    // Same thesaurus content, same documents -> identical raw_score.
+    // Same single matching concept -> identical distinct-concept score (1).
     let thes_a = build_thesaurus("a", &[("widget", 10, "widget")]);
     let thes_b = build_thesaurus("b", &[("widget", 20, "widget")]);
-    let docs = vec![
-        make_doc("d1", "widget widget widget"),
-        make_doc("d2", "more widget content"),
-    ];
-    let rg_a = build_rolegraph(&a_name, thes_a, &docs).await;
-    let rg_b = build_rolegraph(&b_name, thes_b, &docs).await;
+    let rg_a = build_rolegraph(&a_name, thes_a).await;
+    let rg_b = build_rolegraph(&b_name, thes_b).await;
 
     let fixture = assemble(
         vec![
@@ -181,13 +150,12 @@ async fn t2_tie_selected_role_wins() {
 
     assert_eq!(result.role.as_str(), "Terraphim Engineer");
     assert_eq!(result.reason, AutoRouteReason::TieBrokenBySelectedRole);
-    // Both candidates should be at the top with equal scores.
     assert_eq!(result.candidates[0].1, result.candidates[1].1);
-    assert!(result.score > 0);
+    assert_eq!(result.score, 1);
 }
 
 // ---------------------------------------------------------------------------
-// T3: Tie -- alphabetical
+// T3': Tie -- alphabetical
 // ---------------------------------------------------------------------------
 #[tokio::test]
 async fn t3_tie_alphabetical() {
@@ -196,12 +164,8 @@ async fn t3_tie_alphabetical() {
 
     let thes_a = build_thesaurus("a", &[("widget", 10, "widget")]);
     let thes_b = build_thesaurus("b", &[("widget", 20, "widget")]);
-    let docs = vec![
-        make_doc("d1", "widget widget widget"),
-        make_doc("d2", "more widget content"),
-    ];
-    let rg_a = build_rolegraph(&a_name, thes_a, &docs).await;
-    let rg_b = build_rolegraph(&b_name, thes_b, &docs).await;
+    let rg_a = build_rolegraph(&a_name, thes_a).await;
+    let rg_b = build_rolegraph(&b_name, thes_b).await;
 
     let fixture = assemble(
         vec![
@@ -212,8 +176,7 @@ async fn t3_tie_alphabetical() {
         "Personal Assistant",
     );
 
-    // Selected role "PA" is also alphabetically first; switch selected to one
-    // that is NOT in the tied set so we exercise the alphabetical fallback.
+    // Selected role is NOT in the tied set -> alphabetical fallback.
     let outsider = RoleName::new("Other Role Not In Config");
     let ctx = AutoRouteContext {
         selected_role: Some(outsider),
@@ -226,7 +189,7 @@ async fn t3_tie_alphabetical() {
 }
 
 // ---------------------------------------------------------------------------
-// T4: Zero match, selected_role set
+// T4': Zero match, selected_role set
 // ---------------------------------------------------------------------------
 #[tokio::test]
 async fn t4_zero_match_selected_role() {
@@ -236,8 +199,8 @@ async fn t4_zero_match_selected_role() {
     let rust_thes = build_thesaurus("rust", &[("rust", 1, "rust")]);
     let default_thes = build_thesaurus("default", &[("anything", 2, "anything")]);
 
-    let rg_rust = build_rolegraph(&rust_name, rust_thes, &[]).await;
-    let rg_default = build_rolegraph(&default_name, default_thes, &[]).await;
+    let rg_rust = build_rolegraph(&rust_name, rust_thes).await;
+    let rg_default = build_rolegraph(&default_name, default_thes).await;
 
     let fixture = assemble(
         vec![
@@ -256,10 +219,11 @@ async fn t4_zero_match_selected_role() {
 
     assert_eq!(result.role.as_str(), "Rust Engineer");
     assert_eq!(result.reason, AutoRouteReason::ZeroMatchSelectedRole);
+    assert_eq!(result.score, 0);
 }
 
 // ---------------------------------------------------------------------------
-// T5: Zero match, selected_role unset
+// T5': Zero match, selected_role unset
 // ---------------------------------------------------------------------------
 #[tokio::test]
 async fn t5_zero_match_default() {
@@ -269,8 +233,8 @@ async fn t5_zero_match_default() {
     let default_thes = build_thesaurus("default", &[("anything", 1, "anything")]);
     let other_thes = build_thesaurus("other", &[("anything_else", 2, "anything_else")]);
 
-    let rg_default = build_rolegraph(&default_name, default_thes, &[]).await;
-    let rg_other = build_rolegraph(&other_name, other_thes, &[]).await;
+    let rg_default = build_rolegraph(&default_name, default_thes).await;
+    let rg_other = build_rolegraph(&other_name, other_thes).await;
 
     let fixture = assemble(
         vec![
@@ -289,27 +253,26 @@ async fn t5_zero_match_default() {
 
     assert_eq!(result.role.as_str(), "Default");
     assert_eq!(result.reason, AutoRouteReason::ZeroMatchDefault);
+    assert_eq!(result.score, 0);
 }
 
 // ---------------------------------------------------------------------------
-// T6: PA loses with stronger rival even when token is missing
+// T6': PA loses to a stronger rival under JMAP missing-token penalty
 // ---------------------------------------------------------------------------
 #[tokio::test]
 async fn t6_pa_loses_to_stronger_rival() {
     let pa_name = RoleName::new("Personal Assistant");
     let sysop_name = RoleName::new("System Operator");
 
+    // PA matches one concept; sysop matches two distinct concepts.
     let pa_thes = build_thesaurus("pa", &[("invoice", 1, "invoice")]);
-    let sysop_thes = build_thesaurus("sysop", &[("invoice", 2, "invoice")]);
+    let sysop_thes = build_thesaurus(
+        "sysop",
+        &[("invoice", 2, "invoice"), ("procurement", 3, "procurement")],
+    );
 
-    // PA gets a small body; sysop gets many docs so its node rank is much higher.
-    let pa_docs = vec![make_doc("d1", "invoice invoice")];
-    let sysop_docs: Vec<Document> = (0..30)
-        .map(|i| make_doc(&format!("s{i}"), "invoice invoice invoice invoice"))
-        .collect();
-
-    let rg_pa = build_rolegraph(&pa_name, pa_thes, &pa_docs).await;
-    let rg_sysop = build_rolegraph(&sysop_name, sysop_thes, &sysop_docs).await;
+    let rg_pa = build_rolegraph(&pa_name, pa_thes).await;
+    let rg_sysop = build_rolegraph(&sysop_name, sysop_thes).await;
 
     let fixture = assemble(
         vec![
@@ -324,29 +287,32 @@ async fn t6_pa_loses_to_stronger_rival() {
         selected_role: Some(pa_name.clone()),
         jmap_token_present: false,
     };
-    let result = auto_select_role("invoice", &fixture.config, &fixture.state, &ctx).await;
+    let result =
+        auto_select_role("invoice procurement", &fixture.config, &fixture.state, &ctx).await;
 
+    // Raw: PA=1, sysop=2. After penalty: PA=0, sysop=2. Sysop wins outright.
     assert_eq!(result.role.as_str(), "System Operator");
+    assert_eq!(result.score, 2);
     assert_eq!(result.reason, AutoRouteReason::ScoredWinner);
 }
 
 // ---------------------------------------------------------------------------
-// T7: PA wins on Obsidian alone (downweighted score still beats zero rivals)
+// T7': PA wins with sufficient evidence (penalty does not silence it)
 // ---------------------------------------------------------------------------
 #[tokio::test]
 async fn t7_pa_wins_when_only_pa_matches() {
     let pa_name = RoleName::new("Personal Assistant");
     let other_name = RoleName::new("Default");
 
-    let pa_thes = build_thesaurus("pa", &[("invoice", 1, "invoice")]);
-    let other_thes = build_thesaurus("default", &[("rust", 2, "rust")]);
+    // PA matches two distinct concepts; rival matches none.
+    let pa_thes = build_thesaurus(
+        "pa",
+        &[("invoice", 1, "invoice"), ("receipt", 2, "receipt")],
+    );
+    let other_thes = build_thesaurus("default", &[("rust", 3, "rust")]);
 
-    let pa_docs = vec![
-        make_doc("d1", "invoice invoice invoice"),
-        make_doc("d2", "another invoice document with invoice"),
-    ];
-    let rg_pa = build_rolegraph(&pa_name, pa_thes, &pa_docs).await;
-    let rg_other = build_rolegraph(&other_name, other_thes, &[]).await;
+    let rg_pa = build_rolegraph(&pa_name, pa_thes).await;
+    let rg_other = build_rolegraph(&other_name, other_thes).await;
 
     let fixture = assemble(
         vec![
@@ -361,16 +327,11 @@ async fn t7_pa_wins_when_only_pa_matches() {
         selected_role: Some(pa_name.clone()),
         jmap_token_present: false,
     };
-    let result = auto_select_role("invoice", &fixture.config, &fixture.state, &ctx).await;
+    let result =
+        auto_select_role("invoice and receipt", &fixture.config, &fixture.state, &ctx).await;
 
+    // Raw PA=2, after penalty=1. Rival raw=0. PA still wins.
     assert_eq!(result.role.as_str(), "Personal Assistant");
-    assert!(result.score > 0);
-    // Confirm downweight was actually applied by reproducing the math: the raw
-    // rank-sum should round to (score / DOWNWEIGHT). Use saturating equality to
-    // avoid coupling to the exact insert_document tuple_windows behaviour.
-    let raw_estimate = (result.score as f64) / JMAP_MISSING_TOKEN_DOWNWEIGHT;
-    assert!(
-        raw_estimate >= result.score as f64,
-        "downweighted score should be no greater than raw"
-    );
+    assert_eq!(result.score, 1);
+    assert_eq!(result.reason, AutoRouteReason::ScoredWinner);
 }
