@@ -492,6 +492,11 @@ impl AgentOrchestrator {
         Self::new(config)
     }
 
+    /// Return the validated configuration stored in this orchestrator.
+    pub fn config(&self) -> &OrchestratorConfig {
+        &self.config
+    }
+
     /// Run the orchestrator (blocks until shutdown signal).
     ///
     /// 1. Spawns all Safety-layer agents immediately
