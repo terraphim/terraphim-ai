@@ -284,6 +284,24 @@ impl TuiService {
         // Auto-route. Snapshot the live config (the helper needs Role.haystacks)
         // and normalise selected_role against config.roles before passing it.
         let config = self.get_config().await;
+
+        // Pre-warm every role's thesaurus so the in-memory rolegraphs the router
+        // scores against are populated. Without this, freshly loaded roles have
+        // empty graphs and the router returns score=0 across the board, falling
+        // back to Default for every query.
+        {
+            let mut service = self.service.lock().await;
+            for role_name in config.roles.keys() {
+                if let Err(e) = service.ensure_thesaurus_loaded(role_name).await {
+                    log::debug!(
+                        "auto-route: failed to load thesaurus for '{}': {} (role contributes 0 to score)",
+                        role_name,
+                        e
+                    );
+                }
+            }
+        }
+
         let selected = self.get_selected_role().await;
         let selected_normalised = if config.roles.contains_key(&selected) {
             Some(selected)
