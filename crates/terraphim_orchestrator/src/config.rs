@@ -830,6 +830,18 @@ impl OrchestratorConfig {
         Ok(config)
     }
 
+    /// Load from a TOML file, expand include globs, and validate.
+    ///
+    /// Single entry-point for production startup and `adf --check`. Callers
+    /// that need a pre-parsed config can call `from_file` + `validate` directly.
+    pub fn load_and_validate(
+        path: impl AsRef<std::path::Path>,
+    ) -> Result<Self, crate::error::OrchestratorError> {
+        let cfg = Self::from_file(path)?;
+        cfg.validate()?;
+        Ok(cfg)
+    }
+
     /// Substitute environment variables in workflow config.
     /// Replaces ${VAR} or $VAR with the value of the environment variable.
     pub fn substitute_env_vars(&mut self) {
