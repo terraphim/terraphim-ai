@@ -131,6 +131,16 @@ impl GiteaTracker {
         Ok(Self { client, config })
     }
 
+    /// Gitea owner (org or user) this tracker is scoped to.
+    pub fn owner(&self) -> &str {
+        &self.config.owner
+    }
+
+    /// Gitea repository this tracker is scoped to.
+    pub fn repo(&self) -> &str {
+        &self.config.repo
+    }
+
     /// Build request with authentication.
     pub(crate) fn build_request(
         &self,
