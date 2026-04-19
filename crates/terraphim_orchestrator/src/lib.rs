@@ -4420,6 +4420,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
         // Add a test flow with a schedule
         config.flows = vec![FlowDefinition {
             name: "test-flow".to_string(),
+            project: "test".to_string(),
             schedule: Some("0 2 * * *".to_string()), // 2 AM daily
             repo_path: "/tmp/test-repo".to_string(),
             base_branch: "main".to_string(),
