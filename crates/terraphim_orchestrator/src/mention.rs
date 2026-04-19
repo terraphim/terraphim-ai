@@ -13,15 +13,54 @@ use std::collections::HashMap;
 use std::sync::LazyLock;
 use terraphim_tracker::IssueComment;
 
-/// Regex for @adf:name mentions.
-static MENTION_RE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"@adf:([a-z][a-z0-9-]{1,39})\b").unwrap());
+/// Synthetic project id used when no multi-project config is in effect.
+///
+/// Must match `crate::dispatcher::LEGACY_PROJECT_ID`; duplicated here to
+/// avoid the cross-module dependency cycle from `dispatcher::` through
+/// lib.rs during unit tests that pull in just this module.
+pub(crate) const LEGACY_PROJECT_ID: &str = "__global__";
+
+/// Regex for `@adf:[project/]name` mentions.
+///
+/// Captures an optional lowercase project prefix and a mandatory agent name.
+/// Unqualified mentions (`@adf:developer`) keep the `project` capture as `None`.
+/// Qualified mentions (`@adf:odilo/developer`) populate both.
+static MENTION_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"@adf:(?:(?P<project>[a-z][a-z0-9-]{1,39})/)?(?P<agent>[a-z][a-z0-9-]{1,39})\b")
+        .unwrap()
+});
 
 /// How a mention was resolved.
 #[derive(Debug, Clone, PartialEq)]
 pub enum MentionResolution {
     AgentName,
     PersonaName { persona: String },
+}
+
+/// Parsed tokens of a single `@adf:[project/]name` mention.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MentionTokens {
+    pub project: Option<String>,
+    pub agent: String,
+}
+
+/// Parse all `@adf:[project/]name` mentions in `text`, returning their
+/// project prefix (if any) and bare agent name in order of appearance.
+///
+/// Unlike [`parse_mentions`] this is a pure syntactic pass — no lookup
+/// against known agents or personas. Useful for tests and for the
+/// multi-project poller which wants the raw tokens before resolution.
+pub fn parse_mention_tokens(text: &str) -> Vec<MentionTokens> {
+    MENTION_RE
+        .captures_iter(text)
+        .map(|caps| MentionTokens {
+            project: caps.name("project").map(|m| m.as_str().to_string()),
+            agent: caps
+                .name("agent")
+                .map(|m| m.as_str().to_string())
+                .unwrap_or_default(),
+        })
+        .collect()
 }
 
 /// A detected and resolved mention.
@@ -35,6 +74,14 @@ pub struct DetectedMention {
     pub comment_body: String,
     pub mentioner: String,
     pub timestamp: String,
+    /// Project id the mention was detected in.
+    ///
+    /// Set to [`LEGACY_PROJECT_ID`] for legacy single-project mode or to the
+    /// id of the project whose repo the enclosing comment was polled from.
+    /// A qualified `@adf:<proj>/<name>` mention does not override this -- the
+    /// detected project lives in [`MentionTokens`] from [`parse_mention_tokens`]
+    /// and is consumed by [`resolve_mention`].
+    pub project_id: String,
 }
 
 // ---------------------------------------------------------------------------
@@ -179,12 +226,15 @@ impl Default for MentionCursor {
     }
 }
 
-/// Resolve a raw mention to an agent name.
+/// Resolve a raw mention to an agent name via persona lookup.
 ///
 /// 1. If raw matches an agent name exactly -> AgentName
 /// 2. If raw matches a persona name -> PersonaName (pick best-fit agent)
 /// 3. No match -> None
-pub fn resolve_mention(
+///
+/// This is the legacy single-project resolver used by the compound-review
+/// persona dispatch path. Multi-project resolution lives in [`resolve_mention`].
+pub fn resolve_persona_mention(
     raw: &str,
     agents: &[AgentDefinition],
     personas: &PersonaRegistry,
@@ -248,33 +298,121 @@ pub fn resolve_mention(
     None
 }
 
+/// Resolve a `@adf:[project/]name` mention to a concrete [`AgentDefinition`]
+/// using the poller's project hint and optional qualified prefix.
+///
+/// Resolution rules (in order):
+///
+/// 1. If `detected_project` is `Some("p")` — an explicit `@adf:p/name` —
+///    find the unique agent whose `name == agent_name` **and** `project == Some("p")`.
+///    Mismatch between `detected_project` and `hinted_project` is permitted:
+///    a user in repo A may address an agent defined against project B, as long
+///    as that agent exists. If zero or more than one agent matches, return `None`.
+///
+/// 2. If `detected_project` is `None` — an unqualified `@adf:name`:
+///
+///    - If `hinted_project == `[`LEGACY_PROJECT_ID`] (single-project legacy mode),
+///      match on `name == agent_name` only, ignoring the agent's `project` field.
+///
+///    - Otherwise, prefer an agent defined for `hinted_project`
+///      (`name == agent_name` and `project == Some(hinted_project)`).
+///
+///    - Fallback: accept a project-less agent (`project == None`) with a matching name.
+///      Cross-project defaulting (matching an agent whose project differs from
+///      the hint) is never allowed -- that would let an unqualified mention
+///      silently spawn an agent from another repo.
+///
+/// Returns `None` if no agent satisfies these rules or if multiple agents do.
+///
+/// The caller is expected to have obtained `detected_project` from
+/// [`parse_mention_tokens`] or [`MENTION_RE`] and `hinted_project` from the
+/// poller's current iteration over `config.projects` (or [`LEGACY_PROJECT_ID`]
+/// for the legacy top-level gitea path).
+pub fn resolve_mention(
+    detected_project: Option<&str>,
+    hinted_project: &str,
+    agent_name: &str,
+    agents: &[AgentDefinition],
+) -> Option<AgentDefinition> {
+    if let Some(proj) = detected_project {
+        // Qualified form: `@adf:<proj>/<name>` — exact (name, project) match.
+        let matches: Vec<&AgentDefinition> = agents
+            .iter()
+            .filter(|a| a.name == agent_name && a.project.as_deref() == Some(proj))
+            .collect();
+        return match matches.len() {
+            1 => Some(matches[0].clone()),
+            _ => None,
+        };
+    }
+
+    // Unqualified form: `@adf:<name>`.
+    if hinted_project == LEGACY_PROJECT_ID {
+        // Legacy single-project mode: ignore the agent's project field.
+        let matches: Vec<&AgentDefinition> =
+            agents.iter().filter(|a| a.name == agent_name).collect();
+        return match matches.len() {
+            1 => Some(matches[0].clone()),
+            _ => None,
+        };
+    }
+
+    // Multi-project mode: prefer an agent bound to the hinted project.
+    let hinted: Vec<&AgentDefinition> = agents
+        .iter()
+        .filter(|a| a.name == agent_name && a.project.as_deref() == Some(hinted_project))
+        .collect();
+    if hinted.len() == 1 {
+        return Some(hinted[0].clone());
+    }
+    if hinted.len() > 1 {
+        return None;
+    }
+
+    // Fallback: project-less agent with matching name.
+    let unbound: Vec<&AgentDefinition> = agents
+        .iter()
+        .filter(|a| a.name == agent_name && a.project.is_none())
+        .collect();
+    match unbound.len() {
+        1 => Some(unbound[0].clone()),
+        _ => None,
+    }
+}
+
 /// Parse and resolve all @adf:name mentions from a comment.
+///
+/// `hinted_project` is the id of the project whose repo the comment was
+/// polled from, or [`LEGACY_PROJECT_ID`] in single-project mode. It is
+/// stamped on every produced [`DetectedMention`] for downstream dispatch.
 pub fn parse_mentions(
     comment: &IssueComment,
     issue_number: u64,
     agents: &[AgentDefinition],
     personas: &PersonaRegistry,
+    hinted_project: &str,
 ) -> Vec<DetectedMention> {
     let mut mentions = Vec::new();
 
     for cap in MENTION_RE.captures_iter(&comment.body) {
-        let raw = &cap[1];
+        let raw_agent = cap.name("agent").map(|m| m.as_str()).unwrap_or_default();
         if let Some((agent_name, resolution)) =
-            resolve_mention(raw, agents, personas, &comment.body)
+            resolve_persona_mention(raw_agent, agents, personas, &comment.body)
         {
             mentions.push(DetectedMention {
                 issue_number,
                 comment_id: comment.id,
-                raw_mention: raw.to_string(),
+                raw_mention: raw_agent.to_string(),
                 agent_name,
                 resolution,
                 comment_body: comment.body.clone(),
                 mentioner: comment.user.login.clone(),
                 timestamp: comment.created_at.clone(),
+                project_id: hinted_project.to_string(),
             });
         } else {
             tracing::warn!(
-                raw_mention = raw,
+                raw_mention = raw_agent,
                 issue = issue_number,
                 "unresolved @adf mention"
             );
@@ -431,11 +569,12 @@ mod tests {
         let agents = test_agents();
         let personas = test_personas();
         let comment = make_comment(1, "Please @adf:security-sentinel review this code", "alice");
-        let mentions = parse_mentions(&comment, 42, &agents, &personas);
+        let mentions = parse_mentions(&comment, 42, &agents, &personas, LEGACY_PROJECT_ID);
         assert_eq!(mentions.len(), 1);
         assert_eq!(mentions[0].agent_name, "security-sentinel");
         assert_eq!(mentions[0].resolution, MentionResolution::AgentName);
         assert_eq!(mentions[0].raw_mention, "security-sentinel");
+        assert_eq!(mentions[0].project_id, LEGACY_PROJECT_ID);
     }
 
     #[test]
@@ -445,7 +584,7 @@ mod tests {
         // "vigil" persona resolves to an agent. With "security" in context,
         // should prefer security-sentinel over compliance-watchdog.
         let comment = make_comment(2, "@adf:vigil check for security vulnerabilities", "alice");
-        let mentions = parse_mentions(&comment, 42, &agents, &personas);
+        let mentions = parse_mentions(&comment, 42, &agents, &personas, LEGACY_PROJECT_ID);
         assert_eq!(mentions.len(), 1);
         assert_eq!(mentions[0].agent_name, "security-sentinel");
         assert!(matches!(
@@ -459,7 +598,7 @@ mod tests {
         let agents = test_agents();
         let personas = test_personas();
         let comment = make_comment(3, "@adf:vigil and @adf:carthos please review", "bob");
-        let mentions = parse_mentions(&comment, 42, &agents, &personas);
+        let mentions = parse_mentions(&comment, 42, &agents, &personas, LEGACY_PROJECT_ID);
         assert_eq!(mentions.len(), 2);
     }
 
@@ -468,7 +607,7 @@ mod tests {
         let agents = test_agents();
         let personas = test_personas();
         let comment = make_comment(4, "No mentions here", "alice");
-        let mentions = parse_mentions(&comment, 42, &agents, &personas);
+        let mentions = parse_mentions(&comment, 42, &agents, &personas, LEGACY_PROJECT_ID);
         assert!(mentions.is_empty());
     }
 
@@ -477,8 +616,18 @@ mod tests {
         let agents = test_agents();
         let personas = test_personas();
         let comment = make_comment(5, "@alice please review", "bob");
-        let mentions = parse_mentions(&comment, 42, &agents, &personas);
+        let mentions = parse_mentions(&comment, 42, &agents, &personas, LEGACY_PROJECT_ID);
         assert!(mentions.is_empty());
+    }
+
+    #[test]
+    fn test_parse_stamps_hinted_project_id() {
+        let agents = test_agents();
+        let personas = test_personas();
+        let comment = make_comment(6, "Please @adf:security-sentinel look at this", "alice");
+        let mentions = parse_mentions(&comment, 42, &agents, &personas, "odilo");
+        assert_eq!(mentions.len(), 1);
+        assert_eq!(mentions[0].project_id, "odilo");
     }
 
     #[test]
@@ -486,7 +635,7 @@ mod tests {
         let agents = test_agents();
         let personas = test_personas();
         // Lux has only one agent: product-development
-        let result = resolve_mention("lux", &agents, &personas, "some context");
+        let result = resolve_persona_mention("lux", &agents, &personas, "some context");
         assert!(result.is_some());
         let (name, res) = result.unwrap();
         assert_eq!(name, "product-development");
@@ -499,7 +648,8 @@ mod tests {
         let personas = test_personas();
         // Vigil shared by security-sentinel and compliance-watchdog
         // Context mentions "license" -> should pick compliance-watchdog
-        let result = resolve_mention("vigil", &agents, &personas, "check license compliance");
+        let result =
+            resolve_persona_mention("vigil", &agents, &personas, "check license compliance");
         assert!(result.is_some());
         let (name, _) = result.unwrap();
         assert_eq!(name, "compliance-watchdog");
@@ -509,7 +659,7 @@ mod tests {
     fn test_resolve_unknown_name() {
         let agents = test_agents();
         let personas = test_personas();
-        let result = resolve_mention("nonexistent", &agents, &personas, "context");
+        let result = resolve_persona_mention("nonexistent", &agents, &personas, "context");
         assert!(result.is_none());
     }
 
