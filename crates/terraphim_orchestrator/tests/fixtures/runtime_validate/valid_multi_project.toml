@@ -1,0 +1,31 @@
+working_dir = "/tmp/t"
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 2 * * *"
+repo_path = "/tmp/repo"
+
+[[projects]]
+id = "alpha"
+working_dir = "/tmp/alpha"
+
+[[projects]]
+id = "beta"
+working_dir = "/tmp/beta"
+
+[[agents]]
+name = "alpha-sentinel"
+layer = "Safety"
+cli_tool = "claude"
+task = "Watch alpha"
+project = "alpha"
+model = "sonnet"
+
+[[agents]]
+name = "beta-sentinel"
+layer = "Safety"
+cli_tool = "claude"
+task = "Watch beta"
+project = "beta"
+model = "opus"
