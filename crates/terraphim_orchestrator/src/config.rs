@@ -57,6 +57,14 @@ pub struct Project {
     #[cfg(feature = "quickwit")]
     #[serde(default)]
     pub quickwit: Option<QuickwitConfig>,
+    /// Maximum concurrent agents (time + issue + mention) for this project.
+    /// Unset = no per-project cap beyond the global concurrency controller.
+    #[serde(default)]
+    pub max_concurrent_agents: Option<usize>,
+    /// Maximum concurrent mention-driven agents for this project.
+    /// Unset = fall back to global mention cap only.
+    #[serde(default)]
+    pub max_concurrent_mention_agents: Option<usize>,
 }
 
 /// Top-level orchestrator configuration (parsed from TOML).
@@ -762,6 +770,23 @@ pub(crate) fn validate_model_provider(
 }
 
 impl OrchestratorConfig {
+    /// Find a project definition by id.
+    pub fn project_by_id(&self, id: &str) -> Option<&Project> {
+        self.projects.iter().find(|p| p.id == id)
+    }
+
+    /// Resolve the effective working directory for an agent: the project's
+    /// `working_dir` if the agent has a `project` and it matches a known
+    /// project, else the top-level working_dir.
+    pub fn working_dir_for_agent(&self, agent: &AgentDefinition) -> PathBuf {
+        agent
+            .project
+            .as_deref()
+            .and_then(|pid| self.project_by_id(pid))
+            .map(|p| p.working_dir.clone())
+            .unwrap_or_else(|| self.working_dir.clone())
+    }
+
     /// Parse an OrchestratorConfig from a TOML string. Does not expand
     /// `include` globs; use `from_file` when include expansion is needed.
     pub fn from_toml(toml_str: &str) -> Result<Self, crate::error::OrchestratorError> {
