@@ -23,6 +23,8 @@ fn make_agent(name: &str, layer: AgentLayer, schedule: Option<&str>) -> AgentDef
         pre_check: None,
 
         gitea_issue: None,
+
+        project: None,
     }
 }
 

@@ -166,6 +166,8 @@ mod tests {
             pre_check: None,
 
             gitea_issue: None,
+
+            project: None,
         }
     }
 
