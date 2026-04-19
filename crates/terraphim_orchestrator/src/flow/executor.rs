@@ -9,7 +9,7 @@ use super::envelope::StepEnvelope;
 use super::state::{FlowRunState, FlowRunStatus};
 use crate::config::{AgentDefinition, AgentLayer};
 use crate::error::OrchestratorError;
-use terraphim_spawner::{AgentSpawner, OutputEvent, SpawnRequest};
+use terraphim_spawner::{AgentSpawner, OutputEvent, SpawnContext, SpawnRequest};
 use terraphim_types::capability::Provider;
 
 pub struct FlowExecutor {
@@ -225,7 +225,7 @@ impl FlowExecutor {
         // Spawn the agent
         let mut handle = self
             .spawner
-            .spawn_with_fallback(&request)
+            .spawn_with_fallback(&request, SpawnContext::global())
             .await
             .map_err(|e| OrchestratorError::FlowFailed {
                 flow_name: flow.name.clone(),

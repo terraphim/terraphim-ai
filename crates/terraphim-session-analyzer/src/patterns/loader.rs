@@ -153,6 +153,7 @@ fn merge_patterns(builtin: Vec<ToolPattern>, user: Vec<ToolPattern>) -> Result<V
     let mut merged: Vec<ToolPattern> = pattern_map.into_values().collect();
 
     // Sort by name for consistent ordering
+    #[allow(clippy::unnecessary_sort_by)]
     merged.sort_by(|a, b| a.name.cmp(&b.name));
 
     // Validate the merged patterns

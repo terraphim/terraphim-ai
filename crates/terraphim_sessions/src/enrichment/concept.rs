@@ -129,6 +129,7 @@ impl SessionConcepts {
     /// Get concepts sorted by frequency
     pub fn by_frequency(&self) -> Vec<&ConceptMatch> {
         let mut sorted: Vec<_> = self.concepts.values().collect();
+        #[allow(clippy::unnecessary_sort_by)]
         sorted.sort_by(|a, b| b.count.cmp(&a.count));
         sorted
     }

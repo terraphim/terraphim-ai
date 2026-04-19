@@ -165,7 +165,7 @@ impl Reporter {
             .map(|a| (a.timestamp, &a.agent_type, &a.task_description))
             .collect();
 
-        events.sort_by(|a, b| a.0.cmp(&b.0));
+        events.sort_by_key(|(ts, _, _)| *ts);
 
         for (timestamp, agent_type, description) in events.iter().take(10) {
             let time_str = self.format_timestamp(*timestamp);
@@ -224,7 +224,7 @@ impl Reporter {
         }
 
         let mut sorted_agents: Vec<_> = agent_counts.into_iter().collect();
-        sorted_agents.sort_by(|a, b| b.1.cmp(&a.1));
+        sorted_agents.sort_by_key(|(_, count)| std::cmp::Reverse(*count));
 
         println!("  {} {}", "Total agent invocations:".bold(), total_agents);
         println!("  {} {}", "Total files modified:".bold(), total_files);
@@ -444,7 +444,7 @@ impl Reporter {
 
         // Convert to sorted vector
         let mut tool_stats: Vec<_> = stats.iter().collect();
-        tool_stats.sort_by(|a, b| b.1.total_invocations.cmp(&a.1.total_invocations));
+        tool_stats.sort_by_key(|(_, stat)| std::cmp::Reverse(stat.total_invocations));
 
         // Create table rows
         let mut rows = Vec::new();
@@ -545,6 +545,7 @@ impl Reporter {
         }
 
         // Sort by invocation count
+        #[allow(clippy::unnecessary_sort_by)]
         tool_rows.sort_by(|a, b| {
             b.count
                 .parse::<u32>()
@@ -567,7 +568,7 @@ impl Reporter {
             .iter()
             .map(|(cat, count)| (format!("{:?}", cat), *count))
             .collect();
-        category_rows.sort_by(|a, b| b.1.cmp(&a.1));
+        category_rows.sort_by_key(|(_, count)| std::cmp::Reverse(*count));
 
         for (category, count) in category_rows {
             #[allow(clippy::cast_precision_loss)]
@@ -760,7 +761,7 @@ impl Reporter {
             .iter()
             .map(|(cat, count)| (format!("{:?}", cat), *count))
             .collect();
-        category_rows.sort_by(|a, b| b.1.cmp(&a.1));
+        category_rows.sort_by_key(|(_, count)| std::cmp::Reverse(*count));
 
         for (category, count) in category_rows {
             #[allow(clippy::cast_precision_loss)]
@@ -781,7 +782,7 @@ impl Reporter {
         )?;
 
         let mut tool_list: Vec<_> = analysis.tool_statistics.iter().collect();
-        tool_list.sort_by(|a, b| b.1.total_invocations.cmp(&a.1.total_invocations));
+        tool_list.sort_by_key(|(_, stat)| std::cmp::Reverse(stat.total_invocations));
 
         for (tool_name, stat) in tool_list {
             let agents_str = if stat.agents_using.is_empty() {

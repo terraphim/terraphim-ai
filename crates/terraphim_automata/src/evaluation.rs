@@ -178,6 +178,7 @@ pub fn evaluate(ground_truth: &[GroundTruthDocument], thesaurus: Thesaurus) -> E
         .collect();
 
     // Sort per-term reports by term name for deterministic output
+    #[allow(clippy::unnecessary_sort_by)]
     per_term.sort_by(|a, b| a.term.cmp(&b.term));
 
     // Detect systematic errors: terms with false-positive count >= threshold
@@ -192,6 +193,7 @@ pub fn evaluate(ground_truth: &[GroundTruthDocument], thesaurus: Thesaurus) -> E
         .collect();
 
     // Sort systematic errors by term name for deterministic output
+    #[allow(clippy::unnecessary_sort_by)]
     systematic_errors.sort_by(|a, b| a.term.cmp(&b.term));
 
     EvaluationResult {

@@ -18,10 +18,12 @@
 //! - **L2 (Peer-Validated)**: Applied 3+ times across 2+ agents with positive outcome
 //! - **L3 (Human-Approved)**: CTO review via `/evolve` or Gitea issue approval
 
+mod markdown_store;
 mod store;
 mod types;
 mod wiki_sync;
 
+pub use markdown_store::{MarkdownLearningStore, MarkdownStoreConfig, MarkdownStoreError};
 pub use store::{SharedLearningStore, StoreConfig};
 pub use types::{LearningSource as SharedLearningSource, SharedLearning, TrustLevel};
 pub use wiki_sync::{GiteaWikiClient, WikiSyncError};

@@ -733,7 +733,7 @@ fn calculate_tool_chains(invocations: &[models::ToolInvocation]) -> Vec<models::
         .collect();
 
     // Sort by frequency
-    chains.sort_by(|a, b| b.frequency.cmp(&a.frequency));
+    chains.sort_by_key(|c| std::cmp::Reverse(c.frequency));
     chains.truncate(10); // Top 10 chains
 
     chains
@@ -807,7 +807,7 @@ fn calculate_agent_tool_correlations(
         .collect();
 
     // Sort by usage count
-    correlations.sort_by(|a, b| b.usage_count.cmp(&a.usage_count));
+    correlations.sort_by_key(|c| std::cmp::Reverse(c.usage_count));
     correlations.truncate(20); // Top 20 correlations
 
     correlations
@@ -1041,11 +1041,9 @@ fn analyze_tools(
     let sorted_stats: Vec<(String, models::ToolStatistics)> = {
         let mut stats = filtered_stats;
         match sort_by {
-            SortBy::Frequency => {
-                stats.sort_by(|a, b| b.1.total_invocations.cmp(&a.1.total_invocations))
-            }
-            SortBy::Alphabetical => stats.sort_by(|a, b| a.0.cmp(&b.0)),
-            SortBy::Recent => stats.sort_by(|a, b| b.1.last_seen.cmp(&a.1.last_seen)),
+            SortBy::Frequency => stats.sort_by_key(|(_, s)| std::cmp::Reverse(s.total_invocations)),
+            SortBy::Alphabetical => stats.sort_by_key(|(name, _)| name.clone()),
+            SortBy::Recent => stats.sort_by_key(|(_, s)| std::cmp::Reverse(s.last_seen)),
         }
         stats
     };

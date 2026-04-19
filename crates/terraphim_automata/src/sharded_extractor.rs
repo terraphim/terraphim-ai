@@ -69,6 +69,7 @@ impl ShardedUmlsExtractor {
         }
 
         // Sort patterns by term -- daachorse requires sorted, unique input
+        #[allow(clippy::unnecessary_sort_by)]
         all_patterns.sort_by(|a, b| a.0.cmp(&b.0));
 
         // Merge duplicates: group all CUIs that share the same term.

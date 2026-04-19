@@ -718,6 +718,7 @@ Format your response as a detailed execution plan."#,
         }
 
         // Role-specific quality checks
+        #[allow(clippy::collapsible_match)]
         match task.worker_role {
             WorkerRole::Analyst => {
                 if deliverable.contains("analysis") || deliverable.contains("insight") {

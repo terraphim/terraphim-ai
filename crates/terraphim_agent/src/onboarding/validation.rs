@@ -82,47 +82,28 @@ pub fn validate_haystack(haystack: &Haystack) -> Result<(), ValidationError> {
     }
 
     // Service-specific validation
+    let is_url =
+        haystack.location.starts_with("http://") || haystack.location.starts_with("https://");
+
     match haystack.service {
-        ServiceType::Ripgrep => {
-            // For Ripgrep, location should be a path (we don't validate existence here,
-            // that's done separately with path_exists check if needed)
-            // Just ensure it's not a URL
-            if haystack.location.starts_with("http://") || haystack.location.starts_with("https://")
-            {
-                return Err(ValidationError::InvalidLocation(
-                    "Ripgrep requires a local path, not a URL".into(),
-                ));
-            }
+        ServiceType::Ripgrep if is_url => {
+            return Err(ValidationError::InvalidLocation(
+                "Ripgrep requires a local path, not a URL".into(),
+            ));
         }
-        ServiceType::QueryRs => {
-            // QueryRs can be URL or default
-            // No specific validation needed
+        ServiceType::Quickwit if !is_url => {
+            return Err(ValidationError::ServiceRequirement(
+                "Quickwit".into(),
+                "URL (http:// or https://)".into(),
+            ));
         }
-        ServiceType::Quickwit => {
-            // Quickwit requires a URL
-            if !haystack.location.starts_with("http://")
-                && !haystack.location.starts_with("https://")
-            {
-                return Err(ValidationError::ServiceRequirement(
-                    "Quickwit".into(),
-                    "URL (http:// or https://)".into(),
-                ));
-            }
+        ServiceType::Atomic if !is_url => {
+            return Err(ValidationError::ServiceRequirement(
+                "Atomic".into(),
+                "URL (http:// or https://)".into(),
+            ));
         }
-        ServiceType::Atomic => {
-            // Atomic requires a URL
-            if !haystack.location.starts_with("http://")
-                && !haystack.location.starts_with("https://")
-            {
-                return Err(ValidationError::ServiceRequirement(
-                    "Atomic".into(),
-                    "URL (http:// or https://)".into(),
-                ));
-            }
-        }
-        _ => {
-            // Other services - basic validation only
-        }
+        _ => {}
     }
 
     Ok(())

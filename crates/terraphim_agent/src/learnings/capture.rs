@@ -1126,6 +1126,7 @@ pub fn list_learnings(
     }
 
     // Sort by captured_at descending (most recent first)
+    #[allow(clippy::unnecessary_sort_by)]
     learnings.sort_by(|a, b| b.context.captured_at.cmp(&a.context.captured_at));
 
     // Limit results
@@ -1795,6 +1796,7 @@ pub fn suggest_learnings(
         .collect();
 
     // Sort by score descending
+    #[allow(clippy::unnecessary_sort_by)]
     scored.sort_by(|a, b| b.score.cmp(&a.score));
 
     // Limit results

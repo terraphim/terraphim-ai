@@ -244,6 +244,7 @@ pub fn search_by_concept<'a>(
     }
 
     // Sort by occurrence count (most occurrences first)
+    #[allow(clippy::unnecessary_sort_by)]
     results.sort_by(|a, b| b.1.count.cmp(&a.1.count));
 
     results
@@ -286,6 +287,7 @@ pub fn find_related_sessions<'a>(
     }
 
     // Sort by number of shared concepts (most first)
+    #[allow(clippy::unnecessary_sort_by)]
     related.sort_by(|a, b| b.1.cmp(&a.1));
 
     related

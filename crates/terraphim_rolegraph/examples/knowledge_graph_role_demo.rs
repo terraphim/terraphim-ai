@@ -90,6 +90,7 @@ impl RetrievalMetrics {
 fn build_base_thesaurus() -> Thesaurus {
     let mut thesaurus = Thesaurus::new("Domain Expert - Base".to_string());
 
+    #[allow(clippy::useless_vec)]
     let base_concepts = vec![
         (
             "distributed systems",
@@ -116,8 +117,8 @@ fn build_base_thesaurus() -> Thesaurus {
         ),
     ];
 
-    let mut id = 1u64;
-    for (concept, synonyms) in base_concepts {
+    for (i, (concept, synonyms)) in base_concepts.iter().enumerate() {
+        let id = (i as u64) + 1;
         let term = NormalizedTerm::new(id, NormalizedTermValue::new(concept.to_string()))
             .with_display_value(concept.to_string());
         thesaurus.insert(NormalizedTermValue::new(concept.to_string()), term);
@@ -127,7 +128,6 @@ fn build_base_thesaurus() -> Thesaurus {
                 .with_display_value(concept.to_string());
             thesaurus.insert(NormalizedTermValue::new(syn.to_string()), syn_term);
         }
-        id += 1;
     }
 
     thesaurus
@@ -136,8 +136,7 @@ fn build_base_thesaurus() -> Thesaurus {
 fn build_enhanced_thesaurus() -> Thesaurus {
     let mut thesaurus = build_base_thesaurus();
 
-    let mut next_id = 9u64;
-
+    #[allow(clippy::useless_vec)]
     let enhanced_concepts = vec![
         (
             "consensus algorithms",
@@ -215,18 +214,17 @@ fn build_enhanced_thesaurus() -> Thesaurus {
         ),
     ];
 
-    for (concept, synonyms) in enhanced_concepts {
-        let term = NormalizedTerm::new(next_id, NormalizedTermValue::new(concept.to_string()))
+    for (i, (concept, synonyms)) in enhanced_concepts.iter().enumerate() {
+        let id = (i as u64) + 9;
+        let term = NormalizedTerm::new(id, NormalizedTermValue::new(concept.to_string()))
             .with_display_value(concept.to_string());
         thesaurus.insert(NormalizedTermValue::new(concept.to_string()), term);
 
         for syn in synonyms {
-            let syn_term =
-                NormalizedTerm::new(next_id, NormalizedTermValue::new(concept.to_string()))
-                    .with_display_value(concept.to_string());
+            let syn_term = NormalizedTerm::new(id, NormalizedTermValue::new(concept.to_string()))
+                .with_display_value(concept.to_string());
             thesaurus.insert(NormalizedTermValue::new(syn.to_string()), syn_term);
         }
-        next_id += 1;
     }
 
     thesaurus
