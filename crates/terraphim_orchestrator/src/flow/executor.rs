@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 use chrono::Utc;
@@ -12,10 +13,23 @@ use crate::error::OrchestratorError;
 use terraphim_spawner::{AgentSpawner, OutputEvent, SpawnContext, SpawnRequest};
 use terraphim_types::capability::Provider;
 
+/// Per-project runtime metadata used to build a [`SpawnContext`] for flow
+/// steps. Populated from `OrchestratorConfig.projects` when FlowExecutor is
+/// constructed.
+#[derive(Debug, Clone, Default)]
+pub struct ProjectRuntime {
+    pub working_dir: PathBuf,
+    pub gitea_owner: Option<String>,
+    pub gitea_repo: Option<String>,
+}
+
 pub struct FlowExecutor {
     pub working_dir: PathBuf,
     pub spawner: AgentSpawner,
     pub flow_state_dir: PathBuf,
+    /// Per-project runtime metadata, keyed by project id. Missing entries
+    /// mean "use the FlowExecutor's top-level working_dir" (legacy mode).
+    pub projects: HashMap<String, ProjectRuntime>,
 }
 
 impl FlowExecutor {
@@ -24,7 +38,33 @@ impl FlowExecutor {
             working_dir: working_dir.clone(),
             spawner: AgentSpawner::new().with_working_dir(&working_dir),
             flow_state_dir,
+            projects: HashMap::new(),
         }
+    }
+
+    /// Builder: attach per-project runtime metadata.
+    pub fn with_projects(mut self, projects: HashMap<String, ProjectRuntime>) -> Self {
+        self.projects = projects;
+        self
+    }
+
+    /// Build a [`SpawnContext`] for the given flow's project. If the project
+    /// id is unknown or legacy, returns [`SpawnContext::global()`].
+    fn spawn_context_for_flow(&self, flow: &FlowDefinition) -> SpawnContext {
+        let Some(runtime) = self.projects.get(&flow.project) else {
+            return SpawnContext::global();
+        };
+        let working_dir_str = runtime.working_dir.to_string_lossy().into_owned();
+        let mut ctx = SpawnContext::with_working_dir(runtime.working_dir.clone())
+            .with_env("ADF_PROJECT_ID", flow.project.clone())
+            .with_env("ADF_WORKING_DIR", working_dir_str);
+        if let Some(owner) = runtime.gitea_owner.as_deref() {
+            ctx = ctx.with_env("GITEA_OWNER", owner.to_string());
+        }
+        if let Some(repo) = runtime.gitea_repo.as_deref() {
+            ctx = ctx.with_env("GITEA_REPO", repo.to_string());
+        }
+        ctx
     }
 
     /// Execute an action step (shell command).
@@ -223,10 +263,11 @@ impl FlowExecutor {
             request = request.with_primary_model(model);
         }
 
-        // Spawn the agent
+        // Spawn the agent using the flow's project context
+        let spawn_ctx = self.spawn_context_for_flow(flow);
         let mut handle = self
             .spawner
-            .spawn_with_fallback(&request, SpawnContext::global())
+            .spawn_with_fallback(&request, spawn_ctx)
             .await
             .map_err(|e| OrchestratorError::FlowFailed {
                 flow_name: flow.name.clone(),
