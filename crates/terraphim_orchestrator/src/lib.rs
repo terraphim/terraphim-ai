@@ -228,6 +228,9 @@ pub struct AgentOrchestrator {
     provider_health: provider_probe::ProviderHealthMap,
     /// Live telemetry store for model performance tracking from CLI output.
     telemetry_store: control_plane::TelemetryStore,
+    /// Per-provider hour/day spend tracker consulted by the routing
+    /// engine. `None` when the config declares no [[providers]] entries.
+    provider_budget_tracker: Option<Arc<provider_budget::ProviderBudgetTracker>>,
 }
 
 /// Build the composite restart-state key for an agent definition.
@@ -241,6 +244,40 @@ fn agent_key(def: &AgentDefinition) -> (String, String) {
             .unwrap_or_else(|| crate::dispatcher::LEGACY_PROJECT_ID.to_string()),
         def.name.clone(),
     )
+}
+
+/// Build the optional provider-level hour/day budget tracker from the
+/// [[providers]] config block. Returns `Ok(None)` when no providers are
+/// declared (no cap = no tracker, routing works unchanged).
+fn build_provider_budget_tracker(
+    config: &OrchestratorConfig,
+) -> Result<Option<Arc<provider_budget::ProviderBudgetTracker>>, OrchestratorError> {
+    if config.providers.is_empty() {
+        if config.provider_budget_state_file.is_some() {
+            warn!("provider_budget_state_file set but no [[providers]] entries; tracker disabled");
+        }
+        return Ok(None);
+    }
+    let tracker = match config.provider_budget_state_file.as_ref() {
+        Some(path) => provider_budget::ProviderBudgetTracker::with_persistence(
+            config.providers.clone(),
+            path.clone(),
+        )
+        .map_err(|e| {
+            OrchestratorError::Config(format!(
+                "failed to load provider budget state from {}: {}",
+                path.display(),
+                e
+            ))
+        })?,
+        None => provider_budget::ProviderBudgetTracker::new(config.providers.clone()),
+    };
+    info!(
+        providers = tracker.providers().collect::<Vec<_>>().join(","),
+        persistence = ?config.provider_budget_state_file,
+        "provider budget tracker initialised"
+    );
+    Ok(Some(Arc::new(tracker)))
 }
 
 /// Build the per-project runtime map consumed by
@@ -465,6 +502,8 @@ impl AgentOrchestrator {
 
         let telemetry_store = control_plane::TelemetryStore::new(3600);
 
+        let provider_budget_tracker = build_provider_budget_tracker(&config)?;
+
         #[cfg(not(test))]
         let restart_state = Self::load_restart_state();
 
@@ -521,6 +560,7 @@ impl AgentOrchestrator {
             kg_router,
             provider_health,
             telemetry_store,
+            provider_budget_tracker,
         })
     }
 
@@ -1202,11 +1242,12 @@ impl AgentOrchestrator {
                 .map(|r| std::sync::Arc::new(r.clone()));
             let unhealthy = self.provider_health.unhealthy_providers();
             let telemetry_arc = std::sync::Arc::new(self.telemetry_store.clone());
-            let engine = control_plane::RoutingDecisionEngine::new(
+            let engine = control_plane::RoutingDecisionEngine::with_provider_budget(
                 kg_arc,
                 unhealthy,
                 terraphim_router::Router::new(),
                 Some(telemetry_arc),
+                self.provider_budget_tracker.clone(),
             );
             let ctx = control_plane::DispatchContext {
                 agent_name: def.name.clone(),
@@ -4076,6 +4117,8 @@ mod tests {
             quickwit: None,
             projects: vec![],
             include: vec![],
+            providers: vec![],
+            provider_budget_state_file: None,
         }
     }
 
@@ -4300,6 +4343,8 @@ task = "test"
             quickwit: None,
             projects: vec![],
             include: vec![],
+            providers: vec![],
+            provider_budget_state_file: None,
         }
     }
 

@@ -142,6 +142,14 @@ pub struct OrchestratorConfig {
     /// to the base config file's parent directory.
     #[serde(default)]
     pub include: Vec<String>,
+    /// Per-provider spend caps for hour / day tumbling UTC windows.
+    /// Empty means no provider-level budget gating.
+    #[serde(default)]
+    pub providers: Vec<crate::provider_budget::ProviderBudgetConfig>,
+    /// Optional path for persisting ProviderBudgetTracker state across
+    /// restarts. Ignored when `providers` is empty.
+    #[serde(default)]
+    pub provider_budget_state_file: Option<PathBuf>,
 }
 
 /// Configuration for KG-driven model routing.
@@ -727,10 +735,10 @@ pub const BANNED_PROVIDER_PREFIXES: &[&str] = &[
 ];
 
 /// Bare model names routed through claude-code CLI (no explicit provider prefix).
-pub(crate) const CLAUDE_CLI_BARE_MODELS: &[&str] = &["sonnet", "opus", "haiku"];
+pub const CLAUDE_CLI_BARE_MODELS: &[&str] = &["sonnet", "opus", "haiku"];
 
 /// Anthropic-branded bare models that map onto the claude-code CLI.
-pub(crate) const ANTHROPIC_BARE_PROVIDERS: &[&str] = &["anthropic"];
+pub const ANTHROPIC_BARE_PROVIDERS: &[&str] = &["anthropic"];
 
 /// Runtime check: is this model's provider prefix in the allowed subscription
 /// set? Returns `true` for bare names (routed through claude-code CLI) and

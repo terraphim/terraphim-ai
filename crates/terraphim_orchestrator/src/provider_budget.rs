@@ -307,6 +307,26 @@ pub fn provider_has_budget(tracker: &ProviderBudgetTracker, provider: &str) -> b
     !matches!(tracker.check(provider), BudgetVerdict::Exhausted { .. })
 }
 
+/// Extract the provider-budget key for a `provider/model` string
+/// (e.g. `opencode-go/minimax-m2.5` -> `opencode-go`). Bare model
+/// names fall back to the Anthropic subscription id (`claude-code`)
+/// so any caller that knows only the model can still look up quota.
+///
+/// Returns `None` for model strings that cannot be classified.
+pub fn provider_key_for_model(provider_or_model: &str) -> Option<&str> {
+    if let Some((prefix, _)) = provider_or_model.split_once('/') {
+        return Some(prefix);
+    }
+    if crate::config::CLAUDE_CLI_BARE_MODELS.contains(&provider_or_model) {
+        return Some("claude-code");
+    }
+    if crate::config::ANTHROPIC_BARE_PROVIDERS.contains(&provider_or_model) {
+        return Some("claude-code");
+    }
+    // Unknown bare identifier -- treat as its own provider.
+    Some(provider_or_model)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

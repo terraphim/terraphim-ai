@@ -153,6 +153,8 @@ fn test_config() -> OrchestratorConfig {
         quickwit: None,
         projects: vec![],
         include: vec![],
+        providers: vec![],
+        provider_budget_state_file: None,
     }
 }
 
