@@ -198,6 +198,7 @@ impl FlowExecutor {
             max_cpu_seconds: None,
             pre_check: None,
             gitea_issue: None,
+            project: None,
         };
 
         // Build provider for spawner
