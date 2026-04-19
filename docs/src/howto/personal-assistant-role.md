@@ -150,6 +150,18 @@ terraphim-agent-pa search --role "Personal Assistant" --limit 6 "<your project>"
 
 You should see notes and emails interleaved, ordered by `terraphim-graph` rank.
 
+## Auto-routing
+
+When you call `terraphim-agent search "query"` without `--role`, the agent now scores every configured role's knowledge graph against the query and picks the highest-ranked match. The decision is printed once on stderr:
+
+```
+[auto-route] picked role "Personal Assistant" (score=42, candidates=4); to override, pass --role
+```
+
+stdout is untouched, so `--robot` and `--format json` output remain pure JSON. Pass `--role "Some Role"` to short-circuit auto-routing.
+
+When `JMAP_ACCESS_TOKEN` is not set, the Personal Assistant's score is multiplied by 0.5 (it loses the JMAP half of its corpus). The role still competes -- a clearly PA-flavoured query like `invoice tax` still wins over local-only roles when only PA matches.
+
 ## Troubleshooting
 
 - **No email hits, no error** -- the warning `JMAP haystack support not enabled. Skipping haystack:` in stderr means your binary lacks the `jmap` feature. Rebuild from local source per the Prerequisites.
