@@ -253,6 +253,92 @@ impl Default for MentionCursor {
     }
 }
 
+/// One-shot migration of the legacy top-level `adf/mention_cursor` key
+/// to per-project keys `adf/mention_cursor/<project_id>`.
+///
+/// Behaviour:
+///
+/// - If the legacy key does not exist (or storage is unavailable), the call
+///   is a no-op.
+/// - If it does exist, the cursor is copied to every project id in
+///   `projects` **and** to [`LEGACY_PROJECT_ID`]. A target key is only
+///   written when it does not already exist, so repeated invocations
+///   never clobber a cursor the poller has already advanced.
+/// - After copying, the legacy key is deleted so subsequent restarts
+///   skip this path entirely.
+///
+/// `projects` is the current orchestrator config's `projects` list.
+/// An empty list means legacy single-project mode; the legacy cursor is
+/// then simply renamed to the `__global__` key.
+///
+/// Logged but non-fatal on any storage error -- the poller will create
+/// fresh per-project cursors on first use if migration fails.
+pub async fn migrate_legacy_mention_cursor(projects: &[crate::config::Project]) {
+    let legacy_key = "adf/mention_cursor";
+
+    let Some(op) = MentionCursor::sqlite_op().await else {
+        tracing::debug!("mention cursor migration skipped: no sqlite operator");
+        return;
+    };
+
+    let legacy_bytes = match op.read(legacy_key).await {
+        Ok(bs) => bs,
+        Err(_) => {
+            tracing::debug!("no legacy mention cursor at `adf/mention_cursor`, nothing to migrate");
+            return;
+        }
+    };
+
+    let Ok(cursor) = serde_json::from_slice::<MentionCursor>(&legacy_bytes.to_vec()) else {
+        tracing::warn!(
+            "legacy mention cursor is unparsable; deleting it so per-project keys start clean"
+        );
+        let _ = op.delete(legacy_key).await;
+        return;
+    };
+
+    let Ok(json) = serde_json::to_string(&cursor) else {
+        tracing::warn!("failed to serialize legacy mention cursor during migration");
+        return;
+    };
+
+    let mut targets: Vec<String> = projects.iter().map(|p| p.id.clone()).collect();
+    targets.push(LEGACY_PROJECT_ID.to_string());
+
+    let mut written = 0usize;
+    for pid in &targets {
+        let key = MentionCursor::cursor_key(pid);
+        match op.stat(&key).await {
+            Ok(_) => {
+                tracing::debug!(
+                    project = pid.as_str(),
+                    "skipping legacy-cursor migration: per-project cursor already present"
+                );
+            }
+            Err(_) => {
+                if let Err(e) = op.write(&key, json.clone()).await {
+                    tracing::warn!(
+                        project = pid.as_str(),
+                        ?e,
+                        "failed to write migrated MentionCursor"
+                    );
+                } else {
+                    written += 1;
+                }
+            }
+        }
+    }
+
+    match op.delete(legacy_key).await {
+        Ok(()) => tracing::info!(
+            migrated_to = written,
+            last_seen_at = %cursor.last_seen_at,
+            "migrated legacy mention cursor to per-project keys"
+        ),
+        Err(e) => tracing::warn!(?e, "failed to delete legacy mention cursor after migration"),
+    }
+}
+
 /// Resolve a raw mention to an agent name via persona lookup.
 ///
 /// 1. If raw matches an agent name exactly -> AgentName
