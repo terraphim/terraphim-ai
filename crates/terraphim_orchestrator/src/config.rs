@@ -709,11 +709,7 @@ pub(crate) const BANNED_PROVIDER_PREFIXES: &[&str] = &[
 ];
 
 /// Bare model names routed through claude-code CLI (no explicit provider prefix).
-pub(crate) const CLAUDE_CLI_BARE_MODELS: &[&str] = &[
-    "sonnet",
-    "opus",
-    "haiku",
-];
+pub(crate) const CLAUDE_CLI_BARE_MODELS: &[&str] = &["sonnet", "opus", "haiku"];
 
 /// Anthropic-branded bare models that map onto the claude-code CLI.
 pub(crate) const ANTHROPIC_BARE_PROVIDERS: &[&str] = &["anthropic"];

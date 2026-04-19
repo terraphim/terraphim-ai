@@ -28,7 +28,10 @@ fn adf_check_succeeds_on_valid_inline_config() {
 
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success(), "expected success, got {out:?}");
-    assert!(stdout.contains("PROJECT"), "stdout missing header: {stdout}");
+    assert!(
+        stdout.contains("PROJECT"),
+        "stdout missing header: {stdout}"
+    );
     assert!(
         stdout.contains("alpha-watcher"),
         "stdout missing alpha-watcher: {stdout}"

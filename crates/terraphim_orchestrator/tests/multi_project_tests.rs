@@ -244,7 +244,9 @@ model = "{model}"
             .err()
             .unwrap_or_else(|| panic!("expected error for {model}"));
         match err {
-            OrchestratorError::BannedProvider { provider, field, .. } => {
+            OrchestratorError::BannedProvider {
+                provider, field, ..
+            } => {
                 assert_eq!(provider, model, "provider mismatch for {model}");
                 assert_eq!(field, "model");
             }
@@ -280,7 +282,9 @@ fallback_model = "google/gemini-2"
     let config = OrchestratorConfig::from_toml(toml_str).unwrap();
     let err = config.validate().unwrap_err();
     match err {
-        OrchestratorError::BannedProvider { field, provider, .. } => {
+        OrchestratorError::BannedProvider {
+            field, provider, ..
+        } => {
             assert_eq!(field, "fallback_model");
             assert_eq!(provider, "google/gemini-2");
         }
