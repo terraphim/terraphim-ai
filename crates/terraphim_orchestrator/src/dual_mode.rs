@@ -3,6 +3,7 @@
 //! Manages both time-driven and issue-driven agent execution modes
 //! with shared concurrency control and unified status.
 
+use crate::concurrency::ProjectCaps;
 use crate::{
     AgentDefinition, AgentOrchestrator, CompoundReviewResult, ConcurrencyController,
     DispatcherStats, FairnessPolicy, HandoffContext, ModeQuotas, OrchestratorConfig, ScheduleEvent,
@@ -101,10 +102,17 @@ struct TimeModeComponents {
     shutdown_rx: watch::Receiver<bool>,
 }
 
-/// Components for issue mode.
-struct IssueModeComponents {
+/// Per-project tracker state for issue mode.
+struct ProjectTracker {
     tracker: Box<dyn IssueTracker>,
     workflow: WorkflowConfig,
+}
+
+/// Components for issue mode.
+struct IssueModeComponents {
+    /// Trackers keyed by project id. Legacy single-project mode uses
+    /// [`crate::dispatcher::LEGACY_PROJECT_ID`] as the key.
+    running_trackers: HashMap<String, ProjectTracker>,
     shutdown_rx: watch::Receiver<bool>,
 }
 
@@ -113,9 +121,26 @@ impl DualModeOrchestrator {
     pub fn new(config: OrchestratorConfig) -> Result<Self, crate::OrchestratorError> {
         let base = AgentOrchestrator::new(config.clone())?;
 
+        // Collect per-project concurrency caps from project definitions.
+        let project_caps: HashMap<String, ProjectCaps> = config
+            .projects
+            .iter()
+            .filter_map(|p| {
+                p.max_concurrent_agents.map(|max| {
+                    (
+                        p.id.clone(),
+                        ProjectCaps {
+                            max_concurrent_agents: max,
+                            max_concurrent_mention_agents: p.max_concurrent_mention_agents,
+                        },
+                    )
+                })
+            })
+            .collect();
+
         // Create concurrency controller
         let concurrency = if let Some(ref workflow) = config.workflow {
-            ConcurrencyController::new(
+            ConcurrencyController::with_project_caps(
                 workflow.concurrency.global_max,
                 ModeQuotas {
                     time_max: workflow
@@ -129,9 +154,15 @@ impl DualModeOrchestrator {
                     .fairness
                     .parse()
                     .unwrap_or(FairnessPolicy::RoundRobin),
+                project_caps,
             )
         } else {
-            ConcurrencyController::new(10, ModeQuotas::default(), FairnessPolicy::RoundRobin)
+            ConcurrencyController::with_project_caps(
+                10,
+                ModeQuotas::default(),
+                FairnessPolicy::RoundRobin,
+                project_caps,
+            )
         };
 
         // Create shared state
@@ -156,28 +187,61 @@ impl DualModeOrchestrator {
             })
         };
 
-        // Setup issue mode if configured
-        let issue_mode = if let Some(ref workflow) = config.workflow {
+        // Setup issue mode if configured. Build one tracker per project when
+        // multi-project config is present; otherwise fall back to the top-level
+        // workflow with the legacy global project id.
+        let mut running_trackers: HashMap<String, ProjectTracker> = HashMap::new();
+
+        if !config.projects.is_empty() {
+            for project in &config.projects {
+                let Some(workflow) = project.workflow.as_ref() else {
+                    continue;
+                };
+                if !workflow.enabled {
+                    continue;
+                }
+                match create_tracker(workflow) {
+                    Ok(tracker) => {
+                        running_trackers.insert(
+                            project.id.clone(),
+                            ProjectTracker {
+                                tracker,
+                                workflow: workflow.clone(),
+                            },
+                        );
+                    }
+                    Err(e) => warn!(
+                        project = %project.id,
+                        "failed to create per-project issue tracker: {}",
+                        e
+                    ),
+                }
+            }
+        } else if let Some(ref workflow) = config.workflow {
             if workflow.enabled {
                 match create_tracker(workflow) {
                     Ok(tracker) => {
-                        let shutdown_rx = state.shutdown_tx.subscribe();
-                        Some(IssueModeComponents {
-                            tracker,
-                            workflow: workflow.clone(),
-                            shutdown_rx,
-                        })
+                        running_trackers.insert(
+                            crate::dispatcher::LEGACY_PROJECT_ID.to_string(),
+                            ProjectTracker {
+                                tracker,
+                                workflow: workflow.clone(),
+                            },
+                        );
                     }
-                    Err(e) => {
-                        warn!("failed to create issue tracker: {}", e);
-                        None
-                    }
+                    Err(e) => warn!("failed to create issue tracker: {}", e),
                 }
-            } else {
-                None
             }
-        } else {
+        }
+
+        let issue_mode = if running_trackers.is_empty() {
             None
+        } else {
+            let shutdown_rx = state.shutdown_tx.subscribe();
+            Some(IssueModeComponents {
+                running_trackers,
+                shutdown_rx,
+            })
         };
 
         Ok(Self {
@@ -420,8 +484,12 @@ async fn run_time_mode(components: TimeModeComponents, state: SharedState) {
             event = scheduler.next_event() => {
                 match event {
                     ScheduleEvent::Spawn(agent) => {
-                        // Try to acquire time-driven slot
-                        match state.concurrency.acquire_time_driven().await {
+                        let project = agent
+                            .project
+                            .clone()
+                            .unwrap_or_else(|| crate::dispatcher::LEGACY_PROJECT_ID.to_string());
+                        // Try to acquire time-driven slot for this project
+                        match state.concurrency.acquire_time_driven(&project).await {
                             Some(permit) => {
                                 info!(agent_name = %agent.name, "spawning time-driven agent");
                                 // Spawn agent here
@@ -453,51 +521,78 @@ async fn run_time_mode(components: TimeModeComponents, state: SharedState) {
     }
 }
 
-/// Run issue mode in background.
+/// Run issue mode in background. Polls every configured tracker and
+/// dispatches against its owning project id.
 async fn run_issue_mode(components: IssueModeComponents, state: SharedState) {
-    info!("starting issue mode task");
+    info!(
+        projects = components.running_trackers.len(),
+        "starting issue mode task"
+    );
 
     let IssueModeComponents {
-        tracker,
-        workflow,
+        running_trackers,
         mut shutdown_rx,
     } = components;
 
-    let poll_interval = Duration::from_secs(workflow.poll_interval_secs);
+    // Use the shortest configured poll interval across projects so every
+    // tracker gets polled at least as often as its own setting requires. A
+    // per-project cadence could be added later by moving each tracker into
+    // its own task; a single shared interval keeps the loop simple for now.
+    let poll_interval = running_trackers
+        .values()
+        .map(|p| p.workflow.poll_interval_secs)
+        .min()
+        .map(Duration::from_secs)
+        .unwrap_or_else(|| Duration::from_secs(60));
 
     loop {
         tokio::select! {
             _ = tokio::time::sleep(poll_interval) => {
-                match tracker.fetch_candidate_issues().await {
-                    Ok(issues) => {
-                        info!(count = issues.len(), "fetched candidate issues");
+                for (project_id, project_tracker) in running_trackers.iter() {
+                    let ProjectTracker { tracker, workflow } = project_tracker;
+                    match tracker.fetch_candidate_issues().await {
+                        Ok(issues) => {
+                            info!(
+                                project = %project_id,
+                                count = issues.len(),
+                                "fetched candidate issues"
+                            );
 
-                        for issue in issues {
-                            // Skip blocked issues
-                            if !issue.all_blockers_terminal(&workflow.tracker.states.terminal) {
-                                continue;
-                            }
-
-                            // Try to acquire issue-driven slot
-                            match state.concurrency.acquire_issue_driven().await {
-                                Some(permit) => {
-                                    info!(
-                                        issue_id = %issue.id,
-                                        title = %issue.title,
-                                        "dispatching issue-driven agent"
-                                    );
-                                    // Spawn agent here
-                                    drop(permit);
+                            for issue in issues {
+                                // Skip blocked issues
+                                if !issue.all_blockers_terminal(&workflow.tracker.states.terminal) {
+                                    continue;
                                 }
-                                None => {
-                                    warn!("no slot available for issue-driven agent");
-                                    break; // Stop trying until slots free up
+
+                                // Try to acquire issue-driven slot for this project.
+                                match state
+                                    .concurrency
+                                    .acquire_issue_driven(project_id)
+                                    .await
+                                {
+                                    Some(permit) => {
+                                        info!(
+                                            project = %project_id,
+                                            issue_id = %issue.id,
+                                            title = %issue.title,
+                                            "dispatching issue-driven agent"
+                                        );
+                                        // Spawn agent here
+                                        drop(permit);
+                                    }
+                                    None => {
+                                        warn!(
+                                            project = %project_id,
+                                            "no slot available for issue-driven agent"
+                                        );
+                                        break; // Stop trying for this project until slots free up
+                                    }
                                 }
                             }
                         }
-                    }
-                    Err(e) => {
-                        error!("failed to fetch issues: {}", e);
+                        Err(e) => {
+                            error!(project = %project_id, "failed to fetch issues: {}", e);
+                        }
                     }
                 }
             }

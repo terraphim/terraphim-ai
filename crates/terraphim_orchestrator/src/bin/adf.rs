@@ -296,21 +296,27 @@ async fn main() -> ExitCode {
 
             #[cfg(feature = "quickwit")]
             {
-                if let Some(qw_config) = orchestrator.quickwit_config().cloned() {
-                    if qw_config.enabled {
-                        let sink = terraphim_orchestrator::quickwit::QuickwitSink::new(
+                use terraphim_orchestrator::quickwit::{QuickwitFleetSink, QuickwitSink};
+
+                let fleet_configs = orchestrator.quickwit_fleet_configs();
+                if !fleet_configs.is_empty() {
+                    let mut fleet = QuickwitFleetSink::new_multi();
+                    for (project_id, qw_config) in fleet_configs {
+                        let sink = QuickwitSink::new(
                             qw_config.endpoint.clone(),
                             qw_config.index_id.clone(),
                             qw_config.batch_size,
                             qw_config.flush_interval_secs,
                         );
-                        orchestrator.set_quickwit_sink(sink);
                         tracing::info!(
+                            project = %project_id,
                             endpoint = %qw_config.endpoint,
                             index = %qw_config.index_id,
-                            "Quickwit logging enabled"
+                            "Quickwit logging enabled for project"
                         );
+                        fleet.insert_project(project_id, sink);
                     }
+                    orchestrator.set_quickwit_sink(fleet);
                 }
             }
 
