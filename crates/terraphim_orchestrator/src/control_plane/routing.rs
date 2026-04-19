@@ -8,6 +8,7 @@
 use crate::control_plane::telemetry::TelemetryStore;
 use crate::cost_tracker::BudgetVerdict;
 use crate::kg_router::KgRouter;
+use crate::provider_budget::{provider_key_for_model, ProviderBudgetTracker};
 use std::path::PathBuf;
 use std::sync::Arc;
 use terraphim_types::capability::{CostLevel, Latency, Provider, ProviderType};
@@ -130,6 +131,10 @@ pub struct RoutingDecisionEngine {
     unhealthy_providers: Vec<String>,
     router: terraphim_router::Router,
     telemetry_store: Option<Arc<TelemetryStore>>,
+    /// Per-provider hour/day budget tracker. When present, candidates
+    /// whose provider verdict is `Exhausted` are stripped before scoring
+    /// and `NearExhaustion` entries are deprioritised.
+    provider_budget: Option<Arc<ProviderBudgetTracker>>,
 }
 
 impl RoutingDecisionEngine {
@@ -139,11 +144,28 @@ impl RoutingDecisionEngine {
         router: terraphim_router::Router,
         telemetry_store: Option<Arc<TelemetryStore>>,
     ) -> Self {
+        Self::with_provider_budget(
+            kg_router,
+            unhealthy_providers,
+            router,
+            telemetry_store,
+            None,
+        )
+    }
+
+    pub fn with_provider_budget(
+        kg_router: Option<Arc<KgRouter>>,
+        unhealthy_providers: Vec<String>,
+        router: terraphim_router::Router,
+        telemetry_store: Option<Arc<TelemetryStore>>,
+        provider_budget: Option<Arc<ProviderBudgetTracker>>,
+    ) -> Self {
         Self {
             kg_router,
             unhealthy_providers,
             router,
             telemetry_store,
+            provider_budget,
         }
     }
 
@@ -345,6 +367,49 @@ impl RoutingDecisionEngine {
         });
         let filtered_out = before_filter - all_candidates.len();
 
+        // Per-provider budget gate: drop candidates whose hourly or daily
+        // spend has exhausted its configured cap. `NearExhaustion` does
+        // not drop the candidate but is factored into the score below.
+        let mut budget_exhausted_keys: Vec<String> = Vec::new();
+        let mut near_exhaustion_keys: Vec<String> = Vec::new();
+        if let Some(tracker) = self.provider_budget.as_ref() {
+            let before_budget = all_candidates.len();
+            all_candidates.retain(|cand| {
+                let Some(key) = provider_key_for_model(&cand.model) else {
+                    return true;
+                };
+                match tracker.check(key) {
+                    BudgetVerdict::Exhausted { .. } => {
+                        if !budget_exhausted_keys.iter().any(|k| k == key) {
+                            budget_exhausted_keys.push(key.to_string());
+                        }
+                        tracing::warn!(
+                            agent = %ctx.agent_name,
+                            provider_key = %key,
+                            model = %cand.model,
+                            "routing: dropped provider-budget-exhausted candidate"
+                        );
+                        false
+                    }
+                    BudgetVerdict::NearExhaustion { .. } => {
+                        if !near_exhaustion_keys.iter().any(|k| k == key) {
+                            near_exhaustion_keys.push(key.to_string());
+                        }
+                        true
+                    }
+                    _ => true,
+                }
+            });
+            let budget_dropped = before_budget - all_candidates.len();
+            if budget_dropped > 0 {
+                tracing::info!(
+                    agent = %ctx.agent_name,
+                    dropped = budget_dropped,
+                    "routing: stripped provider-budget-exhausted candidates"
+                );
+            }
+        }
+
         if all_candidates.is_empty() {
             let candidate = RouteCandidate {
                 provider: make_agent_provider(&ctx.agent_name, &ctx.cli_tool),
@@ -357,6 +422,12 @@ impl RoutingDecisionEngine {
                 format!(
                     "All {} candidate(s) filtered out by C1/C3 allow-list; using CLI default ({})",
                     filtered_out, cli_name
+                )
+            } else if !budget_exhausted_keys.is_empty() {
+                format!(
+                    "All candidates dropped by provider-budget gate ({}); using CLI default ({})",
+                    budget_exhausted_keys.join(","),
+                    cli_name
                 )
             } else {
                 format!(
@@ -383,6 +454,21 @@ impl RoutingDecisionEngine {
             .iter()
             .map(|c| Self::score_candidate(c, pressure))
             .collect();
+
+        // Provider-budget near-exhaustion deprioritisation. Multiply the
+        // score by 0.6 so a candidate whose provider is 80%+ into its
+        // quota is still eligible but loses to a healthy alternative.
+        let mut provider_budget_influenced = false;
+        if !near_exhaustion_keys.is_empty() {
+            for (i, cand) in all_candidates.iter().enumerate() {
+                if let Some(key) = provider_key_for_model(&cand.model) {
+                    if near_exhaustion_keys.iter().any(|k| k == key) {
+                        pressured_scores[i] *= 0.6;
+                        provider_budget_influenced = true;
+                    }
+                }
+            }
+        }
 
         // Apply telemetry-based scoring adjustments
         let mut telemetry_influenced = false;
@@ -424,12 +510,13 @@ impl RoutingDecisionEngine {
         let winner = &all_candidates[winner_idx];
         let dominant_signal = winner.source.clone();
 
-        let budget_influenced = pressure != BudgetPressure::NoPressure
+        let agent_budget_influenced = pressure != BudgetPressure::NoPressure
             && no_pressure_scores.iter().enumerate().any(|(i, &s)| {
                 let was_winner = s >= no_pressure_scores[winner_idx];
                 let now_loses = pressured_scores[i] < pressured_scores[winner_idx];
                 was_winner && now_loses
             });
+        let budget_influenced = agent_budget_influenced || provider_budget_influenced;
 
         let mut rationale_parts = Vec::new();
 
@@ -458,8 +545,14 @@ impl RoutingDecisionEngine {
             signal_summary,
         );
 
-        if budget_influenced {
+        if agent_budget_influenced {
             rationale.push_str(". Budget pressure biased selection toward cheaper model");
+        }
+        if provider_budget_influenced {
+            rationale.push_str(&format!(
+                ". Provider near-exhaustion deprioritised: {}",
+                near_exhaustion_keys.join(","),
+            ));
         }
         if telemetry_influenced {
             rationale.push_str(". Telemetry data influenced selection");
@@ -1000,5 +1093,100 @@ mod tests {
         let decision = engine.decide_route(&ctx, &BudgetVerdict::Uncapped).await;
         assert_eq!(decision.candidate.source, RouteSource::StaticConfig);
         assert_eq!(decision.candidate.model, "kimi-for-coding/k2p5");
+    }
+
+    // --- Provider-budget gate ---
+
+    #[tokio::test]
+    async fn test_provider_budget_exhausted_drops_candidate() {
+        // opencode-go capped at $0.50/hour; push past it and the static
+        // candidate must be stripped before scoring, forcing CLI default.
+        let tracker =
+            ProviderBudgetTracker::new(vec![crate::provider_budget::ProviderBudgetConfig {
+                id: "opencode-go".to_string(),
+                max_hour_cents: Some(50),
+                max_day_cents: None,
+            }]);
+        let _ = tracker.record_cost("opencode-go", 1.00);
+        let engine = RoutingDecisionEngine::with_provider_budget(
+            None,
+            Vec::new(),
+            terraphim_router::Router::new(),
+            None,
+            Some(Arc::new(tracker)),
+        );
+        let ctx =
+            create_test_context_with_static_model("agent", "task", "opencode-go/minimax-m2.5");
+        let decision = engine.decide_route(&ctx, &BudgetVerdict::Uncapped).await;
+        assert_eq!(decision.candidate.source, RouteSource::CliDefault);
+        assert!(
+            decision.rationale.contains("provider-budget"),
+            "rationale should call out provider-budget: {}",
+            decision.rationale
+        );
+    }
+
+    #[tokio::test]
+    async fn test_provider_budget_near_exhaustion_deprioritises() {
+        // opencode-go at ~85% (well into the NearExhaustion band) and
+        // kimi-for-coding has no cap. Both candidates survive the filter
+        // but opencode-go's score is knocked down so the healthier
+        // kimi-for-coding wins. Rationale must cite the near-exhaustion.
+        let tracker =
+            ProviderBudgetTracker::new(vec![crate::provider_budget::ProviderBudgetConfig {
+                id: "opencode-go".to_string(),
+                max_hour_cents: Some(100),
+                max_day_cents: None,
+            }]);
+        // Spend $0.85 -> 85% of $1/hr cap -> NearExhaustion.
+        let _ = tracker.record_cost("opencode-go", 0.85);
+        let engine = RoutingDecisionEngine::with_provider_budget(
+            None,
+            Vec::new(),
+            terraphim_router::Router::new(),
+            None,
+            Some(Arc::new(tracker)),
+        );
+        // Static model references opencode-go; confidence 0.8.
+        let ctx =
+            create_test_context_with_static_model("agent", "task", "opencode-go/minimax-m2.5");
+        let decision = engine.decide_route(&ctx, &BudgetVerdict::Uncapped).await;
+
+        // Near-exhaustion candidate still wins because it's the only
+        // signal, but the score must be penalised and the rationale
+        // must mention the provider key.
+        assert_eq!(decision.candidate.source, RouteSource::StaticConfig);
+        assert!(
+            decision.budget_influenced,
+            "budget_influenced flag should be set"
+        );
+        assert!(
+            decision.rationale.contains("opencode-go"),
+            "rationale should name the near-exhausted provider: {}",
+            decision.rationale
+        );
+    }
+
+    #[tokio::test]
+    async fn test_provider_budget_uncapped_provider_unaffected() {
+        let tracker =
+            ProviderBudgetTracker::new(vec![crate::provider_budget::ProviderBudgetConfig {
+                id: "opencode-go".to_string(),
+                max_hour_cents: Some(100),
+                max_day_cents: None,
+            }]);
+        // kimi-for-coding has no config entry -> Uncapped -> no effect.
+        let engine = RoutingDecisionEngine::with_provider_budget(
+            None,
+            Vec::new(),
+            terraphim_router::Router::new(),
+            None,
+            Some(Arc::new(tracker)),
+        );
+        let ctx = create_test_context_with_static_model("agent", "task", "kimi-for-coding/k2p5");
+        let decision = engine.decide_route(&ctx, &BudgetVerdict::Uncapped).await;
+        assert_eq!(decision.candidate.source, RouteSource::StaticConfig);
+        assert_eq!(decision.candidate.model, "kimi-for-coding/k2p5");
+        assert!(!decision.budget_influenced);
     }
 }
