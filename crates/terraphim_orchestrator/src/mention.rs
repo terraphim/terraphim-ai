@@ -90,7 +90,9 @@ pub struct DetectedMention {
 
 /// Persistent cursor for mention polling.
 ///
-/// Stored via `terraphim_persistence` as JSON at key `adf/mention_cursor`.
+/// Stored via `terraphim_persistence` as JSON at key
+/// `adf/mention_cursor/<project_id>` (per-project) or
+/// `adf/mention_cursor/__global__` for legacy single-project mode.
 /// The cursor tracks the `created_at` timestamp of the last processed comment,
 /// ensuring we never replay historical mentions on restart.
 ///
@@ -157,45 +159,70 @@ impl MentionCursor {
         Some(op.clone())
     }
 
-    pub async fn load_or_now() -> Self {
-        let key = "adf/mention_cursor";
+    /// Persistence key for a project's cursor.
+    ///
+    /// Multi-project installations use one cursor per project id; legacy
+    /// single-project installations pass [`LEGACY_PROJECT_ID`].
+    fn cursor_key(project_id: &str) -> String {
+        format!("adf/mention_cursor/{}", project_id)
+    }
+
+    pub async fn load_or_now(project_id: &str) -> Self {
+        let key = Self::cursor_key(project_id);
 
         if let Some(op) = Self::sqlite_op().await {
-            if let Ok(bs) = op.read(key).await {
+            if let Ok(bs) = op.read(&key).await {
                 if let Ok(cursor) = serde_json::from_slice::<Self>(&bs.to_vec()) {
                     tracing::info!(
+                        project = project_id,
                         last_seen_at = %cursor.last_seen_at,
                         "loaded MentionCursor from persistence"
                     );
                     return cursor;
                 }
-                tracing::warn!("failed to deserialize MentionCursor, starting fresh");
+                tracing::warn!(
+                    project = project_id,
+                    "failed to deserialize MentionCursor, starting fresh"
+                );
             } else {
-                tracing::info!("no persisted MentionCursor found, starting fresh");
+                tracing::info!(
+                    project = project_id,
+                    "no persisted MentionCursor found, starting fresh"
+                );
             }
         } else {
-            tracing::warn!("DeviceStorage sqlite not available, using in-memory cursor");
+            tracing::warn!(
+                project = project_id,
+                "DeviceStorage sqlite not available, using in-memory cursor"
+            );
         }
 
         Self::now()
     }
 
-    /// Save to persistence.
-    pub async fn save(&self) {
-        let key = "adf/mention_cursor";
+    /// Save to persistence under the given project's cursor key.
+    pub async fn save(&self, project_id: &str) {
+        let key = Self::cursor_key(project_id);
 
         if let Some(op) = Self::sqlite_op().await {
             if let Ok(json) = serde_json::to_string(self) {
-                if let Err(e) = op.write(key, json).await {
-                    tracing::warn!(?e, "failed to save MentionCursor");
+                if let Err(e) = op.write(&key, json).await {
+                    tracing::warn!(project = project_id, ?e, "failed to save MentionCursor");
                 } else {
-                    tracing::debug!(last_seen_at = %self.last_seen_at, "saved MentionCursor");
+                    tracing::debug!(
+                        project = project_id,
+                        last_seen_at = %self.last_seen_at,
+                        "saved MentionCursor"
+                    );
                 }
             } else {
-                tracing::warn!("failed to serialize MentionCursor");
+                tracing::warn!(project = project_id, "failed to serialize MentionCursor");
             }
         } else {
-            tracing::warn!("DeviceStorage sqlite not available, cursor not persisted");
+            tracing::warn!(
+                project = project_id,
+                "DeviceStorage sqlite not available, cursor not persisted"
+            );
         }
     }
 
