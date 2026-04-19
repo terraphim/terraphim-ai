@@ -3595,6 +3595,8 @@ mod tests {
                     pre_check: None,
 
                     gitea_issue: None,
+
+                    project: None,
                 },
                 AgentDefinition {
                     name: "sync".to_string(),
@@ -3618,6 +3620,8 @@ mod tests {
                     pre_check: None,
 
                     gitea_issue: None,
+
+                    project: None,
                 },
             ],
             restart_cooldown_secs: 60,
@@ -3635,6 +3639,8 @@ mod tests {
             webhook: None,
             role_config_path: None,
             routing: None,
+            projects: vec![],
+            include: vec![],
         }
     }
 
@@ -3837,6 +3843,8 @@ task = "test"
                 pre_check: None,
 
                 gitea_issue: None,
+
+                project: None,
             }],
             restart_cooldown_secs: 0, // instant restart for testing
             max_restart_count: 3,
@@ -3853,6 +3861,8 @@ task = "test"
             webhook: None,
             role_config_path: None,
             routing: None,
+            projects: vec![],
+            include: vec![],
         }
     }
 
@@ -3931,6 +3941,8 @@ task = "test"
             pre_check: None,
 
             gitea_issue: None,
+
+            project: None,
         }];
         let mut orch = AgentOrchestrator::new(config).unwrap();
 
@@ -4124,6 +4136,8 @@ task = "test"
             pre_check: None,
 
             gitea_issue: None,
+
+            project: None,
         }];
 
         // Set up persona data dir with a test persona
@@ -4209,6 +4223,8 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             pre_check: None,
 
             gitea_issue: None,
+
+            project: None,
         }];
 
         // No persona_data_dir, so registry will be empty
@@ -4373,6 +4389,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             max_cpu_seconds: Some(1), // 1 second timeout
             pre_check: None,
             gitea_issue: None,
+            project: None,
         }];
         let mut orch = AgentOrchestrator::new(config).unwrap();
         let def = orch.config.agents[0].clone();

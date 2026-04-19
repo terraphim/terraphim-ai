@@ -29,6 +29,36 @@ fn default_pre_check_timeout() -> u64 {
     60
 }
 
+/// Definition of a single project within a multi-project fleet.
+///
+/// Each project carries its own working directory, Gitea target, mention
+/// rate caps, workflow tracker, and Quickwit index. Agents and flows are
+/// bound to exactly one project via `project` fields; the orchestrator
+/// routes per-project configuration to each agent at dispatch time.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Project {
+    /// Unique project id (e.g. "odilo", "digital-twins", "terraphim").
+    pub id: String,
+    /// Per-project working directory (overrides top-level working_dir for this project's agents).
+    pub working_dir: PathBuf,
+    /// Minutes offset added to cron schedules of agents in this project (stagger the fleet).
+    #[serde(default)]
+    pub schedule_offset_minutes: u8,
+    /// Per-project Gitea output config (owner/repo).
+    #[serde(default)]
+    pub gitea: Option<GiteaOutputConfig>,
+    /// Per-project mention config (rate caps).
+    #[serde(default)]
+    pub mentions: Option<MentionConfig>,
+    /// Per-project workflow / tracker config.
+    #[serde(default)]
+    pub workflow: Option<WorkflowConfig>,
+    /// Per-project Quickwit index config.
+    #[cfg(feature = "quickwit")]
+    #[serde(default)]
+    pub quickwit: Option<QuickwitConfig>,
+}
+
 /// Top-level orchestrator configuration (parsed from TOML).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OrchestratorConfig {
@@ -95,6 +125,14 @@ pub struct OrchestratorConfig {
     #[cfg(feature = "quickwit")]
     #[serde(default)]
     pub quickwit: Option<QuickwitConfig>,
+    /// Multi-project definitions. Empty means single-project legacy mode (globals are used).
+    #[serde(default)]
+    pub projects: Vec<Project>,
+    /// Include globs. Each matching file is merged into this config
+    /// (appends to projects / agents / flows). Globs are expanded relative
+    /// to the base config file's parent directory.
+    #[serde(default)]
+    pub include: Vec<String>,
 }
 
 /// Configuration for KG-driven model routing.
@@ -314,6 +352,13 @@ pub struct AgentDefinition {
     /// Gitea issue number to post output to (optional).
     #[serde(default)]
     pub gitea_issue: Option<u64>,
+
+    /// Project this agent belongs to. Must match a `Project.id` when any
+    /// projects are defined. `None` means the agent is global / legacy
+    /// single-project mode; mixing per-project and global agents is
+    /// rejected at load time.
+    #[serde(default)]
+    pub project: Option<String>,
 }
 
 /// Agent layer in the dark factory hierarchy.
