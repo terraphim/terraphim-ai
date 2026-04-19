@@ -219,6 +219,16 @@ fn default_max_concurrent_mention_agents() -> u32 {
     5
 }
 
+impl Default for MentionConfig {
+    fn default() -> Self {
+        Self {
+            poll_modulo: default_poll_modulo(),
+            max_dispatches_per_tick: default_max_dispatches_per_tick(),
+            max_concurrent_mention_agents: default_max_concurrent_mention_agents(),
+        }
+    }
+}
+
 /// Configuration for the webhook server.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WebhookConfig {

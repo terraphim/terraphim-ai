@@ -1914,32 +1914,96 @@ impl AgentOrchestrator {
     /// (no persisted cursor), cursor is set to `now` to skip all historical
     /// mentions — preventing the mention replay storm.
     async fn poll_mentions(&mut self) {
-        let mention_cfg = match self.config.mentions.clone() {
-            Some(cfg) => cfg,
-            None => return,
-        };
+        // Build the list of (project_id, gitea_cfg, mention_cfg) targets.
+        //
+        // - Legacy mode (no `[[projects]]`): one pass under the synthetic
+        //   `__global__` id using the top-level `gitea` and `mentions`.
+        // - Multi-project mode: one pass per configured project that
+        //   declares a `gitea` block. Per-project `mentions` override the
+        //   top-level `mentions`, which in turn falls back to
+        //   `MentionConfig::default()` so operators need not repeat caps
+        //   in every project.
+        let targets: Vec<(String, config::GiteaOutputConfig, config::MentionConfig)> =
+            if self.config.projects.is_empty() {
+                match (self.config.mentions.clone(), self.config.gitea.clone()) {
+                    (Some(m), Some(g)) => {
+                        vec![(dispatcher::LEGACY_PROJECT_ID.to_string(), g, m)]
+                    }
+                    _ => {
+                        tracing::debug!(
+                            "mention polling skipped: legacy mode but no Gitea/mentions config"
+                        );
+                        return;
+                    }
+                }
+            } else {
+                let global_mentions = self.config.mentions.clone();
+                self.config
+                    .projects
+                    .iter()
+                    .filter_map(|project| {
+                        let gitea = project.gitea.clone()?;
+                        let mentions = project
+                            .mentions
+                            .clone()
+                            .or_else(|| global_mentions.clone())
+                            .unwrap_or_default();
+                        Some((project.id.clone(), gitea, mentions))
+                    })
+                    .collect()
+            };
 
-        let gitea_cfg = match self.config.gitea.clone() {
-            Some(cfg) => cfg,
-            None => {
-                tracing::debug!("mention polling skipped: no Gitea output config");
-                return;
-            }
-        };
+        if targets.is_empty() {
+            tracing::debug!("mention polling skipped: no projects with Gitea config");
+            return;
+        }
 
-        // Respect poll_modulo to reduce API traffic
+        for (project_id, gitea_cfg, mention_cfg) in targets {
+            self.poll_mentions_for_project(&project_id, &gitea_cfg, &mention_cfg)
+                .await;
+        }
+    }
+
+    /// Run a single mention-poll pass for one project.
+    ///
+    /// Invoked by [`AgentOrchestrator::poll_mentions`] for each configured
+    /// project (or once for legacy single-project mode under
+    /// `__global__`). Loads/persists the project's cursor, honours the
+    /// project's `MentionConfig`, and threads `project_id` onto every
+    /// dispatched mention.
+    async fn poll_mentions_for_project(
+        &mut self,
+        project_id: &str,
+        gitea_cfg: &config::GiteaOutputConfig,
+        mention_cfg: &config::MentionConfig,
+    ) {
+        // Respect poll_modulo to reduce API traffic.
         if self.tick_count % mention_cfg.poll_modulo != 0 {
             return;
         }
 
-        // Count currently active mention-spawned agents
-        let active_mention_agents = self
-            .active_agents
-            .values()
-            .filter(|a| a.spawned_by_mention)
-            .count() as u32;
+        // Count currently active mention-spawned agents for this project.
+        //
+        // We filter by the agent definition's project field so one noisy
+        // project cannot exhaust the fleet-wide mention budget for others.
+        // In legacy mode (project_id == "__global__") every agent
+        // contributes because project binding isn't meaningful there.
+        let active_mention_agents = if project_id == dispatcher::LEGACY_PROJECT_ID {
+            self.active_agents
+                .values()
+                .filter(|a| a.spawned_by_mention)
+                .count() as u32
+        } else {
+            self.active_agents
+                .values()
+                .filter(|a| {
+                    a.spawned_by_mention && a.definition.project.as_deref() == Some(project_id)
+                })
+                .count() as u32
+        };
         if active_mention_agents >= mention_cfg.max_concurrent_mention_agents {
             tracing::debug!(
+                project = project_id,
                 active = active_mention_agents,
                 max = mention_cfg.max_concurrent_mention_agents,
                 "mention agents at capacity, skipping poll"
@@ -1947,13 +2011,10 @@ impl AgentOrchestrator {
             return;
         }
 
-        // Lazy-load cursor on first poll. In Commit 4 this becomes one
-        // pass per configured project; for now we poll under the legacy
-        // synthetic project id.
-        let project_id = dispatcher::LEGACY_PROJECT_ID.to_string();
-        let mut cursor = match self.mention_cursors.remove(&project_id) {
+        // Lazy-load the project's cursor.
+        let mut cursor = match self.mention_cursors.remove(project_id) {
             Some(c) => c,
-            None => mention::MentionCursor::load_or_now(&project_id).await,
+            None => mention::MentionCursor::load_or_now(project_id).await,
         };
         cursor.dispatches_this_tick = 0;
 
@@ -1972,8 +2033,12 @@ impl AgentOrchestrator {
         let tracker = match terraphim_tracker::GiteaTracker::new(tracker_cfg) {
             Ok(t) => t,
             Err(e) => {
-                tracing::warn!(error = %e, "failed to create GiteaTracker for mention polling");
-                self.mention_cursors.insert(project_id, cursor);
+                tracing::warn!(
+                    project = project_id,
+                    error = %e,
+                    "failed to create GiteaTracker for mention polling"
+                );
+                self.mention_cursors.insert(project_id.to_string(), cursor);
                 return;
             }
         };
@@ -1985,15 +2050,19 @@ impl AgentOrchestrator {
         {
             Ok(c) => c,
             Err(e) => {
-                tracing::warn!(error = %e, "failed to fetch repo comments for mention polling");
-                self.mention_cursors.insert(project_id, cursor);
+                tracing::warn!(
+                    project = project_id,
+                    error = %e,
+                    "failed to fetch repo comments for mention polling"
+                );
+                self.mention_cursors.insert(project_id.to_string(), cursor);
                 return;
             }
         };
 
         if comments.is_empty() {
-            cursor.save(&project_id).await;
-            self.mention_cursors.insert(project_id, cursor);
+            cursor.save(project_id).await;
+            self.mention_cursors.insert(project_id.to_string(), cursor);
             return;
         }
 
@@ -2179,8 +2248,8 @@ impl AgentOrchestrator {
         }
 
         // Persist cursor for next poll / restart
-        cursor.save(&project_id).await;
-        self.mention_cursors.insert(project_id, cursor);
+        cursor.save(project_id).await;
+        self.mention_cursors.insert(project_id.to_string(), cursor);
     }
 
     /// Check if an agent is already assigned to this issue and currently active.
