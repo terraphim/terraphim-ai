@@ -16,19 +16,42 @@
 //! # PA / JMAP downweight
 //!
 //! When a role has any `ServiceType::Jmap` haystack and `$JMAP_ACCESS_TOKEN`
-//! is unset, its raw rank-sum is multiplied by [`JMAP_MISSING_TOKEN_DOWNWEIGHT`].
-//! This is a per-haystack-type policy: future additions to `ServiceType` that
-//! also need ambient credentials should consider applying the same downweight.
+//! is unset, [`JMAP_MISSING_TOKEN_PENALTY`] is subtracted (saturating at zero)
+//! from its raw distinct-concept score. This is a per-haystack-type policy:
+//! future additions to `ServiceType` that also need ambient credentials should
+//! consider applying the same penalty.
 
+use ahash::AHashSet;
 use terraphim_config::{Config, ConfigState, ServiceType};
+use terraphim_rolegraph::RoleGraph;
 use terraphim_types::RoleName;
 
-/// Score downweight applied to a role total when it has any `ServiceType::Jmap`
-/// haystack and `$JMAP_ACCESS_TOKEN` is not set.
-///
-/// Rationale: PA roughly has a two-haystack design (Obsidian + JMAP); with one
-/// half disabled, effective coverage halves. Tunable without an API change.
+/// Legacy multiplicative downweight retained for fixture link-compat only.
+/// New code uses [`JMAP_MISSING_TOKEN_PENALTY`] (saturating subtraction).
+#[deprecated(
+    note = "use JMAP_MISSING_TOKEN_PENALTY (saturating subtraction); kept exported only for fixture link-compat"
+)]
 pub const JMAP_MISSING_TOKEN_DOWNWEIGHT: f64 = 0.5;
+
+/// Penalty subtracted (saturating at zero) from a role's raw distinct-concept
+/// score when the role has any `ServiceType::Jmap` haystack and
+/// `$JMAP_ACCESS_TOKEN` is not set.
+///
+/// Distinct-concept scores typically fall in `0..=10`; multiplicative
+/// downweights collapse at those magnitudes (see design section 2.3).
+/// Subtraction keeps the policy monotonic without rounding pathology.
+pub const JMAP_MISSING_TOKEN_PENALTY: i64 = 1;
+
+/// Count distinct canonical concept IDs from `rg.thesaurus` that any substring
+/// of `query` matches. Uses the rolegraph's pre-built Aho-Corasick automaton
+/// (populated from the thesaurus at `RoleGraph::new_sync` time and requires
+/// no document indexing). Returns 0 when the thesaurus is empty or no concept
+/// matches.
+fn score_distinct_concepts(rg: &RoleGraph, query: &str) -> usize {
+    let ids = rg.find_matching_node_ids(query);
+    let unique: AHashSet<u64> = ids.into_iter().collect();
+    unique.len()
+}
 
 /// Inputs the helper needs that are not part of `Config`/`ConfigState`.
 #[derive(Debug, Clone)]
@@ -78,7 +101,9 @@ pub enum AutoRouteReason {
 pub struct AutoRouteResult {
     /// The chosen role.
     pub role: RoleName,
-    /// The chosen role's final score (post-downweight).
+    /// The chosen role's final score (post-penalty). Semantically the count
+    /// of distinct canonical concept IDs in the role's thesaurus that the
+    /// query touched, optionally reduced by [`JMAP_MISSING_TOKEN_PENALTY`].
     pub score: i64,
     /// All scored candidates including zero-scored, sorted by `(-score, name)`.
     pub candidates: Vec<(RoleName, i64)>,
@@ -98,20 +123,16 @@ pub async fn auto_select_role(
     state: &ConfigState,
     ctx: &AutoRouteContext,
 ) -> AutoRouteResult {
-    use ahash::AHashSet;
-
     // Score every role in state.roles. Lock each rolegraph sequentially.
+    // Scoring is "distinct canonical concept count" against the role's
+    // thesaurus-driven Aho-Corasick automaton; this works cold (no document
+    // indexing required), unlike the prior Node.rank sum.
     let mut scored: Vec<(RoleName, i64)> = Vec::with_capacity(state.roles.len());
     for (role_name, rg_sync) in state.roles.iter() {
         let rg = rg_sync.lock().await;
-        let node_ids = rg.find_matching_node_ids(query);
-        let unique: AHashSet<u64> = node_ids.into_iter().collect();
-        let raw_score: u64 = unique
-            .iter()
-            .filter_map(|id| rg.nodes_map().get(id).map(|n| n.rank))
-            .sum();
+        let raw_score: i64 = score_distinct_concepts(&rg, query) as i64;
 
-        // PA / JMAP downweight: applied to role total, not per-term.
+        // PA / JMAP penalty: applied to role total, not per-term.
         let has_jmap = config
             .roles
             .get(role_name)
@@ -119,9 +140,9 @@ pub async fn auto_select_role(
             .unwrap_or(false);
 
         let final_score: i64 = if has_jmap && !ctx.jmap_token_present {
-            ((raw_score as f64) * JMAP_MISSING_TOKEN_DOWNWEIGHT).round() as i64
+            raw_score.saturating_sub(JMAP_MISSING_TOKEN_PENALTY)
         } else {
-            raw_score as i64
+            raw_score
         };
 
         scored.push((role_name.clone(), final_score));
