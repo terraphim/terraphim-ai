@@ -324,6 +324,27 @@ impl RoutingDecisionEngine {
             all_candidates.push(static_cand.clone());
         }
 
+        // Defence-in-depth: strip any candidate whose model prefix is not an
+        // allowed subscription provider. Load-time `validate()` already enforces
+        // C1/C3 but a malformed KG or telemetry store could still surface a
+        // banned target at runtime. Drop it before scoring so the engine
+        // cannot select a pay-per-use provider.
+        let before_filter = all_candidates.len();
+        all_candidates.retain(|cand| {
+            let allowed = crate::config::is_allowed_provider(&cand.model);
+            if !allowed {
+                tracing::warn!(
+                    agent = %ctx.agent_name,
+                    provider = %cand.provider.name,
+                    model = %cand.model,
+                    source = ?cand.source,
+                    "routing: dropped banned candidate (C1/C3 gate)"
+                );
+            }
+            allowed
+        });
+        let filtered_out = before_filter - all_candidates.len();
+
         if all_candidates.is_empty() {
             let candidate = RouteCandidate {
                 provider: make_agent_provider(&ctx.agent_name, &ctx.cli_tool),
@@ -332,12 +353,20 @@ impl RoutingDecisionEngine {
                 source: RouteSource::CliDefault,
                 confidence: 0.5,
             };
-            return RoutingDecision {
-                candidate: candidate.clone(),
-                rationale: format!(
+            let rationale = if filtered_out > 0 {
+                format!(
+                    "All {} candidate(s) filtered out by C1/C3 allow-list; using CLI default ({})",
+                    filtered_out, cli_name
+                )
+            } else {
+                format!(
                     "No routing signal matched; using CLI default ({})",
                     cli_name
-                ),
+                )
+            };
+            return RoutingDecision {
+                candidate: candidate.clone(),
+                rationale,
                 all_candidates: vec![candidate],
                 primary_available: false,
                 dominant_signal: RouteSource::CliDefault,
@@ -913,5 +942,63 @@ mod tests {
             decision.rationale.contains("Telemetry"),
             "rationale should mention telemetry"
         );
+    }
+
+    // --- C1/C3 allow-list filter ---
+
+    #[tokio::test]
+    async fn test_c3_banned_static_model_falls_back_to_cli_default() {
+        // A malformed static model that names a banned provider must not
+        // survive routing; the engine falls back to the CLI default.
+        let engine = test_engine();
+        let ctx = create_test_context_with_static_model(
+            "agent-with-bad-static",
+            "task",
+            "github-copilot/gpt-4.1",
+        );
+        let decision = engine.decide_route(&ctx, &BudgetVerdict::Uncapped).await;
+
+        assert_eq!(decision.candidate.source, RouteSource::CliDefault);
+        assert!(decision.candidate.model.is_empty());
+        assert!(
+            decision.rationale.contains("C1/C3 allow-list"),
+            "rationale should call out the filter: {}",
+            decision.rationale
+        );
+    }
+
+    #[tokio::test]
+    async fn test_c3_banned_minimax_prefix_rejected_but_plan_allowed() {
+        let engine = test_engine();
+
+        let banned_ctx =
+            create_test_context_with_static_model("agent", "task", "minimax/MiniMax-M2.5");
+        let banned_decision = engine
+            .decide_route(&banned_ctx, &BudgetVerdict::Uncapped)
+            .await;
+        assert_eq!(banned_decision.candidate.source, RouteSource::CliDefault);
+
+        let allowed_ctx = create_test_context_with_static_model(
+            "agent",
+            "task",
+            "minimax-coding-plan/MiniMax-M2.5",
+        );
+        let allowed_decision = engine
+            .decide_route(&allowed_ctx, &BudgetVerdict::Uncapped)
+            .await;
+        assert_eq!(allowed_decision.candidate.source, RouteSource::StaticConfig);
+        assert_eq!(
+            allowed_decision.candidate.model,
+            "minimax-coding-plan/MiniMax-M2.5"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_c1_allowed_subscription_prefix_passes() {
+        let engine = test_engine();
+        let ctx = create_test_context_with_static_model("agent", "task", "kimi-for-coding/k2p5");
+        let decision = engine.decide_route(&ctx, &BudgetVerdict::Uncapped).await;
+        assert_eq!(decision.candidate.source, RouteSource::StaticConfig);
+        assert_eq!(decision.candidate.model, "kimi-for-coding/k2p5");
     }
 }
