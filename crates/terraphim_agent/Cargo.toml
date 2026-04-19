@@ -64,6 +64,7 @@ rustyline = { version = "17.0", optional = true }
 colored = { version = "3.0", optional = true }
 comfy-table = { version = "7.0", optional = true }
 dirs = { version = "5.0" }
+directories = "5.0"
 terraphim_types = { path = "../terraphim_types", version = "1.0.0" }
 terraphim_settings = { path = "../terraphim_settings", version = "1.0.0" }
 terraphim_persistence = { path = "../terraphim_persistence", version = "1.0.0" }
