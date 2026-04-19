@@ -254,6 +254,53 @@ impl TuiService {
         }
     }
 
+    /// Resolve an explicit role or auto-route based on the query.
+    ///
+    /// If `role` is `Some`, behaves exactly like [`Self::resolve_role`] and returns
+    /// `(role_name, None)`. If `role` is `None`, scores every configured role's
+    /// rolegraph against `query` via
+    /// [`terraphim_service::auto_route::auto_select_role`] and returns
+    /// `(picked_role, Some(routing_result))` so callers can emit an explainability
+    /// line. The routing decision is never persisted.
+    ///
+    /// `selected_role` passed to `auto_select_role` is normalised: persisted
+    /// `selected_role` is treated as `None` when it does not exist in `config.roles`.
+    pub async fn resolve_or_auto_route(
+        &self,
+        role: Option<&str>,
+        query: &str,
+    ) -> Result<(
+        RoleName,
+        Option<terraphim_service::auto_route::AutoRouteResult>,
+    )> {
+        if let Some(r) = role {
+            let resolved = self
+                .find_role_by_name_or_shortname(r)
+                .await
+                .ok_or_else(|| anyhow::anyhow!("Role '{}' not found in config", r))?;
+            return Ok((resolved, None));
+        }
+
+        // Auto-route. Snapshot the live config (the helper needs Role.haystacks)
+        // and normalise selected_role against config.roles before passing it.
+        let config = self.get_config().await;
+        let selected = self.get_selected_role().await;
+        let selected_normalised = if config.roles.contains_key(&selected) {
+            Some(selected)
+        } else {
+            None
+        };
+        let ctx = terraphim_service::auto_route::AutoRouteContext::from_env(selected_normalised);
+        let result = terraphim_service::auto_route::auto_select_role(
+            query,
+            &config,
+            &self.config_state,
+            &ctx,
+        )
+        .await;
+        Ok((result.role.clone(), Some(result)))
+    }
+
     /// Search documents with a specific role
     pub async fn search_with_role(
         &self,
