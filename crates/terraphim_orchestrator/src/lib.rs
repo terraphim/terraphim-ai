@@ -207,8 +207,12 @@ pub struct AgentOrchestrator {
     /// Active flow executions keyed by flow name.
     #[allow(dead_code)]
     active_flows: HashMap<String, tokio::task::JoinHandle<flow::state::FlowRunState>>,
-    /// Tracker for processed @adf: mentions (dedup + depth limiting).
-    mention_cursor: Option<MentionCursor>,
+    /// Per-project mention cursors, keyed by project id.
+    ///
+    /// Each project gets its own cursor so repo-wide polls can advance
+    /// independently. Legacy single-project mode uses the synthetic
+    /// [`dispatcher::LEGACY_PROJECT_ID`] key.
+    mention_cursors: HashMap<String, MentionCursor>,
     /// Receiver for webhook dispatch requests.
     webhook_dispatch_rx: Option<tokio::sync::mpsc::Receiver<webhook::WebhookDispatch>>,
     /// Monotonically increasing tick counter for poll_modulo gating.
@@ -507,7 +511,7 @@ impl AgentOrchestrator {
             last_run_commits: HashMap::new(),
             pre_check_tracker: None,
             active_flows: HashMap::new(),
-            mention_cursor: None,
+            mention_cursors: HashMap::new(),
             webhook_dispatch_rx: None,
             tick_count: 0,
             #[cfg(feature = "quickwit")]
@@ -740,16 +744,31 @@ impl AgentOrchestrator {
             for dispatch in pending_dispatches {
                 self.handle_webhook_dispatch(dispatch).await;
             }
-            // Mark webhook-dispatched comments in the mention cursor so the
-            // poller skips them without needing another Gitea API call.
+            // Mark webhook-dispatched comments in every project cursor so
+            // each project's poller skips them without needing another
+            // Gitea API call. The webhook payload does not yet carry a
+            // project id, so we stamp all known cursors (plus the legacy
+            // fallback) to stay correct across both modes.
             if !webhook_comment_ids.is_empty() {
-                let cursor = self
-                    .mention_cursor
-                    .get_or_insert_with(mention::MentionCursor::now);
-                for cid in webhook_comment_ids {
-                    cursor.mark_processed(cid);
+                let project_ids: Vec<String> = if self.config.projects.is_empty() {
+                    vec![dispatcher::LEGACY_PROJECT_ID.to_string()]
+                } else {
+                    self.config.projects.iter().map(|p| p.id.clone()).collect()
+                };
+                for pid in &project_ids {
+                    let cursor = self
+                        .mention_cursors
+                        .entry(pid.clone())
+                        .or_insert_with(mention::MentionCursor::now);
+                    for cid in &webhook_comment_ids {
+                        cursor.mark_processed(*cid);
+                    }
                 }
-                cursor.save().await;
+                for pid in &project_ids {
+                    if let Some(cursor) = self.mention_cursors.get(pid) {
+                        cursor.save(pid).await;
+                    }
+                }
             }
 
             tokio::select! {
@@ -1923,10 +1942,13 @@ impl AgentOrchestrator {
             return;
         }
 
-        // Lazy-load cursor on first poll
-        let mut cursor = match self.mention_cursor.take() {
+        // Lazy-load cursor on first poll. In Commit 4 this becomes one
+        // pass per configured project; for now we poll under the legacy
+        // synthetic project id.
+        let project_id = dispatcher::LEGACY_PROJECT_ID.to_string();
+        let mut cursor = match self.mention_cursors.remove(&project_id) {
             Some(c) => c,
-            None => mention::MentionCursor::load_or_now().await,
+            None => mention::MentionCursor::load_or_now(&project_id).await,
         };
         cursor.dispatches_this_tick = 0;
 
@@ -1946,7 +1968,7 @@ impl AgentOrchestrator {
             Ok(t) => t,
             Err(e) => {
                 tracing::warn!(error = %e, "failed to create GiteaTracker for mention polling");
-                self.mention_cursor = Some(cursor);
+                self.mention_cursors.insert(project_id, cursor);
                 return;
             }
         };
@@ -1959,14 +1981,14 @@ impl AgentOrchestrator {
             Ok(c) => c,
             Err(e) => {
                 tracing::warn!(error = %e, "failed to fetch repo comments for mention polling");
-                self.mention_cursor = Some(cursor);
+                self.mention_cursors.insert(project_id, cursor);
                 return;
             }
         };
 
         if comments.is_empty() {
-            cursor.save().await;
-            self.mention_cursor = Some(cursor);
+            cursor.save(&project_id).await;
+            self.mention_cursors.insert(project_id, cursor);
             return;
         }
 
@@ -2152,8 +2174,8 @@ impl AgentOrchestrator {
         }
 
         // Persist cursor for next poll / restart
-        cursor.save().await;
-        self.mention_cursor = Some(cursor);
+        cursor.save(&project_id).await;
+        self.mention_cursors.insert(project_id, cursor);
     }
 
     /// Check if an agent is already assigned to this issue and currently active.
