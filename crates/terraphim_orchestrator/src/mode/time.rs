@@ -38,10 +38,15 @@ impl TimeMode {
     /// Start a Safety agent immediately.
     pub async fn start_safety_agent(&mut self, agent: AgentDefinition) -> Result<(), String> {
         // Safety agents bypass concurrency limits (they're always on)
+        let project = agent
+            .project
+            .clone()
+            .unwrap_or_else(|| crate::dispatcher::LEGACY_PROJECT_ID.to_string());
         let task = DispatchTask::TimeDriven {
             name: agent.name.clone(),
             task: agent.task.clone(),
             layer: agent.layer,
+            project,
         };
 
         self.dispatcher.enqueue(task);
@@ -101,13 +106,18 @@ impl TimeMode {
 
     /// Handle a spawn event.
     async fn handle_spawn(&mut self, agent: AgentDefinition) -> Result<(), String> {
-        // Try to acquire a time-driven slot
-        match self.concurrency.acquire_time_driven().await {
+        let project = agent
+            .project
+            .clone()
+            .unwrap_or_else(|| crate::dispatcher::LEGACY_PROJECT_ID.to_string());
+        // Try to acquire a time-driven slot for this project
+        match self.concurrency.acquire_time_driven(&project).await {
             Some(permit) => {
                 let task = DispatchTask::TimeDriven {
                     name: agent.name.clone(),
                     task: agent.task.clone(),
                     layer: agent.layer,
+                    project,
                 };
 
                 self.dispatcher.enqueue(task);

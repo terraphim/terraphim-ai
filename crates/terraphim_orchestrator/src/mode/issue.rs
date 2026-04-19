@@ -21,6 +21,8 @@ pub struct IssueMode {
     concurrency: ConcurrencyController,
     /// Set of running issue IDs to prevent duplicates.
     running: std::collections::HashSet<String>,
+    /// Project id that owns the tracker driving this mode.
+    project: String,
 }
 
 impl IssueMode {
@@ -29,6 +31,21 @@ impl IssueMode {
         config: WorkflowConfig,
         tracker: Box<dyn IssueTracker>,
         concurrency: ConcurrencyController,
+    ) -> Self {
+        Self::with_project(
+            config,
+            tracker,
+            concurrency,
+            crate::dispatcher::LEGACY_PROJECT_ID.to_string(),
+        )
+    }
+
+    /// Create a new issue mode controller bound to a specific project id.
+    pub fn with_project(
+        config: WorkflowConfig,
+        tracker: Box<dyn IssueTracker>,
+        concurrency: ConcurrencyController,
+        project: String,
     ) -> Self {
         let pagerank = if config.tracker.use_robot_api {
             Some(PagerankClient::new(
@@ -46,6 +63,7 @@ impl IssueMode {
             dispatcher: Dispatcher::new(),
             concurrency,
             running: std::collections::HashSet::new(),
+            project,
         }
     }
 
@@ -144,8 +162,8 @@ impl IssueMode {
                 continue;
             }
 
-            // Try to acquire concurrency slot
-            match self.concurrency.acquire_issue_driven().await {
+            // Try to acquire concurrency slot for this project
+            match self.concurrency.acquire_issue_driven(&self.project).await {
                 Some(permit) => {
                     // Create dispatch task
                     let task = DispatchTask::IssueDriven {
@@ -153,6 +171,7 @@ impl IssueMode {
                         title: issue.title.clone(),
                         priority: issue.priority,
                         pagerank_score: issue.pagerank_score,
+                        project: self.project.clone(),
                     };
 
                     self.dispatcher.enqueue(task);

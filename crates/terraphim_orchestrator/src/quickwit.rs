@@ -3,16 +3,24 @@
 //! Feature-gated behind `quickwit` feature flag.
 //! Provides async log shipping to Quickwit search engine.
 
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 
 use tokio::sync::mpsc;
 use tracing::warn;
+
+use crate::dispatcher::LEGACY_PROJECT_ID;
 
 /// Log document structure for Quickwit ingestion
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct LogDocument {
     /// ISO 8601 timestamp
     pub timestamp: String,
+    /// Project id owning the agent that produced this log. Legacy
+    /// single-project configs use [`crate::dispatcher::LEGACY_PROJECT_ID`].
+    #[serde(default)]
+    pub project_id: String,
     /// Log level (INFO, WARN, ERROR)
     pub level: String,
     /// Name of the agent
@@ -205,6 +213,95 @@ impl QuickwitSink {
     }
 }
 
+/// Fleet sink routing [`LogDocument`]s to per-project [`QuickwitSink`]s.
+///
+/// Legacy single-project deployments wire a single sink keyed on
+/// [`crate::dispatcher::LEGACY_PROJECT_ID`]. Multi-project fleets register
+/// one sink per project plus an optional fallback for docs whose
+/// `project_id` does not match any registered sink.
+#[derive(Debug, Clone)]
+pub struct QuickwitFleetSink {
+    sinks: HashMap<String, QuickwitSink>,
+    fallback_project: Option<String>,
+}
+
+impl QuickwitFleetSink {
+    /// Build a single-project fleet sink keyed on
+    /// [`crate::dispatcher::LEGACY_PROJECT_ID`]. Used by legacy deployments
+    /// and by test scaffolding.
+    pub fn single(sink: QuickwitSink) -> Self {
+        let mut sinks = HashMap::new();
+        sinks.insert(LEGACY_PROJECT_ID.to_string(), sink);
+        Self {
+            sinks,
+            fallback_project: Some(LEGACY_PROJECT_ID.to_string()),
+        }
+    }
+
+    /// Build an empty fleet sink that can have project-specific sinks
+    /// registered via [`QuickwitFleetSink::insert_project`].
+    pub fn new_multi() -> Self {
+        Self {
+            sinks: HashMap::new(),
+            fallback_project: None,
+        }
+    }
+
+    /// Register a project-specific sink.
+    pub fn insert_project(&mut self, project_id: impl Into<String>, sink: QuickwitSink) {
+        let id = project_id.into();
+        if self.fallback_project.is_none() {
+            self.fallback_project = Some(id.clone());
+        }
+        self.sinks.insert(id, sink);
+    }
+
+    /// Set the fallback project id used when a doc's `project_id` does not
+    /// match any registered sink.
+    pub fn set_fallback_project(&mut self, project_id: impl Into<String>) {
+        self.fallback_project = Some(project_id.into());
+    }
+
+    /// Send a log document, routing it to the sink for `doc.project_id`.
+    ///
+    /// Falls back to the fallback project sink (or legacy) when no matching
+    /// sink is registered. Returns `Ok(())` silently when neither exists so
+    /// that callers can enable Quickwit on a per-project basis without all
+    /// projects configuring it.
+    pub async fn send(&self, doc: LogDocument) -> Result<(), QuickwitError> {
+        if let Some(sink) = self.sinks.get(&doc.project_id) {
+            return sink.send(doc).await;
+        }
+        if let Some(fallback) = self.fallback_project.as_deref() {
+            if let Some(sink) = self.sinks.get(fallback) {
+                return sink.send(doc).await;
+            }
+        }
+        // No sink configured for this project and no fallback: drop silently.
+        Ok(())
+    }
+
+    /// Non-blocking variant of [`QuickwitFleetSink::send`].
+    pub fn try_send(&self, doc: LogDocument) -> Result<(), QuickwitError> {
+        if let Some(sink) = self.sinks.get(&doc.project_id) {
+            return sink.try_send(doc);
+        }
+        if let Some(fallback) = self.fallback_project.as_deref() {
+            if let Some(sink) = self.sinks.get(fallback) {
+                return sink.try_send(doc);
+            }
+        }
+        Ok(())
+    }
+
+    /// Shutdown all underlying sinks, flushing any pending documents.
+    pub fn shutdown(self) {
+        for (_, sink) in self.sinks {
+            sink.shutdown();
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -213,6 +310,7 @@ mod tests {
     fn test_log_document_serialization() {
         let doc = LogDocument {
             timestamp: "2024-01-01T00:00:00Z".to_string(),
+            project_id: "odilo".to_string(),
             level: "INFO".to_string(),
             agent_name: "test-agent".to_string(),
             layer: "Safety".to_string(),
@@ -231,6 +329,7 @@ mod tests {
         assert!(json.contains("test-agent"));
         assert!(json.contains("INFO"));
         assert!(json.contains("gpt-4"));
+        assert!(json.contains("\"project_id\":\"odilo\""));
         // None fields should be skipped
         assert!(!json.contains("persona"));
     }
@@ -239,5 +338,54 @@ mod tests {
     fn test_quickwit_error_display() {
         let err = QuickwitError::HttpError("connection refused".to_string());
         assert_eq!(err.to_string(), "HTTP error: connection refused");
+    }
+
+    #[tokio::test]
+    async fn test_fleet_sink_routes_to_registered_project() {
+        // Point both sinks at non-routable endpoints so the background task
+        // fails ingest silently; we only verify that send() doesn't error
+        // and that unknown project ids fall through to the fallback.
+        let odilo_sink = QuickwitSink::new(
+            "http://127.0.0.1:1".to_string(),
+            "odilo-logs".to_string(),
+            10,
+            60,
+        );
+        let twins_sink = QuickwitSink::new(
+            "http://127.0.0.1:1".to_string(),
+            "twins-logs".to_string(),
+            10,
+            60,
+        );
+
+        let mut fleet = QuickwitFleetSink::new_multi();
+        fleet.insert_project("odilo", odilo_sink);
+        fleet.insert_project("digital-twins", twins_sink);
+        fleet.set_fallback_project("odilo");
+
+        // Known project: should route without error.
+        let odilo_doc = LogDocument {
+            project_id: "odilo".into(),
+            ..Default::default()
+        };
+        assert!(fleet.send(odilo_doc).await.is_ok());
+
+        // Unknown project: routes to fallback rather than erroring.
+        let unknown_doc = LogDocument {
+            project_id: "unregistered".into(),
+            ..Default::default()
+        };
+        assert!(fleet.send(unknown_doc).await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_fleet_sink_drops_silently_without_fallback() {
+        let fleet = QuickwitFleetSink::new_multi();
+        let doc = LogDocument {
+            project_id: "whatever".into(),
+            ..Default::default()
+        };
+        // No sinks registered, no fallback: should succeed silently.
+        assert!(fleet.send(doc).await.is_ok());
     }
 }
