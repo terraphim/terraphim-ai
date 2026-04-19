@@ -141,11 +141,30 @@ impl McpService {
             .await
             .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
 
-        // Determine which role to use (provided role or selected role)
-        let role_name = if let Some(role_str) = role {
-            RoleName::from(role_str)
+        // Determine which role to use. If the caller passed `role`, honour it
+        // verbatim (matches CLI semantics: explicit always wins). Otherwise
+        // auto-route on the query and prepend an explainability line to the
+        // response so MCP clients can see the routing decision.
+        let (role_name, auto) = if let Some(role_str) = role {
+            (RoleName::from(role_str), None)
         } else {
-            self.config_state.get_selected_role().await
+            let config_snapshot = self.config_state.config.lock().await.clone();
+            let selected = self.config_state.get_selected_role().await;
+            let selected_normalised = if config_snapshot.roles.contains_key(&selected) {
+                Some(selected)
+            } else {
+                None
+            };
+            let ctx =
+                terraphim_service::auto_route::AutoRouteContext::from_env(selected_normalised);
+            let result = terraphim_service::auto_route::auto_select_role(
+                &query,
+                &config_snapshot,
+                &*self.config_state,
+                &ctx,
+            )
+            .await;
+            (result.role.clone(), Some(result))
         };
 
         let search_query = SearchQuery {
@@ -162,6 +181,14 @@ impl McpService {
         match service.search(&search_query).await {
             Ok(documents) => {
                 let mut contents = Vec::new();
+                if let Some(ref ar) = auto {
+                    contents.push(Content::text(format!(
+                        "[auto-route] picked role \"{}\" (score={}, candidates={}); pass role parameter to override",
+                        ar.role.as_str(),
+                        ar.score,
+                        ar.candidates.len(),
+                    )));
+                }
                 let summary = format!("Found {} documents matching your query.", documents.len());
                 contents.push(Content::text(summary));
 
