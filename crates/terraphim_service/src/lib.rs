@@ -13,6 +13,12 @@ use terraphim_types::{
 mod score;
 use crate::score::Query;
 
+pub mod auto_route;
+pub use auto_route::{
+    AutoRouteContext, AutoRouteReason, AutoRouteResult, JMAP_MISSING_TOKEN_DOWNWEIGHT,
+    auto_select_role,
+};
+
 #[cfg(feature = "openrouter")]
 pub mod openrouter;
 
