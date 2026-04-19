@@ -80,6 +80,8 @@ fn test_config() -> OrchestratorConfig {
                 pre_check: None,
 
                 gitea_issue: None,
+
+                project: None,
             },
             AgentDefinition {
                 name: "sync".to_string(),
@@ -103,6 +105,8 @@ fn test_config() -> OrchestratorConfig {
                 pre_check: None,
 
                 gitea_issue: None,
+
+                project: None,
             },
             AgentDefinition {
                 name: "reviewer".to_string(),
@@ -126,6 +130,8 @@ fn test_config() -> OrchestratorConfig {
                 pre_check: None,
 
                 gitea_issue: None,
+
+                project: None,
             },
         ],
         restart_cooldown_secs: 60,
@@ -143,6 +149,8 @@ fn test_config() -> OrchestratorConfig {
         webhook: None,
         role_config_path: None,
         routing: None,
+        projects: vec![],
+        include: vec![],
     }
 }
 

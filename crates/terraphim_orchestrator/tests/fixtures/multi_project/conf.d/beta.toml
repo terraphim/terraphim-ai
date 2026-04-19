@@ -1,0 +1,19 @@
+[[projects]]
+id = "beta"
+working_dir = "/tmp/beta"
+schedule_offset_minutes = 5
+
+[[agents]]
+name = "beta-watcher"
+layer = "Safety"
+cli_tool = "claude"
+task = "Watch beta"
+project = "beta"
+
+[[agents]]
+name = "beta-reviewer"
+layer = "Core"
+cli_tool = "claude"
+task = "Review beta"
+project = "beta"
+model = "sonnet"

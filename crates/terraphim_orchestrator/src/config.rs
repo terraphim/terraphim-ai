@@ -29,6 +29,36 @@ fn default_pre_check_timeout() -> u64 {
     60
 }
 
+/// Definition of a single project within a multi-project fleet.
+///
+/// Each project carries its own working directory, Gitea target, mention
+/// rate caps, workflow tracker, and Quickwit index. Agents and flows are
+/// bound to exactly one project via `project` fields; the orchestrator
+/// routes per-project configuration to each agent at dispatch time.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Project {
+    /// Unique project id (e.g. "odilo", "digital-twins", "terraphim").
+    pub id: String,
+    /// Per-project working directory (overrides top-level working_dir for this project's agents).
+    pub working_dir: PathBuf,
+    /// Minutes offset added to cron schedules of agents in this project (stagger the fleet).
+    #[serde(default)]
+    pub schedule_offset_minutes: u8,
+    /// Per-project Gitea output config (owner/repo).
+    #[serde(default)]
+    pub gitea: Option<GiteaOutputConfig>,
+    /// Per-project mention config (rate caps).
+    #[serde(default)]
+    pub mentions: Option<MentionConfig>,
+    /// Per-project workflow / tracker config.
+    #[serde(default)]
+    pub workflow: Option<WorkflowConfig>,
+    /// Per-project Quickwit index config.
+    #[cfg(feature = "quickwit")]
+    #[serde(default)]
+    pub quickwit: Option<QuickwitConfig>,
+}
+
 /// Top-level orchestrator configuration (parsed from TOML).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OrchestratorConfig {
@@ -42,6 +72,7 @@ pub struct OrchestratorConfig {
     #[serde(default)]
     pub workflow: Option<WorkflowConfig>,
     /// Agent definitions.
+    #[serde(default)]
     pub agents: Vec<AgentDefinition>,
     /// Seconds to wait before restarting a Safety agent after it exits.
     #[serde(default = "default_restart_cooldown")]
@@ -95,6 +126,14 @@ pub struct OrchestratorConfig {
     #[cfg(feature = "quickwit")]
     #[serde(default)]
     pub quickwit: Option<QuickwitConfig>,
+    /// Multi-project definitions. Empty means single-project legacy mode (globals are used).
+    #[serde(default)]
+    pub projects: Vec<Project>,
+    /// Include globs. Each matching file is merged into this config
+    /// (appends to projects / agents / flows). Globs are expanded relative
+    /// to the base config file's parent directory.
+    #[serde(default)]
+    pub include: Vec<String>,
 }
 
 /// Configuration for KG-driven model routing.
@@ -314,6 +353,13 @@ pub struct AgentDefinition {
     /// Gitea issue number to post output to (optional).
     #[serde(default)]
     pub gitea_issue: Option<u64>,
+
+    /// Project this agent belongs to. Must match a `Project.id` when any
+    /// projects are defined. `None` means the agent is global / legacy
+    /// single-project mode; mixing per-project and global agents is
+    /// rejected at load time.
+    #[serde(default)]
+    pub project: Option<String>,
 }
 
 /// Agent layer in the dark factory hierarchy.
@@ -625,18 +671,163 @@ fn default_tick_interval() -> u64 {
     30
 }
 
+/// Partial config parsed from `include`d files. Only project definitions,
+/// agents, and flows are merged in; all top-level globals are ignored.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct IncludeFragment {
+    #[serde(default)]
+    projects: Vec<Project>,
+    #[serde(default)]
+    agents: Vec<AgentDefinition>,
+    #[serde(default)]
+    flows: Vec<crate::flow::config::FlowDefinition>,
+}
+
+/// Subscription-only LLM providers allowed by constraint C1.
+/// Any `model` or `fallback_model` string with a `/`-prefixed provider
+/// name must appear in this list; bare names (`sonnet`, `opus`) are
+/// interpreted as claude-code CLI targets and always allowed.
+pub(crate) const ALLOWED_PROVIDER_PREFIXES: &[&str] = &[
+    "claude-code",
+    "opencode-go",
+    "kimi-for-coding",
+    "minimax-coding-plan",
+    "zai-coding-plan",
+];
+
+/// Explicitly banned provider prefixes. Anything matching these is rejected
+/// at load time so a misconfigured fleet never reaches a pay-per-use
+/// provider at runtime. Note `minimax/` is banned but the
+/// `minimax-coding-plan/` subscription variant remains allowed.
+pub(crate) const BANNED_PROVIDER_PREFIXES: &[&str] = &[
+    "opencode",
+    "github-copilot",
+    "google",
+    "huggingface",
+    "minimax",
+];
+
+/// Bare model names routed through claude-code CLI (no explicit provider prefix).
+pub(crate) const CLAUDE_CLI_BARE_MODELS: &[&str] = &["sonnet", "opus", "haiku"];
+
+/// Anthropic-branded bare models that map onto the claude-code CLI.
+pub(crate) const ANTHROPIC_BARE_PROVIDERS: &[&str] = &["anthropic"];
+
+/// Validate that a `model` / `fallback_model` string routes through an
+/// allowed subscription provider. Returns `Ok(())` for allowed strings,
+/// `Err(OrchestratorError::BannedProvider)` for banned ones.
+pub(crate) fn validate_model_provider(
+    agent_name: &str,
+    field: &str,
+    model: &str,
+) -> Result<(), crate::error::OrchestratorError> {
+    // Bare names like "sonnet", "opus", "haiku" -> claude-code CLI.
+    if !model.contains('/') {
+        if CLAUDE_CLI_BARE_MODELS.contains(&model) {
+            return Ok(());
+        }
+        // Unknown bare name: let it through -- claude-code CLI will accept
+        // it if valid. We only need to block banned /-prefixed providers.
+        return Ok(());
+    }
+
+    let prefix = model.split('/').next().unwrap_or("");
+
+    if ANTHROPIC_BARE_PROVIDERS.contains(&prefix) {
+        return Ok(());
+    }
+
+    for banned in BANNED_PROVIDER_PREFIXES {
+        if prefix == *banned {
+            return Err(crate::error::OrchestratorError::BannedProvider {
+                agent: agent_name.to_string(),
+                provider: model.to_string(),
+                field: field.to_string(),
+            });
+        }
+    }
+
+    if ALLOWED_PROVIDER_PREFIXES.contains(&prefix) {
+        return Ok(());
+    }
+
+    // Unknown prefix: treat as banned so the fleet cannot silently route
+    // to a provider the operator has not approved.
+    Err(crate::error::OrchestratorError::BannedProvider {
+        agent: agent_name.to_string(),
+        provider: model.to_string(),
+        field: field.to_string(),
+    })
+}
+
 impl OrchestratorConfig {
-    /// Parse an OrchestratorConfig from a TOML string.
+    /// Parse an OrchestratorConfig from a TOML string. Does not expand
+    /// `include` globs; use `from_file` when include expansion is needed.
     pub fn from_toml(toml_str: &str) -> Result<Self, crate::error::OrchestratorError> {
         toml::from_str(toml_str).map_err(|e| crate::error::OrchestratorError::Config(e.to_string()))
     }
 
-    /// Load an OrchestratorConfig from a TOML file.
+    /// Load an OrchestratorConfig from a TOML file, expanding any
+    /// `include = [...]` globs relative to the base file's parent dir.
+    /// Each include file is parsed as an `IncludeFragment` (projects /
+    /// agents / flows only) and appended onto the base config.
+    ///
+    /// Validation (project id uniqueness, project refs, banned providers,
+    /// mixed mode) runs after merging -- use `validate()` to trigger it.
     pub fn from_file(
         path: impl AsRef<std::path::Path>,
     ) -> Result<Self, crate::error::OrchestratorError> {
-        let content = std::fs::read_to_string(path.as_ref())?;
-        Self::from_toml(&content)
+        let path = path.as_ref();
+        let content = std::fs::read_to_string(path)?;
+        let mut config = Self::from_toml(&content)?;
+
+        if config.include.is_empty() {
+            return Ok(config);
+        }
+
+        let base_dir = path.parent().unwrap_or_else(|| std::path::Path::new("."));
+        let patterns = std::mem::take(&mut config.include);
+
+        for pattern in &patterns {
+            let full_pattern = if std::path::Path::new(pattern).is_absolute() {
+                pattern.clone()
+            } else {
+                base_dir.join(pattern).to_string_lossy().into_owned()
+            };
+
+            let entries = glob::glob(&full_pattern).map_err(|e| {
+                crate::error::OrchestratorError::InvalidIncludeGlob {
+                    pattern: pattern.clone(),
+                    reason: e.to_string(),
+                }
+            })?;
+
+            let mut matched: Vec<std::path::PathBuf> = entries
+                .filter_map(|r| r.ok())
+                .filter(|p| p != path)
+                .collect();
+            matched.sort();
+
+            for include_path in matched {
+                let include_content = std::fs::read_to_string(&include_path)?;
+                let fragment: IncludeFragment = toml::from_str(&include_content).map_err(|e| {
+                    crate::error::OrchestratorError::Config(format!(
+                        "failed to parse include file '{}': {e}",
+                        include_path.display()
+                    ))
+                })?;
+                config.projects.extend(fragment.projects);
+                config.agents.extend(fragment.agents);
+                config.flows.extend(fragment.flows);
+            }
+        }
+
+        // Preserve the original include patterns so downstream tools can
+        // show what was merged.
+        config.include = patterns;
+
+        Ok(config)
     }
 
     /// Substitute environment variables in workflow config.
@@ -648,6 +839,10 @@ impl OrchestratorConfig {
     }
 
     /// Validate the configuration.
+    ///
+    /// Runs all load-time checks: workflow requirements, pre-check strategy
+    /// dependencies, duplicate project ids, agent/flow project references,
+    /// banned LLM providers (C1), and mixed single/multi-project mode.
     pub fn validate(&self) -> Result<(), crate::error::OrchestratorError> {
         // Validate workflow config if present
         if let Some(ref workflow) = self.workflow {
@@ -674,6 +869,71 @@ impl OrchestratorConfig {
                         reason: "gitea-issue strategy requires [workflow] config section".into(),
                     });
                 }
+            }
+        }
+
+        // Validate project ids are unique.
+        let mut seen_ids: std::collections::HashSet<&str> = std::collections::HashSet::new();
+        for project in &self.projects {
+            if !seen_ids.insert(project.id.as_str()) {
+                return Err(crate::error::OrchestratorError::DuplicateProjectId(
+                    project.id.clone(),
+                ));
+            }
+        }
+
+        let multi_project = !self.projects.is_empty();
+
+        // Every agent.project (if Some) must reference a known project id.
+        // In multi-project mode, every agent must set project; in legacy
+        // mode agent.project must be None.
+        for agent in &self.agents {
+            match (&agent.project, multi_project) {
+                (Some(pid), _) => {
+                    if !seen_ids.contains(pid.as_str()) {
+                        return Err(crate::error::OrchestratorError::UnknownAgentProject {
+                            agent: agent.name.clone(),
+                            project: pid.clone(),
+                        });
+                    }
+                }
+                (None, true) => {
+                    return Err(crate::error::OrchestratorError::MixedProjectMode {
+                        kind: "agent",
+                        name: agent.name.clone(),
+                    });
+                }
+                (None, false) => {}
+            }
+        }
+
+        // Every flow.project must reference a known project id.
+        // Flows are always per-project (D14); if projects is empty but a
+        // flow has a project string, treat that as an unresolved reference
+        // so operators see a clear error instead of a silent orphan.
+        for flow in &self.flows {
+            if !multi_project {
+                // Empty projects list but flows exist -> mixed mode error.
+                return Err(crate::error::OrchestratorError::MixedProjectMode {
+                    kind: "flow",
+                    name: flow.name.clone(),
+                });
+            }
+            if !seen_ids.contains(flow.project.as_str()) {
+                return Err(crate::error::OrchestratorError::UnknownFlowProject {
+                    flow: flow.name.clone(),
+                    project: flow.project.clone(),
+                });
+            }
+        }
+
+        // C1: banned subscription providers.
+        for agent in &self.agents {
+            if let Some(model) = &agent.model {
+                validate_model_provider(&agent.name, "model", model)?;
+            }
+            if let Some(model) = &agent.fallback_model {
+                validate_model_provider(&agent.name, "fallback_model", model)?;
             }
         }
 
@@ -1549,6 +1809,7 @@ task = "t"
 
 [[flows]]
 name = "test-flow"
+project = "default"
 repo_path = "/home/user/project"
 
 [[flows.steps]]
