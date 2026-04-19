@@ -18,6 +18,7 @@ terraphim_rolegraph = { path = "../terraphim_rolegraph", version = "1.0.0" }
 terraphim_automata = { path = "../terraphim_automata", version = "1.0.0", features = ["tokio-runtime"] }
 terraphim_types = { path = "../terraphim_types", version = "1.0.0" }
 terraphim_persistence = { path = "../terraphim_persistence", version = "1.0.0" }
+terraphim-markdown-parser = { path = "../terraphim-markdown-parser", version = "1.0.0" }
 # NOTE: haystack_jmap not published to crates.io yet
 # haystack_jmap = { path = "../haystack_jmap", version = "1.0.0", optional = true }
 # NOTE: Atomic Data Server commented out for crates.io publishing (not published yet)

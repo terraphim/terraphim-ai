@@ -1,0 +1,44 @@
+{
+  "id": "ClaudeMd",
+  "global_shortcut": "Ctrl+Shift+C",
+  "roles": {
+    "Claude MD": {
+      "shortname": "ClaudeMd",
+      "name": "Claude MD",
+      "relevance_function": "terraphim-graph",
+      "terraphim_it": true,
+      "theme": "lumen",
+      "kg": {
+        "automata_path": null,
+        "knowledge_graph_local": {
+          "input_type": "markdown",
+          "path": "docs/src/kg"
+        },
+        "public": true,
+        "publish": true
+      },
+      "haystacks": [
+        {
+          "location": "CLAUDE.md",
+          "service": "ClaudeMd",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        },
+        {
+          "location": "docs/src/kg",
+          "service": "ClaudeMd",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "extra": {
+        "pcl_budget_tokens": "1500",
+        "pcl_always": "project-overview,commit-conventions"
+      }
+    }
+  },
+  "default_role": "Claude MD",
+  "selected_role": "Claude MD"
+}

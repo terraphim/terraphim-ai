@@ -308,6 +308,9 @@ pub enum ServiceType {
     Quickwit,
     /// Use JMAP protocol for email search (RFC 8620/8621)
     Jmap,
+    /// Index markdown files (e.g. CLAUDE.md, skills) as H2/H3-segmented fragments
+    /// for progressive context loading.
+    ClaudeMd,
 }
 
 /// A haystack is a collection of documents that can be indexed and searched

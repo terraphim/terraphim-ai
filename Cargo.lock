@@ -8939,6 +8939,7 @@ dependencies = [
  "serde_json",
  "serial_test",
  "tempfile",
+ "terraphim-markdown-parser",
  "terraphim-session-analyzer",
  "terraphim_automata",
  "terraphim_config",

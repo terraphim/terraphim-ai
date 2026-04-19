@@ -12,8 +12,8 @@ use crate::haystack::GrepAppHaystackIndexer;
 #[cfg(feature = "jmap")]
 use crate::haystack::JmapHaystackIndexer;
 use crate::haystack::{
-    ClickUpHaystackIndexer, McpHaystackIndexer, PerplexityHaystackIndexer, QueryRsHaystackIndexer,
-    QuickwitHaystackIndexer,
+    ClaudeMdHaystackIndexer, ClickUpHaystackIndexer, McpHaystackIndexer, PerplexityHaystackIndexer,
+    QueryRsHaystackIndexer, QuickwitHaystackIndexer,
 };
 pub use ripgrep::RipgrepIndexer;
 
@@ -132,6 +132,12 @@ pub async fn search_haystacks(
                 // Search using Quickwit search engine for log and observability data
                 let quickwit = QuickwitHaystackIndexer::default();
                 quickwit.index(needle, haystack).await?
+            }
+            ServiceType::ClaudeMd => {
+                // Index CLAUDE.md / skill markdown as H2/H3 fragments for
+                // progressive context loading.
+                let claude_md = ClaudeMdHaystackIndexer;
+                claude_md.index(needle, haystack).await?
             }
             ServiceType::Jmap => {
                 #[cfg(feature = "jmap")]
