@@ -56,7 +56,9 @@ pub enum OrchestratorError {
     #[error("flow template error: {0}")]
     FlowTemplateError(String),
 
-    #[error("duplicate project id '{0}' (project ids must be unique across base + included configs)")]
+    #[error(
+        "duplicate project id '{0}' (project ids must be unique across base + included configs)"
+    )]
     DuplicateProjectId(String),
 
     #[error(
@@ -81,10 +83,7 @@ pub enum OrchestratorError {
     #[error(
         "mixed project mode: projects are defined but {kind} '{name}' has no project set; every agent and flow must declare a project"
     )]
-    MixedProjectMode {
-        kind: &'static str,
-        name: String,
-    },
+    MixedProjectMode { kind: &'static str, name: String },
 
     #[error("include glob '{pattern}' is invalid: {reason}")]
     InvalidIncludeGlob { pattern: String, reason: String },
