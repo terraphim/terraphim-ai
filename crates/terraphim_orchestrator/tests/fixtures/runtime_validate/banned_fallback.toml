@@ -1,0 +1,20 @@
+working_dir = "/tmp/t"
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 2 * * *"
+repo_path = "/tmp/repo"
+
+[[projects]]
+id = "p"
+working_dir = "/tmp/p"
+
+[[agents]]
+name = "bad-fallback-agent"
+layer = "Safety"
+cli_tool = "claude"
+task = "t"
+project = "p"
+model = "sonnet"
+fallback_model = "opencode/claude-haiku"

@@ -482,9 +482,19 @@ impl AgentOrchestrator {
     }
 
     /// Create from a TOML config file path.
+    ///
+    /// Loads the config, resolves include globs, and runs full validation
+    /// (banned providers, duplicate project ids, unknown project refs, mixed
+    /// mode). Returns `Err` if any check fails -- does not panic or warn-and-
+    /// continue.
     pub fn from_config_file(path: impl AsRef<Path>) -> Result<Self, OrchestratorError> {
-        let config = OrchestratorConfig::from_file(path)?;
+        let config = OrchestratorConfig::load_and_validate(path)?;
         Self::new(config)
+    }
+
+    /// Return the validated configuration stored in this orchestrator.
+    pub fn config(&self) -> &OrchestratorConfig {
+        &self.config
     }
 
     /// Run the orchestrator (blocks until shutdown signal).
