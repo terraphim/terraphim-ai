@@ -73,8 +73,8 @@ pub use dual_mode::DualModeOrchestrator;
 pub use error::OrchestratorError;
 pub use handoff::{HandoffBuffer, HandoffContext, HandoffLedger};
 pub use mention::{
-    parse_mention_tokens, parse_mentions, resolve_mention, resolve_persona_mention,
-    DetectedMention, MentionCursor, MentionTokens, MentionTracker,
+    migrate_legacy_mention_cursor, parse_mention_tokens, parse_mentions, resolve_mention,
+    resolve_persona_mention, DetectedMention, MentionCursor, MentionTokens, MentionTracker,
 };
 pub use metrics_persistence::{
     InMemoryMetricsPersistence, MetricsPersistence, MetricsPersistenceConfig,
@@ -671,6 +671,11 @@ impl AgentOrchestrator {
 
         // Restore persisted telemetry from previous runs
         self.restore_telemetry().await;
+
+        // One-shot migration of the legacy top-level `adf/mention_cursor`
+        // key into per-project keys. No-op after the first successful
+        // startup.
+        mention::migrate_legacy_mention_cursor(&self.config.projects).await;
 
         // Spawn Safety-layer agents immediately
         let immediate = self.scheduler.immediate_agents();
