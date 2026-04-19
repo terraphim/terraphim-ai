@@ -198,6 +198,7 @@ impl FlowExecutor {
             max_cpu_seconds: None,
             pre_check: None,
             gitea_issue: None,
+            project: None,
         };
 
         // Build provider for spawner
@@ -527,6 +528,7 @@ mod tests {
     fn create_test_flow() -> FlowDefinition {
         FlowDefinition {
             name: "test-flow".to_string(),
+            project: "test".to_string(),
             schedule: None,
             repo_path: "/home/user/project".to_string(),
             base_branch: "develop".to_string(),
@@ -744,6 +746,7 @@ mod tests {
 
         let flow = FlowDefinition {
             name: "test-flow".to_string(),
+            project: "test".to_string(),
             schedule: None,
             repo_path: "/tmp/repo".to_string(),
             base_branch: "main".to_string(),
@@ -783,6 +786,7 @@ mod tests {
 
         let flow = FlowDefinition {
             name: "test-flow".to_string(),
+            project: "test".to_string(),
             schedule: None,
             repo_path: "/tmp/repo".to_string(),
             base_branch: "main".to_string(),
@@ -820,6 +824,7 @@ mod tests {
 
         let flow = FlowDefinition {
             name: "test-flow".to_string(),
+            project: "test".to_string(),
             schedule: None,
             repo_path: "/tmp/repo".to_string(),
             base_branch: "main".to_string(),
@@ -868,6 +873,7 @@ mod tests {
 
         let flow = FlowDefinition {
             name: "test-flow".to_string(),
+            project: "test".to_string(),
             schedule: None,
             repo_path: "/tmp/repo".to_string(),
             base_branch: "main".to_string(),
@@ -918,6 +924,7 @@ mod tests {
 
         let flow = FlowDefinition {
             name: "test-flow".to_string(),
+            project: "test".to_string(),
             schedule: None,
             repo_path: "/tmp/repo".to_string(),
             base_branch: "main".to_string(),
@@ -976,6 +983,7 @@ mod tests {
 
         let flow = FlowDefinition {
             name: "test-flow".to_string(),
+            project: "test".to_string(),
             schedule: None,
             repo_path: "/tmp/repo".to_string(),
             base_branch: "main".to_string(),
@@ -1040,6 +1048,7 @@ mod tests {
 
         let flow = FlowDefinition {
             name: "test-flow".to_string(),
+            project: "test".to_string(),
             schedule: None,
             repo_path: "/tmp/repo".to_string(),
             base_branch: "main".to_string(),
@@ -1107,6 +1116,7 @@ mod tests {
 
         let flow = FlowDefinition {
             name: "test-flow".to_string(),
+            project: "test".to_string(),
             schedule: None,
             repo_path: "/tmp/repo".to_string(),
             base_branch: "main".to_string(),
@@ -1186,6 +1196,7 @@ mod tests {
 
         let flow = FlowDefinition {
             name: "test-flow".to_string(),
+            project: "test".to_string(),
             schedule: None,
             repo_path: "/tmp/repo".to_string(),
             base_branch: "main".to_string(),
@@ -1273,6 +1284,7 @@ mod tests {
 
         let flow = FlowDefinition {
             name: "checkpoint-test".to_string(),
+            project: "test".to_string(),
             schedule: None,
             repo_path: dir.to_string_lossy().to_string(),
             base_branch: "main".to_string(),
@@ -1353,6 +1365,7 @@ mod tests {
 
         let flow = FlowDefinition {
             name: "timeout-test".to_string(),
+            project: "test".to_string(),
             schedule: None,
             repo_path: dir.to_string_lossy().to_string(),
             base_branch: "main".to_string(),

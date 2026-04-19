@@ -45,6 +45,7 @@ terraphim_automata = { path = "../terraphim_automata", version = "1.4.10" }
 
 # Config parsing
 toml = "0.8"
+glob = "0.3"
 
 # Template rendering
 handlebars = "6.3"

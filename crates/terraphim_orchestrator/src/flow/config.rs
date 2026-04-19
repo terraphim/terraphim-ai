@@ -3,6 +3,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FlowDefinition {
     pub name: String,
+    /// Project this flow belongs to. Required -- flows are per-project only (D14).
+    /// Must match a `Project.id` when projects are defined.
+    pub project: String,
     #[serde(default)]
     pub schedule: Option<String>, // cron expression
     pub repo_path: String,
@@ -89,6 +92,7 @@ mod tests {
     fn test_flow_config_parse_minimal() {
         let toml_str = r#"
 name = "test-flow"
+project = "default"
 repo_path = "/tmp/repo"
 
 [[steps]]
@@ -99,6 +103,7 @@ command = "cargo build"
 
         let flow: FlowDefinition = toml::from_str(toml_str).unwrap();
         assert_eq!(flow.name, "test-flow");
+        assert_eq!(flow.project, "default");
         assert_eq!(flow.repo_path, "/tmp/repo");
         assert_eq!(flow.base_branch, "main"); // default
         assert!(flow.schedule.is_none());
@@ -116,6 +121,7 @@ command = "cargo build"
     fn test_flow_config_parse_full() {
         let toml_str = r#"
 name = "compound-review-v2"
+project = "terraphim"
 schedule = "0 2 * * *"
 repo_path = "/home/user/project"
 base_branch = "develop"
