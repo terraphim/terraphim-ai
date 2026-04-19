@@ -81,21 +81,67 @@ fn rejects_mixed_mode_at_startup() {
 }
 
 #[test]
-fn accepts_valid_multi_project_config_at_startup() {
-    let result = AgentOrchestrator::from_config_file(fixture("valid_multi_project.toml"));
+fn rejects_banned_fallback_model_at_startup() {
+    let result = AgentOrchestrator::from_config_file(fixture("banned_fallback.toml"));
+    assert!(result.is_err(), "expected Err for banned fallback_model");
+    let err = result.err().unwrap();
+    match err {
+        OrchestratorError::BannedProvider {
+            agent,
+            provider,
+            field,
+        } => {
+            assert_eq!(agent, "bad-fallback-agent");
+            assert!(
+                provider.starts_with("opencode/"),
+                "expected opencode/ prefix, got {provider}"
+            );
+            assert_eq!(field, "fallback_model");
+        }
+        other => panic!("expected BannedProvider on fallback_model, got {other:?}"),
+    }
+}
+
+#[test]
+fn rejects_mixed_mode_flow_at_startup() {
+    let result = AgentOrchestrator::from_config_file(fixture("mixed_mode_flow.toml"));
     assert!(
-        result.is_ok(),
-        "valid multi-project config should load without error: {:?}",
-        result.err()
+        result.is_err(),
+        "expected Err for flow in legacy (no-projects) mode"
     );
+    let err = result.err().unwrap();
+    match err {
+        OrchestratorError::MixedProjectMode { kind, name } => {
+            assert_eq!(kind, "flow");
+            assert_eq!(name, "orphan-flow");
+        }
+        other => panic!("expected MixedProjectMode for flow, got {other:?}"),
+    }
+}
+
+#[test]
+fn accepts_valid_multi_project_config_at_startup() {
+    let orch = AgentOrchestrator::from_config_file(fixture("valid_multi_project.toml"))
+        .expect("valid multi-project config should load");
+
+    let cfg = orch.config();
+    assert_eq!(cfg.projects.len(), 2);
+    let project_ids: Vec<&str> = cfg.projects.iter().map(|p| p.id.as_str()).collect();
+    assert!(project_ids.contains(&"alpha"));
+    assert!(project_ids.contains(&"beta"));
+    assert_eq!(cfg.agents.len(), 2);
 }
 
 #[test]
 fn accepts_valid_legacy_config_at_startup() {
-    let result = AgentOrchestrator::from_config_file(fixture("valid_legacy.toml"));
+    let orch = AgentOrchestrator::from_config_file(fixture("valid_legacy.toml"))
+        .expect("valid legacy config should load");
+
+    let cfg = orch.config();
     assert!(
-        result.is_ok(),
-        "valid legacy config should load without error: {:?}",
-        result.err()
+        cfg.projects.is_empty(),
+        "legacy config should have no projects"
     );
+    assert_eq!(cfg.agents.len(), 1);
+    assert!(cfg.agents[0].project.is_none());
 }
