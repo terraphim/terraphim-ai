@@ -9024,6 +9024,7 @@ dependencies = [
  "axum 0.8.8",
  "chrono",
  "cron",
+ "glob",
  "handlebars",
  "hex",
  "hmac",

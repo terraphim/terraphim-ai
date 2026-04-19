@@ -55,4 +55,37 @@ pub enum OrchestratorError {
 
     #[error("flow template error: {0}")]
     FlowTemplateError(String),
+
+    #[error("duplicate project id '{0}' (project ids must be unique across base + included configs)")]
+    DuplicateProjectId(String),
+
+    #[error(
+        "agent '{agent}' references unknown project '{project}' (must match a Project.id in projects list)"
+    )]
+    UnknownAgentProject { agent: String, project: String },
+
+    #[error(
+        "flow '{flow}' references unknown project '{project}' (must match a Project.id in projects list)"
+    )]
+    UnknownFlowProject { flow: String, project: String },
+
+    #[error(
+        "banned LLM provider '{provider}' in {field} for agent '{agent}' (allowed: claude-code, opencode-go, kimi-for-coding, minimax-coding-plan, zai-coding-plan)"
+    )]
+    BannedProvider {
+        agent: String,
+        provider: String,
+        field: String,
+    },
+
+    #[error(
+        "mixed project mode: projects are defined but {kind} '{name}' has no project set; every agent and flow must declare a project"
+    )]
+    MixedProjectMode {
+        kind: &'static str,
+        name: String,
+    },
+
+    #[error("include glob '{pattern}' is invalid: {reason}")]
+    InvalidIncludeGlob { pattern: String, reason: String },
 }
