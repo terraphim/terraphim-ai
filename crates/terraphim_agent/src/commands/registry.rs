@@ -443,7 +443,7 @@ impl CommandRegistry {
             .collect();
 
         // Sort by score (descending) and take top matches
-        matches.sort_by(|a, b| b.1.cmp(&a.1));
+        matches.sort_by_key(|x| std::cmp::Reverse(x.1));
 
         let limit = limit.unwrap_or(10);
         matches

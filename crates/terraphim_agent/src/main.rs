@@ -1640,7 +1640,8 @@ async fn run_offline_command(
                                 // Apply filtered matches in reverse order to preserve positions
                                 let mut result = input_text.clone();
                                 let mut sorted_matches = filtered_matches;
-                                sorted_matches.sort_by(|a, b| b.pos.cmp(&a.pos)); // Reverse sort by position
+                                #[allow(clippy::unnecessary_sort_by)]
+                                sorted_matches.sort_by(|a, b| b.pos.cmp(&a.pos));
 
                                 for m in sorted_matches {
                                     if let Some((start, end)) = m.pos {
@@ -3049,6 +3050,7 @@ async fn run_server_command(
 
             let graph_res = api.rolegraph(Some(&role_name)).await?;
             let mut nodes_sorted = graph_res.nodes.clone();
+            #[allow(clippy::unnecessary_sort_by)]
             nodes_sorted.sort_by(|a, b| b.rank.cmp(&a.rank));
             for node in nodes_sorted.into_iter().take(top_k) {
                 println!("{}", node.label);

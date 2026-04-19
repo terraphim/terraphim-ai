@@ -17,6 +17,39 @@ use tokio::time::timeout;
 
 use terraphim_types::capability::{ProcessId, Provider};
 
+/// Per-spawn overrides that a caller can pass to AgentSpawner::spawn().
+///
+/// Enables multi-project use: one orchestrator serving many projects can
+/// pass per-project working_dir and env without constructing N spawners.
+#[derive(Debug, Clone, Default)]
+pub struct SpawnContext {
+    /// Working directory for the child process. None -> use spawner default.
+    pub working_dir: Option<PathBuf>,
+    /// Env vars to set on the child process (added to inherited env).
+    pub env_overrides: HashMap<String, String>,
+}
+
+impl SpawnContext {
+    /// Use the spawner's default working_dir and no env overrides.
+    pub fn global() -> Self {
+        Self::default()
+    }
+
+    /// Override working_dir; keep env untouched.
+    pub fn with_working_dir(path: impl Into<PathBuf>) -> Self {
+        Self {
+            working_dir: Some(path.into()),
+            env_overrides: HashMap::new(),
+        }
+    }
+
+    /// Builder-style env addition.
+    pub fn with_env(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+        self.env_overrides.insert(key.into(), value.into());
+        self
+    }
+}
+
 pub mod audit;
 pub mod config;
 pub mod health;
@@ -421,13 +454,15 @@ impl AgentSpawner {
         provider: &Provider,
         task: &str,
         model: Option<&str>,
+        ctx: SpawnContext,
     ) -> Result<AgentHandle, SpawnerError> {
         let config = AgentConfig::from_provider(provider)?;
         let config = match model {
             Some(m) => config.with_model(m),
             None => config,
         };
-        self.spawn_config(provider, &config, task, false).await
+        self.spawn_config(provider, &config, task, false, &ctx)
+            .await
     }
 
     /// Spawn an agent from a provider configuration with an optional model,
@@ -437,13 +472,14 @@ impl AgentSpawner {
         provider: &Provider,
         task: &str,
         model: Option<&str>,
+        ctx: SpawnContext,
     ) -> Result<AgentHandle, SpawnerError> {
         let config = AgentConfig::from_provider(provider)?;
         let config = match model {
             Some(m) => config.with_model(m),
             None => config,
         };
-        self.spawn_config(provider, &config, task, true).await
+        self.spawn_config(provider, &config, task, true, &ctx).await
     }
 
     /// Internal: spawn with model, stdin option, and resource limits.
@@ -454,6 +490,7 @@ impl AgentSpawner {
         model: Option<&str>,
         use_stdin: bool,
         resource_limits: ResourceLimits,
+        ctx: &SpawnContext,
     ) -> Result<AgentHandle, SpawnerError> {
         let config = AgentConfig::from_provider(provider)?;
         let config = config.with_resource_limits(resource_limits);
@@ -461,17 +498,20 @@ impl AgentSpawner {
             Some(m) => config.with_model(m),
             None => config,
         };
-        self.spawn_config(provider, &config, task, use_stdin).await
+        self.spawn_config(provider, &config, task, use_stdin, ctx)
+            .await
     }
 
-    /// Spawn an agent from a provider configuration
+    /// Spawn an agent from a provider configuration.
     pub async fn spawn(
         &self,
         provider: &Provider,
         task: &str,
+        ctx: SpawnContext,
     ) -> Result<AgentHandle, SpawnerError> {
         let config = AgentConfig::from_provider(provider)?;
-        self.spawn_config(provider, &config, task, false).await
+        self.spawn_config(provider, &config, task, false, &ctx)
+            .await
     }
 
     /// Spawn an agent with primary and fallback configuration.
@@ -481,6 +521,7 @@ impl AgentSpawner {
     pub async fn spawn_with_fallback(
         &self,
         request: &SpawnRequest,
+        ctx: SpawnContext,
     ) -> Result<AgentHandle, SpawnerError> {
         // Try primary first with resource limits
         let primary_result = self
@@ -490,6 +531,7 @@ impl AgentSpawner {
                 request.primary_model.as_deref(),
                 request.use_stdin,
                 request.resource_limits.clone(),
+                &ctx,
             )
             .await;
 
@@ -517,6 +559,7 @@ impl AgentSpawner {
                             request.fallback_model.as_deref(),
                             request.use_stdin,
                             request.resource_limits.clone(),
+                            &ctx,
                         )
                         .await;
 
@@ -553,6 +596,7 @@ impl AgentSpawner {
         config: &AgentConfig,
         task: &str,
         use_stdin: bool,
+        ctx: &SpawnContext,
     ) -> Result<AgentHandle, SpawnerError> {
         let _span = tracing::info_span!(
             "spawner.spawn",
@@ -566,7 +610,7 @@ impl AgentSpawner {
 
         // Spawn the agent process
         let process_id = ProcessId::new();
-        let mut child = self.spawn_process(config, task, use_stdin).await?;
+        let mut child = self.spawn_process(config, task, use_stdin, ctx).await?;
 
         // Set up health checking
         let health_checker = HealthChecker::new(process_id, Duration::from_secs(30));
@@ -608,10 +652,13 @@ impl AgentSpawner {
         config: &AgentConfig,
         task: &str,
         use_stdin: bool,
+        ctx: &SpawnContext,
     ) -> Result<Child, SpawnerError> {
-        let working_dir = config
+        // Priority: ctx override > config working_dir > spawner default
+        let working_dir = ctx
             .working_dir
             .as_ref()
+            .or(config.working_dir.as_ref())
             .unwrap_or(&self.default_working_dir);
 
         let mut cmd = Command::new(&config.cli_command);
@@ -626,13 +673,18 @@ impl AgentSpawner {
 
         cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
 
-        // Add environment variables
+        // Add environment variables (spawner defaults, lowest priority)
         for (key, value) in &self.env_vars {
             cmd.env(key, value);
         }
 
         // Add provider-specific env vars
         for (key, value) in &config.env_vars {
+            cmd.env(key, value);
+        }
+
+        // Apply per-call overrides last (highest priority)
+        for (key, value) in &ctx.env_overrides {
             cmd.env(key, value);
         }
 
@@ -763,7 +815,9 @@ mod tests {
         let spawner = AgentSpawner::new();
         let provider = create_test_agent_provider();
 
-        let handle = spawner.spawn(&provider, "Hello World").await;
+        let handle = spawner
+            .spawn(&provider, "Hello World", SpawnContext::global())
+            .await;
 
         // Echo command should succeed
         assert!(handle.is_ok());
@@ -777,7 +831,10 @@ mod tests {
         let spawner = AgentSpawner::new();
         let provider = create_test_agent_provider();
 
-        let mut handle = spawner.spawn(&provider, "done").await.unwrap();
+        let mut handle = spawner
+            .spawn(&provider, "done", SpawnContext::global())
+            .await
+            .unwrap();
 
         // Echo exits immediately; give it a moment
         tokio::time::sleep(Duration::from_millis(100)).await;
@@ -793,7 +850,10 @@ mod tests {
         let provider = create_sleep_agent_provider();
 
         // Spawn a sleep 60 agent
-        let mut handle = spawner.spawn(&provider, "60").await.unwrap();
+        let mut handle = spawner
+            .spawn(&provider, "60", SpawnContext::global())
+            .await
+            .unwrap();
 
         // Graceful shutdown with 2s grace period
         let result = handle.shutdown(Duration::from_secs(2)).await;
@@ -817,7 +877,10 @@ mod tests {
         let spawner = AgentSpawner::new();
         let provider = create_test_agent_provider();
 
-        let handle = spawner.spawn(&provider, "hello").await.unwrap();
+        let handle = spawner
+            .spawn(&provider, "hello", SpawnContext::global())
+            .await
+            .unwrap();
         let mut pool = AgentPool::new(5);
 
         pool.release(handle);
@@ -834,7 +897,10 @@ mod tests {
         let spawner = AgentSpawner::new();
         let provider = create_test_agent_provider();
 
-        let handle = spawner.spawn(&provider, "broadcast test").await.unwrap();
+        let handle = spawner
+            .spawn(&provider, "broadcast test", SpawnContext::global())
+            .await
+            .unwrap();
         let mut receiver = handle.subscribe_output();
 
         // Give the echo process time to produce output and the capture task to process it
@@ -864,7 +930,9 @@ mod tests {
 
         // Spawn with resource limits -- echo exits fast so this validates
         // that the pre_exec hook with setrlimit doesn't break spawning.
-        let handle = spawner.spawn(&provider, "resource-limited").await;
+        let handle = spawner
+            .spawn(&provider, "resource-limited", SpawnContext::global())
+            .await;
         assert!(handle.is_ok());
     }
 
@@ -873,7 +941,10 @@ mod tests {
         let spawner = AgentSpawner::new();
         let provider = create_test_agent_provider();
 
-        let handle = spawner.spawn(&provider, "hello").await.unwrap();
+        let handle = spawner
+            .spawn(&provider, "hello", SpawnContext::global())
+            .await
+            .unwrap();
         let mut pool = AgentPool::new(5);
         pool.release(handle);
 
@@ -908,7 +979,7 @@ mod tests {
 
         // Spawn with stdin delivery - cat will echo the prompt back
         let handle = spawner
-            .spawn_with_model_stdin(&provider, "hello from stdin", None)
+            .spawn_with_model_stdin(&provider, "hello from stdin", None, SpawnContext::global())
             .await;
 
         assert!(handle.is_ok());
@@ -943,7 +1014,9 @@ mod tests {
         let provider = create_test_agent_provider();
 
         // Spawn without stdin - prompt should be CLI arg
-        let handle = spawner.spawn(&provider, "arg test").await;
+        let handle = spawner
+            .spawn(&provider, "arg test", SpawnContext::global())
+            .await;
 
         assert!(handle.is_ok());
 
@@ -978,7 +1051,7 @@ mod tests {
 
         // Spawn with stdin - should complete without error
         let handle = spawner
-            .spawn_with_model_stdin(&provider, &large_prompt, None)
+            .spawn_with_model_stdin(&provider, &large_prompt, None, SpawnContext::global())
             .await;
 
         assert!(
@@ -1009,7 +1082,12 @@ mod tests {
 
         // Spawn with both model and stdin
         let handle = spawner
-            .spawn_with_model_stdin(&provider, "model test via stdin", Some("test-model"))
+            .spawn_with_model_stdin(
+                &provider,
+                "model test via stdin",
+                Some("test-model"),
+                SpawnContext::global(),
+            )
             .await;
 
         assert!(handle.is_ok());
@@ -1035,6 +1113,191 @@ mod tests {
         assert_eq!(
             request.resource_limits.max_memory_bytes,
             Some(2_147_483_648)
+        );
+    }
+
+    // =========================================================================
+    // SpawnContext Tests (Gitea adf-fleet#3)
+    // =========================================================================
+
+    #[test]
+    fn test_spawn_context_global_is_default() {
+        let ctx = SpawnContext::global();
+        assert!(ctx.working_dir.is_none());
+        assert!(ctx.env_overrides.is_empty());
+    }
+
+    #[test]
+    fn test_spawn_context_with_working_dir() {
+        let ctx = SpawnContext::with_working_dir("/some/project");
+        assert_eq!(ctx.working_dir, Some(PathBuf::from("/some/project")));
+        assert!(ctx.env_overrides.is_empty());
+    }
+
+    #[test]
+    fn test_spawn_context_with_env() {
+        let ctx = SpawnContext::global()
+            .with_env("FOO", "bar")
+            .with_env("BAZ", "qux");
+        assert!(ctx.working_dir.is_none());
+        assert_eq!(ctx.env_overrides.get("FOO"), Some(&"bar".to_string()));
+        assert_eq!(ctx.env_overrides.get("BAZ"), Some(&"qux".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_spawn_global_uses_spawner_default_working_dir() {
+        let spawner = AgentSpawner::new().with_working_dir("/tmp");
+        let provider = create_test_agent_provider();
+
+        // SpawnContext::global() should preserve spawner's default behaviour.
+        // We spawn /bin/echo (via echo provider) and check it succeeds.
+        let handle = spawner
+            .spawn(&provider, "hello", SpawnContext::global())
+            .await;
+        assert!(handle.is_ok(), "spawn with global context should succeed");
+    }
+
+    #[tokio::test]
+    async fn test_spawn_with_working_dir_override() {
+        use tempfile::TempDir;
+
+        let tmpdir = TempDir::new().expect("create tempdir");
+        let tmppath = tmpdir.path().to_path_buf();
+
+        // Provider runs /bin/pwd so the child prints its cwd.
+        let provider = Provider::new(
+            "@pwd-agent",
+            "Pwd Agent",
+            terraphim_types::capability::ProviderType::Agent {
+                agent_id: "@pwd".to_string(),
+                cli_command: "/bin/pwd".to_string(),
+                working_dir: PathBuf::from("/tmp"),
+            },
+            vec![terraphim_types::capability::Capability::CodeGeneration],
+        );
+
+        let spawner = AgentSpawner::new().with_working_dir("/tmp");
+        let ctx = SpawnContext::with_working_dir(tmppath.clone());
+
+        // Subscribe before spawn so we don't miss events from a fast process.
+        let handle = spawner
+            .spawn(&provider, ".", ctx)
+            .await
+            .expect("spawn with working_dir override should succeed");
+
+        let mut rx = handle.subscribe_output();
+
+        // Give pwd time to run and the capture task to broadcast its line.
+        tokio::time::sleep(Duration::from_millis(300)).await;
+
+        let mut found = false;
+        let resolved = std::fs::canonicalize(&tmppath).unwrap_or(tmppath.clone());
+        loop {
+            match rx.try_recv() {
+                Ok(OutputEvent::Stdout { line, .. }) => {
+                    let trimmed = line.trim();
+                    if trimmed == resolved.to_string_lossy().as_ref()
+                        || trimmed == tmppath.to_string_lossy().as_ref()
+                    {
+                        found = true;
+                        break;
+                    }
+                }
+                Ok(_) => {}
+                Err(tokio::sync::broadcast::error::TryRecvError::Empty) => break,
+                Err(_) => break,
+            }
+        }
+
+        assert!(found, "child cwd should be the overridden tmpdir");
+    }
+
+    #[tokio::test]
+    async fn test_spawn_env_override_propagates() {
+        // Use /usr/bin/printenv VAR_NAME to verify env override.
+        // printenv takes the variable name as its argument and prints the value.
+        let provider = Provider::new(
+            "@printenv-env-agent",
+            "Printenv Env Agent",
+            terraphim_types::capability::ProviderType::Agent {
+                agent_id: "@printenv-env".to_string(),
+                cli_command: "/usr/bin/printenv".to_string(),
+                working_dir: PathBuf::from("/tmp"),
+            },
+            vec![terraphim_types::capability::Capability::CodeGeneration],
+        );
+
+        let spawner = AgentSpawner::new();
+        let ctx = SpawnContext::global().with_env("ADF_SPAWN_CTX_TEST", "hello-from-ctx");
+
+        // Task "ADF_SPAWN_CTX_TEST" becomes the arg to printenv, printing its value.
+        let handle = spawner
+            .spawn(&provider, "ADF_SPAWN_CTX_TEST", ctx)
+            .await
+            .expect("spawn with env override should succeed");
+
+        let mut rx = handle.subscribe_output();
+        tokio::time::sleep(Duration::from_millis(300)).await;
+
+        let mut output = String::new();
+        loop {
+            match rx.try_recv() {
+                Ok(OutputEvent::Stdout { line, .. }) => output.push_str(line.trim()),
+                Ok(_) => {}
+                Err(tokio::sync::broadcast::error::TryRecvError::Empty) => break,
+                Err(_) => break,
+            }
+        }
+
+        assert!(
+            output.contains("hello-from-ctx"),
+            "env override should be visible in child process, got: {:?}",
+            output
+        );
+    }
+
+    #[tokio::test]
+    async fn test_inherited_env_flows_through_without_override() {
+        // Set an env var in the test process and verify a child sees it.
+        // Using /usr/bin/printenv VAR_NAME avoids shell argument-parsing issues.
+        unsafe {
+            std::env::set_var("ADF_INHERITED_SPAWN_CTX", "inherited-value");
+        }
+
+        let provider = Provider::new(
+            "@printenv-inherit-agent",
+            "Printenv Inherit Agent",
+            terraphim_types::capability::ProviderType::Agent {
+                agent_id: "@printenv-inherit".to_string(),
+                cli_command: "/usr/bin/printenv".to_string(),
+                working_dir: PathBuf::from("/tmp"),
+            },
+            vec![terraphim_types::capability::Capability::CodeGeneration],
+        );
+
+        let spawner = AgentSpawner::new();
+        let handle = spawner
+            .spawn(&provider, "ADF_INHERITED_SPAWN_CTX", SpawnContext::global())
+            .await
+            .expect("spawn should succeed");
+
+        let mut rx = handle.subscribe_output();
+        tokio::time::sleep(Duration::from_millis(300)).await;
+
+        let mut output = String::new();
+        loop {
+            match rx.try_recv() {
+                Ok(OutputEvent::Stdout { line, .. }) => output.push_str(line.trim()),
+                Ok(_) => {}
+                Err(tokio::sync::broadcast::error::TryRecvError::Empty) => break,
+                Err(_) => break,
+            }
+        }
+
+        assert!(
+            output.contains("inherited-value"),
+            "inherited env should be visible in child without override, got: {:?}",
+            output
         );
     }
 }

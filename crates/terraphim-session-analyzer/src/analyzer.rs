@@ -207,7 +207,7 @@ impl Analyzer {
     /// Calculate durations for agent invocations
     fn calculate_agent_durations(agents: &mut [AgentInvocation]) {
         // Sort by timestamp for duration calculation
-        agents.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+        agents.sort_by_key(|a| a.timestamp);
 
         for i in 0..agents.len() {
             if i + 1 < agents.len() {
@@ -561,7 +561,7 @@ impl Analyzer {
         }
 
         let mut sorted: Vec<_> = agent_counts.into_iter().collect();
-        sorted.sort_by(|a, b| b.1.cmp(&a.1));
+        sorted.sort_by_key(|(_, count)| std::cmp::Reverse(*count));
         sorted.into_iter().take(10).collect()
     }
 
@@ -634,7 +634,7 @@ impl Analyzer {
             .collect();
 
         // Sort by usage count descending
-        correlations.sort_by(|a, b| b.usage_count.cmp(&a.usage_count));
+        correlations.sort_by_key(|c| std::cmp::Reverse(c.usage_count));
 
         correlations
     }
@@ -715,6 +715,7 @@ impl Analyzer {
             .collect();
 
         // Sort by total invocations descending
+        #[allow(clippy::unnecessary_sort_by)]
         stats.sort_by(|_, v1, _, v2| v2.total_invocations.cmp(&v1.total_invocations));
 
         stats
@@ -736,6 +737,7 @@ impl Analyzer {
 
         // Convert to IndexMap and sort by count descending
         let mut breakdown: IndexMap<ToolCategory, u32> = category_counts.into_iter().collect();
+        #[allow(clippy::unnecessary_sort_by)]
         breakdown.sort_by(|_, v1, _, v2| v2.cmp(v1));
 
         breakdown
@@ -877,7 +879,7 @@ impl Analyzer {
             .collect();
 
         // Sort by frequency descending
-        chains.sort_by(|a, b| b.frequency.cmp(&a.frequency));
+        chains.sort_by_key(|c| std::cmp::Reverse(c.frequency));
 
         chains
     }

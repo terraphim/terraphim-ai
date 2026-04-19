@@ -246,15 +246,13 @@ fn analyze_task_complexity(prompt: &str, role: &str) -> serde_json::Value {
 
     // Role-specific complexity adjustments
     match role {
-        "technical_writer" => {
-            if prompt.contains("documentation") || prompt.contains("specification") {
-                complexity_score += 0.15;
-            }
+        "technical_writer"
+            if prompt.contains("documentation") || prompt.contains("specification") =>
+        {
+            complexity_score += 0.15;
         }
-        "content_creator" => {
-            if prompt.contains("creative") || prompt.contains("marketing") {
-                complexity_score += 0.1;
-            }
+        "content_creator" if prompt.contains("creative") || prompt.contains("marketing") => {
+            complexity_score += 0.1;
         }
         _ => {}
     }
