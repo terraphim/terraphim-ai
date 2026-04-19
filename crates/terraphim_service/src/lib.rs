@@ -750,6 +750,7 @@ impl TerraphimService {
             .collect();
 
         // Sort by relevance, but prioritize important KG terms
+        #[allow(clippy::unnecessary_sort_by)]
         sorted_terms.sort_by(|a, b| {
             let a_important = important_kg_terms.contains(&a.0.as_str());
             let b_important = important_kg_terms.contains(&b.0.as_str());
@@ -2218,7 +2219,7 @@ impl TerraphimService {
                     }
 
                     // Re-sort documents by the new combined rank
-                    documents.sort_by(|a, b| b.rank.unwrap_or(0).cmp(&a.rank.unwrap_or(0)));
+                    documents.sort_by_key(|d| std::cmp::Reverse(d.rank.unwrap_or(0)));
 
                     log::debug!("TF-IDF scoring applied successfully");
                 }
@@ -3512,7 +3513,7 @@ mod tests {
             .iter()
             .map(|doc| doc.rank.unwrap())
             .collect();
-        ranks.sort_by(|a, b| b.cmp(a)); // Sort in descending order
+        ranks.sort_by_key(|r| std::cmp::Reverse(*r));
         assert_eq!(
             ranks,
             vec![3, 2, 1],

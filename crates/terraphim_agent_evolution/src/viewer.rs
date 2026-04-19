@@ -96,7 +96,7 @@ impl MemoryEvolutionViewer {
         }
 
         // Sort events by timestamp
-        events.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+        events.sort_by_key(|e| e.timestamp);
 
         Ok(EvolutionTimeline {
             agent_id: self.agent_id.clone(),

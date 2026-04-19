@@ -315,6 +315,7 @@ impl RipgrepCommand {
         }
 
         // For numeric parameters, validate they're actually numbers
+        #[allow(clippy::collapsible_match)]
         match key {
             "max_count" | "context" => {
                 if value.parse::<u32>().is_err() {

@@ -5,7 +5,13 @@
 
 mod native;
 
+#[cfg(feature = "aider-connector")]
+mod aider;
+
 pub use native::NativeClaudeConnector;
+
+#[cfg(feature = "aider-connector")]
+pub use aider::AiderConnector;
 
 use crate::model::Session;
 use anyhow::Result;
@@ -106,6 +112,10 @@ impl ConnectorRegistry {
 
         // Add native Claude Code connector (always available)
         connectors.push(Box::new(NativeClaudeConnector));
+
+        // Add Aider connector if feature enabled
+        #[cfg(feature = "aider-connector")]
+        connectors.push(Box::new(AiderConnector));
 
         // Add TSA-based connectors if feature enabled
         #[cfg(feature = "terraphim-session-analyzer")]

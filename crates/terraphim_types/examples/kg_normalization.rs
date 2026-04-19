@@ -391,7 +391,7 @@ fn main() {
 
     // Get most frequent terms
     let mut terms: Vec<_> = ontology.values().collect();
-    terms.sort_by(|a, b| b.frequency.cmp(&a.frequency));
+    terms.sort_by_key(|t| std::cmp::Reverse(t.frequency));
 
     println!("\n--- Top Terms by Frequency ---");
     for entry in terms.iter().take(10) {

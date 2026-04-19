@@ -419,7 +419,7 @@ impl SessionParser {
         }
 
         // Sort by timestamp
-        events.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+        events.sort_by_key(|e| e.timestamp);
         events
     }
 }
