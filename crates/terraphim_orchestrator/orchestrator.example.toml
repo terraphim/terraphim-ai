@@ -464,6 +464,7 @@ timeout_secs = 30
 
 [[flows]]
 name = "compound-review-v2"
+project = "default"
 schedule = "0 2 * * *"
 repo_path = "/opt/ai-dark-factory/workspace"
 base_branch = "main"
