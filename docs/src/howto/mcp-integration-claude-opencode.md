@@ -112,7 +112,7 @@ Both paths now auto-route the search when no role is specified. The agent scores
 CLI: skip `--role` and the picked role is printed once on stderr:
 
 ```
-[auto-route] picked role "System Operator" (score=128, candidates=4); to override, pass --role
+[auto-route] picked role "System Operator" (score=3, candidates=4); to override, pass --role
 ```
 
 stdout (including `--robot` and `--format json` payloads) is unchanged.

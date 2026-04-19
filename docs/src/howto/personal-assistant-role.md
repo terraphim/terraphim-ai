@@ -155,7 +155,7 @@ You should see notes and emails interleaved, ordered by `terraphim-graph` rank.
 When you call `terraphim-agent search "query"` without `--role`, the agent now scores every configured role's knowledge graph against the query and picks the highest-ranked match. The decision is printed once on stderr:
 
 ```
-[auto-route] picked role "Personal Assistant" (score=42, candidates=4); to override, pass --role
+[auto-route] picked role "Personal Assistant" (score=2, candidates=4); to override, pass --role
 ```
 
 stdout is untouched, so `--robot` and `--format json` output remain pure JSON. Pass `--role "Some Role"` to short-circuit auto-routing.
