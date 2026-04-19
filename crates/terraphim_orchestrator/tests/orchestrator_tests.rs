@@ -149,6 +149,8 @@ fn test_config() -> OrchestratorConfig {
         webhook: None,
         role_config_path: None,
         routing: None,
+        #[cfg(feature = "quickwit")]
+        quickwit: None,
         projects: vec![],
         include: vec![],
     }
