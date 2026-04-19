@@ -350,6 +350,7 @@ mod tests {
             max_cpu_seconds: None,
             pre_check: None,
             gitea_issue: None,
+            project: None,
         }
     }
 
