@@ -335,3 +335,59 @@ async fn t7_pa_wins_when_only_pa_matches() {
     assert_eq!(result.score, 1);
     assert_eq!(result.reason, AutoRouteReason::ScoredWinner);
 }
+
+// ---------------------------------------------------------------------------
+// T11': Cold-start regression -- the headline test for #617.
+//
+// Reproduces the production cold-start scenario: a `Config` shaped like
+// `~/.config/terraphim/embedded_config.json` with a "System Operator" role
+// whose thesaurus maps `rfp -> rfp`, but with `RoleGraph::new` called on
+// thesaurus only -- `insert_document` is NEVER called. Against the prior
+// rank-sum scorer this returned score=0 across all roles and Default won by
+// fallback; against the new distinct-concept scorer it must return
+// "System Operator" with score >= 1.
+// ---------------------------------------------------------------------------
+#[tokio::test]
+async fn t11_cold_start_no_documents_indexed() {
+    let sysop_name = RoleName::new("System Operator");
+    let default_name = RoleName::new("Default");
+    let engineer_name = RoleName::new("Terraphim Engineer");
+
+    let sysop_thes = build_thesaurus("sysop", &[("rfp", 1, "rfp")]);
+    let default_thes = build_thesaurus("default", &[("readme", 2, "readme")]);
+    let engineer_thes = build_thesaurus("engineer", &[("crate", 3, "crate")]);
+
+    // Cold start: build rolegraphs from thesaurus only -- no insert_document.
+    let sysop_rg = build_rolegraph(&sysop_name, sysop_thes).await;
+    let default_rg = build_rolegraph(&default_name, default_thes).await;
+    let engineer_rg = build_rolegraph(&engineer_name, engineer_thes).await;
+
+    let fixture = assemble(
+        vec![
+            (make_role("System Operator", false), sysop_rg),
+            (make_role("Default", false), default_rg),
+            (make_role("Terraphim Engineer", false), engineer_rg),
+        ],
+        "Default",
+        "Default",
+    );
+
+    // No --role override; selected_role is "Default" (matches embedded_config).
+    let ctx = AutoRouteContext {
+        selected_role: Some(default_name.clone()),
+        jmap_token_present: true,
+    };
+    let result = auto_select_role("RFP", &fixture.config, &fixture.state, &ctx).await;
+
+    assert_eq!(
+        result.role.as_str(),
+        "System Operator",
+        "cold-start: System Operator must win on 'RFP' without document indexing"
+    );
+    assert!(
+        result.score >= 1,
+        "cold-start: score must be >= 1 (was {}). Prior rank-sum scorer would have returned 0.",
+        result.score
+    );
+    assert_eq!(result.reason, AutoRouteReason::ScoredWinner);
+}
