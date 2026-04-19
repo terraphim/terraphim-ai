@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use terraphim_orchestrator::AgentOrchestrator;
 use terraphim_orchestrator::config::OrchestratorConfig;
+use terraphim_orchestrator::AgentOrchestrator;
 use terraphim_types::capability::{Capability, CostLevel, Latency, Provider, ProviderType};
 use tracing_subscriber::EnvFilter;
 
