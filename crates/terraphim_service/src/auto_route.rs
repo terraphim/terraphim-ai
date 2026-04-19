@@ -20,7 +20,7 @@
 //! This is a per-haystack-type policy: future additions to `ServiceType` that
 //! also need ambient credentials should consider applying the same downweight.
 
-use terraphim_config::{Config, ConfigState};
+use terraphim_config::{Config, ConfigState, ServiceType};
 use terraphim_types::RoleName;
 
 /// Score downweight applied to a role total when it has any `ServiceType::Jmap`
@@ -88,23 +88,120 @@ pub struct AutoRouteResult {
 
 /// Choose a role for `query` by scoring each in-memory rolegraph.
 ///
-/// Skeleton: implementation lands in the next commit. For now this returns
-/// the persisted `selected_role` (or `Default`) so dependent crates compile.
+/// Returns a concrete role per the policies in section 3 of the design.
+/// The function never errors; in degenerate cases (no roles configured)
+/// returns a synthesised result with `RoleName::from("Default")` and reason
+/// `ZeroMatchDefault`.
 pub async fn auto_select_role(
-    _query: &str,
+    query: &str,
     config: &Config,
-    _state: &ConfigState,
+    state: &ConfigState,
     ctx: &AutoRouteContext,
 ) -> AutoRouteResult {
-    let role = ctx
-        .selected_role
-        .clone()
-        .filter(|r| config.roles.contains_key(r))
-        .unwrap_or_else(|| RoleName::from("Default"));
+    use ahash::AHashSet;
+
+    // Score every role in state.roles. Lock each rolegraph sequentially.
+    let mut scored: Vec<(RoleName, i64)> = Vec::with_capacity(state.roles.len());
+    for (role_name, rg_sync) in state.roles.iter() {
+        let rg = rg_sync.lock().await;
+        let node_ids = rg.find_matching_node_ids(query);
+        let unique: AHashSet<u64> = node_ids.into_iter().collect();
+        let raw_score: u64 = unique
+            .iter()
+            .filter_map(|id| rg.nodes_map().get(id).map(|n| n.rank))
+            .sum();
+
+        // PA / JMAP downweight: applied to role total, not per-term.
+        let has_jmap = config
+            .roles
+            .get(role_name)
+            .map(|r| r.haystacks.iter().any(|h| h.service == ServiceType::Jmap))
+            .unwrap_or(false);
+
+        let final_score: i64 = if has_jmap && !ctx.jmap_token_present {
+            ((raw_score as f64) * JMAP_MISSING_TOKEN_DOWNWEIGHT).round() as i64
+        } else {
+            raw_score as i64
+        };
+
+        scored.push((role_name.clone(), final_score));
+    }
+
+    // Sort by (-score, name asc) so candidates[0] is the natural winner and
+    // ties are broken alphabetically.
+    scored.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.original.cmp(&b.0.original)));
+
+    // Degenerate: no roles configured.
+    if scored.is_empty() {
+        return AutoRouteResult {
+            role: RoleName::from("Default"),
+            score: 0,
+            candidates: Vec::new(),
+            reason: AutoRouteReason::ZeroMatchDefault,
+        };
+    }
+
+    let top_score = scored[0].1;
+
+    // Zero-match path.
+    if top_score == 0 {
+        if let Some(sel) = ctx.selected_role.as_ref() {
+            if config.roles.contains_key(sel) {
+                return AutoRouteResult {
+                    role: sel.clone(),
+                    score: 0,
+                    candidates: scored,
+                    reason: AutoRouteReason::ZeroMatchSelectedRole,
+                };
+            }
+        }
+        // Fall back to Default if present, else the alphabetically first role.
+        let default_role = RoleName::from("Default");
+        let chosen = if config.roles.contains_key(&default_role) {
+            default_role
+        } else {
+            scored[0].0.clone()
+        };
+        return AutoRouteResult {
+            role: chosen,
+            score: 0,
+            candidates: scored,
+            reason: AutoRouteReason::ZeroMatchDefault,
+        };
+    }
+
+    // Collect the tied set (all roles sharing top_score).
+    let tied: Vec<&RoleName> = scored
+        .iter()
+        .filter(|(_, s)| *s == top_score)
+        .map(|(n, _)| n)
+        .collect();
+
+    if tied.len() == 1 {
+        return AutoRouteResult {
+            role: scored[0].0.clone(),
+            score: top_score,
+            candidates: scored,
+            reason: AutoRouteReason::ScoredWinner,
+        };
+    }
+
+    // Tie-break: prefer selected_role if it's in the tied set.
+    if let Some(sel) = ctx.selected_role.as_ref() {
+        if tied.iter().any(|n| *n == sel) {
+            return AutoRouteResult {
+                role: sel.clone(),
+                score: top_score,
+                candidates: scored,
+                reason: AutoRouteReason::TieBrokenBySelectedRole,
+            };
+        }
+    }
+
     AutoRouteResult {
-        role,
-        score: 0,
-        candidates: Vec::new(),
-        reason: AutoRouteReason::ZeroMatchDefault,
+        role: scored[0].0.clone(),
+        score: top_score,
+        candidates: scored,
+        reason: AutoRouteReason::TieBrokenAlphabetically,
     }
 }
