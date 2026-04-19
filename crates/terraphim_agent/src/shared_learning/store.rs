@@ -1,18 +1,19 @@
 //! Shared learning store implementation
 //!
-//! Provides terraphim_persistence-backed storage with BM25-based deduplication
+//! Provides markdown-backed storage with BM25-based deduplication
 //! and trust-gated promotion logic.
 
 use std::collections::HashMap;
-use std::sync::Arc;
 
 use chrono::Utc;
-use terraphim_persistence::{DeviceStorage, Persistable};
 use thiserror::Error;
 use tokio::sync::RwLock;
 use tracing::{debug, info};
 
-use crate::shared_learning::types::{LearningSource, SharedLearning, TrustLevel};
+use crate::shared_learning::markdown_store::{
+    MarkdownLearningStore, MarkdownStoreConfig, MarkdownStoreError,
+};
+use crate::shared_learning::types::{SharedLearning, TrustLevel};
 
 #[derive(Error, Debug)]
 pub enum StoreError {
@@ -28,8 +29,8 @@ pub enum StoreError {
     Serialization(#[from] serde_json::Error),
 }
 
-impl From<terraphim_persistence::Error> for StoreError {
-    fn from(e: terraphim_persistence::Error) -> Self {
+impl From<MarkdownStoreError> for StoreError {
+    fn from(e: MarkdownStoreError) -> Self {
         StoreError::Persistence(e.to_string())
     }
 }
@@ -38,6 +39,7 @@ impl From<terraphim_persistence::Error> for StoreError {
 pub struct StoreConfig {
     pub similarity_threshold: f64,
     pub auto_promote_l2: bool,
+    pub markdown: MarkdownStoreConfig,
 }
 
 impl Default for StoreConfig {
@@ -45,6 +47,7 @@ impl Default for StoreConfig {
         Self {
             similarity_threshold: 0.8,
             auto_promote_l2: true,
+            markdown: MarkdownStoreConfig::default(),
         }
     }
 }
@@ -54,45 +57,10 @@ impl StoreConfig {
         self.similarity_threshold = threshold.clamp(0.0, 1.0);
         self
     }
-}
 
-/// Persistable record wrapper for SharedLearning.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct SharedLearningRecord {
-    pub key: String,
-    pub learning: SharedLearning,
-}
-
-#[async_trait::async_trait]
-impl Persistable for SharedLearningRecord {
-    fn new(key: String) -> Self {
-        Self {
-            key,
-            learning: SharedLearning::new(
-                String::new(),
-                String::new(),
-                LearningSource::Manual,
-                String::new(),
-            ),
-        }
-    }
-
-    async fn save(&self) -> terraphim_persistence::Result<()> {
-        self.save_to_all().await
-    }
-
-    async fn save_to_one(&self, profile_name: &str) -> terraphim_persistence::Result<()> {
-        self.save_to_profile(profile_name).await
-    }
-
-    async fn load(&mut self) -> terraphim_persistence::Result<Self> {
-        let key = self.get_key();
-        self.load_from_operator(&key, &self.load_config().await?.1)
-            .await
-    }
-
-    fn get_key(&self) -> String {
-        format!("shared-learning/{}.json", &self.key)
+    pub fn with_markdown_config(mut self, config: MarkdownStoreConfig) -> Self {
+        self.markdown = config;
+        self
     }
 }
 
@@ -177,18 +145,17 @@ impl Bm25Scorer {
     }
 }
 
-#[allow(dead_code)]
 pub struct SharedLearningStore {
-    storage: Arc<DeviceStorage>,
+    backend: MarkdownLearningStore,
     index: RwLock<HashMap<String, SharedLearning>>,
     config: StoreConfig,
 }
 
 impl SharedLearningStore {
     pub async fn open(config: StoreConfig) -> Result<Self, StoreError> {
-        let storage = DeviceStorage::arc_memory_only().await?;
+        let backend = MarkdownLearningStore::with_config(config.markdown.clone());
         let store = Self {
-            storage,
+            backend,
             index: RwLock::new(HashMap::new()),
             config,
         };
@@ -197,16 +164,40 @@ impl SharedLearningStore {
     }
 
     async fn load_all(&self) -> Result<(), StoreError> {
-        info!("Loading shared learnings from persistence");
+        info!("Loading shared learnings from markdown backend");
+        let all_learnings = self.backend.list_all_with_origin().await?;
+        let discovered = all_learnings.len();
+
+        let mut selected: HashMap<String, (bool, SharedLearning)> = HashMap::new();
+        for (is_shared, learning) in all_learnings {
+            match selected.get(&learning.id) {
+                None => {
+                    selected.insert(learning.id.clone(), (is_shared, learning));
+                }
+                Some((existing_is_shared, _)) => {
+                    if *existing_is_shared && !is_shared {
+                        selected.insert(learning.id.clone(), (is_shared, learning));
+                    }
+                }
+            }
+        }
+
+        let mut index = self.index.write().await;
+        for (_, learning) in selected.into_values() {
+            index.insert(learning.id.clone(), learning);
+        }
+        let loaded = index.len();
+        drop(index);
+
+        info!(
+            "Loaded {} shared learnings into index ({} discovered)",
+            loaded, discovered
+        );
         Ok(())
     }
 
     async fn persist(&self, learning: &SharedLearning) -> Result<(), StoreError> {
-        let record = SharedLearningRecord {
-            key: learning.id.clone(),
-            learning: learning.clone(),
-        };
-        record.save().await?;
+        self.backend.save(learning).await?;
         Ok(())
     }
 
@@ -517,9 +508,18 @@ pub enum StoreResult {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::shared_learning::types::LearningSource;
+    use tempfile::TempDir;
 
     async fn create_test_store() -> SharedLearningStore {
-        let config = StoreConfig::default().with_similarity_threshold(0.3);
+        let temp_dir = TempDir::new().unwrap();
+        let markdown_config = MarkdownStoreConfig {
+            learnings_dir: temp_dir.path().to_path_buf(),
+            shared_dir_name: "shared".to_string(),
+        };
+        let config = StoreConfig::default()
+            .with_similarity_threshold(0.3)
+            .with_markdown_config(markdown_config);
         SharedLearningStore::open(config).await.unwrap()
     }
 
@@ -680,5 +680,135 @@ mod tests {
 
         let retrieved = store.get(&id).await.unwrap();
         assert_eq!(retrieved.trust_level, TrustLevel::L2);
+    }
+
+    #[tokio::test]
+    async fn test_open_loads_existing_markdown_learnings() {
+        // Create a temp dir and directly save learnings via the markdown backend
+        let temp_dir = TempDir::new().unwrap();
+        let markdown_config = MarkdownStoreConfig {
+            learnings_dir: temp_dir.path().to_path_buf(),
+            shared_dir_name: "shared".to_string(),
+        };
+        let backend = MarkdownLearningStore::with_config(markdown_config.clone());
+
+        let learning1 = SharedLearning::new(
+            "Pre-existing Learning".to_string(),
+            "This learning was saved before the store opened.".to_string(),
+            LearningSource::AutoExtract,
+            "test-agent".to_string(),
+        );
+        let id1 = learning1.id.clone();
+        backend.save(&learning1).await.unwrap();
+
+        let learning2 = SharedLearning::new(
+            "Another Pre-existing".to_string(),
+            "Also saved before open.".to_string(),
+            LearningSource::Manual,
+            "other-agent".to_string(),
+        );
+        let id2 = learning2.id.clone();
+        backend.save(&learning2).await.unwrap();
+
+        // Now open the store - it should load existing learnings
+        let config = StoreConfig::default()
+            .with_similarity_threshold(0.3)
+            .with_markdown_config(markdown_config);
+        let store = SharedLearningStore::open(config).await.unwrap();
+
+        let all = store.list_all().await.unwrap();
+        assert_eq!(all.len(), 2);
+
+        let retrieved1 = store.get(&id1).await.unwrap();
+        assert_eq!(retrieved1.title, "Pre-existing Learning");
+
+        let retrieved2 = store.get(&id2).await.unwrap();
+        assert_eq!(retrieved2.title, "Another Pre-existing");
+    }
+
+    #[tokio::test]
+    async fn test_open_dedups_shared_and_canonical_copies() {
+        // Create a temp dir and save the same learning to both agent dir and shared dir
+        let temp_dir = TempDir::new().unwrap();
+        let markdown_config = MarkdownStoreConfig {
+            learnings_dir: temp_dir.path().to_path_buf(),
+            shared_dir_name: "shared".to_string(),
+        };
+        let backend = MarkdownLearningStore::with_config(markdown_config.clone());
+
+        let mut learning = SharedLearning::new(
+            "Shared Dedup Test".to_string(),
+            "Testing deduplication.".to_string(),
+            LearningSource::AutoExtract,
+            "agent-x".to_string(),
+        );
+        learning.id = "dedup-test-id".to_string();
+
+        // Save to agent directory (canonical)
+        backend.save(&learning).await.unwrap();
+
+        // Save a stale variant to shared directory with same ID.
+        // Canonical should win after hydration.
+        let mut stale_shared_copy = learning.clone();
+        stale_shared_copy.title = "Stale Shared Copy".to_string();
+        stale_shared_copy.trust_level = TrustLevel::L1;
+        backend.save_to_shared(&stale_shared_copy).await.unwrap();
+
+        // Now open the store - it should deduplicate
+        let config = StoreConfig::default()
+            .with_similarity_threshold(0.3)
+            .with_markdown_config(markdown_config);
+        let store = SharedLearningStore::open(config).await.unwrap();
+
+        let all = store.list_all().await.unwrap();
+        // Should only have 1 entry despite 2 files on disk
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].id, "dedup-test-id");
+        assert_eq!(all[0].title, "Shared Dedup Test");
+    }
+
+    #[tokio::test]
+    async fn test_persist_after_promotion_and_application() {
+        let temp_dir = TempDir::new().unwrap();
+        let markdown_config = MarkdownStoreConfig {
+            learnings_dir: temp_dir.path().to_path_buf(),
+            shared_dir_name: "shared".to_string(),
+        };
+        let config = StoreConfig::default()
+            .with_similarity_threshold(0.3)
+            .with_markdown_config(markdown_config.clone());
+
+        let store = SharedLearningStore::open(config).await.unwrap();
+
+        let learning = SharedLearning::new(
+            "Persist Test".to_string(),
+            "Testing persistence.".to_string(),
+            LearningSource::Manual,
+            "test-agent".to_string(),
+        );
+        let id = learning.id.clone();
+        store.insert(learning).await.unwrap();
+
+        // Promote to L2
+        store.promote_to_l2(&id).await.unwrap();
+
+        // Record applications
+        store.record_application(&id, "agent1", true).await.unwrap();
+        store.record_application(&id, "agent2", true).await.unwrap();
+
+        // Close and reopen the store
+        store.close().await;
+
+        let config2 = StoreConfig::default()
+            .with_similarity_threshold(0.3)
+            .with_markdown_config(markdown_config);
+        let reopened = SharedLearningStore::open(config2).await.unwrap();
+
+        let retrieved = reopened.get(&id).await.unwrap();
+        assert_eq!(retrieved.trust_level, TrustLevel::L2);
+        assert_eq!(retrieved.quality.applied_count, 2);
+        assert_eq!(retrieved.quality.effective_count, 2);
+        assert_eq!(retrieved.quality.agent_count, 2);
+        assert!(retrieved.promoted_at.is_some());
     }
 }

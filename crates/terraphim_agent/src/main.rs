@@ -2868,11 +2868,6 @@ async fn run_shared_learning_command(
             }
             Ok(())
         }
-        #[cfg(not(feature = "cross-agent-injection"))]
-        SharedLearningSub::Inject { .. } => {
-            eprintln!("error: 'inject' requires the 'cross-agent-injection' feature");
-            std::process::exit(1);
-        }
     }
 }
 
