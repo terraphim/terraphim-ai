@@ -8,102 +8,84 @@ use tracing_subscriber::EnvFilter;
 
 /// Register LLM providers for keyword-based model routing.
 ///
+/// Only subscription-based providers are registered here (C1 allow-list).
 /// These providers are matched against task prompts via KeywordRouter.
 /// The selected model_id is passed to the CLI tool via -m/--model flags.
 fn register_providers(orchestrator: &mut AgentOrchestrator) {
     let router = orchestrator.router_mut();
 
-    // Deep thinking: o3 (OpenAI reasoning model)
+    // Implementation and code generation: kimi-for-coding/k2p5
+    // Subscription: Moonshot subscription via kimi-for-coding prefix.
     router.add_provider(Provider {
-        id: "openai-o3".into(),
-        name: "OpenAI o3".into(),
+        id: "kimi-for-coding/k2p5".into(),
+        name: "Kimi K2.5 (Moonshot subscription)".into(),
         provider_type: ProviderType::Llm {
-            model_id: "o3".into(),
-            api_endpoint: "https://api.openai.com".into(),
+            model_id: "k2p5".into(),
+            api_endpoint: "https://api.moonshot.ai".into(),
         },
-        capabilities: vec![
-            Capability::DeepThinking,
-            Capability::SecurityAudit,
-            Capability::Architecture,
-        ],
-        cost_level: CostLevel::Expensive,
-        latency: Latency::Slow,
-        keywords: vec![
-            "reason".into(),
-            "think".into(),
-            "analyze deeply".into(),
-            "security".into(),
-            "vulnerability".into(),
-            "CVE".into(),
-            "architecture".into(),
-        ],
-    });
-
-    // General coding: o4-mini (fast, capable)
-    router.add_provider(Provider {
-        id: "openai-o4-mini".into(),
-        name: "OpenAI o4-mini".into(),
-        provider_type: ProviderType::Llm {
-            model_id: "o4-mini".into(),
-            api_endpoint: "https://api.openai.com".into(),
-        },
-        capabilities: vec![
-            Capability::CodeGeneration,
-            Capability::CodeReview,
-            Capability::Testing,
-            Capability::Refactoring,
-        ],
+        capabilities: vec![Capability::CodeGeneration, Capability::FastThinking],
         cost_level: CostLevel::Moderate,
         latency: Latency::Medium,
         keywords: vec![
             "implement".into(),
             "code".into(),
-            "review".into(),
-            "test".into(),
-            "refactor".into(),
-            "check".into(),
+            "generate".into(),
+            "write".into(),
+            "build".into(),
         ],
     });
 
-    // Fast/cheap: gpt-4.1-nano
+    // Explanation and documentation: minimax-coding-plan/MiniMax-M2.5
+    // Subscription: MiniMax subscription via minimax-coding-plan prefix.
     router.add_provider(Provider {
-        id: "openai-4.1-nano".into(),
-        name: "OpenAI GPT-4.1 Nano".into(),
+        id: "minimax-coding-plan/MiniMax-M2.5".into(),
+        name: "MiniMax M2.5 (MiniMax subscription)".into(),
         provider_type: ProviderType::Llm {
-            model_id: "gpt-4.1-nano".into(),
-            api_endpoint: "https://api.openai.com".into(),
+            model_id: "MiniMax-M2.5".into(),
+            api_endpoint: "https://api.minimax.chat".into(),
         },
-        capabilities: vec![
-            Capability::FastThinking,
-            Capability::Explanation,
-            Capability::Documentation,
-        ],
+        capabilities: vec![Capability::Explanation, Capability::Documentation],
         cost_level: CostLevel::Cheap,
         latency: Latency::Fast,
         keywords: vec![
-            "quick".into(),
-            "fast".into(),
-            "summary".into(),
             "explain".into(),
             "document".into(),
+            "summary".into(),
+            "quick".into(),
+            "fast".into(),
         ],
     });
 
-    // Performance optimization: o4-mini (good at analysis)
+    // Deep thinking, architecture, security: zai-coding-plan/glm-5-turbo
+    // Subscription: ZAI subscription via zai-coding-plan prefix.
     router.add_provider(Provider {
-        id: "openai-o4-mini-perf".into(),
-        name: "OpenAI o4-mini (perf)".into(),
+        id: "zai-coding-plan/glm-5-turbo".into(),
+        name: "GLM-5-Turbo (ZAI subscription)".into(),
         provider_type: ProviderType::Llm {
-            model_id: "o4-mini".into(),
-            api_endpoint: "https://api.openai.com".into(),
+            model_id: "glm-5-turbo".into(),
+            api_endpoint: "https://open.bigmodel.cn".into(),
         },
-        capabilities: vec![Capability::Performance],
+        capabilities: vec![
+            Capability::DeepThinking,
+            Capability::Architecture,
+            Capability::SecurityAudit,
+        ],
         cost_level: CostLevel::Moderate,
         latency: Latency::Medium,
-        keywords: vec!["performance".into(), "optimize".into(), "benchmark".into()],
+        keywords: vec![
+            "reason".into(),
+            "think".into(),
+            "architecture".into(),
+            "security".into(),
+            "vulnerability".into(),
+            "CVE".into(),
+            "analyze".into(),
+            "performance".into(),
+            "optimize".into(),
+        ],
     });
 
-    tracing::info!("registered 4 LLM providers for keyword routing");
+    tracing::info!("registered 3 subscription LLM providers for keyword routing");
 }
 
 enum Cli {
