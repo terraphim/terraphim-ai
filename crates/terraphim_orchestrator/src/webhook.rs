@@ -33,8 +33,8 @@ struct GiteaComment {
 }
 
 #[derive(Debug, Deserialize)]
-struct GiteaUser {
-    login: String,
+pub struct GiteaUser {
+    pub login: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -45,8 +45,35 @@ struct GiteaIssue {
 }
 
 #[derive(Debug, Deserialize)]
-struct GiteaRepository {
-    full_name: String,
+pub struct GiteaRepository {
+    pub full_name: String,
+}
+
+/// Gitea webhook payload for pull_request events.
+#[derive(Debug, Deserialize)]
+pub struct GiteaPullRequestPayload {
+    pub action: String,
+    pub number: u64,
+    pub pull_request: PullRequestFields,
+    pub repository: GiteaRepository,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PullRequestFields {
+    pub head: PrRef,
+    pub base: PrRef,
+    pub user: GiteaUser,
+    pub title: String,
+    pub draft: bool,
+    pub additions: u32,
+    pub deletions: u32,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PrRef {
+    pub sha: String,
+    #[serde(rename = "ref")]
+    pub ref_name: String,
 }
 
 /// A dispatch request sent from the webhook handler to the orchestrator.
@@ -70,15 +97,25 @@ pub enum WebhookDispatch {
         issue_number: u64,
         comment_id: u64,
     },
+    ReviewPr {
+        pr_number: u64,
+        project: String,
+        head_sha: String,
+        author_login: String,
+        title: String,
+        diff_loc: u32,
+    },
 }
 
 impl WebhookDispatch {
     /// Extract the comment_id from any dispatch variant.
+    /// `ReviewPr` dispatches are not associated with a comment — returns 0.
     pub fn comment_id(&self) -> u64 {
         match self {
             Self::SpawnAgent { comment_id, .. } => *comment_id,
             Self::SpawnPersona { comment_id, .. } => *comment_id,
             Self::CompoundReview { comment_id, .. } => *comment_id,
+            Self::ReviewPr { .. } => 0,
         }
     }
 }
@@ -125,7 +162,17 @@ async fn handle_gitea_webhook(
         }
     }
 
-    // 2. Parse payload
+    // 2. Route by event type header
+    let event_type = headers
+        .get("X-Gitea-Event")
+        .and_then(|h| h.to_str().ok())
+        .unwrap_or("issue_comment");
+
+    if event_type == "pull_request" {
+        return handle_pull_request_event(&state, &body).await;
+    }
+
+    // 3. Parse payload
     let payload: GiteaWebhookPayload = match serde_json::from_slice(&body) {
         Ok(p) => p,
         Err(e) => {
@@ -261,8 +308,76 @@ async fn handle_gitea_webhook(
     StatusCode::ACCEPTED
 }
 
+/// Handle Gitea `pull_request` event. Returns 200 for all parse/skip cases
+/// (Gitea retries on non-2xx, causing spam).
+pub async fn handle_pull_request_event(state: &WebhookState, body: &[u8]) -> StatusCode {
+    let payload: GiteaPullRequestPayload = match serde_json::from_slice(body) {
+        Ok(p) => p,
+        Err(e) => {
+            warn!(error = %e, "failed to parse pull_request webhook payload");
+            return StatusCode::OK;
+        }
+    };
+
+    let action = payload.action.as_str();
+
+    // Only enqueue for review-triggering actions on non-draft PRs.
+    let is_review_action = matches!(
+        action,
+        "opened" | "synchronize" | "reopened" | "ready_for_review"
+    );
+
+    if !is_review_action || payload.pull_request.draft {
+        info!(
+            action = action,
+            draft = payload.pull_request.draft,
+            pr = payload.number,
+            "skipped_pr_webhook"
+        );
+        return StatusCode::OK;
+    }
+
+    // Derive project from `owner/repo` → `repo`.
+    let project = payload
+        .repository
+        .full_name
+        .split('/')
+        .next_back()
+        .unwrap_or(&payload.repository.full_name)
+        .to_string();
+
+    let diff_loc = payload
+        .pull_request
+        .additions
+        .saturating_add(payload.pull_request.deletions);
+
+    let dispatch = WebhookDispatch::ReviewPr {
+        pr_number: payload.number,
+        project,
+        head_sha: payload.pull_request.head.sha.clone(),
+        author_login: payload.pull_request.user.login.clone(),
+        title: payload.pull_request.title.clone(),
+        diff_loc,
+    };
+
+    info!(
+        pr = payload.number,
+        action = action,
+        author = %payload.pull_request.user.login,
+        "webhook: enqueuing ReviewPr dispatch"
+    );
+
+    match state.dispatch_tx.send(dispatch).await {
+        Ok(()) => StatusCode::ACCEPTED,
+        Err(e) => {
+            warn!(error = %e, "failed to send ReviewPr dispatch");
+            StatusCode::SERVICE_UNAVAILABLE
+        }
+    }
+}
+
 /// Verify HMAC-SHA256 signature.
-fn verify_signature(secret: &str, body: &[u8], signature: &str) -> bool {
+pub fn verify_signature(secret: &str, body: &[u8], signature: &str) -> bool {
     let mut mac =
         HmacSha256::new_from_slice(secret.as_bytes()).expect("HMAC can take key of any size");
     mac.update(body);
