@@ -168,7 +168,12 @@ fn unknown_stderr_classifies_as_unknown_across_all_providers() {
     // through both lists for every configured provider so the
     // orchestrator escalates it for human review.
     let stderr = read_fixture("unknown_error.txt");
-    for provider in ["claude-code", "opencode-go", "zai-coding-plan", "kimi-for-coding"] {
+    for provider in [
+        "claude-code",
+        "opencode-go",
+        "zai-coding-plan",
+        "kimi-for-coding",
+    ] {
         let sigs = compile(provider);
         assert_eq!(
             error_signatures::classify(&stderr, Some(&sigs)),
@@ -184,17 +189,22 @@ fn build_signature_map_round_trips_canonical_config() {
     // Construct the same [[providers]] block an operator would ship and
     // round-trip it through the public build_signature_map API to
     // confirm compilation + lookup wiring.
-    let configs: Vec<ProviderBudgetConfig> = ["claude-code", "opencode-go", "zai-coding-plan", "kimi-for-coding"]
-        .into_iter()
-        .map(|id| ProviderBudgetConfig {
-            id: id.to_string(),
-            error_signatures: Some(canonical_sigs(id)),
-            ..Default::default()
-        })
-        .collect();
+    let configs: Vec<ProviderBudgetConfig> = [
+        "claude-code",
+        "opencode-go",
+        "zai-coding-plan",
+        "kimi-for-coding",
+    ]
+    .into_iter()
+    .map(|id| ProviderBudgetConfig {
+        id: id.to_string(),
+        error_signatures: Some(canonical_sigs(id)),
+        ..Default::default()
+    })
+    .collect();
 
-    let map = error_signatures::build_signature_map(&configs)
-        .expect("canonical config must compile");
+    let map =
+        error_signatures::build_signature_map(&configs).expect("canonical config must compile");
     assert_eq!(map.len(), 4);
 
     // Spot-check: each provider's fixture still classifies correctly
@@ -202,8 +212,16 @@ fn build_signature_map_round_trips_canonical_config() {
     let cases = [
         ("claude-code", "claude_429.txt", ErrorKind::Throttle),
         ("claude-code", "claude_timeout.txt", ErrorKind::Flake),
-        ("opencode-go", "opencode_go_rate_limit.txt", ErrorKind::Throttle),
-        ("zai-coding-plan", "zai_insufficient_balance.txt", ErrorKind::Throttle),
+        (
+            "opencode-go",
+            "opencode_go_rate_limit.txt",
+            ErrorKind::Throttle,
+        ),
+        (
+            "zai-coding-plan",
+            "zai_insufficient_balance.txt",
+            ErrorKind::Throttle,
+        ),
         ("kimi-for-coding", "kimi_eof.txt", ErrorKind::Flake),
     ];
     for (provider, fixture, want) in cases {

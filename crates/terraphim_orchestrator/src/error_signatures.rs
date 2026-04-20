@@ -99,10 +99,7 @@ impl CompiledSignatures {
     /// Patterns are compiled case-insensitively so the config can use the
     /// canonical spelling (`429`, `rate limit`, `timeout`) and still match
     /// mixed-case CLI output.
-    pub fn compile(
-        provider: &str,
-        sigs: &ProviderErrorSignatures,
-    ) -> Result<Self, CompileError> {
+    pub fn compile(provider: &str, sigs: &ProviderErrorSignatures) -> Result<Self, CompileError> {
         let throttle = compile_list(provider, &sigs.throttle)?;
         let flake = compile_list(provider, &sigs.flake)?;
         Ok(Self { throttle, flake })
@@ -282,11 +279,7 @@ mod tests {
 
     #[test]
     fn compile_error_wraps_regex_error() {
-        let err = CompiledSignatures::compile(
-            "bad",
-            &sigs(&["[unterminated"], &[]),
-        )
-        .unwrap_err();
+        let err = CompiledSignatures::compile("bad", &sigs(&["[unterminated"], &[])).unwrap_err();
         assert_eq!(err.provider, "bad");
         assert_eq!(err.pattern, "[unterminated");
     }
