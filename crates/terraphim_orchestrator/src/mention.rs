@@ -13,12 +13,7 @@ use std::collections::HashMap;
 use std::sync::LazyLock;
 use terraphim_tracker::IssueComment;
 
-/// Synthetic project id used when no multi-project config is in effect.
-///
-/// Must match `crate::dispatcher::LEGACY_PROJECT_ID`; duplicated here to
-/// avoid the cross-module dependency cycle from `dispatcher::` through
-/// lib.rs during unit tests that pull in just this module.
-pub(crate) const LEGACY_PROJECT_ID: &str = "__global__";
+pub(crate) use crate::dispatcher::LEGACY_PROJECT_ID;
 
 /// Regex for `@adf:[project/]name` mentions.
 ///
