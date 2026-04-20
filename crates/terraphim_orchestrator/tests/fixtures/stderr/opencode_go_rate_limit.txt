@@ -1,0 +1,3 @@
+2026/04/20 11:58:03 provider minimax: rate limit exceeded for subscription plan
+2026/04/20 11:58:03 request 3f9c blocked by upstream rate limiter
+opencode-go: error: got 429 from provider, retry after 45s
