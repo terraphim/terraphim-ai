@@ -231,6 +231,7 @@ pub fn normalize_webhook_dispatch(
             issue_number,
             comment_id,
             context,
+            ..
         } => {
             let event_id = generate_event_id(&ctx.repo_full_name, *issue_number, *comment_id);
             let session_id = generate_session_id(&ctx.repo_full_name, *issue_number);
@@ -380,6 +381,7 @@ mod tests {
 
         let webhook_dispatch = WebhookDispatch::SpawnAgent {
             agent_name: "security-sentinel".to_string(),
+            detected_project: None,
             issue_number: 42,
             comment_id: 12345,
             context: "review this".to_string(),
@@ -517,6 +519,7 @@ mod tests {
 
         let dispatch = WebhookDispatch::SpawnAgent {
             agent_name: "security-sentinel".to_string(),
+            detected_project: None,
             issue_number: 42,
             comment_id: 12345,
             context: "check for vulnerabilities".to_string(),
@@ -554,6 +557,7 @@ mod tests {
 
         let dispatch = WebhookDispatch::SpawnAgent {
             agent_name: "agent1".to_string(),
+            detected_project: None,
             issue_number: 42,
             comment_id: 123,
             context: "do something".to_string(),
@@ -588,6 +592,7 @@ mod tests {
 
         let dispatch1 = WebhookDispatch::SpawnAgent {
             agent_name: "agent1".to_string(),
+            detected_project: None,
             issue_number: 42,
             comment_id: 123,
             context: "do something".to_string(),
@@ -595,6 +600,7 @@ mod tests {
 
         let dispatch2 = WebhookDispatch::SpawnAgent {
             agent_name: "agent1".to_string(),
+            detected_project: None,
             issue_number: 42,
             comment_id: 124, // Different comment
             context: "do something".to_string(),
@@ -631,6 +637,7 @@ mod tests {
 
         let dispatch1 = WebhookDispatch::SpawnAgent {
             agent_name: "agent1".to_string(),
+            detected_project: None,
             issue_number: 42,
             comment_id: 123,
             context: "do something".to_string(),
@@ -638,6 +645,7 @@ mod tests {
 
         let dispatch2 = WebhookDispatch::SpawnAgent {
             agent_name: "agent1".to_string(),
+            detected_project: None,
             issue_number: 43, // Different issue
             comment_id: 123,
             context: "do something".to_string(),
@@ -674,6 +682,7 @@ mod tests {
 
         let webhook_dispatch = WebhookDispatch::SpawnAgent {
             agent_name: "security-sentinel".to_string(),
+            detected_project: None,
             issue_number: 42,
             comment_id: 12345,
             context: "review".to_string(),

@@ -53,6 +53,9 @@ struct GiteaRepository {
 pub enum WebhookDispatch {
     SpawnAgent {
         agent_name: String,
+        /// Project extracted from a qualified `@adf:project/name` mention, or
+        /// `None` for unqualified `@adf:name` mentions.
+        detected_project: Option<String>,
         issue_number: u64,
         comment_id: u64,
         context: String,
@@ -157,13 +160,37 @@ async fn handle_gitea_webhook(
         .collect();
     let parser = AdfCommandParser::new(&state.agent_names, &persona_names);
 
+    // Parse all mention tokens first to capture project prefixes from qualified
+    // mentions (`@adf:project/name`) before the Aho-Corasick parser strips them.
+    let mention_tokens = crate::mention::parse_mention_tokens(&payload.comment.body);
+    // Map agent_name -> detected project for unqualified mentions resolved by parser.
+    let unqualified_project_map: std::collections::HashMap<String, Option<String>> = mention_tokens
+        .iter()
+        .filter(|t| t.project.is_none())
+        .map(|t| (t.agent.clone(), None))
+        .collect();
+
     let commands = parser.parse_commands(
         &payload.comment.body,
         payload.issue.number,
         payload.comment.id,
     );
 
-    if commands.is_empty() {
+    // Collect qualified tokens that AdfCommandParser cannot match (it only knows
+    // `@adf:{name}` patterns and `@adf:project/name` is not a substring of those).
+    let qualified_dispatches: Vec<WebhookDispatch> = mention_tokens
+        .into_iter()
+        .filter(|t| t.project.is_some())
+        .map(|t| WebhookDispatch::SpawnAgent {
+            detected_project: t.project,
+            agent_name: t.agent,
+            issue_number: payload.issue.number,
+            comment_id: payload.comment.id,
+            context: String::new(),
+        })
+        .collect();
+
+    if commands.is_empty() && qualified_dispatches.is_empty() {
         return StatusCode::OK;
     }
 
@@ -177,6 +204,7 @@ async fn handle_gitea_webhook(
                 comment_id,
                 context,
             } => WebhookDispatch::SpawnAgent {
+                detected_project: unqualified_project_map.get(&agent_name).cloned().flatten(),
                 agent_name,
                 issue_number,
                 comment_id,
@@ -208,6 +236,15 @@ async fn handle_gitea_webhook(
 
         if let Err(e) = state.dispatch_tx.send(dispatch).await {
             warn!(error = %e, "failed to send webhook dispatch to orchestrator");
+            return StatusCode::SERVICE_UNAVAILABLE;
+        }
+        commands_dispatched += 1;
+    }
+
+    // Dispatch qualified mentions separately (AdfCommandParser can't see `@adf:proj/name`).
+    for dispatch in qualified_dispatches {
+        if let Err(e) = state.dispatch_tx.send(dispatch).await {
+            warn!(error = %e, "failed to send qualified mention dispatch to orchestrator");
             return StatusCode::SERVICE_UNAVAILABLE;
         }
         commands_dispatched += 1;
