@@ -47,8 +47,6 @@ reqwest = { workspace = true, features = ["json", "rustls-tls"] }
 
 scraper = "0.25.0"
 reqwest-eventsource = { version = "0.6", optional = true }
-mcp-client = { version = "0.1", optional = true }
-mcp-spec = { version = "0.1", optional = true }
 rmcp = { version = "0.9", features = ["client", "transport-child-process"], optional = true }
 
 [dev-dependencies]
@@ -85,4 +83,4 @@ mcp-sse = ["reqwest-eventsource"]
 # High-level MCP support using SSE/http-only (no rust-sdk)
 mcp = ["mcp-sse"]
 # Optional: use rust-sdk for full protocol clients
-mcp-rust-sdk = ["mcp-sse", "mcp-client", "mcp-spec", "rmcp"]
+mcp-rust-sdk = ["mcp-sse", "rmcp"]
