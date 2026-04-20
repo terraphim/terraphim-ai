@@ -1,0 +1,100 @@
+# Synthetic terraphim project fixture (no real tokens or private data)
+working_dir = "/home/alex/terraphim-ai"
+restart_cooldown_secs = 300
+max_restart_count = 3
+disk_usage_threshold = 90
+tick_interval_secs = 30
+persona_data_dir = "/home/alex/terraphim-ai/data/personas"
+skill_data_dir = "/opt/ai-dark-factory/skills"
+flow_state_dir = "/opt/ai-dark-factory/flow-states"
+role_config_path = "/opt/ai-dark-factory/persona_roles_config.json"
+
+[quickwit]
+enabled = true
+endpoint = "http://127.0.0.1:7280"
+index_id = "adf-logs"
+batch_size = 100
+flush_interval_secs = 5
+
+[gitea]
+base_url = "https://git.example.test"
+token = "fixture-token-not-real"
+owner = "terraphim"
+repo = "terraphim-ai"
+
+[nightwatch]
+eval_interval_secs = 300
+active_start_hour = 2
+active_end_hour = 6
+minor_threshold = 0.10
+moderate_threshold = 0.20
+severe_threshold = 0.40
+critical_threshold = 0.70
+
+[compound_review]
+schedule = "0 0-10 * * *"
+max_duration_secs = 1800
+repo_path = "/home/alex/terraphim-ai"
+create_prs = false
+worktree_root = "/home/alex/terraphim-ai/.worktrees"
+
+[workflow]
+enabled = true
+workflow_file = "/home/alex/terraphim-ai/WORKFLOW.md"
+
+[workflow.tracker]
+kind = "gitea"
+endpoint = "https://git.example.test"
+api_key = "fixture-token-not-real"
+owner = "terraphim"
+repo = "terraphim-ai"
+
+[[agents]]
+name = "security-sentinel"
+layer = "Safety"
+cli_tool = "/home/alex/.local/bin/claude"
+model = "sonnet"
+fallback_model = "kimi-for-coding/k2p5"
+persona = "Vigil"
+skill_chain = ["disciplined-verification"]
+max_cpu_seconds = 600
+grace_period_secs = 30
+task = "Run security audit on the terraphim-ai project."
+
+[[agents]]
+name = "compliance-auditor"
+layer = "Core"
+cli_tool = "/home/alex/.local/bin/claude"
+model = "sonnet"
+fallback_model = "opencode-go/minimax-m2.5"
+persona = "Audit"
+skill_chain = ["disciplined-validation"]
+schedule = "0 2 * * *"
+max_cpu_seconds = 900
+grace_period_secs = 30
+task = "Run compliance checks."
+
+[[agents]]
+name = "quality-coordinator"
+layer = "Growth"
+cli_tool = "/home/alex/.local/bin/claude"
+model = "sonnet"
+persona = "Conduit"
+skill_chain = ["disciplined-design"]
+max_cpu_seconds = 300
+grace_period_secs = 30
+task = "Coordinate quality review chain."
+
+[[flows]]
+name = "security-audit-flow"
+project = "terraphim"
+repo_path = "/home/alex/terraphim-ai"
+base_branch = "main"
+timeout_secs = 3600
+schedule = "0 */6 * * *"
+
+[[flows.steps]]
+name = "run-cargo-audit"
+kind = "action"
+command = "cargo audit"
+timeout_secs = 300
