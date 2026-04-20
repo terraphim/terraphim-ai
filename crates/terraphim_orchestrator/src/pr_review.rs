@@ -205,7 +205,9 @@ pub fn author_is_agent(login: &str) -> bool {
 
 fn parse_confidence(body: &str) -> Result<u8, VerdictParseError> {
     let needle = "Confidence Score:";
-    let idx = body.find(needle).ok_or(VerdictParseError::MissingConfidence)?;
+    let idx = body
+        .find(needle)
+        .ok_or(VerdictParseError::MissingConfidence)?;
     let tail = &body[idx + needle.len()..];
 
     let digits: String = tail
@@ -257,7 +259,9 @@ fn all_checkboxes_checked(body: &str) -> bool {
 
 fn parse_commit_short_hash(body: &str) -> Result<String, VerdictParseError> {
     let needle = "Last reviewed commit:";
-    let idx = body.find(needle).ok_or(VerdictParseError::MalformedFooter)?;
+    let idx = body
+        .find(needle)
+        .ok_or(VerdictParseError::MalformedFooter)?;
     let tail = &body[idx + needle.len()..];
 
     let hash: String = tail
