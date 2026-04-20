@@ -642,15 +642,14 @@ mod tests {
     #[tokio::test]
     async fn test_static_model_selected_when_only_signal() {
         let engine = test_engine();
-        let ctx = create_test_context_with_static_model(
-            "test-agent",
-            "Implement a feature",
-            "claude-3-opus",
-        );
+        // Use an allow-list-conformant bare model -- `sonnet` is a
+        // claude-code CLI alias and passes C1/C3.
+        let ctx =
+            create_test_context_with_static_model("test-agent", "Implement a feature", "sonnet");
         let decision = engine.decide_route(&ctx, &BudgetVerdict::Uncapped).await;
 
         assert_eq!(decision.candidate.source, RouteSource::StaticConfig);
-        assert_eq!(decision.candidate.model, "claude-3-opus");
+        assert_eq!(decision.candidate.model, "sonnet");
         assert!(decision.rationale.contains("static config"));
         assert_eq!(decision.dominant_signal, RouteSource::StaticConfig);
     }
@@ -700,11 +699,12 @@ mod tests {
     #[tokio::test]
     async fn test_rationale_records_dominant_signal() {
         let engine = test_engine();
-        let ctx = create_test_context_with_static_model("agent", "task", "model-x");
+        // `opus` is an allow-list-conformant claude-code CLI alias.
+        let ctx = create_test_context_with_static_model("agent", "task", "opus");
         let decision = engine.decide_route(&ctx, &BudgetVerdict::Uncapped).await;
 
         assert!(decision.rationale.contains("static config"));
-        assert!(decision.rationale.contains("Selected model-x"));
+        assert!(decision.rationale.contains("Selected opus"));
     }
 
     #[tokio::test]
@@ -713,7 +713,8 @@ mod tests {
         let ctx = DispatchContext {
             agent_name: "test-agent".to_string(),
             task: "implement feature".to_string(),
-            static_model: Some("static-model".to_string()),
+            // Allow-list-conformant static model.
+            static_model: Some("kimi-for-coding/k2p5".to_string()),
             cli_tool: "opencode".to_string(),
             layer: crate::config::AgentLayer::Core,
             session_id: None,
@@ -960,7 +961,7 @@ mod tests {
         let store = TelemetryStore::new(3600);
         store
             .record(CompletionEvent {
-                model: "limited-model".to_string(),
+                model: "opencode-go/limited-model".to_string(),
                 session_id: "test".to_string(),
                 completed_at: chrono::Utc::now(),
                 latency_ms: 0,
@@ -978,7 +979,7 @@ mod tests {
             Some(Arc::new(store)),
         );
 
-        let ctx = create_test_context_with_static_model("agent", "task", "limited-model");
+        let ctx = create_test_context_with_static_model("agent", "task", "opencode-go/limited-model");
         let decision = engine.decide_route(&ctx, &BudgetVerdict::Uncapped).await;
 
         assert!(
@@ -1000,7 +1001,7 @@ mod tests {
         for _ in 0..10 {
             store
                 .record(CompletionEvent {
-                    model: "fast-model".to_string(),
+                    model: "opencode-go/fast-model".to_string(),
                     session_id: "test".to_string(),
                     completed_at: chrono::Utc::now(),
                     latency_ms: 200,
@@ -1024,7 +1025,7 @@ mod tests {
             Some(Arc::new(store)),
         );
 
-        let ctx = create_test_context_with_static_model("agent", "implement feature", "fast-model");
+        let ctx = create_test_context_with_static_model("agent", "implement feature", "opencode-go/fast-model");
         let decision = engine.decide_route(&ctx, &BudgetVerdict::Uncapped).await;
 
         assert!(
