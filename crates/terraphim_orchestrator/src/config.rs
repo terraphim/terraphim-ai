@@ -150,6 +150,33 @@ pub struct OrchestratorConfig {
     /// restarts. Ignored when `providers` is empty.
     #[serde(default)]
     pub provider_budget_state_file: Option<PathBuf>,
+    /// Directory containing per-project pause flag files.
+    ///
+    /// When a file named `<pause_dir>/<project_id>` exists, the orchestrator
+    /// skips dispatching any agent belonging to that project. Operators
+    /// remove the file to resume dispatches. The project circuit breaker
+    /// creates entries here automatically after repeated `project-meta`
+    /// failures.
+    ///
+    /// Default: [`crate::project_control::DEFAULT_PAUSE_DIR`].
+    #[serde(default)]
+    pub pause_dir: Option<PathBuf>,
+    /// Number of consecutive `project-meta` failures required before the
+    /// orchestrator pauses dispatch for the affected project and opens an
+    /// `[ADF]` escalation issue.
+    ///
+    /// Default: [`crate::project_control::DEFAULT_PROJECT_CIRCUIT_BREAKER_THRESHOLD`].
+    #[serde(default = "default_project_circuit_breaker_threshold")]
+    pub project_circuit_breaker_threshold: u32,
+    /// Owner of the Gitea repo where the project circuit breaker opens
+    /// escalation issues (e.g. `terraphim`). When `None`, the orchestrator
+    /// falls back to [`GiteaOutputConfig::owner`] if configured.
+    #[serde(default)]
+    pub fleet_escalation_owner: Option<String>,
+    /// Repo name for fleet-level escalation issues (e.g. `adf-fleet`). When
+    /// `None`, the orchestrator falls back to [`GiteaOutputConfig::repo`].
+    #[serde(default)]
+    pub fleet_escalation_repo: Option<String>,
 }
 
 /// Configuration for KG-driven model routing.
@@ -695,6 +722,10 @@ fn default_disk_usage_threshold() -> u8 {
 
 fn default_tick_interval() -> u64 {
     30
+}
+
+fn default_project_circuit_breaker_threshold() -> u32 {
+    crate::project_control::DEFAULT_PROJECT_CIRCUIT_BREAKER_THRESHOLD
 }
 
 /// Partial config parsed from `include`d files. Only project definitions,
@@ -1256,7 +1287,7 @@ task = "t"
         let example_path =
             std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("orchestrator.example.toml");
         let config = OrchestratorConfig::from_file(&example_path).unwrap();
-        assert_eq!(config.agents.len(), 16);
+        assert_eq!(config.agents.len(), 18);
         assert_eq!(config.agents[0].layer, AgentLayer::Safety);
         assert_eq!(config.agents[1].layer, AgentLayer::Safety);
         assert_eq!(config.agents[2].layer, AgentLayer::Core);

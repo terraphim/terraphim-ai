@@ -49,6 +49,7 @@ pub mod mode;
 pub mod nightwatch;
 pub mod output_poster;
 pub mod persona;
+pub mod project_control;
 pub mod provider_budget;
 pub mod provider_probe;
 #[cfg(feature = "quickwit")]
@@ -243,6 +244,13 @@ pub struct AgentOrchestrator {
     /// window between duplicates is short and restarting the orchestrator
     /// is an acceptable dedupe reset.
     unknown_error_dedupe: Arc<Mutex<std::collections::HashSet<String>>>,
+    /// Counter of consecutive `project-meta` failures per project. Tripped
+    /// entries cause the orchestrator to create a pause flag and open an
+    /// `[ADF]` Gitea escalation issue.
+    project_failure_counter: project_control::ProjectFailureCounter,
+    /// Resolved pause-flag directory. Derived from
+    /// [`OrchestratorConfig::pause_dir`] or [`project_control::DEFAULT_PAUSE_DIR`].
+    pause_dir: PathBuf,
 }
 
 /// Build the composite restart-state key for an agent definition.
@@ -523,6 +531,13 @@ impl AgentOrchestrator {
         let provider_error_signatures = error_signatures::build_signature_map(&config.providers)
             .map_err(|e| OrchestratorError::Config(e.to_string()))?;
 
+        let project_failure_counter =
+            project_control::ProjectFailureCounter::new(config.project_circuit_breaker_threshold);
+        let pause_dir = config
+            .pause_dir
+            .clone()
+            .unwrap_or_else(|| PathBuf::from(project_control::DEFAULT_PAUSE_DIR));
+
         #[cfg(not(test))]
         let restart_state = Self::load_restart_state();
 
@@ -582,6 +597,8 @@ impl AgentOrchestrator {
             provider_budget_tracker,
             provider_error_signatures,
             unknown_error_dedupe: Arc::new(Mutex::new(std::collections::HashSet::new())),
+            project_failure_counter,
+            pause_dir,
         })
     }
 
@@ -1184,6 +1201,21 @@ impl AgentOrchestrator {
     /// Otherwise, route the task prompt through the RoutingEngine to select
     /// a model based on keyword matching.
     async fn spawn_agent(&mut self, def: &AgentDefinition) -> Result<(), OrchestratorError> {
+        // === PROJECT PAUSE GATE ===
+        // Operators and the project circuit breaker can block all dispatches
+        // for a given project by creating a sentinel file at
+        // `<pause_dir>/<project_id>`. The gate is project-scoped; legacy /
+        // global agents (`def.project == None`) are never blocked here.
+        if project_control::is_project_paused(&self.pause_dir, def.project.as_deref()) {
+            info!(
+                agent = %def.name,
+                project = ?def.project,
+                pause_dir = %self.pause_dir.display(),
+                "skipping spawn: project is paused"
+            );
+            return Ok(());
+        }
+
         // === DISK SPACE GUARD ===
         let threshold = self.config.disk_usage_threshold;
         if threshold < 100 {
@@ -3450,6 +3482,7 @@ impl AgentOrchestrator {
                 .and_then(|m| m.worktree_path.clone());
             self.active_agents.remove(&name);
             self.handle_agent_exit(&name, &def, status);
+            self.record_project_meta_exit(&def, status).await;
 
             // Auto-commit in the agent's working directory (worktree or shared)
             let commit_dir = worktree_path.as_deref().unwrap_or(&self.config.working_dir);
@@ -3462,6 +3495,157 @@ impl AgentOrchestrator {
                 self.remove_agent_worktree(&name, wt).await;
             }
         }
+    }
+
+    /// Feed a `project-meta` exit into the per-project circuit breaker. On
+    /// the trip transition (Nth consecutive failure) this touches the pause
+    /// flag and opens an `[ADF]` escalation issue on the configured
+    /// fleet-escalation repository.
+    async fn record_project_meta_exit(
+        &mut self,
+        def: &AgentDefinition,
+        status: std::process::ExitStatus,
+    ) {
+        if !project_control::is_project_meta_agent(def) {
+            return;
+        }
+        let Some(project_id) = def.project.clone() else {
+            return;
+        };
+        let success = status.success();
+        let verdict = self
+            .project_failure_counter
+            .record_project_meta_result(&project_id, success);
+        let count = self.project_failure_counter.count(&project_id);
+        let threshold = self.project_failure_counter.threshold();
+        info!(
+            project = %project_id,
+            agent = %def.name,
+            success,
+            consecutive_failures = count,
+            threshold,
+            "project-meta exit recorded"
+        );
+        if verdict != project_control::ShouldPause::Yes {
+            return;
+        }
+        self.trip_project_circuit_breaker(&project_id, &def.name, count, threshold)
+            .await;
+    }
+
+    /// Touch the pause flag and open an `[ADF]` escalation issue for a
+    /// project that has exceeded the `project-meta` failure threshold.
+    async fn trip_project_circuit_breaker(
+        &self,
+        project_id: &str,
+        agent_name: &str,
+        consecutive_failures: u32,
+        threshold: u32,
+    ) {
+        match project_control::touch_pause_flag(&self.pause_dir, project_id) {
+            Ok(path) => {
+                warn!(
+                    project = %project_id,
+                    pause_flag = %path.display(),
+                    consecutive_failures,
+                    threshold,
+                    "project circuit breaker tripped; pause flag created"
+                );
+            }
+            Err(e) => {
+                error!(
+                    project = %project_id,
+                    pause_dir = %self.pause_dir.display(),
+                    error = %e,
+                    "failed to create project pause flag"
+                );
+            }
+        }
+
+        let (Some(owner), Some(repo)) = self.fleet_escalation_target() else {
+            warn!(
+                project = %project_id,
+                "no fleet-escalation owner/repo configured; skipping issue creation"
+            );
+            return;
+        };
+        let Some(gitea_cfg) = self.config.gitea.as_ref() else {
+            warn!(
+                project = %project_id,
+                "no top-level gitea config; cannot open escalation issue"
+            );
+            return;
+        };
+        let tracker_cfg = terraphim_tracker::GiteaConfig {
+            base_url: gitea_cfg.base_url.clone(),
+            token: gitea_cfg.token.clone(),
+            owner: owner.clone(),
+            repo: repo.clone(),
+            active_states: vec!["open".to_string()],
+            terminal_states: vec!["closed".to_string()],
+            use_robot_api: false,
+            robot_path: std::path::PathBuf::from("/home/alex/go/bin/gitea-robot"),
+            claim_strategy: terraphim_tracker::gitea::ClaimStrategy::PreferRobot,
+        };
+        let tracker = match terraphim_tracker::GiteaTracker::new(tracker_cfg) {
+            Ok(t) => t,
+            Err(e) => {
+                error!(
+                    project = %project_id,
+                    owner = %owner,
+                    repo = %repo,
+                    error = %e,
+                    "failed to construct escalation GiteaTracker"
+                );
+                return;
+            }
+        };
+        let title = format!(
+            "[ADF] project-meta on {project_id} failed {consecutive_failures} consecutively"
+        );
+        let body = format!(
+            "Project `{project_id}` has been paused by the circuit breaker after \
+{consecutive_failures} consecutive `project-meta` failures (threshold: {threshold}).\n\n\
+Agent: `{agent_name}`\n\n\
+Pause flag: `{pause}`\n\n\
+Remove the pause flag once the underlying failure is resolved:\n\n\
+```\nrm {pause}\n```\n",
+            pause = self.pause_dir.join(project_id).display()
+        );
+        let labels = ["adf", "circuit-breaker", "priority/high"];
+        match tracker.create_issue(&title, &body, &labels).await {
+            Ok(issue) => info!(
+                project = %project_id,
+                owner = %owner,
+                repo = %repo,
+                issue = issue.number,
+                "opened [ADF] escalation issue"
+            ),
+            Err(e) => error!(
+                project = %project_id,
+                owner = %owner,
+                repo = %repo,
+                error = %e,
+                "failed to open [ADF] escalation issue"
+            ),
+        }
+    }
+
+    /// Resolve the `(owner, repo)` pair for fleet-level escalation issues.
+    /// Falls back to the configured Gitea output target when the dedicated
+    /// `fleet_escalation_*` fields are unset.
+    fn fleet_escalation_target(&self) -> (Option<String>, Option<String>) {
+        let owner = self
+            .config
+            .fleet_escalation_owner
+            .clone()
+            .or_else(|| self.config.gitea.as_ref().map(|g| g.owner.clone()));
+        let repo = self
+            .config
+            .fleet_escalation_repo
+            .clone()
+            .or_else(|| self.config.gitea.as_ref().map(|g| g.repo.clone()));
+        (owner, repo)
     }
 
     /// Handle an agent exit based on its layer.
@@ -4226,6 +4410,48 @@ impl AgentOrchestrator {
     ) {
         self.record_telemetry(events).await
     }
+
+    /// Test helper: return the pause directory the orchestrator is using.
+    #[doc(hidden)]
+    pub fn pause_dir_for_test(&self) -> &std::path::Path {
+        &self.pause_dir
+    }
+
+    /// Test helper: drive the project circuit breaker from outside the crate
+    /// so integration tests can verify the trip → pause-flag path without
+    /// spawning real agent processes.
+    ///
+    /// Simulates recording `failure_count` consecutive `project-meta` failures
+    /// against `project_id`; on the Nth failure (where N == threshold) the
+    /// underlying counter trips and this function touches the pause flag.
+    /// Returns `true` iff the pause flag was (re)created by this call.
+    #[doc(hidden)]
+    pub async fn simulate_project_meta_failures_for_test(
+        &mut self,
+        project_id: &str,
+        failure_count: u32,
+    ) -> bool {
+        let mut tripped = false;
+        for _ in 0..failure_count {
+            let verdict = self
+                .project_failure_counter
+                .record_project_meta_result(project_id, false);
+            if verdict == project_control::ShouldPause::Yes {
+                let _ = project_control::touch_pause_flag(&self.pause_dir, project_id);
+                tripped = true;
+            }
+        }
+        tripped
+    }
+
+    /// Test helper: record a successful project-meta run, resetting the
+    /// per-project consecutive-failure counter.
+    #[doc(hidden)]
+    pub fn reset_project_meta_counter_for_test(&mut self, project_id: &str) {
+        let _ = self
+            .project_failure_counter
+            .record_project_meta_result(project_id, true);
+    }
 }
 
 /// Check whether any changed file matches any of the watch path prefixes.
@@ -4343,6 +4569,10 @@ mod tests {
             include: vec![],
             providers: vec![],
             provider_budget_state_file: None,
+            pause_dir: None,
+            project_circuit_breaker_threshold: 3,
+            fleet_escalation_owner: None,
+            fleet_escalation_repo: None,
         }
     }
 
@@ -4569,6 +4799,10 @@ task = "test"
             include: vec![],
             providers: vec![],
             provider_budget_state_file: None,
+            pause_dir: None,
+            project_circuit_breaker_threshold: 3,
+            fleet_escalation_owner: None,
+            fleet_escalation_repo: None,
         }
     }
 

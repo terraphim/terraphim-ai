@@ -109,6 +109,10 @@ impl AgentConfig {
                 "--format".to_string(),
                 "json".to_string(),
             ],
+            // Shell interpreters: pass the task as an inline script. Enables
+            // shell-script agents like fleet-meta to run `cli_tool = "/bin/bash"`
+            // with the task body as the script source.
+            "bash" | "sh" => vec!["-c".to_string()],
             _ => Vec::new(),
         }
     }
@@ -380,5 +384,12 @@ mod tests {
     fn test_model_args_opencode_full_path() {
         let args = AgentConfig::model_args("/home/alex/.bun/bin/opencode", "opencode-go/kimi-k2.5");
         assert_eq!(args, vec!["-m", "opencode-go/kimi-k2.5"]);
+    }
+
+    #[test]
+    fn test_infer_args_bash_uses_dash_c() {
+        assert_eq!(AgentConfig::infer_args("/bin/bash"), vec!["-c"]);
+        assert_eq!(AgentConfig::infer_args("bash"), vec!["-c"]);
+        assert_eq!(AgentConfig::infer_args("/usr/bin/sh"), vec!["-c"]);
     }
 }

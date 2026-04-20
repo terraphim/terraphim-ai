@@ -352,6 +352,10 @@ fn budget_aware_config(
         include: vec![],
         providers,
         provider_budget_state_file: state_file,
+        pause_dir: None,
+        project_circuit_breaker_threshold: 3,
+        fleet_escalation_owner: None,
+        fleet_escalation_repo: None,
     }
 }
 
