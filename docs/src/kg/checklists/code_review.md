@@ -2,7 +2,7 @@
 
 Required validation steps for code review submissions.
 
-synonyms:: code review, pr review, pull request review, code checklist
+synonyms:: code review checklist, pr review checklist, pull request review checklist
 checklist:: tests, documentation, error handling, security, performance
 
 ## Checklist Items
@@ -10,24 +10,22 @@ checklist:: tests, documentation, error handling, security, performance
 ### tests
 All code changes must include appropriate tests.
 
-synonyms:: unit test, integration test, test coverage
+synonyms:: unit test coverage, integration test coverage
 
 ### documentation
 Code must have proper documentation and comments.
 
-synonyms:: docs, comments, docstrings, readme
-
 ### error_handling
 Proper error handling must be implemented.
 
-synonyms:: error handling, exception handling, error management, try catch
+synonyms:: exception handling, error management
 
 ### security
 Security considerations must be addressed.
 
-synonyms:: security check, vulnerability check, security review
+synonyms:: security check, vulnerability check, code security review
 
 ### performance
 Performance implications must be considered.
 
-synonyms:: performance check, optimization, efficiency
+synonyms:: performance check, runtime optimization
