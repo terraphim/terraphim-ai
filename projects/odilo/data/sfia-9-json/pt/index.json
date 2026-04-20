@@ -1,0 +1,1052 @@
+{
+  "type": "sfia.index",
+  "sfia_version": 9,
+  "language": "pt",
+  "generated_at": "2026-02-02",
+  "source_file": "sfia_source/SFIA 9 Excel - Português/sfia-9_current-standard_pt_250124.xlsx",
+  "source_date": null,
+  "counts": {
+    "skills": 147,
+    "attributes": 16,
+    "levels_of_responsibility": 7
+  },
+  "paths": {
+    "skills_dir": "skills/",
+    "attributes": "attributes.json",
+    "levels_of_responsibility": "levels-of-responsibility.json",
+    "terms_of_use": "terms-of-use.json",
+    "responsibilities": "responsibilities.json",
+    "behaviour_matrix": "behaviour-matrix.json"
+  },
+  "skills": [
+    {
+      "code": "ITSP",
+      "name": "Planejamento estratégico",
+      "category": "Estratégia e arquitetura",
+      "subcategory": "Planejamento e estratégia",
+      "file": "skills/ITSP.json"
+    },
+    {
+      "code": "ISCO",
+      "name": "Coordenação de sistemas de informação",
+      "category": "Estratégia e arquitetura",
+      "subcategory": "Planejamento e estratégia",
+      "file": "skills/ISCO.json"
+    },
+    {
+      "code": "IRMG",
+      "name": "Gerenciamento de informações",
+      "category": "Estratégia e arquitetura",
+      "subcategory": "Planejamento e estratégia",
+      "file": "skills/IRMG.json"
+    },
+    {
+      "code": "STPL",
+      "name": "Arquitetura corporativa e de negócios",
+      "category": "Estratégia e arquitetura",
+      "subcategory": "Planejamento e estratégia",
+      "file": "skills/STPL.json"
+    },
+    {
+      "code": "ARCH",
+      "name": "Arquitetura de soluções",
+      "category": "Estratégia e arquitetura",
+      "subcategory": "Planejamento e estratégia",
+      "file": "skills/ARCH.json"
+    },
+    {
+      "code": "INOV",
+      "name": "Gestão da Inovação",
+      "category": "Estratégia e arquitetura",
+      "subcategory": "Planejamento e estratégia",
+      "file": "skills/INOV.json"
+    },
+    {
+      "code": "EMRG",
+      "name": "Monitoramento de tecnologias emergentes",
+      "category": "Estratégia e arquitetura",
+      "subcategory": "Planejamento e estratégia",
+      "file": "skills/EMRG.json"
+    },
+    {
+      "code": "RSCH",
+      "name": "Pesquisa formal",
+      "category": "Estratégia e arquitetura",
+      "subcategory": "Planejamento e estratégia",
+      "file": "skills/RSCH.json"
+    },
+    {
+      "code": "SUST",
+      "name": "Sustentabilidade",
+      "category": "Estratégia e arquitetura",
+      "subcategory": "Planejamento e estratégia",
+      "file": "skills/SUST.json"
+    },
+    {
+      "code": "FMIT",
+      "name": "Gestão financeira",
+      "category": "Estratégia e arquitetura",
+      "subcategory": "Gerenciamento financeiro e de valor",
+      "file": "skills/FMIT.json"
+    },
+    {
+      "code": "INVA",
+      "name": "Avaliação de investimentos",
+      "category": "Estratégia e arquitetura",
+      "subcategory": "Gerenciamento financeiro e de valor",
+      "file": "skills/INVA.json"
+    },
+    {
+      "code": "BENM",
+      "name": "Gestão de benefícios",
+      "category": "Estratégia e arquitetura",
+      "subcategory": "Gerenciamento financeiro e de valor",
+      "file": "skills/BENM.json"
+    },
+    {
+      "code": "BUDF",
+      "name": "Orçamento e previsão",
+      "category": "Estratégia e arquitetura",
+      "subcategory": "Gerenciamento financeiro e de valor",
+      "file": "skills/BUDF.json"
+    },
+    {
+      "code": "FIAN",
+      "name": "Análise financeira",
+      "category": "Estratégia e arquitetura",
+      "subcategory": "Gerenciamento financeiro e de valor",
+      "file": "skills/FIAN.json"
+    },
+    {
+      "code": "COMG",
+      "name": "Gestão de custos",
+      "category": "Estratégia e arquitetura",
+      "subcategory": "Gerenciamento financeiro e de valor",
+      "file": "skills/COMG.json"
+    },
+    {
+      "code": "DEMM",
+      "name": "Gestão da demanda",
+      "category": "Estratégia e arquitetura",
+      "subcategory": "Gerenciamento financeiro e de valor",
+      "file": "skills/DEMM.json"
+    },
+    {
+      "code": "MEAS",
+      "name": "Medições",
+      "category": "Estratégia e arquitetura",
+      "subcategory": "Gerenciamento financeiro e de valor",
+      "file": "skills/MEAS.json"
+    },
+    {
+      "code": "SCTY",
+      "name": "Segurança da informação",
+      "category": "Estratégia e arquitetura",
+      "subcategory": "Segurança e privacidade",
+      "file": "skills/SCTY.json"
+    },
+    {
+      "code": "INAS",
+      "name": "Garantia da informação",
+      "category": "Estratégia e arquitetura",
+      "subcategory": "Segurança e privacidade",
+      "file": "skills/INAS.json"
+    },
+    {
+      "code": "THIN",
+      "name": "Modelagem de ameaças",
+      "category": "Estratégia e arquitetura",
+      "subcategory": "Segurança e privacidade",
+      "file": "skills/THIN.json"
+    },
+    {
+      "code": "GOVN",
+      "name": "Governança",
+      "category": "Estratégia e arquitetura",
+      "subcategory": "Governança, risco e conformidade",
+      "file": "skills/GOVN.json"
+    },
+    {
+      "code": "BURM",
+      "name": "Gerenciamento de riscos",
+      "category": "Estratégia e arquitetura",
+      "subcategory": "Governança, risco e conformidade",
+      "file": "skills/BURM.json"
+    },
+    {
+      "code": "AIDE",
+      "name": "Inteligência Artificial (IA) e Ética de Dados",
+      "category": "Estratégia e arquitetura",
+      "subcategory": "Governança, risco e conformidade",
+      "file": "skills/AIDE.json"
+    },
+    {
+      "code": "AUDT",
+      "name": "Auditoria",
+      "category": "Estratégia e arquitetura",
+      "subcategory": "Governança, risco e conformidade",
+      "file": "skills/AUDT.json"
+    },
+    {
+      "code": "QUMG",
+      "name": "Gestão da qualidade",
+      "category": "Estratégia e arquitetura",
+      "subcategory": "Governança, risco e conformidade",
+      "file": "skills/QUMG.json"
+    },
+    {
+      "code": "QUAS",
+      "name": "Garantia da qualidade",
+      "category": "Estratégia e arquitetura",
+      "subcategory": "Governança, risco e conformidade",
+      "file": "skills/QUAS.json"
+    },
+    {
+      "code": "CNSL",
+      "name": "Consultoria",
+      "category": "Estratégia e arquitetura",
+      "subcategory": "Aconselhamento e orientação",
+      "file": "skills/CNSL.json"
+    },
+    {
+      "code": "TECH",
+      "name": "Consultoria especializada",
+      "category": "Estratégia e arquitetura",
+      "subcategory": "Aconselhamento e orientação",
+      "file": "skills/TECH.json"
+    },
+    {
+      "code": "PEDP",
+      "name": "Informação e conformidade de dados",
+      "category": "Estratégia e arquitetura",
+      "subcategory": "Segurança e privacidade",
+      "file": "skills/PEDP.json"
+    },
+    {
+      "code": "METL",
+      "name": "Métodos e ferramentas",
+      "category": "Estratégia e arquitetura",
+      "subcategory": "Aconselhamento e orientação",
+      "file": "skills/METL.json"
+    },
+    {
+      "code": "POMG",
+      "name": "Gestão de portfólio",
+      "category": "Mudança e transformação",
+      "subcategory": "Implementação da mudança nos negócios",
+      "file": "skills/POMG.json"
+    },
+    {
+      "code": "PGMG",
+      "name": "Gestão de programas",
+      "category": "Mudança e transformação",
+      "subcategory": "Implementação da mudança nos negócios",
+      "file": "skills/PGMG.json"
+    },
+    {
+      "code": "PRMG",
+      "name": "Gestão de projetos",
+      "category": "Mudança e transformação",
+      "subcategory": "Implementação da mudança nos negócios",
+      "file": "skills/PRMG.json"
+    },
+    {
+      "code": "PROF",
+      "name": "Suporte a portfólios, programas e projetos",
+      "category": "Mudança e transformação",
+      "subcategory": "Implementação da mudança nos negócios",
+      "file": "skills/PROF.json"
+    },
+    {
+      "code": "DEMG",
+      "name": "Gestão de Entrega",
+      "category": "Mudança e transformação",
+      "subcategory": "Implementação da mudança nos negócios",
+      "file": "skills/DEMG.json"
+    },
+    {
+      "code": "BUSA",
+      "name": "Análise da situação do negócio",
+      "category": "Mudança e transformação",
+      "subcategory": "Análise de mudanças",
+      "file": "skills/BUSA.json"
+    },
+    {
+      "code": "FEAS",
+      "name": "Avaliação de viabilidade",
+      "category": "Mudança e transformação",
+      "subcategory": "Análise de mudanças",
+      "file": "skills/FEAS.json"
+    },
+    {
+      "code": "REQM",
+      "name": "Definição e gerenciamento de requisitos",
+      "category": "Mudança e transformação",
+      "subcategory": "Análise de mudanças",
+      "file": "skills/REQM.json"
+    },
+    {
+      "code": "BSMO",
+      "name": "Modelagem de negócios",
+      "category": "Mudança e transformação",
+      "subcategory": "Análise de mudanças",
+      "file": "skills/BSMO.json"
+    },
+    {
+      "code": "BPTS",
+      "name": "Teste de aceitação do usuário",
+      "category": "Mudança e transformação",
+      "subcategory": "Análise de mudanças",
+      "file": "skills/BPTS.json"
+    },
+    {
+      "code": "VURE",
+      "name": "Pesquisa de vulnerabilidades",
+      "category": "Estratégia e arquitetura",
+      "subcategory": "Segurança e privacidade",
+      "file": "skills/VURE.json"
+    },
+    {
+      "code": "BPRE",
+      "name": "Melhoria em processos de negócio",
+      "category": "Mudança e transformação",
+      "subcategory": "Planejamento de mudanças",
+      "file": "skills/BPRE.json"
+    },
+    {
+      "code": "OCEN",
+      "name": "Facilitação de mudança organizacional",
+      "category": "Mudança e transformação",
+      "subcategory": "Planejamento de mudanças",
+      "file": "skills/OCEN.json"
+    },
+    {
+      "code": "OCDV",
+      "name": "Desenvolvimento de capacidade organizacional",
+      "category": "Mudança e transformação",
+      "subcategory": "Planejamento de mudanças",
+      "file": "skills/OCDV.json"
+    },
+    {
+      "code": "ORDI",
+      "name": "Planejamento e implementação organizacional",
+      "category": "Mudança e transformação",
+      "subcategory": "Planejamento de mudanças",
+      "file": "skills/ORDI.json"
+    },
+    {
+      "code": "JADN",
+      "name": "Análise e desenho de cargos, funções e perfis",
+      "category": "Mudança e transformação",
+      "subcategory": "Planejamento de mudanças",
+      "file": "skills/JADN.json"
+    },
+    {
+      "code": "CIPM",
+      "name": "Gestão de mudanças organizacionais",
+      "category": "Mudança e transformação",
+      "subcategory": "Planejamento de mudanças",
+      "file": "skills/CIPM.json"
+    },
+    {
+      "code": "PROD",
+      "name": "Gestão de produtos",
+      "category": "Desenvolvimento e implementação",
+      "subcategory": "Desenvolvimento de sistemas",
+      "file": "skills/PROD.json"
+    },
+    {
+      "code": "DLMG",
+      "name": "Gerenciamento de desenvolvimento de sistemas",
+      "category": "Desenvolvimento e implementação",
+      "subcategory": "Desenvolvimento de sistemas",
+      "file": "skills/DLMG.json"
+    },
+    {
+      "code": "SLEN",
+      "name": "Engenharia de ciclo de vida de sistemas e software",
+      "category": "Desenvolvimento e implementação",
+      "subcategory": "Desenvolvimento de sistemas",
+      "file": "skills/SLEN.json"
+    },
+    {
+      "code": "DESN",
+      "name": "Projeto de sistemas",
+      "category": "Desenvolvimento e implementação",
+      "subcategory": "Desenvolvimento de sistemas",
+      "file": "skills/DESN.json"
+    },
+    {
+      "code": "SWDN",
+      "name": "Projeto de software",
+      "category": "Desenvolvimento e implementação",
+      "subcategory": "Desenvolvimento de sistemas",
+      "file": "skills/SWDN.json"
+    },
+    {
+      "code": "NTDS",
+      "name": "Projeto de redes",
+      "category": "Desenvolvimento e implementação",
+      "subcategory": "Desenvolvimento de sistemas",
+      "file": "skills/NTDS.json"
+    },
+    {
+      "code": "IFDN",
+      "name": "Projeto de infraestrutura",
+      "category": "Desenvolvimento e implementação",
+      "subcategory": "Desenvolvimento de sistemas",
+      "file": "skills/IFDN.json"
+    },
+    {
+      "code": "HWDE",
+      "name": "Projeto de hardware",
+      "category": "Desenvolvimento e implementação",
+      "subcategory": "Desenvolvimento de sistemas",
+      "file": "skills/HWDE.json"
+    },
+    {
+      "code": "PROG",
+      "name": "Programação/desenvolvimento de software",
+      "category": "Desenvolvimento e implementação",
+      "subcategory": "Desenvolvimento de sistemas",
+      "file": "skills/PROG.json"
+    },
+    {
+      "code": "SINT",
+      "name": "Integração e construção de sistemas",
+      "category": "Desenvolvimento e implementação",
+      "subcategory": "Desenvolvimento de sistemas",
+      "file": "skills/SINT.json"
+    },
+    {
+      "code": "TEST",
+      "name": "Testes funcionais",
+      "category": "Desenvolvimento e implementação",
+      "subcategory": "Desenvolvimento de sistemas",
+      "file": "skills/TEST.json"
+    },
+    {
+      "code": "NFTS",
+      "name": "Testes não funcionais",
+      "category": "Desenvolvimento e implementação",
+      "subcategory": "Desenvolvimento de sistemas",
+      "file": "skills/NFTS.json"
+    },
+    {
+      "code": "PRTS",
+      "name": "Testes de processo",
+      "category": "Desenvolvimento e implementação",
+      "subcategory": "Desenvolvimento de sistemas",
+      "file": "skills/PRTS.json"
+    },
+    {
+      "code": "PORT",
+      "name": "Configuração de software",
+      "category": "Desenvolvimento e implementação",
+      "subcategory": "Desenvolvimento de sistemas",
+      "file": "skills/PORT.json"
+    },
+    {
+      "code": "RESD",
+      "name": "Desenvolvimento de sistemas de tempo real/embarcado",
+      "category": "Desenvolvimento e implementação",
+      "subcategory": "Desenvolvimento de sistemas",
+      "file": "skills/RESD.json"
+    },
+    {
+      "code": "SFEN",
+      "name": "Engenharia de segurança",
+      "category": "Desenvolvimento e implementação",
+      "subcategory": "Desenvolvimento de sistemas",
+      "file": "skills/SFEN.json"
+    },
+    {
+      "code": "SFAS",
+      "name": "Avaliação de segurança",
+      "category": "Desenvolvimento e implementação",
+      "subcategory": "Desenvolvimento de sistemas",
+      "file": "skills/SFAS.json"
+    },
+    {
+      "code": "RFEN",
+      "name": "Engenharia de radiofrequência",
+      "category": "Desenvolvimento e implementação",
+      "subcategory": "Desenvolvimento de sistemas",
+      "file": "skills/RFEN.json"
+    },
+    {
+      "code": "ADEV",
+      "name": "Desenvolvimento de animações",
+      "category": "Desenvolvimento e implementação",
+      "subcategory": "Desenvolvimento de sistemas",
+      "file": "skills/ADEV.json"
+    },
+    {
+      "code": "DATM",
+      "name": "Gestão de dados",
+      "category": "Desenvolvimento e implementação",
+      "subcategory": "Analise de dados",
+      "file": "skills/DATM.json"
+    },
+    {
+      "code": "DTAN",
+      "name": "Modelagem e design de dados",
+      "category": "Desenvolvimento e implementação",
+      "subcategory": "Analise de dados",
+      "file": "skills/DTAN.json"
+    },
+    {
+      "code": "DBDS",
+      "name": "Projeto de banco de dados",
+      "category": "Desenvolvimento e implementação",
+      "subcategory": "Analise de dados",
+      "file": "skills/DBDS.json"
+    },
+    {
+      "code": "DAAN",
+      "name": "Análise de dados",
+      "category": "Desenvolvimento e implementação",
+      "subcategory": "Analise de dados",
+      "file": "skills/DAAN.json"
+    },
+    {
+      "code": "DATS",
+      "name": "Ciência de dados",
+      "category": "Desenvolvimento e implementação",
+      "subcategory": "Analise de dados",
+      "file": "skills/DATS.json"
+    },
+    {
+      "code": "MLNG",
+      "name": "Aprendizagem de máquina (Machine learning)",
+      "category": "Desenvolvimento e implementação",
+      "subcategory": "Analise de dados",
+      "file": "skills/MLNG.json"
+    },
+    {
+      "code": "BINT",
+      "name": "Inteligência de negócio (BI)",
+      "category": "Desenvolvimento e implementação",
+      "subcategory": "Analise de dados",
+      "file": "skills/BINT.json"
+    },
+    {
+      "code": "DENG",
+      "name": "Engenharia de dados",
+      "category": "Desenvolvimento e implementação",
+      "subcategory": "Analise de dados",
+      "file": "skills/DENG.json"
+    },
+    {
+      "code": "VISL",
+      "name": "Visualização de dados",
+      "category": "Desenvolvimento e implementação",
+      "subcategory": "Analise de dados",
+      "file": "skills/VISL.json"
+    },
+    {
+      "code": "URCH",
+      "name": "Pesquisa de usuário",
+      "category": "Desenvolvimento e implementação",
+      "subcategory": "Design Centrado no Usuário",
+      "file": "skills/URCH.json"
+    },
+    {
+      "code": "CEXP",
+      "name": "Experiência do cliente",
+      "category": "Desenvolvimento e implementação",
+      "subcategory": "Design Centrado no Usuário",
+      "file": "skills/CEXP.json"
+    },
+    {
+      "code": "ACIN",
+      "name": "Acessibilidade e Inclusão",
+      "category": "Desenvolvimento e implementação",
+      "subcategory": "Design Centrado no Usuário",
+      "file": "skills/ACIN.json"
+    },
+    {
+      "code": "UNAN",
+      "name": "Análise da experiência do usuário",
+      "category": "Desenvolvimento e implementação",
+      "subcategory": "Design Centrado no Usuário",
+      "file": "skills/UNAN.json"
+    },
+    {
+      "code": "HCEV",
+      "name": "Design da experiência do usuário",
+      "category": "Desenvolvimento e implementação",
+      "subcategory": "Design Centrado no Usuário",
+      "file": "skills/HCEV.json"
+    },
+    {
+      "code": "USEV",
+      "name": "Avaliação da experiência do usuário",
+      "category": "Desenvolvimento e implementação",
+      "subcategory": "Design Centrado no Usuário",
+      "file": "skills/USEV.json"
+    },
+    {
+      "code": "INCA",
+      "name": "Criação e desenho de conteúdo",
+      "category": "Desenvolvimento e implementação",
+      "subcategory": "Gerenciamento de conteúdo",
+      "file": "skills/INCA.json"
+    },
+    {
+      "code": "ICPM",
+      "name": "Publicação de conteúdo",
+      "category": "Desenvolvimento e implementação",
+      "subcategory": "Gerenciamento de conteúdo",
+      "file": "skills/ICPM.json"
+    },
+    {
+      "code": "KNOW",
+      "name": "Gestão do conhecimento",
+      "category": "Desenvolvimento e implementação",
+      "subcategory": "Gerenciamento de conteúdo",
+      "file": "skills/KNOW.json"
+    },
+    {
+      "code": "GRDN",
+      "name": "Design gráfico",
+      "category": "Desenvolvimento e implementação",
+      "subcategory": "Gerenciamento de conteúdo",
+      "file": "skills/GRDN.json"
+    },
+    {
+      "code": "SCMO",
+      "name": "Modelagem científica",
+      "category": "Desenvolvimento e implementação",
+      "subcategory": "Ciência computacional",
+      "file": "skills/SCMO.json"
+    },
+    {
+      "code": "NUAN",
+      "name": "Análise numérica",
+      "category": "Desenvolvimento e implementação",
+      "subcategory": "Ciência computacional",
+      "file": "skills/NUAN.json"
+    },
+    {
+      "code": "HPCC",
+      "name": "Computação de alto desempenho",
+      "category": "Desenvolvimento e implementação",
+      "subcategory": "Ciência computacional",
+      "file": "skills/HPCC.json"
+    },
+    {
+      "code": "ITMG",
+      "name": "Gerenciamento de serviços de tecnologia",
+      "category": "Fornecimento e operação",
+      "subcategory": "Gestão de tecnologia",
+      "file": "skills/ITMG.json"
+    },
+    {
+      "code": "ASUP",
+      "name": "Suporte a aplicações",
+      "category": "Fornecimento e operação",
+      "subcategory": "Gestão de tecnologia",
+      "file": "skills/ASUP.json"
+    },
+    {
+      "code": "ITOP",
+      "name": "Operações de infraestrutura",
+      "category": "Fornecimento e operação",
+      "subcategory": "Gestão de tecnologia",
+      "file": "skills/ITOP.json"
+    },
+    {
+      "code": "SYSP",
+      "name": "Administração de software de sistema",
+      "category": "Fornecimento e operação",
+      "subcategory": "Gestão de tecnologia",
+      "file": "skills/SYSP.json"
+    },
+    {
+      "code": "NTAS",
+      "name": "Suporte à redes",
+      "category": "Fornecimento e operação",
+      "subcategory": "Gestão de tecnologia",
+      "file": "skills/NTAS.json"
+    },
+    {
+      "code": "HSIN",
+      "name": "Instalação e remoção de sistemas",
+      "category": "Fornecimento e operação",
+      "subcategory": "Gestão de tecnologia",
+      "file": "skills/HSIN.json"
+    },
+    {
+      "code": "CFMG",
+      "name": "Gestão da configuração",
+      "category": "Fornecimento e operação",
+      "subcategory": "Gestão de tecnologia",
+      "file": "skills/CFMG.json"
+    },
+    {
+      "code": "RELM",
+      "name": "Gestão de liberação",
+      "category": "Fornecimento e operação",
+      "subcategory": "Gestão de tecnologia",
+      "file": "skills/RELM.json"
+    },
+    {
+      "code": "STMG",
+      "name": "Gestão de armazenamento de dados",
+      "category": "Fornecimento e operação",
+      "subcategory": "Gestão de tecnologia",
+      "file": "skills/STMG.json"
+    },
+    {
+      "code": "DCMA",
+      "name": "Gerenciamento de instalações",
+      "category": "Fornecimento e operação",
+      "subcategory": "Gestão de tecnologia",
+      "file": "skills/DCMA.json"
+    },
+    {
+      "code": "SLMO",
+      "name": "Gestão de nível de serviço",
+      "category": "Fornecimento e operação",
+      "subcategory": "Gestão de serviços",
+      "file": "skills/SLMO.json"
+    },
+    {
+      "code": "SCMG",
+      "name": "Gerenciamento do catálogo de serviços",
+      "category": "Fornecimento e operação",
+      "subcategory": "Gestão de serviços",
+      "file": "skills/SCMG.json"
+    },
+    {
+      "code": "AVMT",
+      "name": "Gerenciamento da disponibilidade",
+      "category": "Fornecimento e operação",
+      "subcategory": "Gestão de serviços",
+      "file": "skills/AVMT.json"
+    },
+    {
+      "code": "COPL",
+      "name": "Gestão da continuidade",
+      "category": "Fornecimento e operação",
+      "subcategory": "Gestão de serviços",
+      "file": "skills/COPL.json"
+    },
+    {
+      "code": "CPMG",
+      "name": "Gestão da capacidade",
+      "category": "Fornecimento e operação",
+      "subcategory": "Gestão de serviços",
+      "file": "skills/CPMG.json"
+    },
+    {
+      "code": "USUP",
+      "name": "Gestão de incidentes",
+      "category": "Fornecimento e operação",
+      "subcategory": "Gestão de serviços",
+      "file": "skills/USUP.json"
+    },
+    {
+      "code": "PBMG",
+      "name": "Gerenciamento de problemas",
+      "category": "Fornecimento e operação",
+      "subcategory": "Gestão de serviços",
+      "file": "skills/PBMG.json"
+    },
+    {
+      "code": "CHMG",
+      "name": "Controle de mudanças",
+      "category": "Fornecimento e operação",
+      "subcategory": "Gestão de serviços",
+      "file": "skills/CHMG.json"
+    },
+    {
+      "code": "ASMG",
+      "name": "Gestão de ativos",
+      "category": "Fornecimento e operação",
+      "subcategory": "Gestão de serviços",
+      "file": "skills/ASMG.json"
+    },
+    {
+      "code": "SEAC",
+      "name": "Aceitação de serviços",
+      "category": "Fornecimento e operação",
+      "subcategory": "Gestão de serviços",
+      "file": "skills/SEAC.json"
+    },
+    {
+      "code": "IAMT",
+      "name": "Gestão de identidades e acessos",
+      "category": "Fornecimento e operação",
+      "subcategory": "Serviços de segurança",
+      "file": "skills/IAMT.json"
+    },
+    {
+      "code": "SCAD",
+      "name": "Operações de segurança",
+      "category": "Fornecimento e operação",
+      "subcategory": "Serviços de segurança",
+      "file": "skills/SCAD.json"
+    },
+    {
+      "code": "VUAS",
+      "name": "Avaliação de vulnerabilidades",
+      "category": "Fornecimento e operação",
+      "subcategory": "Serviços de segurança",
+      "file": "skills/VUAS.json"
+    },
+    {
+      "code": "DGFS",
+      "name": "Forense digital",
+      "category": "Fornecimento e operação",
+      "subcategory": "Serviços de segurança",
+      "file": "skills/DGFS.json"
+    },
+    {
+      "code": "CRIM",
+      "name": "Investigação de cibercrime",
+      "category": "Fornecimento e operação",
+      "subcategory": "Serviços de segurança",
+      "file": "skills/CRIM.json"
+    },
+    {
+      "code": "OCOP",
+      "name": "Operações cibernéticas ofensivas",
+      "category": "Fornecimento e operação",
+      "subcategory": "Serviços de segurança",
+      "file": "skills/OCOP.json"
+    },
+    {
+      "code": "PENT",
+      "name": "Testes de intrusão",
+      "category": "Fornecimento e operação",
+      "subcategory": "Serviços de segurança",
+      "file": "skills/PENT.json"
+    },
+    {
+      "code": "RMGT",
+      "name": "Gerenciamento de registros",
+      "category": "Fornecimento e operação",
+      "subcategory": "Operações de dados e registros",
+      "file": "skills/RMGT.json"
+    },
+    {
+      "code": "ANCC",
+      "name": "Classificação analítica e codificação",
+      "category": "Fornecimento e operação",
+      "subcategory": "Operações de dados e registros",
+      "file": "skills/ANCC.json"
+    },
+    {
+      "code": "DBAD",
+      "name": "Administração de banco de dados",
+      "category": "Fornecimento e operação",
+      "subcategory": "Operações de dados e registros",
+      "file": "skills/DBAD.json"
+    },
+    {
+      "code": "PEMT",
+      "name": "Gestão de desempenho",
+      "category": "Pessoas e habilidades",
+      "subcategory": "Gestão de Pessoas",
+      "file": "skills/PEMT.json"
+    },
+    {
+      "code": "EEXP",
+      "name": "Experiência do colaborador",
+      "category": "Pessoas e habilidades",
+      "subcategory": "Gestão de Pessoas",
+      "file": "skills/EEXP.json"
+    },
+    {
+      "code": "OFCL",
+      "name": "Facilitação organizacional",
+      "category": "Pessoas e habilidades",
+      "subcategory": "Gestão de Pessoas",
+      "file": "skills/OFCL.json"
+    },
+    {
+      "code": "DEPL",
+      "name": "Implementação",
+      "category": "Fornecimento e operação",
+      "subcategory": "Gestão de tecnologia",
+      "file": "skills/DEPL.json"
+    },
+    {
+      "code": "PDSV",
+      "name": "Desenvolvimento profissional",
+      "category": "Pessoas e habilidades",
+      "subcategory": "Gestão de Pessoas",
+      "file": "skills/PDSV.json"
+    },
+    {
+      "code": "WFPL",
+      "name": "Planejamento da força de trabalho",
+      "category": "Pessoas e habilidades",
+      "subcategory": "Gestão de Pessoas",
+      "file": "skills/WFPL.json"
+    },
+    {
+      "code": "RESC",
+      "name": "Recrutamento e seleção",
+      "category": "Pessoas e habilidades",
+      "subcategory": "Gestão de Pessoas",
+      "file": "skills/RESC.json"
+    },
+    {
+      "code": "ETMG",
+      "name": "Gestão de treinamento e desenvolvimento",
+      "category": "Pessoas e habilidades",
+      "subcategory": "Gerenciamento de habilidades",
+      "file": "skills/ETMG.json"
+    },
+    {
+      "code": "TMCR",
+      "name": "Planejamento e desenvolvimento de ensino",
+      "category": "Pessoas e habilidades",
+      "subcategory": "Gerenciamento de habilidades",
+      "file": "skills/TMCR.json"
+    },
+    {
+      "code": "ETDL",
+      "name": "Entrega de ensino",
+      "category": "Pessoas e habilidades",
+      "subcategory": "Gerenciamento de habilidades",
+      "file": "skills/ETDL.json"
+    },
+    {
+      "code": "LEDA",
+      "name": "Avaliação de competências",
+      "category": "Pessoas e habilidades",
+      "subcategory": "Gerenciamento de habilidades",
+      "file": "skills/LEDA.json"
+    },
+    {
+      "code": "CSOP",
+      "name": "Operação de esquemas de certificação",
+      "category": "Pessoas e habilidades",
+      "subcategory": "Gerenciamento de habilidades",
+      "file": "skills/CSOP.json"
+    },
+    {
+      "code": "TEAC",
+      "name": "Ensino",
+      "category": "Pessoas e habilidades",
+      "subcategory": "Gerenciamento de habilidades",
+      "file": "skills/TEAC.json"
+    },
+    {
+      "code": "SUBF",
+      "name": "Desenvolvimento de conteúdo programático",
+      "category": "Pessoas e habilidades",
+      "subcategory": "Gerenciamento de habilidades",
+      "file": "skills/SUBF.json"
+    },
+    {
+      "code": "SORC",
+      "name": "Desenvolvimento de fornecedores",
+      "category": "Relacionamento e engajamento",
+      "subcategory": "Gerenciamento de partes interessadas",
+      "file": "skills/SORC.json"
+    },
+    {
+      "code": "SUPP",
+      "name": "Gestão de fornecedores",
+      "category": "Relacionamento e engajamento",
+      "subcategory": "Gerenciamento de partes interessadas",
+      "file": "skills/SUPP.json"
+    },
+    {
+      "code": "ITCM",
+      "name": "Gestão de contratos",
+      "category": "Relacionamento e engajamento",
+      "subcategory": "Gerenciamento de partes interessadas",
+      "file": "skills/ITCM.json"
+    },
+    {
+      "code": "RLMT",
+      "name": "Gestão de relacionamentos",
+      "category": "Relacionamento e engajamento",
+      "subcategory": "Gerenciamento de partes interessadas",
+      "file": "skills/RLMT.json"
+    },
+    {
+      "code": "CSMG",
+      "name": "Serviços de atendimento ao cliente",
+      "category": "Relacionamento e engajamento",
+      "subcategory": "Gerenciamento de partes interessadas",
+      "file": "skills/CSMG.json"
+    },
+    {
+      "code": "ADMN",
+      "name": "Administração de negócios",
+      "category": "Relacionamento e engajamento",
+      "subcategory": "Gerenciamento de partes interessadas",
+      "file": "skills/ADMN.json"
+    },
+    {
+      "code": "BIDM",
+      "name": "Gestão de cotações e propostas",
+      "category": "Relacionamento e engajamento",
+      "subcategory": "Vendas e gerenciamento de propostas",
+      "file": "skills/BIDM.json"
+    },
+    {
+      "code": "SALE",
+      "name": "Vendas",
+      "category": "Relacionamento e engajamento",
+      "subcategory": "Vendas e gerenciamento de propostas",
+      "file": "skills/SALE.json"
+    },
+    {
+      "code": "SSUP",
+      "name": "Suporte a vendas",
+      "category": "Relacionamento e engajamento",
+      "subcategory": "Vendas e gerenciamento de propostas",
+      "file": "skills/SSUP.json"
+    },
+    {
+      "code": "MKTG",
+      "name": "Gestão de Marketing",
+      "category": "Relacionamento e engajamento",
+      "subcategory": "Marketing",
+      "file": "skills/MKTG.json"
+    },
+    {
+      "code": "MRCH",
+      "name": "Pesquisa de mercado",
+      "category": "Relacionamento e engajamento",
+      "subcategory": "Marketing",
+      "file": "skills/MRCH.json"
+    },
+    {
+      "code": "BRMG",
+      "name": "Gestão de marca",
+      "category": "Relacionamento e engajamento",
+      "subcategory": "Marketing",
+      "file": "skills/BRMG.json"
+    },
+    {
+      "code": "MKCM",
+      "name": "Gestão de campanhas de marketing",
+      "category": "Relacionamento e engajamento",
+      "subcategory": "Marketing",
+      "file": "skills/MKCM.json"
+    },
+    {
+      "code": "CELO",
+      "name": "Engajamento e fidelidade do cliente",
+      "category": "Relacionamento e engajamento",
+      "subcategory": "Marketing",
+      "file": "skills/CELO.json"
+    },
+    {
+      "code": "DIGM",
+      "name": "Marketing digital",
+      "category": "Relacionamento e engajamento",
+      "subcategory": "Marketing",
+      "file": "skills/DIGM.json"
+    }
+  ]
+}
