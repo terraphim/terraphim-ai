@@ -979,7 +979,8 @@ mod tests {
             Some(Arc::new(store)),
         );
 
-        let ctx = create_test_context_with_static_model("agent", "task", "opencode-go/limited-model");
+        let ctx =
+            create_test_context_with_static_model("agent", "task", "opencode-go/limited-model");
         let decision = engine.decide_route(&ctx, &BudgetVerdict::Uncapped).await;
 
         assert!(
@@ -1025,7 +1026,11 @@ mod tests {
             Some(Arc::new(store)),
         );
 
-        let ctx = create_test_context_with_static_model("agent", "implement feature", "opencode-go/fast-model");
+        let ctx = create_test_context_with_static_model(
+            "agent",
+            "implement feature",
+            "opencode-go/fast-model",
+        );
         let decision = engine.decide_route(&ctx, &BudgetVerdict::Uncapped).await;
 
         assert!(
