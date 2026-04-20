@@ -1,0 +1,23 @@
+# Fixture with a banned provider -- migration must exit non-zero.
+working_dir = "/home/alex/projects/example"
+restart_cooldown_secs = 300
+max_restart_count = 3
+tick_interval_secs = 30
+
+[nightwatch]
+eval_interval_secs = 300
+minor_threshold = 0.10
+moderate_threshold = 0.20
+severe_threshold = 0.40
+critical_threshold = 0.70
+
+[compound_review]
+schedule = "0 2 * * *"
+repo_path = "/home/alex/projects/example"
+
+[[agents]]
+name = "bad-agent"
+layer = "Core"
+cli_tool = "/home/alex/.bun/bin/opencode"
+model = "opencode/gpt-4o"
+task = "Do something."
