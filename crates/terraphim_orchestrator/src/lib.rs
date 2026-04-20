@@ -3485,19 +3485,43 @@ impl AgentOrchestrator {
         completion_events
     }
 
-    /// Record parsed telemetry events into the telemetry store and cost tracker.
+    /// Record parsed telemetry events into the telemetry store, per-agent
+    /// cost tracker, and (when configured) the provider-level hour/day
+    /// budget tracker.
     ///
     /// Cost accounting is performed per-agent before the batch write so that
     /// agent-level spend is still tracked individually. The telemetry store
-    /// write uses a single lock acquisition via `record_batch`.
+    /// write uses a single lock acquisition via `record_batch`. Provider
+    /// budget spend is folded in during the same iteration so Layer 3 of
+    /// the subscription gate actually sees real dispatch cost.
     async fn record_telemetry(
         &self,
         events: Vec<(String, control_plane::telemetry::CompletionEvent)>,
     ) {
-        // Record costs per-agent first (no lock involved).
         for (agent_name, event) in &events {
             if event.cost_usd > 0.0 {
                 self.cost_tracker.record_cost(agent_name, event.cost_usd);
+
+                if let Some(tracker) = self.provider_budget_tracker.as_ref() {
+                    if let Some(provider_key) =
+                        provider_budget::provider_key_for_model(&event.model)
+                    {
+                        let verdict = tracker.record_cost(provider_key, event.cost_usd);
+                        if matches!(
+                            verdict,
+                            cost_tracker::BudgetVerdict::Exhausted { .. }
+                                | cost_tracker::BudgetVerdict::NearExhaustion { .. }
+                        ) {
+                            warn!(
+                                provider = provider_key,
+                                agent = agent_name.as_str(),
+                                cost_usd = event.cost_usd,
+                                verdict = ?verdict,
+                                "provider budget pressure recorded"
+                            );
+                        }
+                    }
+                }
             }
         }
         // Write all events in one lock acquisition.
@@ -3828,6 +3852,25 @@ impl AgentOrchestrator {
     #[doc(hidden)]
     pub fn telemetry_store(&self) -> &control_plane::TelemetryStore {
         &self.telemetry_store
+    }
+
+    /// Test helper: access the provider budget tracker (if any).
+    #[doc(hidden)]
+    pub fn provider_budget_tracker(
+        &self,
+    ) -> Option<&Arc<provider_budget::ProviderBudgetTracker>> {
+        self.provider_budget_tracker.as_ref()
+    }
+
+    /// Test helper: drive `record_telemetry` from outside the crate so
+    /// integration tests can verify the cost-tracker / provider-budget
+    /// wiring without starting the full reconcile loop.
+    #[doc(hidden)]
+    pub async fn record_telemetry_for_test(
+        &self,
+        events: Vec<(String, control_plane::telemetry::CompletionEvent)>,
+    ) {
+        self.record_telemetry(events).await
     }
 }
 
