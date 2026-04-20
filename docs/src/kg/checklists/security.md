@@ -10,22 +10,22 @@ checklist:: authentication, authorization, input validation, encryption, logging
 ### authentication
 Proper authentication mechanisms must be in place.
 
-synonyms:: auth, login, identity verification, credentials
+synonyms:: identity verification, user login
 
 ### authorization
 Authorization and access control must be implemented.
 
-synonyms:: access control, permissions, roles, rbac
+synonyms:: access control, rbac policy
 
 ### input_validation
 All user inputs must be validated and sanitized.
 
-synonyms:: input sanitization, validation, user input, sanitize
+synonyms:: input sanitization, user input validation
 
 ### encryption
 Sensitive data must be encrypted.
 
-synonyms:: encrypt, encrypted, ssl, tls, https
+synonyms:: tls encryption, ssl encryption, encryption at rest
 
 ### logging
 Security-relevant events must be logged.

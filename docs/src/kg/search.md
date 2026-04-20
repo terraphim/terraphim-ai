@@ -2,4 +2,4 @@
 
 Search functionality and document retrieval.
 
-synonyms:: query, find, lookup, retrieval
+synonyms:: document retrieval, keyword lookup
