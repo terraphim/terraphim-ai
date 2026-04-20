@@ -1159,18 +1159,32 @@ mod tests {
 
     #[tokio::test]
     async fn test_spawn_with_working_dir_override() {
+        use std::os::unix::fs::PermissionsExt;
         use tempfile::TempDir;
 
         let tmpdir = TempDir::new().expect("create tempdir");
         let tmppath = tmpdir.path().to_path_buf();
 
-        // Provider runs /bin/pwd so the child prints its cwd.
+        // Write a tiny shell script that sleeps briefly before printing pwd.
+        // The sleep is load-bearing: it gives the test time to call
+        // `subscribe_output` after `spawn().await` returns. `OutputCapture`
+        // uses a tokio broadcast channel which drops messages emitted before
+        // any subscriber exists, so a fast `/bin/pwd` could complete and
+        // drop its line on the floor between spawn and subscribe. The
+        // validator only accepts a single executable path, so we cannot
+        // pass `sh -c '...'` as cli_command.
+        let script_path = tmpdir.path().join("pwd-with-delay.sh");
+        std::fs::write(&script_path, "#!/bin/sh\nsleep 0.2\npwd\n").expect("write pwd script");
+        let mut perms = std::fs::metadata(&script_path).unwrap().permissions();
+        perms.set_mode(0o755);
+        std::fs::set_permissions(&script_path, perms).expect("chmod script");
+
         let provider = Provider::new(
             "@pwd-agent",
             "Pwd Agent",
             terraphim_types::capability::ProviderType::Agent {
                 agent_id: "@pwd".to_string(),
-                cli_command: "/bin/pwd".to_string(),
+                cli_command: script_path.to_string_lossy().to_string(),
                 working_dir: PathBuf::from("/tmp"),
             },
             vec![terraphim_types::capability::Capability::CodeGeneration],
@@ -1179,22 +1193,27 @@ mod tests {
         let spawner = AgentSpawner::new().with_working_dir("/tmp");
         let ctx = SpawnContext::with_working_dir(tmppath.clone());
 
-        // Subscribe before spawn so we don't miss events from a fast process.
         let handle = spawner
             .spawn(&provider, ".", ctx)
             .await
             .expect("spawn with working_dir override should succeed");
 
         let mut rx = handle.subscribe_output();
-
-        // Give pwd time to run and the capture task to broadcast its line.
-        tokio::time::sleep(Duration::from_millis(300)).await;
-
-        let mut found = false;
         let resolved = std::fs::canonicalize(&tmppath).unwrap_or(tmppath.clone());
+
+        // Drain output events until either the matching cwd line arrives,
+        // the broadcast closes (sender dropped after capture finished), or
+        // a generous overall timeout fires. recv() rather than try_recv()
+        // blocks for actual output instead of polling-with-sleep.
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(3);
+        let mut found = false;
         loop {
-            match rx.try_recv() {
-                Ok(OutputEvent::Stdout { line, .. }) => {
+            let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+            if remaining.is_zero() {
+                break;
+            }
+            match tokio::time::timeout(remaining, rx.recv()).await {
+                Ok(Ok(OutputEvent::Stdout { line, .. })) => {
                     let trimmed = line.trim();
                     if trimmed == resolved.to_string_lossy().as_ref()
                         || trimmed == tmppath.to_string_lossy().as_ref()
@@ -1203,9 +1222,9 @@ mod tests {
                         break;
                     }
                 }
-                Ok(_) => {}
-                Err(tokio::sync::broadcast::error::TryRecvError::Empty) => break,
-                Err(_) => break,
+                Ok(Ok(_)) => {}      // non-stdout event; keep draining
+                Ok(Err(_)) => break, // broadcast closed
+                Err(_) => break,     // timeout
             }
         }
 

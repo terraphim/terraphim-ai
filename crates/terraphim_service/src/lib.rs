@@ -14,8 +14,6 @@ mod score;
 use crate::score::Query;
 
 pub mod auto_route;
-#[allow(deprecated)]
-pub use auto_route::JMAP_MISSING_TOKEN_DOWNWEIGHT;
 pub use auto_route::{
     AutoRouteContext, AutoRouteReason, AutoRouteResult, JMAP_MISSING_TOKEN_PENALTY,
     auto_select_role,
