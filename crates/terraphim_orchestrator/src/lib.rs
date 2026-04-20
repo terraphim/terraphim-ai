@@ -3871,9 +3871,7 @@ impl AgentOrchestrator {
 
     /// Test helper: access the provider budget tracker (if any).
     #[doc(hidden)]
-    pub fn provider_budget_tracker(
-        &self,
-    ) -> Option<&Arc<provider_budget::ProviderBudgetTracker>> {
+    pub fn provider_budget_tracker(&self) -> Option<&Arc<provider_budget::ProviderBudgetTracker>> {
         self.provider_budget_tracker.as_ref()
     }
 
