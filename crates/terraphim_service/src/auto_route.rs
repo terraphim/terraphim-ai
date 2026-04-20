@@ -202,7 +202,7 @@ pub async fn auto_select_role(
 
     // Tie-break: prefer selected_role if it's in the tied set.
     if let Some(sel) = ctx.selected_role.as_ref() {
-        if tied.iter().any(|n| *n == sel) {
+        if tied.contains(&sel) {
             return AutoRouteResult {
                 role: sel.clone(),
                 score: top_score,
