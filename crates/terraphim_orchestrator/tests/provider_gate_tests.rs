@@ -116,7 +116,7 @@ fn hour_window_exhausts_and_recovers_next_hour() {
         id: "opencode-go".to_string(),
         max_hour_cents: Some(100),
         max_day_cents: None,
-    error_signatures: None,
+        error_signatures: None,
     }]);
     let t0 = Utc.with_ymd_and_hms(2026, 4, 19, 10, 30, 0).unwrap();
     let t_next = Utc.with_ymd_and_hms(2026, 4, 19, 11, 5, 0).unwrap();
@@ -247,7 +247,7 @@ async fn routing_drops_provider_budget_exhausted_candidate() {
         id: "opencode-go".to_string(),
         max_hour_cents: Some(50),
         max_day_cents: None,
-    error_signatures: None,
+        error_signatures: None,
     }]);
     let _ = tracker.record_cost("opencode-go", 1.00);
     assert!(
@@ -439,7 +439,7 @@ async fn record_telemetry_ignores_zero_cost_and_unknown_model() {
         id: "kimi-for-coding".to_string(),
         max_hour_cents: Some(100),
         max_day_cents: None,
-    error_signatures: None,
+        error_signatures: None,
     }];
     let config = budget_aware_config(
         providers,
