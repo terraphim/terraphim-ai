@@ -2045,6 +2045,31 @@ impl AgentOrchestrator {
                     }
                 }
             }
+            webhook::WebhookDispatch::ReviewPr {
+                pr_number,
+                project,
+                head_sha,
+                author_login,
+                title,
+                diff_loc,
+            } => {
+                info!(
+                    pr = pr_number,
+                    project = %project,
+                    head_sha = %head_sha,
+                    author = %author_login,
+                    diff_loc = diff_loc,
+                    "webhook: enqueuing ReviewPr dispatch task"
+                );
+                self.dispatcher.enqueue(dispatcher::DispatchTask::ReviewPr {
+                    pr_number,
+                    project,
+                    head_sha,
+                    author_login,
+                    title,
+                    diff_loc,
+                });
+            }
         }
     }
 
