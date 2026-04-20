@@ -3115,7 +3115,6 @@ mod tests {
                 knowledge: Some(0.8),
                 learning: Some(0.6),
                 synthesis: Some(0.7),
-                ..Default::default()
             }),
         };
 
@@ -3140,7 +3139,6 @@ mod tests {
             synonyms: None,
             route: None,
             priority: None,
-            ..Default::default()
         };
 
         let indexed = IndexedDocument::from_document(doc);
