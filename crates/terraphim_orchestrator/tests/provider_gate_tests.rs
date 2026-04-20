@@ -17,15 +17,21 @@
 //! public surface and catch any future visibility regressions.
 
 use chrono::{TimeZone, Utc};
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use terraphim_orchestrator::config::is_allowed_provider;
 use terraphim_orchestrator::control_plane::routing::{
     BudgetPressure, DispatchContext, RouteSource, RoutingDecisionEngine,
 };
+use terraphim_orchestrator::control_plane::telemetry::{CompletionEvent, TokenBreakdown};
 use terraphim_orchestrator::cost_tracker::{BudgetVerdict, CostTracker};
 use terraphim_orchestrator::provider_budget::{
     provider_has_budget, provider_key_for_model, ProviderBudgetConfig, ProviderBudgetTracker,
+};
+use terraphim_orchestrator::{
+    AgentDefinition, AgentLayer, AgentOrchestrator, CompoundReviewConfig, NightwatchConfig,
+    OrchestratorConfig,
 };
 
 fn dispatch_ctx_with_static(agent: &str, model: &str) -> DispatchContext {
@@ -266,6 +272,275 @@ async fn routing_drops_provider_budget_exhausted_candidate() {
         decision.rationale
     );
     assert_eq!(decision.budget_pressure, BudgetPressure::NoPressure);
+}
+
+// === Scenario 8: record_telemetry wiring drives ProviderBudgetTracker ====
+
+fn agent_with_model(name: &str, model: &str) -> AgentDefinition {
+    AgentDefinition {
+        name: name.to_string(),
+        layer: AgentLayer::Core,
+        cli_tool: "echo".to_string(),
+        task: "task".to_string(),
+        model: Some(model.to_string()),
+        schedule: None,
+        capabilities: vec![],
+        max_memory_bytes: None,
+        budget_monthly_cents: Some(10_000),
+        provider: None,
+        persona: None,
+        terraphim_role: None,
+        skill_chain: vec![],
+        sfia_skills: vec![],
+        fallback_provider: None,
+        fallback_model: None,
+        grace_period_secs: None,
+        max_cpu_seconds: None,
+        pre_check: None,
+        gitea_issue: None,
+        project: None,
+    }
+}
+
+fn budget_aware_config(
+    providers: Vec<ProviderBudgetConfig>,
+    state_file: Option<PathBuf>,
+    agents: Vec<AgentDefinition>,
+) -> OrchestratorConfig {
+    OrchestratorConfig {
+        working_dir: PathBuf::from("/tmp/terraphim-provider-budget-test"),
+        nightwatch: NightwatchConfig::default(),
+        compound_review: CompoundReviewConfig {
+            cli_tool: None,
+            provider: None,
+            model: None,
+            schedule: "0 2 * * *".to_string(),
+            max_duration_secs: 60,
+            repo_path: PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../.."),
+            create_prs: false,
+            worktree_root: PathBuf::from("/tmp/terraphim-provider-budget-test/.worktrees"),
+            base_branch: "main".to_string(),
+            max_concurrent_agents: 3,
+            ..Default::default()
+        },
+        workflow: None,
+        agents,
+        restart_cooldown_secs: 60,
+        max_restart_count: 10,
+        restart_budget_window_secs: 43_200,
+        disk_usage_threshold: 100,
+        tick_interval_secs: 30,
+        handoff_buffer_ttl_secs: None,
+        persona_data_dir: None,
+        skill_data_dir: None,
+        flows: vec![],
+        flow_state_dir: None,
+        gitea: None,
+        mentions: None,
+        webhook: None,
+        role_config_path: None,
+        routing: None,
+        #[cfg(feature = "quickwit")]
+        quickwit: None,
+        projects: vec![],
+        include: vec![],
+        providers,
+        provider_budget_state_file: state_file,
+    }
+}
+
+fn completion_event(model: &str, cost_usd: f64) -> CompletionEvent {
+    CompletionEvent {
+        model: model.to_string(),
+        session_id: "sess-1".to_string(),
+        completed_at: Utc::now(),
+        latency_ms: 100,
+        success: true,
+        tokens: TokenBreakdown::default(),
+        cost_usd,
+        error: None,
+    }
+}
+
+#[tokio::test]
+async fn record_telemetry_feeds_provider_budget_tracker() {
+    // Regression for the P1 "Layer 3 is read-only at runtime": feed
+    // telemetry events through the orchestrator's `record_telemetry`
+    // and confirm the provider budget tracker observes the spend.
+    let providers = vec![ProviderBudgetConfig {
+        id: "opencode-go".to_string(),
+        max_hour_cents: Some(50),
+        max_day_cents: Some(200),
+    }];
+    let config = budget_aware_config(
+        providers,
+        None,
+        vec![agent_with_model("worker", "opencode-go/minimax-m2.5")],
+    );
+
+    let orch = AgentOrchestrator::new(config).expect("build orchestrator");
+    let tracker = orch
+        .provider_budget_tracker()
+        .cloned()
+        .expect("tracker must be constructed when [[providers]] is set");
+
+    // Sanity: nothing recorded yet, budget is healthy.
+    assert_eq!(tracker.check("opencode-go"), BudgetVerdict::WithinBudget);
+
+    // Feed a real CompletionEvent: $0.40 to opencode-go. Below the $0.50
+    // cap so verdict stays WithinBudget but `sub_cents` must update.
+    orch.record_telemetry_for_test(vec![(
+        "worker".to_string(),
+        completion_event("opencode-go/minimax-m2.5", 0.40),
+    )])
+    .await;
+
+    let snap_1 = tracker.snapshot();
+    let entry_1 = snap_1
+        .providers
+        .get("opencode-go")
+        .expect("provider state must exist after telemetry wire-up");
+    assert_eq!(
+        entry_1.hour.sub_cents, 4_000,
+        "record_telemetry must route $0.40 into the hour bucket"
+    );
+    assert_eq!(entry_1.day.sub_cents, 4_000);
+
+    // Feed another event that should push the hour cap over; the
+    // routing-side `check()` must now observe Exhausted.
+    orch.record_telemetry_for_test(vec![(
+        "worker".to_string(),
+        completion_event("opencode-go/minimax-m2.5", 0.30),
+    )])
+    .await;
+
+    assert!(
+        matches!(
+            tracker.check("opencode-go"),
+            BudgetVerdict::Exhausted { .. }
+        ),
+        "second record must tip the hour cap to Exhausted; snapshot={:?}",
+        tracker.snapshot()
+    );
+}
+
+#[tokio::test]
+async fn record_telemetry_ignores_zero_cost_and_unknown_model() {
+    // zero-cost events must be a no-op; unknown bare models silently
+    // feed their own synthetic key (rather than panicking or mis-routing).
+    let providers = vec![ProviderBudgetConfig {
+        id: "kimi-for-coding".to_string(),
+        max_hour_cents: Some(100),
+        max_day_cents: None,
+    }];
+    let config = budget_aware_config(
+        providers,
+        None,
+        vec![agent_with_model("worker", "kimi-for-coding/k2p5")],
+    );
+    let orch = AgentOrchestrator::new(config).expect("build orchestrator");
+    let tracker = orch
+        .provider_budget_tracker()
+        .cloned()
+        .expect("tracker must be constructed");
+
+    // Zero cost event -- no spend recorded.
+    orch.record_telemetry_for_test(vec![(
+        "worker".to_string(),
+        completion_event("kimi-for-coding/k2p5", 0.0),
+    )])
+    .await;
+    assert_eq!(
+        tracker
+            .snapshot()
+            .providers
+            .get("kimi-for-coding")
+            .map(|e| e.hour.sub_cents)
+            .unwrap_or(0),
+        0
+    );
+
+    // Model whose provider is not in [[providers]] -- should not
+    // poison the tracker state for providers we *do* track.
+    orch.record_telemetry_for_test(vec![(
+        "worker".to_string(),
+        completion_event("opencode-go/minimax-m2.5", 0.25),
+    )])
+    .await;
+    assert_eq!(
+        tracker
+            .snapshot()
+            .providers
+            .get("kimi-for-coding")
+            .map(|e| e.hour.sub_cents)
+            .unwrap_or(0),
+        0,
+        "unrelated provider spend must not land in kimi-for-coding's bucket"
+    );
+}
+
+// === Scenario 9: persistence across a simulated restart ==================
+
+#[tokio::test]
+async fn provider_budget_persistence_round_trip_via_orchestrator() {
+    // Drive the tracker through the orchestrator, persist, then build
+    // a new orchestrator from the same config + state file and verify
+    // the counters carry across the "restart".
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    let state_path = tmp.path().to_path_buf();
+    drop(tmp);
+
+    let providers = vec![ProviderBudgetConfig {
+        id: "opencode-go".to_string(),
+        max_hour_cents: Some(500),
+        max_day_cents: Some(2_000),
+    }];
+
+    // Session 1: spend + persist.
+    {
+        let config = budget_aware_config(
+            providers.clone(),
+            Some(state_path.clone()),
+            vec![agent_with_model("worker", "opencode-go/minimax-m2.5")],
+        );
+        let orch = AgentOrchestrator::new(config).expect("build orchestrator");
+        orch.record_telemetry_for_test(vec![(
+            "worker".to_string(),
+            completion_event("opencode-go/minimax-m2.5", 1.23),
+        )])
+        .await;
+        // Explicit persist to mimic the reconcile-tick flush.
+        orch.provider_budget_tracker()
+            .expect("tracker")
+            .persist()
+            .expect("persist must succeed");
+    }
+
+    // Session 2: rebuild from config + state; counters must survive.
+    let config2 = budget_aware_config(
+        providers,
+        Some(state_path.clone()),
+        vec![agent_with_model("worker", "opencode-go/minimax-m2.5")],
+    );
+    let orch2 = AgentOrchestrator::new(config2).expect("rebuild orchestrator");
+    let snap = orch2
+        .provider_budget_tracker()
+        .expect("tracker present on restart")
+        .snapshot();
+    let entry = snap
+        .providers
+        .get("opencode-go")
+        .expect("state must be reloaded");
+    assert_eq!(
+        entry.hour.sub_cents, 12_300,
+        "hour bucket must survive restart"
+    );
+    assert_eq!(
+        entry.day.sub_cents, 12_300,
+        "day bucket must survive restart"
+    );
+
+    let _ = std::fs::remove_file(&state_path);
 }
 
 // === Helper: provider_key_for_model edges =================================
