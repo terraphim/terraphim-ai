@@ -142,6 +142,14 @@ pub struct OrchestratorConfig {
     /// to the base config file's parent directory.
     #[serde(default)]
     pub include: Vec<String>,
+    /// Per-provider spend caps for hour / day tumbling UTC windows.
+    /// Empty means no provider-level budget gating.
+    #[serde(default)]
+    pub providers: Vec<crate::provider_budget::ProviderBudgetConfig>,
+    /// Optional path for persisting ProviderBudgetTracker state across
+    /// restarts. Ignored when `providers` is empty.
+    #[serde(default)]
+    pub provider_budget_state_file: Option<PathBuf>,
 }
 
 /// Configuration for KG-driven model routing.
@@ -706,7 +714,7 @@ struct IncludeFragment {
 /// Any `model` or `fallback_model` string with a `/`-prefixed provider
 /// name must appear in this list; bare names (`sonnet`, `opus`) are
 /// interpreted as claude-code CLI targets and always allowed.
-pub(crate) const ALLOWED_PROVIDER_PREFIXES: &[&str] = &[
+pub const ALLOWED_PROVIDER_PREFIXES: &[&str] = &[
     "claude-code",
     "opencode-go",
     "kimi-for-coding",
@@ -718,7 +726,7 @@ pub(crate) const ALLOWED_PROVIDER_PREFIXES: &[&str] = &[
 /// at load time so a misconfigured fleet never reaches a pay-per-use
 /// provider at runtime. Note `minimax/` is banned but the
 /// `minimax-coding-plan/` subscription variant remains allowed.
-pub(crate) const BANNED_PROVIDER_PREFIXES: &[&str] = &[
+pub const BANNED_PROVIDER_PREFIXES: &[&str] = &[
     "opencode",
     "github-copilot",
     "google",
@@ -727,10 +735,46 @@ pub(crate) const BANNED_PROVIDER_PREFIXES: &[&str] = &[
 ];
 
 /// Bare model names routed through claude-code CLI (no explicit provider prefix).
-pub(crate) const CLAUDE_CLI_BARE_MODELS: &[&str] = &["sonnet", "opus", "haiku"];
+pub const CLAUDE_CLI_BARE_MODELS: &[&str] = &["sonnet", "opus", "haiku"];
 
 /// Anthropic-branded bare models that map onto the claude-code CLI.
-pub(crate) const ANTHROPIC_BARE_PROVIDERS: &[&str] = &["anthropic"];
+pub const ANTHROPIC_BARE_PROVIDERS: &[&str] = &["anthropic"];
+
+/// Runtime check: is this model's provider prefix in the allowed subscription
+/// set? Returns `true` for known bare names (routed through claude-code CLI
+/// or explicitly listed in [`ALLOWED_PROVIDER_PREFIXES`]) and for strings
+/// whose `/`-delimited prefix appears in [`ALLOWED_PROVIDER_PREFIXES`].
+/// Anthropic-branded bare models also pass.
+///
+/// This is an explicit allow-list: unknown bare names (including bare banned
+/// ids like `"minimax"`) are rejected. Matches prefixes by exact equality --
+/// `opencode-go` is allowed, `opencode` is banned, `minimax-coding-plan` is
+/// allowed, `minimax` is banned.
+///
+/// Accepts either the full `provider/model` string (e.g. `kimi-for-coding/k2p5`)
+/// or a bare provider id (e.g. `opencode-go`).
+pub fn is_allowed_provider(provider_or_model: &str) -> bool {
+    // `/`-prefixed form: check the prefix against the explicit allow-list.
+    if let Some((prefix, _)) = provider_or_model.split_once('/') {
+        if ANTHROPIC_BARE_PROVIDERS.contains(&prefix) {
+            return true;
+        }
+        // Exact prefix match. Banned prefixes take precedence so
+        // `minimax/` is rejected even though `minimax-coding-plan/` is allowed.
+        if BANNED_PROVIDER_PREFIXES.contains(&prefix) {
+            return false;
+        }
+        return ALLOWED_PROVIDER_PREFIXES.contains(&prefix);
+    }
+
+    // Bare name (no slash): explicit allow-list only. Previously this
+    // branch fell through to `true` for any unknown id, which meant a
+    // bare banned id (e.g. `model = "minimax"`) silently passed. Now
+    // every bare name must appear in one of the known-safe lists.
+    CLAUDE_CLI_BARE_MODELS.contains(&provider_or_model)
+        || ANTHROPIC_BARE_PROVIDERS.contains(&provider_or_model)
+        || ALLOWED_PROVIDER_PREFIXES.contains(&provider_or_model)
+}
 
 /// Validate that a `model` / `fallback_model` string routes through an
 /// allowed subscription provider. Returns `Ok(())` for allowed strings,
@@ -742,12 +786,20 @@ pub(crate) fn validate_model_provider(
 ) -> Result<(), crate::error::OrchestratorError> {
     // Bare names like "sonnet", "opus", "haiku" -> claude-code CLI.
     if !model.contains('/') {
-        if CLAUDE_CLI_BARE_MODELS.contains(&model) {
+        if CLAUDE_CLI_BARE_MODELS.contains(&model)
+            || ANTHROPIC_BARE_PROVIDERS.contains(&model)
+            || ALLOWED_PROVIDER_PREFIXES.contains(&model)
+        {
             return Ok(());
         }
-        // Unknown bare name: let it through -- claude-code CLI will accept
-        // it if valid. We only need to block banned /-prefixed providers.
-        return Ok(());
+        // Unknown bare name: treat as banned. A bare id like `"minimax"`
+        // must not slip through just because the operator omitted the
+        // slash; operators have to opt in via an explicit allow-list entry.
+        return Err(crate::error::OrchestratorError::BannedProvider {
+            agent: agent_name.to_string(),
+            provider: model.to_string(),
+            field: field.to_string(),
+        });
     }
 
     let prefix = model.split('/').next().unwrap_or("");
@@ -1924,5 +1976,92 @@ task = "t"
         // Flows should be empty by default
         assert!(config.flows.is_empty());
         assert!(config.flow_state_dir.is_none());
+    }
+
+    // --- is_allowed_provider: C1/C3 runtime gate ---
+
+    #[test]
+    fn test_is_allowed_provider_c1_allowed_prefixes() {
+        // Every prefix in ALLOWED_PROVIDER_PREFIXES must pass in `provider/model` form.
+        assert!(is_allowed_provider("claude-code/sonnet-4.5"));
+        assert!(is_allowed_provider("opencode-go/kimi-k2.5"));
+        assert!(is_allowed_provider("kimi-for-coding/k2p5"));
+        assert!(is_allowed_provider("minimax-coding-plan/MiniMax-M2.5"));
+        assert!(is_allowed_provider("zai-coding-plan/glm-4.6"));
+    }
+
+    #[test]
+    fn test_is_allowed_provider_c3_banned_prefixes() {
+        // Every prefix in BANNED_PROVIDER_PREFIXES must be rejected.
+        assert!(!is_allowed_provider("opencode/whatever"));
+        assert!(!is_allowed_provider("github-copilot/gpt-4.1"));
+        assert!(!is_allowed_provider("google/gemini-2.5"));
+        assert!(!is_allowed_provider("huggingface/llama-3"));
+        assert!(!is_allowed_provider("minimax/MiniMax-M2.5"));
+    }
+
+    #[test]
+    fn test_is_allowed_provider_c3_prefix_boundary() {
+        // Exact prefix match: banned `opencode` must not shadow allowed
+        // `opencode-go`; banned `minimax` must not shadow `minimax-coding-plan`.
+        assert!(is_allowed_provider("opencode-go/any"));
+        assert!(!is_allowed_provider("opencode/any"));
+        assert!(is_allowed_provider("minimax-coding-plan/any"));
+        assert!(!is_allowed_provider("minimax/any"));
+    }
+
+    #[test]
+    fn test_is_allowed_provider_bare_claude_cli() {
+        // Bare model names route through claude-code CLI and pass.
+        assert!(is_allowed_provider("sonnet"));
+        assert!(is_allowed_provider("opus"));
+        assert!(is_allowed_provider("haiku"));
+        assert!(is_allowed_provider("anthropic"));
+    }
+
+    #[test]
+    fn test_is_allowed_provider_bare_allowed_id() {
+        // Bare provider ids that appear in the allow-list pass.
+        assert!(is_allowed_provider("claude-code"));
+        assert!(is_allowed_provider("opencode-go"));
+        assert!(is_allowed_provider("kimi-for-coding"));
+    }
+
+    #[test]
+    fn test_is_allowed_provider_anthropic_prefixed() {
+        // `anthropic/<model>` routes through claude-code CLI and must pass.
+        assert!(is_allowed_provider("anthropic/claude-3.5-sonnet"));
+        assert!(is_allowed_provider("anthropic/claude-opus-4"));
+    }
+
+    #[test]
+    fn test_is_allowed_provider_rejects_unknown_bare_names() {
+        // P1 fix: bare banned ids must now reject. Previously any bare
+        // string was waved through, so `model = "minimax"` silently
+        // bypassed the C3 banlist.
+        assert!(!is_allowed_provider("minimax"));
+        assert!(!is_allowed_provider("opencode"));
+        assert!(!is_allowed_provider("google"));
+        assert!(!is_allowed_provider("github-copilot"));
+        assert!(!is_allowed_provider("huggingface"));
+        // And any other unknown bare id.
+        assert!(!is_allowed_provider("unknown"));
+        assert!(!is_allowed_provider(""));
+    }
+
+    #[test]
+    fn test_validate_model_provider_rejects_bare_banned() {
+        // The load-time check must also refuse bare banned ids -- the
+        // runtime filter alone cannot catch them if the validator waves
+        // the config through at startup.
+        let err = validate_model_provider("bare-banned", "model", "minimax")
+            .expect_err("bare 'minimax' must be rejected");
+        assert!(matches!(
+            err,
+            crate::error::OrchestratorError::BannedProvider { .. }
+        ));
+        // And the allowed bare forms still pass.
+        validate_model_provider("ok", "model", "sonnet").expect("sonnet is a bare claude CLI");
+        validate_model_provider("ok", "model", "anthropic").expect("anthropic bare passes");
     }
 }

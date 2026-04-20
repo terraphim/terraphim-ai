@@ -48,6 +48,7 @@ pub mod mode;
 pub mod nightwatch;
 pub mod output_poster;
 pub mod persona;
+pub mod provider_budget;
 pub mod provider_probe;
 #[cfg(feature = "quickwit")]
 pub mod quickwit;
@@ -227,6 +228,9 @@ pub struct AgentOrchestrator {
     provider_health: provider_probe::ProviderHealthMap,
     /// Live telemetry store for model performance tracking from CLI output.
     telemetry_store: control_plane::TelemetryStore,
+    /// Per-provider hour/day spend tracker consulted by the routing
+    /// engine. `None` when the config declares no [[providers]] entries.
+    provider_budget_tracker: Option<Arc<provider_budget::ProviderBudgetTracker>>,
 }
 
 /// Build the composite restart-state key for an agent definition.
@@ -240,6 +244,40 @@ fn agent_key(def: &AgentDefinition) -> (String, String) {
             .unwrap_or_else(|| crate::dispatcher::LEGACY_PROJECT_ID.to_string()),
         def.name.clone(),
     )
+}
+
+/// Build the optional provider-level hour/day budget tracker from the
+/// [[providers]] config block. Returns `Ok(None)` when no providers are
+/// declared (no cap = no tracker, routing works unchanged).
+fn build_provider_budget_tracker(
+    config: &OrchestratorConfig,
+) -> Result<Option<Arc<provider_budget::ProviderBudgetTracker>>, OrchestratorError> {
+    if config.providers.is_empty() {
+        if config.provider_budget_state_file.is_some() {
+            warn!("provider_budget_state_file set but no [[providers]] entries; tracker disabled");
+        }
+        return Ok(None);
+    }
+    let tracker = match config.provider_budget_state_file.as_ref() {
+        Some(path) => provider_budget::ProviderBudgetTracker::with_persistence(
+            config.providers.clone(),
+            path.clone(),
+        )
+        .map_err(|e| {
+            OrchestratorError::Config(format!(
+                "failed to load provider budget state from {}: {}",
+                path.display(),
+                e
+            ))
+        })?,
+        None => provider_budget::ProviderBudgetTracker::new(config.providers.clone()),
+    };
+    info!(
+        providers = tracker.providers().collect::<Vec<_>>().join(","),
+        persistence = ?config.provider_budget_state_file,
+        "provider budget tracker initialised"
+    );
+    Ok(Some(Arc::new(tracker)))
 }
 
 /// Build the per-project runtime map consumed by
@@ -464,6 +502,8 @@ impl AgentOrchestrator {
 
         let telemetry_store = control_plane::TelemetryStore::new(3600);
 
+        let provider_budget_tracker = build_provider_budget_tracker(&config)?;
+
         #[cfg(not(test))]
         let restart_state = Self::load_restart_state();
 
@@ -520,6 +560,7 @@ impl AgentOrchestrator {
             kg_router,
             provider_health,
             telemetry_store,
+            provider_budget_tracker,
         })
     }
 
@@ -791,6 +832,11 @@ impl AgentOrchestrator {
 
         // Graceful shutdown of all agents
         self.persist_telemetry();
+        if let Some(tracker) = self.provider_budget_tracker.as_ref() {
+            if let Err(e) = tracker.persist() {
+                warn!(error = %e, "failed to persist provider budget snapshot during shutdown");
+            }
+        }
         self.shutdown_all_agents().await;
         Ok(())
     }
@@ -1136,6 +1182,29 @@ impl AgentOrchestrator {
             }
         }
 
+        // === BUDGET GATE ===
+        // Skip spawn entirely if the agent's monthly budget is exhausted.
+        // CostTracker::check is already called during routing (for budget
+        // pressure scoring), but routing only deprioritises cheaper models;
+        // it does not short-circuit dispatch. A fully exhausted agent must
+        // not run at all this cycle.
+        let budget_check = self.cost_tracker.check(&def.name);
+        if budget_check.should_pause() {
+            warn!(
+                agent = %def.name,
+                verdict = %budget_check,
+                "skipping spawn: monthly budget exhausted"
+            );
+            return Ok(());
+        }
+        if budget_check.should_warn() {
+            warn!(
+                agent = %def.name,
+                verdict = %budget_check,
+                "budget near exhaustion; routing will prefer cheaper models"
+            );
+        }
+
         // === PRE-CHECK GATE ===
         let pre_check_result = self.run_pre_check(def).await;
         let findings = match pre_check_result {
@@ -1178,11 +1247,12 @@ impl AgentOrchestrator {
                 .map(|r| std::sync::Arc::new(r.clone()));
             let unhealthy = self.provider_health.unhealthy_providers();
             let telemetry_arc = std::sync::Arc::new(self.telemetry_store.clone());
-            let engine = control_plane::RoutingDecisionEngine::new(
+            let engine = control_plane::RoutingDecisionEngine::with_provider_budget(
                 kg_arc,
                 unhealthy,
                 terraphim_router::Router::new(),
                 Some(telemetry_arc),
+                self.provider_budget_tracker.clone(),
             );
             let ctx = control_plane::DispatchContext {
                 agent_name: def.name.clone(),
@@ -2955,6 +3025,16 @@ impl AgentOrchestrator {
         if self.tick_count % 60 == 0 {
             self.persist_telemetry();
         }
+
+        // 16. Flush provider-budget snapshot. The tracker accumulates in
+        // memory via record_telemetry; persist here so hour/day counters
+        // carry across restarts (cf. with_persistence at construction).
+        // Skip when no tracker was configured.
+        if let Some(tracker) = self.provider_budget_tracker.as_ref() {
+            if let Err(e) = tracker.persist() {
+                warn!(error = %e, "failed to persist provider budget snapshot");
+            }
+        }
     }
 
     /// Check all agent budgets and pause any that have exceeded their limits.
@@ -3593,19 +3673,43 @@ impl AgentOrchestrator {
         completion_events
     }
 
-    /// Record parsed telemetry events into the telemetry store and cost tracker.
+    /// Record parsed telemetry events into the telemetry store, per-agent
+    /// cost tracker, and (when configured) the provider-level hour/day
+    /// budget tracker.
     ///
     /// Cost accounting is performed per-agent before the batch write so that
     /// agent-level spend is still tracked individually. The telemetry store
-    /// write uses a single lock acquisition via `record_batch`.
+    /// write uses a single lock acquisition via `record_batch`. Provider
+    /// budget spend is folded in during the same iteration so Layer 3 of
+    /// the subscription gate actually sees real dispatch cost.
     async fn record_telemetry(
         &self,
         events: Vec<(String, control_plane::telemetry::CompletionEvent)>,
     ) {
-        // Record costs per-agent first (no lock involved).
         for (agent_name, event) in &events {
             if event.cost_usd > 0.0 {
                 self.cost_tracker.record_cost(agent_name, event.cost_usd);
+
+                if let Some(tracker) = self.provider_budget_tracker.as_ref() {
+                    if let Some(provider_key) =
+                        provider_budget::provider_key_for_model(&event.model)
+                    {
+                        let verdict = tracker.record_cost(provider_key, event.cost_usd);
+                        if matches!(
+                            verdict,
+                            cost_tracker::BudgetVerdict::Exhausted { .. }
+                                | cost_tracker::BudgetVerdict::NearExhaustion { .. }
+                        ) {
+                            warn!(
+                                provider = provider_key,
+                                agent = agent_name.as_str(),
+                                cost_usd = event.cost_usd,
+                                verdict = ?verdict,
+                                "provider budget pressure recorded"
+                            );
+                        }
+                    }
+                }
             }
         }
         // Write all events in one lock acquisition.
@@ -3937,6 +4041,23 @@ impl AgentOrchestrator {
     pub fn telemetry_store(&self) -> &control_plane::TelemetryStore {
         &self.telemetry_store
     }
+
+    /// Test helper: access the provider budget tracker (if any).
+    #[doc(hidden)]
+    pub fn provider_budget_tracker(&self) -> Option<&Arc<provider_budget::ProviderBudgetTracker>> {
+        self.provider_budget_tracker.as_ref()
+    }
+
+    /// Test helper: drive `record_telemetry` from outside the crate so
+    /// integration tests can verify the cost-tracker / provider-budget
+    /// wiring without starting the full reconcile loop.
+    #[doc(hidden)]
+    pub async fn record_telemetry_for_test(
+        &self,
+        events: Vec<(String, control_plane::telemetry::CompletionEvent)>,
+    ) {
+        self.record_telemetry(events).await
+    }
 }
 
 /// Check whether any changed file matches any of the watch path prefixes.
@@ -4052,6 +4173,8 @@ mod tests {
             quickwit: None,
             projects: vec![],
             include: vec![],
+            providers: vec![],
+            provider_budget_state_file: None,
         }
     }
 
@@ -4276,6 +4399,8 @@ task = "test"
             quickwit: None,
             projects: vec![],
             include: vec![],
+            providers: vec![],
+            provider_budget_state_file: None,
         }
     }
 
@@ -4950,5 +5075,81 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             "body should contain backslash, got: {}",
             result
         );
+    }
+
+    /// An agent whose monthly budget is exhausted must skip spawn entirely.
+    /// `CostTracker::check()` returning `Exhausted` short-circuits
+    /// dispatch before pre-check or routing runs.
+    #[tokio::test]
+    async fn test_spawn_agent_skips_when_budget_exhausted() {
+        let mut config = test_config_fast_lifecycle();
+        config.agents = vec![AgentDefinition {
+            name: "broke-agent".to_string(),
+            layer: AgentLayer::Safety,
+            cli_tool: "echo".to_string(),
+            task: "should not run".to_string(),
+            model: None,
+            schedule: None,
+            capabilities: vec![],
+            max_memory_bytes: None,
+            // $1 monthly budget.
+            budget_monthly_cents: Some(100),
+            provider: None,
+            persona: None,
+            terraphim_role: None,
+            skill_chain: vec![],
+            sfia_skills: vec![],
+            fallback_provider: None,
+            fallback_model: None,
+            grace_period_secs: None,
+            max_cpu_seconds: None,
+            pre_check: None,
+            gitea_issue: None,
+            project: None,
+        }];
+
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        // Blow through the budget before attempting to spawn.
+        let verdict = orch.cost_tracker.record_cost("broke-agent", 2.00);
+        assert!(
+            verdict.should_pause(),
+            "budget must be exhausted: {verdict}"
+        );
+
+        let def = orch.config.agents[0].clone();
+        let result = orch.spawn_agent(&def).await;
+
+        // Spawn should succeed-with-no-op rather than error.
+        assert!(result.is_ok(), "spawn returned error: {:?}", result);
+        // Agent must NOT have been added to active_agents.
+        assert!(
+            !orch.active_agents.contains_key("broke-agent"),
+            "exhausted agent should not have been spawned"
+        );
+    }
+
+    /// An agent with no budget cap (subscription) must spawn normally
+    /// even after recording cost -- `record_cost` returns `Uncapped`.
+    #[tokio::test]
+    async fn test_spawn_agent_runs_when_budget_uncapped() {
+        let mut config = test_config_fast_lifecycle();
+        // Ensure the only agent is uncapped.
+        config.agents[0].budget_monthly_cents = None;
+        config.agents[0].name = "subscription-agent".to_string();
+
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        // Even a large recorded spend must not pause an uncapped agent.
+        let _ = orch
+            .cost_tracker
+            .record_cost("subscription-agent", 9_999.00);
+        let verdict = orch.cost_tracker.check("subscription-agent");
+        assert!(!verdict.should_pause(), "uncapped must never pause");
+
+        let def = orch.config.agents[0].clone();
+        let result = orch.spawn_agent(&def).await;
+        assert!(result.is_ok(), "spawn errored: {:?}", result);
+        assert!(orch.active_agents.contains_key("subscription-agent"));
     }
 }

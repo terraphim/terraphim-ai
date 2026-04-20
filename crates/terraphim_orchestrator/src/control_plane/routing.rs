@@ -8,6 +8,7 @@
 use crate::control_plane::telemetry::TelemetryStore;
 use crate::cost_tracker::BudgetVerdict;
 use crate::kg_router::KgRouter;
+use crate::provider_budget::{provider_key_for_model, ProviderBudgetTracker};
 use std::path::PathBuf;
 use std::sync::Arc;
 use terraphim_types::capability::{CostLevel, Latency, Provider, ProviderType};
@@ -130,6 +131,10 @@ pub struct RoutingDecisionEngine {
     unhealthy_providers: Vec<String>,
     router: terraphim_router::Router,
     telemetry_store: Option<Arc<TelemetryStore>>,
+    /// Per-provider hour/day budget tracker. When present, candidates
+    /// whose provider verdict is `Exhausted` are stripped before scoring
+    /// and `NearExhaustion` entries are deprioritised.
+    provider_budget: Option<Arc<ProviderBudgetTracker>>,
 }
 
 impl RoutingDecisionEngine {
@@ -139,11 +144,28 @@ impl RoutingDecisionEngine {
         router: terraphim_router::Router,
         telemetry_store: Option<Arc<TelemetryStore>>,
     ) -> Self {
+        Self::with_provider_budget(
+            kg_router,
+            unhealthy_providers,
+            router,
+            telemetry_store,
+            None,
+        )
+    }
+
+    pub fn with_provider_budget(
+        kg_router: Option<Arc<KgRouter>>,
+        unhealthy_providers: Vec<String>,
+        router: terraphim_router::Router,
+        telemetry_store: Option<Arc<TelemetryStore>>,
+        provider_budget: Option<Arc<ProviderBudgetTracker>>,
+    ) -> Self {
         Self {
             kg_router,
             unhealthy_providers,
             router,
             telemetry_store,
+            provider_budget,
         }
     }
 
@@ -324,6 +346,70 @@ impl RoutingDecisionEngine {
             all_candidates.push(static_cand.clone());
         }
 
+        // Defence-in-depth: strip any candidate whose model prefix is not an
+        // allowed subscription provider. Load-time `validate()` already enforces
+        // C1/C3 but a malformed KG or telemetry store could still surface a
+        // banned target at runtime. Drop it before scoring so the engine
+        // cannot select a pay-per-use provider.
+        let before_filter = all_candidates.len();
+        all_candidates.retain(|cand| {
+            let allowed = crate::config::is_allowed_provider(&cand.model);
+            if !allowed {
+                tracing::warn!(
+                    agent = %ctx.agent_name,
+                    provider = %cand.provider.name,
+                    model = %cand.model,
+                    source = ?cand.source,
+                    "routing: dropped banned candidate (C1/C3 gate)"
+                );
+            }
+            allowed
+        });
+        let filtered_out = before_filter - all_candidates.len();
+
+        // Per-provider budget gate: drop candidates whose hourly or daily
+        // spend has exhausted its configured cap. `NearExhaustion` does
+        // not drop the candidate but is factored into the score below.
+        let mut budget_exhausted_keys: Vec<String> = Vec::new();
+        let mut near_exhaustion_keys: Vec<String> = Vec::new();
+        if let Some(tracker) = self.provider_budget.as_ref() {
+            let before_budget = all_candidates.len();
+            all_candidates.retain(|cand| {
+                let Some(key) = provider_key_for_model(&cand.model) else {
+                    return true;
+                };
+                match tracker.check(key) {
+                    BudgetVerdict::Exhausted { .. } => {
+                        if !budget_exhausted_keys.iter().any(|k| k == key) {
+                            budget_exhausted_keys.push(key.to_string());
+                        }
+                        tracing::warn!(
+                            agent = %ctx.agent_name,
+                            provider_key = %key,
+                            model = %cand.model,
+                            "routing: dropped provider-budget-exhausted candidate"
+                        );
+                        false
+                    }
+                    BudgetVerdict::NearExhaustion { .. } => {
+                        if !near_exhaustion_keys.iter().any(|k| k == key) {
+                            near_exhaustion_keys.push(key.to_string());
+                        }
+                        true
+                    }
+                    _ => true,
+                }
+            });
+            let budget_dropped = before_budget - all_candidates.len();
+            if budget_dropped > 0 {
+                tracing::info!(
+                    agent = %ctx.agent_name,
+                    dropped = budget_dropped,
+                    "routing: stripped provider-budget-exhausted candidates"
+                );
+            }
+        }
+
         if all_candidates.is_empty() {
             let candidate = RouteCandidate {
                 provider: make_agent_provider(&ctx.agent_name, &ctx.cli_tool),
@@ -332,12 +418,26 @@ impl RoutingDecisionEngine {
                 source: RouteSource::CliDefault,
                 confidence: 0.5,
             };
-            return RoutingDecision {
-                candidate: candidate.clone(),
-                rationale: format!(
+            let rationale = if filtered_out > 0 {
+                format!(
+                    "All {} candidate(s) filtered out by C1/C3 allow-list; using CLI default ({})",
+                    filtered_out, cli_name
+                )
+            } else if !budget_exhausted_keys.is_empty() {
+                format!(
+                    "All candidates dropped by provider-budget gate ({}); using CLI default ({})",
+                    budget_exhausted_keys.join(","),
+                    cli_name
+                )
+            } else {
+                format!(
                     "No routing signal matched; using CLI default ({})",
                     cli_name
-                ),
+                )
+            };
+            return RoutingDecision {
+                candidate: candidate.clone(),
+                rationale,
                 all_candidates: vec![candidate],
                 primary_available: false,
                 dominant_signal: RouteSource::CliDefault,
@@ -354,6 +454,21 @@ impl RoutingDecisionEngine {
             .iter()
             .map(|c| Self::score_candidate(c, pressure))
             .collect();
+
+        // Provider-budget near-exhaustion deprioritisation. Multiply the
+        // score by 0.6 so a candidate whose provider is 80%+ into its
+        // quota is still eligible but loses to a healthy alternative.
+        let mut provider_budget_influenced = false;
+        if !near_exhaustion_keys.is_empty() {
+            for (i, cand) in all_candidates.iter().enumerate() {
+                if let Some(key) = provider_key_for_model(&cand.model) {
+                    if near_exhaustion_keys.iter().any(|k| k == key) {
+                        pressured_scores[i] *= 0.6;
+                        provider_budget_influenced = true;
+                    }
+                }
+            }
+        }
 
         // Apply telemetry-based scoring adjustments
         let mut telemetry_influenced = false;
@@ -395,12 +510,13 @@ impl RoutingDecisionEngine {
         let winner = &all_candidates[winner_idx];
         let dominant_signal = winner.source.clone();
 
-        let budget_influenced = pressure != BudgetPressure::NoPressure
+        let agent_budget_influenced = pressure != BudgetPressure::NoPressure
             && no_pressure_scores.iter().enumerate().any(|(i, &s)| {
                 let was_winner = s >= no_pressure_scores[winner_idx];
                 let now_loses = pressured_scores[i] < pressured_scores[winner_idx];
                 was_winner && now_loses
             });
+        let budget_influenced = agent_budget_influenced || provider_budget_influenced;
 
         let mut rationale_parts = Vec::new();
 
@@ -429,8 +545,14 @@ impl RoutingDecisionEngine {
             signal_summary,
         );
 
-        if budget_influenced {
+        if agent_budget_influenced {
             rationale.push_str(". Budget pressure biased selection toward cheaper model");
+        }
+        if provider_budget_influenced {
+            rationale.push_str(&format!(
+                ". Provider near-exhaustion deprioritised: {}",
+                near_exhaustion_keys.join(","),
+            ));
         }
         if telemetry_influenced {
             rationale.push_str(". Telemetry data influenced selection");
@@ -520,15 +642,14 @@ mod tests {
     #[tokio::test]
     async fn test_static_model_selected_when_only_signal() {
         let engine = test_engine();
-        let ctx = create_test_context_with_static_model(
-            "test-agent",
-            "Implement a feature",
-            "claude-3-opus",
-        );
+        // Use an allow-list-conformant bare model -- `sonnet` is a
+        // claude-code CLI alias and passes C1/C3.
+        let ctx =
+            create_test_context_with_static_model("test-agent", "Implement a feature", "sonnet");
         let decision = engine.decide_route(&ctx, &BudgetVerdict::Uncapped).await;
 
         assert_eq!(decision.candidate.source, RouteSource::StaticConfig);
-        assert_eq!(decision.candidate.model, "claude-3-opus");
+        assert_eq!(decision.candidate.model, "sonnet");
         assert!(decision.rationale.contains("static config"));
         assert_eq!(decision.dominant_signal, RouteSource::StaticConfig);
     }
@@ -578,11 +699,12 @@ mod tests {
     #[tokio::test]
     async fn test_rationale_records_dominant_signal() {
         let engine = test_engine();
-        let ctx = create_test_context_with_static_model("agent", "task", "model-x");
+        // `opus` is an allow-list-conformant claude-code CLI alias.
+        let ctx = create_test_context_with_static_model("agent", "task", "opus");
         let decision = engine.decide_route(&ctx, &BudgetVerdict::Uncapped).await;
 
         assert!(decision.rationale.contains("static config"));
-        assert!(decision.rationale.contains("Selected model-x"));
+        assert!(decision.rationale.contains("Selected opus"));
     }
 
     #[tokio::test]
@@ -591,7 +713,8 @@ mod tests {
         let ctx = DispatchContext {
             agent_name: "test-agent".to_string(),
             task: "implement feature".to_string(),
-            static_model: Some("static-model".to_string()),
+            // Allow-list-conformant static model.
+            static_model: Some("kimi-for-coding/k2p5".to_string()),
             cli_tool: "opencode".to_string(),
             layer: crate::config::AgentLayer::Core,
             session_id: None,
@@ -838,7 +961,7 @@ mod tests {
         let store = TelemetryStore::new(3600);
         store
             .record(CompletionEvent {
-                model: "limited-model".to_string(),
+                model: "opencode-go/limited-model".to_string(),
                 session_id: "test".to_string(),
                 completed_at: chrono::Utc::now(),
                 latency_ms: 0,
@@ -856,7 +979,8 @@ mod tests {
             Some(Arc::new(store)),
         );
 
-        let ctx = create_test_context_with_static_model("agent", "task", "limited-model");
+        let ctx =
+            create_test_context_with_static_model("agent", "task", "opencode-go/limited-model");
         let decision = engine.decide_route(&ctx, &BudgetVerdict::Uncapped).await;
 
         assert!(
@@ -878,7 +1002,7 @@ mod tests {
         for _ in 0..10 {
             store
                 .record(CompletionEvent {
-                    model: "fast-model".to_string(),
+                    model: "opencode-go/fast-model".to_string(),
                     session_id: "test".to_string(),
                     completed_at: chrono::Utc::now(),
                     latency_ms: 200,
@@ -902,7 +1026,11 @@ mod tests {
             Some(Arc::new(store)),
         );
 
-        let ctx = create_test_context_with_static_model("agent", "implement feature", "fast-model");
+        let ctx = create_test_context_with_static_model(
+            "agent",
+            "implement feature",
+            "opencode-go/fast-model",
+        );
         let decision = engine.decide_route(&ctx, &BudgetVerdict::Uncapped).await;
 
         assert!(
@@ -913,5 +1041,158 @@ mod tests {
             decision.rationale.contains("Telemetry"),
             "rationale should mention telemetry"
         );
+    }
+
+    // --- C1/C3 allow-list filter ---
+
+    #[tokio::test]
+    async fn test_c3_banned_static_model_falls_back_to_cli_default() {
+        // A malformed static model that names a banned provider must not
+        // survive routing; the engine falls back to the CLI default.
+        let engine = test_engine();
+        let ctx = create_test_context_with_static_model(
+            "agent-with-bad-static",
+            "task",
+            "github-copilot/gpt-4.1",
+        );
+        let decision = engine.decide_route(&ctx, &BudgetVerdict::Uncapped).await;
+
+        assert_eq!(decision.candidate.source, RouteSource::CliDefault);
+        assert!(decision.candidate.model.is_empty());
+        assert!(
+            decision.rationale.contains("C1/C3 allow-list"),
+            "rationale should call out the filter: {}",
+            decision.rationale
+        );
+    }
+
+    #[tokio::test]
+    async fn test_c3_banned_minimax_prefix_rejected_but_plan_allowed() {
+        let engine = test_engine();
+
+        let banned_ctx =
+            create_test_context_with_static_model("agent", "task", "minimax/MiniMax-M2.5");
+        let banned_decision = engine
+            .decide_route(&banned_ctx, &BudgetVerdict::Uncapped)
+            .await;
+        assert_eq!(banned_decision.candidate.source, RouteSource::CliDefault);
+
+        let allowed_ctx = create_test_context_with_static_model(
+            "agent",
+            "task",
+            "minimax-coding-plan/MiniMax-M2.5",
+        );
+        let allowed_decision = engine
+            .decide_route(&allowed_ctx, &BudgetVerdict::Uncapped)
+            .await;
+        assert_eq!(allowed_decision.candidate.source, RouteSource::StaticConfig);
+        assert_eq!(
+            allowed_decision.candidate.model,
+            "minimax-coding-plan/MiniMax-M2.5"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_c1_allowed_subscription_prefix_passes() {
+        let engine = test_engine();
+        let ctx = create_test_context_with_static_model("agent", "task", "kimi-for-coding/k2p5");
+        let decision = engine.decide_route(&ctx, &BudgetVerdict::Uncapped).await;
+        assert_eq!(decision.candidate.source, RouteSource::StaticConfig);
+        assert_eq!(decision.candidate.model, "kimi-for-coding/k2p5");
+    }
+
+    // --- Provider-budget gate ---
+
+    #[tokio::test]
+    async fn test_provider_budget_exhausted_drops_candidate() {
+        // opencode-go capped at $0.50/hour; push past it and the static
+        // candidate must be stripped before scoring, forcing CLI default.
+        let tracker =
+            ProviderBudgetTracker::new(vec![crate::provider_budget::ProviderBudgetConfig {
+                id: "opencode-go".to_string(),
+                max_hour_cents: Some(50),
+                max_day_cents: None,
+            }]);
+        let _ = tracker.record_cost("opencode-go", 1.00);
+        let engine = RoutingDecisionEngine::with_provider_budget(
+            None,
+            Vec::new(),
+            terraphim_router::Router::new(),
+            None,
+            Some(Arc::new(tracker)),
+        );
+        let ctx =
+            create_test_context_with_static_model("agent", "task", "opencode-go/minimax-m2.5");
+        let decision = engine.decide_route(&ctx, &BudgetVerdict::Uncapped).await;
+        assert_eq!(decision.candidate.source, RouteSource::CliDefault);
+        assert!(
+            decision.rationale.contains("provider-budget"),
+            "rationale should call out provider-budget: {}",
+            decision.rationale
+        );
+    }
+
+    #[tokio::test]
+    async fn test_provider_budget_near_exhaustion_deprioritises() {
+        // opencode-go at ~85% (well into the NearExhaustion band) and
+        // kimi-for-coding has no cap. Both candidates survive the filter
+        // but opencode-go's score is knocked down so the healthier
+        // kimi-for-coding wins. Rationale must cite the near-exhaustion.
+        let tracker =
+            ProviderBudgetTracker::new(vec![crate::provider_budget::ProviderBudgetConfig {
+                id: "opencode-go".to_string(),
+                max_hour_cents: Some(100),
+                max_day_cents: None,
+            }]);
+        // Spend $0.85 -> 85% of $1/hr cap -> NearExhaustion.
+        let _ = tracker.record_cost("opencode-go", 0.85);
+        let engine = RoutingDecisionEngine::with_provider_budget(
+            None,
+            Vec::new(),
+            terraphim_router::Router::new(),
+            None,
+            Some(Arc::new(tracker)),
+        );
+        // Static model references opencode-go; confidence 0.8.
+        let ctx =
+            create_test_context_with_static_model("agent", "task", "opencode-go/minimax-m2.5");
+        let decision = engine.decide_route(&ctx, &BudgetVerdict::Uncapped).await;
+
+        // Near-exhaustion candidate still wins because it's the only
+        // signal, but the score must be penalised and the rationale
+        // must mention the provider key.
+        assert_eq!(decision.candidate.source, RouteSource::StaticConfig);
+        assert!(
+            decision.budget_influenced,
+            "budget_influenced flag should be set"
+        );
+        assert!(
+            decision.rationale.contains("opencode-go"),
+            "rationale should name the near-exhausted provider: {}",
+            decision.rationale
+        );
+    }
+
+    #[tokio::test]
+    async fn test_provider_budget_uncapped_provider_unaffected() {
+        let tracker =
+            ProviderBudgetTracker::new(vec![crate::provider_budget::ProviderBudgetConfig {
+                id: "opencode-go".to_string(),
+                max_hour_cents: Some(100),
+                max_day_cents: None,
+            }]);
+        // kimi-for-coding has no config entry -> Uncapped -> no effect.
+        let engine = RoutingDecisionEngine::with_provider_budget(
+            None,
+            Vec::new(),
+            terraphim_router::Router::new(),
+            None,
+            Some(Arc::new(tracker)),
+        );
+        let ctx = create_test_context_with_static_model("agent", "task", "kimi-for-coding/k2p5");
+        let decision = engine.decide_route(&ctx, &BudgetVerdict::Uncapped).await;
+        assert_eq!(decision.candidate.source, RouteSource::StaticConfig);
+        assert_eq!(decision.candidate.model, "kimi-for-coding/k2p5");
+        assert!(!decision.budget_influenced);
     }
 }
