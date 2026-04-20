@@ -195,18 +195,10 @@ impl ProviderBudgetTracker {
         // Single lock across both windows: record and prune atomically
         // so a concurrent `check` cannot observe a half-updated state.
         let mut w = state.windows.lock().expect("windows lock poisoned");
-        let hour_verdict = update_window_in_place(
-            &mut w.hour,
-            hour_window_id(now),
-            cfg.max_hour_cents,
-            delta,
-        );
-        let day_verdict = update_window_in_place(
-            &mut w.day,
-            day_window_id(now),
-            cfg.max_day_cents,
-            delta,
-        );
+        let hour_verdict =
+            update_window_in_place(&mut w.hour, hour_window_id(now), cfg.max_hour_cents, delta);
+        let day_verdict =
+            update_window_in_place(&mut w.day, day_window_id(now), cfg.max_day_cents, delta);
 
         combine_verdicts(hour_verdict, day_verdict)
     }
@@ -271,11 +263,7 @@ fn update_window_in_place(
     verdict_for(ws.sub_cents, max_cents)
 }
 
-fn check_window_state(
-    ws: &WindowState,
-    current_id: u64,
-    max_cents: Option<u64>,
-) -> BudgetVerdict {
+fn check_window_state(ws: &WindowState, current_id: u64, max_cents: Option<u64>) -> BudgetVerdict {
     if ws.window_id != current_id {
         // Fresh bucket -- no spend yet.
         return verdict_for(0, max_cents);
