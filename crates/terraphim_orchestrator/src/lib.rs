@@ -38,6 +38,7 @@ pub mod cost_tracker;
 pub mod dispatcher;
 pub mod dual_mode;
 pub mod error;
+pub mod error_signatures;
 pub mod flow;
 pub mod handoff;
 pub mod kg_router;
