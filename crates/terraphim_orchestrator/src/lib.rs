@@ -1811,18 +1811,28 @@ impl AgentOrchestrator {
         match dispatch {
             webhook::WebhookDispatch::SpawnAgent {
                 agent_name,
+                detected_project,
                 issue_number,
                 comment_id,
                 context,
             } => {
                 info!(
                     agent = %agent_name,
+                    project = ?detected_project,
                     issue = issue_number,
                     comment_id = comment_id,
                     "webhook: dispatching agent spawn"
                 );
 
-                if let Some(def) = agents.iter().find(|a| a.name == agent_name).cloned() {
+                // Use project-aware resolver. For webhook dispatches we don't know which
+                // project's repo the webhook came from, so we use LEGACY_PROJECT_ID as the
+                // hint for unqualified mentions; qualified mentions carry detected_project.
+                if let Some(def) = mention::resolve_mention(
+                    detected_project.as_deref(),
+                    dispatcher::LEGACY_PROJECT_ID,
+                    &agent_name,
+                    &agents,
+                ) {
                     // Dedup: check Gitea assignment + active_agents before spawning
                     if self.should_skip_dispatch(&agent_name, issue_number).await {
                         return;
@@ -1942,6 +1952,12 @@ impl AgentOrchestrator {
                     .projects
                     .iter()
                     .filter_map(|project| {
+                        if project.gitea.is_none() {
+                            tracing::debug!(
+                                project = project.id.as_str(),
+                                "skipping mention poll: project has no gitea config"
+                            );
+                        }
                         let gitea = project.gitea.clone()?;
                         let mentions = project
                             .mentions
@@ -2105,6 +2121,62 @@ impl AgentOrchestrator {
             let commands =
                 command_parser.parse_commands(&comment.body, comment.issue_number, comment.id);
 
+            // Handle qualified `@adf:project/name` mentions that AdfCommandParser cannot
+            // see (its patterns are `@adf:{name}`; a `project/` prefix is not a substring).
+            for token in mention::parse_mention_tokens(&comment.body) {
+                if cursor.dispatches_this_tick >= max_dispatches {
+                    break;
+                }
+                let proj = match token.project.as_deref() {
+                    Some(p) => p,
+                    None => continue, // unqualified mentions are handled by parse_commands below
+                };
+                match mention::resolve_mention(Some(proj), project_id, &token.agent, &agents) {
+                    Some(def) => {
+                        info!(
+                            agent = %token.agent,
+                            project = proj,
+                            issue = comment.issue_number,
+                            comment_id = comment.id,
+                            "dispatching qualified mention-driven agent"
+                        );
+                        if self
+                            .should_skip_dispatch(&token.agent, comment.issue_number)
+                            .await
+                        {
+                            cursor.dispatches_this_tick += 1;
+                            continue;
+                        }
+                        let mut mention_def = def.clone();
+                        mention_def.task = format!(
+                            "{}\n\n## Mention Context\nTriggered by @adf:{}/{} mention in issue #{} (comment {}).",
+                            def.task, proj, token.agent, comment.issue_number, comment.id
+                        );
+                        mention_def.gitea_issue = Some(comment.issue_number);
+                        if let Err(e) = self.spawn_agent(&mention_def).await {
+                            tracing::error!(
+                                agent = %token.agent,
+                                project = proj,
+                                issue = comment.issue_number,
+                                error = %e,
+                                "failed to spawn agent for qualified mention"
+                            );
+                        } else if let Some(active) = self.active_agents.get_mut(&mention_def.name) {
+                            active.spawned_by_mention = true;
+                        }
+                        cursor.dispatches_this_tick += 1;
+                    }
+                    None => {
+                        tracing::warn!(
+                            mention = format!("@adf:{}/{}", proj, token.agent),
+                            project = project_id,
+                            issue = comment.issue_number,
+                            "qualified mention matched no agent"
+                        );
+                    }
+                }
+            }
+
             for cmd in commands {
                 if cursor.dispatches_this_tick >= max_dispatches {
                     break;
@@ -2156,7 +2228,11 @@ impl AgentOrchestrator {
                             "dispatching mention-driven agent via terraphim-automata parser"
                         );
 
-                        if let Some(def) = agents.iter().find(|a| a.name == agent_name).cloned() {
+                        // Unqualified mention: detected_project is None; use hinted project_id
+                        // from the current poll context for multi-project resolution.
+                        if let Some(def) =
+                            mention::resolve_mention(None, project_id, &agent_name, &agents)
+                        {
                             // Dedup: check Gitea assignment + active_agents before spawning
                             if self.should_skip_dispatch(&agent_name, issue_number).await {
                                 cursor.dispatches_this_tick += 1;

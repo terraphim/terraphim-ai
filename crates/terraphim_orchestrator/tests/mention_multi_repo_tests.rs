@@ -301,3 +301,114 @@ async fn migration_is_noop_without_sqlite_backend() {
     // Calling twice must remain a no-op.
     migrate_legacy_mention_cursor(&projects).await;
 }
+
+// ---------------------------------------------------------------------------
+// Dispatch wiring: parse_mention_tokens + resolve_mention end-to-end
+//
+// These tests mirror the logic now wired into the poll and webhook dispatch
+// paths. They verify the exact sequence the orchestrator executes for each
+// comment body, ensuring qualified `@adf:project/name` mentions route to the
+// correct project-scoped agent and unqualified mentions in multi-project mode
+// prefer the hinted-project agent.
+// ---------------------------------------------------------------------------
+
+/// Simulates the qualified-mention pass added to `poll_mentions_for_project`.
+/// A comment containing `@adf:odilo/developer` must route to the odilo-scoped
+/// agent even when two `developer` agents exist in different projects.
+#[test]
+fn dispatch_wiring_qualified_mention_routes_to_correct_project() {
+    let agents = vec![
+        agent("developer", Some("odilo")),
+        agent("developer", Some("terraphim")),
+    ];
+
+    let comment_body = "Please @adf:odilo/developer review this PR";
+    let project_id = "terraphim"; // the poll is running for the terraphim project
+
+    // This is the exact sequence poll_mentions_for_project now executes:
+    // 1. parse_mention_tokens for qualified mentions
+    // 2. For each qualified token, call resolve_mention with detected project
+    let resolved: Vec<_> = parse_mention_tokens(comment_body)
+        .into_iter()
+        .filter(|t| t.project.is_some())
+        .filter_map(|t| {
+            let proj = t.project.as_deref();
+            resolve_mention(proj, project_id, &t.agent, &agents)
+        })
+        .collect();
+
+    assert_eq!(resolved.len(), 1, "exactly one agent should be resolved");
+    assert_eq!(resolved[0].name, "developer");
+    assert_eq!(
+        resolved[0].project.as_deref(),
+        Some("odilo"),
+        "must resolve to the odilo-scoped developer, not the terraphim one"
+    );
+}
+
+/// Simulates the unqualified-mention dispatch path (AdfCommandParser produces
+/// `agent_name = "developer"`, no detected_project). In multi-project mode the
+/// hinted project_id must select the matching agent.
+#[test]
+fn dispatch_wiring_unqualified_mention_prefers_hinted_project() {
+    let agents = vec![
+        agent("developer", Some("odilo")),
+        agent("developer", Some("terraphim")),
+    ];
+
+    // The AdfCommandParser produces agent_name = "developer" with no project prefix.
+    let agent_name = "developer";
+    let project_id = "odilo"; // poll is running for odilo
+
+    // This is the exact call now used at the SpawnAgent arm in poll_mentions_for_project.
+    let resolved = resolve_mention(None, project_id, agent_name, &agents);
+
+    assert!(
+        resolved.is_some(),
+        "should resolve the hinted-project agent"
+    );
+    assert_eq!(
+        resolved.unwrap().project.as_deref(),
+        Some("odilo"),
+        "must select the odilo-scoped developer"
+    );
+}
+
+/// Simulates the webhook dispatch path: qualified mention carried through
+/// `WebhookDispatch::SpawnAgent.detected_project` is now resolved correctly.
+#[test]
+fn dispatch_wiring_webhook_qualified_mention_resolves_by_detected_project() {
+    let agents = vec![
+        agent("reviewer", Some("odilo")),
+        agent("reviewer", Some("terraphim")),
+    ];
+
+    // webhook.rs now extracts detected_project via parse_mention_tokens
+    let comment_body = "@adf:terraphim/reviewer please check";
+    let detected_project = parse_mention_tokens(comment_body)
+        .into_iter()
+        .find(|t| t.agent == "reviewer")
+        .and_then(|t| t.project);
+
+    assert_eq!(
+        detected_project.as_deref(),
+        Some("terraphim"),
+        "webhook handler must extract the project prefix"
+    );
+
+    // handle_webhook_dispatch now calls resolve_mention with detected_project
+    // and LEGACY_PROJECT_ID as the hinted project (webhook has no repo hint).
+    let resolved = resolve_mention(
+        detected_project.as_deref(),
+        "__global__",
+        "reviewer",
+        &agents,
+    );
+
+    assert!(resolved.is_some());
+    assert_eq!(
+        resolved.unwrap().project.as_deref(),
+        Some("terraphim"),
+        "webhook dispatch must resolve to terraphim-scoped reviewer"
+    );
+}
