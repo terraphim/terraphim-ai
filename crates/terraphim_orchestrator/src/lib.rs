@@ -49,6 +49,7 @@ pub mod mode;
 pub mod nightwatch;
 pub mod output_poster;
 pub mod persona;
+pub mod pr_review;
 pub mod project_control;
 pub mod provider_budget;
 pub mod provider_probe;
