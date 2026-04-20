@@ -1,0 +1,49 @@
+[[projects]]
+id = "odilo"
+working_dir = "/home/alex/projects/odilo"
+
+[projects.gitea]
+base_url = "https://git.example.test"
+token = "fixture-token-not-real"
+owner = "example-org"
+repo = "odilo"
+
+[projects.quickwit]
+enabled = true
+endpoint = "http://127.0.0.1:7280"
+index_id = "adf-odilo-logs"
+batch_size = 100
+flush_interval_secs = 5
+
+[[agents]]
+name = "odilo-developer"
+layer = "Core"
+cli_tool = "/home/alex/.local/bin/claude"
+model = "sonnet"
+persona = "Lux"
+terraphim_role = "Rust Engineer"
+skill_chain = [
+    "disciplined-research",
+    "disciplined-implementation",
+]
+schedule = "0 1-9 * * *"
+max_cpu_seconds = 1800
+grace_period_secs = 30
+task = "Pick the highest PageRank unblocked issue and implement it."
+project = "odilo"
+
+[[agents]]
+name = "odilo-reviewer"
+layer = "Core"
+cli_tool = "/home/alex/.local/bin/claude"
+model = "sonnet"
+fallback_model = "kimi-for-coding/k2p5"
+persona = "Lux"
+skill_chain = [
+    "disciplined-verification",
+]
+schedule = "0 2-10 * * *"
+max_cpu_seconds = 900
+grace_period_secs = 30
+task = "Review open PRs and post verdict."
+project = "odilo"

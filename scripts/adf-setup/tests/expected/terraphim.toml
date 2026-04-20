@@ -1,0 +1,83 @@
+[[projects]]
+id = "terraphim"
+working_dir = "/home/alex/terraphim-ai"
+
+[projects.gitea]
+base_url = "https://git.example.test"
+token = "fixture-token-not-real"
+owner = "terraphim"
+repo = "terraphim-ai"
+
+[projects.quickwit]
+enabled = true
+endpoint = "http://127.0.0.1:7280"
+index_id = "adf-logs"
+batch_size = 100
+flush_interval_secs = 5
+
+[projects.workflow]
+enabled = true
+workflow_file = "/home/alex/terraphim-ai/WORKFLOW.md"
+
+[projects.workflow.tracker]
+kind = "gitea"
+endpoint = "https://git.example.test"
+api_key = "fixture-token-not-real"
+owner = "terraphim"
+repo = "terraphim-ai"
+
+[[agents]]
+name = "security-sentinel"
+layer = "Safety"
+cli_tool = "/home/alex/.local/bin/claude"
+model = "sonnet"
+fallback_model = "kimi-for-coding/k2p5"
+persona = "Vigil"
+skill_chain = [
+    "disciplined-verification",
+]
+max_cpu_seconds = 600
+grace_period_secs = 30
+task = "Run security audit on the terraphim-ai project."
+project = "terraphim"
+
+[[agents]]
+name = "compliance-auditor"
+layer = "Core"
+cli_tool = "/home/alex/.local/bin/claude"
+model = "sonnet"
+fallback_model = "opencode-go/minimax-m2.5"
+persona = "Audit"
+skill_chain = [
+    "disciplined-validation",
+]
+schedule = "0 2 * * *"
+max_cpu_seconds = 900
+grace_period_secs = 30
+task = "Run compliance checks."
+project = "terraphim"
+
+[[agents]]
+name = "quality-coordinator"
+layer = "Growth"
+cli_tool = "/home/alex/.local/bin/claude"
+model = "sonnet"
+persona = "Conduit"
+skill_chain = [
+    "disciplined-design",
+]
+max_cpu_seconds = 300
+grace_period_secs = 30
+task = "Coordinate quality review chain."
+project = "terraphim"
+
+[[flows]]
+name = "security-audit-flow"
+project = "terraphim"
+repo_path = "/home/alex/terraphim-ai"
+base_branch = "main"
+timeout_secs = 3600
+schedule = "0 */6 * * *"
+steps = [
+    { name = "run-cargo-audit", kind = "action", command = "cargo audit", timeout_secs = 300 },
+]
