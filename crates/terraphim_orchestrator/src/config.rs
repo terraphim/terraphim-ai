@@ -184,7 +184,7 @@ pub struct OrchestratorConfig {
 pub struct RoutingConfig {
     /// Path to directory containing KG routing rule markdown files.
     pub taxonomy_path: PathBuf,
-    /// Provider probe TTL in seconds (default: 300 = 5 minutes).
+    /// Provider probe TTL in seconds (default: 1800 = 30 minutes).
     #[serde(default = "default_probe_ttl")]
     pub probe_ttl_secs: u64,
     /// Directory for saving probe results JSON (default: ~/.terraphim/benchmark-results).
@@ -208,7 +208,7 @@ pub struct RoutingConfig {
 }
 
 fn default_probe_ttl() -> u64 {
-    300
+    1800
 }
 
 fn default_true_routing() -> bool {
