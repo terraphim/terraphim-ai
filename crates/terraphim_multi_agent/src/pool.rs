@@ -345,10 +345,7 @@ impl AgentPool {
                 })
                 .map(|(idx, _)| idx)
                 .unwrap_or(0),
-            LoadBalancingStrategy::Random => {
-                use rand::Rng;
-                rand::rng().random_range(0..available.len())
-            }
+            LoadBalancingStrategy::Random => fastrand::usize(0..available.len()),
             LoadBalancingStrategy::WeightedCapabilities => {
                 // For now, use least connections
                 // TODO: Implement capability-based weighting
