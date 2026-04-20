@@ -52,6 +52,7 @@ BANNED_PREFIXES = [
     "github-copilot/",
     "google/",
     "huggingface/",
+    "minimax/",
 ]
 
 # Global keys kept in base orchestrator.toml (not per-project).
