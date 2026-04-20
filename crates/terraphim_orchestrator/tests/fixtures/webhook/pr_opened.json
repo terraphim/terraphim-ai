@@ -1,0 +1,48 @@
+{
+  "action": "opened",
+  "number": 42,
+  "pull_request": {
+    "id": 1000042,
+    "number": 42,
+    "title": "feat: add semantic search endpoint",
+    "body": "Adds a new /search endpoint with BM25 ranking.",
+    "draft": false,
+    "state": "open",
+    "additions": 180,
+    "deletions": 12,
+    "head": {
+      "sha": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+      "ref": "task/42-semantic-search",
+      "repo": {
+        "name": "terraphim-ai",
+        "full_name": "terraphim/terraphim-ai"
+      }
+    },
+    "base": {
+      "sha": "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+      "ref": "main",
+      "repo": {
+        "name": "terraphim-ai",
+        "full_name": "terraphim/terraphim-ai"
+      }
+    },
+    "user": {
+      "id": 7,
+      "login": "alex"
+    },
+    "merged": false,
+    "merged_by": null
+  },
+  "repository": {
+    "id": 1,
+    "name": "terraphim-ai",
+    "full_name": "terraphim/terraphim-ai",
+    "owner": {
+      "login": "terraphim"
+    }
+  },
+  "sender": {
+    "id": 7,
+    "login": "alex"
+  }
+}

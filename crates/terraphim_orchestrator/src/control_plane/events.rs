@@ -30,6 +30,8 @@ pub enum CommandKind {
     SpawnPersona,
     /// Compound review trigger (@adf:compound-review)
     CompoundReview,
+    /// Automated PR review triggered by pull_request webhook event
+    ReviewPr,
 }
 
 /// Normalized representation of an agent-triggering event.
@@ -306,6 +308,36 @@ pub fn normalize_webhook_dispatch(
                 target_agent_name: "compound-review".to_string(),
                 command_kind: CommandKind::CompoundReview,
                 context: String::new(),
+                raw_command,
+            }
+        }
+        WebhookDispatch::ReviewPr {
+            pr_number,
+            project,
+            head_sha,
+            author_login,
+            title,
+            diff_loc,
+        } => {
+            let event_id = generate_event_id(&ctx.repo_full_name, *pr_number, 0);
+            let session_id = generate_session_id(&ctx.repo_full_name, *pr_number);
+            let raw_command = format!("pr-review#{}", pr_number);
+
+            NormalizedAgentEvent {
+                event_id,
+                session_id,
+                origin: EventOrigin::Webhook,
+                repo_full_name: ctx.repo_full_name.clone(),
+                issue_number: *pr_number,
+                issue_title: Some(title.clone()),
+                issue_state: None,
+                comment_id: None,
+                comment_created_at: None,
+                comment_author: Some(author_login.clone()),
+                comment_body: String::new(),
+                target_agent_name: format!("review-pr/{}", project),
+                command_kind: CommandKind::ReviewPr,
+                context: format!("sha={} diff_loc={}", head_sha, diff_loc),
                 raw_command,
             }
         }
