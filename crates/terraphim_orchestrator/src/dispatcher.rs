@@ -49,6 +49,41 @@ pub enum DispatchTask {
         /// Project id this mention was detected in.
         project: String,
     },
+    /// PR review dispatch — triggers the automated review pipeline.
+    ReviewPr {
+        /// Pull request number.
+        pr_number: u64,
+        /// Project id owning this PR.
+        project: String,
+        /// HEAD commit SHA at dispatch time.
+        head_sha: String,
+        /// GitHub/Gitea login of the PR author.
+        author_login: String,
+        /// PR title.
+        title: String,
+        /// Lines of code changed (used for routing / cost gating).
+        diff_loc: u32,
+    },
+    /// Auto-merge dispatch — merges a PR after all required checks pass.
+    AutoMerge {
+        /// Pull request number.
+        pr_number: u64,
+        /// Project id owning this PR.
+        project: String,
+        /// HEAD commit SHA that passed checks.
+        head_sha: String,
+    },
+    /// Post-merge test-gate dispatch — runs regression gates after a merge.
+    PostMergeTestGate {
+        /// Pull request number that was merged.
+        pr_number: u64,
+        /// Project id owning this PR.
+        project: String,
+        /// Merge commit SHA.
+        merge_sha: String,
+        /// PR title (for issue/comment attribution).
+        title: String,
+    },
 }
 
 impl DispatchTask {
@@ -58,6 +93,9 @@ impl DispatchTask {
             DispatchTask::TimeDriven { project, .. } => project,
             DispatchTask::IssueDriven { project, .. } => project,
             DispatchTask::MentionDriven { project, .. } => project,
+            DispatchTask::ReviewPr { project, .. } => project,
+            DispatchTask::AutoMerge { project, .. } => project,
+            DispatchTask::PostMergeTestGate { project, .. } => project,
         }
     }
 }
@@ -227,6 +265,9 @@ impl Dispatcher {
                 base + pagerank_bonus + 3000
             }
             DispatchTask::MentionDriven { .. } => 200,
+            DispatchTask::ReviewPr { .. } => 400,
+            DispatchTask::AutoMerge { .. } => 500,
+            DispatchTask::PostMergeTestGate { .. } => 600,
         }
     }
 
@@ -236,6 +277,9 @@ impl Dispatcher {
             DispatchTask::TimeDriven { .. } => "time_driven".into(),
             DispatchTask::IssueDriven { .. } => "issue_driven".into(),
             DispatchTask::MentionDriven { .. } => "mention_driven".into(),
+            DispatchTask::ReviewPr { .. } => "review_pr".into(),
+            DispatchTask::AutoMerge { .. } => "auto_merge".into(),
+            DispatchTask::PostMergeTestGate { .. } => "post_merge_gate".into(),
         }
     }
 }
@@ -405,6 +449,40 @@ mod tests {
         assert_eq!(t4.project(), "alpha");
 
         assert!(dispatcher.dequeue().is_none());
+    }
+
+    #[test]
+    fn dispatch_task_review_pr_project() {
+        let t = DispatchTask::ReviewPr {
+            pr_number: 1,
+            project: "odilo".to_string(),
+            head_sha: "abc".to_string(),
+            author_login: "claude-code".to_string(),
+            title: "fix".to_string(),
+            diff_loc: 10,
+        };
+        assert_eq!(t.project(), "odilo");
+    }
+
+    #[test]
+    fn dispatch_task_auto_merge_project() {
+        let t = DispatchTask::AutoMerge {
+            pr_number: 1,
+            project: "terraphim".to_string(),
+            head_sha: "x".to_string(),
+        };
+        assert_eq!(t.project(), "terraphim");
+    }
+
+    #[test]
+    fn dispatch_task_post_merge_project() {
+        let t = DispatchTask::PostMergeTestGate {
+            pr_number: 1,
+            project: "digital-twins".to_string(),
+            merge_sha: "x".to_string(),
+            title: "t".to_string(),
+        };
+        assert_eq!(t.project(), "digital-twins");
     }
 
     #[test]
