@@ -155,6 +155,10 @@ fn test_config() -> OrchestratorConfig {
         include: vec![],
         providers: vec![],
         provider_budget_state_file: None,
+        pause_dir: None,
+        project_circuit_breaker_threshold: 3,
+        fleet_escalation_owner: None,
+        fleet_escalation_repo: None,
     }
 }
 
@@ -330,7 +334,7 @@ fn test_example_config_creates_orchestrator() {
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("orchestrator.example.toml");
     let config = OrchestratorConfig::from_file(&example_path).unwrap();
 
-    assert_eq!(config.agents.len(), 16);
+    assert_eq!(config.agents.len(), 18);
     assert_eq!(config.agents[0].layer, AgentLayer::Safety);
     assert_eq!(config.agents[1].layer, AgentLayer::Safety);
     assert_eq!(config.agents[2].layer, AgentLayer::Core);
