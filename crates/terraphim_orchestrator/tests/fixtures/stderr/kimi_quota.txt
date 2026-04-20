@@ -1,0 +1,3 @@
+kimi-for-coding v2.3.1
+error: daily quota exceeded for subscription plan k2p5
+{"error":{"code":"quota_exceeded","message":"You have hit your daily message quota. It resets at 00:00 UTC."}}

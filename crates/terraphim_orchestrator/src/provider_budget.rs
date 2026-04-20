@@ -37,6 +37,10 @@ pub struct ProviderBudgetConfig {
     /// Max spend in cents per UTC day. `None` = uncapped.
     #[serde(default)]
     pub max_day_cents: Option<u64>,
+    /// Optional regex patterns for classifying this provider's stderr.
+    /// Consumed by [`crate::error_signatures`] at config load time.
+    #[serde(default)]
+    pub error_signatures: Option<crate::error_signatures::ProviderErrorSignatures>,
 }
 
 /// Serialisable window state.
@@ -224,6 +228,34 @@ impl ProviderBudgetTracker {
         combine_verdicts(hour_verdict, day_verdict)
     }
 
+    /// Force both windows for `provider` past their caps so the next
+    /// [`Self::check`] returns [`BudgetVerdict::Exhausted`]. Used by the
+    /// error-signature classifier when a spawn stderr signals that the
+    /// provider has hit its external quota even though our spend counter
+    /// has not yet registered the charge (providers bill asynchronously).
+    ///
+    /// Only providers with at least one configured cap are affected --
+    /// uncapped providers remain `Uncapped` because there is nothing to
+    /// exhaust. Unknown providers are silently ignored.
+    pub fn force_exhaust(&self, provider: &str) {
+        let Some(cfg) = self.configs.get(provider) else {
+            return;
+        };
+        let Some(state) = self.state.get(provider) else {
+            return;
+        };
+        let now = Utc::now();
+        let mut w = state.windows.lock().expect("windows lock poisoned");
+        if let Some(cap) = cfg.max_hour_cents {
+            w.hour.window_id = hour_window_id(now);
+            w.hour.sub_cents = cap.saturating_mul(100).saturating_add(100);
+        }
+        if let Some(cap) = cfg.max_day_cents {
+            w.day.window_id = day_window_id(now);
+            w.day.sub_cents = cap.saturating_mul(100).saturating_add(100);
+        }
+    }
+
     /// Iterate over all provider ids known to the tracker.
     pub fn providers(&self) -> impl Iterator<Item = &str> {
         self.configs.keys().map(|s| s.as_str())
@@ -355,6 +387,7 @@ mod tests {
             id: id.to_string(),
             max_hour_cents: hour,
             max_day_cents: day,
+            error_signatures: None,
         }
     }
 
@@ -428,6 +461,41 @@ mod tests {
             "day cap should trip even though hour bucket rolled: {:?}",
             verdict
         );
+    }
+
+    #[test]
+    fn test_force_exhaust_trips_both_windows() {
+        // Every window that has a cap must end up Exhausted after
+        // force_exhaust so the routing gate drops the provider until
+        // the next UTC window rolls -- even though we never recorded
+        // any cost.
+        let t = ProviderBudgetTracker::new(vec![cfg("claude-code", Some(500), Some(2000))]);
+        assert_eq!(t.check("claude-code"), BudgetVerdict::WithinBudget);
+
+        t.force_exhaust("claude-code");
+        assert!(
+            matches!(t.check("claude-code"), BudgetVerdict::Exhausted { .. }),
+            "force_exhaust must trip the combined verdict"
+        );
+        // And the filter helper that routing uses must reject it.
+        assert!(!provider_has_budget(&t, "claude-code"));
+    }
+
+    #[test]
+    fn test_force_exhaust_is_noop_for_uncapped_provider() {
+        // No cap means there's nothing to exhaust -- verdict stays
+        // Uncapped so we don't accidentally block a provider that
+        // the operator has intentionally left unbounded.
+        let t = ProviderBudgetTracker::new(vec![cfg("claude-code", None, None)]);
+        t.force_exhaust("claude-code");
+        assert_eq!(t.check("claude-code"), BudgetVerdict::Uncapped);
+    }
+
+    #[test]
+    fn test_force_exhaust_ignores_unknown_provider() {
+        let t = ProviderBudgetTracker::new(vec![cfg("claude-code", Some(100), None)]);
+        t.force_exhaust("not-a-provider"); // must not panic or poison state
+        assert_eq!(t.check("claude-code"), BudgetVerdict::WithinBudget);
     }
 
     #[test]
