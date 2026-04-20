@@ -115,44 +115,6 @@ mod truncate_snippet_tests {
     }
 }
 
-/// Format the one-line stderr explainability message emitted when the search
-/// command auto-routes (i.e. the user did not pass `--role`).
-///
-/// Exact format pinned by the design (section 5):
-///   `[auto-route] picked role "<name>" (score=<n>, candidates=<m>); to override, pass --role`
-fn format_auto_route_line(result: &terraphim_service::auto_route::AutoRouteResult) -> String {
-    format!(
-        "[auto-route] picked role \"{}\" (score={}, candidates={}); to override, pass --role",
-        result.role.as_str(),
-        result.score,
-        result.candidates.len(),
-    )
-}
-
-#[cfg(test)]
-mod format_auto_route_line_tests {
-    use super::format_auto_route_line;
-    use terraphim_service::auto_route::{AutoRouteReason, AutoRouteResult};
-    use terraphim_types::RoleName;
-
-    #[test]
-    fn pinned_exact_format() {
-        let r = AutoRouteResult {
-            role: RoleName::new("Personal Assistant"),
-            score: 42,
-            candidates: vec![
-                (RoleName::new("Personal Assistant"), 42),
-                (RoleName::new("Default"), 0),
-            ],
-            reason: AutoRouteReason::ScoredWinner,
-        };
-        assert_eq!(
-            format_auto_route_line(&r),
-            "[auto-route] picked role \"Personal Assistant\" (score=42, candidates=2); to override, pass --role"
-        );
-    }
-}
-
 /// Show helpful usage information when run without a TTY
 fn show_usage_info() {
     println!("Terraphim AI Agent v{}", env!("CARGO_PKG_VERSION"));
@@ -1431,12 +1393,7 @@ async fn run_offline_command(
             role,
             limit,
         } => {
-            let (role_name, auto) = service
-                .resolve_or_auto_route(role.as_deref(), &query)
-                .await?;
-            if let Some(ref ar) = auto {
-                eprintln!("{}", format_auto_route_line(ar));
-            }
+            let role_name = service.resolve_role(role.as_deref()).await?;
 
             let results = if let Some(additional_terms) = terms {
                 // Multi-term query with logical operators
