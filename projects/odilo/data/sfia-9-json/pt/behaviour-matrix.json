@@ -1,0 +1,895 @@
+{
+  "type": "sfia.behaviour_matrix",
+  "sfia_version": 9,
+  "language": "pt",
+  "factors": [
+    {
+      "code": "COLL",
+      "name": "Colaboração",
+      "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/collaboration",
+      "levels": [
+        {
+          "level": 1,
+          "description": "Trabalha principalmente em suas próprias tarefas e interage apenas com sua equipe imediata. Desenvolve a compreensão de como seu trabalho ajuda os outros."
+        },
+        {
+          "level": 2,
+          "description": "Compreende a necessidade de colaborar com sua equipe e considera as necessidades do usuário/cliente."
+        },
+        {
+          "level": 3,
+          "description": "Compreende e colabora com a análise das necessidades do usuário/cliente e representa isso em seu trabalho."
+        },
+        {
+          "level": 4,
+          "description": "Facilita a colaboração entre as partes interessadas que compartilham objetivos comuns.  \nEnvolve-se e contribui para o trabalho de equipes multifuncionais para garantir que as necessidades do usuário/cliente sejam atendidas em todo o produto/escopo de trabalho."
+        },
+        {
+          "level": 5,
+          "description": "Facilita a colaboração entre as partes interessadas que têm objetivos diferentes.\nGarante formas colaborativas de trabalho em todos os estágios do trabalho para atender às necessidades do usuário/cliente.\nEstabelece relacionamentos eficazes em toda a organização e com clientes, fornecedores e parceiros."
+        },
+        {
+          "level": 6,
+          "description": "Lidera a colaboração com uma gama diversificada de partes interessadas em objetivos concorrentes dentro da organização.\nEstabelece conexões fortes e influentes com os principais contatos internos e externos em nível de gerência sênior/líder técnico"
+        },
+        {
+          "level": 7,
+          "description": "Promove a colaboração, envolvendo-se com as partes interessadas da liderança, garantindo o alinhamento com a visão e a estratégia corporativas. \nEstabelece relacionamentos sólidos e influentes com clientes, parceiros e líderes do setor."
+        }
+      ]
+    },
+    {
+      "code": "COMM",
+      "name": "Comunicação",
+      "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/communication",
+      "levels": [
+        {
+          "level": 1,
+          "description": "Comunica-se com a equipe imediata para entender e cumprir as tarefas atribuídas. Observa, ouve e faz perguntas para buscar informações ou esclarecer instruções."
+        },
+        {
+          "level": 2,
+          "description": "Comunica informações à equipe imediata e às partes interessadas diretamente relacionadas à sua função.\nOuve para obter compreensão e faz perguntas relevantes para esclarecer ou buscar mais informações."
+        },
+        {
+          "level": 3,
+          "description": "Comunica-se com a equipe e as partes interessadas dentro e fora da organização, explicando e apresentando as informações com clareza.\nContribui para uma série de conversas relacionadas ao trabalho, ouve os outros para obter entendimento e faz perguntas relevantes para sua função."
+        },
+        {
+          "level": 4,
+          "description": "Comunica-se com públicos técnicos e não técnicos, incluindo a equipe e as partes interessadas dentro e fora da organização.\nConforme necessário, assume a liderança na explicação de conceitos complexos para apoiar a tomada de decisões.\nOuve e faz perguntas perspicazes para identificar diferentes perspectivas e esclarecer e confirmar o entendimento."
+        },
+        {
+          "level": 5,
+          "description": "Comunica-se com clareza e impacto, articulando informações e ideias complexas para públicos amplos com diferentes pontos de vista.\nLidera e incentiva conversas para compartilhar ideias e criar consenso sobre as ações a serem tomadas."
+        },
+        {
+          "level": 6,
+          "description": "Comunica-se com credibilidade em todos os níveis da organização para públicos amplos com objetivos divergentes.\nExplica informações e ideias complexas com clareza, influenciando a direção estratégica.\nPromove o compartilhamento de informações em toda a organização."
+        },
+        {
+          "level": 7,
+          "description": "Comunica-se com o público em todos os níveis da própria organização e se envolve com o setor.\nApresenta argumentos e ideias convincentes de forma objetiva para atingir os objetivos de negócio."
+        }
+      ]
+    },
+    {
+      "code": "IMPM",
+      "name": "Mentalidade de melhoria",
+      "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/improvement",
+      "levels": [
+        {
+          "level": 1,
+          "description": "Identifica oportunidades de melhoria em suas próprias tarefas. Sugere aprimoramentos básicos quando solicitado."
+        },
+        {
+          "level": 2,
+          "description": "Propõe ideias para melhorar a própria área de trabalho.\n\nImplementa as alterações acordadas nas tarefas de trabalho atribuídas."
+        },
+        {
+          "level": 3,
+          "description": "Identifica e implementa melhorias em sua própria área de trabalho.\nContribui para aprimoramentos de processos da equipe."
+        },
+        {
+          "level": 4,
+          "description": "Incentiva e apoia as discussões da equipe sobre iniciativas de melhoria.\n\nImplementa mudanças processuais em um escopo de trabalho definido."
+        },
+        {
+          "level": 5,
+          "description": "Identifica e avalia possíveis melhorias em produtos, práticas ou serviços.\nLidera a implementação de aprimoramentos em sua própria área de responsabilidade.\nAvalia a eficácia das mudanças implementadas."
+        },
+        {
+          "level": 6,
+          "description": "Promove iniciativas de melhoria que têm um impacto significativo na organização.\nAlinha as estratégias de aprimoramento com os objetivos organizacionais.\nEnvolve as partes interessadas nos processos de aprimoramento."
+        },
+        {
+          "level": 7,
+          "description": "Define e comunica a abordagem organizacional para a melhoria contínua.\nCultiva uma cultura de aprimoramento contínuo.\nAvalia o impacto das iniciativas de melhoria no sucesso organizacional."
+        }
+      ]
+    },
+    {
+      "code": "CRTY",
+      "name": "Criatividade",
+      "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/creativity",
+      "levels": [
+        {
+          "level": 1,
+          "description": "Participa da geração de novas ideias quando solicitado."
+        },
+        {
+          "level": 2,
+          "description": "Aplica o pensamento criativo para sugerir novas maneiras de abordar uma tarefa e resolver problemas."
+        },
+        {
+          "level": 3,
+          "description": "Aplica e contribui com técnicas de pensamento criativo para contribuir com novas ideias para seu próprio trabalho e para as atividades da equipe."
+        },
+        {
+          "level": 4,
+          "description": "Aplica, facilita e desenvolve conceitos de pensamento criativo e encontra maneiras alternativas de abordar os resultados da equipe."
+        },
+        {
+          "level": 5,
+          "description": "Aplica de forma criativa o pensamento inovador e práticas de design na identificação de soluções que agregarão valor para o benefício do cliente/stakeholder."
+        },
+        {
+          "level": 6,
+          "description": "Aplica com criatividade uma ampla gama de novas ideias e técnicas de gerenciamento eficazes para obter resultados que se alinham à estratégia organizacional."
+        },
+        {
+          "level": 7,
+          "description": "Defende a criatividade e a inovação como incentivadoras do desenvolvimento da estratégia para proporcionar oportunidades de negócio."
+        }
+      ]
+    },
+    {
+      "code": "DECM",
+      "name": "Tomada de Decisão",
+      "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/decision",
+      "levels": [
+        {
+          "level": 1,
+          "description": "Tem pouca liberdade no atendimento a consultas.  \nBusca orientação em situações inesperadas."
+        },
+        {
+          "level": 2,
+          "description": "Tem liberdade limitada na resolução de problemas ou consultas.\nDecide quando buscar orientação em situações inesperadas."
+        },
+        {
+          "level": 3,
+          "description": "Tem liberdade para identificar e responder a questões complexas relacionadas às suas próprias atribuições. \nDetermina quando os problemas devem ser escalados para um nível superior."
+        },
+        {
+          "level": 4,
+          "description": "Julga e possui liberdade substancial para identificar e responder a questões e atribuições complexas relacionadas a projetos e objetivos de equipe.\nEscalona quando o escopo é afetado."
+        },
+        {
+          "level": 5,
+          "description": "Usa o discernimento para tomar decisões informadas sobre ações para atingir os resultados organizacionais, como o cumprimento de metas, prazos e orçamento.\nLevanta questões quando os objetivos estão em risco."
+        },
+        {
+          "level": 6,
+          "description": "Usa o discernimento para tomar decisões que iniciam a realização dos objetivos estratégicos acordados, incluindo o desempenho financeiro.\nEscalona quando a direção estratégica mais ampla é afetada."
+        },
+        {
+          "level": 7,
+          "description": "Usa o discernimento na tomada de decisões essenciais para a direção estratégica e o sucesso da organização.\nEncaminha, quando necessário, a contribuição da gerência executiva da empresa por meio de estruturas de governança estabelecidas."
+        }
+      ]
+    },
+    {
+      "code": "DIGI",
+      "name": "Mentalidade digital",
+      "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/digital_mindset",
+      "levels": [
+        {
+          "level": 1,
+          "description": "Possui habilidades digitais básicas para aprender e usar aplicativos, processos e ferramentas para sua função."
+        },
+        {
+          "level": 2,
+          "description": "Possui habilidades digitais suficientes para sua função; compreende e usa métodos, ferramentas, aplicativos e processos adequados."
+        },
+        {
+          "level": 3,
+          "description": "Explora e aplica ferramentas e habilidades digitais relevantes para sua função.\nCompreende e usa de maneira eficaz os métodos, ferramentas, aplicativos e processos apropriados."
+        },
+        {
+          "level": 4,
+          "description": "Maximiza as capacidades das aplicações para o seu papel, avalia e apoia a utilização de novas tecnologias e ferramentas digitais.\nSeleciona adequadamente e avalia o impacto da mudança nos padrões, métodos, ferramentas, aplicativos e processos aplicáveis relevantes à própria especialidade."
+        },
+        {
+          "level": 5,
+          "description": "Reconhece e avalia o impacto organizacional de novas tecnologias e serviços digitais.\nImplementa práticas novas e eficazes. \nAconselha sobre os padrões, métodos, ferramentas, aplicações e processos disponíveis relevantes para a(s) especialidade(s) do grupo e pode fazer escolhas apropriadas entre alternativas."
+        },
+        {
+          "level": 6,
+          "description": "Lidera o aprimoramento dos recursos digitais da organização. \nIdentifica e endossa oportunidades para adotar novas tecnologias e serviços digitais.\nLidera a governança digital e a conformidade com a legislação pertinente e a necessidade de produtos e serviços."
+        },
+        {
+          "level": 7,
+          "description": "Lidera o desenvolvimento da cultura digital da organização e a visão transformacional.  \nAumenta a capacidade e/ou a exploração da tecnologia em uma ou mais organizações por meio de um profundo entendimento do setor e das implicações das tecnologias emergentes.\nResponsabiliza-se por avaliar como as leis e os regulamentos afetam os objetivos organizacionais e seu uso de recursos digitais, de dados e de tecnologia."
+        }
+      ]
+    },
+    {
+      "code": "LEAD",
+      "name": "Liderança",
+      "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/leadership",
+      "levels": [
+        {
+          "level": 1,
+          "description": "Aumenta proativamente a compreensão de suas tarefas e responsabilidades no trabalho."
+        },
+        {
+          "level": 2,
+          "description": "Assume a responsabilidade pelo desenvolvimento de sua experiência de trabalho."
+        },
+        {
+          "level": 3,
+          "description": "Fornece orientação básica e suporte a membros menos experientes da equipe, conforme necessário."
+        },
+        {
+          "level": 4,
+          "description": "Lidera, apoia ou orienta os membros da equipe.\nDesenvolve soluções para atividades de trabalho complexas relacionadas a atribuições. \nDemonstra compreensão dos fatores de risco em seu trabalho.\nContribui com conhecimento especializado para a definição de requisitos em apoio a propostas."
+        },
+        {
+          "level": 5,
+          "description": "Oferece liderança em nível operacional.\nImplementa e executa políticas alinhadas aos planos estratégicos.\nAnalisa e avalia riscos.\nLeva em conta todos os requisitos ao considerar as propostas."
+        },
+        {
+          "level": 6,
+          "description": "Oferece liderança em nível organizacional.\nContribui para o desenvolvimento e a implementação de políticas e estratégias.\nCompreende e comunica os desenvolvimentos da indústria e o papel e o impacto da tecnologia. \nGerencia e mitiga o risco organizacional.  \nEquilibra os requisitos das propostas com as necessidades mais amplas da organização."
+        },
+        {
+          "level": 7,
+          "description": "Lidera o gerenciamento estratégico.\nAplica o mais alto nível de liderança à formulação e implementação da estratégia.\nComunica o impacto potencial das práticas emergentes e tecnologias sobre as organizações e indivíduos, e avalia os riscos de usar ou não usar tais práticas e tecnologias. \nEstabelece governança para tratar dos riscos do negócio.\nGarante que as propostas se alinhem à direção estratégica da organização."
+        }
+      ]
+    },
+    {
+      "code": "LADV",
+      "name": "Aprendizagem e desenvolvimento",
+      "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/learning",
+      "levels": [
+        {
+          "level": 1,
+          "description": "Aplica o conhecimento recém-adquirido para desenvolver habilidades para sua função. Contribui para identificar as próprias oportunidades de desenvolvimento."
+        },
+        {
+          "level": 2,
+          "description": "Absorve e aplica novas informações às tarefas.\nReconhece as habilidades pessoais e as lacunas de conhecimento e busca oportunidades de aprendizado para resolvê-las."
+        },
+        {
+          "level": 3,
+          "description": "Absorve e aplica novas informações de forma eficaz, com a capacidade de compartilhar o aprendizado com os colegas.\nToma a iniciativa de identificar e negociar suas próprias oportunidades de desenvolvimento apropriadas."
+        },
+        {
+          "level": 4,
+          "description": "Absorve rapidamente e avalia criticamente novas informações e as aplica de forma eficaz.\nMantém um entendimento das práticas emergentes e de sua aplicação e assume a responsabilidade de promover oportunidades de desenvolvimento para si mesmo e para os membros da equipe."
+        },
+        {
+          "level": 5,
+          "description": "Usa suas habilidades e conhecimentos para ajudar a estabelecer os padrões que serão aplicados por outras pessoas na organização.\nToma a iniciativa de desenvolver um conhecimento mais amplo do setor e/ou da empresa e de identificar e gerenciar oportunidades de desenvolvimento na área de responsabilidade."
+        },
+        {
+          "level": 6,
+          "description": "Promove a aplicação do conhecimento para apoiar os imperativos estratégicos.\nDesenvolve ativamente suas habilidades de liderança estratégica e técnica e lidera o desenvolvimento de habilidades em sua área de responsabilidade."
+        },
+        {
+          "level": 7,
+          "description": "Inspira uma cultura de aprendizado para alinhar-se aos objetivos comerciais.   \nMantém uma visão estratégica dos cenários contemporâneos e emergentes do setor. \nGarante que a organização desenvolva e mobilize toda a gama de habilidades e capacidades necessárias."
+        }
+      ]
+    },
+    {
+      "code": "PLAN",
+      "name": "Planejamento",
+      "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/planning",
+      "levels": [
+        {
+          "level": 1,
+          "description": "Confirma as etapas necessárias para tarefas individuais."
+        },
+        {
+          "level": 2,
+          "description": "Planeja seu próprio trabalho em prazos curtos e de forma organizada."
+        },
+        {
+          "level": 3,
+          "description": "Organiza e mantém o controle do próprio trabalho (e de outros, quando necessário) para cumprir os prazos acordados."
+        },
+        {
+          "level": 4,
+          "description": "Planeja, programa e monitora o trabalho para atender a determinados objetivos e processos pessoais e/ou da equipe, demonstrando uma abordagem analítica para cumprir metas de tempo e qualidade."
+        },
+        {
+          "level": 5,
+          "description": "Analisa, projeta, planeja, estabelece marcos, executa e avalia o trabalho de acordo com metas de tempo, custo e qualidade."
+        },
+        {
+          "level": 6,
+          "description": "Inicia e influencia os objetivos estratégicos e atribui responsabilidades."
+        },
+        {
+          "level": 7,
+          "description": "Planeja e lidera, no mais alto nível de autoridade, todos os aspectos de uma área de trabalho significativa."
+        }
+      ]
+    },
+    {
+      "code": "PROB",
+      "name": "Resolução de Problemas",
+      "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/problem",
+      "levels": [
+        {
+          "level": 1,
+          "description": "Trabalha para entender o problema e busca ajuda para resolver problemas inesperados."
+        },
+        {
+          "level": 2,
+          "description": "Investiga e resolve problemas de rotina."
+        },
+        {
+          "level": 3,
+          "description": "Aplica uma abordagem metódica para investigar e avaliar opções para resolver problemas rotineiros e moderadamente complexos."
+        },
+        {
+          "level": 4,
+          "description": "Investiga a causa e o impacto, avalia as opções e resolve uma ampla gama de problemas complexos."
+        },
+        {
+          "level": 5,
+          "description": "Investiga questões complexas para identificar as causas básicas e os impactos, avalia uma série de soluções e toma decisões informadas sobre o melhor curso de ação, muitas vezes em colaboração com outros especialistas."
+        },
+        {
+          "level": 6,
+          "description": "Antecipa e lidera a abordagem de problemas e oportunidades que podem afetar os objetivos organizacionais, estabelecendo uma abordagem estratégica e alocando recursos."
+        },
+        {
+          "level": 7,
+          "description": "Gerencia as inter-relações entre as partes afetadas e os imperativos estratégicos, reconhecendo o contexto comercial mais amplo e tirando conclusões precisas ao resolver problemas."
+        }
+      ]
+    },
+    {
+      "code": "ADAP",
+      "name": "Adaptabilidade",
+      "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/adaptability",
+      "levels": [
+        {
+          "level": 1,
+          "description": "Aceita mudanças e está aberto a novas formas de trabalho."
+        },
+        {
+          "level": 2,
+          "description": "Ajusta-se a diferentes dinâmicas de equipe e requisitos de trabalho.\nParticipa dos processos de adaptação da equipe."
+        },
+        {
+          "level": 3,
+          "description": "Adapta-se e reage às mudanças e demonstra iniciativa na adoção de novos métodos ou tecnologias."
+        },
+        {
+          "level": 4,
+          "description": "Permite que outras pessoas se adaptem e mudem em resposta a desafios e mudanças no ambiente de trabalho."
+        },
+        {
+          "level": 5,
+          "description": "Lidera adaptações a ambientes de negócios em constante mudança.\nOrienta as equipes durante as transições, mantendo o foco nos objetivos organizacionais."
+        },
+        {
+          "level": 6,
+          "description": "Promove a adaptabilidade organizacional ao iniciar e liderar mudanças significativas. Influencia as estratégias de gerenciamento de mudanças em nível organizacional."
+        },
+        {
+          "level": 7,
+          "description": "Promove a agilidade e a resiliência organizacional.\nIncorpora a adaptabilidade à cultura organizacional e ao planejamento estratégico."
+        }
+      ]
+    },
+    {
+      "code": "SCPE",
+      "name": "Segurança, privacidade e ética",
+      "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/security",
+      "levels": [
+        {
+          "level": 1,
+          "description": "Desenvolve o entendimento das regras e expectativas de sua função e da organização."
+        },
+        {
+          "level": 2,
+          "description": "Tem um bom entendimento de sua função e das regras e expectativas da organização."
+        },
+        {
+          "level": 3,
+          "description": "Aplica profissionalismo, práticas de trabalho e conhecimento adequados ao trabalho."
+        },
+        {
+          "level": 4,
+          "description": "Adapta e aplica os padrões aplicáveis, reconhecendo sua importância para alcançar os resultados da equipe."
+        },
+        {
+          "level": 5,
+          "description": "Contribui proativamente para a implementação de práticas profissionais de trabalho e ajuda a promover uma cultura organizacional de apoio."
+        },
+        {
+          "level": 6,
+          "description": "Assume um papel de liderança na promoção e garantia de cultura e práticas de trabalho apropriadas, incluindo o fornecimento de acesso e oportunidades iguais para pessoas com habilidades diversas."
+        },
+        {
+          "level": 7,
+          "description": "Fornece direção clara e liderança estratégica para incorporar a conformidade, a cultura organizacional e as práticas de trabalho, além de promover ativamente a diversidade e a inclusão."
+        }
+      ]
+    }
+  ],
+  "by_level": [
+    {
+      "level": 1,
+      "title": "Segue",
+      "factors": [
+        {
+          "code": "COLL",
+          "name": "Colaboração",
+          "description": "Trabalha principalmente em suas próprias tarefas e interage apenas com sua equipe imediata. Desenvolve a compreensão de como seu trabalho ajuda os outros."
+        },
+        {
+          "code": "COMM",
+          "name": "Comunicação",
+          "description": "Comunica-se com a equipe imediata para entender e cumprir as tarefas atribuídas. Observa, ouve e faz perguntas para buscar informações ou esclarecer instruções."
+        },
+        {
+          "code": "IMPM",
+          "name": "Mentalidade de melhoria",
+          "description": "Identifica oportunidades de melhoria em suas próprias tarefas. Sugere aprimoramentos básicos quando solicitado."
+        },
+        {
+          "code": "CRTY",
+          "name": "Criatividade",
+          "description": "Participa da geração de novas ideias quando solicitado."
+        },
+        {
+          "code": "DECM",
+          "name": "Tomada de Decisão",
+          "description": "Tem pouca liberdade no atendimento a consultas.  \nBusca orientação em situações inesperadas."
+        },
+        {
+          "code": "DIGI",
+          "name": "Mentalidade digital",
+          "description": "Possui habilidades digitais básicas para aprender e usar aplicativos, processos e ferramentas para sua função."
+        },
+        {
+          "code": "LEAD",
+          "name": "Liderança",
+          "description": "Aumenta proativamente a compreensão de suas tarefas e responsabilidades no trabalho."
+        },
+        {
+          "code": "LADV",
+          "name": "Aprendizagem e desenvolvimento",
+          "description": "Aplica o conhecimento recém-adquirido para desenvolver habilidades para sua função. Contribui para identificar as próprias oportunidades de desenvolvimento."
+        },
+        {
+          "code": "PLAN",
+          "name": "Planejamento",
+          "description": "Confirma as etapas necessárias para tarefas individuais."
+        },
+        {
+          "code": "PROB",
+          "name": "Resolução de Problemas",
+          "description": "Trabalha para entender o problema e busca ajuda para resolver problemas inesperados."
+        },
+        {
+          "code": "ADAP",
+          "name": "Adaptabilidade",
+          "description": "Aceita mudanças e está aberto a novas formas de trabalho."
+        },
+        {
+          "code": "SCPE",
+          "name": "Segurança, privacidade e ética",
+          "description": "Desenvolve o entendimento das regras e expectativas de sua função e da organização."
+        }
+      ]
+    },
+    {
+      "level": 2,
+      "title": "Auxilia",
+      "factors": [
+        {
+          "code": "COLL",
+          "name": "Colaboração",
+          "description": "Compreende a necessidade de colaborar com sua equipe e considera as necessidades do usuário/cliente."
+        },
+        {
+          "code": "COMM",
+          "name": "Comunicação",
+          "description": "Comunica informações à equipe imediata e às partes interessadas diretamente relacionadas à sua função.\nOuve para obter compreensão e faz perguntas relevantes para esclarecer ou buscar mais informações."
+        },
+        {
+          "code": "IMPM",
+          "name": "Mentalidade de melhoria",
+          "description": "Propõe ideias para melhorar a própria área de trabalho.\n\nImplementa as alterações acordadas nas tarefas de trabalho atribuídas."
+        },
+        {
+          "code": "CRTY",
+          "name": "Criatividade",
+          "description": "Aplica o pensamento criativo para sugerir novas maneiras de abordar uma tarefa e resolver problemas."
+        },
+        {
+          "code": "DECM",
+          "name": "Tomada de Decisão",
+          "description": "Tem liberdade limitada na resolução de problemas ou consultas.\nDecide quando buscar orientação em situações inesperadas."
+        },
+        {
+          "code": "DIGI",
+          "name": "Mentalidade digital",
+          "description": "Possui habilidades digitais suficientes para sua função; compreende e usa métodos, ferramentas, aplicativos e processos adequados."
+        },
+        {
+          "code": "LEAD",
+          "name": "Liderança",
+          "description": "Assume a responsabilidade pelo desenvolvimento de sua experiência de trabalho."
+        },
+        {
+          "code": "LADV",
+          "name": "Aprendizagem e desenvolvimento",
+          "description": "Absorve e aplica novas informações às tarefas.\nReconhece as habilidades pessoais e as lacunas de conhecimento e busca oportunidades de aprendizado para resolvê-las."
+        },
+        {
+          "code": "PLAN",
+          "name": "Planejamento",
+          "description": "Planeja seu próprio trabalho em prazos curtos e de forma organizada."
+        },
+        {
+          "code": "PROB",
+          "name": "Resolução de Problemas",
+          "description": "Investiga e resolve problemas de rotina."
+        },
+        {
+          "code": "ADAP",
+          "name": "Adaptabilidade",
+          "description": "Ajusta-se a diferentes dinâmicas de equipe e requisitos de trabalho.\nParticipa dos processos de adaptação da equipe."
+        },
+        {
+          "code": "SCPE",
+          "name": "Segurança, privacidade e ética",
+          "description": "Tem um bom entendimento de sua função e das regras e expectativas da organização."
+        }
+      ]
+    },
+    {
+      "level": 3,
+      "title": "Aplica",
+      "factors": [
+        {
+          "code": "COLL",
+          "name": "Colaboração",
+          "description": "Compreende e colabora com a análise das necessidades do usuário/cliente e representa isso em seu trabalho."
+        },
+        {
+          "code": "COMM",
+          "name": "Comunicação",
+          "description": "Comunica-se com a equipe e as partes interessadas dentro e fora da organização, explicando e apresentando as informações com clareza.\nContribui para uma série de conversas relacionadas ao trabalho, ouve os outros para obter entendimento e faz perguntas relevantes para sua função."
+        },
+        {
+          "code": "IMPM",
+          "name": "Mentalidade de melhoria",
+          "description": "Identifica e implementa melhorias em sua própria área de trabalho.\nContribui para aprimoramentos de processos da equipe."
+        },
+        {
+          "code": "CRTY",
+          "name": "Criatividade",
+          "description": "Aplica e contribui com técnicas de pensamento criativo para contribuir com novas ideias para seu próprio trabalho e para as atividades da equipe."
+        },
+        {
+          "code": "DECM",
+          "name": "Tomada de Decisão",
+          "description": "Tem liberdade para identificar e responder a questões complexas relacionadas às suas próprias atribuições. \nDetermina quando os problemas devem ser escalados para um nível superior."
+        },
+        {
+          "code": "DIGI",
+          "name": "Mentalidade digital",
+          "description": "Explora e aplica ferramentas e habilidades digitais relevantes para sua função.\nCompreende e usa de maneira eficaz os métodos, ferramentas, aplicativos e processos apropriados."
+        },
+        {
+          "code": "LEAD",
+          "name": "Liderança",
+          "description": "Fornece orientação básica e suporte a membros menos experientes da equipe, conforme necessário."
+        },
+        {
+          "code": "LADV",
+          "name": "Aprendizagem e desenvolvimento",
+          "description": "Absorve e aplica novas informações de forma eficaz, com a capacidade de compartilhar o aprendizado com os colegas.\nToma a iniciativa de identificar e negociar suas próprias oportunidades de desenvolvimento apropriadas."
+        },
+        {
+          "code": "PLAN",
+          "name": "Planejamento",
+          "description": "Organiza e mantém o controle do próprio trabalho (e de outros, quando necessário) para cumprir os prazos acordados."
+        },
+        {
+          "code": "PROB",
+          "name": "Resolução de Problemas",
+          "description": "Aplica uma abordagem metódica para investigar e avaliar opções para resolver problemas rotineiros e moderadamente complexos."
+        },
+        {
+          "code": "ADAP",
+          "name": "Adaptabilidade",
+          "description": "Adapta-se e reage às mudanças e demonstra iniciativa na adoção de novos métodos ou tecnologias."
+        },
+        {
+          "code": "SCPE",
+          "name": "Segurança, privacidade e ética",
+          "description": "Aplica profissionalismo, práticas de trabalho e conhecimento adequados ao trabalho."
+        }
+      ]
+    },
+    {
+      "level": 4,
+      "title": "Possibilita",
+      "factors": [
+        {
+          "code": "COLL",
+          "name": "Colaboração",
+          "description": "Facilita a colaboração entre as partes interessadas que compartilham objetivos comuns.  \nEnvolve-se e contribui para o trabalho de equipes multifuncionais para garantir que as necessidades do usuário/cliente sejam atendidas em todo o produto/escopo de trabalho."
+        },
+        {
+          "code": "COMM",
+          "name": "Comunicação",
+          "description": "Comunica-se com públicos técnicos e não técnicos, incluindo a equipe e as partes interessadas dentro e fora da organização.\nConforme necessário, assume a liderança na explicação de conceitos complexos para apoiar a tomada de decisões.\nOuve e faz perguntas perspicazes para identificar diferentes perspectivas e esclarecer e confirmar o entendimento."
+        },
+        {
+          "code": "IMPM",
+          "name": "Mentalidade de melhoria",
+          "description": "Incentiva e apoia as discussões da equipe sobre iniciativas de melhoria.\n\nImplementa mudanças processuais em um escopo de trabalho definido."
+        },
+        {
+          "code": "CRTY",
+          "name": "Criatividade",
+          "description": "Aplica, facilita e desenvolve conceitos de pensamento criativo e encontra maneiras alternativas de abordar os resultados da equipe."
+        },
+        {
+          "code": "DECM",
+          "name": "Tomada de Decisão",
+          "description": "Julga e possui liberdade substancial para identificar e responder a questões e atribuições complexas relacionadas a projetos e objetivos de equipe.\nEscalona quando o escopo é afetado."
+        },
+        {
+          "code": "DIGI",
+          "name": "Mentalidade digital",
+          "description": "Maximiza as capacidades das aplicações para o seu papel, avalia e apoia a utilização de novas tecnologias e ferramentas digitais.\nSeleciona adequadamente e avalia o impacto da mudança nos padrões, métodos, ferramentas, aplicativos e processos aplicáveis relevantes à própria especialidade."
+        },
+        {
+          "code": "LEAD",
+          "name": "Liderança",
+          "description": "Lidera, apoia ou orienta os membros da equipe.\nDesenvolve soluções para atividades de trabalho complexas relacionadas a atribuições. \nDemonstra compreensão dos fatores de risco em seu trabalho.\nContribui com conhecimento especializado para a definição de requisitos em apoio a propostas."
+        },
+        {
+          "code": "LADV",
+          "name": "Aprendizagem e desenvolvimento",
+          "description": "Absorve rapidamente e avalia criticamente novas informações e as aplica de forma eficaz.\nMantém um entendimento das práticas emergentes e de sua aplicação e assume a responsabilidade de promover oportunidades de desenvolvimento para si mesmo e para os membros da equipe."
+        },
+        {
+          "code": "PLAN",
+          "name": "Planejamento",
+          "description": "Planeja, programa e monitora o trabalho para atender a determinados objetivos e processos pessoais e/ou da equipe, demonstrando uma abordagem analítica para cumprir metas de tempo e qualidade."
+        },
+        {
+          "code": "PROB",
+          "name": "Resolução de Problemas",
+          "description": "Investiga a causa e o impacto, avalia as opções e resolve uma ampla gama de problemas complexos."
+        },
+        {
+          "code": "ADAP",
+          "name": "Adaptabilidade",
+          "description": "Permite que outras pessoas se adaptem e mudem em resposta a desafios e mudanças no ambiente de trabalho."
+        },
+        {
+          "code": "SCPE",
+          "name": "Segurança, privacidade e ética",
+          "description": "Adapta e aplica os padrões aplicáveis, reconhecendo sua importância para alcançar os resultados da equipe."
+        }
+      ]
+    },
+    {
+      "level": 5,
+      "title": "Garante, aconselha",
+      "factors": [
+        {
+          "code": "COLL",
+          "name": "Colaboração",
+          "description": "Facilita a colaboração entre as partes interessadas que têm objetivos diferentes.\nGarante formas colaborativas de trabalho em todos os estágios do trabalho para atender às necessidades do usuário/cliente.\nEstabelece relacionamentos eficazes em toda a organização e com clientes, fornecedores e parceiros."
+        },
+        {
+          "code": "COMM",
+          "name": "Comunicação",
+          "description": "Comunica-se com clareza e impacto, articulando informações e ideias complexas para públicos amplos com diferentes pontos de vista.\nLidera e incentiva conversas para compartilhar ideias e criar consenso sobre as ações a serem tomadas."
+        },
+        {
+          "code": "IMPM",
+          "name": "Mentalidade de melhoria",
+          "description": "Identifica e avalia possíveis melhorias em produtos, práticas ou serviços.\nLidera a implementação de aprimoramentos em sua própria área de responsabilidade.\nAvalia a eficácia das mudanças implementadas."
+        },
+        {
+          "code": "CRTY",
+          "name": "Criatividade",
+          "description": "Aplica de forma criativa o pensamento inovador e práticas de design na identificação de soluções que agregarão valor para o benefício do cliente/stakeholder."
+        },
+        {
+          "code": "DECM",
+          "name": "Tomada de Decisão",
+          "description": "Usa o discernimento para tomar decisões informadas sobre ações para atingir os resultados organizacionais, como o cumprimento de metas, prazos e orçamento.\nLevanta questões quando os objetivos estão em risco."
+        },
+        {
+          "code": "DIGI",
+          "name": "Mentalidade digital",
+          "description": "Reconhece e avalia o impacto organizacional de novas tecnologias e serviços digitais.\nImplementa práticas novas e eficazes. \nAconselha sobre os padrões, métodos, ferramentas, aplicações e processos disponíveis relevantes para a(s) especialidade(s) do grupo e pode fazer escolhas apropriadas entre alternativas."
+        },
+        {
+          "code": "LEAD",
+          "name": "Liderança",
+          "description": "Oferece liderança em nível operacional.\nImplementa e executa políticas alinhadas aos planos estratégicos.\nAnalisa e avalia riscos.\nLeva em conta todos os requisitos ao considerar as propostas."
+        },
+        {
+          "code": "LADV",
+          "name": "Aprendizagem e desenvolvimento",
+          "description": "Usa suas habilidades e conhecimentos para ajudar a estabelecer os padrões que serão aplicados por outras pessoas na organização.\nToma a iniciativa de desenvolver um conhecimento mais amplo do setor e/ou da empresa e de identificar e gerenciar oportunidades de desenvolvimento na área de responsabilidade."
+        },
+        {
+          "code": "PLAN",
+          "name": "Planejamento",
+          "description": "Analisa, projeta, planeja, estabelece marcos, executa e avalia o trabalho de acordo com metas de tempo, custo e qualidade."
+        },
+        {
+          "code": "PROB",
+          "name": "Resolução de Problemas",
+          "description": "Investiga questões complexas para identificar as causas básicas e os impactos, avalia uma série de soluções e toma decisões informadas sobre o melhor curso de ação, muitas vezes em colaboração com outros especialistas."
+        },
+        {
+          "code": "ADAP",
+          "name": "Adaptabilidade",
+          "description": "Lidera adaptações a ambientes de negócios em constante mudança.\nOrienta as equipes durante as transições, mantendo o foco nos objetivos organizacionais."
+        },
+        {
+          "code": "SCPE",
+          "name": "Segurança, privacidade e ética",
+          "description": "Contribui proativamente para a implementação de práticas profissionais de trabalho e ajuda a promover uma cultura organizacional de apoio."
+        }
+      ]
+    },
+    {
+      "level": 6,
+      "title": "Inicia, influencia",
+      "factors": [
+        {
+          "code": "COLL",
+          "name": "Colaboração",
+          "description": "Lidera a colaboração com uma gama diversificada de partes interessadas em objetivos concorrentes dentro da organização.\nEstabelece conexões fortes e influentes com os principais contatos internos e externos em nível de gerência sênior/líder técnico"
+        },
+        {
+          "code": "COMM",
+          "name": "Comunicação",
+          "description": "Comunica-se com credibilidade em todos os níveis da organização para públicos amplos com objetivos divergentes.\nExplica informações e ideias complexas com clareza, influenciando a direção estratégica.\nPromove o compartilhamento de informações em toda a organização."
+        },
+        {
+          "code": "IMPM",
+          "name": "Mentalidade de melhoria",
+          "description": "Promove iniciativas de melhoria que têm um impacto significativo na organização.\nAlinha as estratégias de aprimoramento com os objetivos organizacionais.\nEnvolve as partes interessadas nos processos de aprimoramento."
+        },
+        {
+          "code": "CRTY",
+          "name": "Criatividade",
+          "description": "Aplica com criatividade uma ampla gama de novas ideias e técnicas de gerenciamento eficazes para obter resultados que se alinham à estratégia organizacional."
+        },
+        {
+          "code": "DECM",
+          "name": "Tomada de Decisão",
+          "description": "Usa o discernimento para tomar decisões que iniciam a realização dos objetivos estratégicos acordados, incluindo o desempenho financeiro.\nEscalona quando a direção estratégica mais ampla é afetada."
+        },
+        {
+          "code": "DIGI",
+          "name": "Mentalidade digital",
+          "description": "Lidera o aprimoramento dos recursos digitais da organização. \nIdentifica e endossa oportunidades para adotar novas tecnologias e serviços digitais.\nLidera a governança digital e a conformidade com a legislação pertinente e a necessidade de produtos e serviços."
+        },
+        {
+          "code": "LEAD",
+          "name": "Liderança",
+          "description": "Oferece liderança em nível organizacional.\nContribui para o desenvolvimento e a implementação de políticas e estratégias.\nCompreende e comunica os desenvolvimentos da indústria e o papel e o impacto da tecnologia. \nGerencia e mitiga o risco organizacional.  \nEquilibra os requisitos das propostas com as necessidades mais amplas da organização."
+        },
+        {
+          "code": "LADV",
+          "name": "Aprendizagem e desenvolvimento",
+          "description": "Promove a aplicação do conhecimento para apoiar os imperativos estratégicos.\nDesenvolve ativamente suas habilidades de liderança estratégica e técnica e lidera o desenvolvimento de habilidades em sua área de responsabilidade."
+        },
+        {
+          "code": "PLAN",
+          "name": "Planejamento",
+          "description": "Inicia e influencia os objetivos estratégicos e atribui responsabilidades."
+        },
+        {
+          "code": "PROB",
+          "name": "Resolução de Problemas",
+          "description": "Antecipa e lidera a abordagem de problemas e oportunidades que podem afetar os objetivos organizacionais, estabelecendo uma abordagem estratégica e alocando recursos."
+        },
+        {
+          "code": "ADAP",
+          "name": "Adaptabilidade",
+          "description": "Promove a adaptabilidade organizacional ao iniciar e liderar mudanças significativas. Influencia as estratégias de gerenciamento de mudanças em nível organizacional."
+        },
+        {
+          "code": "SCPE",
+          "name": "Segurança, privacidade e ética",
+          "description": "Assume um papel de liderança na promoção e garantia de cultura e práticas de trabalho apropriadas, incluindo o fornecimento de acesso e oportunidades iguais para pessoas com habilidades diversas."
+        }
+      ]
+    },
+    {
+      "level": 7,
+      "title": "Define estrategia, inspira, mobiliza",
+      "factors": [
+        {
+          "code": "COLL",
+          "name": "Colaboração",
+          "description": "Promove a colaboração, envolvendo-se com as partes interessadas da liderança, garantindo o alinhamento com a visão e a estratégia corporativas. \nEstabelece relacionamentos sólidos e influentes com clientes, parceiros e líderes do setor."
+        },
+        {
+          "code": "COMM",
+          "name": "Comunicação",
+          "description": "Comunica-se com o público em todos os níveis da própria organização e se envolve com o setor.\nApresenta argumentos e ideias convincentes de forma objetiva para atingir os objetivos de negócio."
+        },
+        {
+          "code": "IMPM",
+          "name": "Mentalidade de melhoria",
+          "description": "Define e comunica a abordagem organizacional para a melhoria contínua.\nCultiva uma cultura de aprimoramento contínuo.\nAvalia o impacto das iniciativas de melhoria no sucesso organizacional."
+        },
+        {
+          "code": "CRTY",
+          "name": "Criatividade",
+          "description": "Defende a criatividade e a inovação como incentivadoras do desenvolvimento da estratégia para proporcionar oportunidades de negócio."
+        },
+        {
+          "code": "DECM",
+          "name": "Tomada de Decisão",
+          "description": "Usa o discernimento na tomada de decisões essenciais para a direção estratégica e o sucesso da organização.\nEncaminha, quando necessário, a contribuição da gerência executiva da empresa por meio de estruturas de governança estabelecidas."
+        },
+        {
+          "code": "DIGI",
+          "name": "Mentalidade digital",
+          "description": "Lidera o desenvolvimento da cultura digital da organização e a visão transformacional.  \nAumenta a capacidade e/ou a exploração da tecnologia em uma ou mais organizações por meio de um profundo entendimento do setor e das implicações das tecnologias emergentes.\nResponsabiliza-se por avaliar como as leis e os regulamentos afetam os objetivos organizacionais e seu uso de recursos digitais, de dados e de tecnologia."
+        },
+        {
+          "code": "LEAD",
+          "name": "Liderança",
+          "description": "Lidera o gerenciamento estratégico.\nAplica o mais alto nível de liderança à formulação e implementação da estratégia.\nComunica o impacto potencial das práticas emergentes e tecnologias sobre as organizações e indivíduos, e avalia os riscos de usar ou não usar tais práticas e tecnologias. \nEstabelece governança para tratar dos riscos do negócio.\nGarante que as propostas se alinhem à direção estratégica da organização."
+        },
+        {
+          "code": "LADV",
+          "name": "Aprendizagem e desenvolvimento",
+          "description": "Inspira uma cultura de aprendizado para alinhar-se aos objetivos comerciais.   \nMantém uma visão estratégica dos cenários contemporâneos e emergentes do setor. \nGarante que a organização desenvolva e mobilize toda a gama de habilidades e capacidades necessárias."
+        },
+        {
+          "code": "PLAN",
+          "name": "Planejamento",
+          "description": "Planeja e lidera, no mais alto nível de autoridade, todos os aspectos de uma área de trabalho significativa."
+        },
+        {
+          "code": "PROB",
+          "name": "Resolução de Problemas",
+          "description": "Gerencia as inter-relações entre as partes afetadas e os imperativos estratégicos, reconhecendo o contexto comercial mais amplo e tirando conclusões precisas ao resolver problemas."
+        },
+        {
+          "code": "ADAP",
+          "name": "Adaptabilidade",
+          "description": "Promove a agilidade e a resiliência organizacional.\nIncorpora a adaptabilidade à cultura organizacional e ao planejamento estratégico."
+        },
+        {
+          "code": "SCPE",
+          "name": "Segurança, privacidade e ética",
+          "description": "Fornece direção clara e liderança estratégica para incorporar a conformidade, a cultura organizacional e as práticas de trabalho, além de promover ativamente a diversidade e a inclusão."
+        }
+      ]
+    }
+  ],
+  "source": {
+    "generic_attributes_url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours",
+    "behavioural_factors_pdf": "https://sfia-online.org/en/sfia-9/responsibilities/sfia-9-alternative-presentation-of-behavioural-factors.pdf"
+  }
+}
