@@ -556,6 +556,83 @@ async fn provider_budget_persistence_round_trip_via_orchestrator() {
     let _ = std::fs::remove_file(&state_path);
 }
 
+// === Scenario 10: C1 adf.rs source-level registration check ==============
+
+/// Assert that the adf.rs binary source no longer contains any `openai`
+/// provider id registrations.  This is a compile-time / text-level sentinel:
+/// if someone re-adds an `id: "openai-*"` block the test fails immediately.
+#[test]
+fn adf_source_contains_no_openai_provider_registrations() {
+    let adf_src = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/bin/adf.rs"));
+
+    // Scan for any Provider `id` field that starts with "openai".
+    // We look for the literal pattern used in struct initialisers.
+    for line in adf_src.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("id:") && trimmed.contains("openai") {
+            panic!(
+                "adf.rs still contains an openai provider registration: {:?}\n\
+                 Remove all OpenAI providers from register_providers() — only \
+                 subscription-based providers (kimi-for-coding, minimax-coding-plan, \
+                 zai-coding-plan, claude-code, opencode-go) are permitted.",
+                line.trim()
+            );
+        }
+    }
+}
+
+// === Scenario 11: probe gate rejects banned provider ======================
+
+/// The C1 gate applied inside `probe_single` relies on
+/// [`is_allowed_provider`].  Verify directly that the gate rejects
+/// `openai/gpt-4` so any regression in config.rs is caught here too.
+#[test]
+fn probe_gate_rejects_openai_provider() {
+    assert!(
+        !is_allowed_provider("openai/gpt-4"),
+        "is_allowed_provider must return false for openai/gpt-4 — \
+         the probe gate will skip this provider at runtime"
+    );
+    // Broader openai variants
+    for banned in [
+        "openai/gpt-4o",
+        "openai/o3",
+        "openai/o4-mini",
+        "openai/gpt-4.1-nano",
+        "openai-o3",
+        "openai-o4-mini",
+        "openai-4.1-nano",
+    ] {
+        assert!(
+            !is_allowed_provider(banned),
+            "probe gate must reject banned provider id: {banned}"
+        );
+    }
+}
+
+// === Scenario 12: probe gate accepts allowed provider =====================
+
+/// Verify that the gate passes the allowed subscription providers so the
+/// probe can actually execute for them.
+#[test]
+fn probe_gate_accepts_allowed_providers() {
+    for allowed in [
+        "kimi-for-coding/k2p5",
+        "minimax-coding-plan/MiniMax-M2.5",
+        "zai-coding-plan/glm-5-turbo",
+        "opencode-go/minimax-m2.5",
+        "claude-code/anthropic/claude-sonnet-4-5",
+        "sonnet",
+        "opus",
+        "anthropic/claude-3-5-sonnet",
+    ] {
+        assert!(
+            is_allowed_provider(allowed),
+            "probe gate must accept allowed provider: {allowed}"
+        );
+    }
+}
+
 // === Helper: provider_key_for_model edges =================================
 
 #[test]
