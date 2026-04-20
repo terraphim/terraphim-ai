@@ -16,8 +16,13 @@ batch_size = 100
 flush_interval_secs = 5
 
 [projects.workflow]
-gitea_base_url = "https://git.example.test"
-gitea_token = "fixture-token-not-real"
+enabled = true
+workflow_file = "/home/alex/terraphim-ai/WORKFLOW.md"
+
+[projects.workflow.tracker]
+kind = "gitea"
+endpoint = "https://git.example.test"
+api_key = "fixture-token-not-real"
 owner = "terraphim"
 repo = "terraphim-ai"
 
