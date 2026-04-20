@@ -4,14 +4,22 @@ Treats the script as a black box -- invoked via subprocess.
 No mocks used.
 """
 
+import os
+import re
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
 
+import pytest
+
 # Absolute path to the script under test.
 SCRIPT = Path(__file__).parent.parent / "migrate-to-confd.py"
 FIXTURES = Path(__file__).parent / "fixtures"
+
+# Rust orchestrator config source (relative to workspace root).
+WORKSPACE_ROOT = Path(__file__).parent.parent.parent.parent
+RUST_CONFIG_SRC = WORKSPACE_ROOT / "crates/terraphim_orchestrator/src/config.rs"
 
 
 def run_migration(*extra_args, check=False, cwd=None):
@@ -272,3 +280,178 @@ task = "Do something."
         assert result.returncode != 0, "Expected non-zero exit for github-copilot provider"
         assert "copilot-agent" in result.stderr
         assert "github-copilot/" in result.stderr
+
+
+# ---------------------------------------------------------------------------
+# Helper: find or build the adf binary
+# ---------------------------------------------------------------------------
+
+def _find_adf_binary() -> Path | None:
+    """Return path to the adf binary, or None if it cannot be located or built."""
+    # 1. Set by cargo when running from the Rust test harness.
+    env_path = os.environ.get("CARGO_BIN_EXE_adf")
+    if env_path and Path(env_path).is_file():
+        return Path(env_path)
+
+    # 2. CARGO_TARGET_DIR override.
+    cargo_target = os.environ.get("CARGO_TARGET_DIR")
+    if cargo_target:
+        candidate = Path(cargo_target) / "debug" / "adf"
+        if candidate.is_file():
+            return candidate
+
+    # 3. Workspace-relative default target dir.
+    for profile in ("debug", "release"):
+        candidate = WORKSPACE_ROOT / "target" / profile / "adf"
+        if candidate.is_file():
+            return candidate
+
+    # 4. Try to build.
+    build_env = dict(os.environ)
+    target_dir = os.environ.get("CARGO_TARGET_DIR", str(WORKSPACE_ROOT / "target"))
+    result = subprocess.run(
+        ["cargo", "build", "--bin", "adf"],
+        cwd=str(WORKSPACE_ROOT),
+        capture_output=True,
+        env={**build_env, "CARGO_TARGET_DIR": target_dir},
+    )
+    if result.returncode == 0:
+        candidate = Path(target_dir) / "debug" / "adf"
+        if candidate.is_file():
+            return candidate
+
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Test 7: banned-list drift detection -- script list must match Rust source
+# ---------------------------------------------------------------------------
+
+def test_banned_list_matches_rust():
+    """Script BANNED_PREFIXES must match BANNED_PROVIDER_PREFIXES in Rust config.rs.
+
+    Parses the Rust source to extract the constant and compares with the
+    Python script's list (normalising the trailing '/' convention).
+    """
+    assert RUST_CONFIG_SRC.exists(), (
+        f"Rust config source not found: {RUST_CONFIG_SRC}"
+    )
+
+    rust_src = RUST_CONFIG_SRC.read_text(encoding="utf-8")
+
+    # Extract the BANNED_PROVIDER_PREFIXES constant block.
+    match = re.search(
+        r'pub const BANNED_PROVIDER_PREFIXES:\s*&\[&str\]\s*=\s*&\[([^\]]*)\]',
+        rust_src,
+        re.DOTALL,
+    )
+    assert match, "Could not find BANNED_PROVIDER_PREFIXES in Rust config.rs"
+
+    rust_entries = re.findall(r'"([^"]+)"', match.group(1))
+    rust_set = set(rust_entries)
+
+    # Import the script's list without executing it fully -- extract via regex.
+    script_src = SCRIPT.read_text(encoding="utf-8")
+    script_match = re.search(
+        r'BANNED_PREFIXES\s*=\s*\[([^\]]*)\]',
+        script_src,
+        re.DOTALL,
+    )
+    assert script_match, "Could not find BANNED_PREFIXES in migrate-to-confd.py"
+
+    script_entries = re.findall(r'"([^"]+)"', script_match.group(1))
+    # Normalise: strip trailing '/' so both sets use bare prefix names.
+    script_set = {e.rstrip("/") for e in script_entries}
+
+    assert script_set == rust_set, (
+        f"BANNED_PREFIXES mismatch.\n"
+        f"  Script (normalised): {sorted(script_set)}\n"
+        f"  Rust:                {sorted(rust_set)}\n"
+        f"  Missing from script: {sorted(rust_set - script_set)}\n"
+        f"  Extra in script:     {sorted(script_set - rust_set)}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Test 8: minimax/ bare prefix is banned (regression for P1-1 sync)
+# ---------------------------------------------------------------------------
+
+def test_minimax_bare_prefix_rejected():
+    """minimax/ prefix must be banned, matching the Rust validator."""
+    fixture_toml = """\
+working_dir = "/tmp/test"
+restart_cooldown_secs = 300
+max_restart_count = 3
+tick_interval_secs = 30
+
+[nightwatch]
+eval_interval_secs = 300
+minor_threshold = 0.1
+moderate_threshold = 0.2
+severe_threshold = 0.4
+critical_threshold = 0.7
+
+[compound_review]
+schedule = "0 2 * * *"
+repo_path = "/tmp/test"
+
+[[agents]]
+name = "minimax-agent"
+layer = "Core"
+cli_tool = "/usr/bin/opencode"
+model = "minimax/abab-7"
+task = "Do something."
+"""
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        fixture_path = tmp_path / "minimax-orchestrator.toml"
+        fixture_path.write_text(fixture_toml, encoding="utf-8")
+
+        result = run_migration(
+            "--input", str(fixture_path),
+            "--output-dir", str(tmp_path / "conf.d"),
+            "--base-output", str(tmp_path / "orchestrator.toml"),
+        )
+        assert result.returncode != 0, (
+            "Expected non-zero exit for minimax/ provider (bare, not minimax-coding-plan/)"
+        )
+        assert "minimax-agent" in result.stderr, (
+            f"Expected agent name in error: {result.stderr}"
+        )
+        assert "minimax/" in result.stderr, (
+            f"Expected banned value in error: {result.stderr}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Test 9: adf --check accepts generated output (P1-3)
+# ---------------------------------------------------------------------------
+
+def test_adf_check_accepts_generated_output():
+    """adf --check must exit 0 on a complete generated conf.d layout."""
+    adf = _find_adf_binary()
+    if adf is None:
+        pytest.skip("adf binary not available and cargo build failed -- skipping")
+
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        confd_dir = tmp_path / "conf.d"
+        base_out = tmp_path / "orchestrator.toml"
+
+        result = run_migration(
+            "--input", str(FIXTURES / "orchestrator.toml"),
+            "--input", str(FIXTURES / "odilo-orchestrator.toml"),
+            "--output-dir", str(confd_dir),
+            "--base-output", str(base_out),
+        )
+        assert result.returncode == 0, f"Migration failed:\n{result.stderr}"
+
+        check = subprocess.run(
+            [str(adf), "--check", str(base_out)],
+            capture_output=True,
+            text=True,
+        )
+        assert check.returncode == 0, (
+            f"adf --check failed with exit {check.returncode}.\n"
+            f"stdout: {check.stdout}\nstderr: {check.stderr}"
+        )
