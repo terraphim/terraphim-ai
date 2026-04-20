@@ -251,6 +251,9 @@ pub struct AgentOrchestrator {
     /// Resolved pause-flag directory. Derived from
     /// [`OrchestratorConfig::pause_dir`] or [`project_control::DEFAULT_PAUSE_DIR`].
     pause_dir: PathBuf,
+    /// Unified priority queue for all dispatch sources (time, issue, mention,
+    /// review-pr, auto-merge, post-merge-gate).
+    dispatcher: dispatcher::Dispatcher,
 }
 
 /// Build the composite restart-state key for an agent definition.
@@ -599,6 +602,7 @@ impl AgentOrchestrator {
             unknown_error_dedupe: Arc::new(Mutex::new(std::collections::HashSet::new())),
             project_failure_counter,
             pause_dir,
+            dispatcher: dispatcher::Dispatcher::new(),
         })
     }
 
@@ -3086,6 +3090,66 @@ impl AgentOrchestrator {
         if let Some(tracker) = self.provider_budget_tracker.as_ref() {
             if let Err(e) = tracker.persist() {
                 warn!(error = %e, "failed to persist provider budget snapshot");
+            }
+        }
+
+        // 17. Drain the unified dispatch queue. Handlers for ReviewPr,
+        // AutoMerge, and PostMergeTestGate are stubs; wiring happens in
+        // Steps D, G, and H respectively.
+        while let Some(task) = self.dispatcher.dequeue() {
+            match task {
+                DispatchTask::TimeDriven { name, project, .. } => {
+                    tracing::debug!(name, project, "TimeDriven task drained from dispatcher");
+                }
+                DispatchTask::IssueDriven {
+                    identifier,
+                    project,
+                    ..
+                } => {
+                    tracing::debug!(
+                        identifier,
+                        project,
+                        "IssueDriven task drained from dispatcher"
+                    );
+                }
+                DispatchTask::MentionDriven {
+                    agent_name,
+                    project,
+                    ..
+                } => {
+                    tracing::debug!(
+                        agent_name,
+                        project,
+                        "MentionDriven task drained from dispatcher"
+                    );
+                }
+                DispatchTask::ReviewPr {
+                    pr_number, project, ..
+                } => {
+                    tracing::info!(
+                        pr_number,
+                        project,
+                        "ReviewPr dispatched (stub; wiring in Step D)"
+                    );
+                    // TODO Step D: build DispatchContext, call RoutingDecisionEngine::decide_route, spawn pr-reviewer.
+                }
+                DispatchTask::AutoMerge {
+                    pr_number, project, ..
+                } => {
+                    tracing::info!(
+                        pr_number,
+                        project,
+                        "AutoMerge dispatched (stub; wiring in Step G)"
+                    );
+                }
+                DispatchTask::PostMergeTestGate {
+                    pr_number,
+                    project,
+                    merge_sha,
+                    ..
+                } => {
+                    tracing::info!(pr_number, project, merge_sha = %merge_sha, "PostMergeTestGate dispatched (stub; wiring in Step H)");
+                }
             }
         }
     }
