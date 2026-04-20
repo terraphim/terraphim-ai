@@ -1,0 +1,2 @@
+Error contacting z.ai: {"code":"InsufficientBalance","message":"Insufficient balance on your subscription account. Please top up at console.z.ai/billing to continue using GLM models."}
+zai-coding-plan exiting with status 1
