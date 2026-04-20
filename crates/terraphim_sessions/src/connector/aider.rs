@@ -133,8 +133,7 @@ impl AiderConnector {
                     .and_then(|m| m.modified())
                     .ok()
                     .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-                    .map(|d| DateTime::from_timestamp(d.as_secs() as i64, 0))
-                    .flatten()
+                    .and_then(|d| DateTime::from_timestamp(d.as_secs() as i64, 0))
                     .unwrap_or_else(Utc::now)
             });
 
