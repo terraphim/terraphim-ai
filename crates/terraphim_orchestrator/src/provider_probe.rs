@@ -363,8 +363,32 @@ impl ProviderHealthMap {
 }
 
 /// Probe a single provider+model by executing its action template.
+///
+/// If the model string does not pass the C1 allow-list checked by
+/// [`crate::config::is_allowed_provider`], the probe is skipped immediately
+/// and returns a sentinel result so banned providers never reach the
+/// CLI execution path.
 async fn probe_single(provider: &str, model: &str, action_template: Option<&str>) -> ProbeResult {
     let timestamp = chrono::Utc::now().to_rfc3339();
+
+    // C1 gate: skip probe for any provider not in the subscription allow-list.
+    if !crate::config::is_allowed_provider(model) {
+        warn!(
+            model = %model,
+            provider = %provider,
+            "probe skipped: provider not in C1 allow-list"
+        );
+        return ProbeResult {
+            provider: provider.to_string(),
+            model: model.to_string(),
+            cli_tool: String::new(),
+            status: ProbeStatus::Error,
+            latency_ms: None,
+            error: Some("probe skipped: provider not in C1 allow-list".to_string()),
+            timestamp,
+        };
+    }
+
     let test_prompt = "echo hello";
 
     let action = match action_template {
