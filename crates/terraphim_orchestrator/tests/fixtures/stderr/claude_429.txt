@@ -1,0 +1,4 @@
+error: received HTTP 429 Too Many Requests from Anthropic API
+retry-after: 60
+request_id: req_01HZ4K7M9NQ8X2Y5P3W1V0T6
+{"type":"error","error":{"type":"rate_limit_error","message":"Number of request tokens has exceeded your per-minute rate limit. Please try again in 60 seconds."}}

@@ -1112,6 +1112,7 @@ mod tests {
                 id: "opencode-go".to_string(),
                 max_hour_cents: Some(50),
                 max_day_cents: None,
+                error_signatures: None,
             }]);
         let _ = tracker.record_cost("opencode-go", 1.00);
         let engine = RoutingDecisionEngine::with_provider_budget(
@@ -1143,6 +1144,7 @@ mod tests {
                 id: "opencode-go".to_string(),
                 max_hour_cents: Some(100),
                 max_day_cents: None,
+                error_signatures: None,
             }]);
         // Spend $0.85 -> 85% of $1/hr cap -> NearExhaustion.
         let _ = tracker.record_cost("opencode-go", 0.85);
@@ -1180,6 +1182,7 @@ mod tests {
                 id: "opencode-go".to_string(),
                 max_hour_cents: Some(100),
                 max_day_cents: None,
+                error_signatures: None,
             }]);
         // kimi-for-coding has no config entry -> Uncapped -> no effect.
         let engine = RoutingDecisionEngine::with_provider_budget(
