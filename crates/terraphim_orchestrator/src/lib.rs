@@ -232,6 +232,17 @@ pub struct AgentOrchestrator {
     /// Per-provider hour/day spend tracker consulted by the routing
     /// engine. `None` when the config declares no [[providers]] entries.
     provider_budget_tracker: Option<Arc<provider_budget::ProviderBudgetTracker>>,
+    /// Compiled per-provider stderr classifiers built from
+    /// `[[providers]].error_signatures`. Providers without signatures
+    /// are absent from the map and classify as
+    /// [`error_signatures::ErrorKind::Unknown`] (fail-safe).
+    provider_error_signatures: error_signatures::ProviderSignatureMap,
+    /// Dedupe set of [`error_signatures::unknown_dedupe_key`] values so we
+    /// don't open a new `[ADF]` Gitea issue for every retry of the same
+    /// stderr shape. Process-lifetime in-memory; intentional since the
+    /// window between duplicates is short and restarting the orchestrator
+    /// is an acceptable dedupe reset.
+    unknown_error_dedupe: Arc<Mutex<std::collections::HashSet<String>>>,
 }
 
 /// Build the composite restart-state key for an agent definition.
@@ -505,6 +516,13 @@ impl AgentOrchestrator {
 
         let provider_budget_tracker = build_provider_budget_tracker(&config)?;
 
+        // Compile per-provider stderr signatures declared under
+        // `[[providers]].error_signatures`. Invalid regexes fail loud
+        // at startup so misconfiguration can never silently disable
+        // runtime classification.
+        let provider_error_signatures = error_signatures::build_signature_map(&config.providers)
+            .map_err(|e| OrchestratorError::Config(e.to_string()))?;
+
         #[cfg(not(test))]
         let restart_state = Self::load_restart_state();
 
@@ -562,6 +580,8 @@ impl AgentOrchestrator {
             provider_health,
             telemetry_store,
             provider_budget_tracker,
+            provider_error_signatures,
+            unknown_error_dedupe: Arc::new(Mutex::new(std::collections::HashSet::new())),
         })
     }
 
@@ -3306,6 +3326,56 @@ impl AgentOrchestrator {
                     }
                     _ => {} // Other exit classes don't affect provider health
                 }
+
+                // issue #7: per-provider stderr-signature classification. This
+                // runs on top of the KG-driven ExitClass match above so that
+                // providers whose CLI exits 0 on quota hits ("returning partial
+                // output") still trip the breaker and force budget exhaustion
+                // when their stderr matches a configured throttle pattern.
+                let sigs = self.provider_error_signatures.get(provider);
+                let sig_kind = error_signatures::classify_lines(&stderr_lines, sigs);
+                match sig_kind {
+                    error_signatures::ErrorKind::Throttle => {
+                        warn!(
+                            agent = %name,
+                            provider = %provider,
+                            model = ?record.model_used,
+                            "stderr classified as throttle; tripping breaker + exhausting budget"
+                        );
+                        self.provider_health.record_failure(provider);
+                        if let Some(tracker) = self.provider_budget_tracker.as_ref() {
+                            tracker.force_exhaust(provider);
+                        }
+                    }
+                    error_signatures::ErrorKind::Flake => {
+                        info!(
+                            agent = %name,
+                            provider = %provider,
+                            "stderr classified as flake; routing will retry next pool entry"
+                        );
+                    }
+                    error_signatures::ErrorKind::Unknown => {
+                        // Only escalate when there *is* stderr text to classify
+                        // AND the run itself looks like a real failure. A clean
+                        // exit with empty stderr must never page fleet-meta.
+                        let looked_like_failure = !matches!(
+                            record.exit_class,
+                            ExitClass::Success | ExitClass::EmptySuccess
+                        );
+                        if looked_like_failure && !stderr_lines.is_empty() {
+                            // Soft-failure accounting so a pathological provider
+                            // that spews unclassified errors still eventually
+                            // opens the breaker.
+                            self.provider_health.record_failure(provider);
+                            self.escalate_unknown_error(
+                                provider,
+                                record.model_used.as_deref(),
+                                &stderr_lines,
+                            )
+                            .await;
+                        }
+                    }
+                }
             }
 
             // Post output to Gitea if configured, routed by the agent's
@@ -4047,6 +4117,103 @@ impl AgentOrchestrator {
     #[doc(hidden)]
     pub fn provider_budget_tracker(&self) -> Option<&Arc<provider_budget::ProviderBudgetTracker>> {
         self.provider_budget_tracker.as_ref()
+    }
+
+    /// Test helper: inspect the unknown-error dedupe set (lock + clone).
+    #[doc(hidden)]
+    pub fn unknown_error_dedupe_snapshot(&self) -> std::collections::HashSet<String> {
+        self.unknown_error_dedupe
+            .lock()
+            .map(|g| g.clone())
+            .unwrap_or_default()
+    }
+
+    /// Open a `[ADF] unknown error signature on <provider>/<model>` Gitea
+    /// issue so fleet-meta can classify the pattern. Deduped by
+    /// [`error_signatures::unknown_dedupe_key`] within the process lifetime
+    /// so retries of the same stderr shape don't spam the tracker.
+    ///
+    /// The target tracker is the orchestrator's default [`GiteaTracker`]
+    /// from [`OutputPoster::tracker`], which points at the fleet-meta repo
+    /// configured in `orchestrator.toml`. If no `OutputPoster` is wired
+    /// (tests, legacy configs), this is a no-op.
+    async fn escalate_unknown_error(
+        &self,
+        provider: &str,
+        model: Option<&str>,
+        stderr_lines: &[String],
+    ) {
+        let joined = stderr_lines.join("\n");
+        let dedupe_key = error_signatures::unknown_dedupe_key(provider, &joined);
+        {
+            let mut set = match self.unknown_error_dedupe.lock() {
+                Ok(g) => g,
+                Err(_) => {
+                    warn!(
+                        provider = %provider,
+                        "unknown_error_dedupe lock poisoned; skipping escalation"
+                    );
+                    return;
+                }
+            };
+            if !set.insert(dedupe_key.clone()) {
+                // Already escalated this shape in this process. Skip quietly.
+                return;
+            }
+        }
+
+        let Some(poster) = self.output_poster.as_ref() else {
+            info!(
+                provider = %provider,
+                dedupe_key = %dedupe_key,
+                "no output_poster configured; unknown stderr logged only"
+            );
+            return;
+        };
+
+        // Cap stderr in the body so a runaway CLI never posts megabytes.
+        const MAX_STDERR_CHARS: usize = 4000;
+        let truncated: String = if joined.len() > MAX_STDERR_CHARS {
+            format!(
+                "{}\n...[truncated, original {} chars]",
+                joined.chars().take(MAX_STDERR_CHARS).collect::<String>(),
+                joined.len()
+            )
+        } else {
+            joined
+        };
+        let model_slug = model.unwrap_or("<unknown-model>");
+        let title = format!(
+            "[ADF] unknown error signature on {}/{}",
+            provider, model_slug
+        );
+        let body = format!(
+            "A spawned agent produced stderr that matched neither the \
+             throttle nor the flake regex lists for provider `{}` \
+             (model `{}`). Please review and extend the provider's \
+             `error_signatures` config so future occurrences classify \
+             correctly.\n\n\
+             **Dedupe key:** `{}`\n\n\
+             ## Captured stderr\n\n```\n{}\n```\n",
+            provider, model_slug, dedupe_key, truncated
+        );
+        let labels = ["adf", "error-signature", "triage"];
+        let tracker = poster.tracker();
+        if let Err(e) = tracker.create_issue(&title, &body, &labels).await {
+            warn!(
+                provider = %provider,
+                model = %model_slug,
+                error = %e,
+                "failed to escalate unknown-error signature to Gitea"
+            );
+        } else {
+            info!(
+                provider = %provider,
+                model = %model_slug,
+                dedupe_key = %dedupe_key,
+                "escalated unknown error signature to fleet-meta"
+            );
+        }
     }
 
     /// Test helper: drive `record_telemetry` from outside the crate so
