@@ -218,12 +218,15 @@ def build_base_doc(inputs: list[tuple[Path, dict]], include_glob: str) -> dict:
 
     Global settings are taken from the first input that defines them.
     include glob is set to the provided pattern.
+    Keys are emitted in a deterministic order so that repeated runs produce
+    byte-identical output.
     """
-    # Collect global settings from inputs (first wins).
+    # Collect global settings from inputs (first wins), using sorted key order
+    # to ensure deterministic serialisation.
     base: dict = {}
 
     for _path, data in inputs:
-        for key in BASE_GLOBAL_KEYS:
+        for key in sorted(BASE_GLOBAL_KEYS):
             if key not in base and key in data:
                 base[key] = _deep_copy(data[key])
 
