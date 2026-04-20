@@ -44,12 +44,23 @@ Issue body:
 $ISSUE_BODY
 ---"
 
-SCOPE_JSON=$(echo "$SCOPE_PROMPT" | /home/alex/.local/bin/claude -p --model haiku --dangerously-skip-permissions 2>&1)
+SCOPE_JSON=$(echo "$SCOPE_PROMPT" | /home/alex/.local/bin/claude -p --model haiku --allowedTools "" 2>&1)
 
 CLEAR=$(echo "$SCOPE_JSON" | python3 -c 'import json,sys,re; t=sys.stdin.read(); m=re.search(r"\{.*\}",t,re.DOTALL); print(json.loads(m.group(0)).get("clear",False) if m else False)' 2>/dev/null || echo "false")
 
 if [ "$CLEAR" = "False" ] || [ "$CLEAR" = "false" ]; then
   MISSING=$(echo "$SCOPE_JSON" | python3 -c 'import json,sys,re; t=sys.stdin.read(); m=re.search(r"\{.*\}",t,re.DOTALL); d=json.loads(m.group(0)) if m else {}; missing=d.get("missing",[]); reasons=d.get("reasons",[]); print("MISSING: "+"; ".join(missing)+"\nREASONS: "+"; ".join(reasons))' 2>/dev/null || echo "could not parse scope check output")
+
+  # Idempotency guard: skip clarification re-post if one already exists in last 24h.
+  # Prevents comment spam on every 30-min tick while the issue stays underspecified.
+  EXISTING_CLARIFICATION=$(curl -sf -H "Authorization: token $GITEA_TOKEN" \
+    "$GITEA_URL/api/v1/repos/$GITEA_OWNER/$GITEA_REPO/issues/$TOP_ISSUE/comments" 2>/dev/null \
+    | python3 -c 'import json,sys,datetime; cs=json.load(sys.stdin); now=datetime.datetime.now(datetime.timezone.utc); recent=[c for c in cs if "Scope clarity check" in c.get("body","") and (now - datetime.datetime.fromisoformat(c["created_at"].replace("Z","+00:00"))).total_seconds() < 86400]; print("yes" if recent else "no")' 2>/dev/null || echo "no")
+
+  if [ "$EXISTING_CLARIFICATION" = "yes" ]; then
+    echo "Scope check FAIL; clarification already posted in last 24h; skip; exit"
+    exit 0
+  fi
 
   gtr comment --owner "$GITEA_OWNER" --repo "$GITEA_REPO" --issue "$TOP_ISSUE" --body "**Scope clarity check — needs more detail before dispatch**
 
@@ -75,7 +86,7 @@ Body:
 $ISSUE_BODY
 ---"
 
-ROLE=$(/home/alex/.local/bin/claude -p --model haiku --dangerously-skip-permissions "$DISPATCH_PROMPT" 2>/dev/null | tr -d '[:space:]' | head -c 20 || echo "developer")
+ROLE=$(/home/alex/.local/bin/claude -p --model haiku --allowedTools "" "$DISPATCH_PROMPT" 2>/dev/null | tr -d '[:space:]' | head -c 20 || echo "developer")
 
 # Sanitise: fall back to developer if role is not recognised
 case "$ROLE" in
