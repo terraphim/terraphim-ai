@@ -1,0 +1,4 @@
+Error: usage limit reached for current billing period
+Your organization has exceeded its monthly message allowance. Contact your
+workspace administrator or upgrade your plan at https://console.anthropic.com/
+CLI exiting with code 1.
