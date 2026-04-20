@@ -720,3 +720,183 @@ mod output_format_tests {
         assert!(!stdout.trim().is_empty() || !output.status.success());
     }
 }
+
+#[cfg(test)]
+mod evaluate_tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    fn create_temp_ground_truth() -> TempDir {
+        let dir = TempDir::new().expect("Failed to create temp dir");
+        let ground_truth_path = dir.path().join("ground_truth.json");
+        let json = serde_json::json!([
+            {
+                "id": "doc1",
+                "text": "I love rust and async programming",
+                "expected_terms": [
+                    {"term": "rust", "category": null},
+                    {"term": "async", "category": null}
+                ]
+            },
+            {
+                "id": "doc2",
+                "text": "Python is great for data science",
+                "expected_terms": [
+                    {"term": "python", "category": null},
+                    {"term": "data science", "category": null}
+                ]
+            }
+        ]);
+        std::fs::write(
+            &ground_truth_path,
+            serde_json::to_string_pretty(&json).unwrap(),
+        )
+        .unwrap();
+        dir
+    }
+
+    fn create_temp_thesaurus() -> TempDir {
+        let dir = TempDir::new().expect("Failed to create temp dir");
+        let thesaurus_path = dir.path().join("thesaurus.json");
+        let json = serde_json::json!({
+            "name": "test",
+            "data": {
+                "rust": {"id": 1, "nterm": "rust"},
+                "async": {"id": 2, "nterm": "async"},
+                "python": {"id": 3, "nterm": "python"}
+            }
+        });
+        std::fs::write(
+            &thesaurus_path,
+            serde_json::to_string_pretty(&json).unwrap(),
+        )
+        .unwrap();
+        dir
+    }
+
+    #[test]
+    #[serial]
+    fn test_evaluate_command_success() {
+        let gt_dir = create_temp_ground_truth();
+        let th_dir = create_temp_thesaurus();
+
+        let gt_path = gt_dir.path().join("ground_truth.json");
+        let th_path = th_dir.path().join("thesaurus.json");
+
+        let result = run_cli_json(&[
+            "evaluate",
+            "--ground-truth",
+            gt_path.to_str().unwrap(),
+            "--thesaurus",
+            th_path.to_str().unwrap(),
+        ]);
+
+        match result {
+            Ok(json) => {
+                // Verify expected structure
+                assert!(
+                    json.get("total_documents").is_some(),
+                    "Should have total_documents"
+                );
+                assert!(json.get("overall").is_some(), "Should have overall metrics");
+                assert!(json.get("per_term").is_some(), "Should have per_term array");
+                // Overall should have precision, recall, f1
+                let overall = &json["overall"];
+                assert!(
+                    overall.get("precision").is_some(),
+                    "Overall should have precision"
+                );
+                assert!(
+                    overall.get("recall").is_some(),
+                    "Overall should have recall"
+                );
+                assert!(overall.get("f1").is_some(), "Overall should have f1");
+            }
+            Err(e) => {
+                panic!("Evaluate command failed: {}", e);
+            }
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn test_evaluate_command_missing_ground_truth() {
+        let th_dir = create_temp_thesaurus();
+        let th_path = th_dir.path().join("thesaurus.json");
+
+        let output = cli_command()
+            .args([
+                "evaluate",
+                "--ground-truth",
+                "/nonexistent/path.json",
+                "--thesaurus",
+                th_path.to_str().unwrap(),
+            ])
+            .output()
+            .expect("Failed to execute");
+
+        // Should fail with non-zero exit code
+        assert!(
+            !output.status.success(),
+            "Should fail with missing ground truth file"
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn test_evaluate_command_missing_thesaurus() {
+        let gt_dir = create_temp_ground_truth();
+        let gt_path = gt_dir.path().join("ground_truth.json");
+
+        let output = cli_command()
+            .args([
+                "evaluate",
+                "--ground-truth",
+                gt_path.to_str().unwrap(),
+                "--thesaurus",
+                "/nonexistent/path.json",
+            ])
+            .output()
+            .expect("Failed to execute");
+
+        // Should fail with non-zero exit code
+        assert!(
+            !output.status.success(),
+            "Should fail with missing thesaurus file"
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn test_evaluate_output_contains_expected_fields() {
+        let gt_dir = create_temp_ground_truth();
+        let th_dir = create_temp_thesaurus();
+
+        let gt_path = gt_dir.path().join("ground_truth.json");
+        let th_path = th_dir.path().join("thesaurus.json");
+
+        let result = run_cli_json(&[
+            "evaluate",
+            "--ground-truth",
+            gt_path.to_str().unwrap(),
+            "--thesaurus",
+            th_path.to_str().unwrap(),
+        ]);
+
+        match result {
+            Ok(json) => {
+                // Check overall metrics structure
+                let overall = &json["overall"];
+                assert!(overall.get("true_positives").is_some());
+                assert!(overall.get("false_positives").is_some());
+                assert!(overall.get("false_negatives").is_some());
+
+                // Check systematic_errors field exists (may be empty)
+                assert!(json.get("systematic_errors").is_some());
+            }
+            Err(e) => {
+                panic!("Evaluate command failed: {}", e);
+            }
+        }
+    }
+}

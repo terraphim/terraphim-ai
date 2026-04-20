@@ -1,3 +1,4 @@
+#![allow(clippy::collapsible_match)]
 //! Orchestrator-Workers workflow pattern
 //!
 //! This pattern implements hierarchical task execution where an orchestrator agent
