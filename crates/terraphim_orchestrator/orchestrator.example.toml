@@ -217,6 +217,70 @@ kind = "shell"
 script = """terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "bounded context architecture decision API design" --role "Carthos Architecture" --limit 5 2>/dev/null || echo '[]'"""
 timeout_secs = 30
 
+# -----------------------------------------------------------------------------
+# PROJECT-META (per-project coordinator). One instance per project; dispatches
+# the next unblocked Gitea issue to the appropriate role. Uses env variables
+# injected by the orchestrator at spawn time ($ADF_PROJECT_ID, $ADF_WORKING_DIR,
+# $GITEA_OWNER, $GITEA_REPO) so the same prompt works across all projects.
+# -----------------------------------------------------------------------------
+
+[[agents]]
+name = "project-meta"
+layer = "Core"
+cli_tool = "claude"
+persona = "carthos"
+terraphim_role = "Carthos Architecture"
+skill_chain = ["disciplined-research", "disciplined-verification"]
+schedule = "*/15 * * * *"
+# NOTE: set `project = "<id>"` per-project override, or duplicate this agent
+# as `project-meta-<id>` to run one instance per project.
+capabilities = ["coordination", "dispatch", "project-health"]
+task = """You are the per-project coordinator for `$ADF_PROJECT_ID`.
+
+Working dir: `$ADF_WORKING_DIR`
+Gitea target: `$GITEA_OWNER/$GITEA_REPO`
+
+## Step 1 -- health check the project
+Run from `$ADF_WORKING_DIR`:
+  cd "$ADF_WORKING_DIR"
+  git status --porcelain | head -20
+  cargo check --workspace 2>&1 | tail -20
+
+## Step 2 -- find the next unblocked issue
+Use the gitea-robot CLI with $GITEA_OWNER/$GITEA_REPO:
+  gtr ready --owner "$GITEA_OWNER" --repo "$GITEA_REPO"
+
+Pick the single highest-PageRank unblocked issue. Do NOT dispatch more than one.
+
+## Step 3 -- route to the right role
+Inspect the issue title, body, and labels to choose one of the standard roles:
+- implementation-swarm (default for feature/bugfix)
+- test-guardian (issues tagged quality/testing)
+- security-sentinel (issues tagged security/*)
+- spec-validator (issues tagged spec/*)
+- documentation-generator (issues tagged docs/*)
+
+Post a claiming comment on the issue using gtr:
+  gtr comment --owner "$GITEA_OWNER" --repo "$GITEA_REPO" --issue <N> \\
+    --body "project-meta ($ADF_PROJECT_ID) dispatching @adf:<role> for this issue"
+
+## Step 4 -- emit a journal event so the fleet-meta can tally work
+Print exactly this line to stdout as the last line of your output:
+  project_meta: project=$ADF_PROJECT_ID dispatched=<role> issue=<N>
+
+If nothing is unblocked, print:
+  project_meta: project=$ADF_PROJECT_ID dispatched=none issue=none
+
+## Domain Knowledge Search
+When you need architecture context, use:
+  terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "<query>" --role "Carthos Architecture"
+"""
+
+[agents.pre_check]
+kind = "shell"
+script = """terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "coordination dispatch project ready queue" --role "Carthos Architecture" --limit 5 2>/dev/null || echo '[]'"""
+timeout_secs = 30
+
 [[agents]]
 name = "spec-validator"
 layer = "Core"
@@ -457,6 +521,94 @@ capabilities = ["knowledge-curation", "kg-maintenance", "terminology-management"
 kind = "shell"
 script = """terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "knowledge graph learning pattern decision framework" --role "Mneme Knowledge" --limit 5 2>/dev/null || echo '[]'"""
 timeout_secs = 30
+
+# =============================================================================
+# FLEET-META (global, cron-only). Shell-script agent that reports fleet health,
+# subscription budget, and per-project status to a daily coordination report
+# and opens [ADF] Gitea issues for threshold breaches. No mentions.
+# =============================================================================
+
+[[agents]]
+name = "fleet-meta"
+layer = "Growth"
+cli_tool = "/bin/bash"
+schedule = "0 * * * *"
+capabilities = ["fleet-health", "budget", "coordination-report"]
+task = """
+set -u
+
+DATE=$(date +%Y-%m-%d)
+HOUR=$(date +%H)
+REPORT_DIR="/opt/ai-dark-factory/workspace/reports"
+REPORT="${REPORT_DIR}/coordination-${DATE}.md"
+BUDGET_DIR="/opt/ai-dark-factory/data/budget"
+PAUSE_DIR="/opt/ai-dark-factory/data/pause"
+OWNER="${GITEA_OWNER:-terraphim}"
+REPO="${GITEA_REPO:-adf-fleet}"
+
+mkdir -p "${REPORT_DIR}"
+
+{
+  echo "# ADF coordination report -- ${DATE} ${HOUR}:00"
+  echo
+  echo "## Fleet health"
+  echo
+  echo "### Recent service journal (last hour)"
+  echo '```'
+  journalctl -u adf-orchestrator.service --since "1 hour ago" --no-pager 2>/dev/null | tail -40 || echo "journalctl unavailable"
+  echo '```'
+  echo
+  echo "### Orchestrator processes"
+  echo '```'
+  ps -o pid,etime,rss,cmd -C terraphim_orchestrator 2>/dev/null || echo "no orchestrator process running"
+  echo '```'
+  echo
+  echo "### Disk"
+  echo '```'
+  df -h /opt/ai-dark-factory 2>/dev/null || df -h /
+  echo '```'
+  echo
+  echo "### Memory"
+  echo '```'
+  free -h
+  echo '```'
+  echo
+  echo "## Subscription budgets"
+  echo
+  if [ -d "${BUDGET_DIR}" ]; then
+    for f in "${BUDGET_DIR}"/*.json; do
+      [ -e "$f" ] || continue
+      echo "### $(basename "$f")"
+      echo '```json'
+      cat "$f"
+      echo '```'
+      echo
+    done
+  else
+    echo "_no budget directory_"
+  fi
+  echo
+  echo "## Paused projects"
+  if [ -d "${PAUSE_DIR}" ]; then
+    ls -1 "${PAUSE_DIR}" 2>/dev/null | sed 's/^/  - /' || echo "  (none)"
+  else
+    echo "  (pause directory absent)"
+  fi
+  echo
+} > "${REPORT}"
+
+echo "wrote ${REPORT}"
+
+# Threshold-breach escalation: if any paused project exists, open an [ADF] issue.
+if [ -d "${PAUSE_DIR}" ] && [ -n "$(ls -A "${PAUSE_DIR}" 2>/dev/null)" ]; then
+  PAUSED=$(ls -1 "${PAUSE_DIR}" | tr '\\n' ' ')
+  TITLE="[ADF] paused projects detected: ${PAUSED}"
+  BODY=$(printf 'One or more projects are paused by the circuit breaker.\\n\\nPaused: %s\\n\\nSee: %s\\n' "${PAUSED}" "${REPORT}")
+  gtr create-issue --owner "${OWNER}" --repo "${REPO}" \\
+    --title "${TITLE}" --body "${BODY}" --labels "adf,fleet-meta,priority/high" \\
+    2>&1 || echo "gtr create-issue failed (continuing)"
+fi
+"""
 
 # =============================================================================
 # FLOW DAG -- Compound Review v2
