@@ -464,6 +464,41 @@ mod tests {
     }
 
     #[test]
+    fn test_force_exhaust_trips_both_windows() {
+        // Every window that has a cap must end up Exhausted after
+        // force_exhaust so the routing gate drops the provider until
+        // the next UTC window rolls -- even though we never recorded
+        // any cost.
+        let t = ProviderBudgetTracker::new(vec![cfg("claude-code", Some(500), Some(2000))]);
+        assert_eq!(t.check("claude-code"), BudgetVerdict::WithinBudget);
+
+        t.force_exhaust("claude-code");
+        assert!(
+            matches!(t.check("claude-code"), BudgetVerdict::Exhausted { .. }),
+            "force_exhaust must trip the combined verdict"
+        );
+        // And the filter helper that routing uses must reject it.
+        assert!(!provider_has_budget(&t, "claude-code"));
+    }
+
+    #[test]
+    fn test_force_exhaust_is_noop_for_uncapped_provider() {
+        // No cap means there's nothing to exhaust -- verdict stays
+        // Uncapped so we don't accidentally block a provider that
+        // the operator has intentionally left unbounded.
+        let t = ProviderBudgetTracker::new(vec![cfg("claude-code", None, None)]);
+        t.force_exhaust("claude-code");
+        assert_eq!(t.check("claude-code"), BudgetVerdict::Uncapped);
+    }
+
+    #[test]
+    fn test_force_exhaust_ignores_unknown_provider() {
+        let t = ProviderBudgetTracker::new(vec![cfg("claude-code", Some(100), None)]);
+        t.force_exhaust("not-a-provider"); // must not panic or poison state
+        assert_eq!(t.check("claude-code"), BudgetVerdict::WithinBudget);
+    }
+
+    #[test]
     fn test_day_window_resets_next_day() {
         let t = ProviderBudgetTracker::new(vec![cfg("opencode-go", None, Some(100))]);
         let t0 = Utc.with_ymd_and_hms(2026, 4, 19, 10, 0, 0).unwrap();
