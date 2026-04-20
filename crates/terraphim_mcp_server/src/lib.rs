@@ -160,7 +160,7 @@ impl McpService {
             let result = terraphim_service::auto_route::auto_select_role(
                 &query,
                 &config_snapshot,
-                &*self.config_state,
+                &self.config_state,
                 &ctx,
             )
             .await;
