@@ -182,3 +182,28 @@ fn evaluate_rejects_low_confidence() {
         AutoMergeDecision::Merge => panic!("3/5 confidence must not auto-merge at default cap"),
     }
 }
+
+#[test]
+fn evaluate_rejects_p0_present() {
+    let body = load("nogo_2_5.md");
+    let v = parse_verdict(&body, 606).expect("nogo_2_5 fixture must parse");
+
+    // Fixture has two P0 findings (RCE + auth bypass) and confidence 2/5.
+    assert_eq!(v.p0_count, 2, "nogo_2_5 fixture must report 2 P0 findings");
+
+    // Relax the confidence threshold so the P0 gate fires in isolation.
+    let criteria = AutoMergeCriteria {
+        min_confidence: 1,
+        ..AutoMergeCriteria::default()
+    };
+    let pr = agent_pr(80);
+    match evaluate(&v, &pr, &criteria) {
+        AutoMergeDecision::HumanReviewNeeded(reason) => {
+            assert!(
+                reason.contains("P0"),
+                "reason should cite P0 gate, got: {reason}"
+            );
+        }
+        AutoMergeDecision::Merge => panic!("two P0 findings must block auto-merge"),
+    }
+}
