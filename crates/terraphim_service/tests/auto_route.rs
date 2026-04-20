@@ -92,7 +92,10 @@ async fn t1_single_role_wins_clearly() {
 
     let sysop_thes = build_thesaurus(
         "sysop",
-        &[("rfp", 1, "acquisition need"), ("acquisition", 1, "acquisition need")],
+        &[
+            ("rfp", 1, "acquisition need"),
+            ("acquisition", 1, "acquisition need"),
+        ],
     );
     let default_thes = build_thesaurus("default", &[("anything", 2, "anything")]);
 

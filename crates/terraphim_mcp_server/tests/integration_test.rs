@@ -189,6 +189,7 @@ async fn test_mcp_server_integration() -> Result<()> {
                 name: "search".into(),
                 arguments: serde_json::json!({
                     "query": query,
+                    "role": "Default",
                     "limit": 5
                 })
                 .as_object()
@@ -424,12 +425,15 @@ async fn test_search_pagination() -> Result<()> {
         })
         .await?;
 
-    // First page
+    // First page. Pass `role` explicitly so the auto-router does not prepend
+    // the `[auto-route]` text content -- this test asserts pagination shape,
+    // not routing behaviour.
     let first_page = service
         .call_tool(CallToolRequestParam {
             name: "search".into(),
             arguments: serde_json::json!({
                 "query": "terraphim",
+                "role": "Default",
                 "limit": 2
             })
             .as_object()
@@ -445,12 +449,13 @@ async fn test_search_pagination() -> Result<()> {
         .filter(|c| c.as_resource().is_some())
         .count();
 
-    // Second page (skip=2)
+    // Second page (skip=2). Same explicit-role short-circuit as above.
     let second_page = service
         .call_tool(CallToolRequestParam {
             name: "search".into(),
             arguments: serde_json::json!({
                 "query": "terraphim",
+                "role": "Default",
                 "limit": 2,
                 "skip": 2
             })

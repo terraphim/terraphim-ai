@@ -26,13 +26,6 @@ use terraphim_config::{Config, ConfigState, ServiceType};
 use terraphim_rolegraph::RoleGraph;
 use terraphim_types::RoleName;
 
-/// Legacy multiplicative downweight retained for fixture link-compat only.
-/// New code uses [`JMAP_MISSING_TOKEN_PENALTY`] (saturating subtraction).
-#[deprecated(
-    note = "use JMAP_MISSING_TOKEN_PENALTY (saturating subtraction); kept exported only for fixture link-compat"
-)]
-pub const JMAP_MISSING_TOKEN_DOWNWEIGHT: f64 = 0.5;
-
 /// Penalty subtracted (saturating at zero) from a role's raw distinct-concept
 /// score when the role has any `ServiceType::Jmap` haystack and
 /// `$JMAP_ACCESS_TOKEN` is not set.

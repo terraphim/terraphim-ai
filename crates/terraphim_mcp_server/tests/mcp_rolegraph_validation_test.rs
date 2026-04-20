@@ -210,7 +210,11 @@ async fn test_mcp_server_terraphim_engineer_search() -> Result<()> {
         }
 
         // Check if we got results
-        let result_count = search_result.content.len().saturating_sub(1); // Subtract summary message
+        let result_count = search_result
+            .content
+            .iter()
+            .filter(|c| c.as_resource().is_some())
+            .count(); // Subtract summary message
         println!("Found {} documents for '{}'", result_count, query);
 
         // Print detailed search result for debugging
@@ -303,7 +307,11 @@ async fn test_mcp_role_switching_before_search() -> Result<()> {
         })
         .await?;
 
-    let default_results = default_search.content.len().saturating_sub(1);
+    let default_results = default_search
+        .content
+        .iter()
+        .filter(|c| c.as_resource().is_some())
+        .count();
     println!(
         "Default config found {} results for 'terraphim-graph'",
         default_results
@@ -343,7 +351,11 @@ async fn test_mcp_role_switching_before_search() -> Result<()> {
         })
         .await?;
 
-    let updated_results = updated_search.content.len().saturating_sub(1);
+    let updated_results = updated_search
+        .content
+        .iter()
+        .filter(|c| c.as_resource().is_some())
+        .count();
     println!(
         "Terraphim Engineer config found {} results for 'terraphim-graph'",
         updated_results
@@ -433,7 +445,11 @@ async fn test_mcp_resource_operations() -> Result<()> {
         })
         .await?;
 
-    let search_results = test_search.content.len().saturating_sub(1);
+    let search_results = test_search
+        .content
+        .iter()
+        .filter(|c| c.as_resource().is_some())
+        .count();
     println!(
         "Regular search found {} results for 'terraphim-graph'",
         search_results
@@ -655,7 +671,15 @@ async fn test_mcp_search_uses_selected_role() -> Result<()> {
         !search_without_role.is_error.unwrap_or(false),
         "Search without role should succeed"
     );
-    let results_without_role = search_without_role.content.len().saturating_sub(1);
+    // Count only resource contents -- the no-role path now also prepends an
+    // `[auto-route]` text content alongside the existing heading, so the
+    // pre-auto-route `len - 1` arithmetic is no longer valid. Counting
+    // resources directly is robust to additional text prepends.
+    let results_without_role = search_without_role
+        .content
+        .iter()
+        .filter(|c| c.as_resource().is_some())
+        .count();
     println!(
         "Search WITHOUT role parameter found {} results",
         results_without_role
@@ -680,7 +704,11 @@ async fn test_mcp_search_uses_selected_role() -> Result<()> {
         !search_with_role.is_error.unwrap_or(false),
         "Search with role should succeed"
     );
-    let results_with_role = search_with_role.content.len().saturating_sub(1);
+    let results_with_role = search_with_role
+        .content
+        .iter()
+        .filter(|c| c.as_resource().is_some())
+        .count();
     println!(
         "Search WITH role parameter found {} results",
         results_with_role
@@ -718,7 +746,11 @@ async fn test_mcp_search_uses_selected_role() -> Result<()> {
 
     // This might fail if Default role doesn't exist, but that's okay - we're testing the override mechanism
     if !search_different_role.is_error.unwrap_or(false) {
-        let results_different_role = search_different_role.content.len().saturating_sub(1);
+        let results_different_role = search_different_role
+            .content
+            .iter()
+            .filter(|c| c.as_resource().is_some())
+            .count();
         println!(
             "Search with different role found {} results",
             results_different_role
@@ -750,7 +782,11 @@ async fn test_mcp_search_uses_selected_role() -> Result<()> {
         !graph_search.is_error.unwrap_or(false),
         "Graph search should succeed"
     );
-    let graph_results = graph_search.content.len().saturating_sub(1);
+    let graph_results = graph_search
+        .content
+        .iter()
+        .filter(|c| c.as_resource().is_some())
+        .count();
     println!("Search for 'graph' found {} results", graph_results);
 
     service.cancel().await?;

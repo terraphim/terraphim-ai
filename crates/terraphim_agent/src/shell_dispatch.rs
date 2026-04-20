@@ -670,8 +670,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_execute_dispatch_captures_exit_code() {
-        let config = test_config("/bin/false");
-        // /bin/false ignores all args and exits 1
+        // `false` exits 1. Path differs across systems: Linux ships it at
+        // /bin/false, macOS at /usr/bin/false. Pick whichever exists.
+        let false_bin = ["/usr/bin/false", "/bin/false"]
+            .iter()
+            .find(|p| std::path::Path::new(p).exists())
+            .copied()
+            .expect("expected /usr/bin/false or /bin/false on this system");
+        let config = test_config(false_bin);
         let result = execute_dispatch(&config, "anything", &[]).await.unwrap();
         assert_ne!(result.exit_code, 0);
     }
