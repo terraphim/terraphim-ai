@@ -61,10 +61,20 @@ pub struct ProviderBudgetSnapshot {
     pub providers: HashMap<String, ProviderSnapshotEntry>,
 }
 
+/// Hour + day windows held behind a single mutex so record and check
+/// observe a consistent snapshot across both windows. A prior split
+/// (one mutex per window) allowed a concurrent recorder to interleave
+/// updates such that an observer between the two locks saw the hour
+/// bucket advanced but not the day bucket.
+#[derive(Debug, Default)]
+struct ProviderWindows {
+    hour: WindowState,
+    day: WindowState,
+}
+
 #[derive(Debug, Default)]
 struct ProviderState {
-    hour: Mutex<WindowState>,
-    day: Mutex<WindowState>,
+    windows: Mutex<ProviderWindows>,
 }
 
 /// Tracks provider spend across hour and day windows.
@@ -118,8 +128,9 @@ impl ProviderBudgetTracker {
     fn apply_snapshot(&mut self, snap: ProviderBudgetSnapshot) {
         for (provider, entry) in snap.providers {
             if let Some(state) = self.state.get_mut(&provider) {
-                *state.hour.lock().expect("hour lock poisoned") = entry.hour;
-                *state.day.lock().expect("day lock poisoned") = entry.day;
+                let mut w = state.windows.lock().expect("windows lock poisoned");
+                w.hour = entry.hour;
+                w.day = entry.day;
             }
         }
     }
@@ -128,9 +139,14 @@ impl ProviderBudgetTracker {
     pub fn snapshot(&self) -> ProviderBudgetSnapshot {
         let mut providers = HashMap::with_capacity(self.state.len());
         for (id, state) in &self.state {
-            let hour = *state.hour.lock().expect("hour lock poisoned");
-            let day = *state.day.lock().expect("day lock poisoned");
-            providers.insert(id.clone(), ProviderSnapshotEntry { hour, day });
+            let w = state.windows.lock().expect("windows lock poisoned");
+            providers.insert(
+                id.clone(),
+                ProviderSnapshotEntry {
+                    hour: w.hour,
+                    day: w.day,
+                },
+            );
         }
         ProviderBudgetSnapshot { providers }
     }
@@ -176,9 +192,21 @@ impl ProviderBudgetTracker {
         };
         let delta = (cost_usd * SUB_CENTS_PER_USD as f64).round().max(0.0) as u64;
 
-        let hour_verdict =
-            update_window(&state.hour, hour_window_id(now), cfg.max_hour_cents, delta);
-        let day_verdict = update_window(&state.day, day_window_id(now), cfg.max_day_cents, delta);
+        // Single lock across both windows: record and prune atomically
+        // so a concurrent `check` cannot observe a half-updated state.
+        let mut w = state.windows.lock().expect("windows lock poisoned");
+        let hour_verdict = update_window_in_place(
+            &mut w.hour,
+            hour_window_id(now),
+            cfg.max_hour_cents,
+            delta,
+        );
+        let day_verdict = update_window_in_place(
+            &mut w.day,
+            day_window_id(now),
+            cfg.max_day_cents,
+            delta,
+        );
 
         combine_verdicts(hour_verdict, day_verdict)
     }
@@ -197,8 +225,10 @@ impl ProviderBudgetTracker {
         let Some(state) = self.state.get(provider) else {
             return BudgetVerdict::Uncapped;
         };
-        let hour_verdict = check_window(&state.hour, hour_window_id(now), cfg.max_hour_cents);
-        let day_verdict = check_window(&state.day, day_window_id(now), cfg.max_day_cents);
+        // Single lock: hour and day observed atomically.
+        let w = state.windows.lock().expect("windows lock poisoned");
+        let hour_verdict = check_window_state(&w.hour, hour_window_id(now), cfg.max_hour_cents);
+        let day_verdict = check_window_state(&w.day, day_window_id(now), cfg.max_day_cents);
         combine_verdicts(hour_verdict, day_verdict)
     }
 
@@ -225,13 +255,14 @@ fn day_window_id(ts: DateTime<Utc>) -> u64 {
 
 /// Apply `delta` sub-cents to the window, resetting first if the bucket
 /// has rolled over. Returns the verdict that applies post-record.
-fn update_window(
-    cell: &Mutex<WindowState>,
+/// Operates on an already-locked `WindowState` so the caller holds the
+/// combined hour+day mutex.
+fn update_window_in_place(
+    ws: &mut WindowState,
     current_id: u64,
     max_cents: Option<u64>,
     delta: u64,
 ) -> BudgetVerdict {
-    let mut ws = cell.lock().expect("window lock poisoned");
     if ws.window_id != current_id {
         ws.window_id = current_id;
         ws.sub_cents = 0;
@@ -240,12 +271,11 @@ fn update_window(
     verdict_for(ws.sub_cents, max_cents)
 }
 
-fn check_window(
-    cell: &Mutex<WindowState>,
+fn check_window_state(
+    ws: &WindowState,
     current_id: u64,
     max_cents: Option<u64>,
 ) -> BudgetVerdict {
-    let ws = cell.lock().expect("window lock poisoned");
     if ws.window_id != current_id {
         // Fresh bucket -- no spend yet.
         return verdict_for(0, max_cents);
