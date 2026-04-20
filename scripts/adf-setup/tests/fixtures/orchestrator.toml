@@ -39,8 +39,13 @@ create_prs = false
 worktree_root = "/home/alex/terraphim-ai/.worktrees"
 
 [workflow]
-gitea_base_url = "https://git.example.test"
-gitea_token = "fixture-token-not-real"
+enabled = true
+workflow_file = "/home/alex/terraphim-ai/WORKFLOW.md"
+
+[workflow.tracker]
+kind = "gitea"
+endpoint = "https://git.example.test"
+api_key = "fixture-token-not-real"
 owner = "terraphim"
 repo = "terraphim-ai"
 
