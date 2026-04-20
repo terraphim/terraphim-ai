@@ -832,6 +832,11 @@ impl AgentOrchestrator {
 
         // Graceful shutdown of all agents
         self.persist_telemetry();
+        if let Some(tracker) = self.provider_budget_tracker.as_ref() {
+            if let Err(e) = tracker.persist() {
+                warn!(error = %e, "failed to persist provider budget snapshot during shutdown");
+            }
+        }
         self.shutdown_all_agents().await;
         Ok(())
     }
@@ -3019,6 +3024,16 @@ impl AgentOrchestrator {
         // 15. Periodic telemetry persistence (every 60 ticks = ~5 min at 5s interval)
         if self.tick_count % 60 == 0 {
             self.persist_telemetry();
+        }
+
+        // 16. Flush provider-budget snapshot. The tracker accumulates in
+        // memory via record_telemetry; persist here so hour/day counters
+        // carry across restarts (cf. with_persistence at construction).
+        // Skip when no tracker was configured.
+        if let Some(tracker) = self.provider_budget_tracker.as_ref() {
+            if let Err(e) = tracker.persist() {
+                warn!(error = %e, "failed to persist provider budget snapshot");
+            }
         }
     }
 
