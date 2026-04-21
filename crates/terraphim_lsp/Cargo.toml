@@ -1,0 +1,30 @@
+[package]
+name = "terraphim_lsp"
+version = "0.1.0"
+edition = "2021"
+authors = ["Terraphim AI"]
+description = "LSP server for Terraphim with EDM scanner diagnostics"
+homepage = "https://terraphim.ai"
+license = "Apache-2.0"
+repository = "https://github.com/terraphim/terraphim-ai"
+
+[features]
+default = []
+terraphim-lsp = []
+
+[[bin]]
+name = "terraphim-lsp"
+path = "src/bin/terraphim-lsp.rs"
+required-features = ["terraphim-lsp"]
+
+[dependencies]
+terraphim_negative_contribution = { path = "../terraphim_negative_contribution", version = "0.1.0" }
+terraphim_types = { path = "../terraphim_types", version = "1.0.0" }
+tower-lsp = "0.20"
+tokio = { workspace = true, features = ["full"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+log = { workspace = true }
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }
