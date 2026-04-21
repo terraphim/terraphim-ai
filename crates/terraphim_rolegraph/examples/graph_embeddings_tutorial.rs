@@ -1,3 +1,4 @@
+#![allow(clippy::explicit_counter_loop)]
 //! Terraphim Graph Embeddings Tutorial - Comprehensive Learnings Example
 //!
 //! This tutorial demonstrates:

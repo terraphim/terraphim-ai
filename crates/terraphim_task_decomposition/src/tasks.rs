@@ -480,29 +480,24 @@ impl Task {
         // Add constraint-specific validation based on type
         #[allow(clippy::collapsible_match)]
         match &constraint.constraint_type {
-            TaskConstraintType::Temporal => {
-                // Validate temporal constraint parameters
+            TaskConstraintType::Temporal
                 if !constraint.parameters.contains_key("deadline")
-                    && !constraint.parameters.contains_key("duration")
-                {
-                    return Err(TaskDecompositionError::InvalidTaskSpec(
-                        self.task_id.clone(),
-                        "Temporal constraints must have deadline or duration parameter".to_string(),
-                    ));
-                }
+                    && !constraint.parameters.contains_key("duration") =>
+            {
+                return Err(TaskDecompositionError::InvalidTaskSpec(
+                    self.task_id.clone(),
+                    "Temporal constraints must have deadline or duration parameter".to_string(),
+                ));
             }
-            TaskConstraintType::Resource => {
-                // Validate resource constraint parameters
-                if !constraint.parameters.contains_key("resource_type") {
-                    return Err(TaskDecompositionError::InvalidTaskSpec(
-                        self.task_id.clone(),
-                        "Resource constraints must specify resource_type".to_string(),
-                    ));
-                }
+            TaskConstraintType::Resource
+                if !constraint.parameters.contains_key("resource_type") =>
+            {
+                return Err(TaskDecompositionError::InvalidTaskSpec(
+                    self.task_id.clone(),
+                    "Resource constraints must specify resource_type".to_string(),
+                ));
             }
-            _ => {
-                // Basic validation for other constraint types
-            }
+            _ => {}
         }
 
         Ok(())
