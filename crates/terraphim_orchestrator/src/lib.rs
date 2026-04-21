@@ -2921,6 +2921,234 @@ impl AgentOrchestrator {
         }
     }
 
+    /// Execute a [`DispatchTask::AutoMerge`] task — ROC v1 Step G.
+    ///
+    /// Builds the per-project [`pr_poller::GiteaPrTracker`] from config and
+    /// delegates to [`AgentOrchestrator::handle_auto_merge_for_project`].
+    /// The task's `project` field must match a configured project with a
+    /// `gitea` block (or, for legacy configs, the top-level `gitea`);
+    /// otherwise the call logs-and-skips so the dispatcher keeps draining.
+    pub async fn handle_auto_merge(
+        &mut self,
+        task: dispatcher::DispatchTask,
+    ) -> Result<(), OrchestratorError> {
+        let (pr_number, project, head_sha) = match &task {
+            dispatcher::DispatchTask::AutoMerge {
+                pr_number,
+                project,
+                head_sha,
+            } => (*pr_number, project.clone(), head_sha.clone()),
+            other => {
+                warn!(task = ?other, "handle_auto_merge invoked with non-AutoMerge task; ignoring");
+                return Ok(());
+            }
+        };
+
+        // Resolve the Gitea config for this project. Mirrors the legacy /
+        // multi-project split used by `poll_pending_reviews`.
+        let gitea_cfg: config::GiteaOutputConfig = if self.config.projects.is_empty() {
+            match self.config.gitea.clone() {
+                Some(g) if project == dispatcher::LEGACY_PROJECT_ID => g,
+                Some(_) => {
+                    warn!(
+                        pr_number,
+                        project = %project,
+                        "AutoMerge skipped: legacy mode but task project id does not match LEGACY_PROJECT_ID"
+                    );
+                    return Ok(());
+                }
+                None => {
+                    warn!(
+                        pr_number,
+                        project = %project,
+                        "AutoMerge skipped: legacy mode with no top-level gitea config"
+                    );
+                    return Ok(());
+                }
+            }
+        } else {
+            match self
+                .config
+                .projects
+                .iter()
+                .find(|p| p.id == project)
+                .and_then(|p| p.gitea.clone())
+            {
+                Some(g) => g,
+                None => {
+                    warn!(
+                        pr_number,
+                        project = %project,
+                        "AutoMerge skipped: project has no gitea config"
+                    );
+                    return Ok(());
+                }
+            }
+        };
+
+        let tracker_cfg = terraphim_tracker::GiteaConfig {
+            base_url: gitea_cfg.base_url.clone(),
+            token: gitea_cfg.token.clone(),
+            owner: gitea_cfg.owner.clone(),
+            repo: gitea_cfg.repo.clone(),
+            active_states: vec!["open".to_string()],
+            terminal_states: vec!["closed".to_string()],
+            use_robot_api: false,
+            robot_path: std::path::PathBuf::from("/home/alex/go/bin/gitea-robot"),
+            claim_strategy: terraphim_tracker::gitea::ClaimStrategy::PreferRobot,
+        };
+        let tracker = match terraphim_tracker::GiteaTracker::new(tracker_cfg) {
+            Ok(t) => pr_poller::GiteaPrTracker::new(t),
+            Err(e) => {
+                warn!(
+                    pr_number,
+                    project = %project,
+                    head = %head_sha,
+                    error = %e,
+                    "AutoMerge skipped: failed to create GiteaTracker"
+                );
+                return Ok(());
+            }
+        };
+
+        self.handle_auto_merge_for_project(task, &tracker).await
+    }
+
+    /// Inner AutoMerge executor. Accepts any [`pr_poller::AutoMergeExecutor`]
+    /// so integration tests can drive the full handler with an in-memory
+    /// tracker. Real production code funnels through
+    /// [`AgentOrchestrator::handle_auto_merge`].
+    ///
+    /// Steps:
+    /// 1. Defensive re-check: list open PRs on the project. Skip when the
+    ///    PR is absent (already closed/merged) or the HEAD SHA has moved.
+    /// 2. Attempt the merge.
+    /// 3. On success — enqueue [`DispatchTask::PostMergeTestGate`], record
+    ///    the `(pr, head_sha)` in the dedupe set so late polls never
+    ///    re-enqueue the same revision.
+    /// 4. On failure — open an `[ADF]` tracking issue with the failure
+    ///    reason via [`pr_poller::AutoMergeExecutor::open_failure_issue`];
+    ///    do **not** enqueue a post-merge gate.
+    pub async fn handle_auto_merge_for_project<T: pr_poller::AutoMergeExecutor + ?Sized>(
+        &mut self,
+        task: dispatcher::DispatchTask,
+        tracker: &T,
+    ) -> Result<(), OrchestratorError> {
+        let (pr_number, project, head_sha) = match task {
+            dispatcher::DispatchTask::AutoMerge {
+                pr_number,
+                project,
+                head_sha,
+            } => (pr_number, project, head_sha),
+            other => {
+                warn!(task = ?other, "handle_auto_merge_for_project invoked with non-AutoMerge task; ignoring");
+                return Ok(());
+            }
+        };
+
+        // 1. Defensive re-check: ensure the PR is still open and the HEAD
+        // SHA matches what the verdict was computed against. If either has
+        // moved, the merge decision is stale — skip silently.
+        let open_prs = match tracker.list_open_prs().await {
+            Ok(prs) => prs,
+            Err(e) => {
+                warn!(
+                    pr_number,
+                    project = %project,
+                    head = %head_sha,
+                    error = %e,
+                    "AutoMerge skipped: failed to list open PRs for head_sha re-check"
+                );
+                return Ok(());
+            }
+        };
+
+        let live = match open_prs.iter().find(|p| p.number == pr_number) {
+            Some(p) => p,
+            None => {
+                info!(
+                    pr_number,
+                    project = %project,
+                    head = %head_sha,
+                    "AutoMerge skipped: PR no longer in open list (closed/merged already)"
+                );
+                return Ok(());
+            }
+        };
+        if live.head_sha != head_sha {
+            info!(
+                pr_number,
+                project = %project,
+                expected_head = %head_sha,
+                live_head = %live.head_sha,
+                "AutoMerge skipped: PR HEAD SHA moved since verdict (stale auto-merge decision)"
+            );
+            return Ok(());
+        }
+
+        // 2. Merge.
+        match tracker.merge_pr(pr_number).await {
+            Ok(outcome) => {
+                info!(
+                    pr_number,
+                    project = %project,
+                    merge_sha = %outcome.merge_commit_sha,
+                    "pr_auto_merged"
+                );
+
+                // 3a. Defensive dedupe write — covers AutoMerge tasks that
+                // reached the handler by a path other than the poller
+                // (webhook, manual enqueue, etc.). `record_if_new` is a
+                // no-op when the entry already exists.
+                let _ = self
+                    .auto_merge_enqueued
+                    .record_if_new(&project, pr_number, &head_sha);
+
+                // 3b. Enqueue the post-merge test gate (Step H stub).
+                self.dispatcher
+                    .enqueue(dispatcher::DispatchTask::PostMergeTestGate {
+                        pr_number,
+                        project: project.clone(),
+                        merge_sha: outcome.merge_commit_sha,
+                        title: outcome.title,
+                    });
+
+                Ok(())
+            }
+            Err(e) => {
+                warn!(
+                    pr_number,
+                    project = %project,
+                    head = %head_sha,
+                    error = %e,
+                    "pr_auto_merge_failed"
+                );
+
+                // 4. Open an [ADF] tracking issue with the failure reason.
+                let title = format!("[ADF] Auto-merge failed for PR #{pr_number}");
+                let body = format!(
+                    "AutoMerge handler failed to merge PR #{pr_number} on project `{project}`.\n\n\
+                     Head SHA: `{head_sha}`\n\n\
+                     Error: {e}\n\n\
+                     The PR was left open; a human needs to investigate (merge conflict, \
+                     protected branch, permissions, transient API failure).\n\n\
+                     Refs: ROC v1 Step G handler, adf-fleet#35."
+                );
+                let labels = ["adf", "auto-merge-failed", "status/needs-triage"];
+                if let Err(issue_err) = tracker.open_failure_issue(&title, &body, &labels).await {
+                    warn!(
+                        pr_number,
+                        project = %project,
+                        error = %issue_err,
+                        "AutoMerge failure issue creation also failed; nothing to retry automatically"
+                    );
+                }
+
+                Ok(())
+            }
+        }
+    }
+
     /// Check if an agent is already assigned to this issue and currently active.
     ///
     /// Returns `true` if dispatch should be **skipped** (duplicate), `false` if
