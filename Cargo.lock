@@ -8682,6 +8682,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "terraphim_negative_contribution"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "terraphim_automata",
+ "terraphim_types",
+]
+
+[[package]]
 name = "terraphim_onepassword_cli"
 version = "1.0.0"
 dependencies = [
