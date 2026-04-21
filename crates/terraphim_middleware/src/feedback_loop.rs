@@ -52,42 +52,29 @@ pub async fn record_learning_application(
     effective: bool,
     config: &FeedbackConfig,
 ) -> Result<(), FeedbackError> {
-    // Update learning quality via store
-    // Note: We assume the store's record_application is called externally
-    // Here we just update the graph rank
-
-    // Find the document in the graph
     let adjustment = if effective {
         config.rank_boost_per_success
     } else {
         config.rank_penalty_per_failure
     };
 
-    update_document_rank(graph, learning_id, adjustment)?;
+    update_document_rank(graph, learning_id, effective, adjustment)?;
 
     Ok(())
 }
 
 /// Update the rank of a document in the graph
 fn update_document_rank(
-    _graph: &mut RoleGraph,
+    graph: &mut RoleGraph,
     document_id: &str,
+    increase: bool,
     adjustment: u64,
 ) -> Result<(), FeedbackError> {
-    // Access the documents field directly
-    // Note: RoleGraph.documents is private, so we need to use public methods
-    // Since index_learning_document just inserts, we can't easily update
-    // For now, this is a no-op that would need RoleGraph to expose document mutation
-
-    // TODO: Requires RoleGraph to expose document mutation API
-    // This is a placeholder that logs the intent
-    log::info!(
-        "Would adjust rank of document {} by {}",
-        document_id,
-        adjustment
-    );
-
-    Ok(())
+    if graph.adjust_learning_document_rank(document_id, increase, adjustment) {
+        Ok(())
+    } else {
+        Err(FeedbackError::DocumentNotFound(document_id.to_string()))
+    }
 }
 
 /// Record that a graph query touched nodes linked to learnings
@@ -124,4 +111,7 @@ pub enum FeedbackError {
 
     #[error("store error: {0}")]
     Store(#[from] StoreError),
+
+    #[error("learning document not found in graph: {0}")]
+    DocumentNotFound(String),
 }
