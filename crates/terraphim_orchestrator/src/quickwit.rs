@@ -2,9 +2,22 @@
 //!
 //! Feature-gated behind `quickwit` feature flag.
 //! Provides async log shipping to Quickwit search engine.
+//!
+//! # Typed orchestrator events
+//!
+//! [`OrchestratorEvent`] is the single event enum for the ROC v1 auto-review
+//! and auto-merge flow. Emit sites:
+//!
+//! | Variant                  | Emit site (lib.rs)                                    |
+//! |--------------------------|-------------------------------------------------------|
+//! | `PrReviewed`             | `poll_pending_reviews_for_project` — after verdict    |
+//! | `PrAutoMerged`           | `handle_auto_merge_for_project` — after merge_pr OK   |
+//! | `PrAutoMergedVerified`   | `handle_post_merge_test_gate_with_runner` — gate pass |
+//! | `PrAutoReverted`         | `handle_post_merge_test_gate_with_runner` — gate fail |
 
 use std::collections::HashMap;
 
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
 use tokio::sync::mpsc;
@@ -81,6 +94,54 @@ impl<T> From<mpsc::error::SendError<T>> for QuickwitError {
     fn from(_: mpsc::error::SendError<T>) -> Self {
         QuickwitError::SendError("Channel closed".to_string())
     }
+}
+
+/// Typed events emitted by the ROC v1 auto-review / auto-merge flow.
+///
+/// Serialised as the `extra.event_kind`-discriminated JSON object that lands
+/// in the `extra` field of a [`LogDocument`]. The Quickwit index is
+/// schema-on-read so no index migration is required.
+#[derive(Debug, Clone, Serialize)]
+#[serde(tag = "event_kind", rename_all = "snake_case")]
+pub enum OrchestratorEvent {
+    /// Reviewer agent completed and a verdict was successfully parsed.
+    PrReviewed {
+        pr_number: u64,
+        project: String,
+        head_sha: String,
+        reviewer_login: String,
+        /// Confidence score 1-5 from the `structural-pr-review` comment.
+        confidence: u8,
+        p0_count: u32,
+        p1_count: u32,
+        /// `"GO"` | `"CONDITIONAL"` | `"NO-GO"`
+        verdict: String,
+    },
+    /// AutoMerge handler merged the PR successfully.
+    PrAutoMerged {
+        pr_number: u64,
+        project: String,
+        merge_sha: String,
+        title: String,
+    },
+    /// Post-merge test gate passed; the merge is stable.
+    PrAutoMergedVerified {
+        pr_number: u64,
+        project: String,
+        merge_sha: String,
+        wall_time_secs: f64,
+    },
+    /// Post-merge test gate failed and the merge was reverted.
+    PrAutoReverted {
+        pr_number: u64,
+        project: String,
+        merge_sha: String,
+        revert_sha: String,
+        /// Classified failure kind (e.g. `"TestFailure"`, `"Timeout"`).
+        reason: String,
+        /// Byte length of the captured stderr tail for forensics.
+        stderr_tail_bytes: u32,
+    },
 }
 
 /// Async log shipper for Quickwit
@@ -279,6 +340,42 @@ impl QuickwitFleetSink {
         }
         // No sink configured for this project and no fallback: drop silently.
         Ok(())
+    }
+
+    /// Emit a typed [`OrchestratorEvent`] to the sink for `project_id`.
+    ///
+    /// Serialises the event into the `extra` field of a [`LogDocument`] and
+    /// routes it through the normal fleet-sink path. All errors (serialisation
+    /// failures, full channel, absent sink) are swallowed with a `warn!` log
+    /// so the caller's business logic is never blocked by Quickwit
+    /// unavailability.
+    pub async fn emit_event(&self, project_id: &str, event: OrchestratorEvent) {
+        let extra = match serde_json::to_value(&event) {
+            Ok(v) => v,
+            Err(e) => {
+                warn!(error = %e, "failed to serialize orchestrator event for Quickwit");
+                return;
+            }
+        };
+        let event_kind = extra
+            .get("event_kind")
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown")
+            .to_string();
+        let doc = LogDocument {
+            timestamp: Utc::now().to_rfc3339(),
+            project_id: project_id.to_string(),
+            level: "INFO".to_string(),
+            agent_name: "orchestrator".to_string(),
+            layer: "Core".to_string(),
+            source: "orchestrator".to_string(),
+            message: event_kind,
+            extra: Some(extra),
+            ..Default::default()
+        };
+        if let Err(e) = self.send(doc).await {
+            warn!(error = %e, "failed to emit orchestrator event to Quickwit sink");
+        }
     }
 
     /// Non-blocking variant of [`QuickwitFleetSink::send`].
