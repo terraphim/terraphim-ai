@@ -797,6 +797,7 @@ pub const ALLOWED_PROVIDER_PREFIXES: &[&str] = &[
     "kimi-for-coding",
     "minimax-coding-plan",
     "zai-coding-plan",
+    "openai",
 ];
 
 /// Explicitly banned provider prefixes. Anything matching these is rejected
@@ -2065,6 +2066,9 @@ task = "t"
         assert!(is_allowed_provider("kimi-for-coding/k2p5"));
         assert!(is_allowed_provider("minimax-coding-plan/MiniMax-M2.5"));
         assert!(is_allowed_provider("zai-coding-plan/glm-4.6"));
+        assert!(is_allowed_provider("openai/gpt-5.4"));
+        assert!(is_allowed_provider("openai/gpt-5.3-codex"));
+        assert!(is_allowed_provider("openai/gpt-5.4"));
     }
 
     #[test]

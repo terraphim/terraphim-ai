@@ -19,6 +19,9 @@ trigger:: tasks requiring deep reasoning, architecture decisions, or strategic p
 route:: anthropic, opus
 action:: /home/alex/.local/bin/claude --model {{ model }} -p "{{ prompt }}" --max-turns 50
 
+route:: kimi, kimi-for-coding/k2p6
+action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"
+
 route:: openai, openai/gpt-5.4
 action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"
 
