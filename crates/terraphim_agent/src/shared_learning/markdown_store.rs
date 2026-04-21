@@ -190,14 +190,33 @@ impl MarkdownLearningStore {
 
     /// List all learnings across all agents
     pub async fn list_all(&self) -> Result<Vec<SharedLearning>, MarkdownStoreError> {
+        let all_with_origin = self.list_all_with_origin().await?;
+        Ok(all_with_origin
+            .into_iter()
+            .map(|(_, learning)| learning)
+            .collect())
+    }
+
+    pub(crate) async fn list_all_with_origin(
+        &self,
+    ) -> Result<Vec<(bool, SharedLearning)>, MarkdownStoreError> {
         let mut all_learnings = Vec::new();
+
+        if !self.config.learnings_dir.exists() {
+            return Ok(all_learnings);
+        }
 
         let mut entries = tokio::fs::read_dir(&self.config.learnings_dir).await?;
         while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
             if path.is_dir() {
-                let mut learnings = self.list_from_dir(&path).await?;
-                all_learnings.append(&mut learnings);
+                let is_shared = path
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .is_some_and(|name| name == self.config.shared_dir_name);
+
+                let learnings = self.list_from_dir(&path).await?;
+                all_learnings.extend(learnings.into_iter().map(|learning| (is_shared, learning)));
             }
         }
 
@@ -603,5 +622,20 @@ This is content from an old learning.
         let titles: Vec<String> = all.into_iter().map(|l| l.title).collect();
         assert!(titles.contains(&"Agent Learning".to_string()));
         assert!(titles.contains(&"Shared Learning".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_list_all_returns_empty_when_root_missing() {
+        let temp_dir = TempDir::new().unwrap();
+        let missing_root = temp_dir.path().join("does-not-exist");
+
+        let config = MarkdownStoreConfig {
+            learnings_dir: missing_root,
+            shared_dir_name: "shared".to_string(),
+        };
+        let store = MarkdownLearningStore::with_config(config);
+
+        let all = store.list_all().await.unwrap();
+        assert!(all.is_empty());
     }
 }
