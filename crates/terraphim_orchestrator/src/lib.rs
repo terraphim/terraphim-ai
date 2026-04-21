@@ -2891,6 +2891,39 @@ impl AgentOrchestrator {
             };
 
             let outcome = pr_poller::evaluate_pr_verdict(&pr, &comments, criteria);
+
+            // Emit PrReviewed for any outcome that resolved a parsed verdict.
+            #[cfg(feature = "quickwit")]
+            if let Some(ref sink) = self.quickwit_sink {
+                let has_verdict = matches!(
+                    outcome,
+                    pr_poller::EvaluationOutcome::Merge { .. }
+                        | pr_poller::EvaluationOutcome::HumanReviewNeeded { .. }
+                );
+                if has_verdict {
+                    if let Some(rc) = pr_poller::latest_reviewer_comment(&comments) {
+                        if let Ok(v) = pr_review::parse_verdict(&rc.body, rc.id) {
+                            let verdict_str = match &outcome {
+                                pr_poller::EvaluationOutcome::Merge { .. } => "GO",
+                                _ if v.p0_count > 0 => "NO-GO",
+                                _ => "CONDITIONAL",
+                            };
+                            let event = quickwit::OrchestratorEvent::PrReviewed {
+                                pr_number: pr.number,
+                                project: project_id.to_string(),
+                                head_sha: pr.head_sha.clone(),
+                                reviewer_login: rc.user_login.clone(),
+                                confidence: v.confidence,
+                                p0_count: v.p0_count,
+                                p1_count: v.p1_count,
+                                verdict: verdict_str.to_string(),
+                            };
+                            let _ = sink.emit_event(project_id, event).await;
+                        }
+                    }
+                }
+            }
+
             match outcome {
                 pr_poller::EvaluationOutcome::Merge { head_sha } => {
                     if !self
@@ -3119,6 +3152,17 @@ impl AgentOrchestrator {
                     "pr_auto_merged"
                 );
 
+                #[cfg(feature = "quickwit")]
+                if let Some(ref sink) = self.quickwit_sink {
+                    let event = quickwit::OrchestratorEvent::PrAutoMerged {
+                        pr_number,
+                        project: project.clone(),
+                        merge_sha: outcome.merge_commit_sha.clone(),
+                        title: outcome.title.clone(),
+                    };
+                    let _ = sink.emit_event(&project, event).await;
+                }
+
                 // 3a. Defensive dedupe write — covers AutoMerge tasks that
                 // reached the handler by a path other than the poller
                 // (webhook, manual enqueue, etc.). `record_if_new` is a
@@ -3292,14 +3336,16 @@ impl AgentOrchestrator {
                 wall_time_secs = outcome.wall_time.as_secs_f64(),
                 "post_merge_gate_verified"
             );
-            // Placeholder for Step I's typed Quickwit event.
-            info!(
-                pr_number,
-                project = %project,
-                merge_sha = %merge_sha,
-                event_kind = "pr_auto_merged_verified",
-                "quickwit_event_placeholder"
-            );
+            #[cfg(feature = "quickwit")]
+            if let Some(ref sink) = self.quickwit_sink {
+                let event = quickwit::OrchestratorEvent::PrAutoMergedVerified {
+                    pr_number,
+                    project: project.clone(),
+                    merge_sha: merge_sha.clone(),
+                    wall_time_secs: outcome.wall_time.as_secs_f64(),
+                };
+                let _ = sink.emit_event(&project, event).await;
+            }
             return Ok(());
         }
 
@@ -3341,14 +3387,18 @@ impl AgentOrchestrator {
             reason = ?classification.kind,
             "post_merge_gate_reverted"
         );
-        // Placeholder for Step I's typed Quickwit event.
-        info!(
-            pr_number,
-            project = %project,
-            merge_sha = %merge_sha,
-            event_kind = "pr_auto_reverted",
-            "quickwit_event_placeholder"
-        );
+        #[cfg(feature = "quickwit")]
+        if let Some(ref sink) = self.quickwit_sink {
+            let event = quickwit::OrchestratorEvent::PrAutoReverted {
+                pr_number,
+                project: project.clone(),
+                merge_sha: merge_sha.clone(),
+                revert_sha: revert.revert_sha.clone(),
+                reason: format!("{:?}", classification.kind),
+                stderr_tail_bytes: outcome.stderr_tail.len() as u32,
+            };
+            let _ = sink.emit_event(&project, event).await;
+        }
 
         // Open an [ADF] tracking issue. Best-effort — a failure here is
         // logged but does not propagate: the revert has already landed.
