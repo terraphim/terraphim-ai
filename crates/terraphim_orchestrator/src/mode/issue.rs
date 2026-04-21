@@ -114,6 +114,7 @@ impl IssueMode {
         }
 
         // Sort by priority and PageRank
+        #[allow(clippy::unnecessary_sort_by)]
         issues.sort_by(|a, b| {
             let a_score = compute_sort_score(a);
             let b_score = compute_sort_score(b);

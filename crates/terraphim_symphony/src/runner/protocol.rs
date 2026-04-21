@@ -280,6 +280,7 @@ pub fn deduplicate_findings(findings: Vec<ReviewFinding>) -> Vec<ReviewFinding> 
             .or_insert(finding);
     }
     let mut result: Vec<ReviewFinding> = best.into_values().collect();
+    #[allow(clippy::unnecessary_sort_by)]
     result.sort_by(|a, b| {
         b.severity
             .cmp(&a.severity)

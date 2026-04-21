@@ -302,6 +302,7 @@ impl LearningPersistence for InMemoryLearningPersistence {
             .collect();
 
         // Sort: highest trust first, then by effective_count desc
+        #[allow(clippy::unnecessary_sort_by)]
         results.sort_by(|a, b| {
             b.trust_level
                 .cmp(&a.trust_level)
@@ -549,6 +550,7 @@ impl LearningPersistence for DeviceStorageLearningPersistence {
             .cloned()
             .collect();
 
+        #[allow(clippy::unnecessary_sort_by)]
         results.sort_by(|a, b| {
             b.trust_level
                 .cmp(&a.trust_level)

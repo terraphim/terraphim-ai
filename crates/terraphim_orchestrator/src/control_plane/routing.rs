@@ -500,6 +500,7 @@ impl RoutingDecisionEngine {
         }
 
         let mut indexed: Vec<usize> = (0..all_candidates.len()).collect();
+        #[allow(clippy::unnecessary_sort_by)]
         indexed.sort_by(|&a, &b| {
             pressured_scores[b]
                 .partial_cmp(&pressured_scores[a])

@@ -217,6 +217,7 @@ impl KnowledgeGraphIntegration {
         }
 
         // Sort by match score (highest first)
+        #[allow(clippy::unnecessary_sort_by)]
         matches.sort_by(|a, b| {
             b.match_score
                 .partial_cmp(&a.match_score)

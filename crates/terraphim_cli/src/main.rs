@@ -193,6 +193,17 @@ enum Commands {
         json: bool,
     },
 
+    /// Evaluate automata classification accuracy against ground truth
+    Evaluate {
+        /// Path to ground truth JSON file
+        #[arg(long)]
+        ground_truth: String,
+
+        /// Path to thesaurus JSON file
+        #[arg(long)]
+        thesaurus: String,
+    },
+
     /// Generate shell completions
     Completions {
         /// Shell to generate completions for
@@ -404,6 +415,10 @@ async fn main() -> Result<()> {
             }
             result
         }
+        Some(Commands::Evaluate {
+            ground_truth,
+            thesaurus,
+        }) => handle_evaluate(&service, &ground_truth, &thesaurus).await,
         Some(Commands::Thesaurus { role, limit }) => handle_thesaurus(&service, role, limit).await,
         Some(Commands::CheckUpdate) => handle_check_update().await,
         Some(Commands::Update) => handle_update().await,
@@ -749,6 +764,25 @@ async fn handle_coverage(
     let schema = terraphim_types::OntologySchema::load_from_file(schema_path)
         .map_err(|e| anyhow::anyhow!("Failed to load schema '{}': {}", schema_path, e))?;
     let result = service.calculate_coverage(&schema, &text, threshold)?;
+    Ok(serde_json::to_value(&result)?)
+}
+
+async fn handle_evaluate(
+    _service: &CliService,
+    ground_truth_path: &str,
+    thesaurus_path: &str,
+) -> Result<serde_json::Value> {
+    use terraphim_automata::{AutomataPath, evaluate, load_ground_truth};
+
+    let ground_truth = load_ground_truth(std::path::Path::new(ground_truth_path)).map_err(|e| {
+        anyhow::anyhow!("Failed to load ground truth '{}': {}", ground_truth_path, e)
+    })?;
+
+    let thesaurus = terraphim_automata::load_thesaurus(&AutomataPath::from_local(thesaurus_path))
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to load thesaurus '{}': {}", thesaurus_path, e))?;
+
+    let result = evaluate(&ground_truth, thesaurus);
     Ok(serde_json::to_value(&result)?)
 }
 
