@@ -52,6 +52,7 @@ impl CodeBlockExtractor {
         code_blocks.extend(self.extract_inline_executable_code(text));
 
         // Sort by execution confidence
+        #[allow(clippy::unnecessary_sort_by)]
         code_blocks.sort_by(|a, b| {
             b.execution_confidence
                 .partial_cmp(&a.execution_confidence)

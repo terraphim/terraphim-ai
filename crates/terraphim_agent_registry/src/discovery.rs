@@ -220,6 +220,7 @@ impl DiscoveryAlgorithmImpl for ExactMatchAlgorithm {
         }
 
         // Sort by match score (highest first)
+        #[allow(clippy::unnecessary_sort_by)]
         matches.sort_by(|a, b| {
             b.match_score
                 .partial_cmp(&a.match_score)
@@ -424,6 +425,7 @@ impl DiscoveryAlgorithmImpl for FuzzyMatchAlgorithm {
         }
 
         // Sort by match score (highest first)
+        #[allow(clippy::unnecessary_sort_by)]
         matches.sort_by(|a, b| {
             b.match_score
                 .partial_cmp(&a.match_score)
@@ -533,6 +535,7 @@ impl DiscoveryEngine {
                     .map(|(agent_match, _, _)| agent_match)
                     .collect();
 
+                #[allow(clippy::unnecessary_sort_by)]
                 final_matches.sort_by(|a, b| {
                     b.match_score
                         .partial_cmp(&a.match_score)
