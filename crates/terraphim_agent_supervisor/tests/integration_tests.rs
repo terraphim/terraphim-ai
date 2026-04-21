@@ -11,6 +11,153 @@ use terraphim_agent_supervisor::{
     SupervisorConfig, SupervisorStatus, TestAgentFactory,
 };
 
+/// Regression test for #252: RestForOne must restart only agents started after the failed one.
+/// Previously sort_by_key used agent_id (UUID) which gave arbitrary order; now uses start_time.
+#[tokio::test]
+async fn rest_for_one_respects_start_order() {
+    env_logger::try_init().ok();
+
+    let mut config = SupervisorConfig::default();
+    config.restart_policy.strategy = RestartStrategy::RestForOne;
+
+    let factory = Arc::new(TestAgentFactory);
+    let mut supervisor = AgentSupervisor::new(config, factory);
+    supervisor.start().await.unwrap();
+
+    // Spawn three agents in sequence; start_time ordering: A < B < C.
+    let agent_a = supervisor
+        .spawn_agent(AgentSpec::new("test".to_string(), json!({})))
+        .await
+        .unwrap();
+    // Brief sleep so system clock advances between spawns.
+    sleep(Duration::from_millis(10)).await;
+    let agent_b = supervisor
+        .spawn_agent(AgentSpec::new("test".to_string(), json!({})))
+        .await
+        .unwrap();
+    sleep(Duration::from_millis(10)).await;
+    let agent_c = supervisor
+        .spawn_agent(AgentSpec::new("test".to_string(), json!({})))
+        .await
+        .unwrap();
+
+    // Capture start_times before the failure so we can compare afterwards.
+    let start_times_before: std::collections::HashMap<_, _> = supervisor
+        .get_children()
+        .await
+        .into_iter()
+        .map(|(pid, info)| (pid, info.start_time))
+        .collect();
+    assert_eq!(start_times_before.len(), 3);
+
+    // Agent B fails. RestForOne must restart B and C (started after A) but leave A untouched.
+    supervisor
+        .handle_agent_exit(agent_b.clone(), ExitReason::Error("b failed".to_string()))
+        .await
+        .unwrap();
+
+    sleep(Duration::from_millis(100)).await;
+
+    let children_after = supervisor.get_children().await;
+    assert_eq!(children_after.len(), 3, "all three agents must still exist");
+
+    // A must not have been restarted: its start_time must be unchanged.
+    let a_start_after = children_after
+        .get(&agent_a)
+        .expect("agent A must still exist")
+        .start_time;
+    assert_eq!(
+        a_start_after,
+        *start_times_before.get(&agent_a).unwrap(),
+        "agent A (started before B) must not be restarted by RestForOne"
+    );
+
+    // B and C must have been re-spawned: their start_times must be >= their original values.
+    // (spawn_agent creates a new SupervisedAgentInfo with Utc::now() as start_time)
+    let b_start_after = children_after
+        .get(&agent_b)
+        .expect("agent B must still exist")
+        .start_time;
+    assert!(
+        b_start_after >= *start_times_before.get(&agent_b).unwrap(),
+        "agent B must have been re-spawned"
+    );
+
+    let c_start_after = children_after
+        .get(&agent_c)
+        .expect("agent C must still exist")
+        .start_time;
+    assert!(
+        c_start_after >= *start_times_before.get(&agent_c).unwrap(),
+        "agent C must have been re-spawned"
+    );
+
+    supervisor.stop().await.unwrap();
+}
+
+/// Regression test for #255: supervisor must permanently set `escalated = true` when max
+/// restarts are exceeded, and all subsequent restart attempts must be rejected.
+#[tokio::test]
+async fn escalated_flag_prevents_further_restarts() {
+    env_logger::try_init().ok();
+
+    // Allow only 1 restart within a long window.
+    let config = SupervisorConfig {
+        restart_policy: RestartPolicy::new(
+            RestartStrategy::OneForOne,
+            RestartIntensity::new(1, Duration::from_secs(120)),
+        ),
+        ..Default::default()
+    };
+
+    let factory = Arc::new(TestAgentFactory);
+    let mut supervisor = AgentSupervisor::new(config, factory);
+    supervisor.start().await.unwrap();
+
+    assert!(
+        !supervisor.is_escalated(),
+        "supervisor must start un-escalated"
+    );
+
+    let spec = AgentSpec::new("test".to_string(), json!({}));
+    let agent_id = supervisor.spawn_agent(spec).await.unwrap();
+
+    // First failure: restart_count goes from 0 -> 1, which equals max_restarts.
+    // The *next* failure should trigger escalation.
+    supervisor
+        .handle_agent_exit(agent_id.clone(), ExitReason::Error("first".to_string()))
+        .await
+        .unwrap();
+    sleep(Duration::from_millis(50)).await;
+    assert!(
+        !supervisor.is_escalated(),
+        "not yet escalated after first failure"
+    );
+
+    // Second failure: restart_count is now 1, which exceeds max_restarts (1) -> escalate.
+    let result = supervisor
+        .handle_agent_exit(agent_id.clone(), ExitReason::Error("second".to_string()))
+        .await;
+    assert!(result.is_err(), "second failure must be rejected");
+    assert!(
+        supervisor.is_escalated(),
+        "supervisor must be escalated now"
+    );
+
+    // Third attempt on a completely different agent must also be rejected.
+    let spec2 = AgentSpec::new("test".to_string(), json!({}));
+    let agent_id2 = supervisor.spawn_agent(spec2).await.unwrap();
+    let result2 = supervisor
+        .handle_agent_exit(agent_id2, ExitReason::Error("third".to_string()))
+        .await;
+    assert!(
+        result2.is_err(),
+        "escalated supervisor must reject all restarts"
+    );
+
+    supervisor.stop().await.unwrap();
+}
+
 #[tokio::test]
 async fn test_supervision_tree_basic_operations() {
     env_logger::try_init().ok();
