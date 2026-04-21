@@ -49,6 +49,7 @@ pub mod mode;
 pub mod nightwatch;
 pub mod output_poster;
 pub mod persona;
+pub mod post_merge_gate;
 pub mod pr_dispatch;
 pub mod pr_poller;
 pub mod pr_review;
@@ -5339,6 +5340,7 @@ mod tests {
             project_circuit_breaker_threshold: 3,
             fleet_escalation_owner: None,
             fleet_escalation_repo: None,
+            post_merge_gate: None,
         }
     }
 
@@ -5569,6 +5571,7 @@ task = "test"
             project_circuit_breaker_threshold: 3,
             fleet_escalation_owner: None,
             fleet_escalation_repo: None,
+            post_merge_gate: None,
         }
     }
 
@@ -6404,6 +6407,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             project_circuit_breaker_threshold: 3,
             fleet_escalation_owner: None,
             fleet_escalation_repo: None,
+            post_merge_gate: None,
         };
         (config, tmp)
     }
