@@ -177,6 +177,52 @@ pub struct OrchestratorConfig {
     /// `None`, the orchestrator falls back to [`GiteaOutputConfig::repo`].
     #[serde(default)]
     pub fleet_escalation_repo: Option<String>,
+    /// Optional post-merge test gate configuration (ROC v1 Step H).
+    ///
+    /// When omitted the orchestrator uses all defaults — 10 minute test
+    /// budget, push revert to `origin main`. Configure explicitly only to
+    /// raise the test timeout or suppress the push (self-hosted fleets
+    /// without a remote).
+    #[serde(default)]
+    pub post_merge_gate: Option<PostMergeGateConfig>,
+}
+
+/// Post-merge test gate (ROC v1 Step H) configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PostMergeGateConfig {
+    /// Wall-time cap for `cargo test --workspace` in seconds. Defaults to
+    /// [`crate::post_merge_gate::DEFAULT_MAX_TEST_DURATION_SECS`] (600).
+    #[serde(default = "default_post_merge_gate_max_test_duration_secs")]
+    pub max_test_duration_secs: u64,
+    /// Git remote to push the revert commit to on red. Defaults to
+    /// `Some("origin")`. Set to `None` to suppress the push.
+    #[serde(default = "default_post_merge_gate_remote")]
+    pub revert_push_remote: Option<String>,
+    /// Branch to push the revert to. Defaults to `"main"`.
+    #[serde(default = "default_post_merge_gate_branch")]
+    pub revert_push_branch: String,
+}
+
+fn default_post_merge_gate_max_test_duration_secs() -> u64 {
+    crate::post_merge_gate::DEFAULT_MAX_TEST_DURATION_SECS
+}
+
+fn default_post_merge_gate_remote() -> Option<String> {
+    Some("origin".to_string())
+}
+
+fn default_post_merge_gate_branch() -> String {
+    "main".to_string()
+}
+
+impl Default for PostMergeGateConfig {
+    fn default() -> Self {
+        Self {
+            max_test_duration_secs: default_post_merge_gate_max_test_duration_secs(),
+            revert_push_remote: default_post_merge_gate_remote(),
+            revert_push_branch: default_post_merge_gate_branch(),
+        }
+    }
 }
 
 /// Configuration for KG-driven model routing.
