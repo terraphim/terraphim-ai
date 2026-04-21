@@ -928,6 +928,16 @@ enum SharedLearningSub {
     Import,
     /// Show shared learning statistics by trust level
     Stats,
+    /// Inject learnings from shared directory into local store
+    #[cfg(feature = "cross-agent-injection")]
+    Inject {
+        /// Minimum trust level to inject (l1, l2, l3)
+        #[arg(long, default_value = "l2")]
+        min_trust: String,
+        /// Dry run (show what would be injected without injecting)
+        #[arg(long, default_value_t = false)]
+        dry_run: bool,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -2870,10 +2880,45 @@ async fn run_shared_learning_command(
                 } else {
                     0.0
                 };
-                println!("  Total applications:   {}", total_applied);
                 println!("  Avg success rate:     {:.1}%", avg_success);
             }
             Ok(())
+        }
+        #[cfg(feature = "cross-agent-injection")]
+        SharedLearningSub::Inject { min_trust, dry_run } => {
+            use terraphim_agent::shared_learning::TrustLevel;
+            use terraphim_agent::shared_learning::injector::{InjectorConfig, LearningInjector};
+
+            let trust_level = min_trust
+                .to_uppercase()
+                .parse::<TrustLevel>()
+                .unwrap_or(TrustLevel::L2);
+
+            let config = InjectorConfig::default().with_min_trust_level(trust_level);
+            let injector = LearningInjector::new(config);
+
+            let result = injector.run_injection().await?;
+
+            if dry_run {
+                println!("Dry run - would inject {} learnings:", result.injected);
+                for id in &result.injected_ids {
+                    println!("  - {}", id);
+                }
+            } else {
+                println!(
+                    "Injection complete: {} injected, {} skipped (trust), {} skipped (context), {} skipped (exists)",
+                    result.injected,
+                    result.skipped_trust,
+                    result.skipped_context,
+                    result.skipped_exists
+                );
+            }
+            Ok(())
+        }
+        #[cfg(not(feature = "cross-agent-injection"))]
+        SharedLearningSub::Inject { .. } => {
+            eprintln!("error: 'inject' requires the 'cross-agent-injection' feature");
+            std::process::exit(1);
         }
     }
 }
