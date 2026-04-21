@@ -391,7 +391,7 @@ impl KnowledgeGraphWorkerAgent {
         } else {
             0.7
         };
-        let random_value: f64 = rand::random();
+        let random_value: f64 = fastrand::f64();
 
         if random_value < success_probability {
             Ok(format!("Task {} completed successfully", task.task_id))
