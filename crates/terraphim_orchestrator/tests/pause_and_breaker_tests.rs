@@ -91,6 +91,7 @@ fn test_config_with_pause(pause_dir: PathBuf, threshold: u32) -> OrchestratorCon
         project_circuit_breaker_threshold: threshold,
         fleet_escalation_owner: None,
         fleet_escalation_repo: None,
+        post_merge_gate: None,
     }
 }
 

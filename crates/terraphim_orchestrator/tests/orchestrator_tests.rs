@@ -159,6 +159,7 @@ fn test_config() -> OrchestratorConfig {
         project_circuit_breaker_threshold: 3,
         fleet_escalation_owner: None,
         fleet_escalation_repo: None,
+        post_merge_gate: None,
     }
 }
 
