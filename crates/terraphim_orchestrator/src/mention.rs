@@ -3,6 +3,14 @@
 //! Supports two addressing modes:
 //! - Agent name: `@adf:security-sentinel` (exact match on agent name)
 //! - Persona name: `@adf:vigil` (resolved via PersonaRegistry)
+//!
+//! # Aho-Corasick mention scanning
+//!
+//! [`MentionScanner`] builds an Aho-Corasick automaton at startup from the
+//! configured agent and persona names, then uses O(text + patterns) matching
+//! to locate `@adf:<name>` mentions.  The regex fallback is kept only for the
+//! project-qualified `@adf:<project>/<name>` form, which is a structural
+//! pattern not suitable for pure substring matching.
 
 use crate::config::AgentDefinition;
 use crate::persona::PersonaRegistry;
@@ -12,6 +20,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::LazyLock;
 use terraphim_tracker::IssueComment;
+use terraphim_types::{NormalizedTerm, NormalizedTermValue, Thesaurus};
 
 pub(crate) use crate::dispatcher::LEGACY_PROJECT_ID;
 
@@ -24,6 +33,106 @@ static MENTION_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"@adf:(?:(?P<project>[a-z][a-z0-9-]{1,39})/)?(?P<agent>[a-z][a-z0-9-]{1,39})\b")
         .unwrap()
 });
+
+// ---------------------------------------------------------------------------
+// MentionScanner: Aho-Corasick automaton for O(text + patterns) scanning
+// ---------------------------------------------------------------------------
+
+/// The kind of a pattern stored in [`MentionScanner`].
+#[derive(Debug, Clone, PartialEq)]
+pub enum MentionPatternKind {
+    AgentName,
+    PersonaName,
+}
+
+/// An Aho-Corasick-based scanner for `@adf:<name>` mentions.
+///
+/// Built once from the current agent and persona lists, and rebuilt whenever
+/// the agent configuration changes.  `scan` returns all known names that
+/// appear as `@adf:<name>` in the input text in O(text + patterns) time.
+pub struct MentionScanner {
+    /// Thesaurus mapping "@adf:<name>" patterns to NormalizedTerms.
+    thesaurus: Thesaurus,
+    /// Parallel vec: which kind each term id corresponds to.
+    kind_by_id: HashMap<u64, MentionPatternKind>,
+}
+
+/// A single hit produced by [`MentionScanner::scan`].
+#[derive(Debug, Clone)]
+pub struct MentionHit {
+    /// The bare name extracted from the `@adf:<name>` pattern.
+    pub name: String,
+    pub kind: MentionPatternKind,
+}
+
+impl MentionScanner {
+    /// Build a scanner from agent definitions and the persona registry.
+    ///
+    /// Patterns are added for every agent name and every persona name (lower-cased).
+    /// If an agent name and a persona share the same identifier the agent entry
+    /// takes precedence (it is inserted first).
+    pub fn new(agents: &[AgentDefinition], personas: &PersonaRegistry) -> Self {
+        let mut thesaurus = Thesaurus::new("adf_mentions".to_string());
+        let mut kind_by_id: HashMap<u64, MentionPatternKind> = HashMap::new();
+
+        // Agent names take priority — insert first.
+        for agent in agents {
+            let pattern = format!("@adf:{}", agent.name.to_lowercase());
+            let key = NormalizedTermValue::from(pattern.as_str());
+            if thesaurus.get(&key).is_none() {
+                let term = NormalizedTerm::with_auto_id(NormalizedTermValue::from(
+                    agent.name.to_lowercase().as_str(),
+                ));
+                let id = term.id;
+                thesaurus.insert(key, term);
+                kind_by_id.insert(id, MentionPatternKind::AgentName);
+            }
+        }
+
+        // Persona names as fallback patterns.
+        for name in personas.persona_names() {
+            let pattern = format!("@adf:{}", name.to_lowercase());
+            let key = NormalizedTermValue::from(pattern.as_str());
+            if thesaurus.get(&key).is_none() {
+                let term = NormalizedTerm::with_auto_id(NormalizedTermValue::from(
+                    name.to_lowercase().as_str(),
+                ));
+                let id = term.id;
+                thesaurus.insert(key, term);
+                kind_by_id.insert(id, MentionPatternKind::PersonaName);
+            }
+        }
+
+        Self { thesaurus, kind_by_id }
+    }
+
+    /// Scan `text` for `@adf:<name>` hits using the Aho-Corasick automaton.
+    ///
+    /// Returns one [`MentionHit`] per pattern match, in order of appearance.
+    /// Duplicate matches (same name mentioned twice) are included.
+    pub fn scan(&self, text: &str) -> Vec<MentionHit> {
+        match terraphim_automata::find_matches(text, self.thesaurus.clone(), false) {
+            Ok(matches) => matches
+                .into_iter()
+                .map(|m| {
+                    let kind = self
+                        .kind_by_id
+                        .get(&m.normalized_term.id)
+                        .cloned()
+                        .unwrap_or(MentionPatternKind::AgentName);
+                    MentionHit {
+                        name: m.normalized_term.value.to_string(),
+                        kind,
+                    }
+                })
+                .collect(),
+            Err(e) => {
+                tracing::warn!(error = %e, "MentionScanner::scan failed, returning empty");
+                Vec::new()
+            }
+        }
+    }
+}
 
 /// How a mention was resolved.
 #[derive(Debug, Clone, PartialEq)]
@@ -342,6 +451,35 @@ pub async fn migrate_legacy_mention_cursor(projects: &[crate::config::Project]) 
 ///
 /// This is the legacy single-project resolver used by the compound-review
 /// persona dispatch path. Multi-project resolution lives in [`resolve_mention`].
+/// Count how many of `capabilities` appear in `context_lower` using
+/// Aho-Corasick matching (O(context + capabilities)).
+///
+/// Returns the number of unique capability terms that match, capped at the
+/// total number of capabilities.
+fn capability_match_count(capabilities: &[String], context_lower: &str) -> usize {
+    if capabilities.is_empty() || context_lower.is_empty() {
+        return 0;
+    }
+
+    let mut thesaurus = Thesaurus::new("caps".to_string());
+    for cap in capabilities {
+        let key = NormalizedTermValue::from(cap.to_lowercase().as_str());
+        let term = NormalizedTerm::with_auto_id(NormalizedTermValue::from(
+            cap.to_lowercase().as_str(),
+        ));
+        thesaurus.insert(key, term);
+    }
+
+    match terraphim_automata::find_matches(context_lower, thesaurus, false) {
+        Ok(matches) => {
+            let unique: std::collections::HashSet<String> =
+                matches.into_iter().map(|m| m.normalized_term.value.to_string()).collect();
+            unique.len()
+        }
+        Err(_) => 0,
+    }
+}
+
 pub fn resolve_persona_mention(
     raw: &str,
     agents: &[AgentDefinition],
@@ -376,17 +514,15 @@ pub fn resolve_persona_mention(
                 ));
             }
             _ => {
-                // Multiple agents share this persona. Pick by keyword overlap with context.
+                // Multiple agents share this persona. Pick by keyword overlap with context
+                // using Aho-Corasick matching (O(context + capabilities)) instead of
+                // O(context * capabilities) substring loops.
                 let context_lower = context.to_lowercase();
                 let mut best_agent = &matching_agents[0];
                 let mut best_score = 0usize;
 
                 for agent in &matching_agents {
-                    let score = agent
-                        .capabilities
-                        .iter()
-                        .filter(|cap| context_lower.contains(&cap.to_lowercase()))
-                        .count();
+                    let score = capability_match_count(&agent.capabilities, &context_lower);
                     if score > best_score || (score == best_score && agent.name < best_agent.name) {
                         best_score = score;
                         best_agent = agent;
@@ -490,6 +626,10 @@ pub fn resolve_mention(
 
 /// Parse and resolve all @adf:name mentions from a comment.
 ///
+/// Uses [`MentionScanner`] (Aho-Corasick) for unqualified `@adf:<name>`
+/// mentions and falls back to the regex for project-qualified
+/// `@adf:<project>/<name>` forms.
+///
 /// `hinted_project` is the id of the project whose repo the comment was
 /// polled from, or [`LEGACY_PROJECT_ID`] in single-project mode. It is
 /// stamped on every produced [`DetectedMention`] for downstream dispatch.
@@ -500,13 +640,61 @@ pub fn parse_mentions(
     personas: &PersonaRegistry,
     hinted_project: &str,
 ) -> Vec<DetectedMention> {
-    let mut mentions = Vec::new();
+    let scanner = MentionScanner::new(agents, personas);
+    parse_mentions_with_scanner(comment, issue_number, agents, personas, hinted_project, &scanner)
+}
 
+/// Low-level mention parser that accepts a pre-built [`MentionScanner`].
+///
+/// Callers that process many comments in a tight loop should build the
+/// scanner once and reuse it via this function instead of `parse_mentions`.
+pub fn parse_mentions_with_scanner(
+    comment: &IssueComment,
+    issue_number: u64,
+    agents: &[AgentDefinition],
+    personas: &PersonaRegistry,
+    hinted_project: &str,
+    scanner: &MentionScanner,
+) -> Vec<DetectedMention> {
+    let mut mentions = Vec::new();
+    let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+    // Phase 1 — Aho-Corasick pass for known unqualified @adf:<name> mentions.
+    for hit in scanner.scan(&comment.body) {
+        if seen.contains(&hit.name) {
+            continue;
+        }
+        if let Some((agent_name, resolution)) =
+            resolve_persona_mention(&hit.name, agents, personas, &comment.body)
+        {
+            seen.insert(hit.name.clone());
+            mentions.push(DetectedMention {
+                issue_number,
+                comment_id: comment.id,
+                raw_mention: hit.name,
+                agent_name,
+                resolution,
+                comment_body: comment.body.clone(),
+                mentioner: comment.user.login.clone(),
+                timestamp: comment.created_at.clone(),
+                project_id: hinted_project.to_string(),
+            });
+        }
+    }
+
+    // Phase 2 — regex fallback for project-qualified @adf:<project>/<name> forms.
     for cap in MENTION_RE.captures_iter(&comment.body) {
+        // Only handle qualified (project/name) mentions; unqualified ones are
+        // covered by the Aho-Corasick pass above.
+        let Some(_project) = cap.name("project") else { continue };
         let raw_agent = cap.name("agent").map(|m| m.as_str()).unwrap_or_default();
+        if seen.contains(raw_agent) {
+            continue;
+        }
         if let Some((agent_name, resolution)) =
             resolve_persona_mention(raw_agent, agents, personas, &comment.body)
         {
+            seen.insert(raw_agent.to_string());
             mentions.push(DetectedMention {
                 issue_number,
                 comment_id: comment.id,
@@ -522,7 +710,7 @@ pub fn parse_mentions(
             tracing::warn!(
                 raw_mention = raw_agent,
                 issue = issue_number,
-                "unresolved @adf mention"
+                "unresolved @adf qualified mention"
             );
         }
     }
@@ -769,6 +957,95 @@ mod tests {
         let personas = test_personas();
         let result = resolve_persona_mention("nonexistent", &agents, &personas, "context");
         assert!(result.is_none());
+    }
+
+    // -----------------------------------------------------------------------
+    // MentionScanner (Aho-Corasick Phase 1 + 2) tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn scanner_detects_agent_name() {
+        let agents = test_agents();
+        let personas = test_personas();
+        let scanner = MentionScanner::new(&agents, &personas);
+        let hits = scanner.scan("Please @adf:security-sentinel review this code");
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].name, "security-sentinel");
+        assert_eq!(hits[0].kind, MentionPatternKind::AgentName);
+    }
+
+    #[test]
+    fn scanner_detects_persona_name() {
+        let agents = test_agents();
+        let personas = test_personas();
+        let scanner = MentionScanner::new(&agents, &personas);
+        let hits = scanner.scan("@adf:vigil please check security");
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].name, "vigil");
+        assert_eq!(hits[0].kind, MentionPatternKind::PersonaName);
+    }
+
+    #[test]
+    fn scanner_returns_empty_for_unknown_name() {
+        let agents = test_agents();
+        let personas = test_personas();
+        let scanner = MentionScanner::new(&agents, &personas);
+        let hits = scanner.scan("@adf:ghost please review");
+        assert!(hits.is_empty());
+    }
+
+    #[test]
+    fn scanner_detects_multiple_hits() {
+        let agents = test_agents();
+        let personas = test_personas();
+        let scanner = MentionScanner::new(&agents, &personas);
+        let hits = scanner.scan("@adf:vigil and @adf:carthos please review");
+        assert_eq!(hits.len(), 2);
+    }
+
+    #[test]
+    fn capability_match_count_basic() {
+        let caps = vec!["security".to_string(), "audit".to_string()];
+        let ctx = "please run a security audit on this code";
+        assert_eq!(capability_match_count(&caps, ctx), 2);
+    }
+
+    #[test]
+    fn capability_match_count_no_match() {
+        let caps = vec!["typescript".to_string(), "frontend".to_string()];
+        let ctx = "please run a security audit on this code";
+        assert_eq!(capability_match_count(&caps, ctx), 0);
+    }
+
+    #[test]
+    fn capability_match_count_empty_caps() {
+        let caps: Vec<String> = vec![];
+        assert_eq!(capability_match_count(&caps, "any context"), 0);
+    }
+
+    #[test]
+    fn parse_mentions_with_scanner_single() {
+        let agents = test_agents();
+        let personas = test_personas();
+        let scanner = MentionScanner::new(&agents, &personas);
+        let comment = make_comment(1, "Please @adf:security-sentinel review", "alice");
+        let mentions =
+            parse_mentions_with_scanner(&comment, 42, &agents, &personas, LEGACY_PROJECT_ID, &scanner);
+        assert_eq!(mentions.len(), 1);
+        assert_eq!(mentions[0].agent_name, "security-sentinel");
+    }
+
+    #[test]
+    fn parse_mentions_with_scanner_persona() {
+        let agents = test_agents();
+        let personas = test_personas();
+        let scanner = MentionScanner::new(&agents, &personas);
+        // "vigil" with "license" context → compliance-watchdog wins
+        let comment = make_comment(2, "@adf:vigil check license compliance", "alice");
+        let mentions =
+            parse_mentions_with_scanner(&comment, 42, &agents, &personas, LEGACY_PROJECT_ID, &scanner);
+        assert_eq!(mentions.len(), 1);
+        assert_eq!(mentions[0].agent_name, "compliance-watchdog");
     }
 
     #[test]
