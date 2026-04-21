@@ -1515,6 +1515,8 @@ mod tests {
                 limit: None,
                 semantic: false,
                 concepts: false,
+                format: None,
+                robot: false,
             }
         );
 
@@ -1529,6 +1531,8 @@ mod tests {
                 limit: Some(5),
                 semantic: false,
                 concepts: false,
+                format: None,
+                robot: false,
             }
         );
     }

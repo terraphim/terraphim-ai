@@ -726,6 +726,7 @@ fn test_repl_complex_search_query() {
             limit,
             semantic,
             concepts,
+            ..
         }) => {
             assert_eq!(query, "rust async programming");
             assert_eq!(role, Some("engineer".to_string()));

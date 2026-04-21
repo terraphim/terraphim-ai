@@ -17,6 +17,7 @@ fn test_basic_search_command_parsing() {
             limit,
             semantic,
             concepts,
+            ..
         } => {
             assert_eq!(query, "rust programming");
             assert_eq!(role, None);
@@ -39,6 +40,7 @@ fn test_search_with_role_command_parsing() {
             limit,
             semantic,
             concepts,
+            ..
         } => {
             assert_eq!(query, "rust programming");
             assert_eq!(role, Some("Developer".to_string()));
@@ -61,6 +63,7 @@ fn test_search_with_limit_command_parsing() {
             limit,
             semantic,
             concepts,
+            ..
         } => {
             assert_eq!(query, "rust programming");
             assert_eq!(role, None);
@@ -83,6 +86,7 @@ fn test_search_semantic_flag_parsing() {
             limit,
             semantic,
             concepts,
+            ..
         } => {
             assert_eq!(query, "rust programming");
             assert_eq!(role, None);
@@ -105,6 +109,7 @@ fn test_search_concepts_flag_parsing() {
             limit,
             semantic,
             concepts,
+            ..
         } => {
             assert_eq!(query, "rust programming");
             assert_eq!(role, None);
@@ -130,6 +135,7 @@ fn test_search_all_flags_parsing() {
             limit,
             semantic,
             concepts,
+            ..
         } => {
             assert_eq!(query, "rust programming");
             assert_eq!(role, Some("Developer".to_string()));
@@ -152,6 +158,7 @@ fn test_search_complex_query_parsing() {
             limit,
             semantic,
             concepts,
+            ..
         } => {
             assert_eq!(query, "\"machine learning algorithms\"");
             assert_eq!(role, Some("DataScientist".to_string()));
@@ -201,10 +208,9 @@ fn test_search_with_multiple_words_and_spaces() {
     match command {
         ReplCommand::Search {
             query,
-            role: _,
-            limit: _,
             semantic,
             concepts,
+            ..
         } => {
             assert_eq!(query, "rust async programming");
             assert!(semantic);
@@ -234,6 +240,7 @@ fn test_search_flags_order_independence() {
                 limit,
                 semantic,
                 concepts,
+                ..
             } => {
                 assert_eq!(query, "test");
                 assert_eq!(role, Some("Dev".to_string()));
@@ -259,9 +266,9 @@ fn test_search_with_special_characters() {
         ReplCommand::Search {
             query,
             role,
-            limit: _,
             semantic,
             concepts,
+            ..
         } => {
             assert_eq!(query, "\"C++ templates\"");
             assert_eq!(role, Some("CppDeveloper".to_string()));
@@ -279,10 +286,9 @@ fn test_search_concepts_flag_multiple_times() {
     match command {
         ReplCommand::Search {
             query,
-            role: _,
-            limit: _,
             semantic,
             concepts,
+            ..
         } => {
             assert_eq!(query, "test");
             assert!(!semantic);
@@ -299,10 +305,9 @@ fn test_search_semantic_flag_multiple_times() {
     match command {
         ReplCommand::Search {
             query,
-            role: _,
-            limit: _,
             semantic,
             concepts,
+            ..
         } => {
             assert_eq!(query, "test");
             assert!(semantic); // Should still be true even with multiple flags
@@ -339,10 +344,8 @@ fn test_search_with_very_long_query() {
     match command {
         ReplCommand::Search {
             query,
-            role: _,
-            limit: _,
             semantic,
-            concepts: _,
+            ..
         } => {
             assert_eq!(query.len(), 1000);
             assert!(semantic);
@@ -395,4 +398,99 @@ fn test_search_edge_cases() {
     } else {
         panic!("Expected Search command");
     }
+}
+
+/// Test --format flag parsing
+#[cfg(feature = "repl")]
+#[test]
+fn test_search_format_json_parsing() {
+    use terraphim_agent::robot::OutputFormat;
+    let cmd = ReplCommand::from_str("/search rust --format json").unwrap();
+    match cmd {
+        ReplCommand::Search { query, format, robot, .. } => {
+            assert_eq!(query, "rust");
+            assert_eq!(format, Some(OutputFormat::Json));
+            assert!(!robot);
+        }
+        _ => panic!("Expected Search command"),
+    }
+}
+
+/// Test --format jsonl flag parsing
+#[cfg(feature = "repl")]
+#[test]
+fn test_search_format_jsonl_parsing() {
+    use terraphim_agent::robot::OutputFormat;
+    let cmd = ReplCommand::from_str("/search rust --format jsonl").unwrap();
+    match cmd {
+        ReplCommand::Search { format, .. } => {
+            assert_eq!(format, Some(OutputFormat::Jsonl));
+        }
+        _ => panic!("Expected Search command"),
+    }
+}
+
+/// Test --format minimal flag parsing
+#[cfg(feature = "repl")]
+#[test]
+fn test_search_format_minimal_parsing() {
+    use terraphim_agent::robot::OutputFormat;
+    let cmd = ReplCommand::from_str("/search rust --format minimal").unwrap();
+    match cmd {
+        ReplCommand::Search { format, .. } => {
+            assert_eq!(format, Some(OutputFormat::Minimal));
+        }
+        _ => panic!("Expected Search command"),
+    }
+}
+
+/// Test --robot flag parsing
+#[cfg(feature = "repl")]
+#[test]
+fn test_search_robot_flag_parsing() {
+    let cmd = ReplCommand::from_str("/search rust --robot").unwrap();
+    match cmd {
+        ReplCommand::Search { robot, format, .. } => {
+            assert!(robot);
+            assert_eq!(format, None);
+        }
+        _ => panic!("Expected Search command"),
+    }
+}
+
+/// Test --robot and --format together
+#[cfg(feature = "repl")]
+#[test]
+fn test_search_robot_with_format_parsing() {
+    use terraphim_agent::robot::OutputFormat;
+    let cmd = ReplCommand::from_str("/search rust --robot --format jsonl").unwrap();
+    match cmd {
+        ReplCommand::Search { robot, format, .. } => {
+            assert!(robot);
+            assert_eq!(format, Some(OutputFormat::Jsonl));
+        }
+        _ => panic!("Expected Search command"),
+    }
+}
+
+/// Test invalid format value returns error
+#[cfg(feature = "repl")]
+#[test]
+fn test_search_invalid_format_returns_error() {
+    let result = ReplCommand::from_str("/search rust --format invalid_fmt");
+    assert!(result.is_err(), "Invalid format should produce an error");
+    let err = result.unwrap_err().to_string();
+    assert!(
+        err.contains("Valid formats"),
+        "Error should list valid formats, got: {}",
+        err
+    );
+}
+
+/// Test --format missing value returns error
+#[cfg(feature = "repl")]
+#[test]
+fn test_search_format_missing_value_returns_error() {
+    let result = ReplCommand::from_str("/search rust --format");
+    assert!(result.is_err(), "--format without value should produce an error");
 }

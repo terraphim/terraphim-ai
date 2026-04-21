@@ -363,7 +363,19 @@ impl ReplHandler {
         limit: Option<usize>,
         semantic: bool,
         concepts: bool,
+        format: Option<crate::robot::OutputFormat>,
+        robot: bool,
     ) -> Result<()> {
+        // Determine if we should use structured output
+        let use_structured = robot || format.is_some();
+        let output_format = if let Some(f) = format {
+            f
+        } else if robot {
+            crate::robot::OutputFormat::Json
+        } else {
+            crate::robot::OutputFormat::Table
+        };
+
         #[cfg(feature = "repl")]
         {
             use colored::Colorize;
@@ -371,15 +383,16 @@ impl ReplHandler {
             use comfy_table::presets::UTF8_FULL;
             use comfy_table::{Cell, Table};
 
-            let search_mode = if semantic { "semantic " } else { "" }.to_string()
-                + if concepts { "concepts " } else { "" };
-
-            println!(
-                "{} {}Searching for: '{}'",
-                "🔍".bold(),
-                search_mode,
-                query.cyan()
-            );
+            if !use_structured {
+                let search_mode = if semantic { "semantic " } else { "" }.to_string()
+                    + if concepts { "concepts " } else { "" };
+                println!(
+                    "{} {}Searching for: '{}'",
+                    "🔍".bold(),
+                    search_mode,
+                    query.cyan()
+                );
+            }
 
             if let Some(service) = &self.service {
                 let role_name = if let Some(r) = role.as_deref() {
@@ -389,7 +402,9 @@ impl ReplHandler {
                 };
                 let results = service.search_with_role(&query, &role_name, limit).await?;
 
-                if results.is_empty() {
+                if use_structured {
+                    Self::print_structured_results(&results, output_format)?;
+                } else if results.is_empty() {
                     println!("{} No results found", "ℹ".blue().bold());
                 } else {
                     let mut table = Table::new();
@@ -440,7 +455,9 @@ impl ReplHandler {
 
                 match api_client.search(&search_query).await {
                     Ok(response) => {
-                        if response.results.is_empty() {
+                        if use_structured {
+                            Self::print_structured_results(&response.results, output_format)?;
+                        } else if response.results.is_empty() {
                             println!("{} No results found", "ℹ".blue().bold());
                         } else {
                             let mut table = Table::new();
@@ -481,6 +498,38 @@ impl ReplHandler {
             println!("Search functionality requires repl feature");
         }
 
+        Ok(())
+    }
+
+    /// Print search results in structured format (JSON/JSONL/minimal)
+    fn print_structured_results(
+        results: &[terraphim_types::Document],
+        format: crate::robot::OutputFormat,
+    ) -> Result<()> {
+        match format {
+            crate::robot::OutputFormat::Jsonl => {
+                for doc in results {
+                    println!("{}", serde_json::to_string(doc)?);
+                }
+            }
+            crate::robot::OutputFormat::Minimal => {
+                let minimal: Vec<serde_json::Value> = results
+                    .iter()
+                    .map(|d| {
+                        serde_json::json!({
+                            "title": d.title,
+                            "url": d.url,
+                            "rank": d.rank
+                        })
+                    })
+                    .collect();
+                println!("{}", serde_json::to_string(&minimal)?);
+            }
+            _ => {
+                // Json and Table both produce pretty JSON in structured mode
+                println!("{}", serde_json::to_string_pretty(results)?);
+            }
+        }
         Ok(())
     }
 
