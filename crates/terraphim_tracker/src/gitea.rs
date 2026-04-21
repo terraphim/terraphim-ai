@@ -1053,6 +1053,8 @@ struct RepoComment {
     id: u64,
     #[serde(default)]
     issue_url: Option<String>,
+    #[serde(default)]
+    pull_request_url: Option<String>,
     user: CommentUser,
     #[serde(default)]
     body: Option<String>,
@@ -1131,11 +1133,21 @@ impl From<GiteaPullRequest> for GiteaPrSummary {
 
 impl From<RepoComment> for IssueComment {
     fn from(rc: RepoComment) -> Self {
-        // Extract issue number from issue_url like "/api/v1/repos/owner/repo/issues/123"
-        let issue_number = rc
+        // Gitea returns two mutually-exclusive URL fields depending on comment kind:
+        //   issue_url        — set for issue comments (empty string for PR comments)
+        //   pull_request_url — set for PR comments (empty string for issue comments)
+        //
+        // Both URLs end in `/NNN` where NNN shares the issue numeric namespace,
+        // so we try issue_url first, then fall back to pull_request_url.
+        // Previously only issue_url was read, which silently set issue_number=0
+        // for every PR comment and broke OutputPoster (see adf-fleet#44).
+        let url = rc
             .issue_url
             .as_deref()
-            .unwrap_or("")
+            .filter(|s| !s.is_empty())
+            .or_else(|| rc.pull_request_url.as_deref().filter(|s| !s.is_empty()))
+            .unwrap_or("");
+        let issue_number = url
             .rsplit('/')
             .next()
             .and_then(|s| s.parse().ok())
@@ -1525,6 +1537,59 @@ mod tests {
         assert_eq!(comments.len(), 1);
         assert_eq!(comments[0].issue_number, 0); // no issue_url -> default 0
         assert_eq!(comments[0].body, "") // missing body -> default empty
+    }
+
+    /// Gitea returns pull_request_url (not issue_url) for PR comments.
+    /// Regression test for adf-fleet#44: previously PR comments all came through
+    /// with issue_number=0, which broke OutputPoster (500 on POST /issues/0/comments).
+    #[tokio::test]
+    async fn test_repo_comments_pr_comment_extracts_pr_number_from_pull_request_url() {
+        let mock_server = wiremock::MockServer::start().await;
+
+        let comments_json = serde_json::json!([
+            {
+                "id": 9880,
+                "user": {"login": "root"},
+                "body": "@adf:reviewer please check",
+                "issue_url": "",
+                "pull_request_url": "https://example.com/api/v1/repos/testowner/testrepo/pulls/28",
+                "created_at": "2026-04-21T17:02:07+02:00",
+                "updated_at": "2026-04-21T17:02:07+02:00"
+            },
+            {
+                "id": 9879,
+                "user": {"login": "merge-coordinator"},
+                "body": "verdict",
+                "issue_url": "https://example.com/api/v1/repos/testowner/testrepo/issues/113",
+                "pull_request_url": "",
+                "created_at": "2026-04-21T16:49:46+02:00",
+                "updated_at": "2026-04-21T16:49:46+02:00"
+            }
+        ]);
+        Mock::given(method("GET"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/comments"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&comments_json))
+            .mount(&mock_server)
+            .await;
+
+        let tracker = make_tracker(&mock_server.uri());
+        let comments = tracker
+            .fetch_repo_comments(None, None)
+            .await
+            .expect("fetch should succeed");
+        assert_eq!(comments.len(), 2);
+
+        let pr_comment = comments.iter().find(|c| c.id == 9880).unwrap();
+        assert_eq!(
+            pr_comment.issue_number, 28,
+            "PR comment must resolve to PR number via pull_request_url fallback"
+        );
+
+        let issue_comment = comments.iter().find(|c| c.id == 9879).unwrap();
+        assert_eq!(
+            issue_comment.issue_number, 113,
+            "issue comment resolution through issue_url still works"
+        );
     }
 
     #[tokio::test]
