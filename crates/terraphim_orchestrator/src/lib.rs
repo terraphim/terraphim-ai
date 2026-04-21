@@ -428,7 +428,6 @@ fn nest_by_project<V: Clone>(
     out
 }
 
-
 /// Validate agent name for safe use in file paths.
 /// Rejects empty names, names containing path separators or traversal sequences.
 fn validate_agent_name(name: &str) -> Result<(), OrchestratorError> {
