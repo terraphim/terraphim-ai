@@ -214,6 +214,7 @@ pub fn autocomplete_search(
     }
 
     // Sort results by score (descending) then by term length (ascending) for better UX
+    #[allow(clippy::unnecessary_sort_by)]
     results.sort_by(|a, b| {
         b.score
             .partial_cmp(&a.score)
@@ -296,6 +297,7 @@ pub fn fuzzy_autocomplete_search_levenshtein(
         }
 
         // Sort by combined score (similarity * original_score)
+        #[allow(clippy::unnecessary_sort_by)]
         fuzzy_candidates.sort_by(|a, b| {
             b.score
                 .partial_cmp(&a.score)
@@ -309,6 +311,7 @@ pub fn fuzzy_autocomplete_search_levenshtein(
     }
 
     // Final sort by score
+    #[allow(clippy::unnecessary_sort_by)]
     all_results.sort_by(|a, b| {
         b.score
             .partial_cmp(&a.score)
@@ -386,6 +389,7 @@ pub fn fuzzy_autocomplete_search(
         }
 
         // Sort by combined score (similarity * original_score)
+        #[allow(clippy::unnecessary_sort_by)]
         fuzzy_candidates.sort_by(|a, b| {
             b.score
                 .partial_cmp(&a.score)
@@ -399,6 +403,7 @@ pub fn fuzzy_autocomplete_search(
     }
 
     // Final sort by score
+    #[allow(clippy::unnecessary_sort_by)]
     all_results.sort_by(|a, b| {
         b.score
             .partial_cmp(&a.score)

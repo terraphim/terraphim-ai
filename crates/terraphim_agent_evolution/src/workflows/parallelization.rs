@@ -1,3 +1,4 @@
+#![allow(clippy::collapsible_match)]
 //! Parallelization workflow pattern
 //!
 //! This pattern executes multiple prompts concurrently and aggregates their results.

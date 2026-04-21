@@ -138,6 +138,7 @@ pub fn apply_policy(
         });
     }
 
+    #[allow(clippy::unnecessary_sort_by)]
     eligible.sort_by(|a, b| {
         b.score
             .partial_cmp(&a.score)

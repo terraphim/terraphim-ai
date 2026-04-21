@@ -56,6 +56,7 @@ pub fn find_similar_commands(
         .collect();
 
     // Sort by edit distance first, then by similarity (descending)
+    #[allow(clippy::unnecessary_sort_by)]
     suggestions.sort_by(|a, b| {
         a.edit_distance.cmp(&b.edit_distance).then_with(|| {
             // Use total_cmp for safe f64 comparison (handles NaN)

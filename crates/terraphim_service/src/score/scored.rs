@@ -50,6 +50,7 @@ impl<T> SearchResults<T> {
             let score = rescore(result.value());
             result.set_score(score);
         }
+        #[allow(clippy::unnecessary_sort_by)]
         self.0.sort_by(|s1, s2| s1.cmp(s2).reverse());
     }
 
