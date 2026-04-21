@@ -49,6 +49,7 @@ pub mod mode;
 pub mod nightwatch;
 pub mod output_poster;
 pub mod persona;
+pub mod pr_dispatch;
 pub mod pr_review;
 pub mod project_control;
 pub mod provider_budget;
@@ -1632,6 +1633,251 @@ impl AgentOrchestrator {
         Ok(())
     }
 
+    /// Handle a `DispatchTask::ReviewPr` dispatch: run the routing engine,
+    /// enforce the C1/C3 provider allow-list, and spawn the pr-reviewer agent
+    /// with `ADF_PR_*` env overrides carrying the per-dispatch context.
+    ///
+    /// The task is a no-op (with a warn log) when no `pr-reviewer` agent is
+    /// configured for the project yet. Step E adds the canonical
+    /// `pr-reviewer.toml` fragment; until then this method must not crash the
+    /// reconcile loop.
+    ///
+    /// Unlike [`spawn_agent`], this path skips persona composition, skill
+    /// chain injection, and worktree creation. The pr-reviewer is review-tier
+    /// (read-only), so the heavyweight scaffolding from the implementation
+    /// spawn path is intentionally left out.
+    ///
+    /// [`spawn_agent`]: AgentOrchestrator::spawn_agent
+    pub(crate) async fn handle_review_pr(
+        &mut self,
+        task: dispatcher::DispatchTask,
+    ) -> Result<(), OrchestratorError> {
+        let (pr_number, project, head_sha, author_login, title, diff_loc) = match task {
+            dispatcher::DispatchTask::ReviewPr {
+                pr_number,
+                project,
+                head_sha,
+                author_login,
+                title,
+                diff_loc,
+            } => (pr_number, project, head_sha, author_login, title, diff_loc),
+            other => {
+                warn!(task = ?other, "handle_review_pr invoked with non-ReviewPr task; ignoring");
+                return Ok(());
+            }
+        };
+
+        let req = pr_dispatch::ReviewPrRequest {
+            pr_number,
+            project: project.clone(),
+            head_sha: head_sha.clone(),
+            author_login,
+            title,
+            diff_loc,
+        };
+
+        // Look up the pr-reviewer agent for this project. Before Step E this
+        // will be missing; log-and-skip so the dispatcher keeps draining.
+        let def = match pr_dispatch::find_pr_reviewer(&self.config, &project) {
+            Some(d) => d.clone(),
+            None => {
+                warn!(
+                    pr_number,
+                    project = %project,
+                    "ReviewPr skipped: no pr-reviewer agent configured for project"
+                );
+                return Ok(());
+            }
+        };
+
+        // === STATIC ALLOW-LIST GATE (pre-routing) ===
+        // Belt-and-braces: the load-time config validator rejects banned
+        // providers, and `RoutingDecisionEngine` filters them from the
+        // candidate pool, but this check guarantees the spawn never runs
+        // against a banned static `model` even if the config was mutated
+        // at runtime or a future refactor drops the routing filter.
+        if let Some(static_model) = def.model.as_deref() {
+            if !config::is_allowed_provider(static_model) {
+                warn!(
+                    agent = %def.name,
+                    pr_number,
+                    project = %project,
+                    model = %static_model,
+                    "ReviewPr skipped: static model rejected by subscription allow-list"
+                );
+                return Ok(());
+            }
+        }
+
+        // === BUDGET GATE ===
+        let budget_verdict = self.cost_tracker.check(&def.name);
+        if budget_verdict.should_pause() {
+            warn!(
+                agent = %def.name,
+                pr_number,
+                project = %project,
+                verdict = %budget_verdict,
+                "ReviewPr skipped: pr-reviewer monthly budget exhausted"
+            );
+            return Ok(());
+        }
+
+        // === ROUTING ===
+        // Build a DispatchContext off the per-PR task string so KG/keyword
+        // routing can pick a model based on "review" keywords and PR shape.
+        let task_string = pr_dispatch::build_review_task(&req);
+        let kg_arc = self
+            .kg_router
+            .as_ref()
+            .map(|r| std::sync::Arc::new(r.clone()));
+        let unhealthy = self.provider_health.unhealthy_providers();
+        let telemetry_arc = std::sync::Arc::new(self.telemetry_store.clone());
+        let engine = control_plane::RoutingDecisionEngine::with_provider_budget(
+            kg_arc,
+            unhealthy,
+            terraphim_router::Router::new(),
+            Some(telemetry_arc),
+            self.provider_budget_tracker.clone(),
+        );
+        let dispatch_ctx = control_plane::DispatchContext {
+            agent_name: def.name.clone(),
+            task: task_string.clone(),
+            static_model: def.model.clone(),
+            cli_tool: def.cli_tool.clone(),
+            layer: def.layer,
+            session_id: None,
+        };
+        let decision = engine.decide_route(&dispatch_ctx, &budget_verdict).await;
+        info!(
+            agent = %def.name,
+            pr_number,
+            project = %project,
+            model = %decision.candidate.model,
+            rationale = %decision.rationale,
+            "ReviewPr routing decision"
+        );
+
+        // === C1/C3 ALLOW-LIST GATE ===
+        // Routing may suggest a banned provider (e.g. via stale KG rules); the
+        // subscription-only allow-list must still short-circuit the spawn so
+        // unsanctioned providers never launch.
+        let routed_model = decision.candidate.model.clone();
+        let effective_cli = if decision.candidate.cli_tool.is_empty() {
+            def.cli_tool.clone()
+        } else {
+            decision.candidate.cli_tool.clone()
+        };
+        if !routed_model.is_empty() && !config::is_allowed_provider(&routed_model) {
+            warn!(
+                agent = %def.name,
+                pr_number,
+                project = %project,
+                model = %routed_model,
+                "ReviewPr skipped: routed model rejected by subscription allow-list"
+            );
+            return Ok(());
+        }
+
+        // === SPAWN ===
+        let primary_provider = terraphim_types::capability::Provider {
+            id: def.name.clone(),
+            name: def.name.clone(),
+            provider_type: terraphim_types::capability::ProviderType::Agent {
+                agent_id: def.name.clone(),
+                cli_command: effective_cli.clone(),
+                working_dir: self.config.working_dir_for_agent(&def),
+            },
+            capabilities: vec![],
+            cost_level: terraphim_types::capability::CostLevel::Cheap,
+            latency: terraphim_types::capability::Latency::Medium,
+            keywords: def.capabilities.clone(),
+        };
+
+        let fallback_provider = def.fallback_provider.as_ref().map(|fallback_cli| {
+            terraphim_types::capability::Provider {
+                id: format!("{}-fallback", def.name),
+                name: format!("{} (fallback)", def.name),
+                provider_type: terraphim_types::capability::ProviderType::Agent {
+                    agent_id: format!("{}-fallback", def.name),
+                    cli_command: fallback_cli.clone(),
+                    working_dir: self.config.working_dir_for_agent(&def),
+                },
+                capabilities: vec![],
+                cost_level: terraphim_types::capability::CostLevel::Cheap,
+                latency: terraphim_types::capability::Latency::Medium,
+                keywords: def.capabilities.clone(),
+            }
+        });
+
+        let mut request = SpawnRequest::new(primary_provider, &task_string);
+        if !routed_model.is_empty() {
+            request = request.with_primary_model(&routed_model);
+        }
+        if let Some(fallback) = fallback_provider {
+            request = request.with_fallback_provider(fallback);
+            if let Some(fallback_model) = &def.fallback_model {
+                request = request.with_fallback_model(fallback_model);
+            }
+        }
+
+        let mut limits = ResourceLimits::default();
+        if let Some(max_cpu) = def.max_cpu_seconds {
+            limits.max_cpu_seconds = Some(max_cpu);
+        }
+        if let Some(max_mem) = def.max_memory_bytes {
+            limits.max_memory_bytes = Some(max_mem);
+        }
+        request = request.with_resource_limits(limits);
+
+        let base_ctx = build_spawn_context_for_agent(&self.config, &def);
+        let spawn_ctx = pr_dispatch::layer_pr_env(base_ctx, &req);
+
+        let handle = self
+            .spawner
+            .spawn_with_fallback(&request, spawn_ctx)
+            .await
+            .map_err(|e| OrchestratorError::SpawnFailed {
+                agent: def.name.clone(),
+                reason: e.to_string(),
+            })?;
+
+        let output_rx = handle.subscribe_output();
+        let restart_count = self
+            .restart_counts
+            .get(&agent_key(&def))
+            .copied()
+            .unwrap_or(0);
+
+        self.active_agents.insert(
+            def.name.clone(),
+            ManagedAgent {
+                definition: def.clone(),
+                handle,
+                started_at: Instant::now(),
+                restart_count,
+                output_rx,
+                spawned_by_mention: false,
+                worktree_path: None,
+                routed_model: if routed_model.is_empty() {
+                    None
+                } else {
+                    Some(routed_model)
+                },
+                session_id: format!("{}-{}", def.name, ulid::Ulid::new()),
+            },
+        );
+
+        info!(
+            agent = %def.name,
+            pr_number,
+            project = %project,
+            head_sha = %head_sha,
+            "ReviewPr spawned pr-reviewer"
+        );
+
+        Ok(())
+    }
+
     /// Evaluate the pre-check strategy for an agent.
     async fn run_pre_check(&mut self, def: &AgentDefinition) -> PreCheckResult {
         match &def.pre_check {
@@ -3149,15 +3395,10 @@ impl AgentOrchestrator {
                         "MentionDriven task drained from dispatcher"
                     );
                 }
-                DispatchTask::ReviewPr {
-                    pr_number, project, ..
-                } => {
-                    tracing::info!(
-                        pr_number,
-                        project,
-                        "ReviewPr dispatched (stub; wiring in Step D)"
-                    );
-                    // TODO Step D: build DispatchContext, call RoutingDecisionEngine::decide_route, spawn pr-reviewer.
+                task @ DispatchTask::ReviewPr { .. } => {
+                    if let Err(e) = self.handle_review_pr(task).await {
+                        warn!(error = %e, "handle_review_pr failed");
+                    }
                 }
                 DispatchTask::AutoMerge {
                     pr_number, project, ..
@@ -5643,5 +5884,209 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
         let result = orch.spawn_agent(&def).await;
         assert!(result.is_ok(), "spawn errored: {:?}", result);
         assert!(orch.active_agents.contains_key("subscription-agent"));
+    }
+
+    /// Helper: build a minimal config with a project-scoped `pr-reviewer`
+    /// agent suitable for driving `handle_review_pr` through the full
+    /// routing and spawn pipeline. Returns the config plus the tempdir that
+    /// owns the working directory so the caller keeps it alive.
+    fn review_pr_config(cli_tool: &str) -> (OrchestratorConfig, TempDir) {
+        let tmp = TempDir::new().unwrap();
+        let working_dir = tmp.path().to_path_buf();
+        let config = OrchestratorConfig {
+            working_dir: working_dir.clone(),
+            nightwatch: NightwatchConfig::default(),
+            compound_review: CompoundReviewConfig {
+                cli_tool: None,
+                provider: None,
+                model: None,
+                schedule: "0 2 * * *".to_string(),
+                max_duration_secs: 60,
+                repo_path: working_dir.clone(),
+                create_prs: false,
+                worktree_root: working_dir.join(".worktrees"),
+                base_branch: "main".to_string(),
+                max_concurrent_agents: 3,
+                ..Default::default()
+            },
+            workflow: None,
+            agents: vec![AgentDefinition {
+                name: "pr-reviewer".to_string(),
+                layer: AgentLayer::Safety,
+                cli_tool: cli_tool.to_string(),
+                task: "review".to_string(),
+                model: None,
+                schedule: None,
+                capabilities: vec!["review".to_string()],
+                max_memory_bytes: None,
+                budget_monthly_cents: None,
+                provider: None,
+                persona: None,
+                terraphim_role: None,
+                skill_chain: vec![],
+                sfia_skills: vec![],
+                fallback_provider: None,
+                fallback_model: None,
+                grace_period_secs: None,
+                max_cpu_seconds: None,
+                pre_check: None,
+                gitea_issue: None,
+                project: Some("alpha".to_string()),
+            }],
+            restart_cooldown_secs: 0,
+            max_restart_count: 3,
+            restart_budget_window_secs: 43_200,
+            disk_usage_threshold: 100,
+            tick_interval_secs: 1,
+            handoff_buffer_ttl_secs: None,
+            persona_data_dir: None,
+            skill_data_dir: None,
+            flows: vec![],
+            flow_state_dir: None,
+            gitea: None,
+            mentions: None,
+            webhook: None,
+            role_config_path: None,
+            routing: None,
+            #[cfg(feature = "quickwit")]
+            quickwit: None,
+            projects: vec![crate::config::Project {
+                id: "alpha".to_string(),
+                working_dir: working_dir.clone(),
+                schedule_offset_minutes: 0,
+                gitea: None,
+                mentions: None,
+                workflow: None,
+                #[cfg(feature = "quickwit")]
+                quickwit: None,
+                max_concurrent_agents: None,
+                max_concurrent_mention_agents: None,
+            }],
+            include: vec![],
+            providers: vec![],
+            provider_budget_state_file: None,
+            pause_dir: None,
+            project_circuit_breaker_threshold: 3,
+            fleet_escalation_owner: None,
+            fleet_escalation_repo: None,
+        };
+        (config, tmp)
+    }
+
+    fn review_pr_task() -> dispatcher::DispatchTask {
+        dispatcher::DispatchTask::ReviewPr {
+            pr_number: 641,
+            project: "alpha".to_string(),
+            head_sha: "deadbeef1234".to_string(),
+            author_login: "claude-code".to_string(),
+            title: "fix(kg): short synonyms".to_string(),
+            diff_loc: 42,
+        }
+    }
+
+    /// `handle_review_pr` must drive the routing engine and spawn the
+    /// pr-reviewer agent it selected, registering it in `active_agents`.
+    #[tokio::test]
+    async fn reviewpr_dispatch_routes_via_routing_engine() {
+        let (config, _tmp) = review_pr_config("echo");
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        orch.handle_review_pr(review_pr_task()).await.unwrap();
+
+        let managed = orch
+            .active_agents
+            .get("pr-reviewer")
+            .expect("pr-reviewer must be registered in active_agents after routing");
+        assert!(
+            !managed.session_id.is_empty(),
+            "routing must tag the spawned agent with a session_id"
+        );
+        assert!(
+            managed.session_id.starts_with("pr-reviewer-"),
+            "session id should be scoped to the agent, got: {}",
+            managed.session_id
+        );
+    }
+
+    /// A banned provider configured on the pr-reviewer agent must be
+    /// short-circuited by the C1/C3 allow-list gate; no spawn happens.
+    #[tokio::test]
+    async fn reviewpr_dispatch_rejects_banned_provider() {
+        let (config, _tmp) = review_pr_config("echo");
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+        // Bypass load-time validation by mutating after construction to
+        // simulate a stale/poisoned config entry reaching the dispatcher.
+        orch.config.agents[0].model = Some("google/gemini-2".to_string());
+
+        orch.handle_review_pr(review_pr_task()).await.unwrap();
+
+        assert!(
+            !orch.active_agents.contains_key("pr-reviewer"),
+            "banned provider must short-circuit before spawn"
+        );
+    }
+
+    /// The per-PR `ADF_PR_*` env overrides must reach the spawned process so
+    /// downstream review skills can read them without parsing the task string.
+    #[tokio::test]
+    async fn reviewpr_dispatch_sets_env_vars() {
+        let tmp = TempDir::new().unwrap();
+        let script_path = tmp.path().join("dump-env.sh");
+        let dump_path = tmp.path().join("env.dump");
+        let script_body = format!(
+            "#!/bin/sh\nenv | grep '^ADF_PR_' > {}\n",
+            dump_path.display()
+        );
+        std::fs::write(&script_path, script_body).unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = std::fs::metadata(&script_path).unwrap().permissions();
+            perms.set_mode(0o755);
+            std::fs::set_permissions(&script_path, perms).unwrap();
+        }
+
+        let (config, _cfg_tmp) = review_pr_config(script_path.to_str().unwrap());
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        orch.handle_review_pr(review_pr_task()).await.unwrap();
+        assert!(orch.active_agents.contains_key("pr-reviewer"));
+
+        // Poll for the script to exit and for the child process reaper to
+        // drop it out of active_agents, then read the env dump it wrote.
+        for _ in 0..40 {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+            orch.poll_agent_exits().await;
+            if dump_path.exists() {
+                break;
+            }
+        }
+
+        let dump = std::fs::read_to_string(&dump_path)
+            .unwrap_or_else(|e| panic!("env dump not written to {}: {e}", dump_path.display()));
+        assert!(
+            dump.contains("ADF_PR_NUMBER=641"),
+            "ADF_PR_NUMBER missing from dump:\n{dump}"
+        );
+        assert!(
+            dump.contains("ADF_PR_HEAD_SHA=deadbeef1234"),
+            "ADF_PR_HEAD_SHA missing from dump:\n{dump}"
+        );
+        assert!(
+            dump.contains("ADF_PR_PROJECT=alpha"),
+            "ADF_PR_PROJECT missing from dump:\n{dump}"
+        );
+        assert!(
+            dump.contains("ADF_PR_AUTHOR=claude-code"),
+            "ADF_PR_AUTHOR missing from dump:\n{dump}"
+        );
+        assert!(
+            dump.contains("ADF_PR_DIFF_LOC=42"),
+            "ADF_PR_DIFF_LOC missing from dump:\n{dump}"
+        );
+        assert!(
+            dump.contains("ADF_PR_TITLE=fix(kg): short synonyms"),
+            "ADF_PR_TITLE missing from dump:\n{dump}"
+        );
     }
 }
