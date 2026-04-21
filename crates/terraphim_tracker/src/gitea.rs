@@ -497,6 +497,50 @@ impl GiteaTracker {
         Ok(raw_comments.into_iter().map(|rc| rc.into()).collect())
     }
 
+    /// List open pull requests for the configured repository.
+    ///
+    /// # API Endpoint
+    ///
+    /// `GET /api/v1/repos/{owner}/{repo}/pulls?state=open&limit=50&page=N`
+    ///
+    /// Returns a flat [`GiteaPrSummary`] per open PR with the fields required
+    /// for ROC auto-merge polling: number, author login, head SHA, base ref,
+    /// and diff size (`additions + deletions`).
+    pub async fn list_open_prs(&self) -> Result<Vec<GiteaPrSummary>> {
+        let url = format!(
+            "{}/api/v1/repos/{}/{}/pulls",
+            self.config.base_url, self.config.owner, self.config.repo
+        );
+        let mut all = Vec::new();
+        let mut page = 1u32;
+
+        loop {
+            let response = self
+                .build_request(reqwest::Method::GET, &url)
+                .query(&[("state", "open"), ("limit", "50")])
+                .query(&[("page", page)])
+                .send()
+                .await?;
+            if !response.status().is_success() {
+                let status = response.status();
+                let text = response.text().await.unwrap_or_default();
+                return Err(TrackerError::Api {
+                    message: format!("Gitea list_open_prs error {}: {}", status, text),
+                });
+            }
+            let raw: Vec<GiteaPullRequest> = response.json().await.map_err(TrackerError::Http)?;
+            let count = raw.len();
+            all.extend(raw.into_iter().map(GiteaPrSummary::from));
+
+            if count < 50 {
+                break;
+            }
+            page += 1;
+        }
+
+        Ok(all)
+    }
+
     /// Claim an issue for an agent using the configured strategy.
     ///
     /// Attempts to assign the issue to the specified agent, with verification.
@@ -882,6 +926,73 @@ struct RepoComment {
     created_at: Option<String>,
     #[serde(default)]
     updated_at: Option<String>,
+}
+
+/// Summary of an open pull request, extracted from the Gitea pulls API.
+///
+/// Only the fields required for ROC v1 verdict polling are included: the PR
+/// number, author login, head commit SHA, base branch name, and change size.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GiteaPrSummary {
+    /// Pull request number (shares the Gitea issue numeric namespace).
+    pub number: u64,
+    /// GitHub/Gitea login of the PR author.
+    pub author_login: String,
+    /// HEAD commit SHA of the PR.
+    pub head_sha: String,
+    /// Base branch ref (e.g. `main`).
+    pub base_ref: String,
+    /// Total diff size in lines (`additions + deletions`). Defaults to 0 when
+    /// Gitea does not report a value.
+    pub diff_loc: u32,
+}
+
+/// Raw pull-request response from the Gitea API.
+///
+/// Kept private; callers only see [`GiteaPrSummary`].
+#[derive(Debug, Deserialize)]
+struct GiteaPullRequest {
+    number: u64,
+    #[serde(default)]
+    user: Option<CommentUser>,
+    head: Option<GiteaPrRef>,
+    base: Option<GiteaPrRef>,
+    #[serde(default)]
+    additions: Option<u32>,
+    #[serde(default)]
+    deletions: Option<u32>,
+}
+
+#[derive(Debug, Deserialize)]
+struct GiteaPrRef {
+    #[serde(default)]
+    sha: Option<String>,
+    #[serde(default, rename = "ref")]
+    ref_name: Option<String>,
+}
+
+impl From<GiteaPullRequest> for GiteaPrSummary {
+    fn from(pr: GiteaPullRequest) -> Self {
+        let head_sha = pr
+            .head
+            .as_ref()
+            .and_then(|h| h.sha.clone())
+            .unwrap_or_default();
+        let base_ref = pr
+            .base
+            .as_ref()
+            .and_then(|b| b.ref_name.clone())
+            .unwrap_or_default();
+        let author_login = pr.user.map(|u| u.login).unwrap_or_default();
+        let diff_loc = pr.additions.unwrap_or(0) + pr.deletions.unwrap_or(0);
+        GiteaPrSummary {
+            number: pr.number,
+            author_login,
+            head_sha,
+            base_ref,
+            diff_loc,
+        }
+    }
 }
 
 impl From<RepoComment> for IssueComment {
