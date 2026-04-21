@@ -50,6 +50,7 @@ pub mod nightwatch;
 pub mod output_poster;
 pub mod persona;
 pub mod pr_dispatch;
+pub mod pr_poller;
 pub mod pr_review;
 pub mod project_control;
 pub mod provider_budget;
@@ -256,6 +257,12 @@ pub struct AgentOrchestrator {
     /// Unified priority queue for all dispatch sources (time, issue, mention,
     /// review-pr, auto-merge, post-merge-gate).
     dispatcher: dispatcher::Dispatcher,
+    /// Per-(project, PR) rate limiter for verdict polling. Keeps the
+    /// orchestrator from re-hitting Gitea for the same PR every tick.
+    pr_poll_rate_limiter: pr_poller::PrPollRateLimiter,
+    /// Per-project dedupe set of `(pr_number, head_sha)` already enqueued
+    /// for auto-merge so the same revision is never dispatched twice.
+    auto_merge_enqueued: pr_poller::AutoMergeDedupeSet,
 }
 
 /// Build the composite restart-state key for an agent definition.
@@ -605,6 +612,10 @@ impl AgentOrchestrator {
             project_failure_counter,
             pause_dir,
             dispatcher: dispatcher::Dispatcher::new(),
+            pr_poll_rate_limiter: pr_poller::PrPollRateLimiter::new(
+                pr_poller::PR_POLL_MIN_INTERVAL,
+            ),
+            auto_merge_enqueued: pr_poller::AutoMergeDedupeSet::new(),
         })
     }
 
@@ -2727,6 +2738,180 @@ impl AgentOrchestrator {
         self.mention_cursors.insert(project_id.to_string(), cursor);
     }
 
+    /// Poll every project with a Gitea config for open PRs, parse the latest
+    /// structural-pr-review comment, and enqueue [`DispatchTask::AutoMerge`]
+    /// for any PR that clears every gate in
+    /// [`pr_review::AutoMergeCriteria::default`].
+    ///
+    /// Called once per [`AgentOrchestrator::reconcile_tick`] after the
+    /// dispatcher has been drained so AutoMerge tasks enqueued here are
+    /// serviced on the next tick (deterministic ordering). The method is a
+    /// no-op when no project has a `gitea` config.
+    ///
+    /// This is ROC v1 Step F — it enqueues auto-merge but does **not**
+    /// actually merge the PR; that lands in Step G. Dedupe is process-local
+    /// via [`pr_poller::AutoMergeDedupeSet`]; durable tracking is Step I.
+    pub async fn poll_pending_reviews(&mut self) -> Result<(), OrchestratorError> {
+        // Build the list of (project_id, gitea_cfg) targets. Mirrors the
+        // legacy/multi-project split used by [`Self::poll_mentions`] so the
+        // two pollers stay aligned as the config surface evolves.
+        let targets: Vec<(String, config::GiteaOutputConfig)> = if self.config.projects.is_empty() {
+            match self.config.gitea.clone() {
+                Some(g) => vec![(dispatcher::LEGACY_PROJECT_ID.to_string(), g)],
+                None => {
+                    tracing::debug!(
+                        "verdict polling skipped: legacy mode with no top-level gitea config"
+                    );
+                    return Ok(());
+                }
+            }
+        } else {
+            self.config
+                .projects
+                .iter()
+                .filter_map(|project| {
+                    let gitea = project.gitea.clone()?;
+                    Some((project.id.clone(), gitea))
+                })
+                .collect()
+        };
+
+        if targets.is_empty() {
+            tracing::debug!("verdict polling skipped: no projects with Gitea config");
+            return Ok(());
+        }
+
+        let criteria = pr_review::AutoMergeCriteria::default();
+
+        for (project_id, gitea_cfg) in targets {
+            let tracker_cfg = terraphim_tracker::GiteaConfig {
+                base_url: gitea_cfg.base_url.clone(),
+                token: gitea_cfg.token.clone(),
+                owner: gitea_cfg.owner.clone(),
+                repo: gitea_cfg.repo.clone(),
+                active_states: vec!["open".to_string()],
+                terminal_states: vec!["closed".to_string()],
+                use_robot_api: false,
+                robot_path: std::path::PathBuf::from("/home/alex/go/bin/gitea-robot"),
+                claim_strategy: terraphim_tracker::gitea::ClaimStrategy::PreferRobot,
+            };
+            let tracker = match terraphim_tracker::GiteaTracker::new(tracker_cfg) {
+                Ok(t) => pr_poller::GiteaPrTracker::new(t),
+                Err(e) => {
+                    tracing::warn!(
+                        project = %project_id,
+                        error = %e,
+                        "failed to create GiteaTracker for verdict polling"
+                    );
+                    continue;
+                }
+            };
+
+            self.poll_pending_reviews_for_project(&project_id, &tracker, &criteria)
+                .await;
+        }
+
+        Ok(())
+    }
+
+    /// Inner per-project verdict poll. Accepts a generic [`pr_poller::PrTracker`]
+    /// so integration tests can drive it with an in-memory tracker.
+    pub async fn poll_pending_reviews_for_project<T: pr_poller::PrTracker + ?Sized>(
+        &mut self,
+        project_id: &str,
+        tracker: &T,
+        criteria: &pr_review::AutoMergeCriteria,
+    ) {
+        let prs = match tracker.list_open_prs().await {
+            Ok(prs) => prs,
+            Err(e) => {
+                tracing::warn!(
+                    project = %project_id,
+                    error = %e,
+                    "failed to list open PRs"
+                );
+                return;
+            }
+        };
+
+        let now = std::time::Instant::now();
+        for pr in prs {
+            if !self.pr_poll_rate_limiter.allow(project_id, pr.number, now) {
+                tracing::trace!(
+                    project = %project_id,
+                    pr = pr.number,
+                    "skipping PR: poll rate limited"
+                );
+                continue;
+            }
+
+            let comments = match tracker.fetch_pr_comments(pr.number).await {
+                Ok(c) => c,
+                Err(e) => {
+                    tracing::warn!(
+                        project = %project_id,
+                        pr = pr.number,
+                        error = %e,
+                        "failed to fetch PR comments"
+                    );
+                    continue;
+                }
+            };
+
+            let outcome = pr_poller::evaluate_pr_verdict(&pr, &comments, criteria);
+            match outcome {
+                pr_poller::EvaluationOutcome::Merge { head_sha } => {
+                    if !self
+                        .auto_merge_enqueued
+                        .record_if_new(project_id, pr.number, &head_sha)
+                    {
+                        tracing::debug!(
+                            project = %project_id,
+                            pr = pr.number,
+                            head = %head_sha,
+                            "auto-merge already enqueued for this revision"
+                        );
+                        continue;
+                    }
+                    tracing::info!(
+                        project = %project_id,
+                        pr = pr.number,
+                        head = %head_sha,
+                        "enqueuing AutoMerge for PR that cleared every gate"
+                    );
+                    self.dispatcher.enqueue(DispatchTask::AutoMerge {
+                        pr_number: pr.number,
+                        project: project_id.to_string(),
+                        head_sha,
+                    });
+                }
+                pr_poller::EvaluationOutcome::HumanReviewNeeded { reason } => {
+                    tracing::info!(
+                        project = %project_id,
+                        pr = pr.number,
+                        reason = %reason,
+                        "PR requires human review"
+                    );
+                }
+                pr_poller::EvaluationOutcome::NoReviewerComment => {
+                    tracing::debug!(
+                        project = %project_id,
+                        pr = pr.number,
+                        "no pr-reviewer comment yet; skipping"
+                    );
+                }
+                pr_poller::EvaluationOutcome::ParseError { reason } => {
+                    tracing::warn!(
+                        project = %project_id,
+                        pr = pr.number,
+                        reason = %reason,
+                        "reviewer comment failed to parse; skipping"
+                    );
+                }
+            }
+        }
+    }
+
     /// Check if an agent is already assigned to this issue and currently active.
     ///
     /// Returns `true` if dispatch should be **skipped** (duplicate), `false` if
@@ -3418,6 +3603,14 @@ impl AgentOrchestrator {
                     tracing::info!(pr_number, project, merge_sha = %merge_sha, "PostMergeTestGate dispatched (stub; wiring in Step H)");
                 }
             }
+        }
+
+        // 18. ROC v1 Step F: poll open PRs for reviewer verdicts and enqueue
+        // AutoMerge for any PR that clears every gate. Runs AFTER the
+        // dispatch drain so the newly enqueued AutoMerge tasks are serviced
+        // on the NEXT tick (deterministic ordering).
+        if let Err(e) = self.poll_pending_reviews().await {
+            warn!(error = %e, "poll_pending_reviews failed");
         }
     }
 
