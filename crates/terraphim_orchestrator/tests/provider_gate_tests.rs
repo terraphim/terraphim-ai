@@ -584,29 +584,23 @@ fn adf_source_contains_no_openai_provider_registrations() {
 
 // === Scenario 11: probe gate rejects banned provider ======================
 
-/// The C1 gate applied inside `probe_single` relies on
-/// [`is_allowed_provider`].  Verify directly that the gate rejects
-/// `openai/gpt-4` so any regression in config.rs is caught here too.
+/// openai/* routes through the OpenAI subscription plan (Plus/Pro/Team),
+/// not pay-per-use. The C1 gate therefore ALLOWS openai/ prefixed models
+/// so ProviderHealthMap can probe + track session-token state for them.
+/// Session-token exhaustion surfaces as circuit-breaker trips and budget-
+/// window fall-through, not as permanent removal from the allow-list.
 #[test]
-fn probe_gate_rejects_openai_provider() {
-    assert!(
-        !is_allowed_provider("openai/gpt-4"),
-        "is_allowed_provider must return false for openai/gpt-4 — \
-         the probe gate will skip this provider at runtime"
-    );
-    // Broader openai variants
-    for banned in [
+fn probe_gate_allows_openai_subscription_provider() {
+    for allowed in [
+        "openai/gpt-5.4",
+        "openai/gpt-5.4-mini",
+        "openai/gpt-5.3-codex",
+        "openai/gpt-4",
         "openai/gpt-4o",
-        "openai/o3",
-        "openai/o4-mini",
-        "openai/gpt-4.1-nano",
-        "openai-o3",
-        "openai-o4-mini",
-        "openai-4.1-nano",
     ] {
         assert!(
-            !is_allowed_provider(banned),
-            "probe gate must reject banned provider id: {banned}"
+            is_allowed_provider(allowed),
+            "probe gate must allow openai subscription provider: {allowed}"
         );
     }
 }
