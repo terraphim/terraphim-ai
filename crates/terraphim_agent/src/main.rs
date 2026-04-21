@@ -705,6 +705,111 @@ fn print_json_output<T: Serialize>(value: &T, mode: CommandOutputMode) -> Result
     Ok(())
 }
 
+#[cfg(test)]
+mod token_budget_tests {
+    use super::*;
+    use terraphim_types::Document;
+
+    fn make_doc(id: &str, title: &str, description: Option<&str>, body: &str) -> Document {
+        Document {
+            id: id.to_string(),
+            title: title.to_string(),
+            url: format!("https://example.com/{}", id),
+            body: body.to_string(),
+            description: description.map(|s| s.to_string()),
+            summarization: None,
+            stub: None,
+            tags: None,
+            rank: None,
+            source_haystack: None,
+            doc_type: terraphim_types::DocumentType::default(),
+            synonyms: None,
+            route: None,
+            priority: None,
+        }
+    }
+
+    #[test]
+    fn full_mode_returns_all_fields() {
+        let doc = make_doc("1", "Test", Some("desc"), "body content");
+        let out = apply_field_mode_and_budget(&doc, "full", None);
+        assert_eq!(out.description.as_deref(), Some("desc"));
+        assert_eq!(out.body.as_deref(), Some("body content"));
+        assert!(!out._limited);
+        assert!(out.original_length.is_none());
+    }
+
+    #[test]
+    fn summary_mode_drops_body() {
+        let doc = make_doc("1", "Test", Some("desc"), "body content");
+        let out = apply_field_mode_and_budget(&doc, "summary", None);
+        assert_eq!(out.description.as_deref(), Some("desc"));
+        assert!(out.body.is_none());
+    }
+
+    #[test]
+    fn minimal_mode_drops_description_and_body() {
+        let doc = make_doc("1", "Test", Some("desc"), "body content");
+        let out = apply_field_mode_and_budget(&doc, "minimal", None);
+        assert!(out.description.is_none());
+        assert!(out.body.is_none());
+        assert_eq!(out.title, "Test");
+        assert_eq!(out.url, "https://example.com/1");
+    }
+
+    #[test]
+    fn content_limit_truncates_body_and_sets_limited() {
+        let long_body = "a".repeat(200);
+        let doc = make_doc("1", "Test", None, &long_body);
+        let out = apply_field_mode_and_budget(&doc, "full", Some(50));
+        assert!(out._limited);
+        assert_eq!(out.original_length, Some(200));
+        let body = out.body.unwrap();
+        assert!(body.ends_with("..."));
+        assert!(body.len() <= 53); // 50 + "..."
+    }
+
+    #[test]
+    fn content_limit_truncates_description_and_sets_limited() {
+        let long_desc = "b".repeat(200);
+        let doc = make_doc("1", "Test", Some(&long_desc), "short");
+        let out = apply_field_mode_and_budget(&doc, "full", Some(50));
+        assert!(out._limited);
+        let desc = out.description.unwrap();
+        assert!(desc.ends_with("..."));
+    }
+
+    #[test]
+    fn content_within_limit_not_marked_limited() {
+        let doc = make_doc("1", "Test", Some("short desc"), "short body");
+        let out = apply_field_mode_and_budget(&doc, "full", Some(200));
+        assert!(!out._limited);
+        assert!(out.original_length.is_none());
+    }
+
+    #[test]
+    fn estimate_tokens_heuristic() {
+        assert_eq!(estimate_tokens(""), 0);
+        assert_eq!(estimate_tokens("1234"), 1);
+        assert_eq!(estimate_tokens("12345678"), 2);
+        // 100 chars -> 25 tokens (100/4 = 25)
+        assert_eq!(estimate_tokens(&"x".repeat(100)), 25);
+    }
+
+    #[test]
+    fn pagination_has_more_false_when_not_limited() {
+        let p = PaginationOutput {
+            total: 5,
+            returned: 5,
+            has_more: false,
+            limited_count: 0,
+        };
+        let json = serde_json::to_string(&p).unwrap();
+        assert!(json.contains("has_more"));
+        assert!(json.contains("false"));
+    }
+}
+
 #[derive(Parser, Debug)]
 #[command(
     name = "terraphim-agent",
@@ -3077,6 +3182,10 @@ async fn run_server_command(
             operator,
             role,
             limit,
+            max_tokens,
+            max_content_length,
+            max_results,
+            field_mode,
         } => {
             // Get selected role from server if not specified
             let role_name = if let Some(role) = role {
@@ -3084,6 +3193,11 @@ async fn run_server_command(
             } else {
                 let config_res = api.get_config().await?;
                 config_res.config.selected_role
+            };
+
+            let effective_limit = match max_results {
+                Some(mr) => limit.min(mr),
+                None => limit,
             };
 
             let q = if let Some(additional_terms) = terms {
@@ -3098,7 +3212,7 @@ async fn run_server_command(
                     search_terms: Some(search_terms),
                     operator: operator.map(|op| op.into()),
                     skip: Some(0),
-                    limit: Some(limit),
+                    limit: Some(effective_limit),
                     role: Some(role_name),
                     layer: Layer::default(),
                     include_pinned: false,
@@ -3110,7 +3224,7 @@ async fn run_server_command(
                     search_terms: None,
                     operator: None,
                     skip: Some(0),
-                    limit: Some(limit),
+                    limit: Some(effective_limit),
                     role: Some(role_name),
                     layer: Layer::default(),
                     include_pinned: false,
@@ -3137,6 +3251,27 @@ async fn run_server_command(
             }
 
             if output.is_machine_readable() {
+                let total = res.results.len();
+                let field_mode_lower = field_mode.to_lowercase();
+                let docs: Vec<SearchDocumentOutput> = res
+                    .results
+                    .iter()
+                    .map(|doc| {
+                        apply_field_mode_and_budget(doc, &field_mode_lower, max_content_length)
+                    })
+                    .collect();
+
+                let token_budget = max_tokens.map(|max| {
+                    let json_estimate = serde_json::to_string(&docs)
+                        .map(|s| estimate_tokens(&s))
+                        .unwrap_or(0);
+                    TokenBudgetOutput {
+                        max_tokens: max,
+                        estimated_tokens: json_estimate,
+                        truncated: json_estimate > max,
+                    }
+                });
+
                 let payload = SearchOutput {
                     query,
                     role: q
@@ -3144,23 +3279,19 @@ async fn run_server_command(
                         .as_ref()
                         .map(|r| r.to_string())
                         .unwrap_or_else(|| "unknown".to_string()),
-                    count: res.results.len(),
-                    results: res
-                        .results
-                        .iter()
-                        .map(|doc| SearchDocumentOutput {
-                            id: doc.id.clone(),
-                            title: doc.title.clone(),
-                            url: doc.url.clone(),
-                            rank: doc.rank,
-                            description: doc.description.clone(),
-                            body: if doc.body.is_empty() {
-                                None
-                            } else {
-                                Some(doc.body.clone())
-                            },
-                        })
-                        .collect(),
+                    count: docs.len(),
+                    results: docs,
+                    pagination: Some(PaginationOutput {
+                        total,
+                        returned: total,
+                        has_more: false,
+                        limited_count: if let Some(mr) = max_results {
+                            total.saturating_sub(mr.min(total))
+                        } else {
+                            0
+                        },
+                    }),
+                    token_budget,
                 };
                 print_json_output(&payload, output.mode)?;
             } else {
