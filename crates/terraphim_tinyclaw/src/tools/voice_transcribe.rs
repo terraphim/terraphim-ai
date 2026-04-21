@@ -384,18 +384,15 @@ impl VoiceTranscribeTool {
                     message: format!("Whisper transcription failed: {}", e),
                 })?;
 
-            let num_segments = state
-                .full_n_segments()
-                .map_err(|e| ToolError::ExecutionFailed {
-                    tool: "voice_transcribe".to_string(),
-                    message: format!("Failed to get segment count: {}", e),
-                })?;
+            let num_segments = state.full_n_segments();
 
             let mut text = String::new();
             for i in 0..num_segments {
-                if let Ok(segment) = state.full_get_segment_text(i) {
-                    text.push_str(&segment);
-                    text.push(' ');
+                if let Some(segment) = state.get_segment(i) {
+                    if let Ok(seg_text) = segment.to_str_lossy() {
+                        text.push_str(&seg_text);
+                        text.push(' ');
+                    }
                 }
             }
 

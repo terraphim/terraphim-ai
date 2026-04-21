@@ -219,6 +219,10 @@ pub mod path_traversal_tests {
                 tags: None,
                 rank: None,
                 source_haystack: None,
+                doc_type: terraphim_types::DocumentType::default(),
+                synonyms: None,
+                route: None,
+                priority: None,
             };
 
             let response = server.post("/documents", &malicious_document).await;
@@ -339,6 +343,10 @@ pub mod input_validation_tests {
             tags: None,
             rank: None,
             source_haystack: None,
+            doc_type: terraphim_types::DocumentType::default(),
+            synonyms: None,
+            route: None,
+            priority: None,
         };
 
         let response = server.post("/documents", &large_document).await;
@@ -379,6 +387,10 @@ pub mod input_validation_tests {
             tags: None,
             rank: None,
             source_haystack: None,
+            doc_type: terraphim_types::DocumentType::default(),
+            synonyms: None,
+            route: None,
+            priority: None,
         };
 
         let response = server.post("/documents", &malicious_document).await;
@@ -459,6 +471,10 @@ pub mod command_injection_tests {
                 tags: None,
                 rank: None,
                 source_haystack: None,
+                doc_type: terraphim_types::DocumentType::default(),
+                synonyms: None,
+                route: None,
+                priority: None,
             };
 
             let response = server.post("/documents", &malicious_document).await;
