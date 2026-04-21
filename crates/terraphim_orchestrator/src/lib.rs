@@ -730,6 +730,15 @@ impl AgentOrchestrator {
         &self.config
     }
 
+    /// Read-only access to the unified dispatcher queue.
+    ///
+    /// Integration tests use this to assert that ROC v1 Step F polling
+    /// enqueued the expected [`DispatchTask::AutoMerge`] work without the
+    /// test itself holding a reference to the internal dispatcher.
+    pub fn dispatcher(&self) -> &dispatcher::Dispatcher {
+        &self.dispatcher
+    }
+
     /// Run the orchestrator (blocks until shutdown signal).
     ///
     /// 1. Spawns all Safety-layer agents immediately
