@@ -267,7 +267,16 @@ impl ReplHandler {
                 format,
                 robot,
             } => {
-                self.handle_search(query, role, limit, semantic, concepts, format, robot)
+                let robot_cfg = crate::robot::RobotConfig {
+                    enabled: robot,
+                    format: format.unwrap_or(if robot {
+                        crate::robot::OutputFormat::Json
+                    } else {
+                        crate::robot::OutputFormat::Table
+                    }),
+                    ..Default::default()
+                };
+                self.handle_search(query, role, limit, semantic, concepts, robot_cfg)
                     .await?;
             }
             ReplCommand::Config { subcommand } => {
@@ -363,18 +372,11 @@ impl ReplHandler {
         limit: Option<usize>,
         semantic: bool,
         concepts: bool,
-        format: Option<crate::robot::OutputFormat>,
-        robot: bool,
+        robot_cfg: crate::robot::RobotConfig,
     ) -> Result<()> {
-        // Determine if we should use structured output
-        let use_structured = robot || format.is_some();
-        let output_format = if let Some(f) = format {
-            f
-        } else if robot {
-            crate::robot::OutputFormat::Json
-        } else {
-            crate::robot::OutputFormat::Table
-        };
+        let use_structured =
+            robot_cfg.enabled || !matches!(robot_cfg.format, crate::robot::OutputFormat::Table);
+        let output_format = robot_cfg.format;
 
         #[cfg(feature = "repl")]
         {

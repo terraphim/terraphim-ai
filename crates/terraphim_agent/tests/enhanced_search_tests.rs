@@ -343,9 +343,7 @@ fn test_search_with_very_long_query() {
 
     match command {
         ReplCommand::Search {
-            query,
-            semantic,
-            ..
+            query, semantic, ..
         } => {
             assert_eq!(query.len(), 1000);
             assert!(semantic);
@@ -407,7 +405,12 @@ fn test_search_format_json_parsing() {
     use terraphim_agent::robot::OutputFormat;
     let cmd = ReplCommand::from_str("/search rust --format json").unwrap();
     match cmd {
-        ReplCommand::Search { query, format, robot, .. } => {
+        ReplCommand::Search {
+            query,
+            format,
+            robot,
+            ..
+        } => {
             assert_eq!(query, "rust");
             assert_eq!(format, Some(OutputFormat::Json));
             assert!(!robot);
@@ -492,5 +495,8 @@ fn test_search_invalid_format_returns_error() {
 #[test]
 fn test_search_format_missing_value_returns_error() {
     let result = ReplCommand::from_str("/search rust --format");
-    assert!(result.is_err(), "--format without value should produce an error");
+    assert!(
+        result.is_err(),
+        "--format without value should produce an error"
+    );
 }

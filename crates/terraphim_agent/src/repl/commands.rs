@@ -1,7 +1,7 @@
 //! Command definitions for REPL interface
 
-use anyhow::{Result, anyhow};
 use crate::robot::OutputFormat;
+use anyhow::{Result, anyhow};
 use std::str::FromStr;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -352,9 +352,10 @@ impl FromStr for ReplCommand {
                         }
                         "--format" => {
                             if i + 1 < parts.len() {
-                                format = Some(parts[i + 1].parse::<OutputFormat>().map_err(
-                                    |e| anyhow!("{}\nValid formats: json, jsonl, minimal, table", e),
-                                )?);
+                                format =
+                                    Some(parts[i + 1].parse::<OutputFormat>().map_err(|e| {
+                                        anyhow!("{}\nValid formats: json, jsonl, minimal, table", e)
+                                    })?);
                                 i += 2;
                             } else {
                                 return Err(anyhow!(
