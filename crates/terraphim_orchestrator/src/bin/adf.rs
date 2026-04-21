@@ -14,13 +14,13 @@ use tracing_subscriber::EnvFilter;
 fn register_providers(orchestrator: &mut AgentOrchestrator) {
     let router = orchestrator.router_mut();
 
-    // Implementation and code generation: kimi-for-coding/k2p5
+    // Implementation and code generation: kimi-for-coding/k2p6
     // Subscription: Moonshot subscription via kimi-for-coding prefix.
     router.add_provider(Provider {
-        id: "kimi-for-coding/k2p5".into(),
-        name: "Kimi K2.5 (Moonshot subscription)".into(),
+        id: "kimi-for-coding/k2p6".into(),
+        name: "Kimi K2.6 (Moonshot subscription)".into(),
         provider_type: ProviderType::Llm {
-            model_id: "k2p5".into(),
+            model_id: "k2p6".into(),
             api_endpoint: "https://api.moonshot.ai".into(),
         },
         capabilities: vec![Capability::CodeGeneration, Capability::FastThinking],
