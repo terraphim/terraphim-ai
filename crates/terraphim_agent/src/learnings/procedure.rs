@@ -42,7 +42,7 @@ use terraphim_automata::matcher::find_matches;
 #[cfg(test)]
 use terraphim_types::procedure::ProcedureConfidence;
 use terraphim_types::{
-    NormalizedTerm, NormalizedTermValue, Thesaurus, procedure::CapturedProcedure,
+    procedure::CapturedProcedure, NormalizedTerm, NormalizedTermValue, Thesaurus,
 };
 
 /// Health status of a procedure based on its confidence metrics.
@@ -138,6 +138,7 @@ impl ProcedureStore {
     /// (> 0.8) exists, merge the steps instead of creating a duplicate.
     ///
     /// Returns the saved (or merged) procedure.
+    #[allow(dead_code)]
     pub fn save_with_dedup(
         &self,
         mut procedure: CapturedProcedure,
@@ -377,12 +378,14 @@ impl ProcedureStore {
 ///
 /// These are navigational, informational, or read-only commands that do not
 /// contribute meaningful steps to a procedure.
+#[allow(dead_code)]
 pub const TRIVIAL_COMMANDS: &[&str] = &[
     "cd ", "ls", "pwd", "echo ", "cat ", "head ", "tail ", "wc ", "which ", "type ", "date",
     "whoami",
 ];
 
 /// Check whether a command is trivial (should be excluded from procedure extraction).
+#[allow(dead_code)]
 fn is_trivial_command(command: &str) -> bool {
     let trimmed = command.trim();
     TRIVIAL_COMMANDS
@@ -405,6 +408,7 @@ fn is_trivial_command(command: &str) -> bool {
 /// # Returns
 ///
 /// A `CapturedProcedure` with steps derived from the successful, non-trivial commands.
+#[allow(dead_code)]
 pub fn from_session_commands(
     commands: Vec<(String, i32)>,
     title: Option<String>,
