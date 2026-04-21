@@ -338,9 +338,16 @@ fn build_flow_project_runtimes(
 /// Gitea owner/repo, and the project id itself into the child process's
 /// environment (`ADF_PROJECT_ID`, `ADF_WORKING_DIR`, `GITEA_OWNER`,
 /// `GITEA_REPO`). Legacy (project-less) agents use [`SpawnContext::global()`].
+///
+/// When an [`OutputPoster`] is available and has a per-agent Gitea token
+/// for `(project, agent_name)` (loaded from `agent_tokens.json`), the
+/// token is injected as `GITEA_TOKEN` so the agent's own `gtr` / API
+/// calls inside its task shell post under its own Gitea identity. Without
+/// this, `source ~/.profile` would overlay the shared root token.
 fn build_spawn_context_for_agent(
     config: &OrchestratorConfig,
     def: &AgentDefinition,
+    output_poster: Option<&OutputPoster>,
 ) -> SpawnContext {
     let Some(pid) = def.project.as_deref() else {
         return SpawnContext::global();
@@ -356,6 +363,11 @@ fn build_spawn_context_for_agent(
         ctx = ctx
             .with_env("GITEA_OWNER", gitea.owner.clone())
             .with_env("GITEA_REPO", gitea.repo.clone());
+    }
+    if let Some(poster) = output_poster {
+        if let Some(token) = poster.agent_token(pid, &def.name) {
+            ctx = ctx.with_env("GITEA_TOKEN", token.to_string());
+        }
     }
     ctx
 }
@@ -1614,7 +1626,8 @@ impl AgentOrchestrator {
         }
         request = request.with_resource_limits(limits);
 
-        let spawn_ctx = build_spawn_context_for_agent(&self.config, def);
+        let spawn_ctx =
+            build_spawn_context_for_agent(&self.config, def, self.output_poster.as_ref());
         let handle = self
             .spawner
             .spawn_with_fallback(&request, spawn_ctx)
@@ -1872,7 +1885,8 @@ impl AgentOrchestrator {
         }
         request = request.with_resource_limits(limits);
 
-        let base_ctx = build_spawn_context_for_agent(&self.config, &def);
+        let base_ctx =
+            build_spawn_context_for_agent(&self.config, &def, self.output_poster.as_ref());
         let spawn_ctx = pr_dispatch::layer_pr_env(base_ctx, &req);
 
         let handle = self
