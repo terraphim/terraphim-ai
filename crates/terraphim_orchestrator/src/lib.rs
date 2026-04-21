@@ -3822,14 +3822,10 @@ impl AgentOrchestrator {
                         warn!(error = %e, "handle_review_pr failed");
                     }
                 }
-                DispatchTask::AutoMerge {
-                    pr_number, project, ..
-                } => {
-                    tracing::info!(
-                        pr_number,
-                        project,
-                        "AutoMerge dispatched (stub; wiring in Step G)"
-                    );
+                task @ DispatchTask::AutoMerge { .. } => {
+                    if let Err(e) = self.handle_auto_merge(task).await {
+                        warn!(error = %e, "handle_auto_merge failed");
+                    }
                 }
                 DispatchTask::PostMergeTestGate {
                     pr_number,
