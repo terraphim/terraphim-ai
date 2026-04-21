@@ -739,6 +739,15 @@ impl AgentOrchestrator {
         &self.dispatcher
     }
 
+    /// Read-only access to the in-memory `(project, pr_number, head_sha)`
+    /// dedupe set populated by ROC v1 Step F polling and the Step G
+    /// AutoMerge handler. Integration tests use this to assert that a
+    /// successful merge leaves the revision recorded so subsequent polls
+    /// never re-enqueue the same auto-merge.
+    pub fn auto_merge_enqueued(&self) -> &pr_poller::AutoMergeDedupeSet {
+        &self.auto_merge_enqueued
+    }
+
     /// Run the orchestrator (blocks until shutdown signal).
     ///
     /// 1. Spawns all Safety-layer agents immediately
