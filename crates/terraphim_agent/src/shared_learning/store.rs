@@ -6,7 +6,6 @@
 use std::collections::HashMap;
 
 use chrono::Utc;
-use thiserror::Error;
 use tokio::sync::RwLock;
 use tracing::{debug, info};
 
@@ -14,20 +13,7 @@ use crate::shared_learning::markdown_store::{
     MarkdownLearningStore, MarkdownStoreConfig, MarkdownStoreError,
 };
 use crate::shared_learning::types::{SharedLearning, TrustLevel};
-
-#[derive(Error, Debug)]
-pub enum StoreError {
-    #[error("persistence error: {0}")]
-    Persistence(String),
-    #[error("learning not found: {0}")]
-    NotFound(String),
-    #[error("BM25 calculation error: {0}")]
-    Bm25(String),
-    #[error("invalid input: {0}")]
-    InvalidInput(String),
-    #[error("serialization error: {0}")]
-    Serialization(#[from] serde_json::Error),
-}
+pub use terraphim_types::shared_learning::StoreError;
 
 impl From<MarkdownStoreError> for StoreError {
     fn from(e: MarkdownStoreError) -> Self {
@@ -295,6 +281,23 @@ impl SharedLearningStore {
         Ok(())
     }
 
+    /// Record that a graph query touched this learning
+    ///
+    /// Increments the applied_count quality metric and persists the update.
+    pub async fn record_graph_touch(&self, learning_id: &str) -> Result<(), StoreError> {
+        let mut index = self.index.write().await;
+        if let Some(learning) = index.get_mut(learning_id) {
+            learning.quality.applied_count += 1;
+            learning.updated_at = Utc::now();
+            let updated = learning.clone();
+            drop(index);
+            self.persist(&updated).await?;
+            Ok(())
+        } else {
+            Err(StoreError::NotFound(learning_id.to_string()))
+        }
+    }
+
     pub async fn get(&self, id: &str) -> Result<SharedLearning, StoreError> {
         let index = self.index.read().await;
         index
@@ -496,6 +499,29 @@ impl SharedLearningStore {
 
     pub async fn close(&self) {
         info!("Shared learning store closed");
+    }
+}
+
+#[cfg(feature = "shared-learning")]
+impl terraphim_middleware::feedback_loop::GraphTouchStore for SharedLearningStore {
+    fn record_graph_touch<'a>(
+        &'a self,
+        learning_id: &'a str,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), StoreError>> + Send + 'a>>
+    {
+        Box::pin(async move {
+            let mut index = self.index.write().await;
+            if let Some(learning) = index.get_mut(learning_id) {
+                learning.quality.applied_count += 1;
+                learning.updated_at = chrono::Utc::now();
+                let updated = learning.clone();
+                drop(index);
+                self.persist(&updated).await?;
+                Ok(())
+            } else {
+                Err(StoreError::NotFound(learning_id.to_string()))
+            }
+        })
     }
 }
 

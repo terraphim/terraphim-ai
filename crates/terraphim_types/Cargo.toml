@@ -48,4 +48,5 @@ default = ["ontology"]
 ontology = []       # Core generic ontology (string-based types)
 medical = ["ontology"]  # Medical/oncology extensions
 hgnc = ["medical"] # HGNC gene normalization
+kg-integration = []  # Knowledge graph integration with learning capture
 typescript = ["tsify", "wasm-bindgen"]

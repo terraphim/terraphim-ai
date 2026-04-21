@@ -7,6 +7,15 @@ pub mod haystack;
 pub mod indexer;
 pub mod thesaurus;
 
+#[cfg(feature = "kg-integration")]
+pub mod learning_indexer;
+
+#[cfg(feature = "kg-integration")]
+pub mod learning_query;
+
+#[cfg(feature = "feedback-loop")]
+pub mod feedback_loop;
+
 pub use haystack::QueryRsHaystackIndexer;
 pub use indexer::{search_haystacks, RipgrepIndexer};
 
