@@ -78,6 +78,43 @@ pub trait PrTracker: Send + Sync {
     async fn fetch_pr_comments(&self, pr_number: u64) -> Result<Vec<PrComment>, String>;
 }
 
+/// Outcome of a successful merge call, decoupled from
+/// [`terraphim_tracker::GiteaMergeResult`] so the orchestrator handler can
+/// be driven by in-memory test implementations without pulling the tracker
+/// concrete types into test code.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MergeOutcome {
+    pub pr_number: u64,
+    pub merge_commit_sha: String,
+    pub title: String,
+}
+
+/// Write-side abstraction used by the AutoMerge handler (ROC v1 Step G).
+///
+/// Re-uses [`PrTracker::list_open_prs`] for the defensive head-SHA re-check
+/// and adds two writer methods: `merge_pr` (actually merge the PR) and
+/// `open_failure_issue` (record an `[ADF]` tracking issue when the merge
+/// call fails). Test impls are plain structs that record calls — no mock
+/// frameworks involved.
+#[async_trait]
+pub trait AutoMergeExecutor: PrTracker {
+    /// Merge `pr_number` on the project this executor is scoped to.
+    ///
+    /// The real Gitea implementation does a standard merge with branch
+    /// deletion; the style/flag choice is intentionally not parameterised
+    /// here — it is a per-project policy baked into the impl.
+    async fn merge_pr(&self, pr_number: u64) -> Result<MergeOutcome, String>;
+
+    /// Create an `[ADF]` tracking issue describing a merge failure so a
+    /// human can follow up. Returns the newly created issue number.
+    async fn open_failure_issue(
+        &self,
+        title: &str,
+        body: &str,
+        labels: &[&str],
+    ) -> Result<u64, String>;
+}
+
 /// Real [`PrTracker`] backed by [`terraphim_tracker::GiteaTracker`].
 pub struct GiteaPrTracker {
     inner: terraphim_tracker::GiteaTracker,
@@ -123,6 +160,34 @@ impl PrTracker for GiteaPrTracker {
                     })
                     .collect()
             })
+            .map_err(|e| e.to_string())
+    }
+}
+
+#[async_trait]
+impl AutoMergeExecutor for GiteaPrTracker {
+    async fn merge_pr(&self, pr_number: u64) -> Result<MergeOutcome, String> {
+        self.inner
+            .merge_pull(pr_number, terraphim_tracker::MergeStyle::Merge, true)
+            .await
+            .map(|r| MergeOutcome {
+                pr_number: r.pr_number,
+                merge_commit_sha: r.merge_commit_sha,
+                title: r.title,
+            })
+            .map_err(|e| e.to_string())
+    }
+
+    async fn open_failure_issue(
+        &self,
+        title: &str,
+        body: &str,
+        labels: &[&str],
+    ) -> Result<u64, String> {
+        self.inner
+            .create_issue(title, body, labels)
+            .await
+            .map(|i| i.number)
             .map_err(|e| e.to_string())
     }
 }
@@ -273,9 +338,9 @@ impl AutoMergeDedupeSet {
             .insert((pr_number, head_sha.to_string()))
     }
 
-    /// Test helper — reveal whether `(project, pr_number, head_sha)` has
-    /// been recorded already.
-    #[cfg(test)]
+    /// Return `true` when `(project, pr_number, head_sha)` has already
+    /// been recorded. Used for observability (integration tests) and for
+    /// the AutoMerge handler's defensive dedupe write.
     pub fn contains(&self, project: &str, pr_number: u64, head_sha: &str) -> bool {
         self.by_project
             .get(project)
