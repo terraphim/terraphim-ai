@@ -265,6 +265,7 @@ impl TuiService {
     ///
     /// `selected_role` passed to `auto_select_role` is normalised: persisted
     /// `selected_role` is treated as `None` when it does not exist in `config.roles`.
+    #[allow(dead_code)]
     pub async fn resolve_or_auto_route(
         &self,
         role: Option<&str>,
