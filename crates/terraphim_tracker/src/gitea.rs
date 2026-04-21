@@ -38,6 +38,45 @@ pub enum ClaimStrategy {
     RobotOnly,
 }
 
+/// Merge style accepted by the Gitea pulls/merge API.
+///
+/// Maps to the `Do` field of the POST `/pulls/{index}/merge` request body.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MergeStyle {
+    /// Standard merge commit (default).
+    Merge,
+    /// Rebase the PR commits onto the base branch without a merge commit.
+    Rebase,
+    /// Squash all commits into a single merge commit.
+    Squash,
+}
+
+impl MergeStyle {
+    /// Gitea API wire value for this merge style.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            MergeStyle::Merge => "merge",
+            MergeStyle::Rebase => "rebase",
+            MergeStyle::Squash => "squash",
+        }
+    }
+}
+
+/// Result of a successful `merge_pull` call.
+///
+/// Carries the data the orchestrator needs to enqueue a post-merge test
+/// gate and write audit logs without a second round-trip.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GiteaMergeResult {
+    /// Pull request number that was merged.
+    pub pr_number: u64,
+    /// Merge commit SHA, or the PR head SHA when Gitea returns an empty
+    /// `merge_commit_sha` (e.g. rebase merges).
+    pub merge_commit_sha: String,
+    /// PR title at the time of merge, used for post-merge audit trails.
+    pub title: String,
+}
+
 /// Configuration for Gitea tracker.
 #[derive(Debug, Clone)]
 pub struct GiteaConfig {
@@ -539,6 +578,101 @@ impl GiteaTracker {
         }
 
         Ok(all)
+    }
+
+    /// Merge an open pull request.
+    ///
+    /// # API Endpoints
+    ///
+    /// 1. `POST /api/v1/repos/{owner}/{repo}/pulls/{index}/merge` with
+    ///    body `{ "Do": "<style>", "delete_branch_after_merge": <bool> }`
+    ///    triggers the merge.
+    /// 2. `GET /api/v1/repos/{owner}/{repo}/pulls/{index}` fetches the
+    ///    merged PR so the caller receives `merge_commit_sha` and `title`
+    ///    for post-merge bookkeeping (audit logs, test gates).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TrackerError::Api`] when either call fails. Callers treat
+    /// any failure as a merge failure (e.g. conflict, 409, 405) and should
+    /// open an `[ADF]` tracking issue rather than retry blindly.
+    pub async fn merge_pull(
+        &self,
+        pr_number: u64,
+        merge_style: MergeStyle,
+        delete_branch: bool,
+    ) -> Result<GiteaMergeResult> {
+        let merge_url = format!(
+            "{}/api/v1/repos/{}/{}/pulls/{}/merge",
+            self.config.base_url, self.config.owner, self.config.repo, pr_number
+        );
+        let merge_body = serde_json::json!({
+            "Do": merge_style.as_str(),
+            "delete_branch_after_merge": delete_branch,
+        });
+
+        let merge_response = self
+            .build_request(reqwest::Method::POST, &merge_url)
+            .json(&merge_body)
+            .send()
+            .await?;
+        if !merge_response.status().is_success() {
+            let status = merge_response.status();
+            let text = merge_response.text().await.unwrap_or_default();
+            return Err(TrackerError::Api {
+                message: format!(
+                    "Gitea merge_pull error {} on PR {}: {}",
+                    status, pr_number, text
+                ),
+            });
+        }
+        // Drain the merge response body; Gitea returns HTTP 200 with an
+        // empty body on success, so we ignore its contents.
+        let _ = merge_response.bytes().await;
+
+        // Fetch the merged PR to obtain merge_commit_sha + title.
+        let pr_url = format!(
+            "{}/api/v1/repos/{}/{}/pulls/{}",
+            self.config.base_url, self.config.owner, self.config.repo, pr_number
+        );
+        let pr_response = self
+            .build_request(reqwest::Method::GET, &pr_url)
+            .send()
+            .await?;
+        if !pr_response.status().is_success() {
+            let status = pr_response.status();
+            let text = pr_response.text().await.unwrap_or_default();
+            return Err(TrackerError::Api {
+                message: format!(
+                    "Gitea merge_pull post-fetch error {} on PR {}: {}",
+                    status, pr_number, text
+                ),
+            });
+        }
+
+        let raw: serde_json::Value = pr_response.json().await.map_err(TrackerError::Http)?;
+        let merge_commit_sha = raw
+            .get("merge_commit_sha")
+            .and_then(|v| v.as_str())
+            .filter(|s| !s.is_empty())
+            .or_else(|| {
+                raw.get("head")
+                    .and_then(|h| h.get("sha"))
+                    .and_then(|v| v.as_str())
+            })
+            .unwrap_or_default()
+            .to_string();
+        let title = raw
+            .get("title")
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .to_string();
+
+        Ok(GiteaMergeResult {
+            pr_number,
+            merge_commit_sha,
+            title,
+        })
     }
 
     /// Claim an issue for an agent using the configured strategy.
