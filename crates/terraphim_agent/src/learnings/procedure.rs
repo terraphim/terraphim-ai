@@ -42,7 +42,7 @@ use terraphim_automata::matcher::find_matches;
 #[cfg(test)]
 use terraphim_types::procedure::ProcedureConfidence;
 use terraphim_types::{
-    procedure::CapturedProcedure, NormalizedTerm, NormalizedTermValue, Thesaurus,
+    NormalizedTerm, NormalizedTermValue, Thesaurus, procedure::CapturedProcedure,
 };
 
 /// Health status of a procedure based on its confidence metrics.
