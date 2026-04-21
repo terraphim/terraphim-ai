@@ -111,6 +111,12 @@ pub struct InjectionResult {
     pub injected_ids: Vec<String>,
 }
 
+impl Default for InjectionResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl InjectionResult {
     pub fn new() -> Self {
         Self {
