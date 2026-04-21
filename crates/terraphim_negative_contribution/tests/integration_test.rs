@@ -65,7 +65,7 @@ fn test_scan_terraphim_ai_codebase() {
         .filter_map(|e| e.ok())
         .filter(|e| {
             let path = e.path();
-            path.extension().map_or(false, |ext| ext == "rs")
+            path.extension().is_some_and(|ext| ext == "rs")
                 && !path.starts_with(root.join("target"))
                 && !path.starts_with(root.join(".git"))
         })
@@ -114,7 +114,7 @@ fn test_scan_does_not_panic_on_any_file() {
         .filter_map(|e| e.ok())
         .filter(|e| {
             let path = e.path();
-            path.extension().map_or(false, |ext| ext == "rs")
+            path.extension().is_some_and(|ext| ext == "rs")
                 && !path.starts_with(root.join("target"))
                 && !path.starts_with(root.join(".git"))
         })
