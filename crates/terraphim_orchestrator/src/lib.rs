@@ -432,6 +432,19 @@ fn validate_agent_name(name: &str) -> Result<(), OrchestratorError> {
     Ok(())
 }
 
+/// Truncate a string to at most `max_bytes` UTF-8 bytes, honouring char
+/// boundaries. If truncation occurs, append a marker so the reader knows.
+fn truncate_for_issue(s: &str, max_bytes: usize) -> String {
+    if s.len() <= max_bytes {
+        return s.to_string();
+    }
+    let mut end = max_bytes;
+    while end > 0 && !s.is_char_boundary(end) {
+        end -= 1;
+    }
+    format!("{}... (truncated)", &s[..end])
+}
+
 impl AgentOrchestrator {
     /// Create a new orchestrator from configuration.
     pub fn new(config: OrchestratorConfig) -> Result<Self, OrchestratorError> {
@@ -3159,6 +3172,258 @@ impl AgentOrchestrator {
         }
     }
 
+    /// Execute a [`DispatchTask::PostMergeTestGate`] task — ROC v1 Step H.
+    ///
+    /// Defers the heavy lifting to [`post_merge_gate::run_workspace_tests`]
+    /// and [`post_merge_gate::revert_merge`] so those helpers stay fully
+    /// testable without orchestrator state. This method resolves the
+    /// project's `working_dir` as `repo_root`, constructs the [`GateConfig`]
+    /// (picking up any overrides from `[post_merge_gate]` in
+    /// orchestrator.toml), and funnels the result through
+    /// [`handle_post_merge_test_gate_for_project`] which takes a
+    /// [`post_merge_gate::CommandRunner`] so integration tests can drive the
+    /// full handler with a scripted runner.
+    pub async fn handle_post_merge_test_gate(
+        &mut self,
+        task: dispatcher::DispatchTask,
+    ) -> Result<(), OrchestratorError> {
+        let runner = post_merge_gate::TokioCommandRunner;
+        self.handle_post_merge_test_gate_with_runner(task, &runner)
+            .await
+    }
+
+    /// Inner handler that accepts any [`post_merge_gate::CommandRunner`].
+    /// Integration tests use a [`post_merge_gate::ScriptedRunner`] here to
+    /// assert on the exact `cargo test` / `git revert` / `git push` call
+    /// sequence without spawning real processes.
+    ///
+    /// On green: logs `post_merge_gate_verified` at info.
+    /// On red: classifies the failure, runs `git revert`, pushes to the
+    /// configured remote, opens an `[ADF] post-merge test gate reverted`
+    /// tracking issue on the project's Gitea repo, and logs
+    /// `post_merge_gate_reverted` at warn. Returns `Ok(())` in every
+    /// case the dispatcher should continue draining — only hard I/O
+    /// errors that prevent even the attempt return `Err`.
+    pub async fn handle_post_merge_test_gate_with_runner<R>(
+        &mut self,
+        task: dispatcher::DispatchTask,
+        runner: &R,
+    ) -> Result<(), OrchestratorError>
+    where
+        R: post_merge_gate::CommandRunner + ?Sized,
+    {
+        let (pr_number, project, merge_sha, title) = match task {
+            dispatcher::DispatchTask::PostMergeTestGate {
+                pr_number,
+                project,
+                merge_sha,
+                title,
+            } => (pr_number, project, merge_sha, title),
+            other => {
+                warn!(task = ?other, "handle_post_merge_test_gate invoked with non-PostMergeTestGate task; ignoring");
+                return Ok(());
+            }
+        };
+
+        // Resolve repo_root + gitea tracking target for this project.
+        // Legacy mode uses the top-level `working_dir` and `gitea`.
+        let (repo_root, gitea_cfg) = if self.config.projects.is_empty() {
+            if project != dispatcher::LEGACY_PROJECT_ID {
+                warn!(
+                    pr_number,
+                    project = %project,
+                    "PostMergeTestGate skipped: legacy mode but task project id does not match LEGACY_PROJECT_ID"
+                );
+                return Ok(());
+            }
+            (self.config.working_dir.clone(), self.config.gitea.clone())
+        } else {
+            match self.config.projects.iter().find(|p| p.id == project) {
+                Some(p) => (p.working_dir.clone(), p.gitea.clone()),
+                None => {
+                    warn!(
+                        pr_number,
+                        project = %project,
+                        "PostMergeTestGate skipped: no project entry for id"
+                    );
+                    return Ok(());
+                }
+            }
+        };
+
+        // Build GateConfig from orchestrator overrides (if any).
+        let gate_override = self.config.post_merge_gate.clone().unwrap_or_default();
+        let cfg = post_merge_gate::GateConfig {
+            repo_root,
+            merge_sha: merge_sha.clone(),
+            max_test_duration: std::time::Duration::from_secs(gate_override.max_test_duration_secs),
+            revert_push_remote: gate_override.revert_push_remote,
+            revert_push_branch: gate_override.revert_push_branch,
+        };
+
+        info!(
+            pr_number,
+            project = %project,
+            merge_sha = %merge_sha,
+            max_test_duration_secs = cfg.max_test_duration.as_secs(),
+            title = %title,
+            "post_merge_gate_start"
+        );
+
+        let outcome = match post_merge_gate::run_workspace_tests(runner, &cfg).await {
+            Ok(o) => o,
+            Err(e) => {
+                warn!(
+                    pr_number,
+                    project = %project,
+                    merge_sha = %merge_sha,
+                    error = %e,
+                    "post_merge_gate: run_workspace_tests failed before producing an outcome"
+                );
+                return Ok(());
+            }
+        };
+
+        if outcome.passed {
+            info!(
+                pr_number,
+                project = %project,
+                merge_sha = %merge_sha,
+                wall_time_secs = outcome.wall_time.as_secs_f64(),
+                "post_merge_gate_verified"
+            );
+            // Placeholder for Step I's typed Quickwit event.
+            info!(
+                pr_number,
+                project = %project,
+                merge_sha = %merge_sha,
+                event_kind = "pr_auto_merged_verified",
+                "quickwit_event_placeholder"
+            );
+            return Ok(());
+        }
+
+        let classification = post_merge_gate::classify_failure(&outcome);
+        warn!(
+            pr_number,
+            project = %project,
+            merge_sha = %merge_sha,
+            kind = ?classification.kind,
+            failing_tests = ?classification.failing_tests,
+            wall_time_secs = outcome.wall_time.as_secs_f64(),
+            "post_merge_gate_failed"
+        );
+
+        let revert = match post_merge_gate::revert_merge(runner, &cfg).await {
+            Ok(r) => r,
+            Err(e) => {
+                warn!(
+                    pr_number,
+                    project = %project,
+                    merge_sha = %merge_sha,
+                    error = %e,
+                    "post_merge_gate: revert_merge failed — manual intervention required"
+                );
+                // Still try to file the tracking issue below so a human notices.
+                post_merge_gate::RevertOutcome {
+                    revert_sha: String::new(),
+                    pushed: false,
+                }
+            }
+        };
+
+        warn!(
+            pr_number,
+            project = %project,
+            merge_sha = %merge_sha,
+            revert_sha = %revert.revert_sha,
+            pushed = revert.pushed,
+            reason = ?classification.kind,
+            "post_merge_gate_reverted"
+        );
+        // Placeholder for Step I's typed Quickwit event.
+        info!(
+            pr_number,
+            project = %project,
+            merge_sha = %merge_sha,
+            event_kind = "pr_auto_reverted",
+            "quickwit_event_placeholder"
+        );
+
+        // Open an [ADF] tracking issue. Best-effort — a failure here is
+        // logged but does not propagate: the revert has already landed.
+        if let Some(gitea) = gitea_cfg {
+            let issue_title =
+                format!("[ADF] post-merge test gate reverted PR #{pr_number}: {title}");
+            let stderr_excerpt = truncate_for_issue(&outcome.stderr_tail, 4000);
+            let failing_list = if classification.failing_tests.is_empty() {
+                "(none parsed)".to_string()
+            } else {
+                classification
+                    .failing_tests
+                    .iter()
+                    .map(|t| format!("- `{t}`"))
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            };
+            let body = format!(
+                "Auto-merged PR #{pr_number} on project `{project}` failed the post-merge test gate.\n\n\
+                 Merge SHA: `{merge_sha}`\n\
+                 Revert SHA: `{}`\n\
+                 Revert pushed: {}\n\
+                 Failure kind: `{:?}`\n\
+                 Wall time: {:.1}s\n\n\
+                 Failing tests:\n\n{failing_list}\n\n\
+                 stderr tail (truncated):\n\n```\n{stderr_excerpt}\n```\n\n\
+                 Refs: ROC v1 Step H, adf-fleet#36.",
+                revert.revert_sha,
+                revert.pushed,
+                classification.kind,
+                outcome.wall_time.as_secs_f64(),
+            );
+            let labels = ["adf", "post-merge-gate", "status/needs-triage"];
+            let tracker_cfg = terraphim_tracker::GiteaConfig {
+                base_url: gitea.base_url.clone(),
+                token: gitea.token.clone(),
+                owner: gitea.owner.clone(),
+                repo: gitea.repo.clone(),
+                active_states: vec!["open".to_string()],
+                terminal_states: vec!["closed".to_string()],
+                use_robot_api: false,
+                robot_path: std::path::PathBuf::from("/home/alex/go/bin/gitea-robot"),
+                claim_strategy: terraphim_tracker::gitea::ClaimStrategy::PreferRobot,
+            };
+            match terraphim_tracker::GiteaTracker::new(tracker_cfg) {
+                Ok(tracker) => {
+                    if let Err(e) = tracker.create_issue(&issue_title, &body, &labels).await {
+                        warn!(
+                            pr_number,
+                            project = %project,
+                            error = %e,
+                            "post_merge_gate: failed to open [ADF] tracking issue"
+                        );
+                    }
+                }
+                Err(e) => {
+                    warn!(
+                        pr_number,
+                        project = %project,
+                        error = %e,
+                        "post_merge_gate: failed to construct tracker for [ADF] issue"
+                    );
+                }
+            }
+        } else {
+            warn!(
+                pr_number,
+                project = %project,
+                "post_merge_gate: no gitea config for project; skipping [ADF] issue creation"
+            );
+        }
+
+        Ok(())
+    }
+
     /// Check if an agent is already assigned to this issue and currently active.
     ///
     /// Returns `true` if dispatch should be **skipped** (duplicate), `false` if
@@ -3837,13 +4102,10 @@ impl AgentOrchestrator {
                         warn!(error = %e, "handle_auto_merge failed");
                     }
                 }
-                DispatchTask::PostMergeTestGate {
-                    pr_number,
-                    project,
-                    merge_sha,
-                    ..
-                } => {
-                    tracing::info!(pr_number, project, merge_sha = %merge_sha, "PostMergeTestGate dispatched (stub; wiring in Step H)");
+                task @ DispatchTask::PostMergeTestGate { .. } => {
+                    if let Err(e) = self.handle_post_merge_test_gate(task).await {
+                        tracing::error!(error = ?e, "handle_post_merge_test_gate failed");
+                    }
                 }
             }
         }
