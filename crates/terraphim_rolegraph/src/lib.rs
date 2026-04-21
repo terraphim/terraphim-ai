@@ -271,6 +271,9 @@ pub struct SerializableRoleGraph {
     pub trigger_descriptions: AHashMap<u64, String>,
     /// Node IDs that are pinned (always included in results)
     pub pinned_node_ids: Vec<u64>,
+    /// Document IDs that were indexed from shared learnings
+    #[serde(default)]
+    pub learning_document_ids: Vec<String>,
 }
 
 impl SerializableRoleGraph {
@@ -317,6 +320,8 @@ pub struct RoleGraph {
     trigger_index: TriggerIndex,
     /// Node IDs that are pinned (always included in results)
     pinned_node_ids: Vec<u64>,
+    /// Document IDs that originated from the shared learning pipeline
+    learning_document_ids: std::collections::HashSet<String>,
 }
 
 impl RoleGraph {
@@ -344,6 +349,7 @@ impl RoleGraph {
             ac_reverse_nterm,
             trigger_index: TriggerIndex::new(DEFAULT_TRIGGER_THRESHOLD),
             pinned_node_ids: Vec::new(),
+            learning_document_ids: std::collections::HashSet::new(),
         })
     }
 
@@ -390,6 +396,7 @@ impl RoleGraph {
             ac_reverse_nterm: self.ac_reverse_nterm.clone(),
             trigger_descriptions: self.trigger_index.get_trigger_descriptions(),
             pinned_node_ids: self.pinned_node_ids.clone(),
+            learning_document_ids: self.learning_document_ids.iter().cloned().collect(),
         }
     }
 
@@ -419,6 +426,7 @@ impl RoleGraph {
             ac_reverse_nterm: serializable.ac_reverse_nterm,
             trigger_index,
             pinned_node_ids: serializable.pinned_node_ids,
+            learning_document_ids: serializable.learning_document_ids.into_iter().collect(),
         };
 
         // Rebuild the Aho-Corasick automata
@@ -1229,24 +1237,72 @@ impl RoleGraph {
     /// Index a learning document in the graph
     #[cfg(feature = "kg-integration")]
     pub fn index_learning_document(&mut self, doc: IndexedDocument) -> Result<()> {
+        self.learning_document_ids.insert(doc.id.clone());
         self.documents.insert(doc.id.clone(), doc);
         Ok(())
     }
 
-    /// Get documents whose nodes match the query terms
+    /// Get learning documents whose nodes match the query terms
     #[cfg(feature = "kg-integration")]
     pub fn get_learning_documents(&self, query: &str) -> Vec<&IndexedDocument> {
-        let matching_node_ids = self.find_matching_node_ids(query);
-        let matching_set: std::collections::HashSet<u64> = matching_node_ids.into_iter().collect();
+        let matching_set = self.matching_node_id_set(query);
+        self.documents
+            .values()
+            .filter(|doc| {
+                self.learning_document_ids.contains(&doc.id)
+                    && doc
+                        .nodes
+                        .iter()
+                        .any(|node_id| matching_set.contains(node_id))
+            })
+            .collect()
+    }
+
+    /// Get non-learning documents whose nodes match the query terms.
+    #[cfg(feature = "kg-integration")]
+    pub fn get_non_learning_documents(&self, query: &str) -> Vec<&IndexedDocument> {
+        let matching_set = self.matching_node_id_set(query);
 
         self.documents
             .values()
             .filter(|doc| {
-                doc.nodes
-                    .iter()
-                    .any(|node_id| matching_set.contains(node_id))
+                !self.learning_document_ids.contains(&doc.id)
+                    && doc
+                        .nodes
+                        .iter()
+                        .any(|node_id| matching_set.contains(node_id))
             })
             .collect()
+    }
+
+    /// Adjust the rank of a tracked learning document.
+    #[cfg(feature = "kg-integration")]
+    pub fn adjust_learning_document_rank(
+        &mut self,
+        document_id: &str,
+        increase: bool,
+        adjustment: u64,
+    ) -> bool {
+        let Some(doc) = self.documents.get_mut(document_id) else {
+            return false;
+        };
+
+        if !self.learning_document_ids.contains(document_id) {
+            return false;
+        }
+
+        if increase {
+            doc.rank = doc.rank.saturating_add(adjustment);
+        } else {
+            doc.rank = doc.rank.saturating_sub(adjustment);
+        }
+
+        true
+    }
+
+    #[cfg(feature = "kg-integration")]
+    fn matching_node_id_set(&self, query: &str) -> std::collections::HashSet<u64> {
+        self.find_matching_node_ids(query).into_iter().collect()
     }
 }
 
