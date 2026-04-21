@@ -1,6 +1,7 @@
 //! Command definitions for REPL interface
 
 use anyhow::{Result, anyhow};
+use crate::robot::OutputFormat;
 use std::str::FromStr;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -12,6 +13,10 @@ pub enum ReplCommand {
         limit: Option<usize>,
         semantic: bool,
         concepts: bool,
+        /// Output format (json, jsonl, minimal, table)
+        format: Option<OutputFormat>,
+        /// Robot mode: machine-readable structured output
+        robot: bool,
     },
     Config {
         subcommand: ConfigSubcommand,
@@ -319,6 +324,8 @@ impl FromStr for ReplCommand {
                 let mut limit = None;
                 let _semantic = false;
                 let _concepts = false;
+                let mut format: Option<OutputFormat> = None;
+                let mut robot = false;
                 let mut i = 1;
 
                 while i < parts.len() {
@@ -342,6 +349,22 @@ impl FromStr for ReplCommand {
                             } else {
                                 return Err(anyhow!("--limit requires a value"));
                             }
+                        }
+                        "--format" => {
+                            if i + 1 < parts.len() {
+                                format = Some(parts[i + 1].parse::<OutputFormat>().map_err(
+                                    |e| anyhow!("{}\nValid formats: json, jsonl, minimal, table", e),
+                                )?);
+                                i += 2;
+                            } else {
+                                return Err(anyhow!(
+                                    "--format requires a value (json, jsonl, minimal, table)"
+                                ));
+                            }
+                        }
+                        "--robot" => {
+                            robot = true;
+                            i += 1;
                         }
                         _ => {
                             if !query.is_empty() {
@@ -379,6 +402,8 @@ impl FromStr for ReplCommand {
                     limit,
                     semantic,
                     concepts,
+                    format,
+                    robot,
                 })
             }
 

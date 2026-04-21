@@ -264,8 +264,10 @@ impl ReplHandler {
                 limit,
                 semantic,
                 concepts,
+                format,
+                robot,
             } => {
-                self.handle_search(query, role, limit, semantic, concepts)
+                self.handle_search(query, role, limit, semantic, concepts, format, robot)
                     .await?;
             }
             ReplCommand::Config { subcommand } => {
