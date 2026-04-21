@@ -65,6 +65,8 @@ pub struct RestartEntry {
 pub struct AgentSupervisor {
     config: SupervisorConfig,
     status: SupervisorStatus,
+    /// Set permanently when restart intensity is exceeded; guards all subsequent restart actions
+    escalated: bool,
     children: Arc<RwLock<HashMap<AgentPid, SupervisedAgentInfo>>>,
     agents: Arc<RwLock<HashMap<AgentPid, Box<dyn SupervisedAgent>>>>,
     agent_factory: Arc<dyn AgentFactory>,
@@ -78,12 +80,19 @@ impl AgentSupervisor {
         Self {
             config,
             status: SupervisorStatus::Stopped,
+            escalated: false,
             children: Arc::new(RwLock::new(HashMap::new())),
             agents: Arc::new(RwLock::new(HashMap::new())),
             agent_factory,
             restart_history: Arc::new(Mutex::new(Vec::new())),
             shutdown_signal: Arc::new(Mutex::new(None)),
         }
+    }
+
+    /// Returns `true` if the supervisor has escalated due to excessive restarts.
+    /// Once escalated, no further restarts are permitted until the supervisor is reset.
+    pub fn is_escalated(&self) -> bool {
+        self.escalated
     }
 
     /// Start the supervisor
@@ -204,6 +213,18 @@ impl AgentSupervisor {
     ) -> SupervisionResult<()> {
         log::warn!("Agent {} exited with reason: {:?}", agent_id, reason);
 
+        // Guard: once escalated, no further restarts are permitted (NoRestartAfterEscalation)
+        if self.escalated {
+            log::error!(
+                "Supervisor {} is escalated; refusing restart of agent {}",
+                self.config.supervisor_id.0,
+                agent_id
+            );
+            return Err(SupervisionError::MaxRestartsExceeded(
+                self.config.supervisor_id.clone(),
+            ));
+        }
+
         // Record restart entry
         {
             let mut history = self.restart_history.lock().await;
@@ -214,8 +235,24 @@ impl AgentSupervisor {
             });
         }
 
-        // Check if restart is allowed
-        if !self.should_restart(&agent_id, &reason, Utc::now()).await? {
+        // Check if restart is allowed; escalate permanently on MaxRestartsExceeded
+        let restart_allowed = match self.should_restart(&agent_id, &reason, Utc::now()).await {
+            Ok(allowed) => allowed,
+            Err(SupervisionError::MaxRestartsExceeded(_)) => {
+                self.escalated = true;
+                log::error!(
+                    "Supervisor {} escalated: max restarts exceeded for agent {}",
+                    self.config.supervisor_id.0,
+                    agent_id
+                );
+                return Err(SupervisionError::MaxRestartsExceeded(
+                    self.config.supervisor_id.clone(),
+                ));
+            }
+            Err(e) => return Err(e),
+        };
+
+        if !restart_allowed {
             log::info!("Not restarting agent {} due to policy", agent_id);
             // Remove the failed agent
             self.stop_agent(&agent_id).await?;
@@ -433,14 +470,16 @@ impl AgentSupervisor {
     async fn restart_from_agent(&mut self, failed_agent_id: &AgentPid) -> SupervisionResult<()> {
         log::info!("Restarting from agent {}", failed_agent_id);
 
-        // Get all agent specs in order
-        let mut agent_specs: Vec<AgentSpec> = {
+        // Get all agent specs ordered by start_time (RestForOne requires original start order)
+        let mut agent_infos: Vec<(chrono::DateTime<chrono::Utc>, AgentSpec)> = {
             let children = self.children.read().await;
-            children.values().map(|info| info.spec.clone()).collect()
+            children
+                .values()
+                .map(|info| (info.start_time, info.spec.clone()))
+                .collect()
         };
-
-        // Sort by start time to maintain order
-        agent_specs.sort_by_key(|spec| spec.agent_id.0);
+        agent_infos.sort_by_key(|(start_time, _)| *start_time);
+        let agent_specs: Vec<AgentSpec> = agent_infos.into_iter().map(|(_, spec)| spec).collect();
 
         // Find the failed agent index
         let failed_index = agent_specs
