@@ -21,6 +21,11 @@ struct ProjectTrackers {
     default_tracker: GiteaTracker,
     /// Per-agent trackers keyed by agent name (scoped to this project).
     agent_trackers: HashMap<String, GiteaTracker>,
+    /// Per-agent raw token strings keyed by agent name (parallel to
+    /// agent_trackers). Exposed via [`OutputPoster::agent_token`] so the
+    /// spawn path can inject the token as a `GITEA_TOKEN` env override,
+    /// giving each agent's own `gtr` calls their own identity.
+    agent_tokens: HashMap<String, String>,
 }
 
 /// Posts collected agent output to a Gitea issue comment.
@@ -139,6 +144,18 @@ impl OutputPoster {
         self.projects
             .get(project)
             .is_some_and(|p| p.agent_trackers.contains_key(agent_name))
+    }
+
+    /// Return the agent's own Gitea token for this project, if one is
+    /// configured in `agent_tokens.json`. Used by the spawn path to inject
+    /// `GITEA_TOKEN` into the child process so the agent's own `gtr` /
+    /// API calls post under its own Gitea user identity (matching what
+    /// [`OutputPoster`] does for the wrapped completion comment).
+    pub fn agent_token(&self, project: &str, agent_name: &str) -> Option<&str> {
+        self.projects
+            .get(project)
+            .and_then(|p| p.agent_tokens.get(agent_name))
+            .map(|s| s.as_str())
     }
 
     /// Post agent output as a comment on a Gitea issue in the given project.
@@ -382,68 +399,126 @@ fn build_project_trackers(config: &GiteaOutputConfig) -> ProjectTrackers {
     let default_tracker =
         GiteaTracker::new(default_gitea_config).expect("Failed to create default GiteaTracker");
 
-    let agent_trackers = match &config.agent_tokens_path {
-        Some(path) => match std::fs::read_to_string(path) {
-            Ok(contents) => match serde_json::from_str::<HashMap<String, String>>(&contents) {
-                Ok(tokens) => {
-                    tracing::info!(
-                        count = tokens.len(),
-                        path = %path.display(),
-                        owner = %config.owner,
-                        repo = %config.repo,
-                        "loaded per-agent Gitea tokens"
-                    );
-                    let mut trackers = HashMap::with_capacity(tokens.len());
-                    for (agent_name, token) in tokens {
-                        let agent_config = GiteaConfig {
-                            base_url: config.base_url.clone(),
-                            token,
-                            owner: config.owner.clone(),
-                            repo: config.repo.clone(),
-                            active_states: vec!["open".to_string()],
-                            terminal_states: vec!["closed".to_string()],
-                            use_robot_api: false,
-                            robot_path: PathBuf::from(ROBOT_PATH),
-                            claim_strategy: ClaimStrategy::PreferRobot,
-                        };
-                        match GiteaTracker::new(agent_config) {
-                            Ok(tracker) => {
-                                trackers.insert(agent_name, tracker);
-                            }
-                            Err(e) => {
-                                tracing::warn!(
-                                    agent = %agent_name,
-                                    error = %e,
-                                    "failed to create agent tracker, will use project default"
-                                );
+    let (agent_trackers, agent_tokens): (HashMap<String, GiteaTracker>, HashMap<String, String>) =
+        match &config.agent_tokens_path {
+            Some(path) => match std::fs::read_to_string(path) {
+                Ok(contents) => match serde_json::from_str::<HashMap<String, String>>(&contents) {
+                    Ok(tokens) => {
+                        tracing::info!(
+                            count = tokens.len(),
+                            path = %path.display(),
+                            owner = %config.owner,
+                            repo = %config.repo,
+                            "loaded per-agent Gitea tokens"
+                        );
+                        let mut trackers = HashMap::with_capacity(tokens.len());
+                        let mut raw = HashMap::with_capacity(tokens.len());
+                        for (agent_name, token) in tokens {
+                            let agent_config = GiteaConfig {
+                                base_url: config.base_url.clone(),
+                                token: token.clone(),
+                                owner: config.owner.clone(),
+                                repo: config.repo.clone(),
+                                active_states: vec!["open".to_string()],
+                                terminal_states: vec!["closed".to_string()],
+                                use_robot_api: false,
+                                robot_path: PathBuf::from(ROBOT_PATH),
+                                claim_strategy: ClaimStrategy::PreferRobot,
+                            };
+                            match GiteaTracker::new(agent_config) {
+                                Ok(tracker) => {
+                                    trackers.insert(agent_name.clone(), tracker);
+                                    raw.insert(agent_name, token);
+                                }
+                                Err(e) => {
+                                    tracing::warn!(
+                                        agent = %agent_name,
+                                        error = %e,
+                                        "failed to create agent tracker, will use project default"
+                                    );
+                                }
                             }
                         }
+                        (trackers, raw)
                     }
-                    trackers
-                }
+                    Err(e) => {
+                        tracing::warn!(
+                            path = %path.display(),
+                            error = %e,
+                            "failed to parse agent tokens JSON, all agents will use project default token"
+                        );
+                        (HashMap::new(), HashMap::new())
+                    }
+                },
                 Err(e) => {
                     tracing::warn!(
                         path = %path.display(),
                         error = %e,
-                        "failed to parse agent tokens JSON, all agents will use project default token"
+                        "failed to read agent tokens file, all agents will use project default token"
                     );
-                    HashMap::new()
+                    (HashMap::new(), HashMap::new())
                 }
             },
-            Err(e) => {
-                tracing::warn!(
-                    path = %path.display(),
-                    error = %e,
-                    "failed to read agent tokens file, all agents will use project default token"
-                );
-                HashMap::new()
-            }
-        },
-        None => HashMap::new(),
-    };
+            None => (HashMap::new(), HashMap::new()),
+        };
 
     ProjectTrackers {
         default_tracker,
         agent_trackers,
+        agent_tokens,
+    }
+}
+
+#[cfg(test)]
+mod agent_token_tests {
+    use super::*;
+    use crate::config::GiteaOutputConfig;
+
+    #[test]
+    fn agent_token_returns_configured_value_when_tokens_file_loaded() {
+        use std::io::Write;
+        let dir = tempfile::tempdir().unwrap();
+        let tokens_path = dir.path().join("agent_tokens.json");
+        let mut f = std::fs::File::create(&tokens_path).unwrap();
+        writeln!(f, r#"{{"alpha":"tok-alpha","beta":"tok-beta"}}"#).unwrap();
+        drop(f);
+
+        let config = GiteaOutputConfig {
+            base_url: "https://example.com".to_string(),
+            token: "root-token".to_string(),
+            owner: "terraphim".to_string(),
+            repo: "acme".to_string(),
+            agent_tokens_path: Some(tokens_path),
+        };
+        let poster = OutputPoster::new(&config);
+
+        assert_eq!(
+            poster.agent_token(crate::dispatcher::LEGACY_PROJECT_ID, "alpha"),
+            Some("tok-alpha")
+        );
+        assert_eq!(
+            poster.agent_token(crate::dispatcher::LEGACY_PROJECT_ID, "beta"),
+            Some("tok-beta")
+        );
+        assert_eq!(
+            poster.agent_token(crate::dispatcher::LEGACY_PROJECT_ID, "gamma"),
+            None
+        );
+        assert_eq!(poster.agent_token("nonexistent", "alpha"), None);
+    }
+
+    #[test]
+    fn agent_token_returns_none_when_no_tokens_file() {
+        let config = GiteaOutputConfig {
+            base_url: "https://example.com".to_string(),
+            token: "root-token".to_string(),
+            owner: "terraphim".to_string(),
+            repo: "acme".to_string(),
+            agent_tokens_path: None,
+        };
+        let poster = OutputPoster::new(&config);
+        assert!(poster
+            .agent_token(crate::dispatcher::LEGACY_PROJECT_ID, "anything")
+            .is_none());
     }
 }
