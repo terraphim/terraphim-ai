@@ -181,89 +181,7 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          components: rustfmt
-
-      - name: Rustfmt Check
-        run: cargo fmt --all -- --check
-
-  rust-clippy:
-    name: Rust Clippy
-    runs-on: [self-hosted, Linux, X64]
-    timeout-minutes: 5
-    needs: [changes]
-    if: needs.changes.outputs.rust-changed == 'true'
-
-    steps:
-      - name: Fix workspace permissions
-        run: |
-          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
-          sudo chown -R $(id -u):$(id -g) "${WORKDIR}" 2>/dev/null || true
-          sudo chmod -R u+rw "${WORKDIR}" 2>/dev/null || true
-
-      - name: Pre-checkout cleanup
-        run: |
-          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
-          sudo rm -rf "${WORKDIR}/target" || true
-
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Disk cleanup
-        run: |
-          sudo rm -rf ~/.rustup/tmp/* 2>/dev/null || true
-          sudo docker system prune -f 2>/dev/null || true
-          df -h
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy
-
-      - name: Setup sccache
-        uses: mozilla-actions/sccache-action@v0.0.9
-
-      - name: Configure sccache
-        run: |
-          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
-          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
-
-      - name: Clippy Check
-        run: cargo clippy --workspace --all-targets --features zlob -- -D warnings
-        env:
-          RUST_BACKTRACE: 1
-
-  # Quick Rust compilation check
-  rust-compile:
-    name: Rust Compilation Check
-    runs-on: [self-hosted, Linux, X64]
-    timeout-minutes: 6
-    needs: [changes]
-    if: needs.changes.outputs.rust-changed == 'true'
-
-    steps:
-      - name: Fix workspace permissions
-        run: |
-          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
-          sudo chown -R $(id -u):$(id -g) "${WORKDIR}" 2>/dev/null || true
-          sudo chmod -R u+rw "${WORKDIR}" 2>/dev/null || true
-
-      - name: Pre-checkout cleanup
-        run: |
-          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
-          sudo rm -rf "${WORKDIR}/target" || true
-
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Disk cleanup
-        run: |
-          sudo rm -rf ~/.rustup/tmp/* 2>/dev/null || true
-          sudo docker system prune -f 2>/dev/null || true
-          df -h
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
+          toolchain: "1.94.0"
           components: rustfmt, clippy
 
       - name: Setup sccache
@@ -273,6 +191,14 @@ jobs:
         run: |
           echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
           echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+
+      - name: Rustfmt Check
+        run: cargo fmt --all -- --check
+
+      - name: Clippy Check
+        run: cargo clippy --workspace --all-targets --features zlob -- -D warnings
+        env:
+          RUST_BACKTRACE: 1
 
       - name: Cache Cargo registry and index
         uses: actions/cache@v4

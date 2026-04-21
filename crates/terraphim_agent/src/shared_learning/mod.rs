@@ -27,3 +27,8 @@ pub use markdown_store::{MarkdownLearningStore, MarkdownStoreConfig, MarkdownSto
 pub use store::{SharedLearningStore, StoreConfig};
 pub use types::{LearningSource as SharedLearningSource, SharedLearning, TrustLevel};
 pub use wiki_sync::{GiteaWikiClient, WikiSyncError};
+
+#[cfg(feature = "cross-agent-injection")]
+pub mod injector;
+#[cfg(feature = "cross-agent-injection")]
+pub use injector::{InjectionError, InjectionResult, InjectorConfig, LearningInjector};
