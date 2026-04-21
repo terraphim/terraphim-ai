@@ -416,6 +416,122 @@ fn nest_by_project<V: Clone>(
     out
 }
 
+/// Build the composite restart-state key for an agent definition.
+///
+/// Legacy (project-less) agents use [`crate::dispatcher::LEGACY_PROJECT_ID`]
+/// so restart counts never collide across projects once projects are added.
+fn agent_key(def: &AgentDefinition) -> (String, String) {
+    (
+        def.project
+            .clone()
+            .unwrap_or_else(|| crate::dispatcher::LEGACY_PROJECT_ID.to_string()),
+        def.name.clone(),
+    )
+}
+
+/// Build the per-project runtime map consumed by
+/// [`flow::executor::FlowExecutor::with_projects`].
+fn build_flow_project_runtimes(
+    config: &OrchestratorConfig,
+) -> HashMap<String, flow::executor::ProjectRuntime> {
+    config
+        .projects
+        .iter()
+        .map(|p| {
+            (
+                p.id.clone(),
+                flow::executor::ProjectRuntime {
+                    working_dir: p.working_dir.clone(),
+                    gitea_owner: p.gitea.as_ref().map(|g| g.owner.clone()),
+                    gitea_repo: p.gitea.as_ref().map(|g| g.repo.clone()),
+                },
+            )
+        })
+        .collect()
+}
+
+/// Build a [`SpawnContext`] for an agent, resolving per-project working_dir,
+/// Gitea owner/repo, and the project id itself into the child process's
+/// environment (`ADF_PROJECT_ID`, `ADF_WORKING_DIR`, `GITEA_OWNER`,
+/// `GITEA_REPO`). Legacy (project-less) agents use [`SpawnContext::global()`].
+fn build_spawn_context_for_agent(
+    config: &OrchestratorConfig,
+    def: &AgentDefinition,
+) -> SpawnContext {
+    let Some(pid) = def.project.as_deref() else {
+        return SpawnContext::global();
+    };
+    let Some(project) = config.project_by_id(pid) else {
+        return SpawnContext::global();
+    };
+    let working_dir_str = project.working_dir.to_string_lossy().into_owned();
+    let mut ctx = SpawnContext::with_working_dir(project.working_dir.clone())
+        .with_env("ADF_PROJECT_ID", pid)
+        .with_env("ADF_WORKING_DIR", working_dir_str);
+    if let Some(gitea) = project.gitea.as_ref() {
+        ctx = ctx
+            .with_env("GITEA_OWNER", gitea.owner.clone())
+            .with_env("GITEA_REPO", gitea.repo.clone());
+    }
+    ctx
+}
+
+/// Flatten persisted nested maps (project -> agent -> count) and any legacy
+/// flat entries into the in-memory composite key map. Legacy flat entries are
+/// mapped to [`crate::dispatcher::LEGACY_PROJECT_ID`].
+#[cfg(not(test))]
+fn flatten_restart_counts(state: &PersistedRestartState) -> HashMap<(String, String), u32> {
+    let mut out: HashMap<(String, String), u32> = HashMap::new();
+    for (project, per_agent) in &state.counts_by_project {
+        for (agent, count) in per_agent {
+            out.insert((project.clone(), agent.clone()), *count);
+        }
+    }
+    for (agent, count) in &state.counts {
+        out.entry((
+            crate::dispatcher::LEGACY_PROJECT_ID.to_string(),
+            agent.clone(),
+        ))
+        .or_insert(*count);
+    }
+    out
+}
+
+/// Flatten persisted nested maps for last-failure timestamps into the
+/// composite key format.
+#[cfg(not(test))]
+fn flatten_restart_failures(state: &PersistedRestartState) -> HashMap<(String, String), i64> {
+    let mut out: HashMap<(String, String), i64> = HashMap::new();
+    for (project, per_agent) in &state.last_failure_unix_secs_by_project {
+        for (agent, ts) in per_agent {
+            out.insert((project.clone(), agent.clone()), *ts);
+        }
+    }
+    for (agent, ts) in &state.last_failure_unix_secs {
+        out.entry((
+            crate::dispatcher::LEGACY_PROJECT_ID.to_string(),
+            agent.clone(),
+        ))
+        .or_insert(*ts);
+    }
+    out
+}
+
+/// Re-nest composite keyed maps into the persisted `project -> agent -> value`
+/// shape for serialisation.
+#[cfg(not(test))]
+fn nest_by_project<V: Clone>(
+    flat: &HashMap<(String, String), V>,
+) -> HashMap<String, HashMap<String, V>> {
+    let mut out: HashMap<String, HashMap<String, V>> = HashMap::new();
+    for ((project, agent), value) in flat {
+        out.entry(project.clone())
+            .or_default()
+            .insert(agent.clone(), value.clone());
+    }
+    out
+}
+
 /// Validate agent name for safe use in file paths.
 /// Rejects empty names, names containing path separators or traversal sequences.
 fn validate_agent_name(name: &str) -> Result<(), OrchestratorError> {
