@@ -1,3 +1,4 @@
+#![allow(clippy::collapsible_match)]
 //! Ripgrep command and message types.
 //!
 //! This module contains the `RipgrepCommand` struct, which is used to run

@@ -93,9 +93,11 @@ else
 fi
 
 echo -e "${BLUE}🔍 Running cargo clippy...${NC}"
-# Pre-build dependencies to avoid timeout
+# Pre-build dependencies to avoid timeout. Use --features zlob so fff-search's
+# build.rs (which panics under CI without zlob) succeeds; matches the clippy
+# invocation below.
 echo "Pre-building dependencies..."
-if cargo build --workspace --all-targets; then
+if cargo build --workspace --all-targets --features zlob; then
     echo -e "${GREEN}  ✅ Dependencies pre-built successfully${NC}"
 else
     echo -e "${YELLOW}  ⚠️  Dependency pre-build had issues, continuing anyway${NC}"

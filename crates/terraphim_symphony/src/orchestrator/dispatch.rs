@@ -73,6 +73,7 @@ pub fn is_dispatch_eligible(
 /// 3. Created at oldest first
 /// 4. Identifier lexicographic tiebreaker
 pub fn sort_for_dispatch(issues: &mut [Issue]) {
+    #[allow(clippy::unnecessary_sort_by)]
     issues.sort_by(|a, b| {
         // PageRank: higher score first (more downstream impact)
         let pra = a.pagerank_score.unwrap_or(0.0);

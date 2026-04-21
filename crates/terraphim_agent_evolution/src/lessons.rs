@@ -244,6 +244,7 @@ impl LessonsState {
         }
 
         // Sort by relevance (success rate and application count)
+        #[allow(clippy::unnecessary_sort_by)]
         applicable.sort_by(|a, b| {
             let a_score = a.success_rate * (1.0 + (a.applied_count as f64 / 10.0));
             let b_score = b.success_rate * (1.0 + (b.applied_count as f64 / 10.0));

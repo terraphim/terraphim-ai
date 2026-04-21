@@ -31,7 +31,7 @@ exclude = [
 default-members = ["terraphim_server"]
 
 [workspace.package]
-version = "1.16.34"
+version = "1.16.35"
 edition = "2024"
 
 [workspace.dependencies]
@@ -53,8 +53,8 @@ tempfile = "3.27"
 
 # Security: Force rustls 0.23+ to fix RUSTSEC-2026-0049
 rustls = { version = "0.23", default-features = false }
-# Security: Force rustls-webpki 0.103.10+ to fix RUSTSEC-2026-0049 (CRL validation bypass)
-rustls-webpki = "0.103.10"
+# Security: Force rustls-webpki 0.103.12+ to fix RUSTSEC-2026-0049, 0098, 0099
+rustls-webpki = "0.103.12"
 
 # LLM Router integration
 
@@ -63,9 +63,9 @@ genai = { git = "https://github.com/terraphim/rust-genai.git", branch = "merge-u
 self_update = { git = "https://github.com/AlexMikhalev/self_update.git", branch = "update-zipsign-api-v0.2" }
 # Security: Patch tokio-tungstenite to use rustls 0.23+ for RUSTSEC-2026-0049
 tokio-tungstenite = { git = "https://github.com/snapview/tokio-tungstenite.git", tag = "v0.28.0" }
-# Security: Patch rustls-webpki to fix RUSTSEC-2026-0049
+# Security: Patch rustls-webpki to fix RUSTSEC-2026-0049 (CRL bypass), 0098, 0099 (name constraints)
 # Using git source to force version override
-rustls-webpki = { git = "https://github.com/rustls/webpki.git", tag = "v/0.103.10" }
+rustls-webpki = { git = "https://github.com/rustls/webpki.git", tag = "v/0.103.12" }
 
 [profile.release]
 panic = "unwind"

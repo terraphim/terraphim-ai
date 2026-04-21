@@ -1,3 +1,4 @@
+#![allow(clippy::explicit_counter_loop)]
 //! Learning via Negativa: Command Correction Example
 //!
 //! This example demonstrates how Terraphim can learn from failed commands

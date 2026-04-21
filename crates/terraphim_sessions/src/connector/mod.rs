@@ -8,10 +8,16 @@ mod native;
 #[cfg(feature = "aider-connector")]
 mod aider;
 
+#[cfg(feature = "cline-connector")]
+mod cline;
+
 pub use native::NativeClaudeConnector;
 
 #[cfg(feature = "aider-connector")]
 pub use aider::AiderConnector;
+
+#[cfg(feature = "cline-connector")]
+pub use cline::ClineConnector;
 
 use crate::model::Session;
 use anyhow::Result;
@@ -116,6 +122,10 @@ impl ConnectorRegistry {
         // Add Aider connector if feature enabled
         #[cfg(feature = "aider-connector")]
         connectors.push(Box::new(AiderConnector));
+
+        // Add Cline connector if feature enabled
+        #[cfg(feature = "cline-connector")]
+        connectors.push(Box::new(ClineConnector::new()));
 
         // Add TSA-based connectors if feature enabled
         #[cfg(feature = "terraphim-session-analyzer")]

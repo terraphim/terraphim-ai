@@ -31,8 +31,16 @@ ignore = [
     # rustls-webpki CRL revocation bypass - transitive dep via serenity -> hyper-rustls -> rustls 0.21.x
     # serenity 0.12 pins hyper-rustls 0.24 which pins rustls 0.21; cannot override without serenity upgrade
     # Disabled by default: discord removed from tinyclaw default features
+    # Default build uses patched rustls-webpki 0.103.12 (fixes 0049, 0098, 0099 on reqwest chain)
+    # These only apply when --features discord is explicitly enabled
     # TODO: Remove once serenity 0.13+ releases with rustls 0.23+ support
     "RUSTSEC-2026-0049",
+    # rustls-webpki name constraints bypass (URI) - same serenity -> rustls 0.22 -> webpki 0.102.x chain
+    # Only affects builds with --features discord; default build uses patched 0.103.12
+    "RUSTSEC-2026-0098",
+    # rustls-webpki name constraints bypass (wildcards) - same serenity -> rustls 0.22 -> webpki 0.102.x chain
+    # Only affects builds with --features discord; default build uses patched 0.103.12
+    "RUSTSEC-2026-0099",
     # rand unsound with custom logger + thread_rng - currently transitive via proptest/dev tooling.
     # TODO: remove once the rand 0.9.3+ upgrade lands across the dependency graph.
     "RUSTSEC-2026-0097",

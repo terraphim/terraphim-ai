@@ -3,7 +3,7 @@
 
 [toolchain]
 # Stable Rust version with edition 2024 support
-channel = "1.87.0"
+channel = "1.94.0"
 
 # Components needed for the project
 components = ["rustfmt", "clippy"]
