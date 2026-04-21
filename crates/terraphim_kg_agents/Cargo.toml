@@ -11,7 +11,7 @@ async-trait = { workspace = true }
 
 log = { workspace = true }
 
-rand = "0.9"
+fastrand = "2"
 serde = { workspace = true, features = ["derive"] }
 
 serde_json = { workspace = true }
