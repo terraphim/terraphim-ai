@@ -1,0 +1,98 @@
+# PR-reviewer agent template
+#
+# Mention-dispatched via DispatchTask::ReviewPr (wired in ROC v1 Step D).
+# Reads ADF_PR_* env overrides injected by handle_review_pr, fetches the PR
+# diff, invokes claude with the structural-pr-review skill chain, and posts
+# the verdict as a single gtr comment on the PR.
+#
+# NO schedule field -- this is event-driven, not cron.
+# Subscription-only models only (C1 constraint).
+
+[[agents]]
+name = "pr-reviewer"
+layer = "Growth"
+cli_tool = "/home/alex/.local/bin/claude"
+model = "sonnet"
+fallback_model = "kimi-for-coding/k2p5"
+persona = "Carthos"
+skill_chain = ["structural-pr-review"]
+max_cpu_seconds = 1800
+grace_period_secs = 30
+task = '''
+source ~/.profile
+
+# Context injected by handle_review_pr (ROC v1 Step D):
+#   ADF_PR_NUMBER, ADF_PR_HEAD_SHA, ADF_PR_PROJECT, ADF_PR_AUTHOR,
+#   ADF_PR_DIFF_LOC, ADF_PR_TITLE
+if [ -z "${ADF_PR_NUMBER:-}" ] || [ -z "${ADF_PR_PROJECT:-}" ]; then
+  echo "pr-reviewer: missing ADF_PR_NUMBER or ADF_PR_PROJECT; exit" >&2
+  exit 1
+fi
+
+# Idempotency: skip re-review if a review comment referencing the same
+# head_sha already exists within the last 2 hours.
+EXISTING=$(curl -sf -H "Authorization: token $GITEA_TOKEN" \
+  "$GITEA_URL/api/v1/repos/$GITEA_OWNER/$GITEA_REPO/issues/$ADF_PR_NUMBER/comments" 2>/dev/null \
+  | python3 -c '
+import json, sys, datetime, os
+head = os.environ.get("ADF_PR_HEAD_SHA", "")
+cs = json.load(sys.stdin)
+now = datetime.datetime.now(datetime.timezone.utc)
+recent = [
+  c for c in cs
+  if ("Last reviewed commit: " + head[:7]) in c.get("body", "")
+  and (now - datetime.datetime.fromisoformat(
+    c["created_at"].replace("Z", "+00:00")
+  )).total_seconds() < 7200
+]
+print("yes" if recent else "no")
+' 2>/dev/null || echo "no")
+
+if [ "$EXISTING" = "yes" ]; then
+  echo "pr-reviewer: same head_sha already reviewed in last 2h; skip; exit"
+  exit 0
+fi
+
+# Fetch the PR diff (capped to avoid blowing the context window).
+cd "$GITEA_WORKING_DIR"
+git fetch gitea "pull/$ADF_PR_NUMBER/head:pr-$ADF_PR_NUMBER" 2>/dev/null || true
+PR_DIFF=$(git diff "main...pr-$ADF_PR_NUMBER" 2>/dev/null | head -2000)
+
+HEAD_SHORT=$(echo "$ADF_PR_HEAD_SHA" | cut -c1-7)
+
+REVIEW_PROMPT="You are reviewing PR #$ADF_PR_NUMBER on $GITEA_OWNER/$GITEA_REPO. Apply the structural-pr-review skill.
+
+PR metadata:
+- Title: $ADF_PR_TITLE
+- Author: $ADF_PR_AUTHOR
+- Head SHA: $ADF_PR_HEAD_SHA
+- Diff LOC: $ADF_PR_DIFF_LOC
+
+PR diff (first 2000 lines):
+\`\`\`diff
+$PR_DIFF
+\`\`\`
+
+Post your review as a single gtr comment on PR #$ADF_PR_NUMBER. Follow the structural-pr-review output template exactly:
+- <h3>Summary</h3>
+- <h3>Confidence Score: N/5</h3>
+- <h3>Important Files Changed</h3>
+- Architecture diagram (Mermaid)
+- <h3>Inline Findings</h3> (with P0/P1/P2 prefixes)
+- <sub>Last reviewed commit: $HEAD_SHORT | Reviews (1)</sub>
+
+Rules:
+- Do NOT use --dangerously-skip-permissions
+- Do NOT mention agent handles with the adf colon prefix (triggers false-positive review chains)
+- Do NOT mock, bypass tests, or skip hooks
+- One review comment per round; batch all findings
+
+Post the completed review with:
+  gtr comment --owner \"\$GITEA_OWNER\" --repo \"\$GITEA_REPO\" --issue \"$ADF_PR_NUMBER\" --body-file /tmp/pr-review-$ADF_PR_NUMBER.md"
+
+echo "$REVIEW_PROMPT" | /home/alex/.local/bin/claude -p \
+  --allowedTools "Bash,Read,Grep,Glob" \
+  2>&1
+
+echo "pr-reviewer: verdict posted on PR #$ADF_PR_NUMBER"
+'''
