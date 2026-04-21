@@ -1702,11 +1702,7 @@ async fn run_offline_command(
                 let docs: Vec<SearchDocumentOutput> = results
                     .iter()
                     .map(|doc| {
-                        apply_field_mode_and_budget(
-                            doc,
-                            &field_mode_lower,
-                            max_content_length,
-                        )
+                        apply_field_mode_and_budget(doc, &field_mode_lower, max_content_length)
                     })
                     .collect();
 
