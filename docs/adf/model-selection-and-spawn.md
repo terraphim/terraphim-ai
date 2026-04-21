@@ -64,6 +64,15 @@ Plus a `BudgetVerdict` from the agent's per-month USD cost budget
 (`ProviderBudgetTracker`). `BudgetPressure` comes out as `NoPressure`,
 `NearExhaustion`, or `Exhausted`.
 
+The `SpawnContext` also carries **per-agent Gitea identity**. When the
+orchestrator's `OutputPoster` has loaded an entry for `(project, agent)`
+from `agent_tokens.json`, `build_spawn_context_for_agent` injects
+`GITEA_TOKEN` into `env_overrides`. This overrides the shared root token
+from `~/.profile`, so `gtr` / `curl` calls inside the agent's own task
+shell authenticate as the agent's own Gitea user — not `root`. The
+`OutputPoster` wrapper comment + any direct `gtr comment` the agent
+makes both show `author = <agent-name>` in Gitea.
+
 ## Stage 2: RoutingDecisionEngine picks the model
 
 `crates/terraphim_orchestrator/src/control_plane/routing.rs` —
@@ -306,15 +315,56 @@ Resolves the per-project `GiteaTracker`, looks up the per-agent Gitea token
 (`agent_tokens.json`) so the comment lands under the agent's own login, and
 POSTs to `/api/v1/repos/{owner}/{repo}/issues/{issue_number}/comments`.
 
-### Known bug recently fixed (adf-fleet#44)
+### Known bug recently fixed (adf-fleet#44, PR #738)
 
-Before commit `7cf60d2c` (PR #738), `RepoComment::issue_number` was extracted
-only from `issue_url`. For comments on pull requests Gitea returns
+Before commit `7cf60d2c`, `RepoComment::issue_number` was extracted only
+from `issue_url`. For comments on pull requests Gitea returns
 `pull_request_url` instead, so every PR comment arrived with
 `issue_number = 0` and OutputPoster tried to post to `/issues/0/comments` —
 500 from Gitea. The fix reads `pull_request_url` as a fallback. PRs share
 the issue numeric namespace so the same trailing-segment extraction works
 for both URLs.
+
+### Per-agent identity end-to-end (PR #741)
+
+`OutputPoster::has_own_token` controls the wrapper comment's author.
+`OutputPoster::agent_token(project, name)` exposes the raw token string
+so `build_spawn_context_for_agent` can inject `GITEA_TOKEN` into the
+spawned child's env. Together these close the attribution loop:
+
+| Path | Token used | Gitea author |
+|---|---|---|
+| OutputPoster wrapper: "Agent X completed" | per-agent | X |
+| Agent's own `gtr comment` in task shell | per-agent (via env override) | X |
+| Agent lookup misses `agent_tokens.json` | project root token | root |
+
+`agent_tokens.json` maps every agent name listed in `conf.d/*.toml` to a
+Gitea personal access token. If the map is empty or the path is not set
+on `[projects.gitea]`, every agent on that project falls back to `root`.
+
+### Meta-coordinator as work dispatcher
+
+On both `digital-twins` and `terraphim-ai` the meta-coordinator's task
+envelope now follows the canonical scope-gate + dispatch pattern from
+`scripts/adf-setup/agents/meta-coordinator.toml`:
+
+1. `gtr ready` → highest-PageRank unblocked issue
+2. Haiku scope-clarity check via `claude -p --model haiku --allowedTools ""`
+   (pure text, no tool surface — prompt-injection safe)
+3. If unclear → `gtr comment` with a "needs more detail" note, skip if
+   already posted in the last 24 h (idempotency)
+4. If clear → Haiku role classifier picks one of
+   implementation-swarm, quality-coordinator, security-sentinel,
+   compliance-watchdog, spec-validator, test-guardian,
+   documentation-generator
+5. `gtr comment "@adf:<role> please pick up issue #N"` on the ready
+   issue → the mention parser dispatches the named role at the next
+   poll tick
+
+Terraphim's previous fleet-health-report pattern (writing to
+`/opt/ai-dark-factory/reports/` and posting to issue `#107`) has been
+replaced. Fleet-health reporting is now the job of `fleet-meta`
+(cross-project) and the journal + Quickwit indices.
 
 ## Example: trace from the journal
 
