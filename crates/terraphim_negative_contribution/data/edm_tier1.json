@@ -1,0 +1,41 @@
+{
+  "name": "edm_tier1_patterns",
+  "data": {
+    "todo!()": {
+      "id": 1,
+      "nterm": "todo_macro",
+      "display_value": "todo!()",
+      "url": "todo!() macro -- unimplemented stub||Replace with implementation||high"
+    },
+    "todo!(\"": {
+      "id": 1,
+      "nterm": "todo_macro_message",
+      "display_value": "todo!(\"...\")",
+      "url": "todo!() macro with message -- unimplemented stub||Replace with implementation||high"
+    },
+    "unimplemented!()": {
+      "id": 2,
+      "nterm": "unimplemented_macro",
+      "display_value": "unimplemented!()",
+      "url": "unimplemented!() macro -- explicit deferral||Replace with implementation or return appropriate error||high"
+    },
+    "unimplemented!(\"": {
+      "id": 2,
+      "nterm": "unimplemented_macro_message",
+      "display_value": "unimplemented!(\"...\")",
+      "url": "unimplemented!() macro with message -- explicit deferral||Replace with implementation or return appropriate error||high"
+    },
+    "panic!(\"not implemented\")": {
+      "id": 3,
+      "nterm": "panic_not_implemented",
+      "display_value": "panic!(\"not implemented\")",
+      "url": "panic with 'not implemented' -- runtime deferral||Replace with proper error handling||high"
+    },
+    "panic!(\"TODO\")": {
+      "id": 3,
+      "nterm": "panic_todo",
+      "display_value": "panic!(\"TODO\")",
+      "url": "panic with 'TODO' -- runtime deferral||Replace with proper error handling||high"
+    }
+  }
+}
