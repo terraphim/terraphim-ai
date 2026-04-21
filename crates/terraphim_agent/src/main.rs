@@ -589,6 +589,27 @@ struct SearchDocumentOutput {
     description: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     body: Option<String>,
+    /// Whether any field was truncated due to content length limit
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    _limited: bool,
+    /// Original byte length before truncation (only present when _limited is true)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    original_length: Option<usize>,
+}
+
+#[derive(Debug, Serialize)]
+struct PaginationOutput {
+    total: usize,
+    returned: usize,
+    has_more: bool,
+    limited_count: usize,
+}
+
+#[derive(Debug, Serialize)]
+struct TokenBudgetOutput {
+    max_tokens: usize,
+    estimated_tokens: usize,
+    truncated: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -597,6 +618,81 @@ struct SearchOutput {
     role: String,
     count: usize,
     results: Vec<SearchDocumentOutput>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pagination: Option<PaginationOutput>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    token_budget: Option<TokenBudgetOutput>,
+}
+
+/// Estimate token count using 4 chars per token heuristic.
+fn estimate_tokens(text: &str) -> usize {
+    text.len().saturating_add(3) / 4
+}
+
+/// Apply field mode filtering and optional content truncation to a document.
+///
+/// - "minimal": title, url, rank only (no description or body)
+/// - "summary": title, url, rank, description (no body)
+/// - "full" or anything else: all fields
+///
+/// When `max_content_length` is set, description and body are truncated and
+/// `_limited` / `original_length` are set on the result.
+fn apply_field_mode_and_budget(
+    doc: &terraphim_types::Document,
+    field_mode: &str,
+    max_content_length: Option<usize>,
+) -> SearchDocumentOutput {
+    let include_description = field_mode != "minimal";
+    let include_body = field_mode == "full";
+
+    let mut limited = false;
+    let mut original_length: Option<usize> = None;
+
+    let description = if include_description {
+        doc.description.as_deref().map(|d| {
+            if let Some(max) = max_content_length {
+                if d.len() > max {
+                    limited = true;
+                    original_length = Some(d.len());
+                    truncate_snippet(d, max)
+                } else {
+                    d.to_string()
+                }
+            } else {
+                d.to_string()
+            }
+        })
+    } else {
+        None
+    };
+
+    let body = if include_body && !doc.body.is_empty() {
+        let b = doc.body.as_str();
+        if let Some(max) = max_content_length {
+            if b.len() > max {
+                limited = true;
+                original_length = original_length.or(Some(b.len()));
+                Some(truncate_snippet(b, max))
+            } else {
+                Some(b.to_string())
+            }
+        } else {
+            Some(b.to_string())
+        }
+    } else {
+        None
+    };
+
+    SearchDocumentOutput {
+        id: doc.id.clone(),
+        title: doc.title.clone(),
+        url: doc.url.clone(),
+        rank: doc.rank,
+        description,
+        body,
+        _limited: limited,
+        original_length,
+    }
 }
 
 fn print_json_output<T: Serialize>(value: &T, mode: CommandOutputMode) -> Result<()> {
@@ -654,6 +750,18 @@ enum Command {
         role: Option<String>,
         #[arg(long, default_value_t = 10)]
         limit: usize,
+        /// Maximum token budget for the entire JSON response (estimated at 4 chars/token)
+        #[arg(long)]
+        max_tokens: Option<usize>,
+        /// Maximum character length for body/description fields before truncation
+        #[arg(long)]
+        max_content_length: Option<usize>,
+        /// Maximum number of results to return (overrides limit when smaller)
+        #[arg(long)]
+        max_results: Option<usize>,
+        /// Field selection mode: full (all fields), summary (no body), minimal (title+url+score)
+        #[arg(long, default_value = "full")]
+        field_mode: String,
     },
     /// Manage roles (list, select)
     Roles {
@@ -1420,6 +1528,10 @@ async fn run_offline_command(
             operator,
             role,
             limit,
+            max_tokens,
+            max_content_length,
+            max_results,
+            field_mode,
         } => {
             let (role_name, auto) = service
                 .resolve_or_auto_route(role.as_deref(), &query)
@@ -1427,6 +1539,12 @@ async fn run_offline_command(
             if let Some(ref ar) = auto {
                 eprintln!("{}", format_auto_route_line(ar));
             }
+
+            // Effective result limit: the smaller of limit and max_results (if set)
+            let effective_limit = match max_results {
+                Some(mr) => limit.min(mr),
+                None => limit,
+            };
 
             let results = if let Some(additional_terms) = terms {
                 // Multi-term query with logical operators
@@ -1459,7 +1577,7 @@ async fn run_offline_command(
                     },
                     operator: operator.map(|op| op.into()),
                     skip: Some(0),
-                    limit: Some(limit),
+                    limit: Some(effective_limit),
                     include_pinned: false,
                     role: Some(role_name.clone()),
                     layer: Layer::default(),
@@ -1469,30 +1587,53 @@ async fn run_offline_command(
             } else {
                 // Single term query (backward compatibility)
                 service
-                    .search_with_role(&query, &role_name, Some(limit))
+                    .search_with_role(&query, &role_name, Some(effective_limit))
                     .await?
             };
 
             if output.is_machine_readable() {
+                let total = results.len();
+                let field_mode_lower = field_mode.to_lowercase();
+                let docs: Vec<SearchDocumentOutput> = results
+                    .iter()
+                    .map(|doc| {
+                        apply_field_mode_and_budget(
+                            doc,
+                            &field_mode_lower,
+                            max_content_length,
+                        )
+                    })
+                    .collect();
+
+                let token_budget = max_tokens.map(|max| {
+                    let json_estimate = serde_json::to_string(&docs)
+                        .map(|s| estimate_tokens(&s))
+                        .unwrap_or(0);
+                    TokenBudgetOutput {
+                        max_tokens: max,
+                        estimated_tokens: json_estimate,
+                        truncated: json_estimate > max,
+                    }
+                });
+
+                let pagination = Some(PaginationOutput {
+                    total,
+                    returned: docs.len(),
+                    has_more: false, // offline search returns all matching docs up to limit
+                    limited_count: if let Some(mr) = max_results {
+                        total.saturating_sub(mr.min(total))
+                    } else {
+                        0
+                    },
+                });
+
                 let payload = SearchOutput {
                     query,
                     role: role_name.to_string(),
-                    count: results.len(),
-                    results: results
-                        .iter()
-                        .map(|doc| SearchDocumentOutput {
-                            id: doc.id.clone(),
-                            title: doc.title.clone(),
-                            url: doc.url.clone(),
-                            rank: doc.rank,
-                            description: doc.description.clone(),
-                            body: if doc.body.is_empty() {
-                                None
-                            } else {
-                                Some(doc.body.clone())
-                            },
-                        })
-                        .collect(),
+                    count: docs.len(),
+                    results: docs,
+                    pagination,
+                    token_budget,
                 };
                 print_json_output(&payload, output.mode)?;
             } else {
