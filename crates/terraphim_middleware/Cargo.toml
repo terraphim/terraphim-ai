@@ -86,3 +86,6 @@ mcp-sse = ["reqwest-eventsource"]
 mcp = ["mcp-sse"]
 # Optional: use rust-sdk for full protocol clients
 mcp-rust-sdk = ["mcp-sse", "mcp-client", "mcp-spec", "rmcp"]
+# Knowledge graph integration with learning capture
+kg-integration = ["terraphim_rolegraph/kg-integration", "terraphim_types/kg-integration"]
+feedback-loop = ["kg-integration"]

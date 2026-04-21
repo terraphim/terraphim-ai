@@ -89,6 +89,10 @@ pub use medical_types::*;
 #[cfg(feature = "hgnc")]
 pub mod hgnc;
 
+// Shared learning types for knowledge graph integration
+#[cfg(feature = "kg-integration")]
+pub mod shared_learning;
+
 // Capability-based routing types
 pub mod capability;
 pub use capability::*;
@@ -471,7 +475,7 @@ pub struct MarkdownDirectives {
 ///     synonyms: None,
 ///     route: None,
 ///     priority: None,
-///};
+/// };
 /// ```
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[cfg_attr(feature = "typescript", derive(Tsify))]
@@ -3111,6 +3115,7 @@ mod tests {
                 knowledge: Some(0.8),
                 learning: Some(0.6),
                 synthesis: Some(0.7),
+                ..Default::default()
             }),
         };
 
@@ -3135,6 +3140,7 @@ mod tests {
             synonyms: None,
             route: None,
             priority: None,
+            ..Default::default()
         };
 
         let indexed = IndexedDocument::from_document(doc);

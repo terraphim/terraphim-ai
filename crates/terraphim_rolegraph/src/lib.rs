@@ -1225,6 +1225,29 @@ impl RoleGraph {
     pub fn edges_map(&self) -> &ahash::AHashMap<u64, Edge> {
         &self.edges
     }
+
+    /// Index a learning document in the graph
+    #[cfg(feature = "kg-integration")]
+    pub fn index_learning_document(&mut self, doc: IndexedDocument) -> Result<()> {
+        self.documents.insert(doc.id.clone(), doc);
+        Ok(())
+    }
+
+    /// Get documents whose nodes match the query terms
+    #[cfg(feature = "kg-integration")]
+    pub fn get_learning_documents(&self, query: &str) -> Vec<&IndexedDocument> {
+        let matching_node_ids = self.find_matching_node_ids(query);
+        let matching_set: std::collections::HashSet<u64> = matching_node_ids.into_iter().collect();
+
+        self.documents
+            .values()
+            .filter(|doc| {
+                doc.nodes
+                    .iter()
+                    .any(|node_id| matching_set.contains(node_id))
+            })
+            .collect()
+    }
 }
 
 /// Wraps the `RoleGraph` for ingesting documents and is `Send` and `Sync`
