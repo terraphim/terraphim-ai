@@ -65,7 +65,9 @@ impl TerraphimLspServer {
                 None => Vec::new(),
             };
 
-            client.publish_diagnostics(uri_for_spawn, diagnostics, None).await;
+            client
+                .publish_diagnostics(uri_for_spawn, diagnostics, None)
+                .await;
         });
 
         guard.insert(uri_for_insert, handle.abort_handle());
@@ -112,8 +114,6 @@ impl LanguageServer for TerraphimLspServer {
     async fn did_close(&self, params: DidCloseTextDocumentParams) {
         let uri = params.text_document.uri.clone();
         self.documents.lock().await.remove(&uri);
-        self.client
-            .publish_diagnostics(uri, Vec::new(), None)
-            .await;
+        self.client.publish_diagnostics(uri, Vec::new(), None).await;
     }
 }

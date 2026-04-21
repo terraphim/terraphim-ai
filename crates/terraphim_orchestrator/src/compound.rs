@@ -462,7 +462,9 @@ impl CompoundReviewWorkflow {
             .filter(|p| !self.allowed_stub_paths.contains(p))
             .filter_map(|p| {
                 let path = Path::new(&self.config.repo_path).join(p);
-                std::fs::read_to_string(&path).ok().map(|content| (p.clone(), content))
+                std::fs::read_to_string(&path)
+                    .ok()
+                    .map(|content| (p.clone(), content))
             })
             .collect();
 
