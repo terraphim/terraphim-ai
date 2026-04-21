@@ -529,6 +529,16 @@ pub struct CompoundReviewConfig {
     /// Map of finding categories to remediation agent names.
     #[serde(default)]
     pub remediation_agents: std::collections::HashMap<String, String>,
+    /// Enable EDM (Explicit Deferral Marker) static pre-check before LLM swarm.
+    #[serde(default = "default_true")]
+    pub stub_scan_enabled: bool,
+    /// File paths exempt from EDM scanning (e.g., intentionally deferred modules).
+    #[serde(default)]
+    pub allowed_stub_paths: Vec<String>,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 fn default_max_duration() -> u64 {
@@ -564,6 +574,8 @@ impl Default for CompoundReviewConfig {
             auto_file_issues: false,
             auto_remediate: false,
             remediation_agents: std::collections::HashMap::new(),
+            stub_scan_enabled: true,
+            allowed_stub_paths: Vec::new(),
         }
     }
 }

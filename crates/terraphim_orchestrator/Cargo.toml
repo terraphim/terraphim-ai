@@ -17,6 +17,7 @@ terraphim_spawner = { path = "../terraphim_spawner", version = "1.0.0" }
 terraphim_router = { path = "../terraphim_router", version = "1.0.0" }
 terraphim_types = { path = "../terraphim_types", version = "1.0.0" }
 terraphim_tracker = { path = "../terraphim_tracker", version = "1.0.0" }
+terraphim_negative_contribution = { path = "../terraphim_negative_contribution", version = "0.1.0" }
 
 # Core dependencies
 tokio = { workspace = true, features = ["full", "signal"] }

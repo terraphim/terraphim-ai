@@ -7,6 +7,8 @@ use uuid::Uuid;
 
 use terraphim_types::{FindingCategory, FindingSeverity, ReviewAgentOutput, ReviewFinding};
 
+use terraphim_negative_contribution::NegativeContributionScanner;
+
 use crate::config::CompoundReviewConfig;
 use crate::error::OrchestratorError;
 use crate::scope::WorktreeManager;
@@ -232,6 +234,9 @@ impl CompoundReviewResult {
 pub struct CompoundReviewWorkflow {
     config: SwarmConfig,
     worktree_manager: WorktreeManager,
+    scanner: NegativeContributionScanner,
+    stub_scan_enabled: bool,
+    allowed_stub_paths: Vec<String>,
 }
 
 impl CompoundReviewWorkflow {
@@ -241,13 +246,24 @@ impl CompoundReviewWorkflow {
         Self {
             config,
             worktree_manager,
+            scanner: NegativeContributionScanner::new(),
+            stub_scan_enabled: true,
+            allowed_stub_paths: Vec::new(),
         }
     }
 
     /// Create from CompoundReviewConfig (legacy compatibility).
     pub fn from_compound_config(config: CompoundReviewConfig) -> Self {
+        let stub_scan_enabled = config.stub_scan_enabled;
+        let allowed_stub_paths = config.allowed_stub_paths.clone();
         let swarm_config = SwarmConfig::from_compound_config(&config);
-        Self::new(swarm_config)
+        Self {
+            config: swarm_config,
+            worktree_manager: WorktreeManager::with_base(&config.repo_path, &config.worktree_root),
+            scanner: NegativeContributionScanner::new(),
+            stub_scan_enabled,
+            allowed_stub_paths,
+        }
     }
 
     /// Run a full compound review cycle.
@@ -370,10 +386,23 @@ impl CompoundReviewWorkflow {
         }
 
         // Collect all findings and deduplicate
-        let all_findings: Vec<ReviewFinding> = agent_outputs
+        let mut all_findings: Vec<ReviewFinding> = agent_outputs
             .iter()
             .flat_map(|o| o.findings.clone())
             .collect();
+
+        // Merge static EDM pre-check findings (zero LLM cost)
+        if self.stub_scan_enabled {
+            let static_findings = self.run_static_precheck(&changed_files);
+            if !static_findings.is_empty() {
+                info!(
+                    static_findings = static_findings.len(),
+                    "EDM static pre-check found deferral markers"
+                );
+                all_findings.extend(static_findings);
+            }
+        }
+
         let deduplicated = terraphim_types::deduplicate_findings(all_findings);
 
         // Determine overall pass/fail
@@ -418,6 +447,30 @@ impl CompoundReviewWorkflow {
         category: FindingCategory,
     ) -> ReviewAgentOutput {
         extract_review_output(stdout, agent_name, category)
+    }
+
+    /// Run the static EDM pre-check on changed files.
+    ///
+    /// Scans changed .rs files for Explicit Deferral Markers (todo!(), unimplemented!(), etc.)
+    /// at zero LLM cost. Returns findings merged before deduplication.
+    fn run_static_precheck(&self, changed_files: &[String]) -> Vec<ReviewFinding> {
+        use std::path::Path;
+
+        let files: Vec<(String, String)> = changed_files
+            .iter()
+            .filter(|p| p.ends_with(".rs"))
+            .filter(|p| !self.allowed_stub_paths.contains(p))
+            .filter_map(|p| {
+                let path = Path::new(&self.config.repo_path).join(p);
+                std::fs::read_to_string(&path).ok().map(|content| (p.clone(), content))
+            })
+            .collect();
+
+        if files.is_empty() {
+            return Vec::new();
+        }
+
+        self.scanner.scan_files(&files)
     }
 
     /// Get list of changed files between two git refs.
