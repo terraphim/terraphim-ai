@@ -589,10 +589,10 @@ struct SearchDocumentOutput {
     description: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     body: Option<String>,
-    /// Whether any field was truncated due to content length limit
+    /// Whether any field was shortened due to content length limit
     #[serde(skip_serializing_if = "std::ops::Not::not")]
-    _limited: bool,
-    /// Original byte length before truncation (only present when _limited is true)
+    _truncated: bool,
+    /// Original byte length before shortening (only present when _truncated is true)
     #[serde(skip_serializing_if = "Option::is_none")]
     original_length: Option<usize>,
 }
@@ -602,7 +602,7 @@ struct PaginationOutput {
     total: usize,
     returned: usize,
     has_more: bool,
-    limited_count: usize,
+    truncated_count: usize,
 }
 
 #[derive(Debug, Serialize)]
@@ -635,8 +635,8 @@ fn estimate_tokens(text: &str) -> usize {
 /// - "summary": title, url, rank, description (no body)
 /// - "full" or anything else: all fields
 ///
-/// When `max_content_length` is set, description and body are truncated and
-/// `_limited` / `original_length` are set on the result.
+/// When `max_content_length` is set, description and body are shortened and
+/// `_truncated` / `original_length` are set on the result.
 fn apply_field_mode_and_budget(
     doc: &terraphim_types::Document,
     field_mode: &str,
@@ -690,7 +690,7 @@ fn apply_field_mode_and_budget(
         rank: doc.rank,
         description,
         body,
-        _limited: limited,
+        _truncated: limited,
         original_length,
     }
 }
@@ -735,7 +735,7 @@ mod token_budget_tests {
         let out = apply_field_mode_and_budget(&doc, "full", None);
         assert_eq!(out.description.as_deref(), Some("desc"));
         assert_eq!(out.body.as_deref(), Some("body content"));
-        assert!(!out._limited);
+        assert!(!out._truncated);
         assert!(out.original_length.is_none());
     }
 
@@ -762,7 +762,7 @@ mod token_budget_tests {
         let long_body = "a".repeat(200);
         let doc = make_doc("1", "Test", None, &long_body);
         let out = apply_field_mode_and_budget(&doc, "full", Some(50));
-        assert!(out._limited);
+        assert!(out._truncated);
         assert_eq!(out.original_length, Some(200));
         let body = out.body.unwrap();
         assert!(body.ends_with("..."));
@@ -774,7 +774,7 @@ mod token_budget_tests {
         let long_desc = "b".repeat(200);
         let doc = make_doc("1", "Test", Some(&long_desc), "short");
         let out = apply_field_mode_and_budget(&doc, "full", Some(50));
-        assert!(out._limited);
+        assert!(out._truncated);
         let desc = out.description.unwrap();
         assert!(desc.ends_with("..."));
     }
@@ -783,7 +783,7 @@ mod token_budget_tests {
     fn content_within_limit_not_marked_limited() {
         let doc = make_doc("1", "Test", Some("short desc"), "short body");
         let out = apply_field_mode_and_budget(&doc, "full", Some(200));
-        assert!(!out._limited);
+        assert!(!out._truncated);
         assert!(out.original_length.is_none());
     }
 
@@ -802,11 +802,40 @@ mod token_budget_tests {
             total: 5,
             returned: 5,
             has_more: false,
-            limited_count: 0,
+            truncated_count: 0,
         };
         let json = serde_json::to_string(&p).unwrap();
         assert!(json.contains("has_more"));
         assert!(json.contains("false"));
+    }
+
+    #[test]
+    fn token_budget_output_serialises_truncated_field() {
+        let b = TokenBudgetOutput {
+            max_tokens: 100,
+            estimated_tokens: 150,
+            truncated: true,
+        };
+        let json = serde_json::to_string(&b).unwrap();
+        assert!(json.contains("\"truncated\":true"));
+        assert!(json.contains("\"max_tokens\":100"));
+    }
+
+    #[test]
+    fn search_document_output_truncated_field_name() {
+        let doc = make_doc("x", "Title", Some("desc"), "body");
+        let out = apply_field_mode_and_budget(&doc, "full", None);
+        let json = serde_json::to_string(&out).unwrap();
+        // _truncated is omitted when false (skip_serializing_if)
+        assert!(!json.contains("_truncated"));
+
+        // With a tiny content limit the field appears
+        let long_body = "z".repeat(200);
+        let doc2 = make_doc("y", "Title2", None, &long_body);
+        let out2 = apply_field_mode_and_budget(&doc2, "full", Some(10));
+        assert!(out2._truncated);
+        let json2 = serde_json::to_string(&out2).unwrap();
+        assert!(json2.contains("_truncated"));
     }
 }
 
@@ -1706,6 +1735,24 @@ async fn run_offline_command(
                     })
                     .collect();
 
+                // Enforce token budget: drop results from the end until the JSON
+                // representation of the docs array fits within the budget.
+                let (docs, budget_dropped) = if let Some(max) = max_tokens {
+                    let mut kept = docs;
+                    loop {
+                        let estimate = serde_json::to_string(&kept)
+                            .map(|s| estimate_tokens(&s))
+                            .unwrap_or(0);
+                        if estimate <= max || kept.is_empty() {
+                            let kept_len = kept.len();
+                            break (kept, total.saturating_sub(kept_len));
+                        }
+                        kept.pop();
+                    }
+                } else {
+                    (docs, 0usize)
+                };
+
                 let token_budget = max_tokens.map(|max| {
                     let json_estimate = serde_json::to_string(&docs)
                         .map(|s| estimate_tokens(&s))
@@ -1713,25 +1760,28 @@ async fn run_offline_command(
                     TokenBudgetOutput {
                         max_tokens: max,
                         estimated_tokens: json_estimate,
-                        truncated: json_estimate > max,
+                        truncated: budget_dropped > 0,
                     }
                 });
 
-                let pagination = Some(PaginationOutput {
-                    total,
-                    returned: docs.len(),
-                    has_more: false, // offline search returns all matching docs up to limit
-                    limited_count: if let Some(mr) = max_results {
+                let result_count = docs.len();
+                let budget_or_result_dropped = budget_dropped
+                    + if let Some(mr) = max_results {
                         total.saturating_sub(mr.min(total))
                     } else {
                         0
-                    },
+                    };
+                let pagination = Some(PaginationOutput {
+                    total,
+                    returned: result_count,
+                    has_more: result_count < total,
+                    truncated_count: budget_or_result_dropped,
                 });
 
                 let payload = SearchOutput {
                     query,
                     role: role_name.to_string(),
-                    count: docs.len(),
+                    count: result_count,
                     results: docs,
                     pagination,
                     token_budget,
@@ -3257,6 +3307,23 @@ async fn run_server_command(
                     })
                     .collect();
 
+                // Enforce token budget: drop results from the end until the JSON fits.
+                let (docs, budget_dropped) = if let Some(max) = max_tokens {
+                    let mut kept = docs;
+                    loop {
+                        let estimate = serde_json::to_string(&kept)
+                            .map(|s| estimate_tokens(&s))
+                            .unwrap_or(0);
+                        if estimate <= max || kept.is_empty() {
+                            let kept_len = kept.len();
+                            break (kept, total.saturating_sub(kept_len));
+                        }
+                        kept.pop();
+                    }
+                } else {
+                    (docs, 0usize)
+                };
+
                 let token_budget = max_tokens.map(|max| {
                     let json_estimate = serde_json::to_string(&docs)
                         .map(|s| estimate_tokens(&s))
@@ -3264,10 +3331,16 @@ async fn run_server_command(
                     TokenBudgetOutput {
                         max_tokens: max,
                         estimated_tokens: json_estimate,
-                        truncated: json_estimate > max,
+                        truncated: budget_dropped > 0,
                     }
                 });
 
+                let result_count = docs.len();
+                let result_dropped = if let Some(mr) = max_results {
+                    total.saturating_sub(mr.min(total))
+                } else {
+                    0
+                };
                 let payload = SearchOutput {
                     query,
                     role: q
@@ -3275,17 +3348,13 @@ async fn run_server_command(
                         .as_ref()
                         .map(|r| r.to_string())
                         .unwrap_or_else(|| "unknown".to_string()),
-                    count: docs.len(),
+                    count: result_count,
                     results: docs,
                     pagination: Some(PaginationOutput {
                         total,
-                        returned: total,
-                        has_more: false,
-                        limited_count: if let Some(mr) = max_results {
-                            total.saturating_sub(mr.min(total))
-                        } else {
-                            0
-                        },
+                        returned: result_count,
+                        has_more: result_count < total,
+                        truncated_count: budget_dropped + result_dropped,
                     }),
                     token_budget,
                 };
