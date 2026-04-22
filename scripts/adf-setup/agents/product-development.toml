@@ -1,0 +1,85 @@
+# Product-development agent template
+#
+# Roadmap and feature-prioritisation agent.  Gathers backlog inputs,
+# ranks candidate features, produces prioritisation rationale, and
+# hands off shaped work to @adf:implementation-swarm.
+#
+# NO branch/PR creation.  NO direct implementation.  NO Lux/frontend/UI
+# semantics.  Planning-only contract.
+#
+# Subscription-only models only (C1 constraint).
+
+[[agents]]
+name = "product-development"
+layer = "Core"
+cli_tool = "/home/alex/.local/bin/claude"
+model = "sonnet"
+fallback_model = "kimi-for-coding/k2p5"
+persona = "Conduit"
+skill_chain = ["disciplined-research", "disciplined-design"]
+schedule = "0 6 * * *"
+max_cpu_seconds = 1200
+grace_period_secs = 30
+task = '''
+source ~/.profile
+cd "$GITEA_WORKING_DIR"
+
+## Planning-only contract
+#
+# 1. Gather roadmap and backlog inputs
+# 2. Rank candidate features or backlog moves
+# 3. Produce prioritisation rationale
+# 4. Hand off shaped work to @adf:implementation-swarm
+#
+# MUST NOT: create branches or PRs, perform direct implementation,
+#           resolve through Lux, or carry frontend/UI semantics.
+
+READY=$(gtr ready --owner "$GITEA_OWNER" --repo "$GITEA_REPO" 2>/dev/null)
+TOP_ISSUE=$(echo "$READY" | python3 -c 'import json, sys; d=json.load(sys.stdin); issues=d.get("ready_issues",[]); print(issues[0]["index"] if issues else "")')
+
+if [ -z "$TOP_ISSUE" ]; then
+  echo "No ready issues; exit"
+  exit 0
+fi
+
+ISSUE_BODY=$(gtr view-issue --owner "$GITEA_OWNER" --repo "$GITEA_REPO" --issue "$TOP_ISSUE" 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin).get("body","") or "")')
+ISSUE_TITLE=$(gtr view-issue --owner "$GITEA_OWNER" --repo "$GITEA_REPO" --issue "$TOP_ISSUE" 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin).get("title","") or "")')
+
+# Gather open issues for backlog context
+BACKLOG=$(gtr list-issues --owner "$GITEA_OWNER" --repo "$GITEA_REPO" --state open --limit 50 2>/dev/null | python3 -c 'import json,sys; issues=json.load(sys.stdin); print("\n".join(f"#{i[\"number\"]}: {i[\"title\"]} (priority={i.get(\"priority\",\"-\")})" for i in issues))')
+
+RANK_PROMPT="You are the product-development agent. Your role is strictly planning and prioritisation.
+
+Current top issue:
+#${TOP_ISSUE}: ${ISSUE_TITLE}
+
+Issue body:
+---
+${ISSUE_BODY}
+---
+
+Open backlog (first 50):
+${BACKLOG}
+
+Instructions:
+1. Assess the top issue against the current backlog.
+2. Rank candidate features or backlog moves by value, risk, and effort.
+3. Produce a concise prioritisation rationale (3-5 bullets).
+4. If the top issue is ready for implementation, post a comment:
+   @adf:implementation-swarm please pick up issue #${TOP_ISSUE}
+   Include a brief shaping note (scope boundary, success criteria).
+
+Constraints:
+- Do NOT create branches or pull requests.
+- Do NOT write implementation code.
+- Do NOT invoke Lux or frontend/UI tools.
+- Focus solely on roadmap clarity and feature prioritisation."
+
+echo "$RANK_PROMPT" | /home/alex/.local/bin/claude -p \
+  --allowedTools "Bash,Read,Grep,Glob" \
+  2>&1
+
+echo "product-development: prioritisation cycle complete for issue #${TOP_ISSUE}"
+'''
+
+capabilities = ["roadmap", "prioritisation", "backlog-analysis", "feature-ranking", "shaping"]

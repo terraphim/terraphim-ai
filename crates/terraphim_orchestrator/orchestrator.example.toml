@@ -177,22 +177,33 @@ timeout_secs = 30
 name = "product-development"
 layer = "Core"
 cli_tool = "claude"
-persona = "ferrox"
-terraphim_role = "Ferrox Rust"
-skill_chain = ["disciplined-research", "disciplined-design", "disciplined-implementation", "disciplined-verification", "disciplined-validation"]
-task = """Develop new product features based on roadmap priorities.
-Focus on user-facing functionality, integration points, and API design.
+persona = "conduit"
+terraphim_role = "Conduit Planning"
+skill_chain = ["disciplined-research", "disciplined-design"]
+task = """Plan and prioritise roadmap work. Gather backlog inputs, rank candidate features,
+and produce prioritisation rationale. Hand off shaped work to @adf:implementation-swarm.
+
+## Planning-only contract
+- Gather roadmap and backlog inputs
+- Rank candidate features or backlog moves
+- Produce prioritisation rationale
+- Optionally hand off shaped work to @adf:implementation-swarm
+
+## Constraints
+- Do NOT create branches or pull requests
+- Do NOT perform direct implementation work
+- Do NOT resolve through Lux or carry frontend/UI semantics
 
 ## Domain Knowledge Search
-When you need Rust context, use:
-  terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "<query>" --role "Ferrox Rust"
+When you need planning context, use:
+  terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "<query>" --role "Conduit Planning"
 """
-schedule = "0 2 * * *"
-capabilities = ["product-development", "feature-implementation", "api-design"]
+schedule = "0 6 * * *"
+capabilities = ["roadmap", "prioritisation", "backlog-analysis", "feature-ranking", "shaping"]
 
 [agents.pre_check]
 kind = "shell"
-script = """terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "feature api service integration" --role "Ferrox Rust" --limit 5 2>/dev/null || echo '[]'"""
+script = """terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "roadmap prioritisation backlog" --role "Conduit Planning" --limit 5 2>/dev/null || echo '[]'"""
 timeout_secs = 30
 
 [[agents]]
