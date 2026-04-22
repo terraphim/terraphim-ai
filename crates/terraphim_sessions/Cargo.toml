@@ -32,8 +32,11 @@ extra-connectors = ["aider-connector", "cline-connector"]
 # Enable terraphim knowledge graph enrichment
 enrichment = ["terraphim_automata", "terraphim_rolegraph", "terraphim_types"]
 
+# Enable BM25-ranked session search via terraphim_types score module
+search-index = ["terraphim_types"]
+
 # All features
-full = ["tsa-full", "extra-connectors", "enrichment"]
+full = ["tsa-full", "extra-connectors", "enrichment", "search-index"]
 
 [dependencies]
 # Core dependencies

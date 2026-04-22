@@ -2,9 +2,10 @@ use std::collections::HashMap;
 use std::f64;
 
 use super::common::{BM25Params, FieldWeights};
-use terraphim_types::Document;
+use crate::Document;
 
 /// BM25F scorer implementation
+#[derive(Default)]
 pub struct BM25FScorer {
     params: BM25Params,
     weights: FieldWeights,
@@ -170,6 +171,7 @@ impl BM25FScorer {
 }
 
 /// BM25+ scorer implementation
+#[derive(Default)]
 pub struct BM25PlusScorer {
     params: BM25Params,
     avg_doc_length: f64,
@@ -308,7 +310,7 @@ mod tests {
                 tags: Some(vec!["programming".to_string(), "systems".to_string()]),
                 rank: None,
                 source_haystack: None,
-                doc_type: terraphim_types::DocumentType::KgEntry,
+                doc_type: crate::DocumentType::KgEntry,
                 synonyms: None,
                 route: None,
                 priority: None,
@@ -324,7 +326,7 @@ mod tests {
                 tags: Some(vec!["programming".to_string(), "tutorial".to_string()]),
                 rank: None,
                 source_haystack: None,
-                doc_type: terraphim_types::DocumentType::KgEntry,
+                doc_type: crate::DocumentType::KgEntry,
                 synonyms: None,
                 route: None,
                 priority: None,
@@ -363,7 +365,7 @@ mod tests {
                 tags: Some(vec!["programming".to_string(), "systems".to_string()]),
                 rank: None,
                 source_haystack: None,
-                doc_type: terraphim_types::DocumentType::KgEntry,
+                doc_type: crate::DocumentType::KgEntry,
                 synonyms: None,
                 route: None,
                 priority: None,
@@ -379,7 +381,7 @@ mod tests {
                 tags: Some(vec!["programming".to_string(), "tutorial".to_string()]),
                 rank: None,
                 source_haystack: None,
-                doc_type: terraphim_types::DocumentType::KgEntry,
+                doc_type: crate::DocumentType::KgEntry,
                 synonyms: None,
                 route: None,
                 priority: None,

@@ -1904,49 +1904,105 @@ impl ReplHandler {
             }
 
             SessionsSubcommand::Search { query } => {
-                let sessions = svc.search(&query).await;
+                #[cfg(feature = "enrichment")]
+                {
+                    let thesaurus = if let Some(ref tui_service) = self.service {
+                        let role_name: terraphim_types::RoleName = self.current_role.clone().into();
+                        tui_service.get_thesaurus(&role_name).await.ok()
+                    } else {
+                        None
+                    };
+                    let sessions = svc.search_with_thesaurus(&query, thesaurus).await;
 
-                if sessions.is_empty() {
-                    println!("{} No sessions match '{}'", "ℹ".blue().bold(), query.cyan());
-                    return Ok(());
+                    if sessions.is_empty() {
+                        println!("{} No sessions match '{}'", "ℹ".blue().bold(), query.cyan());
+                        return Ok(());
+                    }
+
+                    println!(
+                        "\n{} sessions match '{}':",
+                        sessions.len().to_string().green(),
+                        query.cyan()
+                    );
+                    let mut table = Table::new();
+                    table
+                        .load_preset(UTF8_FULL)
+                        .apply_modifier(UTF8_ROUND_CORNERS)
+                        .set_header(vec![
+                            Cell::new("ID").add_attribute(comfy_table::Attribute::Bold),
+                            Cell::new("Source").add_attribute(comfy_table::Attribute::Bold),
+                            Cell::new("Title").add_attribute(comfy_table::Attribute::Bold),
+                        ]);
+
+                    for session in sessions.iter().take(10) {
+                        let title = session
+                            .title
+                            .as_ref()
+                            .map(|t| {
+                                if t.len() > 50 {
+                                    format!("{}...", &t[..50])
+                                } else {
+                                    t.clone()
+                                }
+                            })
+                            .unwrap_or_else(|| "-".to_string());
+
+                        table.add_row(vec![
+                            Cell::new(&session.external_id[..8.min(session.external_id.len())]),
+                            Cell::new(&session.source),
+                            Cell::new(title),
+                        ]);
+                    }
+
+                    println!("{}", table);
                 }
 
-                println!(
-                    "\n{} sessions match '{}':",
-                    sessions.len().to_string().green(),
-                    query.cyan()
-                );
-                let mut table = Table::new();
-                table
-                    .load_preset(UTF8_FULL)
-                    .apply_modifier(UTF8_ROUND_CORNERS)
-                    .set_header(vec![
-                        Cell::new("ID").add_attribute(comfy_table::Attribute::Bold),
-                        Cell::new("Source").add_attribute(comfy_table::Attribute::Bold),
-                        Cell::new("Title").add_attribute(comfy_table::Attribute::Bold),
-                    ]);
+                #[cfg(not(feature = "enrichment"))]
+                {
+                    let sessions = svc.search(&query).await;
 
-                for session in sessions.iter().take(10) {
-                    let title = session
-                        .title
-                        .as_ref()
-                        .map(|t| {
-                            if t.len() > 50 {
-                                format!("{}...", &t[..50])
-                            } else {
-                                t.clone()
-                            }
-                        })
-                        .unwrap_or_else(|| "-".to_string());
+                    if sessions.is_empty() {
+                        println!("{} No sessions match '{}'", "ℹ".blue().bold(), query.cyan());
+                        return Ok(());
+                    }
 
-                    table.add_row(vec![
-                        Cell::new(&session.external_id[..8.min(session.external_id.len())]),
-                        Cell::new(&session.source),
-                        Cell::new(title),
-                    ]);
+                    println!(
+                        "\n{} sessions match '{}':",
+                        sessions.len().to_string().green(),
+                        query.cyan()
+                    );
+                    let mut table = Table::new();
+                    table
+                        .load_preset(UTF8_FULL)
+                        .apply_modifier(UTF8_ROUND_CORNERS)
+                        .set_header(vec![
+                            Cell::new("ID").add_attribute(comfy_table::Attribute::Bold),
+                            Cell::new("Source").add_attribute(comfy_table::Attribute::Bold),
+                            Cell::new("Title").add_attribute(comfy_table::Attribute::Bold),
+                        ]);
+
+                    for session in sessions.iter().take(10) {
+                        let title = session
+                            .title
+                            .as_ref()
+                            .map(|t| {
+                                if t.len() > 50 {
+                                    format!("{}...", &t[..50])
+                                } else {
+                                    t.clone()
+                                }
+                            })
+                            .unwrap_or_else(|| "-".to_string());
+
+                        table.add_row(vec![
+                            Cell::new(&session.external_id[..8.min(session.external_id.len())]),
+                            Cell::new(&session.source),
+                            Cell::new(title),
+                        ]);
+                    }
+
+                    println!("{}", table);
                 }
-
-                println!("{}", table);
             }
 
             SessionsSubcommand::Stats => {
@@ -2544,6 +2600,44 @@ impl ReplHandler {
                         ]);
                     }
                     println!("{}", table);
+                }
+            }
+
+            SessionsSubcommand::Index { verbose } => {
+                let sessions = svc.list_sessions().await;
+                let count = sessions.len();
+                let total_messages: usize = sessions.iter().map(|s| s.message_count()).sum();
+
+                println!("\n{} Search Index Status", "🔍".bold());
+                println!("{}", "─".repeat(40));
+                println!("  Sessions indexed: {}", count.to_string().green());
+                println!("  Total messages:   {}", total_messages.to_string().green());
+                println!("  Scorer:           {}", "BM25 (Okapi)".cyan());
+
+                if verbose {
+                    let sources: std::collections::HashMap<&str, usize> = {
+                        let mut map = std::collections::HashMap::new();
+                        for s in &sessions {
+                            *map.entry(s.source.as_str()).or_default() += 1;
+                        }
+                        map
+                    };
+                    println!("\n  {} By source:", "▸".blue());
+                    for (source, cnt) in sources {
+                        println!("    {}: {}", source.magenta(), cnt);
+                    }
+
+                    let total_chars: usize = sessions
+                        .iter()
+                        .map(|s| {
+                            s.messages.iter().map(|m| m.content.len()).sum::<usize>()
+                                + s.title.as_ref().map(|t| t.len()).unwrap_or(0)
+                        })
+                        .sum();
+                    println!(
+                        "\n  Total text size:  {} chars",
+                        total_chars.to_string().yellow()
+                    );
                 }
             }
         }
