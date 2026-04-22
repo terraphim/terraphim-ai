@@ -8574,6 +8574,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "terraphim_lsp"
+version = "0.1.0"
+
+[[package]]
 name = "terraphim_mcp_server"
 version = "1.0.0"
 dependencies = [

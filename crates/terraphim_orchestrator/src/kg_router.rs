@@ -136,6 +136,10 @@ impl KgRouter {
                     value: NormalizedTermValue::from(concept.clone()),
                     display_value: None,
                     url: None,
+                    action: None,
+                    priority: None,
+                    trigger: None,
+                    pinned: false,
                 };
                 thesaurus.insert(key, term);
                 term_id += 1;

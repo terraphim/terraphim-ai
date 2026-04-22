@@ -23,8 +23,17 @@ pub struct AutocompleteIndex {
 pub struct AutocompleteMetadata {
     pub id: u64,
     pub normalized_term: NormalizedTermValue,
+    #[serde(default)]
     pub url: Option<String>,
     pub original_term: String,
+    #[serde(default)]
+    pub action: Option<String>,
+    #[serde(default)]
+    pub priority: Option<u8>,
+    #[serde(default)]
+    pub trigger: Option<String>,
+    #[serde(default)]
+    pub pinned: bool,
 }
 
 /// Result from autocomplete search
@@ -121,6 +130,10 @@ pub fn build_autocomplete_index(
                 } else {
                     key.as_str().to_lowercase()
                 },
+                action: normalized_term.action.clone(),
+                priority: normalized_term.priority,
+                trigger: normalized_term.trigger.clone(),
+                pinned: normalized_term.pinned,
             },
         );
     }
@@ -495,6 +508,10 @@ mod tests {
                     "https://example.com/{}",
                     normalized.replace(' ', "-")
                 )),
+                action: None,
+                priority: None,
+                trigger: None,
+                pinned: false,
             };
             thesaurus.insert(NormalizedTermValue::from(key), normalized_term);
         }
