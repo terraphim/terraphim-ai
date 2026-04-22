@@ -26,9 +26,6 @@ pub enum Error {
 // which gets used by the `#[config]` macro below.
 pub type DeviceSettingsResult<T> = std::result::Result<T, Error>;
 
-/// Default config path
-pub const DEFAULT_CONFIG_PATH: &str = ".config";
-
 /// Default settings file
 pub const DEFAULT_SETTINGS: &str = include_str!("../default/settings_local_dev.toml");
 
@@ -188,12 +185,27 @@ impl DeviceSettings {
     /// Get the default path for the config file
     ///
     /// This is the default path where the config file is stored.
+    /// Always returns an absolute path to avoid creating config files
+    /// in arbitrary working directories.
     pub fn default_config_path() -> PathBuf {
         if let Some(proj_dirs) = ProjectDirs::from("com", "aks", "terraphim") {
             let config_dir = proj_dirs.config_dir();
             config_dir.to_path_buf()
         } else {
-            PathBuf::from(DEFAULT_CONFIG_PATH)
+            // Fallback to ~/.config/terraphim (Unix) or %APPDATA%/terraphim (Windows)
+            // Never use a relative path to avoid polluting arbitrary directories
+            if let Ok(home) = std::env::var("HOME") {
+                PathBuf::from(home).join(".config").join("terraphim")
+            } else if let Ok(user_profile) = std::env::var("USERPROFILE") {
+                PathBuf::from(user_profile)
+                    .join("AppData")
+                    .join("Roaming")
+                    .join("terraphim")
+            } else {
+                // Last resort: use /tmp with a warning
+                log::warn!("Could not determine home directory, falling back to /tmp/terraphim");
+                PathBuf::from("/tmp").join("terraphim")
+            }
         }
     }
 
