@@ -1,0 +1,104 @@
+# product-development agent template
+#
+# Planning-only agent for roadmap and feature prioritization.
+# Normalized to remove implementation/frontend semantic drift.
+#
+# Layer: Core
+# Schedule: Daily at 02:00
+# Persona: Carthos (architecture/planning aligned)
+# Subscription-only models only (C1 constraint).
+
+[[agents]]
+name = "product-development"
+layer = "Core"
+cli_tool = "/home/alex/.local/bin/claude"
+model = "sonnet"
+fallback_model = "kimi-for-coding/k2p5"
+persona = "Carthos"
+terraphim_role = "Carthos Architecture"
+skill_chain = [
+  "disciplined-research",
+  "disciplined-design",
+  "documentation"
+]
+schedule = "0 2 * * *"
+max_cpu_seconds = 1200
+grace_period_secs = 30
+capabilities = [
+  "product-development",
+  "roadmap-prioritization",
+  "feature-prioritization",
+  "backlog-shaping"
+]
+task = '''
+source ~/.profile
+cd "$GITEA_WORKING_DIR" && git pull --ff-only
+
+## Step 1: Gather candidate inputs
+
+READY=$(gtr ready --owner "$GITEA_OWNER" --repo "$GITEA_REPO" 2>/dev/null)
+TRIAGE=$(gtr triage --owner "$GITEA_OWNER" --repo "$GITEA_REPO" 2>/dev/null || echo "{}")
+
+## Step 2: Search for prior roadmap learnings
+
+LEARNINGS=$(terraphim-agent learn query "roadmap prioritization feature backlog" 2>/dev/null || echo "")
+KG_CONTEXT=$(terraphim-agent --config "$ROLE_CONFIG_PATH" search "roadmap milestone feature request" --role "$TERRAPHIM_ROLE" --limit 10 2>/dev/null || echo "[]")
+
+## Step 3: Produce prioritization shortlist
+
+PRIORITIZATION_PROMPT="You are the product-development agent for $GITEA_OWNER/$GITEA_REPO.
+Your job is roadmap and feature prioritization ONLY. You do NOT implement code, create branches, or write PRs.
+
+Current ready issues (highest PageRank first):
+$READY
+
+Triage overview:
+$TRIAGE
+
+Prior learnings:
+$LEARNINGS
+
+Knowledge graph context:
+$KG_CONTEXT
+
+Produce a prioritization analysis with:
+1. Top 3-5 candidate features/backlog items from ready issues
+2. For each candidate, rank by: reach, impact, confidence, effort, dependencies
+3. Explicit prioritization rationale
+4. Recommended next action (e.g., 'ready for implementation', 'needs research', 'blocked by X')
+5. Suggested sequencing if dependencies exist
+
+Format as a structured comment suitable for posting to Gitea.
+Do NOT create branches, code, or PRs."
+
+PRIORITIZATION=$(echo "$PRIORITIZATION_PROMPT" | /home/alex/.local/bin/claude -p --model sonnet --allowedTools "Bash,Read,Grep,Glob" 2>&1)
+
+## Step 4: Post prioritization comment to top ready issue
+
+TOP_ISSUE=$(echo "$READY" | python3 -c 'import json, sys; d=json.load(sys.stdin); issues=d.get("ready_issues",[]); print(issues[0]["index"] if issues else "")')
+
+if [ -n "$TOP_ISSUE" ]; then
+  gtr comment --owner "$GITEA_OWNER" --repo "$GITEA_REPO" --issue "$TOP_ISSUE" \
+    --body "## Product Development Prioritization
+
+$PRIORITIZATION
+
+---
+*This analysis was produced by @adf:product-development. It is a planning output, not implementation work.*"
+  echo "Posted prioritization to issue #$TOP_ISSUE"
+else
+  echo "No ready issues found; nothing to prioritize"
+fi
+
+## Step 5: Capture learning
+
+terraphim-agent learn capture --type insight \
+  --context "product-development/$GITEA_REPO" \
+  --description "Produced roadmap prioritization for $GITEA_REPO" \
+  2>/dev/null || true
+'''
+
+[agents.pre_check]
+kind = "shell"
+script = """terraphim-agent --config "$ROLE_CONFIG_PATH" search "roadmap feature prioritization backlog" --role "$TERRAPHIM_ROLE" --limit 5 2>/dev/null || echo '[]'"""
+timeout_secs = 30

@@ -77,7 +77,15 @@ echo "Scope check PASS; proceeding to dispatch"
 
 ISSUE_TITLE=$(gtr view-issue --owner "$GITEA_OWNER" --repo "$GITEA_REPO" --issue "$TOP_ISSUE" 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin).get("title","") or "")')
 
-DISPATCH_PROMPT="Given this Gitea issue title and body, select the most appropriate ADF agent role from: developer, security, compliance, reviewer. Return ONLY the role name (one word).
+DISPATCH_PROMPT="Given this Gitea issue title and body, select the most appropriate ADF agent role from: developer, security, compliance, reviewer, product-development, repo-steward. Return ONLY the role name (one word).
+
+Routing rules:
+- developer: implementation, bugfix, feature coding (default)
+- security: vulnerabilities, CVEs, security policy
+- compliance: license, standards, regulatory
+- reviewer: code review, PR review
+- product-development: roadmap, feature tradeoffs, sequencing, scoping, prioritization
+- repo-steward: repo health, docs confusion, recurring friction, onboarding pain, stability debt, usefulness debt
 
 Title: $ISSUE_TITLE
 
@@ -90,7 +98,7 @@ ROLE=$(/home/alex/.local/bin/claude -p --model haiku --allowedTools "" "$DISPATC
 
 # Sanitise: fall back to developer if role is not recognised
 case "$ROLE" in
-  developer|security|compliance|reviewer) ;;
+  developer|security|compliance|reviewer|product-development|repo-steward) ;;
   *) ROLE="developer" ;;
 esac
 
