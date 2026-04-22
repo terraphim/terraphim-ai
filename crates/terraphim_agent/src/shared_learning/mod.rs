@@ -25,6 +25,7 @@ mod wiki_sync;
 
 pub use markdown_store::{MarkdownLearningStore, MarkdownStoreConfig, MarkdownStoreError};
 pub use store::{SharedLearningStore, StoreConfig};
+pub use terraphim_types::shared_learning::SuggestionStatus;
 pub use types::{LearningSource as SharedLearningSource, SharedLearning, TrustLevel};
 pub use wiki_sync::{GiteaWikiClient, WikiSyncError};
 

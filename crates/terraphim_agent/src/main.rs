@@ -934,6 +934,12 @@ enum LearnSub {
         #[arg(long)]
         merge_with: Option<PathBuf>,
     },
+    /// Review and approve/reject knowledge suggestions
+    #[cfg(feature = "shared-learning")]
+    Suggest {
+        #[command(subcommand)]
+        sub: SuggestSub,
+    },
     /// Manage shared learnings with trust levels (L1/L2/L3)
     #[cfg(feature = "shared-learning")]
     Shared {
@@ -975,6 +981,50 @@ enum SharedLearningSub {
         /// Dry run (show what would be injected without injecting)
         #[arg(long, default_value_t = false)]
         dry_run: bool,
+    },
+}
+
+#[cfg(feature = "shared-learning")]
+#[derive(Subcommand, Debug)]
+enum SuggestSub {
+    /// List pending suggestions, optionally filtered by status
+    List {
+        /// Filter by status: pending, approved, rejected
+        #[arg(long)]
+        status: Option<String>,
+        #[arg(long, default_value_t = 20)]
+        limit: usize,
+    },
+    /// Show full details of a suggestion
+    Show { id: String },
+    /// Approve a suggestion (promotes to L3 and marks as approved)
+    Approve { id: String },
+    /// Reject a suggestion
+    Reject {
+        id: String,
+        #[arg(long)]
+        reason: Option<String>,
+    },
+    /// Approve all pending suggestions above a confidence threshold
+    ApproveAll {
+        #[arg(long, default_value_t = 0.8)]
+        min_confidence: f64,
+        #[arg(long, default_value_t = false)]
+        dry_run: bool,
+    },
+    /// Reject all pending suggestions below a confidence threshold
+    RejectAll {
+        #[arg(long, default_value_t = 0.3)]
+        max_confidence: f64,
+        #[arg(long, default_value_t = false)]
+        dry_run: bool,
+    },
+    /// Show suggestion approval metrics
+    Metrics,
+    /// Show session-end suggestion summary
+    SessionEnd {
+        #[arg(long)]
+        context: Option<String>,
     },
 }
 
@@ -2760,7 +2810,243 @@ async fn run_learn_command(sub: LearnSub) -> Result<()> {
             Ok(())
         }
         #[cfg(feature = "shared-learning")]
+        LearnSub::Suggest { sub } => run_suggest_command(sub).await,
+        #[cfg(feature = "shared-learning")]
         LearnSub::Shared { sub } => run_shared_learning_command(sub, &config).await,
+    }
+}
+
+#[cfg(feature = "shared-learning")]
+async fn run_suggest_command(sub: SuggestSub) -> Result<()> {
+    use crate::learnings::suggest::{SuggestionMetrics, SuggestionMetricsEntry};
+    use terraphim_agent::shared_learning::{SharedLearningStore, StoreConfig, SuggestionStatus};
+    use terraphim_types::shared_learning::SuggestionStatus as Status;
+
+    let store_config = StoreConfig::default();
+    let store = SharedLearningStore::open(store_config)
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to open shared learning store: {}", e))?;
+    let metrics = SuggestionMetrics::new(SuggestionMetrics::default_path());
+
+    match sub {
+        SuggestSub::List { status, limit } => {
+            let entries = if let Some(ref s) = status {
+                let st: SuggestionStatus = s.parse().map_err(|e| anyhow::anyhow!("{}", e))?;
+                store
+                    .list_by_status(st)
+                    .await
+                    .map_err(|e| anyhow::anyhow!("{}", e))?
+            } else {
+                store
+                    .list_pending()
+                    .await
+                    .map_err(|e| anyhow::anyhow!("{}", e))?
+            };
+            if entries.is_empty() {
+                println!("No suggestions found.");
+            } else {
+                let display_count = limit.min(entries.len());
+                println!("Suggestions ({} of {}):", display_count, entries.len());
+                for entry in entries.iter().take(limit) {
+                    let confidence = entry
+                        .bm25_confidence
+                        .map(|c| format!("{:.2}", c))
+                        .unwrap_or_else(|| "N/A".to_string());
+                    println!(
+                        "  [{}] {} (confidence: {}, status: {})",
+                        &entry.id[..entry.id.len().min(12)],
+                        entry.title,
+                        confidence,
+                        entry.suggestion_status,
+                    );
+                }
+            }
+            Ok(())
+        }
+        SuggestSub::Show { id } => {
+            let entry = store.get(&id).await.map_err(|e| anyhow::anyhow!("{}", e))?;
+            println!("ID:          {}", entry.id);
+            println!("Title:       {}", entry.title);
+            println!("Status:      {}", entry.suggestion_status);
+            println!("Trust Level: {}", entry.trust_level);
+            println!("Source:      {} ({})", entry.source, entry.source_agent);
+            println!("Created:     {}", entry.created_at.to_rfc3339());
+            if let Some(ref reason) = entry.rejection_reason {
+                println!("Reject Reason: {}", reason);
+            }
+            if let Some(c) = entry.bm25_confidence {
+                println!("Confidence:  {:.4}", c);
+            }
+            println!("\n{}", entry.content);
+            Ok(())
+        }
+        SuggestSub::Approve { id } => {
+            store
+                .approve(&id)
+                .await
+                .map_err(|e| anyhow::anyhow!("{}", e))?;
+            let entry = store.get(&id).await.map_err(|e| anyhow::anyhow!("{}", e))?;
+            metrics.append(SuggestionMetricsEntry {
+                id: id.clone(),
+                status: Status::Approved,
+                confidence: entry.bm25_confidence.unwrap_or(0.0),
+                timestamp: chrono::Utc::now(),
+                title: entry.title,
+            })?;
+            println!("Approved suggestion {}.", id);
+            Ok(())
+        }
+        SuggestSub::Reject { id, reason } => {
+            store
+                .reject(&id, reason.as_deref())
+                .await
+                .map_err(|e| anyhow::anyhow!("{}", e))?;
+            let entry = store.get(&id).await.map_err(|e| anyhow::anyhow!("{}", e))?;
+            metrics.append(SuggestionMetricsEntry {
+                id: id.clone(),
+                status: Status::Rejected,
+                confidence: entry.bm25_confidence.unwrap_or(0.0),
+                timestamp: chrono::Utc::now(),
+                title: entry.title,
+            })?;
+            println!("Rejected suggestion {}.", id);
+            Ok(())
+        }
+        SuggestSub::ApproveAll {
+            min_confidence,
+            dry_run,
+        } => {
+            let pending = store
+                .list_pending()
+                .await
+                .map_err(|e| anyhow::anyhow!("{}", e))?;
+            let to_approve: Vec<_> = pending
+                .iter()
+                .filter(|l| {
+                    l.bm25_confidence
+                        .map(|c| c >= min_confidence)
+                        .unwrap_or(false)
+                })
+                .collect();
+            if dry_run {
+                println!(
+                    "Would approve {} suggestions (confidence >= {}):",
+                    to_approve.len(),
+                    min_confidence
+                );
+                for entry in &to_approve {
+                    println!(
+                        "  [{}] {} ({:.2})",
+                        &entry.id[..entry.id.len().min(12)],
+                        entry.title,
+                        entry.bm25_confidence.unwrap_or(0.0)
+                    );
+                }
+                return Ok(());
+            }
+            let mut approved = 0usize;
+            for entry in &to_approve {
+                if store.approve(&entry.id).await.is_ok() {
+                    let _ = metrics.append(SuggestionMetricsEntry {
+                        id: entry.id.clone(),
+                        status: Status::Approved,
+                        confidence: entry.bm25_confidence.unwrap_or(0.0),
+                        timestamp: chrono::Utc::now(),
+                        title: entry.title.clone(),
+                    });
+                    approved += 1;
+                }
+            }
+            println!("Approved {} suggestions.", approved);
+            Ok(())
+        }
+        SuggestSub::RejectAll {
+            max_confidence,
+            dry_run,
+        } => {
+            let pending = store
+                .list_pending()
+                .await
+                .map_err(|e| anyhow::anyhow!("{}", e))?;
+            let to_reject: Vec<_> = pending
+                .iter()
+                .filter(|l| {
+                    l.bm25_confidence
+                        .map(|c| c <= max_confidence)
+                        .unwrap_or(true)
+                })
+                .collect();
+            if dry_run {
+                println!(
+                    "Would reject {} suggestions (confidence <= {}):",
+                    to_reject.len(),
+                    max_confidence
+                );
+                for entry in &to_reject {
+                    println!(
+                        "  [{}] {} ({:.2})",
+                        &entry.id[..entry.id.len().min(12)],
+                        entry.title,
+                        entry.bm25_confidence.unwrap_or(0.0)
+                    );
+                }
+                return Ok(());
+            }
+            let mut rejected = 0usize;
+            for entry in &to_reject {
+                if store.reject(&entry.id, None).await.is_ok() {
+                    let _ = metrics.append(SuggestionMetricsEntry {
+                        id: entry.id.clone(),
+                        status: Status::Rejected,
+                        confidence: entry.bm25_confidence.unwrap_or(0.0),
+                        timestamp: chrono::Utc::now(),
+                        title: entry.title.clone(),
+                    });
+                    rejected += 1;
+                }
+            }
+            println!("Rejected {} suggestions.", rejected);
+            Ok(())
+        }
+        SuggestSub::Metrics => {
+            let summary = metrics.summary()?;
+            println!("Suggestion Metrics:");
+            println!("  Total:   {}", summary.total);
+            println!("  Pending: {}", summary.pending);
+            println!("  Approved: {}", summary.approved);
+            println!("  Rejected: {}", summary.rejected);
+            println!("  Approval Rate: {:.1}%", summary.approval_rate * 100.0);
+            Ok(())
+        }
+        SuggestSub::SessionEnd { context } => {
+            let pending = store
+                .list_pending()
+                .await
+                .map_err(|e| anyhow::anyhow!("{}", e))?;
+            let count = pending.len();
+            if count == 0 {
+                println!("[suggestions] No pending suggestions.");
+                return Ok(());
+            }
+            let top = if let Some(ref ctx) = context {
+                store
+                    .suggest(ctx, "session-end", 1)
+                    .await
+                    .map_err(|e| anyhow::anyhow!("{}", e))
+                    .ok()
+                    .and_then(|v| v.into_iter().next())
+            } else {
+                pending.into_iter().next()
+            };
+            print!("[suggestions] {} suggestion(s) pending", count);
+            if let Some(t) = top {
+                println!(", top: '{}'", truncate_snippet(&t.title, 60));
+            } else {
+                println!();
+            }
+            println!("  Run `terraphim-agent learn suggest list` to review.");
+            Ok(())
+        }
     }
 }
 
