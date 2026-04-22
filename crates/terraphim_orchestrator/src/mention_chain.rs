@@ -192,6 +192,11 @@ mod tests {
     }
 
     #[test]
+    fn test_config_default_mention_depth() {
+        assert_eq!(DEFAULT_MAX_MENTION_DEPTH, 3);
+    }
+
+    #[test]
     fn test_build_context_includes_chain_id() {
         let args = MentionContextArgs {
             parent_agent: "agent-a".to_string(),
