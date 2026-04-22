@@ -8415,6 +8415,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "terraphim_codebase_eval"
+version = "1.16.37"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 1.0.69",
+ "toml 0.8.23",
+]
+
+[[package]]
 name = "terraphim_config"
 version = "1.15.0"
 dependencies = [
