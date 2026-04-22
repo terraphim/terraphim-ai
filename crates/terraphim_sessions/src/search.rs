@@ -1,7 +1,11 @@
-//! BM25-ranked session search adapter
+//! BM25-ranked session search adapter with KG hybrid boost
 //!
 //! Converts sessions into `terraphim_types::Document` instances and uses
 //! the existing BM25 scoring infrastructure for ranked full-text search.
+//!
+//! When the `enrichment` feature is also enabled and a `Thesaurus` is provided,
+//! sessions matching knowledge graph concepts for the current role are boosted
+//! above pure BM25 results (hybrid search).
 
 use crate::model::{MessageRole, Session};
 use terraphim_types::score::{OkapiBM25Scorer, Query, QueryScorer, Scored, Scorer, SearchResults};
@@ -10,6 +14,11 @@ use terraphim_types::{Document, DocumentType};
 const MAX_BODY_LENGTH: usize = 50_000;
 const MAX_SEARCH_RESULTS: usize = 50;
 const MIN_SCORE_FRACTION: f64 = 0.1;
+
+/// Score multiplier applied to sessions with KG concept matches.
+/// Must be large enough to guarantee KG-matched sessions always rank
+/// above pure BM25 results regardless of BM25 score.
+const KG_BOOST_MULTIPLIER: f64 = 10_000.0;
 
 /// Adapter that converts a `Session` into a searchable `Document`.
 pub fn session_to_document(session: &Session) -> Document {
@@ -130,6 +139,85 @@ pub fn search_sessions(sessions: &[Session], query: &str) -> Vec<Scored<Session>
     }
 
     scored
+}
+
+/// Hybrid search: KG concept matches for the current role come first, BM25 fallback.
+///
+/// When a `Thesaurus` is provided, the query is matched against KG terms via
+/// Aho-Corasick. Sessions whose enrichment data contains matching concepts
+/// receive a large score boost so they always rank above pure BM25 results.
+///
+/// Without a thesaurus (or when no sessions are enriched), falls back to pure BM25.
+#[cfg(feature = "enrichment")]
+pub fn search_sessions_hybrid(
+    sessions: &[Session],
+    query: &str,
+    thesaurus: Option<terraphim_types::Thesaurus>,
+) -> Vec<Scored<Session>> {
+    if query.trim().is_empty() || sessions.is_empty() {
+        return Vec::new();
+    }
+
+    let mut scored = search_sessions(sessions, query);
+
+    let Some(thesaurus) = thesaurus else {
+        return scored;
+    };
+
+    let kg_terms = match extract_kg_terms(query, thesaurus) {
+        Ok(terms) if !terms.is_empty() => terms,
+        _ => return scored,
+    };
+
+    let kg_term_set: std::collections::HashSet<String> = kg_terms
+        .iter()
+        .map(|t| t.normalized_term.value.as_str().to_lowercase())
+        .collect();
+
+    if kg_term_set.is_empty() {
+        return scored;
+    }
+
+    for scored_session in &mut scored {
+        let session = scored_session.value();
+        let boost = compute_kg_boost(session, &kg_term_set);
+        if boost > 0 {
+            let new_score = scored_session.score() + (boost as f64 * KG_BOOST_MULTIPLIER);
+            scored_session.set_score(new_score);
+        }
+    }
+
+    scored.sort_by(|a, b| {
+        b.score()
+            .partial_cmp(&a.score())
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    scored
+}
+
+#[cfg(feature = "enrichment")]
+fn extract_kg_terms(
+    query: &str,
+    thesaurus: terraphim_types::Thesaurus,
+) -> Result<Vec<terraphim_automata::matcher::Matched>, terraphim_automata::TerraphimAutomataError> {
+    terraphim_automata::matcher::find_matches(query, thesaurus, false)
+}
+
+#[cfg(feature = "enrichment")]
+fn compute_kg_boost(session: &Session, kg_term_set: &std::collections::HashSet<String>) -> usize {
+    let Some(enrichment) = &session.metadata.enrichment else {
+        return 0;
+    };
+
+    let mut match_count = 0usize;
+    for (normalized, concept) in &enrichment.concepts {
+        if kg_term_set.contains(&normalized.to_lowercase()) {
+            match_count += concept.count;
+        }
+    }
+
+    match_count
 }
 
 #[cfg(test)]

@@ -182,6 +182,23 @@ impl SessionService {
     /// When the `search-index` feature is enabled, uses BM25 scoring for
     /// relevance-ranked results. Otherwise falls back to substring matching.
     pub async fn search(&self, query: &str) -> Vec<Session> {
+        self.search_inner(query).await
+    }
+
+    /// Hybrid search: KG concept matches from the role thesaurus rank first, BM25 fallback.
+    ///
+    /// Requires both `search-index` and `enrichment` features for the hybrid boost.
+    /// Without a thesaurus, falls back to plain BM25.
+    #[cfg(feature = "enrichment")]
+    pub async fn search_with_thesaurus(
+        &self,
+        query: &str,
+        thesaurus: Option<terraphim_types::Thesaurus>,
+    ) -> Vec<Session> {
+        self.search_inner_with_thesaurus(query, thesaurus).await
+    }
+
+    async fn search_inner(&self, query: &str) -> Vec<Session> {
         if let Err(e) = self.maybe_auto_import().await {
             tracing::warn!("Auto-import check failed: {}", e);
         }
@@ -198,6 +215,54 @@ impl SessionService {
 
         #[cfg(not(feature = "search-index"))]
         {
+            let query_lower = query.to_lowercase();
+            sessions
+                .into_iter()
+                .filter(|session| {
+                    if let Some(title) = &session.title {
+                        if title.to_lowercase().contains(&query_lower) {
+                            return true;
+                        }
+                    }
+                    if let Some(path) = &session.metadata.project_path {
+                        if path.to_lowercase().contains(&query_lower) {
+                            return true;
+                        }
+                    }
+                    for msg in &session.messages {
+                        if msg.content.to_lowercase().contains(&query_lower) {
+                            return true;
+                        }
+                    }
+                    false
+                })
+                .collect()
+        }
+    }
+
+    #[cfg(feature = "enrichment")]
+    async fn search_inner_with_thesaurus(
+        &self,
+        query: &str,
+        thesaurus: Option<terraphim_types::Thesaurus>,
+    ) -> Vec<Session> {
+        if let Err(e) = self.maybe_auto_import().await {
+            tracing::warn!("Auto-import check failed: {}", e);
+        }
+
+        let cache = self.cache.read().await;
+        let sessions: Vec<Session> = cache.values().cloned().collect();
+        drop(cache);
+
+        #[cfg(feature = "search-index")]
+        {
+            let scored = crate::search::search_sessions_hybrid(&sessions, query, thesaurus);
+            scored.into_iter().map(|s| s.into_value()).collect()
+        }
+
+        #[cfg(not(feature = "search-index"))]
+        {
+            let _ = thesaurus;
             let query_lower = query.to_lowercase();
             sessions
                 .into_iter()

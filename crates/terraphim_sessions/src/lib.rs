@@ -56,5 +56,8 @@ pub use enrichment::{
 #[cfg(feature = "search-index")]
 pub use search::{search_sessions, session_to_document};
 
+#[cfg(all(feature = "search-index", feature = "enrichment"))]
+pub use search::search_sessions_hybrid;
+
 /// Crate version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

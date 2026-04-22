@@ -1904,49 +1904,105 @@ impl ReplHandler {
             }
 
             SessionsSubcommand::Search { query } => {
-                let sessions = svc.search(&query).await;
+                #[cfg(feature = "enrichment")]
+                {
+                    let thesaurus = if let Some(ref tui_service) = self.service {
+                        let role_name: terraphim_types::RoleName = self.current_role.clone().into();
+                        tui_service.get_thesaurus(&role_name).await.ok()
+                    } else {
+                        None
+                    };
+                    let sessions = svc.search_with_thesaurus(&query, thesaurus).await;
 
-                if sessions.is_empty() {
-                    println!("{} No sessions match '{}'", "ℹ".blue().bold(), query.cyan());
-                    return Ok(());
+                    if sessions.is_empty() {
+                        println!("{} No sessions match '{}'", "ℹ".blue().bold(), query.cyan());
+                        return Ok(());
+                    }
+
+                    println!(
+                        "\n{} sessions match '{}':",
+                        sessions.len().to_string().green(),
+                        query.cyan()
+                    );
+                    let mut table = Table::new();
+                    table
+                        .load_preset(UTF8_FULL)
+                        .apply_modifier(UTF8_ROUND_CORNERS)
+                        .set_header(vec![
+                            Cell::new("ID").add_attribute(comfy_table::Attribute::Bold),
+                            Cell::new("Source").add_attribute(comfy_table::Attribute::Bold),
+                            Cell::new("Title").add_attribute(comfy_table::Attribute::Bold),
+                        ]);
+
+                    for session in sessions.iter().take(10) {
+                        let title = session
+                            .title
+                            .as_ref()
+                            .map(|t| {
+                                if t.len() > 50 {
+                                    format!("{}...", &t[..50])
+                                } else {
+                                    t.clone()
+                                }
+                            })
+                            .unwrap_or_else(|| "-".to_string());
+
+                        table.add_row(vec![
+                            Cell::new(&session.external_id[..8.min(session.external_id.len())]),
+                            Cell::new(&session.source),
+                            Cell::new(title),
+                        ]);
+                    }
+
+                    println!("{}", table);
                 }
 
-                println!(
-                    "\n{} sessions match '{}':",
-                    sessions.len().to_string().green(),
-                    query.cyan()
-                );
-                let mut table = Table::new();
-                table
-                    .load_preset(UTF8_FULL)
-                    .apply_modifier(UTF8_ROUND_CORNERS)
-                    .set_header(vec![
-                        Cell::new("ID").add_attribute(comfy_table::Attribute::Bold),
-                        Cell::new("Source").add_attribute(comfy_table::Attribute::Bold),
-                        Cell::new("Title").add_attribute(comfy_table::Attribute::Bold),
-                    ]);
+                #[cfg(not(feature = "enrichment"))]
+                {
+                    let sessions = svc.search(&query).await;
 
-                for session in sessions.iter().take(10) {
-                    let title = session
-                        .title
-                        .as_ref()
-                        .map(|t| {
-                            if t.len() > 50 {
-                                format!("{}...", &t[..50])
-                            } else {
-                                t.clone()
-                            }
-                        })
-                        .unwrap_or_else(|| "-".to_string());
+                    if sessions.is_empty() {
+                        println!("{} No sessions match '{}'", "ℹ".blue().bold(), query.cyan());
+                        return Ok(());
+                    }
 
-                    table.add_row(vec![
-                        Cell::new(&session.external_id[..8.min(session.external_id.len())]),
-                        Cell::new(&session.source),
-                        Cell::new(title),
-                    ]);
+                    println!(
+                        "\n{} sessions match '{}':",
+                        sessions.len().to_string().green(),
+                        query.cyan()
+                    );
+                    let mut table = Table::new();
+                    table
+                        .load_preset(UTF8_FULL)
+                        .apply_modifier(UTF8_ROUND_CORNERS)
+                        .set_header(vec![
+                            Cell::new("ID").add_attribute(comfy_table::Attribute::Bold),
+                            Cell::new("Source").add_attribute(comfy_table::Attribute::Bold),
+                            Cell::new("Title").add_attribute(comfy_table::Attribute::Bold),
+                        ]);
+
+                    for session in sessions.iter().take(10) {
+                        let title = session
+                            .title
+                            .as_ref()
+                            .map(|t| {
+                                if t.len() > 50 {
+                                    format!("{}...", &t[..50])
+                                } else {
+                                    t.clone()
+                                }
+                            })
+                            .unwrap_or_else(|| "-".to_string());
+
+                        table.add_row(vec![
+                            Cell::new(&session.external_id[..8.min(session.external_id.len())]),
+                            Cell::new(&session.source),
+                            Cell::new(title),
+                        ]);
+                    }
+
+                    println!("{}", table);
                 }
-
-                println!("{}", table);
             }
 
             SessionsSubcommand::Stats => {
