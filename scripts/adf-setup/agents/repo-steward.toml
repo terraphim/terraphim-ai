@@ -1,0 +1,199 @@
+# repo-steward agent template
+#
+# Repository stewardship agent that synthesizes stability and usefulness
+# signals into evidence-backed backlog actions.
+#
+# Layer: Growth
+# Schedule: Every 6 hours at :15
+# Persona: Carthos (reused pragmatically in v1)
+# Subscription-only models only (C1 constraint).
+
+[[agents]]
+name = "repo-steward"
+layer = "Growth"
+cli_tool = "/home/alex/.local/bin/claude"
+model = "sonnet"
+fallback_model = "kimi-for-coding/k2p5"
+persona = "Carthos"
+terraphim_role = "Carthos Architecture"
+skill_chain = [
+  "disciplined-research",
+  "disciplined-design",
+  "disciplined-verification",
+  "documentation"
+]
+schedule = "15 */6 * * *"
+max_cpu_seconds = 1200
+grace_period_secs = 30
+capabilities = [
+  "repo-stewardship",
+  "stability-synthesis",
+  "usefulness-synthesis",
+  "backlog-prioritization"
+]
+task = '''
+source ~/.profile
+cd "$GITEA_WORKING_DIR" && git pull --ff-only
+
+## Step 1: Gather evidence bundle
+
+READY=$(gtr ready --owner "$GITEA_OWNER" --repo "$GITEA_REPO" 2>/dev/null)
+TRIAGE=$(gtr triage --owner "$GITEA_OWNER" --repo "$GITEA_REPO" 2>/dev/null || echo "{}")
+
+# Recent issues (last 7 days)
+RECENT_ISSUES=$(curl -sf -H "Authorization: token $GITEA_TOKEN" \
+  "$GITEA_URL/api/v1/repos/$GITEA_OWNER/$GITEA_REPO/issues?state=open&since=$(date -u -d '7 days ago' +%Y-%m-%dT%H:%M:%SZ)" 2>/dev/null \
+  | python3 -c 'import json,sys; issues=json.load(sys.stdin); print(json.dumps([{"number":i["number"],"title":i["title"],"labels":[l["name"] for l in i.get("labels",[])]} for i in issues[:20]]))' 2>/dev/null || echo "[]")
+
+# Quickwit query (fail-open)
+QUICKWIT_ERRORS=""
+if [ -n "${QUICKWIT_ENDPOINT:-}" ]; then
+  QUICKWIT_ERRORS=$(curl -sf "$QUICKWIT_ENDPOINT/api/v1/terraphim-ai/search?q=ERROR&max_hits=10" 2>/dev/null \
+    | python3 -c 'import json,sys; d=json.load(sys.stdin); hits=d.get("hits",[]); print(json.dumps([{"message":h.get("message","")[:200]} for h in hits[:5]]))' 2>/dev/null || echo "")
+fi
+
+# Repo friction scan
+FRICTION=$(rg -n "workaround|manual|TODO|FIXME|known issue|not supported|confusing|unclear" README.md docs .docs crates scripts 2>/dev/null | head -20 || echo "")
+
+# KG and learnings
+LEARNINGS=$(terraphim-agent learn query "repo-stewardship stability usefulness" 2>/dev/null || echo "")
+KG_CONTEXT=$(terraphim-agent --config "$ROLE_CONFIG_PATH" search "stability debt usefulness friction" --role "$TERRAPHIM_ROLE" --limit 10 2>/dev/null || echo "[]")
+
+## Step 2: Synthesize up to 3 candidate themes
+
+SYNTHESIS_PROMPT="You are the repo-steward agent for $GITEA_OWNER/$GITEA_REPO.
+Your job is repository stewardship synthesis ONLY. You do NOT implement code, create branches, merge PRs, or run tests.
+
+Evidence bundle:
+- Ready issues: $READY
+- Triage: $TRIAGE
+- Recent issues (7d): $RECENT_ISSUES
+- Quickwit errors: $QUICKWIT_ERRORS
+- Repo friction scan: $FRICTION
+- Prior learnings: $LEARNINGS
+- KG context: $KG_CONTEXT
+
+Produce up to 3 candidate themes. For each theme:
+1. Compute Stability score (0-5) based on: error frequency, test failures, reviewer findings, safety verdicts, repeated regressions
+2. Compute Usefulness score (0-5) based on: recurring issue themes, docs friction, onboarding pain, workaround language, repeated manual remediation
+3. Check for duplicate: look for Theme-ID in existing open issues
+4. Only recommend action if:
+   - A panel score is >= 4
+   - Evidence comes from at least 2 sources
+
+Output format for each theme:
+```
+Theme: <short name>
+Theme-ID: <stable-slug>
+Stability: <score>/5
+Usefulness: <score>/5
+Evidence:
+- [Source 1: description]
+- [Source 2: description]
+Recommendation: [concrete backlog action]
+Suggested next agent: @adf:<agent-name> (only if remediation is concrete)
+```
+
+If no themes meet the threshold, output: NO_ACTION_NEEDED"
+
+SYNTHESIS=$(echo "$SYNTHESIS_PROMPT" | /home/alex/.local/bin/claude -p --model sonnet --allowedTools "Bash,Read,Grep,Glob" 2>&1)
+
+## Step 3: Check for duplicates and create issues
+
+if echo "$SYNTHESIS" | grep -q "NO_ACTION_NEEDED"; then
+  echo "No themes meet threshold; capturing learning only"
+  terraphim-agent learn capture --type friction \
+    --context "repo-steward/$GITEA_REPO" \
+    --description "No stewardship themes met threshold this cycle" \
+    2>/dev/null || true
+  exit 0
+fi
+
+# Extract themes and Theme-IDs
+THEMES=$(echo "$SYNTHESIS" | python3 -c '
+import json, sys, re
+text = sys.stdin.read()
+themes = []
+for block in re.split(r"\nTheme:", text):
+    if "Theme-ID:" not in block:
+        continue
+    theme_id = re.search(r"Theme-ID:\s*(\S+)", block)
+    stability = re.search(r"Stability:\s*(\d+)", block)
+    usefulness = re.search(r"Usefulness:\s*(\d+)", block)
+    if theme_id:
+        themes.append({
+            "id": theme_id.group(1),
+            "stability": int(stability.group(1)) if stability else 0,
+            "usefulness": int(usefulness.group(1)) if usefulness else 0,
+            "block": block
+        })
+print(json.dumps(themes))
+' 2>/dev/null || echo "[]")
+
+# Process each theme
+for theme in $(echo "$THEMES" | python3 -c 'import json,sys; print("\n".join([t["id"] for t in json.load(sys.stdin)]))'); do
+  # Check for existing issue with this Theme-ID in last 24h
+  EXISTING=$(curl -sf -H "Authorization: token $GITEA_TOKEN" \
+    "$GITEA_URL/api/v1/repos/$GITEA_OWNER/$GITEA_REPO/issues?state=open&labels=repo-steward" 2>/dev/null \
+    | python3 -c "import json,sys,datetime; issues=json.load(sys.stdin); now=datetime.datetime.now(datetime.timezone.utc); recent=[i for i in issues if 'Theme-ID: $theme' in i.get('body','') and (now - datetime.datetime.fromisoformat(i['created_at'].replace('Z','+00:00'))).total_seconds() < 86400]; print('yes' if recent else 'no')" 2>/dev/null || echo "no")
+
+  if [ "$EXISTING" = "yes" ]; then
+    echo "Theme $theme already has open issue in last 24h; skipping"
+    continue
+  fi
+
+  # Determine panel and title
+  PANEL=""
+  if echo "$THEMES" | grep -A5 "$theme" | grep -q "Stability: [4-5]"; then
+    PANEL="Stability"
+  elif echo "$THEMES" | grep -A5 "$theme" | grep -q "Usefulness: [4-5]"; then
+    PANEL="Usefulness"
+  fi
+
+  if [ -z "$PANEL" ]; then
+    echo "Theme $theme does not meet threshold; skipping"
+    continue
+  fi
+
+  # Extract theme block for issue body
+  THEME_BLOCK=$(echo "$SYNTHESIS" | awk "/Theme-ID: $theme/{flag=1;print;next} /^Theme:/{flag=0} flag")
+
+  # Create issue
+  TITLE="[Repo Stewardship][$PANEL] $theme"
+  BODY="## Why Now
+$THEME_BLOCK
+
+## Evidence
+See issue body above for evidence sources.
+
+## KG Cross-Check
+- Search query: repo-stewardship stability usefulness
+- Similar learnings: $LEARNINGS
+
+## Recommendation
+See synthesis output above.
+
+## Suggested Next Agent
+See synthesis output above.
+
+Theme-ID: $theme"
+
+  gtr create-issue --owner "$GITEA_OWNER" --repo "$GITEA_REPO" \
+    --title "$TITLE" --body "$BODY" --labels "repo-steward,$(echo $PANEL | tr '[:upper:]' '[:lower:]')-debt" \
+    2>&1 || echo "Failed to create issue for theme $theme"
+
+  echo "Created issue for theme $theme ($PANEL)"
+done
+
+## Step 4: Capture learning
+
+terraphim-agent learn capture --type insight \
+  --context "repo-steward/$GITEA_REPO" \
+  --description "Completed stewardship synthesis cycle for $GITEA_REPO" \
+  2>/dev/null || true
+'''
+
+[agents.pre_check]
+kind = "shell"
+script = """terraphim-agent --config "$ROLE_CONFIG_PATH" search "stability debt usefulness friction" --role "$TERRAPHIM_ROLE" --limit 5 2>/dev/null || echo '[]'"""
+timeout_secs = 30
