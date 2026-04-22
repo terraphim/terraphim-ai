@@ -37,6 +37,9 @@ pub mod cla;
 #[cfg(feature = "enrichment")]
 pub mod enrichment;
 
+#[cfg(feature = "search-index")]
+pub mod search;
+
 // Re-exports for convenience
 pub use connector::{ConnectorRegistry, ConnectorStatus, ImportOptions, SessionConnector};
 pub use model::{
@@ -49,6 +52,9 @@ pub use enrichment::{
     ConceptMatch, ConceptOccurrence, EnrichmentConfig, EnrichmentResult, SessionConcepts,
     SessionEnricher, find_related_sessions, search_by_concept,
 };
+
+#[cfg(feature = "search-index")]
+pub use search::{search_sessions, session_to_document};
 
 /// Crate version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
