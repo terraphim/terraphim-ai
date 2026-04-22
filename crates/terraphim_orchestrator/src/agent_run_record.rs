@@ -177,6 +177,12 @@ pub struct AgentRunRecord {
     pub matched_patterns: Vec<String>,
     /// Classification confidence (0.0 - 1.0)
     pub confidence: f64,
+    /// ULID identifying the mention chain (set when spawned via @adf: mention).
+    pub mention_chain_id: Option<String>,
+    /// Depth in the mention chain (0 = direct human mention).
+    pub mention_depth: Option<u32>,
+    /// Name of the parent agent that triggered this mention (empty for human).
+    pub mention_parent_agent: Option<String>,
 }
 
 impl AgentRunRecord {
@@ -834,6 +840,9 @@ mod tests {
             trigger: RunTrigger::Cron,
             matched_patterns: vec!["timed out".to_string()],
             confidence: 0.95,
+            mention_chain_id: None,
+            mention_depth: None,
+            mention_parent_agent: None,
         };
         let json = serde_json::to_string(&record).unwrap();
         let deserialized: AgentRunRecord = serde_json::from_str(&json).unwrap();
@@ -904,6 +913,9 @@ mod tests {
             trigger: RunTrigger::Cron,
             matched_patterns: vec!["timed out".to_string()],
             confidence: 0.9,
+            mention_chain_id: None,
+            mention_depth: None,
+            mention_parent_agent: None,
         };
 
         store.insert(&record).await.unwrap();
