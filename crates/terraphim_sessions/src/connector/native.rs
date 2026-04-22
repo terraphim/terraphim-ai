@@ -181,12 +181,7 @@ impl NativeClaudeConnector {
             started_at,
             ended_at,
             messages,
-            metadata: SessionMetadata {
-                project_path,
-                model: None,
-                tags: vec![],
-                extra: serde_json::Value::Null,
-            },
+            metadata: SessionMetadata::new(project_path, None, vec![], serde_json::Value::Null),
         }))
     }
 

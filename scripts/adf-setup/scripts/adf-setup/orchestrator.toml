@@ -1,0 +1,42 @@
+disk_usage_threshold = 90
+flow_state_dir = "/opt/ai-dark-factory/flow-states"
+max_restart_count = 3
+persona_data_dir = "/home/alex/terraphim-ai/data/personas"
+restart_cooldown_secs = 300
+role_config_path = "/opt/ai-dark-factory/persona_roles_config.json"
+skill_data_dir = "/opt/ai-dark-factory/skills"
+tick_interval_secs = 30
+working_dir = "/home/alex/terraphim-ai"
+include = [
+    "conf.d/*.toml",
+]
+
+[compound_review]
+schedule = "0 0-10 * * *"
+max_duration_secs = 1800
+repo_path = "/home/alex/terraphim-ai"
+create_prs = false
+worktree_root = "/home/alex/terraphim-ai/.worktrees"
+cli_tool = "/home/alex/.bun/bin/opencode"
+gitea_issue = 514
+auto_file_issues = false
+auto_remediate = false
+
+[nightwatch]
+eval_interval_secs = 300
+active_start_hour = 2
+active_end_hour = 6
+minor_threshold = 0.1
+moderate_threshold = 0.2
+severe_threshold = 0.4
+critical_threshold = 0.7
+
+[routing]
+taxonomy_path = "/home/alex/terraphim-ai/docs/taxonomy/routing_scenarios/adf"
+probe_ttl_secs = 300
+probe_results_dir = "/home/alex/.terraphim/benchmark-results"
+probe_on_startup = true
+
+[webhook]
+bind = "172.18.0.1:9091"
+secret = "85af336ebec99fe512871106650bce179f9a2b218f40576f76d5ff0a55e7af9a"
