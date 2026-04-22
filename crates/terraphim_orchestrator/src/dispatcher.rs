@@ -48,6 +48,12 @@ pub enum DispatchTask {
         context: String,
         /// Project id this mention was detected in.
         project: String,
+        /// ULID identifying this mention chain (same across nested mentions).
+        chain_id: String,
+        /// Current depth in the mention chain (0 = initial human mention).
+        depth: u32,
+        /// Name of the agent that triggered this mention (empty for human).
+        parent_agent: String,
     },
     /// PR review dispatch — triggers the automated review pipeline.
     ReviewPr {

@@ -286,6 +286,11 @@ pub struct MentionConfig {
     /// Max concurrent mention-spawned agents (default 5).
     #[serde(default = "default_max_concurrent_mention_agents")]
     pub max_concurrent_mention_agents: u32,
+    /// Max mention chain nesting depth (default 3).
+    /// Depth 0 = direct human mention, depth N = mention of mention.
+    /// Set to 0 to disable nested mentions entirely.
+    #[serde(default = "default_max_mention_depth")]
+    pub max_mention_depth: u32,
 }
 
 fn default_poll_modulo() -> u64 {
@@ -300,12 +305,17 @@ fn default_max_concurrent_mention_agents() -> u32 {
     5
 }
 
+fn default_max_mention_depth() -> u32 {
+    crate::mention_chain::DEFAULT_MAX_MENTION_DEPTH
+}
+
 impl Default for MentionConfig {
     fn default() -> Self {
         Self {
             poll_modulo: default_poll_modulo(),
             max_dispatches_per_tick: default_max_dispatches_per_tick(),
             max_concurrent_mention_agents: default_max_concurrent_mention_agents(),
+            max_mention_depth: default_max_mention_depth(),
         }
     }
 }
