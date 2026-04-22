@@ -16,8 +16,7 @@ const MAX_SEARCH_RESULTS: usize = 50;
 const MIN_SCORE_FRACTION: f64 = 0.1;
 
 /// Score multiplier applied to sessions with KG concept matches.
-/// Must be large enough to guarantee KG-matched sessions always rank
-/// above pure BM25 results regardless of BM25 score.
+#[cfg(feature = "enrichment")]
 const KG_BOOST_MULTIPLIER: f64 = 10_000.0;
 
 /// Adapter that converts a `Session` into a searchable `Document`.
@@ -78,7 +77,11 @@ fn build_body(session: &Session) -> String {
 
     let body = parts.join("\n");
     if body.len() > MAX_BODY_LENGTH {
-        body[..MAX_BODY_LENGTH].to_string()
+        let mut end = MAX_BODY_LENGTH;
+        while !body.is_char_boundary(end) {
+            end -= 1;
+        }
+        body[..end].to_string()
     } else {
         body
     }
@@ -108,7 +111,10 @@ pub fn search_sessions(sessions: &[Session], query: &str) -> Vec<Scored<Session>
 
     let results: SearchResults<Document> = match scorer.score(&q, documents) {
         Ok(r) => r,
-        Err(_) => return Vec::new(),
+        Err(e) => {
+            tracing::warn!("BM25 scoring failed: {}", e);
+            return Vec::new();
+        }
     };
 
     let session_map: std::collections::HashMap<&str, &Session> =
@@ -382,5 +388,23 @@ mod tests {
         let body = build_body(&session);
         assert!(body.contains("/my/project"));
         assert!(body.contains("claude-3"));
+    }
+
+    #[test]
+    fn test_build_body_truncation_multibyte_utf8() {
+        let emoji = "🎉";
+        let emoji_bytes = emoji.len();
+        let count = (MAX_BODY_LENGTH / emoji_bytes) + 10;
+        let long_content: String = emoji.repeat(count);
+        let session = make_session(
+            "s1",
+            "test",
+            vec![("user", MessageRole::User, long_content.as_str())],
+        );
+
+        let body = build_body(&session);
+        assert!(body.len() <= MAX_BODY_LENGTH + emoji_bytes);
+        assert!(body.is_char_boundary(body.len()));
+        assert!(!body.is_empty());
     }
 }
