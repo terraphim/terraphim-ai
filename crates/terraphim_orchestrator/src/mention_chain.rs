@@ -88,6 +88,18 @@ impl MentionChainTracker {
             args.comment_body.clone()
         };
 
+        let agents_section = if args.available_agents.is_empty() {
+            String::new()
+        } else {
+            let list: String = args
+                .available_agents
+                .iter()
+                .map(|a| format!("- `@adf:{}`", a))
+                .collect::<Vec<_>>()
+                .join("\n");
+            format!("\nAvailable agents to mention:\n{}\n", list)
+        };
+
         format!(
             "---\n\
              **Mention Context** (chain: `{}`, depth: {})\n\
@@ -96,16 +108,16 @@ impl MentionChainTracker {
              \n{}\n\
              \n---\n\
              When your work is complete, you may mention another agent using \
-             `@adf:agent-name` in your output.\n\
+             `@adf:agent-name` in your output.{}\n\
              Maximum mention chain depth remaining: {}\n\
              ---",
-            args.chain_id, args.depth, parent_line, body_excerpt, remaining
+            args.chain_id, args.depth, parent_line, body_excerpt, agents_section, remaining
         )
     }
 }
 
 /// Arguments for building mention context.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct MentionContextArgs {
     /// Name of the agent that triggered this mention (empty for human).
     pub parent_agent: String,
@@ -117,6 +129,8 @@ pub struct MentionContextArgs {
     pub depth: u32,
     /// ULID identifying this mention chain.
     pub chain_id: String,
+    /// Names of other agents available for downstream mentions.
+    pub available_agents: Vec<String>,
 }
 
 #[cfg(test)]
@@ -185,6 +199,7 @@ mod tests {
             comment_body: "please review".to_string(),
             depth: 1,
             chain_id: "01HZTEST123".to_string(),
+            available_agents: vec![],
         };
         let ctx = MentionChainTracker::build_context(&args, 3);
         assert!(ctx.contains("01HZTEST123"));
@@ -201,6 +216,7 @@ mod tests {
             comment_body: "do thing".to_string(),
             depth: 1,
             chain_id: "chain-1".to_string(),
+            available_agents: vec![],
         };
         let ctx = MentionChainTracker::build_context(&args, 3);
         assert!(ctx.contains("remaining: 1"));
@@ -214,6 +230,7 @@ mod tests {
             comment_body: "please check".to_string(),
             depth: 0,
             chain_id: "chain-human".to_string(),
+            available_agents: vec![],
         };
         let ctx = MentionChainTracker::build_context(&args, 3);
         assert!(ctx.contains("human mention"));
@@ -229,6 +246,7 @@ mod tests {
             comment_body: long_body,
             depth: 0,
             chain_id: "chain-1".to_string(),
+            available_agents: vec![],
         };
         let ctx = MentionChainTracker::build_context(&args, 3);
         assert!(ctx.contains("[truncated]"));
@@ -247,5 +265,35 @@ mod tests {
             result,
             Err(MentionChainError::DepthExceeded { .. })
         ));
+    }
+
+    #[test]
+    fn test_build_context_includes_available_agents() {
+        let args = MentionContextArgs {
+            parent_agent: String::new(),
+            issue_number: 1,
+            comment_body: "please review".to_string(),
+            depth: 0,
+            chain_id: "chain-1".to_string(),
+            available_agents: vec!["reviewer".to_string(), "coder".to_string()],
+        };
+        let ctx = MentionChainTracker::build_context(&args, 3);
+        assert!(ctx.contains("Available agents to mention"));
+        assert!(ctx.contains("`@adf:reviewer`"));
+        assert!(ctx.contains("`@adf:coder`"));
+    }
+
+    #[test]
+    fn test_build_context_empty_agents_no_section() {
+        let args = MentionContextArgs {
+            parent_agent: String::new(),
+            issue_number: 1,
+            comment_body: "please review".to_string(),
+            depth: 0,
+            chain_id: "chain-1".to_string(),
+            available_agents: vec![],
+        };
+        let ctx = MentionChainTracker::build_context(&args, 3);
+        assert!(!ctx.contains("Available agents to mention"));
     }
 }

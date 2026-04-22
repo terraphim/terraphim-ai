@@ -155,6 +155,7 @@ struct ManagedAgent {
     session_id: String,
     mention_chain_id: Option<String>,
     mention_depth: Option<u32>,
+    mention_parent_agent: Option<String>,
 }
 
 #[cfg(not(test))]
@@ -1663,6 +1664,7 @@ impl AgentOrchestrator {
                 session_id: format!("{}-{}", def.name, ulid::Ulid::new()),
                 mention_chain_id: None,
                 mention_depth: None,
+                mention_parent_agent: None,
             },
         );
 
@@ -1927,6 +1929,7 @@ impl AgentOrchestrator {
                 session_id: format!("{}-{}", def.name, ulid::Ulid::new()),
                 mention_chain_id: None,
                 mention_depth: None,
+                mention_parent_agent: None,
             },
         );
 
@@ -2641,6 +2644,11 @@ impl AgentOrchestrator {
                             comment_body: comment.body.clone(),
                             depth,
                             chain_id: chain_id.clone(),
+                            available_agents: agent_names
+                                .iter()
+                                .filter(|n| *n != &token.agent)
+                                .cloned()
+                                .collect(),
                         };
                         let chain_ctx = mention_chain::MentionChainTracker::build_context(
                             &ctx_args,
@@ -2660,6 +2668,13 @@ impl AgentOrchestrator {
                             );
                         } else if let Some(active) = self.active_agents.get_mut(&mention_def.name) {
                             active.spawned_by_mention = true;
+                            active.mention_chain_id = Some(chain_id);
+                            active.mention_depth = Some(depth);
+                            active.mention_parent_agent = if parent_agent.is_empty() {
+                                None
+                            } else {
+                                Some(parent_agent)
+                            };
                         }
                         cursor.dispatches_this_tick += 1;
                     }
@@ -2757,11 +2772,16 @@ impl AgentOrchestrator {
                             }
 
                             let ctx_args = mention_chain::MentionContextArgs {
-                                parent_agent,
+                                parent_agent: parent_agent.clone(),
                                 issue_number,
                                 comment_body: context.clone(),
                                 depth,
-                                chain_id,
+                                chain_id: chain_id.clone(),
+                                available_agents: agent_names
+                                    .iter()
+                                    .filter(|n| *n != &agent_name)
+                                    .cloned()
+                                    .collect(),
                             };
                             let chain_ctx = mention_chain::MentionChainTracker::build_context(
                                 &ctx_args,
@@ -2778,6 +2798,13 @@ impl AgentOrchestrator {
                                 self.active_agents.get_mut(&mention_def.name)
                             {
                                 agent.spawned_by_mention = true;
+                                agent.mention_chain_id = Some(chain_id);
+                                agent.mention_depth = Some(depth);
+                                agent.mention_parent_agent = if parent_agent.is_empty() {
+                                    None
+                                } else {
+                                    Some(parent_agent)
+                                };
                             }
 
                             cursor.dispatches_this_tick += 1;
@@ -2835,11 +2862,16 @@ impl AgentOrchestrator {
                                 }
 
                                 let ctx_args = mention_chain::MentionContextArgs {
-                                    parent_agent,
+                                    parent_agent: parent_agent.clone(),
                                     issue_number,
                                     comment_body: context.clone(),
                                     depth,
-                                    chain_id,
+                                    chain_id: chain_id.clone(),
+                                    available_agents: agent_names
+                                        .iter()
+                                        .filter(|n| *n != &agent_name)
+                                        .cloned()
+                                        .collect(),
                                 };
                                 let chain_ctx = mention_chain::MentionChainTracker::build_context(
                                     &ctx_args,
@@ -2856,6 +2888,13 @@ impl AgentOrchestrator {
                                     self.active_agents.get_mut(&mention_def.name)
                                 {
                                     agent.spawned_by_mention = true;
+                                    agent.mention_chain_id = Some(chain_id);
+                                    agent.mention_depth = Some(depth);
+                                    agent.mention_parent_agent = if parent_agent.is_empty() {
+                                        None
+                                    } else {
+                                        Some(parent_agent)
+                                    };
                                 }
 
                                 cursor.dispatches_this_tick += 1;
@@ -4525,6 +4564,18 @@ impl AgentOrchestrator {
                 .get(name)
                 .and_then(|m| m.routed_model.clone());
 
+            let (mention_chain_id, mention_depth, mention_parent_agent) = self
+                .active_agents
+                .get(name)
+                .map(|m| {
+                    (
+                        m.mention_chain_id.clone(),
+                        m.mention_depth,
+                        m.mention_parent_agent.clone(),
+                    )
+                })
+                .unwrap_or((None, None, None));
+
             let trigger = if self
                 .active_agents
                 .get(name)
@@ -4551,6 +4602,9 @@ impl AgentOrchestrator {
                 trigger,
                 matched_patterns: classification.matched_patterns.clone(),
                 confidence: classification.confidence,
+                mention_chain_id,
+                mention_depth,
+                mention_parent_agent,
             };
 
             info!(
