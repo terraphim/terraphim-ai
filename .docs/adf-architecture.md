@@ -65,8 +65,8 @@ CORE LAYER (essential pipeline agents)
 +---------------------+   +---------------------+   +---------------------+
 +---------------------+   +---------------------+
 | documentation-gen   |   | product-development |
-| Daily 04:00         |   | Every 6h            |
-| Doc comments, CHLOG |   | Code review         |
+| Daily 04:00         |   | Daily 02:00         |
+| Doc comments, CHLOG |   | Roadmap prioritiz.  |
 | Posts to issue #114  |   | Posts to issue #112  |
 +---------------------+   +---------------------+
 
@@ -78,6 +78,13 @@ GROWTH LAYER (coordination and quality)
 | Triggers 4 reviewers|   | Creates remediation |   | testing             |
 |                     |   | issues for FAILs    |   |                     |
 +---------------------+   +---------------------+   +---------------------+
++---------------------+
+| repo-steward        |
+| Every 6h            |
+| Stability + useful. |
+| Evidence-backed     |
+| issues              |
++---------------------+
 
 FLOW DAG (multi-step pipeline)
 +---------------------------------------------------------------------+
@@ -182,13 +189,14 @@ flowchart TB
             upstream["upstream-synchronizer<br/>Every 6h"]
             meta["meta-coordinator<br/>Every 12h<br/>ADF health monitor"]
             docs["documentation-generator<br/>Daily 04:00"]
-            product["product-development<br/>Every 6h<br/>Code review"]
+            product["product-development<br/>Daily 02:00<br/>Roadmap prioritization"]
         end
 
         subgraph growth["Growth Layer"]
             qc["quality-coordinator<br/>Mention-only<br/>Compound code review"]
             mc["merge-coordinator<br/>Mention-only<br/>5-verdict merge gate"]
             bqa["browser-qa<br/>Mention-only<br/>Playwright visual QA"]
+            rs["repo-steward<br/>Every 6h<br/>Stability + usefulness"]
         end
 
         subgraph flow["Flow DAG: security-audit-flow (every 6h)"]
@@ -302,6 +310,7 @@ product-development      yes    yes         Core
 quality-coordinator      yes    yes         Growth
 merge-coordinator        yes    yes         Growth
 browser-qa               yes    yes         Growth
+repo-steward             yes    yes         Growth
 ---
 analyse-findings         n/a    n/a         Flow step (uses root)
 cargo-audit              n/a    n/a         Flow step (action)

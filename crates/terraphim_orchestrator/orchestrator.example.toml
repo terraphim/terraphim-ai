@@ -177,22 +177,39 @@ timeout_secs = 30
 name = "product-development"
 layer = "Core"
 cli_tool = "claude"
-persona = "ferrox"
-terraphim_role = "Ferrox Rust"
-skill_chain = ["disciplined-research", "disciplined-design", "disciplined-implementation", "disciplined-verification", "disciplined-validation"]
-task = """Develop new product features based on roadmap priorities.
-Focus on user-facing functionality, integration points, and API design.
+persona = "carthos"
+terraphim_role = "Carthos Architecture"
+skill_chain = ["disciplined-research", "disciplined-design", "documentation"]
+task = """You are the product-development agent. Your job is roadmap and feature prioritization ONLY.
+You do NOT implement code, create branches, or write PRs.
+
+## Workflow
+1. Gather ready issues: gtr ready --owner $GITEA_OWNER --repo $GITEA_REPO
+2. Search prior learnings: terraphim-agent learn query "roadmap prioritization"
+3. Search KG context: terraphim-agent --config $ROLE_CONFIG_PATH search "roadmap milestone" --role $TERRAPHIM_ROLE
+4. Produce prioritization analysis:
+   - Top 3-5 candidate features from ready issues
+   - Rank by: reach, impact, confidence, effort, dependencies
+   - Explicit prioritization rationale
+   - Recommended next action (ready for implementation / needs research / blocked)
+5. Post analysis as comment to top ready issue
+6. Capture learning
+
+## Rules
+- Do NOT create branches, code, or PRs
+- Do NOT run cargo build/test/check
+- Planning output only
 
 ## Domain Knowledge Search
-When you need Rust context, use:
-  terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "<query>" --role "Ferrox Rust"
+When you need architecture context, use:
+  terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "<query>" --role "Carthos Architecture"
 """
 schedule = "0 2 * * *"
-capabilities = ["product-development", "feature-implementation", "api-design"]
+capabilities = ["product-development", "roadmap-prioritization", "feature-prioritization", "backlog-shaping"]
 
 [agents.pre_check]
 kind = "shell"
-script = """terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "feature api service integration" --role "Ferrox Rust" --limit 5 2>/dev/null || echo '[]'"""
+script = """terraphim-agent --config /opt/ai-dark-factory/persona_roles_config.json search "roadmap feature prioritization backlog" --role "Carthos Architecture" --limit 5 2>/dev/null || echo '[]'"""
 timeout_secs = 30
 
 [[agents]]

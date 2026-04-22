@@ -626,8 +626,13 @@ mod tests {
             },
             AgentDefinition {
                 name: "product-development".into(),
-                persona: Some("Lux".into()),
-                capabilities: vec!["typescript".into(), "frontend".into(), "ui".into()],
+                persona: Some("Carthos".into()),
+                capabilities: vec![
+                    "product-development".into(),
+                    "roadmap-prioritization".into(),
+                    "feature-prioritization".into(),
+                    "backlog-shaping".into(),
+                ],
                 ..test_agent_default()
             },
         ]
@@ -655,7 +660,6 @@ mod tests {
         let mut registry = PersonaRegistry::new();
         registry.insert(test_persona_definition("Vigil"));
         registry.insert(test_persona_definition("Carthos"));
-        registry.insert(test_persona_definition("Lux"));
         registry
     }
 
@@ -742,8 +746,8 @@ mod tests {
     fn test_resolve_persona_single_agent() {
         let agents = test_agents();
         let personas = test_personas();
-        // Lux has only one agent: product-development
-        let result = resolve_persona_mention("lux", &agents, &personas, "some context");
+        // Carthos has only one agent: product-development
+        let result = resolve_persona_mention("carthos", &agents, &personas, "some context");
         assert!(result.is_some());
         let (name, res) = result.unwrap();
         assert_eq!(name, "product-development");
