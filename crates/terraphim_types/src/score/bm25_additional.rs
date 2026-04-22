@@ -4,6 +4,7 @@ use super::common::BM25Params;
 use crate::Document;
 
 /// Okapi BM25 scorer implementation
+#[derive(Default)]
 pub struct OkapiBM25Scorer {
     params: BM25Params,
     avg_doc_length: f64,
@@ -114,6 +115,7 @@ impl OkapiBM25Scorer {
 }
 
 /// TFIDF scorer implementation
+#[derive(Default)]
 pub struct TFIDFScorer {
     doc_count: usize,
     term_doc_frequencies: HashMap<String, usize>,
@@ -189,6 +191,7 @@ impl TFIDFScorer {
 }
 
 /// Jaccard similarity scorer implementation
+#[derive(Default)]
 pub struct JaccardScorer {
     doc_count: usize,
 }
@@ -242,6 +245,7 @@ impl JaccardScorer {
 }
 
 /// QueryRatio scorer implementation
+#[derive(Default)]
 pub struct QueryRatioScorer {
     doc_count: usize,
 }

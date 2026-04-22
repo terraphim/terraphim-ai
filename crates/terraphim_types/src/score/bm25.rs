@@ -5,6 +5,7 @@ use super::common::{BM25Params, FieldWeights};
 use crate::Document;
 
 /// BM25F scorer implementation
+#[derive(Default)]
 pub struct BM25FScorer {
     params: BM25Params,
     weights: FieldWeights,
@@ -170,6 +171,7 @@ impl BM25FScorer {
 }
 
 /// BM25+ scorer implementation
+#[derive(Default)]
 pub struct BM25PlusScorer {
     params: BM25Params,
     avg_doc_length: f64,

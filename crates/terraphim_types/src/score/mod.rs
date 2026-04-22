@@ -62,7 +62,7 @@ pub fn sort_documents(query: &Query, documents: Vec<Document>) -> Vec<Document> 
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Scorer {
     similarity: Similarity,
     scorer: Option<Box<dyn std::any::Any>>,
@@ -70,10 +70,7 @@ pub struct Scorer {
 
 impl Scorer {
     pub fn new() -> Scorer {
-        Scorer {
-            similarity: Similarity::default(),
-            scorer: None,
-        }
+        Scorer::default()
     }
 
     pub fn with_similarity(mut self, similarity: Similarity) -> Scorer {
