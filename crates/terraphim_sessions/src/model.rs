@@ -162,6 +162,24 @@ pub struct SessionMetadata {
     pub enrichment: Option<SessionConcepts>,
 }
 
+impl SessionMetadata {
+    pub fn new(
+        project_path: Option<String>,
+        model: Option<String>,
+        tags: Vec<String>,
+        extra: serde_json::Value,
+    ) -> Self {
+        Self {
+            project_path,
+            model,
+            tags,
+            extra,
+            #[cfg(feature = "enrichment")]
+            enrichment: None,
+        }
+    }
+}
+
 /// A coding assistant session
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Session {

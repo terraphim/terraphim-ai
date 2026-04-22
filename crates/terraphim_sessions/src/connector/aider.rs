@@ -143,19 +143,18 @@ impl AiderConnector {
             .map(|(idx, m)| Message::text(idx, m.role, m.content))
             .collect();
 
-        let metadata = {
-            let mut m = SessionMetadata::default();
-            m.project_path = file_path
+        let metadata = SessionMetadata::new(
+            file_path
                 .parent()
                 .and_then(|p| p.to_str())
-                .map(|s| s.to_string());
-            m.tags = vec!["aider".to_string(), "chat".to_string()];
-            m.extra = serde_json::json!({
+                .map(|s| s.to_string()),
+            None,
+            vec!["aider".to_string(), "chat".to_string()],
+            serde_json::json!({
                 "title": format!("Aider session: {}", project_name),
                 "description": format!("Aider chat session from {}", file_path.display()),
-            });
-            m
-        };
+            }),
+        );
 
         let started_at = jiff::Timestamp::from_second(created_at.timestamp()).ok();
 

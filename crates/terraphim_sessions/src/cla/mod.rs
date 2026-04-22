@@ -27,16 +27,15 @@ pub(crate) fn from_normalized_session(ns: NormalizedSession, prefix: &str) -> Se
         started_at: ns.started_at,
         ended_at: ns.ended_at,
         messages,
-        metadata: {
-            let mut m = SessionMetadata::default();
-            m.project_path = ns
-                .metadata
+        metadata: SessionMetadata::new(
+            ns.metadata
                 .get("project_path")
                 .and_then(|v| v.as_str())
-                .map(|s| s.to_string());
-            m.extra = ns.metadata;
-            m
-        },
+                .map(|s| s.to_string()),
+            None,
+            vec![],
+            ns.metadata,
+        ),
     }
 }
 
