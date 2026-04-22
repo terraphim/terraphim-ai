@@ -191,6 +191,8 @@ pub enum SessionsSubcommand {
     Files { session_id: String, json: bool },
     /// Find sessions by file path
     ByFile { file_path: String, json: bool },
+    /// Build search index and show index statistics
+    Index { verbose: bool },
 }
 
 #[cfg(feature = "firecracker")]
@@ -1309,8 +1311,14 @@ impl FromStr for ReplCommand {
                             subcommand: SessionsSubcommand::ByFile { file_path, json },
                         })
                     }
+                    "index" => {
+                        let verbose = parts.contains(&"--verbose") || parts.contains(&"-v");
+                        Ok(ReplCommand::Sessions {
+                            subcommand: SessionsSubcommand::Index { verbose },
+                        })
+                    }
                     _ => Err(anyhow!(
-                        "Unknown sessions subcommand: {}. Use: sources, list, search, stats, show, concepts, related, timeline, export, enrich, files, by-file",
+                        "Unknown sessions subcommand: {}. Use: sources, list, search, stats, show, concepts, related, timeline, export, enrich, files, by-file, index",
                         parts[1]
                     )),
                 }

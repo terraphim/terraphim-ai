@@ -2546,6 +2546,44 @@ impl ReplHandler {
                     println!("{}", table);
                 }
             }
+
+            SessionsSubcommand::Index { verbose } => {
+                let sessions = svc.list_sessions().await;
+                let count = sessions.len();
+                let total_messages: usize = sessions.iter().map(|s| s.message_count()).sum();
+
+                println!("\n{} Search Index Status", "🔍".bold());
+                println!("{}", "─".repeat(40));
+                println!("  Sessions indexed: {}", count.to_string().green());
+                println!("  Total messages:   {}", total_messages.to_string().green());
+                println!("  Scorer:           {}", "BM25 (Okapi)".cyan());
+
+                if verbose {
+                    let sources: std::collections::HashMap<&str, usize> = {
+                        let mut map = std::collections::HashMap::new();
+                        for s in &sessions {
+                            *map.entry(s.source.as_str()).or_default() += 1;
+                        }
+                        map
+                    };
+                    println!("\n  {} By source:", "▸".blue());
+                    for (source, cnt) in sources {
+                        println!("    {}: {}", source.magenta(), cnt);
+                    }
+
+                    let total_chars: usize = sessions
+                        .iter()
+                        .map(|s| {
+                            s.messages.iter().map(|m| m.content.len()).sum::<usize>()
+                                + s.title.as_ref().map(|t| t.len()).unwrap_or(0)
+                        })
+                        .sum();
+                    println!(
+                        "\n  Total text size:  {} chars",
+                        total_chars.to_string().yellow()
+                    );
+                }
+            }
         }
 
         Ok(())
