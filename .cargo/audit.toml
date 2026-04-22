@@ -48,4 +48,13 @@ ignore = [
     # - No known vulnerabilities, just unmaintained
     # - Resolution: Migrate to bincode 2.0 or postcard (tracked in backlog)
     "RUSTSEC-2025-0141",
+    # RUSTSEC-2026-0104: rustls-webpki reachable panic in CRL parsing
+    # - Package: rustls-webpki 0.102.8
+    # - Dependency chain: serenity -> tokio-tungstenite -> tokio-rustls -> rustls 0.22 -> rustls-webpki 0.102
+    # - serenity is an OPTIONAL dependency, only activated with `--features discord` in terraphim_tinyclaw
+    # - discord feature is NOT in default features; the vulnerable code is not built by default
+    # - Same root cause as RUSTSEC-2026-0049/0098/0099 (already ignored)
+    # - semver-incompatible with 0.103.x fix; blocked on serenity 0.13+
+    # - Resolution: Remove once serenity 0.13+ releases with rustls 0.23+ support
+    "RUSTSEC-2026-0104",
 ]
