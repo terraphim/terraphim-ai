@@ -9,6 +9,7 @@ use terraphim_types::{Document, DocumentType};
 
 const MAX_BODY_LENGTH: usize = 50_000;
 const MAX_SEARCH_RESULTS: usize = 50;
+const MIN_SCORE_FRACTION: f64 = 0.1;
 
 /// Adapter that converts a `Session` into a searchable `Document`.
 pub fn session_to_document(session: &Session) -> Document {
@@ -120,6 +121,13 @@ pub fn search_sessions(sessions: &[Session], query: &str) -> Vec<Scored<Session>
             .partial_cmp(&a.score())
             .unwrap_or(std::cmp::Ordering::Equal)
     });
+
+    if let Some(top_score) = scored.first().map(|s| s.score()) {
+        if top_score > 0.0 {
+            let threshold = top_score * MIN_SCORE_FRACTION;
+            scored.retain(|s| s.score() >= threshold);
+        }
+    }
 
     scored
 }
