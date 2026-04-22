@@ -204,9 +204,6 @@ pub struct ChannelsConfig {
     #[cfg(feature = "telegram")]
     pub telegram: Option<TelegramConfig>,
 
-    #[cfg(feature = "discord")]
-    pub discord: Option<DiscordConfig>,
-
     #[cfg(feature = "slack")]
     pub slack: Option<SlackConfig>,
     // Note: matrix config disabled due to sqlite dependency conflict
@@ -218,11 +215,6 @@ impl ChannelsConfig {
     pub fn validate(&self) -> anyhow::Result<()> {
         #[cfg(feature = "telegram")]
         if let Some(ref cfg) = self.telegram {
-            cfg.validate()?;
-        }
-
-        #[cfg(feature = "discord")]
-        if let Some(ref cfg) = self.discord {
             cfg.validate()?;
         }
 
@@ -260,38 +252,6 @@ impl TelegramConfig {
         if self.allow_from.is_empty() {
             anyhow::bail!(
                 "telegram.allow_from cannot be empty - \
-                 at least one user must be authorized for security"
-            );
-        }
-        Ok(())
-    }
-
-    /// Check if a sender is allowed.
-    /// Returns true if allow_from contains `"*"` (wildcard) or the given sender_id.
-    pub fn is_allowed(&self, sender_id: &str) -> bool {
-        crate::channel::is_sender_allowed(&self.allow_from, sender_id)
-    }
-}
-
-/// Discord channel configuration.
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct DiscordConfig {
-    /// Bot token from Discord Developer Portal.
-    pub token: String,
-
-    /// List of allowed sender IDs (usernames or user IDs).
-    /// Must be non-empty for security.
-    pub allow_from: Vec<String>,
-}
-
-impl DiscordConfig {
-    pub fn validate(&self) -> anyhow::Result<()> {
-        if self.token.is_empty() {
-            anyhow::bail!("discord.token cannot be empty");
-        }
-        if self.allow_from.is_empty() {
-            anyhow::bail!(
-                "discord.allow_from cannot be empty - \
                  at least one user must be authorized for security"
             );
         }

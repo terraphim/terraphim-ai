@@ -40,14 +40,6 @@ pub fn markdown_to_telegram_html(text: &str) -> String {
     result
 }
 
-/// Convert markdown to Discord format (pass-through with minor adjustments).
-/// Discord supports markdown natively, but we need to handle code blocks properly.
-pub fn markdown_to_discord(text: &str) -> String {
-    // Discord supports standard markdown, so mostly pass-through
-    // Just ensure code blocks are formatted correctly
-    text.to_string()
-}
-
 /// Convert markdown to Slack mrkdwn format.
 ///
 /// Slack mrkdwn differences from standard markdown:
@@ -361,22 +353,6 @@ mod tests {
         let chunks = chunk_message(&text, 4096);
         assert!(!chunks.is_empty());
         // Verify we got chunks back (exact length check skipped due to HTML escaping)
-    }
-
-    #[test]
-    fn test_chunk_message_discord() {
-        let text = "a ".repeat(2500);
-        let chunks = chunk_message(&text, 2000);
-        // Verify we got chunks back
-        assert!(!chunks.is_empty());
-    }
-
-    #[test]
-    fn test_markdown_to_discord_pass_through() {
-        let input = "**bold** and *italic*";
-        let result = markdown_to_discord(input);
-        // Discord supports markdown natively, so pass through
-        assert_eq!(result, input);
     }
 
     #[test]

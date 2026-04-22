@@ -106,15 +106,6 @@ pub fn build_channels_from_config(
         }
     }
 
-    #[cfg(feature = "discord")]
-    {
-        use crate::channels::discord::DiscordChannel;
-
-        if let Some(ref cfg) = config.discord {
-            channels.push(Box::new(DiscordChannel::new(cfg.clone())));
-        }
-    }
-
     #[cfg(feature = "slack")]
     {
         use crate::channels::slack::SlackChannel;

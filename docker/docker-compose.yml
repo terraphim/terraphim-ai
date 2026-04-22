@@ -38,9 +38,9 @@ services:
     volumes:
       - ./ollama:/root/.ollama
     environment:
-      # OLLAMA_HOST binds the container's listener on all interfaces for intra-container networking.
-      # External access is restricted by the port binding above (127.0.0.1 only).
-      - OLLAMA_HOST=0.0.0.0
+      # OLLAMA_HOST binds the container's listener to localhost only.
+      # The published port above (127.0.0.1:11434) is the only access path.
+      - OLLAMA_HOST=127.0.0.1
     networks:
       - terraphim-network
     profiles:
