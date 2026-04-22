@@ -2325,46 +2325,122 @@ impl ReplHandler {
             }
 
             SessionsSubcommand::Enrich { session_id } => {
-                println!("\n{} Enriching sessions with concepts...", "🧠".bold());
-                println!(
-                    "{} This feature requires the 'enrichment' feature flag.",
-                    "ℹ".blue()
-                );
-                println!(
-                    "{} Rebuild with: cargo build --features repl-sessions,enrichment",
-                    "💡".yellow()
-                );
+                #[cfg(feature = "enrichment")]
+                {
+                    println!("\n{} Enriching sessions with concepts...", "🧠".bold());
 
-                // For now, show what would be enriched
-                if let Some(id) = session_id {
-                    if let Some(session) = svc.get_session(&id).await {
-                        println!("\n  Would enrich session: {}", session.id.cyan());
-                        println!("  Messages to process: {}", session.message_count());
+                    if let Some(ref tui_service) = self.service {
+                        let role_name: terraphim_types::RoleName = self.current_role.clone().into();
+                        match tui_service.get_thesaurus(&role_name).await {
+                            Ok(thesaurus) => {
+                                use terraphim_sessions::SessionEnricher;
+                                let enricher = SessionEnricher::new(thesaurus);
 
-                        // Show sample text
-                        if let Some(first_msg) = session.messages.first() {
-                            let preview = if first_msg.content.len() > 100 {
-                                format!("{}...", &first_msg.content[..100])
-                            } else {
-                                first_msg.content.clone()
-                            };
-                            println!("  Sample: {}", preview.italic());
+                                let sessions: Vec<terraphim_sessions::Session> =
+                                    if let Some(id) = session_id {
+                                        svc.get_session(&id).await.into_iter().collect()
+                                    } else {
+                                        svc.list_sessions().await
+                                    };
+
+                                if sessions.is_empty() {
+                                    println!("{} No sessions to enrich", "ℹ".blue().bold());
+                                    return Ok(());
+                                }
+
+                                let mut enriched_count = 0;
+                                for session in sessions {
+                                    let session_id = session.id.clone();
+                                    match enricher.enrich_session(&session).await {
+                                        Ok(result) => {
+                                            let concept_count = result.concepts.concept_count();
+                                            let mut enriched = session;
+                                            enriched.metadata.enrichment = Some(result.concepts);
+                                            svc.load_sessions(vec![enriched]).await;
+                                            enriched_count += 1;
+                                            println!(
+                                                "  {} Enriched {} ({} concepts)",
+                                                "✓".green(),
+                                                session_id.cyan(),
+                                                concept_count
+                                            );
+                                        }
+                                        Err(e) => {
+                                            println!(
+                                                "  {} Failed to enrich {}: {}",
+                                                "✗".red().bold(),
+                                                session.id,
+                                                e
+                                            );
+                                        }
+                                    }
+                                }
+
+                                println!(
+                                    "\n{} Enriched {} sessions",
+                                    "✅".green().bold(),
+                                    enriched_count.to_string().green()
+                                );
+                            }
+                            Err(e) => {
+                                println!(
+                                    "{} Failed to load thesaurus: {}",
+                                    "❌".bold(),
+                                    e.to_string().red()
+                                );
+                            }
                         }
                     } else {
-                        println!("{} Session '{}' not found", "⚠".yellow().bold(), id);
+                        println!(
+                            "{} Enrichment requires offline mode with thesaurus",
+                            "ℹ".blue().bold()
+                        );
                     }
-                } else {
-                    let sessions = svc.list_sessions().await;
+                }
+                #[cfg(not(feature = "enrichment"))]
+                {
+                    println!("\n{} Enriching sessions with concepts...", "🧠".bold());
                     println!(
-                        "\n  Would enrich {} sessions",
-                        sessions.len().to_string().green()
+                        "{} This feature requires the 'enrichment' feature flag.",
+                        "ℹ".blue()
+                    );
+                    println!(
+                        "{} Rebuild with: cargo build --features repl-sessions,enrichment",
+                        "💡".yellow()
                     );
 
-                    let total_messages: usize = sessions.iter().map(|s| s.message_count()).sum();
-                    println!(
-                        "  Total messages to process: {}",
-                        total_messages.to_string().green()
-                    );
+                    // For now, show what would be enriched
+                    if let Some(id) = session_id {
+                        if let Some(session) = svc.get_session(&id).await {
+                            println!("\n  Would enrich session: {}", session.id.cyan());
+                            println!("  Messages to process: {}", session.message_count());
+
+                            // Show sample text
+                            if let Some(first_msg) = session.messages.first() {
+                                let preview = if first_msg.content.len() > 100 {
+                                    format!("{}...", &first_msg.content[..100])
+                                } else {
+                                    first_msg.content.clone()
+                                };
+                                println!("  Sample: {}", preview.italic());
+                            }
+                        } else {
+                            println!("{} Session '{}' not found", "⚠".yellow().bold(), id);
+                        }
+                    } else {
+                        let sessions = svc.list_sessions().await;
+                        println!(
+                            "\n  Would enrich {} sessions",
+                            sessions.len().to_string().green()
+                        );
+
+                        let total_messages: usize =
+                            sessions.iter().map(|s| s.message_count()).sum();
+                        println!(
+                            "  Total messages to process: {}",
+                            total_messages.to_string().green()
+                        );
+                    }
                 }
             }
 
