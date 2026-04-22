@@ -97,6 +97,8 @@ pub mod shared_learning;
 pub mod capability;
 pub use capability::*;
 
+pub mod score;
+
 // MCP Tool types for self-learning system
 pub mod mcp_tool;
 pub use mcp_tool::*;

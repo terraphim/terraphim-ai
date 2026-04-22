@@ -9054,6 +9054,7 @@ dependencies = [
  "schemars 0.8.22",
  "serde",
  "serde_json",
+ "strsim",
  "thiserror 1.0.69",
  "toml 0.8.23",
  "tsify",
