@@ -44,6 +44,7 @@ pub mod handoff;
 pub mod kg_router;
 pub mod learning;
 pub mod mention;
+pub mod mention_chain;
 pub mod metrics_persistence;
 pub mod mode;
 pub mod nightwatch;
@@ -82,6 +83,9 @@ pub use handoff::{HandoffBuffer, HandoffContext, HandoffLedger};
 pub use mention::{
     migrate_legacy_mention_cursor, parse_mention_tokens, parse_mentions, resolve_mention,
     resolve_persona_mention, DetectedMention, MentionCursor, MentionTokens, MentionTracker,
+};
+pub use mention_chain::{
+    MentionChainError, MentionChainTracker, MentionContextArgs, DEFAULT_MAX_MENTION_DEPTH,
 };
 pub use metrics_persistence::{
     InMemoryMetricsPersistence, MetricsPersistence, MetricsPersistenceConfig,
@@ -144,15 +148,14 @@ struct ManagedAgent {
     handle: AgentHandle,
     started_at: Instant,
     restart_count: u32,
-    /// Broadcast receiver for draining output events to nightwatch.
     output_rx: broadcast::Receiver<OutputEvent>,
     spawned_by_mention: bool,
-    /// Git worktree path for workspace isolation (None = shared working_dir).
     worktree_path: Option<PathBuf>,
-    /// KG-routed model selected at spawn time (None = CLI default). Used for logging.
     routed_model: Option<String>,
-    /// Session ID for telemetry tracking (format: "{agent_name}-{ulid}").
     session_id: String,
+    mention_chain_id: Option<String>,
+    mention_depth: Option<u32>,
+    mention_parent_agent: Option<String>,
 }
 
 #[cfg(not(test))]
@@ -1659,6 +1662,9 @@ impl AgentOrchestrator {
                 worktree_path,
                 routed_model: model.clone(),
                 session_id: format!("{}-{}", def.name, ulid::Ulid::new()),
+                mention_chain_id: None,
+                mention_depth: None,
+                mention_parent_agent: None,
             },
         );
 
@@ -1921,6 +1927,9 @@ impl AgentOrchestrator {
                     Some(routed_model)
                 },
                 session_id: format!("{}-{}", def.name, ulid::Ulid::new()),
+                mention_chain_id: None,
+                mention_depth: None,
+                mention_parent_agent: None,
             },
         );
 
@@ -2238,6 +2247,8 @@ impl AgentOrchestrator {
         }
 
         let agents = self.config.agents.clone();
+        let agent_names: Vec<String> = agents.iter().map(|a| a.name.clone()).collect();
+        let max_mention_depth = mention_cfg.max_mention_depth;
 
         match dispatch {
             webhook::WebhookDispatch::SpawnAgent {
@@ -2269,24 +2280,72 @@ impl AgentOrchestrator {
                         return;
                     }
 
-                    let mut mention_def = def.clone();
-                    mention_def.task = format!(
-                        "{}\n\n## Mention Context\nTriggered by @adf:{} webhook in issue #{} (comment {}).\nContext: {}",
-                        def.task, agent_name, issue_number, comment_id, context
+                    let chain_id = ulid::Ulid::new().to_string();
+                    let depth: u32 = 0;
+                    let parent_agent = String::new();
+
+                    if let Err(e) = mention_chain::MentionChainTracker::check(
+                        depth,
+                        &parent_agent,
+                        &agent_name,
+                        max_mention_depth,
+                    ) {
+                        warn!(
+                            agent = %agent_name,
+                            chain_id = %chain_id,
+                            depth,
+                            error = %e,
+                            "webhook mention chain check rejected dispatch"
+                        );
+                        if let Some(ref poster) = self.output_poster {
+                            let body = format!(
+                                "## Mention Dispatch Blocked\n\n\
+                                Agent `{}` was not spawned: {}.\n\n\
+                                _Webhook chain `{}` blocked._",
+                                agent_name, e, chain_id
+                            );
+                            if let Err(pe) = poster.post_raw(issue_number, &body).await {
+                                warn!(error = %pe, "failed to post webhook chain rejection comment");
+                            }
+                        }
+                        return;
+                    }
+
+                    let ctx_args = mention_chain::MentionContextArgs {
+                        parent_agent: parent_agent.clone(),
+                        issue_number,
+                        comment_body: context.clone(),
+                        depth,
+                        chain_id: chain_id.clone(),
+                        available_agents: agent_names
+                            .iter()
+                            .filter(|n| *n != &agent_name)
+                            .cloned()
+                            .collect(),
+                    };
+                    let chain_ctx = mention_chain::MentionChainTracker::build_context(
+                        &ctx_args,
+                        max_mention_depth,
                     );
+
+                    let mut mention_def = def.clone();
+                    mention_def.task = format!("{}\n\n{}", def.task, chain_ctx);
                     mention_def.gitea_issue = Some(issue_number);
 
                     if let Err(e) = self.spawn_agent(&mention_def).await {
                         error!(agent = %agent_name, issue = issue_number, error = %e, "webhook: failed to spawn agent");
                     } else if let Some(agent) = self.active_agents.get_mut(&mention_def.name) {
                         agent.spawned_by_mention = true;
+                        agent.mention_chain_id = Some(chain_id);
+                        agent.mention_depth = Some(depth);
+                        agent.mention_parent_agent = None;
                     }
                 }
             }
             webhook::WebhookDispatch::SpawnPersona {
                 persona_name,
                 issue_number,
-                comment_id,
+                comment_id: _,
                 context,
             } => {
                 if let Some((agent_name, _)) = mention::resolve_persona_mention(
@@ -2308,17 +2367,65 @@ impl AgentOrchestrator {
                             return;
                         }
 
-                        let mut mention_def = def.clone();
-                        mention_def.task = format!(
-                            "{}\n\n## Mention Context\nTriggered by @adf:{} persona webhook in issue #{} (comment {}).\nContext: {}",
-                            def.task, persona_name, issue_number, comment_id, context
+                        let chain_id = ulid::Ulid::new().to_string();
+                        let depth: u32 = 0;
+                        let parent_agent = String::new();
+
+                        if let Err(e) = mention_chain::MentionChainTracker::check(
+                            depth,
+                            &parent_agent,
+                            &agent_name,
+                            max_mention_depth,
+                        ) {
+                            warn!(
+                                agent = %agent_name,
+                                chain_id = %chain_id,
+                                depth,
+                                error = %e,
+                                "webhook mention chain check rejected persona dispatch"
+                            );
+                            if let Some(ref poster) = self.output_poster {
+                                let body = format!(
+                                    "## Mention Dispatch Blocked\n\n\
+                                    Agent `{}` (via persona) was not spawned: {}.\n\n\
+                                    _Webhook chain `{}` blocked._",
+                                    agent_name, e, chain_id
+                                );
+                                if let Err(pe) = poster.post_raw(issue_number, &body).await {
+                                    warn!(error = %pe, "failed to post webhook chain rejection comment");
+                                }
+                            }
+                            return;
+                        }
+
+                        let ctx_args = mention_chain::MentionContextArgs {
+                            parent_agent: parent_agent.clone(),
+                            issue_number,
+                            comment_body: context.clone(),
+                            depth,
+                            chain_id: chain_id.clone(),
+                            available_agents: agent_names
+                                .iter()
+                                .filter(|n| *n != &agent_name)
+                                .cloned()
+                                .collect(),
+                        };
+                        let chain_ctx = mention_chain::MentionChainTracker::build_context(
+                            &ctx_args,
+                            max_mention_depth,
                         );
+
+                        let mut mention_def = def.clone();
+                        mention_def.task = format!("{}\n\n{}", def.task, chain_ctx);
                         mention_def.gitea_issue = Some(issue_number);
 
                         if let Err(e) = self.spawn_agent(&mention_def).await {
                             error!(agent = %agent_name, issue = issue_number, error = %e, "webhook: failed to spawn agent");
                         } else if let Some(agent) = self.active_agents.get_mut(&mention_def.name) {
                             agent.spawned_by_mention = true;
+                            agent.mention_chain_id = Some(chain_id);
+                            agent.mention_depth = Some(depth);
+                            agent.mention_parent_agent = None;
                         }
                     }
                 }
@@ -2552,6 +2659,8 @@ impl AgentOrchestrator {
         let command_parser =
             crate::adf_commands::AdfCommandParser::new(&agent_names, &persona_names);
 
+        let max_mention_depth = mention_cfg.max_mention_depth;
+
         for comment in &comments {
             if cursor.dispatches_this_tick >= max_dispatches {
                 tracing::debug!(
@@ -2603,11 +2712,63 @@ impl AgentOrchestrator {
                             cursor.dispatches_this_tick += 1;
                             continue;
                         }
-                        let mut mention_def = def.clone();
-                        mention_def.task = format!(
-                            "{}\n\n## Mention Context\nTriggered by @adf:{}/{} mention in issue #{} (comment {}).",
-                            def.task, proj, token.agent, comment.issue_number, comment.id
+
+                        let (chain_id, depth, parent_agent) = self.resolve_mention_chain(
+                            &comment.user.login,
+                            &agent_names,
+                            max_mention_depth,
                         );
+
+                        if let Err(e) = mention_chain::MentionChainTracker::check(
+                            depth,
+                            &parent_agent,
+                            &token.agent,
+                            max_mention_depth,
+                        ) {
+                            warn!(
+                                agent = %token.agent,
+                                chain_id = %chain_id,
+                                depth,
+                                error = %e,
+                                "mention chain check rejected dispatch"
+                            );
+                            if let Some(ref poster) = self.output_poster {
+                                let body = format!(
+                                    "## Mention Dispatch Blocked\n\n\
+                                    Agent `{}` was not spawned: {}.\n\n\
+                                    _Chain `{}` at depth {} exceeds the configured limit._",
+                                    token.agent, e, chain_id, depth
+                                );
+                                if let Err(pe) = poster
+                                    .post_raw_for_project(project_id, comment.issue_number, &body)
+                                    .await
+                                {
+                                    warn!(error = %pe, "failed to post chain rejection comment");
+                                }
+                            }
+                            cursor.dispatches_this_tick += 1;
+                            continue;
+                        }
+
+                        let ctx_args = mention_chain::MentionContextArgs {
+                            parent_agent: parent_agent.clone(),
+                            issue_number: comment.issue_number,
+                            comment_body: comment.body.clone(),
+                            depth,
+                            chain_id: chain_id.clone(),
+                            available_agents: agent_names
+                                .iter()
+                                .filter(|n| *n != &token.agent)
+                                .cloned()
+                                .collect(),
+                        };
+                        let chain_ctx = mention_chain::MentionChainTracker::build_context(
+                            &ctx_args,
+                            max_mention_depth,
+                        );
+
+                        let mut mention_def = def.clone();
+                        mention_def.task = format!("{}\n\n{}", def.task, chain_ctx);
                         mention_def.gitea_issue = Some(comment.issue_number);
                         if let Err(e) = self.spawn_agent(&mention_def).await {
                             tracing::error!(
@@ -2619,6 +2780,13 @@ impl AgentOrchestrator {
                             );
                         } else if let Some(active) = self.active_agents.get_mut(&mention_def.name) {
                             active.spawned_by_mention = true;
+                            active.mention_chain_id = Some(chain_id);
+                            active.mention_depth = Some(depth);
+                            active.mention_parent_agent = if parent_agent.is_empty() {
+                                None
+                            } else {
+                                Some(parent_agent)
+                            };
                         }
                         cursor.dispatches_this_tick += 1;
                     }
@@ -2684,26 +2852,70 @@ impl AgentOrchestrator {
                             "dispatching mention-driven agent via terraphim-automata parser"
                         );
 
-                        // Unqualified mention: detected_project is None; use hinted project_id
-                        // from the current poll context for multi-project resolution.
                         if let Some(def) =
                             mention::resolve_mention(None, project_id, &agent_name, &agents)
                         {
-                            // Dedup: check Gitea assignment + active_agents before spawning
                             if self.should_skip_dispatch(&agent_name, issue_number).await {
                                 cursor.dispatches_this_tick += 1;
                                 continue;
                             }
 
-                            let mut mention_def = def.clone();
-                            mention_def.task = format!(
-                                "{}\n\n## Mention Context\nTriggered by @adf:{} mention in issue #{} (comment {}).\nContext: {}",
-                                def.task,
-                                agent_name,
-                                issue_number,
-                                comment_id,
-                                context
+                            let (chain_id, depth, parent_agent) = self.resolve_mention_chain(
+                                &comment.user.login,
+                                &agent_names,
+                                max_mention_depth,
                             );
+
+                            if let Err(e) = mention_chain::MentionChainTracker::check(
+                                depth,
+                                &parent_agent,
+                                &agent_name,
+                                max_mention_depth,
+                            ) {
+                                warn!(
+                                    agent = %agent_name,
+                                    chain_id = %chain_id,
+                                    depth,
+                                    error = %e,
+                                    "mention chain check rejected dispatch"
+                                );
+                                if let Some(ref poster) = self.output_poster {
+                                    let body = format!(
+                                        "## Mention Dispatch Blocked\n\n\
+                                        Agent `{}` was not spawned: {}.\n\n\
+                                        _Chain `{}` at depth {} exceeds the configured limit._",
+                                        agent_name, e, chain_id, depth
+                                    );
+                                    if let Err(pe) = poster
+                                        .post_raw_for_project(project_id, issue_number, &body)
+                                        .await
+                                    {
+                                        warn!(error = %pe, "failed to post chain rejection comment");
+                                    }
+                                }
+                                cursor.dispatches_this_tick += 1;
+                                continue;
+                            }
+
+                            let ctx_args = mention_chain::MentionContextArgs {
+                                parent_agent: parent_agent.clone(),
+                                issue_number,
+                                comment_body: context.clone(),
+                                depth,
+                                chain_id: chain_id.clone(),
+                                available_agents: agent_names
+                                    .iter()
+                                    .filter(|n| *n != &agent_name)
+                                    .cloned()
+                                    .collect(),
+                            };
+                            let chain_ctx = mention_chain::MentionChainTracker::build_context(
+                                &ctx_args,
+                                max_mention_depth,
+                            );
+
+                            let mut mention_def = def.clone();
+                            mention_def.task = format!("{}\n\n{}", def.task, chain_ctx);
                             mention_def.gitea_issue = Some(issue_number);
 
                             if let Err(e) = self.spawn_agent(&mention_def).await {
@@ -2712,6 +2924,13 @@ impl AgentOrchestrator {
                                 self.active_agents.get_mut(&mention_def.name)
                             {
                                 agent.spawned_by_mention = true;
+                                agent.mention_chain_id = Some(chain_id);
+                                agent.mention_depth = Some(depth);
+                                agent.mention_parent_agent = if parent_agent.is_empty() {
+                                    None
+                                } else {
+                                    Some(parent_agent)
+                                };
                             }
 
                             cursor.dispatches_this_tick += 1;
@@ -2720,7 +2939,7 @@ impl AgentOrchestrator {
                     crate::adf_commands::AdfCommand::SpawnPersona {
                         persona_name,
                         issue_number,
-                        comment_id,
+                        comment_id: _,
                         context,
                     } => {
                         // Resolve persona to agent
@@ -2745,15 +2964,62 @@ impl AgentOrchestrator {
                                     continue;
                                 }
 
-                                let mut mention_def = def.clone();
-                                mention_def.task = format!(
-                                    "{}\n\n## Mention Context\nTriggered by @adf:{} persona mention in issue #{} (comment {}).\nContext: {}",
-                                    def.task,
-                                    persona_name,
-                                    issue_number,
-                                    comment_id,
-                                    context
+                                let (chain_id, depth, parent_agent) = self.resolve_mention_chain(
+                                    &comment.user.login,
+                                    &agent_names,
+                                    max_mention_depth,
                                 );
+
+                                if let Err(e) = mention_chain::MentionChainTracker::check(
+                                    depth,
+                                    &parent_agent,
+                                    &agent_name,
+                                    max_mention_depth,
+                                ) {
+                                    warn!(
+                                        agent = %agent_name,
+                                        chain_id = %chain_id,
+                                        depth,
+                                        error = %e,
+                                        "mention chain check rejected persona dispatch"
+                                    );
+                                    if let Some(ref poster) = self.output_poster {
+                                        let body = format!(
+                                            "## Mention Dispatch Blocked\n\n\
+                                            Agent `{}` (via persona) was not spawned: {}.\n\n\
+                                            _Chain `{}` at depth {} exceeds the configured limit._",
+                                            agent_name, e, chain_id, depth
+                                        );
+                                        if let Err(pe) = poster
+                                            .post_raw_for_project(project_id, issue_number, &body)
+                                            .await
+                                        {
+                                            warn!(error = %pe, "failed to post chain rejection comment");
+                                        }
+                                    }
+                                    cursor.dispatches_this_tick += 1;
+                                    continue;
+                                }
+
+                                let ctx_args = mention_chain::MentionContextArgs {
+                                    parent_agent: parent_agent.clone(),
+                                    issue_number,
+                                    comment_body: context.clone(),
+                                    depth,
+                                    chain_id: chain_id.clone(),
+                                    available_agents: agent_names
+                                        .iter()
+                                        .filter(|n| *n != &agent_name)
+                                        .cloned()
+                                        .collect(),
+                                };
+                                let chain_ctx = mention_chain::MentionChainTracker::build_context(
+                                    &ctx_args,
+                                    max_mention_depth,
+                                );
+
+                                let mut mention_def = def.clone();
+                                mention_def.task = format!("{}\n\n{}", def.task, chain_ctx);
                                 mention_def.gitea_issue = Some(issue_number);
 
                                 if let Err(e) = self.spawn_agent(&mention_def).await {
@@ -2762,6 +3028,13 @@ impl AgentOrchestrator {
                                     self.active_agents.get_mut(&mention_def.name)
                                 {
                                     agent.spawned_by_mention = true;
+                                    agent.mention_chain_id = Some(chain_id);
+                                    agent.mention_depth = Some(depth);
+                                    agent.mention_parent_agent = if parent_agent.is_empty() {
+                                        None
+                                    } else {
+                                        Some(parent_agent)
+                                    };
                                 }
 
                                 cursor.dispatches_this_tick += 1;
@@ -3587,6 +3860,35 @@ impl AgentOrchestrator {
         false
     }
 
+    /// Resolve mention chain metadata from the comment author.
+    ///
+    /// If the comment was posted by a known agent, this is a nested mention:
+    /// inherit the chain_id from the agent's current run and increment depth.
+    /// If posted by a human, start a fresh chain with depth 0.
+    fn resolve_mention_chain(
+        &self,
+        comment_author: &str,
+        agent_names: &[String],
+        _max_depth: u32,
+    ) -> (String, u32, String) {
+        if agent_names.iter().any(|n| n == comment_author) {
+            if let Some(active) = self.active_agents.get(comment_author) {
+                let parent_chain_id = active
+                    .mention_chain_id
+                    .clone()
+                    .unwrap_or_else(|| ulid::Ulid::new().to_string());
+                let parent_depth = active.mention_depth.unwrap_or(0).saturating_add(1);
+                (parent_chain_id, parent_depth, comment_author.to_string())
+            } else {
+                let chain_id = ulid::Ulid::new().to_string();
+                (chain_id, 1, comment_author.to_string())
+            }
+        } else {
+            let chain_id = ulid::Ulid::new().to_string();
+            (chain_id, 0, String::new())
+        }
+    }
+
     /// Sanitise finding text for use in issue title.
     /// Strips JSON syntax characters that break title parsing.
     fn sanitise_for_title(input: &str) -> String {
@@ -4402,6 +4704,18 @@ impl AgentOrchestrator {
                 .get(name)
                 .and_then(|m| m.routed_model.clone());
 
+            let (mention_chain_id, mention_depth, mention_parent_agent) = self
+                .active_agents
+                .get(name)
+                .map(|m| {
+                    (
+                        m.mention_chain_id.clone(),
+                        m.mention_depth,
+                        m.mention_parent_agent.clone(),
+                    )
+                })
+                .unwrap_or((None, None, None));
+
             let trigger = if self
                 .active_agents
                 .get(name)
@@ -4428,6 +4742,9 @@ impl AgentOrchestrator {
                 trigger,
                 matched_patterns: classification.matched_patterns.clone(),
                 confidence: classification.confidence,
+                mention_chain_id,
+                mention_depth,
+                mention_parent_agent,
             };
 
             info!(
