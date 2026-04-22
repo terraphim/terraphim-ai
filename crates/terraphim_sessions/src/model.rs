@@ -6,6 +6,9 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+#[cfg(feature = "enrichment")]
+use crate::enrichment::SessionConcepts;
+
 /// Unique identifier for a session
 pub type SessionId = String;
 
@@ -153,6 +156,10 @@ pub struct SessionMetadata {
     /// Additional fields
     #[serde(flatten)]
     pub extra: serde_json::Value,
+    /// Knowledge graph enrichment results
+    #[cfg(feature = "enrichment")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enrichment: Option<SessionConcepts>,
 }
 
 /// A coding assistant session

@@ -154,6 +154,7 @@ impl AiderConnector {
                 "title": format!("Aider session: {}", project_name),
                 "description": format!("Aider chat session from {}", file_path.display()),
             }),
+            ..Default::default()
         };
 
         let started_at = jiff::Timestamp::from_second(created_at.timestamp()).ok();

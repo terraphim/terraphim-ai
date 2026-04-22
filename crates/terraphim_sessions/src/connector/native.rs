@@ -186,6 +186,7 @@ impl NativeClaudeConnector {
                 model: None,
                 tags: vec![],
                 extra: serde_json::Value::Null,
+                ..Default::default()
             },
         }))
     }

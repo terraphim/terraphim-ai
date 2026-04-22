@@ -36,6 +36,7 @@ pub(crate) fn from_normalized_session(ns: NormalizedSession, prefix: &str) -> Se
             model: None,
             tags: vec![],
             extra: ns.metadata,
+            ..Default::default()
         },
     }
 }
