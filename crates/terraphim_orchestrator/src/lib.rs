@@ -2247,6 +2247,8 @@ impl AgentOrchestrator {
         }
 
         let agents = self.config.agents.clone();
+        let agent_names: Vec<String> = agents.iter().map(|a| a.name.clone()).collect();
+        let max_mention_depth = mention_cfg.max_mention_depth;
 
         match dispatch {
             webhook::WebhookDispatch::SpawnAgent {
@@ -2278,24 +2280,72 @@ impl AgentOrchestrator {
                         return;
                     }
 
-                    let mut mention_def = def.clone();
-                    mention_def.task = format!(
-                        "{}\n\n## Mention Context\nTriggered by @adf:{} webhook in issue #{} (comment {}).\nContext: {}",
-                        def.task, agent_name, issue_number, comment_id, context
+                    let chain_id = ulid::Ulid::new().to_string();
+                    let depth: u32 = 0;
+                    let parent_agent = String::new();
+
+                    if let Err(e) = mention_chain::MentionChainTracker::check(
+                        depth,
+                        &parent_agent,
+                        &agent_name,
+                        max_mention_depth,
+                    ) {
+                        warn!(
+                            agent = %agent_name,
+                            chain_id = %chain_id,
+                            depth,
+                            error = %e,
+                            "webhook mention chain check rejected dispatch"
+                        );
+                        if let Some(ref poster) = self.output_poster {
+                            let body = format!(
+                                "## Mention Dispatch Blocked\n\n\
+                                Agent `{}` was not spawned: {}.\n\n\
+                                _Webhook chain `{}` blocked._",
+                                agent_name, e, chain_id
+                            );
+                            if let Err(pe) = poster.post_raw(issue_number, &body).await {
+                                warn!(error = %pe, "failed to post webhook chain rejection comment");
+                            }
+                        }
+                        return;
+                    }
+
+                    let ctx_args = mention_chain::MentionContextArgs {
+                        parent_agent: parent_agent.clone(),
+                        issue_number,
+                        comment_body: context.clone(),
+                        depth,
+                        chain_id: chain_id.clone(),
+                        available_agents: agent_names
+                            .iter()
+                            .filter(|n| *n != &agent_name)
+                            .cloned()
+                            .collect(),
+                    };
+                    let chain_ctx = mention_chain::MentionChainTracker::build_context(
+                        &ctx_args,
+                        max_mention_depth,
                     );
+
+                    let mut mention_def = def.clone();
+                    mention_def.task = format!("{}\n\n{}", def.task, chain_ctx);
                     mention_def.gitea_issue = Some(issue_number);
 
                     if let Err(e) = self.spawn_agent(&mention_def).await {
                         error!(agent = %agent_name, issue = issue_number, error = %e, "webhook: failed to spawn agent");
                     } else if let Some(agent) = self.active_agents.get_mut(&mention_def.name) {
                         agent.spawned_by_mention = true;
+                        agent.mention_chain_id = Some(chain_id);
+                        agent.mention_depth = Some(depth);
+                        agent.mention_parent_agent = None;
                     }
                 }
             }
             webhook::WebhookDispatch::SpawnPersona {
                 persona_name,
                 issue_number,
-                comment_id,
+                comment_id: _,
                 context,
             } => {
                 if let Some((agent_name, _)) = mention::resolve_persona_mention(
@@ -2317,17 +2367,65 @@ impl AgentOrchestrator {
                             return;
                         }
 
-                        let mut mention_def = def.clone();
-                        mention_def.task = format!(
-                            "{}\n\n## Mention Context\nTriggered by @adf:{} persona webhook in issue #{} (comment {}).\nContext: {}",
-                            def.task, persona_name, issue_number, comment_id, context
+                        let chain_id = ulid::Ulid::new().to_string();
+                        let depth: u32 = 0;
+                        let parent_agent = String::new();
+
+                        if let Err(e) = mention_chain::MentionChainTracker::check(
+                            depth,
+                            &parent_agent,
+                            &agent_name,
+                            max_mention_depth,
+                        ) {
+                            warn!(
+                                agent = %agent_name,
+                                chain_id = %chain_id,
+                                depth,
+                                error = %e,
+                                "webhook mention chain check rejected persona dispatch"
+                            );
+                            if let Some(ref poster) = self.output_poster {
+                                let body = format!(
+                                    "## Mention Dispatch Blocked\n\n\
+                                    Agent `{}` (via persona) was not spawned: {}.\n\n\
+                                    _Webhook chain `{}` blocked._",
+                                    agent_name, e, chain_id
+                                );
+                                if let Err(pe) = poster.post_raw(issue_number, &body).await {
+                                    warn!(error = %pe, "failed to post webhook chain rejection comment");
+                                }
+                            }
+                            return;
+                        }
+
+                        let ctx_args = mention_chain::MentionContextArgs {
+                            parent_agent: parent_agent.clone(),
+                            issue_number,
+                            comment_body: context.clone(),
+                            depth,
+                            chain_id: chain_id.clone(),
+                            available_agents: agent_names
+                                .iter()
+                                .filter(|n| *n != &agent_name)
+                                .cloned()
+                                .collect(),
+                        };
+                        let chain_ctx = mention_chain::MentionChainTracker::build_context(
+                            &ctx_args,
+                            max_mention_depth,
                         );
+
+                        let mut mention_def = def.clone();
+                        mention_def.task = format!("{}\n\n{}", def.task, chain_ctx);
                         mention_def.gitea_issue = Some(issue_number);
 
                         if let Err(e) = self.spawn_agent(&mention_def).await {
                             error!(agent = %agent_name, issue = issue_number, error = %e, "webhook: failed to spawn agent");
                         } else if let Some(agent) = self.active_agents.get_mut(&mention_def.name) {
                             agent.spawned_by_mention = true;
+                            agent.mention_chain_id = Some(chain_id);
+                            agent.mention_depth = Some(depth);
+                            agent.mention_parent_agent = None;
                         }
                     }
                 }
@@ -2634,6 +2732,20 @@ impl AgentOrchestrator {
                                 error = %e,
                                 "mention chain check rejected dispatch"
                             );
+                            if let Some(ref poster) = self.output_poster {
+                                let body = format!(
+                                    "## Mention Dispatch Blocked\n\n\
+                                    Agent `{}` was not spawned: {}.\n\n\
+                                    _Chain `{}` at depth {} exceeds the configured limit._",
+                                    token.agent, e, chain_id, depth
+                                );
+                                if let Err(pe) = poster
+                                    .post_raw_for_project(project_id, comment.issue_number, &body)
+                                    .await
+                                {
+                                    warn!(error = %pe, "failed to post chain rejection comment");
+                                }
+                            }
                             cursor.dispatches_this_tick += 1;
                             continue;
                         }
@@ -2767,6 +2879,20 @@ impl AgentOrchestrator {
                                     error = %e,
                                     "mention chain check rejected dispatch"
                                 );
+                                if let Some(ref poster) = self.output_poster {
+                                    let body = format!(
+                                        "## Mention Dispatch Blocked\n\n\
+                                        Agent `{}` was not spawned: {}.\n\n\
+                                        _Chain `{}` at depth {} exceeds the configured limit._",
+                                        agent_name, e, chain_id, depth
+                                    );
+                                    if let Err(pe) = poster
+                                        .post_raw_for_project(project_id, issue_number, &body)
+                                        .await
+                                    {
+                                        warn!(error = %pe, "failed to post chain rejection comment");
+                                    }
+                                }
                                 cursor.dispatches_this_tick += 1;
                                 continue;
                             }
@@ -2857,6 +2983,20 @@ impl AgentOrchestrator {
                                         error = %e,
                                         "mention chain check rejected persona dispatch"
                                     );
+                                    if let Some(ref poster) = self.output_poster {
+                                        let body = format!(
+                                            "## Mention Dispatch Blocked\n\n\
+                                            Agent `{}` (via persona) was not spawned: {}.\n\n\
+                                            _Chain `{}` at depth {} exceeds the configured limit._",
+                                            agent_name, e, chain_id, depth
+                                        );
+                                        if let Err(pe) = poster
+                                            .post_raw_for_project(project_id, issue_number, &body)
+                                            .await
+                                        {
+                                            warn!(error = %pe, "failed to post chain rejection comment");
+                                        }
+                                    }
                                     cursor.dispatches_this_tick += 1;
                                     continue;
                                 }

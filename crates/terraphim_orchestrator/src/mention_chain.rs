@@ -83,7 +83,11 @@ impl MentionChainTracker {
         };
 
         let body_excerpt = if args.comment_body.len() > 2000 {
-            format!("{}\n...[truncated]", &args.comment_body[..2000])
+            let mut end = 2000;
+            while !args.comment_body.is_char_boundary(end) {
+                end -= 1;
+            }
+            format!("{}\n...[truncated]", &args.comment_body[..end])
         } else {
             args.comment_body.clone()
         };
@@ -286,6 +290,25 @@ mod tests {
         assert!(ctx.contains("Available agents to mention"));
         assert!(ctx.contains("`@adf:reviewer`"));
         assert!(ctx.contains("`@adf:coder`"));
+    }
+
+    #[test]
+    fn test_truncation_safe_on_multibyte_boundary() {
+        let mut body = String::new();
+        while body.len() < 2100 {
+            body.push('\u{1F600}');
+        }
+        let args = MentionContextArgs {
+            parent_agent: String::new(),
+            issue_number: 1,
+            comment_body: body,
+            depth: 0,
+            chain_id: "chain-1".to_string(),
+            available_agents: vec![],
+        };
+        let ctx = MentionChainTracker::build_context(&args, 3);
+        assert!(ctx.contains("[truncated]"));
+        assert!(ctx.contains('\u{1F600}'));
     }
 
     #[test]
