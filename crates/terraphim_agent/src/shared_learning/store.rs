@@ -14,6 +14,7 @@ use crate::shared_learning::markdown_store::{
 };
 use crate::shared_learning::types::{SharedLearning, TrustLevel};
 pub use terraphim_types::shared_learning::StoreError;
+use terraphim_types::shared_learning::SuggestionStatus;
 
 impl From<MarkdownStoreError> for StoreError {
     fn from(e: MarkdownStoreError) -> Self {
@@ -348,6 +349,53 @@ impl SharedLearningStore {
 
         self.persist(&updated).await?;
         info!("Promoted learning {} to L3", id);
+        Ok(())
+    }
+
+    pub async fn list_pending(&self) -> Result<Vec<SharedLearning>, StoreError> {
+        self.list_by_status(SuggestionStatus::Pending).await
+    }
+
+    pub async fn list_by_status(
+        &self,
+        status: SuggestionStatus,
+    ) -> Result<Vec<SharedLearning>, StoreError> {
+        let index = self.index.read().await;
+        Ok(index
+            .values()
+            .filter(|l| l.suggestion_status == status)
+            .cloned()
+            .collect())
+    }
+
+    pub async fn approve(&self, id: &str) -> Result<(), StoreError> {
+        let mut index = self.index.write().await;
+        let learning = index
+            .get_mut(id)
+            .ok_or_else(|| StoreError::NotFound(id.to_string()))?;
+        learning.suggestion_status = SuggestionStatus::Approved;
+        learning.promote_to_l3();
+        let updated = learning.clone();
+        drop(index);
+
+        self.persist(&updated).await?;
+        info!("Approved suggestion {}", id);
+        Ok(())
+    }
+
+    pub async fn reject(&self, id: &str, reason: Option<&str>) -> Result<(), StoreError> {
+        let mut index = self.index.write().await;
+        let learning = index
+            .get_mut(id)
+            .ok_or_else(|| StoreError::NotFound(id.to_string()))?;
+        learning.suggestion_status = SuggestionStatus::Rejected;
+        learning.rejection_reason = reason.map(|r| r.to_string());
+        learning.updated_at = Utc::now();
+        let updated = learning.clone();
+        drop(index);
+
+        self.persist(&updated).await?;
+        info!("Rejected suggestion {}", id);
         Ok(())
     }
 
@@ -836,5 +884,96 @@ mod tests {
         assert_eq!(retrieved.quality.effective_count, 2);
         assert_eq!(retrieved.quality.agent_count, 2);
         assert!(retrieved.promoted_at.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_approve_promotes_to_l3() {
+        let store = create_test_store().await;
+        let learning = SharedLearning::new(
+            "Approve Test".to_string(),
+            "Content".to_string(),
+            LearningSource::Manual,
+            "agent".to_string(),
+        );
+        let id = learning.id.clone();
+        store.insert(learning).await.unwrap();
+
+        store.approve(&id).await.unwrap();
+
+        let retrieved = store.get(&id).await.unwrap();
+        assert_eq!(retrieved.trust_level, TrustLevel::L3);
+        assert_eq!(retrieved.suggestion_status, SuggestionStatus::Approved);
+    }
+
+    #[tokio::test]
+    async fn test_reject_sets_status() {
+        let store = create_test_store().await;
+        let learning = SharedLearning::new(
+            "Reject Test".to_string(),
+            "Content".to_string(),
+            LearningSource::Manual,
+            "agent".to_string(),
+        );
+        let id = learning.id.clone();
+        store.insert(learning).await.unwrap();
+
+        store.reject(&id, Some("not applicable")).await.unwrap();
+
+        let retrieved = store.get(&id).await.unwrap();
+        assert_eq!(retrieved.suggestion_status, SuggestionStatus::Rejected);
+        assert_eq!(
+            retrieved.rejection_reason.as_deref(),
+            Some("not applicable")
+        );
+        assert_eq!(retrieved.trust_level, TrustLevel::L1);
+    }
+
+    #[tokio::test]
+    async fn test_list_pending_filters() {
+        let store = create_test_store().await;
+
+        let pending = SharedLearning::new(
+            "Pending".to_string(),
+            "Content".to_string(),
+            LearningSource::Manual,
+            "agent".to_string(),
+        );
+        let pending_id = pending.id.clone();
+        store.insert(pending).await.unwrap();
+
+        let mut approved = SharedLearning::new(
+            "Approved".to_string(),
+            "Content".to_string(),
+            LearningSource::Manual,
+            "agent".to_string(),
+        );
+        approved.suggestion_status = SuggestionStatus::Approved;
+        store.insert(approved).await.unwrap();
+
+        let result = store.list_pending().await.unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].id, pending_id);
+    }
+
+    #[tokio::test]
+    async fn test_list_by_status() {
+        let store = create_test_store().await;
+
+        let mut rejected = SharedLearning::new(
+            "Rejected".to_string(),
+            "Content".to_string(),
+            LearningSource::Manual,
+            "agent".to_string(),
+        );
+        rejected.suggestion_status = SuggestionStatus::Rejected;
+        let rejected_id = rejected.id.clone();
+        store.insert(rejected).await.unwrap();
+
+        let result = store
+            .list_by_status(SuggestionStatus::Rejected)
+            .await
+            .unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].id, rejected_id);
     }
 }

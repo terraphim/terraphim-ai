@@ -146,6 +146,43 @@ impl QualityMetrics {
     }
 }
 
+/// Suggestion status for the approval workflow
+///
+/// Tracks whether a captured suggestion has been reviewed by a human.
+/// Orthogonal to `TrustLevel`: a learning can be L2 (peer-validated)
+/// but still Rejected if the human disagrees with it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum SuggestionStatus {
+    #[default]
+    Pending,
+    Approved,
+    Rejected,
+}
+
+impl std::fmt::Display for SuggestionStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SuggestionStatus::Pending => write!(f, "pending"),
+            SuggestionStatus::Approved => write!(f, "approved"),
+            SuggestionStatus::Rejected => write!(f, "rejected"),
+        }
+    }
+}
+
+impl std::str::FromStr for SuggestionStatus {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "pending" => Ok(SuggestionStatus::Pending),
+            "approved" => Ok(SuggestionStatus::Approved),
+            "rejected" => Ok(SuggestionStatus::Rejected),
+            _ => Err(format!("invalid suggestion status: {}", s)),
+        }
+    }
+}
+
 /// Source of a shared learning
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -217,6 +254,15 @@ pub struct SharedLearning {
     pub error_context: Option<String>,
     /// Suggested correction or solution
     pub correction: Option<String>,
+    /// Suggestion approval status (Pending/Approved/Rejected)
+    #[serde(default)]
+    pub suggestion_status: SuggestionStatus,
+    /// Reason for rejection (only set when status is Rejected)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rejection_reason: Option<String>,
+    /// BM25 confidence score from the suggestion engine
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bm25_confidence: Option<f64>,
 }
 
 impl SharedLearning {
@@ -251,6 +297,9 @@ impl SharedLearning {
             original_command: None,
             error_context: None,
             correction: None,
+            suggestion_status: SuggestionStatus::Pending,
+            rejection_reason: None,
+            bm25_confidence: None,
         }
     }
 
@@ -592,5 +641,53 @@ mod tests {
         assert!(text.contains("push"));
         assert!(text.contains("git push -f"));
         assert!(text.contains("rejected"));
+    }
+
+    #[test]
+    fn test_suggestion_status_display() {
+        assert_eq!(SuggestionStatus::Pending.to_string(), "pending");
+        assert_eq!(SuggestionStatus::Approved.to_string(), "approved");
+        assert_eq!(SuggestionStatus::Rejected.to_string(), "rejected");
+    }
+
+    #[test]
+    fn test_suggestion_status_from_str_roundtrip() {
+        assert_eq!(
+            "pending".parse::<SuggestionStatus>().unwrap(),
+            SuggestionStatus::Pending
+        );
+        assert_eq!(
+            "approved".parse::<SuggestionStatus>().unwrap(),
+            SuggestionStatus::Approved
+        );
+        assert_eq!(
+            "rejected".parse::<SuggestionStatus>().unwrap(),
+            SuggestionStatus::Rejected
+        );
+        assert_eq!(
+            "PENDING".parse::<SuggestionStatus>().unwrap(),
+            SuggestionStatus::Pending
+        );
+        assert!("invalid".parse::<SuggestionStatus>().is_err());
+    }
+
+    #[test]
+    fn test_shared_learning_default_suggestion_status() {
+        let learning = SharedLearning::new(
+            "Test".to_string(),
+            "Content".to_string(),
+            LearningSource::Manual,
+            "agent".to_string(),
+        );
+        assert_eq!(learning.suggestion_status, SuggestionStatus::Pending);
+        assert!(learning.rejection_reason.is_none());
+        assert!(learning.bm25_confidence.is_none());
+    }
+
+    #[test]
+    fn test_suggestion_status_serde_default() {
+        let json = r#"{"id":"x","title":"t","content":"c","trust_level":"L1","quality":{"applied_count":0,"effective_count":0,"agent_count":0,"agent_names":[],"success_rate":null},"source":"manual","source_agent":"a","applicable_agents":[],"keywords":[],"created_at":"2026-01-01T00:00:00Z","updated_at":"2026-01-01T00:00:00Z"}"#;
+        let learning: SharedLearning = serde_json::from_str(json).unwrap();
+        assert_eq!(learning.suggestion_status, SuggestionStatus::Pending);
     }
 }

@@ -30,6 +30,8 @@ mod install;
 pub(crate) mod procedure;
 pub(crate) mod redaction;
 mod replay;
+#[cfg(feature = "shared-learning")]
+pub mod suggest;
 
 pub use procedure::ProcedureStore;
 pub use replay::{StepOutcome, replay_procedure};
