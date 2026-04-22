@@ -44,6 +44,7 @@ pub mod handoff;
 pub mod kg_router;
 pub mod learning;
 pub mod mention;
+pub mod mention_chain;
 pub mod metrics_persistence;
 pub mod mode;
 pub mod nightwatch;
@@ -82,6 +83,9 @@ pub use handoff::{HandoffBuffer, HandoffContext, HandoffLedger};
 pub use mention::{
     migrate_legacy_mention_cursor, parse_mention_tokens, parse_mentions, resolve_mention,
     resolve_persona_mention, DetectedMention, MentionCursor, MentionTokens, MentionTracker,
+};
+pub use mention_chain::{
+    MentionChainError, MentionChainTracker, MentionContextArgs, DEFAULT_MAX_MENTION_DEPTH,
 };
 pub use metrics_persistence::{
     InMemoryMetricsPersistence, MetricsPersistence, MetricsPersistenceConfig,
