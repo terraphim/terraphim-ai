@@ -7,6 +7,12 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+// Re-export canonical review types from terraphim_types.
+// Previously duplicated here; consolidated per issue #750.
+pub use terraphim_types::review::{
+    deduplicate_findings, FindingCategory, FindingSeverity, ReviewAgentOutput, ReviewFinding,
+};
+
 /// A JSON-RPC request (client -> server or server -> client).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JsonRpcRequest {
@@ -163,57 +169,6 @@ pub struct TokenTotals {
     pub seconds_running: f64,
 }
 
-/// Severity of a review finding.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum FindingSeverity {
-    Info,
-    Low,
-    Medium,
-    High,
-    Critical,
-}
-
-/// Category of a review finding (maps to the 6 review groups).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum FindingCategory {
-    Security,
-    Architecture,
-    Performance,
-    Quality,
-    Domain,
-    DesignQuality,
-}
-
-/// A single structured finding from a review agent.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ReviewFinding {
-    pub file: String,
-    #[serde(default)]
-    pub line: u32,
-    pub severity: FindingSeverity,
-    pub category: FindingCategory,
-    pub finding: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub suggestion: Option<String>,
-    #[serde(default = "default_confidence")]
-    pub confidence: f64,
-}
-
-fn default_confidence() -> f64 {
-    0.5
-}
-
-/// Output schema for a single review agent's results.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ReviewAgentOutput {
-    pub agent: String,
-    pub findings: Vec<ReviewFinding>,
-    pub summary: String,
-    pub pass: bool,
-}
-
 /// ADF envelope message types for swarm orchestration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "envelope_type", rename_all = "snake_case")]
@@ -262,32 +217,6 @@ impl AdfEnvelope {
     pub fn from_jsonl(line: &str) -> Result<Self, serde_json::Error> {
         serde_json::from_str(line.trim())
     }
-}
-
-/// Deduplicate findings by (file, line, category).
-/// When duplicates exist, keep the highest-severity finding.
-pub fn deduplicate_findings(findings: Vec<ReviewFinding>) -> Vec<ReviewFinding> {
-    use std::collections::HashMap;
-    let mut best: HashMap<(String, u32, FindingCategory), ReviewFinding> = HashMap::new();
-    for finding in findings {
-        let key = (finding.file.clone(), finding.line, finding.category);
-        best.entry(key)
-            .and_modify(|existing| {
-                if finding.severity > existing.severity {
-                    *existing = finding.clone();
-                }
-            })
-            .or_insert(finding);
-    }
-    let mut result: Vec<ReviewFinding> = best.into_values().collect();
-    #[allow(clippy::unnecessary_sort_by)]
-    result.sort_by(|a, b| {
-        b.severity
-            .cmp(&a.severity)
-            .then_with(|| a.file.cmp(&b.file))
-            .then_with(|| a.line.cmp(&b.line))
-    });
-    result
 }
 
 #[cfg(test)]
@@ -563,7 +492,7 @@ mod tests {
         assert_eq!(deduped[0].severity, FindingSeverity::High);
         assert_eq!(deduped[0].file, "src/a.rs");
         assert_eq!(deduped[0].line, 3); // Earlier line within same severity
-        // Then medium severity
+                                        // Then medium severity
         assert_eq!(deduped[2].severity, FindingSeverity::Medium);
     }
 }

@@ -39,6 +39,9 @@ nix = { version = "0.27", features = ["process", "signal"] }
 # Issue tracker abstraction
 terraphim_tracker = { path = "../terraphim_tracker" }
 
+# Shared types for review findings (deduplicated from protocol.rs, see issue #750)
+terraphim_types = { path = "../terraphim_types", version = "1.0.0" }
+
 # File watching (for WORKFLOW.md hot-reload)
 notify = { version = "6.1", optional = true }
 

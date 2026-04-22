@@ -112,12 +112,39 @@ pub struct AgentDiscoveryQuery {
     pub required_domains: Vec<String>,
     /// Task description for context extraction
     pub task_description: Option<String>,
-    /// Minimum success rate
+    /// Minimum success rate (must be in [0.0, 1.0])
     pub min_success_rate: Option<f64>,
     /// Maximum resource usage
     pub max_resource_usage: Option<crate::ResourceUsage>,
     /// Preferred agent tags
     pub preferred_tags: Vec<String>,
+}
+
+impl AgentDiscoveryQuery {
+    /// Validate query invariants.
+    ///
+    /// Returns `Err` if constraints are internally inconsistent.
+    pub fn validate(&self) -> Result<(), crate::RegistryError> {
+        if let Some(rate) = self.min_success_rate {
+            if !(0.0..=1.0).contains(&rate) {
+                return Err(crate::RegistryError::DiscoveryFailed(format!(
+                    "min_success_rate must be in [0.0, 1.0], got {rate}"
+                )));
+            }
+        }
+        if let Some(ref usage) = self.max_resource_usage {
+            if usage.memory_mb < 0.0
+                || usage.cpu_percent < 0.0
+                || usage.network_kbps < 0.0
+                || usage.storage_mb < 0.0
+            {
+                return Err(crate::RegistryError::DiscoveryFailed(
+                    "max_resource_usage values must be non-negative".to_string(),
+                ));
+            }
+        }
+        Ok(())
+    }
 }
 
 /// Agent discovery result
@@ -147,16 +174,37 @@ pub struct AgentMatch {
 /// Detailed scoring breakdown
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScoreBreakdown {
-    /// Role compatibility score
+    /// Role compatibility score (0.0 to 1.0)
     pub role_score: f64,
-    /// Capability match score
+    /// Capability match score (0.0 to 1.0)
     pub capability_score: f64,
-    /// Domain expertise score
+    /// Domain expertise score (0.0 to 1.0)
     pub domain_score: f64,
-    /// Performance score
+    /// Performance score (0.0 to 1.0)
     pub performance_score: f64,
-    /// Availability score
+    /// Availability score (0.0 to 1.0)
     pub availability_score: f64,
+}
+
+impl ScoreBreakdown {
+    /// Validate that all scores are within the valid range [0.0, 1.0].
+    pub fn validate(&self) -> Result<(), crate::RegistryError> {
+        let scores = [
+            ("role_score", self.role_score),
+            ("capability_score", self.capability_score),
+            ("domain_score", self.domain_score),
+            ("performance_score", self.performance_score),
+            ("availability_score", self.availability_score),
+        ];
+        for (name, value) in scores {
+            if !(0.0..=1.0).contains(&value) {
+                return Err(crate::RegistryError::DiscoveryFailed(format!(
+                    "{name} must be in [0.0, 1.0], got {value}"
+                )));
+            }
+        }
+        Ok(())
+    }
 }
 
 /// Query analysis results

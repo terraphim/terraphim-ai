@@ -58,6 +58,22 @@ impl PolicyConfig {
     pub fn new() -> Self {
         Self::default()
     }
+
+    /// Validate that weights sum to 1.0 (within floating-point tolerance).
+    pub fn validate(&self) -> Result<(), String> {
+        let sum = self.task_fit_weight
+            + self.throughput_weight
+            + self.latency_weight
+            + self.consumption_weight;
+        const EPSILON: f64 = 1e-6;
+        if (sum - 1.0).abs() > EPSILON {
+            return Err(format!(
+                "Policy weights must sum to 1.0, got {sum} (task_fit={}, throughput={}, latency={}, consumption={})",
+                self.task_fit_weight, self.throughput_weight, self.latency_weight, self.consumption_weight
+            ));
+        }
+        Ok(())
+    }
 }
 
 /// Apply routing policy to a set of candidates.

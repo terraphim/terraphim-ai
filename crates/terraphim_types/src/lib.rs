@@ -140,8 +140,9 @@ use tsify::Tsify;
 /// personas in the Terraphim system, each with specific knowledge domains
 /// and search preferences.
 ///
-/// Note: Equality is based on both fields, so two instances with different
-/// original casing are not equal. Use `as_lowercase()` for case-insensitive comparisons.
+/// Equality and hashing are based on the lowercase field, so two instances
+/// with different original casing but the same lowercase value are equal.
+/// This ensures case-insensitive identity semantics per domain rules.
 ///
 /// # Examples
 ///
@@ -152,11 +153,11 @@ use tsify::Tsify;
 /// assert_eq!(role.as_str(), "DataScientist");
 /// assert_eq!(role.as_lowercase(), "datascientist");
 ///
-/// // Compare using lowercase for case-insensitive matching
+/// // Equality is case-insensitive
 /// let role2 = RoleName::new("datascientist");
-/// assert_eq!(role.as_lowercase(), role2.as_lowercase());
+/// assert_eq!(role, role2);
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Default, JsonSchema)]
+#[derive(Debug, Clone, Default, JsonSchema)]
 #[cfg_attr(feature = "typescript", derive(Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct RoleName {
@@ -164,6 +165,20 @@ pub struct RoleName {
     pub original: String,
     /// Lowercase version for case-insensitive comparisons
     pub lowercase: String,
+}
+
+impl PartialEq for RoleName {
+    fn eq(&self, other: &Self) -> bool {
+        self.lowercase == other.lowercase
+    }
+}
+
+impl Eq for RoleName {}
+
+impl std::hash::Hash for RoleName {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.lowercase.hash(state);
+    }
 }
 
 impl RoleName {

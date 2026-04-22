@@ -64,43 +64,9 @@ pub enum LearningError {
 // Domain types
 // ---------------------------------------------------------------------------
 
-/// Trust levels for learnings.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-pub enum TrustLevel {
-    /// Unverified, just extracted
-    L0 = 0,
-    /// Verified once
-    L1 = 1,
-    /// Verified multiple times, candidate for wiki sync
-    L2 = 2,
-    /// Golden, manually verified
-    L3 = 3,
-}
-
-impl std::fmt::Display for TrustLevel {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            TrustLevel::L0 => write!(f, "L0"),
-            TrustLevel::L1 => write!(f, "L1"),
-            TrustLevel::L2 => write!(f, "L2"),
-            TrustLevel::L3 => write!(f, "L3"),
-        }
-    }
-}
-
-impl std::str::FromStr for TrustLevel {
-    type Err = LearningError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_uppercase().as_str() {
-            "L0" => Ok(TrustLevel::L0),
-            "L1" => Ok(TrustLevel::L1),
-            "L2" => Ok(TrustLevel::L2),
-            "L3" => Ok(TrustLevel::L3),
-            _ => Err(LearningError::InvalidTrustLevel(s.to_string())),
-        }
-    }
-}
+// Re-export canonical TrustLevel from terraphim_types.
+// Previously defined locally with incompatible semantics (see issue #750).
+pub use terraphim_types::shared_learning::TrustLevel;
 
 /// Categories of learnings.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -168,6 +134,18 @@ pub struct Learning {
     pub archived_at: Option<DateTime<Utc>>,
 }
 
+/// Domain event emitted when a learning's trust level changes.
+#[derive(Debug, Clone)]
+pub enum LearningEvent {
+    /// Trust level was promoted due to effective applications.
+    LearningPromoted {
+        learning_id: String,
+        old_level: TrustLevel,
+        new_level: TrustLevel,
+        effective_count: u32,
+    },
+}
+
 /// Input for creating a new learning (no id/timestamps).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NewLearning {
@@ -209,7 +187,9 @@ pub trait LearningPersistence: Send + Sync {
     async fn record_applied(&self, id: &str) -> Result<(), LearningError>;
 
     /// Increment effective_count and auto-promote trust level.
-    async fn record_effective(&self, id: &str) -> Result<(), LearningError>;
+    ///
+    /// Returns `Ok(Some(event))` if the trust level was promoted, or `Ok(None)` if it stayed the same.
+    async fn record_effective(&self, id: &str) -> Result<Option<LearningEvent>, LearningError>;
 
     /// Archive stale learnings older than `max_age_days` that are still L0.
     async fn archive_stale(&self, max_age_days: u32) -> Result<usize, LearningError>;
@@ -327,7 +307,7 @@ impl LearningPersistence for InMemoryLearningPersistence {
         }
     }
 
-    async fn record_effective(&self, id: &str) -> Result<(), LearningError> {
+    async fn record_effective(&self, id: &str) -> Result<Option<LearningEvent>, LearningError> {
         let mut data = self
             .data
             .write()
@@ -335,6 +315,7 @@ impl LearningPersistence for InMemoryLearningPersistence {
         if let Some(l) = data.get_mut(id) {
             l.effective_count += 1;
             l.updated_at = Utc::now();
+            let old_level = l.trust_level;
             // Auto-promote
             l.trust_level = match (l.trust_level, l.effective_count) {
                 (TrustLevel::L0, n) if n >= 1 => TrustLevel::L1,
@@ -342,7 +323,17 @@ impl LearningPersistence for InMemoryLearningPersistence {
                 (TrustLevel::L2, n) if n >= 5 => TrustLevel::L3,
                 (current, _) => current,
             };
-            Ok(())
+            let event = if l.trust_level != old_level {
+                Some(LearningEvent::LearningPromoted {
+                    learning_id: l.id.clone(),
+                    old_level,
+                    new_level: l.trust_level,
+                    effective_count: l.effective_count,
+                })
+            } else {
+                None
+            };
+            Ok(event)
         } else {
             Err(LearningError::NotFound(id.to_string()))
         }
@@ -573,13 +564,14 @@ impl LearningPersistence for DeviceStorageLearningPersistence {
         self.persist_learning(&snapshot).await
     }
 
-    async fn record_effective(&self, id: &str) -> Result<(), LearningError> {
+    async fn record_effective(&self, id: &str) -> Result<Option<LearningEvent>, LearningError> {
         let mut cache = self.cache.write().await;
         let learning = cache
             .get_mut(id)
             .ok_or_else(|| LearningError::NotFound(id.to_string()))?;
         learning.effective_count += 1;
         learning.updated_at = Utc::now();
+        let old_level = learning.trust_level;
         // Auto-promote
         learning.trust_level = match (learning.trust_level, learning.effective_count) {
             (TrustLevel::L0, n) if n >= 1 => TrustLevel::L1,
@@ -587,10 +579,21 @@ impl LearningPersistence for DeviceStorageLearningPersistence {
             (TrustLevel::L2, n) if n >= 5 => TrustLevel::L3,
             (current, _) => current,
         };
+        let event = if learning.trust_level != old_level {
+            Some(LearningEvent::LearningPromoted {
+                learning_id: learning.id.clone(),
+                old_level,
+                new_level: learning.trust_level,
+                effective_count: learning.effective_count,
+            })
+        } else {
+            None
+        };
         let snapshot = learning.clone();
         drop(cache);
 
-        self.persist_learning(&snapshot).await
+        self.persist_learning(&snapshot).await?;
+        Ok(event)
     }
 
     async fn archive_stale(&self, max_age_days: u32) -> Result<usize, LearningError> {
@@ -692,7 +695,7 @@ impl SharedLearningStore {
         self.persistence.record_applied(id).await
     }
 
-    pub async fn record_effective(&self, id: &str) -> Result<(), LearningError> {
+    pub async fn record_effective(&self, id: &str) -> Result<Option<LearningEvent>, LearningError> {
         self.persistence.record_effective(id).await
     }
 

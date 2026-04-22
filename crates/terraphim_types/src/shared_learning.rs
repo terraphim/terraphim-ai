@@ -11,14 +11,17 @@ use uuid::Uuid;
 /// Trust level for a shared learning
 ///
 /// Represents the validation state of a learning:
-/// - L1: Unverified (auto-captured)
-/// - L2: Peer-validated (tested across multiple agents)
-/// - L3: Human-approved (reviewed by CTO)
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+/// - L0: Unverified (just extracted, not yet shown to agents)
+/// - L1: Verified once (passed verify_pattern or one effective application)
+/// - L2: Peer-validated (applied 3+ times across 2+ agents with positive outcome)
+/// - L3: Human-approved (reviewed by CTO via `/evolve` or Gitea issue approval)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Default)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum TrustLevel {
-    /// Unverified learning, auto-captured from various sources
+    /// Unverified, just extracted or auto-captured from various sources
     #[default]
+    L0,
+    /// Verified once: passed verify_pattern or one effective application
     L1,
     /// Peer-validated: applied 3+ times across 2+ agents with positive outcome
     L2,
@@ -27,9 +30,10 @@ pub enum TrustLevel {
 }
 
 impl TrustLevel {
-    /// Get the trust level code (L1, L2, L3) for database storage
+    /// Get the trust level code (L0, L1, L2, L3) for database storage
     pub fn as_str(&self) -> &'static str {
         match self {
+            TrustLevel::L0 => "L0",
             TrustLevel::L1 => "L1",
             TrustLevel::L2 => "L2",
             TrustLevel::L3 => "L3",
@@ -39,6 +43,7 @@ impl TrustLevel {
     /// Get numeric weight for ranking purposes
     pub fn weight(&self) -> u8 {
         match self {
+            TrustLevel::L0 => 0,
             TrustLevel::L1 => 1,
             TrustLevel::L2 => 2,
             TrustLevel::L3 => 3,
@@ -53,7 +58,8 @@ impl TrustLevel {
     /// Get display name for the trust level
     pub fn display_name(&self) -> &'static str {
         match self {
-            TrustLevel::L1 => "Unverified",
+            TrustLevel::L0 => "Unverified",
+            TrustLevel::L1 => "Verified Once",
             TrustLevel::L2 => "Peer-Validated",
             TrustLevel::L3 => "Human-Approved",
         }
@@ -71,17 +77,12 @@ impl std::str::FromStr for TrustLevel {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_uppercase().as_str() {
-            "L1" | "UNVERIFIED" => Ok(TrustLevel::L1),
+            "L0" | "UNVERIFIED" => Ok(TrustLevel::L0),
+            "L1" | "VERIFIED_ONCE" | "VERIFIED-ONCE" => Ok(TrustLevel::L1),
             "L2" | "PEER-VALIDATED" | "PEER_VALIDATED" => Ok(TrustLevel::L2),
             "L3" | "HUMAN-APPROVED" | "HUMAN_APPROVED" => Ok(TrustLevel::L3),
             _ => Err(TrustLevelError::InvalidTrustLevel(s.to_string())),
         }
-    }
-}
-
-impl PartialOrd for TrustLevel {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.weight().cmp(&other.weight()))
     }
 }
 
@@ -445,7 +446,13 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_trust_level_default_is_l0() {
+        assert_eq!(TrustLevel::default(), TrustLevel::L0);
+    }
+
+    #[test]
     fn test_trust_level_weight() {
+        assert_eq!(TrustLevel::L0.weight(), 0);
         assert_eq!(TrustLevel::L1.weight(), 1);
         assert_eq!(TrustLevel::L2.weight(), 2);
         assert_eq!(TrustLevel::L3.weight(), 3);
@@ -453,6 +460,7 @@ mod tests {
 
     #[test]
     fn test_trust_level_allows_wiki_sync() {
+        assert!(!TrustLevel::L0.allows_wiki_sync());
         assert!(!TrustLevel::L1.allows_wiki_sync());
         assert!(TrustLevel::L2.allows_wiki_sync());
         assert!(TrustLevel::L3.allows_wiki_sync());
@@ -460,6 +468,8 @@ mod tests {
 
     #[test]
     fn test_trust_level_from_str() {
+        assert_eq!("L0".parse::<TrustLevel>().unwrap(), TrustLevel::L0);
+        assert_eq!("l0".parse::<TrustLevel>().unwrap(), TrustLevel::L0);
         assert_eq!("L1".parse::<TrustLevel>().unwrap(), TrustLevel::L1);
         assert_eq!("l1".parse::<TrustLevel>().unwrap(), TrustLevel::L1);
         assert_eq!("L2".parse::<TrustLevel>().unwrap(), TrustLevel::L2);
