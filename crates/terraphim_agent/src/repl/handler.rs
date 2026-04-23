@@ -10,6 +10,7 @@ use crate::client::ApiClient;
 use crate::service::TuiService;
 
 // Import robot module types
+use crate::forgiving::parser::ForgivingParser;
 use crate::robot::{ExitCode, SelfDocumentation};
 
 #[cfg(feature = "repl-mcp")]
@@ -255,7 +256,107 @@ impl ReplHandler {
     }
 
     async fn execute_command(&mut self, input: &str) -> Result<bool> {
-        let command = ReplCommand::from_str(input)?;
+        let parser = ForgivingParser::new(
+            ReplCommand::available_commands()
+                .into_iter()
+                .map(String::from)
+                .collect(),
+        );
+        let parse_result = parser.parse(input.trim());
+
+        let (effective_input, correction_msg) = match parse_result {
+            crate::forgiving::parser::ParseResult::Exact { .. } => (input.to_string(), None),
+            crate::forgiving::parser::ParseResult::AliasExpanded {
+                original,
+                command,
+                args,
+            } => {
+                let reconstructed = if args.is_empty() {
+                    format!("/{}", command)
+                } else {
+                    format!("/{} {}", command, args)
+                };
+                (
+                    reconstructed,
+                    Some(format!("[alias] {} -> {}", original, command)),
+                )
+            }
+            crate::forgiving::parser::ParseResult::AutoCorrected {
+                original,
+                command,
+                distance,
+                args,
+            } => {
+                let reconstructed = if args.is_empty() {
+                    format!("/{}", command)
+                } else {
+                    format!("/{} {}", command, args)
+                };
+                (
+                    reconstructed,
+                    Some(format!(
+                        "[auto-corrected] {} -> {} (distance={})",
+                        original, command, distance
+                    )),
+                )
+            }
+            crate::forgiving::parser::ParseResult::Suggestions {
+                original,
+                suggestions,
+            } => {
+                #[cfg(feature = "repl")]
+                {
+                    use colored::Colorize;
+                    println!(
+                        "{} Unknown command: {}",
+                        "X".red().bold(),
+                        original.yellow()
+                    );
+                    if !suggestions.is_empty() {
+                        println!(
+                            "  {} Did you mean: {}?",
+                            "hint:".blue(),
+                            suggestions
+                                .iter()
+                                .take(3)
+                                .map(|s| s.command.green().to_string())
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        );
+                    }
+                }
+                return Ok(false);
+            }
+            crate::forgiving::parser::ParseResult::Unknown { original } => {
+                #[cfg(feature = "repl")]
+                {
+                    use colored::Colorize;
+                    println!(
+                        "{} Unknown command: {}",
+                        "X".red().bold(),
+                        original.yellow()
+                    );
+                }
+                return Ok(false);
+            }
+            crate::forgiving::parser::ParseResult::Empty => {
+                return Ok(false);
+            }
+        };
+
+        if let Some(msg) = &correction_msg {
+            #[cfg(feature = "repl")]
+            {
+                use colored::Colorize;
+                eprintln!("{}", msg.blue());
+            }
+            #[cfg(not(feature = "repl"))]
+            {
+                let _ = msg;
+            }
+        }
+
+        let command = ReplCommand::from_str(&effective_input)?;
 
         match command {
             ReplCommand::Search {
