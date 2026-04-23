@@ -11,6 +11,12 @@ mod aider;
 #[cfg(feature = "cline-connector")]
 mod cline;
 
+#[cfg(feature = "opencode-connector")]
+mod opencode;
+
+#[cfg(feature = "codex-connector")]
+mod codex;
+
 pub use native::NativeClaudeConnector;
 
 #[cfg(feature = "aider-connector")]
@@ -18,6 +24,12 @@ pub use aider::AiderConnector;
 
 #[cfg(feature = "cline-connector")]
 pub use cline::ClineConnector;
+
+#[cfg(feature = "opencode-connector")]
+pub use opencode::OpenCodeConnector;
+
+#[cfg(feature = "codex-connector")]
+pub use codex::CodexConnector;
 
 use crate::model::Session;
 use anyhow::Result;
@@ -126,6 +138,14 @@ impl ConnectorRegistry {
         // Add Cline connector if feature enabled
         #[cfg(feature = "cline-connector")]
         connectors.push(Box::new(ClineConnector::new()));
+
+        // Add OpenCode connector if feature enabled
+        #[cfg(feature = "opencode-connector")]
+        connectors.push(Box::new(OpenCodeConnector));
+
+        // Add Codex connector if feature enabled
+        #[cfg(feature = "codex-connector")]
+        connectors.push(Box::new(CodexConnector));
 
         // Add TSA-based connectors if feature enabled
         #[cfg(feature = "terraphim-session-analyzer")]
