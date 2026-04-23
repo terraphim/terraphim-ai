@@ -215,7 +215,7 @@ impl LearningStore for InMemoryLearningStore {
             })
             .cloned()
             .collect();
-        results.sort_by(|a, b| b.quality.effective_count.cmp(&a.quality.effective_count));
+        results.sort_by_key(|l| std::cmp::Reverse(l.quality.effective_count));
         results.truncate(limit);
         Ok(results)
     }
