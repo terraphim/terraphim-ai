@@ -7,8 +7,11 @@ use super::{ConnectorStatus, ImportOptions, SessionConnector};
 use crate::model::{ContentBlock, Message, MessageRole, Session, SessionMetadata};
 use anyhow::{Context, Result};
 use async_trait::async_trait;
+use notify::{Event, EventKind, RecursiveMode, Watcher, recommended_watcher};
 use serde::Deserialize;
 use std::path::PathBuf;
+use std::sync::Arc;
+use tokio::sync::mpsc;
 
 /// Native Claude Code session connector
 #[derive(Debug, Default)]
@@ -115,6 +118,85 @@ impl SessionConnector for NativeClaudeConnector {
             total
         );
         Ok(sessions)
+    }
+
+    fn supports_watch(&self) -> bool {
+        true
+    }
+
+    async fn watch(&self) -> Result<mpsc::Receiver<Session>> {
+        let (tx, rx) = mpsc::channel(32);
+        let base_path = self
+            .default_path()
+            .ok_or_else(|| anyhow::anyhow!("No default path found for watch"))?;
+
+        if !base_path.exists() {
+            anyhow::bail!("Watch path does not exist: {}", base_path.display());
+        }
+
+        let path = Arc::new(base_path);
+
+        tokio::task::spawn_blocking(move || -> Result<()> {
+            let (watcher_tx, watcher_rx) = std::sync::mpsc::channel();
+            let mut watcher = recommended_watcher(move |res| {
+                let _ = watcher_tx.send(res);
+            })?;
+
+            watcher.watch(&path, RecursiveMode::Recursive)?;
+
+            tracing::info!(
+                "Started watching for Claude sessions in: {}",
+                path.display()
+            );
+
+            for res in watcher_rx {
+                match res {
+                    Ok(event) => {
+                        if let Event {
+                            kind: EventKind::Create(_) | EventKind::Modify(_),
+                            paths,
+                            ..
+                        } = event
+                        {
+                            for path in paths {
+                                if path.extension().is_some_and(|ext| ext == "jsonl") {
+                                    let tx = tx.clone();
+                                    let path_clone = path.clone();
+
+                                    tokio::spawn(async move {
+                                        let connector = NativeClaudeConnector;
+                                        match connector.parse_session_file(&path_clone).await {
+                                            Ok(Some(session)) => {
+                                                if tx.send(session).await.is_err() {
+                                                    tracing::warn!(
+                                                        "Failed to send session from watch"
+                                                    );
+                                                }
+                                            }
+                                            Ok(None) => {}
+                                            Err(e) => {
+                                                tracing::warn!(
+                                                    "Failed to parse new session {}: {}",
+                                                    path_clone.display(),
+                                                    e
+                                                );
+                                            }
+                                        }
+                                    });
+                                }
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        tracing::warn!("Watch error: {}", e);
+                    }
+                }
+            }
+
+            Ok(())
+        });
+
+        Ok(rx)
     }
 }
 
@@ -476,5 +558,11 @@ mod tests {
             .with_limit(2);
         let sessions = connector.import(&options).await.unwrap();
         assert_eq!(sessions.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_supports_watch() {
+        let connector = NativeClaudeConnector;
+        assert!(connector.supports_watch());
     }
 }
