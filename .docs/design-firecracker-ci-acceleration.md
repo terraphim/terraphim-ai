@@ -40,31 +40,48 @@ Transform the current CI pipeline to leverage Firecracker microVMs for 2-5x fast
 ### System Architecture
 
 ```
-GitHub Actions Workflow
+GitHub Actions PR trigger
          │
-         ▼
-    fcctl-web API (host)
-         │
-         ├──► VM-1 (Rust build cache) ──► cargo build
-         ├──► VM-2 (clean) ──────────────► cargo test
-         └──► VM-3 (parallel build) ───────► cargo clippy
+         ▼  runs-on: [self-hosted]  ← bigbox runners (runner-2..5)
+    fcctl-web (127.0.0.1:8080)      ← systemd service, active on bigbox
+         │                             private repo: firecracker-rust/fcctl-web
+         │                             auth: TEST_AUTH_BYPASS=1 (test mode)
+         ├──► Firecracker VM-1 ──► cargo fmt --check
+         ├──► Firecracker VM-2 ──► cargo clippy
+         ├──► Firecracker VM-3 ──► cargo build --workspace
+         └──► Firecracker VM-4 ──► cargo test --workspace
 ```
+
+**Key constraint**: fcctl-web binds to `127.0.0.1` only. All CI jobs must use
+`runs-on: [self-hosted]` to reach it. GitHub-hosted runners cannot be used.
 
 ### Components
 
-| Component | Responsibility | Location | Changes |
-|-----------|----------------|----------|---------|
-| **fcctl-web** | Manage Firecracker VMs, execute commands | `scratchpad/firecracker-rust/fcctl-web` | Extend API for build artifacts |
-| **CI Workflow** | Orchestrate builds in Firecracker VMs | `.github/workflows/ci-firecracker.yml` | Create new workflow |
-| **VM Template** | Pre-configured Rust build VM | `infrastructure/vm-templates/rust-build.json` | New file |
-| **Cache Manager** | Maintain Cargo registry cache | `scripts/fc-cache-sync.sh` | New file |
+| Component | Responsibility | Location | Status |
+|-----------|----------------|----------|--------|
+| **fcctl-web** | Manage Firecracker VMs, execute commands | `~/projects/terraphim/firecracker-rust/fcctl-web` on bigbox (private repo) | Running as systemd service |
+| **Firecracker** | MicroVM hypervisor | `/usr/local/bin/firecracker` on bigbox | Installed |
+| **Self-hosted runners** | Execute CI jobs on bigbox | `~/actions-runner/` (runner-2..5), connected to terraphim/terraphim-ai | Active |
+| **CI Workflow** | Orchestrate builds in Firecracker VMs | `.github/workflows/ci-firecracker.yml` | Implemented |
+| **VM Template** | API contract reference for rust builds | `infrastructure/vm-templates/rust-build.json` | Aligned to API |
+
+### API Contract (fcctl-web)
+
+```
+POST /api/vms           { "vm_type": "focal-ci" }  →  { "id": "<uuid>" }
+POST /api/llm/execute   { "code", "language", "agent_id", "timeout_ms" }
+DELETE /api/vms/:id
+GET  /health
+```
+
+Valid vm_types: `focal-ci` (recommended), `focal`, `bionic-test`, `focal-optimized`
 
 ### Boundaries
 
 **Inside scope:**
-- Firecracker VM creation and management via fcctl-web
-- Caching Cargo registry and dependencies
-- Parallel build execution
+- Firecracker VM creation and management via fcctl-web on bigbox
+- Sequential build pipeline: fmt → clippy → build → test
+- VM cleanup after every run (always-run destroy step)
 - Artifact collection from VMs
 
 **Outside scope:**
