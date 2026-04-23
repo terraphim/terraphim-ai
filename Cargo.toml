@@ -27,6 +27,9 @@ exclude = [
     "crates/terraphim_github_runner",
     "crates/terraphim_github_runner_server",
     "terraphim_firecracker",
+    # Standalone multi-channel bot (Discord dep pulls in vulnerable rustls-webpki 0.102.8 via serenity)
+    # Build separately: cd crates/terraphim_tinyclaw && cargo build --features telegram|discord|slack
+    "crates/terraphim_tinyclaw",
 ]
 default-members = ["terraphim_server"]
 
