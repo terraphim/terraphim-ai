@@ -1,0 +1,37 @@
+{
+  "Front-End Developer": {
+    "shortname": "fedev",
+    "name": "Front-End Developer",
+    "relevance_function": "BM25Plus",
+    "terraphim_it": false,
+    "theme": "yeti",
+    "kg": {
+      "automata_path": null,
+      "knowledge_graph_local": {
+        "input_type": "markdown",
+        "path": "~/.config/terraphim/kg/frontend"
+      },
+      "public": false,
+      "publish": false
+    },
+    "haystacks": [
+      {
+        "location": "~/projects",
+        "service": "Ripgrep",
+        "read_only": true,
+        "fetch_content": false,
+        "extra_parameters": {}
+      },
+      {
+        "location": "https://grep.app",
+        "service": "GrepApp",
+        "read_only": true,
+        "fetch_content": false,
+        "extra_parameters": {
+          "language": "typescript"
+        }
+      }
+    ],
+    "llm_enabled": false
+  }
+}
