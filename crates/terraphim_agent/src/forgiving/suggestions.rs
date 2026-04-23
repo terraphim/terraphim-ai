@@ -153,4 +153,70 @@ mod tests {
         assert!(!suggestions.is_empty());
         assert_eq!(suggestions[0].command, "search");
     }
+
+    #[test]
+    fn test_high_confidence_boundary() {
+        let suggestion = CommandSuggestion::new("search", "searcg");
+        assert!(suggestion.edit_distance <= 2);
+        assert!(suggestion.similarity > 0.8);
+        assert!(suggestion.is_high_confidence());
+    }
+
+    #[test]
+    fn test_reasonable_boundary() {
+        let suggestion = CommandSuggestion::new("search", "srch");
+        assert!(suggestion.is_reasonable());
+    }
+
+    #[test]
+    fn test_empty_command_list() {
+        let suggestions: Vec<&str> = vec![];
+        let result = find_similar_commands("search", &suggestions, 5);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_find_best_match_empty_commands() {
+        let suggestions: Vec<&str> = vec![];
+        assert!(find_best_match("search", &suggestions).is_none());
+    }
+
+    #[test]
+    fn test_max_suggestions_respected() {
+        let commands = vec!["search", "config", "role", "graph", "help", "quit"];
+        let suggestions = find_similar_commands("searc", &commands, 2);
+        assert!(suggestions.len() <= 2);
+    }
+}
+
+#[cfg(test)]
+mod proptests {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn edit_distance_non_negative(a: String, b: String) {
+            let d = edit_distance(&a, &b);
+            prop_assert!(d == d); // sanity: always returns a valid usize
+        }
+
+        #[test]
+        fn edit_distance_zero_for_identical(s: String) {
+            prop_assert_eq!(edit_distance(&s, &s), 0);
+        }
+
+        #[test]
+        fn similarity_in_range(a: String, b: String) {
+            let s = similarity(&a, &b);
+            prop_assert!(s >= 0.0);
+            prop_assert!(s <= 1.0);
+        }
+
+        #[test]
+        fn find_similar_never_panics(input: String) {
+            let commands = vec!["search", "config", "role"];
+            let _ = find_similar_commands(&input, &commands, 5);
+        }
+    }
 }

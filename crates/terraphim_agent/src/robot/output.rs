@@ -210,12 +210,22 @@ impl RobotFormatter {
     pub fn truncate_content(&self, content: &str) -> (String, bool) {
         if let Some(max_len) = self.config.max_content_length {
             if content.len() > max_len {
-                // Truncate at word boundary if possible
-                let truncated = if let Some(pos) = content[..max_len].rfind(char::is_whitespace) {
-                    &content[..pos]
+                let safe_boundary = if content.is_char_boundary(max_len) {
+                    max_len
                 } else {
-                    &content[..max_len]
+                    content
+                        .char_indices()
+                        .take_while(|(i, _)| *i < max_len)
+                        .last()
+                        .map(|(i, _)| i)
+                        .unwrap_or(0)
                 };
+                let truncated =
+                    if let Some(pos) = content[..safe_boundary].rfind(char::is_whitespace) {
+                        &content[..pos]
+                    } else {
+                        &content[..safe_boundary]
+                    };
                 return (format!("{}...", truncated), true);
             }
         }
@@ -310,5 +320,153 @@ mod tests {
         let output = formatter.format(&data).unwrap();
         assert!(output.contains("key"));
         assert!(output.contains("value"));
+    }
+
+    #[test]
+    fn test_formatter_jsonl_streaming() {
+        let formatter = RobotFormatter::new(RobotConfig::new().with_format(OutputFormat::Jsonl));
+        let items = vec![serde_json::json!({"id": 1}), serde_json::json!({"id": 2})];
+        let output = formatter.format_stream(items).unwrap();
+        assert!(output.contains('\n'));
+        let lines: Vec<&str> = output.lines().collect();
+        assert_eq!(lines.len(), 2);
+    }
+
+    #[test]
+    fn test_formatter_minimal_format() {
+        let formatter = RobotFormatter::new(RobotConfig::new().with_format(OutputFormat::Minimal));
+        let data = serde_json::json!({"key": "value"});
+        let output = formatter.format(&data).unwrap();
+        assert!(!output.contains('\n'));
+    }
+
+    #[test]
+    fn test_formatter_table_format() {
+        let formatter = RobotFormatter::new(RobotConfig::new().with_format(OutputFormat::Table));
+        let data = serde_json::json!({"key": "value"});
+        let output = formatter.format(&data).unwrap();
+        assert!(output.contains("key"));
+    }
+
+    #[test]
+    fn test_would_exceed_budget() {
+        let config = RobotConfig::new().with_max_tokens(5);
+        let formatter = RobotFormatter::new(config);
+        assert!(formatter.would_exceed_budget("this is more than twenty chars"));
+        assert!(!formatter.would_exceed_budget("hi"));
+    }
+
+    #[test]
+    fn test_no_budget_unlimited() {
+        let formatter = RobotFormatter::new(RobotConfig::new());
+        assert!(!formatter.would_exceed_budget(&"x".repeat(10000)));
+    }
+
+    #[test]
+    fn test_output_format_from_str() {
+        use std::str::FromStr;
+        assert!(OutputFormat::from_str("json").is_ok());
+        assert!(OutputFormat::from_str("jsonl").is_ok());
+        assert!(OutputFormat::from_str("unknown_format").is_err());
+    }
+
+    #[test]
+    fn test_output_format_name() {
+        assert_eq!(OutputFormat::Json.name(), "json");
+        assert_eq!(OutputFormat::Jsonl.name(), "jsonl");
+        assert_eq!(OutputFormat::Minimal.name(), "minimal");
+        assert_eq!(OutputFormat::Table.name(), "table");
+    }
+
+    #[test]
+    fn test_field_mode_custom_empty() {
+        let mode = FieldMode::from_str_loose("custom:");
+        assert_eq!(mode, FieldMode::Custom(vec![]));
+    }
+
+    #[test]
+    fn test_field_mode_unknown_defaults_full() {
+        assert_eq!(FieldMode::from_str_loose("unknown"), FieldMode::Full);
+    }
+
+    #[test]
+    fn test_robot_config_default() {
+        let config = RobotConfig::default();
+        assert!(!config.enabled);
+        assert_eq!(config.format, OutputFormat::Json);
+        assert_eq!(config.max_results, Some(10));
+    }
+
+    #[test]
+    fn test_robot_config_builder() {
+        let config = RobotConfig::new()
+            .with_format(OutputFormat::Jsonl)
+            .with_max_tokens(100)
+            .with_max_results(5)
+            .with_max_content_length(200)
+            .with_fields(FieldMode::Minimal);
+        assert!(config.enabled);
+        assert_eq!(config.format, OutputFormat::Jsonl);
+        assert_eq!(config.max_tokens, Some(100));
+        assert_eq!(config.max_results, Some(5));
+        assert_eq!(config.max_content_length, Some(200));
+        assert_eq!(config.fields, FieldMode::Minimal);
+    }
+
+    #[test]
+    fn test_truncation_word_boundary() {
+        let config = RobotConfig::new().with_max_content_length(10);
+        let formatter = RobotFormatter::new(config);
+        let (truncated, was_truncated) = formatter.truncate_content("hello world test");
+        assert!(was_truncated);
+        assert!(!truncated.contains("world"));
+    }
+
+    #[test]
+    fn test_truncation_no_whitespace() {
+        let config = RobotConfig::new().with_max_content_length(5);
+        let formatter = RobotFormatter::new(config);
+        let (truncated, was_truncated) = formatter.truncate_content("abcdefgh");
+        assert!(was_truncated);
+        assert!(truncated.starts_with("abcde"));
+    }
+}
+
+#[cfg(test)]
+mod proptests {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn format_never_panics(key: String, value: String) {
+            let formatter = RobotFormatter::new(RobotConfig::new());
+            let data = serde_json::json!({ key: value });
+            let _ = formatter.format(&data);
+        }
+
+        #[test]
+        fn truncate_never_panics(content: String) {
+            let config = RobotConfig::new().with_max_content_length(50);
+            let formatter = RobotFormatter::new(config);
+            let (result, _) = formatter.truncate_content(&content);
+            if content.len() > 50 {
+                prop_assert!(result.contains("..."));
+            }
+        }
+
+        #[test]
+        fn from_str_loose_never_panics(input: String) {
+            let _ = OutputFormat::from_str_loose(&input);
+            let _ = FieldMode::from_str_loose(&input);
+        }
+
+        #[test]
+        fn format_stream_empty_is_empty(_input: String) {
+            let formatter = RobotFormatter::new(RobotConfig::new());
+            let items: Vec<serde_json::Value> = vec![];
+            let output = formatter.format_stream(items).unwrap();
+            prop_assert!(output.is_empty());
+        }
     }
 }
