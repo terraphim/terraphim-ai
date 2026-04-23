@@ -107,20 +107,22 @@ fn t9_robot_mode_stdout_is_pure_json_stderr_has_auto_route() -> Result<()> {
         stderr
     );
 
-    // Stdout must parse as JSON. Find the first `{` (skip any preamble) and
-    // deserialise; do not just substring-check.
     let start = stdout
         .find('{')
         .with_context(|| format!("stdout has no JSON object; stdout={}", stdout))?;
     let parsed: Value = serde_json::from_str(&stdout[start..])
         .with_context(|| format!("stdout JSON did not parse; stdout={}", stdout))?;
     assert!(
-        parsed.get("query").is_some(),
-        "JSON envelope missing 'query' field"
+        parsed.get("success").is_some(),
+        "JSON envelope missing 'success' field"
     );
     assert!(
-        parsed.get("role").is_some(),
-        "JSON envelope missing 'role' field"
+        parsed.get("meta").and_then(|m| m.get("command")).is_some(),
+        "JSON envelope missing 'meta.command' field"
+    );
+    assert!(
+        parsed.get("data").is_some(),
+        "JSON envelope missing 'data' field"
     );
     Ok(())
 }
