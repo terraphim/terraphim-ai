@@ -402,4 +402,95 @@ mod tests {
         assert!(json.contains("E001"));
         assert!(json.contains("serach"));
     }
+
+    #[test]
+    fn test_meta_with_auto_correction() {
+        let meta = ResponseMeta::new("search").with_auto_correction(AutoCorrection {
+            original: "serach".to_string(),
+            corrected: "search".to_string(),
+            distance: 2,
+        });
+        assert!(meta.auto_corrected.is_some());
+        let ac = meta.auto_corrected.unwrap();
+        assert_eq!(ac.original, "serach");
+        assert_eq!(ac.corrected, "search");
+        assert_eq!(ac.distance, 2);
+    }
+
+    #[test]
+    fn test_meta_with_pagination() {
+        let meta = ResponseMeta::new("search").with_pagination(Pagination::new(100, 10, 0));
+        assert!(meta.pagination.is_some());
+    }
+
+    #[test]
+    fn test_search_result_item_serialization_roundtrip() {
+        let item = SearchResultItem {
+            rank: 1,
+            id: "doc-1".to_string(),
+            title: "Test Document".to_string(),
+            url: Some("https://example.com".to_string()),
+            score: 0.95,
+            preview: Some("A test document".to_string()),
+            source: Some("test".to_string()),
+            date: None,
+            preview_truncated: false,
+        };
+        let json = serde_json::to_string(&item).unwrap();
+        let deserialized: SearchResultItem = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.id, "doc-1");
+        assert_eq!(deserialized.title, "Test Document");
+        assert_eq!(deserialized.rank, 1);
+    }
+
+    #[test]
+    fn test_preview_truncated_skip_serializing_false() {
+        let item = SearchResultItem {
+            rank: 1,
+            id: "doc-1".to_string(),
+            title: "Test".to_string(),
+            url: None,
+            score: 0.5,
+            preview: None,
+            source: None,
+            date: None,
+            preview_truncated: false,
+        };
+        let json = serde_json::to_string(&item).unwrap();
+        assert!(!json.contains("preview_truncated"));
+    }
+
+    #[test]
+    fn test_preview_truncated_included_when_true() {
+        let item = SearchResultItem {
+            rank: 1,
+            id: "doc-1".to_string(),
+            title: "Test".to_string(),
+            url: None,
+            score: 0.5,
+            preview: None,
+            source: None,
+            date: None,
+            preview_truncated: true,
+        };
+        let json = serde_json::to_string(&item).unwrap();
+        assert!(json.contains("preview_truncated"));
+    }
+
+    #[test]
+    fn test_token_budget_serialization() {
+        let budget = TokenBudget::new(1000);
+        let json = serde_json::to_string(&budget).unwrap();
+        let deserialized: TokenBudget = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.max_tokens, 1000);
+        assert!(!deserialized.truncated);
+        assert_eq!(deserialized.estimated_tokens, 0);
+    }
+
+    #[test]
+    fn test_robot_error_no_results() {
+        let error = RobotError::no_results("missing query");
+        let json = serde_json::to_string(&error).unwrap();
+        assert!(json.contains("missing query"));
+    }
 }
