@@ -23,6 +23,7 @@ use crate::model::Session;
 use anyhow::Result;
 use async_trait::async_trait;
 use std::path::PathBuf;
+use tokio::sync::mpsc;
 
 /// Status of a connector's detection
 #[derive(Debug, Clone)]
@@ -102,6 +103,19 @@ pub trait SessionConnector: Send + Sync {
 
     /// Import sessions from this source
     async fn import(&self, options: &ImportOptions) -> Result<Vec<Session>>;
+
+    /// Check if this connector supports real-time watching
+    fn supports_watch(&self) -> bool {
+        false
+    }
+
+    /// Start watching for new sessions in real-time
+    ///
+    /// Returns a receiver that emits sessions as they are detected.
+    /// Default implementation returns an error if not supported.
+    async fn watch(&self) -> Result<mpsc::Receiver<Session>> {
+        anyhow::bail!("Watch not supported for this connector")
+    }
 }
 
 /// Registry of available connectors
@@ -212,6 +226,33 @@ impl ConnectorRegistry {
 
         tracing::info!("Total sessions imported: {}", all_sessions.len());
         Ok(all_sessions)
+    }
+
+    /// Start watching all connectors that support watching
+    ///
+    /// Returns a vector of receivers that emit sessions as they are detected.
+    pub async fn watch_all(&self) -> Vec<mpsc::Receiver<Session>> {
+        let mut receivers = Vec::new();
+
+        for connector in self.connectors() {
+            if connector.supports_watch() {
+                match connector.watch().await {
+                    Ok(rx) => {
+                        tracing::info!("Watching: {}", connector.display_name());
+                        receivers.push(rx);
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            "Failed to start watch for {}: {}",
+                            connector.display_name(),
+                            e
+                        );
+                    }
+                }
+            }
+        }
+
+        receivers
     }
 }
 
