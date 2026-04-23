@@ -579,26 +579,6 @@ fn resolve_output_config(robot: bool, format: OutputFormat) -> CommandOutputConf
     CommandOutputConfig { mode, robot }
 }
 
-#[derive(Debug, Serialize)]
-struct SearchDocumentOutput {
-    id: String,
-    title: String,
-    url: String,
-    rank: Option<u64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    description: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    body: Option<String>,
-}
-
-#[derive(Debug, Serialize)]
-struct SearchOutput {
-    query: String,
-    role: String,
-    count: usize,
-    results: Vec<SearchDocumentOutput>,
-}
-
 #[cfg(feature = "repl-sessions")]
 mod session_output {
     use serde::Serialize;
@@ -1592,27 +1572,75 @@ async fn run_offline_command(
             };
 
             if output.is_machine_readable() {
-                let payload = SearchOutput {
-                    query,
-                    role: role_name.to_string(),
-                    count: results.len(),
-                    results: results
-                        .iter()
-                        .map(|doc| SearchDocumentOutput {
+                use crate::robot::schema::{SearchResultItem, SearchResultsData};
+                use crate::robot::{ResponseMeta, RobotConfig, RobotFormatter, RobotResponse};
+                use std::time::Instant;
+
+                let start = Instant::now();
+                let robot_format = match output.mode {
+                    CommandOutputMode::JsonCompact => crate::robot::output::OutputFormat::Minimal,
+                    _ => crate::robot::output::OutputFormat::Json,
+                };
+                let mut robot_config = RobotConfig::new()
+                    .with_format(robot_format)
+                    .with_max_results(limit);
+                if output.robot {
+                    robot_config = robot_config
+                        .with_max_content_length(2000)
+                        .with_max_tokens(8000);
+                }
+
+                let formatter = RobotFormatter::new(robot_config.clone());
+                let max_results = robot_config.max_results.unwrap_or(limit);
+                let truncated_results: Vec<_> = results.into_iter().take(max_results).collect();
+                let total = truncated_results.len();
+
+                let items: Vec<SearchResultItem> = truncated_results
+                    .iter()
+                    .enumerate()
+                    .map(|(i, doc)| {
+                        let preview = doc.description.as_deref().or(if doc.body.is_empty() {
+                            None
+                        } else {
+                            Some(doc.body.as_str())
+                        });
+                        let (preview_text, preview_truncated) = match preview {
+                            Some(text) => {
+                                let (t, was_truncated) = formatter.truncate_content(text.trim());
+                                (Some(t), was_truncated)
+                            }
+                            None => (None, false),
+                        };
+                        SearchResultItem {
+                            rank: i + 1,
                             id: doc.id.clone(),
                             title: doc.title.clone(),
-                            url: doc.url.clone(),
-                            rank: doc.rank,
-                            description: doc.description.clone(),
-                            body: if doc.body.is_empty() {
+                            url: if doc.url.is_empty() {
                                 None
                             } else {
-                                Some(doc.body.clone())
+                                Some(doc.url.clone())
                             },
-                        })
-                        .collect(),
+                            score: doc.rank.unwrap_or_default() as f64,
+                            preview: preview_text,
+                            source: None,
+                            date: None,
+                            preview_truncated,
+                        }
+                    })
+                    .collect();
+
+                let data = SearchResultsData {
+                    results: items,
+                    total_matches: total,
+                    concepts_matched: vec![],
+                    wildcard_fallback: false,
                 };
-                print_json_output(&payload, output.mode)?;
+
+                let meta =
+                    ResponseMeta::new("search").with_elapsed(start.elapsed().as_millis() as u64);
+                let response = RobotResponse::success(data, meta);
+                let output_str = formatter.format(&response)?;
+                println!("{}", output_str);
             } else {
                 for doc in results.iter() {
                     let snippet = doc
@@ -3463,32 +3491,75 @@ async fn run_server_command(
             }
 
             if output.is_machine_readable() {
-                let payload = SearchOutput {
-                    query,
-                    role: q
-                        .role
-                        .as_ref()
-                        .map(|r| r.to_string())
-                        .unwrap_or_else(|| "unknown".to_string()),
-                    count: res.results.len(),
-                    results: res
-                        .results
-                        .iter()
-                        .map(|doc| SearchDocumentOutput {
+                use crate::robot::schema::{SearchResultItem, SearchResultsData};
+                use crate::robot::{ResponseMeta, RobotConfig, RobotFormatter, RobotResponse};
+                use std::time::Instant;
+
+                let start = Instant::now();
+                let robot_format = match output.mode {
+                    CommandOutputMode::JsonCompact => crate::robot::output::OutputFormat::Minimal,
+                    _ => crate::robot::output::OutputFormat::Json,
+                };
+                let mut robot_config = RobotConfig::new()
+                    .with_format(robot_format)
+                    .with_max_results(limit);
+                if output.robot {
+                    robot_config = robot_config
+                        .with_max_content_length(2000)
+                        .with_max_tokens(8000);
+                }
+
+                let formatter = RobotFormatter::new(robot_config.clone());
+                let max_results = robot_config.max_results.unwrap_or(limit);
+                let truncated_results: Vec<_> = res.results.into_iter().take(max_results).collect();
+                let total = truncated_results.len();
+
+                let items: Vec<SearchResultItem> = truncated_results
+                    .iter()
+                    .enumerate()
+                    .map(|(i, doc)| {
+                        let preview = doc.description.as_deref().or(if doc.body.is_empty() {
+                            None
+                        } else {
+                            Some(doc.body.as_str())
+                        });
+                        let (preview_text, preview_truncated) = match preview {
+                            Some(text) => {
+                                let (t, was_truncated) = formatter.truncate_content(text.trim());
+                                (Some(t), was_truncated)
+                            }
+                            None => (None, false),
+                        };
+                        SearchResultItem {
+                            rank: i + 1,
                             id: doc.id.clone(),
                             title: doc.title.clone(),
-                            url: doc.url.clone(),
-                            rank: doc.rank,
-                            description: doc.description.clone(),
-                            body: if doc.body.is_empty() {
+                            url: if doc.url.is_empty() {
                                 None
                             } else {
-                                Some(doc.body.clone())
+                                Some(doc.url.clone())
                             },
-                        })
-                        .collect(),
+                            score: doc.rank.unwrap_or_default() as f64,
+                            preview: preview_text,
+                            source: None,
+                            date: None,
+                            preview_truncated,
+                        }
+                    })
+                    .collect();
+
+                let data = SearchResultsData {
+                    results: items,
+                    total_matches: total,
+                    concepts_matched: vec![],
+                    wildcard_fallback: false,
                 };
-                print_json_output(&payload, output.mode)?;
+
+                let meta =
+                    ResponseMeta::new("search").with_elapsed(start.elapsed().as_millis() as u64);
+                let response = RobotResponse::success(data, meta);
+                let output_str = formatter.format(&response)?;
+                println!("{}", output_str);
             } else {
                 for doc in res.results.iter() {
                     let snippet = doc
