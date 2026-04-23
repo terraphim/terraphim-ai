@@ -26,8 +26,14 @@ aider-connector = ["dep:regex", "dep:terraphim-markdown-parser"]
 # Enable Cline session connector (VS Code extension)
 cline-connector = []
 
+# Enable OpenCode session connector
+opencode-connector = []
+
+# Enable Codex (OpenAI) session connector
+codex-connector = []
+
 # Enable all extra connectors
-extra-connectors = ["aider-connector", "cline-connector"]
+extra-connectors = ["aider-connector", "cline-connector", "opencode-connector", "codex-connector"]
 
 # Enable terraphim knowledge graph enrichment
 enrichment = ["terraphim_automata", "terraphim_rolegraph", "terraphim_types"]
