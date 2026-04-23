@@ -428,10 +428,253 @@ EOF
 - **Use trigger directives** for TF-IDF fallback: `trigger:: when testing Svelte components`
 - **Use pinned nodes** sparingly: `pinned:: true` always includes a concept regardless of query
 
+## Integrating with AI Coding Agents
+
+The `terraphim_mcp_server` binary exposes all search, autocomplete, replace, and knowledge graph tools via the Model Context Protocol (MCP). This lets any MCP-compatible AI coding agent -- opencode, Claude Code, Cursor, Windsurf -- use your front-end developer knowledge graph as a tool during coding sessions.
+
+### Prerequisites
+
+Build and install the MCP server:
+
+```bash
+cargo build --release -p terraphim_mcp_server
+cargo install --path crates/terraphim_mcp_server
+```
+
+Verify it runs:
+
+```bash
+terraphim_mcp_server --help
+```
+
+The server supports two transport modes:
+- **stdio** (default): JSON-RPC over stdin/stdout -- used by opencode and Claude Code
+- **SSE**: HTTP-based Server-Sent Events -- use `--sse` flag with `--bind 127.0.0.1:8000`
+
+### How It Works
+
+When the MCP server starts, it:
+1. Loads your role configuration from `~/.config/terraphim/embedded_config.json`
+2. Builds the Aho-Corasick automaton from the knowledge graph
+3. Registers 15+ tools: `search`, `autocomplete_terms`, `autocomplete_with_snippets`, `fuzzy_autocomplete_search`, `find_matches`, `replace_matches`, `extract_paragraphs_from_automata`, `terraphim_find_files`, `terraphim_grep`, `terraphim_multi_grep`, and more
+4. Auto-routes queries to the correct role based on query content
+
+The AI coding agent calls these tools during conversations. For example, when you ask "how do I make this Svelte component accessible?", the agent can:
+1. Call `search` with query "accessible Svelte component" (auto-routes to Front-End Developer)
+2. Call `autocomplete_terms` with query "a11y" to discover related terms
+3. Call `replace_matches` to insert KG links into its response
+
+### Integration: opencode
+
+opencode uses a local JSON config at `~/.config/opencode/opencode.json`. Add the terraphim MCP server under the `"mcp"` key:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "terraphim": {
+      "type": "local",
+      "command": ["~/.cargo/bin/terraphim_mcp_server"],
+      "environment": {
+        "TERRAPHIM_DATA_PATH": "~/.terraphim"
+      }
+    }
+  }
+}
+```
+
+After editing the config, restart opencode. The terraphim tools appear as `terraphim__search`, `terraphim__autocomplete_terms`, etc.
+
+The double-underscore prefix (`terraphim__`) is how opencode namespaces MCP tools: `{server_name}__{tool_name}`.
+
+#### Using in opencode Conversations
+
+Once configured, the AI agent in opencode can use terraphim tools automatically. You can also reference them explicitly:
+
+```
+Search the front-end knowledge graph for "flexbox responsive layout" patterns
+```
+
+The agent calls `terraphim__search` with `{"query": "flexbox responsive layout"}`. If you have multiple roles configured, you can force the Front-End Developer role:
+
+```
+Search using role "Front-End Developer" for Svelte form validation patterns
+```
+
+This calls `terraphim__search` with `{"query": "Svelte form validation patterns", "role": "Front-End Developer"}`.
+
+#### opencode Skill Integration
+
+For more structured integration, create a skill at `~/.config/opencode/skill/frontend-developer/SKILL.md`:
+
+```markdown
+---
+name: frontend-developer
+description: Front-end development expert using Terraphim knowledge graph
+triggers:
+  - "svelte"
+  - "typescript"
+  - "css"
+  - "accessibility"
+  - "responsive"
+  - "component"
+---
+
+# Front-End Developer Agent
+
+You have access to the Terraphim knowledge graph via MCP tools. When working on
+front-end code:
+
+1. Use `terraphim__search` to find relevant patterns before coding
+2. Use `terraphim__autocomplete_terms` to discover related terminology
+3. Use `terraphim__terraphim_find_files` to locate files by concept
+
+Always search the KG before suggesting patterns or writing code.
+```
+
+This skill auto-loads when front-end topics are detected in the conversation.
+
+### Integration: Claude Code
+
+Claude Code uses `~/.claude.json` for MCP server configuration. Add the terraphim server under the `"mcpServers"` key:
+
+```json
+{
+  "mcpServers": {
+    "terraphim": {
+      "type": "stdio",
+      "command": "~/.cargo/bin/terraphim_mcp_server",
+      "args": [],
+      "env": {
+        "RUST_LOG": "error",
+        "TERRAPHIM_DATA_PATH": "~/.terraphim"
+      }
+    }
+  }
+}
+```
+
+Key differences from opencode config:
+- `"type": "stdio"` instead of `"type": "local"`
+- Uses `"env"` instead of `"environment"`
+- Optional `"args"` array for command arguments
+
+After editing `~/.claude.json`, restart Claude Code. Verify the tools are loaded:
+
+```bash
+claude mcp list
+```
+
+You should see `terraphim` with all its tools.
+
+#### Claude Code Tool Names
+
+Claude Code names MCP tools as `mcp__{server_name}__{tool_name}`:
+
+| Terraphim Tool | Claude Code Name |
+|---------------|------------------|
+| `search` | `mcp__terraphim__search` |
+| `autocomplete_terms` | `mcp__terraphim__autocomplete_terms` |
+| `autocomplete_with_snippets` | `mcp__terraphim__autocomplete_with_snippets` |
+| `find_matches` | `mcp__terraphim__find_matches` |
+| `replace_matches` | `mcp__terraphim__replace_matches` |
+| `terraphim_find_files` | `mcp__terraphim__terraphim_find_files` |
+| `terraphim_grep` | `mcp__terraphim__terraphim_grep` |
+
+#### Claude Code Permissions
+
+To allow Claude Code to use terraphim tools without prompting, add permissions to `~/.claude/settings.local.json`:
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "mcp__terraphim__search",
+      "mcp__terraphim__autocomplete_terms",
+      "mcp__terraphim__autocomplete_with_snippets",
+      "mcp__terraphim__fuzzy_autocomplete_search",
+      "mcp__terraphim__find_matches",
+      "mcp__terraphim__replace_matches",
+      "mcp__terraphim__extract_paragraphs_from_automata",
+      "mcp__terraphim__terraphim_find_files",
+      "mcp__terraphim__terraphim_grep",
+      "mcp__terraphim__terraphim_multi_grep"
+    ]
+  }
+}
+```
+
+#### Session Start Hook (Optional)
+
+To remind Claude Code about available roles at session start, add to `~/.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo 'Terraphim roles: Front-End Developer (Svelte/TS KG), Default (fallback). Use mcp__terraphim__search to query.'"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+### Integration: Cursor, Windsurf, and Other MCP Clients
+
+Any MCP-compatible client can connect to `terraphim_mcp_server`. For HTTP-based clients, start the SSE server:
+
+```bash
+terraphim_mcp_server --sse --bind 127.0.0.1:8000
+```
+
+Then point the client at `http://127.0.0.1:8000/sse` as the MCP endpoint.
+
+For stdio-based clients, use the same pattern as Claude Code: point the command at `~/.cargo/bin/terraphim_mcp_server`.
+
+### Verifying the Integration
+
+After configuring any client, verify with a simple search:
+
+```
+Search the knowledge graph for "responsive flexbox"
+```
+
+You should see results from the Front-End Developer role with KG concept matches. If you see `[auto-route] picked role "Front-End Developer"`, the integration is working correctly.
+
+### Available MCP Tools Reference
+
+The `terraphim_mcp_server` exposes these tools:
+
+| Tool | Purpose | Key Parameters |
+|------|---------|---------------|
+| `search` | KG-powered document search | `query`, `role`, `limit` |
+| `update_config_tool` | Update role configuration at runtime | `config_str` (JSON) |
+| `build_autocomplete_index` | Build FST index for a role | `role` |
+| `autocomplete_terms` | Prefix + fuzzy term suggestions | `query`, `limit`, `role` |
+| `autocomplete_with_snippets` | Term suggestions with document snippets | `query`, `limit`, `role` |
+| `fuzzy_autocomplete_search` | Jaro-Winkler fuzzy matching | `query`, `similarity`, `limit` |
+| `fuzzy_autocomplete_search_levenshtein` | Levenshtein distance matching | `query`, `max_edit_distance`, `limit` |
+| `fuzzy_autocomplete_search_jaro_winkler` | Explicit Jaro-Winkler matching | `query`, `similarity`, `limit` |
+| `find_matches` | Aho-Corasick term matching in text | `text`, `role`, `return_positions` |
+| `replace_matches` | Replace matched terms with KG links | `text`, `link_type`, `role` |
+| `extract_paragraphs_from_automata` | Extract paragraphs containing KG terms | `text`, `role`, `include_term` |
+| `json_decode` | Parse Logseq JSON output | `jsonlines` |
+| `load_thesaurus` | Load thesaurus from file/URL | `automata_path` |
+| `load_thesaurus_from_json` | Load thesaurus from JSON string | `json_str` |
+| `is_all_terms_connected_by_path` | Check KG term connectivity | `text`, `role` |
+| `terraphim_find_files` | Fuzzy file search with KG scoring | `query`, `path`, `limit` |
+| `terraphim_grep` | Content search with KG-ordered results | `query`, `path`, `limit` |
+| `terraphim_multi_grep` | Multi-pattern Aho-Corasick content search | `patterns`, `path`, `constraints` |
+
 ## Next Steps
 
 - **Add LLM chat**: Set `llm_enabled: true` and configure an Ollama model for conversational search
-- **MCP server**: Expose the agent as a Model Context Protocol tool for Claude Code or Cursor integration
 - **More haystacks**: Add QueryRs for TypeScript documentation, or Quickwit for log analysis
 - **Create more roles**: React specialist, CSS expert, or DevOps engineer using the same pattern
 
