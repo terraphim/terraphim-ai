@@ -66,7 +66,7 @@ impl ProviderHealthMap {
             probed_at: None,
             ttl,
             cb_config: CircuitBreakerConfig {
-                failure_threshold: 5,
+                failure_threshold: 2,
                 cooldown: Duration::from_secs(60),
                 success_threshold: 1,
             },
@@ -95,7 +95,21 @@ impl ProviderHealthMap {
             if seen.contains_key(&key) {
                 continue;
             }
-            seen.insert(key, true);
+            seen.insert(key.clone(), true);
+
+            // Skip probing models whose circuit breaker is already Open.
+            // Probing a known-unhealthy provider wastes tokens and spawns
+            // processes that will likely timeout and leak.
+            if let Some(breaker) = self.breakers.get(&key) {
+                if matches!(breaker.state(), CircuitState::Open) {
+                    debug!(
+                        provider = %rule.provider,
+                        model = %rule.model,
+                        "probe skipped: circuit breaker open"
+                    );
+                    continue;
+                }
+            }
 
             let provider = rule.provider.clone();
             let model = rule.model.clone();
@@ -430,67 +444,99 @@ async fn probe_single(provider: &str, model: &str, action_template: Option<&str>
     let home = std::env::var("HOME").unwrap_or_else(|_| "/home/alex".to_string());
     let path_prefix =
         format!("{home}/.local/bin:{home}/.bun/bin:{home}/bin:{home}/.cargo/bin:{home}/go/bin",);
-    let result = tokio::time::timeout(timeout, async {
-        let output = tokio::process::Command::new("bash")
-            .arg("-c")
-            .arg(&action)
-            .env(
-                "PATH",
-                format!(
-                    "{path_prefix}:{}",
-                    std::env::var("PATH").unwrap_or_default()
-                ),
-            )
-            .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::piped())
-            .spawn()
-            .map_err(|e| format!("spawn failed: {e}"))?
-            .wait_with_output()
-            .await
-            .map_err(|e| format!("wait failed: {e}"))?;
 
-        if output.status.success() {
-            Ok(())
-        } else {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            Err(format!(
-                "exit {}: {}",
-                output.status,
-                stderr.chars().take(200).collect::<String>()
-            ))
+    // Spawn the child process BEFORE the timeout so we can kill it explicitly
+    // if the probe hangs.  Previously the timeout dropped the future without
+    // terminating the underlying bash/opencode process, causing task
+    // accumulation in systemd (observed: 1 244 leaked tasks).
+    let child = match tokio::process::Command::new("bash")
+        .arg("-c")
+        .arg(&action)
+        .env(
+            "PATH",
+            format!(
+                "{path_prefix}:{}",
+                std::env::var("PATH").unwrap_or_default()
+            ),
+        )
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+    {
+        Ok(c) => c,
+        Err(e) => {
+            return ProbeResult {
+                provider: provider.to_string(),
+                model: model.to_string(),
+                cli_tool,
+                status: ProbeStatus::Error,
+                latency_ms: None,
+                error: Some(format!("spawn failed: {e}")),
+                timestamp,
+            };
         }
-    })
-    .await;
+    };
+
+    let pid = child.id();
+    let result = tokio::time::timeout(timeout, child.wait_with_output()).await;
 
     let latency_ms = start.elapsed().as_millis() as u64;
 
     match result {
-        Ok(Ok(())) => {
-            info!(provider, model, latency_ms, "probe success");
-            ProbeResult {
-                provider: provider.to_string(),
-                model: model.to_string(),
-                cli_tool,
-                status: ProbeStatus::Success,
-                latency_ms: Some(latency_ms),
-                error: None,
-                timestamp,
+        Ok(Ok(output)) => {
+            if output.status.success() {
+                info!(provider, model, latency_ms, "probe success");
+                ProbeResult {
+                    provider: provider.to_string(),
+                    model: model.to_string(),
+                    cli_tool,
+                    status: ProbeStatus::Success,
+                    latency_ms: Some(latency_ms),
+                    error: None,
+                    timestamp,
+                }
+            } else {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                let err = format!(
+                    "exit {}: {}",
+                    output.status,
+                    stderr.chars().take(200).collect::<String>()
+                );
+                warn!(provider, model, error = %err, "probe failed");
+                ProbeResult {
+                    provider: provider.to_string(),
+                    model: model.to_string(),
+                    cli_tool,
+                    status: ProbeStatus::Error,
+                    latency_ms: Some(latency_ms),
+                    error: Some(err),
+                    timestamp,
+                }
             }
         }
         Ok(Err(e)) => {
-            warn!(provider, model, error = %e, "probe failed");
+            let err = format!("wait failed: {e}");
+            warn!(provider, model, error = %err, "probe failed");
             ProbeResult {
                 provider: provider.to_string(),
                 model: model.to_string(),
                 cli_tool,
                 status: ProbeStatus::Error,
                 latency_ms: Some(latency_ms),
-                error: Some(e),
+                error: Some(err),
                 timestamp,
             }
         }
         Err(_) => {
-            warn!(provider, model, "probe timed out after 30s");
+            // Timeout: the bash/opencode process is still running.  Explicitly
+            // SIGKILL it to prevent process leaks.
+            if let Some(pid) = pid {
+                let _ = std::process::Command::new("kill")
+                    .arg("-9")
+                    .arg(pid.to_string())
+                    .spawn();
+            }
+            warn!(provider, model, "probe timed out after 60s");
             ProbeResult {
                 provider: provider.to_string(),
                 model: model.to_string(),
