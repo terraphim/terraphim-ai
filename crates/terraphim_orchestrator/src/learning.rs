@@ -3,30 +3,24 @@
 //! Provides a persistence-backed store for learnings extracted from agent runs.
 //! Learnings are shared across agents to improve reliability and efficiency.
 //!
-//! Uses `terraphim_persistence` for storage, following the same pattern as
-//! `metrics_persistence` — a trait with in-memory and device-storage implementations.
+//! Two trait layers:
+//! - `LearningPersistence` (async, internal) — direct DeviceStorage interaction
+//! - `terraphim_types::shared_learning::LearningStore` (sync, public) — shared
+//!   contract with `terraphim_agent`
 //!
 //! # Architecture
 //!
 //! ```text
-//! Flow State Parser (Python)
-//!     ↓ JSONL learnings
+//! terraphim_types::LearningStore (sync trait)
+//!     ↓ impl on SharedLearningStore
 //! SharedLearningStore
-//!     ↓ LearningPersistence trait
+//!     ↓ delegates to LearningPersistence
 //!     ├── InMemoryLearningPersistence (tests)
-//!     └── DeviceStorageLearningPersistence (production, uses terraphim_persistence)
-//!          ↓
+//!     └── DeviceStorageLearningPersistence (production)
+//!          ↓ terraphim_persistence
 //!     Orchestrator (pre-spawn context injection)
-//!          ↓ /tmp/adf-context-{agent}.md
 //!     Agent Task
 //! ```
-//!
-//! # Trust Levels
-//!
-//! - **L0**: Unverified — just extracted, not yet shown to agents
-//! - **L1**: Verified once — passed verify_pattern or one effective application
-//! - **L2**: Verified multiple times — candidate for Gitea wiki sync
-//! - **L3**: Golden — manually verified, always included in context
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -799,6 +793,152 @@ impl SharedLearningStore {
     }
 }
 
+fn block_on<F: std::future::Future>(fut: F) -> F::Output {
+    tokio::task::block_in_place(|| {
+        let rt = tokio::runtime::Handle::current();
+        rt.block_on(fut)
+    })
+}
+
+fn convert_trust(tl: terraphim_types::shared_learning::TrustLevel) -> TrustLevel {
+    match tl {
+        terraphim_types::shared_learning::TrustLevel::L0 => TrustLevel::L0,
+        terraphim_types::shared_learning::TrustLevel::L1 => TrustLevel::L1,
+        terraphim_types::shared_learning::TrustLevel::L2 => TrustLevel::L2,
+        terraphim_types::shared_learning::TrustLevel::L3 => TrustLevel::L3,
+    }
+}
+
+fn to_shared_learning(l: &Learning) -> terraphim_types::shared_learning::SharedLearning {
+    let mut sl = terraphim_types::shared_learning::SharedLearning::new(
+        l.summary.clone(),
+        l.details.clone().unwrap_or_default(),
+        terraphim_types::shared_learning::LearningSource::Manual,
+        l.source_agent.clone(),
+    );
+    sl.id = l.id.clone();
+    sl.trust_level = match l.trust_level {
+        TrustLevel::L0 => terraphim_types::shared_learning::TrustLevel::L0,
+        TrustLevel::L1 => terraphim_types::shared_learning::TrustLevel::L1,
+        TrustLevel::L2 => terraphim_types::shared_learning::TrustLevel::L2,
+        TrustLevel::L3 => terraphim_types::shared_learning::TrustLevel::L3,
+    };
+    sl.applicable_agents = l.applicable_agents.clone();
+    sl.verify_pattern = l.verify_pattern.clone();
+    sl.quality.applied_count = l.applied_count;
+    sl.quality.effective_count = l.effective_count;
+    sl.created_at = l.created_at;
+    sl.updated_at = l.updated_at;
+    sl
+}
+
+impl terraphim_types::shared_learning::LearningStore for SharedLearningStore {
+    fn insert(
+        &self,
+        learning: terraphim_types::shared_learning::SharedLearning,
+    ) -> Result<String, terraphim_types::shared_learning::StoreError> {
+        let input = NewLearning {
+            source_agent: learning.source_agent.clone(),
+            category: LearningCategory::Pattern,
+            summary: learning.title.clone(),
+            details: Some(learning.content.clone()),
+            applicable_agents: learning.applicable_agents.clone(),
+            verify_pattern: learning.verify_pattern.clone(),
+        };
+        block_on(self.persistence.insert(input))
+            .map_err(|e| terraphim_types::shared_learning::StoreError::Persistence(e.to_string()))
+    }
+
+    fn get(
+        &self,
+        id: &str,
+    ) -> Result<
+        terraphim_types::shared_learning::SharedLearning,
+        terraphim_types::shared_learning::StoreError,
+    > {
+        let opt = block_on(self.persistence.get(id)).map_err(|e| {
+            terraphim_types::shared_learning::StoreError::Persistence(e.to_string())
+        })?;
+        opt.as_ref()
+            .map(to_shared_learning)
+            .ok_or_else(|| terraphim_types::shared_learning::StoreError::NotFound(id.to_string()))
+    }
+
+    fn query_relevant(
+        &self,
+        agent: &str,
+        context: &str,
+        min_trust: terraphim_types::shared_learning::TrustLevel,
+        limit: usize,
+    ) -> Result<
+        Vec<terraphim_types::shared_learning::SharedLearning>,
+        terraphim_types::shared_learning::StoreError,
+    > {
+        let results = block_on(
+            self.persistence
+                .query_relevant(agent, convert_trust(min_trust)),
+        )
+        .map_err(|e| terraphim_types::shared_learning::StoreError::Persistence(e.to_string()))?;
+        let context_lower = context.to_lowercase();
+        let mut filtered: Vec<_> = results
+            .into_iter()
+            .filter(|l| {
+                context_lower.is_empty()
+                    || l.summary.to_lowercase().contains(&context_lower)
+                    || l.details
+                        .as_ref()
+                        .is_some_and(|d| d.to_lowercase().contains(&context_lower))
+            })
+            .map(|l| to_shared_learning(&l))
+            .collect();
+        filtered.truncate(limit);
+        Ok(filtered)
+    }
+
+    fn record_applied(&self, id: &str) -> Result<(), terraphim_types::shared_learning::StoreError> {
+        block_on(self.persistence.record_applied(id))
+            .map_err(|e| terraphim_types::shared_learning::StoreError::Persistence(e.to_string()))
+    }
+
+    fn record_effective(
+        &self,
+        id: &str,
+    ) -> Result<(), terraphim_types::shared_learning::StoreError> {
+        block_on(self.persistence.record_effective(id))
+            .map_err(|e| terraphim_types::shared_learning::StoreError::Persistence(e.to_string()))
+    }
+
+    fn list_by_trust(
+        &self,
+        min_trust: terraphim_types::shared_learning::TrustLevel,
+    ) -> Result<
+        Vec<terraphim_types::shared_learning::SharedLearning>,
+        terraphim_types::shared_learning::StoreError,
+    > {
+        let ids = block_on(self.persistence.list_ids()).map_err(|e| {
+            terraphim_types::shared_learning::StoreError::Persistence(e.to_string())
+        })?;
+        let min = convert_trust(min_trust);
+        let mut results = Vec::new();
+        for id in &ids {
+            if let Ok(Some(l)) = block_on(self.persistence.get(id)) {
+                if l.trust_level >= min && l.archived_at.is_none() {
+                    results.push(to_shared_learning(&l));
+                }
+            }
+        }
+        Ok(results)
+    }
+
+    fn archive_stale(
+        &self,
+        max_age_days: u32,
+    ) -> Result<usize, terraphim_types::shared_learning::StoreError> {
+        block_on(self.persistence.archive_stale(max_age_days))
+            .map_err(|e| terraphim_types::shared_learning::StoreError::Persistence(e.to_string()))
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -968,5 +1108,40 @@ mod tests {
 "#;
         let count = store.import_jsonl(jsonl).await.unwrap();
         assert_eq!(count, 2);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_learning_store_trait_impl() {
+        use terraphim_types::shared_learning::{
+            LearningSource, LearningStore as _, SharedLearning,
+        };
+
+        let store = SharedLearningStore::in_memory();
+        let dyn_store: &dyn terraphim_types::shared_learning::LearningStore = &store;
+
+        let learning = SharedLearning::new(
+            "Trait impl test".to_string(),
+            "content".to_string(),
+            LearningSource::Manual,
+            "test-agent".to_string(),
+        );
+        let id = dyn_store.insert(learning).unwrap();
+
+        let retrieved = dyn_store.get(&id).unwrap();
+        assert_eq!(retrieved.title, "Trait impl test");
+
+        dyn_store.record_effective(&id).unwrap();
+        let after = dyn_store.get(&id).unwrap();
+        assert_eq!(after.quality.effective_count, 1);
+
+        let results = dyn_store
+            .query_relevant(
+                "test-agent",
+                "",
+                terraphim_types::shared_learning::TrustLevel::L1,
+                10,
+            )
+            .unwrap();
+        assert_eq!(results.len(), 1);
     }
 }
