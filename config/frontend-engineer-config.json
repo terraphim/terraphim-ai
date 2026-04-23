@@ -2,8 +2,8 @@
   "Front-End Developer": {
     "shortname": "fedev",
     "name": "Front-End Developer",
-    "relevance_function": "BM25Plus",
-    "terraphim_it": false,
+    "relevance_function": "terraphim-graph",
+    "terraphim_it": true,
     "theme": "yeti",
     "kg": {
       "automata_path": null,
