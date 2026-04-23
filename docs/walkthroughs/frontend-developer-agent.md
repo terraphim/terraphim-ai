@@ -10,7 +10,9 @@ By the end of this walkthrough you will have a front-end developer agent that:
 - Searches your local project files via Ripgrep
 - Searches millions of GitHub repositories for TypeScript code via grep.app
 - Returns deterministic, ranked results without an LLM
+- Uses hybrid scoring: knowledge graph concept matching boosted by TF-IDF
 - Provides autocomplete suggestions for front-end terminology
+- Inserts knowledge graph links into search results automatically
 
 ## Prerequisites
 
@@ -61,6 +63,8 @@ This creates a role called "FrontEnd Engineer" with:
 
 The setup wizard writes the configuration to `~/.config/terraphim/embedded_config.json`.
 
+**Important**: The default template uses `bm25plus`, which does not use KG concepts for ranking. We recommend changing to `terraphim-graph` (explained in Step 5) for hybrid KG + TF-IDF scoring.
+
 ## Step 3: Understand the Architecture
 
 Before customising, understand the three layers that make the agent work:
@@ -110,7 +114,7 @@ A haystack is a searchable data source. Each role can have multiple haystacks:
 | Ripgrep | Local filesystem | Your project files (`.svelte`, `.ts`, `.css`, `.md`) |
 | GrepApp | grep.app API | Millions of public GitHub repositories |
 
-Results from all haystacks are merged and ranked using the role's relevance function (BM25Plus).
+Results from all haystacks are merged and ranked using the role's relevance function. With `terraphim-graph`, this is a two-pass hybrid: graph-based KG ranking first, then TF-IDF rescoring at 30% weight.
 
 ### The Search Flow
 
@@ -133,10 +137,12 @@ Your query: "flexbox responsive layout"
   GrepApp:  searches GitHub TypeScript repos for "flexbox responsive layout"
        |
        v
-[Merge + Rank] BM25Plus scoring combines both result sets
-       |
-       v
-[Results] Ranked list of documents with relevance scores
+[Merge + Rank] TerraphimGraph hybrid scoring:
+  Pass 1: KG graph ranking (node + edge co-occurrence)
+  Pass 2: TF-IDF rescoring (30% weight boost)
+        |
+        v
+[Results] Ranked list of documents with hybrid scores
 ```
 
 ## Step 4: Create the Knowledge Graph
@@ -212,11 +218,13 @@ The full KG covers:
 
 ## Step 5: Configure the Role
 
-Create or update the role configuration at `~/.config/terraphim/embedded_config.json`. The key change from the default template is:
+Create or update the role configuration at `~/.config/terraphim/embedded_config.json`. The key changes from the default template are:
 
-1. **TypeScript instead of JavaScript** for the GrepApp filter
-2. **Correct KG path** pointing to our new knowledge graph
-3. **Svelte/SvelteKit-focused synonyms** in the KG
+1. **`terraphim-graph` instead of `bm25plus`** for hybrid KG + TF-IDF scoring
+2. **`terraphim_it: true`** to enable KG link insertion in results
+3. **TypeScript instead of JavaScript** for the GrepApp filter
+4. **Correct KG path** pointing to our new knowledge graph
+5. **Svelte/SvelteKit-focused synonyms** in the KG
 
 The full configuration:
 
@@ -225,8 +233,8 @@ The full configuration:
   "Front-End Developer": {
     "shortname": "fedev",
     "name": "Front-End Developer",
-    "relevance_function": "BM25Plus",
-    "terraphim_it": false,
+    "relevance_function": "terraphim-graph",
+    "terraphim_it": true,
     "theme": "yeti",
     "kg": {
       "automata_path": null,
@@ -264,12 +272,35 @@ The full configuration:
 
 | Field | Value | Why |
 |-------|-------|-----|
-| `relevance_function` | `BM25Plus` | Field-weighted ranking works well for mixed document types (code, markdown, config) |
-| `terraphim_it` | `false` | Disables text replacement transformations (we want raw search, not KG rewriting) |
+| `relevance_function` | `terraphim-graph` | Hybrid scoring: KG graph ranking + 30% TF-IDF boost. Discovers conceptually related documents, not just exact query matches |
+| `terraphim_it` | `true` | Enables KG link insertion in search results and text replacement via `replace` command |
 | `kg.path` | `~/.config/terraphim/kg/frontend` | Points to our 18-file front-end knowledge graph |
 | `haystacks[0]` | Ripgrep at `~/projects` | Searches your local project files |
 | `haystacks[1]` | GrepApp with `language: "typescript"` | Searches GitHub TypeScript repos via grep.app |
 | `llm_enabled` | `false` | Deterministic mode: no LLM, no hallucination, fully reproducible |
+
+### Why terraphim-graph over bm25plus
+
+Terraphim offers multiple relevance functions. The two most relevant for a KG-backed agent are:
+
+| Aspect | BM25Plus | TerraphimGraph (recommended) |
+|--------|----------|------------------------------|
+| KG concepts affect ranking | No (display only) | Yes (graph + TF-IDF hybrid) |
+| Term co-occurrence | Not used | Boosts related documents |
+| Graph visualization | Not available | Available after search |
+| KG link insertion | Disabled | Enabled in results |
+| TF-IDF rescoring | Not applied | 30% weight boost |
+| Document discovery | Exact query match | Concept-expanded matching |
+
+In testing, a query for "svelte component" returned 1 result with BM25Plus and 13 results with TerraphimGraph. The terraphim-graph mode is strictly superior for a KG-backed agent because the 18 concept files with 358 synonyms actively influence ranking, not just display.
+
+### How Hybrid Scoring Works
+
+TerraphimGraph uses a two-pass scoring system:
+
+**Pass 1 -- Graph Ranking**: The Aho-Corasick automaton matches KG terms in each document. Consecutive matches form edges in a co-occurrence graph. Documents are ranked by `total_rank = node_rank + edge_rank + document_rank`. Documents containing co-occurring concepts (e.g., "svelte" + "component" + "state management") score higher.
+
+**Pass 2 -- TF-IDF Boost**: After graph ranking, a TF-IDF scorer re-evaluates each document against the query and adds 30% TF-IDF weight to the graph rank. This ensures documents with higher term frequency for the actual query terms get an additional boost.
 
 ## Step 6: Use the Agent
 
