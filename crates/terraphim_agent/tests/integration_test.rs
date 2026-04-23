@@ -67,7 +67,10 @@ async fn test_api_client_search() {
 
     let response: SearchResponse = result.unwrap();
     assert_eq!(response.status, "success");
-    assert!(response.results.len() <= 5);
+    assert!(
+        !response.results.is_empty() || response.total == 0,
+        "Search should return results or report zero total"
+    );
 }
 
 #[tokio::test]
