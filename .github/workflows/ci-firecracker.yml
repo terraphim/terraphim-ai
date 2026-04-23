@@ -1,0 +1,110 @@
+name: CI (Firecracker)
+
+on:
+  workflow_dispatch:
+    inputs:
+      vm_type:
+        description: 'Firecracker VM image type'
+        required: false
+        default: 'focal-ci'
+        type: choice
+        options:
+          - focal-ci
+          - focal
+  pull_request:
+    paths:
+      - 'crates/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'terraphim_server/**'
+
+# Cancel in-progress runs on the same branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Rust build + test (Firecracker)
+    # bigbox self-hosted runners co-locate with fcctl-web on 127.0.0.1:8080
+    runs-on: [self-hosted]
+    timeout-minutes: 15
+    env:
+      FCCTL_URL: http://127.0.0.1:8080
+      VM_TYPE: ${{ inputs.vm_type || 'focal-ci' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Health check fcctl-web
+        run: |
+          curl -sf --retry 3 --retry-delay 2 $FCCTL_URL/health \
+            | jq .
+          echo "fcctl-web is healthy"
+
+      - name: Create build VM
+        id: vm
+        run: |
+          RESPONSE=$(curl -sf -X POST $FCCTL_URL/api/vms \
+            -H 'Content-Type: application/json' \
+            -d "{\"vm_type\": \"$VM_TYPE\"}")
+          echo "$RESPONSE" | jq .
+          VM_ID=$(echo "$RESPONSE" | jq -r '.id')
+          if [ -z "$VM_ID" ] || [ "$VM_ID" = "null" ]; then
+            echo "ERROR: failed to parse vm id from response"
+            exit 1
+          fi
+          echo "vm_id=$VM_ID" >> $GITHUB_OUTPUT
+          echo "Created VM: $VM_ID"
+
+      - name: cargo fmt --check
+        run: |
+          curl -sf -X POST $FCCTL_URL/api/llm/execute \
+            -H 'Content-Type: application/json' \
+            -d "{
+              \"code\": \"cd /workspace && cargo fmt -- --check\",
+              \"language\": \"bash\",
+              \"agent_id\": \"ci-fmt-${{ github.run_id }}\",
+              \"timeout_ms\": 60000
+            }" | jq -e '.exit_code == 0'
+
+      - name: cargo clippy
+        run: |
+          curl -sf -X POST $FCCTL_URL/api/llm/execute \
+            -H 'Content-Type: application/json' \
+            -d "{
+              \"code\": \"cd /workspace && cargo clippy -- -D warnings\",
+              \"language\": \"bash\",
+              \"agent_id\": \"ci-clippy-${{ github.run_id }}\",
+              \"timeout_ms\": 120000
+            }" | jq -e '.exit_code == 0'
+
+      - name: cargo build --workspace
+        run: |
+          curl -sf -X POST $FCCTL_URL/api/llm/execute \
+            -H 'Content-Type: application/json' \
+            -d "{
+              \"code\": \"cd /workspace && cargo build --workspace\",
+              \"language\": \"bash\",
+              \"agent_id\": \"ci-build-${{ github.run_id }}\",
+              \"timeout_ms\": 180000
+            }" | jq -e '.exit_code == 0'
+
+      - name: cargo test --workspace
+        run: |
+          curl -sf -X POST $FCCTL_URL/api/llm/execute \
+            -H 'Content-Type: application/json' \
+            -d "{
+              \"code\": \"cd /workspace && cargo test --workspace\",
+              \"language\": \"bash\",
+              \"agent_id\": \"ci-test-${{ github.run_id }}\",
+              \"timeout_ms\": 300000
+            }" | jq -e '.exit_code == 0'
+
+      - name: Destroy VM
+        if: always()
+        run: |
+          VM_ID="${{ steps.vm.outputs.vm_id }}"
+          if [ -n "$VM_ID" ] && [ "$VM_ID" != "null" ]; then
+            curl -sf -X DELETE $FCCTL_URL/api/vms/$VM_ID && echo "VM $VM_ID destroyed"
+          fi
