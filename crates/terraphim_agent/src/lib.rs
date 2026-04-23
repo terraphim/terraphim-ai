@@ -26,8 +26,8 @@ pub use client::*;
 
 // Re-export robot mode types
 pub use robot::{
-    ExitCode, FieldMode, OutputFormat, RobotConfig, RobotError, RobotFormatter, RobotResponse,
-    SelfDocumentation,
+    BudgetEngine, BudgetError, BudgetedResults, ExitCode, FieldMode, OutputFormat, RobotConfig,
+    RobotError, RobotFormatter, RobotResponse, SelfDocumentation,
 };
 
 // Re-export forgiving CLI types

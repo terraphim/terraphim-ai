@@ -3,6 +3,7 @@
 //! This module provides structured JSON output and self-documentation
 //! capabilities for integration with AI agents and automation tools.
 
+pub mod budget;
 #[allow(dead_code)]
 pub mod docs;
 #[allow(dead_code)]
@@ -12,6 +13,7 @@ pub mod output;
 #[allow(dead_code)]
 pub mod schema;
 
+pub use budget::{BudgetEngine, BudgetError, BudgetedResults};
 #[allow(unused_imports)]
 pub use docs::{ArgumentDoc, Capabilities, CommandDoc, ExampleDoc, FlagDoc, SelfDocumentation};
 #[allow(unused_imports)]
