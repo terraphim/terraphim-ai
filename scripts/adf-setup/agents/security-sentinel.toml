@@ -1,0 +1,104 @@
+# Security-sentinel agent template
+#
+# Safety-layer agent. Runs security audits (cargo audit, secret scan,
+# unsafe block review) and posts plain verdicts to Gitea issues.
+#
+# Triggered by cron schedule OR human mention. Does NOT trigger
+# merge-coordinator — verdicts are consumed by the cron-driven
+# merge-coordinator on its next evaluation cycle.
+#
+# Subscription-only models only (C1 constraint).
+
+[[agents]]
+name = "security-sentinel"
+layer = "Safety"
+cli_tool = "/home/alex/.bun/bin/opencode"
+fallback_provider = "/home/alex/.bun/bin/opencode"
+fallback_model = "kimi-for-coding/k2p5"
+persona = "Vigil"
+skill_chain = [
+    "disciplined-verification",
+    "disciplined-validation",
+]
+max_cpu_seconds = 7200
+max_ticks = 24
+grace_period_secs = 30
+schedule = "0 1 * * *"
+capabilities = [
+    "security",
+    "vulnerability-scanning",
+    "compliance",
+]
+project = "terraphim"
+task = '''
+source ~/.profile
+
+## Session Start -- Read Before Working
+
+Before doing ANY work, check for learnings from previous agent runs:
+
+1. List wiki pages for relevant learnings:
+   gtr wiki-list --owner terraphim --repo terraphim-ai | grep -i "Learning-"
+
+2. Read any learning pages matching your current task:
+   gtr wiki-get --owner terraphim --repo terraphim-ai --name "Learning-<relevant>"
+
+3. Check terraphim-agent learnings for known mistakes:
+   ~/.cargo/bin/terraphim-agent learn query "<keywords from your task>"
+
+4. Apply any relevant learnings to avoid repeating past mistakes.
+   If a learning says "don't do X", do NOT do X.
+
+---
+
+Run security audit on the terraphim-ai project at /home/alex/terraphim-ai:
+1. cd /home/alex/terraphim-ai && cargo audit (check for known CVEs in dependencies)
+2. Review Cargo.lock for outdated dependencies with known vulnerabilities
+3. Scan for hardcoded secrets or API keys: grep -r "sk-" "api_key" "secret" in src/
+4. Check unsafe blocks: grep -rn "unsafe" crates/ and assess necessity
+5. Review recent commits for security-relevant changes: git log --since=24hours --oneline
+6. Also check server exposure: ss -tlnp for unexpected listening ports
+7. Generate a security report
+Prioritize any CVEs or critical vulnerabilities in project dependencies.
+
+## MANDATORY: Post verdict to Gitea
+Post your security verdict to the Gitea issue from the mention context.
+- PASS if no critical security issues found
+- FAIL if critical vulnerabilities or issues found
+
+Use ISSUE_NUMBER from the mention context that dispatched you:
+
+/home/alex/go/bin/gitea-robot comment --owner terraphim --repo terraphim-ai --index ISSUE_NUMBER --body 'security-sentinel verdict: PASS/FAIL
+
+<your security report>'
+
+IMPORTANT: Do NOT mention @adf:merge-coordinator or any other agent in your verdict comment. The merge-coordinator evaluates all verdicts on its scheduled cron cycle.
+
+---
+
+## Session Handover -- Write Before Exiting
+
+Before you finish, write a handover:
+
+1. Create/update a wiki page with your session summary:
+   gtr wiki-create --owner terraphim --repo terraphim-ai --title "Learning-$(date +%Y%m%d)-security-sentinel-ISSUE_NUMBER" --content "## Session Summary
+
+   **Agent**: security-sentinel
+   **Issue**: #ISSUE_NUMBER
+   **Outcome**: SUCCESS/FAIL
+
+   ### What Worked
+   - ...
+
+   ### What Failed (avoid next time)
+   - ...
+
+   ### Key Decisions
+   - ...
+   " --message "Session learning from security-sentinel"
+
+2. If you encountered errors, capture them:
+   ~/.cargo/bin/terraphim-agent learn capture "command that failed" --error "error message" --exit-code 1
+
+3. IMPORTANT: Do NOT mention @adf: agents in your handover.
+'''

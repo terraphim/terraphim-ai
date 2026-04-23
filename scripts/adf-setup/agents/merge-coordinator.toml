@@ -1,0 +1,220 @@
+# Merge-coordinator agent template
+#
+# Cron-driven review gate agent. Evaluates open issues every 4 hours.
+# Only acts when ALL required reviews PASS (merge) or ANY FAIL (remediate).
+# Silent when reviews are MISSING — no churn, no noise.
+#
+# Human override: mention @adf:merge-coordinator on any issue for
+# immediate evaluation.
+#
+# Subscription-only models only (C1 constraint).
+
+[[agents]]
+name = "merge-coordinator"
+layer = "Growth"
+schedule = "0 */4 * * *"
+cli_tool = "/home/alex/.bun/bin/opencode"
+fallback_provider = "/home/alex/.bun/bin/opencode"
+fallback_model = "kimi-for-coding/k2p5"
+max_cpu_seconds = 7200
+max_ticks = 24
+grace_period_secs = 30
+persona = "Ferrox"
+skill_chain = [
+    "disciplined-research",
+    "disciplined-design",
+    "disciplined-specification",
+    "disciplined-verification",
+]
+capabilities = [
+    "merge",
+    "review-gate",
+    "pull-request",
+    "quality-gate",
+    "coordination",
+]
+task = '''
+source ~/.profile
+export GITEA_TOKEN=11d7135832c0953d0856b103b561a6740e230db6
+export GITEA_URL=https://git.terraphim.cloud
+
+# merge-coordinator: cron-driven review gate
+# Evaluates all open issues with linked PRs every 4 hours.
+# Only acts on ALL PASS (merge) or ANY FAIL (remediate).
+# Skips silently when ANY MISSING.
+
+REQUIRED_REVIEWERS="compound-review test-guardian spec-validator compliance-watchdog security-sentinel"
+
+# Fetch open issues
+ISSUES_JSON=$(gtr list-issues --owner terraphim --repo terraphim-ai --state open 2>/dev/null)
+
+if [ -z "$ISSUES_JSON" ] || [ "$ISSUES_JSON" = "null" ]; then
+  echo "No open issues or failed to fetch."
+  exit 0
+fi
+
+# Process each issue via inline Python for structured parsing
+echo "$ISSUES_JSON" | python3 -c '
+import json, sys, re, datetime, os, subprocess
+
+issues = json.load(sys.stdin)
+if not issues:
+    print("No open issues found.")
+    sys.exit(0)
+
+REQUIRED = ["compound-review", "test-guardian", "spec-validator", "compliance-watchdog", "security-sentinel"]
+GITEA_TOKEN = os.environ.get("GITEA_TOKEN", "")
+GITEA_URL = os.environ.get("GITEA_URL", "")
+
+def gtr_cmd(*args):
+    result = subprocess.run(["gtr"] + list(args), capture_output=True, text=True)
+    return result.stdout.strip(), result.returncode
+
+def fetch_comments(issue_num):
+    try:
+        result = subprocess.run([
+            "curl", "-sf", "-H", f"Authorization: token {GITEA_TOKEN}",
+            f"{GITEA_URL}/api/v1/repos/terraphim/terraphim-ai/issues/{issue_num}/comments"
+        ], capture_output=True, text=True)
+        if result.returncode == 0 and result.stdout:
+            return json.loads(result.stdout)
+    except Exception:
+        pass
+    return []
+
+def recently_evaluated(comments, hours=6):
+    now = datetime.datetime.now(datetime.timezone.utc)
+    for c in comments:
+        if c.get("user", {}).get("login") == "merge-coordinator":
+            created = datetime.datetime.fromisoformat(c["created_at"].replace("Z", "+00:00"))
+            if (now - created).total_seconds() < hours * 3600:
+                return True
+    return False
+
+def parse_verdicts(comments):
+    verdicts = {r: "MISSING" for r in REQUIRED}
+    for c in comments:
+        body = c.get("body", "")
+        for reviewer in REQUIRED:
+            if reviewer not in body:
+                continue
+            body_upper = body.upper()
+            if any(v in body_upper for v in ["PASS", "GO", "APPROVED", "LGTM", "NO ISSUES FOUND", "CLEAN"]):
+                verdicts[reviewer] = "PASS"
+            elif any(v in body_upper for v in ["FAIL", "NO-GO", "REJECTED", "BLOCKED", "ISSUES FOUND", "CRITICAL"]):
+                verdicts[reviewer] = "FAIL"
+    return verdicts
+
+def find_linked_pr(issue_body, comments):
+    text = issue_body + " " + " ".join(c.get("body", "") for c in comments)
+    m = re.search(r"(?:PR|pull[s/]*)[#\s]*(\d+)", text, re.IGNORECASE)
+    if m:
+        return m.group(1)
+    return None
+
+def find_existing_remediation(issue_num, reviewer):
+    out, _ = gtr_cmd("list-issues", "--owner", "terraphim", "--repo", "terraphim-ai", "--state", "open")
+    if not out:
+        return None
+    try:
+        open_issues = json.loads(out)
+        prefix = f"[Remediation] {reviewer} FAIL on #{issue_num}"
+        for i in open_issues:
+            if i.get("title", "").startswith(prefix):
+                return i["number"]
+    except Exception:
+        pass
+    return None
+
+for issue in issues:
+    issue_num = issue["number"]
+    issue_title = issue.get("title", "")
+
+    print(f"\n=== Evaluating issue #{issue_num}: {issue_title[:60]} ===")
+
+    comments = fetch_comments(issue_num)
+
+    # Self-cooldown: skip if already evaluated in last 6h
+    if recently_evaluated(comments, hours=6):
+        print(f"  Self-cooldown: already evaluated in last 6h; skip")
+        continue
+
+    verdicts = parse_verdicts(comments)
+    missing = [r for r, v in verdicts.items() if v == "MISSING"]
+    failed = [r for r, v in verdicts.items() if v == "FAIL"]
+    passed = [r for r, v in verdicts.items() if v == "PASS"]
+
+    print(f"  Verdicts: PASS={passed}, FAIL={failed}, MISSING={missing}")
+
+    # Case 1: ANY MISSING -> skip silently (no churn)
+    if missing:
+        print(f"  MISSING reviewers ({len(missing)}); skip silently. Will re-check on next cron tick.")
+        continue
+
+    # Case 2: ALL PASS -> merge PR and close issue
+    if not failed and not missing:
+        pr_num = find_linked_pr(issue.get("body", ""), comments)
+        if not pr_num:
+            print(f"  ALL PASS but no linked PR found; skip merge. Post ready-for-merge comment.")
+            summary = f"merge-coordinator: All {len(REQUIRED)} required reviews PASSED.\n\n"
+            summary += "Review summary:\n" + "\n".join(f"- {r}: PASS" for r in REQUIRED)
+            summary += "\n\nNo linked PR detected. Human merge required."
+            gtr_cmd("comment", "--owner", "terraphim", "--repo", "terraphim-ai", "--issue", str(issue_num), "--body", summary)
+            continue
+
+        print(f"  ALL PASS. Merging PR #{pr_num} and closing issue #{issue_num}.")
+        gtr_cmd("merge-pull", "--owner", "terraphim", "--repo", "terraphim-ai", "--index", pr_num, "--style", "merge", "--delete-branch")
+        gtr_cmd("close-issue", "--owner", "terraphim", "--repo", "terraphim-ai", "--issue", str(issue_num))
+
+        summary = f"merge-coordinator: All {len(REQUIRED)} required reviews PASSED. PR #{pr_num} merged and issue closed.\n\n"
+        summary += "Review summary:\n" + "\n".join(f"- {r}: PASS" for r in REQUIRED)
+        gtr_cmd("comment", "--owner", "terraphim", "--repo", "terraphim-ai", "--issue", str(issue_num), "--body", summary)
+        continue
+
+    # Case 3: ANY FAIL -> create remediation issues, close original
+    print(f"  FAIL verdicts from: {failed}")
+
+    remediation_list = []
+    for reviewer in failed:
+        existing = find_existing_remediation(issue_num, reviewer)
+        if existing:
+            print(f"  Remediation issue #{existing} already exists for {reviewer}; skip creation")
+            remediation_list.append(f"- {reviewer}: FAIL -> Issue #{existing} (existing)")
+            continue
+
+        # Extract the reviewer FAIL comment for context
+        reviewer_comment = ""
+        for c in comments:
+            if reviewer in c.get("body", ""):
+                reviewer_comment = c.get("body", "")[:500]
+                break
+
+        title = f"[Remediation] {reviewer} FAIL on #{issue_num}: {issue_title[:40]}"
+        body = f"## Problem Statement\n\n{reviewer} returned FAIL on issue #{issue_num}.\n\n## Reviewer Comment Excerpt\n{reviewer_comment}\n\n## Acceptance Criteria\n- [ ] Fix the issue identified by {reviewer}\n- [ ] Re-run {reviewer} check and obtain PASS verdict\n- [ ] All existing tests continue to pass\n\n## Original Review\nFrom issue #{issue_num}, reviewer: {reviewer}\nVerdict: FAIL"
+
+        out, rc = gtr_cmd("create-issue", "--owner", "terraphim", "--repo", "terraphim-ai", "--title", title, "--body", body)
+        if rc == 0 and out:
+            try:
+                new_issue = json.loads(out)
+                new_num = new_issue["number"]
+                remediation_list.append(f"- {reviewer}: FAIL -> Issue #{new_num}")
+                # Trigger implementation-swarm on the NEW issue (not the original)
+                gtr_cmd("comment", "--owner", "terraphim", "--repo", "terraphim-ai", "--issue", str(new_num), "--body", f"@adf:implementation-swarm please implement this remediation for issue #{new_num}")
+            except Exception as e:
+                print(f"  Failed to parse created issue: {e}")
+                remediation_list.append(f"- {reviewer}: FAIL -> (creation error)")
+        else:
+            remediation_list.append(f"- {reviewer}: FAIL -> (creation failed)")
+
+    # Close original issue
+    gtr_cmd("close-issue", "--owner", "terraphim", "--repo", "terraphim-ai", "--issue", str(issue_num))
+
+    summary = f"merge-coordinator: Review gate FAIL. Issue closed.\n\nReview summary:\n"
+    summary += "\n".join(f"- {r}: {verdicts[r]}" for r in REQUIRED)
+    summary += "\n\nRemediation issues:\n" + "\n".join(remediation_list)
+    summary += "\n\nImplementation-swarm triggered on remediation issues."
+    gtr_cmd("comment", "--owner", "terraphim", "--repo", "terraphim-ai", "--issue", str(issue_num), "--body", summary)
+
+print("\nmerge-coordinator: evaluation complete.")
+'''
+project = "terraphim"
