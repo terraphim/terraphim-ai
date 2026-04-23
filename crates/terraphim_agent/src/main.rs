@@ -599,6 +599,64 @@ struct SearchOutput {
     results: Vec<SearchDocumentOutput>,
 }
 
+#[cfg(feature = "repl-sessions")]
+mod session_output {
+    use serde::Serialize;
+
+    #[derive(Debug, Serialize)]
+    pub struct SourcesOutput {
+        pub count: usize,
+        pub sources: Vec<SourceEntry>,
+    }
+
+    #[derive(Debug, Serialize)]
+    pub struct SourceEntry {
+        pub id: String,
+        pub name: Option<String>,
+        pub available: bool,
+    }
+
+    #[derive(Debug, Serialize)]
+    pub struct SessionListOutput {
+        pub total: usize,
+        pub shown: usize,
+        pub sessions: Vec<SessionEntry>,
+    }
+
+    #[derive(Debug, Serialize)]
+    pub struct SessionEntry {
+        pub id: String,
+        pub title: Option<String>,
+        pub message_count: usize,
+        pub source: String,
+    }
+
+    #[derive(Debug, Serialize)]
+    pub struct SessionSearchOutput {
+        pub query: String,
+        pub total: usize,
+        pub shown: usize,
+        pub sessions: Vec<SessionSearchEntry>,
+    }
+
+    #[derive(Debug, Serialize)]
+    pub struct SessionSearchEntry {
+        pub id: String,
+        pub title: Option<String>,
+        pub message_count: usize,
+        pub preview: Option<String>,
+    }
+
+    #[derive(Debug, Serialize)]
+    pub struct SessionStatsOutput {
+        pub total_sessions: usize,
+        pub total_messages: usize,
+        pub total_user_messages: usize,
+        pub total_assistant_messages: usize,
+        pub by_source: std::collections::HashMap<String, usize>,
+    }
+}
+
 fn print_json_output<T: Serialize>(value: &T, mode: CommandOutputMode) -> Result<()> {
     let out = match mode {
         CommandOutputMode::Human => serde_json::to_string_pretty(value)?,
@@ -2221,6 +2279,7 @@ async fn run_offline_command(
 
         #[cfg(feature = "repl-sessions")]
         Command::Sessions { sub } => {
+            use session_output::*;
             use terraphim_sessions::SessionService;
 
             let service = SessionService::new();
@@ -2233,7 +2292,9 @@ async fn run_offline_command(
                         serde_json::from_str::<Vec<terraphim_sessions::Session>>(&data)
                     {
                         service.load_sessions(cached).await;
-                        println!("Loaded sessions from cache.");
+                        if !output.is_machine_readable() {
+                            println!("Loaded sessions from cache.");
+                        }
                     }
                 }
             }
@@ -2241,7 +2302,23 @@ async fn run_offline_command(
             match sub {
                 SessionsSub::Sources => {
                     let sources = service.detect_sources();
-                    if sources.is_empty() {
+                    if output.is_machine_readable() {
+                        let payload = SourcesOutput {
+                            count: sources.len(),
+                            sources: sources
+                                .into_iter()
+                                .map(|s| {
+                                    let available = s.is_available();
+                                    SourceEntry {
+                                        id: s.id,
+                                        name: s.name,
+                                        available,
+                                    }
+                                })
+                                .collect(),
+                        };
+                        print_json_output(&payload, output.mode)?;
+                    } else if sources.is_empty() {
                         println!("No session sources detected.");
                     } else {
                         println!("Available session sources:");
@@ -2262,7 +2339,25 @@ async fn run_offline_command(
                 }
                 SessionsSub::List { limit } => {
                     let sessions = service.list_sessions().await;
-                    if sessions.is_empty() {
+                    if output.is_machine_readable() {
+                        let session_entries: Vec<SessionEntry> = sessions
+                            .iter()
+                            .take(limit)
+                            .map(|s| SessionEntry {
+                                id: s.id.to_string(),
+                                title: s.title.clone(),
+                                message_count: s.message_count(),
+                                source: s.source.clone(),
+                            })
+                            .collect();
+                        let shown = session_entries.len();
+                        let payload = SessionListOutput {
+                            total: sessions.len(),
+                            shown,
+                            sessions: session_entries,
+                        };
+                        print_json_output(&payload, output.mode)?;
+                    } else if sessions.is_empty() {
                         println!("No sessions found.");
                     } else {
                         println!("Cached sessions ({} total):", sessions.len());
@@ -2279,14 +2374,49 @@ async fn run_offline_command(
                 }
                 SessionsSub::Search { query, limit } => {
                     let results = service.search(&query).await;
-                    if results.is_empty() {
+                    if output.is_machine_readable() {
+                        let entries: Vec<SessionSearchEntry> = results
+                            .iter()
+                            .take(limit)
+                            .map(|s| {
+                                let preview = s
+                                    .messages
+                                    .iter()
+                                    .find(|msg| {
+                                        msg.content.to_lowercase().contains(&query.to_lowercase())
+                                    })
+                                    .map(|msg| {
+                                        let p: String = msg.content.chars().take(100).collect();
+                                        p
+                                    });
+                                SessionSearchEntry {
+                                    id: s.id.to_string(),
+                                    title: s.title.clone(),
+                                    message_count: s.message_count(),
+                                    preview,
+                                }
+                            })
+                            .collect();
+                        let shown = entries.len();
+                        let payload = SessionSearchOutput {
+                            query: query.clone(),
+                            total: results.len(),
+                            shown,
+                            sessions: entries,
+                        };
+                        print_json_output(&payload, output.mode)?;
+                        if results.is_empty() {
+                            std::process::exit(
+                                robot::exit_codes::ExitCode::ErrorNotFound.code().into(),
+                            );
+                        }
+                    } else if results.is_empty() {
                         println!("No sessions matching '{}'.", query);
                     } else {
                         println!("Found {} matching sessions:", results.len());
                         for session in results.iter().take(limit) {
                             let title = session.title.as_deref().unwrap_or("(untitled)");
                             println!("  - {}", title);
-                            // Show preview of matching content
                             for msg in &session.messages {
                                 let content_lower = msg.content.to_lowercase();
                                 if content_lower.contains(&query.to_lowercase()) {
@@ -2301,15 +2431,26 @@ async fn run_offline_command(
                 }
                 SessionsSub::Stats => {
                     let stats = service.statistics().await;
-                    println!("Session Statistics:");
-                    println!("  Total sessions: {}", stats.total_sessions);
-                    println!("  Total messages: {}", stats.total_messages);
-                    println!("  User messages: {}", stats.total_user_messages);
-                    println!("  Assistant messages: {}", stats.total_assistant_messages);
-                    if !stats.sessions_by_source.is_empty() {
-                        println!("  By source:");
-                        for (source, count) in stats.sessions_by_source {
-                            println!("    - {}: {}", source, count);
+                    if output.is_machine_readable() {
+                        let payload = SessionStatsOutput {
+                            total_sessions: stats.total_sessions,
+                            total_messages: stats.total_messages,
+                            total_user_messages: stats.total_user_messages,
+                            total_assistant_messages: stats.total_assistant_messages,
+                            by_source: stats.sessions_by_source,
+                        };
+                        print_json_output(&payload, output.mode)?;
+                    } else {
+                        println!("Session Statistics:");
+                        println!("  Total sessions: {}", stats.total_sessions);
+                        println!("  Total messages: {}", stats.total_messages);
+                        println!("  User messages: {}", stats.total_user_messages);
+                        println!("  Assistant messages: {}", stats.total_assistant_messages);
+                        if !stats.sessions_by_source.is_empty() {
+                            println!("  By source:");
+                            for (source, count) in stats.sessions_by_source {
+                                println!("    - {}: {}", source, count);
+                            }
                         }
                     }
                     Ok(())
@@ -3784,6 +3925,7 @@ async fn run_server_command(
 
         #[cfg(feature = "repl-sessions")]
         Command::Sessions { sub } => {
+            use session_output::*;
             use terraphim_sessions::SessionService;
 
             let rt = Runtime::new()?;
@@ -3793,7 +3935,23 @@ async fn run_server_command(
                 match sub {
                     SessionsSub::Sources => {
                         let sources = service.detect_sources();
-                        if sources.is_empty() {
+                        if output.is_machine_readable() {
+                            let payload = SourcesOutput {
+                                count: sources.len(),
+                                sources: sources
+                                    .into_iter()
+                                    .map(|s| {
+                                        let available = s.is_available();
+                                        SourceEntry {
+                                            id: s.id,
+                                            name: s.name,
+                                            available,
+                                        }
+                                    })
+                                    .collect(),
+                            };
+                            print_json_output(&payload, output.mode)?;
+                        } else if sources.is_empty() {
                             println!("No session sources detected.");
                         } else {
                             println!("Available session sources:");
@@ -3815,7 +3973,25 @@ async fn run_server_command(
 
                     SessionsSub::List { limit } => {
                         let sessions = service.list_sessions().await;
-                        if sessions.is_empty() {
+                        if output.is_machine_readable() {
+                            let session_entries: Vec<SessionEntry> = sessions
+                                .iter()
+                                .take(limit)
+                                .map(|s| SessionEntry {
+                                    id: s.id.to_string(),
+                                    title: s.title.clone(),
+                                    message_count: s.message_count(),
+                                    source: s.source.clone(),
+                                })
+                                .collect();
+                            let shown = session_entries.len();
+                            let payload = SessionListOutput {
+                                total: sessions.len(),
+                                shown,
+                                sessions: session_entries,
+                            };
+                            print_json_output(&payload, output.mode)?;
+                        } else if sessions.is_empty() {
                             println!("No sessions found.");
                         } else {
                             println!("Cached sessions ({} total):", sessions.len());
@@ -3832,14 +4008,51 @@ async fn run_server_command(
                     }
                     SessionsSub::Search { query, limit } => {
                         let results = service.search(&query).await;
-                        if results.is_empty() {
+                        if output.is_machine_readable() {
+                            let entries: Vec<SessionSearchEntry> = results
+                                .iter()
+                                .take(limit)
+                                .map(|s| {
+                                    let preview = s
+                                        .messages
+                                        .iter()
+                                        .find(|msg| {
+                                            msg.content
+                                                .to_lowercase()
+                                                .contains(&query.to_lowercase())
+                                        })
+                                        .map(|msg| {
+                                            let p: String = msg.content.chars().take(100).collect();
+                                            p
+                                        });
+                                    SessionSearchEntry {
+                                        id: s.id.to_string(),
+                                        title: s.title.clone(),
+                                        message_count: s.message_count(),
+                                        preview,
+                                    }
+                                })
+                                .collect();
+                            let shown = entries.len();
+                            let payload = SessionSearchOutput {
+                                query: query.clone(),
+                                total: results.len(),
+                                shown,
+                                sessions: entries,
+                            };
+                            print_json_output(&payload, output.mode)?;
+                            if results.is_empty() {
+                                std::process::exit(
+                                    robot::exit_codes::ExitCode::ErrorNotFound.code().into(),
+                                );
+                            }
+                        } else if results.is_empty() {
                             println!("No sessions matching '{}'.", query);
                         } else {
                             println!("Found {} matching sessions:", results.len());
                             for session in results.iter().take(limit) {
                                 let title = session.title.as_deref().unwrap_or("(untitled)");
                                 println!("  - {}", title);
-                                // Show preview of matching content
                                 for msg in &session.messages {
                                     let content_lower = msg.content.to_lowercase();
                                     if content_lower.contains(&query.to_lowercase()) {
@@ -3855,15 +4068,26 @@ async fn run_server_command(
                     }
                     SessionsSub::Stats => {
                         let stats = service.statistics().await;
-                        println!("Session Statistics:");
-                        println!("  Total sessions: {}", stats.total_sessions);
-                        println!("  Total messages: {}", stats.total_messages);
-                        println!("  User messages: {}", stats.total_user_messages);
-                        println!("  Assistant messages: {}", stats.total_assistant_messages);
-                        if !stats.sessions_by_source.is_empty() {
-                            println!("  By source:");
-                            for (source, count) in stats.sessions_by_source {
-                                println!("    - {}: {}", source, count);
+                        if output.is_machine_readable() {
+                            let payload = SessionStatsOutput {
+                                total_sessions: stats.total_sessions,
+                                total_messages: stats.total_messages,
+                                total_user_messages: stats.total_user_messages,
+                                total_assistant_messages: stats.total_assistant_messages,
+                                by_source: stats.sessions_by_source,
+                            };
+                            print_json_output(&payload, output.mode)?;
+                        } else {
+                            println!("Session Statistics:");
+                            println!("  Total sessions: {}", stats.total_sessions);
+                            println!("  Total messages: {}", stats.total_messages);
+                            println!("  User messages: {}", stats.total_user_messages);
+                            println!("  Assistant messages: {}", stats.total_assistant_messages);
+                            if !stats.sessions_by_source.is_empty() {
+                                println!("  By source:");
+                                for (source, count) in stats.sessions_by_source {
+                                    println!("    - {}: {}", source, count);
+                                }
                             }
                         }
                         Ok(())
