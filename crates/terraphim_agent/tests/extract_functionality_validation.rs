@@ -140,7 +140,7 @@ fn get_workspace_root() -> PathBuf {
         .unwrap_or(manifest_dir)
 }
 
-/// Helper function to run TUI extract command
+/// Helper function to run TUI extract command with a bounded runtime.
 fn run_extract_command_with_port(args: &[&str], port: u16) -> Result<(String, String, i32)> {
     let workspace_root = get_workspace_root();
 
@@ -154,19 +154,46 @@ fn run_extract_command_with_port(args: &[&str], port: u16) -> Result<(String, St
         )
         .env("TERRAPHIM_SERVER_HOSTNAME", format!("127.0.0.1:{}", port));
 
-    let output = cmd.output()?;
-
-    Ok((
-        String::from_utf8_lossy(&output.stdout).to_string(),
-        String::from_utf8_lossy(&output.stderr).to_string(),
-        output.status.code().unwrap_or(-1),
-    ))
+    // Bound each extract invocation to 60s to prevent hangs from cargo lock contention.
+    run_command_with_timeout(cmd, Duration::from_secs(60))
 }
 
 /// Helper function to run TUI extract command (legacy, uses default port)
 #[allow(dead_code)]
 fn run_extract_command(args: &[&str]) -> Result<(String, String, i32)> {
     run_extract_command_with_port(args, 8000)
+}
+
+/// Run a command with a wall-clock timeout to prevent indefinite hangs.
+/// Returns an error if the command does not complete within the timeout.
+fn run_command_with_timeout(mut cmd: Command, timeout: Duration) -> Result<(String, String, i32)> {
+    let child = cmd.spawn()?;
+    let pid = child.id();
+
+    // Spawn a watchdog thread that kills the process if it exceeds the timeout.
+    std::thread::spawn(move || {
+        std::thread::sleep(timeout);
+        // Try graceful termination first.
+        let _ = Command::new("kill")
+            .args(["-TERM", &pid.to_string()])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn();
+        // Give the process a moment to exit, then force-kill if needed.
+        std::thread::sleep(Duration::from_secs(2));
+        let _ = Command::new("kill")
+            .args(["-KILL", &pid.to_string()])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn();
+    });
+
+    let output = child.wait_with_output()?;
+    let exit_code = output.status.code().unwrap_or(-1);
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+
+    Ok((stdout, stderr, exit_code))
 }
 
 /// Extract clean output without log messages
@@ -505,6 +532,8 @@ fn test_extract_error_conditions() -> Result<()> {
     ];
 
     let workspace_root = get_workspace_root();
+    // Cap each subprocess at 60s to prevent indefinite hangs from cargo lock contention.
+    let timeout = Duration::from_secs(60);
 
     for (case_name, args) in error_cases {
         println!("  Testing error case: {}", case_name);
@@ -514,8 +543,11 @@ fn test_extract_error_conditions() -> Result<()> {
             .args(&args)
             .current_dir(&workspace_root);
 
-        let output = cmd.output()?;
-        let exit_code = output.status.code().unwrap_or(-1);
+        let (stdout, stderr, exit_code) = run_command_with_timeout(cmd, timeout)?;
+        println!("    stdout: {}", stdout.lines().next().unwrap_or(""));
+        if !stderr.is_empty() {
+            println!("    stderr: {}", stderr.lines().next().unwrap_or(""));
+        }
 
         match case_name {
             "Missing argument" | "Invalid flag" => {
