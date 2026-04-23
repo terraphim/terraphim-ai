@@ -1,0 +1,743 @@
+{
+  "type": "sfia.attributes",
+  "sfia_version": 9,
+  "language": "pt",
+  "items": [
+    {
+      "type": "sfia.attribute",
+      "sfia_version": 9,
+      "language": "pt",
+      "code": "AUTO",
+      "name": "Autonomia",
+      "url": "https://sfia-online.org/pt/shortcode/9/AUTO",
+      "attribute_type": "Attributes",
+      "overall_description": "O nível de independência, liberdade e responsabilidade pelos resultados em sua função.",
+      "guidance_notes": "A autonomia no SFIA representa uma progressão do cumprimento de instruções para a definição da estratégia organizacional. Ela envolve:\n\ntrabalhar sob vários níveis de direção e supervisão\ntomar decisões independentes de acordo com a responsabilidade\nassumir a responsabilidade pelas ações e seus resultados\ndelegar tarefas e responsabilidades adequadamente\ndefinir metas pessoais, de equipe ou organizacionais.\n\nA autonomia efetiva engloba habilidades de tomada de decisão, autogerenciamento e a capacidade de equilibrar a independência com as metas organizacionais. A autonomia está intimamente ligada a habilidades como tomada de decisões, liderança e planejamento.\nÀ medida que os profissionais avançam, seu nível de autonomia determina cada vez mais sua capacidade de promover mudanças, inovar e contribuir para o sucesso organizacional. À medida que os profissionais avançam, sua autonomia permite que eles liderem iniciativas e gerem resultados estratégicos.  Em níveis mais altos, os indivíduos moldam sua função e tomam decisões que têm um impacto organizacional mais amplo, com supervisão mínima.",
+      "levels": [
+        {
+          "level": 1,
+          "description": "Segue as instruções e trabalha sob orientação rigorosa. Recebe instruções e orientações específicas e tem seu trabalho revisado de perto."
+        },
+        {
+          "level": 2,
+          "description": "Trabalha sob direção rotineira. Recebe instruções e orientações e tem seu trabalho revisado regularmente."
+        },
+        {
+          "level": 3,
+          "description": "Trabalha sob direção geral para concluir as tarefas atribuídas. Recebe orientação e tem o trabalho revisado nos marcos acordados. Quando necessário, delega tarefas de rotina a outras pessoas da própria equipe."
+        },
+        {
+          "level": 4,
+          "description": "Trabalha sob direção geral dentro de uma estrutura clara de responsabilidade. Exerce considerável responsabilidade pessoal e autonomia. Quando necessário, planeja, agenda e delega trabalho a outras pessoas, geralmente dentro da própria equipe."
+        },
+        {
+          "level": 5,
+          "description": "Trabalha sob ampla direção. O trabalho é de iniciativa própria, consistente com os requisitos operacionais e orçamentários acordados para atender aos objetivos técnicos e/ou de grupo alocados. Define tarefas e delega trabalho a equipes e indivíduos dentro da sua área de responsabilidade."
+        },
+        {
+          "level": 6,
+          "description": "Orienta decisões e estratégias de alto nível dentro das políticas e dos objetivos gerais da organização. Tem autoridade e responsabilidade definidas para ações e decisões em uma área significativa de trabalho, incluindo aspectos técnicos, financeiros e de qualidade. Delega a responsabilidade pelos objetivos operacionais."
+        },
+        {
+          "level": 7,
+          "description": "Define e lidera a visão e a estratégia da organização dentro dos objetivos comerciais mais abrangentes. É totalmente responsável pelas ações e decisões tomadas, tanto por si mesmo quanto por outros a quem foram atribuídas responsabilidades. Delega autoridade e responsabilidade pelos objetivos estratégicos do negócio."
+        }
+      ],
+      "source": {
+        "file": "sfia_source/SFIA 9 Excel - Português/sfia-9_current-standard_pt_250124.xlsx",
+        "sheet": "Atributos",
+        "source_date": null
+      }
+    },
+    {
+      "type": "sfia.attribute",
+      "sfia_version": 9,
+      "language": "pt",
+      "code": "INFL",
+      "name": "Influência",
+      "url": "https://sfia-online.org/pt/shortcode/9/INFL",
+      "attribute_type": "Attributes",
+      "overall_description": "O alcance e o impacto de suas decisões e ações, tanto dentro quanto fora da organização.",
+      "guidance_notes": "A influência, no SFIA, reflete a progressão do impacto sobre os colegas imediatos para a formação da direção organizacional. Ela envolve:\n\nexpansão da esfera de interação e impacto\nprogressão de interações transacionais para interações estratégicas\nengajamento com as partes interessadas, tanto internas quanto externas, em níveis crescentes de senioridade\nmoldar decisões com impacto organizacional crescente\ncontribuir para a direção da equipe, do departamento e da organização.\n\nA influência está intimamente ligada a outros atributos, como comunicação e liderança. A influência efetiva se desenvolve por meio da experiência e da interação com níveis mais altos da organização e do setor. Esse atributo reflete o alcance e o impacto das decisões e ações, tanto dentro quanto fora da organização. \nÀ medida que os profissionais avançam, sua influência se estende para além da equipe, contribuindo para decisões estratégicas e ajudando a moldar a direção da organização. Ela progride da consciência de como o trabalho de cada um apoia os outros para direcionar a estratégia em nível organizacional. A extensão da influência geralmente se reflete na natureza das interações, no nível dos contatos e no impacto das decisões sobre a direção da organização.",
+      "levels": [
+        {
+          "level": 1,
+          "description": "Quando necessário, contribui para discussões de equipe com colegas imediatos."
+        },
+        {
+          "level": 2,
+          "description": "Contribui para as discussões com os membros da equipe. Trabalha ao lado dos membros da equipe, contribuindo para as decisões da equipe. Quando a função exige, interage com pessoas de fora da equipe, incluindo colegas internos e contatos externos."
+        },
+        {
+          "level": 3,
+          "description": "Trabalha com a equipe e influencia suas decisões. Tem um nível transacional de contato com pessoas de fora da equipe, incluindo colegas internos e contatos externos."
+        },
+        {
+          "level": 4,
+          "description": "Influencia os projetos e os objetivos da equipe. Tem um nível tático de contato com pessoas de fora da equipe, incluindo colegas internos e contatos externos."
+        },
+        {
+          "level": 5,
+          "description": "Influencia decisões críticas em seu domínio.  Tem contato de nível operacional que afeta a execução e a implementação com colegas internos e contatos externos. Tem influência significativa sobre a alocação e o gerenciamento dos recursos necessários para a execução dos projetos."
+        },
+        {
+          "level": 6,
+          "description": "Influencia a formação da estratégia e a execução dos planos de negócios. Tem um nível gerencial significativo de contato com colegas internos e contatos externos. Exerce liderança organizacional e influência sobre a nomeação e o gerenciamento de recursos relacionados à implementação de iniciativas estratégicas."
+        },
+        {
+          "level": 7,
+          "description": "Dirige, influencia e inspira a direção estratégica e o desenvolvimento da organização. Tem um nível de liderança extensivo de contato com colegas internos e contatos externos. Autoriza a nomeação dos recursos necessários."
+        }
+      ],
+      "source": {
+        "file": "sfia_source/SFIA 9 Excel - Português/sfia-9_current-standard_pt_250124.xlsx",
+        "sheet": "Atributos",
+        "source_date": null
+      }
+    },
+    {
+      "type": "sfia.attribute",
+      "sfia_version": 9,
+      "language": "pt",
+      "code": "COMP",
+      "name": "Complexidade",
+      "url": "https://sfia-online.org/pt/shortcode/9/COMP",
+      "attribute_type": "Attributes",
+      "overall_description": "A variedade e a complexidade das tarefas e responsabilidades inerentes à sua função.",
+      "guidance_notes": "A complexidade, no SFIA, representa uma progressão das tarefas rotineiras para a liderança estratégica que proporciona valor para o negócio. Ela envolve:\n\nlidar com ambientes de trabalho cada vez mais variados e imprevisíveis\nabordar uma gama crescente de atividades técnicas ou profissionais\nresolver problemas progressivamente complexos\ngerenciamento de diversas partes interessadas\ncontribuir para a política e a estratégia\naproveitar tecnologias emergentes para gerar valor para o negócio.\n\nO gerenciamento eficaz da complexidade abrange habilidades de resolução de problemas, tomada de decisões e planejamento, além de conhecimento técnico ou profissional.  Esse atributo reflete a variedade e a complexidade das tarefas e responsabilidades em uma função, progredindo de atividades rotineiras para uma liderança estratégica abrangente. Ele pode ser medido pelo nível de solução de problemas exigido, pela natureza e pelo número de participantes envolvidos e pelo impacto das decisões tomadas.\nÀ medida que os profissionais avançam, sua capacidade de navegar e aproveitar a complexidade contribui cada vez mais para a inovação organizacional, a eficiência e a vantagem competitiva.",
+      "levels": [
+        {
+          "level": 1,
+          "description": "Realiza atividades de rotina em um ambiente estruturado."
+        },
+        {
+          "level": 2,
+          "description": "Realiza uma série de atividades de trabalho em ambientes variados."
+        },
+        {
+          "level": 3,
+          "description": "Realiza uma série de trabalhos, às vezes complexos e não rotineiros, em ambientes variados."
+        },
+        {
+          "level": 4,
+          "description": "O trabalho inclui uma ampla gama de atividades técnicas ou profissionais complexas em contextos variados."
+        },
+        {
+          "level": 5,
+          "description": "Executa uma ampla gama de atividades de trabalho técnicas e/ou profissionais complexas, exigindo a aplicação de princípios fundamentais em uma variedade de contextos imprevisíveis."
+        },
+        {
+          "level": 6,
+          "description": "Realiza atividades de trabalho altamente complexas que abrangem aspectos técnicos, financeiros e de qualidade."
+        },
+        {
+          "level": 7,
+          "description": "Exerce ampla liderança estratégica na entrega de valor comercial por meio de visão, governança e gerenciamento executivo."
+        }
+      ],
+      "source": {
+        "file": "sfia_source/SFIA 9 Excel - Português/sfia-9_current-standard_pt_250124.xlsx",
+        "sheet": "Atributos",
+        "source_date": null
+      }
+    },
+    {
+      "type": "sfia.attribute",
+      "sfia_version": 9,
+      "language": "pt",
+      "code": "KNGE",
+      "name": "Conhecimento",
+      "url": "https://sfia-online.org/pt/shortcode/9/KNGE",
+      "attribute_type": "Attributes",
+      "overall_description": "A profundidade e a amplitude do entendimento necessárias para realizar e influenciar o trabalho de forma eficaz.",
+      "guidance_notes": "O conhecimento, no SFIA, representa uma progressão da aplicação de informações básicas específicas da função para alavancar um entendimento amplo e estratégico que molda a direção organizacional e as tendências do setor. Ele envolve:\n\naplicar conhecimentos específicos da função para realizar tarefas de rotina\nintegração de conhecimentos gerais, específicos da função e do setor\nusar o entendimento de tecnologias, métodos e processos para obter resultados\naplicar conhecimentos profundos para resolver problemas complexos\naproveitar o amplo conhecimento para influenciar decisões estratégicas\nmoldar as práticas organizacionais de gestão do conhecimento\n\nA aplicação eficaz do conhecimento se desenvolve por meio da experiência prática, da educação formal, do treinamento profissional, do aprendizado contínuo e da orientação. Ela abrange a capacidade de aplicar o conhecimento em cenários do mundo real, adaptar-se a desafios emergentes e criar valor para a organização.\nÀ medida que os profissionais avançam, sua aplicação do conhecimento evolui significativamente, desde tarefas básicas e específicas da função até a liderança organizacional estratégica. Essa progressão envolve o apoio a atividades de equipe, a aplicação de práticas em contextos de negócios, a integração de conhecimentos para tarefas complexas, a oferta de aconselhamento com autoridade e a viabilização da tomada de decisões entre domínios. Em níveis mais altos, os profissionais aplicam amplo conhecimento comercial e estratégico para moldar a estratégia organizacional e antecipar as tendências do setor.",
+      "levels": [
+        {
+          "level": 1,
+          "description": "Aplica conhecimentos básicos para executar tarefas rotineiras, bem definidas e previsíveis, específicas da função."
+        },
+        {
+          "level": 2,
+          "description": "Aplica o conhecimento das tarefas e práticas comuns do local de trabalho para apoiar as atividades da equipe, sob orientação."
+        },
+        {
+          "level": 3,
+          "description": "Aplica o conhecimento de uma série de práticas específicas da função para concluir tarefas dentro de limites definidos e avalia como esse conhecimento se aplica ao contexto comercial mais amplo."
+        },
+        {
+          "level": 4,
+          "description": "Aplica conhecimento em diferentes áreas de seu campo, integrando esse conhecimento para realizar tarefas complexas e diversas. Aplica o conhecimento prático do domínio da organização."
+        },
+        {
+          "level": 5,
+          "description": "Aplica o conhecimento para interpretar situações complexas e oferecer conselhos com autoridade. Aplica conhecimentos profundos em campos específicos, com uma compreensão mais ampla do setor/negócio."
+        },
+        {
+          "level": 6,
+          "description": "Aplica amplo conhecimento comercial para permitir a liderança estratégica e a tomada de decisões em vários domínios."
+        },
+        {
+          "level": 7,
+          "description": "Aplica conhecimentos estratégicos e de base ampla para moldar a estratégia organizacional, prever tendências futuras do setor e preparar a organização para se adaptar e liderar."
+        }
+      ],
+      "source": {
+        "file": "sfia_source/SFIA 9 Excel - Português/sfia-9_current-standard_pt_250124.xlsx",
+        "sheet": "Atributos",
+        "source_date": null
+      }
+    },
+    {
+      "type": "sfia.attribute",
+      "sfia_version": 9,
+      "language": "pt",
+      "code": "COLL",
+      "name": "Colaboração",
+      "url": "https://sfia-online.org/pt/shortcode/9/COLL",
+      "attribute_type": "Business skills/Behavioural factors",
+      "overall_description": "Trabalhar de forma eficaz com outras pessoas, compartilhar recursos e coordenar esforços para atingir objetivos compartilhados.",
+      "guidance_notes": "A colaboração, no SFIA, representa a progressão da interação básica da equipe para parcerias estratégicas e gerenciamento de partes interessadas. Ela envolve:\n\ntrabalhar de forma cooperativa em equipes imediatas\ncompartilhamento eficaz de informações e recursos\ncoordenação de esforços para atingir objetivos comuns\nfacilitar o trabalho em equipe multifuncional\nconstruir relacionamentos influentes em toda a organização\nestabelecer e gerenciar parcerias estratégicas.\n\nA colaboração eficaz abrange a comunicação, a tomada de perspectiva e a capacidade de alinhar diversos pontos de vista a objetivos comuns. Também envolve a criação de um ambiente que estimule o compartilhamento de conhecimento e a solução coletiva de problemas.\nÀ medida que os profissionais avançam, suas habilidades de colaboração evoluem do apoio às metas da equipe para a formação da cultura organizacional, impulsionando a inovação e aumentando a capacidade da organização de enfrentar desafios complexos. Em níveis mais altos, a colaboração se estende para influenciar a cooperação e as parcerias em todo o setor.",
+      "levels": [
+        {
+          "level": 1,
+          "description": "Trabalha principalmente em suas próprias tarefas e interage apenas com sua equipe imediata. Desenvolve a compreensão de como seu trabalho ajuda os outros."
+        },
+        {
+          "level": 2,
+          "description": "Compreende a necessidade de colaborar com sua equipe e considera as necessidades do usuário/cliente."
+        },
+        {
+          "level": 3,
+          "description": "Compreende e colabora com a análise das necessidades do usuário/cliente e representa isso em seu trabalho."
+        },
+        {
+          "level": 4,
+          "description": "Facilita a colaboração entre as partes interessadas que compartilham objetivos comuns.  \nEnvolve-se e contribui para o trabalho de equipes multifuncionais para garantir que as necessidades do usuário/cliente sejam atendidas em todo o produto/escopo de trabalho."
+        },
+        {
+          "level": 5,
+          "description": "Facilita a colaboração entre as partes interessadas que têm objetivos diferentes.\nGarante formas colaborativas de trabalho em todos os estágios do trabalho para atender às necessidades do usuário/cliente.\nEstabelece relacionamentos eficazes em toda a organização e com clientes, fornecedores e parceiros."
+        },
+        {
+          "level": 6,
+          "description": "Lidera a colaboração com uma gama diversificada de partes interessadas em objetivos concorrentes dentro da organização.\nEstabelece conexões fortes e influentes com os principais contatos internos e externos em nível de gerência sênior/líder técnico"
+        },
+        {
+          "level": 7,
+          "description": "Promove a colaboração, envolvendo-se com as partes interessadas da liderança, garantindo o alinhamento com a visão e a estratégia corporativas. \nEstabelece relacionamentos sólidos e influentes com clientes, parceiros e líderes do setor."
+        }
+      ],
+      "source": {
+        "file": "sfia_source/SFIA 9 Excel - Português/sfia-9_current-standard_pt_250124.xlsx",
+        "sheet": "Atributos",
+        "source_date": null
+      }
+    },
+    {
+      "type": "sfia.attribute",
+      "sfia_version": 9,
+      "language": "pt",
+      "code": "COMM",
+      "name": "Comunicação",
+      "url": "https://sfia-online.org/pt/shortcode/9/COMM",
+      "attribute_type": "Business skills/Behavioural factors",
+      "overall_description": "Trocar informações, ideias e percepções de forma clara para permitir o entendimento mútuo e a cooperação.",
+      "guidance_notes": "A comunicação, no SFIA, representa uma progressão da interação básica da equipe para a influência complexa em toda a organização e o envolvimento externo. Ela envolve:\n\ncomunicação com as equipes imediatas\ntrocar informações e ideias com clareza\nhabilidades verbais e escritas, escuta ativa e capacidade de usar ferramentas e plataformas de comunicação adequadamente\nadaptação do estilo de comunicação a diversos públicos, tanto técnicos quanto não técnicos\narticular conceitos complexos de forma a permitir a tomada de decisões informadas\ninfluenciar a estratégia por meio de um diálogo eficaz com as partes interessadas sênior.\n\nÀ medida que os profissionais avançam, suas habilidades de comunicação evoluem do simples compartilhamento de informações dentro das equipes para influenciar decisões nos níveis mais altos de uma organização. Essa progressão envolve a adaptação da comunicação a diferentes públicos, incluindo partes interessadas sênior e parceiros externos, e a formação de resultados estratégicos por meio de um diálogo eficaz. Em níveis mais altos, os profissionais assumem a responsabilidade de usar a comunicação para conduzir a direção organizacional e se envolver com líderes do setor para atingir os objetivos do negócio.",
+      "levels": [
+        {
+          "level": 1,
+          "description": "Comunica-se com a equipe imediata para entender e cumprir as tarefas atribuídas. Observa, ouve e faz perguntas para buscar informações ou esclarecer instruções."
+        },
+        {
+          "level": 2,
+          "description": "Comunica informações à equipe imediata e às partes interessadas diretamente relacionadas à sua função.\nOuve para obter compreensão e faz perguntas relevantes para esclarecer ou buscar mais informações."
+        },
+        {
+          "level": 3,
+          "description": "Comunica-se com a equipe e as partes interessadas dentro e fora da organização, explicando e apresentando as informações com clareza.\nContribui para uma série de conversas relacionadas ao trabalho, ouve os outros para obter entendimento e faz perguntas relevantes para sua função."
+        },
+        {
+          "level": 4,
+          "description": "Comunica-se com públicos técnicos e não técnicos, incluindo a equipe e as partes interessadas dentro e fora da organização.\nConforme necessário, assume a liderança na explicação de conceitos complexos para apoiar a tomada de decisões.\nOuve e faz perguntas perspicazes para identificar diferentes perspectivas e esclarecer e confirmar o entendimento."
+        },
+        {
+          "level": 5,
+          "description": "Comunica-se com clareza e impacto, articulando informações e ideias complexas para públicos amplos com diferentes pontos de vista.\nLidera e incentiva conversas para compartilhar ideias e criar consenso sobre as ações a serem tomadas."
+        },
+        {
+          "level": 6,
+          "description": "Comunica-se com credibilidade em todos os níveis da organização para públicos amplos com objetivos divergentes.\nExplica informações e ideias complexas com clareza, influenciando a direção estratégica.\nPromove o compartilhamento de informações em toda a organização."
+        },
+        {
+          "level": 7,
+          "description": "Comunica-se com o público em todos os níveis da própria organização e se envolve com o setor.\nApresenta argumentos e ideias convincentes de forma objetiva para atingir os objetivos de negócio."
+        }
+      ],
+      "source": {
+        "file": "sfia_source/SFIA 9 Excel - Português/sfia-9_current-standard_pt_250124.xlsx",
+        "sheet": "Atributos",
+        "source_date": null
+      }
+    },
+    {
+      "type": "sfia.attribute",
+      "sfia_version": 9,
+      "language": "pt",
+      "code": "IMPM",
+      "name": "Mentalidade de melhoria",
+      "url": "https://sfia-online.org/pt/shortcode/9/IMPM",
+      "attribute_type": "Business skills/Behavioural factors",
+      "overall_description": "Identificação contínua de oportunidades para refinar práticas de trabalho, processos, produtos ou serviços para aumentar a eficiência e o impacto.",
+      "guidance_notes": "Ter uma mentalidade de melhoria, no SFIA, representa uma progressão do reconhecimento de oportunidades de aprimoramento para a condução de uma cultura de otimização contínua. Isso envolve:\n\nidentificar áreas de melhoria em processos, produtos ou serviços\nimplementar mudanças para aumentar a eficiência e a eficácia\navaliar o impacto das melhorias e refinar as abordagens\nincentivar e apoiar uma mentalidade de melhoria contínua em outras pessoas\nalinhar as iniciativas de melhoria aos objetivos organizacionais\ncultivar uma cultura de aprimoramento e otimização contínuos\n\nUma mentalidade de melhoria envolve a busca proativa de oportunidades para refinar e otimizar práticas, processos, produtos e serviços de trabalho. Isso reflete a crescente responsabilidade de identificar, implementar e liderar melhorias em escopos de influência cada vez maiores.À medida que os profissionais avançam, seu foco muda da identificação de oportunidades de melhoria em suas próprias tarefas para a liderança de iniciativas de melhoria em equipes e na organização. Essa progressão inclui o aprimoramento das práticas em nível pessoal, o apoio a outras pessoas na promoção de uma cultura de otimização contínua e a garantia de que os esforços de melhoria estejam alinhados com as metas organizacionais mais amplas. Em níveis mais altos, os profissionais assumem a responsabilidade de incorporar estratégias de melhoria contínua em toda a organização, gerando impacto de longo prazo.",
+      "levels": [
+        {
+          "level": 1,
+          "description": "Identifica oportunidades de melhoria em suas próprias tarefas. Sugere aprimoramentos básicos quando solicitado."
+        },
+        {
+          "level": 2,
+          "description": "Propõe ideias para melhorar a própria área de trabalho.\n\nImplementa as alterações acordadas nas tarefas de trabalho atribuídas."
+        },
+        {
+          "level": 3,
+          "description": "Identifica e implementa melhorias em sua própria área de trabalho.\nContribui para aprimoramentos de processos da equipe."
+        },
+        {
+          "level": 4,
+          "description": "Incentiva e apoia as discussões da equipe sobre iniciativas de melhoria.\n\nImplementa mudanças processuais em um escopo de trabalho definido."
+        },
+        {
+          "level": 5,
+          "description": "Identifica e avalia possíveis melhorias em produtos, práticas ou serviços.\nLidera a implementação de aprimoramentos em sua própria área de responsabilidade.\nAvalia a eficácia das mudanças implementadas."
+        },
+        {
+          "level": 6,
+          "description": "Promove iniciativas de melhoria que têm um impacto significativo na organização.\nAlinha as estratégias de aprimoramento com os objetivos organizacionais.\nEnvolve as partes interessadas nos processos de aprimoramento."
+        },
+        {
+          "level": 7,
+          "description": "Define e comunica a abordagem organizacional para a melhoria contínua.\nCultiva uma cultura de aprimoramento contínuo.\nAvalia o impacto das iniciativas de melhoria no sucesso organizacional."
+        }
+      ],
+      "source": {
+        "file": "sfia_source/SFIA 9 Excel - Português/sfia-9_current-standard_pt_250124.xlsx",
+        "sheet": "Atributos",
+        "source_date": null
+      }
+    },
+    {
+      "type": "sfia.attribute",
+      "sfia_version": 9,
+      "language": "pt",
+      "code": "CRTY",
+      "name": "Criatividade",
+      "url": "https://sfia-online.org/pt/shortcode/9/CRTY",
+      "attribute_type": "Business skills/Behavioural factors",
+      "overall_description": "Gerar e aplicar ideias inovadoras para aprimorar processos, resolver problemas e impulsionar o sucesso organizacional.",
+      "guidance_notes": "A criatividade, no SFIA, representa uma progressão da geração de ideias básicas para a condução da inovação estratégica. Ela envolve:\n\ngerar ideias e soluções inovadoras\naplicar o pensamento inovador para melhorar os processos\nresolver problemas complexos de forma criativa\nincentivar e facilitar o pensamento criativo de outras pessoas\ndesenvolvimento de uma cultura de inovação\nalinhar iniciativas criativas com a estratégia organizacional.\n\nA criatividade efetiva engloba o pensamento imaginativo, as habilidades de resolução de problemas e o desafio às abordagens convencionais. Ela prospera em ambientes que incentivam a tomada de riscos calculados e valorizam ideias inovadoras.\nÀ medida que os profissionais avançam, sua função muda de contribuir para processos criativos para inspirar e liderar a inovação em um nível estratégico. Essa evolução ressalta a importância cada vez maior do pensamento criativo para impulsionar o sucesso organizacional e enfrentar desafios complexos em várias disciplinas.",
+      "levels": [
+        {
+          "level": 1,
+          "description": "Participa da geração de novas ideias quando solicitado."
+        },
+        {
+          "level": 2,
+          "description": "Aplica o pensamento criativo para sugerir novas maneiras de abordar uma tarefa e resolver problemas."
+        },
+        {
+          "level": 3,
+          "description": "Aplica e contribui com técnicas de pensamento criativo para contribuir com novas ideias para seu próprio trabalho e para as atividades da equipe."
+        },
+        {
+          "level": 4,
+          "description": "Aplica, facilita e desenvolve conceitos de pensamento criativo e encontra maneiras alternativas de abordar os resultados da equipe."
+        },
+        {
+          "level": 5,
+          "description": "Aplica de forma criativa o pensamento inovador e práticas de design na identificação de soluções que agregarão valor para o benefício do cliente/stakeholder."
+        },
+        {
+          "level": 6,
+          "description": "Aplica com criatividade uma ampla gama de novas ideias e técnicas de gerenciamento eficazes para obter resultados que se alinham à estratégia organizacional."
+        },
+        {
+          "level": 7,
+          "description": "Defende a criatividade e a inovação como incentivadoras do desenvolvimento da estratégia para proporcionar oportunidades de negócio."
+        }
+      ],
+      "source": {
+        "file": "sfia_source/SFIA 9 Excel - Português/sfia-9_current-standard_pt_250124.xlsx",
+        "sheet": "Atributos",
+        "source_date": null
+      }
+    },
+    {
+      "type": "sfia.attribute",
+      "sfia_version": 9,
+      "language": "pt",
+      "code": "DECM",
+      "name": "Tomada de Decisão",
+      "url": "https://sfia-online.org/pt/shortcode/9/DECM",
+      "attribute_type": "Business skills/Behavioural factors",
+      "overall_description": "Aplicar o pensamento crítico para avaliar opções, avaliar riscos e selecionar o curso de ação mais adequado.",
+      "guidance_notes": "A tomada de decisões, no SFIA, representa uma progressão de escolhas rotineiras para decisões estratégicas de alto impacto. Ela envolve:\n\navaliação de informações e avaliação de riscos\nequilibrar intuição e lógica\ncompreender o contexto organizacional\ndeterminar o melhor curso de ação\nassumir a responsabilidade pelos resultados.\n\nA tomada de decisão eficaz engloba habilidades analíticas e de pensamento crítico, a capacidade de avaliar riscos e consequências e uma compreensão abrangente do contexto comercial. Também envolve saber quando escalar problemas e como equilibrar prioridades concorrentes.\nÀ medida que os profissionais avançam, sua tomada de decisões evolui da abordagem de questões rotineiras para a definição de direções estratégicas. No início, as decisões se concentram no gerenciamento de tarefas ou pequenos projetos. Com o tempo, a tomada de decisões se torna mais complexa, exigindo maior discernimento, avaliação de riscos e responsabilidade por resultados de alto impacto. Em níveis mais altos, os profissionais são responsáveis por tomar decisões críticas que influenciam a estratégia e o sucesso da organização.",
+      "levels": [
+        {
+          "level": 1,
+          "description": "Tem pouca liberdade no atendimento a consultas.  \nBusca orientação em situações inesperadas."
+        },
+        {
+          "level": 2,
+          "description": "Tem liberdade limitada na resolução de problemas ou consultas.\nDecide quando buscar orientação em situações inesperadas."
+        },
+        {
+          "level": 3,
+          "description": "Tem liberdade para identificar e responder a questões complexas relacionadas às suas próprias atribuições. \nDetermina quando os problemas devem ser escalados para um nível superior."
+        },
+        {
+          "level": 4,
+          "description": "Julga e possui liberdade substancial para identificar e responder a questões e atribuições complexas relacionadas a projetos e objetivos de equipe.\nEscalona quando o escopo é afetado."
+        },
+        {
+          "level": 5,
+          "description": "Usa o discernimento para tomar decisões informadas sobre ações para atingir os resultados organizacionais, como o cumprimento de metas, prazos e orçamento.\nLevanta questões quando os objetivos estão em risco."
+        },
+        {
+          "level": 6,
+          "description": "Usa o discernimento para tomar decisões que iniciam a realização dos objetivos estratégicos acordados, incluindo o desempenho financeiro.\nEscalona quando a direção estratégica mais ampla é afetada."
+        },
+        {
+          "level": 7,
+          "description": "Usa o discernimento na tomada de decisões essenciais para a direção estratégica e o sucesso da organização.\nEncaminha, quando necessário, a contribuição da gerência executiva da empresa por meio de estruturas de governança estabelecidas."
+        }
+      ],
+      "source": {
+        "file": "sfia_source/SFIA 9 Excel - Português/sfia-9_current-standard_pt_250124.xlsx",
+        "sheet": "Atributos",
+        "source_date": null
+      }
+    },
+    {
+      "type": "sfia.attribute",
+      "sfia_version": 9,
+      "language": "pt",
+      "code": "DIGI",
+      "name": "Mentalidade digital",
+      "url": "https://sfia-online.org/pt/shortcode/9/DIGI",
+      "attribute_type": "Business skills/Behavioural factors",
+      "overall_description": "Adotar e usar efetivamente ferramentas e tecnologias digitais para melhorar o desempenho e a produtividade.",
+      "guidance_notes": "Ter uma mentalidade digital, no SFIA, representa uma progressão da alfabetização digital básica para a condução da estratégia digital organizacional. Isso envolve:\n\ncompreensão e aplicação de tecnologias digitais\nadaptação a cenários digitais em rápida evolução\nusar ferramentas digitais, IA e dados para aprimorar os processos de trabalho\nimpulsionar a inovação e a transformação digital\ncompreender as implicações das tecnologias emergentes, incluindo a IA, e seu potencial para promover mudanças organizacionais\ngarantir a governança digital e a conformidade.\n\nUma mentalidade digital eficaz abrange o aprendizado contínuo, a adaptabilidade e a capacidade de ver como as tecnologias digitais podem transformar os modelos e as estratégias de negócios. Ela também envolve a compreensão das implicações das tecnologias emergentes e seu potencial para promover mudanças organizacionais.\nÀ medida que os profissionais avançam, sua mentalidade digital evolui do simples uso de ferramentas digitais para a formação e liderança de estratégias digitais organizacionais. No início de suas carreiras, eles se concentram na aplicação de habilidades digitais em suas funções, mas, à medida que progridem, começam a impulsionar a inovação e a usar tecnologias emergentes para transformar os processos de trabalho. Em níveis mais altos, os profissionais são responsáveis por liderar a transformação digital, garantir a conformidade com a governança digital e incorporar uma cultura digital em toda a organização.",
+      "levels": [
+        {
+          "level": 1,
+          "description": "Possui habilidades digitais básicas para aprender e usar aplicativos, processos e ferramentas para sua função."
+        },
+        {
+          "level": 2,
+          "description": "Possui habilidades digitais suficientes para sua função; compreende e usa métodos, ferramentas, aplicativos e processos adequados."
+        },
+        {
+          "level": 3,
+          "description": "Explora e aplica ferramentas e habilidades digitais relevantes para sua função.\nCompreende e usa de maneira eficaz os métodos, ferramentas, aplicativos e processos apropriados."
+        },
+        {
+          "level": 4,
+          "description": "Maximiza as capacidades das aplicações para o seu papel, avalia e apoia a utilização de novas tecnologias e ferramentas digitais.\nSeleciona adequadamente e avalia o impacto da mudança nos padrões, métodos, ferramentas, aplicativos e processos aplicáveis relevantes à própria especialidade."
+        },
+        {
+          "level": 5,
+          "description": "Reconhece e avalia o impacto organizacional de novas tecnologias e serviços digitais.\nImplementa práticas novas e eficazes. \nAconselha sobre os padrões, métodos, ferramentas, aplicações e processos disponíveis relevantes para a(s) especialidade(s) do grupo e pode fazer escolhas apropriadas entre alternativas."
+        },
+        {
+          "level": 6,
+          "description": "Lidera o aprimoramento dos recursos digitais da organização. \nIdentifica e endossa oportunidades para adotar novas tecnologias e serviços digitais.\nLidera a governança digital e a conformidade com a legislação pertinente e a necessidade de produtos e serviços."
+        },
+        {
+          "level": 7,
+          "description": "Lidera o desenvolvimento da cultura digital da organização e a visão transformacional.  \nAumenta a capacidade e/ou a exploração da tecnologia em uma ou mais organizações por meio de um profundo entendimento do setor e das implicações das tecnologias emergentes.\nResponsabiliza-se por avaliar como as leis e os regulamentos afetam os objetivos organizacionais e seu uso de recursos digitais, de dados e de tecnologia."
+        }
+      ],
+      "source": {
+        "file": "sfia_source/SFIA 9 Excel - Português/sfia-9_current-standard_pt_250124.xlsx",
+        "sheet": "Atributos",
+        "source_date": null
+      }
+    },
+    {
+      "type": "sfia.attribute",
+      "sfia_version": 9,
+      "language": "pt",
+      "code": "LEAD",
+      "name": "Liderança",
+      "url": "https://sfia-online.org/pt/shortcode/9/LEAD",
+      "attribute_type": "Business skills/Behavioural factors",
+      "overall_description": "Orientar e influenciar indivíduos ou equipes para alinhar ações com metas estratégicas e gerar resultados positivos.",
+      "guidance_notes": "A liderança na SFIA representa uma progressão da autogestão para a formação da estratégia organizacional. Ela envolve:\n\ndemonstração de responsabilidade pessoal\nassumir a responsabilidade pelo trabalho e pelo desenvolvimento\norientar e influenciar outras pessoas\ncontribuir para as capacidades da equipe\nalinhar as ações com os objetivos organizacionais\ninspirar e promover mudanças positivas.\n\nA liderança eficaz abrange o autoconhecimento, a influência, a compreensão, a inspiração e a motivação de outras pessoas. Também envolve pensamento estratégico, gerenciamento de riscos e a capacidade de alinhar ações com objetivos de longo prazo.\nÀ medida que os profissionais avançam, sua liderança evolui da gestão de responsabilidades pessoais para a orientação de equipes e, por fim, para a formação da estratégia organizacional. Com o passar do tempo, eles vão além de influenciar as equipes e passam a conduzir resultados estratégicos, alinhar políticas com metas organizacionais e gerenciar riscos em uma escala mais ampla. Em níveis mais altos, a liderança desempenha um papel fundamental na formação da cultura organizacional, na promoção da inovação e no aprimoramento da capacidade da organização de enfrentar desafios complexos e aproveitar oportunidades.",
+      "levels": [
+        {
+          "level": 1,
+          "description": "Aumenta proativamente a compreensão de suas tarefas e responsabilidades no trabalho."
+        },
+        {
+          "level": 2,
+          "description": "Assume a responsabilidade pelo desenvolvimento de sua experiência de trabalho."
+        },
+        {
+          "level": 3,
+          "description": "Fornece orientação básica e suporte a membros menos experientes da equipe, conforme necessário."
+        },
+        {
+          "level": 4,
+          "description": "Lidera, apoia ou orienta os membros da equipe.\nDesenvolve soluções para atividades de trabalho complexas relacionadas a atribuições. \nDemonstra compreensão dos fatores de risco em seu trabalho.\nContribui com conhecimento especializado para a definição de requisitos em apoio a propostas."
+        },
+        {
+          "level": 5,
+          "description": "Oferece liderança em nível operacional.\nImplementa e executa políticas alinhadas aos planos estratégicos.\nAnalisa e avalia riscos.\nLeva em conta todos os requisitos ao considerar as propostas."
+        },
+        {
+          "level": 6,
+          "description": "Oferece liderança em nível organizacional.\nContribui para o desenvolvimento e a implementação de políticas e estratégias.\nCompreende e comunica os desenvolvimentos da indústria e o papel e o impacto da tecnologia. \nGerencia e mitiga o risco organizacional.  \nEquilibra os requisitos das propostas com as necessidades mais amplas da organização."
+        },
+        {
+          "level": 7,
+          "description": "Lidera o gerenciamento estratégico.\nAplica o mais alto nível de liderança à formulação e implementação da estratégia.\nComunica o impacto potencial das práticas emergentes e tecnologias sobre as organizações e indivíduos, e avalia os riscos de usar ou não usar tais práticas e tecnologias. \nEstabelece governança para tratar dos riscos do negócio.\nGarante que as propostas se alinhem à direção estratégica da organização."
+        }
+      ],
+      "source": {
+        "file": "sfia_source/SFIA 9 Excel - Português/sfia-9_current-standard_pt_250124.xlsx",
+        "sheet": "Atributos",
+        "source_date": null
+      }
+    },
+    {
+      "type": "sfia.attribute",
+      "sfia_version": 9,
+      "language": "pt",
+      "code": "LADV",
+      "name": "Aprendizagem e desenvolvimento",
+      "url": "https://sfia-online.org/pt/shortcode/9/LADV",
+      "attribute_type": "Business skills/Behavioural factors",
+      "overall_description": "Adquirir continuamente novos conhecimentos e habilidades para aprimorar o desempenho pessoal e organizacional.",
+      "guidance_notes": "O aprendizado e o desenvolvimento profissional, no SFIA, representam uma progressão do aprimoramento das habilidades pessoais para a formação de uma cultura de aprendizado organizacional. Isso envolve:\n\nadquirir e aplicar novos conhecimentos\nidentificar e tratar lacunas de habilidades\ncompartilhar aprendizados com colegas\npromover o desenvolvimento pessoal e da equipe\npromover a aplicação do conhecimento para objetivos estratégicos\ninspirar uma cultura de aprendizagem alinhada aos objetivos do negócio.\n\nO aprendizado eficaz e o desenvolvimento profissional abrangem a educação formal, o aprendizado experimental, o estudo autodirigido e a capacidade de avaliar criticamente e aplicar novas informações. Também envolve a manutenção da conscientização sobre práticas emergentes e tendências do setor e o alinhamento de iniciativas de aprendizado com objetivos comerciais estratégicos.À medida que os profissionais avançam, sua abordagem de aprendizado e desenvolvimento evolui, passando do foco no aprimoramento de habilidades pessoais para a condução do desenvolvimento organizacional e da equipe. Com o tempo, eles deixam de aplicar novos conhecimentos e passam a liderar esforços que moldam uma cultura de aprendizado, alinhando iniciativas de desenvolvimento com metas estratégicas. Nos níveis sênior, os profissionais não apenas inspiram uma cultura de aprendizagem, mas também garantem que a organização tenha as habilidades e capacidades necessárias para navegar pelas mudanças do setor e aproveitar as oportunidades.",
+      "levels": [
+        {
+          "level": 1,
+          "description": "Aplica o conhecimento recém-adquirido para desenvolver habilidades para sua função. Contribui para identificar as próprias oportunidades de desenvolvimento."
+        },
+        {
+          "level": 2,
+          "description": "Absorve e aplica novas informações às tarefas.\nReconhece as habilidades pessoais e as lacunas de conhecimento e busca oportunidades de aprendizado para resolvê-las."
+        },
+        {
+          "level": 3,
+          "description": "Absorve e aplica novas informações de forma eficaz, com a capacidade de compartilhar o aprendizado com os colegas.\nToma a iniciativa de identificar e negociar suas próprias oportunidades de desenvolvimento apropriadas."
+        },
+        {
+          "level": 4,
+          "description": "Absorve rapidamente e avalia criticamente novas informações e as aplica de forma eficaz.\nMantém um entendimento das práticas emergentes e de sua aplicação e assume a responsabilidade de promover oportunidades de desenvolvimento para si mesmo e para os membros da equipe."
+        },
+        {
+          "level": 5,
+          "description": "Usa suas habilidades e conhecimentos para ajudar a estabelecer os padrões que serão aplicados por outras pessoas na organização.\nToma a iniciativa de desenvolver um conhecimento mais amplo do setor e/ou da empresa e de identificar e gerenciar oportunidades de desenvolvimento na área de responsabilidade."
+        },
+        {
+          "level": 6,
+          "description": "Promove a aplicação do conhecimento para apoiar os imperativos estratégicos.\nDesenvolve ativamente suas habilidades de liderança estratégica e técnica e lidera o desenvolvimento de habilidades em sua área de responsabilidade."
+        },
+        {
+          "level": 7,
+          "description": "Inspira uma cultura de aprendizado para alinhar-se aos objetivos comerciais.   \nMantém uma visão estratégica dos cenários contemporâneos e emergentes do setor. \nGarante que a organização desenvolva e mobilize toda a gama de habilidades e capacidades necessárias."
+        }
+      ],
+      "source": {
+        "file": "sfia_source/SFIA 9 Excel - Português/sfia-9_current-standard_pt_250124.xlsx",
+        "sheet": "Atributos",
+        "source_date": null
+      }
+    },
+    {
+      "type": "sfia.attribute",
+      "sfia_version": 9,
+      "language": "pt",
+      "code": "PLAN",
+      "name": "Planejamento",
+      "url": "https://sfia-online.org/pt/shortcode/9/PLAN",
+      "attribute_type": "Business skills/Behavioural factors",
+      "overall_description": "Adotar uma abordagem sistemática para organizar tarefas, recursos e cronogramas para atingir metas definidas.",
+      "guidance_notes": "O planejamento, no SFIA, representa uma progressão da organização do trabalho individual para a liderança do planejamento estratégico em uma organização. Ele envolve: \n\ndefinição de objetivos e determinação de cronogramas\norganização de tarefas e alocação de recursos\nalinhar atividades com metas mais abrangentes\nadaptar planos a circunstâncias variáveis\nmonitorar o progresso e avaliação dos resultados\niniciar e influenciar objetivos estratégicos.\n\nO planejamento eficaz abrange habilidades analíticas, previsão e a capacidade de equilibrar várias prioridades. Também envolve adaptabilidade para responder a circunstâncias variáveis e a capacidade de alinhar planos operacionais com metas estratégicas. À medida que os profissionais avançam, suas habilidades de planejamento moldam cada vez mais a direção e o desempenho da organização.\nÀ medida que os profissionais avançam, suas responsabilidades de planejamento aumentam, passando do gerenciamento de tarefas pessoais ou de equipe para a condução de esforços de planejamento organizacional. Com o tempo, eles passam da organização de seu próprio trabalho para a definição de objetivos estratégicos que moldam a direção da organização. Em níveis mais altos, os profissionais assumem a liderança no planejamento de iniciativas complexas, garantindo o alinhamento com as metas estratégicas e orientando o desempenho organizacional.",
+      "levels": [
+        {
+          "level": 1,
+          "description": "Confirma as etapas necessárias para tarefas individuais."
+        },
+        {
+          "level": 2,
+          "description": "Planeja seu próprio trabalho em prazos curtos e de forma organizada."
+        },
+        {
+          "level": 3,
+          "description": "Organiza e mantém o controle do próprio trabalho (e de outros, quando necessário) para cumprir os prazos acordados."
+        },
+        {
+          "level": 4,
+          "description": "Planeja, programa e monitora o trabalho para atender a determinados objetivos e processos pessoais e/ou da equipe, demonstrando uma abordagem analítica para cumprir metas de tempo e qualidade."
+        },
+        {
+          "level": 5,
+          "description": "Analisa, projeta, planeja, estabelece marcos, executa e avalia o trabalho de acordo com metas de tempo, custo e qualidade."
+        },
+        {
+          "level": 6,
+          "description": "Inicia e influencia os objetivos estratégicos e atribui responsabilidades."
+        },
+        {
+          "level": 7,
+          "description": "Planeja e lidera, no mais alto nível de autoridade, todos os aspectos de uma área de trabalho significativa."
+        }
+      ],
+      "source": {
+        "file": "sfia_source/SFIA 9 Excel - Português/sfia-9_current-standard_pt_250124.xlsx",
+        "sheet": "Atributos",
+        "source_date": null
+      }
+    },
+    {
+      "type": "sfia.attribute",
+      "sfia_version": 9,
+      "language": "pt",
+      "code": "PROB",
+      "name": "Resolução de Problemas",
+      "url": "https://sfia-online.org/pt/shortcode/9/PROB",
+      "attribute_type": "Business skills/Behavioural factors",
+      "overall_description": "Analisar desafios, aplicar métodos lógicos e desenvolver soluções eficazes para superar obstáculos.",
+      "guidance_notes": "A solução de problemas, no SFIA, representa uma progressão da abordagem de questões rotineiras para o gerenciamento de desafios estratégicos. Ela envolve:\n\nreconhecer e compreender os problemas\nanalisar possíveis soluções\nimplementar resoluções eficazes\navaliar os resultados e aprender com as experiências\nantecipar e abordar possíveis problemas de forma proativa\nalinhar a solução de problemas com os objetivos organizacionais.\n\nA solução eficaz de problemas engloba o pensamento analítico, a criatividade e a capacidade de tomar decisões informadas. Ela também envolve a colaboração com especialistas de várias disciplinas, especialmente em níveis sênior.\nÀ medida que os profissionais avançam, suas responsabilidades de solução de problemas aumentam, passando da resolução de questões rotineiras para o enfrentamento de desafios complexos e estratégicos. Inicialmente, eles se concentram em abordagens metódicas para problemas cotidianos, mas, com o tempo, desenvolvem a capacidade de prever problemas, avaliar uma série de soluções e enfrentar desafios que afetam objetivos organizacionais mais amplos. Em níveis mais altos, os profissionais lideram os esforços de solução de problemas, garantindo que os desafios complexos sejam gerenciados em alinhamento com as metas de longo prazo.",
+      "levels": [
+        {
+          "level": 1,
+          "description": "Trabalha para entender o problema e busca ajuda para resolver problemas inesperados."
+        },
+        {
+          "level": 2,
+          "description": "Investiga e resolve problemas de rotina."
+        },
+        {
+          "level": 3,
+          "description": "Aplica uma abordagem metódica para investigar e avaliar opções para resolver problemas rotineiros e moderadamente complexos."
+        },
+        {
+          "level": 4,
+          "description": "Investiga a causa e o impacto, avalia as opções e resolve uma ampla gama de problemas complexos."
+        },
+        {
+          "level": 5,
+          "description": "Investiga questões complexas para identificar as causas básicas e os impactos, avalia uma série de soluções e toma decisões informadas sobre o melhor curso de ação, muitas vezes em colaboração com outros especialistas."
+        },
+        {
+          "level": 6,
+          "description": "Antecipa e lidera a abordagem de problemas e oportunidades que podem afetar os objetivos organizacionais, estabelecendo uma abordagem estratégica e alocando recursos."
+        },
+        {
+          "level": 7,
+          "description": "Gerencia as inter-relações entre as partes afetadas e os imperativos estratégicos, reconhecendo o contexto comercial mais amplo e tirando conclusões precisas ao resolver problemas."
+        }
+      ],
+      "source": {
+        "file": "sfia_source/SFIA 9 Excel - Português/sfia-9_current-standard_pt_250124.xlsx",
+        "sheet": "Atributos",
+        "source_date": null
+      }
+    },
+    {
+      "type": "sfia.attribute",
+      "sfia_version": 9,
+      "language": "pt",
+      "code": "ADAP",
+      "name": "Adaptabilidade",
+      "url": "https://sfia-online.org/pt/shortcode/9/ADAP",
+      "attribute_type": "Business skills/Behavioural factors",
+      "overall_description": "Ajustar-se às mudanças e persistir em meio a desafios nos níveis pessoal, de equipe e organizacional.",
+      "guidance_notes": "A adaptabilidade e a resiliência, no SFIA, representam uma progressão da flexibilidade pessoal para a formação da agilidade organizacional. Isso envolve:\n\nestar aberto a mudanças e a novas formas de trabalho\najustar-se a diferentes dinâmicas de equipe e requisitos de trabalho\nadotar novos métodos e tecnologias de forma proativa\npermitir que outras pessoas se adaptem aos desafios\nliderar equipes em transições\npromover mudanças organizacionais significativas\nincorporar a adaptabilidade à cultura organizacional.\n\nA adaptabilidade e a resiliência eficazes abrangem a abertura para mudanças, o aprendizado proativo e a capacidade de manter o foco nos objetivos durante as transições. Ela também envolve o apoio a outras pessoas durante a mudança e a criação de um ambiente em que a inovação e a flexibilidade prosperem.\nÀ medida que os profissionais avançam, sua capacidade de conduzir e gerenciar mudanças molda cada vez mais a resiliência organizacional e o sucesso de longo prazo em ambientes dinâmicos.",
+      "levels": [
+        {
+          "level": 1,
+          "description": "Aceita mudanças e está aberto a novas formas de trabalho."
+        },
+        {
+          "level": 2,
+          "description": "Ajusta-se a diferentes dinâmicas de equipe e requisitos de trabalho.\nParticipa dos processos de adaptação da equipe."
+        },
+        {
+          "level": 3,
+          "description": "Adapta-se e reage às mudanças e demonstra iniciativa na adoção de novos métodos ou tecnologias."
+        },
+        {
+          "level": 4,
+          "description": "Permite que outras pessoas se adaptem e mudem em resposta a desafios e mudanças no ambiente de trabalho."
+        },
+        {
+          "level": 5,
+          "description": "Lidera adaptações a ambientes de negócios em constante mudança.\nOrienta as equipes durante as transições, mantendo o foco nos objetivos organizacionais."
+        },
+        {
+          "level": 6,
+          "description": "Promove a adaptabilidade organizacional ao iniciar e liderar mudanças significativas. Influencia as estratégias de gerenciamento de mudanças em nível organizacional."
+        },
+        {
+          "level": 7,
+          "description": "Promove a agilidade e a resiliência organizacional.\nIncorpora a adaptabilidade à cultura organizacional e ao planejamento estratégico."
+        }
+      ],
+      "source": {
+        "file": "sfia_source/SFIA 9 Excel - Português/sfia-9_current-standard_pt_250124.xlsx",
+        "sheet": "Atributos",
+        "source_date": null
+      }
+    },
+    {
+      "type": "sfia.attribute",
+      "sfia_version": 9,
+      "language": "pt",
+      "code": "SCPE",
+      "name": "Segurança, privacidade e ética",
+      "url": "https://sfia-online.org/pt/shortcode/9/SCPE",
+      "attribute_type": "Business skills/Behavioural factors",
+      "overall_description": "Garantir a proteção de informações confidenciais, defender a privacidade de dados e indivíduos e demonstrar conduta ética dentro e fora da organização.",
+      "guidance_notes": "A segurança, a privacidade e a ética, no SFIA, representam uma progressão da conscientização básica para a liderança estratégica. Isso envolve:\n\naplicar práticas profissionais de trabalho e aderir às regras organizacionais\nimplementar padrões e práticas recomendadas\npromover uma cultura de segurança, privacidade e conduta ética\nabordar desafios éticos, inclusive aqueles introduzidos por tecnologias emergentes, como a IA\ngarantir a conformidade com as leis e regulamentos relevantes\niniciativas líderes que incorporam segurança, privacidade e ética à cultura e às operações da organização.\n\nO gerenciamento eficaz da segurança, da privacidade e da ética abrange o conhecimento técnico, as habilidades de tomada de decisões éticas e a capacidade de equilibrar prioridades conflitantes. Também envolve a criação de um ambiente em que esses princípios sejam incorporados em todos os aspectos do trabalho.\nÀ medida que os profissionais avançam, espera-se que eles assumam um papel ativo na promoção do comportamento ético e na proteção de informações confidenciais em todas as áreas de trabalho. Em níveis mais altos, os indivíduos são responsáveis por desenvolver estratégias que equilibrem as necessidades operacionais com considerações éticas, garantindo a sustentabilidade e a confiança a longo prazo.",
+      "levels": [
+        {
+          "level": 1,
+          "description": "Desenvolve o entendimento das regras e expectativas de sua função e da organização."
+        },
+        {
+          "level": 2,
+          "description": "Tem um bom entendimento de sua função e das regras e expectativas da organização."
+        },
+        {
+          "level": 3,
+          "description": "Aplica profissionalismo, práticas de trabalho e conhecimento adequados ao trabalho."
+        },
+        {
+          "level": 4,
+          "description": "Adapta e aplica os padrões aplicáveis, reconhecendo sua importância para alcançar os resultados da equipe."
+        },
+        {
+          "level": 5,
+          "description": "Contribui proativamente para a implementação de práticas profissionais de trabalho e ajuda a promover uma cultura organizacional de apoio."
+        },
+        {
+          "level": 6,
+          "description": "Assume um papel de liderança na promoção e garantia de cultura e práticas de trabalho apropriadas, incluindo o fornecimento de acesso e oportunidades iguais para pessoas com habilidades diversas."
+        },
+        {
+          "level": 7,
+          "description": "Fornece direção clara e liderança estratégica para incorporar a conformidade, a cultura organizacional e as práticas de trabalho, além de promover ativamente a diversidade e a inclusão."
+        }
+      ],
+      "source": {
+        "file": "sfia_source/SFIA 9 Excel - Português/sfia-9_current-standard_pt_250124.xlsx",
+        "sheet": "Atributos",
+        "source_date": null
+      }
+    }
+  ]
+}

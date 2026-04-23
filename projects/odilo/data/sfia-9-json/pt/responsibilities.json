@@ -1,0 +1,762 @@
+{
+  "type": "sfia.responsibilities",
+  "sfia_version": 9,
+  "language": "pt",
+  "guidance_notes": "Os niveis do SFIA representam niveis de responsabilidade no local de trabalho. Cada nivel sucessivo descreve maior impacto, responsabilidade e prestacao de contas.\n- Autonomia, influencia e complexidade sao atributos genericos que indicam o nivel de responsabilidade.\n- Habilidades de negocios e fatores comportamentais descrevem os comportamentos necessarios para ser eficaz em cada nivel.\n- O atributo de conhecimento define a profundidade e amplitude de compreensao necessarias para realizar e influenciar o trabalho de forma eficaz.\nCompreender esses atributos ajudara voce a aproveitar ao maximo o SFIA. Eles sao fundamentais para compreender e aplicar os niveis descritos nas descricoes de habilidades do SFIA.",
+  "levels": [
+    {
+      "level": 1,
+      "title": "Segue",
+      "guiding_phrase": "Segue",
+      "essence": "Essência do nível: Executa tarefas de rotina sob supervisão rigorosa, segue instruções e precisa de orientação para concluir seu trabalho. Aprende e aplica habilidades e conhecimentos básicos.",
+      "url": "https://sfia-online.org/en/sfia-9/responsibilities/level-1",
+      "generic_attributes": [
+        {
+          "code": "AUTO",
+          "name": "Autonomia",
+          "description": "Segue as instruções e trabalha sob orientação rigorosa. Recebe instruções e orientações específicas e tem seu trabalho revisado de perto.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/autonomy"
+        },
+        {
+          "code": "INFL",
+          "name": "Influência",
+          "description": "Quando necessário, contribui para discussões de equipe com colegas imediatos.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/influence"
+        },
+        {
+          "code": "COMP",
+          "name": "Complexidade",
+          "description": "Realiza atividades de rotina em um ambiente estruturado.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/complexity"
+        },
+        {
+          "code": "KNGE",
+          "name": "Conhecimento",
+          "description": "Aplica conhecimentos básicos para executar tarefas rotineiras, bem definidas e previsíveis, específicas da função.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/knowledge"
+        }
+      ],
+      "business_skills_behavioural_factors": [
+        {
+          "code": "COLL",
+          "name": "Colaboração",
+          "description": "Trabalha principalmente em suas próprias tarefas e interage apenas com sua equipe imediata. Desenvolve a compreensão de como seu trabalho ajuda os outros.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/collaboration"
+        },
+        {
+          "code": "COMM",
+          "name": "Comunicação",
+          "description": "Comunica-se com a equipe imediata para entender e cumprir as tarefas atribuídas. Observa, ouve e faz perguntas para buscar informações ou esclarecer instruções.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/communication"
+        },
+        {
+          "code": "IMPM",
+          "name": "Mentalidade de melhoria",
+          "description": "Identifica oportunidades de melhoria em suas próprias tarefas. Sugere aprimoramentos básicos quando solicitado.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/improvement"
+        },
+        {
+          "code": "CRTY",
+          "name": "Criatividade",
+          "description": "Participa da geração de novas ideias quando solicitado.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/creativity"
+        },
+        {
+          "code": "DECM",
+          "name": "Tomada de Decisão",
+          "description": "Tem pouca liberdade no atendimento a consultas.  \nBusca orientação em situações inesperadas.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/decision"
+        },
+        {
+          "code": "DIGI",
+          "name": "Mentalidade digital",
+          "description": "Possui habilidades digitais básicas para aprender e usar aplicativos, processos e ferramentas para sua função.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/digital_mindset"
+        },
+        {
+          "code": "LEAD",
+          "name": "Liderança",
+          "description": "Aumenta proativamente a compreensão de suas tarefas e responsabilidades no trabalho.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/leadership"
+        },
+        {
+          "code": "LADV",
+          "name": "Aprendizagem e desenvolvimento",
+          "description": "Aplica o conhecimento recém-adquirido para desenvolver habilidades para sua função. Contribui para identificar as próprias oportunidades de desenvolvimento.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/learning"
+        },
+        {
+          "code": "PLAN",
+          "name": "Planejamento",
+          "description": "Confirma as etapas necessárias para tarefas individuais.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/planning"
+        },
+        {
+          "code": "PROB",
+          "name": "Resolução de Problemas",
+          "description": "Trabalha para entender o problema e busca ajuda para resolver problemas inesperados.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/problem"
+        },
+        {
+          "code": "ADAP",
+          "name": "Adaptabilidade",
+          "description": "Aceita mudanças e está aberto a novas formas de trabalho.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/adaptability"
+        },
+        {
+          "code": "SCPE",
+          "name": "Segurança, privacidade e ética",
+          "description": "Desenvolve o entendimento das regras e expectativas de sua função e da organização.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/security"
+        }
+      ]
+    },
+    {
+      "level": 2,
+      "title": "Auxilia",
+      "guiding_phrase": "Auxilia",
+      "essence": "Essência do nível: Presta assistência a outras pessoas, trabalha sob supervisão rotineira e usa critérios próprios para resolver problemas rotineiros. Aprende ativamente por meio de treinamento e experiências no trabalho.",
+      "url": "https://sfia-online.org/en/sfia-9/responsibilities/level-2",
+      "generic_attributes": [
+        {
+          "code": "AUTO",
+          "name": "Autonomia",
+          "description": "Trabalha sob direção rotineira. Recebe instruções e orientações e tem seu trabalho revisado regularmente.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/autonomy"
+        },
+        {
+          "code": "INFL",
+          "name": "Influência",
+          "description": "Contribui para as discussões com os membros da equipe. Trabalha ao lado dos membros da equipe, contribuindo para as decisões da equipe. Quando a função exige, interage com pessoas de fora da equipe, incluindo colegas internos e contatos externos.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/influence"
+        },
+        {
+          "code": "COMP",
+          "name": "Complexidade",
+          "description": "Realiza uma série de atividades de trabalho em ambientes variados.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/complexity"
+        },
+        {
+          "code": "KNGE",
+          "name": "Conhecimento",
+          "description": "Aplica o conhecimento das tarefas e práticas comuns do local de trabalho para apoiar as atividades da equipe, sob orientação.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/knowledge"
+        }
+      ],
+      "business_skills_behavioural_factors": [
+        {
+          "code": "COLL",
+          "name": "Colaboração",
+          "description": "Compreende a necessidade de colaborar com sua equipe e considera as necessidades do usuário/cliente.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/collaboration"
+        },
+        {
+          "code": "COMM",
+          "name": "Comunicação",
+          "description": "Comunica informações à equipe imediata e às partes interessadas diretamente relacionadas à sua função.\nOuve para obter compreensão e faz perguntas relevantes para esclarecer ou buscar mais informações.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/communication"
+        },
+        {
+          "code": "IMPM",
+          "name": "Mentalidade de melhoria",
+          "description": "Propõe ideias para melhorar a própria área de trabalho.\n\nImplementa as alterações acordadas nas tarefas de trabalho atribuídas.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/improvement"
+        },
+        {
+          "code": "CRTY",
+          "name": "Criatividade",
+          "description": "Aplica o pensamento criativo para sugerir novas maneiras de abordar uma tarefa e resolver problemas.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/creativity"
+        },
+        {
+          "code": "DECM",
+          "name": "Tomada de Decisão",
+          "description": "Tem liberdade limitada na resolução de problemas ou consultas.\nDecide quando buscar orientação em situações inesperadas.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/decision"
+        },
+        {
+          "code": "DIGI",
+          "name": "Mentalidade digital",
+          "description": "Possui habilidades digitais suficientes para sua função; compreende e usa métodos, ferramentas, aplicativos e processos adequados.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/digital_mindset"
+        },
+        {
+          "code": "LEAD",
+          "name": "Liderança",
+          "description": "Assume a responsabilidade pelo desenvolvimento de sua experiência de trabalho.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/leadership"
+        },
+        {
+          "code": "LADV",
+          "name": "Aprendizagem e desenvolvimento",
+          "description": "Absorve e aplica novas informações às tarefas.\nReconhece as habilidades pessoais e as lacunas de conhecimento e busca oportunidades de aprendizado para resolvê-las.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/learning"
+        },
+        {
+          "code": "PLAN",
+          "name": "Planejamento",
+          "description": "Planeja seu próprio trabalho em prazos curtos e de forma organizada.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/planning"
+        },
+        {
+          "code": "PROB",
+          "name": "Resolução de Problemas",
+          "description": "Investiga e resolve problemas de rotina.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/problem"
+        },
+        {
+          "code": "ADAP",
+          "name": "Adaptabilidade",
+          "description": "Ajusta-se a diferentes dinâmicas de equipe e requisitos de trabalho.\nParticipa dos processos de adaptação da equipe.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/adaptability"
+        },
+        {
+          "code": "SCPE",
+          "name": "Segurança, privacidade e ética",
+          "description": "Tem um bom entendimento de sua função e das regras e expectativas da organização.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/security"
+        }
+      ]
+    },
+    {
+      "level": 3,
+      "title": "Aplica",
+      "guiding_phrase": "Aplica",
+      "essence": "Essência do nível: Executa tarefas variadas, às vezes complexas e não rotineiras, usando métodos e procedimentos padrão. Trabalha sob direção geral, possui alguma liberdade e gerencia seu próprio trabalho dentro dos prazos. Aprimora proativamente as habilidades e o impacto no local de trabalho.",
+      "url": "https://sfia-online.org/en/sfia-9/responsibilities/level-3",
+      "generic_attributes": [
+        {
+          "code": "AUTO",
+          "name": "Autonomia",
+          "description": "Trabalha sob direção geral para concluir as tarefas atribuídas. Recebe orientação e tem o trabalho revisado nos marcos acordados. Quando necessário, delega tarefas de rotina a outras pessoas da própria equipe.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/autonomy"
+        },
+        {
+          "code": "INFL",
+          "name": "Influência",
+          "description": "Trabalha com a equipe e influencia suas decisões. Tem um nível transacional de contato com pessoas de fora da equipe, incluindo colegas internos e contatos externos.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/influence"
+        },
+        {
+          "code": "COMP",
+          "name": "Complexidade",
+          "description": "Realiza uma série de trabalhos, às vezes complexos e não rotineiros, em ambientes variados.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/complexity"
+        },
+        {
+          "code": "KNGE",
+          "name": "Conhecimento",
+          "description": "Aplica o conhecimento de uma série de práticas específicas da função para concluir tarefas dentro de limites definidos e avalia como esse conhecimento se aplica ao contexto comercial mais amplo.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/knowledge"
+        }
+      ],
+      "business_skills_behavioural_factors": [
+        {
+          "code": "COLL",
+          "name": "Colaboração",
+          "description": "Compreende e colabora com a análise das necessidades do usuário/cliente e representa isso em seu trabalho.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/collaboration"
+        },
+        {
+          "code": "COMM",
+          "name": "Comunicação",
+          "description": "Comunica-se com a equipe e as partes interessadas dentro e fora da organização, explicando e apresentando as informações com clareza.\nContribui para uma série de conversas relacionadas ao trabalho, ouve os outros para obter entendimento e faz perguntas relevantes para sua função.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/communication"
+        },
+        {
+          "code": "IMPM",
+          "name": "Mentalidade de melhoria",
+          "description": "Identifica e implementa melhorias em sua própria área de trabalho.\nContribui para aprimoramentos de processos da equipe.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/improvement"
+        },
+        {
+          "code": "CRTY",
+          "name": "Criatividade",
+          "description": "Aplica e contribui com técnicas de pensamento criativo para contribuir com novas ideias para seu próprio trabalho e para as atividades da equipe.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/creativity"
+        },
+        {
+          "code": "DECM",
+          "name": "Tomada de Decisão",
+          "description": "Tem liberdade para identificar e responder a questões complexas relacionadas às suas próprias atribuições. \nDetermina quando os problemas devem ser escalados para um nível superior.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/decision"
+        },
+        {
+          "code": "DIGI",
+          "name": "Mentalidade digital",
+          "description": "Explora e aplica ferramentas e habilidades digitais relevantes para sua função.\nCompreende e usa de maneira eficaz os métodos, ferramentas, aplicativos e processos apropriados.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/digital_mindset"
+        },
+        {
+          "code": "LEAD",
+          "name": "Liderança",
+          "description": "Fornece orientação básica e suporte a membros menos experientes da equipe, conforme necessário.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/leadership"
+        },
+        {
+          "code": "LADV",
+          "name": "Aprendizagem e desenvolvimento",
+          "description": "Absorve e aplica novas informações de forma eficaz, com a capacidade de compartilhar o aprendizado com os colegas.\nToma a iniciativa de identificar e negociar suas próprias oportunidades de desenvolvimento apropriadas.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/learning"
+        },
+        {
+          "code": "PLAN",
+          "name": "Planejamento",
+          "description": "Organiza e mantém o controle do próprio trabalho (e de outros, quando necessário) para cumprir os prazos acordados.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/planning"
+        },
+        {
+          "code": "PROB",
+          "name": "Resolução de Problemas",
+          "description": "Aplica uma abordagem metódica para investigar e avaliar opções para resolver problemas rotineiros e moderadamente complexos.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/problem"
+        },
+        {
+          "code": "ADAP",
+          "name": "Adaptabilidade",
+          "description": "Adapta-se e reage às mudanças e demonstra iniciativa na adoção de novos métodos ou tecnologias.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/adaptability"
+        },
+        {
+          "code": "SCPE",
+          "name": "Segurança, privacidade e ética",
+          "description": "Aplica profissionalismo, práticas de trabalho e conhecimento adequados ao trabalho.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/security"
+        }
+      ]
+    },
+    {
+      "level": 4,
+      "title": "Possibilita",
+      "guiding_phrase": "Possibilita",
+      "essence": "Essência do nível: Realiza diversas atividades complexas, apoia e orienta outras pessoas, delega tarefas quando apropriado, trabalha de forma autônoma sob orientação geral e contribui com conhecimentos especializados para atingir os objetivos da equipe.",
+      "url": "https://sfia-online.org/en/sfia-9/responsibilities/level-4",
+      "generic_attributes": [
+        {
+          "code": "AUTO",
+          "name": "Autonomia",
+          "description": "Trabalha sob direção geral dentro de uma estrutura clara de responsabilidade. Exerce considerável responsabilidade pessoal e autonomia. Quando necessário, planeja, agenda e delega trabalho a outras pessoas, geralmente dentro da própria equipe.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/autonomy"
+        },
+        {
+          "code": "INFL",
+          "name": "Influência",
+          "description": "Influencia os projetos e os objetivos da equipe. Tem um nível tático de contato com pessoas de fora da equipe, incluindo colegas internos e contatos externos.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/influence"
+        },
+        {
+          "code": "COMP",
+          "name": "Complexidade",
+          "description": "O trabalho inclui uma ampla gama de atividades técnicas ou profissionais complexas em contextos variados.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/complexity"
+        },
+        {
+          "code": "KNGE",
+          "name": "Conhecimento",
+          "description": "Aplica conhecimento em diferentes áreas de seu campo, integrando esse conhecimento para realizar tarefas complexas e diversas. Aplica o conhecimento prático do domínio da organização.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/knowledge"
+        }
+      ],
+      "business_skills_behavioural_factors": [
+        {
+          "code": "COLL",
+          "name": "Colaboração",
+          "description": "Facilita a colaboração entre as partes interessadas que compartilham objetivos comuns.  \nEnvolve-se e contribui para o trabalho de equipes multifuncionais para garantir que as necessidades do usuário/cliente sejam atendidas em todo o produto/escopo de trabalho.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/collaboration"
+        },
+        {
+          "code": "COMM",
+          "name": "Comunicação",
+          "description": "Comunica-se com públicos técnicos e não técnicos, incluindo a equipe e as partes interessadas dentro e fora da organização.\nConforme necessário, assume a liderança na explicação de conceitos complexos para apoiar a tomada de decisões.\nOuve e faz perguntas perspicazes para identificar diferentes perspectivas e esclarecer e confirmar o entendimento.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/communication"
+        },
+        {
+          "code": "IMPM",
+          "name": "Mentalidade de melhoria",
+          "description": "Incentiva e apoia as discussões da equipe sobre iniciativas de melhoria.\n\nImplementa mudanças processuais em um escopo de trabalho definido.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/improvement"
+        },
+        {
+          "code": "CRTY",
+          "name": "Criatividade",
+          "description": "Aplica, facilita e desenvolve conceitos de pensamento criativo e encontra maneiras alternativas de abordar os resultados da equipe.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/creativity"
+        },
+        {
+          "code": "DECM",
+          "name": "Tomada de Decisão",
+          "description": "Julga e possui liberdade substancial para identificar e responder a questões e atribuições complexas relacionadas a projetos e objetivos de equipe.\nEscalona quando o escopo é afetado.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/decision"
+        },
+        {
+          "code": "DIGI",
+          "name": "Mentalidade digital",
+          "description": "Maximiza as capacidades das aplicações para o seu papel, avalia e apoia a utilização de novas tecnologias e ferramentas digitais.\nSeleciona adequadamente e avalia o impacto da mudança nos padrões, métodos, ferramentas, aplicativos e processos aplicáveis relevantes à própria especialidade.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/digital_mindset"
+        },
+        {
+          "code": "LEAD",
+          "name": "Liderança",
+          "description": "Lidera, apoia ou orienta os membros da equipe.\nDesenvolve soluções para atividades de trabalho complexas relacionadas a atribuições. \nDemonstra compreensão dos fatores de risco em seu trabalho.\nContribui com conhecimento especializado para a definição de requisitos em apoio a propostas.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/leadership"
+        },
+        {
+          "code": "LADV",
+          "name": "Aprendizagem e desenvolvimento",
+          "description": "Absorve rapidamente e avalia criticamente novas informações e as aplica de forma eficaz.\nMantém um entendimento das práticas emergentes e de sua aplicação e assume a responsabilidade de promover oportunidades de desenvolvimento para si mesmo e para os membros da equipe.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/learning"
+        },
+        {
+          "code": "PLAN",
+          "name": "Planejamento",
+          "description": "Planeja, programa e monitora o trabalho para atender a determinados objetivos e processos pessoais e/ou da equipe, demonstrando uma abordagem analítica para cumprir metas de tempo e qualidade.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/planning"
+        },
+        {
+          "code": "PROB",
+          "name": "Resolução de Problemas",
+          "description": "Investiga a causa e o impacto, avalia as opções e resolve uma ampla gama de problemas complexos.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/problem"
+        },
+        {
+          "code": "ADAP",
+          "name": "Adaptabilidade",
+          "description": "Permite que outras pessoas se adaptem e mudem em resposta a desafios e mudanças no ambiente de trabalho.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/adaptability"
+        },
+        {
+          "code": "SCPE",
+          "name": "Segurança, privacidade e ética",
+          "description": "Adapta e aplica os padrões aplicáveis, reconhecendo sua importância para alcançar os resultados da equipe.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/security"
+        }
+      ]
+    },
+    {
+      "level": 5,
+      "title": "Garante, aconselha",
+      "guiding_phrase": "Garante, aconselha",
+      "essence": "Essência do nível: Fornece orientação autorizada em seu campo e trabalha sob ampla direção. Responsável pela entrega de resultados significativos do trabalho, desde a análise, passando pela execução, até a avaliação.",
+      "url": "https://sfia-online.org/en/sfia-9/responsibilities/level-5",
+      "generic_attributes": [
+        {
+          "code": "AUTO",
+          "name": "Autonomia",
+          "description": "Trabalha sob ampla direção. O trabalho é de iniciativa própria, consistente com os requisitos operacionais e orçamentários acordados para atender aos objetivos técnicos e/ou de grupo alocados. Define tarefas e delega trabalho a equipes e indivíduos dentro da sua área de responsabilidade.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/autonomy"
+        },
+        {
+          "code": "INFL",
+          "name": "Influência",
+          "description": "Influencia decisões críticas em seu domínio.  Tem contato de nível operacional que afeta a execução e a implementação com colegas internos e contatos externos. Tem influência significativa sobre a alocação e o gerenciamento dos recursos necessários para a execução dos projetos.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/influence"
+        },
+        {
+          "code": "COMP",
+          "name": "Complexidade",
+          "description": "Executa uma ampla gama de atividades de trabalho técnicas e/ou profissionais complexas, exigindo a aplicação de princípios fundamentais em uma variedade de contextos imprevisíveis.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/complexity"
+        },
+        {
+          "code": "KNGE",
+          "name": "Conhecimento",
+          "description": "Aplica o conhecimento para interpretar situações complexas e oferecer conselhos com autoridade. Aplica conhecimentos profundos em campos específicos, com uma compreensão mais ampla do setor/negócio.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/knowledge"
+        }
+      ],
+      "business_skills_behavioural_factors": [
+        {
+          "code": "COLL",
+          "name": "Colaboração",
+          "description": "Facilita a colaboração entre as partes interessadas que têm objetivos diferentes.\nGarante formas colaborativas de trabalho em todos os estágios do trabalho para atender às necessidades do usuário/cliente.\nEstabelece relacionamentos eficazes em toda a organização e com clientes, fornecedores e parceiros.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/collaboration"
+        },
+        {
+          "code": "COMM",
+          "name": "Comunicação",
+          "description": "Comunica-se com clareza e impacto, articulando informações e ideias complexas para públicos amplos com diferentes pontos de vista.\nLidera e incentiva conversas para compartilhar ideias e criar consenso sobre as ações a serem tomadas.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/communication"
+        },
+        {
+          "code": "IMPM",
+          "name": "Mentalidade de melhoria",
+          "description": "Identifica e avalia possíveis melhorias em produtos, práticas ou serviços.\nLidera a implementação de aprimoramentos em sua própria área de responsabilidade.\nAvalia a eficácia das mudanças implementadas.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/improvement"
+        },
+        {
+          "code": "CRTY",
+          "name": "Criatividade",
+          "description": "Aplica de forma criativa o pensamento inovador e práticas de design na identificação de soluções que agregarão valor para o benefício do cliente/stakeholder.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/creativity"
+        },
+        {
+          "code": "DECM",
+          "name": "Tomada de Decisão",
+          "description": "Usa o discernimento para tomar decisões informadas sobre ações para atingir os resultados organizacionais, como o cumprimento de metas, prazos e orçamento.\nLevanta questões quando os objetivos estão em risco.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/decision"
+        },
+        {
+          "code": "DIGI",
+          "name": "Mentalidade digital",
+          "description": "Reconhece e avalia o impacto organizacional de novas tecnologias e serviços digitais.\nImplementa práticas novas e eficazes. \nAconselha sobre os padrões, métodos, ferramentas, aplicações e processos disponíveis relevantes para a(s) especialidade(s) do grupo e pode fazer escolhas apropriadas entre alternativas.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/digital_mindset"
+        },
+        {
+          "code": "LEAD",
+          "name": "Liderança",
+          "description": "Oferece liderança em nível operacional.\nImplementa e executa políticas alinhadas aos planos estratégicos.\nAnalisa e avalia riscos.\nLeva em conta todos os requisitos ao considerar as propostas.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/leadership"
+        },
+        {
+          "code": "LADV",
+          "name": "Aprendizagem e desenvolvimento",
+          "description": "Usa suas habilidades e conhecimentos para ajudar a estabelecer os padrões que serão aplicados por outras pessoas na organização.\nToma a iniciativa de desenvolver um conhecimento mais amplo do setor e/ou da empresa e de identificar e gerenciar oportunidades de desenvolvimento na área de responsabilidade.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/learning"
+        },
+        {
+          "code": "PLAN",
+          "name": "Planejamento",
+          "description": "Analisa, projeta, planeja, estabelece marcos, executa e avalia o trabalho de acordo com metas de tempo, custo e qualidade.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/planning"
+        },
+        {
+          "code": "PROB",
+          "name": "Resolução de Problemas",
+          "description": "Investiga questões complexas para identificar as causas básicas e os impactos, avalia uma série de soluções e toma decisões informadas sobre o melhor curso de ação, muitas vezes em colaboração com outros especialistas.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/problem"
+        },
+        {
+          "code": "ADAP",
+          "name": "Adaptabilidade",
+          "description": "Lidera adaptações a ambientes de negócios em constante mudança.\nOrienta as equipes durante as transições, mantendo o foco nos objetivos organizacionais.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/adaptability"
+        },
+        {
+          "code": "SCPE",
+          "name": "Segurança, privacidade e ética",
+          "description": "Contribui proativamente para a implementação de práticas profissionais de trabalho e ajuda a promover uma cultura organizacional de apoio.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/security"
+        }
+      ]
+    },
+    {
+      "level": 6,
+      "title": "Inicia, influencia",
+      "guiding_phrase": "Inicia, influencia",
+      "essence": "Essência do nível: tem influência organizacional significativa, toma decisões de alto nível, molda políticas, demonstra liderança, promove a colaboração organizacional e aceita a responsabilidade em áreas-chave.",
+      "url": "https://sfia-online.org/en/sfia-9/responsibilities/level-6",
+      "generic_attributes": [
+        {
+          "code": "AUTO",
+          "name": "Autonomia",
+          "description": "Orienta decisões e estratégias de alto nível dentro das políticas e dos objetivos gerais da organização. Tem autoridade e responsabilidade definidas para ações e decisões em uma área significativa de trabalho, incluindo aspectos técnicos, financeiros e de qualidade. Delega a responsabilidade pelos objetivos operacionais.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/autonomy"
+        },
+        {
+          "code": "INFL",
+          "name": "Influência",
+          "description": "Influencia a formação da estratégia e a execução dos planos de negócios. Tem um nível gerencial significativo de contato com colegas internos e contatos externos. Exerce liderança organizacional e influência sobre a nomeação e o gerenciamento de recursos relacionados à implementação de iniciativas estratégicas.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/influence"
+        },
+        {
+          "code": "COMP",
+          "name": "Complexidade",
+          "description": "Realiza atividades de trabalho altamente complexas que abrangem aspectos técnicos, financeiros e de qualidade.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/complexity"
+        },
+        {
+          "code": "KNGE",
+          "name": "Conhecimento",
+          "description": "Aplica amplo conhecimento comercial para permitir a liderança estratégica e a tomada de decisões em vários domínios.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/knowledge"
+        }
+      ],
+      "business_skills_behavioural_factors": [
+        {
+          "code": "COLL",
+          "name": "Colaboração",
+          "description": "Lidera a colaboração com uma gama diversificada de partes interessadas em objetivos concorrentes dentro da organização.\nEstabelece conexões fortes e influentes com os principais contatos internos e externos em nível de gerência sênior/líder técnico",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/collaboration"
+        },
+        {
+          "code": "COMM",
+          "name": "Comunicação",
+          "description": "Comunica-se com credibilidade em todos os níveis da organização para públicos amplos com objetivos divergentes.\nExplica informações e ideias complexas com clareza, influenciando a direção estratégica.\nPromove o compartilhamento de informações em toda a organização.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/communication"
+        },
+        {
+          "code": "IMPM",
+          "name": "Mentalidade de melhoria",
+          "description": "Promove iniciativas de melhoria que têm um impacto significativo na organização.\nAlinha as estratégias de aprimoramento com os objetivos organizacionais.\nEnvolve as partes interessadas nos processos de aprimoramento.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/improvement"
+        },
+        {
+          "code": "CRTY",
+          "name": "Criatividade",
+          "description": "Aplica com criatividade uma ampla gama de novas ideias e técnicas de gerenciamento eficazes para obter resultados que se alinham à estratégia organizacional.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/creativity"
+        },
+        {
+          "code": "DECM",
+          "name": "Tomada de Decisão",
+          "description": "Usa o discernimento para tomar decisões que iniciam a realização dos objetivos estratégicos acordados, incluindo o desempenho financeiro.\nEscalona quando a direção estratégica mais ampla é afetada.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/decision"
+        },
+        {
+          "code": "DIGI",
+          "name": "Mentalidade digital",
+          "description": "Lidera o aprimoramento dos recursos digitais da organização. \nIdentifica e endossa oportunidades para adotar novas tecnologias e serviços digitais.\nLidera a governança digital e a conformidade com a legislação pertinente e a necessidade de produtos e serviços.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/digital_mindset"
+        },
+        {
+          "code": "LEAD",
+          "name": "Liderança",
+          "description": "Oferece liderança em nível organizacional.\nContribui para o desenvolvimento e a implementação de políticas e estratégias.\nCompreende e comunica os desenvolvimentos da indústria e o papel e o impacto da tecnologia. \nGerencia e mitiga o risco organizacional.  \nEquilibra os requisitos das propostas com as necessidades mais amplas da organização.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/leadership"
+        },
+        {
+          "code": "LADV",
+          "name": "Aprendizagem e desenvolvimento",
+          "description": "Promove a aplicação do conhecimento para apoiar os imperativos estratégicos.\nDesenvolve ativamente suas habilidades de liderança estratégica e técnica e lidera o desenvolvimento de habilidades em sua área de responsabilidade.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/learning"
+        },
+        {
+          "code": "PLAN",
+          "name": "Planejamento",
+          "description": "Inicia e influencia os objetivos estratégicos e atribui responsabilidades.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/planning"
+        },
+        {
+          "code": "PROB",
+          "name": "Resolução de Problemas",
+          "description": "Antecipa e lidera a abordagem de problemas e oportunidades que podem afetar os objetivos organizacionais, estabelecendo uma abordagem estratégica e alocando recursos.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/problem"
+        },
+        {
+          "code": "ADAP",
+          "name": "Adaptabilidade",
+          "description": "Promove a adaptabilidade organizacional ao iniciar e liderar mudanças significativas. Influencia as estratégias de gerenciamento de mudanças em nível organizacional.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/adaptability"
+        },
+        {
+          "code": "SCPE",
+          "name": "Segurança, privacidade e ética",
+          "description": "Assume um papel de liderança na promoção e garantia de cultura e práticas de trabalho apropriadas, incluindo o fornecimento de acesso e oportunidades iguais para pessoas com habilidades diversas.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/security"
+        }
+      ]
+    },
+    {
+      "level": 7,
+      "title": "Define estrategia, inspira, mobiliza",
+      "guiding_phrase": "Define estratégIa, inspira, mobiliza",
+      "essence": "Essência do nível: Opera no mais alto nível organizacional, determina a visão e a estratégia organizacional geral e assume a responsabilidade pelo sucesso geral.",
+      "url": "https://sfia-online.org/en/sfia-9/responsibilities/level-7",
+      "generic_attributes": [
+        {
+          "code": "AUTO",
+          "name": "Autonomia",
+          "description": "Define e lidera a visão e a estratégia da organização dentro dos objetivos comerciais mais abrangentes. É totalmente responsável pelas ações e decisões tomadas, tanto por si mesmo quanto por outros a quem foram atribuídas responsabilidades. Delega autoridade e responsabilidade pelos objetivos estratégicos do negócio.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/autonomy"
+        },
+        {
+          "code": "INFL",
+          "name": "Influência",
+          "description": "Dirige, influencia e inspira a direção estratégica e o desenvolvimento da organização. Tem um nível de liderança extensivo de contato com colegas internos e contatos externos. Autoriza a nomeação dos recursos necessários.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/influence"
+        },
+        {
+          "code": "COMP",
+          "name": "Complexidade",
+          "description": "Exerce ampla liderança estratégica na entrega de valor comercial por meio de visão, governança e gerenciamento executivo.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/complexity"
+        },
+        {
+          "code": "KNGE",
+          "name": "Conhecimento",
+          "description": "Aplica conhecimentos estratégicos e de base ampla para moldar a estratégia organizacional, prever tendências futuras do setor e preparar a organização para se adaptar e liderar.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/knowledge"
+        }
+      ],
+      "business_skills_behavioural_factors": [
+        {
+          "code": "COLL",
+          "name": "Colaboração",
+          "description": "Promove a colaboração, envolvendo-se com as partes interessadas da liderança, garantindo o alinhamento com a visão e a estratégia corporativas. \nEstabelece relacionamentos sólidos e influentes com clientes, parceiros e líderes do setor.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/collaboration"
+        },
+        {
+          "code": "COMM",
+          "name": "Comunicação",
+          "description": "Comunica-se com o público em todos os níveis da própria organização e se envolve com o setor.\nApresenta argumentos e ideias convincentes de forma objetiva para atingir os objetivos de negócio.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/communication"
+        },
+        {
+          "code": "IMPM",
+          "name": "Mentalidade de melhoria",
+          "description": "Define e comunica a abordagem organizacional para a melhoria contínua.\nCultiva uma cultura de aprimoramento contínuo.\nAvalia o impacto das iniciativas de melhoria no sucesso organizacional.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/improvement"
+        },
+        {
+          "code": "CRTY",
+          "name": "Criatividade",
+          "description": "Defende a criatividade e a inovação como incentivadoras do desenvolvimento da estratégia para proporcionar oportunidades de negócio.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/creativity"
+        },
+        {
+          "code": "DECM",
+          "name": "Tomada de Decisão",
+          "description": "Usa o discernimento na tomada de decisões essenciais para a direção estratégica e o sucesso da organização.\nEncaminha, quando necessário, a contribuição da gerência executiva da empresa por meio de estruturas de governança estabelecidas.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/decision"
+        },
+        {
+          "code": "DIGI",
+          "name": "Mentalidade digital",
+          "description": "Lidera o desenvolvimento da cultura digital da organização e a visão transformacional.  \nAumenta a capacidade e/ou a exploração da tecnologia em uma ou mais organizações por meio de um profundo entendimento do setor e das implicações das tecnologias emergentes.\nResponsabiliza-se por avaliar como as leis e os regulamentos afetam os objetivos organizacionais e seu uso de recursos digitais, de dados e de tecnologia.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/digital_mindset"
+        },
+        {
+          "code": "LEAD",
+          "name": "Liderança",
+          "description": "Lidera o gerenciamento estratégico.\nAplica o mais alto nível de liderança à formulação e implementação da estratégia.\nComunica o impacto potencial das práticas emergentes e tecnologias sobre as organizações e indivíduos, e avalia os riscos de usar ou não usar tais práticas e tecnologias. \nEstabelece governança para tratar dos riscos do negócio.\nGarante que as propostas se alinhem à direção estratégica da organização.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/leadership"
+        },
+        {
+          "code": "LADV",
+          "name": "Aprendizagem e desenvolvimento",
+          "description": "Inspira uma cultura de aprendizado para alinhar-se aos objetivos comerciais.   \nMantém uma visão estratégica dos cenários contemporâneos e emergentes do setor. \nGarante que a organização desenvolva e mobilize toda a gama de habilidades e capacidades necessárias.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/learning"
+        },
+        {
+          "code": "PLAN",
+          "name": "Planejamento",
+          "description": "Planeja e lidera, no mais alto nível de autoridade, todos os aspectos de uma área de trabalho significativa.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/planning"
+        },
+        {
+          "code": "PROB",
+          "name": "Resolução de Problemas",
+          "description": "Gerencia as inter-relações entre as partes afetadas e os imperativos estratégicos, reconhecendo o contexto comercial mais amplo e tirando conclusões precisas ao resolver problemas.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/problem"
+        },
+        {
+          "code": "ADAP",
+          "name": "Adaptabilidade",
+          "description": "Promove a agilidade e a resiliência organizacional.\nIncorpora a adaptabilidade à cultura organizacional e ao planejamento estratégico.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/adaptability"
+        },
+        {
+          "code": "SCPE",
+          "name": "Segurança, privacidade e ética",
+          "description": "Fornece direção clara e liderança estratégica para incorporar a conformidade, a cultura organizacional e as práticas de trabalho, além de promover ativamente a diversidade e a inclusão.",
+          "url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours/security"
+        }
+      ]
+    }
+  ],
+  "source": {
+    "base_url": "https://sfia-online.org/en/sfia-9/responsibilities",
+    "generic_attributes_url": "https://sfia-online.org/en/sfia-9/responsibilities/generic-attributes-business-skills-behaviours",
+    "behavioural_factors_pdf": "https://sfia-online.org/en/sfia-9/responsibilities/sfia-9-alternative-presentation-of-behavioural-factors.pdf"
+  }
+}
