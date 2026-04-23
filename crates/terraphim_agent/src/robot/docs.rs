@@ -690,4 +690,50 @@ mod tests {
         assert!(json.contains("search"));
         assert!(json.contains("query"));
     }
+
+    #[test]
+    fn test_search_aliases_present() {
+        let docs = SelfDocumentation::new();
+        let search_doc = docs.schema("search").unwrap();
+        assert!(search_doc.aliases.contains(&"q".to_string()));
+        assert!(search_doc.aliases.contains(&"query".to_string()));
+        assert!(search_doc.aliases.contains(&"find".to_string()));
+    }
+
+    #[test]
+    fn test_help_command_has_aliases() {
+        let docs = SelfDocumentation::new();
+        let help_doc = docs.schema("help").unwrap();
+        assert!(help_doc.aliases.contains(&"h".to_string()));
+        assert!(help_doc.aliases.contains(&"?".to_string()));
+    }
+
+    #[test]
+    fn test_unknown_command_schema() {
+        let docs = SelfDocumentation::new();
+        assert!(docs.schema("nonexistent_xyz").is_none());
+    }
+
+    #[test]
+    fn test_unknown_command_examples() {
+        let docs = SelfDocumentation::new();
+        assert!(docs.examples("nonexistent_xyz").is_none());
+    }
+
+    #[test]
+    fn test_all_commands_have_names() {
+        let docs = SelfDocumentation::new();
+        for cmd in &docs.commands {
+            assert!(!cmd.name.is_empty());
+        }
+    }
+
+    #[test]
+    fn test_command_doc_roundtrip() {
+        let docs = SelfDocumentation::new();
+        let config_doc = docs.schema("config").unwrap();
+        let json = serde_json::to_string(config_doc).unwrap();
+        let deserialized: CommandDoc = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.name, "config");
+    }
 }

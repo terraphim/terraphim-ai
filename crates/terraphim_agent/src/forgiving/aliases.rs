@@ -180,4 +180,99 @@ mod tests {
         // Original aliases preserved
         assert_eq!(base.expand("q"), Some("search"));
     }
+
+    #[test]
+    fn test_empty_registry() {
+        let registry = AliasRegistry::empty();
+        assert!(registry.expand("q").is_none());
+        assert!(!registry.is_alias("q"));
+        assert!(registry.all().is_empty());
+    }
+
+    #[test]
+    fn test_remove_alias() {
+        let mut registry = AliasRegistry::new();
+        assert_eq!(registry.expand("q"), Some("search"));
+        let removed = registry.remove("q");
+        assert_eq!(removed, Some("search".to_string()));
+        assert!(registry.expand("q").is_none());
+    }
+
+    #[test]
+    fn test_remove_nonexistent() {
+        let mut registry = AliasRegistry::new();
+        assert!(registry.remove("nonexistent").is_none());
+    }
+
+    #[test]
+    fn test_is_alias() {
+        let registry = AliasRegistry::new();
+        assert!(registry.is_alias("q"));
+        assert!(registry.is_alias("?"));
+        assert!(!registry.is_alias("search"));
+        assert!(!registry.is_alias(""));
+    }
+
+    #[test]
+    fn test_add_duplicate_overwrites() {
+        let mut registry = AliasRegistry::empty();
+        registry.add("x", "cmd_a");
+        registry.add("x", "cmd_b");
+        assert_eq!(registry.expand("x"), Some("cmd_b"));
+    }
+
+    #[test]
+    fn test_from_config_whitespace_lines() {
+        let config = "\n\n  \n# comment\n";
+        let registry = AliasRegistry::from_config(config).unwrap();
+        assert!(registry.all().is_empty());
+    }
+
+    #[test]
+    fn test_aliases_for_no_matches() {
+        let registry = AliasRegistry::new();
+        let matches = registry.aliases_for("nonexistent_command");
+        assert!(matches.is_empty());
+    }
+
+    #[test]
+    fn test_expand_empty_string() {
+        let registry = AliasRegistry::new();
+        assert!(registry.expand("").is_none());
+    }
+}
+
+#[cfg(test)]
+mod proptests {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn expand_never_panics(input: String) {
+            let registry = AliasRegistry::new();
+            let _ = registry.expand(&input);
+        }
+
+        #[test]
+        fn is_alias_never_panics(input: String) {
+            let registry = AliasRegistry::new();
+            let _ = registry.is_alias(&input);
+        }
+
+        #[test]
+        fn add_then_expand_roundtrip(alias: String, canonical: String) {
+            let mut registry = AliasRegistry::empty();
+            registry.add(&alias, &canonical);
+            prop_assert_eq!(registry.expand(&alias), Some(canonical.as_str()));
+        }
+
+        #[test]
+        fn remove_then_expand_absent(alias: String, canonical: String) {
+            let mut registry = AliasRegistry::empty();
+            registry.add(&alias, &canonical);
+            registry.remove(&alias);
+            prop_assert!(registry.expand(&alias).is_none());
+        }
+    }
 }

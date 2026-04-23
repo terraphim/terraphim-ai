@@ -441,4 +441,94 @@ mod tests {
         assert!(result.is_success());
         assert_eq!(result.command(), Some("custom"));
     }
+
+    #[test]
+    fn test_double_slash_prefix() {
+        let parser = ForgivingParser::default();
+        let result = parser.parse("//search test");
+        assert!(result.is_success());
+        assert_eq!(result.command(), Some("search"));
+    }
+
+    #[test]
+    fn test_special_characters_in_args() {
+        let parser = ForgivingParser::default();
+        let result = parser.parse("search @#$% hello-world");
+        assert!(result.is_success());
+        assert_eq!(result.args(), Some("@#$% hello-world"));
+    }
+
+    #[test]
+    fn test_very_long_input() {
+        let parser = ForgivingParser::default();
+        let long_args = "a".repeat(10000);
+        let result = parser.parse(&format!("search {}", long_args));
+        assert!(result.is_success());
+        assert_eq!(result.args().unwrap().len(), 10000);
+    }
+
+    #[test]
+    fn test_empty_command_returns_none_accessors() {
+        let parser = ForgivingParser::default();
+        let result = parser.parse("");
+        assert!(matches!(result, ParseResult::Empty));
+        assert!(result.command().is_none());
+        assert!(result.args().is_none());
+        assert!(result.original().is_none());
+        assert!(result.full_command().is_none());
+        assert!(!result.was_corrected());
+        assert!(!result.was_alias());
+    }
+
+    #[test]
+    fn test_add_commands() {
+        let mut parser = ForgivingParser::new(vec!["search".to_string()]);
+        parser.add_commands(&["graph", "role"]);
+        assert_eq!(parser.known_commands().len(), 3);
+        let result = parser.parse("graph");
+        assert!(result.is_success());
+    }
+
+    #[test]
+    fn test_aliases_accessor() {
+        let parser = ForgivingParser::default();
+        assert!(parser.aliases().expand("q").is_some());
+    }
+}
+
+#[cfg(test)]
+mod proptests {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn parse_never_panics(input: String) {
+            let parser = ForgivingParser::default();
+            let _ = parser.parse(&input);
+        }
+
+        #[test]
+        fn parse_result_accessors_never_panics(input: String) {
+            let parser = ForgivingParser::default();
+            let result = parser.parse(&input);
+            let _ = result.command();
+            let _ = result.original();
+            let _ = result.args();
+            let _ = result.full_command();
+            let _ = result.was_corrected();
+            let _ = result.was_alias();
+            let _ = result.is_success();
+        }
+
+        #[test]
+        fn empty_string_always_empty(input: String) {
+            let trimmed = input.trim();
+            if trimmed.is_empty() {
+                let parser = ForgivingParser::default();
+                let result = parser.parse(&input);
+                prop_assert!(matches!(result, ParseResult::Empty));
+            }
+        }
+    }
 }
