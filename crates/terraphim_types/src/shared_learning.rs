@@ -1,7 +1,10 @@
 //! Shared learning types for knowledge graph integration
 //!
 //! These types support cross-agent learning capture, trust management,
-//! and quality tracking.
+//! quality tracking, and the shared `LearningStore` trait used by both
+//! `terraphim_orchestrator` and `terraphim_agent`.
+
+use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -11,12 +14,15 @@ use uuid::Uuid;
 /// Trust level for a shared learning
 ///
 /// Represents the validation state of a learning:
+/// - L0: Extracted (just captured, not yet reviewed)
 /// - L1: Unverified (auto-captured)
 /// - L2: Peer-validated (tested across multiple agents)
 /// - L3: Human-approved (reviewed by CTO)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum TrustLevel {
+    /// Just extracted from agent output, not yet reviewed
+    L0,
     /// Unverified learning, auto-captured from various sources
     #[default]
     L1,
@@ -27,32 +33,31 @@ pub enum TrustLevel {
 }
 
 impl TrustLevel {
-    /// Get the trust level code (L1, L2, L3) for database storage
     pub fn as_str(&self) -> &'static str {
         match self {
+            TrustLevel::L0 => "L0",
             TrustLevel::L1 => "L1",
             TrustLevel::L2 => "L2",
             TrustLevel::L3 => "L3",
         }
     }
 
-    /// Get numeric weight for ranking purposes
     pub fn weight(&self) -> u8 {
         match self {
+            TrustLevel::L0 => 0,
             TrustLevel::L1 => 1,
             TrustLevel::L2 => 2,
             TrustLevel::L3 => 3,
         }
     }
 
-    /// Check if this trust level allows Gitea wiki sync
     pub fn allows_wiki_sync(&self) -> bool {
         matches!(self, TrustLevel::L2 | TrustLevel::L3)
     }
 
-    /// Get display name for the trust level
     pub fn display_name(&self) -> &'static str {
         match self {
+            TrustLevel::L0 => "Extracted",
             TrustLevel::L1 => "Unverified",
             TrustLevel::L2 => "Peer-Validated",
             TrustLevel::L3 => "Human-Approved",
@@ -71,6 +76,7 @@ impl std::str::FromStr for TrustLevel {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_uppercase().as_str() {
+            "L0" | "EXTRACTED" => Ok(TrustLevel::L0),
             "L1" | "UNVERIFIED" => Ok(TrustLevel::L1),
             "L2" | "PEER-VALIDATED" | "PEER_VALIDATED" => Ok(TrustLevel::L2),
             "L3" | "HUMAN-APPROVED" | "HUMAN_APPROVED" => Ok(TrustLevel::L3),
@@ -85,11 +91,190 @@ impl PartialOrd for TrustLevel {
     }
 }
 
-/// Error type for trust level operations
 #[derive(Error, Debug)]
 pub enum TrustLevelError {
     #[error("invalid trust level: {0}")]
     InvalidTrustLevel(String),
+}
+
+/// Category of a learning for classification.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LearningCategory {
+    Technical,
+    Process,
+    Domain,
+    Failure,
+    SuccessPattern,
+}
+
+impl std::fmt::Display for LearningCategory {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LearningCategory::Technical => write!(f, "technical"),
+            LearningCategory::Process => write!(f, "process"),
+            LearningCategory::Domain => write!(f, "domain"),
+            LearningCategory::Failure => write!(f, "failure"),
+            LearningCategory::SuccessPattern => write!(f, "success_pattern"),
+        }
+    }
+}
+
+/// Synchronous trait for a learning store shared between orchestrator and agent.
+///
+/// Implementations may persist to DeviceStorage, markdown files, or in-memory
+/// maps. The trait is intentionally synchronous so that `terraphim_types`
+/// remains free of async runtime dependencies. Implementations that need
+/// async I/O can use internal synchronisation (e.g. `tokio::runtime::Handle`).
+pub trait LearningStore: Send + Sync {
+    fn insert(&self, learning: SharedLearning) -> Result<String, StoreError>;
+    fn get(&self, id: &str) -> Result<SharedLearning, StoreError>;
+    fn query_relevant(
+        &self,
+        agent: &str,
+        context: &str,
+        min_trust: TrustLevel,
+        limit: usize,
+    ) -> Result<Vec<SharedLearning>, StoreError>;
+    fn record_applied(&self, id: &str) -> Result<(), StoreError>;
+    fn record_effective(&self, id: &str) -> Result<(), StoreError>;
+    fn list_by_trust(&self, min_trust: TrustLevel) -> Result<Vec<SharedLearning>, StoreError>;
+    fn archive_stale(&self, max_age_days: u32) -> Result<usize, StoreError>;
+}
+
+/// In-memory `LearningStore` for tests and development.
+///
+/// No persistence -- data lives only for the lifetime of the struct.
+/// Thread-safe via `std::sync::Mutex`.
+pub struct InMemoryLearningStore {
+    learnings: std::sync::Mutex<HashMap<String, SharedLearning>>,
+}
+
+impl InMemoryLearningStore {
+    pub fn new() -> Self {
+        Self {
+            learnings: std::sync::Mutex::new(HashMap::new()),
+        }
+    }
+}
+
+impl Default for InMemoryLearningStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl LearningStore for InMemoryLearningStore {
+    fn insert(&self, learning: SharedLearning) -> Result<String, StoreError> {
+        let id = learning.id.clone();
+        let mut map = self
+            .learnings
+            .lock()
+            .map_err(|e| StoreError::Persistence(e.to_string()))?;
+        map.insert(id.clone(), learning);
+        Ok(id)
+    }
+
+    fn get(&self, id: &str) -> Result<SharedLearning, StoreError> {
+        let map = self
+            .learnings
+            .lock()
+            .map_err(|e| StoreError::Persistence(e.to_string()))?;
+        map.get(id)
+            .cloned()
+            .ok_or_else(|| StoreError::NotFound(id.to_string()))
+    }
+
+    fn query_relevant(
+        &self,
+        agent: &str,
+        context: &str,
+        min_trust: TrustLevel,
+        limit: usize,
+    ) -> Result<Vec<SharedLearning>, StoreError> {
+        let map = self
+            .learnings
+            .lock()
+            .map_err(|e| StoreError::Persistence(e.to_string()))?;
+        let context_lower = context.to_lowercase();
+        let mut results: Vec<SharedLearning> = map
+            .values()
+            .filter(|l| l.trust_level >= min_trust)
+            .filter(|l| {
+                if l.applicable_agents.is_empty() {
+                    true
+                } else {
+                    l.applicable_agents
+                        .iter()
+                        .any(|a| a.eq_ignore_ascii_case(agent))
+                }
+            })
+            .filter(|l| {
+                let text = l.extract_searchable_text();
+                text.contains(&context_lower) || context_lower.is_empty()
+            })
+            .cloned()
+            .collect();
+        results.sort_by(|a, b| b.quality.effective_count.cmp(&a.quality.effective_count));
+        results.truncate(limit);
+        Ok(results)
+    }
+
+    fn record_applied(&self, id: &str) -> Result<(), StoreError> {
+        let mut map = self
+            .learnings
+            .lock()
+            .map_err(|e| StoreError::Persistence(e.to_string()))?;
+        let learning = map
+            .get_mut(id)
+            .ok_or_else(|| StoreError::NotFound(id.to_string()))?;
+        learning
+            .quality
+            .record_application(&learning.source_agent, false);
+        learning.updated_at = Utc::now();
+        Ok(())
+    }
+
+    fn record_effective(&self, id: &str) -> Result<(), StoreError> {
+        let mut map = self
+            .learnings
+            .lock()
+            .map_err(|e| StoreError::Persistence(e.to_string()))?;
+        let learning = map
+            .get_mut(id)
+            .ok_or_else(|| StoreError::NotFound(id.to_string()))?;
+        learning
+            .quality
+            .record_application(&learning.source_agent, true);
+        learning.updated_at = Utc::now();
+        if learning.quality.meets_l2_criteria() && learning.trust_level == TrustLevel::L1 {
+            learning.promote_to_l2();
+        }
+        Ok(())
+    }
+
+    fn list_by_trust(&self, min_trust: TrustLevel) -> Result<Vec<SharedLearning>, StoreError> {
+        let map = self
+            .learnings
+            .lock()
+            .map_err(|e| StoreError::Persistence(e.to_string()))?;
+        Ok(map
+            .values()
+            .filter(|l| l.trust_level >= min_trust)
+            .cloned()
+            .collect())
+    }
+
+    fn archive_stale(&self, max_age_days: u32) -> Result<usize, StoreError> {
+        let mut map = self
+            .learnings
+            .lock()
+            .map_err(|e| StoreError::Persistence(e.to_string()))?;
+        let cutoff = Utc::now() - chrono::Duration::days(max_age_days as i64);
+        let before = map.len();
+        map.retain(|_, l| l.trust_level > TrustLevel::L0 || l.updated_at > cutoff);
+        Ok(before - map.len())
+    }
 }
 
 /// Quality metrics for a shared learning
@@ -495,6 +680,7 @@ mod tests {
 
     #[test]
     fn test_trust_level_weight() {
+        assert_eq!(TrustLevel::L0.weight(), 0);
         assert_eq!(TrustLevel::L1.weight(), 1);
         assert_eq!(TrustLevel::L2.weight(), 2);
         assert_eq!(TrustLevel::L3.weight(), 3);
@@ -502,6 +688,7 @@ mod tests {
 
     #[test]
     fn test_trust_level_allows_wiki_sync() {
+        assert!(!TrustLevel::L0.allows_wiki_sync());
         assert!(!TrustLevel::L1.allows_wiki_sync());
         assert!(TrustLevel::L2.allows_wiki_sync());
         assert!(TrustLevel::L3.allows_wiki_sync());
@@ -509,6 +696,8 @@ mod tests {
 
     #[test]
     fn test_trust_level_from_str() {
+        assert_eq!("L0".parse::<TrustLevel>().unwrap(), TrustLevel::L0);
+        assert_eq!("extracted".parse::<TrustLevel>().unwrap(), TrustLevel::L0);
         assert_eq!("L1".parse::<TrustLevel>().unwrap(), TrustLevel::L1);
         assert_eq!("l1".parse::<TrustLevel>().unwrap(), TrustLevel::L1);
         assert_eq!("L2".parse::<TrustLevel>().unwrap(), TrustLevel::L2);
@@ -518,6 +707,13 @@ mod tests {
             TrustLevel::L2
         );
         assert!("invalid".parse::<TrustLevel>().is_err());
+    }
+
+    #[test]
+    fn test_trust_level_ordering() {
+        assert!(TrustLevel::L3 > TrustLevel::L2);
+        assert!(TrustLevel::L2 > TrustLevel::L1);
+        assert!(TrustLevel::L1 > TrustLevel::L0);
     }
 
     #[test]
@@ -689,5 +885,179 @@ mod tests {
         let json = r#"{"id":"x","title":"t","content":"c","trust_level":"L1","quality":{"applied_count":0,"effective_count":0,"agent_count":0,"agent_names":[],"success_rate":null},"source":"manual","source_agent":"a","applicable_agents":[],"keywords":[],"created_at":"2026-01-01T00:00:00Z","updated_at":"2026-01-01T00:00:00Z"}"#;
         let learning: SharedLearning = serde_json::from_str(json).unwrap();
         assert_eq!(learning.suggestion_status, SuggestionStatus::Pending);
+    }
+
+    #[test]
+    fn test_learning_category_display() {
+        assert_eq!(LearningCategory::Technical.to_string(), "technical");
+        assert_eq!(LearningCategory::Failure.to_string(), "failure");
+        assert_eq!(
+            LearningCategory::SuccessPattern.to_string(),
+            "success_pattern"
+        );
+    }
+
+    #[test]
+    fn test_l0_trust_level_display() {
+        assert_eq!(TrustLevel::L0.as_str(), "L0");
+        assert_eq!(TrustLevel::L0.display_name(), "Extracted");
+        assert_eq!(TrustLevel::L0.to_string(), "Extracted");
+    }
+
+    #[test]
+    fn test_in_memory_store_insert_and_get() {
+        let store = InMemoryLearningStore::new();
+        let learning = SharedLearning::new(
+            "Test".to_string(),
+            "cargo build failed".to_string(),
+            LearningSource::BashHook,
+            "test-agent".to_string(),
+        );
+        let id = store.insert(learning).unwrap();
+        let retrieved = store.get(&id).unwrap();
+        assert_eq!(retrieved.title, "Test");
+    }
+
+    #[test]
+    fn test_in_memory_store_get_not_found() {
+        let store = InMemoryLearningStore::new();
+        assert!(store.get("nonexistent").is_err());
+    }
+
+    #[test]
+    fn test_in_memory_store_query_relevant() {
+        let store = InMemoryLearningStore::new();
+        let learning = SharedLearning::new(
+            "Rust compilation error".to_string(),
+            "Use cargo clippy".to_string(),
+            LearningSource::Manual,
+            "test-agent".to_string(),
+        )
+        .with_keywords(vec!["rust".to_string(), "clippy".to_string()]);
+        store.insert(learning).unwrap();
+
+        let results = store
+            .query_relevant("test-agent", "rust clippy", TrustLevel::L1, 10)
+            .unwrap();
+        assert_eq!(results.len(), 1);
+        assert!(results[0].title.contains("compilation"));
+    }
+
+    #[test]
+    fn test_in_memory_store_query_respects_trust() {
+        let store = InMemoryLearningStore::new();
+        let mut learning = SharedLearning::new(
+            "Test".to_string(),
+            "content".to_string(),
+            LearningSource::Manual,
+            "agent".to_string(),
+        );
+        learning.trust_level = TrustLevel::L0;
+        store.insert(learning).unwrap();
+
+        let results = store
+            .query_relevant("agent", "test", TrustLevel::L1, 10)
+            .unwrap();
+        assert!(results.is_empty());
+
+        let results = store
+            .query_relevant("agent", "test", TrustLevel::L0, 10)
+            .unwrap();
+        assert_eq!(results.len(), 1);
+    }
+
+    #[test]
+    fn test_in_memory_store_record_applied_and_effective() {
+        let store = InMemoryLearningStore::new();
+        let learning = SharedLearning::new(
+            "Test".to_string(),
+            "content".to_string(),
+            LearningSource::Manual,
+            "agent".to_string(),
+        );
+        let id = store.insert(learning).unwrap();
+
+        store.record_applied(&id).unwrap();
+        let l = store.get(&id).unwrap();
+        assert_eq!(l.quality.applied_count, 1);
+        assert_eq!(l.quality.effective_count, 0);
+
+        store.record_effective(&id).unwrap();
+        let l = store.get(&id).unwrap();
+        assert_eq!(l.quality.applied_count, 2);
+        assert_eq!(l.quality.effective_count, 1);
+    }
+
+    #[test]
+    fn test_in_memory_store_auto_promote_on_effective() {
+        let store = InMemoryLearningStore::new();
+        let mut learning = SharedLearning::new(
+            "Test".to_string(),
+            "content".to_string(),
+            LearningSource::Manual,
+            "agent".to_string(),
+        );
+        learning.applicable_agents = vec!["agent".to_string(), "other".to_string()];
+        let id = store.insert(learning).unwrap();
+
+        for agent in &["agent", "other", "agent"] {
+            store.record_effective(&id).unwrap();
+        }
+        let l = store.get(&id).unwrap();
+        assert!(l.quality.meets_l2_criteria());
+        assert_eq!(l.trust_level, TrustLevel::L2);
+    }
+
+    #[test]
+    fn test_in_memory_store_list_by_trust() {
+        let store = InMemoryLearningStore::new();
+        let mut l0 = SharedLearning::new(
+            "L0".to_string(),
+            "c".to_string(),
+            LearningSource::Manual,
+            "a".to_string(),
+        );
+        l0.trust_level = TrustLevel::L0;
+        let mut l2 = SharedLearning::new(
+            "L2".to_string(),
+            "c".to_string(),
+            LearningSource::Manual,
+            "a".to_string(),
+        );
+        l2.trust_level = TrustLevel::L2;
+        store.insert(l0).unwrap();
+        store.insert(l2).unwrap();
+
+        let l1_plus = store.list_by_trust(TrustLevel::L1).unwrap();
+        assert_eq!(l1_plus.len(), 1);
+        assert_eq!(l1_plus[0].title, "L2");
+    }
+
+    #[test]
+    fn test_in_memory_store_archive_stale() {
+        let store = InMemoryLearningStore::new();
+        let mut l0 = SharedLearning::new(
+            "stale".to_string(),
+            "c".to_string(),
+            LearningSource::Manual,
+            "a".to_string(),
+        );
+        l0.trust_level = TrustLevel::L0;
+        l0.updated_at = Utc::now() - chrono::Duration::days(60);
+        let mut l1 = SharedLearning::new(
+            "fresh".to_string(),
+            "c".to_string(),
+            LearningSource::Manual,
+            "a".to_string(),
+        );
+        l1.trust_level = TrustLevel::L1;
+        l1.updated_at = Utc::now() - chrono::Duration::days(60);
+        store.insert(l0).unwrap();
+        store.insert(l1).unwrap();
+
+        let archived = store.archive_stale(30).unwrap();
+        assert_eq!(archived, 1);
+        assert_eq!(store.list_by_trust(TrustLevel::L0).unwrap().len(), 0);
+        assert_eq!(store.list_by_trust(TrustLevel::L1).unwrap().len(), 1);
     }
 }
