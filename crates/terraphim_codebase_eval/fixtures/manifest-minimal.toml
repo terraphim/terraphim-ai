@@ -1,0 +1,38 @@
+[[haystacks]]
+id = "baseline-1"
+path = "/tmp/repo"
+commit_sha = "abc123def456"
+state = "baseline"
+metadata = { branch = "main", timestamp = "2026-04-22T10:00:00Z" }
+
+[[haystacks]]
+id = "candidate-1"
+path = "/tmp/repo"
+commit_sha = "def789ghi012"
+state = "candidate"
+
+[[roles]]
+role_id = "code-reviewer"
+description = "Reviews code for bugs, maintainability, and idiomatic Rust patterns"
+term_sets = ["code-reviewer-terms"]
+
+[roles.scoring_weights]
+search_score = 1.0
+graph_density = 0.8
+entity_count = 0.5
+
+[[queries]]
+query_text = "highlight potential bugs in the codebase"
+role_id = "code-reviewer"
+expected_signal = "increase"
+confidence_threshold = 0.6
+
+[[queries]]
+query_text = "areas needing refactoring"
+role_id = "code-reviewer"
+expected_signal = "increase"
+
+[thresholds]
+improved_pct = 10.0
+degraded_pct = 5.0
+critical_test_failures = 0

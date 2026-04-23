@@ -1,0 +1,15 @@
+[package]
+name = "terraphim_codebase_eval"
+version.workspace = true
+edition.workspace = true
+description = "Manifest types and loaders for AI-agent codebase evaluation"
+license = "MIT"
+
+[dependencies]
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+toml = "0.8"
+
+[dev-dependencies]
+tempfile = { workspace = true }
