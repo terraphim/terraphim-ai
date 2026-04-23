@@ -2,7 +2,7 @@
   "Front-End Developer": {
     "shortname": "fedev",
     "name": "Front-End Developer",
-    "relevance_function": "bm25plus",
+    "relevance_function": "BM25Plus",
     "terraphim_it": false,
     "theme": "yeti",
     "kg": {
