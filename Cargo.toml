@@ -31,6 +31,8 @@ exclude = [
     "crates/terraphim_lsp",
     # Infrastructure templates (not a crate)
     "infrastructure/vm-templates",
+    # fcctl-web binary lives in the private firecracker-rust repo (already running on bigbox)
+    "infrastructure/fcctl-web",
 ]
 default-members = ["terraphim_server"]
 
