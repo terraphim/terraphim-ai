@@ -4,38 +4,27 @@
 
 use anyhow::Result;
 use serial_test::serial;
-use std::path::PathBuf;
 use std::process::{Child, Command};
-use std::str;
-use std::sync::Once;
+use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
 
-static SERVER_INIT: Once = Once::new();
-static mut SERVER_PORT: u16 = 0;
+#[path = "support/binary.rs"]
+mod binary;
+use binary::{agent_binary, server_binary};
 
+static SERVER_PORT: OnceLock<u16> = OnceLock::new();
+static SERVER_CHILD: Mutex<Option<Child>> = Mutex::new(None);
 /// Start the terraphim server for tests on a random available port
 fn start_test_server() -> Result<(Child, u16)> {
-    let workspace_root = get_workspace_root();
-
-    // Find an available port
     let port = find_available_port()?;
 
     println!("Starting test server on port {}...", port);
 
-    // Start the server with the test port
-    let mut cmd = Command::new("cargo");
-    cmd.args([
-        "run",
-        "-p",
-        "terraphim_server",
-        "--",
-        "--port",
-        &port.to_string(),
-    ])
-    .current_dir(&workspace_root)
-    .env("TERRAPHIM_SERVER_PORT", port.to_string())
-    .stdout(std::process::Stdio::piped())
-    .stderr(std::process::Stdio::piped());
+    let mut cmd = Command::new(server_binary());
+    cmd.args(["--port", &port.to_string()])
+        .env("TERRAPHIM_SERVER_PORT", port.to_string())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped());
 
     let child = cmd.spawn()?;
 
@@ -78,26 +67,19 @@ fn find_available_port() -> Result<u16> {
 
 /// Initialize server once for all tests
 fn ensure_server_running() -> Result<u16> {
-    unsafe {
-        SERVER_INIT.call_once(|| {
-            match start_test_server() {
-                Ok((child, port)) => {
-                    SERVER_PORT = port;
-                    // Store the child process so it doesn't get killed
-                    // In a real scenario, we'd need to manage this better
-                    std::mem::forget(child);
-                }
-                Err(e) => {
-                    eprintln!("Failed to start test server: {}", e);
-                    SERVER_PORT = 0;
-                }
-            }
-        });
+    if let Some(&port) = SERVER_PORT.get() {
+        return Ok(port);
+    }
 
-        if SERVER_PORT == 0 {
-            Err(anyhow::anyhow!("Server failed to start"))
-        } else {
-            Ok(SERVER_PORT)
+    match start_test_server() {
+        Ok((child, port)) => {
+            *SERVER_CHILD.lock().unwrap() = Some(child);
+            let _ = SERVER_PORT.set(port);
+            Ok(port)
+        }
+        Err(e) => {
+            eprintln!("Failed to start test server: {}", e);
+            Err(e)
         }
     }
 }
@@ -129,25 +111,10 @@ fn is_ci_expected_error(stderr: &str) -> bool {
         || stderr.contains("Connection reset")
 }
 
-/// Get the workspace root directory
-fn get_workspace_root() -> PathBuf {
-    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    // Go up from crates/terraphim_agent to workspace root
-    manifest_dir
-        .parent()
-        .and_then(|p| p.parent())
-        .map(|p| p.to_path_buf())
-        .unwrap_or(manifest_dir)
-}
-
-/// Helper function to run TUI extract command
 fn run_extract_command_with_port(args: &[&str], port: u16) -> Result<(String, String, i32)> {
-    let workspace_root = get_workspace_root();
-
-    let mut cmd = Command::new("cargo");
-    cmd.args(["run", "-p", "terraphim_agent", "--", "extract"])
+    let mut cmd = Command::new(agent_binary());
+    cmd.arg("extract")
         .args(args)
-        .current_dir(&workspace_root)
         .env(
             "TERRAPHIM_API_ENDPOINT",
             format!("http://127.0.0.1:{}/api", port),
@@ -163,7 +130,6 @@ fn run_extract_command_with_port(args: &[&str], port: u16) -> Result<(String, St
     ))
 }
 
-/// Helper function to run TUI extract command (legacy, uses default port)
 #[allow(dead_code)]
 fn run_extract_command(args: &[&str]) -> Result<(String, String, i32)> {
     run_extract_command_with_port(args, 8000)
@@ -504,15 +470,13 @@ fn test_extract_error_conditions() -> Result<()> {
         ("Very long text", vec![long_text.as_str()]),
     ];
 
-    let workspace_root = get_workspace_root();
+    let binary = agent_binary();
 
     for (case_name, args) in error_cases {
         println!("  Testing error case: {}", case_name);
 
-        let mut cmd = Command::new("cargo");
-        cmd.args(["run", "-p", "terraphim_agent", "--", "extract"])
-            .args(&args)
-            .current_dir(&workspace_root);
+        let mut cmd = Command::new(&binary);
+        cmd.arg("extract").args(&args);
 
         let output = cmd.output()?;
         let exit_code = output.status.code().unwrap_or(-1);
