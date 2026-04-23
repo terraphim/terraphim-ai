@@ -1,73 +1,36 @@
 {
-  "vm_template": {
-    "name": "rust-build",
-    "description": "Firecracker VM with Rust toolchain for CI acceleration",
-    "vm_type": "rust-build-v1",
-    "version": "1.0.0",
-    "firecracker_version": "v1.10.1",
-    "base_rootfs": "/home/alex/projects/terraphim/infrastructure/vm-templates/rootfs-rust-v1.10.1.ext4",
-    "kernel": "/home/alex/projects/terraphim/infrastructure/vm-templates/vmlinux-5.10.225"
+  "description": "VM template reference for Rust CI builds via fcctl-web on bigbox",
+  "fcctl_web": {
+    "host": "127.0.0.1",
+    "port": 8080,
+    "note": "Reachable from self-hosted runners; not exposed externally"
   },
-  "machine_config": {
-    "vcpu_count": 4,
+  "create_vm_request": {
+    "vm_type": "focal-ci",
+    "note": "Only vm_type is accepted by POST /api/vms; vcpus/mem are server-side defaults"
+  },
+  "vm_type": "focal-ci",
+  "image": {
+    "description": "Ubuntu 22.04 with official Firecracker CI kernel 5.10.225",
+    "rootfs": "firecracker-ci-artifacts/ubuntu-22.04.ext4",
+    "kernel": "firecracker-ci-artifacts/vmlinux-5.10.225",
+    "username": "root",
+    "boot_timeout_secs": 10
+  },
+  "server_defaults": {
+    "vcpus": 2,
     "mem_size_mib": 4096,
-    "smt": false
+    "note": "Configured in fcctl-web server; not overridable via API"
   },
-  "rootfs": {
-    "path": "/home/alex/projects/terraphim/infrastructure/vm-templates/rootfs-rust-v1.10.1.ext4",
-    "is_read_only": false,
-    "drive_id": "rootfs"
-  },
-  "network_interfaces": [
-    {
-      "iface_id": "eth0",
-      "host_dev_name": "tap0",
-      "guest_mac": "06:00:ac:10:00:01"
-    }
-  ],
-  "vsock": {
-    "vsock_id": "vsock0",
-    "guest_cid": 3,
-    "uds_path": "/tmp/firecracker-vsock.sock"
-  },
-  "rust_toolchain": {
-    "version": "1.87.0",
-    "components": ["rustc", "cargo", "rustfmt", "clippy"],
-    "targets": [
-      "x86_64-unknown-linux-gnu",
-      "aarch64-unknown-linux-gnu",
-      "x86_64-unknown-linux-musl"
-    ]
-  },
-  "cached_dependencies": {
-    "cargo_registry": "/home/alex/.cargo/registry",
-    "cargo_git_db": "/home/alex/.cargo/git",
-    "target_dir": "/home/alex/projects/terraphim/terraphim-ai/target"
-  },
-  "mounts": {
-    "cargo_registry": {
-      "type": "virtio-9p",
-      "tag": "cargo-registry",
-      "path": "/home/alex/.cargo/registry",
-      "readonly": true
-    },
-    "workspace": {
-      "type": "virtio-9p",
-      "tag": "workspace",
-      "path": "/home/alex/projects/terraphim/terraphim-ai",
-      "readonly": false
+  "execute_request": {
+    "endpoint": "POST /api/llm/execute",
+    "fields": {
+      "code": "bash command string",
+      "language": "bash",
+      "agent_id": "unique identifier for this execution",
+      "timeout_ms": 300000
     }
   },
-  "boot_time_target_ms": 1000,
-  "build_targets": [
-    "terraphim_agent",
-    "terraphim_sessions",
-    "terraphim_server",
-    "terraphim_mcp_server"
-  ],
-  "test_targets": [
-    "--workspace"
-  ],
   "success_metrics": {
     "cargo_build_time_s": 30,
     "cargo_test_time_s": 60,
