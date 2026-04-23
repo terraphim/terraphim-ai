@@ -185,6 +185,62 @@ pub struct OrchestratorConfig {
     /// without a remote).
     #[serde(default)]
     pub post_merge_gate: Option<PostMergeGateConfig>,
+    /// Shared learning system configuration.
+    #[serde(default)]
+    pub learning: LearningConfig,
+}
+
+/// Configuration for the shared learning system.
+///
+/// When enabled, the orchestrator injects prior learnings into agent
+/// prompts at spawn time and records exit outcomes as validation evidence.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LearningConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default = "default_learning_min_trust")]
+    pub min_trust: String,
+    #[serde(default = "default_learning_max_tokens")]
+    pub max_tokens: usize,
+    #[serde(default = "default_learning_max_entries")]
+    pub max_entries: usize,
+    #[serde(default = "default_learning_archive_days")]
+    pub archive_days: u32,
+    #[serde(default = "default_learning_consolidation_ticks")]
+    pub consolidation_ticks: u64,
+}
+
+fn default_learning_min_trust() -> String {
+    "L1".to_string()
+}
+
+fn default_learning_max_tokens() -> usize {
+    1500
+}
+
+fn default_learning_max_entries() -> usize {
+    10
+}
+
+fn default_learning_archive_days() -> u32 {
+    30
+}
+
+fn default_learning_consolidation_ticks() -> u64 {
+    100
+}
+
+impl Default for LearningConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            min_trust: default_learning_min_trust(),
+            max_tokens: default_learning_max_tokens(),
+            max_entries: default_learning_max_entries(),
+            archive_days: default_learning_archive_days(),
+            consolidation_ticks: default_learning_consolidation_ticks(),
+        }
+    }
 }
 
 /// Post-merge test gate (ROC v1 Step H) configuration.
