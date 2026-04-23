@@ -25,16 +25,15 @@ Clone the repository and build with the `grepapp` feature flag:
 ```bash
 git clone https://github.com/terraphim/terraphim-ai.git
 cd terraphim-ai
-cargo build --release
-cargo build --release -p terraphim_middleware --features grepapp
+cargo build --release -p terraphim_agent --features "llm repl-interactive grepapp"
 ```
 
-The `grepapp` feature flag lives on the `terraphim_middleware` crate, which is a dependency of `terraphim_agent`. Building the middleware with the feature enables GrepApp haystack support.
+The `grepapp` feature flag lives on the `terraphim_agent` crate and propagates to `terraphim_middleware`. Without it, the agent silently skips GrepApp haystacks and only uses local search.
 
 Install the binary:
 
 ```bash
-cargo install --path crates/terraphim_agent
+cargo install --path crates/terraphim_agent --features grepapp
 ```
 
 Verify the installation:
@@ -225,7 +224,7 @@ The full configuration:
   "Front-End Developer": {
     "shortname": "fedev",
     "name": "Front-End Developer",
-    "relevance_function": "BM25Plus",
+    "relevance_function": "bm25plus",
     "terraphim_it": false,
     "theme": "yeti",
     "kg": {

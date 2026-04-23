@@ -314,7 +314,20 @@ mod tests {
 
     #[test]
     fn test_zai_provider_no_api_key() {
+        let key_before = std::env::var("ZAI_API_KEY").ok();
+        // SAFETY: test-only, single-threaded, restoring env var after test
+        unsafe {
+            std::env::remove_var("ZAI_API_KEY");
+        }
         let provider = ZaiProvider::new();
-        assert!(provider.api_key.is_none() || std::env::var("ZAI_API_KEY").is_err());
+        assert!(
+            provider.api_key.is_none(),
+            "ZaiProvider should have no API key when ZAI_API_KEY is unset"
+        );
+        if let Some(key) = key_before {
+            unsafe {
+                std::env::set_var("ZAI_API_KEY", key);
+            }
+        }
     }
 }
