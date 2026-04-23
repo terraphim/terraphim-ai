@@ -1,0 +1,77 @@
+{
+  "vm_template": {
+    "name": "rust-build",
+    "description": "Firecracker VM with Rust toolchain for CI acceleration",
+    "vm_type": "rust-build-v1",
+    "version": "1.0.0",
+    "firecracker_version": "v1.10.1",
+    "base_rootfs": "/home/alex/projects/terraphim/infrastructure/vm-templates/rootfs-rust-v1.10.1.ext4",
+    "kernel": "/home/alex/projects/terraphim/infrastructure/vm-templates/vmlinux-5.10.225"
+  },
+  "machine_config": {
+    "vcpu_count": 4,
+    "mem_size_mib": 4096,
+    "smt": false
+  },
+  "rootfs": {
+    "path": "/home/alex/projects/terraphim/infrastructure/vm-templates/rootfs-rust-v1.10.1.ext4",
+    "is_read_only": false,
+    "drive_id": "rootfs"
+  },
+  "network_interfaces": [
+    {
+      "iface_id": "eth0",
+      "host_dev_name": "tap0",
+      "guest_mac": "06:00:ac:10:00:01"
+    }
+  ],
+  "vsock": {
+    "vsock_id": "vsock0",
+    "guest_cid": 3,
+    "uds_path": "/tmp/firecracker-vsock.sock"
+  },
+  "rust_toolchain": {
+    "version": "1.87.0",
+    "components": ["rustc", "cargo", "rustfmt", "clippy"],
+    "targets": [
+      "x86_64-unknown-linux-gnu",
+      "aarch64-unknown-linux-gnu",
+      "x86_64-unknown-linux-musl"
+    ]
+  },
+  "cached_dependencies": {
+    "cargo_registry": "/home/alex/.cargo/registry",
+    "cargo_git_db": "/home/alex/.cargo/git",
+    "target_dir": "/home/alex/projects/terraphim/terraphim-ai/target"
+  },
+  "mounts": {
+    "cargo_registry": {
+      "type": "virtio-9p",
+      "tag": "cargo-registry",
+      "path": "/home/alex/.cargo/registry",
+      "readonly": true
+    },
+    "workspace": {
+      "type": "virtio-9p",
+      "tag": "workspace",
+      "path": "/home/alex/projects/terraphim/terraphim-ai",
+      "readonly": false
+    }
+  },
+  "boot_time_target_ms": 1000,
+  "build_targets": [
+    "terraphim_agent",
+    "terraphim_sessions",
+    "terraphim_server",
+    "terraphim_mcp_server"
+  ],
+  "test_targets": [
+    "--workspace"
+  ],
+  "success_metrics": {
+    "cargo_build_time_s": 30,
+    "cargo_test_time_s": 60,
+    "vm_boot_time_ms": 1000,
+    "cache_hit_rate_pct": 80
+  }
+}
