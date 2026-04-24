@@ -65,11 +65,15 @@ fn search_succeeds_exits_0() {
 
 #[test]
 fn validate_with_no_kg_exits_3() {
-    // The default offline configuration has no knowledge graph configured for
-    // the validate command.  classify_error maps "Knowledge graph not configured"
-    // to ErrorIndexMissing (3).
+    // Load a fixture config where the role has kg: null so the service layer
+    // returns "Knowledge graph not configured", which classify_error maps to
+    // ErrorIndexMissing (3).  This avoids relying on the developer's local KG.
+    let fixture = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/no_kg_config.json"
+    );
     cmd()
-        .args(["validate", "xyzzy_f1_2_exit_code_test_sentinel"])
+        .args(["--config", fixture, "validate", "xyzzy_f1_2_exit_code_test_sentinel"])
         .assert()
         .code(3);
 }
