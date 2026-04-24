@@ -645,6 +645,7 @@ impl terraphim_types::shared_learning::LearningStore for SharedLearningStore {
         }
 
         if !context.is_empty() {
+            let context_lower = context.to_lowercase();
             if let Some(ref graph_lock) = self.role_graph {
                 if let Ok(graph) = graph_lock.read() {
                     if let Ok(graph_results) = graph.query_graph(context, None, None) {
@@ -656,8 +657,7 @@ impl terraphim_types::shared_learning::LearningStore for SharedLearningStore {
                                     .collect();
                             candidates.retain(|l| {
                                 graph_id_rank.contains_key(&l.id)
-                                    || l.extract_searchable_text()
-                                        .contains(&context.to_lowercase())
+                                    || l.extract_searchable_text().contains(&context_lower)
                             });
                             candidates.sort_by(|a, b| {
                                 let a_rank = graph_id_rank.get(&a.id).copied().unwrap_or(0);
@@ -671,7 +671,6 @@ impl terraphim_types::shared_learning::LearningStore for SharedLearningStore {
                 }
             }
 
-            let context_lower = context.to_lowercase();
             candidates.retain(|l| l.extract_searchable_text().contains(&context_lower));
         }
 
