@@ -1265,6 +1265,9 @@ fn classify_error(err: &anyhow::Error) -> robot::exit_codes::ExitCode {
         || msg.contains("not initialised")
         || msg.contains("not initialized")
         || (msg.contains("not found") && msg.contains("index"))
+        || msg.contains("knowledge graph not configured")
+        || msg.contains("no local knowledge graph")
+        || (msg.contains("thesaurus") && (msg.contains("not found") || msg.contains("failed to load")))
     {
         ExitCode::ErrorIndexMissing
     } else {
