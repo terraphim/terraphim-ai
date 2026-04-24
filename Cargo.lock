@@ -8194,6 +8194,7 @@ dependencies = [
  "jiff",
  "log",
  "portpicker",
+ "proptest",
  "pulldown-cmark 0.13.3",
  "ratatui",
  "regex",
