@@ -24,7 +24,12 @@ notify = "8"
 notify-debouncer-full = "0.6"
 
 [features]
-default = []
+# zlob: fff-core's Zig-compiled glob matcher. Default so fff-core's build.rs
+# CI-detection panic branch is never reached. Requires `zig` on PATH at
+# build time (installed on bigbox, the rust-ci VM image, and local Mac dev
+# machines via homebrew). On Darwin, see .cargo/config.toml for the
+# `-undefined dynamic_lookup` linker workaround.
+default = ["zlob"]
 zlob = ["fff-search/zlob"]
 
 [dev-dependencies]

@@ -35,11 +35,16 @@ linker = "riscv64-linux-gnu-gcc"
 # [target.x86_64-unknown-linux-gnu]
 # rustflags = "-C target-cpu=native -C link-arg=-Wl,--as-needed"
 
-# [target.aarch64-apple-darwin]
-# rustflags = "-C target-cpu=apple-m1 -C link-arg=-Wl,--as-needed"
+# Darwin: zlob (Zig-compiled static C lib from fff-core) references libSystem
+# symbols (_getenv, _isatty, _sigaction, etc.) but doesn't emit a
+# cargo:rustc-link-lib directive for them. Tell the macOS linker to defer
+# undefined symbols to dynamic (load-time) resolution, so libSystem satisfies
+# them at runtime. Matches the pattern used by pyo3 and similar zig-bindings.
+[target.aarch64-apple-darwin]
+rustflags = ["-C", "link-arg=-undefined", "-C", "link-arg=dynamic_lookup"]
 
-# [target.x86_64-apple-darwin]
-# rustflags = "-C target-cpu=native -C link-arg=-Wl,--as-needed"
+[target.x86_64-apple-darwin]
+rustflags = ["-C", "link-arg=-undefined", "-C", "link-arg=dynamic_lookup"]
 
 # Build configuration
 [build]

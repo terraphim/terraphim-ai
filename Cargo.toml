@@ -33,6 +33,8 @@ exclude = [
     "infrastructure/vm-templates",
     # Rust build cache stack -- docker compose + systemd unit, no Cargo.toml
     "infrastructure/rust-cache-stack",
+    # Firecracker rust-ci VM image build -- shell scripts + overlay, no Cargo.toml
+    "infrastructure/firecracker-rust-ci",
     # fcctl-web binary lives in the private firecracker-rust repo (already running on bigbox)
     "infrastructure/fcctl-web",
 ]

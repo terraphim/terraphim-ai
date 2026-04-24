@@ -128,17 +128,19 @@ jobs:
           /home/alex/.local/bin/sccache --start-server || true
           /home/alex/.local/bin/sccache --zero-stats
 
-      # fff-search/fff-core build.rs panics in CI unless --features zlob is set,
-      # but zlob fails to link on any runner due to zig/Darwin symbol issues.
-      # Unsetting CI bypasses the build.rs check without enabling zlob.
+      # zlob is default on terraphim_file_search + terraphim_mcp_server, so
+      # fff-core/build.rs never hits its CI-detection panic branch and we
+      # don't need the old `unset CI` workaround. zig 0.16 is installed on
+      # bigbox; see .cargo/config.toml for the Darwin `dynamic_lookup`
+      # linker workaround on local Mac dev.
       - name: cargo fmt --check
-        run: unset CI && cargo fmt -- --check
+        run: cargo fmt -- --check
 
       - name: cargo clippy
-        run: unset CI && cargo clippy -- -D warnings
+        run: cargo clippy -- -D warnings
 
       - name: cargo build --workspace
-        run: unset CI && cargo build --workspace
+        run: cargo build --workspace
 
       - name: cargo test --workspace
         # Skipped tests:
@@ -149,7 +151,7 @@ jobs:
         #   self-hosted runners due to port/state residue. Pre-existing flake;
         #   Firecracker VM isolation (next layer) will properly fix it.
         run: |
-          unset CI && cargo test --workspace -- \
+          cargo test --workspace -- \
             --skip test_chat_command \
             --skip test_end_to_end_server_workflow
 
@@ -179,15 +181,20 @@ jobs:
           RESPONSE=$(curl -sf -X POST $FCCTL_URL/api/vms \
             -H 'Content-Type: application/json' \
             -d '{"vm_type": "rust-ci"}')
+          echo "$RESPONSE" | python3 -m json.tool
           VM_ID=$(echo "$RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
           echo "vm_id=$VM_ID" >> $GITHUB_OUTPUT
           for i in $(seq 1 20); do
-            STATUS=$(curl -sf $FCCTL_URL/api/vms/$VM_ID \
-              | python3 -c "import sys,json; print(json.load(sys.stdin).get('status','?'))" 2>/dev/null || echo "?")
-            [ "$STATUS" = "running" ] && break
+            STATUS_JSON=$(curl -sf $FCCTL_URL/api/vms/$VM_ID) || true
+            STATUS=$(echo "$STATUS_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status','?'))" 2>/dev/null || echo "?")
+            [ "$STATUS" = "running" ] && { VM_IP=$(echo "$STATUS_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin).get('ip_address') or '')"); break; }
             sleep 3
           done
-          VM_IP=$(curl -sf $FCCTL_URL/api/vms/$VM_ID | python3 -c "import sys,json; print(json.load(sys.stdin).get('ip_address',''))")
+          if [ -z "$VM_IP" ]; then
+            echo "ERROR: VM did not report an ip_address after boot"
+            curl -sf $FCCTL_URL/api/vms/$VM_ID
+            exit 1
+          fi
           echo "vm_ip=$VM_IP" >> $GITHUB_OUTPUT
           echo "VM_ID=$VM_ID VM_IP=$VM_IP"
 
