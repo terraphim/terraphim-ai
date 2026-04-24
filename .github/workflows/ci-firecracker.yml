@@ -103,23 +103,37 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # fff-search/fff-core build.rs panics in CI without --features zlob.
+      # zlob uses macOS-specific symbols and cannot be compiled on Linux.
+      # Workaround: enable zlob on macOS; unset CI on Linux to bypass the check.
       - name: cargo fmt --check
-        # Unset CI so fff-search build.rs doesn't panic (zlob is macOS-only)
-        env:
-          CI: ""
-        run: cargo fmt -- --check
+        run: |
+          if [ "$(uname)" = "Darwin" ]; then
+            cargo fmt -- --check
+          else
+            unset CI && cargo fmt -- --check
+          fi
 
       - name: cargo clippy
-        env:
-          CI: ""
-        run: cargo clippy -- -D warnings
+        run: |
+          if [ "$(uname)" = "Darwin" ]; then
+            cargo clippy -- -D warnings
+          else
+            unset CI && cargo clippy -- -D warnings
+          fi
 
       - name: cargo build --workspace
-        env:
-          CI: ""
-        run: cargo build --workspace
+        run: |
+          if [ "$(uname)" = "Darwin" ]; then
+            cargo build --workspace --features "terraphim_mcp_server/zlob,terraphim_file_search/zlob"
+          else
+            unset CI && cargo build --workspace
+          fi
 
       - name: cargo test --workspace
-        env:
-          CI: ""
-        run: cargo test --workspace
+        run: |
+          if [ "$(uname)" = "Darwin" ]; then
+            cargo test --workspace --features "terraphim_mcp_server/zlob,terraphim_file_search/zlob"
+          else
+            unset CI && cargo test --workspace
+          fi
