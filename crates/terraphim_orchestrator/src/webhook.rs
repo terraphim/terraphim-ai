@@ -42,6 +42,16 @@ struct GiteaIssue {
     number: u64,
     title: String,
     state: String,
+    #[serde(default)]
+    body: Option<String>,
+}
+
+/// Gitea webhook payload for issues events (opened, closed, etc.).
+#[derive(Debug, Deserialize)]
+struct GiteaIssueEventPayload {
+    action: String,
+    issue: GiteaIssue,
+    repository: GiteaRepository,
 }
 
 #[derive(Debug, Deserialize)]
@@ -170,6 +180,10 @@ async fn handle_gitea_webhook(
 
     if event_type == "pull_request" {
         return handle_pull_request_event(&state, &body).await;
+    }
+
+    if event_type == "issues" {
+        return handle_issues_event(&state, &body).await;
     }
 
     // 3. Parse payload
@@ -305,6 +319,126 @@ async fn handle_gitea_webhook(
         commands = commands_dispatched,
         "webhook dispatch complete"
     );
+    StatusCode::ACCEPTED
+}
+
+/// Handle Gitea `issues` event. Scans the issue body for @adf: mentions when
+/// action=opened and dispatches any found commands.
+async fn handle_issues_event(state: &WebhookState, body: &[u8]) -> StatusCode {
+    let payload: GiteaIssueEventPayload = match serde_json::from_slice(body) {
+        Ok(p) => p,
+        Err(e) => {
+            warn!(error = %e, "failed to parse issues webhook payload");
+            return StatusCode::BAD_REQUEST;
+        }
+    };
+
+    if payload.action != "opened" {
+        return StatusCode::OK;
+    }
+
+    let issue_body = match payload.issue.body.as_deref() {
+        Some(b) if !b.is_empty() => b.to_string(),
+        _ => return StatusCode::OK,
+    };
+
+    info!(
+        repo = %payload.repository.full_name,
+        issue = payload.issue.number,
+        issue_title = %payload.issue.title,
+        "scanning new issue body for mentions"
+    );
+
+    let persona_names: Vec<String> = state
+        .persona_registry
+        .persona_names()
+        .into_iter()
+        .map(|s| s.to_string())
+        .collect();
+    let parser = AdfCommandParser::new(&state.agent_names, &persona_names);
+
+    let mention_tokens = crate::mention::parse_mention_tokens(&issue_body);
+    let unqualified_project_map: std::collections::HashMap<String, Option<String>> = mention_tokens
+        .iter()
+        .filter(|t| t.project.is_none())
+        .map(|t| (t.agent.clone(), None))
+        .collect();
+
+    let commands = parser.parse_commands(&issue_body, payload.issue.number, 0);
+
+    let qualified_dispatches: Vec<WebhookDispatch> = mention_tokens
+        .into_iter()
+        .filter(|t| t.project.is_some())
+        .map(|t| WebhookDispatch::SpawnAgent {
+            detected_project: t.project,
+            agent_name: t.agent,
+            issue_number: payload.issue.number,
+            comment_id: 0,
+            context: String::new(),
+        })
+        .collect();
+
+    if commands.is_empty() && qualified_dispatches.is_empty() {
+        return StatusCode::OK;
+    }
+
+    info!(
+        issue = payload.issue.number,
+        dispatch_count = commands.len() + qualified_dispatches.len(),
+        "dispatching from new issue body mentions"
+    );
+
+    for cmd in commands {
+        let dispatch = match cmd {
+            crate::adf_commands::AdfCommand::SpawnAgent {
+                agent_name,
+                issue_number,
+                comment_id,
+                context,
+            } => WebhookDispatch::SpawnAgent {
+                detected_project: unqualified_project_map.get(&agent_name).cloned().flatten(),
+                agent_name,
+                issue_number,
+                comment_id,
+                context,
+            },
+            crate::adf_commands::AdfCommand::SpawnPersona {
+                persona_name,
+                issue_number,
+                comment_id,
+                context,
+            } => WebhookDispatch::SpawnPersona {
+                persona_name,
+                issue_number,
+                comment_id,
+                context,
+            },
+            crate::adf_commands::AdfCommand::CompoundReview {
+                issue_number,
+                comment_id,
+            } => WebhookDispatch::CompoundReview {
+                issue_number,
+                comment_id,
+            },
+            crate::adf_commands::AdfCommand::Unknown { raw } => {
+                warn!(raw = %raw, "unknown ADF command in new issue body");
+                continue;
+            }
+        };
+
+        if let Err(e) = state.dispatch_tx.send(dispatch).await {
+            warn!(error = %e, "failed to send issue body dispatch to orchestrator");
+            return StatusCode::SERVICE_UNAVAILABLE;
+        }
+    }
+
+    for dispatch in qualified_dispatches {
+        if let Err(e) = state.dispatch_tx.send(dispatch).await {
+            warn!(error = %e, "failed to send qualified issue body mention dispatch");
+            return StatusCode::SERVICE_UNAVAILABLE;
+        }
+    }
+
     StatusCode::ACCEPTED
 }
 
