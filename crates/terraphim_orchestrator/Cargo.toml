@@ -15,7 +15,7 @@ quickwit = ["dep:reqwest"]
 # Terraphim internal crates
 terraphim_spawner = { path = "../terraphim_spawner", version = "1.0.0" }
 terraphim_router = { path = "../terraphim_router", version = "1.0.0" }
-terraphim_types = { path = "../terraphim_types", version = "1.0.0" }
+terraphim_types = { path = "../terraphim_types", version = "1.0.0", features = ["kg-integration"] }
 terraphim_tracker = { path = "../terraphim_tracker", version = "1.0.0" }
 
 # Core dependencies
