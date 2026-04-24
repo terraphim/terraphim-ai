@@ -137,3 +137,80 @@ firecracker:
 
     SAVE ARTIFACT rootfs.ext4 AS LOCAL rootfs.ext4
     SAVE ARTIFACT kernel.bin AS LOCAL kernel.bin
+
+# Docker image for Rust CI builds inside Firecracker VMs.
+# Includes: Rust stable, cargo, clippy, rustfmt, common build deps.
+# Used by +rust-ci-rootfs to produce the ext4 image for fcctl-web.
+rust-ci-docker-image:
+    FROM ubuntu:22.04
+    ENV DEBIAN_FRONTEND=noninteractive
+    RUN apt-get update -qq && apt-get install -yqq --no-install-recommends \
+        build-essential \
+        ca-certificates \
+        curl \
+        git \
+        libssl-dev \
+        pkg-config \
+        rsync \
+        openssh-server \
+        && rm -rf /var/lib/apt/lists/*
+    # Install Rust stable via rustup
+    RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+        | sh -s -- -y --default-toolchain stable --profile minimal \
+        && . /root/.cargo/env \
+        && rustup component add clippy rustfmt
+    ENV PATH="/root/.cargo/bin:$PATH"
+    ENV CARGO_HOME="/root/.cargo"
+    # Configure SSH for fcctl-web access (key injected at build time via build arg)
+    RUN mkdir -p /root/.ssh && chmod 700 /root/.ssh
+    ARG SSH_PUBKEY
+    RUN if [ -n "$SSH_PUBKEY" ]; then \
+        echo "$SSH_PUBKEY" > /root/.ssh/authorized_keys && \
+        chmod 600 /root/.ssh/authorized_keys; \
+    fi
+    # Enable SSH daemon
+    RUN sed -i 's/#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config && \
+        sed -i 's/#PubkeyAuthentication.*/PubkeyAuthentication yes/' /etc/ssh/sshd_config
+    # Workspace directory
+    RUN mkdir -p /workspace
+
+# Convert the Rust CI Docker image to a Firecracker-compatible ext4 rootfs.
+# Output: rust-ci.ext4 (4GB, ready for use as Firecracker rootfs)
+# Usage:
+#   earthly +rust-ci-rootfs --SSH_PUBKEY="$(cat ~/.ssh/id_rsa.pub)"
+# Then add to fcctl-images.yaml:
+#   rust-ci:
+#     path: "./firecracker-ci-artifacts/rust-ci.ext4"
+#     kernel: "./firecracker-ci-artifacts/vmlinux-5.10.225"
+#     username: "root"
+#     ssh_key: "<path-to-matching-private-key>"
+#     network_type: "static"
+rust-ci-rootfs:
+    FROM earthly/dind
+
+    COPY +tar2ext4/tar2ext4 /usr/bin/tar2ext4
+
+    ARG SSH_PUBKEY
+    WORKDIR imgbuild
+
+    WITH DOCKER --load rust-ci:latest=(+rust-ci-docker-image --SSH_PUBKEY=$SSH_PUBKEY)
+        RUN docker save rust-ci:latest > image.tar
+    END
+
+    RUN mkdir image rootfs && tar -xf image.tar -C image
+
+    FOR layer IN $(jq -r '.[].Layers | @sh' ./image/manifest.json | tr -d \')
+        RUN tar -xf ./image/$layer -C rootfs
+    END
+
+    WORKDIR rootfs
+    RUN mkdir -pv {dev,proc,run,sys} && tar -cf ../rootfs.tar *
+
+    WORKDIR /imgbuild
+    # 4GB image to fit Rust toolchain + build artifacts
+    RUN tar2ext4 -i rootfs.tar -o rust-ci.ext4 && \
+        tune2fs -O ^read-only rust-ci.ext4 && \
+        dd if=/dev/zero bs=1M seek=4096 count=0 of=rust-ci.ext4 && \
+        resize2fs rust-ci.ext4
+
+    SAVE ARTIFACT rust-ci.ext4 AS LOCAL rust-ci.ext4

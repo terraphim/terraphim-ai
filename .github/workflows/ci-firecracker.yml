@@ -110,7 +110,7 @@ jobs:
         run: cargo clippy -- -D warnings
 
       - name: cargo build --workspace
-        run: cargo build --workspace
+        run: cargo build --workspace --features "terraphim_mcp_server/zlob,terraphim_file_search/zlob"
 
       - name: cargo test --workspace
-        run: cargo test --workspace
+        run: cargo test --workspace --features "terraphim_mcp_server/zlob,terraphim_file_search/zlob"
