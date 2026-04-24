@@ -11,23 +11,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### Agent CLI Enhancements
 - **Exit code table** in top-level `--help` output for CLI reference (F1.2 AC5)
-- **RobotFormatter integration** in CLI search functionality for structured output
-- **ForgivingParser integration** in REPL for improved command parsing
+- **RobotFormatter integration** in CLI search functionality for structured output (`7d64f126`)
+- **ForgivingParser integration** in REPL for improved command parsing (`7d64f126`)
+- **Token budget management engine** for robot mode with budget tracking and enforcement (`34891c29`)
+
+#### Session Features
+- **BM25-ranked session search** with search-index feature flag for fast full-text queries (`6871da00`)
+- **Session enrichment pipeline** with concept extraction from KG (`d99ea1be`)
+- **Robot mode JSON output** wired into session commands for machine-readable results (`5a24b319`)
+
+#### Orchestrator & Webhook
+- **Mention-chain coordination** for Gitea mentions in orchestrator (`e5c3147e`)
+- **`@adf:` mention scanning** in new issue bodies on `issues.opened` webhook event (`ec0c3967`)
+- **Per-agent GITEA_TOKEN injection** into spawn environment (`a297a213`)
+- **`project_id` threading** through dispatch, spawn, tracker, output, and Quickwit (`6c4f61a8`)
+
+#### Learning Store
+- **Suggestion approval workflow** with batch operations (`e6605b03`)
 
 #### Phase 1 Testing Framework
 - **Unit tests** for agent REPL functionality
 - **Property-based tests** for input validation and edge cases
-- **Integration tests** for multi-component workflows
+- **Integration tests** for multi-component workflows (`42c6f44d`)
 
+#### Documentation
 - Rustdoc for the `terraphim_server` public surface, including `AppState`, server start helpers, workflow state, and API error types.
+- Module-level rustdoc for `terraphim_middleware`, `terraphim_service`, and `terraphim_mcp_server`.
+- Error enum docs for `Error`, `ServiceError`, and `TerraphimMcpError`.
 - Documentation report artefacts for issue #114.
-- Documentation scan results for `terraphim-session-analyzer` and `terraphim-markdown-parser`, with representative API reference snippets.
+- Agent issue creation convention with Theme-ID dedup pattern (`762e1bb0`).
 
 ### Fixed
-- **Agent formatting** in RobotResponse chaining for consistent output
-- **Cargo formatting** applied to exit code additions
+- **Agent formatting** in RobotResponse chaining for consistent output (`b5ba8927`)
+- **Cargo formatting** applied to exit code additions (`d10e6598`)
+- **Orchestrator probe circuit breaker** and timeout handling hardened (`1238a680`)
+- **Auto-route cold-start scoring** fixed by scoring against thesaurus (`53bf3faf`)
+- **Settings config directory** now uses absolute path (`a73a7976`)
+- **Data-dependent test assertion** replaced in `test_api_client_search` (`1edcb7ff`)
 - Stabilised the extract validation test runtime and serialised execution to keep the suite deterministic (`03f9cf94`).
 - Excluded `terraphim_tinyclaw` from workspace builds to avoid the `rustls-webpki` advisory (`fd703068`).
+
+### Security
+- Resolved RUSTSEC-2026-0098, RUSTSEC-2026-0099, RUSTSEC-2026-0097: removed dead dependencies (`3be7148d`)
+- Added RUSTSEC-2026-0104 to audit ignore list (`2d5d513b`)
 
 ### Changed
 - **REPL output handling** improved with ForgivingParser for better error recovery

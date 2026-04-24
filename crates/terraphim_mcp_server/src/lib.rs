@@ -1,3 +1,6 @@
+//! MCP server for Terraphim -- exposes autocomplete, file search, and knowledge-graph
+//! tools over the Model Context Protocol.
+
 use anyhow::Result;
 use base64::Engine;
 use fff_search::external_scorer::ExternalScorer;
@@ -29,6 +32,7 @@ pub mod resource_mapper;
 
 use crate::resource_mapper::TerraphimResourceMapper;
 
+/// Errors returned by MCP server operations.
 #[derive(Error, Debug)]
 pub enum TerraphimMcpError {
     #[error("Service error: {0}")]

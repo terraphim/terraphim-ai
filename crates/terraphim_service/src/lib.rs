@@ -1,3 +1,9 @@
+//! Terraphim service layer -- search, document management, and AI integration.
+//!
+//! Orchestrates knowledge-graph-backed search across multiple haystacks,
+//! manages role-graph lifecycle, and exposes LLM summarisation and chat
+//! completion via a provider-agnostic interface.
+
 use ahash::AHashMap;
 use terraphim_automata::builder::{Logseq, ThesaurusBuilder};
 use terraphim_automata::load_thesaurus;
@@ -64,6 +70,7 @@ fn normalize_filename_to_id(filename: &str) -> String {
     re.replace_all(filename, "").to_lowercase()
 }
 
+/// Errors returned by service-layer operations.
 #[derive(thiserror::Error, Debug)]
 pub enum ServiceError {
     #[error("Middleware error: {0}")]
