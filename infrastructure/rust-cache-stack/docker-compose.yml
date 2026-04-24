@@ -1,0 +1,29 @@
+services:
+  seaweedfs:
+    image: chrislusf/seaweedfs:latest
+    container_name: rust-cache-seaweedfs
+    restart: unless-stopped
+    command: >
+      server
+      -dir=/data
+      -s3
+      -s3.port=8333
+      -master.port=9333
+      -volume.port=9080
+      -filer
+      -filer.port=9888
+    ports:
+      # Bound to fcbr0 bridge IP so Firecracker VMs on TAP devices can reach it,
+      # host processes reach it via the same address, and it is NOT exposed on
+      # any public interface. See .docs/adr-rust-build-cache-seaweedfs.md.
+      - '172.26.0.1:8333:8333'
+    volumes:
+      - rust-cache-data:/data
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:8333/']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  rust-cache-data:
