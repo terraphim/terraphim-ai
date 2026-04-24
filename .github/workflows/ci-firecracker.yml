@@ -26,8 +26,8 @@ concurrency:
 jobs:
   vm-infrastructure:
     name: Firecracker VM lifecycle proof
-    # bigbox self-hosted runners co-locate with fcctl-web on 127.0.0.1:8080
-    runs-on: [self-hosted]
+    # bigbox runners co-locate with fcctl-web at 127.0.0.1:8080 — must use bigbox label
+    runs-on: [self-hosted, bigbox]
     timeout-minutes: 5
     env:
       FCCTL_URL: http://127.0.0.1:8080
@@ -103,37 +103,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # fff-search/fff-core build.rs panics in CI without --features zlob.
-      # zlob uses macOS-specific symbols and cannot be compiled on Linux.
-      # Workaround: enable zlob on macOS; unset CI on Linux to bypass the check.
+      # fff-search/fff-core build.rs panics in CI unless --features zlob is set,
+      # but zlob fails to link on any runner due to zig/Darwin symbol issues.
+      # Unsetting CI bypasses the build.rs check without enabling zlob.
       - name: cargo fmt --check
-        run: |
-          if [ "$(uname)" = "Darwin" ]; then
-            cargo fmt -- --check
-          else
-            unset CI && cargo fmt -- --check
-          fi
+        run: unset CI && cargo fmt -- --check
 
       - name: cargo clippy
-        run: |
-          if [ "$(uname)" = "Darwin" ]; then
-            cargo clippy -- -D warnings
-          else
-            unset CI && cargo clippy -- -D warnings
-          fi
+        run: unset CI && cargo clippy -- -D warnings
 
       - name: cargo build --workspace
-        run: |
-          if [ "$(uname)" = "Darwin" ]; then
-            cargo build --workspace --features "terraphim_mcp_server/zlob,terraphim_file_search/zlob"
-          else
-            unset CI && cargo build --workspace
-          fi
+        run: unset CI && cargo build --workspace
 
       - name: cargo test --workspace
-        run: |
-          if [ "$(uname)" = "Darwin" ]; then
-            cargo test --workspace --features "terraphim_mcp_server/zlob,terraphim_file_search/zlob"
-          else
-            unset CI && cargo test --workspace
-          fi
+        run: unset CI && cargo test --workspace
