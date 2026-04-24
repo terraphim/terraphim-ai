@@ -156,3 +156,73 @@ jobs:
       - name: sccache stats
         if: always()
         run: /home/alex/.local/bin/sccache --show-stats
+
+  vm-cargo-probe:
+    # Proof-of-concept: dispatch a cargo build INTO a rust-ci Firecracker VM,
+    # measure sccache hit rate against SeaweedFS S3 on fcbr0. Uses a tiny
+    # synthetic crate (one dep) to stay within the VM's 4 GB rootfs while
+    # still exercising the full dispatch path end-to-end:
+    #   create VM -> SSH in -> cargo build -> sccache -> SeaweedFS -> destroy.
+    # Full workspace dispatch is blocked on VM rootfs size / virtio-fs mount
+    # support (follow-up task).
+    name: Cargo build inside Firecracker VM
+    runs-on: [self-hosted, bigbox]
+    timeout-minutes: 10
+    env:
+      FCCTL_URL: http://127.0.0.1:8080
+      SSH_KEY: /home/alex/projects/terraphim/firecracker-rust/firecracker-ci-artifacts/ubuntu-22.04.id_rsa
+
+    steps:
+      - name: Create rust-ci VM
+        id: vm
+        run: |
+          RESPONSE=$(curl -sf -X POST $FCCTL_URL/api/vms \
+            -H 'Content-Type: application/json' \
+            -d '{"vm_type": "rust-ci"}')
+          VM_ID=$(echo "$RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+          echo "vm_id=$VM_ID" >> $GITHUB_OUTPUT
+          for i in $(seq 1 20); do
+            STATUS=$(curl -sf $FCCTL_URL/api/vms/$VM_ID \
+              | python3 -c "import sys,json; print(json.load(sys.stdin).get('status','?'))" 2>/dev/null || echo "?")
+            [ "$STATUS" = "running" ] && break
+            sleep 3
+          done
+          VM_IP=$(curl -sf $FCCTL_URL/api/vms/$VM_ID | python3 -c "import sys,json; print(json.load(sys.stdin).get('ip_address',''))")
+          echo "vm_ip=$VM_IP" >> $GITHUB_OUTPUT
+          echo "VM_ID=$VM_ID VM_IP=$VM_IP"
+
+      - name: cargo build + sccache stats in VM
+        id: build
+        run: |
+          VM_IP="${{ steps.vm.outputs.vm_ip }}"
+          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              -i $SSH_KEY root@$VM_IP bash -s <<'REMOTE'
+            set -e
+            sccache --start-server || true
+            sccache --zero-stats > /dev/null
+            mkdir -p /tmp/probe-ci/src
+            cat > /tmp/probe-ci/Cargo.toml <<EOF
+          [package]
+          name = "probe-ci"
+          version = "0.0.1"
+          edition = "2021"
+          [dependencies]
+          serde_json = "1"
+          EOF
+            cat > /tmp/probe-ci/src/lib.rs <<EOF
+          pub fn v() -> serde_json::Value { serde_json::json!({"ok": true}) }
+          EOF
+            cd /tmp/probe-ci
+            echo "== cargo build =="
+            time cargo build
+            echo "== sccache stats =="
+            sccache --show-stats | grep -E 'Compile requests|Cache hits|Cache misses|Cache hits rate|Cache write'
+          REMOTE
+
+      - name: Destroy VM
+        if: always()
+        run: |
+          VM_ID="${{ steps.vm.outputs.vm_id }}"
+          if [ -n "$VM_ID" ] && [ "$VM_ID" != "null" ]; then
+            curl -sf -X DELETE $FCCTL_URL/api/vms/$VM_ID && echo "VM $VM_ID destroyed" || echo "VM cleanup failed (non-fatal)"
+          fi

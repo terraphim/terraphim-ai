@@ -65,8 +65,11 @@ STAGE="$WORK/stage"
 mkdir -p "$STAGE"
 sudo tar -xf "$WORK/rootfs.tar" -C "$STAGE"
 sudo tee "$STAGE/etc/resolv.conf" > /dev/null <<'EOF'
-nameserver 1.1.1.1
-nameserver 8.8.8.8
+# Hetzner-provided resolvers. Public DNS (1.1.1.1 / 8.8.8.8) is blocked
+# outbound by the hoster, so we must use the upstream ASN's resolver
+# which is what bigbox's own systemd-resolved uses.
+nameserver 185.12.64.1
+nameserver 185.12.64.2
 EOF
 sudo tar -cf "$WORK/rootfs.tar" -C "$STAGE" .
 
