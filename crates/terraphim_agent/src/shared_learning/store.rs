@@ -136,6 +136,8 @@ pub struct SharedLearningStore {
     backend: MarkdownLearningStore,
     index: RwLock<HashMap<String, SharedLearning>>,
     config: StoreConfig,
+    #[cfg(feature = "shared-learning")]
+    role_graph: Option<std::sync::RwLock<terraphim_rolegraph::RoleGraph>>,
 }
 
 impl SharedLearningStore {
@@ -145,6 +147,8 @@ impl SharedLearningStore {
             backend,
             index: RwLock::new(HashMap::new()),
             config,
+            #[cfg(feature = "shared-learning")]
+            role_graph: None,
         };
         store.load_all().await?;
         Ok(store)
@@ -548,6 +552,16 @@ impl SharedLearningStore {
     pub async fn close(&self) {
         info!("Shared learning store closed");
     }
+
+    #[cfg(feature = "shared-learning")]
+    pub fn set_role_graph(&mut self, graph: terraphim_rolegraph::RoleGraph) {
+        self.role_graph = Some(std::sync::RwLock::new(graph));
+    }
+
+    #[cfg(feature = "shared-learning")]
+    pub fn role_graph(&self) -> Option<&std::sync::RwLock<terraphim_rolegraph::RoleGraph>> {
+        self.role_graph.as_ref()
+    }
 }
 
 #[cfg(feature = "shared-learning")]
@@ -570,6 +584,140 @@ impl terraphim_middleware::feedback_loop::GraphTouchStore for SharedLearningStor
                 Err(StoreError::NotFound(learning_id.to_string()))
             }
         })
+    }
+}
+
+#[cfg(feature = "shared-learning")]
+fn block_on<F: std::future::Future>(fut: F) -> F::Output {
+    tokio::task::block_in_place(|| {
+        let rt = tokio::runtime::Handle::current();
+        rt.block_on(fut)
+    })
+}
+
+#[cfg(feature = "shared-learning")]
+impl terraphim_types::shared_learning::LearningStore for SharedLearningStore {
+    fn insert(
+        &self,
+        learning: terraphim_types::shared_learning::SharedLearning,
+    ) -> Result<String, terraphim_types::shared_learning::StoreError> {
+        let id = learning.id.clone();
+        block_on(Self::insert(self, learning))?;
+        Ok(id)
+    }
+
+    fn get(
+        &self,
+        id: &str,
+    ) -> Result<
+        terraphim_types::shared_learning::SharedLearning,
+        terraphim_types::shared_learning::StoreError,
+    > {
+        block_on(Self::get(self, id))
+    }
+
+    fn query_relevant(
+        &self,
+        agent: &str,
+        context: &str,
+        min_trust: terraphim_types::shared_learning::TrustLevel,
+        limit: usize,
+    ) -> Result<
+        Vec<terraphim_types::shared_learning::SharedLearning>,
+        terraphim_types::shared_learning::StoreError,
+    > {
+        let index = block_on(self.index.read());
+        let mut candidates: Vec<terraphim_types::shared_learning::SharedLearning> = index
+            .values()
+            .filter(|l| l.trust_level >= min_trust)
+            .filter(|l| {
+                l.applicable_agents.is_empty()
+                    || l.applicable_agents
+                        .iter()
+                        .any(|a| a.eq_ignore_ascii_case(agent))
+            })
+            .cloned()
+            .collect();
+        drop(index);
+
+        if candidates.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        if !context.is_empty() {
+            if let Some(ref graph_lock) = self.role_graph {
+                if let Ok(graph) = graph_lock.read() {
+                    if let Ok(graph_results) = graph.query_graph(context, None, None) {
+                        if !graph_results.is_empty() {
+                            let graph_ids: std::collections::HashSet<String> =
+                                graph_results.into_iter().map(|(id, _)| id).collect();
+                            candidates.retain(|l| {
+                                graph_ids.contains(&l.id)
+                                    || l.extract_searchable_text()
+                                        .contains(&context.to_lowercase())
+                            });
+                            candidates.sort_by_key(|l| {
+                                std::cmp::Reverse(if graph_ids.contains(&l.id) {
+                                    u64::MAX
+                                } else {
+                                    0
+                                })
+                            });
+                            candidates.truncate(limit);
+                            return Ok(candidates);
+                        }
+                    }
+                }
+            }
+
+            let context_lower = context.to_lowercase();
+            candidates.retain(|l| l.extract_searchable_text().contains(&context_lower));
+        }
+
+        candidates.sort_by_key(|l| std::cmp::Reverse(l.trust_level.weight()));
+        candidates.truncate(limit);
+        Ok(candidates)
+    }
+
+    fn record_applied(&self, id: &str) -> Result<(), terraphim_types::shared_learning::StoreError> {
+        block_on(self.record_application(id, "learning-store", false))
+    }
+
+    fn record_effective(
+        &self,
+        id: &str,
+    ) -> Result<(), terraphim_types::shared_learning::StoreError> {
+        block_on(self.record_application(id, "learning-store", true))
+    }
+
+    fn list_by_trust(
+        &self,
+        min_trust: terraphim_types::shared_learning::TrustLevel,
+    ) -> Result<
+        Vec<terraphim_types::shared_learning::SharedLearning>,
+        terraphim_types::shared_learning::StoreError,
+    > {
+        let all = block_on(self.list_all())?;
+        Ok(all
+            .into_iter()
+            .filter(|l| l.trust_level >= min_trust)
+            .collect())
+    }
+
+    fn archive_stale(
+        &self,
+        max_age_days: u32,
+    ) -> Result<usize, terraphim_types::shared_learning::StoreError> {
+        let cutoff = chrono::Utc::now() - chrono::Duration::days(max_age_days as i64);
+        let mut index = block_on(self.index.write());
+        let before = index.len();
+        index.retain(|_, l| {
+            l.trust_level > terraphim_types::shared_learning::TrustLevel::L0
+                || l.updated_at > cutoff
+        });
+        let removed = before - index.len();
+        drop(index);
+        Ok(removed)
     }
 }
 
@@ -975,5 +1123,282 @@ mod tests {
             .unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].id, rejected_id);
+    }
+
+    #[cfg(feature = "shared-learning")]
+    mod learning_store_trait_tests {
+        use super::*;
+        use terraphim_types::shared_learning::{LearningStore, TrustLevel as Tl};
+
+        async fn create_trait_test_store() -> SharedLearningStore {
+            create_test_store().await
+        }
+
+        #[tokio::test(flavor = "multi_thread")]
+        async fn test_trait_insert_and_get() {
+            let store = create_trait_test_store().await;
+            let dyn_store: &dyn LearningStore = &store;
+
+            let learning = SharedLearning::new(
+                "Trait Test".to_string(),
+                "Testing trait insert and get".to_string(),
+                LearningSource::Manual,
+                "test-agent".to_string(),
+            );
+            let id = dyn_store.insert(learning).unwrap();
+            assert!(!id.is_empty());
+
+            let retrieved = dyn_store.get(&id).unwrap();
+            assert_eq!(retrieved.title, "Trait Test");
+            assert_eq!(retrieved.source_agent, "test-agent");
+        }
+
+        #[tokio::test(flavor = "multi_thread")]
+        async fn test_trait_get_not_found() {
+            let store = create_trait_test_store().await;
+            let dyn_store: &dyn LearningStore = &store;
+            assert!(dyn_store.get("nonexistent-id").is_err());
+        }
+
+        #[tokio::test(flavor = "multi_thread")]
+        async fn test_trait_record_applied_and_effective() {
+            let store = create_trait_test_store().await;
+            let dyn_store: &dyn LearningStore = &store;
+
+            let learning = SharedLearning::new(
+                "App Test".to_string(),
+                "Content".to_string(),
+                LearningSource::Manual,
+                "agent".to_string(),
+            );
+            let id = dyn_store.insert(learning).unwrap();
+
+            dyn_store.record_applied(&id).unwrap();
+            let l = dyn_store.get(&id).unwrap();
+            assert_eq!(l.quality.applied_count, 1);
+
+            dyn_store.record_effective(&id).unwrap();
+            let l = dyn_store.get(&id).unwrap();
+            assert_eq!(l.quality.applied_count, 2);
+            assert_eq!(l.quality.effective_count, 1);
+        }
+
+        #[tokio::test(flavor = "multi_thread")]
+        async fn test_trait_auto_promote_on_effective() {
+            let store = create_trait_test_store().await;
+            let dyn_store: &dyn LearningStore = &store;
+
+            let learning = SharedLearning::new(
+                "Promote Test".to_string(),
+                "Content".to_string(),
+                LearningSource::Manual,
+                "agent".to_string(),
+            );
+            let id = dyn_store.insert(learning).unwrap();
+
+            assert_eq!(dyn_store.get(&id).unwrap().trust_level, Tl::L1);
+
+            dyn_store.record_effective(&id).unwrap();
+            dyn_store.record_effective(&id).unwrap();
+            dyn_store.record_effective(&id).unwrap();
+            dyn_store.record_effective(&id).unwrap();
+
+            let l = dyn_store.get(&id).unwrap();
+            assert_eq!(l.quality.effective_count, 4);
+        }
+
+        #[tokio::test(flavor = "multi_thread")]
+        async fn test_trait_list_by_trust() {
+            let store = create_trait_test_store().await;
+            let dyn_store: &dyn LearningStore = &store;
+
+            let l1 = SharedLearning::new(
+                "L1".to_string(),
+                "c".to_string(),
+                LearningSource::Manual,
+                "a".to_string(),
+            );
+            let mut l2 = SharedLearning::new(
+                "L2".to_string(),
+                "c".to_string(),
+                LearningSource::Manual,
+                "a".to_string(),
+            );
+            l2.promote_to_l2();
+            dyn_store.insert(l1).unwrap();
+            dyn_store.insert(l2).unwrap();
+
+            let l1_plus = dyn_store.list_by_trust(Tl::L1).unwrap();
+            assert_eq!(l1_plus.len(), 2);
+
+            let l2_only = dyn_store.list_by_trust(Tl::L2).unwrap();
+            assert_eq!(l2_only.len(), 1);
+            assert_eq!(l2_only[0].title, "L2");
+        }
+
+        #[tokio::test(flavor = "multi_thread")]
+        async fn test_trait_query_relevant_respects_trust() {
+            let store = create_trait_test_store().await;
+            let dyn_store: &dyn LearningStore = &store;
+
+            let mut l0 = SharedLearning::new(
+                "L0 Test".to_string(),
+                "l0 content".to_string(),
+                LearningSource::Manual,
+                "agent".to_string(),
+            );
+            l0.trust_level = Tl::L0;
+            dyn_store.insert(l0).unwrap();
+
+            let results = dyn_store
+                .query_relevant("agent", "l0 content", Tl::L1, 10)
+                .unwrap();
+            assert!(results.is_empty(), "L0 should be filtered out at L1 min");
+        }
+
+        #[tokio::test(flavor = "multi_thread")]
+        async fn test_trait_query_relevant_respects_agents() {
+            let store = create_trait_test_store().await;
+            let dyn_store: &dyn LearningStore = &store;
+
+            let learning = SharedLearning::new(
+                "Agent Specific".to_string(),
+                "Only for security".to_string(),
+                LearningSource::Manual,
+                "sec".to_string(),
+            )
+            .with_applicable_agents(vec!["security-audit".to_string()]);
+            dyn_store.insert(learning).unwrap();
+
+            let for_sec = dyn_store
+                .query_relevant("security-audit", "security", Tl::L1, 10)
+                .unwrap();
+            assert_eq!(for_sec.len(), 1);
+
+            let for_other = dyn_store
+                .query_relevant("other-agent", "security", Tl::L1, 10)
+                .unwrap();
+            assert!(for_other.is_empty());
+        }
+
+        #[tokio::test(flavor = "multi_thread")]
+        async fn test_trait_archive_stale() {
+            let temp_dir = TempDir::new().unwrap();
+            let markdown_config = MarkdownStoreConfig {
+                learnings_dir: temp_dir.path().to_path_buf(),
+                shared_dir_name: "shared".to_string(),
+            };
+            let config = StoreConfig::default().with_markdown_config(markdown_config);
+            let store = SharedLearningStore::open(config).await.unwrap();
+
+            let mut l0_stale = SharedLearning::new(
+                "stale".to_string(),
+                "c".to_string(),
+                LearningSource::Manual,
+                "a".to_string(),
+            );
+            l0_stale.trust_level = Tl::L0;
+            l0_stale.updated_at = chrono::Utc::now() - chrono::Duration::days(60);
+            let mut l1_old = SharedLearning::new(
+                "old but L1".to_string(),
+                "c".to_string(),
+                LearningSource::Manual,
+                "a".to_string(),
+            );
+            l1_old.trust_level = Tl::L1;
+            l1_old.updated_at = chrono::Utc::now() - chrono::Duration::days(60);
+
+            let dyn_store: &dyn LearningStore = &store;
+            dyn_store.insert(l0_stale).unwrap();
+            dyn_store.insert(l1_old).unwrap();
+
+            let archived = dyn_store.archive_stale(30).unwrap();
+            assert_eq!(archived, 1);
+
+            let remaining = dyn_store.list_by_trust(Tl::L0).unwrap();
+            assert_eq!(remaining.len(), 1);
+            assert_eq!(remaining[0].trust_level, Tl::L1);
+        }
+
+        #[tokio::test(flavor = "multi_thread")]
+        async fn test_trait_query_relevant_with_role_graph() {
+            use terraphim_rolegraph::RoleGraph;
+            use terraphim_types::{Document, NormalizedTerm, NormalizedTermValue, Thesaurus};
+
+            let mut store = create_test_store().await;
+
+            let mut thesaurus = Thesaurus::new("test".to_string());
+            thesaurus.insert(
+                NormalizedTermValue::from("git"),
+                NormalizedTerm::new(1, NormalizedTermValue::from("git")),
+            );
+            thesaurus.insert(
+                NormalizedTermValue::from("push"),
+                NormalizedTerm::new(2, NormalizedTermValue::from("push")),
+            );
+
+            let mut graph =
+                RoleGraph::new_sync(terraphim_types::RoleName::new("test-role"), thesaurus)
+                    .unwrap();
+
+            let doc = Document {
+                id: "doc-1".to_string(),
+                url: String::new(),
+                title: "Git Push".to_string(),
+                body: "Git push force error fix".to_string(),
+                description: None,
+                summarization: None,
+                stub: None,
+                tags: None,
+                rank: None,
+                source_haystack: None,
+                doc_type: terraphim_types::DocumentType::default(),
+                synonyms: None,
+                route: None,
+                priority: None,
+            };
+            let learning_id = "learning-graph-test";
+            graph.insert_document(learning_id, doc);
+
+            store.set_role_graph(graph);
+
+            let learning = SharedLearning::new(
+                "Graph Test Learning".to_string(),
+                "Git push force error fix".to_string(),
+                LearningSource::Manual,
+                "agent".to_string(),
+            );
+            let mut l = learning;
+            l.id = learning_id.to_string();
+            l.trust_level = Tl::L2;
+            let dyn_store: &dyn LearningStore = &store;
+            dyn_store.insert(l).unwrap();
+
+            let results = dyn_store
+                .query_relevant("agent", "git push", Tl::L1, 10)
+                .unwrap();
+            assert!(!results.is_empty());
+            assert_eq!(results[0].id, learning_id);
+        }
+
+        #[tokio::test(flavor = "multi_thread")]
+        async fn test_trait_query_relevant_without_graph() {
+            let store = create_trait_test_store().await;
+            let dyn_store: &dyn LearningStore = &store;
+
+            let learning = SharedLearning::new(
+                "Rust Error".to_string(),
+                "Use cargo clippy for rust errors".to_string(),
+                LearningSource::Manual,
+                "agent".to_string(),
+            )
+            .with_keywords(vec!["rust".to_string(), "clippy".to_string()]);
+            dyn_store.insert(learning).unwrap();
+
+            let results = dyn_store
+                .query_relevant("agent", "rust clippy", Tl::L1, 10)
+                .unwrap();
+            assert!(!results.is_empty());
+        }
     }
 }
