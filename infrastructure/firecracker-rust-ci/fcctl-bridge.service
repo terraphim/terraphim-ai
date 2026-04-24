@@ -1,0 +1,18 @@
+[Unit]
+Description=Firecracker network bridge fcbr0
+Before=fcctl-web.service
+Wants=network.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# Brings up the fcbr0 bridge that Firecracker VMs TAP onto, plus the NAT
+# and FORWARD rules that give guests internet access:
+#   - MASQUERADE on POSTROUTING lets VM packets leave the host with its IP
+#   - FORWARD ACCEPT both directions bypasses the default DROP policy
+# Rules are idempotent (check + add) so restarts are safe.
+ExecStart=/bin/sh -c 'ip link add fcbr0 type bridge 2>/dev/null || true; ip addr add 172.26.0.1/24 dev fcbr0 2>/dev/null || true; ip link set fcbr0 up; iptables -t nat -C POSTROUTING -s 172.26.0.0/24 -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -s 172.26.0.0/24 -j MASQUERADE; iptables -C FORWARD -i fcbr0 -j ACCEPT 2>/dev/null || iptables -I FORWARD -i fcbr0 -j ACCEPT; iptables -C FORWARD -o fcbr0 -j ACCEPT 2>/dev/null || iptables -I FORWARD -o fcbr0 -j ACCEPT'
+ExecStop=/bin/sh -c 'iptables -D FORWARD -o fcbr0 -j ACCEPT 2>/dev/null || true; iptables -D FORWARD -i fcbr0 -j ACCEPT 2>/dev/null || true; iptables -t nat -D POSTROUTING -s 172.26.0.0/24 -j MASQUERADE 2>/dev/null || true; ip link del fcbr0 2>/dev/null || true'
+
+[Install]
+WantedBy=multi-user.target
