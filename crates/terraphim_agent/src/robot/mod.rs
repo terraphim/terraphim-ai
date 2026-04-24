@@ -24,4 +24,5 @@ pub use output::{FieldMode, OutputFormat, RobotConfig, RobotFormatter};
 #[allow(unused_imports)]
 pub use schema::{
     AutoCorrection, Pagination, ResponseMeta, RobotError, RobotResponse, TokenBudget,
+    detect_wildcard_fallback, extract_concepts_from_results,
 };

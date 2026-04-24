@@ -28,6 +28,7 @@ pub use client::*;
 pub use robot::{
     BudgetEngine, BudgetError, BudgetedResults, ExitCode, FieldMode, OutputFormat, RobotConfig,
     RobotError, RobotFormatter, RobotResponse, SelfDocumentation,
+    detect_wildcard_fallback, extract_concepts_from_results,
 };
 
 // Re-export forgiving CLI types

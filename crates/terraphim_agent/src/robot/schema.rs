@@ -291,6 +291,30 @@ pub struct SearchResultsData {
     pub wildcard_fallback: bool,
 }
 
+/// Extract unique concepts from document tags across a slice of search results.
+///
+/// Returns a sorted, deduplicated list of concept strings. An empty vec means
+/// no concept metadata was attached to any result document.
+pub fn extract_concepts_from_results(docs: &[terraphim_types::Document]) -> Vec<String> {
+    let mut concepts: Vec<String> = docs
+        .iter()
+        .flat_map(|doc| doc.tags.as_deref().unwrap_or(&[]).iter().cloned())
+        .filter(|s| !s.is_empty())
+        .collect();
+    concepts.sort();
+    concepts.dedup();
+    concepts
+}
+
+/// Determine whether the search pipeline used a wildcard fallback.
+///
+/// Returns `true` when the result set is non-empty but no concept metadata
+/// was present on any document – a signal that the search engine widened
+/// beyond the original query terms to produce results.
+pub fn detect_wildcard_fallback(concepts_matched: &[String], result_count: usize) -> bool {
+    result_count > 0 && concepts_matched.is_empty()
+}
+
 /// Individual search result
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SearchResultItem {

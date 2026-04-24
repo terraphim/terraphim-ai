@@ -1596,6 +1596,10 @@ async fn run_offline_command(
                 let truncated_results: Vec<_> = results.into_iter().take(max_results).collect();
                 let total = truncated_results.len();
 
+                use crate::robot::schema::{detect_wildcard_fallback, extract_concepts_from_results};
+                let concepts_matched = extract_concepts_from_results(&truncated_results);
+                let wildcard_fallback = detect_wildcard_fallback(&concepts_matched, total);
+
                 let items: Vec<SearchResultItem> = truncated_results
                     .iter()
                     .enumerate()
@@ -1633,8 +1637,8 @@ async fn run_offline_command(
                 let data = SearchResultsData {
                     results: items,
                     total_matches: total,
-                    concepts_matched: vec![],
-                    wildcard_fallback: false,
+                    concepts_matched,
+                    wildcard_fallback,
                 };
 
                 let meta =
