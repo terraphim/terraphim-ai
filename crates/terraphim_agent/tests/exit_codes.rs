@@ -68,12 +68,14 @@ fn validate_with_no_kg_exits_3() {
     // Load a fixture config where the role has kg: null so the service layer
     // returns "Knowledge graph not configured", which classify_error maps to
     // ErrorIndexMissing (3).  This avoids relying on the developer's local KG.
-    let fixture = concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/tests/no_kg_config.json"
-    );
+    let fixture = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/no_kg_config.json");
     cmd()
-        .args(["--config", fixture, "validate", "xyzzy_f1_2_exit_code_test_sentinel"])
+        .args([
+            "--config",
+            fixture,
+            "validate",
+            "xyzzy_f1_2_exit_code_test_sentinel",
+        ])
         .assert()
         .code(3);
 }
