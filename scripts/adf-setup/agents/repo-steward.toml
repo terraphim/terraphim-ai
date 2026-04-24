@@ -14,6 +14,7 @@ layer = "Growth"
 cli_tool = "/home/alex/.local/bin/claude"
 model = "sonnet"
 fallback_model = "kimi-for-coding/k2p5"
+fallback_provider = "/home/alex/.bun/bin/opencode"
 persona = "Carthos"
 terraphim_role = "Carthos Architecture"
 skill_chain = [
