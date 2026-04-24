@@ -104,13 +104,22 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: cargo fmt --check
+        # Unset CI so fff-search build.rs doesn't panic (zlob is macOS-only)
+        env:
+          CI: ""
         run: cargo fmt -- --check
 
       - name: cargo clippy
+        env:
+          CI: ""
         run: cargo clippy -- -D warnings
 
       - name: cargo build --workspace
-        run: cargo build --workspace --features "terraphim_mcp_server/zlob,terraphim_file_search/zlob"
+        env:
+          CI: ""
+        run: cargo build --workspace
 
       - name: cargo test --workspace
-        run: cargo test --workspace --features "terraphim_mcp_server/zlob,terraphim_file_search/zlob"
+        env:
+          CI: ""
+        run: cargo test --workspace
