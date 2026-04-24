@@ -99,9 +99,26 @@ jobs:
     name: Rust build + test
     runs-on: [self-hosted]
     timeout-minutes: 45
+    # Route all rustc invocations through sccache backed by SeaweedFS S3 on
+    # fcbr0. See .docs/adr-rust-build-cache-seaweedfs.md. Env is applied to
+    # every step so cargo fmt/clippy/build/test all share the cache.
+    env:
+      RUSTC_WRAPPER: /home/alex/.local/bin/sccache
+      SCCACHE_BUCKET: rust-cache
+      SCCACHE_ENDPOINT: http://172.26.0.1:8333
+      SCCACHE_S3_USE_SSL: "false"
+      SCCACHE_REGION: us-east-1
+      SCCACHE_S3_KEY_PREFIX: terraphim-ai
+      AWS_ACCESS_KEY_ID: any
+      AWS_SECRET_ACCESS_KEY: any
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: sccache start and zero stats
+        run: |
+          /home/alex/.local/bin/sccache --start-server || true
+          /home/alex/.local/bin/sccache --zero-stats
 
       # fff-search/fff-core build.rs panics in CI unless --features zlob is set,
       # but zlob fails to link on any runner due to zig/Darwin symbol issues.
@@ -119,3 +136,7 @@ jobs:
         # comprehensive_cli_tests.rs spawns cargo run for chat/LLM commands
         # which require external API credentials not present in CI.
         run: unset CI && cargo test --workspace -- --skip test_chat_command
+
+      - name: sccache stats
+        if: always()
+        run: /home/alex/.local/bin/sccache --show-stats

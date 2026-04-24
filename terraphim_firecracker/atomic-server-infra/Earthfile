@@ -161,6 +161,21 @@ rust-ci-docker-image:
         && rustup component add clippy rustfmt
     ENV PATH="/root/.cargo/bin:$PATH"
     ENV CARGO_HOME="/root/.cargo"
+    # Install sccache and point it at the SeaweedFS S3 cache on fcbr0.
+    # See .docs/adr-rust-build-cache-seaweedfs.md. Endpoint 172.26.0.1:8333
+    # is reachable from every Firecracker guest via the TAP bridge.
+    RUN curl -fsSL https://github.com/mozilla/sccache/releases/download/v0.8.2/sccache-v0.8.2-x86_64-unknown-linux-musl.tar.gz \
+        | tar xz -C /tmp \
+        && mv /tmp/sccache-v0.8.2-x86_64-unknown-linux-musl/sccache /usr/local/bin/sccache \
+        && chmod +x /usr/local/bin/sccache
+    ENV RUSTC_WRAPPER=/usr/local/bin/sccache
+    ENV SCCACHE_BUCKET=rust-cache
+    ENV SCCACHE_ENDPOINT=http://172.26.0.1:8333
+    ENV SCCACHE_S3_USE_SSL=false
+    ENV SCCACHE_REGION=us-east-1
+    ENV SCCACHE_S3_KEY_PREFIX=terraphim-ai
+    ENV AWS_ACCESS_KEY_ID=any
+    ENV AWS_SECRET_ACCESS_KEY=any
     # Configure SSH for fcctl-web access (key injected at build time via build arg)
     RUN mkdir -p /root/.ssh && chmod 700 /root/.ssh
     ARG SSH_PUBKEY
