@@ -12,6 +12,12 @@ pub struct RobotResponse<T: Serialize> {
     pub success: bool,
     /// Response metadata
     pub meta: ResponseMeta,
+    /// The query string that was searched
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub query: Option<String>,
+    /// The role name used for the search
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub role: Option<String>,
     /// The actual data payload (None on error)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub data: Option<T>,
@@ -26,6 +32,8 @@ impl<T: Serialize> RobotResponse<T> {
         Self {
             success: true,
             meta,
+            query: None,
+            role: None,
             data: Some(data),
             errors: vec![],
         }
@@ -36,9 +44,18 @@ impl<T: Serialize> RobotResponse<T> {
         RobotResponse {
             success: false,
             meta,
+            query: None,
+            role: None,
             data: None,
             errors,
         }
+    }
+
+    /// Attach the originating query and role to the response
+    pub fn with_context(mut self, query: impl Into<String>, role: impl Into<String>) -> Self {
+        self.query = Some(query.into());
+        self.role = Some(role.into());
+        self
     }
 }
 
