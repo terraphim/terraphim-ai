@@ -416,6 +416,46 @@ action:: opencode -m {{ model }} -p "{{ prompt }}"
     }
 
     #[test]
+    fn review_tier_falls_back_to_kimi_when_anthropic_unhealthy() {
+        let dir = tempdir().unwrap();
+        write_rule(
+            dir.path(),
+            "review_tier",
+            "priority:: 60\nsynonyms:: verify, validate, check results, drift detection\n\
+             route:: anthropic, haiku\naction:: claude --model {{ model }} -p \"{{ prompt }}\" --max-turns 30\n\
+             route:: kimi, kimi-for-coding/k2p5\naction:: opencode run -m {{ model }} --format json \"{{ prompt }}\"\n\
+             route:: zai, zai-coding-plan/glm-5-turbo\naction:: opencode run -m {{ model }} --format json \"{{ prompt }}\"\n\
+             route:: openai, openai/gpt-5.4-mini\naction:: opencode run -m {{ model }} --format json \"{{ prompt }}\"\n",
+        );
+
+        let router = KgRouter::load(dir.path()).unwrap();
+        let decision = router
+            .route_agent("verify and validate outputs, check results")
+            .unwrap();
+
+        // Primary: anthropic/haiku when all providers healthy
+        assert_eq!(decision.provider, "anthropic");
+        assert_eq!(decision.model, "haiku");
+
+        // Anthropic unhealthy: kimi/k2p5 selected
+        let healthy = decision
+            .first_healthy_route(&["anthropic".to_string()])
+            .unwrap();
+        assert_eq!(healthy.provider, "kimi");
+        assert_eq!(healthy.model, "kimi-for-coding/k2p5");
+
+        // Anthropic + kimi unhealthy: zai selected
+        let healthy2 = decision
+            .first_healthy_route(&["anthropic".to_string(), "kimi".to_string()])
+            .unwrap();
+        assert_eq!(healthy2.provider, "zai");
+        assert_eq!(healthy2.model, "zai-coding-plan/glm-5-turbo");
+
+        // Four routes: anthropic + kimi + zai + openai
+        assert_eq!(decision.fallback_routes.len(), 4);
+    }
+
+    #[test]
     fn empty_dir_loads_with_zero_rules() {
         let dir = tempdir().unwrap();
         let router = KgRouter::load(dir.path()).unwrap();
