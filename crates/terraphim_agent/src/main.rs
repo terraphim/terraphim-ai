@@ -680,6 +680,10 @@ struct Cli {
 #[derive(Subcommand, Debug)]
 enum Command {
     /// Search documents using the knowledge graph
+    ///
+    /// Robot-mode exit codes:
+    ///   0 SUCCESS, 1 ERROR_GENERAL, 2 ERROR_USAGE, 3 ERROR_INDEX_MISSING,
+    ///   4 ERROR_NOT_FOUND, 5 ERROR_AUTH, 6 ERROR_NETWORK, 7 ERROR_TIMEOUT
     Search {
         /// Primary search query
         query: String,
@@ -693,6 +697,10 @@ enum Command {
         role: Option<String>,
         #[arg(long, default_value_t = 10)]
         limit: usize,
+        /// Exit with code 4 (ERROR_NOT_FOUND) when the search returns zero results.
+        /// By default, an empty result set exits 0 so existing agents are not broken.
+        #[arg(long, default_value_t = false)]
+        fail_on_empty: bool,
     },
     /// Manage roles (list, select)
     Roles {
@@ -1519,6 +1527,7 @@ async fn run_offline_command(
             operator,
             role,
             limit,
+            fail_on_empty,
         } => {
             let (role_name, auto) = service
                 .resolve_or_auto_route(role.as_deref(), &query)

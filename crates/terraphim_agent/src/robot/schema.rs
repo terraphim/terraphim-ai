@@ -190,6 +190,9 @@ impl TokenBudget {
 pub struct RobotError {
     /// Error code (e.g., "E001")
     pub code: String,
+    /// Machine-readable exit code matching the process exit code (F1.2 contract)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub exit_code: Option<u8>,
     /// Human-readable message
     pub message: String,
     /// Additional details
@@ -205,10 +208,17 @@ impl RobotError {
     pub fn new(code: impl Into<String>, message: impl Into<String>) -> Self {
         Self {
             code: code.into(),
+            exit_code: None,
             message: message.into(),
             details: None,
             suggestion: None,
         }
+    }
+
+    /// Attach the numeric exit code from the F1.2 contract
+    pub fn with_exit_code(mut self, exit_code: u8) -> Self {
+        self.exit_code = Some(exit_code);
+        self
     }
 
     /// Add details
@@ -227,7 +237,8 @@ impl RobotError {
 
     /// Unknown command error
     pub fn unknown_command(command: &str, suggestions: &[String]) -> Self {
-        let mut err = Self::new("E001", format!("Unknown command: {}", command));
+        let mut err = Self::new("E001", format!("Unknown command: {}", command))
+            .with_exit_code(super::exit_codes::ExitCode::ErrorUsage.code());
         if !suggestions.is_empty() {
             err = err.with_suggestion(format!("Did you mean: {}?", suggestions.join(", ")));
         }
@@ -237,29 +248,34 @@ impl RobotError {
     /// Invalid argument error
     pub fn invalid_argument(arg: &str, reason: &str) -> Self {
         Self::new("E002", format!("Invalid argument '{}': {}", arg, reason))
+            .with_exit_code(super::exit_codes::ExitCode::ErrorUsage.code())
     }
 
     /// Missing argument error
     pub fn missing_argument(arg: &str) -> Self {
         Self::new("E003", format!("Missing required argument: {}", arg))
             .with_suggestion(format!("Provide the {} argument", arg))
+            .with_exit_code(super::exit_codes::ExitCode::ErrorUsage.code())
     }
 
     /// Index not found error
     pub fn index_not_found(index_name: &str) -> Self {
         Self::new("E004", format!("Index not found: {}", index_name))
             .with_suggestion("Initialize the index first")
+            .with_exit_code(super::exit_codes::ExitCode::ErrorIndexMissing.code())
     }
 
     /// No results error
     pub fn no_results(query: &str) -> Self {
         Self::new("E005", format!("No results found for: {}", query))
             .with_suggestion("Try a broader search query")
+            .with_exit_code(super::exit_codes::ExitCode::ErrorNotFound.code())
     }
 
     /// Network error
     pub fn network_error(message: &str) -> Self {
         Self::new("E006", format!("Network error: {}", message))
+            .with_exit_code(super::exit_codes::ExitCode::ErrorNetwork.code())
     }
 
     /// Timeout error
@@ -268,11 +284,19 @@ impl RobotError {
             "E007",
             format!("Operation '{}' timed out after {}ms", operation, timeout_ms),
         )
+        .with_exit_code(super::exit_codes::ExitCode::ErrorTimeout.code())
     }
 
     /// Parse error
     pub fn parse_error(message: &str) -> Self {
         Self::new("E008", format!("Parse error: {}", message))
+            .with_exit_code(super::exit_codes::ExitCode::ErrorGeneral.code())
+    }
+
+    /// Authentication error
+    pub fn auth_error(message: &str) -> Self {
+        Self::new("E009", format!("Authentication error: {}", message))
+            .with_exit_code(super::exit_codes::ExitCode::ErrorAuth.code())
     }
 }
 
