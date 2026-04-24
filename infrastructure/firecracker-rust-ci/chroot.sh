@@ -77,6 +77,16 @@ curl -fsSL https://github.com/mozilla/sccache/releases/download/v0.8.2/sccache-v
 mv /tmp/sccache-v0.8.2-x86_64-unknown-linux-musl/sccache /usr/local/bin/sccache
 chmod +x /usr/local/bin/sccache
 
+# Install zig 0.16.0 (minisig-verified upstream tarball). Required for the
+# `zlob` feature of fff-core, which is default in terraphim_file_search and
+# terraphim_mcp_server. Without zig, fff-core's build.rs panics under CI.
+ZIG_VERSION=0.16.0
+curl -fsSL "https://ziglang.org/download/${ZIG_VERSION}/zig-x86_64-linux-${ZIG_VERSION}.tar.xz" -o /tmp/zig.tar.xz
+tar -xf /tmp/zig.tar.xz -C /opt
+ln -s /opt/zig-x86_64-linux-${ZIG_VERSION}/zig /usr/local/bin/zig
+rm -f /tmp/zig.tar.xz
+zig version
+
 # Bake sccache + rust env into /etc/environment (read by systemd + ssh).
 # Endpoint is fcbr0 bridge IP, reachable from every VM that fcctl-web spawns
 # on the TAP devices attached to fcbr0. See

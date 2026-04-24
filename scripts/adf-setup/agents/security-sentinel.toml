@@ -1,33 +1,39 @@
 # Security-sentinel agent template
 #
-# Safety-layer agent. Runs security audits (cargo audit, secret scan,
-# unsafe block review) and posts plain verdicts to Gitea issues.
+# Core-layer agent. Comprehensive security posture review:
+# CVE scanning (cargo audit), secret detection, unsafe block review,
+# UBS static analysis, port exposure. Owns all security scanning --
+# the dedicated security-audit-flow agent has been removed.
+# Runs 4 times per day (every 6 hours).
 #
 # Triggered by cron schedule OR human mention. Does NOT trigger
-# merge-coordinator — verdicts are consumed by the cron-driven
+# merge-coordinator -- verdicts are consumed by the cron-driven
 # merge-coordinator on its next evaluation cycle.
 #
 # Subscription-only models only (C1 constraint).
 
 [[agents]]
 name = "security-sentinel"
-layer = "Safety"
+layer = "Core"
+schedule = "0 */6 * * *"
 cli_tool = "/home/alex/.bun/bin/opencode"
 fallback_provider = "/home/alex/.bun/bin/opencode"
 fallback_model = "kimi-for-coding/k2p5"
 persona = "Vigil"
 skill_chain = [
+    "security-audit",
+    "via-negativa-analysis",
     "disciplined-verification",
     "disciplined-validation",
 ]
-max_cpu_seconds = 7200
+max_cpu_seconds = 1200
 max_ticks = 24
 grace_period_secs = 30
-schedule = "0 1 * * *"
 capabilities = [
     "security",
     "vulnerability-scanning",
     "compliance",
+    "static-analysis",
 ]
 project = "terraphim"
 task = '''
@@ -37,68 +43,101 @@ source ~/.profile
 
 Before doing ANY work, check for learnings from previous agent runs:
 
-1. List wiki pages for relevant learnings:
-   gtr wiki-list --owner terraphim --repo terraphim-ai | grep -i "Learning-"
+1. Check terraphim-agent learnings for known security patterns:
+   ~/.cargo/bin/terraphim-agent learn query "security vulnerability CVE unsafe"
 
-2. Read any learning pages matching your current task:
-   gtr wiki-get --owner terraphim --repo terraphim-ai --name "Learning-<relevant>"
-
-3. Check terraphim-agent learnings for known mistakes:
-   ~/.cargo/bin/terraphim-agent learn query "<keywords from your task>"
-
-4. Apply any relevant learnings to avoid repeating past mistakes.
-   If a learning says "don't do X", do NOT do X.
+2. Read any relevant wiki learnings:
+   gtr wiki-list --owner terraphim --repo terraphim-ai | grep -i "Learning-security"
 
 ---
 
-Run security audit on the terraphim-ai project at /home/alex/terraphim-ai:
-1. cd /home/alex/terraphim-ai && cargo audit (check for known CVEs in dependencies)
-2. Review Cargo.lock for outdated dependencies with known vulnerabilities
-3. Scan for hardcoded secrets or API keys: grep -r "sk-" "api_key" "secret" in src/
-4. Check unsafe blocks: grep -rn "unsafe" crates/ and assess necessity
-5. Review recent commits for security-relevant changes: git log --since=24hours --oneline
-6. Also check server exposure: ss -tlnp for unexpected listening ports
-7. Generate a security report
-Prioritize any CVEs or critical vulnerabilities in project dependencies.
+## Security Scan
 
-## MANDATORY: Post verdict to Gitea
-Post your security verdict to the Gitea issue from the mention context.
-- PASS if no critical security issues found
-- FAIL if critical vulnerabilities or issues found
+cd /home/alex/terraphim-ai
 
-Use ISSUE_NUMBER from the mention context that dispatched you:
+### 1. CVE and dependency audit
+cargo audit 2>&1 | tee /tmp/security-sentinel-cargo-audit.txt
 
-/home/alex/go/bin/gitea-robot comment --owner terraphim --repo terraphim-ai --index ISSUE_NUMBER --body 'security-sentinel verdict: PASS/FAIL
+### 2. Secret and credential scan
+grep -rn \
+  --include="*.rs" --include="*.toml" --include="*.json" --include="*.env" \
+  -e "sk-" -e "api_key\s*=" -e "secret\s*=" -e "password\s*=" \
+  crates/ scripts/ terraphim_server/ 2>/dev/null \
+  | grep -v "test\|example\|\.lock\|_test\." \
+  | tee /tmp/security-sentinel-secrets.txt
 
-<your security report>'
+### 3. Unsafe block audit
+grep -rn "unsafe" crates/ \
+  | grep -v "test\|#\[allow\|//.*unsafe" \
+  | tee /tmp/security-sentinel-unsafe.txt
 
-IMPORTANT: Do NOT mention @adf:merge-coordinator or any other agent in your verdict comment. The merge-coordinator evaluates all verdicts on its scheduled cron cycle.
+### 4. UBS static analysis (if available)
+if command -v ubs >/dev/null 2>&1 || [ -f "$HOME/.local/bin/ubs" ]; then
+  UBS_CMD=$(command -v ubs 2>/dev/null || echo "$HOME/.local/bin/ubs")
+  UBS_MAX_DIR_SIZE_MB=0 "$UBS_CMD" . 2>&1 | tail -60 | tee /tmp/security-sentinel-ubs.txt
+else
+  echo "UBS not installed -- skipping AST-based scan" | tee /tmp/security-sentinel-ubs.txt
+fi
+
+### 5. Port exposure
+ss -tlnp 2>/dev/null | tee /tmp/security-sentinel-ports.txt
+
+### 6. Recent security-relevant commits (last 24h)
+git log --since="24 hours ago" --oneline -- "*.rs" "*.toml" | tee /tmp/security-sentinel-commits.txt
 
 ---
 
-## Session Handover -- Write Before Exiting
+## Verdict
 
-Before you finish, write a handover:
+Analyse the scan outputs above. Apply via-negativa-analysis and security-audit skill guidance.
 
-1. Create/update a wiki page with your session summary:
-   gtr wiki-create --owner terraphim --repo terraphim-ai --title "Learning-$(date +%Y%m%d)-security-sentinel-ISSUE_NUMBER" --content "## Session Summary
+Classify findings:
+- P0: exploitable remotely or exposes credentials
+- P1: high severity CVE or unsafe block with unsafe assumption
+- P2: medium CVE or UBS high-confidence finding
+- P3: low severity / informational
 
-   **Agent**: security-sentinel
-   **Issue**: #ISSUE_NUMBER
-   **Outcome**: SUCCESS/FAIL
+## Post verdict to Gitea
 
-   ### What Worked
-   - ...
+If dispatched via @adf:security-sentinel mention:
+gtr comment --owner terraphim --repo terraphim-ai --index ISSUE_NUMBER \
+  --body "security-sentinel verdict: PASS/FAIL
 
-   ### What Failed (avoid next time)
-   - ...
+<structured findings by priority>
+"
 
-   ### Key Decisions
-   - ...
-   " --message "Session learning from security-sentinel"
+If running on cron schedule and P0 or P1 findings exist:
+EXISTING=$(gtr list-issues --owner terraphim --repo terraphim-ai --state open 2>/dev/null \
+  | python3 -c 'import sys,json; d=json.load(sys.stdin); [print(i["number"]) for i in d if "Theme-ID: security-finding" in i.get("body","")]' | head -1)
+if [ -n "$EXISTING" ]; then
+  gtr comment --owner terraphim --repo terraphim-ai --index "$EXISTING" \
+    --body "Recurrence $(date -u +%Y-%m-%dT%H:%M:%SZ): <summary>"
+else
+  gtr create-issue --owner terraphim --repo terraphim-ai \
+    --title "[Security] Findings $(date +%Y-%m-%d)" \
+    --body "<findings>
 
-2. If you encountered errors, capture them:
-   ~/.cargo/bin/terraphim-agent learn capture "command that failed" --error "error message" --exit-code 1
+Theme-ID: security-finding
 
-3. IMPORTANT: Do NOT mention @adf: agents in your handover.
+@adf:meta-coordinator please action this finding."
+fi
+
+If cron run and no P0/P1 findings: exit 0 silently.
+
+IMPORTANT: Do NOT mention @adf:merge-coordinator or any other agent in your verdict comment.
+
+---
+
+## Session Handover
+
+gtr wiki-create --owner terraphim --repo terraphim-ai \
+  --title "Learning-$(date +%Y%m%d)-security-sentinel" \
+  --content "## Session Summary
+**Agent**: security-sentinel
+**Outcome**: PASS/FAIL
+### Findings
+- ...
+### What to check next time
+- ..." \
+  --message "Session learning from security-sentinel"
 '''
