@@ -357,6 +357,7 @@ fn budget_aware_config(
         fleet_escalation_owner: None,
         fleet_escalation_repo: None,
         post_merge_gate: None,
+        learning: terraphim_orchestrator::LearningConfig::default(),
     }
 }
 

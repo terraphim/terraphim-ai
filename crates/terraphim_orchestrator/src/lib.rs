@@ -72,8 +72,8 @@ pub use concurrency::{ConcurrencyController, FairnessPolicy, ModeQuotas};
 pub use config::QuickwitConfig;
 pub use config::{
     AgentDefinition, AgentLayer, CompoundReviewConfig, ConcurrencyConfig, GiteaOutputConfig,
-    MentionConfig, NightwatchConfig, OrchestratorConfig, PreCheckStrategy, TrackerConfig,
-    TrackerStates, WebhookConfig, WorkflowConfig,
+    LearningConfig, MentionConfig, NightwatchConfig, OrchestratorConfig, PreCheckStrategy,
+    TrackerConfig, TrackerStates, WebhookConfig, WorkflowConfig,
 };
 pub use cost_tracker::{AgentMetrics, BudgetVerdict, CostSnapshot, CostTracker, ExecutionMetrics};
 pub use dispatcher::{DispatchTask, Dispatcher, DispatcherStats};
@@ -267,6 +267,14 @@ pub struct AgentOrchestrator {
     /// Per-project dedupe set of `(pr_number, head_sha)` already enqueued
     /// for auto-merge so the same revision is never dispatched twice.
     auto_merge_enqueued: pr_poller::AutoMergeDedupeSet,
+    /// Shared learning store. `None` when `learning.enabled = false` or
+    /// when initialisation failed (graceful degradation).
+    learning_store: Option<learning::SharedLearningStore>,
+    /// Learning config snapshot (min_trust, max_tokens, etc.).
+    learning_config: config::LearningConfig,
+    /// Agent name -> learning IDs injected at spawn time, used to record
+    /// outcome feedback at exit.
+    injected_learning_ids: HashMap<String, Vec<String>>,
 }
 
 /// Build the composite restart-state key for an agent definition.
@@ -582,6 +590,8 @@ impl AgentOrchestrator {
         #[cfg(not(test))]
         let restart_state = Self::load_restart_state();
 
+        let learning_config = config.learning.clone();
+
         // MentionCursor loaded lazily on first poll (async)
 
         Ok(Self {
@@ -645,6 +655,9 @@ impl AgentOrchestrator {
                 pr_poller::PR_POLL_MIN_INTERVAL,
             ),
             auto_merge_enqueued: pr_poller::AutoMergeDedupeSet::new(),
+            learning_store: None,
+            learning_config,
+            injected_learning_ids: HashMap::new(),
         })
     }
 
@@ -1235,6 +1248,56 @@ impl AgentOrchestrator {
         )
     }
 
+    fn render_lessons_section(&self, agent_name: &str) -> (String, Vec<String>) {
+        let store = match self.learning_store {
+            Some(ref s) => s,
+            None => return (String::new(), Vec::new()),
+        };
+
+        let learnings = match tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(store.query_relevant(agent_name))
+        }) {
+            Ok(l) => l,
+            Err(e) => {
+                warn!(agent = %agent_name, error = %e, "failed to query learnings");
+                return (String::new(), Vec::new());
+            }
+        };
+
+        if learnings.is_empty() {
+            return (String::new(), Vec::new());
+        }
+
+        let max_entries = self.learning_config.max_entries;
+        let max_tokens = self.learning_config.max_tokens;
+        let truncated: Vec<_> = learnings.into_iter().take(max_entries).collect();
+        let ids: Vec<String> = truncated.iter().map(|l| l.id.clone()).collect();
+
+        let mut section = String::from("## Prior Lessons\n\nLessons learned from previous agent runs. Apply relevant insights:\n\n");
+        for l in &truncated {
+            section.push_str(&format!(
+                "- [{}] {} (trust: {}, verified {}x)\n",
+                l.category, l.summary, l.trust_level, l.effective_count
+            ));
+            if let Some(ref details) = l.details {
+                if let Some(first_line) = details.lines().next() {
+                    section.push_str(&format!("  > {}\n", first_line));
+                }
+            }
+        }
+
+        if section.len() > max_tokens {
+            let mut end = max_tokens;
+            while end > 0 && !section.is_char_boundary(end) {
+                end -= 1;
+            }
+            section.truncate(end);
+            section.push_str("\n... (truncated)\n");
+        }
+
+        (section, ids)
+    }
+
     fn skill_roots(
         configured: Option<&std::path::Path>,
         home_dir: Option<&std::path::Path>,
@@ -1549,6 +1612,21 @@ impl AgentOrchestrator {
                 "injecting skill_chain into prompt"
             );
             format!("{}{}", composed_task, skill_content)
+        };
+
+        // Inject prior lessons from shared learning store
+        let (lessons_section, lesson_ids) = self.render_lessons_section(&def.name);
+        let composed_task = if lessons_section.is_empty() {
+            composed_task
+        } else {
+            info!(
+                agent = %def.name,
+                lessons = lesson_ids.len(),
+                "injecting prior lessons into prompt"
+            );
+            self.injected_learning_ids
+                .insert(def.name.clone(), lesson_ids);
+            format!("{}\n\n{}", composed_task, lessons_section)
         };
 
         // Use stdin only when persona was actually resolved (prompt is enriched)
@@ -4428,6 +4506,24 @@ impl AgentOrchestrator {
             }
         }
 
+        // Archive stale learnings periodically
+        if self.tick_count % self.learning_config.consolidation_ticks == 0 {
+            if let Some(ref store) = self.learning_store {
+                match tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current()
+                        .block_on(store.archive_stale(self.learning_config.archive_days))
+                }) {
+                    Ok(archived) if archived > 0 => {
+                        info!(archived, "archived stale learnings");
+                    }
+                    Err(e) => {
+                        warn!(error = %e, "failed to archive stale learnings");
+                    }
+                    Ok(_) => {}
+                }
+            }
+        }
+
         // 17. Drain the unified dispatch queue. Handlers for ReviewPr,
         // AutoMerge, and PostMergeTestGate are stubs; wiring happens in
         // Steps D, G, and H respectively.
@@ -4756,6 +4852,37 @@ impl AgentOrchestrator {
                 wall_time_secs = record.wall_time_secs,
                 "agent exit classified"
             );
+
+            // Record learning outcome for injected lessons
+            if let Some(ref store) = self.learning_store {
+                if let Some(ids) = self.injected_learning_ids.get(name) {
+                    for id in ids {
+                        let result = match record.exit_class {
+                            ExitClass::Success | ExitClass::EmptySuccess => {
+                                tokio::task::block_in_place(|| {
+                                    tokio::runtime::Handle::current()
+                                        .block_on(store.record_effective(id))
+                                })
+                            }
+                            ExitClass::Timeout
+                            | ExitClass::RateLimit
+                            | ExitClass::ModelError
+                            | ExitClass::CompilationError
+                            | ExitClass::TestFailure
+                            | ExitClass::NetworkError
+                            | ExitClass::ResourceExhaustion
+                            | ExitClass::Crash => tokio::task::block_in_place(|| {
+                                tokio::runtime::Handle::current().block_on(store.record_applied(id))
+                            }),
+                            _ => continue,
+                        };
+                        if let Err(e) = result {
+                            debug!(agent = %name, learning_id = %id, error = %e, "failed to record learning outcome");
+                        }
+                    }
+                }
+                self.injected_learning_ids.remove(name);
+            }
 
             // D-3: Feed exit classification into provider health circuit breaker
             if let Some(ref provider) = def.provider {
@@ -5984,6 +6111,7 @@ mod tests {
             fleet_escalation_owner: None,
             fleet_escalation_repo: None,
             post_merge_gate: None,
+            learning: config::LearningConfig::default(),
         }
     }
 
@@ -6215,6 +6343,7 @@ task = "test"
             fleet_escalation_owner: None,
             fleet_escalation_repo: None,
             post_merge_gate: None,
+            learning: config::LearningConfig::default(),
         }
     }
 
@@ -7051,6 +7180,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             fleet_escalation_owner: None,
             fleet_escalation_repo: None,
             post_merge_gate: None,
+            learning: config::LearningConfig::default(),
         };
         (config, tmp)
     }
@@ -7170,5 +7300,54 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             dump.contains("ADF_PR_TITLE=fix(kg): short synonyms"),
             "ADF_PR_TITLE missing from dump:\n{dump}"
         );
+    }
+
+    #[test]
+    fn test_learning_config_default_disabled() {
+        let cfg = config::LearningConfig::default();
+        assert!(!cfg.enabled);
+        assert_eq!(cfg.min_trust, "L1");
+        assert_eq!(cfg.max_tokens, 1500);
+        assert_eq!(cfg.max_entries, 10);
+        assert_eq!(cfg.archive_days, 30);
+        assert_eq!(cfg.consolidation_ticks, 100);
+    }
+
+    #[test]
+    fn test_render_lessons_section_empty_store() {
+        let config = test_config();
+        let orch = AgentOrchestrator::new(config).unwrap();
+        let (section, ids) = orch.render_lessons_section("sentinel");
+        assert!(section.is_empty());
+        assert!(ids.is_empty());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_render_lessons_section_with_learnings() {
+        let config = test_config();
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        let persistence = learning::InMemoryLearningPersistence::new();
+        let store =
+            learning::SharedLearningStore::new(Box::new(persistence), learning::TrustLevel::L0);
+        store
+            .insert(learning::NewLearning {
+                source_agent: "other-agent".to_string(),
+                category: learning::LearningCategory::Tip,
+                summary: "Always run clippy before committing".to_string(),
+                details: Some("Prevents CI failures from lint warnings".to_string()),
+                applicable_agents: vec![],
+                verify_pattern: None,
+            })
+            .await
+            .unwrap();
+
+        orch.learning_store = Some(store);
+
+        let (section, ids) = orch.render_lessons_section("sentinel");
+        assert!(!section.is_empty(), "expected non-empty section, got empty");
+        assert!(section.contains("Prior Lessons"));
+        assert!(section.contains("Always run clippy before committing"));
+        assert_eq!(ids.len(), 1);
     }
 }
