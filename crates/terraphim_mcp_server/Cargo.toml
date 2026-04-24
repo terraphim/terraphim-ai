@@ -35,6 +35,8 @@ tokio-util = { version = "0.7" }
 axum = { version = "0.8" }
 
 [features]
+# zlob default: see terraphim_file_search/Cargo.toml + .cargo/config.toml.
+default = ["zlob"]
 openrouter = ["terraphim_config/openrouter"]
 zlob = ["fff-search/zlob", "terraphim_file_search/zlob"]
 jmap = ["terraphim_middleware/jmap"]
