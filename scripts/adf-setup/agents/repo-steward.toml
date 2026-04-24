@@ -155,8 +155,8 @@ for theme in $(echo "$THEMES" | python3 -c 'import json,sys; print("\n".join([t[
     continue
   fi
 
-  # Extract theme block for issue body
-  THEME_BLOCK=$(echo "$SYNTHESIS" | awk "/Theme-ID: $theme/{flag=1;print;next} /^Theme:/{flag=0} flag")
+  # Extract theme block for issue body (use -v to avoid regex metacharacter injection)
+  THEME_BLOCK=$(echo "$SYNTHESIS" | awk -v id="Theme-ID: $theme" 'index($0,id){flag=1;print;next} /^Theme:/{flag=0} flag')
 
   # Create issue
   TITLE="[Repo Stewardship][$PANEL] $theme"

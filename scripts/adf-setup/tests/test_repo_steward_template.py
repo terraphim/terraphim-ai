@@ -181,7 +181,7 @@ def test_model_constraints():
     model = agent.get("model", "")
     fallback = agent.get("fallback_model", "")
 
-    banned_prefixes = ["opencode/", "github-copilot/", "minimax/"]
+    banned_prefixes = ["opencode/", "opencode-go/", "github-copilot/", "minimax/"]
     for prefix in banned_prefixes:
         assert not model.startswith(prefix), f"Banned model prefix: {prefix}"
         assert not fallback.startswith(prefix), f"Banned fallback prefix: {prefix}"
