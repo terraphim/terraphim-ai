@@ -31,6 +31,8 @@ exclude = [
     "crates/terraphim_lsp",
     # Infrastructure templates (not a crate)
     "infrastructure/vm-templates",
+    # Rust build cache stack -- docker compose + systemd unit, no Cargo.toml
+    "infrastructure/rust-cache-stack",
     # fcctl-web binary lives in the private firecracker-rust repo (already running on bigbox)
     "infrastructure/fcctl-web",
 ]
