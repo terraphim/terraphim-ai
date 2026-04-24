@@ -116,4 +116,6 @@ jobs:
         run: unset CI && cargo build --workspace
 
       - name: cargo test --workspace
-        run: unset CI && cargo test --workspace
+        # comprehensive_cli_tests.rs spawns cargo run for chat/LLM commands
+        # which require external API credentials not present in CI.
+        run: unset CI && cargo test --workspace -- --skip test_chat_command
