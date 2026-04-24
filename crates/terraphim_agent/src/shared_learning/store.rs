@@ -7,7 +7,7 @@ use std::collections::HashMap;
 
 use chrono::Utc;
 use tokio::sync::RwLock;
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 use crate::shared_learning::markdown_store::{
     MarkdownLearningStore, MarkdownStoreConfig, MarkdownStoreError,
@@ -725,7 +725,9 @@ impl terraphim_types::shared_learning::LearningStore for SharedLearningStore {
         }
         drop(index);
         for (id, agent) in &stale {
-            let _ = block_on(self.backend.delete(agent, id));
+            if let Err(e) = block_on(self.backend.delete(agent, id)) {
+                warn!("Failed to delete markdown for stale learning {}: {e}", id);
+            }
         }
         let removed = before - stale.len();
         Ok(removed)
