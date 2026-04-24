@@ -13,6 +13,7 @@ pub mod output;
 #[allow(dead_code)]
 pub mod schema;
 
+#[allow(unused_imports)]
 pub use budget::{BudgetEngine, BudgetError, BudgetedResults};
 #[allow(unused_imports)]
 pub use docs::{ArgumentDoc, Capabilities, CommandDoc, ExampleDoc, FlagDoc, SelfDocumentation};
