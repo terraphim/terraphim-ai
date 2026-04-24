@@ -1,3 +1,8 @@
+//! Workflow execution endpoints and shared workflow state.
+//!
+//! This module exposes the request and response types used by the workflow
+//! HTTP handlers together with the in-memory session store and router factory.
+
 use axum::{
     Router,
     extract::{Path, State},
@@ -21,7 +26,7 @@ pub mod routing;
 pub mod vm_execution;
 pub mod websocket;
 
-// LLM configuration for workflow execution
+/// LLM configuration used by workflow execution steps.
 #[derive(Debug, Deserialize, Clone)]
 pub struct LlmConfig {
     pub llm_provider: Option<String>,
@@ -41,7 +46,7 @@ impl Default for LlmConfig {
     }
 }
 
-// Step configuration for per-step customization
+/// Per-step workflow configuration.
 #[derive(Debug, Deserialize, Clone)]
 pub struct StepConfig {
     pub id: String,
@@ -52,7 +57,7 @@ pub struct StepConfig {
     pub llm_config: Option<LlmConfig>,
 }
 
-// Workflow execution request/response types
+/// Request payload for workflow execution.
 #[derive(Debug, Deserialize)]
 pub struct WorkflowRequest {
     pub prompt: String,
@@ -63,6 +68,7 @@ pub struct WorkflowRequest {
     pub steps: Option<Vec<StepConfig>>, // Per-step configuration
 }
 
+/// Response returned by workflow execution endpoints.
 #[derive(Debug, Serialize)]
 pub struct WorkflowResponse {
     pub workflow_id: String,
@@ -72,6 +78,7 @@ pub struct WorkflowResponse {
     pub metadata: WorkflowMetadata,
 }
 
+/// Metadata returned alongside workflow execution results.
 #[derive(Debug, Serialize)]
 pub struct WorkflowMetadata {
     pub execution_time_ms: u64,
@@ -81,7 +88,7 @@ pub struct WorkflowMetadata {
     pub overall_role: String,
 }
 
-// Workflow status types
+/// Current status for a workflow session.
 #[derive(Debug, Clone, Serialize)]
 pub struct WorkflowStatus {
     pub id: String,
@@ -94,6 +101,7 @@ pub struct WorkflowStatus {
     pub error: Option<String>,
 }
 
+/// Lifecycle state for a workflow session.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecutionStatus {
@@ -104,7 +112,7 @@ pub enum ExecutionStatus {
     Cancelled,
 }
 
-// WebSocket message types
+/// Broadcast message sent to WebSocket subscribers.
 #[derive(Debug, Clone, Serialize)]
 pub struct WebSocketMessage {
     pub message_type: String,
@@ -114,10 +122,12 @@ pub struct WebSocketMessage {
     pub timestamp: chrono::DateTime<chrono::Utc>,
 }
 
-// Workflow session management
+/// In-memory workflow sessions keyed by workflow identifier.
 pub type WorkflowSessions = RwLock<HashMap<String, WorkflowStatus>>;
+/// Broadcast channel for workflow WebSocket messages.
 pub type WebSocketBroadcaster = broadcast::Sender<WebSocketMessage>;
 
+/// Build the workflow router and mount all workflow endpoints.
 pub fn create_router() -> Router<AppState> {
     Router::new()
         // Workflow execution endpoints
@@ -197,11 +207,12 @@ async fn list_workflows(State(state): State<AppState>) -> Json<Vec<WorkflowStatu
     Json(workflows)
 }
 
-// Utility functions
+/// Generate a unique workflow identifier.
 pub fn generate_workflow_id() -> String {
     format!("workflow_{}", Uuid::new_v4())
 }
 
+/// Update a workflow session and broadcast the new state.
 pub async fn update_workflow_status(
     sessions: &WorkflowSessions,
     broadcaster: &WebSocketBroadcaster,

@@ -136,6 +136,7 @@ fn create_document_description(content: &str) -> Option<String> {
 mod api;
 mod error;
 
+/// Workflow routing and execution support for the server.
 pub mod workflows;
 
 pub use api::{
@@ -174,14 +175,18 @@ mod assets {
 #[cfg(not(feature = "embedded-assets"))]
 use assets::Asset as Assets;
 
-// Extended application state that includes workflow management
+/// Shared application state injected into HTTP handlers.
 #[derive(Clone)]
 pub struct AppState {
+    /// Loaded Terraphim configuration and runtime state.
     pub config_state: ConfigState,
+    /// Active workflow sessions keyed by workflow identifier.
     pub workflow_sessions: Arc<workflows::WorkflowSessions>,
+    /// Broadcast channel used to notify WebSocket clients.
     pub websocket_broadcaster: workflows::WebSocketBroadcaster,
 }
 
+/// Start the Axum server on the provided socket address.
 pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigState) -> Result<()> {
     log::info!("Starting axum server");
 
@@ -647,6 +652,7 @@ async fn not_found() -> Response {
     (StatusCode::NOT_FOUND, "404").into_response()
 }
 
+/// Build a router with in-memory state for integration tests.
 pub async fn build_router_for_tests() -> Router {
     use terraphim_config::ConfigBuilder;
 

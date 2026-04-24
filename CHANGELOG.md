@@ -19,12 +19,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Property-based tests** for input validation and edge cases
 - **Integration tests** for multi-component workflows
 
+- Rustdoc for the `terraphim_server` public surface, including `AppState`, server start helpers, workflow state, and API error types.
+- Documentation report artefacts for issue #114.
+- Documentation scan results for `terraphim-session-analyzer` and `terraphim-markdown-parser`, with representative API reference snippets.
+
 ### Fixed
 - **Agent formatting** in RobotResponse chaining for consistent output
 - **Cargo formatting** applied to exit code additions
+- Stabilised the extract validation test runtime and serialised execution to keep the suite deterministic (`03f9cf94`).
+- Excluded `terraphim_tinyclaw` from workspace builds to avoid the `rustls-webpki` advisory (`fd703068`).
 
 ### Changed
 - **REPL output handling** improved with ForgivingParser for better error recovery
+- Added manifest types and TOML loading for codebase evaluation (`1e32d894`).
 
 ## [1.14.0] - 2026-03-22
 
