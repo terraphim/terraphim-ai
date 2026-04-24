@@ -1354,8 +1354,7 @@ fn main() -> Result<()> {
             #[cfg(feature = "server")]
             {
                 if cli.server {
-                    let result =
-                        rt.block_on(run_server_command(command, &cli.server_url, output));
+                    let result = rt.block_on(run_server_command(command, &cli.server_url, output));
                     if let Err(ref e) = result {
                         let code = classify_error(e);
                         eprintln!("Error: {:#}", e);
@@ -1747,9 +1746,7 @@ async fn run_offline_command(
                 }
             }
             if fail_on_empty && result_count == 0 {
-                std::process::exit(
-                    robot::exit_codes::ExitCode::ErrorNotFound.code().into(),
-                );
+                std::process::exit(robot::exit_codes::ExitCode::ErrorNotFound.code().into());
             }
             Ok(())
         }
@@ -3678,9 +3675,7 @@ async fn run_server_command(
                 }
             }
             if fail_on_empty && res_count == 0 {
-                std::process::exit(
-                    robot::exit_codes::ExitCode::ErrorNotFound.code().into(),
-                );
+                std::process::exit(robot::exit_codes::ExitCode::ErrorNotFound.code().into());
             }
             Ok(())
         }
