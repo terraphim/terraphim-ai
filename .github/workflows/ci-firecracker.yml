@@ -97,7 +97,10 @@ jobs:
 
   rust-build:
     name: Rust build + test
-    runs-on: [self-hosted]
+    # Must run on bigbox: sccache binary lives at /home/alex/.local/bin and the
+    # SeaweedFS S3 cache is bound to fcbr0 (172.26.0.1:8333), reachable only
+    # from this host. Mac runners would fail on both counts.
+    runs-on: [self-hosted, bigbox]
     timeout-minutes: 45
     # Route all rustc invocations through sccache backed by SeaweedFS S3 on
     # fcbr0. See .docs/adr-rust-build-cache-seaweedfs.md. Env is applied to
