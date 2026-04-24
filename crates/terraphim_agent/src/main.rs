@@ -1267,11 +1267,110 @@ fn classify_error(err: &anyhow::Error) -> robot::exit_codes::ExitCode {
         || (msg.contains("not found") && msg.contains("index"))
         || msg.contains("knowledge graph not configured")
         || msg.contains("no local knowledge graph")
-        || (msg.contains("thesaurus") && (msg.contains("not found") || msg.contains("failed to load")))
+        || (msg.contains("thesaurus")
+            && (msg.contains("not found") || msg.contains("failed to load")))
     {
         ExitCode::ErrorIndexMissing
     } else {
         ExitCode::ErrorGeneral
+    }
+}
+
+#[cfg(test)]
+mod classify_error_tests {
+    use super::*;
+    use robot::exit_codes::ExitCode;
+
+    fn err(msg: &str) -> anyhow::Error {
+        anyhow::anyhow!("{}", msg)
+    }
+
+    #[test]
+    fn general_error_maps_to_1() {
+        assert_eq!(
+            classify_error(&err("something unexpected happened")),
+            ExitCode::ErrorGeneral
+        );
+    }
+
+    #[test]
+    fn index_missing_patterns_map_to_3() {
+        assert_eq!(
+            classify_error(&err("index not found on disk")),
+            ExitCode::ErrorIndexMissing
+        );
+        assert_eq!(
+            classify_error(&err("index missing")),
+            ExitCode::ErrorIndexMissing
+        );
+        assert_eq!(
+            classify_error(&err("automata index not initialised")),
+            ExitCode::ErrorIndexMissing
+        );
+        assert_eq!(
+            classify_error(&err("Config error: knowledge graph not configured")),
+            ExitCode::ErrorIndexMissing
+        );
+        assert_eq!(
+            classify_error(&err("no local knowledge graph path available")),
+            ExitCode::ErrorIndexMissing
+        );
+        assert_eq!(
+            classify_error(&err("thesaurus not found at path")),
+            ExitCode::ErrorIndexMissing
+        );
+    }
+
+    #[test]
+    fn auth_patterns_map_to_5() {
+        assert_eq!(
+            classify_error(&err("authentication required")),
+            ExitCode::ErrorAuth
+        );
+        assert_eq!(
+            classify_error(&err("request forbidden: 403")),
+            ExitCode::ErrorAuth
+        );
+        assert_eq!(
+            classify_error(&err("401 Unauthorised")),
+            ExitCode::ErrorAuth
+        );
+        assert_eq!(
+            classify_error(&err("server returned 403 Forbidden")),
+            ExitCode::ErrorAuth
+        );
+    }
+
+    #[test]
+    fn timeout_patterns_map_to_7() {
+        assert_eq!(
+            classify_error(&err("operation timed out")),
+            ExitCode::ErrorTimeout
+        );
+        assert_eq!(
+            classify_error(&err("deadline elapsed waiting for response")),
+            ExitCode::ErrorTimeout
+        );
+        assert_eq!(
+            classify_error(&err("request timeout after 30s")),
+            ExitCode::ErrorTimeout
+        );
+    }
+
+    #[test]
+    fn network_patterns_map_to_6() {
+        assert_eq!(
+            classify_error(&err("connection refused on port 8080")),
+            ExitCode::ErrorNetwork
+        );
+        assert_eq!(
+            classify_error(&err("dns resolution failed")),
+            ExitCode::ErrorNetwork
+        );
+        assert_eq!(
+            classify_error(&err("network error connecting to host")),
+            ExitCode::ErrorNetwork
+        );
     }
 }
 

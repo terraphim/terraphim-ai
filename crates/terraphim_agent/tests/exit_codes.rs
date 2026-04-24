@@ -28,6 +28,26 @@ fn search_missing_query_arg_exits_2() {
 }
 
 // ---------------------------------------------------------------------------
+// Exit code 1 — ERROR_GENERAL (unspecified error, no matching pattern)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn bad_config_file_exits_1() {
+    // A nonexistent config file produces a "Failed to load config" error which
+    // does not match any specific exit-code pattern, so classify_error returns
+    // ErrorGeneral (1).
+    cmd()
+        .args([
+            "--config",
+            "/tmp/nonexistent_f1_2_exit_code_test.json",
+            "search",
+            "terraphim",
+        ])
+        .assert()
+        .code(1);
+}
+
+// ---------------------------------------------------------------------------
 // Exit code 0 — successful offline search (may return 0 results but succeeds)
 // ---------------------------------------------------------------------------
 
@@ -37,6 +57,21 @@ fn search_succeeds_exits_0() {
         .args(["search", "terraphim", "--role", "Terraphim Engineer"])
         .assert()
         .code(0);
+}
+
+// ---------------------------------------------------------------------------
+// Exit code 3 — index missing (knowledge graph not configured)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn validate_with_no_kg_exits_3() {
+    // The default offline configuration has no knowledge graph configured for
+    // the validate command.  classify_error maps "Knowledge graph not configured"
+    // to ErrorIndexMissing (3).
+    cmd()
+        .args(["validate", "xyzzy_f1_2_exit_code_test_sentinel"])
+        .assert()
+        .code(3);
 }
 
 // ---------------------------------------------------------------------------
@@ -98,9 +133,11 @@ fn unreachable_server_exits_6() {
 }
 
 // ---------------------------------------------------------------------------
-// Exit code mapping table verified by unit tests in src/robot/exit_codes.rs
-// (codes 1, 3, 5, 7 are exercised there; integration paths for those require
-// live services or specific filesystem state and are tested separately)
+// Exit codes 5 (ERROR_AUTH) and 7 (ERROR_TIMEOUT) are exercised by the
+// classify_error unit tests in src/main.rs.  Their binary-level integration
+// paths require either a live authenticating server (5) or a controllable
+// slow endpoint (7) and are therefore omitted here to keep the suite
+// self-contained and offline.
 // ---------------------------------------------------------------------------
 
 #[test]
