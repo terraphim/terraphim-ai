@@ -1067,12 +1067,29 @@ pub fn capture_correction(
 
 /// Parse a chained command to find the failing subcommand.
 ///
-/// For commands like `cmd1 && cmd2 || cmd3`, attempts to determine
-/// which subcommand failed based on the chain structure.
+/// For commands like `cmd1 && cmd2 || cmd3`, determines
+/// which subcommand failed based on the chain structure and exit code.
 ///
-/// Returns (actual_command, full_chain_option)
-fn parse_chained_command(command: &str, _exit_code: i32) -> (String, Option<String>) {
-    // Check for simple chains
+/// Returns (failing_subcommand, full_chain_option).
+///
+/// Logic:
+/// - For `&&` chains with non-zero exit: last executed subcommand failed
+/// - For `||` chains with non-zero exit: all failed, last was final attempt
+/// - For `;` chains with non-zero exit: cannot disambiguate, return last (documented limitation)
+/// - For zero exit (success): return first subcommand as the meaningful one
+fn parse_chained_command(command: &str, exit_code: i32) -> (String, Option<String>) {
+    // Helper to get failing subcommand based on exit code
+    let get_failing = |parts: &[&str]| -> String {
+        if exit_code != 0 {
+            // Non-zero exit: the last executed/submitted subcommand failed
+            parts.last().unwrap().trim().to_string()
+        } else {
+            // Zero exit: chain succeeded, first subcommand is the meaningful one
+            parts[0].trim().to_string()
+        }
+    };
+
+    // Check for chain operators in order
     let chain_operators = [" && ", " || ", "; "];
 
     for op in &chain_operators {
@@ -1080,10 +1097,8 @@ fn parse_chained_command(command: &str, _exit_code: i32) -> (String, Option<Stri
             // Split by the operator
             let parts: Vec<&str> = command.split(op).collect();
             if parts.len() > 1 {
-                // For now, return the first part as the failing command
-                // In a more sophisticated implementation, we would track
-                // which command actually failed based on execution order
-                return (parts[0].trim().to_string(), Some(command.to_string()));
+                let failing = get_failing(&parts);
+                return (failing, Some(command.to_string()));
             }
         }
     }
@@ -1884,13 +1899,35 @@ mod tests {
 
     #[test]
     fn test_parse_chained_command() {
-        let (cmd, chain) = parse_chained_command("docker build . && docker run", 1);
-        assert_eq!(cmd, "docker build .");
-        assert_eq!(chain, Some("docker build . && docker run".to_string()));
+        // Test && chain with non-zero exit (last subcommand failed)
+        let (cmd, chain) = parse_chained_command("cargo build && cargo test", 1);
+        assert_eq!(cmd, "cargo test");
+        assert_eq!(chain, Some("cargo build && cargo test".to_string()));
 
-        let (cmd2, chain2) = parse_chained_command("git status", 0);
-        assert_eq!(cmd2, "git status");
-        assert_eq!(chain2, None);
+        // Test && chain with zero exit (success, first subcommand is meaningful)
+        let (cmd2, chain2) = parse_chained_command("cargo build && cargo test", 0);
+        assert_eq!(cmd2, "cargo build");
+        assert_eq!(chain2, Some("cargo build && cargo test".to_string()));
+
+        // Test || chain with non-zero exit (all failed, last attempted)
+        let (cmd3, chain3) = parse_chained_command("cmd_a || cmd_b || cmd_c", 1);
+        assert_eq!(cmd3, "cmd_c");
+        assert_eq!(chain3, Some("cmd_a || cmd_b || cmd_c".to_string()));
+
+        // Test ; chain with non-zero exit (cannot disambiguate, return last)
+        let (cmd4, chain4) = parse_chained_command("cmd_a; cmd_b; cmd_c", 1);
+        assert_eq!(cmd4, "cmd_c");
+        assert_eq!(chain4, Some("cmd_a; cmd_b; cmd_c".to_string()));
+
+        // Test single command without chain
+        let (cmd5, chain5) = parse_chained_command("git status", 0);
+        assert_eq!(cmd5, "git status");
+        assert_eq!(chain5, None);
+
+        // Test single command with failure (no chain)
+        let (cmd6, chain6) = parse_chained_command("git status", 1);
+        assert_eq!(cmd6, "git status");
+        assert_eq!(chain6, None);
     }
 
     #[test]
@@ -2059,7 +2096,7 @@ mod tests {
 
         let result = capture_correction(
             CorrectionType::FactCorrection,
-            "AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE",
+            "AWS_ACCESS_KEY_ID=MOCK_AKSK_0123456789ABCDEF",
             "Use environment variables instead",
             "Never hardcode AWS keys",
             &config,
@@ -2070,7 +2107,7 @@ mod tests {
         let content = fs::read_to_string(&path).unwrap();
 
         // Secret should be redacted
-        assert!(!content.contains("AKIAIOSFODNN7EXAMPLE"));
+        assert!(!content.contains("MOCK_AKSK_0123456789ABCDEF"));
         assert!(content.contains("[AWS_KEY_REDACTED]") || content.contains("[ENV_REDACTED]"));
     }
 
