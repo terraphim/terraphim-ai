@@ -1639,8 +1639,8 @@ async fn run_offline_command(
 
                 let meta =
                     ResponseMeta::new("search").with_elapsed(start.elapsed().as_millis() as u64);
-                let response = RobotResponse::success(data, meta)
-                    .with_context(&query, role_name.as_str());
+                let response =
+                    RobotResponse::success(data, meta).with_context(&query, role_name.as_str());
                 let output_str = formatter.format(&response)?;
                 println!("{}", output_str);
             } else {
@@ -3564,8 +3564,7 @@ async fn run_server_command(
                     .as_ref()
                     .map(|r| r.as_str().to_owned())
                     .unwrap_or_default();
-                let response = RobotResponse::success(data, meta)
-                    .with_context(&query, &role_str);
+                let response = RobotResponse::success(data, meta).with_context(&query, &role_str);
                 let output_str = formatter.format(&response)?;
                 println!("{}", output_str);
             } else {
