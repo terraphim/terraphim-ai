@@ -652,7 +652,20 @@ fn print_json_output<T: Serialize>(value: &T, mode: CommandOutputMode) -> Result
 #[command(
     name = "terraphim-agent",
     version,
-    about = "Terraphim Agent: server-backed fullscreen TUI with offline-capable REPL and CLI commands"
+    about = "Terraphim Agent: server-backed fullscreen TUI with offline-capable REPL and CLI commands",
+    after_long_help = "EXIT CODES (F1.2 contract — stable for orchestrator use)\n\
+        \n\
+        \x20 0  SUCCESS           Operation completed successfully\n\
+        \x20 1  ERROR_GENERAL     Unspecified or unexpected error\n\
+        \x20 2  ERROR_USAGE       Invalid arguments or unknown command\n\
+        \x20 3  ERROR_INDEX_MISSING  Required index not initialised on disk\n\
+        \x20 4  ERROR_NOT_FOUND   No results (only when --fail-on-empty is set)\n\
+        \x20 5  ERROR_AUTH        Authentication required or failed\n\
+        \x20 6  ERROR_NETWORK     Transport-level network error\n\
+        \x20 7  ERROR_TIMEOUT     Operation exceeded configured timeout\n\
+        \n\
+        By default an empty result set exits 0; pass --fail-on-empty to the search\n\
+        subcommand to receive code 4 instead."
 )]
 struct Cli {
     /// Use server API mode instead of self-contained offline mode
