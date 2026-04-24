@@ -29,6 +29,9 @@ pub use terraphim_types::shared_learning::SuggestionStatus;
 pub use types::{LearningSource as SharedLearningSource, SharedLearning, TrustLevel};
 pub use wiki_sync::{GiteaWikiClient, WikiSyncError};
 
+#[cfg(feature = "shared-learning")]
+pub use terraphim_types::shared_learning::LearningStore;
+
 #[cfg(feature = "cross-agent-injection")]
 pub mod injector;
 #[cfg(feature = "cross-agent-injection")]

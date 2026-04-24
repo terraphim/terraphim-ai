@@ -3292,6 +3292,11 @@ async fn run_shared_learning_command(
                         "Cannot promote to L1 -- learnings start at L1. Use l2 or l3."
                     ));
                 }
+                TrustLevel::L0 => {
+                    return Err(anyhow::anyhow!(
+                        "Cannot promote to L0 -- L0 is for extracted learnings only."
+                    ));
+                }
             }
             Ok(())
         }
