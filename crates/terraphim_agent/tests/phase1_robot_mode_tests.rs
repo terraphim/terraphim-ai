@@ -2,6 +2,7 @@ use terraphim_agent::forgiving::{AliasRegistry, ForgivingParser};
 use terraphim_agent::robot::{
     ExitCode, FieldMode, OutputFormat, ResponseMeta, RobotConfig, RobotFormatter, RobotResponse,
 };
+use terraphim_agent::{detect_wildcard_fallback, extract_concepts_from_results};
 
 #[test]
 fn test_parser_to_robot_formatter_pipeline() {
@@ -145,4 +146,91 @@ fn test_truncation_with_budget() {
     let (truncated, was_truncated) = formatter.truncate_content(&long_content);
     assert!(was_truncated);
     assert!(truncated.len() <= 53);
+}
+
+#[test]
+fn concepts_matched_populated_when_documents_have_tags() {
+    let docs = vec![
+        terraphim_types::Document {
+            id: "doc1".to_string(),
+            url: "http://example.com/1".to_string(),
+            title: "Rust async programming".to_string(),
+            body: String::new(),
+            description: None,
+            summarization: None,
+            stub: None,
+            tags: Some(vec!["rust".to_string(), "async".to_string()]),
+            rank: Some(1),
+            source_haystack: None,
+            doc_type: terraphim_types::DocumentType::default(),
+            synonyms: None,
+            route: None,
+            priority: None,
+        },
+        terraphim_types::Document {
+            id: "doc2".to_string(),
+            url: "http://example.com/2".to_string(),
+            title: "Tokio runtime".to_string(),
+            body: String::new(),
+            description: None,
+            summarization: None,
+            stub: None,
+            tags: Some(vec!["tokio".to_string(), "async".to_string()]),
+            rank: Some(2),
+            source_haystack: None,
+            doc_type: terraphim_types::DocumentType::default(),
+            synonyms: None,
+            route: None,
+            priority: None,
+        },
+    ];
+
+    let concepts = extract_concepts_from_results(&docs);
+    assert!(
+        !concepts.is_empty(),
+        "concepts_matched should be populated from document tags"
+    );
+    assert!(concepts.contains(&"async".to_string()));
+    assert!(concepts.contains(&"rust".to_string()));
+    assert!(concepts.contains(&"tokio".to_string()));
+    // Results are sorted and deduplicated
+    assert_eq!(concepts, vec!["async", "rust", "tokio"]);
+
+    let fallback = detect_wildcard_fallback(&concepts, docs.len());
+    assert!(
+        !fallback,
+        "wildcard_fallback should be false when concepts are matched"
+    );
+}
+
+#[test]
+fn wildcard_fallback_true_when_results_have_no_concept_tags() {
+    let docs = vec![terraphim_types::Document {
+        id: "doc1".to_string(),
+        url: "http://example.com/1".to_string(),
+        title: "Some document".to_string(),
+        body: "body text".to_string(),
+        description: None,
+        summarization: None,
+        stub: None,
+        tags: None,
+        rank: Some(1),
+        source_haystack: None,
+        doc_type: terraphim_types::DocumentType::default(),
+        synonyms: None,
+        route: None,
+        priority: None,
+    }];
+
+    let concepts = extract_concepts_from_results(&docs);
+    assert!(
+        concepts.is_empty(),
+        "no tags on docs means no concepts extracted"
+    );
+
+    let fallback = detect_wildcard_fallback(&concepts, docs.len());
+    assert!(
+        fallback,
+        "wildcard_fallback should be true: results returned but no concept metadata"
+    );
 }
