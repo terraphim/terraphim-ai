@@ -8179,6 +8179,7 @@ version = "1.16.37"
 dependencies = [
  "ahash",
  "anyhow",
+ "assert_cmd",
  "async-trait",
  "chrono",
  "clap",

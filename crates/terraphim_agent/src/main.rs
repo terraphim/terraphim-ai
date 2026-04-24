@@ -1201,6 +1201,64 @@ enum SessionsSub {
     Stats,
 }
 
+/// Classify an anyhow error to the appropriate F1.2 exit code.
+///
+/// Checks the error chain for known types first, then falls back to
+/// message-pattern heuristics. Maps at the `main` boundary only so
+/// library types remain unaware of exit codes.
+fn classify_error(err: &anyhow::Error) -> robot::exit_codes::ExitCode {
+    use robot::exit_codes::ExitCode;
+
+    // Check for tokio elapsed (timeout)
+    if err.chain().any(|e| e.is::<tokio::time::error::Elapsed>()) {
+        return ExitCode::ErrorTimeout;
+    }
+
+    // Check for reqwest errors (network)
+    #[cfg(feature = "server")]
+    if err.chain().any(|e| e.is::<reqwest::Error>()) {
+        let is_timeout = err
+            .chain()
+            .filter_map(|e| e.downcast_ref::<reqwest::Error>())
+            .any(|re| re.is_timeout());
+        if is_timeout {
+            return ExitCode::ErrorTimeout;
+        }
+        return ExitCode::ErrorNetwork;
+    }
+
+    // Fall back to message-pattern heuristics
+    let msg = err.to_string().to_lowercase();
+
+    if msg.contains("timed out") || msg.contains("timeout") || msg.contains("elapsed") {
+        ExitCode::ErrorTimeout
+    } else if msg.contains("connection refused")
+        || msg.contains("connection reset")
+        || msg.contains("network")
+        || msg.contains("dns")
+        || msg.contains("transport")
+        || msg.contains("connect error")
+    {
+        ExitCode::ErrorNetwork
+    } else if msg.contains("unauthori")
+        || msg.contains("forbidden")
+        || msg.contains("auth")
+        || msg.contains("401")
+        || msg.contains("403")
+    {
+        ExitCode::ErrorAuth
+    } else if msg.contains("index not found")
+        || msg.contains("index missing")
+        || msg.contains("not initialised")
+        || msg.contains("not initialized")
+        || (msg.contains("not found") && msg.contains("index"))
+    {
+        ExitCode::ErrorIndexMissing
+    } else {
+        ExitCode::ErrorGeneral
+    }
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
     let output = resolve_output_config(cli.robot, cli.format.clone());
@@ -1296,10 +1354,23 @@ fn main() -> Result<()> {
             #[cfg(feature = "server")]
             {
                 if cli.server {
-                    return rt.block_on(run_server_command(command, &cli.server_url, output));
+                    let result =
+                        rt.block_on(run_server_command(command, &cli.server_url, output));
+                    if let Err(ref e) = result {
+                        let code = classify_error(e);
+                        eprintln!("Error: {:#}", e);
+                        std::process::exit(code.code().into());
+                    }
+                    return result;
                 }
             }
-            rt.block_on(run_offline_command(command, output, cli.config))
+            let result = rt.block_on(run_offline_command(command, output, cli.config));
+            if let Err(ref e) = result {
+                let code = classify_error(e);
+                eprintln!("Error: {:#}", e);
+                std::process::exit(code.code().into());
+            }
+            result
         }
     }
 }
@@ -1581,6 +1652,8 @@ async fn run_offline_command(
                     .await?
             };
 
+            let result_count = results.len();
+
             if output.is_machine_readable() {
                 use crate::robot::schema::{SearchResultItem, SearchResultsData};
                 use crate::robot::{ResponseMeta, RobotConfig, RobotFormatter, RobotResponse};
@@ -1672,6 +1745,11 @@ async fn run_offline_command(
                     }
                     println!();
                 }
+            }
+            if fail_on_empty && result_count == 0 {
+                std::process::exit(
+                    robot::exit_codes::ExitCode::ErrorNotFound.code().into(),
+                );
             }
             Ok(())
         }
@@ -3442,6 +3520,7 @@ async fn run_server_command(
             operator,
             role,
             limit,
+            fail_on_empty,
         } => {
             // Get selected role from server if not specified
             let role_name = if let Some(role) = role {
@@ -3483,6 +3562,7 @@ async fn run_server_command(
             };
 
             let res: SearchResponse = api.search(&q).await?;
+            let res_count = res.results.len();
 
             if let Some(ref additional_terms) = q.search_terms {
                 let op_str = match q.operator {
@@ -3596,6 +3676,11 @@ async fn run_server_command(
                     }
                     println!();
                 }
+            }
+            if fail_on_empty && res_count == 0 {
+                std::process::exit(
+                    robot::exit_codes::ExitCode::ErrorNotFound.code().into(),
+                );
             }
             Ok(())
         }
