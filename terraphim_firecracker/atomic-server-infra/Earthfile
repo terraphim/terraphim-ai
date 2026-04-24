@@ -64,9 +64,13 @@ build:
   END
 
 tar2ext4:
-    FROM alpine:3.20
-    RUN apk add --no-cache go git
-    WORKDIR src
+    # Upstream microsoft/hcsshim tracks latest Go (currently requires 1.25+
+    # via `tool` blocks). Use golang:1-alpine (latest stable) plus
+    # GOTOOLCHAIN=auto so Go transparently fetches newer toolchains if needed.
+    FROM golang:1-alpine
+    ENV GOTOOLCHAIN=auto
+    RUN apk add --no-cache git
+    WORKDIR /src
     GIT CLONE https://github.com/microsoft/hcsshim .
     RUN go build ./cmd/tar2ext4
 
@@ -176,13 +180,13 @@ rust-ci-docker-image:
     ENV SCCACHE_S3_KEY_PREFIX=terraphim-ai
     ENV AWS_ACCESS_KEY_ID=any
     ENV AWS_SECRET_ACCESS_KEY=any
-    # Configure SSH for fcctl-web access (key injected at build time via build arg)
+    # Configure SSH for fcctl-web access. SSH pubkey must be provided as a
+    # file `ssh_pubkey.txt` in the build context (alongside this Earthfile).
+    # File-based delivery avoids Earthly's flag parser splitting whitespace
+    # in keys like "ssh-rsa AAAA... root@host" when passed via --SSH_PUBKEY.
     RUN mkdir -p /root/.ssh && chmod 700 /root/.ssh
-    ARG SSH_PUBKEY
-    RUN if [ -n "$SSH_PUBKEY" ]; then \
-        echo "$SSH_PUBKEY" > /root/.ssh/authorized_keys && \
-        chmod 600 /root/.ssh/authorized_keys; \
-    fi
+    COPY ssh_pubkey.txt /root/.ssh/authorized_keys
+    RUN chmod 600 /root/.ssh/authorized_keys
     # Enable SSH daemon
     RUN sed -i 's/#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config && \
         sed -i 's/#PubkeyAuthentication.*/PubkeyAuthentication yes/' /etc/ssh/sshd_config
@@ -192,7 +196,8 @@ rust-ci-docker-image:
 # Convert the Rust CI Docker image to a Firecracker-compatible ext4 rootfs.
 # Output: rust-ci.ext4 (4GB, ready for use as Firecracker rootfs)
 # Usage:
-#   earthly +rust-ci-rootfs --SSH_PUBKEY="$(cat ~/.ssh/id_rsa.pub)"
+#   ssh-keygen -y -f <PRIVATE_KEY> > ssh_pubkey.txt
+#   earthly +rust-ci-rootfs
 # Then add to fcctl-images.yaml:
 #   rust-ci:
 #     path: "./firecracker-ci-artifacts/rust-ci.ext4"
@@ -205,10 +210,9 @@ rust-ci-rootfs:
 
     COPY +tar2ext4/tar2ext4 /usr/bin/tar2ext4
 
-    ARG SSH_PUBKEY
     WORKDIR imgbuild
 
-    WITH DOCKER --load rust-ci:latest=(+rust-ci-docker-image --SSH_PUBKEY=$SSH_PUBKEY)
+    WITH DOCKER --load rust-ci:latest=+rust-ci-docker-image
         RUN docker save rust-ci:latest > image.tar
     END
 
