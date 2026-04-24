@@ -272,3 +272,68 @@ Use ONLY subscription-based models:
 - NEVER stop before pushing - that leaves work stranded locally
 - NEVER say "ready to push when you are" - YOU must push
 - If push fails, resolve and retry until it succeeds
+
+## Agent Issue Creation Convention
+
+Agents MUST follow this pattern when reporting findings. Do NOT post to standing log sinks.
+
+### Rule: new issue per finding, with deduplication
+
+Before creating any issue, check if one already exists for the same pattern:
+
+```bash
+THEME_ID="<agent-specific-slug>-$(date +%Y%m%d)"
+EXISTING=$(gtr list-issues --owner OWNER --repo REPO --state open 2>/dev/null \
+  | python3 -c 'import sys,json; issues=json.load(sys.stdin); [print(str(i["number"])) for i in issues if "Theme-ID: <prefix>" in i.get("body","")]' \
+  | head -1)
+
+if [ -n "$EXISTING" ]; then
+  # Recurrence: comment on the existing issue
+  gtr comment --owner OWNER --repo REPO --index "$EXISTING" \
+    --body "Recurrence $(date -u +%Y-%m-%dT%H:%M:%SZ): $FINDING_DETAILS"
+else
+  # First occurrence: create new issue
+  gtr create-issue --owner OWNER --repo REPO \
+    --title "[Category] Finding title $(date +%Y-%m-%d)" \
+    --body "$FINDING_DETAILS
+
+Theme-ID: $THEME_ID
+
+@adf:follow-up-agent please action this finding."
+fi
+# If nothing found: exit 0 silently - no issue needed
+```
+
+### Theme-ID convention
+
+Every agent-created issue MUST include `Theme-ID: <slug>` in the body. The slug must be:
+- Kebab-case
+- Specific enough not to false-match related-but-different issues
+
+| Agent | Theme-ID prefix | Follow-up agent |
+|---|---|---|
+| security-sentinel | `security-<finding-type>` | `@adf:merge-coordinator` |
+| drift-detector | `config-drift` | `@adf:meta-coordinator` |
+| documentation-generator | `doc-gap` | `@adf:reviewer` |
+| spec-validator | `spec-gap` | `@adf:implementation-swarm` |
+| test-guardian | `test-failure` | `@adf:implementation-swarm` |
+| compliance-watchdog | `compliance-<finding>` | `@adf:merge-coordinator` |
+
+### What NOT to do
+
+```bash
+# WRONG: posting to standing sink
+gtr comment --owner terraphim --repo terraphim-ai --index 113 --body "report..."
+
+# WRONG: creating duplicate issue without dedup check
+gtr create-issue --owner terraphim --repo terraphim-ai --title "Security issue" ...
+
+# WRONG: exiting silently when there is a finding (no issue created)
+echo "Found drift" && exit 0
+```
+
+### When to create issues vs stay silent
+
+- **Finding detected, no open issue for it**: create new issue with Theme-ID
+- **Finding detected, open issue exists**: add recurrence comment
+- **No findings**: exit 0 silently - do NOT create a "all clear" issue
