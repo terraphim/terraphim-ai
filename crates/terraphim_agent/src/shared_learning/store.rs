@@ -649,19 +649,20 @@ impl terraphim_types::shared_learning::LearningStore for SharedLearningStore {
                 if let Ok(graph) = graph_lock.read() {
                     if let Ok(graph_results) = graph.query_graph(context, None, None) {
                         if !graph_results.is_empty() {
-                            let graph_ids: std::collections::HashSet<String> =
-                                graph_results.into_iter().map(|(id, _)| id).collect();
+                            let graph_id_rank: std::collections::HashMap<String, u64> =
+                                graph_results
+                                    .into_iter()
+                                    .map(|(id, doc)| (id, doc.rank))
+                                    .collect();
                             candidates.retain(|l| {
-                                graph_ids.contains(&l.id)
+                                graph_id_rank.contains_key(&l.id)
                                     || l.extract_searchable_text()
                                         .contains(&context.to_lowercase())
                             });
-                            candidates.sort_by_key(|l| {
-                                std::cmp::Reverse(if graph_ids.contains(&l.id) {
-                                    u64::MAX
-                                } else {
-                                    0
-                                })
+                            candidates.sort_by(|a, b| {
+                                let a_rank = graph_id_rank.get(&a.id).copied().unwrap_or(0);
+                                let b_rank = graph_id_rank.get(&b.id).copied().unwrap_or(0);
+                                b_rank.cmp(&a_rank)
                             });
                             candidates.truncate(limit);
                             return Ok(candidates);
@@ -711,12 +712,22 @@ impl terraphim_types::shared_learning::LearningStore for SharedLearningStore {
         let cutoff = chrono::Utc::now() - chrono::Duration::days(max_age_days as i64);
         let mut index = block_on(self.index.write());
         let before = index.len();
-        index.retain(|_, l| {
-            l.trust_level > terraphim_types::shared_learning::TrustLevel::L0
-                || l.updated_at > cutoff
-        });
-        let removed = before - index.len();
+        let stale: Vec<(String, String)> = index
+            .iter()
+            .filter(|(_, l)| {
+                l.trust_level <= terraphim_types::shared_learning::TrustLevel::L0
+                    && l.updated_at <= cutoff
+            })
+            .map(|(id, l)| (id.clone(), l.source_agent.clone()))
+            .collect();
+        for (id, _) in &stale {
+            index.remove(id.as_str());
+        }
         drop(index);
+        for (id, agent) in &stale {
+            let _ = block_on(self.backend.delete(agent, id));
+        }
+        let removed = before - stale.len();
         Ok(removed)
     }
 }
