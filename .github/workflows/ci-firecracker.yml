@@ -24,32 +24,29 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-and-test:
-    name: Rust build + test (Firecracker)
+  vm-infrastructure:
+    name: Firecracker VM lifecycle proof
     # bigbox self-hosted runners co-locate with fcctl-web on 127.0.0.1:8080
     runs-on: [self-hosted]
-    timeout-minutes: 15
+    timeout-minutes: 5
     env:
       FCCTL_URL: http://127.0.0.1:8080
       VM_TYPE: ${{ inputs.vm_type || 'focal-ci' }}
 
     steps:
-      - uses: actions/checkout@v4
-
       - name: Health check fcctl-web
         run: |
-          curl -sf --retry 3 --retry-delay 2 $FCCTL_URL/health \
-            | jq .
+          curl -sf --retry 3 --retry-delay 2 $FCCTL_URL/health
           echo "fcctl-web is healthy"
 
-      - name: Create build VM
+      - name: Create VM
         id: vm
         run: |
           RESPONSE=$(curl -sf -X POST $FCCTL_URL/api/vms \
             -H 'Content-Type: application/json' \
             -d "{\"vm_type\": \"$VM_TYPE\"}")
-          echo "$RESPONSE" | jq .
-          VM_ID=$(echo "$RESPONSE" | jq -r '.id')
+          echo "$RESPONSE"
+          VM_ID=$(echo "$RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
           if [ -z "$VM_ID" ] || [ "$VM_ID" = "null" ]; then
             echo "ERROR: failed to parse vm id from response"
             exit 1
@@ -57,54 +54,63 @@ jobs:
           echo "vm_id=$VM_ID" >> $GITHUB_OUTPUT
           echo "Created VM: $VM_ID"
 
-      - name: cargo fmt --check
+      - name: Wait for VM ready
         run: |
-          curl -sf -X POST $FCCTL_URL/api/llm/execute \
-            -H 'Content-Type: application/json' \
-            -d "{
-              \"code\": \"cd /workspace && cargo fmt -- --check\",
-              \"language\": \"bash\",
-              \"agent_id\": \"ci-fmt-${{ github.run_id }}\",
-              \"timeout_ms\": 60000
-            }" | jq -e '.exit_code == 0'
+          VM_ID="${{ steps.vm.outputs.vm_id }}"
+          for i in $(seq 1 18); do
+            STATUS=$(curl -sf $FCCTL_URL/api/vms/$VM_ID \
+              | python3 -c "import sys,json; print(json.load(sys.stdin).get('status','unknown'))" 2>/dev/null || echo "unknown")
+            echo "  attempt $i: status=$STATUS"
+            if [ "$STATUS" = "running" ]; then
+              echo "VM is running"
+              break
+            fi
+            if [ "$i" = "18" ]; then
+              echo "ERROR: VM did not reach running status within 90 seconds"
+              exit 1
+            fi
+            sleep 5
+          done
 
-      - name: cargo clippy
+      - name: Execute command in VM
         run: |
-          curl -sf -X POST $FCCTL_URL/api/llm/execute \
+          VM_ID="${{ steps.vm.outputs.vm_id }}"
+          RESULT=$(curl -sf -X POST $FCCTL_URL/api/llm/execute \
             -H 'Content-Type: application/json' \
             -d "{
-              \"code\": \"cd /workspace && cargo clippy -- -D warnings\",
+              \"vm_id\": \"$VM_ID\",
+              \"code\": \"echo vm-ok && uname -r && id\",
               \"language\": \"bash\",
-              \"agent_id\": \"ci-clippy-${{ github.run_id }}\",
-              \"timeout_ms\": 120000
-            }" | jq -e '.exit_code == 0'
-
-      - name: cargo build --workspace
-        run: |
-          curl -sf -X POST $FCCTL_URL/api/llm/execute \
-            -H 'Content-Type: application/json' \
-            -d "{
-              \"code\": \"cd /workspace && cargo build --workspace\",
-              \"language\": \"bash\",
-              \"agent_id\": \"ci-build-${{ github.run_id }}\",
-              \"timeout_ms\": 180000
-            }" | jq -e '.exit_code == 0'
-
-      - name: cargo test --workspace
-        run: |
-          curl -sf -X POST $FCCTL_URL/api/llm/execute \
-            -H 'Content-Type: application/json' \
-            -d "{
-              \"code\": \"cd /workspace && cargo test --workspace\",
-              \"language\": \"bash\",
-              \"agent_id\": \"ci-test-${{ github.run_id }}\",
-              \"timeout_ms\": 300000
-            }" | jq -e '.exit_code == 0'
+              \"agent_id\": \"ci-probe-${{ github.run_id }}\",
+              \"timeout_ms\": 15000
+            }")
+          echo "$RESULT" | python3 -m json.tool
+          echo "$RESULT" | python3 -c "import sys,json; r=json.load(sys.stdin); sys.exit(0 if r.get('exit_code')==0 else 1)"
 
       - name: Destroy VM
         if: always()
         run: |
           VM_ID="${{ steps.vm.outputs.vm_id }}"
           if [ -n "$VM_ID" ] && [ "$VM_ID" != "null" ]; then
-            curl -sf -X DELETE $FCCTL_URL/api/vms/$VM_ID && echo "VM $VM_ID destroyed"
+            curl -sf -X DELETE $FCCTL_URL/api/vms/$VM_ID && echo "VM $VM_ID destroyed" || echo "VM cleanup failed (non-fatal)"
           fi
+
+  rust-build:
+    name: Rust build + test
+    runs-on: [self-hosted]
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: cargo fmt --check
+        run: cargo fmt -- --check
+
+      - name: cargo clippy
+        run: cargo clippy -- -D warnings
+
+      - name: cargo build --workspace
+        run: cargo build --workspace
+
+      - name: cargo test --workspace
+        run: cargo test --workspace
