@@ -1,3 +1,17 @@
+// Regression tests for the `terraphim-agent search` CLI's --robot / --format
+// JSON output. The canonical schema is the RobotResponse envelope from
+// crates/terraphim_agent/src/robot/schema.rs:
+//
+//   {
+//     "success": bool,
+//     "meta":    { command, elapsed_ms, timestamp, version },
+//     "data":    SearchResultsData { results, total_matches, concepts_matched?, wildcard_fallback },
+//     "error":   ... (only on failure)
+//   }
+//
+// where each SearchResultItem carries: rank, id, title, url?, score, preview?,
+// source?, date?, preview_truncated.
+
 use std::process::Command;
 
 use anyhow::{Context, Result};
@@ -6,7 +20,7 @@ use serial_test::serial;
 
 fn run_agent_command(args: &[&str]) -> Result<(String, String, i32)> {
     let output = Command::new("cargo")
-        .args(["run", "-p", "terraphim_agent", "--"])
+        .args(["run", "-p", "terraphim_agent", "--quiet", "--"])
         .args(args)
         .output()
         .context("failed to execute terraphim-agent command")?;
@@ -30,43 +44,57 @@ fn parse_first_json_object(stdout: &str) -> Result<Value> {
         .context("failed to parse first JSON value from stdout")
 }
 
-fn assert_search_output_contract(value: &Value, expected_query: &str, expected_limit: usize) {
-    let root = value
-        .as_object()
-        .expect("search output should be a JSON object");
+/// Verify the RobotResponse envelope (success, meta, data) and the
+/// SearchResultsData under data, plus per-item field types.
+fn assert_search_envelope(value: &Value, expected_limit: usize) {
+    let root = value.as_object().expect("envelope should be a JSON object");
 
-    let query = root
-        .get("query")
-        .and_then(Value::as_str)
-        .expect("search output should contain string field 'query'");
-    assert_eq!(query, expected_query, "search output should echo the query");
-
-    let role = root
-        .get("role")
-        .and_then(Value::as_str)
-        .expect("search output should contain string field 'role'");
     assert!(
-        !role.trim().is_empty(),
-        "search output 'role' should not be empty"
+        root.get("success")
+            .and_then(Value::as_bool)
+            .expect("envelope should contain bool field 'success'"),
+        "search should report success=true"
     );
 
-    let count = root
-        .get("count")
-        .and_then(Value::as_u64)
-        .expect("search output should contain numeric field 'count'") as usize;
+    let meta = root
+        .get("meta")
+        .and_then(Value::as_object)
+        .expect("envelope should contain object field 'meta'");
+    let cmd = meta
+        .get("command")
+        .and_then(Value::as_str)
+        .expect("meta should contain string field 'command'");
+    assert_eq!(cmd, "search", "meta.command should echo the subcommand");
+    assert!(
+        meta.get("timestamp").and_then(Value::as_str).is_some(),
+        "meta should contain string field 'timestamp'"
+    );
+    assert!(
+        meta.get("version").and_then(Value::as_str).is_some(),
+        "meta should contain string field 'version'"
+    );
 
-    let results = root
+    let data = root
+        .get("data")
+        .and_then(Value::as_object)
+        .expect("envelope should contain object field 'data'");
+
+    let total_matches =
+        data.get("total_matches")
+            .and_then(Value::as_u64)
+            .expect("data should contain numeric field 'total_matches'") as usize;
+
+    let results = data
         .get("results")
         .and_then(Value::as_array)
-        .expect("search output should contain array field 'results'");
+        .expect("data should contain array field 'results'");
 
     assert_eq!(
-        count,
+        total_matches,
         results.len(),
-        "search output count must match results length"
+        "data.total_matches must match data.results length"
     );
-    // Note: not all relevance functions (e.g. TitleScorer) enforce the limit
-    // parameter server-side, so we only warn rather than fail.
+
     if results.len() > expected_limit {
         eprintln!(
             "warning: search returned {} results, limit was {} (relevance function may not enforce limit)",
@@ -76,11 +104,11 @@ fn assert_search_output_contract(value: &Value, expected_query: &str, expected_l
     }
 
     for result in results {
-        let result_obj = result
+        let obj = result
             .as_object()
             .expect("each search result should be an object");
 
-        let id = result_obj
+        let id = obj
             .get("id")
             .and_then(Value::as_str)
             .expect("search result should contain string field 'id'");
@@ -89,33 +117,28 @@ fn assert_search_output_contract(value: &Value, expected_query: &str, expected_l
             "search result 'id' should not be empty"
         );
 
-        let title = result_obj
+        let title = obj
             .get("title")
             .and_then(Value::as_str)
             .expect("search result should contain string field 'title'");
         assert!(
-            !title.trim().is_empty(),
+            !title.is_empty(),
             "search result 'title' should not be empty"
         );
 
-        let _url = result_obj
-            .get("url")
-            .and_then(Value::as_str)
-            .expect("search result should contain string field 'url'");
+        obj.get("rank")
+            .and_then(Value::as_u64)
+            .expect("search result should contain u64 field 'rank'");
 
-        let rank = result_obj
-            .get("rank")
-            .expect("search result should contain field 'rank'");
-        assert!(
-            rank.is_null() || rank.as_u64().is_some(),
-            "search result 'rank' should be null or u64"
-        );
+        obj.get("score")
+            .and_then(Value::as_f64)
+            .expect("search result should contain f64 field 'score'");
     }
 }
 
 #[test]
 #[serial]
-fn search_robot_mode_emits_parseable_json_contract() -> Result<()> {
+fn search_robot_mode_emits_parseable_json_envelope() -> Result<()> {
     let query = "terraphim";
     let limit = 5usize;
     let (stdout, stderr, code) = run_agent_command(&["--robot", "search", query, "--limit", "5"])?;
@@ -127,13 +150,13 @@ fn search_robot_mode_emits_parseable_json_contract() -> Result<()> {
     );
 
     let json = parse_first_json_object(&stdout)?;
-    assert_search_output_contract(&json, query, limit);
+    assert_search_envelope(&json, limit);
     Ok(())
 }
 
 #[test]
 #[serial]
-fn search_format_json_emits_parseable_json_contract() -> Result<()> {
+fn search_format_json_emits_parseable_json_envelope() -> Result<()> {
     let query = "terraphim";
     let limit = 5usize;
     let (stdout, stderr, code) =
@@ -146,13 +169,13 @@ fn search_format_json_emits_parseable_json_contract() -> Result<()> {
     );
 
     let json = parse_first_json_object(&stdout)?;
-    assert_search_output_contract(&json, query, limit);
+    assert_search_envelope(&json, limit);
     Ok(())
 }
 
 #[test]
 #[serial]
-fn search_format_json_compact_emits_parseable_json_contract() -> Result<()> {
+fn search_format_json_compact_emits_parseable_json_envelope() -> Result<()> {
     let query = "terraphim";
     let limit = 5usize;
     let (stdout, stderr, code) =
@@ -165,13 +188,13 @@ fn search_format_json_compact_emits_parseable_json_contract() -> Result<()> {
     );
 
     let json = parse_first_json_object(&stdout)?;
-    assert_search_output_contract(&json, query, limit);
+    assert_search_envelope(&json, limit);
     Ok(())
 }
 
 #[test]
 #[serial]
-fn search_robot_json_includes_description_and_body_fields() -> Result<()> {
+fn search_robot_json_results_carry_optional_preview_url() -> Result<()> {
     let query = "terraphim";
     let (stdout, stderr, code) = run_agent_command(&["--robot", "search", query, "--limit", "3"])?;
 
@@ -183,26 +206,24 @@ fn search_robot_json_includes_description_and_body_fields() -> Result<()> {
 
     let json = parse_first_json_object(&stdout)?;
     let results = json
-        .get("results")
+        .pointer("/data/results")
         .and_then(Value::as_array)
-        .expect("search output should contain array field 'results'");
+        .expect("envelope should contain array at /data/results");
 
-    // Verify that description and body fields are accepted by the schema
-    // (they may be null/absent for some documents due to skip_serializing_if)
     for result in results {
         let obj = result.as_object().expect("each result should be an object");
-        // description is optional (may be absent due to skip_serializing_if)
-        if let Some(desc) = obj.get("description") {
+        // url is optional but if present must be string
+        if let Some(url) = obj.get("url") {
             assert!(
-                desc.is_string() || desc.is_null(),
-                "description should be a string or null"
+                url.is_string() || url.is_null(),
+                "result 'url' should be string or null"
             );
         }
-        // body is optional (may be absent due to skip_serializing_if)
-        if let Some(body) = obj.get("body") {
+        // preview is optional but if present must be string
+        if let Some(preview) = obj.get("preview") {
             assert!(
-                body.is_string() || body.is_null(),
-                "body should be a string or null"
+                preview.is_string() || preview.is_null(),
+                "result 'preview' should be string or null"
             );
         }
     }
@@ -222,22 +243,21 @@ fn search_format_json_compact_produces_single_line_output() -> Result<()> {
         stderr
     );
 
-    // Find the JSON object in stdout (skip any non-JSON preamble lines)
+    // Find the JSON line in stdout (skip any non-JSON preamble)
     let json_line = stdout
         .lines()
         .find(|line| line.trim_start().starts_with('{'))
         .expect("should find a JSON line in stdout");
 
-    // Compact JSON should be a single line containing the full object
     let parsed: Value = serde_json::from_str(json_line)
         .expect("compact JSON output should be parseable from a single line");
     assert!(
-        parsed.get("query").is_some(),
-        "compact JSON should contain query field"
+        parsed.get("success").is_some(),
+        "compact JSON should contain success field"
     );
     assert!(
-        parsed.get("results").is_some(),
-        "compact JSON should contain results field"
+        parsed.pointer("/data/results").is_some(),
+        "compact JSON should contain /data/results"
     );
     Ok(())
 }

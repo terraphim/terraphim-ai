@@ -142,12 +142,20 @@ impl TerraphimService {
             role_name: &RoleName,
             rolegraphs: &mut AHashMap<RoleName, RoleGraphSync>,
         ) -> Result<Thesaurus> {
-            let config = config_state.config.lock().await;
-            let Some(role) = config.roles.get(role_name).cloned() else {
-                return Err(ServiceError::Config(format!(
-                    "Role '{}' not found in config",
-                    role_name
-                )));
+            // CRITICAL: clone the role out, then drop the config lock before
+            // doing I/O. Holding the lock across the network/disk operations
+            // below blocks every other endpoint that touches /config (e.g.
+            // GET /config from `roles select`, `roles list`, etc.) for the
+            // duration of the thesaurus load + persistence + RoleGraph build.
+            let role = {
+                let config = config_state.config.lock().await;
+                let Some(role) = config.roles.get(role_name).cloned() else {
+                    return Err(ServiceError::Config(format!(
+                        "Role '{}' not found in config",
+                        role_name
+                    )));
+                };
+                role
             };
             if let Some(kg) = &role.kg {
                 if let Some(automata_path) = &kg.automata_path {
@@ -2791,9 +2799,13 @@ impl TerraphimService {
         &self,
         config: terraphim_config::Config,
     ) -> Result<terraphim_config::Config> {
-        let mut current_config = self.config_state.config.lock().await;
-        *current_config = config.clone();
-        current_config.save().await?;
+        // Lock briefly to swap in the new config, then drop before save so
+        // the disk write doesn't block other /config endpoints.
+        {
+            let mut current_config = self.config_state.config.lock().await;
+            *current_config = config.clone();
+        }
+        config.save().await?;
         log::info!("Config updated");
         Ok(config)
     }
@@ -2804,18 +2816,41 @@ impl TerraphimService {
         &self,
         role_name: terraphim_types::RoleName,
     ) -> Result<terraphim_config::Config> {
-        let mut current_config = self.config_state.config.lock().await;
+        // Lock briefly: validate, mutate in-memory state, snapshot. Drop the
+        // lock BEFORE the disk save -- holding the config mutex across an
+        // async I/O write blocks every other endpoint that touches /config
+        // (e.g. concurrent search, get_config) for the duration of the save.
+        let snapshot = {
+            let mut current_config = self.config_state.config.lock().await;
 
-        // Ensure the role exists before updating.
-        if !current_config.roles.contains_key(&role_name) {
-            return Err(ServiceError::Config(format!(
-                "Role `{}` not found in config",
-                role_name
-            )));
-        }
+            if !current_config.roles.contains_key(&role_name) {
+                return Err(ServiceError::Config(format!(
+                    "Role `{}` not found in config",
+                    role_name
+                )));
+            }
 
-        current_config.selected_role = role_name.clone();
-        current_config.save().await?;
+            current_config.selected_role = role_name.clone();
+            current_config.clone()
+        };
+        // Persist asynchronously: in-memory update is the source of truth for
+        // subsequent reads; disk save is best-effort and must not delay the
+        // HTTP response. save_to_all() can take many seconds depending on the
+        // configured persistence profiles (sled WAL flush, S3 PUT, etc.) and
+        // should never block role selection.
+        let snapshot_for_save = snapshot.clone();
+        let role_for_log = role_name.clone();
+        tokio::spawn(async move {
+            if let Err(e) = snapshot_for_save.save().await {
+                log::warn!(
+                    "background persist of selected_role={} failed: {}",
+                    role_for_log,
+                    e
+                );
+            }
+        });
+        // Re-lock briefly only to read role metadata for logging.
+        let current_config = self.config_state.config.lock().await;
 
         // Log role selection with terraphim_it status
         if let Some(role) = current_config.roles.get(&role_name) {

@@ -143,22 +143,10 @@ jobs:
         run: cargo build --workspace
 
       - name: cargo test --workspace
-        # Skipped tests, all of the same class: spawn `terraphim-agent` /
-        # `terraphim_server` subprocesses on fixed ports and parse their
-        # stdout. They fail on shared self-hosted runners because of port
-        # / state residue from prior runs and missing data fixtures.
-        # Firecracker VM isolation (vm-cargo-probe / future vm-test job)
-        # will solve this class properly. Until then, skip:
-        #   - test_chat_command: needs external LLM API credentials
-        #   - test_end_to_end_server_workflow: real server on fixed port
-        #   - search_robot_*: parse terraphim-agent CLI JSON output, need
-        #     KG/data fixtures that aren't checked into the runner workspace
-        run: |
-          cargo test --workspace -- \
-            --skip test_chat_command \
-            --skip test_end_to_end_server_workflow \
-            --skip search_robot_ \
-            --skip search_format_json_
+        # Only test_chat_command is skipped: it requires LLM API credentials
+        # not present in CI. All other failures must be fixed at the source,
+        # not skipped.
+        run: cargo test --workspace -- --skip test_chat_command
 
       - name: sccache stats
         if: always()

@@ -3607,29 +3607,46 @@ async fn run_server_command(
                     }
                 }
                 RolesSub::Select { name } => {
-                    // Try to find role by name or shortname
-                    let cfg = api.get_config().await?;
-                    let query_lower = name.to_lowercase();
-                    let role_name = cfg
-                        .config
-                        .roles
-                        .iter()
-                        .find(|(n, _)| n.to_string().to_lowercase() == query_lower)
-                        .or_else(|| {
-                            cfg.config.roles.iter().find(|(_, role)| {
-                                role.shortname
-                                    .as_ref()
-                                    .map(|s| s.to_lowercase() == query_lower)
-                                    .unwrap_or(false)
-                            })
-                        })
-                        .map(|(n, _)| n.to_string())
-                        .ok_or_else(|| {
-                            anyhow::anyhow!(
-                                "Role '{}' not found (checked name and shortname)",
-                                name
-                            )
-                        })?;
+                    // Try to find role by name or shortname via get_config for
+                    // case-insensitive convenience. If the server's /config
+                    // endpoint is locked (e.g. background KG indexing holds
+                    // the config lock during search/extract), fall back to
+                    // the user's input as-is and let the server validate. The
+                    // server's update_selected_role does its own contains_key
+                    // check and returns a clean "Role not found" error on
+                    // miss, so we preserve correctness either way.
+                    let role_name = match api.get_config().await {
+                        Ok(cfg) => {
+                            let query_lower = name.to_lowercase();
+                            cfg.config
+                                .roles
+                                .iter()
+                                .find(|(n, _)| n.to_string().to_lowercase() == query_lower)
+                                .or_else(|| {
+                                    cfg.config.roles.iter().find(|(_, role)| {
+                                        role.shortname
+                                            .as_ref()
+                                            .map(|s| s.to_lowercase() == query_lower)
+                                            .unwrap_or(false)
+                                    })
+                                })
+                                .map(|(n, _)| n.to_string())
+                                .ok_or_else(|| {
+                                    anyhow::anyhow!(
+                                        "Role '{}' not found (checked name and shortname)",
+                                        name
+                                    )
+                                })?
+                        }
+                        Err(e) => {
+                            log::warn!(
+                                "get_config failed during roles select ({}); \
+                                 falling back to user-supplied name verbatim",
+                                e
+                            );
+                            name.to_string()
+                        }
+                    };
                     let _ = api.update_selected_role(&role_name).await?;
                     println!("selected:{}", role_name);
                 }
