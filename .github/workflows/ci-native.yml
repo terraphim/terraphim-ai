@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   setup:
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: [self-hosted, bigbox]
     timeout-minutes: 15
     outputs:
       cache-key: ${{ steps.cache.outputs.key }}
@@ -72,9 +72,21 @@ jobs:
           fi
       
   lint-and-format:
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: [self-hosted, bigbox]
     timeout-minutes: 30
     needs: [setup]
+    # Optimal stack: bigbox + sccache+SeaweedFS + rch dispatch.
+    # See .docs/walkthrough-ci-build-pipeline.md.
+    env:
+      RUSTC_WRAPPER: /home/alex/.local/bin/sccache
+      SCCACHE_BUCKET: rust-cache
+      SCCACHE_ENDPOINT: http://172.26.0.1:8333
+      SCCACHE_S3_USE_SSL: "false"
+      SCCACHE_REGION: us-east-1
+      SCCACHE_S3_KEY_PREFIX: terraphim-ai
+      AWS_ACCESS_KEY_ID: any
+      AWS_SECRET_ACCESS_KEY: any
+      CARGO_INCREMENTAL: "0"
     steps:
       - name: Pre-checkout cleanup
         run: |
@@ -143,5 +155,16 @@ jobs:
           restore-keys: |
             ${{ needs.setup.outputs.cache-key }}-cargo-lint-
 
+      - name: sccache start and zero stats
+        run: |
+          /home/alex/.local/bin/sccache --start-server || true
+          /home/alex/.local/bin/sccache --zero-stats
+
       - name: Run format and linting checks
-        run: ./scripts/ci-check-format.sh
+        # rch exec dispatches the underlying cargo invocations through
+        # rchd's queue, sharing slots with ADF agents.
+        run: /home/alex/.local/bin/rch exec -- ./scripts/ci-check-format.sh
+
+      - name: sccache stats
+        if: always()
+        run: /home/alex/.local/bin/sccache --show-stats

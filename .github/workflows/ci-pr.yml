@@ -21,7 +21,7 @@ jobs:
   # Quick change detection
   changes:
     name: Detect Changes
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: [self-hosted, bigbox]
     timeout-minutes: 1
     outputs:
       rust-changed: ${{ steps.changes.outputs.rust }}
@@ -94,7 +94,7 @@ jobs:
   # Build frontend (frontend-only changes)
   build-frontend:
     name: Build Frontend
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: [self-hosted, bigbox]
     timeout-minutes: 20
     needs: changes
     if: needs.changes.outputs.frontend-changed == 'true'
@@ -150,12 +150,23 @@ jobs:
           retention-days: 1
 
   # Rust formatting and linting (quick checks)
+  # Optimal stack: bigbox + sccache+SeaweedFS + rch dispatch.
+  # See .docs/walkthrough-ci-build-pipeline.md.
   rust-format:
     name: Rust Format Check
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: [self-hosted, bigbox]
     timeout-minutes: 2
     needs: changes
     if: needs.changes.outputs.rust-changed == 'true'
+    env:
+      RUSTC_WRAPPER: /home/alex/.local/bin/sccache
+      SCCACHE_BUCKET: rust-cache
+      SCCACHE_ENDPOINT: http://172.26.0.1:8333
+      SCCACHE_S3_USE_SSL: "false"
+      SCCACHE_REGION: us-east-1
+      SCCACHE_S3_KEY_PREFIX: terraphim-ai
+      AWS_ACCESS_KEY_ID: any
+      AWS_SECRET_ACCESS_KEY: any
 
     steps:
       - name: Fix workspace permissions
@@ -184,19 +195,16 @@ jobs:
           toolchain: "1.94.0"
           components: rustfmt, clippy
 
-      - name: Setup sccache
-        uses: mozilla-actions/sccache-action@v0.0.9
-
-      - name: Configure sccache
+      - name: sccache start and zero stats
         run: |
-          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
-          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+          /home/alex/.local/bin/sccache --start-server || true
+          /home/alex/.local/bin/sccache --zero-stats
 
       - name: Rustfmt Check
-        run: cargo fmt --all -- --check
+        run: /home/alex/.local/bin/rch exec -- cargo fmt --all -- --check
 
       - name: Clippy Check
-        run: cargo clippy --workspace --all-targets --features zlob -- -D warnings
+        run: /home/alex/.local/bin/rch exec -- cargo clippy --workspace --all-targets --features zlob -- -D warnings
         env:
           RUST_BACKTRACE: 1
 
@@ -219,15 +227,19 @@ jobs:
       - name: Check compilation
         run: |
           # Quick compilation check without building all binaries
-          cargo check --workspace --features zlob
+          /home/alex/.local/bin/rch exec -- cargo check --workspace --features zlob
           # Check key binaries compile
-          cargo check --package terraphim_server
-          cargo check --package terraphim_mcp_server --features zlob
+          /home/alex/.local/bin/rch exec -- cargo check --package terraphim_server
+          /home/alex/.local/bin/rch exec -- cargo check --package terraphim_mcp_server --features zlob
+
+      - name: sccache stats
+        if: always()
+        run: /home/alex/.local/bin/sccache --show-stats
 
   # Frontend linting and type checking
   frontend-check:
     name: Frontend Check
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: [self-hosted, bigbox]
     timeout-minutes: 3
     needs: changes
     if: needs.changes.outputs.frontend-changed == 'true'
@@ -277,10 +289,19 @@ jobs:
   # Quick unit tests for changed code
   rust-tests:
     name: Rust Unit Tests
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: [self-hosted, bigbox]
     timeout-minutes: 8
     needs: [changes, rust-compile]
     if: needs.changes.outputs.rust-changed == 'true' && needs.rust-compile.result == 'success'
+    env:
+      RUSTC_WRAPPER: /home/alex/.local/bin/sccache
+      SCCACHE_BUCKET: rust-cache
+      SCCACHE_ENDPOINT: http://172.26.0.1:8333
+      SCCACHE_S3_USE_SSL: "false"
+      SCCACHE_REGION: us-east-1
+      SCCACHE_S3_KEY_PREFIX: terraphim-ai
+      AWS_ACCESS_KEY_ID: any
+      AWS_SECRET_ACCESS_KEY: any
 
     steps:
       - name: Fix workspace permissions
@@ -313,13 +334,10 @@ jobs:
         with:
           components: rustfmt, clippy
 
-      - name: Setup sccache
-        uses: mozilla-actions/sccache-action@v0.0.9
-
-      - name: Configure sccache
+      - name: sccache start and zero stats
         run: |
-          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
-          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+          /home/alex/.local/bin/sccache --start-server || true
+          /home/alex/.local/bin/sccache --zero-stats
 
       - name: Cache Cargo registry and index
         uses: actions/cache@v4
@@ -338,15 +356,28 @@ jobs:
       - name: Run unit tests
         run: |
           # Run unit tests (rocksdb feature disabled in CI, zlob enabled for fff-search)
-          cargo test --workspace --lib --bins --features zlob -- --test-threads=2
+          /home/alex/.local/bin/rch exec -- cargo test --workspace --lib --bins --features zlob -- --test-threads=2
+
+      - name: sccache stats
+        if: always()
+        run: /home/alex/.local/bin/sccache --show-stats
 
   # WASM build verification
   wasm-build:
     name: WASM Build Check
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: [self-hosted, bigbox]
     timeout-minutes: 3
     needs: changes
     if: needs.changes.outputs.rust-changed == 'true'
+    env:
+      RUSTC_WRAPPER: /home/alex/.local/bin/sccache
+      SCCACHE_BUCKET: rust-cache
+      SCCACHE_ENDPOINT: http://172.26.0.1:8333
+      SCCACHE_S3_USE_SSL: "false"
+      SCCACHE_REGION: us-east-1
+      SCCACHE_S3_KEY_PREFIX: terraphim-ai-wasm
+      AWS_ACCESS_KEY_ID: any
+      AWS_SECRET_ACCESS_KEY: any
 
     steps:
       - name: Fix workspace permissions
@@ -374,13 +405,10 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
 
-      - name: Setup sccache
-        uses: mozilla-actions/sccache-action@v0.0.9
-
-      - name: Configure sccache
+      - name: sccache start and zero stats
         run: |
-          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
-          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+          /home/alex/.local/bin/sccache --start-server || true
+          /home/alex/.local/bin/sccache --zero-stats
 
       - name: Install wasm-pack
         run: |
@@ -390,12 +418,16 @@ jobs:
 
       - name: Build WASM
         run: |
-          ./scripts/build-wasm.sh web dev
+          /home/alex/.local/bin/rch exec -- ./scripts/build-wasm.sh web dev
+
+      - name: sccache stats
+        if: always()
+        run: /home/alex/.local/bin/sccache --show-stats
 
   # Security audit
   security-audit:
     name: Security Audit
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: [self-hosted, bigbox]
     timeout-minutes: 2
     needs: changes
     if: needs.changes.outputs.rust-changed == 'true'
@@ -443,7 +475,7 @@ jobs:
   # Job summary
   pr-summary:
     name: PR Validation Summary
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: [self-hosted, bigbox]
     timeout-minutes: 1
     needs: [changes, build-frontend, rust-format, rust-clippy, rust-compile, rust-tests, frontend-check, wasm-build]
     if: always()
