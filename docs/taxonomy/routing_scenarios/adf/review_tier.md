@@ -6,7 +6,7 @@ verification agents and for any task that reviews existing output.
 
 Maps to ZDP phases: disciplined-verification, disciplined-validation.
 
-priority:: 60
+priority:: 40
 
 synonyms:: review plan, check results, verify, validate, compliance check
 synonyms:: acceptance test, UAT, quality gate, GO NO-GO, pass fail
