@@ -5,6 +5,7 @@ use uuid::Uuid;
 
 use super::envelope::StepEnvelope;
 
+/// Persistent state for a single in-progress or completed flow run.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FlowRunState {
     pub flow_name: String,
@@ -18,6 +19,7 @@ pub struct FlowRunState {
     pub error: Option<String>,
 }
 
+/// Lifecycle status of a flow run.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum FlowRunStatus {

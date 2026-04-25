@@ -32,6 +32,7 @@ struct GiteaComment {
     created_at: String,
 }
 
+/// Minimal Gitea user record embedded in webhook payloads.
 #[derive(Debug, Deserialize)]
 pub struct GiteaUser {
     pub login: String,
@@ -54,6 +55,7 @@ struct GiteaIssueEventPayload {
     repository: GiteaRepository,
 }
 
+/// Minimal Gitea repository record embedded in webhook payloads.
 #[derive(Debug, Deserialize)]
 pub struct GiteaRepository {
     pub full_name: String,
@@ -68,6 +70,7 @@ pub struct GiteaPullRequestPayload {
     pub repository: GiteaRepository,
 }
 
+/// Fields from a Gitea pull-request object used for dispatch decisions.
 #[derive(Debug, Deserialize)]
 pub struct PullRequestFields {
     pub head: PrRef,
@@ -79,6 +82,7 @@ pub struct PullRequestFields {
     pub deletions: u32,
 }
 
+/// Branch/SHA reference for the head or base of a pull request.
 #[derive(Debug, Deserialize)]
 pub struct PrRef {
     pub sha: String,

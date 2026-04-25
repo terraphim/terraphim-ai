@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 
 const MAX_OUTPUT_BYTES: usize = 512 * 1024; // 512 KB
 
+/// Captures the full output of a completed flow step, including timings and token usage.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StepEnvelope {
     pub step_name: String,

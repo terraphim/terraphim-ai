@@ -534,6 +534,7 @@ mod tests {
     }
 }
 
+/// Controls the serialisation format for command output.
 #[derive(clap::ValueEnum, Debug, Clone, Default)]
 pub enum OutputFormat {
     /// Human-readable output (default)
@@ -583,12 +584,14 @@ fn resolve_output_config(robot: bool, format: OutputFormat) -> CommandOutputConf
 mod session_output {
     use serde::Serialize;
 
+    /// Serialisable summary of available session sources.
     #[derive(Debug, Serialize)]
     pub struct SourcesOutput {
         pub count: usize,
         pub sources: Vec<SourceEntry>,
     }
 
+    /// One discovered session source (e.g. Claude Code, Cursor).
     #[derive(Debug, Serialize)]
     pub struct SourceEntry {
         pub id: String,
@@ -596,6 +599,7 @@ mod session_output {
         pub available: bool,
     }
 
+    /// Serialisable list of sessions returned by `/sessions list`.
     #[derive(Debug, Serialize)]
     pub struct SessionListOutput {
         pub total: usize,
@@ -603,6 +607,7 @@ mod session_output {
         pub sessions: Vec<SessionEntry>,
     }
 
+    /// Compact session summary for list output.
     #[derive(Debug, Serialize)]
     pub struct SessionEntry {
         pub id: String,

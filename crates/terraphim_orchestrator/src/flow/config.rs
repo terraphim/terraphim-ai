@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+/// Top-level definition of an orchestrator flow, loaded from TOML.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FlowDefinition {
     pub name: String,
@@ -26,6 +27,7 @@ fn default_flow_timeout() -> u64 {
     3600 // 1 hour default
 }
 
+/// Definition of a single step within a [`FlowDefinition`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FlowStepDef {
     pub name: String,
@@ -66,6 +68,7 @@ fn default_timeout() -> u64 {
     600
 }
 
+/// Determines how a flow step is executed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum StepKind {
@@ -75,6 +78,7 @@ pub enum StepKind {
     Checkpoint,
 }
 
+/// What the orchestrator does when a step exits with a non-zero status.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum FailStrategy {
