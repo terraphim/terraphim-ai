@@ -1,0 +1,12 @@
+# Bigbox localhost worker pool.
+# slot_count = nproc/4 leaves headroom for OS + adf-orchestrator + dev REPL.
+# See .docs/adr-rch-build-queue-not-firecracker-ci.md.
+[[workers]]
+id = "bigbox-local"
+host = "127.0.0.1"
+user = "alex"
+identity_file = "~/.ssh/id_ed25519"
+total_slots = 6
+priority = 100
+tags = ["local", "fast", "terraphim-ai"]
+enabled = true

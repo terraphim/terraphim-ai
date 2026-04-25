@@ -509,10 +509,10 @@ action:: opencode -m {{ model }} -p "{{ prompt }}"
         assert_eq!(d.provider, "anthropic");
         assert!(d.model.contains("opus"));
 
-        // Review tier (priority 60) -- "verify" triggers review
+        // Review tier (priority 40) -- "verify" triggers review
         let d = router.route_agent("verify and validate results").unwrap();
         assert_eq!(d.matched_concept, "review_tier");
-        assert_eq!(d.priority, 60);
+        assert_eq!(d.priority, 40);
         assert_eq!(d.provider, "anthropic");
         assert!(d.model.contains("haiku"));
 
@@ -565,7 +565,7 @@ action:: opencode -m {{ model }} -p "{{ prompt }}"
             (
                 "quality-coordinator",
                 "review code quality and verify test results for PR approval",
-                "review_tier",
+                "implementation_tier",
                 "anthropic",
             ),
             (
@@ -583,7 +583,7 @@ action:: opencode -m {{ model }} -p "{{ prompt }}"
             (
                 "merge-coordinator",
                 "review merge verdict and evaluate GO NO-GO for PR approval",
-                "review_tier",
+                "implementation_tier",
                 "anthropic",
             ),
             // IMPLEMENTATION TIER (sonnet)

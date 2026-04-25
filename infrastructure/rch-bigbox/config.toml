@@ -1,0 +1,4 @@
+# RCH user config. See: https://github.com/Dicklesworthstone/remote_compilation_helper
+# Canonical project root left at rch default (/data/projects); terraphim-ai
+# is bind-mounted at /data/projects/terraphim-ai on bigbox per
+# .docs/adr-rch-build-queue-not-firecracker-ci.md.
