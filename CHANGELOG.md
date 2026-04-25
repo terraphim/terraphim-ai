@@ -44,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **Agent formatting** in RobotResponse chaining for consistent output (`b5ba8927`)
 - **Cargo formatting** applied to exit code additions (`d10e6598`)
+- **Merge-coordinator** converted to cron-driven scheduling, removing trigger cascades (`2406a867`)
 - **Orchestrator probe circuit breaker** and timeout handling hardened (`1238a680`)
 - **Auto-route cold-start scoring** fixed by scoring against thesaurus (`53bf3faf`)
 - **Settings config directory** now uses absolute path (`a73a7976`)
