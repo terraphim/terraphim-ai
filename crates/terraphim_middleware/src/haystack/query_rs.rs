@@ -522,7 +522,7 @@ impl QueryRsHaystackIndexer {
     }
 
     /// Extract Reddit post ID from URL
-    /// Example: https://www.reddit.com/r/rust/comments/abc123/title/ -> abc123
+    /// Example: `https://www.reddit.com/r/rust/comments/abc123/title/` -> abc123
     pub fn extract_reddit_post_id(&self, url: &str) -> Option<String> {
         // Look for the pattern /comments/{post_id}/
         if let Some(comments_pos) = url.find("/comments/") {
@@ -538,7 +538,7 @@ impl QueryRsHaystackIndexer {
     }
 
     /// Extract a clean identifier from a documentation URL
-    /// Example: https://doc.rust-lang.org/std/iter/trait.Iterator.html -> std_iter_Iterator
+    /// Example: `https://doc.rust-lang.org/std/iter/trait.Iterator.html` -> std_iter_Iterator
     pub fn extract_doc_identifier(&self, url: &str) -> String {
         if let Some(path) = url.strip_prefix("https://doc.rust-lang.org/") {
             // Remove .html extension and replace slashes and dots with underscores

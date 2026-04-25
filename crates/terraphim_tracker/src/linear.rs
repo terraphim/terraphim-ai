@@ -11,7 +11,7 @@ use tracing::debug;
 /// Configuration for Linear tracker.
 #[derive(Debug, Clone)]
 pub struct LinearConfig {
-    /// GraphQL endpoint URL (typically https://api.linear.app/graphql).
+    /// GraphQL endpoint URL (typically `https://api.linear.app/graphql`).
     pub endpoint: String,
     /// API key for authentication (LINEAR_API_KEY).
     pub api_key: String,

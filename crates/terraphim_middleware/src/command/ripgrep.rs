@@ -6,7 +6,7 @@
 //! type is used to represent ripgrep's internal JSON output.
 //!
 //! Learn more about ripgrep's JSON output here:
-//! https://docs.rs/grep-printer/0.2.1/grep_printer/struct.JSON.html
+//! <https://docs.rs/grep-printer/0.2.1/grep_printer/struct.JSON.html>
 
 use serde::Deserialize;
 use std::path::Path;
@@ -162,7 +162,7 @@ struct Duration {
     human: String,
 }
 
-/// Decode JSON Lines into a Vec<Message>.
+/// Decode JSON Lines into a `Vec<Message>`.
 pub fn json_decode(jsonlines: &str) -> Result<Vec<Message>> {
     Ok(serde_json::Deserializer::from_str(jsonlines)
         .into_iter()
@@ -219,7 +219,7 @@ impl RipgrepCommand {
     ///
     /// Returns a Vec of Messages, which correspond to ripgrep's internal
     /// JSON output. Learn more about ripgrep's JSON output here:
-    /// https://docs.rs/grep-printer/0.2.1/grep_printer/struct.JSON.html
+    /// <https://docs.rs/grep-printer/0.2.1/grep_printer/struct.JSON.html>
     pub async fn run(&self, needle: &str, haystack: &Path) -> Result<Vec<Message>> {
         Self::validate_needle(needle)?;
         self.run_with_extra_args(needle, haystack, &[]).await

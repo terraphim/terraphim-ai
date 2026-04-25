@@ -347,7 +347,7 @@ impl SlackConfig {
 /// Matrix channel configuration for WhatsApp bridge.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct MatrixConfig {
-    /// Matrix homeserver URL (e.g., "https://matrix.example.com")
+    /// Matrix homeserver URL (e.g., `https://matrix.example.com`)
     pub homeserver_url: String,
     /// Matrix username
     pub username: String,

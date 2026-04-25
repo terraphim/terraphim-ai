@@ -101,7 +101,7 @@ impl ProviderRegistry {
     /// Subscribe to registry change events.
     ///
     /// Returns `None` if change notifications were not enabled
-    /// via [`with_change_notifications`].
+    /// via [`Self::with_change_notifications`].
     pub fn subscribe_changes(&self) -> Option<broadcast::Receiver<RegistryEvent>> {
         self.change_sender.as_ref().map(|s| s.subscribe())
     }

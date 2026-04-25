@@ -1,6 +1,6 @@
 //! Middleware layer for Terraphim haystack indexing and search orchestration.
 //!
-//! Provides [`IndexMiddleware`] implementations for each haystack service type
+//! Provides indexer implementations for each haystack service type
 //! (Ripgrep, QueryRs, MCP, ClickUp, Quickwit, etc.) and the [`search_haystacks`]
 //! orchestrator that fans out queries across all configured haystacks.
 
