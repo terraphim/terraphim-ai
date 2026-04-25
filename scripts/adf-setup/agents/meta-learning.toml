@@ -1,0 +1,272 @@
+# meta-learning agent template (Mneme)
+#
+# Fleet-pattern synthesis agent. Reads the systemd journal for the last
+# 24 hours of agent exits, identifies recurring patterns, reads the latest
+# infra-health report, counts open Gitea Theme-IDs, and writes a daily
+# Fleet-Health wiki page. Only creates a Gitea alert issue for P0/P1
+# patterns (e.g. an agent failing every run, new crash pattern).
+#
+# Runs AFTER the overnight cron window closes (11am = after 10am last run).
+# This gives it the complete picture of one full overnight cycle.
+#
+# Persona: Mneme -- The memory of the fleet. Eldest and wisest.
+#   Observes, correlates, advises. Never acts -- only synthesises.
+#
+# Layer: Core (daily at 11am)
+# Subscription-only models only (C1 constraint).
+
+[[agents]]
+name = "meta-learning"
+layer = "Core"
+schedule = "0 11 * * *"
+cli_tool = "/home/alex/.local/bin/claude"
+model = "sonnet"
+fallback_model = "kimi-for-coding/k2p5"
+fallback_provider = "/home/alex/.bun/bin/opencode"
+persona = "Mneme"
+skill_chain = [
+    "disciplined-research",
+    "disciplined-verification",
+]
+max_cpu_seconds = 1200
+grace_period_secs = 30
+capabilities = [
+    "meta-learning",
+    "pattern-synthesis",
+    "fleet-health",
+    "cross-agent-analysis",
+]
+project = "terraphim"
+task = '''
+source ~/.profile
+
+export GITEA_TOKEN=5d663368d955953ddf900ff33420fcabebfbfb4b
+export GITEA_URL=https://git.terraphim.cloud
+TODAY=$(date +%Y%m%d)
+YESTERDAY=$(date -d 'yesterday' +%Y%m%d 2>/dev/null || date -v-1d +%Y%m%d 2>/dev/null)
+
+echo "=== Mneme Fleet Health Synthesis: $TODAY ==="
+echo "Observing, correlating, advising."
+echo ""
+
+## Step 1: Parse systemd journal for last 24h agent exit stats
+
+echo "--- Journal stats (last 24h) ---"
+JOURNAL_RAW=$(sudo -n journalctl -u adf-orchestrator --since "24 hours ago" --no-pager 2>/dev/null \
+  | grep "exit classified")
+
+TOTAL_RUNS=$(echo "$JOURNAL_RAW" | grep -c "exit_class=" || echo 0)
+echo "Total agent runs: $TOTAL_RUNS"
+
+# Runs by agent
+echo ""
+echo "Runs per agent:"
+echo "$JOURNAL_RAW" | grep -oP 'agent=\K[^ ]+' | sort | uniq -c | sort -rn | head -20
+
+# Exits by class
+echo ""
+echo "Exit class distribution:"
+echo "$JOURNAL_RAW" | grep -oP 'exit_class=\K[^ ]+' | sort | uniq -c | sort -rn
+
+# Non-success exits (excluding empty_success -- that is normal for no-work cycles)
+FAILURES=$(echo "$JOURNAL_RAW" | grep -v "exit_class=success\b" | grep -v "exit_class=empty_success")
+FAILURE_COUNT=$(echo "$FAILURES" | grep -c "exit_class=" 2>/dev/null || echo 0)
+echo ""
+echo "Non-success exits: $FAILURE_COUNT"
+echo "$FAILURES" | grep -oP 'agent=\K[^ ]+' | sort | uniq -c | sort -rn | head -20
+
+# Confidence=0.5 patterns (pattern/exit_code conflict -- potential false positives)
+CONF_HALF=$(echo "$JOURNAL_RAW" | grep "confidence=0.5" \
+  | grep -oP 'agent=\K[^ ]+' | sort | uniq -c | sort -rn)
+if [ -n "$CONF_HALF" ]; then
+  echo ""
+  echo "Agents with confidence=0.5 exits (pattern/exit_code conflict):"
+  echo "$CONF_HALF"
+fi
+
+# Agents hitting wall-time ceiling (consistently running to budget)
+WALL_MAX=$(echo "$JOURNAL_RAW" | grep -E "wall_time_secs=29[0-9]\." \
+  | grep -oP 'agent=\K[^ ]+' | sort | uniq -c | sort -rn)
+if [ -n "$WALL_MAX" ]; then
+  echo ""
+  echo "Agents hitting wall-time ceiling (>290s wall_time):"
+  echo "$WALL_MAX"
+fi
+
+## Step 2: Read previous Fleet-Health wiki page for comparison
+
+echo ""
+echo "--- Yesterday's fleet health ---"
+PREV_HEALTH=$(gtr wiki-get --owner terraphim --repo terraphim-ai \
+  --name "Fleet-Health-${YESTERDAY}-Mneme" 2>/dev/null \
+  | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("content","") or d.get("body",""))' \
+  2>/dev/null | head -30 || echo "(no previous report)")
+echo "$PREV_HEALTH" | head -20
+
+## Step 3: Read latest infra-health report
+
+echo ""
+echo "--- Latest infra state ---"
+LATEST_INFRA=$(ls -t /opt/ai-dark-factory/reports/infra-health-*.md 2>/dev/null | head -1)
+if [ -n "$LATEST_INFRA" ]; then
+  echo "Source: $LATEST_INFRA"
+  cat "$LATEST_INFRA" | tail -30
+else
+  echo "(no infra-health report found)"
+fi
+
+## Step 4: Count open Gitea issues by Theme-ID
+
+echo ""
+echo "--- Open Gitea issues with Theme-IDs ---"
+OPEN_ISSUES=$(gtr list-issues --owner terraphim --repo terraphim-ai --state open 2>/dev/null)
+THEME_IDS=$(echo "$OPEN_ISSUES" | python3 -c '
+import json, sys, re
+issues = json.load(sys.stdin)
+themes = {}
+for i in issues:
+    body = i.get("body", "") or ""
+    m = re.search(r"Theme-ID:\s*(\S+)", body)
+    if m:
+        tid = m.group(1)
+        themes[tid] = themes.get(tid, 0) + 1
+for tid, count in sorted(themes.items(), key=lambda x: -x[1]):
+    print(f"  {count:2d}x  {tid}")
+' 2>/dev/null || echo "(could not parse issues)")
+echo "$THEME_IDS"
+
+OPEN_COUNT=$(echo "$OPEN_ISSUES" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)))' 2>/dev/null || echo "?")
+echo "Total open issues: $OPEN_COUNT"
+
+## Step 5: LLM synthesis -- pattern identification and recommendations
+
+SYNTHESIS_PROMPT="You are Mneme, the meta-learning agent for the terraphim-ai AI Dark Factory. You are the fleet's memory and pattern keeper.
+
+Your role today: synthesise the overnight run data and identify patterns worth noting. You NEVER implement code, dispatch agents, or create branches. You observe, correlate, and advise.
+
+## Fleet data for $TODAY
+
+**Journal summary (last 24h):**
+Total runs: $TOTAL_RUNS
+Non-success exits: $FAILURE_COUNT
+Confidence=0.5 agents: $CONF_HALF
+Wall-time ceiling agents: $WALL_MAX
+
+**Open Gitea issues (Theme-IDs):**
+$THEME_IDS
+
+**Latest infra state:**
+$(cat "$LATEST_INFRA" 2>/dev/null | tail -20)
+
+**Yesterday's fleet health (for comparison):**
+$PREV_HEALTH
+
+## Your task
+
+1. Identify up to 3 patterns worth flagging. For each:
+   - Name the pattern
+   - Severity: P0 (agent completely broken every run), P1 (degraded, >50% failure rate), P2 (informational trend), P3 (observation only)
+   - Evidence (which agents, how many runs affected)
+   - Recommendation (what a human should look at)
+
+2. Classify any P0/P1 patterns. These warrant a Gitea alert issue.
+
+3. Note any improvements vs yesterday (patterns resolved, exit_class distribution better).
+
+4. Write a concise fleet health verdict: HEALTHY / DEGRADED / CRITICAL
+
+Output format:
+VERDICT: <HEALTHY|DEGRADED|CRITICAL>
+PATTERNS:
+- P<N> <name>: <evidence> -- <recommendation>
+IMPROVEMENTS:
+- <what got better>
+NOTES:
+- <other observations>"
+
+SYNTHESIS=$(/home/alex/.local/bin/claude -p --model sonnet --allowedTools "" --max-turns 3 "$SYNTHESIS_PROMPT" 2>&1)
+echo ""
+echo "--- Synthesis ---"
+echo "$SYNTHESIS"
+
+## Step 6: Write Fleet-Health wiki page
+
+WIKI_CONTENT="## Fleet Health Report: $TODAY
+
+**Agent**: meta-learning (Mneme)
+**Time**: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+### Verdict
+
+$(echo "$SYNTHESIS" | grep "^VERDICT:" || echo "VERDICT: UNKNOWN")
+
+### Patterns
+
+$(echo "$SYNTHESIS" | awk '/^PATTERNS:/,/^IMPROVEMENTS:|^NOTES:|^$/')
+
+### Improvements vs Yesterday
+
+$(echo "$SYNTHESIS" | awk '/^IMPROVEMENTS:/,/^NOTES:|^$/')
+
+### Raw Stats
+
+- Total runs: $TOTAL_RUNS
+- Non-success exits: $FAILURE_COUNT
+- Open issues with Theme-IDs: $(echo "$THEME_IDS" | wc -l)
+- Open issues total: $OPEN_COUNT
+
+### Notes
+
+$(echo "$SYNTHESIS" | awk '/^NOTES:/,0')"
+
+gtr wiki-create --owner terraphim --repo terraphim-ai \
+  --title "Fleet-Health-${TODAY}-Mneme" \
+  --content "$WIKI_CONTENT" \
+  --message "Daily fleet health synthesis from Mneme" \
+  2>&1 || echo "Warning: wiki-create failed (page may already exist)"
+
+echo "Fleet-Health-${TODAY}-Mneme wiki page written"
+
+## Step 7: Create Gitea alert issue ONLY for P0/P1 patterns
+
+P0P1=$(echo "$SYNTHESIS" | grep -E "^- P[01] " | head -5)
+VERDICT=$(echo "$SYNTHESIS" | grep "^VERDICT:" | grep -oE "HEALTHY|DEGRADED|CRITICAL")
+
+if [ -n "$P0P1" ] && [ "$VERDICT" != "HEALTHY" ]; then
+  EXISTING=$(gtr list-issues --owner terraphim --repo terraphim-ai --state open 2>/dev/null \
+    | python3 -c "import json,sys; issues=json.load(sys.stdin); [print(i['number']) for i in issues if 'Theme-ID: adf-fleet-health-alert' in i.get('body','') and '${TODAY}' in i.get('title','')]" \
+    | head -1)
+
+  if [ -z "$EXISTING" ]; then
+    gtr create-issue --owner terraphim --repo terraphim-ai \
+      --title "[ADF] Fleet health alert $TODAY: $VERDICT" \
+      --body "## Mneme Fleet Health Alert
+
+**Date**: $TODAY
+**Verdict**: $VERDICT
+
+## P0/P1 Patterns
+
+$P0P1
+
+## Full Synthesis
+
+$SYNTHESIS
+
+## Data Sources
+
+- Journal: $TOTAL_RUNS agent runs analysed
+- Open issues: $OPEN_COUNT ($THEME_IDS)
+
+Theme-ID: adf-fleet-health-alert"
+    echo "Created fleet health alert issue"
+  else
+    echo "Alert issue already exists for today (#$EXISTING); skipping"
+  fi
+else
+  echo "Verdict: $VERDICT -- no P0/P1 patterns -- no alert issue created"
+fi
+
+echo ""
+echo "=== Mneme synthesis complete ==="
+'''
