@@ -1478,7 +1478,7 @@ fn main() -> Result<()> {
             if cli.server {
                 eprintln!("error: listen mode does not support --server flag");
                 eprintln!("The listener runs in offline mode only.");
-                std::process::exit(1);
+                std::process::exit(robot::exit_codes::ExitCode::ErrorUsage.code().into());
             }
             let listener_config = match config.as_deref() {
                 Some(path) => listener::ListenerConfig::load_from_path(path)?,

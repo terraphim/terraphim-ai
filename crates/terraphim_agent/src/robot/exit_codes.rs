@@ -65,6 +65,7 @@ impl ExitCode {
     pub fn from_code(code: u8) -> Self {
         match code {
             0 => ExitCode::Success,
+            1 => ExitCode::ErrorGeneral,
             2 => ExitCode::ErrorUsage,
             3 => ExitCode::ErrorIndexMissing,
             4 => ExitCode::ErrorNotFound,
