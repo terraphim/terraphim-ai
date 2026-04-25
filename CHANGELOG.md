@@ -59,6 +59,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `terraphim_service`: `OpenRouterError`, `Result`, `OpenRouterService`, `get_role`, summarisation-queue builder methods (`new`, `with_priority`, `with_max_retries`, `with_max_summary_length`, `with_force_regenerate`, `with_callback_url`, `with_config`, `can_retry`, `increment_retry`, `get_summary_length`, `is_terminal`, `is_processing`, `is_pending`).
   - `terraphim_persistence`: `DeviceStorage`, `DeviceStorage::instance`, `Error`, `Result`, `ConversationIndex` CRUD methods, `parse_profile`, `parse_profiles`.
   - `terraphim_rolegraph`: `Error`, `is_empty`, `add_or_update_document`, `split_paragraphs`, test-fixture constants.
+- **Doc-gap audit 2026-04-25 (round 3 — full workspace)**: `RUSTDOCFLAGS="-W missing-docs" cargo doc --no-deps` across all 40+ crates produces zero `missing_docs` warnings. Prior estimate of ~660 remaining gaps fully resolved.
 - **Doc-gap audit 2026-04-25 (round 2)**: resolved all remaining rustdoc warnings; `cargo doc --workspace --no-deps` now exits with zero warnings.
   - `terraphim_router`: qualified `[with_change_notifications]` to `[Self::with_change_notifications]`.
   - `terraphim_tinyclaw`: backtick-escaped bare URL in `MatrixConfig::homeserver_url` doc.
