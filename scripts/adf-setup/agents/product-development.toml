@@ -1,34 +1,42 @@
 # product-development agent template
 #
-# Planning-only agent for roadmap and feature prioritization.
-# Normalized to remove implementation/frontend semantic drift.
+# Tech lead agent: code quality, spec coverage, architecture review,
+# quality gate enforcement. Runs hourly at :25, midnight to 10am.
+#
+# NOT a planning/roadmap agent -- that is product-owner (Themis).
+# This agent reviews what has been built, not what should be built next.
 #
 # Layer: Core
-# Schedule: Daily at 02:00
-# Persona: Carthos (architecture/planning aligned)
+# Schedule: Hourly at :25, midnight to 10am
+# Persona: Ferrox (Rust Engineer -- direct, technical, allergic to ambiguity)
 # Subscription-only models only (C1 constraint).
 
 [[agents]]
 name = "product-development"
 layer = "Core"
 cli_tool = "/home/alex/.local/bin/claude"
-model = "sonnet"
+model = "haiku"
 fallback_model = "kimi-for-coding/k2p5"
-persona = "Carthos"
-terraphim_role = "Carthos Architecture"
+fallback_provider = "/home/alex/.bun/bin/opencode"
+persona = "Ferrox"
 skill_chain = [
   "disciplined-research",
   "disciplined-design",
-  "documentation"
+  "disciplined-specification",
+  "disciplined-verification",
+  "code-review",
+  "architecture",
+  "testing",
+  "requirements-traceability"
 ]
-schedule = "0 2 * * *"
-max_cpu_seconds = 1200
+schedule = "25 0-10 * * *"
+max_cpu_seconds = 7200
 grace_period_secs = 30
 capabilities = [
-  "product-development",
-  "roadmap-prioritization",
-  "feature-prioritization",
-  "backlog-shaping"
+  "code-review",
+  "architecture",
+  "quality-gate",
+  "spec-validation"
 ]
 task = '''
 source ~/.profile
