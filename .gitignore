@@ -121,3 +121,6 @@ pi-session-*.html
 
 # Git worktree agent scratch directories
 .worktrees/
+
+# Client project data - never track
+projects/odilo/
