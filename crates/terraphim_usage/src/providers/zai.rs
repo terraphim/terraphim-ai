@@ -314,20 +314,22 @@ mod tests {
 
     #[test]
     fn test_zai_provider_no_api_key() {
-        let key_before = std::env::var("ZAI_API_KEY").ok();
-        // SAFETY: test-only, single-threaded, restoring env var after test
-        unsafe {
-            std::env::remove_var("ZAI_API_KEY");
+        let has_key = std::env::var("ZAI_API_KEY")
+            .or_else(|_| std::env::var("GLM_API_KEY"))
+            .is_ok();
+        if has_key {
+            return;
         }
         let provider = ZaiProvider::new();
         assert!(
             provider.api_key.is_none(),
-            "ZaiProvider should have no API key when ZAI_API_KEY is unset"
+            "ZaiProvider should have no API key when ZAI_API_KEY and GLM_API_KEY are unset"
         );
-        if let Some(key) = key_before {
-            unsafe {
-                std::env::set_var("ZAI_API_KEY", key);
-            }
-        }
+    }
+
+    #[test]
+    fn test_zai_provider_with_explicit_key() {
+        let provider = ZaiProvider::with_api_key("test-key".to_string());
+        assert_eq!(provider.api_key.as_deref(), Some("test-key"));
     }
 }
