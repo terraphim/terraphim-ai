@@ -101,11 +101,7 @@ jobs:
     # SeaweedFS S3 cache is bound to fcbr0 (172.26.0.1:8333), reachable only
     # from this host. Mac runners would fail on both counts.
     runs-on: [self-hosted, bigbox]
-    # 90 min: terraphim_agent integration tests shell out via `cargo run` for
-    # every CLI invocation, which pays per-call compile cost even on warm
-    # cache. test_end_to_end_server_workflow alone makes 8 such calls. Will
-    # be reduced once that test is refactored to use the binary directly.
-    timeout-minutes: 90
+    timeout-minutes: 30
     # Route all rustc invocations through sccache backed by SeaweedFS S3 on
     # fcbr0. See .docs/adr-rust-build-cache-seaweedfs.md. Env is applied to
     # every step so cargo fmt/clippy/build/test all share the cache.
