@@ -1,0 +1,15 @@
+[Unit]
+Description=RCH Remote Compilation Helper Daemon
+After=network.target network-online.target
+Wants=network-online.target
+Before=adf-orchestrator.service
+
+[Service]
+Type=simple
+ExecStart=/home/alex/.local/bin/rchd --foreground --socket %h/.cache/rch/rch.sock --workers-config %h/.config/rch/workers.toml
+Restart=always
+RestartSec=5
+Environment=RUST_LOG=info
+
+[Install]
+WantedBy=default.target
