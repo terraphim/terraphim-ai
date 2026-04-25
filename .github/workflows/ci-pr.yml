@@ -161,6 +161,7 @@ jobs:
     env:
       RUSTC_WRAPPER: /home/alex/.local/bin/sccache
       SCCACHE_BUCKET: rust-cache
+      SCCACHE_SERVER_PORT: "4231"
       SCCACHE_ENDPOINT: http://172.26.0.1:8333
       SCCACHE_S3_USE_SSL: "false"
       SCCACHE_REGION: us-east-1
@@ -197,13 +198,8 @@ jobs:
 
       - name: sccache start and zero stats
         run: |
-          # Stop any stale sccache server (e.g. from a prior GHA-action run on this
 
-          # runner) so the bigbox-local 0.8.2 client never hits a v0.14 server.
-
-          pkill -u "$(id -un)" -x sccache || true
-
-          /home/alex/.local/bin/sccache --start-server
+          /home/alex/.local/bin/sccache --start-server || true
           /home/alex/.local/bin/sccache --zero-stats
 
       - name: Rustfmt Check
@@ -302,6 +298,7 @@ jobs:
     env:
       RUSTC_WRAPPER: /home/alex/.local/bin/sccache
       SCCACHE_BUCKET: rust-cache
+      SCCACHE_SERVER_PORT: "4231"
       SCCACHE_ENDPOINT: http://172.26.0.1:8333
       SCCACHE_S3_USE_SSL: "false"
       SCCACHE_REGION: us-east-1
@@ -342,13 +339,8 @@ jobs:
 
       - name: sccache start and zero stats
         run: |
-          # Stop any stale sccache server (e.g. from a prior GHA-action run on this
 
-          # runner) so the bigbox-local 0.8.2 client never hits a v0.14 server.
-
-          pkill -u "$(id -un)" -x sccache || true
-
-          /home/alex/.local/bin/sccache --start-server
+          /home/alex/.local/bin/sccache --start-server || true
           /home/alex/.local/bin/sccache --zero-stats
 
       - name: Cache Cargo registry and index
@@ -384,6 +376,7 @@ jobs:
     env:
       RUSTC_WRAPPER: /home/alex/.local/bin/sccache
       SCCACHE_BUCKET: rust-cache
+      SCCACHE_SERVER_PORT: "4231"
       SCCACHE_ENDPOINT: http://172.26.0.1:8333
       SCCACHE_S3_USE_SSL: "false"
       SCCACHE_REGION: us-east-1
@@ -419,13 +412,8 @@ jobs:
 
       - name: sccache start and zero stats
         run: |
-          # Stop any stale sccache server (e.g. from a prior GHA-action run on this
 
-          # runner) so the bigbox-local 0.8.2 client never hits a v0.14 server.
-
-          pkill -u "$(id -un)" -x sccache || true
-
-          /home/alex/.local/bin/sccache --start-server
+          /home/alex/.local/bin/sccache --start-server || true
           /home/alex/.local/bin/sccache --zero-stats
 
       - name: Install wasm-pack
