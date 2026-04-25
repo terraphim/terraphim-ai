@@ -40,6 +40,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Error enum docs for `Error`, `ServiceError`, and `TerraphimMcpError`.
 - Documentation report artefacts for issue #114.
 - Agent issue creation convention with Theme-ID dedup pattern (`762e1bb0`).
+- **Doc-gap audit**: added missing rustdoc to six high-debt crates; `terraphim_config` 38→0 warnings (100%), `terraphim_middleware` 37→0 (100%), `terraphim_service` 112→16 (-86%), `terraphim_types` 79→14 (-82%), `terraphim_agent` 99→25 (-75%), `terraphim_sessions` 13→8 (-38%).
+  - `terraphim_config`: crate-level `//!`, all `TerraphimConfigError` variants, `Role`/`KnowledgeGraph`/`KnowledgeGraphLocal` field docs, `ConfigBuilder` methods, `ConfigId` variants.
+  - `terraphim_middleware`: module-level `//!`, all `Error` variants, `RipgrepCommand` + message-type structs, `ClickUpHaystackIndexer`, `build_thesaurus_from_haystack`.
+  - `terraphim_service`: `TerraphimService`, `ServiceError`, `LlmClient` trait, `SummarizeOptions`, `ChatOptions`, `ProxyConfig`, `CommonError` + constructors, `TaskStatus` variants, `ConversationStatistics` fields.
+  - `terraphim_types`: `DocumentType`, `RouteDirective`, `MarkdownDirectives`, `Edge::new`, `NormalizedTermValue` methods, `Scorer`/`Query`/`Similarity` types, `FindingSeverity`/`FindingCategory`/`ReviewFinding`/`ReviewAgentOutput`.
+  - `terraphim_agent`: crate-level `//!`, `TuiService`, `ConnectivityResult`/`FuzzySuggestion`/`ChecklistResult` fields, `BudgetedResults`/`BudgetEngine`, `Capabilities`/`CommandDoc`/`ArgumentDoc`/`FlagDoc`/`ExampleDoc` fields, `ReplCommand` variants.
+  - `terraphim_sessions`: `SessionMetadata::new`, `FileOperation` variants, `ConnectorStatus::Available` fields.
 
 ### Fixed
 - **Agent formatting** in RobotResponse chaining for consistent output (`b5ba8927`)
