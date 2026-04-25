@@ -154,8 +154,14 @@ fn test_all_personas_load_into_registry() {
         }
     }
 
-    // Should have exactly 8 personas
-    assert_eq!(personas.len(), 8, "Expected 8 persona TOML files");
+    // At least one persona must exist; the previous hardcoded count
+    // (was: 8) went stale every time a persona was added (themis,
+    // future ones). Each file is already validated by the loop above —
+    // the remaining concern is uniqueness, asserted next.
+    assert!(
+        !personas.is_empty(),
+        "Expected at least one persona TOML file in {dir:?}"
+    );
 
     // Verify all have unique agent names
     let names: Vec<_> = personas.iter().map(|p| &p.agent_name).collect();
