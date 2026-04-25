@@ -73,19 +73,27 @@ jobs:
           done
 
       - name: Execute command in VM
+        # /api/vms/{id} returning status=running means firecracker VMM is up,
+        # but the in-guest sshd may still be initialising. Retry the execute
+        # call (which SSHes into the guest) until it returns exit_code=0 or
+        # until we exhaust attempts. Each retry has a short SSH timeout so a
+        # single failure doesn't burn the workflow timeout.
         run: |
           VM_ID="${{ steps.vm.outputs.vm_id }}"
-          RESULT=$(curl -sf -X POST $FCCTL_URL/api/llm/execute \
-            -H 'Content-Type: application/json' \
-            -d "{
-              \"vm_id\": \"$VM_ID\",
-              \"code\": \"echo vm-ok && uname -r && id\",
-              \"language\": \"bash\",
-              \"agent_id\": \"ci-probe-${{ github.run_id }}\",
-              \"timeout_ms\": 15000
-            }")
-          echo "$RESULT" | python3 -m json.tool
-          echo "$RESULT" | python3 -c "import sys,json; r=json.load(sys.stdin); sys.exit(0 if r.get('exit_code')==0 else 1)"
+          PAYLOAD="{\"vm_id\":\"$VM_ID\",\"code\":\"echo vm-ok && uname -r && id\",\"language\":\"bash\",\"agent_id\":\"ci-probe-${{ github.run_id }}\",\"timeout_ms\":15000}"
+          for i in $(seq 1 6); do
+            RESULT=$(curl -sf -X POST $FCCTL_URL/api/llm/execute -H 'Content-Type: application/json' -d "$PAYLOAD" || echo '{"exit_code":-1,"stderr":"curl failed"}')
+            EXIT=$(echo "$RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin).get('exit_code', -1))" 2>/dev/null || echo "-1")
+            echo "attempt $i: exit_code=$EXIT"
+            if [ "$EXIT" = "0" ]; then
+              echo "$RESULT" | python3 -m json.tool
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "ERROR: VM did not accept SSH after 6 attempts"
+          echo "$RESULT" | python3 -m json.tool || echo "$RESULT"
+          exit 1
 
       - name: Destroy VM
         if: always()
