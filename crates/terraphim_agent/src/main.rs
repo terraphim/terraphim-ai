@@ -1355,11 +1355,23 @@ mod classify_error_tests {
     #[test]
     fn non_auth_strings_do_not_map_to_5() {
         // Ensure "author", "authority", and path prefixes are not misclassified.
-        assert_ne!(classify_error(&err("author field missing")), ExitCode::ErrorAuth);
-        assert_ne!(classify_error(&err("authority header")), ExitCode::ErrorAuth);
-        assert_ne!(classify_error(&err("failed to open auth_tokens.json")), ExitCode::ErrorAuth);
+        assert_ne!(
+            classify_error(&err("author field missing")),
+            ExitCode::ErrorAuth
+        );
+        assert_ne!(
+            classify_error(&err("authority header")),
+            ExitCode::ErrorAuth
+        );
+        assert_ne!(
+            classify_error(&err("failed to open auth_tokens.json")),
+            ExitCode::ErrorAuth
+        );
         // "4010" (not a bare 401) should not match.
-        assert_ne!(classify_error(&err("error code 4010 unknown")), ExitCode::ErrorAuth);
+        assert_ne!(
+            classify_error(&err("error code 4010 unknown")),
+            ExitCode::ErrorAuth
+        );
     }
 
     #[test]
