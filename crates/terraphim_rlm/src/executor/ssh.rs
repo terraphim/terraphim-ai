@@ -74,6 +74,8 @@ impl SshExecutor {
             format!("ConnectTimeout={}", self.connect_timeout_ms / 1000),
             "-o".to_string(),
             "BatchMode=yes".to_string(),
+            "-o".to_string(),
+            "IdentitiesOnly=yes".to_string(),
         ];
 
         if let Some(key_path) = &self.private_key_path {

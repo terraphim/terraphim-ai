@@ -103,6 +103,12 @@ async fn test_session_lifecycle_real() {
     let executor =
         FirecrackerExecutor::new(config.clone()).expect("Failed to create FirecrackerExecutor");
 
+    // Initialize the executor (creates VmManager and SnapshotManager)
+    executor
+        .initialize()
+        .await
+        .expect("Failed to initialize FirecrackerExecutor");
+
     let rlm = TerraphimRlm::with_executor(config, executor).expect("Failed to create TerraphimRlm");
 
     // Create session
@@ -146,6 +152,12 @@ async fn test_execute_code_real() {
     let executor =
         FirecrackerExecutor::new(config.clone()).expect("Failed to create FirecrackerExecutor");
 
+    // Initialize the executor (creates VmManager and SnapshotManager)
+    executor
+        .initialize()
+        .await
+        .expect("Failed to initialize FirecrackerExecutor");
+
     let rlm = TerraphimRlm::with_executor(config, executor).expect("Failed to create TerraphimRlm");
 
     let session = rlm
@@ -159,10 +171,19 @@ async fn test_execute_code_real() {
         .await
         .expect("Failed to execute code");
 
-    // The result may be a stub if no VM is allocated
-    // In a full setup, this would execute in a real VM
     println!("Code execution result: {:?}", result);
-    assert_eq!(result.exit_code, 0); // Stubs return 0
+
+    // With real VMs, we should see actual output
+    // Without VMs, we get a stub response
+    if result.stdout.contains("Hello from RLM!") {
+        println!("SUCCESS: Code executed in real VM!");
+    } else if result
+        .stdout
+        .contains("[FirecrackerExecutor] No VM available")
+    {
+        println!("INFO: VM not allocated (expected if pool not initialized)");
+    }
+    assert_eq!(result.exit_code, 0);
 
     // Clean up
     rlm.destroy_session(&session.id).await.ok();

@@ -91,7 +91,17 @@ pub async fn select_executor(
         match backend {
             BackendType::Firecracker if is_kvm_available() => {
                 log::info!("Selected Firecracker backend (KVM available)");
-                return Ok(Box::new(FirecrackerExecutor::new(config.clone())?));
+                let executor = FirecrackerExecutor::new(config.clone())?;
+                // Initialize the executor to set up VmManager and SnapshotManager
+                if let Err(e) = executor.initialize().await {
+                    log::warn!(
+                        "Failed to initialize FirecrackerExecutor: {}. Trying next backend.",
+                        e
+                    );
+                    tried.push(format!("firecracker (init failed: {})", e));
+                    continue;
+                }
+                return Ok(Box::new(executor));
             }
             BackendType::Firecracker => {
                 log::debug!("Firecracker unavailable: KVM not present");
