@@ -138,7 +138,7 @@ impl FirecrackerExecutor {
         log::info!("Initializing FirecrackerExecutor with fcctl-core managers");
 
         // Initialize VmManager from fcctl-core
-        let firecracker_bin = PathBuf::from("/usr/bin/firecracker");
+        let firecracker_bin = PathBuf::from("/usr/local/bin/firecracker");
         let socket_base_path = PathBuf::from("/tmp/firecracker-sockets");
 
         // Create socket directory if it doesn't exist
@@ -228,8 +228,42 @@ impl FirecrackerExecutor {
             }
         }
 
-        // No VM assigned yet - would allocate from pool in production
-        log::debug!("No VM available for session {}", session_id);
+        // Try to create a new VM if managers are initialized
+        let mut vm_manager_guard = self.vm_manager.lock().await;
+        if let Some(ref mut vm_manager) = *vm_manager_guard {
+            log::info!("Creating new VM for session {}", session_id);
+
+            // VM configuration
+            let vm_config = fcctl_core::firecracker::VmConfig {
+                kernel_path: "/home/alex/firecracker/build/kernel/vmlinux-5.10".to_string(),
+                rootfs_path: "/home/alex/firecracker/build/rootfs/bionic.rootfs.ext4".to_string(),
+                vcpus: 2,
+                memory_mb: 512,
+                initrd_path: None,
+                boot_args: Some("console=ttyS0 reboot=k panic=1 pci=off".to_string()),
+                vm_type: fcctl_core::firecracker::VmType::Minimal,
+            };
+
+            match vm_manager.create_vm(&vm_config, None).await {
+                Ok(vm_id) => {
+                    log::info!("Created VM {} for session {}", vm_id, session_id);
+                    drop(vm_manager_guard); // Release lock before writing to session_to_vm
+                    self.session_to_vm
+                        .write()
+                        .insert(*session_id, vm_id.clone());
+                    return Ok(Some(vm_id));
+                }
+                Err(e) => {
+                    log::error!("Failed to create VM for session {}: {}", session_id, e);
+                }
+            }
+        } else {
+            log::debug!(
+                "VmManager not initialized, cannot create VM for session {}",
+                session_id
+            );
+        }
+
         Ok(None)
     }
 

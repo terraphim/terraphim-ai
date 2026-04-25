@@ -84,9 +84,15 @@ impl TerraphimRlm {
     ///
     /// # Example
     ///
-    /// ```rust,ignore
-    /// let config = RlmConfig::default();
-    /// let rlm = TerraphimRlm::new(config).await?;
+    /// ```rust,no_run
+    /// use terraphim_rlm::{RlmConfig, TerraphimRlm};
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     let config = RlmConfig::default();
+    ///     let rlm = TerraphimRlm::new(config).await?;
+    ///     Ok(())
+    /// }
     /// ```
     pub async fn new(config: RlmConfig) -> RlmResult<Self> {
         // Validate configuration
@@ -273,12 +279,21 @@ impl TerraphimRlm {
     ///
     /// # Example
     ///
-    /// ```rust,ignore
-    /// let result = rlm.execute_code(&session.id, r#"
-    ///     import math
-    ///     print(f"Pi = {math.pi}")
-    /// "#).await?;
-    /// assert!(result.stdout.contains("Pi = 3.14"));
+    /// ```rust,no_run
+    /// use terraphim_rlm::{TerraphimRlm, RlmConfig};
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     let config = RlmConfig::default();
+    ///     let rlm = TerraphimRlm::new(config).await?;
+    ///     let session = rlm.create_session().await?;
+    ///     let result = rlm.execute_code(&session.id, r#"
+    ///         import math
+    ///         print(f"Pi = {math.pi}")
+    ///     "#).await?;
+    ///     assert!(result.stdout.contains("Pi = 3.14"));
+    ///     Ok(())
+    /// }
     /// ```
     pub async fn execute_code(
         &self,
@@ -323,9 +338,18 @@ impl TerraphimRlm {
     ///
     /// # Example
     ///
-    /// ```rust,ignore
-    /// let result = rlm.execute_command(&session.id, "ls -la /").await?;
-    /// println!("Files: {}", result.stdout);
+    /// ```rust,no_run
+    /// use terraphim_rlm::{TerraphimRlm, RlmConfig};
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     let config = RlmConfig::default();
+    ///     let rlm = TerraphimRlm::new(config).await?;
+    ///     let session = rlm.create_session().await?;
+    ///     let result = rlm.execute_command(&session.id, "ls -la /").await?;
+    ///     println!("Files: {}", result.stdout);
+    ///     Ok(())
+    /// }
     /// ```
     pub async fn execute_command(
         &self,
@@ -378,16 +402,25 @@ impl TerraphimRlm {
     ///
     /// # Example
     ///
-    /// ```rust,ignore
-    /// let result = rlm.query(&session.id, "Write a Python function to calculate factorial").await?;
-    /// match result.termination_reason {
-    ///     TerminationReason::FinalReached => {
-    ///         println!("Result: {}", result.result.unwrap());
+    /// ```rust,no_run
+    /// use terraphim_rlm::{TerraphimRlm, RlmConfig, query_loop::TerminationReason};
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     let config = RlmConfig::default();
+    ///     let rlm = TerraphimRlm::new(config).await?;
+    ///     let session = rlm.create_session().await?;
+    ///     let result = rlm.query(&session.id, "Write a Python function to calculate factorial").await?;
+    ///     match result.termination_reason {
+    ///         TerminationReason::FinalReached => {
+    ///             println!("Result: {}", result.result.unwrap());
+    ///         }
+    ///         TerminationReason::TokenBudgetExhausted => {
+    ///             println!("Ran out of tokens!");
+    ///         }
+    ///         _ => {}
     ///     }
-    ///     TerminationReason::TokenBudgetExhausted => {
-    ///         println!("Ran out of tokens!");
-    ///     }
-    ///     _ => {}
+    ///     Ok(())
     /// }
     /// ```
     pub async fn query(&self, session_id: &SessionId, prompt: &str) -> RlmResult<QueryLoopResult> {
