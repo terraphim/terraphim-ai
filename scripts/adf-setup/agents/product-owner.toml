@@ -316,6 +316,41 @@ $WIGS
 REPORTEOF
 echo "Report: $REPORT_FILE"
 
+## Step 5b: Post scoring summary as comment on top ready issue
+
+TOP_ISSUE=$(echo "$READY" | python3 -c '
+import json,sys
+d=json.load(sys.stdin)
+issues=d.get("ready_issues",[])
+print(issues[0]["index"] if issues else "")
+' 2>/dev/null)
+
+if [ -n "$TOP_ISSUE" ]; then
+  COMMENT_BODY="## Themis Roadmap Scoring -- $(date +%Y-%m-%d)
+
+### Essentialism Filter (5/25 Rule)
+$(echo "$FILTER_OUTPUT" | head -30)
+
+### Compound-RICE Scores
+$(echo "$RICE_OUTPUT" | head -40)
+
+### Ranked Top 3
+$(echo "$RICE_OUTPUT" | grep -A1 "^RANKED\|^TOP 3\|^1\.\|^2\.\|^3\." | head -10)
+
+### Lead Measures (4DX)
+$(echo "$RICE_OUTPUT" | grep -A3 "^LEAD MEASURES\|^Lead Measures" | head -8)
+
+---
+*Themis product-owner cycle -- full report at \`/opt/ai-dark-factory/reports/roadmap-$(date +%Y%m%d-%H%M).md\`*"
+
+  gtr comment --owner "$GITEA_OWNER" --repo "$GITEA_REPO" --index "$TOP_ISSUE" \
+    --body "$COMMENT_BODY" \
+    2>&1 && echo "Posted scoring summary to issue #$TOP_ISSUE" \
+    || echo "Warning: could not post to issue #$TOP_ISSUE (continuing)"
+else
+  echo "No ready issues -- skipping Gitea comment"
+fi
+
 ## Step 6: Capture learning
 
 ~/.cargo/bin/terraphim-agent learn capture --type insight \
