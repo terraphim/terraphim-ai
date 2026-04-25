@@ -44,7 +44,7 @@ Issue body:
 $ISSUE_BODY
 ---"
 
-SCOPE_JSON=$(echo "$SCOPE_PROMPT" | /home/alex/.local/bin/claude -p --model haiku --allowedTools "" 2>&1)
+SCOPE_JSON=$(echo "$SCOPE_PROMPT" | /home/alex/.local/bin/claude -p --model haiku --allowedTools "" --max-turns 3 2>&1)
 
 CLEAR=$(echo "$SCOPE_JSON" | python3 -c 'import json,sys,re; t=sys.stdin.read(); m=re.search(r"\{.*\}",t,re.DOTALL); print(json.loads(m.group(0)).get("clear",False) if m else False)' 2>/dev/null || echo "false")
 
@@ -94,7 +94,7 @@ Body:
 $ISSUE_BODY
 ---"
 
-ROLE=$(/home/alex/.local/bin/claude -p --model haiku --allowedTools "" "$DISPATCH_PROMPT" 2>/dev/null | tr -d '[:space:]' | head -c 20 || echo "developer")
+ROLE=$(/home/alex/.local/bin/claude -p --model haiku --allowedTools "" --max-turns 3 "$DISPATCH_PROMPT" 2>/dev/null | tr -d '[:space:]' | head -c 20 || echo "developer")
 
 # Sanitise: fall back to developer if role is not recognised
 case "$ROLE" in

@@ -399,20 +399,18 @@ impl ExitClassifier {
                 };
             }
 
-            // Even for exit code 0, check for error patterns (some tools
-            // return 0 but print errors to stderr)
+            // exit_code=0 is authoritative: the agent completed cleanly.
+            // Pattern-match for observability only; matched_patterns are
+            // preserved in the record but must not override exit_class.
+            // Agents that discuss or report on failure conditions (e.g.
+            // "current swap OOM risk") are not themselves failing.
+            // Real OOM kills produce SIGKILL (exit_code != 0).
+            // Rate-limit detection for exit_code=0 tools is handled
+            // separately by error_signatures.rs.
             let classification = self.match_patterns(&combined);
-            if classification.exit_class != ExitClass::Unknown {
-                // Downgrade confidence since exit code was 0
-                return ExitClassification {
-                    confidence: classification.confidence * 0.5,
-                    ..classification
-                };
-            }
-
             return ExitClassification {
                 exit_class: ExitClass::Success,
-                matched_patterns: vec![],
+                matched_patterns: classification.matched_patterns,
                 confidence: 1.0,
             };
         }
@@ -893,6 +891,47 @@ mod tests {
         let lines: Vec<String> = (0..50).map(|i| format!("emoji {} 🔥", i)).collect();
         let summary = AgentRunRecord::summarise_output(&lines);
         assert!(std::str::from_utf8(summary.as_bytes()).is_ok());
+    }
+
+    // Regression tests for false-positive exit classification:
+    // agents that discuss failure conditions in their output must not be
+    // misclassified as having failed themselves when exit_code=0.
+
+    #[test]
+    fn exit_code_zero_with_oom_pattern_is_success() {
+        let c = classifier();
+        let result = c.classify(
+            Some(0),
+            &["Infrastructure check complete. OOM risk: low (swap 99% full but 108GiB RAM available).".to_string()],
+            &[],
+        );
+        assert_eq!(result.exit_class, ExitClass::Success);
+        assert_eq!(result.confidence, 1.0);
+        // matched_patterns preserved for observability even though exit_class=Success
+        assert!(result.matched_patterns.iter().any(|p| p.contains("oom")));
+    }
+
+    #[test]
+    fn exit_code_zero_with_timeout_pattern_is_success() {
+        let c = classifier();
+        let result = c.classify(
+            Some(0),
+            &["gtr wiki-list: operation timed out after 30s, skipping".to_string()],
+            &[],
+        );
+        assert_eq!(result.exit_class, ExitClass::Success);
+        assert_eq!(result.confidence, 1.0);
+    }
+
+    #[test]
+    fn nonzero_exit_with_oom_pattern_is_resource_exhaustion() {
+        let c = classifier();
+        let result = c.classify(
+            Some(137),
+            &["out of memory: killed process 1234".to_string()],
+            &[],
+        );
+        assert_eq!(result.exit_class, ExitClass::ResourceExhaustion);
     }
 
     #[tokio::test]
