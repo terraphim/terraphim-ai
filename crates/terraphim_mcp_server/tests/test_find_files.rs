@@ -25,6 +25,10 @@ fn thesaurus_with_terms(name: &str, terms: &[(u64, &str)]) -> Thesaurus {
             value: NormalizedTermValue::from(val.to_string()),
             display_value: None,
             url: None,
+            action: None,
+            priority: None,
+            trigger: None,
+            pinned: false,
         };
         t.insert(key, term);
     }

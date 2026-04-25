@@ -979,6 +979,15 @@ enum LearnSub {
         #[command(subcommand)]
         sub: SuggestSub,
     },
+    /// Export captured corrections as reviewable KG markdown artefacts
+    ExportKg {
+        /// Output directory for KG markdown files
+        #[arg(long)]
+        output: PathBuf,
+        /// Filter by correction type: tool-preference or all (default: all)
+        #[arg(long, default_value = "all")]
+        correction_type: String,
+    },
     /// Manage shared learnings with trust levels (L1/L2/L3)
     #[cfg(feature = "shared-learning")]
     Shared {
@@ -2977,6 +2986,30 @@ async fn run_learn_command(sub: LearnSub) -> Result<()> {
                 .map_err(|e| anyhow::anyhow!("Failed to write thesaurus to {:?}: {}", output, e))?;
 
             println!("Thesaurus written to: {}", output.display());
+            Ok(())
+        }
+        LearnSub::ExportKg {
+            output,
+            correction_type,
+        } => {
+            let storage_loc = config.storage_location();
+            let filter = match correction_type.as_str() {
+                "tool-preference" => learnings::CorrectionTypeFilter::ToolPreference,
+                "all" => learnings::CorrectionTypeFilter::All,
+                _ => {
+                    return Err(anyhow::anyhow!(
+                        "Invalid correction_type '{}'. Use 'tool-preference' or 'all'.",
+                        correction_type
+                    ));
+                }
+            };
+            let count = learnings::export_corrections_as_kg(&storage_loc, &output, filter)
+                .map_err(|e| anyhow::anyhow!("Failed to export corrections: {}", e))?;
+            println!(
+                "Exported {} correction(s) as KG markdown to: {}",
+                count,
+                output.display()
+            );
             Ok(())
         }
         #[cfg(feature = "shared-learning")]
