@@ -62,11 +62,15 @@ pub fn is_gvisor_available() -> bool {
 ///
 /// # Example
 ///
-/// ```rust,ignore
-/// use terraphim_rlm::{RlmConfig, select_executor};
+/// ```rust,no_run
+/// use terraphim_rlm::{RlmConfig, executor::select_executor};
 ///
-/// let config = RlmConfig::default();
-/// let executor = select_executor(&config).await?;
+/// #[tokio::main]
+/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+///     let config = RlmConfig::default();
+///     let executor = select_executor(&config).await?;
+///     Ok(())
+/// }
 /// ```
 pub async fn select_executor(
     config: &RlmConfig,
