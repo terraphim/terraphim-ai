@@ -14,6 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **RobotFormatter integration** in CLI search functionality for structured output (`7d64f126`)
 - **ForgivingParser integration** in REPL for improved command parsing (`7d64f126`)
 - **Token budget management engine** for robot mode with budget tracking and enforcement (`34891c29`)
+- **Typed `ExitCode` throughout `main.rs`**: all 22 bare `process::exit(1)` calls converted to `ExitCode::ErrorGeneral` for phase-3 instrumentation consistency (`994caeab`)
+- **Listen-mode guard** now emits `ExitCode::ErrorUsage` (2) instead of bare exit(1); `from_code()` gains explicit `1 => ErrorGeneral` arm for self-documentation (`4f9beed1`)
+
+#### Phase 4 Verification (F1.2 Exit Codes)
+- **Exit-code integration test suite** added at `crates/terraphim_agent/tests/exit_codes_integration_test.rs` covering `--help` (0), invalid subcommand (1/2), listen-mode `--server` guard (2), and structural contract of `exit_codes.rs` (`d12ae2ed`)
 
 #### Session Features
 - **BM25-ranked session search** with search-index feature flag for fast full-text queries (`6871da00`)
