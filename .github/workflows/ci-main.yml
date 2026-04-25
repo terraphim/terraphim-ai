@@ -32,7 +32,7 @@ jobs:
   # Build setup and metadata
   setup:
     name: Build Setup
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: [self-hosted, bigbox]
     timeout-minutes: 3
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -90,15 +90,27 @@ jobs:
           echo "targets=$TARGETS" >> $GITHUB_OUTPUT
 
   # Rust build with comprehensive caching
+  # Optimal stack: bigbox runner + sccache backed by SeaweedFS S3 on fcbr0 +
+  # rch dispatch for queue/slot accounting shared with ADF agents. See
+  # .docs/walkthrough-ci-build-pipeline.md and the two ADRs it links.
   rust-build:
     name: Rust Build (${{ matrix.target }})
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: [self-hosted, bigbox]
     timeout-minutes: 30
     needs: [setup, frontend-build]
     strategy:
       fail-fast: false
       matrix:
         target: ${{ fromJson(needs.setup.outputs.targets) }}
+    env:
+      RUSTC_WRAPPER: /home/alex/.local/bin/sccache
+      SCCACHE_BUCKET: rust-cache
+      SCCACHE_ENDPOINT: http://172.26.0.1:8333
+      SCCACHE_S3_USE_SSL: "false"
+      SCCACHE_REGION: us-east-1
+      SCCACHE_S3_KEY_PREFIX: terraphim-ai
+      AWS_ACCESS_KEY_ID: any
+      AWS_SECRET_ACCESS_KEY: any
 
     steps:
       - name: Fix target directory permissions
@@ -143,13 +155,10 @@ jobs:
           components: rustfmt, clippy
           targets: ${{ matrix.target }}
 
-      - name: Setup sccache
-        uses: mozilla-actions/sccache-action@v0.0.9
-
-      - name: Configure sccache
+      - name: sccache start and zero stats
         run: |
-          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
-          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+          /home/alex/.local/bin/sccache --start-server || true
+          /home/alex/.local/bin/sccache --zero-stats
 
       - name: Cache Cargo registry and dependencies (self-hosted)
         uses: actions/cache@v4
@@ -182,10 +191,12 @@ jobs:
           echo "Cleaned terraphim_server to ensure fresh UI embedding"
 
       - name: Build release binaries
+        # Dispatched through rch so this build queues alongside ADF agents
+        # via rchd's slot accounting. Fail-open: if rchd is down, rch falls
+        # through to local cargo. zlob feature required: fff-search build.rs
+        # panics when CI=true unless zlob is explicitly enabled.
         run: |
-          # Build workspace. zlob feature required: fff-search build.rs
-          # panics when CI=true unless zlob is explicitly enabled.
-          cargo build --release --target ${{ matrix.target }} --workspace --features zlob
+          /home/alex/.local/bin/rch exec -- cargo build --release --target ${{ matrix.target }} --workspace --features zlob
 
           # Verify key binaries exist
           ls -la target/${{ matrix.target }}/release/terraphim*
@@ -215,7 +226,11 @@ jobs:
         run: |
           # Run unit and integration tests (exclude integration-signing which requires zitsign CLI)
           # zlob feature required: fff-search build.rs panics when CI=true without zlob.
-          cargo test --release --target ${{ matrix.target }} --workspace --features "self_update/signatures,zlob"
+          /home/alex/.local/bin/rch exec -- cargo test --release --target ${{ matrix.target }} --workspace --features "self_update/signatures,zlob"
+
+      - name: sccache stats
+        if: always()
+        run: /home/alex/.local/bin/sccache --show-stats
 
       - name: Upload binary artifacts
         uses: actions/upload-artifact@v4
@@ -252,7 +267,7 @@ jobs:
   # Frontend build
   frontend-build:
     name: Frontend Build
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: [self-hosted, bigbox]
     timeout-minutes: 15
     needs: setup
 
@@ -297,11 +312,23 @@ jobs:
           retention-days: ${{ needs.setup.outputs.is-release == 'true' && '90' || '30' }}
 
   # WASM build
+  # Bigbox runner so the SeaweedFS S3 sccache backend on fcbr0 is reachable.
+  # The build-wasm.sh script invokes cargo internally; we set the SCCACHE
+  # env at job-level so RUSTC_WRAPPER picks it up.
   wasm-build:
     name: WASM Build
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: [self-hosted, bigbox]
     timeout-minutes: 12
     needs: setup
+    env:
+      RUSTC_WRAPPER: /home/alex/.local/bin/sccache
+      SCCACHE_BUCKET: rust-cache
+      SCCACHE_ENDPOINT: http://172.26.0.1:8333
+      SCCACHE_S3_USE_SSL: "false"
+      SCCACHE_REGION: us-east-1
+      SCCACHE_S3_KEY_PREFIX: terraphim-ai-wasm
+      AWS_ACCESS_KEY_ID: any
+      AWS_SECRET_ACCESS_KEY: any
 
     steps:
       - name: Fix target directory permissions
@@ -319,13 +346,10 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
 
-      - name: Setup sccache
-        uses: mozilla-actions/sccache-action@v0.0.9
-
-      - name: Configure sccache
+      - name: sccache start and zero stats
         run: |
-          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
-          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+          /home/alex/.local/bin/sccache --start-server || true
+          /home/alex/.local/bin/sccache --zero-stats
 
       - name: Install wasm-pack
         run: |
@@ -334,8 +358,10 @@ jobs:
           fi
 
       - name: Build WASM for web
+        # rch exec wraps the script so the underlying cargo invocations
+        # share the rchd queue with other CI + ADF builds.
         run: |
-          ./scripts/build-wasm.sh web release
+          /home/alex/.local/bin/rch exec -- ./scripts/build-wasm.sh web release
 
           # Show WASM artifacts
           ls -la crates/terraphim_automata/wasm/pkg/
@@ -343,7 +369,11 @@ jobs:
 
       - name: Build WASM for Node.js
         run: |
-          ./scripts/build-wasm.sh nodejs release
+          /home/alex/.local/bin/rch exec -- ./scripts/build-wasm.sh nodejs release
+
+      - name: sccache stats
+        if: always()
+        run: /home/alex/.local/bin/sccache --show-stats
 
       - name: Upload WASM artifacts
         uses: actions/upload-artifact@v4
@@ -355,7 +385,7 @@ jobs:
   # Docker image build
   docker-build:
     name: Docker Build
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: [self-hosted, bigbox]
     timeout-minutes: 45
     needs: [setup, rust-build, frontend-build]
     if: needs.setup.outputs.is-release == 'true' || github.event.inputs.deploy-staging == 'true'
@@ -421,7 +451,7 @@ jobs:
   # Integration tests
   integration-tests:
     name: Integration Tests
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: [self-hosted, bigbox]
     timeout-minutes: 20
     needs: [rust-build, frontend-build]
     if: github.ref == 'refs/heads/main' || needs.setup.outputs.is-release == 'true'
@@ -479,7 +509,7 @@ jobs:
   # Security scanning
   security-scan:
     name: Security Scan
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: [self-hosted, bigbox]
     timeout-minutes: 5
     needs: setup
     if: github.ref == 'refs/heads/main' || needs.setup.outputs.is-release == 'true'
@@ -512,7 +542,7 @@ jobs:
   # Build summary
   build-summary:
     name: Build Summary
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: [self-hosted, bigbox]
     timeout-minutes: 2
     needs: [setup, rust-build, frontend-build, wasm-build, docker-build, integration-tests]
     if: always()
