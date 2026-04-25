@@ -22,22 +22,36 @@ on bigbox. System-wide files (`/etc/ssh/sshd_config.d/`, `/dp` symlink,
 ## Required system state on bigbox
 
 These exist outside this directory but are required for RCH to dispatch
-terraphim-ai builds:
+builds across all projects (handled by `deploy.sh`):
 
-- `/dp -> /data/projects` symlink (`sudo ln -sfn /data/projects /dp`).
-  rch's `topology audit` enforces `/dp` as alias for the canonical root.
-- `/data/projects/terraphim-ai` bind-mount of `/home/alex/projects/terraphim/terraphim-ai`.
-  rch's hook normalizes project paths and rejects anything outside the
-  canonical root `/data/projects`. Bind-mounting the workspace satisfies the
-  topology check without moving the actual checkout. Make persistent via
-  fstab:
-  ```
-  /home/alex/projects/terraphim/terraphim-ai  /data/projects/terraphim-ai  none  bind  0  0
-  ```
+- **`/data/projects` is a symlink to `/home/alex/projects`.** rch v1.0.16
+  hardcodes `/data/projects` as the canonical project root and ignores the
+  `RCH_CANONICAL_PROJECT_ROOT` env var (verified). Symlinking sets the
+  effective canonical root to `/home/alex/projects` after rch's
+  canonicalize() resolves the link. Every existing and future project under
+  `/home/alex/projects/*` is automatically in scope -- no per-project
+  bind-mount maintenance.
+- `/dp -> /data/projects` symlink. rch's `topology audit` enforces `/dp`
+  as alias for the canonical root.
 - `~/.local/bin/rch{,d,-wkr}` binaries (install with the upstream script):
   ```bash
   curl -fsSL https://raw.githubusercontent.com/Dicklesworthstone/remote_compilation_helper/main/install.sh | bash
   ```
+
+## What's in/out of rch dispatch scope
+
+| Path | rch dispatch? |
+|---|---|
+| `/home/alex/projects/zestic-ai/digital-twins` (ADF target) | yes |
+| `/home/alex/projects/zestic-ai/odilo` (ADF target) | yes |
+| `/home/alex/projects/terraphim/terraphim-ai` (dev) | yes |
+| `/home/alex/projects/<anything-new>` | yes (auto) |
+| `/home/alex/terraphim-ai` (ADF terraphim orchestrator working dir) | NO -- falls open to local; outside `/home/alex/projects/` |
+| `~/actions-runner-N/_work/...` (CI runners) | NO -- falls open; per-runner workspace dirs |
+
+Fail-open behaviour: when rch rejects a path it just runs cargo locally,
+so out-of-scope paths still build, they just don't share queue/slot
+accounting with the dispatched workload.
 
 ## Verifying
 
