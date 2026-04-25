@@ -7,8 +7,8 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use terraphim_tracker::GiteaTracker;
 use terraphim_tracker::gitea::{ClaimStrategy, GiteaConfig};
+use terraphim_tracker::GiteaTracker;
 
 use crate::config::{GiteaOutputConfig, OrchestratorConfig};
 use crate::dispatcher::LEGACY_PROJECT_ID;
@@ -517,10 +517,8 @@ mod agent_token_tests {
             agent_tokens_path: None,
         };
         let poster = OutputPoster::new(&config);
-        assert!(
-            poster
-                .agent_token(crate::dispatcher::LEGACY_PROJECT_ID, "anything")
-                .is_none()
-        );
+        assert!(poster
+            .agent_token(crate::dispatcher::LEGACY_PROJECT_ID, "anything")
+            .is_none());
     }
 }

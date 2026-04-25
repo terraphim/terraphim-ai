@@ -92,7 +92,11 @@ fn parse_opencode_step_finish(
     let latency_ms = start_timestamp
         .map(|start| {
             let diff = finish_timestamp - start;
-            if diff > 0 { diff as u64 } else { 0 }
+            if diff > 0 {
+                diff as u64
+            } else {
+                0
+            }
         })
         .unwrap_or(0);
 

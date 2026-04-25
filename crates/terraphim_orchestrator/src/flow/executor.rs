@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use chrono::Utc;
 use tokio::process::Command;
-use tokio::time::{Duration, timeout};
+use tokio::time::{timeout, Duration};
 
 use super::config::{FailStrategy, FlowDefinition, FlowStepDef, StepKind};
 use super::envelope::StepEnvelope;

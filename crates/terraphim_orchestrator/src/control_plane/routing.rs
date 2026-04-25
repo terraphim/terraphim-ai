@@ -8,7 +8,7 @@
 use crate::control_plane::telemetry::TelemetryStore;
 use crate::cost_tracker::BudgetVerdict;
 use crate::kg_router::KgRouter;
-use crate::provider_budget::{ProviderBudgetTracker, provider_key_for_model};
+use crate::provider_budget::{provider_key_for_model, ProviderBudgetTracker};
 use std::path::PathBuf;
 use std::sync::Arc;
 use terraphim_types::capability::{CostLevel, Latency, Provider, ProviderType};
@@ -723,12 +723,10 @@ mod tests {
         let decision = engine.decide_route(&ctx, &BudgetVerdict::Uncapped).await;
 
         assert!(!decision.all_candidates.is_empty());
-        assert!(
-            decision
-                .all_candidates
-                .iter()
-                .any(|c| c.source == RouteSource::StaticConfig)
-        );
+        assert!(decision
+            .all_candidates
+            .iter()
+            .any(|c| c.source == RouteSource::StaticConfig));
     }
 
     #[tokio::test]

@@ -285,8 +285,13 @@ async fn test_offline_extract_command() -> Result<()> {
 async fn test_offline_extract_with_role() -> Result<()> {
     let text = "This is a test paragraph. It contains some text for extraction.";
     // Use Terraphim Engineer role which has a configured knowledge graph
-    let (stdout, stderr, code) =
-        run_offline_command(&["extract", text, "--role", "Terraphim Engineer", "--exclude-term"])?;
+    let (stdout, stderr, code) = run_offline_command(&[
+        "extract",
+        text,
+        "--role",
+        "Terraphim Engineer",
+        "--exclude-term",
+    ])?;
 
     // Extract with role might succeed or fail depending on content
     assert!(

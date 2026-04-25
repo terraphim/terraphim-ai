@@ -20,8 +20,8 @@ pub mod telemetry;
 pub mod telemetry_persist;
 
 pub use events::{
-    CommandKind, EventOrigin, NormalizedAgentEvent, WebhookContext, dedup_key,
-    normalize_polled_command, normalize_webhook_dispatch,
+    dedup_key, normalize_polled_command, normalize_webhook_dispatch, CommandKind, EventOrigin,
+    NormalizedAgentEvent, WebhookContext,
 };
 pub use routing::{DispatchContext, RouteCandidate, RoutingDecision, RoutingDecisionEngine};
 pub use telemetry::{CompletionEvent, TelemetryStore, TelemetrySummary};
