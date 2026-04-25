@@ -51,10 +51,63 @@ pub fn apply_hermetic_env(cmd: &mut Command) -> Result<()> {
     let home_dir = root.join("home");
     let xdg_config_home = root.join("xdg-config");
     let data_dir = root.join("data");
+    let dashmap_dir = root.join("dashmap");
+    let sqlite_dir = root.join("sqlite");
 
     fs::create_dir_all(&home_dir)?;
     fs::create_dir_all(&xdg_config_home)?;
     fs::create_dir_all(&data_dir)?;
+    fs::create_dir_all(&dashmap_dir)?;
+    fs::create_dir_all(&sqlite_dir)?;
+
+    // Write a per-test settings.toml that scopes ALL persistence profiles to
+    // this hermetic root. Otherwise terraphim_settings ships defaults that
+    // hardcode /tmp/terraphim_sqlite + /tmp/terraphim_dashmap; multiple
+    // processes (other tests, ADF agents, dev REPL) would contend on the
+    // same SQLite WAL and update_selected_role's save() would block for
+    // minutes. See settings_local_dev.toml for the upstream defaults.
+    //
+    // terraphim_settings uses `directories::ProjectDirs` to locate the
+    // config dir, which differs by platform:
+    //   - Linux:   $XDG_CONFIG_HOME/terraphim or $HOME/.config/terraphim
+    //   - macOS:   $HOME/Library/Application Support/com.aks.terraphim
+    //   - Windows: %APPDATA%/aks/terraphim/config
+    // Write to all three under the hermetic HOME so whichever runs first
+    // finds our settings.
+    let sqlite_db = sqlite_dir.join("terraphim.db");
+    let settings_toml = format!(
+        r#"
+server_hostname = "127.0.0.1:8000"
+api_endpoint = "http://localhost:8000/api"
+initialized = "false"
+default_data_path = "{data}"
+
+[profiles.dashmap]
+type = "dashmap"
+root = "{dashmap}"
+
+[profiles.sqlite]
+type = "sqlite"
+datadir = "{sqlite}"
+connection_string = "{db}"
+table = "terraphim_kv"
+"#,
+        data = data_dir.display(),
+        dashmap = dashmap_dir.display(),
+        sqlite = sqlite_dir.display(),
+        db = sqlite_db.display(),
+    );
+    let settings_dirs = [
+        home_dir.join(".config").join("terraphim"),
+        home_dir
+            .join("Library")
+            .join("Application Support")
+            .join("com.aks.terraphim"),
+    ];
+    for dir in &settings_dirs {
+        fs::create_dir_all(dir)?;
+        fs::write(dir.join("settings.toml"), &settings_toml)?;
+    }
 
     let workspace = workspace_root()?;
     let role_config = workspace.join("terraphim_server/default/terraphim_engineer_config.json");

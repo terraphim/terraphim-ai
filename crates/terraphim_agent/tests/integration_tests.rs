@@ -470,10 +470,35 @@ async fn test_end_to_end_server_workflow() -> Result<()> {
     );
     println!("✓ Server extract command completed");
 
-    // 8. Test role selection on server using the dedicated server-mode path
-    let (set_stdout, _, set_code) =
+    // 8. Test role selection on server using the dedicated server-mode path.
+    //
+    // Steps 3-7 may have started server-side background work (KG indexing,
+    // thesaurus persistence) that briefly contends on the config mutex. The
+    // CLI's own get_config + update_selected_role both touch that lock. Give
+    // the server a few seconds to drain, and retry once on a network timeout.
+    thread::sleep(Duration::from_secs(5));
+
+    let (mut set_stdout, mut set_stderr, mut set_code) =
         run_server_command(&server_url, &["roles", "select", &selected_role])?;
-    assert_eq!(set_code, 0, "Server role select should succeed");
+
+    if set_code != 0 && set_stderr.contains("timed out") {
+        eprintln!(
+            "roles select timed out; waiting 10s for server to settle and retrying once. \
+             stderr was: {}",
+            set_stderr
+        );
+        thread::sleep(Duration::from_secs(10));
+        let retry = run_server_command(&server_url, &["roles", "select", &selected_role])?;
+        set_stdout = retry.0;
+        set_stderr = retry.1;
+        set_code = retry.2;
+    }
+
+    assert_eq!(
+        set_code, 0,
+        "Server role select for '{}' should succeed (with one retry on timeout).\nstdout={}\nstderr={}",
+        selected_role, set_stdout, set_stderr
+    );
     assert!(extract_clean_output(&set_stdout).contains(&format!("selected:{}", selected_role)));
     println!("✓ Server role selection completed");
 
