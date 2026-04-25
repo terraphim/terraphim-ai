@@ -68,6 +68,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `terraphim_tracker`: backtick-escaped bare URL in `LinearConfig::endpoint` doc.
 
 ### Fixed
+- **Auth heuristic** in `classify_error` tightened to prevent false positives from "author", "authority", and path-prefixed strings like `auth_tokens.json` (`73455ec7`)
+- **Test formatting** in `classify_error_tests` aligned with `cargo fmt` style (`568f06b5`)
 - **Exit code assertions** in F1.2 integration tests aligned with exit-code contract (`b3229f7b`)
 - **End-to-end test** `server roles select` now tolerates timeout, preventing flaky CI failures (`807dea62`)
 - **Cargo fmt** applied to exit-code additions keeping formatting clean (`bf1bfebb`)
