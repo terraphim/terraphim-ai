@@ -374,6 +374,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "performance benchmark: only reliable in --release builds"]
     fn test_discovery_latency_benchmark() {
         let mut index = McpToolIndex::new(PathBuf::from("/tmp/test-benchmark.json"));
 
