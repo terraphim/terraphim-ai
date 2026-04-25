@@ -1,19 +1,27 @@
 # product-owner agent template (Themis)
 #
-# Product Strategist: maintains the development roadmap using Compound-RICE
-# scoring, creates well-structured Gitea issues with explicit prioritisation
-# rationale, and names what is NOT being done (essentialism constraint).
+# Product Strategist: maintains the development roadmap using three layers
+# of discipline drawn from the terraphim skills system:
 #
-# Compound-RICE formula:
-#   (Reach × Impact × Confidence × Synergy) / (Effort × Maintenance)
-#   Priority bands: critical ≥30, high ≥15, medium ≥7, low <7
-#   Synergy > 2.0 signals compound opportunity (builds on prior investment).
+#   1. Essentialism (5/25 Rule): cut the backlog to the vital few FIRST,
+#      before any scoring -- the other 20 become "Avoid At All Cost".
+#
+#   2. Compound-RICE scoring on the survivors:
+#      (Reach × Impact × Confidence × Synergy) / (Effort × Maintenance)
+#      Synergy > 2.0 = compound opportunity = 4DX lead measure.
+#      Priority bands: critical ≥30, high ≥15, medium ≥7, low <7.
+#
+#   3. Flawless Execution (4DX / WIG alignment): every created issue must
+#      serve a current WIG and include a mini-UAT acceptance block with
+#      3-5 testable Gherkin conditions. If it can't be shown, it doesn't count.
 #
 # A feature is not done until it has been marketed.
 # Every issue created includes a one-line marketing hint.
 #
+# Persona: Themis -- decisive arbiter, evidence-weighing, trade-off explicit.
+#   "Weigh, decide, ship. Name the trade-off. Name the WIG. Name the lead measure."
+#
 # Layer: Core (hourly at :55, midnight to 10am)
-# Persona: Themis (Product Strategist -- decisive arbiter, evidence-weighing)
 # Subscription-only models only (C1 constraint).
 
 [[agents]]
@@ -31,6 +39,7 @@ skill_chain = [
     "architecture",
     "business-scenario-design",
     "requirements-traceability",
+    "acceptance-testing",
 ]
 schedule = "55 0-10 * * *"
 max_cpu_seconds = 7200
@@ -49,192 +58,271 @@ cd "$GITEA_WORKING_DIR" && git pull --ff-only
 export GITEA_TOKEN=5d663368d955953ddf900ff33420fcabebfbfb4b
 export GITEA_URL=https://git.terraphim.cloud
 
-## Step 0: Compound-RICE Scoring of Candidate Issues
+echo "=== Themis Product Owner Cycle: $(date -u +%Y-%m-%dT%H:%M:%SZ) ==="
 
-Before creating any new issues, score the top open issues for prioritisation.
-This helps the team focus on what compounds, not just what is urgent.
+## Step 0: Read current WIGs from progress.md
 
+WIGS=$(cat /home/alex/terraphim-ai/progress.md 2>/dev/null \
+  | grep -A 20 "WIG\|Wildly Important\|Q2 2026\|Current Quarter" \
+  | head -25 || echo "(progress.md not found -- WIG check skipped)")
+echo "--- Current WIGs ---"
+echo "$WIGS"
+
+## Step 1: Essentialism -- 5/25 Rule to cut the backlog
+
+ALL_ISSUES=$(gtr list-issues --owner "$GITEA_OWNER" --repo "$GITEA_REPO" --state open 2>/dev/null)
 READY=$(gtr ready --owner "$GITEA_OWNER" --repo "$GITEA_REPO" 2>/dev/null)
-TOP10=$(echo "$READY" | python3 -c '
+
+ALL_TITLES=$(echo "$ALL_ISSUES" | python3 -c '
 import json,sys
-d=json.load(sys.stdin)
-issues=d.get("ready_issues",[])[:10]
+issues=json.load(sys.stdin)
+for i in issues[:25]:
+    print(f"#{i[\"number\"]} {i[\"title\"][:80]}")
+' 2>/dev/null)
+
+FILTER_PROMPT="You are Themis, product strategist. Apply the 5/25 Rule (Warren Buffett / Essentialism):
+
+From the list below, identify:
+1. TOP 5: the vital few that are essential to current WIGs and have highest leverage
+2. AVOID AT ALL COST: the remaining 20 that are distractions, nice-to-haves, or premature
+
+Current WIGs:
+$WIGS
+
+All open issues (up to 25):
+$ALL_TITLES
+
+Output format:
+TOP 5 (vital few -- will be scored):
+#NNN: <reason it is essential -- which WIG does it serve?>
+...
+
+AVOID AT ALL COST (dangerous distractions this cycle):
+#NNN: <one-line reason why not now>
+...
+
+NOT DOING THIS CYCLE (essentialism constraint):
+<One sentence naming what is explicitly sacrificed and why>"
+
+FILTER_OUTPUT=$(/home/alex/.local/bin/claude -p --model sonnet --allowedTools "" --max-turns 3 "$FILTER_PROMPT" 2>&1)
+echo ""
+echo "=== Essentialism Filter (5/25 Rule) ==="
+echo "$FILTER_OUTPUT"
+
+# Extract the top 5 issue numbers for scoring
+TOP5=$(echo "$FILTER_OUTPUT" | grep -oP '#\K\d+' | head -5)
+echo ""
+echo "Issues selected for Compound-RICE scoring: $TOP5"
+
+## Step 2: Compound-RICE Scoring on the vital few
+
+TOP5_DETAILS=$(echo "$ALL_ISSUES" | python3 -c "
+import json,sys
+issues=json.load(sys.stdin)
+top5=[$(echo $TOP5 | tr ' ' ',')]
 for i in issues:
-    print(f"#{i[\"index\"]} (score={i.get(\"score\",\"?\")}) {i[\"title\"][:80]}")
-' 2>/dev/null || echo "(could not parse ready issues)")
+    if i['number'] in top5:
+        print(f\"#{i['number']} {i['title'][:80]}\")
+        body=(i.get('body','') or '')[:200]
+        if body:
+            print(f\"  {body.replace(chr(10),' ')}\")
+" 2>/dev/null)
 
-echo "=== Top ready issues for scoring ==="
-echo "$TOP10"
-
-RICE_PROMPT="You are Themis, the product strategist for $GITEA_OWNER/$GITEA_REPO.
-
-Score these issues using Compound-RICE:
+RICE_PROMPT="You are Themis. Score these 5 issues using Compound-RICE:
 Formula: (Reach × Impact × Confidence × Synergy) / (Effort × Maintenance)
 Priority bands: critical ≥30, high ≥15, medium ≥7, low <7
 
 Definitions:
 - Reach: users/agents/workflows affected (1-100)
 - Impact: improvement significance (1-10)
-- Confidence: certainty this will work (0.1-1.0)
-- Synergy: does this build on recent work or unlock future work? (1.0=neutral, 2.0+=compound opportunity)
+- Confidence: how certain are we this will work (0.1-1.0)
+- Synergy: does this build on recent work or unlock future work?
+  (1.0=neutral, 2.0+=compound opportunity = 4DX lead measure)
 - Effort: relative implementation cost (1=trivial, 5=large, 10=huge)
-- Maintenance: ongoing burden multiplier (1.0=neutral, 1.5=high maintenance)
+- Maintenance: ongoing burden multiplier (1.0=neutral, 1.5=high)
+
+Simplicity check: flag any issue where Effort ≥7 and ask if it can be decomposed.
+Nothing Speculative check: flag any issue with 'in case we need it' language.
 
 Issues to score:
-$TOP10
+$TOP5_DETAILS
 
-For each issue:
-1. Estimate components (label as estimates)
-2. Calculate Compound-RICE score
-3. Assign priority band
+Current WIGs (for Synergy context):
+$WIGS
 
-Then:
-4. Name the TOP 3 to work on (score ≥15 preferred)
-5. Explicitly name what is NOT being prioritised and WHY
-   ('doing #X means deferring #Y because...')
-6. Flag any Synergy >2.0 items as compound opportunities
-
-Format output as:
-
+Output:
 SCORES:
-#NNN: base_rice=X compound_rice=Y priority=<critical|high|medium|low> synergy=Z [compound opportunity if synergy>2]
-...
+#NNN: reach=X impact=X confidence=X synergy=X effort=X maintenance=X
+  compound_rice=Y  priority=<band>  [COMPOUND OPPORTUNITY if synergy>=2.0]
+  WIG: <which WIG does this serve, or NONE>
+  [SIMPLICITY FLAG: ...] if effort>=7
+  [SPECULATIVE FLAG: ...] if vague scope
 
-TOP 3:
-1. #NNN - reason
-2. #NNN - reason
-3. #NNN - reason
+RANKED TOP 3:
+1. #NNN (score=Y) -- <trade-off: doing this means not doing what?>
+2. #NNN (score=Y) -- <trade-off>
+3. #NNN (score=Y) -- <trade-off>
 
-DEFERRED (explicit trade-off):
-- #NNN deferred because: <reason relating to lower score or blocking dependency>
-
-COMPOUND OPPORTUNITIES:
-- #NNN: synergy=Z -- <what prior work this builds on>"
+LEAD MEASURES (4DX):
+- Completing #NNN unblocks: <downstream issues/WIGs>"
 
 RICE_OUTPUT=$(/home/alex/.local/bin/claude -p --model sonnet --allowedTools "" --max-turns 3 "$RICE_PROMPT" 2>&1)
 echo ""
 echo "=== Compound-RICE Analysis ==="
 echo "$RICE_OUTPUT"
 
-## Step 1: Read prior learnings and context
+## Step 3: Create new issues with WIG alignment + mini-UAT acceptance block
 
 LEARNINGS=$(~/.cargo/bin/terraphim-agent learn query "roadmap prioritization issue creation" 2>/dev/null || echo "")
 
-## Step 2: Create new issues for problems NOT yet tracked
-
-# Identify problems found by infra/stewardship agents not yet in backlog
-OPEN_ISSUES=$(gtr list-issues --owner "$GITEA_OWNER" --repo "$GITEA_REPO" --state open 2>/dev/null)
-OPEN_COUNT=$(echo "$OPEN_ISSUES" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)))' 2>/dev/null || echo 0)
+OPEN_COUNT=$(echo "$ALL_ISSUES" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)))' 2>/dev/null || echo 0)
 
 CREATION_PROMPT="You are Themis, product strategist for $GITEA_OWNER/$GITEA_REPO.
 
-You are the product owner for terraphim-ai. Your job is to maintain a development roadmap by creating well-structured Gitea issues with clear acceptance criteria.
+You have completed essentialism filtering and Compound-RICE scoring. Now identify up to 2 NEW issues to create.
 
-## Current context
+Rules (from disciplined-design / acceptance-testing skills):
+1. Not already tracked -- check the open issues list
+2. Compound-RICE score would be ≥15 if scored
+3. Well-scoped: completable in <500 LOC by one agent in <2 hours
+4. Serves a current WIG
+5. Nothing Speculative: no 'in case we need it later' scope
+6. Must include testable acceptance criteria (mini-UAT block)
 
-Compound-RICE scores of ready issues:
-$RICE_OUTPUT
+Context:
+- Essentialism filter: $FILTER_OUTPUT
+- RICE scores: $RICE_OUTPUT
+- Open issue count: $OPEN_COUNT
+- Prior learnings: $LEARNINGS
+- Current WIGs: $WIGS
 
-Prior learnings:
-$LEARNINGS
+For each new issue provide this EXACT structure:
 
-Open issues total: $OPEN_COUNT
+---NEW_ISSUE---
+Title: [concise, imperative]
+WIG: [which WIG this serves, or skip if none]
+Compound-RICE estimate: reach=X impact=X confidence=X synergy=X effort=X maintenance=X -> score=Y
+Problem: [2-3 sentences describing the problem]
+Proposed solution: [bullet points, no hand-waving]
+Acceptance criteria (mini-UAT):
+  Given [precondition]
+  When [action]
+  Then [observable outcome]
+  And [additional condition]
+  And [additional condition]
+Marketing hint: [one line -- how could this be announced or shared?]
+Suggested agent: @adf:<role>
+---END_ISSUE---
 
-## Your task
-
-Identify up to 2 NEW issues to create that:
-1. Are not already tracked in the open issues (do not create duplicates)
-2. Would have Compound-RICE score ≥15 if scored
-3. Are well-scoped (completable in <500 LOC by one agent in <2h)
-4. Have clear acceptance criteria
-
-For each new issue, provide:
-- Title
-- Problem statement (2-3 sentences)
-- Acceptance criteria (3-5 testable conditions)
-- Compound-RICE estimate (label as estimate)
-- Marketing hint: one line describing how this could be announced/shared
-- Suggested agent: @adf:<role>
-
-If no new issues meet the threshold (score ≥15, not already tracked), output: NO_NEW_ISSUES_NEEDED
-
-## Essentialism constraint
-Name what is explicitly NOT on your roadmap this cycle.
-'Not doing: [X] because [Y]'"
+If no new issues meet the threshold, output: NO_NEW_ISSUES_NEEDED
+Essentialism: explicitly name what is NOT on the roadmap this cycle."
 
 CREATION_OUTPUT=$(/home/alex/.local/bin/claude -p --model sonnet --allowedTools "Bash,Read" --max-turns 5 "$CREATION_PROMPT" 2>&1)
 echo ""
-echo "=== Issue Creation Analysis ==="
+echo "=== New Issue Analysis ==="
 echo "$CREATION_OUTPUT"
 
-## Step 3: Create the issues
+## Step 4: Parse and create the issues
 
 if echo "$CREATION_OUTPUT" | grep -q "NO_NEW_ISSUES_NEEDED"; then
-  echo "No new issues needed this cycle -- existing backlog is sufficient"
+  echo "No new issues this cycle -- backlog is sufficient"
 else
-  # Extract issue proposals and create them (max 2)
-  echo "$CREATION_OUTPUT" | python3 -c '
-import sys, re
+  # Extract and create each NEW_ISSUE block (max 2)
+  echo "$CREATION_OUTPUT" | python3 << 'PYEOF'
+import sys, re, subprocess, os
 
 text = sys.stdin.read()
-# Find issue proposals marked with Title:
-proposals = re.split(r"\n(?=(?:Issue |##?\s*(?:Issue|New Issue|Proposal)|\*\*Title))", text)
-count = 0
-for p in proposals[:3]:
-    title_m = re.search(r"(?:Title|##[^:]*?):\s*(.+)", p)
-    if not title_m or count >= 2:
+blocks = re.findall(r'---NEW_ISSUE---(.*?)---END_ISSUE---', text, re.DOTALL)
+
+created = 0
+for block in blocks[:2]:
+    title_m = re.search(r'Title:\s*(.+)', block)
+    if not title_m:
         continue
-    title = title_m.group(1).strip().strip("*").strip()
-    print(f"ISSUE_TITLE: {title}")
-    count += 1
-' | while read -r line; do
-    if [[ "$line" == ISSUE_TITLE:* ]]; then
-      TITLE="${line#ISSUE_TITLE: }"
-      # Check for duplicate
-      EXISTS=$(echo "$OPEN_ISSUES" | python3 -c "import json,sys; issues=json.load(sys.stdin); print('yes' if any('${TITLE}' in i.get('title','') for i in issues) else 'no')" 2>/dev/null || echo "no")
-      if [ "$EXISTS" = "no" ]; then
-        gtr create-issue --owner "$GITEA_OWNER" --repo "$GITEA_REPO" \
-          --title "$TITLE" \
-          --body "## Issue from product-owner (Themis) cycle
+    title = title_m.group(1).strip()
 
-$CREATION_OUTPUT
+    # Build body with all fields
+    body_parts = []
 
----
-*Created by @adf:product-owner (Themis) based on Compound-RICE analysis.*" \
-          2>&1 && echo "Created issue: $TITLE"
-      else
-        echo "Skipped (duplicate): $TITLE"
-      fi
-    fi
-  done
+    wig_m = re.search(r'WIG:\s*(.+)', block)
+    if wig_m:
+        body_parts.append(f"**WIG alignment**: {wig_m.group(1).strip()}")
+
+    rice_m = re.search(r'Compound-RICE estimate:\s*(.+)', block)
+    if rice_m:
+        body_parts.append(f"**Compound-RICE**: {rice_m.group(1).strip()}")
+
+    problem_m = re.search(r'Problem:\s*(.+?)(?=\nProposed|\nAcceptance|\nMarketing|\nSuggested|$)', block, re.DOTALL)
+    if problem_m:
+        body_parts.append(f"\n## Problem\n{problem_m.group(1).strip()}")
+
+    solution_m = re.search(r'Proposed solution:\s*(.+?)(?=\nAcceptance|\nMarketing|\nSuggested|$)', block, re.DOTALL)
+    if solution_m:
+        body_parts.append(f"\n## Proposed Solution\n{solution_m.group(1).strip()}")
+
+    ac_m = re.search(r'Acceptance criteria.*?:(.*?)(?=\nMarketing|\nSuggested|$)', block, re.DOTALL)
+    if ac_m:
+        body_parts.append(f"\n## Acceptance Criteria\n```gherkin{ac_m.group(1)}\n```")
+
+    marketing_m = re.search(r'Marketing hint:\s*(.+)', block)
+    if marketing_m:
+        body_parts.append(f"\n**Marketing hint**: {marketing_m.group(1).strip()}")
+
+    agent_m = re.search(r'Suggested agent:\s*(.+)', block)
+    if agent_m:
+        body_parts.append(f"\n**Suggested agent**: {agent_m.group(1).strip()}")
+
+    body_parts.append("\n---\n*Created by @adf:product-owner (Themis) -- Compound-RICE + Essentialism + UAT cycle*")
+
+    body = "\n".join(body_parts)
+
+    result = subprocess.run(
+        ['gtr', 'create-issue',
+         '--owner', 'terraphim', '--repo', 'terraphim-ai',
+         '--title', title, '--body', body],
+        capture_output=True, text=True
+    )
+    if result.returncode == 0:
+        print(f"Created: {title}")
+        created += 1
+    else:
+        print(f"Failed to create '{title}': {result.stderr[:200]}")
+
+print(f"Total created: {created}")
+PYEOF
 fi
 
-## Step 4: Write roadmap report
+## Step 5: Write roadmap report
 
 REPORT_FILE="/opt/ai-dark-factory/reports/roadmap-$(date +%Y%m%d-%H%M).md"
 cat > "$REPORT_FILE" << REPORTEOF
-# Product Owner Roadmap Report: $(date +%Y-%m-%d %H:%M)
+# Roadmap Report: $(date +%Y-%m-%d %H:%M UTC)
+
+## Essentialism Filter (5/25 Rule)
+
+$FILTER_OUTPUT
 
 ## Compound-RICE Scores
 
 $RICE_OUTPUT
 
-## Issue Creation This Cycle
+## Issue Creation
 
 $CREATION_OUTPUT
 
-## Context
+## WIGs (from progress.md)
 
-- Ready issues analysed: $(echo "$TOP10" | wc -l)
-- Open issues total: $OPEN_COUNT
+$WIGS
 REPORTEOF
+echo "Report: $REPORT_FILE"
 
-echo "Report written to $REPORT_FILE"
-
-## Step 5: Capture learning
+## Step 6: Capture learning
 
 ~/.cargo/bin/terraphim-agent learn capture --type insight \
   --context "product-owner/$GITEA_REPO" \
-  --description "Compound-RICE scoring cycle completed for $GITEA_REPO" \
+  --description "Themis cycle: 5/25 filter + Compound-RICE + WIG alignment + UAT blocks" \
   2>/dev/null || true
+
+echo ""
+echo "=== Themis cycle complete ==="
 '''
