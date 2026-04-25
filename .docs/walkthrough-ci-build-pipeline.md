@@ -15,18 +15,17 @@ configuration is, and how to diagnose the common failure modes.
 
 ## TL;DR
 
-- **Canonical workflow**: `.github/workflows/ci-firecracker.yml`. It uses the
-  optimal stack: `rch exec --` dispatch + sccache + SeaweedFS S3 cache,
-  pinned to the bigbox runner. Use it as the template for any new pipeline.
-- **Legacy workflows**: `ci-main.yml`, `ci-pr.yml`, `ci-native.yml` predate
-  the ADRs and use the GitHub-Actions cache backend on the generic
-  `[self-hosted, Linux, X64]` runner pool. They mostly work but flake on
-  `sccache: caused by: Connection reset by peer` because GHA cache is
-  rate-limited and adds a network hop. Migration is tracked as follow-up.
-- **VM lifecycle proof flake**: fcctl-web reports `status=running` as soon
-  as the firecracker VMM is up, but the in-guest sshd needs a few more
-  seconds before it accepts connections. The Execute step now retries 6×
-  with 5s backoff (commit `129364a5`). No more single-shot failures.
+- **All Rust/WASM CI workflows are on the same optimal stack**: `rch exec --`
+  dispatch + bigbox-local `sccache` backed by SeaweedFS S3 on fcbr0,
+  pinned to the `[self-hosted, bigbox]` runner label. `ci-firecracker.yml`
+  was the canonical reference; `ci-main.yml`, `ci-pr.yml`, and
+  `ci-native.yml` were migrated to the same pattern (commit `54cbdd1b`).
+- **VM lifecycle proof flake** (in `ci-firecracker.yml`) was fixed in
+  commit `129364a5`: the Execute step now retries 6× with 5s backoff so
+  the in-guest sshd readiness race no longer fails the proof.
+- **Use `ci-firecracker.yml` as the template** for any new pipeline that
+  builds Rust on bigbox. Its `rust-build` job is the smallest complete
+  example.
 
 ## Architecture
 
@@ -71,18 +70,14 @@ configuration is, and how to diagnose the common failure modes.
 
 | Workflow | Trigger | Runner | Cache | rch exec? | Status |
 |---|---|---|---|---|---|
-| `ci-firecracker.yml` | PR (crates/**) + dispatch | `[self-hosted, bigbox]` | sccache + SeaweedFS S3 | yes | **canonical** |
-| `ci-main.yml` | push to main | `[self-hosted, Linux, X64]` | sccache + GHA backend | no | flaky (GHA conn reset) |
-| `ci-pr.yml` | pull_request | `[self-hosted, Linux, X64]` | sccache + GHA backend | no | flaky (same cause) |
-| `ci-native.yml` | various | `[self-hosted, Linux, X64]` | sccache + GHA backend | no | usually green |
+| `ci-firecracker.yml` | PR (crates/**) + dispatch | `[self-hosted, bigbox]` | sccache + SeaweedFS S3 | yes | canonical |
+| `ci-main.yml` | push to main | `[self-hosted, bigbox]` | sccache + SeaweedFS S3 | yes | migrated (54cbdd1b) |
+| `ci-pr.yml` | pull_request | `[self-hosted, bigbox]` | sccache + SeaweedFS S3 | yes | migrated (54cbdd1b) |
+| `ci-native.yml` | various | `[self-hosted, bigbox]` | sccache + SeaweedFS S3 | yes | migrated (54cbdd1b) |
 | `test-firecracker-runner.yml` | push | bigbox | n/a | n/a | green (healthcheck only) |
 | `deploy-docs.yml` | push (docs/**) | hosted | n/a | n/a | green |
 | `frontend-build.yml`, `tauri-build.yml` | manual | various | n/a | n/a | stale, needs review |
 | `vm-execution-tests.yml`, `performance-benchmarking.yml` | manual | various | mixed | no | red, out of scope here |
-
-**Recommendation**: migrate `ci-main.yml` and `ci-pr.yml` to the
-canonical pattern (see "Migration recipe" below). After migration the
-legacy workflows can be retired.
 
 ## ci-firecracker.yml: canonical reference
 
@@ -362,8 +357,10 @@ from `infrastructure/rust-cache-stack/`.
 
 ## Open follow-ups
 
-- Migrate `ci-main.yml` and `ci-pr.yml` to the canonical pattern; retire
-  the GHA cache backend altogether.
+- Tag `terraphim-ai-runner-3` with the `bigbox` label so all four
+  Linux runners can pick up jobs pinned to `[self-hosted, bigbox]`.
+  Currently runners 2/4/5 are eligible; runner 3 is not (verified via
+  `gh api repos/.../actions/runners`).
 - Watch upstream rch issue #10
   (https://github.com/Dicklesworthstone/remote_compilation_helper/issues/10):
   if `RCH_CANONICAL_PROJECT_ROOT` becomes functional, drop the
