@@ -2373,7 +2373,7 @@ checksum = "9f1f227452a390804cdb637b74a86990f2a7d7ba4b7d5693aac9b4dd6defd8d6"
 [[package]]
 name = "fcctl-core"
 version = "0.1.0"
-source = "git+https://github.com/terraphim/firecracker-rust?branch=main#14dbb4d54be0f8bfc991557459780bd49dfbb1fd"
+source = "git+https://github.com/terraphim/firecracker-rust?branch=main#07265b36de1d829fd64cbfc680443cd605802c3d"
 dependencies = [
  "anyhow",
  "async-trait",
