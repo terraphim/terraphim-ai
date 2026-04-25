@@ -9549,7 +9549,6 @@ dependencies = [
  "pretty_assertions",
  "regex",
  "reqwest 0.12.28",
- "ring",
  "rustc_version",
  "serde",
  "serde_json",

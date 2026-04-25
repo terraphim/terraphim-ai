@@ -41,7 +41,6 @@ tower-http = { version = "0.5", features = ["cors", "trace"] }
 # Security and validation
 sha2 = "0.10"
 hex = "0.4"
-ring = { version = "0.17", optional = true }
 
 # Testing and assertions
 tempfile = { workspace = true }
@@ -97,9 +96,8 @@ path = "src/bin/terraphim-desktop-ui-tester.rs"
 
 [features]
 default = ["full"]
-full = ["docker", "security", "performance"]
+full = ["docker", "performance"]
 docker = ["bollard"]
-security = ["ring"]
 performance = []
 server-api-tests = []
 desktop-ui-tests = []
