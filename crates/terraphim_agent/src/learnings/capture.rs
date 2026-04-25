@@ -1067,43 +1067,52 @@ pub fn capture_correction(
 
 /// Parse a chained command to find the failing subcommand.
 ///
-/// For commands like `cmd1 && cmd2 || cmd3`, determines
-/// which subcommand failed based on the chain structure and exit code.
-///
 /// Returns (failing_subcommand, full_chain_option).
 ///
-/// Logic:
-/// - For `&&` chains with non-zero exit: last executed subcommand failed
-/// - For `||` chains with non-zero exit: all failed, last was final attempt
-/// - For `;` chains with non-zero exit: cannot disambiguate, return last (documented limitation)
-/// - For zero exit (success): return first subcommand as the meaningful one
+/// Operator-specific heuristics:
+/// - `&&` chains short-circuit on first failure. With only a single exit code
+///   we cannot tell which subcommand failed. We return the first subcommand
+///   because it definitely executed (later ones may never have run).
+/// - `||` chains short-circuit on first success. Non-zero exit means all
+///   commands ran and all failed, so the last is the final attempt.
+/// - `;` chains run all commands regardless. We return the last as convention
+///   (cannot disambiguate without per-step exit codes).
+/// - Zero exit: first subcommand (chain succeeded).
 fn parse_chained_command(command: &str, exit_code: i32) -> (String, Option<String>) {
-    // Helper to get failing subcommand based on exit code
-    let get_failing = |parts: &[&str]| -> String {
-        if exit_code != 0 {
-            // Non-zero exit: the last executed/submitted subcommand failed
-            parts.last().unwrap().trim().to_string()
-        } else {
-            // Zero exit: chain succeeded, first subcommand is the meaningful one
-            parts[0].trim().to_string()
-        }
-    };
-
-    // Check for chain operators in order
-    let chain_operators = [" && ", " || ", "; "];
-
-    for op in &chain_operators {
-        if command.contains(op) {
-            // Split by the operator
-            let parts: Vec<&str> = command.split(op).collect();
-            if parts.len() > 1 {
-                let failing = get_failing(&parts);
-                return (failing, Some(command.to_string()));
-            }
+    if command.contains(" && ") {
+        let parts: Vec<&str> = command.split(" && ").collect();
+        if parts.len() > 1 {
+            // First subcommand always: it definitely executed.
+            // (Later ones may not have run due to short-circuit.)
+            let candidate = parts[0].trim().to_string();
+            return (candidate, Some(command.to_string()));
         }
     }
 
-    // No chain detected
+    if command.contains(" || ") {
+        let parts: Vec<&str> = command.split(" || ").collect();
+        if parts.len() > 1 {
+            let candidate = if exit_code != 0 {
+                parts.last().unwrap().trim().to_string()
+            } else {
+                parts[0].trim().to_string()
+            };
+            return (candidate, Some(command.to_string()));
+        }
+    }
+
+    if command.contains("; ") {
+        let parts: Vec<&str> = command.split("; ").collect();
+        if parts.len() > 1 {
+            let candidate = if exit_code != 0 {
+                parts.last().unwrap().trim().to_string()
+            } else {
+                parts[0].trim().to_string()
+            };
+            return (candidate, Some(command.to_string()));
+        }
+    }
+
     (command.trim().to_string(), None)
 }
 
@@ -1899,35 +1908,46 @@ mod tests {
 
     #[test]
     fn test_parse_chained_command() {
-        // Test && chain with non-zero exit (last subcommand failed)
+        // && chain, non-zero exit: first subcommand (definitely executed;
+        // later ones may never have run due to short-circuit)
         let (cmd, chain) = parse_chained_command("cargo build && cargo test", 1);
-        assert_eq!(cmd, "cargo test");
+        assert_eq!(cmd, "cargo build");
         assert_eq!(chain, Some("cargo build && cargo test".to_string()));
 
-        // Test && chain with zero exit (success, first subcommand is meaningful)
+        // && chain, zero exit: first subcommand (chain succeeded)
         let (cmd2, chain2) = parse_chained_command("cargo build && cargo test", 0);
         assert_eq!(cmd2, "cargo build");
         assert_eq!(chain2, Some("cargo build && cargo test".to_string()));
 
-        // Test || chain with non-zero exit (all failed, last attempted)
-        let (cmd3, chain3) = parse_chained_command("cmd_a || cmd_b || cmd_c", 1);
-        assert_eq!(cmd3, "cmd_c");
-        assert_eq!(chain3, Some("cmd_a || cmd_b || cmd_c".to_string()));
+        // && three-part chain: first subcommand regardless of which failed
+        let (cmd3, chain3) = parse_chained_command("cmd1 && cmd2 && cmd3", 1);
+        assert_eq!(cmd3, "cmd1");
+        assert_eq!(chain3, Some("cmd1 && cmd2 && cmd3".to_string()));
 
-        // Test ; chain with non-zero exit (cannot disambiguate, return last)
-        let (cmd4, chain4) = parse_chained_command("cmd_a; cmd_b; cmd_c", 1);
+        // || chain, non-zero exit: last subcommand (all failed, last attempted)
+        let (cmd4, chain4) = parse_chained_command("cmd_a || cmd_b || cmd_c", 1);
         assert_eq!(cmd4, "cmd_c");
-        assert_eq!(chain4, Some("cmd_a; cmd_b; cmd_c".to_string()));
+        assert_eq!(chain4, Some("cmd_a || cmd_b || cmd_c".to_string()));
 
-        // Test single command without chain
-        let (cmd5, chain5) = parse_chained_command("git status", 0);
-        assert_eq!(cmd5, "git status");
-        assert_eq!(chain5, None);
+        // || chain, zero exit: first subcommand (short-circuited on success)
+        let (cmd5, chain5) = parse_chained_command("cmd_a || cmd_b || cmd_c", 0);
+        assert_eq!(cmd5, "cmd_a");
+        assert_eq!(chain5, Some("cmd_a || cmd_b || cmd_c".to_string()));
 
-        // Test single command with failure (no chain)
-        let (cmd6, chain6) = parse_chained_command("git status", 1);
-        assert_eq!(cmd6, "git status");
-        assert_eq!(chain6, None);
+        // ; chain, non-zero exit: last subcommand (cannot disambiguate)
+        let (cmd6, chain6) = parse_chained_command("cmd_a; cmd_b; cmd_c", 1);
+        assert_eq!(cmd6, "cmd_c");
+        assert_eq!(chain6, Some("cmd_a; cmd_b; cmd_c".to_string()));
+
+        // Single command without chain
+        let (cmd7, chain7) = parse_chained_command("git status", 0);
+        assert_eq!(cmd7, "git status");
+        assert_eq!(chain7, None);
+
+        // Single command with failure (no chain)
+        let (cmd8, chain8) = parse_chained_command("git status", 1);
+        assert_eq!(cmd8, "git status");
+        assert_eq!(chain8, None);
     }
 
     #[test]
