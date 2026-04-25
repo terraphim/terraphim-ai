@@ -1259,10 +1259,16 @@ fn classify_error(err: &anyhow::Error) -> robot::exit_codes::ExitCode {
     {
         ExitCode::ErrorNetwork
     } else if msg.contains("unauthori")
+        || msg.contains("unauthenticated")
         || msg.contains("forbidden")
-        || msg.contains("auth")
-        || msg.contains("401")
-        || msg.contains("403")
+        || msg.contains("authentication required")
+        || msg.contains("authentication failed")
+        || msg.contains(" 401 ")
+        || msg.contains(" 403 ")
+        || msg.ends_with(" 401")
+        || msg.ends_with(" 403")
+        || msg.contains("http 401")
+        || msg.contains("http 403")
     {
         ExitCode::ErrorAuth
     } else if msg.contains("index not found")
@@ -1344,6 +1350,16 @@ mod classify_error_tests {
             classify_error(&err("server returned 403 Forbidden")),
             ExitCode::ErrorAuth
         );
+    }
+
+    #[test]
+    fn non_auth_strings_do_not_map_to_5() {
+        // Ensure "author", "authority", and path prefixes are not misclassified.
+        assert_ne!(classify_error(&err("author field missing")), ExitCode::ErrorAuth);
+        assert_ne!(classify_error(&err("authority header")), ExitCode::ErrorAuth);
+        assert_ne!(classify_error(&err("failed to open auth_tokens.json")), ExitCode::ErrorAuth);
+        // "4010" (not a bare 401) should not match.
+        assert_ne!(classify_error(&err("error code 4010 unknown")), ExitCode::ErrorAuth);
     }
 
     #[test]
