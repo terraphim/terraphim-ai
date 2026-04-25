@@ -12,15 +12,46 @@
 // where each SearchResultItem carries: rank, id, title, url?, score, preview?,
 // source?, date?, preview_truncated.
 
+use std::path::PathBuf;
 use std::process::Command;
+use std::sync::OnceLock;
 
 use anyhow::{Context, Result};
 use serde_json::Value;
 use serial_test::serial;
 
+/// Build the agent binary once per `cargo test` invocation; subsequent calls
+/// exec it directly. Avoids the per-call cargo metadata + recheck overhead.
+static AGENT_BINARY: OnceLock<Result<PathBuf, String>> = OnceLock::new();
+
+fn agent_binary() -> Result<PathBuf> {
+    AGENT_BINARY
+        .get_or_init(|| {
+            let status = Command::new("cargo")
+                .args(["build", "-p", "terraphim_agent", "--bin", "terraphim-agent"])
+                .status()
+                .map_err(|e| format!("failed to spawn cargo build: {}", e))?;
+            if !status.success() {
+                return Err(format!("cargo build failed with status {}", status));
+            }
+            // CARGO_MANIFEST_DIR is set by cargo when building/running tests.
+            let manifest = std::env::var("CARGO_MANIFEST_DIR")
+                .map_err(|_| "CARGO_MANIFEST_DIR not set".to_string())?;
+            // crates/terraphim_agent -> ../../target/debug/terraphim-agent
+            let bin = PathBuf::from(manifest)
+                .parent()
+                .and_then(|p| p.parent())
+                .ok_or("could not derive workspace root from CARGO_MANIFEST_DIR")?
+                .join("target/debug/terraphim-agent");
+            Ok(bin)
+        })
+        .clone()
+        .map_err(anyhow::Error::msg)
+}
+
 fn run_agent_command(args: &[&str]) -> Result<(String, String, i32)> {
-    let output = Command::new("cargo")
-        .args(["run", "-p", "terraphim_agent", "--quiet", "--"])
+    let bin = agent_binary().context("agent binary build failed")?;
+    let output = Command::new(&bin)
         .args(args)
         .output()
         .context("failed to execute terraphim-agent command")?;

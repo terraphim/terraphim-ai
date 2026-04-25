@@ -2849,35 +2849,19 @@ impl TerraphimService {
                 );
             }
         });
-        // Re-lock briefly only to read role metadata for logging.
-        let current_config = self.config_state.config.lock().await;
-
-        // Log role selection with terraphim_it status
-        if let Some(role) = current_config.roles.get(&role_name) {
+        // Log role selection from the snapshot (no need to re-lock).
+        if let Some(role) = snapshot.roles.get(&role_name) {
             if role.terraphim_it {
                 log::info!(
-                    "🎯 Selected role '{}' → terraphim_it: ✅ ENABLED (KG preprocessing will be applied)",
+                    "🎯 Selected role '{}' → terraphim_it: ENABLED (KG preprocessing will be applied)",
                     role_name
                 );
-                if role.kg.is_some() {
-                    log::info!("📚 KG configuration: Available for role '{}'", role_name);
-                } else {
-                    log::warn!(
-                        "⚠️ KG configuration: Missing for role '{}' (terraphim_it enabled but no KG)",
-                        role_name
-                    );
-                }
             } else {
-                log::info!(
-                    "🎯 Selected role '{}' → terraphim_it: ❌ DISABLED (KG preprocessing skipped)",
-                    role_name
-                );
+                log::info!("🎯 Selected role '{}' → terraphim_it: DISABLED", role_name);
             }
-        } else {
-            log::info!("🎯 Selected role updated to '{}'", role_name);
         }
 
-        Ok(current_config.clone())
+        Ok(snapshot)
     }
 
     /// Highlight search terms in the given text content
