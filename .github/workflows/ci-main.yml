@@ -157,7 +157,13 @@ jobs:
 
       - name: sccache start and zero stats
         run: |
-          /home/alex/.local/bin/sccache --start-server || true
+          # Stop any stale sccache server (e.g. from a prior GHA-action run on this
+
+          # runner) so the bigbox-local 0.8.2 client never hits a v0.14 server.
+
+          pkill -u "$(id -un)" -x sccache || true
+
+          /home/alex/.local/bin/sccache --start-server
           /home/alex/.local/bin/sccache --zero-stats
 
       - name: Cache Cargo registry and dependencies (self-hosted)
@@ -348,7 +354,13 @@ jobs:
 
       - name: sccache start and zero stats
         run: |
-          /home/alex/.local/bin/sccache --start-server || true
+          # Stop any stale sccache server (e.g. from a prior GHA-action run on this
+
+          # runner) so the bigbox-local 0.8.2 client never hits a v0.14 server.
+
+          pkill -u "$(id -un)" -x sccache || true
+
+          /home/alex/.local/bin/sccache --start-server
           /home/alex/.local/bin/sccache --zero-stats
 
       - name: Install wasm-pack
