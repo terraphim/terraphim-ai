@@ -81,11 +81,11 @@ pub use dual_mode::DualModeOrchestrator;
 pub use error::OrchestratorError;
 pub use handoff::{HandoffBuffer, HandoffContext, HandoffLedger};
 pub use mention::{
-    migrate_legacy_mention_cursor, parse_mention_tokens, parse_mentions, resolve_mention,
-    resolve_persona_mention, DetectedMention, MentionCursor, MentionTokens, MentionTracker,
+    DetectedMention, MentionCursor, MentionTokens, MentionTracker, migrate_legacy_mention_cursor,
+    parse_mention_tokens, parse_mentions, resolve_mention, resolve_persona_mention,
 };
 pub use mention_chain::{
-    MentionChainError, MentionChainTracker, MentionContextArgs, DEFAULT_MAX_MENTION_DEPTH,
+    DEFAULT_MAX_MENTION_DEPTH, MentionChainError, MentionChainTracker, MentionContextArgs,
 };
 pub use metrics_persistence::{
     InMemoryMetricsPersistence, MetricsPersistence, MetricsPersistenceConfig,
@@ -93,9 +93,9 @@ pub use metrics_persistence::{
 };
 pub use mode::{IssueMode, TimeMode};
 pub use nightwatch::{
-    dual_panel_evaluate, validate_certificate, Claim, CorrectionAction, CorrectionLevel,
-    DriftAlert, DriftMetrics, DriftScore, DualPanelResult, NightwatchMonitor, RateLimitTracker,
-    RateLimitWindow, ReasoningCertificate,
+    Claim, CorrectionAction, CorrectionLevel, DriftAlert, DriftMetrics, DriftScore,
+    DualPanelResult, NightwatchMonitor, RateLimitTracker, RateLimitWindow, ReasoningCertificate,
+    dual_panel_evaluate, validate_certificate,
 };
 pub use output_poster::OutputPoster;
 pub use persona::{MetapromptRenderError, MetapromptRenderer, PersonaRegistry};
@@ -6366,9 +6366,11 @@ task = "test"
         let count = orch.current_restart_count(&legacy_key("echo-safety"));
         assert_eq!(count, 0);
         assert!(!orch.restart_counts.contains_key(&legacy_key("echo-safety")));
-        assert!(!orch
-            .restart_last_failure_unix_secs
-            .contains_key(&legacy_key("echo-safety")));
+        assert!(
+            !orch
+                .restart_last_failure_unix_secs
+                .contains_key(&legacy_key("echo-safety"))
+        );
     }
 
     #[tokio::test]

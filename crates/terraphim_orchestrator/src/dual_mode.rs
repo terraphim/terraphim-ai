@@ -13,7 +13,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use terraphim_tracker::{GiteaTracker, IssueTracker};
-use tokio::sync::{mpsc, watch, Mutex};
+use tokio::sync::{Mutex, mpsc, watch};
 use tracing::{error, info, warn};
 
 /// Shared state between time and issue modes.

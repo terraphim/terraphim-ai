@@ -1,7 +1,7 @@
 //! Relevance scoring infrastructure for document search.
 //!
 //! Provides BM25 variants, Jaccard, TF-IDF, and query-ratio scorers, plus
-//! a [`Scorer`] orchestrator that dispatches to the chosen algorithm.
+//! a `Scorer` orchestrator that dispatches to the chosen algorithm.
 
 /// BM25F and BM25Plus scorer implementations.
 pub mod bm25;

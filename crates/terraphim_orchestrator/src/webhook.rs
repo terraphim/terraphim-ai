@@ -4,7 +4,7 @@
 //! Gitea sends POST requests on issue comment events, which are parsed
 //! for @adf: commands and dispatched immediately.
 
-use axum::{body::Bytes, extract::State, http::StatusCode, routing::post, Router};
+use axum::{Router, body::Bytes, extract::State, http::StatusCode, routing::post};
 use hmac::{Hmac, Mac};
 use serde::Deserialize;
 use sha2::Sha256;

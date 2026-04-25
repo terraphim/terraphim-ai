@@ -47,6 +47,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `terraphim_types`: `DocumentType`, `RouteDirective`, `MarkdownDirectives`, `Edge::new`, `NormalizedTermValue` methods, `Scorer`/`Query`/`Similarity` types, `FindingSeverity`/`FindingCategory`/`ReviewFinding`/`ReviewAgentOutput`.
   - `terraphim_agent`: crate-level `//!`, `TuiService`, `ConnectivityResult`/`FuzzySuggestion`/`ChecklistResult` fields, `BudgetedResults`/`BudgetEngine`, `Capabilities`/`CommandDoc`/`ArgumentDoc`/`FlagDoc`/`ExampleDoc` fields, `ReplCommand` variants.
   - `terraphim_sessions`: `SessionMetadata::new`, `FileOperation` variants, `ConnectorStatus::Available` fields.
+- **Doc-gap audit 2026-04-25**: resolved all remaining rustdoc warnings in six crates; total warnings across audited set now 0.
+  - `terraphim_orchestrator`: 14→0 — fixed broken intra-doc links (`MENTION_RE`, `RoutingDecisionEngine::decide_route`, `reconcile_tick`, `GateConfig`, `handle_post_merge_test_gate_for_project`, `AgentOrchestrator::poll_pending_reviews`), unclosed HTML tags in `<name>` template placeholders (`executor.rs`), and `Vec<HandoffContext>` tag (`handoff.rs`).
+  - `terraphim_types`: 4→0 — removed unresolvable `HgncGene`/`HgncNormalizer` links, fixed `Scorer` module-doc link, escaped bare URL in `uri_prefix` field doc.
+  - `terraphim_service`: 1→0 — escaped inline markdown link syntax in `preprocess_document_content` doc.
+  - `terraphim_rolegraph`: 2→0 — qualified `[new]`/`[from_serializable]` links to `[Self::new]`/`[Self::from_serializable]`.
+  - `terraphim_persistence`: 2→0 — backtick-escaped `Arc<DeviceStorage>` in doc comments to prevent unclosed-HTML-tag warnings.
 
 ### Fixed
 - **Agent formatting** in RobotResponse chaining for consistent output (`b5ba8927`)

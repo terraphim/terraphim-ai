@@ -581,7 +581,7 @@ impl TerraphimService {
     /// Preprocess document content to create clickable KG links when terraphim_it is enabled
     ///
     /// This function replaces KG terms in the document body with markdown links
-    /// in the format [term](kg:term) which can be intercepted by the frontend
+    /// in the format `[term](kg:term)` which can be intercepted by the frontend
     /// to display KG documents when clicked.
     pub async fn preprocess_document_content(
         &mut self,

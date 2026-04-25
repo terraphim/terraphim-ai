@@ -344,11 +344,7 @@ fn combine_verdicts(a: BudgetVerdict, b: BudgetVerdict) -> BudgetVerdict {
             BudgetVerdict::Uncapped => 0,
         }
     }
-    if rank(&a) >= rank(&b) {
-        a
-    } else {
-        b
-    }
+    if rank(&a) >= rank(&b) { a } else { b }
 }
 
 /// Filter helper for the routing engine: returns `true` if the

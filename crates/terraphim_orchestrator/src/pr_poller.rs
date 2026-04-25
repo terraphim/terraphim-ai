@@ -1,11 +1,11 @@
 //! Polling helpers for ROC v1 Step F — turn open PRs + reviewer comments into
-//! [`DispatchTask::AutoMerge`] tasks.
+//! [`crate::DispatchTask::AutoMerge`] tasks.
 //!
-//! The orchestrator invokes [`AgentOrchestrator::poll_pending_reviews`] once
+//! The orchestrator invokes `AgentOrchestrator::poll_pending_reviews` once
 //! per `reconcile_tick`. That method walks every project with a Gitea config,
 //! lists open PRs, looks for the latest structural-pr-review comment, calls
 //! [`crate::pr_review::parse_verdict`] + [`crate::pr_review::evaluate`], and
-//! enqueues an [`DispatchTask::AutoMerge`] when — and only when — every gate
+//! enqueues a [`crate::DispatchTask::AutoMerge`] when — and only when — every gate
 //! in [`crate::pr_review::AutoMergeCriteria::default`] is satisfied.
 //!
 //! The module is split into:
@@ -249,7 +249,7 @@ pub fn evaluate_pr_verdict(
         Err(e) => {
             return EvaluationOutcome::ParseError {
                 reason: describe_parse_error(e),
-            }
+            };
         }
     };
 

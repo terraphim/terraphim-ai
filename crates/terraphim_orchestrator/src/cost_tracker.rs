@@ -543,17 +543,21 @@ mod tests {
 
     #[test]
     fn test_should_pause_only_on_exhausted() {
-        assert!(BudgetVerdict::Exhausted {
-            spent_cents: 100,
-            budget_cents: 100
-        }
-        .should_pause());
+        assert!(
+            BudgetVerdict::Exhausted {
+                spent_cents: 100,
+                budget_cents: 100
+            }
+            .should_pause()
+        );
 
-        assert!(!BudgetVerdict::NearExhaustion {
-            spent_cents: 80,
-            budget_cents: 100
-        }
-        .should_pause());
+        assert!(
+            !BudgetVerdict::NearExhaustion {
+                spent_cents: 80,
+                budget_cents: 100
+            }
+            .should_pause()
+        );
 
         assert!(!BudgetVerdict::WithinBudget.should_pause());
         assert!(!BudgetVerdict::Uncapped.should_pause());
@@ -561,17 +565,21 @@ mod tests {
 
     #[test]
     fn test_should_warn_only_on_near_exhaustion() {
-        assert!(BudgetVerdict::NearExhaustion {
-            spent_cents: 80,
-            budget_cents: 100
-        }
-        .should_warn());
+        assert!(
+            BudgetVerdict::NearExhaustion {
+                spent_cents: 80,
+                budget_cents: 100
+            }
+            .should_warn()
+        );
 
-        assert!(!BudgetVerdict::Exhausted {
-            spent_cents: 100,
-            budget_cents: 100
-        }
-        .should_warn());
+        assert!(
+            !BudgetVerdict::Exhausted {
+                spent_cents: 100,
+                budget_cents: 100
+            }
+            .should_warn()
+        );
 
         assert!(!BudgetVerdict::WithinBudget.should_warn());
         assert!(!BudgetVerdict::Uncapped.should_warn());

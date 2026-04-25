@@ -527,7 +527,7 @@ pub trait RunRecordPersistence: Send + Sync {
 
     /// Query records by agent name.
     async fn query_by_agent(&self, agent_name: &str)
-        -> Result<Vec<AgentRunRecord>, RunRecordError>;
+    -> Result<Vec<AgentRunRecord>, RunRecordError>;
 
     /// Query records by exit class.
     async fn query_by_exit_class(
@@ -655,10 +655,12 @@ mod tests {
         );
         assert_eq!(result.exit_class, ExitClass::Timeout);
         assert!(result.confidence > 0.0);
-        assert!(result
-            .matched_patterns
-            .iter()
-            .any(|p| p.contains("timed out")));
+        assert!(
+            result
+                .matched_patterns
+                .iter()
+                .any(|p| p.contains("timed out"))
+        );
     }
 
     #[test]
