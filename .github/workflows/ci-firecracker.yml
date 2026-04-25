@@ -225,15 +225,20 @@ jobs:
           RESULT=$(curl -sS -X POST $FCCTL_URL/api/llm/execute \
             -H 'Content-Type: application/json' \
             -d @/tmp/exec.json)
-          echo "$RESULT" | python3 -c '
-          import sys,json
-          r=json.load(sys.stdin)
+          # Save the response to a file so the python parser can use simple
+          # quoted dict access without YAML+shell+python triple-quoting.
+          echo "$RESULT" > /tmp/exec.result
+          python3 - <<'PY'
+          import json, sys
+          with open("/tmp/exec.result") as f:
+              r = json.load(f)
           print("--- stdout ---")
           print(r["stdout"])
           print("--- stderr ---")
           print(r["stderr"])
-          print(f"exit_code={r[\"exit_code\"]} duration_ms={r.get(\"duration_ms\")}")
-          sys.exit(0 if r["exit_code"] == 0 else 1)'
+          print("exit_code=" + str(r["exit_code"]) + " duration_ms=" + str(r.get("duration_ms")))
+          sys.exit(0 if r["exit_code"] == 0 else 1)
+          PY
 
       - name: Destroy VM
         if: always()
