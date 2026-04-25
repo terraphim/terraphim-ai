@@ -115,6 +115,7 @@ impl FirecrackerExecutor {
         // Configure SSH executor with sensible defaults for VM access
         let ssh_executor = SshExecutor::new()
             .with_user("root")
+            .with_private_key("/tmp/ubuntu-22.04.id_rsa")
             .with_output_dir(std::env::temp_dir().join("terraphim_rlm_output"));
 
         Ok(Self {
@@ -233,14 +234,26 @@ impl FirecrackerExecutor {
         if let Some(ref mut vm_manager) = *vm_manager_guard {
             log::info!("Creating new VM for session {}", session_id);
 
-            // VM configuration
+            // VM configuration using official Firecracker CI images
+            // IP parameter format: ip=client-ip::gateway:netmask::eth0:off
+            let vm_ip = vm_manager.get_vm_ip("placeholder").ok();
+
+            let boot_args = if let Some(ref ip) = vm_ip {
+                format!(
+                    "console=ttyS0 reboot=k panic=1 pci=off ip={}::172.26.0.1:255.255.255.0::eth0:off",
+                    ip
+                )
+            } else {
+                "console=ttyS0 reboot=k panic=1 pci=off".to_string()
+            };
+
             let vm_config = fcctl_core::firecracker::VmConfig {
-                kernel_path: "/home/alex/firecracker/build/kernel/vmlinux-5.10".to_string(),
-                rootfs_path: "/home/alex/firecracker/build/rootfs/bionic.rootfs.ext4".to_string(),
+                kernel_path: "/tmp/vmlinux-5.10.225".to_string(),
+                rootfs_path: "/tmp/ubuntu-22.04.ext4".to_string(),
                 vcpus: 2,
-                memory_mb: 512,
+                memory_mb: 1024,
                 initrd_path: None,
-                boot_args: Some("console=ttyS0 reboot=k panic=1 pci=off".to_string()),
+                boot_args: Some(boot_args),
                 vm_type: fcctl_core::firecracker::VmType::Minimal,
             };
 
@@ -382,6 +395,26 @@ impl FirecrackerExecutor {
                             ip,
                             ctx.session_id
                         );
+
+                        // Wait for VM to be ready (SSH available)
+                        let ssh_ready =
+                            tokio::time::timeout(std::time::Duration::from_secs(30), async {
+                                for i in 0..30 {
+                                    if self.ssh_executor.check_connection(&ip).await {
+                                        log::info!("VM {} SSH ready after {} attempts", id, i + 1);
+                                        return true;
+                                    }
+                                    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                                }
+                                false
+                            })
+                            .await
+                            .unwrap_or(false);
+
+                        if !ssh_ready {
+                            log::warn!("VM {} SSH not ready, returning stub", id);
+                            return self.stub_response(code, start);
+                        }
 
                         let result = if is_python {
                             self.ssh_executor.execute_python(&ip, code, ctx).await
