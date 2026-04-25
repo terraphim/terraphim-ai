@@ -17,7 +17,7 @@ use crate::types::SessionId;
 ///
 /// # Example
 ///
-/// ```rust,ignore
+/// ```rust,no_run
 /// use terraphim_rlm::executor::{ExecutionEnvironment, ExecutionContext};
 ///
 /// async fn run_code<E: ExecutionEnvironment>(

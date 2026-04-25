@@ -26,22 +26,27 @@
 //!
 //! ## Example
 //!
-//! ```rust,ignore
+//! ```rust,no_run
 //! use terraphim_rlm::{TerraphimRlm, RlmConfig};
 //!
-//! let config = RlmConfig::default();
-//! let rlm = TerraphimRlm::new(config).await?;
+//! #[tokio::main]
+//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!     let config = RlmConfig::default();
+//!     let rlm = TerraphimRlm::new(config).await?;
 //!
-//! // Create a session
-//! let session = rlm.create_session().await?;
+//!     // Create a session
+//!     let session = rlm.create_session().await?;
 //!
-//! // Execute Python code
-//! let result = rlm.execute_code(&session, "print('Hello, RLM!')").await?;
-//! println!("Output: {}", result.stdout);
+//!     // Execute Python code
+//!     let result = rlm.execute_code(&session.id, "print('Hello, RLM!')").await?;
+//!     println!("Output: {}", result.stdout);
 //!
-//! // Execute bash command
-//! let result = rlm.execute_command(&session, "ls -la").await?;
-//! println!("Output: {}", result.stdout);
+//!     // Execute bash command
+//!     let result = rlm.execute_command(&session.id, "ls -la").await?;
+//!     println!("Output: {}", result.stdout);
+//!
+//!     Ok(())
+//! }
 //! ```
 
 // Core modules
