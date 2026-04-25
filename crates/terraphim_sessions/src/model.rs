@@ -163,6 +163,7 @@ pub struct SessionMetadata {
 }
 
 impl SessionMetadata {
+    /// Construct metadata from individual fields.
     pub fn new(
         project_path: Option<String>,
         model: Option<String>,
@@ -678,10 +679,12 @@ mod tests {
     }
 }
 
-/// File access operation type
+/// File access operation type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FileOperation {
+    /// File was read.
     Read,
+    /// File was written or modified.
     Write,
 }
 

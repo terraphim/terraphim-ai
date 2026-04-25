@@ -27,9 +27,11 @@ use std::path::PathBuf;
 /// Status of a connector's detection
 #[derive(Debug, Clone)]
 pub enum ConnectorStatus {
-    /// Connector found with estimated session count
+    /// Connector found and its data directory is accessible.
     Available {
+        /// Path to the connector's data directory.
         path: PathBuf,
+        /// Estimated number of sessions available; `None` when unknown.
         sessions_estimate: Option<usize>,
     },
     /// Connector's data directory not found

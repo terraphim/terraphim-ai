@@ -9,10 +9,15 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum FindingSeverity {
+    /// Informational note, no action required.
     Info,
+    /// Minor issue; low urgency.
     Low,
+    /// Moderate issue worth addressing before release.
     Medium,
+    /// Significant issue that should be fixed soon.
     High,
+    /// Blocker — must be resolved before merge.
     Critical,
 }
 
@@ -20,25 +25,38 @@ pub enum FindingSeverity {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum FindingCategory {
+    /// Security vulnerability or weakness.
     Security,
+    /// Architectural or structural concern.
     Architecture,
+    /// Runtime performance problem.
     Performance,
+    /// General code quality issue.
     Quality,
+    /// Domain-specific correctness concern.
     Domain,
+    /// Design quality or abstraction concern.
     DesignQuality,
 }
 
 /// A single structured finding from a review agent.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReviewFinding {
+    /// Path to the file containing the issue.
     pub file: String,
+    /// Line number within the file; 0 when not applicable.
     #[serde(default)]
     pub line: u32,
+    /// How severe the issue is.
     pub severity: FindingSeverity,
+    /// Which review category this finding belongs to.
     pub category: FindingCategory,
+    /// Human-readable description of the finding.
     pub finding: String,
+    /// Optional suggested fix or improvement.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub suggestion: Option<String>,
+    /// Confidence score for this finding (0.0–1.0).
     #[serde(default = "default_confidence")]
     pub confidence: f64,
 }
@@ -50,9 +68,13 @@ fn default_confidence() -> f64 {
 /// Output schema for a single review agent's results.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReviewAgentOutput {
+    /// Identifier of the agent that produced this output.
     pub agent: String,
+    /// All structured findings from this agent.
     pub findings: Vec<ReviewFinding>,
+    /// High-level summary of the review outcome.
     pub summary: String,
+    /// `true` when the agent considers the code acceptable for merge.
     pub pass: bool,
 }
 

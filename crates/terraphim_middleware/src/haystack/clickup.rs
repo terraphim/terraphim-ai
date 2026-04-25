@@ -6,6 +6,7 @@ use terraphim_config::Haystack;
 use terraphim_persistence::Persistable;
 use terraphim_types::{Document, DocumentType, Index};
 
+/// Haystack indexer that fetches tasks and pages from the ClickUp API.
 #[derive(Debug, Clone)]
 pub struct ClickUpHaystackIndexer {
     client: Client,

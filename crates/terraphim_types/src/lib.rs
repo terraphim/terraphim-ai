@@ -97,6 +97,7 @@ pub mod shared_learning;
 pub mod capability;
 pub use capability::*;
 
+/// Relevance scoring utilities shared between service and middleware layers.
 pub mod score;
 
 // MCP Tool types for self-learning system
@@ -255,11 +256,13 @@ impl<'de> Deserialize<'de> for RoleName {
 pub struct NormalizedTermValue(String);
 
 impl NormalizedTermValue {
+    /// Construct a new normalised term by trimming whitespace and lower-casing.
     pub fn new(term: String) -> Self {
         let value = term.trim().to_lowercase();
         Self(value)
     }
-    // convert to &str
+
+    /// Return the normalised string slice.
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -396,28 +399,38 @@ impl Display for Concept {
     }
 }
 
+/// Classifies how a document is used within the knowledge graph.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DocumentType {
+    /// A knowledge-graph concept entry (default).
     #[default]
     KgEntry,
+    /// A regular searchable document.
     Document,
+    /// A configuration document (not surfaced in search results).
     ConfigDocument,
 }
 
+/// Routing directive instructing which LLM provider and model to use.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RouteDirective {
+    /// LLM provider identifier (e.g. `"openrouter"`, `"ollama"`).
     pub provider: String,
+    /// Model name within the provider.
     pub model: String,
     /// CLI action template with `{{ model }}` and `{{ prompt }}` placeholders.
     #[serde(default)]
     pub action: Option<String>,
 }
 
+/// Parsed front-matter directives extracted from a Markdown document.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MarkdownDirectives {
+    /// Classification of the document within the knowledge graph.
     #[serde(default)]
     pub doc_type: DocumentType,
+    /// Synonyms declared in the front matter for automata building.
     #[serde(default)]
     pub synonyms: Vec<String>,
     /// Primary route (first in the list). Kept for backward compatibility.
@@ -427,10 +440,13 @@ pub struct MarkdownDirectives {
     /// Each route may have an `action::` template for CLI invocation.
     #[serde(default)]
     pub routes: Vec<RouteDirective>,
+    /// Optional routing priority (lower value = higher priority).
     #[serde(default)]
     pub priority: Option<u8>,
+    /// Trigger keyword that activates this document in agent workflows.
     #[serde(default)]
     pub trigger: Option<String>,
+    /// When `true`, this document is pinned to the top of search results.
     #[serde(default)]
     pub pinned: bool,
     /// First `# Heading` from the markdown file, preserving original case.
@@ -567,6 +583,7 @@ pub struct Edge {
 }
 
 impl Edge {
+    /// Create a new edge with a single document reference and initial rank of 1.
     pub fn new(id: u64, document_id: String) -> Self {
         let mut doc_hash = AHashMap::new();
         doc_hash.insert(document_id, 1);

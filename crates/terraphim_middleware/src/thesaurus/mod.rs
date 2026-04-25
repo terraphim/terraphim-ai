@@ -36,6 +36,8 @@ use terraphim_types::{RoleName, Thesaurus};
 use crate::Result;
 use std::path::PathBuf;
 
+/// Build the automata thesaurus for the role specified in `search_query`, loading from a
+/// remote URL or re-indexing local files as needed, then persist it back to `config_state`.
 pub async fn build_thesaurus_from_haystack(
     config_state: &mut ConfigState,
     search_query: &SearchQuery,

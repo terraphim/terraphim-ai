@@ -1,6 +1,15 @@
+//! Relevance scoring infrastructure for document search.
+//!
+//! Provides BM25 variants, Jaccard, TF-IDF, and query-ratio scorers, plus
+//! a [`Scorer`] orchestrator that dispatches to the chosen algorithm.
+
+/// BM25F and BM25Plus scorer implementations.
 pub mod bm25;
+/// Additional scorers: Okapi BM25, TF-IDF, Jaccard, and QueryRatio.
 pub mod bm25_additional;
+/// Shared scoring helpers and traits.
 pub mod common;
+/// [`QueryScorer`] enum and display logic.
 pub mod names;
 mod scored;
 
@@ -62,6 +71,7 @@ pub fn sort_documents(query: &Query, documents: Vec<Document>) -> Vec<Document> 
     }
 }
 
+/// Orchestrates relevance scoring over a collection of documents.
 #[derive(Debug, Default)]
 pub struct Scorer {
     similarity: Similarity,
@@ -69,20 +79,24 @@ pub struct Scorer {
 }
 
 impl Scorer {
+    /// Create a new `Scorer` with default settings.
     pub fn new() -> Scorer {
         Scorer::default()
     }
 
+    /// Set the string similarity metric (builder method).
     pub fn with_similarity(mut self, similarity: Similarity) -> Scorer {
         self.similarity = similarity;
         self
     }
 
+    /// Attach a concrete scoring algorithm (builder method).
     pub fn with_scorer(mut self, scorer: Box<dyn std::any::Any>) -> Scorer {
         self.scorer = Some(scorer);
         self
     }
 
+    /// Score `documents` against `query`, trim to `query.size`, and normalise.
     pub fn score(
         &mut self,
         query: &Query,
@@ -171,21 +185,29 @@ impl Scorer {
     }
 }
 
+/// Error returned when scoring fails.
 #[derive(Debug, thiserror::Error)]
 pub enum ScoreError {
+    /// A scorer reported an error during computation.
     #[error("scoring error: {0}")]
     Scoring(String),
 }
 
+/// Describes a search query including the scoring algorithm and size limits.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Query {
+    /// The raw query string to match against document titles.
     pub name: String,
+    /// Which scoring algorithm to apply.
     pub name_scorer: QueryScorer,
+    /// String similarity metric used for fuzzy title matching.
     pub similarity: Similarity,
+    /// Maximum number of documents to return.
     pub size: usize,
 }
 
 impl Query {
+    /// Create a new query with default scorer and similarity settings.
     pub fn new(name: &str) -> Query {
         Query {
             name: name.to_string(),
@@ -195,15 +217,18 @@ impl Query {
         }
     }
 
+    /// Return `true` when the query string is empty.
     pub fn is_empty(&self) -> bool {
         self.name.is_empty()
     }
 
+    /// Override the scoring algorithm (builder method).
     pub fn name_scorer(mut self, scorer: QueryScorer) -> Query {
         self.name_scorer = scorer;
         self
     }
 
+    /// Override the similarity metric (builder method).
     pub fn similarity(mut self, sim: Similarity) -> Query {
         self.similarity = sim;
         self
@@ -226,16 +251,22 @@ impl fmt::Display for Query {
     }
 }
 
+/// String similarity metric applied to document titles during scoring.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Default)]
 pub enum Similarity {
+    /// No similarity weighting; all titles score equally.
     #[default]
     None,
+    /// Levenshtein edit-distance similarity (lower distance → higher score).
     Levenshtein,
+    /// Jaro similarity.
     Jaro,
+    /// Jaro-Winkler similarity (boosts prefix matches).
     JaroWinkler,
 }
 
 impl Similarity {
+    /// Compute the similarity score between two strings in the range (0.0, 1.0].
     pub fn similarity(&self, q1: &str, q2: &str) -> f64 {
         let sim = match *self {
             Similarity::None => 1.0,

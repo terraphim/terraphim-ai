@@ -17,14 +17,23 @@ use tokio::process::Command;
 
 use crate::Result;
 
+/// A ripgrep JSON output message.
+///
+/// See the [grep-printer JSON docs](https://docs.rs/grep-printer/latest/grep_printer/struct.JSON.html)
+/// for the full specification.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash)]
 #[serde(tag = "type", content = "data")]
 #[serde(rename_all = "snake_case")]
 pub enum Message {
+    /// Emitted once at the start of a per-file search.
     Begin(Begin),
+    /// Emitted once at the end of a per-file search.
     End(End),
+    /// Emitted for each non-overlapping match.
     Match(Match),
+    /// Context lines surrounding a match.
     Context(Context),
+    /// Emitted once at the very end of the search.
     Summary(Summary),
 }
 
@@ -32,6 +41,7 @@ pub enum Message {
 /// It contains the path that is being searched, if one exists.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash)]
 pub struct Begin {
+    /// Path of the file being searched; `None` when searching stdin.
     pub path: Option<Data>,
 }
 
@@ -60,10 +70,13 @@ pub struct Summary {
 /// The `Match` message is sent for each non-overlapping match of a search.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash)]
 pub struct Match {
+    /// Path of the file containing this match.
     pub path: Option<Data>,
+    /// The matched line(s) of text.
     pub lines: Data,
     line_number: Option<u64>,
     absolute_offset: u64,
+    /// Individual sub-matches within the line.
     pub submatches: Vec<SubMatch>,
 }
 
@@ -77,7 +90,9 @@ impl Match {
 /// The `Context` specifies the lines surrounding a match.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash)]
 pub struct Context {
+    /// Path of the file containing this context line.
     pub path: Option<Data>,
+    /// The context line(s) of text.
     pub lines: Data,
     line_number: Option<u64>,
     absolute_offset: u64,
@@ -100,15 +115,20 @@ pub struct SubMatch {
     end: usize,
 }
 
-/// The `Data` type is used for fields that may be either text or bytes.
-/// In contains the raw data of the field.
+/// Raw data value from a ripgrep JSON field; either valid UTF-8 text or base64-encoded bytes.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash)]
 #[serde(untagged)]
 pub enum Data {
-    Text { text: String },
-    // This variant is used when the data isn't valid UTF-8. The bytes are
-    // base64 encoded, so using a String here is OK.
-    Bytes { bytes: String },
+    /// Valid UTF-8 text content.
+    Text {
+        /// The text string.
+        text: String,
+    },
+    /// Non-UTF-8 content encoded as base64.
+    Bytes {
+        /// Base64-encoded byte string.
+        bytes: String,
+    },
 }
 
 /// Gets the path from a `Data` type.
@@ -149,6 +169,7 @@ pub fn json_decode(jsonlines: &str) -> Result<Vec<Message>> {
         .collect::<std::result::Result<Vec<Message>, serde_json::Error>>()?)
 }
 
+/// Wrapper around the `rg` binary that runs searches and parses JSON output.
 pub struct RipgrepCommand {
     command: String,
     default_args: Vec<String>,
@@ -242,6 +263,7 @@ impl RipgrepCommand {
         )
     }
 
+    /// Run ripgrep with additional caller-supplied arguments.
     pub async fn run_with_extra_args(
         &self,
         needle: &str,

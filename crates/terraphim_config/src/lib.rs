@@ -1,3 +1,8 @@
+//! Terraphim configuration management -- roles, haystacks, and knowledge graphs.
+//!
+//! Provides [`Config`], [`Role`], and [`ConfigState`] along with persistence and
+//! builder helpers for loading, saving, and updating Terraphim role configurations.
+
 use std::{path::PathBuf, sync::Arc};
 
 use terraphim_automata::{
@@ -28,44 +33,57 @@ use crate::llm_router::LlmRouterConfig;
 // LLM Router configuration
 pub mod llm_router;
 
+/// Convenience alias for config-layer results.
 pub type Result<T> = std::result::Result<T, TerraphimConfigError>;
 
 use opendal::Result as OpendalResult;
 
 type PersistenceResult<T> = std::result::Result<T, terraphim_persistence::Error>;
 
+/// Errors returned by configuration loading and manipulation.
 #[derive(Error, Debug)]
 pub enum TerraphimConfigError {
+    /// The configuration file or persistence entry was not found.
     #[error("Unable to load config")]
     NotFound,
 
+    /// A configuration must contain at least one role.
     #[error("At least one role is required")]
     NoRoles,
 
+    /// A profile-specific error occurred.
     #[error("Profile error")]
     Profile(String),
 
+    /// An error from the persistence layer.
     #[error("Persistence error")]
     Persistence(Box<terraphim_persistence::Error>),
 
+    /// JSON serialisation or deserialisation failure.
     #[error("Serde JSON error")]
     Json(#[from] serde_json::Error),
 
+    /// Failed to initialise the tracing subscriber.
     #[error("Cannot initialize tracing subscriber")]
     TracingSubscriber(Box<dyn std::error::Error + Send + Sync>),
 
+    /// RoleGraph pipeline error.
     #[error("Pipe error")]
     Pipe(#[from] terraphim_rolegraph::Error),
 
+    /// Automata construction error.
     #[error("Automata error")]
     Automata(#[from] terraphim_automata::TerraphimAutomataError),
 
+    /// URL parse error.
     #[error("Url error")]
     Url(#[from] url::ParseError),
 
+    /// I/O error.
     #[error("IO error")]
     Io(#[from] std::io::Error),
 
+    /// Generic configuration error with a message.
     #[error("Config error")]
     Config(String),
 }
@@ -199,13 +217,19 @@ fn default_context_window() -> Option<u64> {
 #[cfg_attr(feature = "typescript", derive(Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct Role {
+    /// Short identifier used in CLI and config references; derived from `name` when absent.
     pub shortname: Option<String>,
+    /// Full display name of this role.
     pub name: RoleName,
-    /// The relevance function used to rank search results
+    /// The relevance function used to rank search results.
     pub relevance_function: RelevanceFunction,
+    /// When `true`, Terraphim-specific knowledge graph enhancements are applied.
     pub terraphim_it: bool,
+    /// UI theme name for this role.
     pub theme: String,
+    /// Optional knowledge graph configuration for this role.
     pub kg: Option<KnowledgeGraph>,
+    /// List of haystacks (data sources) assigned to this role.
     pub haystacks: Vec<Haystack>,
     /// Enable AI-powered article summaries using LLM providers
     #[serde(default)]
@@ -231,6 +255,7 @@ pub struct Role {
     /// Maximum tokens for LLM context window (default: 32768)
     #[serde(default = "default_context_window")]
     pub llm_context_window: Option<u64>,
+    /// Arbitrary extension fields forwarded from JSON configuration.
     #[serde(flatten)]
     #[schemars(skip)]
     #[cfg_attr(feature = "typescript", tsify(type = "Record<string, unknown>"))]
@@ -433,26 +458,32 @@ impl Haystack {
 #[cfg_attr(feature = "typescript", derive(Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct KnowledgeGraph {
-    /// automata path refering to the published automata and can be online url or local file with pre-build automata
+    /// Path to a pre-built automata file (URL or local path).
     #[schemars(with = "Option<String>")]
     pub automata_path: Option<AutomataPath>,
-    /// Knowlege graph can be re-build from local files, for example Markdown files
+    /// Configuration for re-building the graph from local source files.
     pub knowledge_graph_local: Option<KnowledgeGraphLocal>,
+    /// When `true`, this knowledge graph is publicly accessible.
     pub public: bool,
+    /// When `true`, the automata should be published after building.
     pub publish: bool,
 }
-/// check KG set correctly
+
 impl KnowledgeGraph {
+    /// Return `true` if either `automata_path` or `knowledge_graph_local` is configured.
     pub fn is_set(&self) -> bool {
         self.automata_path.is_some() || self.knowledge_graph_local.is_some()
     }
 }
 
+/// Configuration for building a knowledge graph from local source files.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema)]
 #[cfg_attr(feature = "typescript", derive(Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct KnowledgeGraphLocal {
+    /// Format of the input files.
     pub input_type: KnowledgeGraphInputType,
+    /// Directory containing the input files.
     pub path: PathBuf,
 }
 /// Builder, which allows to create a new `Config`
@@ -490,6 +521,7 @@ impl ConfigBuilder {
             settings_path: PathBuf::new(),
         }
     }
+    /// Create a builder pre-configured for the given [`ConfigId`].
     pub fn new_with_id(id: ConfigId) -> Self {
         let device_settings = match id {
             ConfigId::Embedded => DeviceSettings::default_embedded(),
@@ -505,6 +537,7 @@ impl ConfigBuilder {
             settings_path: PathBuf::new(),
         }
     }
+    /// Build the default embedded configuration for CLI / TUI use.
     pub fn build_default_embedded(mut self) -> Self {
         self.config.id = ConfigId::Embedded;
 
@@ -594,9 +627,12 @@ impl ConfigBuilder {
         self
     }
 
+    /// Return the expanded default data directory path from device settings.
     pub fn get_default_data_path(&self) -> PathBuf {
         expand_path(&self.device_settings.default_data_path)
     }
+
+    /// Build the default server configuration for `terraphim_server`.
     pub fn build_default_server(mut self) -> Self {
         self.config.id = ConfigId::Server;
         // mind where cargo run is triggered from
@@ -691,6 +727,7 @@ impl ConfigBuilder {
             .unwrap()
     }
 
+    /// Build the default desktop configuration for the Tauri application.
     pub fn build_default_desktop(mut self) -> Self {
         let default_data_path = self.get_default_data_path();
         // Remove the automata_path - let it be built from local KG files during startup
@@ -820,12 +857,16 @@ impl Default for ConfigBuilder {
     }
 }
 
+/// Identifies the deployment context for a [`Config`].
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema)]
 #[cfg_attr(feature = "typescript", derive(Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum ConfigId {
+    /// Running as an HTTP server (`terraphim_server`).
     Server,
+    /// Running as a Tauri desktop application.
     Desktop,
+    /// Embedded in a CLI or TUI binary.
     Embedded,
 }
 
@@ -845,6 +886,7 @@ pub struct Config {
     pub roles: AHashMap<RoleName, Role>,
     /// The default role to use if no role is specified
     pub default_role: RoleName,
+    /// The role currently selected by the user.
     pub selected_role: RoleName,
 }
 
@@ -1074,6 +1116,7 @@ impl ConfigState {
         config.default_role.clone()
     }
 
+    /// Return the currently selected role name.
     pub async fn get_selected_role(&self) -> RoleName {
         let config = self.config.lock().await;
         config.selected_role.clone()

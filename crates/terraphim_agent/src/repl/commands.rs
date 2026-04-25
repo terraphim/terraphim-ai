@@ -3,23 +3,35 @@
 use anyhow::{Result, anyhow};
 use std::str::FromStr;
 
+/// Commands accepted by the interactive REPL and the `--robot` CLI mode.
 #[derive(Debug, Clone, PartialEq)]
 pub enum ReplCommand {
-    // Base commands (always available with 'repl' feature)
+    /// Search the active haystack.
     Search {
+        /// Free-text search query.
         query: String,
+        /// Override the active role for this query.
         role: Option<String>,
+        /// Maximum number of results to return.
         limit: Option<usize>,
+        /// Use semantic / knowledge-graph expansion.
         semantic: bool,
+        /// Include matched concept names in output.
         concepts: bool,
     },
+    /// Inspect or modify the current configuration.
     Config {
+        /// Which configuration operation to perform.
         subcommand: ConfigSubcommand,
     },
+    /// Manage roles.
     Role {
+        /// Which role operation to perform.
         subcommand: RoleSubcommand,
     },
+    /// Display the knowledge-graph summary.
     Graph {
+        /// Number of top-ranked nodes to show; defaults to all when `None`.
         top_k: Option<usize>,
     },
 
@@ -97,12 +109,16 @@ pub enum ReplCommand {
         subcommand: UpdateSubcommand,
     },
 
-    // Utility commands
+    /// Show help text.
     Help {
+        /// Name of the command to describe; shows top-level help when `None`.
         command: Option<String>,
     },
+    /// Exit the REPL (alias for `Exit`).
     Quit,
+    /// Exit the REPL.
     Exit,
+    /// Clear the terminal screen.
     Clear,
 }
 
@@ -131,16 +147,30 @@ pub enum UpdateSubcommand {
     List,
 }
 
+/// Operations on the active configuration.
 #[derive(Debug, Clone, PartialEq)]
 pub enum ConfigSubcommand {
+    /// Print the current configuration.
     Show,
-    Set { key: String, value: String },
+    /// Set a single configuration value by key.
+    Set {
+        /// Dot-separated configuration key (e.g. `"role.relevance_function"`).
+        key: String,
+        /// Value to assign.
+        value: String,
+    },
 }
 
+/// Operations on available roles.
 #[derive(Debug, Clone, PartialEq)]
 pub enum RoleSubcommand {
+    /// List all configured roles.
     List,
-    Select { name: String },
+    /// Switch to the named role.
+    Select {
+        /// Name of the role to activate.
+        name: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
