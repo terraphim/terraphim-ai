@@ -44,7 +44,7 @@ pub fn find_pr_reviewer<'a>(
         .find(|a| a.name == "pr-reviewer" && a.project.as_deref() == Some(project))
 }
 
-/// Build the task prompt fed into [`RoutingDecisionEngine::decide_route`] and
+/// Build the task prompt fed into `RoutingDecisionEngine::decide_route` and
 /// ultimately to the spawned pr-reviewer process.
 ///
 /// The prompt embeds "review" keywords (so KG and keyword routers can match it)

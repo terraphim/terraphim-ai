@@ -3062,7 +3062,7 @@ impl AgentOrchestrator {
     /// for any PR that clears every gate in
     /// [`pr_review::AutoMergeCriteria::default`].
     ///
-    /// Called once per [`AgentOrchestrator::reconcile_tick`] after the
+    /// Called once per `AgentOrchestrator::reconcile_tick` after the
     /// dispatcher has been drained so AutoMerge tasks enqueued here are
     /// serviced on the next tick (deterministic ordering). The method is a
     /// no-op when no project has a `gitea` config.
@@ -3508,10 +3508,10 @@ impl AgentOrchestrator {
     /// Defers the heavy lifting to [`post_merge_gate::run_workspace_tests`]
     /// and [`post_merge_gate::revert_merge`] so those helpers stay fully
     /// testable without orchestrator state. This method resolves the
-    /// project's `working_dir` as `repo_root`, constructs the [`GateConfig`]
-    /// (picking up any overrides from `[post_merge_gate]` in
-    /// orchestrator.toml), and funnels the result through
-    /// [`handle_post_merge_test_gate_for_project`] which takes a
+    /// project's `working_dir` as `repo_root`, constructs the
+    /// [`post_merge_gate::GateConfig`] (picking up any overrides from
+    /// `[post_merge_gate]` in orchestrator.toml), and funnels the result
+    /// through `handle_post_merge_test_gate_for_project` which takes a
     /// [`post_merge_gate::CommandRunner`] so integration tests can drive the
     /// full handler with a scripted runner.
     pub async fn handle_post_merge_test_gate(

@@ -332,7 +332,7 @@ impl RoleGraph {
 
     /// Creates a new `RoleGraph` synchronously.
     ///
-    /// This is identical to [`new`] but does not require an async runtime.
+    /// This is identical to [`Self::new`] but does not require an async runtime.
     /// The async version exists for API compatibility; the actual construction
     /// is fully synchronous.
     pub fn new_sync(role: RoleName, thesaurus: Thesaurus) -> Result<Self> {
@@ -407,7 +407,7 @@ impl RoleGraph {
 
     /// Create RoleGraph from serializable representation synchronously.
     ///
-    /// This is identical to [`from_serializable`] but does not require an async runtime.
+    /// This is identical to [`Self::from_serializable`] but does not require an async runtime.
     /// The async version exists for API compatibility; the actual construction
     /// is fully synchronous.
     pub fn from_serializable_sync(serializable: SerializableRoleGraph) -> Result<Self> {

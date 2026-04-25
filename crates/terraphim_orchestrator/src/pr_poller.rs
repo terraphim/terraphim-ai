@@ -195,7 +195,7 @@ impl AutoMergeExecutor for GiteaPrTracker {
 /// Outcome of applying the auto-merge policy to a single PR.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EvaluationOutcome {
-    /// Every gate cleared; the caller should enqueue [`DispatchTask::AutoMerge`].
+    /// Every gate cleared; the caller should enqueue [`crate::DispatchTask::AutoMerge`].
     Merge { head_sha: String },
     /// At least one gate failed. The reason is a short human-readable string
     /// suitable for logging or posting back to the PR.

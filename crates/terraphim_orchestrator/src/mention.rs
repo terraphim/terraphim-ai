@@ -433,7 +433,7 @@ pub fn resolve_persona_mention(
 /// Returns `None` if no agent satisfies these rules or if multiple agents do.
 ///
 /// The caller is expected to have obtained `detected_project` from
-/// [`parse_mention_tokens`] or [`MENTION_RE`] and `hinted_project` from the
+/// [`parse_mention_tokens`] or `MENTION_RE` and `hinted_project` from the
 /// poller's current iteration over `config.projects` (or [`LEGACY_PROJECT_ID`]
 /// for the legacy top-level gitea path).
 pub fn resolve_mention(

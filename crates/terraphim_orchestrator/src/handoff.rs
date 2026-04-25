@@ -255,7 +255,7 @@ impl HandoffLedger {
     }
 
     /// Read all entries from the ledger file.
-    /// Returns Vec<HandoffContext> in order of insertion.
+    /// Returns `Vec<HandoffContext>` in order of insertion.
     pub fn read_all(&self) -> Result<Vec<HandoffContext>, std::io::Error> {
         let file = OpenOptions::new().read(true).open(&self.path)?;
 

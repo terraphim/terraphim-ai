@@ -68,10 +68,10 @@ impl DeviceStorage {
         Ok(storage)
     }
 
-    /// Get an Arc<DeviceStorage> instance safely
+    /// Get an `Arc<DeviceStorage>` instance safely.
     ///
-    /// This is a safe alternative to using unsafe ptr::read operations.
-    /// It initializes storage if needed and returns an Arc clone.
+    /// Safe alternative to using unsafe `ptr::read` operations.
+    /// Initialises storage if needed and returns an Arc clone.
     pub async fn arc_instance() -> Result<Arc<DeviceStorage>> {
         let storage_ref = Self::instance().await?;
 
@@ -84,9 +84,9 @@ impl DeviceStorage {
         Ok(Arc::new(safe_storage))
     }
 
-    /// Get an Arc<DeviceStorage> instance using memory-only backend safely
+    /// Get an `Arc<DeviceStorage>` instance using a memory-only backend safely.
     ///
-    /// This is a safe alternative to using unsafe ptr::read operations for tests.
+    /// Safe alternative to unsafe `ptr::read` operations; intended for tests.
     pub async fn arc_memory_only() -> Result<Arc<DeviceStorage>> {
         let storage_ref = Self::init_memory_only().await?;
 

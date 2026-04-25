@@ -512,9 +512,10 @@ impl FlowExecutor {
     }
 
     /// Resolve template variables in a string.
-    /// Supports: {{repo_path}}, {{base_branch}}, {{flow.name}}, {{flow.correlation_id}},
-    /// {{steps.<name>.stdout}}, {{steps.<name>.stderr}}, {{steps.<name>.exit_code}},
-    /// {{steps.<name>.stdout_file}}
+    ///
+    /// Supports: `{{repo_path}}`, `{{base_branch}}`, `{{flow.name}}`, `{{flow.correlation_id}}`,
+    /// `{{steps.<step_name>.stdout}}`, `{{steps.<step_name>.stderr}}`,
+    /// `{{steps.<step_name>.exit_code}}`, `{{steps.<step_name>.stdout_file}}`
     pub fn resolve_templates(
         &self,
         template: &str,
