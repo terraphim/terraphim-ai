@@ -637,6 +637,7 @@ mod session_output {
     }
 }
 
+#[allow(dead_code)]
 fn print_json_output<T: Serialize>(value: &T, mode: CommandOutputMode) -> Result<()> {
     let out = match mode {
         CommandOutputMode::Human => serde_json::to_string_pretty(value)?,
