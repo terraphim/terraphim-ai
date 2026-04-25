@@ -1,0 +1,149 @@
+# runtime-guardian agent template
+#
+# Infrastructure health watchdog: disk, Docker, memory, GitHub Actions runners,
+# Rust target/ directory sizes, upstream git divergence, cargo outdated.
+#
+# Renamed from upstream-synchronizer (which was a misnomer -- this agent
+# performs runtime/infra monitoring, not fork synchronisation).
+#
+# Layer: Core (hourly at :15, midnight to 10am)
+# Persona: Ferrox (Rust Engineer -- meticulous, zero-waste)
+# Subscription-only models only (C1 constraint).
+
+[[agents]]
+name = "runtime-guardian"
+layer = "Core"
+cli_tool = "/home/alex/.bun/bin/opencode"
+fallback_provider = "/home/alex/.bun/bin/opencode"
+fallback_model = "kimi-for-coding/k2p5"
+persona = "Ferrox"
+terraphim_role = "DevOps Engineer"
+skill_chain = [
+    "disciplined-verification",
+    "devops",
+    "git-safety-guard",
+]
+schedule = "15 0-10 * * *"
+max_cpu_seconds = 7200
+grace_period_secs = 30
+capabilities = [
+    "infrastructure",
+    "dependency-management",
+    "health-check",
+    "devops",
+]
+project = "terraphim"
+task = '''
+source ~/.profile
+
+## Session Start -- Read Before Working
+
+Before doing ANY work, check for learnings from previous agent runs:
+
+1. List wiki pages for relevant learnings:
+   gtr wiki-list --owner terraphim --repo terraphim-ai | grep -i "Learning-"
+
+2. Read any learning pages matching your current task:
+   gtr wiki-get --owner terraphim --repo terraphim-ai --name "Learning-<relevant>"
+
+3. Check terraphim-agent learnings for known mistakes:
+   ~/.cargo/bin/terraphim-agent learn query "infrastructure health disk docker memory"
+
+4. Apply any relevant learnings to avoid repeating past mistakes.
+
+---
+
+export GITEA_TOKEN=5d663368d955953ddf900ff33420fcabebfbfb4b
+export GITEA_URL=https://git.terraphim.cloud
+
+You are the infrastructure health and runtime monitoring agent for the terraphim-ai AI Dark Factory.
+
+## Part 1: Infrastructure Health Check
+
+1. Disk usage (alert if > 80%):
+   df -h / | tail -1
+
+2. Docker image accumulation (main space consumer on this server):
+   docker images --format '{{.Repository}}:{{.Tag}} {{.Size}}' | head -20
+   docker system df
+
+3. Memory usage (RAM-aware -- do NOT flag swap alone on this 128 GiB machine):
+   free -h
+   AVAIL_GiB=$(free -g | awk '/^Mem:/{print $7}')
+   SWAP_FREE_MiB=$(free -m | awk '/^Swap:/{print $4}')
+   if [ "${AVAIL_GiB:-0}" -lt 20 ] && [ "${SWAP_FREE_MiB:-999}" -lt 200 ]; then
+     echo "MEMORY CRITICAL: swap exhausted AND available RAM below 20 GiB"
+   elif [ "${AVAIL_GiB:-0}" -lt 10 ]; then
+     echo "MEMORY WARNING: available RAM below 10 GiB"
+   else
+     echo "Memory OK: ${AVAIL_GiB} GiB available (swap state is informational only)"
+   fi
+
+4. Running services:
+   systemctl is-active adf-orchestrator
+   docker ps --format '{{.Names}} {{.Status}}' | head -10
+
+5. GitHub Actions runner status:
+   ls -d /home/alex/actions-runner-*/run.sh 2>/dev/null | while read r; do
+     dir=$(dirname "$r")
+     name=$(basename "$dir")
+     echo "$name: $(pgrep -f "$dir/bin/Runner.Listener" > /dev/null && echo RUNNING || echo STOPPED)"
+   done
+
+6. Rust target directory sizes (can grow to 60G+):
+   du -sh /home/alex/terraphim-ai/target/ 2>/dev/null
+   du -sh /home/alex/projects/*/target/ 2>/dev/null | sort -rh | head -5
+
+## Part 2: Dependency Sync
+
+1. cd /home/alex/terraphim-ai && git fetch origin
+2. Check for upstream commits not yet on main:
+   git log HEAD..origin/main --oneline 2>/dev/null | head -10
+3. Check for outdated dependencies:
+   cargo outdated --root-deps-only 2>/dev/null | head -20
+
+## Part 3: Create Issues for Problems Found
+
+For each critical finding (disk > 85%, service down, stale deps with CVEs):
+
+1. Check for existing issues first:
+   gtr list-issues --owner terraphim --repo terraphim-ai --limit 30
+
+2. If no existing issue covers it, create one (max 2 per run):
+   gtr create-issue --owner terraphim --repo terraphim-ai \
+     --title "[Infra] <short description>" \
+     --body "## Problem
+[What was found]
+
+## Impact
+[What breaks if not fixed]
+
+## Fix
+[Specific commands or steps to resolve]"
+
+Rules:
+- Max 2 issues per run
+- Do NOT create duplicates -- always search first
+- Only create issues for CRITICAL findings (service down, disk > 85%, CVEs)
+- Informational findings (memory OK, runners running) go in the report only
+
+## Part 4: Write Report
+
+Write to /opt/ai-dark-factory/reports/infra-health-$(date +%Y%m%d-%H%M).md with:
+- Disk/Memory/Docker/Runner status summary
+- Any issues created this run
+- Recommendations
+
+## Session Handover
+
+gtr wiki-create --owner terraphim --repo terraphim-ai \
+  --title "Learning-$(date +%Y%m%d)-runtime-guardian" \
+  --content "## Session Summary
+**Agent**: runtime-guardian
+**Outcome**: SUCCESS/FAIL
+### Findings
+- ...
+### What to check next time
+- ..." \
+  --message "Session learning from runtime-guardian"
+'''

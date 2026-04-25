@@ -1,0 +1,155 @@
+# upstream-synchronizer agent template
+#
+# Monitors divergence between the terraphim gitea fork and upstream go-gitea.
+# Runs once daily at 1:30am. Adds the upstream remote if absent.
+# Only creates a Gitea issue if the fork is >50 commits behind AND
+# security-relevant commits (CVE, security, fix(sec)) are found upstream.
+#
+# Fork location: /home/alex/projects/terraphim/gitea
+# Upstream: https://github.com/go-gitea/gitea.git
+#
+# Layer: Core (daily at 1:30am)
+# Persona: Conduit (DevOps Engineer -- connective tissue, pipeline-minded)
+# Subscription-only models only (C1 constraint).
+
+[[agents]]
+name = "upstream-synchronizer"
+layer = "Core"
+schedule = "30 1 * * *"
+cli_tool = "/home/alex/.local/bin/claude"
+model = "haiku"
+fallback_model = "kimi-for-coding/k2p5"
+fallback_provider = "/home/alex/.bun/bin/opencode"
+persona = "Conduit"
+skill_chain = [
+    "devops",
+    "git-safety-guard",
+]
+max_cpu_seconds = 600
+grace_period_secs = 30
+capabilities = [
+    "upstream-sync",
+    "fork-management",
+    "security-patch-detection",
+]
+project = "terraphim"
+task = '''
+source ~/.profile
+
+export GITEA_TOKEN=5d663368d955953ddf900ff33420fcabebfbfb4b
+export GITEA_URL=https://git.terraphim.cloud
+
+GITEA_FORK="/home/alex/projects/terraphim/gitea"
+UPSTREAM_URL="https://github.com/go-gitea/gitea.git"
+
+echo "=== Gitea Fork Upstream Sync Check ==="
+echo "Fork: $GITEA_FORK"
+echo "Upstream: $UPSTREAM_URL"
+echo "Time: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+# 1. Ensure fork directory exists
+if [ ! -d "$GITEA_FORK/.git" ]; then
+  echo "ERROR: Gitea fork not found at $GITEA_FORK"
+  exit 1
+fi
+
+cd "$GITEA_FORK"
+
+# 2. Add upstream remote if absent
+if ! git remote | grep -q "^upstream$"; then
+  git remote add upstream "$UPSTREAM_URL"
+  echo "Added upstream remote: $UPSTREAM_URL"
+else
+  echo "Upstream remote already configured"
+fi
+
+# 3. Fetch upstream (shallow -- last 200 commits is sufficient for go-gitea)
+echo ""
+echo "Fetching upstream..."
+git fetch upstream --depth=200 2>&1 | tail -5 || {
+  echo "ERROR: git fetch upstream failed -- check network or URL"
+  exit 1
+}
+
+# 4. Count divergence
+BEHIND=$(git log HEAD..upstream/main --oneline 2>/dev/null | wc -l | tr -d ' ')
+AHEAD=$(git log upstream/main..HEAD --oneline 2>/dev/null | wc -l | tr -d ' ')
+
+echo ""
+echo "=== Divergence Summary ==="
+echo "Fork is $AHEAD commits ahead of upstream/main (our custom Robot API additions)"
+echo "Fork is $BEHIND commits behind upstream/main (unmerged upstream changes)"
+
+# 5. Show our custom commits (ahead)
+echo ""
+echo "Our custom commits (top 10):"
+git log upstream/main..HEAD --oneline 2>/dev/null | head -10
+
+# 6. If behind, scan for security-relevant upstream commits
+SECURITY_COMMITS=""
+if [ "$BEHIND" -gt 0 ]; then
+  echo ""
+  echo "=== Upstream commits we are missing (top 20) ==="
+  git log HEAD..upstream/main --oneline 2>/dev/null | head -20
+
+  SECURITY_COMMITS=$(git log HEAD..upstream/main --oneline 2>/dev/null \
+    | grep -iE "CVE|security|vuln|fix.*(sec|auth|xss|sqli|csrf|injection|bypass|escalat)" \
+    | head -10)
+
+  if [ -n "$SECURITY_COMMITS" ]; then
+    echo ""
+    echo "=== SECURITY-RELEVANT UPSTREAM COMMITS ==="
+    echo "$SECURITY_COMMITS"
+  else
+    echo ""
+    echo "No security-relevant commits in upstream gap"
+  fi
+fi
+
+# 7. Create Gitea issue only if significantly behind AND security commits found
+if [ "$BEHIND" -gt 50 ] && [ -n "$SECURITY_COMMITS" ]; then
+  EXISTING=$(gtr list-issues --owner terraphim --repo terraphim-ai --state open 2>/dev/null \
+    | python3 -c 'import json,sys; issues=json.load(sys.stdin); [print(i["number"]) for i in issues if "Theme-ID: gitea-upstream-drift" in i.get("body","")]' \
+    | head -1)
+
+  if [ -n "$EXISTING" ]; then
+    gtr comment --owner terraphim --repo terraphim-ai --index "$EXISTING" \
+      --body "Upstream drift update $(date -u +%Y-%m-%dT%H:%M:%SZ): fork is now $BEHIND commits behind.
+
+Security-relevant upstream commits:
+$SECURITY_COMMITS"
+  else
+    gtr create-issue --owner terraphim --repo terraphim-ai \
+      --title "[Infra] gitea fork $BEHIND commits behind upstream go-gitea" \
+      --body "## Problem
+
+The terraphim gitea fork (\`/home/alex/projects/terraphim/gitea\`) is $BEHIND commits behind \`go-gitea/gitea\` main branch.
+
+## Security-Relevant Commits Missing
+
+$SECURITY_COMMITS
+
+## Context
+
+The fork is $AHEAD commits ahead (our custom Robot API additions). These custom commits must be preserved when cherry-picking upstream security fixes.
+
+## Recommended Action
+
+Review each security commit above and cherry-pick if applicable:
+\`\`\`bash
+cd /home/alex/projects/terraphim/gitea
+git cherry-pick <commit-sha>
+# Resolve conflicts if any (our Robot API additions are in routers/api/v1/robot/)
+\`\`\`
+
+Theme-ID: gitea-upstream-drift"
+  fi
+elif [ "$BEHIND" -gt 0 ]; then
+  echo "Fork is $BEHIND commits behind but no security commits found -- informational only"
+else
+  echo "Fork is up to date with upstream go-gitea -- no action needed"
+fi
+
+echo ""
+echo "=== Sync check complete ==="
+'''
