@@ -133,20 +133,26 @@ jobs:
       # don't need the old `unset CI` workaround. zig 0.16 is installed on
       # bigbox; see .cargo/config.toml for the Darwin `dynamic_lookup`
       # linker workaround on local Mac dev.
+      #
+      # All cargo invocations are dispatched via `rch exec --` so they
+      # share rchd's queue + slot accounting with ADF agents (see
+      # .docs/adr-rch-build-queue-not-firecracker-ci.md). Fail-open: if
+      # rchd is down or no slot is available, rch falls through to local
+      # cargo with no behaviour change.
       - name: cargo fmt --check
-        run: cargo fmt -- --check
+        run: /home/alex/.local/bin/rch exec -- cargo fmt -- --check
 
       - name: cargo clippy
-        run: cargo clippy -- -D warnings
+        run: /home/alex/.local/bin/rch exec -- cargo clippy -- -D warnings
 
       - name: cargo build --workspace
-        run: cargo build --workspace
+        run: /home/alex/.local/bin/rch exec -- cargo build --workspace
 
       - name: cargo test --workspace
         # Only test_chat_command is skipped: it requires LLM API credentials
         # not present in CI. All other failures must be fixed at the source,
         # not skipped.
-        run: cargo test --workspace -- --skip test_chat_command
+        run: /home/alex/.local/bin/rch exec -- cargo test --workspace -- --skip test_chat_command
 
       - name: sccache stats
         if: always()
