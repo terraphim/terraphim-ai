@@ -538,6 +538,10 @@ impl MarkdownCommandParser {
                     value: normalized_term.clone(),
                     display_value: None,
                     url: Some(format!("learned-term:{}", term)),
+                    action: None,
+                    priority: None,
+                    trigger: None,
+                    pinned: false,
                 },
             );
         }
@@ -1281,6 +1285,10 @@ The service requires proper database configuration and SSL certificates for secu
                 value: NormalizedTermValue::from("database"),
                 display_value: None,
                 url: Some("concept:database".to_string()),
+                action: None,
+                priority: None,
+                trigger: None,
+                pinned: false,
             },
         );
 
@@ -1290,7 +1298,25 @@ The service requires proper database configuration and SSL certificates for secu
                 id: 2u64,
                 value: NormalizedTermValue::from("kubernetes"),
                 display_value: None,
-                url: Some("concept:kubernetes".to_string()),
+                url: None,
+                action: None,
+                priority: None,
+                trigger: None,
+                pinned: false,
+            },
+        );
+
+        thesaurus.insert(
+            NormalizedTermValue::from("api"),
+            NormalizedTerm {
+                id: 3u64,
+                value: NormalizedTermValue::from("api"),
+                display_value: None,
+                url: None,
+                action: None,
+                priority: None,
+                trigger: None,
+                pinned: false,
             },
         );
 

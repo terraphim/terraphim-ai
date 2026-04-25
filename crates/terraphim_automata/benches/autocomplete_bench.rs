@@ -69,6 +69,10 @@ fn create_large_thesaurus(size: usize) -> Thesaurus {
                 value: NormalizedTermValue::from(term.clone()),
                 display_value: None,
                 url: Some(format!("https://example.com/{}", term.replace('_', "-"))),
+                action: None,
+                priority: None,
+                trigger: None,
+                pinned: false,
             };
             thesaurus.insert(NormalizedTermValue::from(term), normalized_term);
         }

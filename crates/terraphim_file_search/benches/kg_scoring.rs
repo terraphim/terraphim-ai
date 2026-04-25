@@ -32,6 +32,10 @@ fn make_thesaurus(terms: &[&str]) -> Thesaurus {
             value: NormalizedTermValue::from(term.to_string()),
             display_value: None,
             url: None,
+            action: None,
+            priority: None,
+            trigger: None,
+            pinned: false,
         };
         t.insert(key, nt);
     }

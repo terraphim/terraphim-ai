@@ -306,7 +306,20 @@ pub struct NormalizedTerm {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub display_value: Option<String>,
     /// The URL of the normalized term
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
+    /// CLI action template with `{{ model }}` and `{{ prompt }}` placeholders.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub action: Option<String>,
+    /// Routing tiebreaking priority (higher = preferred).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub priority: Option<u8>,
+    /// Pattern or alias that activates this term.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trigger: Option<String>,
+    /// Whether the term is pinned.
+    #[serde(default)]
+    pub pinned: bool,
 }
 
 impl NormalizedTerm {
@@ -318,6 +331,10 @@ impl NormalizedTerm {
             value,
             display_value: None,
             url: None,
+            action: None,
+            priority: None,
+            trigger: None,
+            pinned: false,
         }
     }
 
@@ -329,6 +346,10 @@ impl NormalizedTerm {
             value,
             display_value: None,
             url: None,
+            action: None,
+            priority: None,
+            trigger: None,
+            pinned: false,
         }
     }
 
@@ -345,12 +366,56 @@ impl NormalizedTerm {
         self
     }
 
+    /// Set the action template for this term.
+    pub fn with_action(mut self, action: String) -> Self {
+        self.action = Some(action);
+        self
+    }
+
+    /// Set the priority for this term.
+    pub fn with_priority(mut self, priority: u8) -> Self {
+        self.priority = Some(priority);
+        self
+    }
+
+    /// Set the trigger for this term.
+    pub fn with_trigger(mut self, trigger: String) -> Self {
+        self.trigger = Some(trigger);
+        self
+    }
+
+    /// Set the pinned flag for this term.
+    pub fn with_pinned(mut self, pinned: bool) -> Self {
+        self.pinned = pinned;
+        self
+    }
+
     /// Get the display value, falling back to the normalized value if not set.
     /// This is the value that should be used for replacement output.
     pub fn display(&self) -> &str {
         self.display_value
             .as_deref()
             .unwrap_or_else(|| self.value.as_str())
+    }
+
+    /// Get the action template.
+    pub fn action(&self) -> Option<&String> {
+        self.action.as_ref()
+    }
+
+    /// Get the priority.
+    pub fn priority(&self) -> Option<&u8> {
+        self.priority.as_ref()
+    }
+
+    /// Get the trigger.
+    pub fn trigger(&self) -> Option<&String> {
+        self.trigger.as_ref()
+    }
+
+    /// Get the pinned flag.
+    pub fn pinned(&self) -> bool {
+        self.pinned
     }
 }
 

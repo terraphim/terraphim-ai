@@ -100,6 +100,10 @@ mod tests {
             value: NormalizedTermValue::from(value.to_string()),
             display_value: None,
             url: None,
+            action: None,
+            priority: None,
+            trigger: None,
+            pinned: false,
         };
         (key, term)
     }

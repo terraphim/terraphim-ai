@@ -25,6 +25,7 @@
 
 pub(crate) mod capture;
 pub mod compile;
+pub mod export_kg;
 mod hook;
 mod install;
 pub(crate) mod procedure;
@@ -52,6 +53,9 @@ pub(crate) use capture::{build_kg_thesaurus_from_dir, find_kg_dir};
 // Re-export compile functions for building thesauruses from corrections
 #[allow(unused_imports)]
 pub use compile::{compile_corrections_to_thesaurus, merge_thesauruses, write_thesaurus_json};
+
+#[allow(unused_imports)]
+pub use export_kg::{CorrectionTypeFilter, export_corrections_as_kg};
 
 #[allow(unused_imports)]
 pub use redaction::redact_secrets;

@@ -554,6 +554,10 @@ impl CommandRegistry {
                     value: term_value.clone(),
                     display_value: None,
                     url: Some(format!("command:{}", name)),
+                    action: None,
+                    priority: None,
+                    trigger: None,
+                    pinned: false,
                 },
             );
 
@@ -568,6 +572,10 @@ impl CommandRegistry {
                         value: keyword_value,
                         display_value: None,
                         url: Some(format!("command:{}", name)),
+                        action: None,
+                        priority: None,
+                        trigger: None,
+                        pinned: false,
                     },
                 );
             }
@@ -583,6 +591,10 @@ impl CommandRegistry {
                         value: param_value,
                         display_value: None,
                         url: Some(format!("command:{}:param:{}", name, param.name)),
+                        action: None,
+                        priority: None,
+                        trigger: None,
+                        pinned: false,
                     },
                 );
             }
@@ -740,6 +752,10 @@ impl CommandRegistry {
                     value: term_value,
                     display_value: None,
                     url: None,
+                    action: None,
+                    priority: None,
+                    trigger: None,
+                    pinned: false,
                 },
             );
         }
