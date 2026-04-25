@@ -389,9 +389,10 @@ async fn test_server_mode_with_custom_url() -> Result<()> {
     let stderr = String::from_utf8_lossy(&output.stderr);
     let code = output.status.code().unwrap_or(-1);
 
+    // Exit code 6 is ErrorNetwork (F1.2 exit code contract)
     assert_eq!(
-        code, 1,
-        "Should fail with custom URL when no server running"
+        code, 6,
+        "Should fail with ErrorNetwork exit code when no server running"
     );
     assert!(
         stderr.contains("Connection refused") || stderr.contains("connect error"),
