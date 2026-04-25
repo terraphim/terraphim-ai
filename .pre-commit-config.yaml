@@ -32,9 +32,16 @@ repos:
         name: Check for large files
         args: ['--maxkb=1000']
 
-  # Rust-specific hooks
+  # Customer data protection
   - repo: local
     hooks:
+      - id: reject-customer-data
+        name: Reject customer/project data
+        entry: scripts/hooks/reject-customer-data.sh
+        language: script
+        pass_filenames: true
+        description: "Block any file under projects/ to prevent customer data leaks"
+
       - id: cargo-fmt
         name: Cargo format check
         entry: cargo fmt --all -- --check
