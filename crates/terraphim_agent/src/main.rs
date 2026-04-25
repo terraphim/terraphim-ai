@@ -1684,7 +1684,7 @@ async fn run_offline_command(
             if let Some(reason) = &result.reason {
                 eprintln!("BLOCKED: {}", reason);
                 if !fail_open {
-                    std::process::exit(1);
+                    std::process::exit(robot::exit_codes::ExitCode::ErrorGeneral.code().into());
                 }
             }
         }
@@ -1702,7 +1702,7 @@ async fn run_offline_command(
             }
             Err(e) => {
                 eprintln!("Failed to check for updates: {}", e);
-                std::process::exit(1);
+                std::process::exit(robot::exit_codes::ExitCode::ErrorGeneral.code().into());
             }
         }
     }
@@ -1717,7 +1717,7 @@ async fn run_offline_command(
             }
             Err(e) => {
                 eprintln!("Update failed: {}", e);
-                std::process::exit(1);
+                std::process::exit(robot::exit_codes::ExitCode::ErrorGeneral.code().into());
             }
         }
     }
@@ -1968,7 +1968,7 @@ async fn run_offline_command(
                             }
                             Err(e) => {
                                 eprintln!("Failed to reload from '{}': {:?}", path, e);
-                                std::process::exit(1);
+                                std::process::exit(robot::exit_codes::ExitCode::ErrorGeneral.code().into());
                             }
                         },
                         None => {
@@ -1976,7 +1976,7 @@ async fn run_offline_command(
                             eprintln!(
                                 "Add role_config = \"path/to/roles.json\" to your settings.toml"
                             );
-                            std::process::exit(1);
+                            std::process::exit(robot::exit_codes::ExitCode::ErrorGeneral.code().into());
                         }
                     }
                 }
@@ -2471,7 +2471,7 @@ async fn run_offline_command(
                     }
                     Err(e) => {
                         eprintln!("Failed to apply template: {}", e);
-                        std::process::exit(1);
+                        std::process::exit(robot::exit_codes::ExitCode::ErrorGeneral.code().into());
                     }
                 }
             }
@@ -2519,11 +2519,11 @@ async fn run_offline_command(
                     eprintln!(
                         "Interactive mode requires a terminal. Use --template for non-interactive setup."
                     );
-                    std::process::exit(1);
+                    std::process::exit(robot::exit_codes::ExitCode::ErrorGeneral.code().into());
                 }
                 Err(e) => {
                     eprintln!("Setup failed: {}", e);
-                    std::process::exit(1);
+                    std::process::exit(robot::exit_codes::ExitCode::ErrorGeneral.code().into());
                 }
             }
 
@@ -3001,7 +3001,7 @@ async fn run_learn_command(sub: LearnSub) -> Result<()> {
                     match procedure {
                         None => {
                             eprintln!("Procedure '{}' not found.", id);
-                            std::process::exit(1);
+                            std::process::exit(robot::exit_codes::ExitCode::ErrorGeneral.code().into());
                         }
                         Some(proc) => {
                             // Check if procedure is disabled
@@ -3010,7 +3010,7 @@ async fn run_learn_command(sub: LearnSub) -> Result<()> {
                                     "Procedure '{}' is disabled. Use 'learn procedure enable {}' to re-enable it.",
                                     id, id,
                                 );
-                                std::process::exit(1);
+                                std::process::exit(robot::exit_codes::ExitCode::ErrorGeneral.code().into());
                             }
 
                             // Check minimum confidence threshold
@@ -3022,7 +3022,7 @@ async fn run_learn_command(sub: LearnSub) -> Result<()> {
                                     id,
                                     proc.confidence.score * 100.0,
                                 );
-                                std::process::exit(1);
+                                std::process::exit(robot::exit_codes::ExitCode::ErrorGeneral.code().into());
                             }
 
                             println!(
@@ -3066,7 +3066,7 @@ async fn run_learn_command(sub: LearnSub) -> Result<()> {
                                     println!("Replay completed successfully.");
                                 } else {
                                     println!("Replay failed.");
-                                    std::process::exit(1);
+                                    std::process::exit(robot::exit_codes::ExitCode::ErrorGeneral.code().into());
                                 }
                             } else {
                                 println!("Dry run completed.");
@@ -3171,7 +3171,7 @@ async fn run_learn_command(sub: LearnSub) -> Result<()> {
                                 "Session '{}' not found. Try running 'sessions list' first to import sessions.",
                                 session_id
                             );
-                            std::process::exit(1);
+                            std::process::exit(robot::exit_codes::ExitCode::ErrorGeneral.code().into());
                         }
                     }
                 }
@@ -4005,7 +4005,7 @@ async fn run_server_command(
                 }
                 Err(e) => {
                     eprintln!("❌ Failed to check for updates: {}", e);
-                    std::process::exit(1);
+                    std::process::exit(robot::exit_codes::ExitCode::ErrorGeneral.code().into());
                 }
             }
         }
@@ -4018,7 +4018,7 @@ async fn run_server_command(
                 }
                 Err(e) => {
                     eprintln!("❌ Update failed: {}", e);
-                    std::process::exit(1);
+                    std::process::exit(robot::exit_codes::ExitCode::ErrorGeneral.code().into());
                 }
             }
         }
@@ -4054,7 +4054,7 @@ async fn run_server_command(
                 Ok(())
             } else {
                 eprintln!("Replace command is only available in offline mode");
-                std::process::exit(1);
+                std::process::exit(robot::exit_codes::ExitCode::ErrorGeneral.code().into());
             }
         }
         Command::Validate { json, .. } => {
@@ -4066,7 +4066,7 @@ async fn run_server_command(
             } else {
                 eprintln!("Validate command is only available in offline mode");
             }
-            std::process::exit(1);
+            std::process::exit(robot::exit_codes::ExitCode::ErrorGeneral.code().into());
         }
         Command::Suggest { json, .. } => {
             if json {
@@ -4077,14 +4077,14 @@ async fn run_server_command(
             } else {
                 eprintln!("Suggest command is only available in offline mode");
             }
-            std::process::exit(1);
+            std::process::exit(robot::exit_codes::ExitCode::ErrorGeneral.code().into());
         }
         Command::Hook { .. } => {
             let err = serde_json::json!({
                 "error": "Hook command is only available in offline mode"
             });
             println!("{}", serde_json::to_string(&err)?);
-            std::process::exit(1);
+            std::process::exit(robot::exit_codes::ExitCode::ErrorGeneral.code().into());
         }
         Command::Guard {
             command,
@@ -4143,7 +4143,7 @@ async fn run_server_command(
                 if let Some(reason) = &result.reason {
                     eprintln!("BLOCKED: {}", reason);
                     if !fail_open {
-                        std::process::exit(1);
+                        std::process::exit(robot::exit_codes::ExitCode::ErrorGeneral.code().into());
                     }
                 }
             }
@@ -4222,7 +4222,7 @@ async fn run_server_command(
                     }
                     Err(e) => {
                         eprintln!("Setup error: {}", e);
-                        std::process::exit(1);
+                        std::process::exit(robot::exit_codes::ExitCode::ErrorGeneral.code().into());
                     }
                 }
             }
@@ -4413,7 +4413,7 @@ async fn run_server_command(
         Command::Listen { .. } => {
             eprintln!("error: listen mode is not available in server mode");
             eprintln!("The listener runs in offline mode only.");
-            std::process::exit(1);
+            std::process::exit(robot::exit_codes::ExitCode::ErrorGeneral.code().into());
         }
     }
 }
