@@ -583,59 +583,85 @@ impl Default for SelfDocumentation {
     }
 }
 
-/// Capabilities summary
+/// Capabilities summary returned by the `--capabilities` robot-mode flag.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Capabilities {
+    /// Agent name (e.g. `"terraphim-agent"`).
     pub name: String,
+    /// Semver version string.
     pub version: String,
+    /// Human-readable description of what the agent does.
     pub description: String,
+    /// Feature-flag matrix indicating which optional capabilities are compiled in.
     pub features: FeatureFlags,
+    /// List of top-level command names the agent exposes.
     pub commands: Vec<String>,
+    /// Output formats supported by robot mode (e.g. `["json", "json-compact"]`).
     pub supported_formats: Vec<String>,
 }
 
-/// Documentation for a single command
+/// Documentation for a single command exposed in robot mode.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CommandDoc {
+    /// Primary command name.
     pub name: String,
+    /// Alternative spellings or short forms.
     pub aliases: Vec<String>,
+    /// One-line description of what the command does.
     pub description: String,
+    /// Positional arguments accepted by the command.
     pub arguments: Vec<ArgumentDoc>,
+    /// Optional flags accepted by the command.
     pub flags: Vec<FlagDoc>,
+    /// Worked examples showing usage.
     pub examples: Vec<ExampleDoc>,
+    /// JSON Schema describing the command's robot-mode response envelope.
     pub response_schema: serde_json::Value,
 }
 
-/// Documentation for a command argument
+/// Documentation for a positional argument of a command.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ArgumentDoc {
+    /// Argument name as it appears in usage strings.
     pub name: String,
+    /// Type label (e.g. `"string"`, `"integer"`).
     #[serde(rename = "type")]
     pub arg_type: String,
+    /// Whether the argument must be provided.
     pub required: bool,
+    /// Description of the argument's purpose and accepted values.
     pub description: String,
+    /// Default value used when the argument is omitted, if any.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default: Option<String>,
 }
 
-/// Documentation for a command flag
+/// Documentation for an optional command flag.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FlagDoc {
+    /// Long flag name without leading dashes (e.g. `"format"`).
     pub name: String,
+    /// Single-character short alias without dash (e.g. `"f"`), if any.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub short: Option<String>,
+    /// Type label for the flag value (e.g. `"string"`, `"bool"`).
     #[serde(rename = "type")]
     pub flag_type: String,
+    /// Default value when the flag is not supplied, if any.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default: Option<String>,
+    /// Description of what the flag controls.
     pub description: String,
 }
 
-/// Documentation for a command example
+/// A worked example illustrating command usage.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExampleDoc {
+    /// Short description of what this example demonstrates.
     pub description: String,
+    /// The full command string including flags and arguments.
     pub command: String,
+    /// Expected or representative output, omitted when not applicable.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output: Option<String>,
 }

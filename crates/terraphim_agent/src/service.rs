@@ -9,6 +9,10 @@ use terraphim_settings::{DeviceSettings, Error as DeviceSettingsError};
 use terraphim_types::{Document, Layer, NormalizedTermValue, RoleName, SearchQuery, Thesaurus};
 use tokio::sync::Mutex;
 
+/// Top-level service facade used by the TUI and CLI front-ends.
+///
+/// Wraps [`TerraphimService`] behind an `Arc<Mutex<…>>` so it can be shared
+/// across async tasks while keeping config mutations serialised.
 #[derive(Clone)]
 pub struct TuiService {
     config_state: ConfigState,
@@ -798,27 +802,37 @@ impl TuiService {
     }
 }
 
-/// Result of connectivity check
+/// Result of a knowledge-graph connectivity check.
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct ConnectivityResult {
+    /// Whether all queried terms are reachable via a single graph path.
     pub connected: bool,
+    /// Terms that matched automata entries in the knowledge graph.
     pub matched_terms: Vec<String>,
+    /// Human-readable summary of the connectivity check outcome.
     pub message: String,
 }
 
-/// Fuzzy suggestion result
+/// A fuzzy-match suggestion returned when an exact term is not found.
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct FuzzySuggestion {
+    /// The suggested term from the knowledge graph.
     pub term: String,
+    /// Jaro-Winkler similarity score between the query and this suggestion (0.0–1.0).
     pub similarity: f64,
 }
 
-/// Checklist validation result
+/// Outcome of validating LLM output against a named checklist.
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct ChecklistResult {
+    /// Name of the checklist used for validation.
     pub checklist_name: String,
+    /// `true` when all checklist items are satisfied.
     pub passed: bool,
+    /// Total number of items in the checklist.
     pub total_items: usize,
+    /// Checklist items that were found in the output.
     pub satisfied: Vec<String>,
+    /// Checklist items absent from the output.
     pub missing: Vec<String>,
 }

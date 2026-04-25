@@ -46,8 +46,11 @@ pub enum LoggingConfig {
     Test,
     /// Integration test logging (INFO level, reduced noise)
     IntegrationTest,
-    /// Custom logging level
-    Custom { level: log::LevelFilter },
+    /// Custom logging level specified by the caller.
+    Custom {
+        /// The `log` crate level filter to apply.
+        level: log::LevelFilter,
+    },
 }
 
 /// Initialize logging based on configuration preset

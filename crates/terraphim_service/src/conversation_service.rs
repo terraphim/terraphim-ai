@@ -26,13 +26,18 @@ pub struct ConversationFilter {
     pub limit: Option<usize>,
 }
 
-/// Statistics about conversations
+/// Aggregate statistics across all stored conversations.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ConversationStatistics {
+    /// Total number of conversations in the store.
     pub total_conversations: usize,
+    /// Cumulative message count across all conversations.
     pub total_messages: usize,
+    /// Cumulative number of context items injected across all conversations.
     pub total_context_items: usize,
+    /// Count of conversations indexed by role name.
     pub conversations_by_role: std::collections::HashMap<String, usize>,
+    /// Mean number of messages per conversation.
     pub average_messages_per_conversation: f64,
 }
 

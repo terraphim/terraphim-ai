@@ -1,3 +1,9 @@
+//! Terraphim Agent -- TUI, robot-mode output, and knowledge-graph CLI.
+//!
+//! Provides the terminal user interface, machine-readable JSON output for AI
+//! agents, forgiving CLI parsing, and MCP tool discovery on top of the
+//! [`terraphim_service`] stack.
+
 #[cfg(feature = "server")]
 pub mod client;
 pub mod onboarding;

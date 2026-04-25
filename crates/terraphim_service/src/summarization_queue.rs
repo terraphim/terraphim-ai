@@ -21,6 +21,7 @@ impl Default for TaskId {
 }
 
 impl TaskId {
+    /// Generate a fresh random task identifier.
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
@@ -46,35 +47,48 @@ pub enum Priority {
     Critical = 3,
 }
 
-/// Status of a summarization task
+/// Status of a summarisation task.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum TaskStatus {
-    /// Task is queued and waiting to be processed
+    /// Task is queued and waiting to be processed.
     Pending {
+        /// When the task entered the queue.
         queued_at: DateTime<Utc>,
+        /// Estimated position in the queue; `None` when unknown.
         position_in_queue: Option<usize>,
     },
-    /// Task is currently being processed
+    /// Task is currently being processed.
     Processing {
+        /// When processing started.
         started_at: DateTime<Utc>,
+        /// Completion fraction (0.0–1.0); `None` when indeterminate.
         progress: Option<f32>,
     },
-    /// Task completed successfully
+    /// Task completed successfully.
     Completed {
+        /// The generated summary text.
         summary: String,
+        /// When the task finished.
         completed_at: DateTime<Utc>,
+        /// Wall-clock processing time in seconds.
         processing_duration_seconds: u64,
     },
-    /// Task failed with error
+    /// Task failed with an error.
     Failed {
+        /// Human-readable error description.
         error: String,
+        /// When the failure was recorded.
         failed_at: DateTime<Utc>,
+        /// How many retry attempts have been made so far.
         retry_count: u32,
+        /// Scheduled time for the next retry attempt; `None` when retries are exhausted.
         next_retry_at: Option<DateTime<Utc>>,
     },
-    /// Task was cancelled
+    /// Task was explicitly cancelled.
     Cancelled {
+        /// When the cancellation was recorded.
         cancelled_at: DateTime<Utc>,
+        /// Human-readable reason for cancellation.
         reason: String,
     },
 }
