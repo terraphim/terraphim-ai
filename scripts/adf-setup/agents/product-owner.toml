@@ -1,0 +1,240 @@
+# product-owner agent template (Themis)
+#
+# Product Strategist: maintains the development roadmap using Compound-RICE
+# scoring, creates well-structured Gitea issues with explicit prioritisation
+# rationale, and names what is NOT being done (essentialism constraint).
+#
+# Compound-RICE formula:
+#   (Reach × Impact × Confidence × Synergy) / (Effort × Maintenance)
+#   Priority bands: critical ≥30, high ≥15, medium ≥7, low <7
+#   Synergy > 2.0 signals compound opportunity (builds on prior investment).
+#
+# A feature is not done until it has been marketed.
+# Every issue created includes a one-line marketing hint.
+#
+# Layer: Core (hourly at :55, midnight to 10am)
+# Persona: Themis (Product Strategist -- decisive arbiter, evidence-weighing)
+# Subscription-only models only (C1 constraint).
+
+[[agents]]
+name = "product-owner"
+layer = "Core"
+cli_tool = "/home/alex/.local/bin/claude"
+model = "sonnet"
+fallback_model = "kimi-for-coding/k2p5"
+fallback_provider = "/home/alex/.bun/bin/opencode"
+persona = "Themis"
+skill_chain = [
+    "disciplined-research",
+    "disciplined-design",
+    "disciplined-specification",
+    "architecture",
+    "business-scenario-design",
+    "requirements-traceability",
+]
+schedule = "55 0-10 * * *"
+max_cpu_seconds = 7200
+grace_period_secs = 30
+capabilities = [
+    "planning",
+    "roadmap",
+    "issue-creation",
+    "prioritisation",
+]
+project = "terraphim"
+task = '''
+source ~/.profile
+cd "$GITEA_WORKING_DIR" && git pull --ff-only
+
+export GITEA_TOKEN=5d663368d955953ddf900ff33420fcabebfbfb4b
+export GITEA_URL=https://git.terraphim.cloud
+
+## Step 0: Compound-RICE Scoring of Candidate Issues
+
+Before creating any new issues, score the top open issues for prioritisation.
+This helps the team focus on what compounds, not just what is urgent.
+
+READY=$(gtr ready --owner "$GITEA_OWNER" --repo "$GITEA_REPO" 2>/dev/null)
+TOP10=$(echo "$READY" | python3 -c '
+import json,sys
+d=json.load(sys.stdin)
+issues=d.get("ready_issues",[])[:10]
+for i in issues:
+    print(f"#{i[\"index\"]} (score={i.get(\"score\",\"?\")}) {i[\"title\"][:80]}")
+' 2>/dev/null || echo "(could not parse ready issues)")
+
+echo "=== Top ready issues for scoring ==="
+echo "$TOP10"
+
+RICE_PROMPT="You are Themis, the product strategist for $GITEA_OWNER/$GITEA_REPO.
+
+Score these issues using Compound-RICE:
+Formula: (Reach × Impact × Confidence × Synergy) / (Effort × Maintenance)
+Priority bands: critical ≥30, high ≥15, medium ≥7, low <7
+
+Definitions:
+- Reach: users/agents/workflows affected (1-100)
+- Impact: improvement significance (1-10)
+- Confidence: certainty this will work (0.1-1.0)
+- Synergy: does this build on recent work or unlock future work? (1.0=neutral, 2.0+=compound opportunity)
+- Effort: relative implementation cost (1=trivial, 5=large, 10=huge)
+- Maintenance: ongoing burden multiplier (1.0=neutral, 1.5=high maintenance)
+
+Issues to score:
+$TOP10
+
+For each issue:
+1. Estimate components (label as estimates)
+2. Calculate Compound-RICE score
+3. Assign priority band
+
+Then:
+4. Name the TOP 3 to work on (score ≥15 preferred)
+5. Explicitly name what is NOT being prioritised and WHY
+   ('doing #X means deferring #Y because...')
+6. Flag any Synergy >2.0 items as compound opportunities
+
+Format output as:
+
+SCORES:
+#NNN: base_rice=X compound_rice=Y priority=<critical|high|medium|low> synergy=Z [compound opportunity if synergy>2]
+...
+
+TOP 3:
+1. #NNN - reason
+2. #NNN - reason
+3. #NNN - reason
+
+DEFERRED (explicit trade-off):
+- #NNN deferred because: <reason relating to lower score or blocking dependency>
+
+COMPOUND OPPORTUNITIES:
+- #NNN: synergy=Z -- <what prior work this builds on>"
+
+RICE_OUTPUT=$(/home/alex/.local/bin/claude -p --model sonnet --allowedTools "" --max-turns 3 "$RICE_PROMPT" 2>&1)
+echo ""
+echo "=== Compound-RICE Analysis ==="
+echo "$RICE_OUTPUT"
+
+## Step 1: Read prior learnings and context
+
+LEARNINGS=$(~/.cargo/bin/terraphim-agent learn query "roadmap prioritization issue creation" 2>/dev/null || echo "")
+
+## Step 2: Create new issues for problems NOT yet tracked
+
+# Identify problems found by infra/stewardship agents not yet in backlog
+OPEN_ISSUES=$(gtr list-issues --owner "$GITEA_OWNER" --repo "$GITEA_REPO" --state open 2>/dev/null)
+OPEN_COUNT=$(echo "$OPEN_ISSUES" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)))' 2>/dev/null || echo 0)
+
+CREATION_PROMPT="You are Themis, product strategist for $GITEA_OWNER/$GITEA_REPO.
+
+You are the product owner for terraphim-ai. Your job is to maintain a development roadmap by creating well-structured Gitea issues with clear acceptance criteria.
+
+## Current context
+
+Compound-RICE scores of ready issues:
+$RICE_OUTPUT
+
+Prior learnings:
+$LEARNINGS
+
+Open issues total: $OPEN_COUNT
+
+## Your task
+
+Identify up to 2 NEW issues to create that:
+1. Are not already tracked in the open issues (do not create duplicates)
+2. Would have Compound-RICE score ≥15 if scored
+3. Are well-scoped (completable in <500 LOC by one agent in <2h)
+4. Have clear acceptance criteria
+
+For each new issue, provide:
+- Title
+- Problem statement (2-3 sentences)
+- Acceptance criteria (3-5 testable conditions)
+- Compound-RICE estimate (label as estimate)
+- Marketing hint: one line describing how this could be announced/shared
+- Suggested agent: @adf:<role>
+
+If no new issues meet the threshold (score ≥15, not already tracked), output: NO_NEW_ISSUES_NEEDED
+
+## Essentialism constraint
+Name what is explicitly NOT on your roadmap this cycle.
+'Not doing: [X] because [Y]'"
+
+CREATION_OUTPUT=$(/home/alex/.local/bin/claude -p --model sonnet --allowedTools "Bash,Read" --max-turns 5 "$CREATION_PROMPT" 2>&1)
+echo ""
+echo "=== Issue Creation Analysis ==="
+echo "$CREATION_OUTPUT"
+
+## Step 3: Create the issues
+
+if echo "$CREATION_OUTPUT" | grep -q "NO_NEW_ISSUES_NEEDED"; then
+  echo "No new issues needed this cycle -- existing backlog is sufficient"
+else
+  # Extract issue proposals and create them (max 2)
+  echo "$CREATION_OUTPUT" | python3 -c '
+import sys, re
+
+text = sys.stdin.read()
+# Find issue proposals marked with Title:
+proposals = re.split(r"\n(?=(?:Issue |##?\s*(?:Issue|New Issue|Proposal)|\*\*Title))", text)
+count = 0
+for p in proposals[:3]:
+    title_m = re.search(r"(?:Title|##[^:]*?):\s*(.+)", p)
+    if not title_m or count >= 2:
+        continue
+    title = title_m.group(1).strip().strip("*").strip()
+    print(f"ISSUE_TITLE: {title}")
+    count += 1
+' | while read -r line; do
+    if [[ "$line" == ISSUE_TITLE:* ]]; then
+      TITLE="${line#ISSUE_TITLE: }"
+      # Check for duplicate
+      EXISTS=$(echo "$OPEN_ISSUES" | python3 -c "import json,sys; issues=json.load(sys.stdin); print('yes' if any('${TITLE}' in i.get('title','') for i in issues) else 'no')" 2>/dev/null || echo "no")
+      if [ "$EXISTS" = "no" ]; then
+        gtr create-issue --owner "$GITEA_OWNER" --repo "$GITEA_REPO" \
+          --title "$TITLE" \
+          --body "## Issue from product-owner (Themis) cycle
+
+$CREATION_OUTPUT
+
+---
+*Created by @adf:product-owner (Themis) based on Compound-RICE analysis.*" \
+          2>&1 && echo "Created issue: $TITLE"
+      else
+        echo "Skipped (duplicate): $TITLE"
+      fi
+    fi
+  done
+fi
+
+## Step 4: Write roadmap report
+
+REPORT_FILE="/opt/ai-dark-factory/reports/roadmap-$(date +%Y%m%d-%H%M).md"
+cat > "$REPORT_FILE" << REPORTEOF
+# Product Owner Roadmap Report: $(date +%Y-%m-%d %H:%M)
+
+## Compound-RICE Scores
+
+$RICE_OUTPUT
+
+## Issue Creation This Cycle
+
+$CREATION_OUTPUT
+
+## Context
+
+- Ready issues analysed: $(echo "$TOP10" | wc -l)
+- Open issues total: $OPEN_COUNT
+REPORTEOF
+
+echo "Report written to $REPORT_FILE"
+
+## Step 5: Capture learning
+
+~/.cargo/bin/terraphim-agent learn capture --type insight \
+  --context "product-owner/$GITEA_REPO" \
+  --description "Compound-RICE scoring cycle completed for $GITEA_REPO" \
+  2>/dev/null || true
+'''
