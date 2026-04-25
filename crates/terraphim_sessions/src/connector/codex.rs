@@ -92,6 +92,8 @@ impl SessionConnector for CodexConnector {
         if let Some(path) = self.default_path() {
             if path.exists() {
                 let count = walkdir::WalkDir::new(&path)
+                    .max_depth(4)
+                    .follow_links(false)
                     .into_iter()
                     .filter_map(|e| e.ok())
                     .filter(|e| e.path().extension().is_some_and(|ext| ext == "jsonl"))
@@ -123,6 +125,8 @@ impl SessionConnector for CodexConnector {
 
         // Find all JSONL session files
         for entry in walkdir::WalkDir::new(&path)
+            .max_depth(4)
+            .follow_links(false)
             .into_iter()
             .filter_map(|e| e.ok())
             .filter(|e| e.path().extension().is_some_and(|ext| ext == "jsonl"))
