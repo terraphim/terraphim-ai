@@ -37,6 +37,7 @@ pub use error::{Error, Result};
 
 static DEVICE_STORAGE: AsyncOnceCell<DeviceStorage> = AsyncOnceCell::new();
 
+/// Persistent storage for device-local state, profiles, and settings.
 #[derive(Debug)]
 pub struct DeviceStorage {
     pub ops: HashMap<String, (Operator, u128)>,
@@ -44,6 +45,7 @@ pub struct DeviceStorage {
 }
 
 impl DeviceStorage {
+    /// Returns the global [`DeviceStorage`] singleton, initialising it on first call.
     pub async fn instance() -> Result<&'static DeviceStorage> {
         let storage = DEVICE_STORAGE
             .get_or_try_init(async {

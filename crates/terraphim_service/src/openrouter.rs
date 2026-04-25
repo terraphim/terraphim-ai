@@ -7,6 +7,7 @@
 use reqwest;
 use thiserror::Error;
 
+/// Errors returned by the OpenRouter API client.
 #[derive(Error, Debug)]
 pub enum OpenRouterError {
     #[error("Feature not enabled: {0}")]
@@ -33,6 +34,7 @@ pub enum OpenRouterError {
     ContentTooLong(usize, usize),
 }
 
+/// Convenience alias for `std::result::Result` with `OpenRouterError`.
 pub type Result<T> = std::result::Result<T, OpenRouterError>;
 
 /// OpenRouter service for generating AI summaries
@@ -390,6 +392,7 @@ impl OpenRouterService {
     }
 }
 
+/// An LLM service backed by the OpenRouter API.
 // Stub implementation when the feature is disabled
 #[cfg(not(feature = "openrouter"))]
 pub struct OpenRouterService;

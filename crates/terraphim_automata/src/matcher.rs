@@ -5,6 +5,7 @@ use crate::url_protector::UrlProtector;
 
 use crate::{Result, TerraphimAutomataError};
 
+/// A single term matched in the input text, with its position and metadata.
 #[derive(Debug, PartialEq, Clone)]
 pub struct Matched {
     pub term: String,
@@ -15,6 +16,7 @@ pub struct Matched {
 /// Minimum pattern length for find_matches to prevent spurious matches.
 const MIN_FIND_PATTERN_LENGTH: usize = 2;
 
+/// Finds all automaton matches in `text` and returns them in match order.
 pub fn find_matches(
     text: &str,
     thesaurus: Thesaurus,
@@ -79,6 +81,7 @@ pub fn find_matches(
     Ok(matches)
 }
 
+/// The kind of link associated with a matched term.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum LinkType {
     WikiLinks,

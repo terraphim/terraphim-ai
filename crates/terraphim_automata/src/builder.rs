@@ -15,6 +15,7 @@ use cached::proc_macro::cached;
 use serde::Deserialize;
 use terraphim_types::{Concept, NormalizedTerm, NormalizedTermValue, Thesaurus};
 
+/// Errors that can occur when building the automaton from a source.
 #[derive(Error, Debug)]
 pub enum BuilderError {
     #[error("IO error")]
@@ -25,6 +26,7 @@ pub enum BuilderError {
     Indexation(String),
 }
 
+/// Convenience alias for `std::result::Result` with `BuilderError`.
 pub type Result<T> = std::result::Result<T, BuilderError>;
 
 /// A ThesaurusBuilder receives a path containing
@@ -42,6 +44,7 @@ pub trait ThesaurusBuilder {
 const LOGSEQ_KEY_VALUE_DELIMITER: &str = "::";
 const LOGSEQ_SYNONYMS_KEYWORD: &str = "synonyms";
 
+/// A Logseq knowledge-base source for building an automaton.
 #[derive(Default)]
 pub struct Logseq {
     #[allow(dead_code)]
@@ -66,6 +69,7 @@ impl ThesaurusBuilder for Logseq {
     }
 }
 
+/// Async service that wraps a `Logseq` source for concurrent automaton builds.
 #[allow(dead_code)]
 pub struct LogseqService {
     command: String,
@@ -86,6 +90,7 @@ impl Default for LogseqService {
 
 #[cfg(feature = "tokio-runtime")]
 impl LogseqService {
+    /// Searches `haystack` for lines matching `needle` and returns raw ripgrep messages.
     pub async fn get_raw_messages(&self, needle: &str, haystack: &Path) -> Result<Vec<Message>> {
         let haystack = haystack.to_string_lossy().to_string();
         log::debug!("Running logseq with needle `{needle}` and haystack `{haystack}`");
@@ -210,6 +215,7 @@ fn concept_from_path(path: PathBuf) -> Result<ConceptWithDisplay> {
     })
 }
 
+/// A ripgrep output message (begin, end, match, context, or summary).
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash)]
 #[serde(tag = "type", content = "data")]
 #[serde(rename_all = "snake_case")]
@@ -221,6 +227,7 @@ pub enum Message {
     Summary(Summary),
 }
 
+/// Marks the start of ripgrep results for a file.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash)]
 pub struct Begin {
     pub path: Option<Data>,
@@ -232,6 +239,7 @@ impl Begin {
     }
 }
 
+/// Marks the end of ripgrep results for a file.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash)]
 pub struct End {
     path: Option<Data>,
@@ -239,12 +247,14 @@ pub struct End {
     stats: Stats,
 }
 
+/// Summary statistics from a ripgrep run.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash)]
 pub struct Summary {
     elapsed_total: Duration,
     stats: Stats,
 }
 
+/// A single line match from ripgrep.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash)]
 pub struct Match {
     pub path: Option<Data>,
@@ -256,6 +266,7 @@ pub struct Match {
 
 impl Match {}
 
+/// A context line surrounding a ripgrep match.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash)]
 pub struct Context {
     pub path: Option<Data>,
@@ -267,6 +278,7 @@ pub struct Context {
 
 impl Context {}
 
+/// A sub-match region within a ripgrep match line.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash)]
 pub struct SubMatch {
     #[serde(rename = "match")]
@@ -275,6 +287,7 @@ pub struct SubMatch {
     end: usize,
 }
 
+/// The raw bytes or decoded text of a ripgrep match.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash)]
 #[serde(untagged)]
 pub enum Data {
@@ -311,6 +324,7 @@ struct Duration {
     human: String,
 }
 
+/// Decodes a JSONL string from ripgrep into a list of `Message` values.
 pub fn json_decode(jsonlines: &str) -> Result<Vec<Message>> {
     Ok(serde_json::Deserializer::from_str(jsonlines)
         .into_iter()

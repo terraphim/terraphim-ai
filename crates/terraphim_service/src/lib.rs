@@ -2786,6 +2786,7 @@ impl TerraphimService {
     }
 
     // Test helper methods
+    /// Retrieves the `Role` configuration for the given role name.
     #[cfg(test)]
     pub async fn get_role(&self, role_name: &RoleName) -> Result<Role> {
         let config = self.config_state.config.lock().await;

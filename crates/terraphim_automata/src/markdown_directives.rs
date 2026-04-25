@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use terraphim_types::{DocumentType, MarkdownDirectives, RouteDirective};
 use walkdir::WalkDir;
 
+/// A non-fatal warning produced while parsing a markdown directive.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MarkdownDirectiveWarning {
     pub path: PathBuf,
@@ -12,12 +13,14 @@ pub struct MarkdownDirectiveWarning {
     pub message: String,
 }
 
+/// The result of parsing all markdown directives in a directory.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct MarkdownDirectivesParseResult {
     pub directives: HashMap<String, MarkdownDirectives>,
     pub warnings: Vec<MarkdownDirectiveWarning>,
 }
 
+/// Recursively parses all markdown directive files under `root`.
 pub fn parse_markdown_directives_dir(root: &Path) -> crate::Result<MarkdownDirectivesParseResult> {
     let mut directives = HashMap::new();
     let mut warnings = Vec::new();

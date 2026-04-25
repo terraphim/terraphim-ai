@@ -25,6 +25,7 @@ use serde::{Serialize, Serializer};
 
 use crate::Document;
 
+/// Sorts `documents` by relevance to `query` in descending order.
 pub fn sort_documents(query: &Query, documents: Vec<Document>) -> Vec<Document> {
     let mut scorer = Scorer::new().with_similarity(query.similarity);
 

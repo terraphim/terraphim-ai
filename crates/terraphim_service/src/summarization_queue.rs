@@ -94,6 +94,7 @@ pub enum TaskStatus {
 }
 
 impl TaskStatus {
+    /// Returns `true` if the status is a terminal state (completed or failed).
     pub fn is_terminal(&self) -> bool {
         matches!(
             self,
@@ -101,10 +102,12 @@ impl TaskStatus {
         )
     }
 
+    /// Returns `true` if the summarisation is currently being processed.
     pub fn is_processing(&self) -> bool {
         matches!(self, TaskStatus::Processing { .. })
     }
 
+    /// Returns `true` if the summarisation has not yet started.
     pub fn is_pending(&self) -> bool {
         matches!(self, TaskStatus::Pending { .. })
     }
@@ -138,6 +141,7 @@ pub struct SummarizationTask {
 }
 
 impl SummarizationTask {
+    /// Creates a new summarisation request for `document` using `role`.
     pub fn new(document: Document, role: Role) -> Self {
         Self {
             id: TaskId::new(),
@@ -154,44 +158,53 @@ impl SummarizationTask {
         }
     }
 
+    /// Sets the priority for this summarisation request.
     pub fn with_priority(mut self, priority: Priority) -> Self {
         self.priority = priority;
         self
     }
 
+    /// Sets the maximum number of retry attempts on failure.
     pub fn with_max_retries(mut self, max_retries: u32) -> Self {
         self.max_retries = max_retries;
         self
     }
 
+    /// Sets the maximum output length (in characters) for the summary.
     pub fn with_max_summary_length(mut self, length: usize) -> Self {
         self.max_summary_length = Some(length);
         self
     }
 
+    /// If `true`, regenerates the summary even if one already exists.
     pub fn with_force_regenerate(mut self, force: bool) -> Self {
         self.force_regenerate = force;
         self
     }
 
+    /// Sets a callback URL to notify when summarisation completes.
     pub fn with_callback_url(mut self, url: String) -> Self {
         self.callback_url = Some(url);
         self
     }
 
+    /// Overrides the default LLM configuration for this request.
     pub fn with_config(mut self, config: Config) -> Self {
         self.config = Some(config);
         self
     }
 
+    /// Returns `true` if the request has remaining retry attempts.
     pub fn can_retry(&self) -> bool {
         self.retry_count < self.max_retries
     }
 
+    /// Increments the retry counter by one.
     pub fn increment_retry(&mut self) {
         self.retry_count += 1;
     }
 
+    /// Returns the configured maximum summary length.
     pub fn get_summary_length(&self) -> usize {
         self.max_summary_length.unwrap_or(250)
     }

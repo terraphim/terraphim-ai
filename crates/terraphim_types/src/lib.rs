@@ -569,6 +569,7 @@ impl Document {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+/// A graph edge connecting two knowledge-graph nodes, with document references and rank.
 pub struct Edge {
     /// ID of the edge (u64)
     pub id: u64,
@@ -695,6 +696,7 @@ impl Thesaurus {
         self.data.get(key)
     }
 
+    /// Returns an iterator over the keys of the node map.
     pub fn keys(
         &self,
     ) -> std::collections::hash_map::Keys<'_, NormalizedTermValue, NormalizedTerm> {
@@ -880,9 +882,11 @@ pub struct IndexedDocument {
 }
 
 impl IndexedDocument {
+    /// Serialises the document to a compact JSON string.
     pub fn to_json_string(&self) -> Result<String, serde_json::Error> {
         serde_json::to_string(&self)
     }
+    /// Converts a [`Document`] into a lightweight [`IndexedDocument`] by extracting the key fields.
     pub fn from_document(document: Document) -> Self {
         IndexedDocument {
             id: document.id,
@@ -1163,14 +1167,17 @@ pub enum KnowledgeGraphInputType {
 pub struct ConversationId(pub String);
 
 impl ConversationId {
+    /// Creates a new [`ConversationId`] with a randomly generated UUID.
     pub fn new() -> Self {
         Self(uuid::Uuid::new_v4().to_string())
     }
 
+    /// Wraps an existing string as a [`ConversationId`].
     pub fn from_string(id: String) -> Self {
         Self(id)
     }
 
+    /// Returns the conversation identifier as a string slice.
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -1216,14 +1223,17 @@ pub enum ContextType {
 pub struct MessageId(pub String);
 
 impl MessageId {
+    /// Creates a new [`MessageId`] with a randomly generated UUID.
     pub fn new() -> Self {
         Self(uuid::Uuid::new_v4().to_string())
     }
 
+    /// Wraps an existing string as a [`MessageId`].
     pub fn from_string(id: String) -> Self {
         Self(id)
     }
 
+    /// Returns the message identifier as a string slice.
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -1517,6 +1527,7 @@ pub struct KGIndexInfo {
     pub version: Option<String>,
 }
 
+/// A single message in a conversation, with role, content, and metadata.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
@@ -1730,6 +1741,7 @@ pub struct ContextHistory {
 }
 
 impl ContextHistory {
+    /// Creates a new [`ContextHistory`] with the given maximum entry count.
     pub fn new(max_entries: usize) -> Self {
         Self {
             used_contexts: Vec::new(),
@@ -1814,8 +1826,7 @@ pub enum ContextUsageType {
 
 // Routing and Priority Types
 
-/// Priority level for routing rules and decisions
-/// Higher numeric values indicate higher priority
+/// A priority value in the range 0–100, where higher is more urgent.
 #[derive(
     Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, JsonSchema, Default,
 )]
@@ -2210,6 +2221,7 @@ pub struct MultiAgentContext {
 }
 
 impl MultiAgentContext {
+    /// Creates a new empty [`MultiAgentContext`].
     pub fn new() -> Self {
         let now = chrono::Utc::now();
         Self {

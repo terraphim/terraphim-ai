@@ -53,8 +53,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `terraphim_service`: 1→0 — escaped inline markdown link syntax in `preprocess_document_content` doc.
   - `terraphim_rolegraph`: 2→0 — qualified `[new]`/`[from_serializable]` links to `[Self::new]`/`[Self::from_serializable]`.
   - `terraphim_persistence`: 2→0 — backtick-escaped `Arc<DeviceStorage>` in doc comments to prevent unclosed-HTML-tag warnings.
+- **Doc comment coverage (2026-04-25)**: added 81 missing `///` doc comments across five priority crates; `cargo doc --workspace` remains warning-free.
+  - `terraphim_types`: `Edge`, `keys`, `to_json_string`, `from_document`, `ConversationId`/`MessageId` accessors, `ChatMessage`, `ContextHistory::new`, `Priority`, `MultiAgentContext::new`, `sort_documents`.
+  - `terraphim_automata`: `BuilderError`, `Result`, `Logseq`, `LogseqService`, `get_raw_messages`, ripgrep message types (`Message`, `Begin`, `End`, `Summary`, `Match`, `Context`, `SubMatch`, `Data`), `json_decode`, `Matched`, `find_matches`, `LinkType`, `SnomedConcept::new`, `MarkdownDirectiveWarning`, `MarkdownDirectivesParseResult`, `parse_markdown_directives_dir`, WASM `init`, `iter_metadata`, `get_metadata`.
+  - `terraphim_service`: `OpenRouterError`, `Result`, `OpenRouterService`, `get_role`, summarisation-queue builder methods (`new`, `with_priority`, `with_max_retries`, `with_max_summary_length`, `with_force_regenerate`, `with_callback_url`, `with_config`, `can_retry`, `increment_retry`, `get_summary_length`, `is_terminal`, `is_processing`, `is_pending`).
+  - `terraphim_persistence`: `DeviceStorage`, `DeviceStorage::instance`, `Error`, `Result`, `ConversationIndex` CRUD methods, `parse_profile`, `parse_profiles`.
+  - `terraphim_rolegraph`: `Error`, `is_empty`, `add_or_update_document`, `split_paragraphs`, test-fixture constants.
 
 ### Fixed
+- **Exit code assertions** in F1.2 integration tests aligned with exit-code contract (`b3229f7b`)
+- **End-to-end test** `server roles select` now tolerates timeout, preventing flaky CI failures (`807dea62`)
+- **Cargo fmt** applied to exit-code additions keeping formatting clean (`bf1bfebb`)
 - **Agent formatting** in RobotResponse chaining for consistent output (`b5ba8927`)
 - **Cargo formatting** applied to exit code additions (`d10e6598`)
 - **Merge-coordinator** converted to cron-driven scheduling, removing trigger cascades (`2406a867`)

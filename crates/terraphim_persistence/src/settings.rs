@@ -161,6 +161,7 @@ fn create_memory_operator() -> OpendalResult<Operator> {
     Ok(Operator::new(builder)?.finish())
 }
 
+/// Parses and loads a single settings profile from the given path.
 pub async fn parse_profile(
     settings: &DeviceSettings,
     profile_name: &str,
@@ -346,6 +347,7 @@ pub async fn parse_profile(
     Ok((op, speed))
 }
 
+/// Parses all settings profiles from the given directory path.
 pub async fn parse_profiles(
     settings: &DeviceSettings,
 ) -> Result<HashMap<String, (Operator, u128)>> {

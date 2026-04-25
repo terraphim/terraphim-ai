@@ -19,6 +19,7 @@ pub mod symbolic_embeddings;
 use aho_corasick::{AhoCorasick, MatchKind};
 use unicode_segmentation::UnicodeSegmentation;
 
+/// Errors returned by the role-graph.
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("The given node ID was not found")]
@@ -234,6 +235,7 @@ impl TriggerIndex {
         )
     }
 
+    /// Returns `true` if the graph contains no nodes.
     pub fn is_empty(&self) -> bool {
         self.triggers.is_empty()
     }
@@ -1100,6 +1102,7 @@ impl RoleGraph {
         self.documents.contains_key(document_id)
     }
 
+    /// Adds a document reference to the graph, or updates its coordinates if already present.
     pub fn add_or_update_document(&mut self, document_id: &str, x: u64, y: u64) {
         let edge_id = magic_pair(x, y);
         let edge = self.init_or_update_edge(edge_id, document_id);
@@ -1365,6 +1368,7 @@ impl From<RoleGraph> for RoleGraphSync {
 static RE: std::sync::LazyLock<Regex> =
     std::sync::LazyLock::new(|| Regex::new(r"[?!|]\s+").unwrap());
 
+/// Splits a text blob into individual paragraphs, filtering blank lines.
 pub fn split_paragraphs(paragraphs: &str) -> Vec<&str> {
     let sentences = UnicodeSegmentation::split_sentence_bounds(paragraphs);
     let parts =
