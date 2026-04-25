@@ -28,14 +28,11 @@ fn start_test_server() -> Result<(Child, u16)> {
 
     let child = cmd.spawn()?;
 
-    // Wait for server to be ready
-    std::thread::sleep(Duration::from_secs(5));
-
-    // Verify server is running by checking health endpoint
     let client = reqwest::blocking::Client::new();
     let health_url = format!("http://127.0.0.1:{}/health", port);
 
     let mut retries = 10;
+    let mut backoff = Duration::from_millis(50);
     while retries > 0 {
         if let Ok(response) = client
             .get(&health_url)
@@ -47,7 +44,8 @@ fn start_test_server() -> Result<(Child, u16)> {
                 return Ok((child, port));
             }
         }
-        std::thread::sleep(Duration::from_secs(1));
+        std::thread::sleep(backoff);
+        backoff = backoff.saturating_mul(2);
         retries -= 1;
     }
 
