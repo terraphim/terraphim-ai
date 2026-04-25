@@ -1,6 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
+use std::sync::OnceLock;
 
 use anyhow::Result;
 use serial_test::serial;
@@ -10,6 +11,66 @@ use std::time::Duration;
 
 mod support;
 use support::cli_test_env::apply_hermetic_env;
+
+/// Cache the path to the pre-built terraphim-agent binary. We build it ONCE
+/// per `cargo test` invocation (with the `server` feature enabled) and then
+/// run that binary directly for every CLI call. Previously every call shelled
+/// out to `cargo run`, paying cargo metadata + dependency resolution + recheck
+/// overhead per invocation -- 8+ calls per test * ~5s = the dominant test
+/// runtime cost. Building once and exec'ing brings each call from seconds
+/// down to milliseconds + actual work.
+static AGENT_BINARY: OnceLock<Result<PathBuf, String>> = OnceLock::new();
+static SERVER_BINARY: OnceLock<Result<PathBuf, String>> = OnceLock::new();
+
+fn agent_binary_path() -> Result<PathBuf> {
+    AGENT_BINARY
+        .get_or_init(|| {
+            let workspace = get_workspace_root().map_err(|e| e.to_string())?;
+            let status = Command::new("cargo")
+                .args([
+                    "build",
+                    "-p",
+                    "terraphim_agent",
+                    "--features",
+                    "server",
+                    "--bin",
+                    "terraphim-agent",
+                ])
+                .current_dir(&workspace)
+                .status()
+                .map_err(|e| format!("failed to spawn cargo build: {}", e))?;
+            if !status.success() {
+                return Err(format!("cargo build failed with status {}", status));
+            }
+            Ok(workspace.join("target/debug/terraphim-agent"))
+        })
+        .clone()
+        .map_err(anyhow::Error::msg)
+}
+
+fn server_binary_path() -> Result<PathBuf> {
+    SERVER_BINARY
+        .get_or_init(|| {
+            let workspace = get_workspace_root().map_err(|e| e.to_string())?;
+            let status = Command::new("cargo")
+                .args([
+                    "build",
+                    "-p",
+                    "terraphim_server",
+                    "--bin",
+                    "terraphim_server",
+                ])
+                .current_dir(&workspace)
+                .status()
+                .map_err(|e| format!("failed to spawn cargo build: {}", e))?;
+            if !status.success() {
+                return Err(format!("cargo build failed with status {}", status));
+            }
+            Ok(workspace.join("target/debug/terraphim_server"))
+        })
+        .clone()
+        .map_err(anyhow::Error::msg)
+}
 
 /// Get workspace root directory by walking up to find [workspace] in Cargo.toml
 fn get_workspace_root() -> Result<PathBuf> {
@@ -47,23 +108,20 @@ async fn start_test_server() -> Result<(Child, String)> {
 
     println!("Using config path: {}", config_path.display());
 
-    let mut server_cmd = Command::new("cargo");
+    // Build once (cached), then exec the binary directly so server start
+    // doesn't pay cargo overhead.
+    let server_bin = server_binary_path()?;
+    let mut server_cmd = Command::new(&server_bin);
+    // Inherit stdout/stderr from the test process so server logs show up
+    // in --nocapture output. Helpful for diagnosing where the server is
+    // when a request hangs.
     server_cmd
-        .args([
-            "run",
-            "-p",
-            "terraphim_server",
-            "--",
-            "--config",
-            config_path.to_str().unwrap(),
-        ])
-        // The server reads its bind address from settings (env/file), not TERRAPHIM_SERVER_PORT.
-        // Override the server bind host+port explicitly for tests.
+        .args(["--config", config_path.to_str().unwrap()])
         .env("TERRAPHIM_SERVER_HOSTNAME", format!("127.0.0.1:{}", port))
-        .env("RUST_LOG", "warn") // Reduce log noise
+        .env("RUST_LOG", "info,terraphim_service=debug")
         .current_dir(&workspace_root)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit());
     apply_hermetic_env(&mut server_cmd)?;
     let mut server = server_cmd.spawn()?;
 
@@ -103,10 +161,11 @@ async fn start_test_server() -> Result<(Child, String)> {
     ))
 }
 
-/// Run TUI command in offline mode
+/// Run TUI command in offline mode (using pre-built binary, not `cargo run`)
 fn run_offline_command(args: &[&str]) -> Result<(String, String, i32)> {
-    let mut cmd = Command::new("cargo");
-    cmd.args(["run", "-p", "terraphim_agent", "--"]).args(args);
+    let bin = agent_binary_path()?;
+    let mut cmd = Command::new(&bin);
+    cmd.args(args);
     apply_hermetic_env(&mut cmd)?;
 
     let output = cmd.output()?;
@@ -118,8 +177,9 @@ fn run_offline_command(args: &[&str]) -> Result<(String, String, i32)> {
     ))
 }
 
-/// Run TUI command in server mode
+/// Run TUI command in server mode (using pre-built binary, not `cargo run`)
 fn run_server_command(server_url: &str, args: &[&str]) -> Result<(String, String, i32)> {
+    let bin = agent_binary_path()?;
     let mut cmd_args = vec!["--server", "--server-url", server_url];
     cmd_args.extend_from_slice(args);
 
@@ -128,9 +188,8 @@ fn run_server_command(server_url: &str, args: &[&str]) -> Result<(String, String
         .map(|v| v.parse().unwrap_or(300))
         .unwrap_or(300);
 
-    let mut cmd = Command::new("cargo");
-    cmd.args(["run", "-p", "terraphim_agent", "--features", "server", "--"])
-        .args(&cmd_args)
+    let mut cmd = Command::new(&bin);
+    cmd.args(&cmd_args)
         .env("TERRAPHIM_CLIENT_TIMEOUT", format!("{}", timeout_secs));
     apply_hermetic_env(&mut cmd)?;
 
