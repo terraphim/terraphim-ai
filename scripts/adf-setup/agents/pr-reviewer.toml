@@ -90,9 +90,53 @@ Rules:
 Post the completed review with:
   gtr comment --owner \"\$GITEA_OWNER\" --repo \"\$GITEA_REPO\" --issue \"$ADF_PR_NUMBER\" --body-file /tmp/pr-review-$ADF_PR_NUMBER.md"
 
-echo "$REVIEW_PROMPT" | /home/alex/.local/bin/claude -p \
+REVIEW_OUTPUT=$(echo "$REVIEW_PROMPT" | /home/alex/.local/bin/claude -p \
   --allowedTools "Bash,Read,Grep,Glob" \
-  2>&1
+  2>&1)
+echo "$REVIEW_OUTPUT"
 
 echo "pr-reviewer: verdict posted on PR #$ADF_PR_NUMBER"
+
+# ADF Phase 1 (Refs #928): post the verdict as a Gitea commit status so
+# the PR's checks gate reflects the review outcome (not just a comment).
+# Confidence Score is parsed from the agent output OR the rendered review
+# file -- whichever is available.
+REVIEW_FILE="/tmp/pr-review-$ADF_PR_NUMBER.md"
+SCORE_TEXT=""
+if [ -f "$REVIEW_FILE" ]; then
+  SCORE_TEXT=$(cat "$REVIEW_FILE")
+fi
+SCORE_TEXT="$SCORE_TEXT
+$REVIEW_OUTPUT"
+
+# Match e.g. "Confidence Score: 4/5" or "Confidence Score: 4 / 5".
+SCORE=$(echo "$SCORE_TEXT" \
+  | grep -oE 'Confidence Score:[[:space:]]*[0-9]+' \
+  | grep -oE '[0-9]+' \
+  | head -1)
+
+if [ -z "$SCORE" ]; then
+  STATE=error
+  DESC="review parse failed; see PR comment"
+elif [ "$SCORE" -ge 4 ]; then
+  STATE=success
+  DESC="confidence ${SCORE}/5"
+elif [ "$SCORE" -eq 3 ]; then
+  STATE=success
+  DESC="confidence 3/5 -- concerns flagged"
+else
+  STATE=failure
+  DESC="confidence ${SCORE}/5 -- blocking concerns"
+fi
+
+# Best-effort -- never fail the agent run if the status post errors.
+curl -fsS -X POST \
+  -H "Authorization: token $GITEA_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{\"state\":\"$STATE\",\"context\":\"adf/pr-reviewer\",\"description\":\"$DESC\"}" \
+  "$GITEA_URL/api/v1/repos/$GITEA_OWNER/$GITEA_REPO/statuses/$ADF_PR_HEAD_SHA" \
+  >/dev/null 2>&1 || \
+  echo "pr-reviewer: status post failed (state=$STATE) -- non-fatal" >&2
+
+echo "pr-reviewer: posted adf/pr-reviewer status state=$STATE"
 '''
