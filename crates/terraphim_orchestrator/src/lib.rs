@@ -2225,8 +2225,13 @@ impl AgentOrchestrator {
     /// Handle a dispatch request received from the webhook endpoint.
     /// This is the webhook equivalent of poll_mentions but immediate.
     async fn handle_webhook_dispatch(&mut self, dispatch: webhook::WebhookDispatch) {
-        // Rate limiting: check concurrent mention-spawned agents
-        let mention_cfg = match self.config.mentions.as_ref() {
+        // Rate limiting: check concurrent mention-spawned agents.
+        // Fall back to the first project-level mentions config when the top-level
+        // config is absent (multi-project configs put mentions under [projects.mentions]).
+        let mention_cfg = self.config.mentions.as_ref().or_else(|| {
+            self.config.projects.iter().find_map(|p| p.mentions.as_ref())
+        });
+        let mention_cfg = match mention_cfg {
             Some(cfg) => cfg,
             None => return,
         };
