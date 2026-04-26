@@ -11,7 +11,11 @@ fn help_flag_exits_success() {
         .output()
         .expect("Failed to execute terraphim-agent --help");
 
-    assert_eq!(output.status.code(), Some(0), "Help should exit with SUCCESS (0)");
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "Help should exit with SUCCESS (0)"
+    );
 }
 
 #[test]
@@ -32,14 +36,7 @@ fn invalid_subcommand_exits_with_error_usage() {
 #[test]
 fn listen_mode_with_server_flag_exits_error_usage() {
     let output = Command::new("cargo")
-        .args(&[
-            "run",
-            "-p",
-            "terraphim_agent",
-            "--",
-            "listen",
-            "--server",
-        ])
+        .args(&["run", "-p", "terraphim_agent", "--", "listen", "--server"])
         .output()
         .expect("Failed to execute listen mode with --server flag");
 
@@ -69,8 +66,7 @@ fn exit_code_enum_values() {
         "exit_codes.rs module should exist"
     );
 
-    let content = std::fs::read_to_string(&exit_codes_path)
-        .expect("Failed to read exit_codes.rs");
+    let content = std::fs::read_to_string(&exit_codes_path).expect("Failed to read exit_codes.rs");
 
     let expected_variants = vec![
         "Success = 0",
@@ -110,8 +106,8 @@ fn exit_code_from_code_round_trip() {
     for (code, name) in code_variants {
         let manifest_dir = env!("CARGO_MANIFEST_DIR");
         let exit_codes_path = std::path::Path::new(manifest_dir).join("src/robot/exit_codes.rs");
-        let content = std::fs::read_to_string(&exit_codes_path)
-            .expect("Failed to read exit_codes.rs");
+        let content =
+            std::fs::read_to_string(&exit_codes_path).expect("Failed to read exit_codes.rs");
 
         // Verify code value
         assert!(

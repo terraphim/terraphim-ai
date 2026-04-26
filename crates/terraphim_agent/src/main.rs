@@ -1968,7 +1968,9 @@ async fn run_offline_command(
                             }
                             Err(e) => {
                                 eprintln!("Failed to reload from '{}': {:?}", path, e);
-                                std::process::exit(robot::exit_codes::ExitCode::ErrorGeneral.code().into());
+                                std::process::exit(
+                                    robot::exit_codes::ExitCode::ErrorGeneral.code().into(),
+                                );
                             }
                         },
                         None => {
@@ -1976,7 +1978,9 @@ async fn run_offline_command(
                             eprintln!(
                                 "Add role_config = \"path/to/roles.json\" to your settings.toml"
                             );
-                            std::process::exit(robot::exit_codes::ExitCode::ErrorGeneral.code().into());
+                            std::process::exit(
+                                robot::exit_codes::ExitCode::ErrorGeneral.code().into(),
+                            );
                         }
                     }
                 }
@@ -3001,7 +3005,9 @@ async fn run_learn_command(sub: LearnSub) -> Result<()> {
                     match procedure {
                         None => {
                             eprintln!("Procedure '{}' not found.", id);
-                            std::process::exit(robot::exit_codes::ExitCode::ErrorGeneral.code().into());
+                            std::process::exit(
+                                robot::exit_codes::ExitCode::ErrorGeneral.code().into(),
+                            );
                         }
                         Some(proc) => {
                             // Check if procedure is disabled
@@ -3010,7 +3016,9 @@ async fn run_learn_command(sub: LearnSub) -> Result<()> {
                                     "Procedure '{}' is disabled. Use 'learn procedure enable {}' to re-enable it.",
                                     id, id,
                                 );
-                                std::process::exit(robot::exit_codes::ExitCode::ErrorGeneral.code().into());
+                                std::process::exit(
+                                    robot::exit_codes::ExitCode::ErrorGeneral.code().into(),
+                                );
                             }
 
                             // Check minimum confidence threshold
@@ -3022,7 +3030,9 @@ async fn run_learn_command(sub: LearnSub) -> Result<()> {
                                     id,
                                     proc.confidence.score * 100.0,
                                 );
-                                std::process::exit(robot::exit_codes::ExitCode::ErrorGeneral.code().into());
+                                std::process::exit(
+                                    robot::exit_codes::ExitCode::ErrorGeneral.code().into(),
+                                );
                             }
 
                             println!(
@@ -3066,7 +3076,9 @@ async fn run_learn_command(sub: LearnSub) -> Result<()> {
                                     println!("Replay completed successfully.");
                                 } else {
                                     println!("Replay failed.");
-                                    std::process::exit(robot::exit_codes::ExitCode::ErrorGeneral.code().into());
+                                    std::process::exit(
+                                        robot::exit_codes::ExitCode::ErrorGeneral.code().into(),
+                                    );
                                 }
                             } else {
                                 println!("Dry run completed.");
@@ -3171,7 +3183,9 @@ async fn run_learn_command(sub: LearnSub) -> Result<()> {
                                 "Session '{}' not found. Try running 'sessions list' first to import sessions.",
                                 session_id
                             );
-                            std::process::exit(robot::exit_codes::ExitCode::ErrorGeneral.code().into());
+                            std::process::exit(
+                                robot::exit_codes::ExitCode::ErrorGeneral.code().into(),
+                            );
                         }
                     }
                 }
