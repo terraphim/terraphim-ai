@@ -97,6 +97,11 @@ pub enum ReplCommand {
         subcommand: UpdateSubcommand,
     },
 
+    // Cache management commands
+    Cache {
+        subcommand: CacheSubcommand,
+    },
+
     // Utility commands
     Help {
         command: Option<String>,
@@ -129,6 +134,13 @@ pub enum UpdateSubcommand {
     Rollback { version: String },
     /// List available backup versions
     List,
+}
+
+/// Subcommands for cache management
+#[derive(Debug, Clone, PartialEq)]
+pub enum CacheSubcommand {
+    /// Flush the compiled thesaurus cache
+    Flush { role: Option<String> },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1329,6 +1341,46 @@ impl FromStr for ReplCommand {
                 "Sessions feature not enabled. Rebuild with --features repl-sessions"
             )),
 
+            "cache" => {
+                if parts.len() < 2 {
+                    return Err(anyhow!(
+                        "Cache command requires a subcommand (flush [--role ROLE])"
+                    ));
+                }
+
+                match parts[1] {
+                    "flush" => {
+                        let mut role = None;
+                        let mut i = 2;
+                        while i < parts.len() {
+                            match parts[i] {
+                                "--role" => {
+                                    if i + 1 < parts.len() {
+                                        role = Some(parts[i + 1].to_string());
+                                        i += 2;
+                                    } else {
+                                        return Err(anyhow!("--role requires a value"));
+                                    }
+                                }
+                                _ => {
+                                    return Err(anyhow!(
+                                        "Unknown cache flush option: {}",
+                                        parts[i]
+                                    ));
+                                }
+                            }
+                        }
+                        Ok(ReplCommand::Cache {
+                            subcommand: CacheSubcommand::Flush { role },
+                        })
+                    }
+                    _ => Err(anyhow!(
+                        "Unknown cache subcommand: {}. Use: flush [--role ROLE]",
+                        parts[1]
+                    )),
+                }
+            }
+
             "update" => {
                 if parts.len() < 2 {
                     return Err(anyhow!(
@@ -1388,8 +1440,8 @@ impl ReplCommand {
         // Allow unused_mut because mut is conditionally needed based on features
         #[allow(unused_mut)]
         let mut commands = vec![
-            "search", "config", "role", "graph", "vm", "robot", "update", "help", "quit", "exit",
-            "clear",
+            "search", "config", "role", "graph", "vm", "robot", "cache", "update", "help", "quit",
+            "exit", "clear",
         ];
 
         #[cfg(feature = "llm")]
@@ -1622,5 +1674,48 @@ mod tests {
         let result = "/update unknown".parse::<ReplCommand>();
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("Unknown update"));
+    }
+
+    #[test]
+    fn test_cache_command_parsing() {
+        // Test cache flush without role
+        let cmd = "/cache flush".parse::<ReplCommand>().unwrap();
+        assert_eq!(
+            cmd,
+            ReplCommand::Cache {
+                subcommand: CacheSubcommand::Flush { role: None }
+            }
+        );
+
+        // Test cache flush with role
+        let cmd = "/cache flush --role engineer"
+            .parse::<ReplCommand>()
+            .unwrap();
+        assert_eq!(
+            cmd,
+            ReplCommand::Cache {
+                subcommand: CacheSubcommand::Flush {
+                    role: Some("engineer".to_string())
+                }
+            }
+        );
+    }
+
+    #[test]
+    fn test_cache_command_errors() {
+        // Test cache without subcommand
+        let result = "/cache".parse::<ReplCommand>();
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("requires a subcommand")
+        );
+
+        // Test unknown cache subcommand
+        let result = "/cache unknown".parse::<ReplCommand>();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Unknown cache"));
     }
 }

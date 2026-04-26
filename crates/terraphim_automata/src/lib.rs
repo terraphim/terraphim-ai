@@ -109,9 +109,13 @@ pub use self::builder::{Logseq, ThesaurusBuilder};
 pub mod autocomplete;
 pub mod builder;
 pub mod evaluation;
+pub mod hash;
 pub mod markdown_directives;
 pub mod matcher;
 pub mod url_protector;
+
+pub use builder::clear_cached_index;
+pub use hash::hash_kg_dir;
 
 pub use evaluation::{
     ClassificationMetrics, EvaluationResult, ExpectedMatch, GroundTruthDocument, SystematicError,

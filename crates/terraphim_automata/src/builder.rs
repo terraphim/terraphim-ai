@@ -311,6 +311,16 @@ struct Duration {
     human: String,
 }
 
+/// Clear the in-process cached memoization for `index_inner`.
+///
+/// This must be called when the persistent cache is invalidated,
+/// otherwise the `cached` crate will return stale data.
+pub fn clear_cached_index() {
+    use cached::Cached;
+    let mut cache = INDEX_INNER.lock().unwrap();
+    cache.cache_clear();
+}
+
 pub fn json_decode(jsonlines: &str) -> Result<Vec<Message>> {
     Ok(serde_json::Deserializer::from_str(jsonlines)
         .into_iter()

@@ -8722,6 +8722,7 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "tsify",
+ "twox-hash",
  "walkdir",
  "wasm-bindgen",
  "wasm-bindgen-futures",
@@ -9048,14 +9049,17 @@ dependencies = [
 name = "terraphim_orchestrator"
 version = "1.8.0"
 dependencies = [
+ "anyhow",
  "async-trait",
  "axum 0.8.9",
  "chrono",
+ "clap",
  "cron",
  "glob",
  "handlebars",
  "hex",
  "hmac 0.12.1",
+ "jiff",
  "opendal",
  "regex",
  "reqwest 0.12.28",
@@ -10199,6 +10203,15 @@ dependencies = [
  "shellexpand",
  "thiserror 1.0.69",
  "toml 0.5.11",
+]
+
+[[package]]
+name = "twox-hash"
+version = "2.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9ea3136b675547379c4bd395ca6b938e5ad3c3d20fad76e7fe85f9e0d011419c"
+dependencies = [
+ "rand 0.9.4",
 ]
 
 [[package]]
