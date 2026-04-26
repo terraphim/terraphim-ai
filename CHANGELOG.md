@@ -90,6 +90,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `main.rs` (binary): added `//!` crate doc.
 - **Spec-validation report** generated at `reports/spec-validation-20260426.md` (`b4a39831`).
 - **Tech lead gate artefact** added at `.docs/tech_lead_gate_20260426.md` (`69da3c6c`).
+- **Doc-gap audit 2026-04-26 (round 7 — full workspace re-scan)**: Comprehensive grep-based audit of all 54 crates reveals 3,165 undocumented public items. No crate has `#![warn(missing_docs)]`, so `cargo doc` emits 0 warnings — the debt is invisible to the compiler. Top 10 worst offenders: `terraphim_agent` (338), `terraphim_orchestrator` (244), `terraphim_multi_agent` (191), `terraphim_validation` (156), `terraphim_types` (117), `terraphim-session-analyzer` (117), `terraphim_agent_evolution` (116), `terraphim_tinyclaw` (78), `terraphim_agent_application` (74), `terraphim_rlm` (63). Tracked in Gitea #931.
 
 ### Fixed
 - **Listen-mode `--server` guard** (`fix(agent): accept listen --server locally`, `21634c5b`, Refs #860): `--server` is now a hidden local arg on the `Listen` variant so clap accepts it; the handler checks it first and emits the correct `"listen mode does not support --server flag"` message with `ExitCode::ErrorUsage` (2).
