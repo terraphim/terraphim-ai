@@ -187,7 +187,17 @@ impl TerraphimUpdater {
                                 Err(e) => Err(e),
                             }
                         }
-                        Err(e) => Ok(UpdateStatus::Failed(format!("Check failed: {}", e))),
+                Err(e) => {
+                    let err_msg = e.to_string();
+                    if err_msg.contains("403") {
+                        Ok(UpdateStatus::Failed(format!(
+                            "GitHub API rate limit exceeded. Set GITHUB_TOKEN env var for authenticated access (higher rate limit). Error: {}",
+                            err_msg
+                        )))
+                    } else {
+                        Ok(UpdateStatus::Failed(format!("Check failed: {}", err_msg)))
+                    }
+                }
                     }
                 }
                 Err(e) => Ok(UpdateStatus::Failed(format!("Configuration error: {}", e))),
@@ -953,10 +963,13 @@ pub async fn check_for_updates_auto(bin_name: &str, current_version: &str) -> Re
         let mut builder = self_update::backends::github::Update::configure();
         builder.repo_owner("terraphim");
         builder.repo_name("terraphim-ai");
-        builder.bin_name(&bin_name_for_asset); // Use hyphenated name for asset lookup
+        builder.bin_name(&bin_name_for_asset);
         builder.current_version(&current_version);
 
-        // Set custom install path to preserve underscore naming
+        if let Ok(token) = std::env::var("GITHUB_TOKEN") {
+            builder.auth_token(&token);
+        }
+
         builder.bin_install_path(format!("/usr/local/bin/{}", bin_name));
 
         match builder.build() {

@@ -297,13 +297,11 @@ impl TerraphimService {
                                     }
                                 }
                             } else {
-                                log::error!(
-                                    "No fallback available for role {}: no local KG path configured",
+                                log::warn!(
+                                    "No fallback available for role {}: no local KG path configured, returning empty thesaurus",
                                     role_name
                                 );
-                                Err(ServiceError::Config(
-                                    "No automata path and no local KG available".into(),
-                                ))
+                                Ok(Thesaurus::new(role_name.as_lowercase().to_string()))
                             }
                         }
                     }
@@ -490,15 +488,19 @@ impl TerraphimService {
                             }
                         }
                     } else {
-                        Err(ServiceError::Config(
-                            "No local knowledge graph path available".into(),
-                        ))
+                        log::debug!(
+                            "Role '{}' has no local KG path, returning empty thesaurus",
+                            role_name
+                        );
+                        Ok(Thesaurus::new(role_name.as_lowercase().to_string()))
                     }
                 }
             } else {
-                Err(ServiceError::Config(
-                    "Knowledge graph not configured".into(),
-                ))
+                log::debug!(
+                    "Role '{}' has no knowledge graph configured, returning empty thesaurus",
+                    role_name
+                );
+                Ok(Thesaurus::new(role_name.as_lowercase().to_string()))
             }
         }
 
