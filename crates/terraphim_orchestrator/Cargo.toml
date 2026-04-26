@@ -57,6 +57,11 @@ hmac = "0.12"
 sha2 = "0.10"
 hex = "0.4"
 
+# adf-ctl CLI binary
+clap = { version = "4", features = ["derive"] }
+jiff = { version = "0.2" }
+anyhow = { workspace = true }
+
 # Persistence layer for shared learnings
 opendal = { version = "0.54", default-features = false }
 terraphim_persistence = { path = "../terraphim_persistence", version = "1.4.10", features = ["sqlite"] }
@@ -74,3 +79,7 @@ serial_test = "3"
 [[bin]]
 name = "adf"
 path = "src/bin/adf.rs"
+
+[[bin]]
+name = "adf-ctl"
+path = "src/bin/adf-ctl.rs"
