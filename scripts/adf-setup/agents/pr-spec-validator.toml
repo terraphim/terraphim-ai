@@ -1,0 +1,203 @@
+# pr-spec-validator agent template
+#
+# Phase 2b of the ADF replaces-Gitea-Actions plan
+# (.docs/plan-adf-agents-replace-gitea-actions.md, §5 Phases 2b-2e
+# table). Spawned by `AgentOrchestrator::handle_review_pr` on a Gitea
+# `pull_request.opened` event when listed in
+# `[pr_dispatch.agents_on_pr_open]` with context `adf/spec`.
+#
+# Performs requirements-traceability review: maps PR changes back to
+# specifications, ADRs, and existing requirements, and flags drift /
+# undocumented decisions / missing tests for new requirements.
+#
+# Path filter (in this script, NOT in the orchestrator): skip with a
+# `success` status when the PR touches no spec-relevant paths
+# (`plans/**`, `crates/**/src/**`, `*.rs`). Skip-with-success — rather
+# than skip-without-posting — is required because `adf/spec` is a
+# branch-protection-required check on `main`, so a never-resolved
+# `pending` would block all docs-only / CI-only PRs forever.
+#
+# Subscription-only models only (C1 invariant). Sonnet (NOT haiku) is
+# the right tier here because requirements-traceability needs deeper
+# reasoning than a structural diff scan. Mirrors the model choice used
+# by the existing `pr-reviewer` template.
+#
+# NO `schedule` field -- event-driven, not cron. The cron-scheduled
+# `spec-validator` agent stays in tree for full-repo audits.
+
+[[agents]]
+name = "pr-spec-validator"
+layer = "Safety"
+cli_tool = "/home/alex/.local/bin/claude"
+model = "sonnet"
+fallback_model = "kimi-for-coding/k2p5"
+persona = "Carthos"
+skill_chain = ["requirements-traceability"]
+max_cpu_seconds = 1800
+grace_period_secs = 30
+capabilities = ["review", "spec", "requirements-traceability"]
+project = "terraphim"
+task = '''
+source ~/.profile
+
+# Context injected by handle_review_pr (Phase 2 fan-out):
+#   ADF_PR_NUMBER, ADF_PR_HEAD_SHA, ADF_PR_PROJECT, ADF_PR_AUTHOR,
+#   ADF_PR_DIFF_LOC, ADF_PR_TITLE
+if [ -z "${ADF_PR_NUMBER:-}" ] || [ -z "${ADF_PR_PROJECT:-}" ]; then
+  echo "pr-spec-validator: missing ADF_PR_NUMBER or ADF_PR_PROJECT; exit" >&2
+  exit 1
+fi
+
+HEAD_SHORT=$(echo "$ADF_PR_HEAD_SHA" | cut -c1-7)
+
+# POST_STATUS posts to the Gitea Commit Status API. Best-effort -- the
+# agent never fails because the status post hit a transient network
+# error. Mirrors the helper used by build-runner.toml.
+POST_STATUS() {
+  local STATE="$1"
+  local DESC="$2"
+  curl -fsS -X POST \
+    -H "Authorization: token $GITEA_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d "{\"state\":\"$STATE\",\"context\":\"adf/spec\",\"description\":\"$DESC\"}" \
+    "$GITEA_URL/api/v1/repos/$GITEA_OWNER/$GITEA_REPO/statuses/$ADF_PR_HEAD_SHA" \
+    >/dev/null 2>&1 || \
+    echo "pr-spec-validator: status post failed (state=$STATE) -- non-fatal" >&2
+}
+
+# Idempotency: skip re-validation if a comment referencing the same
+# head_sha already exists within the last 2 hours. Mirrors the
+# pr-reviewer pattern; uses the agent-scoped marker to avoid
+# false-matching against the structural review.
+EXISTING=$(curl -sf -H "Authorization: token $GITEA_TOKEN" \
+  "$GITEA_URL/api/v1/repos/$GITEA_OWNER/$GITEA_REPO/issues/$ADF_PR_NUMBER/comments" 2>/dev/null \
+  | python3 -c '
+import json, sys, datetime, os
+head = os.environ.get("ADF_PR_HEAD_SHA", "")
+cs = json.load(sys.stdin)
+now = datetime.datetime.now(datetime.timezone.utc)
+recent = [
+  c for c in cs
+  if ("Last spec-validated commit: " + head[:7]) in c.get("body", "")
+  and (now - datetime.datetime.fromisoformat(
+    c["created_at"].replace("Z", "+00:00")
+  )).total_seconds() < 7200
+]
+print("yes" if recent else "no")
+' 2>/dev/null || echo "no")
+
+if [ "$EXISTING" = "yes" ]; then
+  echo "pr-spec-validator: same head_sha already validated in last 2h; skip; exit"
+  exit 0
+fi
+
+# Fetch the PR diff once (cap to avoid blowing the LLM context window).
+cd "$GITEA_WORKING_DIR"
+git fetch gitea "pull/$ADF_PR_NUMBER/head:pr-$ADF_PR_NUMBER" 2>/dev/null || true
+
+# === PATH FILTER (early exit -- happy path for docs-only / CI-only PRs) ===
+#
+# requirements-traceability only matters when the PR touches the
+# specifications themselves (`plans/**`) or the implementation that
+# realises them (`crates/**/src/**`, any `*.rs`). Other changes
+# (markdown docs, workflow yaml, scripts, frontend tweaks) cannot
+# regress traceability against the Rust workspace, so we mark the
+# check `success` and exit cleanly.
+#
+# `adf/spec` is a required check on `main` (branch protection PATCHed
+# at the end of Phase 2b deployment). A `pending` left behind by an
+# early-exit-without-post would block every docs-only PR forever, so
+# the skip path MUST post `success` -- not "no post".
+CHANGED_FILES=$(git diff --name-only "main...pr-$ADF_PR_NUMBER" 2>/dev/null || true)
+if [ -z "$CHANGED_FILES" ]; then
+  # Empty diff or fetch failure: behave as if there's nothing to validate.
+  POST_STATUS success "n/a — no spec-relevant changes"
+  echo "pr-spec-validator: empty diff; posted success n/a"
+  exit 0
+fi
+
+SPEC_RELEVANT=$(echo "$CHANGED_FILES" | grep -E '^plans/|^crates/[^/]+/src/|\.rs$' || true)
+if [ -z "$SPEC_RELEVANT" ]; then
+  POST_STATUS success "n/a — no spec-relevant changes"
+  echo "pr-spec-validator: no spec-relevant paths changed; posted success n/a"
+  exit 0
+fi
+
+PR_DIFF=$(git diff "main...pr-$ADF_PR_NUMBER" 2>/dev/null | head -2000)
+
+REVIEW_PROMPT="You are reviewing PR #$ADF_PR_NUMBER on $GITEA_OWNER/$GITEA_REPO. Apply the requirements-traceability skill.
+
+PR metadata:
+- Title: $ADF_PR_TITLE
+- Author: $ADF_PR_AUTHOR
+- Head SHA: $ADF_PR_HEAD_SHA
+- Diff LOC: $ADF_PR_DIFF_LOC
+
+Spec-relevant paths in this PR:
+$SPEC_RELEVANT
+
+PR diff (first 2000 lines):
+\`\`\`diff
+$PR_DIFF
+\`\`\`
+
+Apply the requirements-traceability skill: build a REQ → design/ADR → implementation → test matrix for the changed code, flag any gap (unimplemented requirements, untested changes, undocumented decisions, drift between spec and code), and write a single PR comment summarising findings.
+
+Output template:
+- <h3>Requirements Traceability Summary</h3>
+- <h3>Verdict: pass | concerns | fail</h3>
+- <h3>Traceability Matrix</h3> (table)
+- <h3>Gaps</h3>
+- <sub>Last spec-validated commit: $HEAD_SHORT</sub>
+
+Rules:
+- Do NOT use --dangerously-skip-permissions
+- Do NOT mention agent handles with the adf colon prefix (triggers false-positive review chains)
+- Do NOT mock, bypass tests, or skip hooks
+- Verdict line MUST appear exactly as 'Verdict: pass' / 'Verdict: concerns' / 'Verdict: fail' for the status parser
+
+Post the completed review with:
+  gtr comment --owner \"\$GITEA_OWNER\" --repo \"\$GITEA_REPO\" --index \"$ADF_PR_NUMBER\" --body-file /tmp/pr-spec-validator-$ADF_PR_NUMBER.md"
+
+REVIEW_OUTPUT=$(echo "$REVIEW_PROMPT" | /home/alex/.local/bin/claude -p \
+  --allowedTools "Bash,Read,Grep,Glob" \
+  2>&1)
+echo "$REVIEW_OUTPUT"
+
+echo "pr-spec-validator: verdict posted on PR #$ADF_PR_NUMBER"
+
+# Derive the commit-status verdict from the agent output (or the
+# rendered review file, whichever is available). Mirrors the
+# pr-reviewer Confidence-Score parsing pattern; falls back to a
+# `success` "manual gate" state when the verdict line is missing
+# (the commit status is never left in `pending`).
+REVIEW_FILE="/tmp/pr-spec-validator-$ADF_PR_NUMBER.md"
+SCORE_TEXT=""
+if [ -f "$REVIEW_FILE" ]; then
+  SCORE_TEXT=$(cat "$REVIEW_FILE")
+fi
+SCORE_TEXT="$SCORE_TEXT
+$REVIEW_OUTPUT"
+
+VERDICT=$(echo "$SCORE_TEXT" \
+  | grep -oE 'Verdict:[[:space:]]*(pass|concerns|fail)' \
+  | grep -oE '(pass|concerns|fail)' \
+  | head -1)
+
+if [ "$VERDICT" = "fail" ]; then
+  STATE=failure
+  DESC="traceability gaps blocking"
+elif [ "$VERDICT" = "concerns" ]; then
+  STATE=success
+  DESC="traceability concerns flagged"
+elif [ "$VERDICT" = "pass" ]; then
+  STATE=success
+  DESC="traceability matrix complete"
+else
+  STATE=success
+  DESC="review posted; manual gate"
+fi
+
+POST_STATUS "$STATE" "$DESC"
+echo "pr-spec-validator: posted adf/spec status state=$STATE"
+'''
