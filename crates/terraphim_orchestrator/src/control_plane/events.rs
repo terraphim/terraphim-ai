@@ -32,6 +32,9 @@ pub enum CommandKind {
     CompoundReview,
     /// Automated PR review triggered by pull_request webhook event
     ReviewPr,
+    /// Deterministic build/test verdict triggered by a Gitea push event
+    /// (Phase 3: ADF replaces Gitea Actions).
+    Push,
 }
 
 /// Normalized representation of an agent-triggering event.
@@ -338,6 +341,46 @@ pub fn normalize_webhook_dispatch(
                 target_agent_name: format!("review-pr/{}", project),
                 command_kind: CommandKind::ReviewPr,
                 context: format!("sha={} diff_loc={}", head_sha, diff_loc),
+                raw_command,
+            }
+        }
+        WebhookDispatch::Push {
+            project,
+            ref_name,
+            before_sha,
+            after_sha,
+            pusher_login,
+            files_changed,
+        } => {
+            // Push events have no PR/issue number; use 0 with the after_sha
+            // mixed into the event_id seed via the comment_id slot so each
+            // commit produces a distinct dedup key.
+            let sha_seed = u64::from_str_radix(after_sha.get(..8).unwrap_or("0"), 16).unwrap_or(0);
+            let event_id = generate_event_id(&ctx.repo_full_name, 0, sha_seed);
+            let session_id = generate_session_id(&ctx.repo_full_name, 0);
+            let raw_command = format!("push#{}", after_sha);
+
+            NormalizedAgentEvent {
+                event_id,
+                session_id,
+                origin: EventOrigin::Webhook,
+                repo_full_name: ctx.repo_full_name.clone(),
+                issue_number: 0,
+                issue_title: Some(format!("push to {}", ref_name)),
+                issue_state: None,
+                comment_id: None,
+                comment_created_at: None,
+                comment_author: Some(pusher_login.clone()),
+                comment_body: String::new(),
+                target_agent_name: format!("build-runner/{}", project),
+                command_kind: CommandKind::Push,
+                context: format!(
+                    "ref={} before={} after={} files={}",
+                    ref_name,
+                    before_sha,
+                    after_sha,
+                    files_changed.len()
+                ),
                 raw_command,
             }
         }

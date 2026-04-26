@@ -105,6 +105,26 @@ pub enum WebhookDispatch {
         title: String,
         diff_loc: u32,
     },
+    /// Push event dispatch — triggers the deterministic `build-runner` agent
+    /// (Phase 3 of the ADF replaces-Gitea-Actions plan). The orchestrator's
+    /// `handle_push` consumes this and spawns the bash agent that shells out
+    /// to `rch exec` for `cargo fmt/clippy/test`.
+    Push {
+        /// Project id resolved from `repository.full_name` (the repo segment
+        /// after the `/`, mirroring the `ReviewPr` derivation).
+        project: String,
+        /// Full git ref, e.g. `refs/heads/main` or `refs/tags/v1.0.0`.
+        ref_name: String,
+        /// Parent commit SHA (zeros for branch creation).
+        before_sha: String,
+        /// New tip commit SHA the build-runner must check out.
+        after_sha: String,
+        /// `pusher.login` from the Gitea payload, used for audit logging.
+        pusher_login: String,
+        /// Unique union of `added ∪ removed ∪ modified` paths across all
+        /// commits in the payload, in stable insertion order.
+        files_changed: Vec<String>,
+    },
 }
 
 impl WebhookDispatch {
@@ -116,8 +136,37 @@ impl WebhookDispatch {
             Self::SpawnPersona { comment_id, .. } => *comment_id,
             Self::CompoundReview { comment_id, .. } => *comment_id,
             Self::ReviewPr { .. } => 0,
+            Self::Push { .. } => 0,
         }
     }
+}
+
+/// Gitea webhook payload for `push` events (Phase 3).
+#[derive(Debug, Deserialize)]
+pub struct GiteaPushPayload {
+    #[serde(rename = "ref")]
+    pub ref_name: String,
+    pub before: String,
+    pub after: String,
+    pub pusher: GiteaPusher,
+    pub repository: GiteaRepository,
+    #[serde(default)]
+    pub commits: Vec<GiteaPushCommit>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct GiteaPusher {
+    pub login: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct GiteaPushCommit {
+    #[serde(default)]
+    pub added: Vec<String>,
+    #[serde(default)]
+    pub removed: Vec<String>,
+    #[serde(default)]
+    pub modified: Vec<String>,
 }
 
 /// Shared state for the webhook handler.
@@ -170,6 +219,14 @@ async fn handle_gitea_webhook(
 
     if event_type == "pull_request" {
         return handle_pull_request_event(&state, &body).await;
+    }
+
+    // Push events (Phase 3): explicit `X-Gitea-Event: push` header, or fall
+    // back to JSON shape detection (presence of `ref` + `before` + `after` +
+    // `commits`) for clients that omit the header. Falls through to the
+    // legacy issue-comment parser otherwise.
+    if event_type == "push" || looks_like_push_payload(&body) {
+        return handle_push_event(&state, &body).await;
     }
 
     // 3. Parse payload
@@ -371,6 +428,92 @@ pub async fn handle_pull_request_event(state: &WebhookState, body: &[u8]) -> Sta
         Ok(()) => StatusCode::ACCEPTED,
         Err(e) => {
             warn!(error = %e, "failed to send ReviewPr dispatch");
+            StatusCode::SERVICE_UNAVAILABLE
+        }
+    }
+}
+
+/// JSON-shape sniffer for `push` events when the `X-Gitea-Event` header is
+/// missing. Returns true when the body parses as an object containing the
+/// trio of `ref`, `before`, `after` and a `commits` array — the unique
+/// fingerprint of a Gitea push payload.
+fn looks_like_push_payload(body: &[u8]) -> bool {
+    let v: serde_json::Value = match serde_json::from_slice(body) {
+        Ok(v) => v,
+        Err(_) => return false,
+    };
+    v.get("ref").is_some()
+        && v.get("before").is_some()
+        && v.get("after").is_some()
+        && v.get("commits").map(|c| c.is_array()).unwrap_or(false)
+}
+
+/// Aggregate `added ∪ removed ∪ modified` paths across all commits in a push
+/// payload, deduplicating while preserving first-seen insertion order.
+pub fn aggregate_files_changed(commits: &[GiteaPushCommit]) -> Vec<String> {
+    let mut seen = std::collections::HashSet::new();
+    let mut out = Vec::new();
+    for c in commits {
+        for path in c
+            .added
+            .iter()
+            .chain(c.removed.iter())
+            .chain(c.modified.iter())
+        {
+            if seen.insert(path.clone()) {
+                out.push(path.clone());
+            }
+        }
+    }
+    out
+}
+
+/// Handle Gitea `push` event (Phase 3). Returns 200 for parse/skip cases so
+/// Gitea does not retry-spam on malformed bodies; emits `ACCEPTED` once a
+/// `WebhookDispatch::Push` has been forwarded to the orchestrator.
+pub async fn handle_push_event(state: &WebhookState, body: &[u8]) -> StatusCode {
+    let payload: GiteaPushPayload = match serde_json::from_slice(body) {
+        Ok(p) => p,
+        Err(e) => {
+            warn!(error = %e, "failed to parse push webhook payload");
+            return StatusCode::OK;
+        }
+    };
+
+    // Derive project from `owner/repo` → `repo`, mirroring the ReviewPr path.
+    let project = payload
+        .repository
+        .full_name
+        .split('/')
+        .next_back()
+        .unwrap_or(&payload.repository.full_name)
+        .to_string();
+
+    let files_changed = aggregate_files_changed(&payload.commits);
+
+    let dispatch = WebhookDispatch::Push {
+        project,
+        ref_name: payload.ref_name.clone(),
+        before_sha: payload.before.clone(),
+        after_sha: payload.after.clone(),
+        pusher_login: payload.pusher.login.clone(),
+        files_changed,
+    };
+
+    info!(
+        repo = %payload.repository.full_name,
+        ref_name = %payload.ref_name,
+        before = %payload.before,
+        after = %payload.after,
+        pusher = %payload.pusher.login,
+        commits = payload.commits.len(),
+        "webhook: enqueuing Push dispatch"
+    );
+
+    match state.dispatch_tx.send(dispatch).await {
+        Ok(()) => StatusCode::ACCEPTED,
+        Err(e) => {
+            warn!(error = %e, "failed to send Push dispatch");
             StatusCode::SERVICE_UNAVAILABLE
         }
     }
