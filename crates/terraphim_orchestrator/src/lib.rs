@@ -2084,6 +2084,199 @@ impl AgentOrchestrator {
         }
     }
 
+    /// Handle a `DispatchTask::Push` dispatch (Phase 3 — ADF replaces Gitea
+    /// Actions): look up the project's `build-runner` agent, gate on the
+    /// subscription allow-list and monthly budget, log a routing decision row
+    /// for observability (even though `build-runner` is bash, not LLM), then
+    /// spawn it with `ADF_PUSH_*` env injection so the bash task can shell
+    /// out to `rch exec` for the deterministic cargo gates.
+    ///
+    /// The handler is a no-op (with warn log) when no `build-runner` agent is
+    /// configured for the project — repos without build-runner must not break
+    /// the orchestrator drain loop.
+    pub(crate) async fn handle_push(
+        &mut self,
+        task: dispatcher::DispatchTask,
+    ) -> Result<(), OrchestratorError> {
+        let (project, ref_name, before_sha, after_sha, pusher_login, files_changed) = match task {
+            dispatcher::DispatchTask::Push {
+                project,
+                ref_name,
+                before_sha,
+                after_sha,
+                pusher_login,
+                files_changed,
+            } => (
+                project,
+                ref_name,
+                before_sha,
+                after_sha,
+                pusher_login,
+                files_changed,
+            ),
+            other => {
+                warn!(task = ?other, "handle_push invoked with non-Push task; ignoring");
+                return Ok(());
+            }
+        };
+
+        // Look up the build-runner agent for this project. Repos without
+        // build-runner shouldn't break the orchestrator -- log and skip.
+        let def =
+            match self.config.agents.iter().find(|a| {
+                a.name == "build-runner" && a.project.as_deref() == Some(project.as_str())
+            }) {
+                Some(d) => d.clone(),
+                None => {
+                    warn!(
+                        project = %project,
+                        after_sha = %after_sha,
+                        "Push skipped: no build-runner agent configured for project"
+                    );
+                    return Ok(());
+                }
+            };
+
+        // === STATIC ALLOW-LIST GATE ===
+        // build-runner is bash-only (no LLM), so def.model is normally None
+        // and this gate is a no-op. The check is retained for defence in
+        // depth so a future config that mis-sets `model` cannot bypass C1/C3.
+        if let Some(static_model) = def.model.as_deref() {
+            if !config::is_allowed_provider(static_model) {
+                warn!(
+                    agent = %def.name,
+                    project = %project,
+                    model = %static_model,
+                    "Push skipped: static model rejected by subscription allow-list"
+                );
+                return Ok(());
+            }
+        }
+
+        // === BUDGET GATE ===
+        // build-runner has no LLM cost but the budget tracker still records
+        // its dispatches; pause if the operator deliberately capped it.
+        let budget_verdict = self.cost_tracker.check(&def.name);
+        if budget_verdict.should_pause() {
+            warn!(
+                agent = %def.name,
+                project = %project,
+                verdict = %budget_verdict,
+                "Push skipped: build-runner monthly budget exhausted"
+            );
+            return Ok(());
+        }
+
+        // === ROUTING DECISION (observability only) ===
+        // Even though build-runner is bash, we still log a routing decision
+        // row so the dashboard sees one entry per dispatch. Cost is 0 because
+        // there is no LLM, and the model column reads "n/a".
+        info!(
+            agent = %def.name,
+            project = %project,
+            ref_name = %ref_name,
+            after_sha = %after_sha,
+            model = "n/a",
+            cost_estimate_cents = 0,
+            rationale = "deterministic build-runner (no LLM)",
+            "Push routing decision"
+        );
+
+        // === SPAWN ===
+        // build-runner is a plain bash agent: cli_tool from the def, no
+        // primary model, no fallback model. Mirror the SpawnRequest shape
+        // used by handle_review_pr but skip the LLM-specific overrides.
+        let primary_provider = terraphim_types::capability::Provider {
+            id: def.name.clone(),
+            name: def.name.clone(),
+            provider_type: terraphim_types::capability::ProviderType::Agent {
+                agent_id: def.name.clone(),
+                cli_command: def.cli_tool.clone(),
+                working_dir: self.config.working_dir_for_agent(&def),
+            },
+            capabilities: vec![],
+            cost_level: terraphim_types::capability::CostLevel::Cheap,
+            latency: terraphim_types::capability::Latency::Medium,
+            keywords: def.capabilities.clone(),
+        };
+
+        let task_string = format!(
+            "Build/test verdict for push to {} ({} → {}, {} files changed) on project={}, pushed by {}",
+            ref_name,
+            before_sha,
+            after_sha,
+            files_changed.len(),
+            project,
+            pusher_login,
+        );
+
+        let mut request = SpawnRequest::new(primary_provider, &task_string);
+
+        let mut limits = ResourceLimits::default();
+        if let Some(max_cpu) = def.max_cpu_seconds {
+            limits.max_cpu_seconds = Some(max_cpu);
+        }
+        if let Some(max_mem) = def.max_memory_bytes {
+            limits.max_memory_bytes = Some(max_mem);
+        }
+        request = request.with_resource_limits(limits);
+
+        // Layer the ADF_PUSH_* env on top of the per-agent base context.
+        let mut spawn_ctx =
+            build_spawn_context_for_agent(&self.config, &def, self.output_poster.as_ref());
+        spawn_ctx = spawn_ctx
+            .with_env("ADF_PUSH_SHA", after_sha.clone())
+            .with_env("ADF_PUSH_REF", ref_name.clone())
+            .with_env("ADF_PUSH_PROJECT", project.clone())
+            .with_env("ADF_PUSH_BEFORE_SHA", before_sha.clone())
+            .with_env("ADF_PUSH_PUSHER", pusher_login.clone())
+            .with_env("ADF_PUSH_FILES", files_changed.join("\n"));
+
+        let handle = self
+            .spawner
+            .spawn_with_fallback(&request, spawn_ctx)
+            .await
+            .map_err(|e| OrchestratorError::SpawnFailed {
+                agent: def.name.clone(),
+                reason: e.to_string(),
+            })?;
+
+        let output_rx = handle.subscribe_output();
+        let restart_count = self
+            .restart_counts
+            .get(&agent_key(&def))
+            .copied()
+            .unwrap_or(0);
+
+        self.active_agents.insert(
+            def.name.clone(),
+            ManagedAgent {
+                definition: def.clone(),
+                handle,
+                started_at: Instant::now(),
+                restart_count,
+                output_rx,
+                spawned_by_mention: false,
+                worktree_path: None,
+                routed_model: None,
+                session_id: format!("{}-{}", def.name, ulid::Ulid::new()),
+                mention_chain_id: None,
+                mention_depth: None,
+                mention_parent_agent: None,
+            },
+        );
+
+        info!(
+            agent = %def.name,
+            project = %project,
+            ref_name = %ref_name,
+            after_sha = %after_sha,
+            "Push spawned build-runner"
+        );
+
+        Ok(())
+    }
+
     /// Evaluate the pre-check strategy for an agent.
     async fn run_pre_check(&mut self, def: &AgentDefinition) -> PreCheckResult {
         match &def.pre_check {
@@ -2618,6 +2811,31 @@ impl AgentOrchestrator {
                     author_login,
                     title,
                     diff_loc,
+                });
+            }
+            webhook::WebhookDispatch::Push {
+                project,
+                ref_name,
+                before_sha,
+                after_sha,
+                pusher_login,
+                files_changed,
+            } => {
+                info!(
+                    project = %project,
+                    ref_name = %ref_name,
+                    after_sha = %after_sha,
+                    pusher = %pusher_login,
+                    files = files_changed.len(),
+                    "webhook: enqueuing Push dispatch task"
+                );
+                self.dispatcher.enqueue(dispatcher::DispatchTask::Push {
+                    project,
+                    ref_name,
+                    before_sha,
+                    after_sha,
+                    pusher_login,
+                    files_changed,
                 });
             }
         }
@@ -4629,6 +4847,11 @@ impl AgentOrchestrator {
                 task @ DispatchTask::PostMergeTestGate { .. } => {
                     if let Err(e) = self.handle_post_merge_test_gate(task).await {
                         tracing::error!(error = ?e, "handle_post_merge_test_gate failed");
+                    }
+                }
+                task @ DispatchTask::Push { .. } => {
+                    if let Err(e) = self.handle_push(task).await {
+                        warn!(error = %e, "handle_push failed");
                     }
                 }
             }
