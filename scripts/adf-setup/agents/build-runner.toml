@@ -1,0 +1,70 @@
+# build-runner agent template
+#
+# Phase 3 of the ADF replaces-Gitea-Actions plan
+# (.docs/plan-adf-agents-replace-gitea-actions.md).
+#
+# Event-driven (NOT cron). Spawned by `AgentOrchestrator::handle_push`
+# in response to a Gitea `push` webhook event. Posts the `adf/build`
+# commit status. NO LLM -- pure shell wrapping `rch exec`, which
+# dispatches to the bigbox + SeaweedFS S3 cache pipeline (the same
+# compute path as `.github/workflows/ci-pr.yml`).
+#
+# Per locked decision D1 in the plan, push to GitHub is manual /
+# opt-in, so this agent is the sole deterministic CI verdict on
+# Gitea-originated changes.
+#
+# NO `schedule` field -- the dispatcher invokes this on demand.
+# NO `model`, NO `persona`, NO `skill_chain` -- this is bash-only.
+
+[[agents]]
+name = "build-runner"
+layer = "Growth"
+cli_tool = "/bin/bash"
+max_cpu_seconds = 1800
+grace_period_secs = 30
+capabilities = ["build", "test", "deterministic-ci"]
+project = "terraphim"
+task = '''
+source ~/.profile
+
+# Context injected by handle_push:
+#   ADF_PUSH_SHA, ADF_PUSH_REF, ADF_PUSH_PROJECT,
+#   ADF_PUSH_BEFORE_SHA, ADF_PUSH_PUSHER, ADF_PUSH_FILES (newline list).
+if [ -z "${ADF_PUSH_SHA:-}" ] || [ -z "${ADF_PUSH_REF:-}" ]; then
+  echo "build-runner: missing ADF_PUSH_SHA or ADF_PUSH_REF; exit" >&2
+  exit 1
+fi
+
+cd "$GITEA_WORKING_DIR"
+git fetch origin "$ADF_PUSH_REF" || true
+git checkout "$ADF_PUSH_SHA"
+
+# POST_STATUS posts to the Gitea Commit Status API directly. This is
+# the same endpoint Phase 1 will wrap in `set_commit_status`; using
+# curl here keeps Phase 3 standalone (does not depend on Phase 1).
+POST_STATUS() {
+  local STATE="$1"
+  local DESC="$2"
+  curl -fsS -X POST \
+    -H "Authorization: token $GITEA_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d "{\"state\":\"$STATE\",\"context\":\"adf/build\",\"description\":\"$DESC\"}" \
+    "$GITEA_URL/api/v1/repos/$GITEA_OWNER/$GITEA_REPO/statuses/$ADF_PUSH_SHA" \
+    >/dev/null 2>&1 || true
+}
+
+POST_STATUS pending "build started via rch"
+
+set -e
+trap 'POST_STATUS failure "build failed at last step"; exit 1' ERR
+
+# Cargo step list lifted verbatim from .github/workflows/ci-pr.yml.
+# rch dispatches to bigbox + SeaweedFS S3 cache (82.83% hit rate
+# observed on GitHub Actions run 24929848023).
+/home/alex/.local/bin/rch exec -- cargo fmt --all -- --check
+/home/alex/.local/bin/rch exec -- cargo clippy --workspace --all-targets -- -D warnings
+/home/alex/.local/bin/rch exec -- cargo test --workspace --no-fail-fast
+
+POST_STATUS success "fmt+clippy+test pass via rch"
+echo "build-runner: adf/build success on $ADF_PUSH_SHA"
+'''
