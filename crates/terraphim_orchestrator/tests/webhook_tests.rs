@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use terraphim_orchestrator::webhook::{
-    handle_pull_request_event, verify_signature, WebhookDispatch, WebhookState,
+    handle_pull_request_event, handle_push_event, verify_signature, WebhookDispatch, WebhookState,
 };
 use terraphim_orchestrator::PersonaRegistry;
 
@@ -108,4 +108,117 @@ async fn webhook_pr_malformed_payload_logs_returns_200() {
         rx.try_recv().is_err(),
         "malformed payload must not enqueue anything"
     );
+}
+
+// === Phase 3: Push event tests (Refs #929) ===
+
+#[tokio::test]
+async fn push_event_parses_correct_shape() {
+    let (state, mut rx) = make_state(None);
+    let body = fixture("push_main.json");
+
+    let status = handle_push_event(&state, &body).await;
+    assert_eq!(status, axum::http::StatusCode::ACCEPTED);
+
+    let dispatch = rx.try_recv().expect("expected a Push dispatch");
+    match dispatch {
+        WebhookDispatch::Push {
+            project,
+            ref_name,
+            before_sha,
+            after_sha,
+            pusher_login,
+            files_changed: _,
+        } => {
+            assert_eq!(project, "terraphim-ai");
+            assert_eq!(ref_name, "refs/heads/main");
+            assert_eq!(before_sha, "0000000000000000000000000000000000000001");
+            assert_eq!(after_sha, "abc123def456abc123def456abc123def456abcd");
+            assert_eq!(pusher_login, "alex");
+        }
+        other => panic!(
+            "unexpected dispatch variant: comment_id={}",
+            other.comment_id()
+        ),
+    }
+}
+
+#[tokio::test]
+async fn push_event_files_changed_aggregated_from_commits() {
+    let (state, mut rx) = make_state(None);
+    let body = fixture("push_main.json");
+
+    let _ = handle_push_event(&state, &body).await;
+
+    let dispatch = rx.try_recv().expect("expected a Push dispatch");
+    match dispatch {
+        WebhookDispatch::Push { files_changed, .. } => {
+            // commit 1: modified [a.rs, b.rs]; commit 2: added [c.rs] modified [a.rs]
+            // Union, dedup, insertion order: a.rs, b.rs, c.rs.
+            assert_eq!(
+                files_changed,
+                vec!["a.rs".to_string(), "b.rs".to_string(), "c.rs".to_string()],
+            );
+        }
+        other => panic!(
+            "unexpected dispatch variant: comment_id={}",
+            other.comment_id()
+        ),
+    }
+}
+
+#[tokio::test]
+async fn push_event_zero_commits_yields_empty_files_changed() {
+    let (state, mut rx) = make_state(None);
+    let body = fixture("push_tag_zero_commits.json");
+
+    let status = handle_push_event(&state, &body).await;
+    assert_eq!(status, axum::http::StatusCode::ACCEPTED);
+
+    let dispatch = rx.try_recv().expect("expected a Push dispatch");
+    match dispatch {
+        WebhookDispatch::Push {
+            ref_name,
+            files_changed,
+            ..
+        } => {
+            assert_eq!(ref_name, "refs/tags/v1.0.0");
+            assert!(
+                files_changed.is_empty(),
+                "tag push with zero commits must yield empty files_changed"
+            );
+        }
+        other => panic!(
+            "unexpected dispatch variant: comment_id={}",
+            other.comment_id()
+        ),
+    }
+}
+
+#[tokio::test]
+async fn push_event_rejected_without_hmac() {
+    // Push events are routed through the same outer HMAC gate as every other
+    // Gitea webhook event; verify that a wrong/forged signature on the
+    // canonical push payload would not validate. (handle_push_event is the
+    // post-HMAC inner function — the gate lives in handle_gitea_webhook,
+    // exercised here via verify_signature with the same body bytes.)
+    let secret = "phase3-push-secret";
+    let body = fixture("push_main.json");
+    assert!(!verify_signature(secret, &body, "sha256=deadbeef0000"));
+    assert!(!verify_signature(secret, &body, "not-hex"));
+    assert!(!verify_signature(secret, &body, ""));
+}
+
+#[tokio::test]
+async fn push_event_malformed_payload_returns_200() {
+    let (state, mut rx) = make_state(None);
+    let bad_body = b"{ malformed push :::";
+
+    let status = handle_push_event(&state, bad_body).await;
+    assert_eq!(
+        status,
+        axum::http::StatusCode::OK,
+        "malformed push payload must return 200 to avoid Gitea retry spam"
+    );
+    assert!(rx.try_recv().is_err());
 }

@@ -90,6 +90,22 @@ pub enum DispatchTask {
         /// PR title (for issue/comment attribution).
         title: String,
     },
+    /// Push event dispatch (Phase 3) — drives the deterministic build-runner
+    /// agent for a single commit pushed to a branch or tag.
+    Push {
+        /// Project id resolved from the Gitea repo full_name.
+        project: String,
+        /// Full git ref pushed to (e.g. `refs/heads/main`).
+        ref_name: String,
+        /// Parent commit SHA.
+        before_sha: String,
+        /// New tip commit SHA the build-runner checks out.
+        after_sha: String,
+        /// Login of the user who pushed.
+        pusher_login: String,
+        /// Newline-aggregable union of files added/removed/modified.
+        files_changed: Vec<String>,
+    },
 }
 
 impl DispatchTask {
@@ -102,6 +118,7 @@ impl DispatchTask {
             DispatchTask::ReviewPr { project, .. } => project,
             DispatchTask::AutoMerge { project, .. } => project,
             DispatchTask::PostMergeTestGate { project, .. } => project,
+            DispatchTask::Push { project, .. } => project,
         }
     }
 }
@@ -274,6 +291,9 @@ impl Dispatcher {
             DispatchTask::ReviewPr { .. } => 400,
             DispatchTask::AutoMerge { .. } => 500,
             DispatchTask::PostMergeTestGate { .. } => 600,
+            // Push events are deterministic CI; bias slightly higher than
+            // ReviewPr so the build verdict races ahead of LLM review.
+            DispatchTask::Push { .. } => 350,
         }
     }
 
@@ -286,6 +306,7 @@ impl Dispatcher {
             DispatchTask::ReviewPr { .. } => "review_pr".into(),
             DispatchTask::AutoMerge { .. } => "auto_merge".into(),
             DispatchTask::PostMergeTestGate { .. } => "post_merge_gate".into(),
+            DispatchTask::Push { .. } => "push".into(),
         }
     }
 }
