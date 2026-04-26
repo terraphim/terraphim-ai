@@ -652,7 +652,17 @@ fn print_json_output<T: Serialize>(value: &T, mode: CommandOutputMode) -> Result
 #[command(
     name = "terraphim-agent",
     version,
-    about = "Terraphim Agent: server-backed fullscreen TUI with offline-capable REPL and CLI commands"
+    about = "Terraphim Agent: server-backed fullscreen TUI with offline-capable REPL and CLI commands",
+    after_long_help = "EXIT CODES (F1.2 contract)\n\
+        \n\
+        \x20 0  SUCCESS             Operation completed successfully\n\
+        \x20 1  ERROR_GENERAL       Unspecified or unexpected error\n\
+        \x20 2  ERROR_USAGE         Invalid arguments or unknown command\n\
+        \x20 3  ERROR_INDEX_MISSING Required index not initialised\n\
+        \x20 4  ERROR_NOT_FOUND     No results (only with --fail-on-empty)\n\
+        \x20 5  ERROR_AUTH          Authentication required or failed\n\
+        \x20 6  ERROR_NETWORK       Transport-level network error\n\
+        \x20 7  ERROR_TIMEOUT       Operation exceeded configured timeout\n"
 )]
 struct Cli {
     /// Use server API mode instead of self-contained offline mode
@@ -693,6 +703,8 @@ enum Command {
         role: Option<String>,
         #[arg(long, default_value_t = 10)]
         limit: usize,
+        #[arg(long, default_value_t = false)]
+        fail_on_empty: bool,
     },
     /// Manage roles (list, select)
     Roles {
@@ -1202,6 +1214,184 @@ enum SessionsSub {
     Stats,
 }
 
+fn classify_error(err: &anyhow::Error) -> robot::exit_codes::ExitCode {
+    use robot::exit_codes::ExitCode;
+
+    if err.chain().any(|e| e.is::<tokio::time::error::Elapsed>()) {
+        return ExitCode::ErrorTimeout;
+    }
+
+    #[cfg(feature = "server")]
+    if err.chain().any(|e| e.is::<reqwest::Error>()) {
+        let is_timeout = err
+            .chain()
+            .filter_map(|e| e.downcast_ref::<reqwest::Error>())
+            .any(|re| re.is_timeout());
+        if is_timeout {
+            return ExitCode::ErrorTimeout;
+        }
+        return ExitCode::ErrorNetwork;
+    }
+
+    let msg = err.to_string().to_lowercase();
+
+    if msg.contains("timed out") || msg.contains("timeout") || msg.contains("elapsed") {
+        ExitCode::ErrorTimeout
+    } else if msg.contains("connection refused")
+        || msg.contains("connection reset")
+        || msg.contains("network")
+        || msg.contains("dns")
+        || msg.contains("transport")
+        || msg.contains("connect error")
+    {
+        ExitCode::ErrorNetwork
+    } else if msg.contains("unauthori")
+        || msg.contains("unauthenticated")
+        || msg.contains("forbidden")
+        || msg.contains("authentication required")
+        || msg.contains("authentication failed")
+        || msg.contains(" 401 ")
+        || msg.contains(" 403 ")
+        || msg.ends_with(" 401")
+        || msg.ends_with(" 403")
+        || msg.contains("http 401")
+        || msg.contains("http 403")
+    {
+        ExitCode::ErrorAuth
+    } else if msg.contains("index not found")
+        || msg.contains("index missing")
+        || msg.contains("not initialised")
+        || msg.contains("not initialized")
+        || (msg.contains("not found") && msg.contains("index"))
+        || msg.contains("knowledge graph not configured")
+        || msg.contains("no local knowledge graph")
+        || (msg.contains("thesaurus")
+            && (msg.contains("not found") || msg.contains("failed to load")))
+    {
+        ExitCode::ErrorIndexMissing
+    } else {
+        ExitCode::ErrorGeneral
+    }
+}
+
+#[cfg(test)]
+mod classify_error_tests {
+    use super::*;
+    use robot::exit_codes::ExitCode;
+
+    fn err(msg: &str) -> anyhow::Error {
+        anyhow::anyhow!("{}", msg)
+    }
+
+    #[test]
+    fn general_error_maps_to_1() {
+        assert_eq!(
+            classify_error(&err("something unexpected happened")),
+            ExitCode::ErrorGeneral
+        );
+    }
+
+    #[test]
+    fn index_missing_patterns_map_to_3() {
+        assert_eq!(
+            classify_error(&err("index not found on disk")),
+            ExitCode::ErrorIndexMissing
+        );
+        assert_eq!(
+            classify_error(&err("index missing")),
+            ExitCode::ErrorIndexMissing
+        );
+        assert_eq!(
+            classify_error(&err("automata index not initialised")),
+            ExitCode::ErrorIndexMissing
+        );
+        assert_eq!(
+            classify_error(&err("Config error: knowledge graph not configured")),
+            ExitCode::ErrorIndexMissing
+        );
+        assert_eq!(
+            classify_error(&err("no local knowledge graph path available")),
+            ExitCode::ErrorIndexMissing
+        );
+        assert_eq!(
+            classify_error(&err("thesaurus not found at path")),
+            ExitCode::ErrorIndexMissing
+        );
+    }
+
+    #[test]
+    fn auth_patterns_map_to_5() {
+        assert_eq!(
+            classify_error(&err("authentication required")),
+            ExitCode::ErrorAuth
+        );
+        assert_eq!(
+            classify_error(&err("request forbidden: 403")),
+            ExitCode::ErrorAuth
+        );
+        assert_eq!(
+            classify_error(&err("401 Unauthorised")),
+            ExitCode::ErrorAuth
+        );
+        assert_eq!(
+            classify_error(&err("server returned 403 Forbidden")),
+            ExitCode::ErrorAuth
+        );
+    }
+
+    #[test]
+    fn non_auth_strings_do_not_map_to_5() {
+        assert_ne!(
+            classify_error(&err("author field missing")),
+            ExitCode::ErrorAuth
+        );
+        assert_ne!(
+            classify_error(&err("authority header")),
+            ExitCode::ErrorAuth
+        );
+        assert_ne!(
+            classify_error(&err("failed to open auth_tokens.json")),
+            ExitCode::ErrorAuth
+        );
+        assert_ne!(
+            classify_error(&err("error code 4010 unknown")),
+            ExitCode::ErrorAuth
+        );
+    }
+
+    #[test]
+    fn timeout_patterns_map_to_7() {
+        assert_eq!(
+            classify_error(&err("operation timed out")),
+            ExitCode::ErrorTimeout
+        );
+        assert_eq!(
+            classify_error(&err("deadline elapsed waiting for response")),
+            ExitCode::ErrorTimeout
+        );
+        assert_eq!(
+            classify_error(&err("request timeout after 30s")),
+            ExitCode::ErrorTimeout
+        );
+    }
+
+    #[test]
+    fn network_patterns_map_to_6() {
+        assert_eq!(
+            classify_error(&err("connection refused on port 8080")),
+            ExitCode::ErrorNetwork
+        );
+        assert_eq!(
+            classify_error(&err("dns resolution failed")),
+            ExitCode::ErrorNetwork
+        );
+        assert_eq!(
+            classify_error(&err("network error connecting to host")),
+            ExitCode::ErrorNetwork
+        );
+    }
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
     let output = resolve_output_config(cli.robot, cli.format.clone());
@@ -1297,10 +1487,22 @@ fn main() -> Result<()> {
             #[cfg(feature = "server")]
             {
                 if cli.server {
-                    return rt.block_on(run_server_command(command, &cli.server_url, output));
+                    let result = rt.block_on(run_server_command(command, &cli.server_url, output));
+                    if let Err(ref e) = result {
+                        let code = classify_error(e);
+                        eprintln!("Error: {:#}", e);
+                        std::process::exit(code.code().into());
+                    }
+                    return result;
                 }
             }
-            rt.block_on(run_offline_command(command, output, cli.config))
+            let result = rt.block_on(run_offline_command(command, output, cli.config));
+            if let Err(ref e) = result {
+                let code = classify_error(e);
+                eprintln!("Error: {:#}", e);
+                std::process::exit(code.code().into());
+            }
+            result
         }
     }
 }
@@ -1528,6 +1730,7 @@ async fn run_offline_command(
             operator,
             role,
             limit,
+            fail_on_empty,
         } => {
             let (role_name, auto) = service
                 .resolve_or_auto_route(role.as_deref(), &query)
@@ -1581,6 +1784,7 @@ async fn run_offline_command(
                     .await?
             };
 
+            let results_count = results.len();
             if output.is_machine_readable() {
                 use crate::robot::schema::{SearchResultItem, SearchResultsData};
                 use crate::robot::{ResponseMeta, RobotConfig, RobotFormatter, RobotResponse};
@@ -1671,6 +1875,9 @@ async fn run_offline_command(
                     }
                     println!();
                 }
+            }
+            if fail_on_empty && results_count == 0 {
+                std::process::exit(robot::exit_codes::ExitCode::ErrorNotFound.code().into());
             }
             Ok(())
         }
@@ -3470,6 +3677,7 @@ async fn run_server_command(
             operator,
             role,
             limit,
+            fail_on_empty: _,
         } => {
             // Get selected role from server if not specified
             let role_name = if let Some(role) = role {
