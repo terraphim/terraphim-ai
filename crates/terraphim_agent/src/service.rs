@@ -796,6 +796,12 @@ impl TuiService {
         self.save_config().await?;
         Ok(())
     }
+
+    /// Flush (invalidate) thesaurus cache for one or all roles.
+    pub async fn flush_cache(&self, role_name: Option<&RoleName>) -> Result<usize> {
+        let mut service = self.service.lock().await;
+        Ok(service.flush_thesaurus_cache(role_name).await?)
+    }
 }
 
 /// Result of connectivity check

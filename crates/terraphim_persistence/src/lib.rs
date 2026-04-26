@@ -2,6 +2,7 @@ pub mod compression;
 pub mod conversation;
 pub mod document;
 pub mod error;
+pub mod hash_store;
 pub mod memory;
 pub mod settings;
 pub mod thesaurus;

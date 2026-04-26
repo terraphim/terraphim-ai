@@ -3,7 +3,8 @@
 #[cfg(feature = "repl-sessions")]
 use super::commands::SessionsSubcommand;
 use super::commands::{
-    ConfigSubcommand, ReplCommand, RobotSubcommand, RoleSubcommand, UpdateSubcommand,
+    CacheSubcommand, ConfigSubcommand, ReplCommand, RobotSubcommand, RoleSubcommand,
+    UpdateSubcommand,
 };
 #[cfg(feature = "server")]
 use crate::client::ApiClient;
@@ -455,9 +456,32 @@ impl ReplHandler {
             ReplCommand::Update { subcommand } => {
                 self.handle_update(subcommand).await?;
             }
+
+            ReplCommand::Cache { subcommand } => {
+                self.handle_cache(subcommand).await?;
+            }
         }
 
         Ok(false)
+    }
+
+    async fn handle_cache(&self, subcommand: CacheSubcommand) -> Result<()> {
+        match subcommand {
+            CacheSubcommand::Flush { role } => {
+                if let Some(service) = &self.service {
+                    let role_name = if let Some(r) = role {
+                        terraphim_types::RoleName::new(&r)
+                    } else {
+                        terraphim_types::RoleName::new(&self.current_role)
+                    };
+                    let count = service.flush_cache(Some(&role_name)).await?;
+                    println!("Flushed cache for {} role(s)", count);
+                } else {
+                    println!("Service not available");
+                }
+            }
+        }
+        Ok(())
     }
 
     async fn handle_search(

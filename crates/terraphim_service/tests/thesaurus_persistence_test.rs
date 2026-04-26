@@ -358,3 +358,141 @@ async fn test_thesaurus_memory_vs_persistence() {
 
     println!("✅ Memory persistence stability test passed");
 }
+
+#[tokio::test]
+#[serial]
+async fn test_thesaurus_cache_invalidation_on_kg_edit() {
+    println!("🧪 Testing thesaurus cache invalidation on KG markdown edit");
+
+    let _ = tracing_subscriber::fmt()
+        .with_max_level(Level::INFO)
+        .try_init();
+
+    // Step 1: Initialize memory-only persistence
+    terraphim_persistence::DeviceStorage::init_memory_only()
+        .await
+        .expect("Failed to initialize memory-only persistence");
+
+    // Step 2: Create a temp directory with a KG markdown file
+    let temp_dir = tempfile::tempdir().expect("Failed to create temp directory");
+    let kg_path = temp_dir.path().to_path_buf();
+
+    // Create initial markdown file with a synonym
+    let md_file = kg_path.join("test_concept.md");
+    std::fs::write(
+        &md_file,
+        "# Test Concept\n\nsynonyms:: original_term, another_term\n",
+    )
+    .expect("Failed to write initial markdown file");
+
+    // Step 3: Create config with role pointing to temp KG directory
+    let mut config = ConfigBuilder::new_with_id(ConfigId::Desktop)
+        .build_default_desktop()
+        .build()
+        .expect("Failed to build desktop config");
+
+    let role_name = RoleName::new("TestRole");
+    config.roles.insert(
+        role_name.clone(),
+        terraphim_config::Role {
+            name: role_name.clone(),
+            kg: Some(KnowledgeGraph {
+                automata_path: None,
+                knowledge_graph_local: Some(terraphim_config::KnowledgeGraphLocal {
+                    input_type: KnowledgeGraphInputType::Markdown,
+                    path: kg_path.clone(),
+                }),
+                public: false,
+                publish: false,
+            }),
+            ..Default::default()
+        },
+    );
+    config.selected_role = role_name.clone();
+
+    let config_state = ConfigState::new(&mut config)
+        .await
+        .expect("Failed to initialize ConfigState");
+
+    // Step 4: Create service and load thesaurus (first build)
+    println!("  🔍 First load: Building thesaurus from KG files");
+    let mut service = TerraphimService::new(config_state);
+    let first_thesaurus = service
+        .ensure_thesaurus_loaded(&role_name)
+        .await
+        .expect("First thesaurus load failed");
+
+    // Verify original terms exist
+    let original_term = NormalizedTermValue::from("original_term");
+    let another_term = NormalizedTermValue::from("another_term");
+    assert!(
+        first_thesaurus.get(&original_term).is_some(),
+        "First thesaurus should contain 'original_term'"
+    );
+    assert!(
+        first_thesaurus.get(&another_term).is_some(),
+        "First thesaurus should contain 'another_term'"
+    );
+    println!("    ✅ First thesaurus contains expected terms");
+
+    // Step 5: Verify hash was saved
+    let cached_hash =
+        terraphim_persistence::hash_store::load_source_hash(&role_name.as_lowercase())
+            .await
+            .expect("Failed to load source hash");
+    assert!(
+        cached_hash.is_some(),
+        "Source hash should be saved after first load"
+    );
+    println!("    ✅ Source hash saved to cache");
+
+    // Step 6: Edit the markdown file (change synonyms)
+    std::fs::write(
+        &md_file,
+        "# Test Concept\n\nsynonyms:: updated_term, another_term\n",
+    )
+    .expect("Failed to write updated markdown file");
+    println!("  ✏️  Edited markdown file: changed 'original_term' to 'updated_term'");
+
+    // Step 7: Load thesaurus again (should detect hash mismatch and rebuild)
+    println!("  🔍 Second load: Should detect hash mismatch and rebuild");
+    let second_thesaurus = service
+        .ensure_thesaurus_loaded(&role_name)
+        .await
+        .expect("Second thesaurus load failed");
+
+    // Step 8: Verify thesaurus reflects the edit
+    let updated_term = NormalizedTermValue::from("updated_term");
+    assert!(
+        second_thesaurus.get(&updated_term).is_some(),
+        "Second thesaurus should contain 'updated_term' after KG edit"
+    );
+    assert!(
+        second_thesaurus.get(&original_term).is_none(),
+        "Second thesaurus should NOT contain 'original_term' after KG edit"
+    );
+    assert!(
+        second_thesaurus.get(&another_term).is_some(),
+        "Second thesaurus should still contain 'another_term'"
+    );
+    println!("    ✅ Second thesaurus reflects updated KG mappings");
+
+    // Step 9: Verify new hash was saved
+    let new_cached_hash =
+        terraphim_persistence::hash_store::load_source_hash(&role_name.as_lowercase())
+            .await
+            .expect("Failed to load updated source hash");
+    assert!(
+        new_cached_hash.is_some(),
+        "Updated source hash should be saved after rebuild"
+    );
+    assert_ne!(
+        cached_hash, new_cached_hash,
+        "Cached hash should have changed after file edit"
+    );
+    println!("    ✅ Updated source hash saved to cache");
+
+    println!("🎉 Cache invalidation test passed!");
+    println!("✅ Thesaurus reflects KG markdown edits without manual cache flush");
+    println!("✅ Hash mismatch correctly triggers cache invalidation and rebuild");
+}

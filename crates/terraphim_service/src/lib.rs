@@ -504,6 +504,9 @@ impl TerraphimService {
             }
         }
 
+        // Check if source hash has changed and invalidate cache if needed
+        self.check_and_invalidate_thesaurus_cache(role_name).await;
+
         log::debug!("Loading thesaurus for role: {}", role_name);
         log::debug!("Role keys {:?}", self.config_state.roles.keys());
 
@@ -513,6 +516,7 @@ impl TerraphimService {
                 Ok(thesaurus) => {
                     log::debug!("Thesaurus loaded: {:?}", thesaurus);
                     log::info!("Rolegraph loaded: for role name {:?}", role_name);
+                    self.save_source_hash_for_role(role_name).await;
                     Ok(thesaurus)
                 }
                 Err(e) => {
@@ -546,6 +550,7 @@ impl TerraphimService {
                                 role_name
                             );
                         }
+                        self.save_source_hash_for_role(role_name).await;
                     }
 
                     result
@@ -569,9 +574,161 @@ impl TerraphimService {
                         role_name
                     );
                 }
+                self.save_source_hash_for_role(role_name).await;
             }
 
             result
+        }
+    }
+
+    /// Get the local knowledge graph path for a role, if configured.
+    async fn get_kg_path_for_role(&self, role_name: &RoleName) -> Option<std::path::PathBuf> {
+        let config = self.config_state.config.lock().await;
+        let role = config.roles.get(role_name)?;
+        let kg = role.kg.as_ref()?;
+        let kg_local = kg.knowledge_graph_local.as_ref()?;
+        Some(kg_local.path.clone())
+    }
+
+    /// Check if the source hash has changed and invalidate the cache if needed.
+    ///
+    /// This is called automatically by `ensure_thesaurus_loaded()` before loading
+    /// from cache. If the hash has changed, the persistent cache and in-process
+    /// rolegraph are cleared, forcing a rebuild on the next load.
+    async fn check_and_invalidate_thesaurus_cache(&mut self, role_name: &RoleName) {
+        let Some(kg_path) = self.get_kg_path_for_role(role_name).await else {
+            // Role has no local KG path — skip hash check
+            return;
+        };
+
+        // Compute current source hash
+        let current_hash = match terraphim_automata::hash::hash_kg_dir(&kg_path) {
+            Ok(hash) => hash,
+            Err(e) => {
+                log::warn!(
+                    "Failed to compute source hash for role '{}': {:?}",
+                    role_name,
+                    e
+                );
+                return;
+            }
+        };
+
+        // Load cached hash
+        match terraphim_persistence::hash_store::load_source_hash(role_name.as_lowercase()).await {
+            Ok(Some(cached_hash)) => {
+                if cached_hash == current_hash {
+                    log::debug!("Source hash matches for role '{}' — using cache", role_name);
+                } else {
+                    log::info!(
+                        "Source hash mismatch for role '{}' (cached: {}, current: {}) — invalidating cache",
+                        role_name,
+                        cached_hash,
+                        current_hash
+                    );
+                    if let Err(e) = self.invalidate_thesaurus_cache(role_name).await {
+                        log::warn!(
+                            "Failed to invalidate thesaurus cache for role '{}': {:?}",
+                            role_name,
+                            e
+                        );
+                    }
+                }
+            }
+            Ok(None) => {
+                log::debug!(
+                    "No cached hash for role '{}' — will save after build",
+                    role_name
+                );
+            }
+            Err(e) => {
+                log::warn!(
+                    "Failed to load source hash for role '{}': {:?}",
+                    role_name,
+                    e
+                );
+            }
+        }
+    }
+
+    /// Invalidate the thesaurus cache for a role, forcing rebuild on next load.
+    ///
+    /// This deletes both the thesaurus JSON and the source hash from the
+    /// persistent cache, clears the in-process memoization, and removes the
+    /// rolegraph from config_state.
+    pub async fn invalidate_thesaurus_cache(&mut self, role_name: &RoleName) -> Result<()> {
+        // 1. Delete persistent cache entries
+        let thesaurus = Thesaurus::new(role_name.as_lowercase().to_string());
+        let key = thesaurus.get_key();
+
+        let storage = terraphim_persistence::DeviceStorage::instance()
+            .await
+            .map_err(ServiceError::Persistence)?;
+
+        if let Err(e) = storage.fastest_op.delete(&key).await {
+            log::debug!("Failed to delete thesaurus cache '{}': {}", key, e);
+        }
+
+        terraphim_persistence::hash_store::delete_source_hash(role_name.as_lowercase())
+            .await
+            .map_err(ServiceError::Persistence)?;
+
+        // 2. Clear in-process memoization
+        terraphim_automata::clear_cached_index();
+
+        // 3. Remove from config_state roles (forces rebuild)
+        self.config_state.roles.remove(role_name);
+
+        log::info!("Invalidated thesaurus cache for role '{}'", role_name);
+        Ok(())
+    }
+
+    /// Flush (invalidate) thesaurus cache for one or all roles.
+    pub async fn flush_thesaurus_cache(&mut self, role_name: Option<&RoleName>) -> Result<usize> {
+        let mut count = 0;
+
+        if let Some(role) = role_name {
+            self.invalidate_thesaurus_cache(role).await?;
+            count = 1;
+        } else {
+            // Get all role names first to avoid borrow issues
+            let roles: Vec<RoleName> = self.config_state.roles.keys().cloned().collect();
+            for role in roles {
+                self.invalidate_thesaurus_cache(&role).await?;
+                count += 1;
+            }
+        }
+
+        log::info!("Flushed thesaurus cache for {} role(s)", count);
+        Ok(count)
+    }
+
+    /// Save the source hash for a role after successful thesaurus load/build.
+    async fn save_source_hash_for_role(&self, role_name: &RoleName) {
+        if let Some(kg_path) = self.get_kg_path_for_role(role_name).await {
+            match terraphim_automata::hash::hash_kg_dir(&kg_path) {
+                Ok(hash) => {
+                    if let Err(e) = terraphim_persistence::hash_store::save_source_hash(
+                        role_name.as_lowercase(),
+                        &hash,
+                    )
+                    .await
+                    {
+                        log::warn!(
+                            "Failed to save source hash for role '{}': {:?}",
+                            role_name,
+                            e
+                        );
+                    }
+                }
+                Err(e) => {
+                    log::warn!(
+                        "Failed to compute source hash for role '{}': {:?}",
+                        role_name,
+                        e
+                    );
+                }
+            }
         }
     }
 

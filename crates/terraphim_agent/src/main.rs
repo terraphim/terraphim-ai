@@ -889,6 +889,22 @@ enum Command {
         #[arg(long)]
         config: Option<String>,
     },
+
+    /// Manage the compiled thesaurus cache
+    Cache {
+        #[command(subcommand)]
+        sub: CacheSub,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum CacheSub {
+    /// Flush the compiled thesaurus cache
+    Flush {
+        /// Role to flush (flushes all roles if omitted)
+        #[arg(long)]
+        role: Option<String>,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -2710,6 +2726,7 @@ async fn run_offline_command(
             }
             Ok(())
         }
+        Command::Cache { sub } => run_cache_command(sub).await,
         Command::Interactive => {
             unreachable!("Interactive mode should be handled above")
         }
@@ -2717,6 +2734,18 @@ async fn run_offline_command(
         #[cfg(feature = "repl")]
         Command::Repl { .. } => {
             unreachable!("REPL mode should be handled above")
+        }
+    }
+}
+
+async fn run_cache_command(sub: CacheSub) -> Result<()> {
+    let service = TuiService::new(None).await?;
+    match sub {
+        CacheSub::Flush { role } => {
+            let role_name = role.map(RoleName::from);
+            let count = service.flush_cache(role_name.as_ref()).await?;
+            println!("Flushed cache for {} role(s)", count);
+            Ok(())
         }
     }
 }
@@ -4435,6 +4464,7 @@ async fn run_server_command(
             eprintln!("The listener runs in offline mode only.");
             std::process::exit(1);
         }
+        Command::Cache { sub } => run_cache_command(sub).await,
     }
 }
 

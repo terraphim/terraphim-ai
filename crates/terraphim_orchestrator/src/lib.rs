@@ -1816,17 +1816,69 @@ impl AgentOrchestrator {
             diff_loc,
         };
 
-        // Look up the pr-reviewer agent for this project. Before Step E this
-        // will be missing; log-and-skip so the dispatcher keeps draining.
-        let def = match pr_dispatch::find_pr_reviewer(&self.config, &project) {
+        // ADF Phase 2 (issue #944): fan-out over the configured
+        // `agents_on_pr_open` list. Each entry is gated independently
+        // (subscription allow-list + per-agent monthly budget). Only
+        // entries that successfully spawn get a `pending` commit status
+        // — a `pending` from a skipped agent would block the PR forever.
+        // When `[pr_dispatch]` is absent the legacy default ships a single
+        // pr-reviewer entry, preserving pre-Phase-2 behaviour.
+        let entries = self.config.agents_on_pr_open();
+        for entry in entries {
+            let spawned = match entry.name.as_str() {
+                "build-runner" => self.dispatch_build_runner_for_pr(&req).await?,
+                _ => self.dispatch_pr_reviewer_for_pr(&req, &entry.name).await?,
+            };
+            if spawned {
+                self.post_pending_status(
+                    &head_sha,
+                    pr_number,
+                    &project,
+                    &entry.context,
+                    &format!("{} dispatched", entry.name),
+                )
+                .await;
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Phase 2 helper: spawn the LLM-style PR review agent (`pr-reviewer`
+    /// or any future fan-out entry that runs through the routing engine).
+    ///
+    /// Returns `Ok(true)` when the agent was spawned and is now in
+    /// `active_agents`; `Ok(false)` when it was gated out (no agent
+    /// configured for the project, banned static or routed model, or
+    /// budget exhausted). The caller posts a `pending` commit status only
+    /// when this returns `true`.
+    async fn dispatch_pr_reviewer_for_pr(
+        &mut self,
+        req: &pr_dispatch::ReviewPrRequest,
+        agent_name: &str,
+    ) -> Result<bool, OrchestratorError> {
+        let pr_number = req.pr_number;
+        let project = req.project.clone();
+        let head_sha = req.head_sha.clone();
+
+        // Look up the agent for this project. Missing entries in the
+        // fan-out list must skip silently (no `pending` posted) — a
+        // hung pending would block the PR forever.
+        let def = match self
+            .config
+            .agents
+            .iter()
+            .find(|a| a.name == agent_name && a.project.as_deref() == Some(project.as_str()))
+        {
             Some(d) => d.clone(),
             None => {
                 warn!(
                     pr_number,
                     project = %project,
-                    "ReviewPr skipped: no pr-reviewer agent configured for project"
+                    agent = %agent_name,
+                    "ReviewPr skipped: no agent configured for project"
                 );
-                return Ok(());
+                return Ok(false);
             }
         };
 
@@ -1845,7 +1897,7 @@ impl AgentOrchestrator {
                     model = %static_model,
                     "ReviewPr skipped: static model rejected by subscription allow-list"
                 );
-                return Ok(());
+                return Ok(false);
             }
         }
 
@@ -1857,15 +1909,15 @@ impl AgentOrchestrator {
                 pr_number,
                 project = %project,
                 verdict = %budget_verdict,
-                "ReviewPr skipped: pr-reviewer monthly budget exhausted"
+                "ReviewPr skipped: monthly budget exhausted"
             );
-            return Ok(());
+            return Ok(false);
         }
 
         // === ROUTING ===
         // Build a DispatchContext off the per-PR task string so KG/keyword
         // routing can pick a model based on "review" keywords and PR shape.
-        let task_string = pr_dispatch::build_review_task(&req);
+        let task_string = pr_dispatch::build_review_task(req);
         let kg_arc = self
             .kg_router
             .as_ref()
@@ -1915,7 +1967,7 @@ impl AgentOrchestrator {
                 model = %routed_model,
                 "ReviewPr skipped: routed model rejected by subscription allow-list"
             );
-            return Ok(());
+            return Ok(false);
         }
 
         // === SPAWN ===
@@ -1971,7 +2023,7 @@ impl AgentOrchestrator {
 
         let base_ctx =
             build_spawn_context_for_agent(&self.config, &def, self.output_poster.as_ref());
-        let spawn_ctx = pr_dispatch::layer_pr_env(base_ctx, &req);
+        let spawn_ctx = pr_dispatch::layer_pr_env(base_ctx, req);
 
         let handle = self
             .spawner
@@ -2016,7 +2068,439 @@ impl AgentOrchestrator {
             pr_number,
             project = %project,
             head_sha = %head_sha,
-            "ReviewPr spawned pr-reviewer"
+            "ReviewPr spawned LLM review agent"
+        );
+
+        Ok(true)
+    }
+
+    /// Phase 2 helper: spawn the deterministic `build-runner` agent on a
+    /// `pull_request.opened` event. Mirrors `handle_push`'s spawn pipeline
+    /// but injects PR-shaped `ADF_PUSH_*` env (using
+    /// `refs/pull/<n>/head` as the synthetic ref) so the same bash task
+    /// script handles both push events and PR opens.
+    ///
+    /// Skips the routing engine — `build-runner` is bash-only (no LLM, no
+    /// model) so a routing decision would invite a false-positive
+    /// banned-provider check on an unset `def.model`. Logs a synthetic
+    /// `model = "n/a"` row for parity with the LLM path.
+    ///
+    /// Returns `Ok(true)` on successful spawn (caller posts pending);
+    /// `Ok(false)` when gated out.
+    async fn dispatch_build_runner_for_pr(
+        &mut self,
+        req: &pr_dispatch::ReviewPrRequest,
+    ) -> Result<bool, OrchestratorError> {
+        let pr_number = req.pr_number;
+        let project = req.project.clone();
+        let head_sha = req.head_sha.clone();
+
+        // Look up the build-runner agent for this project. Missing must
+        // skip silently — no `pending` posted by the caller.
+        let def =
+            match self.config.agents.iter().find(|a| {
+                a.name == "build-runner" && a.project.as_deref() == Some(project.as_str())
+            }) {
+                Some(d) => d.clone(),
+                None => {
+                    warn!(
+                        pr_number,
+                        project = %project,
+                        "ReviewPr skipped: no build-runner agent configured for project"
+                    );
+                    return Ok(false);
+                }
+            };
+
+        // === STATIC ALLOW-LIST GATE ===
+        // build-runner is bash-only (no LLM), so def.model is normally None
+        // and this gate is a no-op. The check is retained for defence in
+        // depth so a future config that mis-sets `model` cannot bypass C1/C3.
+        if let Some(static_model) = def.model.as_deref() {
+            if !config::is_allowed_provider(static_model) {
+                warn!(
+                    agent = %def.name,
+                    pr_number,
+                    project = %project,
+                    model = %static_model,
+                    "ReviewPr skipped: build-runner static model rejected by subscription allow-list"
+                );
+                return Ok(false);
+            }
+        }
+
+        // === BUDGET GATE ===
+        let budget_verdict = self.cost_tracker.check(&def.name);
+        if budget_verdict.should_pause() {
+            warn!(
+                agent = %def.name,
+                pr_number,
+                project = %project,
+                verdict = %budget_verdict,
+                "ReviewPr skipped: build-runner monthly budget exhausted"
+            );
+            return Ok(false);
+        }
+
+        // === ROUTING DECISION (observability only) ===
+        // build-runner is bash; mirror handle_push's synthetic log row so
+        // dashboards see one entry per dispatch. No call to decide_route —
+        // an LLM router on an unset model would surface false positives.
+        info!(
+            agent = %def.name,
+            pr_number,
+            project = %project,
+            model = "n/a",
+            cost_estimate_cents = 0,
+            rationale = "deterministic build-runner (no LLM)",
+            "ReviewPr routing decision"
+        );
+
+        // === SPAWN ===
+        let primary_provider = terraphim_types::capability::Provider {
+            id: def.name.clone(),
+            name: def.name.clone(),
+            provider_type: terraphim_types::capability::ProviderType::Agent {
+                agent_id: def.name.clone(),
+                cli_command: def.cli_tool.clone(),
+                working_dir: self.config.working_dir_for_agent(&def),
+            },
+            capabilities: vec![],
+            cost_level: terraphim_types::capability::CostLevel::Cheap,
+            latency: terraphim_types::capability::Latency::Medium,
+            keywords: def.capabilities.clone(),
+        };
+
+        let task_string = format!(
+            "Build/test verdict for PR #{} (head={}, {} LOC, project={}, author={})",
+            pr_number, head_sha, req.diff_loc, project, req.author_login,
+        );
+
+        let mut request = SpawnRequest::new(primary_provider, &task_string);
+
+        let mut limits = ResourceLimits::default();
+        if let Some(max_cpu) = def.max_cpu_seconds {
+            limits.max_cpu_seconds = Some(max_cpu);
+        }
+        if let Some(max_mem) = def.max_memory_bytes {
+            limits.max_memory_bytes = Some(max_mem);
+        }
+        request = request.with_resource_limits(limits);
+
+        // Layer ADF_PUSH_* env on top of the per-agent base context.
+        // The ref is synthesised as `refs/pull/<n>/head` so the task
+        // script can `git fetch origin <ref> && git checkout <sha>`
+        // identically to a push-event dispatch. `ADF_PUSH_BEFORE_SHA`
+        // is empty because the ReviewPr dispatch task does not carry
+        // the PR base SHA — the build-runner script only requires
+        // `ADF_PUSH_SHA` and `ADF_PUSH_REF`.
+        let mut spawn_ctx =
+            build_spawn_context_for_agent(&self.config, &def, self.output_poster.as_ref());
+        spawn_ctx = spawn_ctx
+            .with_env("ADF_PUSH_SHA", head_sha.clone())
+            .with_env("ADF_PUSH_REF", format!("refs/pull/{}/head", pr_number))
+            .with_env("ADF_PUSH_PROJECT", project.clone())
+            .with_env("ADF_PUSH_BEFORE_SHA", String::new())
+            .with_env("ADF_PUSH_PUSHER", req.author_login.clone())
+            .with_env("ADF_PUSH_FILES", String::new());
+
+        let handle = self
+            .spawner
+            .spawn_with_fallback(&request, spawn_ctx)
+            .await
+            .map_err(|e| OrchestratorError::SpawnFailed {
+                agent: def.name.clone(),
+                reason: e.to_string(),
+            })?;
+
+        let output_rx = handle.subscribe_output();
+        let restart_count = self
+            .restart_counts
+            .get(&agent_key(&def))
+            .copied()
+            .unwrap_or(0);
+
+        self.active_agents.insert(
+            def.name.clone(),
+            ManagedAgent {
+                definition: def.clone(),
+                handle,
+                started_at: Instant::now(),
+                restart_count,
+                output_rx,
+                spawned_by_mention: false,
+                worktree_path: None,
+                routed_model: None,
+                session_id: format!("{}-{}", def.name, ulid::Ulid::new()),
+                mention_chain_id: None,
+                mention_depth: None,
+                mention_parent_agent: None,
+            },
+        );
+
+        info!(
+            agent = %def.name,
+            pr_number,
+            project = %project,
+            head_sha = %head_sha,
+            "ReviewPr spawned build-runner"
+        );
+
+        Ok(true)
+    }
+
+    /// Post a `pending` commit status for the given `context` against the
+    /// PR head SHA.
+    ///
+    /// Generalised from Phase 1's `post_pr_reviewer_pending_status` so the
+    /// Phase 2 PR-fan-out path can post one pending per dispatched agent
+    /// (one row per `agents_on_pr_open` entry that successfully spawned).
+    ///
+    /// Best-effort: when the workflow tracker isn't configured (e.g. in
+    /// unit tests) or the API call fails we log and return without
+    /// surfacing the error. The agent itself owns the final state
+    /// transition (success / failure / error).
+    async fn post_pending_status(
+        &mut self,
+        head_sha: &str,
+        pr_number: u64,
+        project: &str,
+        context: &str,
+        description: &str,
+    ) {
+        let tracker = match self.get_or_init_pre_check_tracker() {
+            Some(t) => t,
+            None => {
+                debug!(
+                    pr_number,
+                    project,
+                    context,
+                    "ReviewPr: no workflow tracker configured; skipping pending status"
+                );
+                return;
+            }
+        };
+        let owner = tracker.owner().to_string();
+        let repo = tracker.repo().to_string();
+        let result = tracker
+            .set_commit_status(
+                &owner,
+                &repo,
+                head_sha,
+                terraphim_tracker::StatusState::Pending,
+                context,
+                description,
+                None,
+            )
+            .await;
+        match result {
+            Ok(()) => {
+                info!(
+                    pr_number,
+                    project, head_sha, context, "ReviewPr: posted pending status"
+                );
+            }
+            Err(e) => {
+                warn!(
+                    error = %e,
+                    pr_number,
+                    project,
+                    head_sha,
+                    context,
+                    "ReviewPr: failed to post pending status"
+                );
+            }
+        }
+    }
+
+    /// Handle a `DispatchTask::Push` dispatch (Phase 3 — ADF replaces Gitea
+    /// Actions): look up the project's `build-runner` agent, gate on the
+    /// subscription allow-list and monthly budget, log a routing decision row
+    /// for observability (even though `build-runner` is bash, not LLM), then
+    /// spawn it with `ADF_PUSH_*` env injection so the bash task can shell
+    /// out to `rch exec` for the deterministic cargo gates.
+    ///
+    /// The handler is a no-op (with warn log) when no `build-runner` agent is
+    /// configured for the project — repos without build-runner must not break
+    /// the orchestrator drain loop.
+    pub(crate) async fn handle_push(
+        &mut self,
+        task: dispatcher::DispatchTask,
+    ) -> Result<(), OrchestratorError> {
+        let (project, ref_name, before_sha, after_sha, pusher_login, files_changed) = match task {
+            dispatcher::DispatchTask::Push {
+                project,
+                ref_name,
+                before_sha,
+                after_sha,
+                pusher_login,
+                files_changed,
+            } => (
+                project,
+                ref_name,
+                before_sha,
+                after_sha,
+                pusher_login,
+                files_changed,
+            ),
+            other => {
+                warn!(task = ?other, "handle_push invoked with non-Push task; ignoring");
+                return Ok(());
+            }
+        };
+
+        // Look up the build-runner agent for this project. Repos without
+        // build-runner shouldn't break the orchestrator -- log and skip.
+        let def =
+            match self.config.agents.iter().find(|a| {
+                a.name == "build-runner" && a.project.as_deref() == Some(project.as_str())
+            }) {
+                Some(d) => d.clone(),
+                None => {
+                    warn!(
+                        project = %project,
+                        after_sha = %after_sha,
+                        "Push skipped: no build-runner agent configured for project"
+                    );
+                    return Ok(());
+                }
+            };
+
+        // === STATIC ALLOW-LIST GATE ===
+        // build-runner is bash-only (no LLM), so def.model is normally None
+        // and this gate is a no-op. The check is retained for defence in
+        // depth so a future config that mis-sets `model` cannot bypass C1/C3.
+        if let Some(static_model) = def.model.as_deref() {
+            if !config::is_allowed_provider(static_model) {
+                warn!(
+                    agent = %def.name,
+                    project = %project,
+                    model = %static_model,
+                    "Push skipped: static model rejected by subscription allow-list"
+                );
+                return Ok(());
+            }
+        }
+
+        // === BUDGET GATE ===
+        // build-runner has no LLM cost but the budget tracker still records
+        // its dispatches; pause if the operator deliberately capped it.
+        let budget_verdict = self.cost_tracker.check(&def.name);
+        if budget_verdict.should_pause() {
+            warn!(
+                agent = %def.name,
+                project = %project,
+                verdict = %budget_verdict,
+                "Push skipped: build-runner monthly budget exhausted"
+            );
+            return Ok(());
+        }
+
+        // === ROUTING DECISION (observability only) ===
+        // Even though build-runner is bash, we still log a routing decision
+        // row so the dashboard sees one entry per dispatch. Cost is 0 because
+        // there is no LLM, and the model column reads "n/a".
+        info!(
+            agent = %def.name,
+            project = %project,
+            ref_name = %ref_name,
+            after_sha = %after_sha,
+            model = "n/a",
+            cost_estimate_cents = 0,
+            rationale = "deterministic build-runner (no LLM)",
+            "Push routing decision"
+        );
+
+        // === SPAWN ===
+        // build-runner is a plain bash agent: cli_tool from the def, no
+        // primary model, no fallback model. Mirror the SpawnRequest shape
+        // used by handle_review_pr but skip the LLM-specific overrides.
+        let primary_provider = terraphim_types::capability::Provider {
+            id: def.name.clone(),
+            name: def.name.clone(),
+            provider_type: terraphim_types::capability::ProviderType::Agent {
+                agent_id: def.name.clone(),
+                cli_command: def.cli_tool.clone(),
+                working_dir: self.config.working_dir_for_agent(&def),
+            },
+            capabilities: vec![],
+            cost_level: terraphim_types::capability::CostLevel::Cheap,
+            latency: terraphim_types::capability::Latency::Medium,
+            keywords: def.capabilities.clone(),
+        };
+
+        let task_string = format!(
+            "Build/test verdict for push to {} ({} → {}, {} files changed) on project={}, pushed by {}",
+            ref_name,
+            before_sha,
+            after_sha,
+            files_changed.len(),
+            project,
+            pusher_login,
+        );
+
+        let mut request = SpawnRequest::new(primary_provider, &task_string);
+
+        let mut limits = ResourceLimits::default();
+        if let Some(max_cpu) = def.max_cpu_seconds {
+            limits.max_cpu_seconds = Some(max_cpu);
+        }
+        if let Some(max_mem) = def.max_memory_bytes {
+            limits.max_memory_bytes = Some(max_mem);
+        }
+        request = request.with_resource_limits(limits);
+
+        // Layer the ADF_PUSH_* env on top of the per-agent base context.
+        let mut spawn_ctx =
+            build_spawn_context_for_agent(&self.config, &def, self.output_poster.as_ref());
+        spawn_ctx = spawn_ctx
+            .with_env("ADF_PUSH_SHA", after_sha.clone())
+            .with_env("ADF_PUSH_REF", ref_name.clone())
+            .with_env("ADF_PUSH_PROJECT", project.clone())
+            .with_env("ADF_PUSH_BEFORE_SHA", before_sha.clone())
+            .with_env("ADF_PUSH_PUSHER", pusher_login.clone())
+            .with_env("ADF_PUSH_FILES", files_changed.join("\n"));
+
+        let handle = self
+            .spawner
+            .spawn_with_fallback(&request, spawn_ctx)
+            .await
+            .map_err(|e| OrchestratorError::SpawnFailed {
+                agent: def.name.clone(),
+                reason: e.to_string(),
+            })?;
+
+        let output_rx = handle.subscribe_output();
+        let restart_count = self
+            .restart_counts
+            .get(&agent_key(&def))
+            .copied()
+            .unwrap_or(0);
+
+        self.active_agents.insert(
+            def.name.clone(),
+            ManagedAgent {
+                definition: def.clone(),
+                handle,
+                started_at: Instant::now(),
+                restart_count,
+                output_rx,
+                spawned_by_mention: false,
+                worktree_path: None,
+                routed_model: None,
+                session_id: format!("{}-{}", def.name, ulid::Ulid::new()),
+                mention_chain_id: None,
+                mention_depth: None,
+                mention_parent_agent: None,
+            },
+        );
+
+        info!(
+            agent = %def.name,
+            project = %project,
+            ref_name = %ref_name,
+            after_sha = %after_sha,
+            "Push spawned build-runner"
         );
 
         Ok(())
@@ -2556,6 +3040,31 @@ impl AgentOrchestrator {
                     author_login,
                     title,
                     diff_loc,
+                });
+            }
+            webhook::WebhookDispatch::Push {
+                project,
+                ref_name,
+                before_sha,
+                after_sha,
+                pusher_login,
+                files_changed,
+            } => {
+                info!(
+                    project = %project,
+                    ref_name = %ref_name,
+                    after_sha = %after_sha,
+                    pusher = %pusher_login,
+                    files = files_changed.len(),
+                    "webhook: enqueuing Push dispatch task"
+                );
+                self.dispatcher.enqueue(dispatcher::DispatchTask::Push {
+                    project,
+                    ref_name,
+                    before_sha,
+                    after_sha,
+                    pusher_login,
+                    files_changed,
                 });
             }
         }
@@ -4569,6 +5078,11 @@ impl AgentOrchestrator {
                         tracing::error!(error = ?e, "handle_post_merge_test_gate failed");
                     }
                 }
+                task @ DispatchTask::Push { .. } => {
+                    if let Err(e) = self.handle_push(task).await {
+                        warn!(error = %e, "handle_push failed");
+                    }
+                }
             }
         }
 
@@ -6112,6 +6626,7 @@ mod tests {
             fleet_escalation_repo: None,
             post_merge_gate: None,
             learning: config::LearningConfig::default(),
+            pr_dispatch: None,
         }
     }
 
@@ -6344,6 +6859,7 @@ task = "test"
             fleet_escalation_repo: None,
             post_merge_gate: None,
             learning: config::LearningConfig::default(),
+            pr_dispatch: None,
         }
     }
 
@@ -7181,6 +7697,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             fleet_escalation_repo: None,
             post_merge_gate: None,
             learning: config::LearningConfig::default(),
+            pr_dispatch: None,
         };
         (config, tmp)
     }
@@ -7218,6 +7735,99 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             "session id should be scoped to the agent, got: {}",
             managed.session_id
         );
+    }
+
+    /// When a workflow tracker is configured, `handle_review_pr` must POST
+    /// a `pending` commit status with context `adf/pr-reviewer` for the
+    /// PR head SHA after spawning. Verifies issue #928 (ADF Phase 1).
+    #[tokio::test]
+    async fn reviewpr_dispatch_posts_pending_status_when_tracker_configured() {
+        use axum::{
+            extract::{Path, State},
+            http::StatusCode,
+            response::IntoResponse,
+            routing::post,
+            Router,
+        };
+        use std::sync::atomic::{AtomicUsize, Ordering as AOrdering};
+        use std::sync::Arc;
+        use tokio::net::TcpListener;
+
+        #[derive(Default)]
+        struct Captured {
+            calls: AtomicUsize,
+            last_path: std::sync::Mutex<Option<String>>,
+            last_body: std::sync::Mutex<Option<serde_json::Value>>,
+        }
+
+        async fn capture(
+            Path((owner, repo, sha)): Path<(String, String, String)>,
+            State(captured): State<Arc<Captured>>,
+            body: axum::body::Bytes,
+        ) -> impl IntoResponse {
+            captured.calls.fetch_add(1, AOrdering::SeqCst);
+            *captured.last_path.lock().unwrap() =
+                Some(format!("/api/v1/repos/{}/{}/statuses/{}", owner, repo, sha));
+            if let Ok(parsed) = serde_json::from_slice::<serde_json::Value>(&body) {
+                *captured.last_body.lock().unwrap() = Some(parsed);
+            }
+            StatusCode::CREATED
+        }
+
+        let captured = Arc::new(Captured::default());
+        let app = Router::new()
+            .route("/api/v1/repos/{owner}/{repo}/statuses/{sha}", post(capture))
+            .with_state(captured.clone());
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            axum::serve(listener, app).await.ok();
+        });
+        let base_url = format!("http://{}", addr);
+
+        // Build the standard review-pr config and bolt on a workflow that
+        // points at the loopback Gitea endpoint above. Tests with no
+        // workflow already cover the silent skip-path (other reviewpr_*).
+        let (mut config, _tmp) = review_pr_config("echo");
+        config.workflow = Some(crate::config::WorkflowConfig {
+            enabled: true,
+            poll_interval_secs: 60,
+            workflow_file: std::path::PathBuf::from("/tmp/workflow.md"),
+            tracker: crate::config::TrackerConfig {
+                kind: "gitea".to_string(),
+                endpoint: base_url.clone(),
+                api_key: "test-token".to_string(),
+                owner: "fakeowner".to_string(),
+                repo: "fakerepo".to_string(),
+                project_slug: None,
+                use_robot_api: false,
+                states: crate::config::TrackerStates::default(),
+            },
+            concurrency: crate::config::ConcurrencyConfig::default(),
+        });
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        orch.handle_review_pr(review_pr_task()).await.unwrap();
+
+        // Allow the loopback server to receive the POST.
+        for _ in 0..50 {
+            if captured.calls.load(AOrdering::SeqCst) > 0 {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        assert_eq!(
+            captured.calls.load(AOrdering::SeqCst),
+            1,
+            "exactly one pending status post expected"
+        );
+        assert_eq!(
+            captured.last_path.lock().unwrap().as_deref(),
+            Some("/api/v1/repos/fakeowner/fakerepo/statuses/deadbeef1234")
+        );
+        let body = captured.last_body.lock().unwrap().clone().unwrap();
+        assert_eq!(body["state"], "pending");
+        assert_eq!(body["context"], "adf/pr-reviewer");
     }
 
     /// A banned provider configured on the pr-reviewer agent must be
@@ -7299,6 +7909,372 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
         assert!(
             dump.contains("ADF_PR_TITLE=fix(kg): short synonyms"),
             "ADF_PR_TITLE missing from dump:\n{dump}"
+        );
+    }
+
+    /// Helper: extend a `review_pr_config` setup with a project-scoped
+    /// `build-runner` agent and a Phase 2 D2 `[pr_dispatch]` block listing
+    /// both agents. Used by the fan-out tests below.
+    fn review_pr_config_with_fanout(cli_tool: &str) -> (OrchestratorConfig, TempDir) {
+        let (mut config, tmp) = review_pr_config(cli_tool);
+        config.agents.push(AgentDefinition {
+            name: "build-runner".to_string(),
+            layer: AgentLayer::Growth,
+            cli_tool: cli_tool.to_string(),
+            task: "build".to_string(),
+            model: None,
+            schedule: None,
+            capabilities: vec!["build".to_string()],
+            max_memory_bytes: None,
+            budget_monthly_cents: None,
+            provider: None,
+            persona: None,
+            terraphim_role: None,
+            skill_chain: vec![],
+            sfia_skills: vec![],
+            fallback_provider: None,
+            fallback_model: None,
+            grace_period_secs: None,
+            max_cpu_seconds: None,
+            pre_check: None,
+            gitea_issue: None,
+            project: Some("alpha".to_string()),
+        });
+        config.pr_dispatch = Some(crate::config::PrDispatchConfig {
+            agents_on_pr_open: vec![
+                crate::config::PrDispatchEntry {
+                    name: "build-runner".to_string(),
+                    context: "adf/build".to_string(),
+                },
+                crate::config::PrDispatchEntry {
+                    name: "pr-reviewer".to_string(),
+                    context: "adf/pr-reviewer".to_string(),
+                },
+            ],
+        });
+        (config, tmp)
+    }
+
+    /// ADF Phase 2 (issue #944): a `pull_request.opened` event with both
+    /// `build-runner` and `pr-reviewer` in `agents_on_pr_open` must spawn
+    /// both agents. Each receives the appropriate env injection: build-runner
+    /// gets `ADF_PUSH_*` (mirroring `handle_push`); pr-reviewer keeps the
+    /// existing `ADF_PR_*` keys.
+    #[tokio::test]
+    async fn handle_review_pr_spawns_both_build_runner_and_pr_reviewer() {
+        let (config, _tmp) = review_pr_config_with_fanout("echo");
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        orch.handle_review_pr(review_pr_task()).await.unwrap();
+
+        assert!(
+            orch.active_agents.contains_key("pr-reviewer"),
+            "pr-reviewer must be spawned; active_agents: {:?}",
+            orch.active_agents.keys().collect::<Vec<_>>()
+        );
+        assert!(
+            orch.active_agents.contains_key("build-runner"),
+            "build-runner must be spawned; active_agents: {:?}",
+            orch.active_agents.keys().collect::<Vec<_>>()
+        );
+    }
+
+    /// The per-agent env injection must distinguish the two agents:
+    /// build-runner sees `ADF_PUSH_*` (with `ref_name = refs/pull/<n>/head`),
+    /// pr-reviewer sees `ADF_PR_*`. Verified by writing a tiny script that
+    /// dumps env to a file and reading the artefacts back.
+    #[tokio::test]
+    async fn handle_review_pr_injects_per_agent_env_correctly() {
+        let tmp = TempDir::new().unwrap();
+        let pr_dump = tmp.path().join("pr.env");
+        let push_dump = tmp.path().join("push.env");
+        // Single shell script that picks which dump to write based on which
+        // env vars are present. Avoids needing two separate cli_tools.
+        let script_path = tmp.path().join("dump-env.sh");
+        let script_body = format!(
+            "#!/bin/sh\nif [ -n \"$ADF_PUSH_SHA\" ]; then env | grep '^ADF_PUSH_' > {}\nelse env | grep '^ADF_PR_' > {}\nfi\n",
+            push_dump.display(),
+            pr_dump.display(),
+        );
+        std::fs::write(&script_path, script_body).unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = std::fs::metadata(&script_path).unwrap().permissions();
+            perms.set_mode(0o755);
+            std::fs::set_permissions(&script_path, perms).unwrap();
+        }
+
+        let (config, _cfg_tmp) = review_pr_config_with_fanout(script_path.to_str().unwrap());
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+        orch.handle_review_pr(review_pr_task()).await.unwrap();
+
+        for _ in 0..40 {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+            orch.poll_agent_exits().await;
+            if pr_dump.exists() && push_dump.exists() {
+                break;
+            }
+        }
+
+        let pr = std::fs::read_to_string(&pr_dump).unwrap_or_default();
+        let push = std::fs::read_to_string(&push_dump).unwrap_or_default();
+        assert!(
+            pr.contains("ADF_PR_NUMBER=641"),
+            "pr-reviewer env missing ADF_PR_NUMBER:\n{pr}"
+        );
+        assert!(
+            push.contains("ADF_PUSH_SHA=deadbeef1234"),
+            "build-runner env missing ADF_PUSH_SHA=deadbeef1234:\n{push}"
+        );
+        assert!(
+            push.contains("ADF_PUSH_REF=refs/pull/641/head"),
+            "build-runner env missing ADF_PUSH_REF=refs/pull/641/head:\n{push}"
+        );
+        assert!(
+            push.contains("ADF_PUSH_PROJECT=alpha"),
+            "build-runner env missing ADF_PUSH_PROJECT=alpha:\n{push}"
+        );
+    }
+
+    /// When `agents_on_pr_open` references an agent that isn't configured
+    /// for the project, the orchestrator must skip it gracefully without
+    /// panicking and without posting a `pending` status that would never
+    /// resolve. The other entries still spawn.
+    #[tokio::test]
+    async fn handle_review_pr_skips_missing_agents() {
+        // Standard config has only pr-reviewer; bolt on a pr_dispatch list
+        // that ALSO references build-runner (which is absent).
+        let (mut config, _tmp) = review_pr_config("echo");
+        config.pr_dispatch = Some(crate::config::PrDispatchConfig {
+            agents_on_pr_open: vec![
+                crate::config::PrDispatchEntry {
+                    name: "build-runner".to_string(),
+                    context: "adf/build".to_string(),
+                },
+                crate::config::PrDispatchEntry {
+                    name: "pr-reviewer".to_string(),
+                    context: "adf/pr-reviewer".to_string(),
+                },
+            ],
+        });
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        orch.handle_review_pr(review_pr_task()).await.unwrap();
+
+        assert!(
+            orch.active_agents.contains_key("pr-reviewer"),
+            "pr-reviewer must still spawn even when build-runner is missing"
+        );
+        assert!(
+            !orch.active_agents.contains_key("build-runner"),
+            "build-runner must not be spawned when not configured"
+        );
+    }
+
+    /// When a workflow tracker is configured, each fan-out agent that spawns
+    /// must POST exactly one `pending` commit status with its configured
+    /// context. With both build-runner and pr-reviewer in the dispatch list,
+    /// the orchestrator must POST two distinct statuses.
+    #[tokio::test]
+    async fn handle_review_pr_pending_status_posted_per_agent() {
+        use axum::{
+            extract::{Path, State},
+            http::StatusCode,
+            response::IntoResponse,
+            routing::post,
+            Router,
+        };
+        use std::sync::atomic::{AtomicUsize, Ordering as AOrdering};
+        use std::sync::Arc;
+        use tokio::net::TcpListener;
+
+        #[derive(Default)]
+        struct Captured {
+            calls: AtomicUsize,
+            contexts: std::sync::Mutex<Vec<String>>,
+            states: std::sync::Mutex<Vec<String>>,
+        }
+
+        async fn capture(
+            Path((_owner, _repo, _sha)): Path<(String, String, String)>,
+            State(captured): State<Arc<Captured>>,
+            body: axum::body::Bytes,
+        ) -> impl IntoResponse {
+            captured.calls.fetch_add(1, AOrdering::SeqCst);
+            if let Ok(parsed) = serde_json::from_slice::<serde_json::Value>(&body) {
+                if let Some(ctx) = parsed.get("context").and_then(|v| v.as_str()) {
+                    captured.contexts.lock().unwrap().push(ctx.to_string());
+                }
+                if let Some(st) = parsed.get("state").and_then(|v| v.as_str()) {
+                    captured.states.lock().unwrap().push(st.to_string());
+                }
+            }
+            StatusCode::CREATED
+        }
+
+        let captured = Arc::new(Captured::default());
+        let app = Router::new()
+            .route("/api/v1/repos/{owner}/{repo}/statuses/{sha}", post(capture))
+            .with_state(captured.clone());
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            axum::serve(listener, app).await.ok();
+        });
+        let base_url = format!("http://{}", addr);
+
+        let (mut config, _tmp) = review_pr_config_with_fanout("echo");
+        config.workflow = Some(crate::config::WorkflowConfig {
+            enabled: true,
+            poll_interval_secs: 60,
+            workflow_file: std::path::PathBuf::from("/tmp/workflow.md"),
+            tracker: crate::config::TrackerConfig {
+                kind: "gitea".to_string(),
+                endpoint: base_url.clone(),
+                api_key: "test-token".to_string(),
+                owner: "fakeowner".to_string(),
+                repo: "fakerepo".to_string(),
+                project_slug: None,
+                use_robot_api: false,
+                states: crate::config::TrackerStates::default(),
+            },
+            concurrency: crate::config::ConcurrencyConfig::default(),
+        });
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        orch.handle_review_pr(review_pr_task()).await.unwrap();
+
+        // Wait for both POSTs.
+        for _ in 0..100 {
+            if captured.calls.load(AOrdering::SeqCst) >= 2 {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        assert_eq!(
+            captured.calls.load(AOrdering::SeqCst),
+            2,
+            "exactly two pending status posts expected (one per fan-out agent)"
+        );
+        let contexts = captured.contexts.lock().unwrap().clone();
+        assert!(
+            contexts.iter().any(|c| c == "adf/build"),
+            "adf/build pending status missing; got: {contexts:?}"
+        );
+        assert!(
+            contexts.iter().any(|c| c == "adf/pr-reviewer"),
+            "adf/pr-reviewer pending status missing; got: {contexts:?}"
+        );
+        let states = captured.states.lock().unwrap().clone();
+        assert!(
+            states.iter().all(|s| s == "pending"),
+            "all initial statuses must be pending; got: {states:?}"
+        );
+    }
+
+    /// When a fan-out agent is gated out (in this test: build-runner has a
+    /// banned static model so the C1/C3 subscription gate short-circuits its
+    /// spawn), the orchestrator must NOT post a `pending` status for that
+    /// agent. A `pending` that never resolves would block the PR forever.
+    /// The other agent still spawns and posts its own pending.
+    #[tokio::test]
+    async fn handle_review_pr_skipped_agent_does_not_post_pending() {
+        use axum::{
+            extract::{Path, State},
+            http::StatusCode,
+            response::IntoResponse,
+            routing::post,
+            Router,
+        };
+        use std::sync::atomic::{AtomicUsize, Ordering as AOrdering};
+        use std::sync::Arc;
+        use tokio::net::TcpListener;
+
+        #[derive(Default)]
+        struct Captured {
+            calls: AtomicUsize,
+            contexts: std::sync::Mutex<Vec<String>>,
+        }
+
+        async fn capture(
+            Path((_owner, _repo, _sha)): Path<(String, String, String)>,
+            State(captured): State<Arc<Captured>>,
+            body: axum::body::Bytes,
+        ) -> impl IntoResponse {
+            captured.calls.fetch_add(1, AOrdering::SeqCst);
+            if let Ok(parsed) = serde_json::from_slice::<serde_json::Value>(&body) {
+                if let Some(ctx) = parsed.get("context").and_then(|v| v.as_str()) {
+                    captured.contexts.lock().unwrap().push(ctx.to_string());
+                }
+            }
+            StatusCode::CREATED
+        }
+
+        let captured = Arc::new(Captured::default());
+        let app = Router::new()
+            .route("/api/v1/repos/{owner}/{repo}/statuses/{sha}", post(capture))
+            .with_state(captured.clone());
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            axum::serve(listener, app).await.ok();
+        });
+        let base_url = format!("http://{}", addr);
+
+        let (mut config, _tmp) = review_pr_config_with_fanout("echo");
+        // Stamp a banned model on build-runner AFTER load-time validation
+        // so the runtime allow-list gate is the one rejecting the spawn.
+        let br = config
+            .agents
+            .iter_mut()
+            .find(|a| a.name == "build-runner")
+            .unwrap();
+        br.model = Some("google/gemini-2".to_string());
+
+        config.workflow = Some(crate::config::WorkflowConfig {
+            enabled: true,
+            poll_interval_secs: 60,
+            workflow_file: std::path::PathBuf::from("/tmp/workflow.md"),
+            tracker: crate::config::TrackerConfig {
+                kind: "gitea".to_string(),
+                endpoint: base_url.clone(),
+                api_key: "test-token".to_string(),
+                owner: "fakeowner".to_string(),
+                repo: "fakerepo".to_string(),
+                project_slug: None,
+                use_robot_api: false,
+                states: crate::config::TrackerStates::default(),
+            },
+            concurrency: crate::config::ConcurrencyConfig::default(),
+        });
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        orch.handle_review_pr(review_pr_task()).await.unwrap();
+
+        // Allow time for the (single expected) POST to land — and any
+        // erroneous extra POST to also land if the bug is present.
+        for _ in 0..100 {
+            if captured.calls.load(AOrdering::SeqCst) >= 1 {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        // Give a small grace window for an erroneous adf/build POST to surface.
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        let contexts = captured.contexts.lock().unwrap().clone();
+        assert!(
+            contexts.iter().any(|c| c == "adf/pr-reviewer"),
+            "pr-reviewer must still post its pending status; got: {contexts:?}"
+        );
+        assert!(
+            !contexts.iter().any(|c| c == "adf/build"),
+            "skipped build-runner must NOT post adf/build pending; got: {contexts:?}"
+        );
+        assert!(
+            !orch.active_agents.contains_key("build-runner"),
+            "build-runner must not be in active_agents when subscription gate rejects"
         );
     }
 
