@@ -1,3 +1,5 @@
+//! Session analysis logic: aggregates parsed entries into per-agent statistics and attribution.
+
 use crate::models::{
     AgentAttribution, AgentInvocation, AgentStatistics, AgentToolCorrelation, AnalyzerConfig,
     CollaborationPattern, FileOperation, SessionAnalysis, ToolCategory, ToolInvocation,
@@ -11,6 +13,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use tracing::{debug, info};
 
+/// Analyses one or more session log files, attributing file operations to agents.
 pub struct Analyzer {
     parsers: Vec<SessionParser>,
     config: AnalyzerConfig,
@@ -936,12 +939,18 @@ impl SequenceData {
     }
 }
 
+/// Aggregate statistics across all analysed sessions.
 #[derive(Debug, Clone)]
 pub struct SummaryStats {
+    /// Total number of sessions analysed.
     pub total_sessions: usize,
+    /// Total number of distinct agent instances encountered.
     pub total_agents: usize,
+    /// Total number of file operations recorded.
     pub total_files: usize,
+    /// Count of unique agent type names.
     pub unique_agent_types: usize,
+    /// Top agents sorted by invocation count: `(name, count)`.
     pub most_active_agents: Vec<(String, u32)>,
 }
 

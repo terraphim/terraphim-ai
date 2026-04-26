@@ -1,3 +1,5 @@
+//! Domain model types for session log analysis: sessions, messages, agents, and tool invocations.
+
 use indexmap::IndexMap;
 use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
@@ -10,12 +12,14 @@ use std::str::FromStr;
 pub struct SessionId(String);
 
 impl SessionId {
+    /// Create a new `SessionId` from a string.
     #[must_use]
     #[allow(dead_code)]
     pub fn new(id: String) -> Self {
         Self(id)
     }
 
+    /// Return the inner string slice.
     #[must_use]
     #[allow(dead_code)]
     pub fn as_str(&self) -> &str {
@@ -41,16 +45,19 @@ impl From<&str> for SessionId {
     }
 }
 
+/// Newtype wrapper for agent type names (e.g. `"developer"`, `"rust-developer"`).
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct AgentType(String);
 
 impl AgentType {
+    /// Create a new `AgentType` from a string.
     #[must_use]
     #[allow(dead_code)]
     pub fn new(agent_type: String) -> Self {
         Self(agent_type)
     }
 
+    /// Return the inner string slice.
     #[must_use]
     #[allow(dead_code)]
     pub fn as_str(&self) -> &str {
@@ -76,16 +83,19 @@ impl From<&str> for AgentType {
     }
 }
 
+/// Newtype wrapper for message UUIDs within a session.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct MessageId(String);
 
 impl MessageId {
+    /// Create a new `MessageId` from a string.
     #[must_use]
     #[allow(dead_code)]
     pub fn new(id: String) -> Self {
         Self(id)
     }
 
+    /// Return the inner string slice.
     #[must_use]
     #[allow(dead_code)]
     pub fn as_str(&self) -> &str {
