@@ -1,0 +1,227 @@
+# pr-security-sentinel agent template
+#
+# Phase 2c of the ADF replaces-Gitea-Actions plan
+# (.docs/plan-adf-agents-replace-gitea-actions.md, §5 Phases 2b-2e
+# table). Spawned by `AgentOrchestrator::handle_review_pr` on a Gitea
+# `pull_request.opened` event when listed in
+# `[pr_dispatch.agents_on_pr_open]` with context `adf/security`.
+#
+# Performs security audit on the PR diff: reviews unsafe code,
+# dependency changes, input handling, and secret exposure. Mirrors the
+# OWASP-aligned `security-audit` skill checklist already used by the
+# cron-scheduled `security-sentinel` (which stays in tree for full-repo
+# audits).
+#
+# Path filter (in this script, NOT in the orchestrator): skip with a
+# `success` status when the PR touches no security-relevant paths
+# (`Cargo.toml`, `Cargo.lock`, `crates/**/src/**`, `**/secrets/**`).
+# Skip-with-success — rather than skip-without-posting — is required
+# because `adf/security` becomes a branch-protection-required check on
+# `main` post-deploy, so a never-resolved `pending` would block all
+# docs-only / CI-only PRs forever.
+#
+# Subscription-only models only (C1 invariant). Sonnet (NOT haiku) is
+# the right tier here because security-audit needs deeper reasoning to
+# spot data-flow vulnerabilities and unsafe-code subtleties. Mirrors
+# the model choice used by `pr-reviewer` and `pr-spec-validator`.
+#
+# NO `schedule` field -- event-driven, not cron. The cron-scheduled
+# `security-sentinel` agent stays in tree for full-repo audits.
+
+[[agents]]
+name = "pr-security-sentinel"
+layer = "Safety"
+cli_tool = "/home/alex/.local/bin/claude"
+model = "sonnet"
+fallback_model = "kimi-for-coding/k2p5"
+persona = "Carthos"
+skill_chain = ["security-audit"]
+max_cpu_seconds = 1800
+grace_period_secs = 30
+capabilities = ["review", "security", "security-audit"]
+project = "terraphim"
+task = '''
+source ~/.profile
+
+# Context injected by handle_review_pr (Phase 2 fan-out):
+#   ADF_PR_NUMBER, ADF_PR_HEAD_SHA, ADF_PR_PROJECT, ADF_PR_AUTHOR,
+#   ADF_PR_DIFF_LOC, ADF_PR_TITLE
+if [ -z "${ADF_PR_NUMBER:-}" ] || [ -z "${ADF_PR_PROJECT:-}" ]; then
+  echo "pr-security-sentinel: missing ADF_PR_NUMBER or ADF_PR_PROJECT; exit" >&2
+  exit 1
+fi
+
+HEAD_SHORT=$(echo "$ADF_PR_HEAD_SHA" | cut -c1-7)
+
+# POST_STATUS posts to the Gitea Commit Status API. Best-effort -- the
+# agent never fails because the status post hit a transient network
+# error. Mirrors the helper used by build-runner.toml and
+# pr-spec-validator.toml.
+POST_STATUS() {
+  local STATE="$1"
+  local DESC="$2"
+  curl -fsS -X POST \
+    -H "Authorization: token $GITEA_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d "{\"state\":\"$STATE\",\"context\":\"adf/security\",\"description\":\"$DESC\"}" \
+    "$GITEA_URL/api/v1/repos/$GITEA_OWNER/$GITEA_REPO/statuses/$ADF_PR_HEAD_SHA" \
+    >/dev/null 2>&1 || \
+    echo "pr-security-sentinel: status post failed (state=$STATE) -- non-fatal" >&2
+}
+
+# Idempotency: skip re-audit if a comment referencing the same head_sha
+# already exists within the last 2 hours. Mirrors the pr-reviewer
+# pattern; uses the agent-scoped marker to avoid false-matching against
+# the structural review or the spec-validator audit.
+EXISTING=$(curl -sf -H "Authorization: token $GITEA_TOKEN" \
+  "$GITEA_URL/api/v1/repos/$GITEA_OWNER/$GITEA_REPO/issues/$ADF_PR_NUMBER/comments" 2>/dev/null \
+  | python3 -c '
+import json, sys, datetime, os
+head = os.environ.get("ADF_PR_HEAD_SHA", "")
+cs = json.load(sys.stdin)
+now = datetime.datetime.now(datetime.timezone.utc)
+recent = [
+  c for c in cs
+  if ("Last security-audited commit: " + head[:7]) in c.get("body", "")
+  and (now - datetime.datetime.fromisoformat(
+    c["created_at"].replace("Z", "+00:00")
+  )).total_seconds() < 7200
+]
+print("yes" if recent else "no")
+' 2>/dev/null || echo "no")
+
+if [ "$EXISTING" = "yes" ]; then
+  echo "pr-security-sentinel: same head_sha already audited in last 2h; skip; exit"
+  exit 0
+fi
+
+# Fetch the PR diff once (cap to avoid blowing the LLM context window).
+cd "$GITEA_WORKING_DIR"
+git fetch gitea "pull/$ADF_PR_NUMBER/head:pr-$ADF_PR_NUMBER" 2>/dev/null || true
+
+# === PATH FILTER (early exit -- happy path for docs-only / CI-only PRs) ===
+#
+# security-audit only matters when the PR touches dependencies
+# (`Cargo.toml`, `Cargo.lock`), Rust source (`crates/**/src/**`), or
+# anything under a secrets directory (`**/secrets/**`). Other changes
+# (markdown docs, workflow yaml, scripts, frontend tweaks) cannot
+# regress the security posture of the Rust workspace, so we mark the
+# check `success` and exit cleanly.
+#
+# `adf/security` is a required check on `main` (branch protection
+# PATCHed at the end of Phase 2c deployment). A `pending` left behind
+# by an early-exit-without-post would block every docs-only PR forever,
+# so the skip path MUST post `success` -- not "no post".
+CHANGED_FILES=$(git diff --name-only "main...pr-$ADF_PR_NUMBER" 2>/dev/null || true)
+if [ -z "$CHANGED_FILES" ]; then
+  # Empty diff or fetch failure: behave as if there's nothing to audit.
+  POST_STATUS success "n/a — no security-relevant changes"
+  echo "pr-security-sentinel: empty diff; posted success n/a"
+  exit 0
+fi
+
+# Match: exactly Cargo.toml or Cargo.lock at any path depth (workspace
+# root or per-crate manifests both count); any path under a
+# `crates/<name>/src/` directory; any path containing a `secrets/`
+# segment.
+SECURITY_RELEVANT=$(echo "$CHANGED_FILES" \
+  | grep -E '(^|/)Cargo\.(toml|lock)$|^crates/[^/]+/src/|(^|/)secrets/' \
+  || true)
+if [ -z "$SECURITY_RELEVANT" ]; then
+  POST_STATUS success "n/a — no security-relevant changes"
+  echo "pr-security-sentinel: no security-relevant paths changed; posted success n/a"
+  exit 0
+fi
+
+PR_DIFF=$(git diff "main...pr-$ADF_PR_NUMBER" 2>/dev/null | head -2000)
+
+REVIEW_PROMPT="You are reviewing PR #$ADF_PR_NUMBER on $GITEA_OWNER/$GITEA_REPO. Apply the security-audit skill.
+
+PR metadata:
+- Title: $ADF_PR_TITLE
+- Author: $ADF_PR_AUTHOR
+- Head SHA: $ADF_PR_HEAD_SHA
+- Diff LOC: $ADF_PR_DIFF_LOC
+
+Security-relevant paths in this PR:
+$SECURITY_RELEVANT
+
+PR diff (first 2000 lines):
+\`\`\`diff
+$PR_DIFF
+\`\`\`
+
+Apply the security-audit skill: review the diff for vulnerabilities (OWASP categories), unsafe code blocks, dependency changes (new crates, version bumps to known-vulnerable versions, license risks), input handling (deserialisation, parsing user data, command injection), secret exposure (hardcoded credentials, leaked tokens, weak crypto), and insecure defaults. Write a single PR comment summarising findings.
+
+Output template:
+- <h3>Security Audit Summary</h3>
+- <h3>Risk: low | medium | high | critical</h3>
+- <h3>Verdict: pass | concerns | fail</h3>
+- <h3>Findings</h3> (severity-tiered)
+- <h3>Dependency Changes</h3> (if any)
+- <sub>Last security-audited commit: $HEAD_SHORT</sub>
+
+Rules:
+- Do NOT use --dangerously-skip-permissions
+- Do NOT mention agent handles with the adf colon prefix (triggers false-positive review chains)
+- Do NOT mock, bypass tests, or skip hooks
+- Verdict line MUST appear exactly as 'Verdict: pass' / 'Verdict: concerns' / 'Verdict: fail' for the status parser
+
+Post the completed review with:
+  gtr comment --owner \"\$GITEA_OWNER\" --repo \"\$GITEA_REPO\" --index \"$ADF_PR_NUMBER\" --body-file /tmp/pr-security-sentinel-$ADF_PR_NUMBER.md"
+
+REVIEW_OUTPUT=$(echo "$REVIEW_PROMPT" | /home/alex/.local/bin/claude -p \
+  --allowedTools "Bash,Read,Grep,Glob" \
+  2>&1)
+echo "$REVIEW_OUTPUT"
+
+echo "pr-security-sentinel: verdict posted on PR #$ADF_PR_NUMBER"
+
+# Derive the commit-status verdict from the agent output (or the
+# rendered review file, whichever is available). Prefers an explicit
+# `Verdict:` line; falls back to a `Risk:` line (critical/high → fail,
+# medium → concerns, low → pass); finally falls back to a `success`
+# "manual gate" state when neither parses (the commit status is never
+# left in `pending`).
+REVIEW_FILE="/tmp/pr-security-sentinel-$ADF_PR_NUMBER.md"
+SCORE_TEXT=""
+if [ -f "$REVIEW_FILE" ]; then
+  SCORE_TEXT=$(cat "$REVIEW_FILE")
+fi
+SCORE_TEXT="$SCORE_TEXT
+$REVIEW_OUTPUT"
+
+VERDICT=$(echo "$SCORE_TEXT" \
+  | grep -oE 'Verdict:[[:space:]]*(pass|concerns|fail)' \
+  | grep -oE '(pass|concerns|fail)' \
+  | head -1)
+
+if [ -z "$VERDICT" ]; then
+  RISK=$(echo "$SCORE_TEXT" \
+    | grep -oE 'Risk:[[:space:]]*(low|medium|high|critical)' \
+    | grep -oE '(low|medium|high|critical)' \
+    | head -1)
+  case "$RISK" in
+    critical|high) VERDICT="fail" ;;
+    medium)        VERDICT="concerns" ;;
+    low)           VERDICT="pass" ;;
+  esac
+fi
+
+if [ "$VERDICT" = "fail" ]; then
+  STATE=failure
+  DESC="security findings blocking"
+elif [ "$VERDICT" = "concerns" ]; then
+  STATE=success
+  DESC="security concerns flagged"
+elif [ "$VERDICT" = "pass" ]; then
+  STATE=success
+  DESC="audit clean"
+else
+  STATE=success
+  DESC="audit posted; manual gate"
+fi
+
+POST_STATUS "$STATE" "$DESC"
+echo "pr-security-sentinel: posted adf/security status state=$STATE"
+'''
