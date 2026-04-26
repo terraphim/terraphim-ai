@@ -7,6 +7,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::process::Command;
+use std::time::Duration;
 
 /// Result of a claim operation.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -110,10 +111,64 @@ impl GiteaConfig {
     }
 }
 
+/// State of a Gitea commit status, mirroring the Gitea API enum.
+///
+/// Used by [`GiteaTracker::set_commit_status`] to mark a commit's check
+/// state for a given context (e.g. `adf/pr-reviewer`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StatusState {
+    /// The check is queued or running.
+    Pending,
+    /// The check passed.
+    Success,
+    /// The check failed (a reviewer-actionable failure).
+    Failure,
+    /// The check could not run to completion (infrastructure problem).
+    Error,
+}
+
+impl StatusState {
+    /// Gitea API wire value for this state.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            StatusState::Pending => "pending",
+            StatusState::Success => "success",
+            StatusState::Failure => "failure",
+            StatusState::Error => "error",
+        }
+    }
+}
+
+/// Maximum length of a Gitea commit status `description` field.
+///
+/// Per the Gitea API spec, descriptions over this length are rejected
+/// or truncated server-side; we truncate client-side to keep behaviour
+/// deterministic.
+const STATUS_DESCRIPTION_MAX_CHARS: usize = 140;
+
+/// Default exponential backoff between retries on transient failures.
+const DEFAULT_STATUS_BACKOFF_MS: [u64; 3] = [1_000, 2_000, 4_000];
+
+/// Truncate a status `description` to at most [`STATUS_DESCRIPTION_MAX_CHARS`]
+/// characters, on a Unicode boundary so multi-byte characters never split.
+fn truncate_description(description: &str) -> String {
+    if description.chars().count() <= STATUS_DESCRIPTION_MAX_CHARS {
+        return description.to_string();
+    }
+    description
+        .chars()
+        .take(STATUS_DESCRIPTION_MAX_CHARS)
+        .collect()
+}
+
 /// Gitea REST API client.
 pub struct GiteaTracker {
     client: Client,
     pub(crate) config: GiteaConfig,
+    /// Backoff sequence between retries on 5xx/429 responses for
+    /// `set_commit_status`. Empty means "no retries". Tests inject a tight
+    /// sequence (e.g. `[1ms, 1ms, 1ms]`) to keep runtime small.
+    status_backoff: Vec<Duration>,
 }
 
 /// Gitea API issue response.
@@ -167,7 +222,25 @@ impl GiteaTracker {
                 message: format!("Failed to create HTTP client: {e}"),
             })?;
 
-        Ok(Self { client, config })
+        let status_backoff = DEFAULT_STATUS_BACKOFF_MS
+            .iter()
+            .map(|ms| Duration::from_millis(*ms))
+            .collect();
+
+        Ok(Self {
+            client,
+            config,
+            status_backoff,
+        })
+    }
+
+    /// Override the retry backoff sequence used by [`set_commit_status`].
+    ///
+    /// Intended for tests; production callers get the default `1s, 2s, 4s`.
+    /// An empty vector disables retries entirely.
+    pub fn with_status_backoff(mut self, backoff: Vec<Duration>) -> Self {
+        self.status_backoff = backoff;
+        self
     }
 
     /// Gitea owner (org or user) this tracker is scoped to.
@@ -964,6 +1037,117 @@ impl GiteaTracker {
         }
 
         Ok(false)
+    }
+
+    /// Post a commit status to Gitea (`POST /api/v1/repos/{owner}/{repo}/statuses/{sha}`).
+    ///
+    /// This is the primitive used by ADF agents to surface their verdict as a
+    /// native Gitea PR check (red/green) rather than relying on PR-comment
+    /// scraping. Multiple calls with the same `(sha, context)` are idempotent
+    /// from Gitea's perspective: the latest call wins.
+    ///
+    /// # Parameters
+    ///
+    /// - `owner`, `repo`, `sha`: target commit. `owner`/`repo` are explicit
+    ///   (rather than reading from `self.config`) so callers can post statuses
+    ///   to a different repo without rebuilding a tracker.
+    /// - `state`: see [`StatusState`].
+    /// - `context`: short stable identifier (e.g. `adf/pr-reviewer`). Gitea
+    ///   uses `(sha, context)` as the natural key.
+    /// - `description`: human-readable summary. Truncated to 140 characters
+    ///   on a Unicode boundary.
+    /// - `target_url`: optional link to a richer report (PR comment URL,
+    ///   build log, etc.). When `None`, the field is omitted from the JSON
+    ///   body so Gitea does not receive a stray `null`.
+    ///
+    /// # Retries
+    ///
+    /// Transient failures (HTTP 5xx and 429) are retried with the backoff
+    /// sequence configured on the tracker (default `1s, 2s, 4s`). Permanent
+    /// failures (4xx other than 429 — auth, validation, etc.) are returned
+    /// immediately without retry.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn set_commit_status(
+        &self,
+        owner: &str,
+        repo: &str,
+        sha: &str,
+        state: StatusState,
+        context: &str,
+        description: &str,
+        target_url: Option<&str>,
+    ) -> Result<()> {
+        let url = format!(
+            "{}/api/v1/repos/{}/{}/statuses/{}",
+            self.config.base_url, owner, repo, sha
+        );
+
+        let truncated_description = truncate_description(description);
+
+        let mut body = serde_json::Map::new();
+        body.insert(
+            "state".to_string(),
+            serde_json::Value::String(state.as_str().to_string()),
+        );
+        body.insert(
+            "context".to_string(),
+            serde_json::Value::String(context.to_string()),
+        );
+        body.insert(
+            "description".to_string(),
+            serde_json::Value::String(truncated_description),
+        );
+        if let Some(url) = target_url {
+            body.insert(
+                "target_url".to_string(),
+                serde_json::Value::String(url.to_string()),
+            );
+        }
+        let body = serde_json::Value::Object(body);
+
+        // Attempt 0 + len(status_backoff) retries.
+        let mut attempt = 0usize;
+        loop {
+            let response = self
+                .build_request(reqwest::Method::POST, &url)
+                .json(&body)
+                .send()
+                .await?;
+            let status = response.status();
+
+            if status.is_success() {
+                return Ok(());
+            }
+
+            // 4xx (except 429) are permanent — return immediately.
+            let is_transient =
+                status.is_server_error() || status == reqwest::StatusCode::TOO_MANY_REQUESTS;
+            if !is_transient {
+                let text = response.text().await.unwrap_or_default();
+                return Err(TrackerError::Api {
+                    message: format!(
+                        "Gitea set_commit_status error {} on {}/{}@{} ctx={}: {}",
+                        status, owner, repo, sha, context, text
+                    ),
+                });
+            }
+
+            // Transient — sleep then retry, unless out of attempts.
+            if attempt >= self.status_backoff.len() {
+                let text = response.text().await.unwrap_or_default();
+                return Err(TrackerError::Api {
+                    message: format!(
+                        "Gitea set_commit_status exhausted retries (last status {}) on {}/{}@{} ctx={}: {}",
+                        status, owner, repo, sha, context, text
+                    ),
+                });
+            }
+            let delay = self.status_backoff[attempt];
+            // Drop the response before sleeping so the connection returns to the pool.
+            drop(response);
+            tokio::time::sleep(delay).await;
+            attempt += 1;
+        }
     }
 
     /// Check if an error indicates gitea-robot is unavailable.
@@ -2015,5 +2199,215 @@ mod tests {
                 assignee: "unknown (race condition)".to_string()
             }
         );
+    }
+
+    // ----- set_commit_status tests (real loopback HTTP via axum) -----
+
+    mod status_tests {
+        use super::super::*;
+        use axum::{
+            Router,
+            extract::{Path, State},
+            http::StatusCode,
+            response::IntoResponse,
+            routing::post,
+        };
+        use std::sync::Arc;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::time::Duration;
+        use tokio::net::TcpListener;
+
+        /// Snapshot of the most recent request the test server saw.
+        #[derive(Default)]
+        struct CapturedRequest {
+            path: std::sync::Mutex<Option<String>>,
+            body: std::sync::Mutex<Option<serde_json::Value>>,
+        }
+
+        /// Per-test server state: counts attempts and stores the last captured
+        /// payload for assertion.
+        struct ServerState {
+            calls: AtomicUsize,
+            captured: CapturedRequest,
+            // Status code sequence; if shorter than the call count the last
+            // entry is reused.
+            status_sequence: Vec<u16>,
+        }
+
+        async fn handle_status(
+            Path((owner, repo, sha)): Path<(String, String, String)>,
+            State(state): State<Arc<ServerState>>,
+            body: axum::body::Bytes,
+        ) -> impl IntoResponse {
+            let idx = state.calls.fetch_add(1, Ordering::SeqCst);
+            let captured_path = format!("/api/v1/repos/{}/{}/statuses/{}", owner, repo, sha);
+            *state.captured.path.lock().unwrap() = Some(captured_path);
+            if let Ok(parsed) = serde_json::from_slice::<serde_json::Value>(&body) {
+                *state.captured.body.lock().unwrap() = Some(parsed);
+            }
+            let pick = state
+                .status_sequence
+                .get(idx)
+                .copied()
+                .or_else(|| state.status_sequence.last().copied())
+                .unwrap_or(200);
+            StatusCode::from_u16(pick).unwrap_or(StatusCode::OK)
+        }
+
+        /// Spin up an axum server bound to an ephemeral 127.0.0.1 port and
+        /// return its base URL plus the shared state.
+        async fn spawn_server(status_sequence: Vec<u16>) -> (String, Arc<ServerState>) {
+            let state = Arc::new(ServerState {
+                calls: AtomicUsize::new(0),
+                captured: CapturedRequest::default(),
+                status_sequence,
+            });
+            let app = Router::new()
+                .route(
+                    "/api/v1/repos/{owner}/{repo}/statuses/{sha}",
+                    post(handle_status),
+                )
+                .with_state(state.clone());
+            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let addr = listener.local_addr().unwrap();
+            tokio::spawn(async move {
+                axum::serve(listener, app).await.ok();
+            });
+            (format!("http://{}", addr), state)
+        }
+
+        fn make_status_tracker(base_url: &str) -> GiteaTracker {
+            let config = GiteaConfig {
+                base_url: base_url.to_string(),
+                token: "test-token".to_string(),
+                owner: "ignored".to_string(),
+                repo: "ignored".to_string(),
+                active_states: vec!["open".to_string()],
+                terminal_states: vec!["closed".to_string()],
+                use_robot_api: false,
+                robot_path: PathBuf::from("/home/alex/go/bin/gitea-robot"),
+                claim_strategy: ClaimStrategy::PreferRobot,
+            };
+            // Tight backoff so retry tests do not extend wall time.
+            GiteaTracker::new(config).unwrap().with_status_backoff(vec![
+                Duration::from_millis(1),
+                Duration::from_millis(1),
+                Duration::from_millis(1),
+            ])
+        }
+
+        #[tokio::test]
+        async fn set_commit_status_posts_correct_payload() {
+            let (base_url, state) = spawn_server(vec![201]).await;
+            let tracker = make_status_tracker(&base_url);
+
+            tracker
+                .set_commit_status(
+                    "o",
+                    "r",
+                    "abc123",
+                    StatusState::Success,
+                    "adf/test",
+                    "hello",
+                    None,
+                )
+                .await
+                .expect("status post should succeed");
+
+            assert_eq!(state.calls.load(Ordering::SeqCst), 1);
+            assert_eq!(
+                state.captured.path.lock().unwrap().as_deref(),
+                Some("/api/v1/repos/o/r/statuses/abc123")
+            );
+            let body = state
+                .captured
+                .body
+                .lock()
+                .unwrap()
+                .clone()
+                .expect("body captured");
+            assert_eq!(body["state"], "success");
+            assert_eq!(body["context"], "adf/test");
+            assert_eq!(body["description"], "hello");
+            // target_url=None must be omitted entirely.
+            assert!(
+                body.get("target_url").is_none(),
+                "target_url should be omitted when None, got {body:?}"
+            );
+        }
+
+        #[tokio::test]
+        async fn set_commit_status_retries_on_5xx() {
+            // First call: 503; second call: 200.
+            let (base_url, state) = spawn_server(vec![503, 200]).await;
+            let tracker = make_status_tracker(&base_url);
+
+            tracker
+                .set_commit_status(
+                    "o",
+                    "r",
+                    "sha",
+                    StatusState::Pending,
+                    "adf/test",
+                    "retrying",
+                    None,
+                )
+                .await
+                .expect("retry should succeed");
+
+            assert_eq!(state.calls.load(Ordering::SeqCst), 2);
+        }
+
+        #[tokio::test]
+        async fn set_commit_status_no_retry_on_4xx() {
+            let (base_url, state) = spawn_server(vec![401]).await;
+            let tracker = make_status_tracker(&base_url);
+
+            let result = tracker
+                .set_commit_status(
+                    "o",
+                    "r",
+                    "sha",
+                    StatusState::Failure,
+                    "adf/test",
+                    "auth fail",
+                    None,
+                )
+                .await;
+
+            assert!(result.is_err(), "401 must surface as Err");
+            assert_eq!(
+                state.calls.load(Ordering::SeqCst),
+                1,
+                "4xx must not be retried"
+            );
+        }
+
+        #[tokio::test]
+        async fn set_commit_status_truncates_long_description() {
+            let (base_url, state) = spawn_server(vec![201]).await;
+            let tracker = make_status_tracker(&base_url);
+
+            let long = "x".repeat(200);
+            tracker
+                .set_commit_status(
+                    "o",
+                    "r",
+                    "sha",
+                    StatusState::Success,
+                    "adf/test",
+                    &long,
+                    Some("https://example.com/report"),
+                )
+                .await
+                .expect("status post should succeed");
+
+            let body = state.captured.body.lock().unwrap().clone().unwrap();
+            let desc = body["description"].as_str().unwrap();
+            assert_eq!(desc.chars().count(), 140);
+            assert!(desc.chars().all(|c| c == 'x'));
+            // target_url=Some must be sent through unchanged.
+            assert_eq!(body["target_url"], "https://example.com/report");
+        }
     }
 }

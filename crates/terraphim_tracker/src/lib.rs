@@ -9,7 +9,7 @@ pub mod pagerank;
 
 pub use gitea::{
     CommentUser, GiteaComment, GiteaConfig, GiteaMergeResult, GiteaPrSummary, GiteaTracker,
-    IssueComment, MergeStyle,
+    IssueComment, MergeStyle, StatusState,
 };
 pub use linear::{LinearConfig, LinearTracker};
 pub use pagerank::{PagerankClient, PagerankScore};
