@@ -71,6 +71,11 @@ impl ReplHandler {
         use rustyline::validate::Validator;
         use rustyline::{Context, Helper};
 
+        if let Some(service) = &self.service {
+            let selected = service.get_selected_role().await;
+            self.current_role = selected.to_string();
+        }
+
         // Create a command completer
         #[derive(Clone)]
         struct CommandCompleter;
