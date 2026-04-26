@@ -1214,6 +1214,25 @@ enum SessionsSub {
     Stats,
 }
 
+fn emit_robot_error_and_exit(
+    err: &anyhow::Error,
+    code: robot::exit_codes::ExitCode,
+    robot: bool,
+    format: &OutputFormat,
+) -> ! {
+    if robot || !matches!(format, OutputFormat::Human) {
+        use crate::robot::schema::{ResponseMeta, RobotError, RobotResponse};
+        let meta = ResponseMeta::new("unknown");
+        let robot_error = RobotError::new(format!("E{:03}", code.code()), format!("{:#}", err));
+        let response = RobotResponse::<()>::error(vec![robot_error], meta);
+        if let Ok(json) = serde_json::to_string(&response) {
+            println!("{}", json);
+        }
+    }
+    eprintln!("Error: {:#}", err);
+    std::process::exit(code.code().into())
+}
+
 fn classify_error(err: &anyhow::Error) -> robot::exit_codes::ExitCode {
     use robot::exit_codes::ExitCode;
 
@@ -1484,14 +1503,15 @@ fn main() -> Result<()> {
         }
         Some(command) => {
             let rt = Runtime::new()?;
+            let robot_mode = cli.robot;
+            let output_format = cli.format.clone();
             #[cfg(feature = "server")]
             {
                 if cli.server {
                     let result = rt.block_on(run_server_command(command, &cli.server_url, output));
                     if let Err(ref e) = result {
                         let code = classify_error(e);
-                        eprintln!("Error: {:#}", e);
-                        std::process::exit(code.code().into());
+                        emit_robot_error_and_exit(e, code, robot_mode, &output_format);
                     }
                     return result;
                 }
@@ -1499,8 +1519,7 @@ fn main() -> Result<()> {
             let result = rt.block_on(run_offline_command(command, output, cli.config));
             if let Err(ref e) = result {
                 let code = classify_error(e);
-                eprintln!("Error: {:#}", e);
-                std::process::exit(code.code().into());
+                emit_robot_error_and_exit(e, code, robot_mode, &output_format);
             }
             result
         }

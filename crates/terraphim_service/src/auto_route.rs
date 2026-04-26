@@ -147,8 +147,14 @@ pub async fn auto_select_role(
 
     // Degenerate: no roles configured.
     if scored.is_empty() {
+        let fallback = config
+            .roles
+            .keys()
+            .min_by(|a, b| a.original.cmp(&b.original))
+            .cloned()
+            .unwrap_or_else(|| RoleName::from("Default"));
         return AutoRouteResult {
-            role: RoleName::from("Default"),
+            role: fallback,
             score: 0,
             candidates: Vec::new(),
             reason: AutoRouteReason::ZeroMatchDefault,
