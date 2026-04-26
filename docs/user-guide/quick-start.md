@@ -20,7 +20,7 @@ Invoke-WebRequest -Uri https://sh.rustup.rs -OutFile rustup-init.sh; bash rustup
 
 ```bash
 # Create your personal AI workspace
-terraphim-agent init
+terraphim-agent setup
 
 # Answer the prompts:
 # ✓ Default data path: ~/Documents/terraphim
@@ -42,11 +42,19 @@ terraphim-agent search --help
 ### Step 4: Optional - Add Your Data (2 Minutes)
 
 ```bash
-# Add your documents folder
-terraphim-agent add-source local --path ~/Documents
+# Add your documents folder (configure in ~/.config/terraphim/embedded_config.json)
+# Edit the haystacks section to include your project directory
 
-# Add a GitHub repository (if you want code search)
-terraphim-agent add-source github --owner terraphim --repo terraphim-ai
+# Example haystack configuration:
+# {
+#   "haystacks": [
+#     {
+#       "location": "~/Documents",
+#       "service": "Ripgrep",
+#       "read_only": true
+#     }
+#   ]
+# }
 ```
 
 ### Step 5: AI Chat (1 Minute)
@@ -138,17 +146,20 @@ terraphim-agent search --source local,github "your query"  # Search both sources
 
 ### Personalize Your Experience
 ```bash
-# Create custom roles
-terraphim-agent role create "my-research" --purpose "Research assistance" --model "llama3.2:3b"
+# List available roles
+terraphim-agent roles list
 
-# Set up custom workflows
-terraphim-agent workflow create "literature-review" --steps "search,analyze,summarize"
+# Select a role
+terraphim-agent roles select "terraphim-engineer"
+
+# Or use the setup wizard to create custom configurations
+terraphim-agent setup --template terraphim-engineer
 ```
 
 ### Keyboard Shortcuts
 ```bash
-# Enable TUI mode for keyboard users
-terraphim-agent --tui
+# Enable interactive TUI mode for keyboard users
+terraphim-agent interactive
 
 # Common shortcuts in TUI:
 # Ctrl+R: Search
@@ -166,8 +177,8 @@ terraphim-agent --tui
 # Full terminal experience
 terraphim-agent
 
-# TUI mode (enhanced interface)
-terraphim-agent --tui
+# Interactive TUI mode (enhanced interface)
+terraphim-agent interactive
 
 # Background mode (for scripts)
 terraphim-agent search "query" > results.json
@@ -178,8 +189,8 @@ terraphim-agent search "query" > results.json
 # PowerShell commands
 terraphim-agent search "query"
 
-# TUI mode
-terraphim-agent --tui
+# Interactive TUI mode
+terraphim-agent interactive
 ```
 
 ### Desktop Application
@@ -215,14 +226,14 @@ cargo install terraphim-agent --force
 
 ### "No results found"
 ```bash
-# Check data sources
-terraphim-agent sources list
+# Check configuration
+terraphim-agent config show
 
-# Rebuild index
-terraphim-agent rebuild-index
+# Reload configuration
+terraphim-agent config reload
 
 # Try broader search terms
-terraphim-agent search "search term" --scorer tfidf --max-results 50
+terraphim-agent search "search term" --limit 50
 ```
 
 ---

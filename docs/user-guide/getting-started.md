@@ -182,7 +182,7 @@ You now have Terraphim AI installed and configured. Start exploring your knowled
 ```bash
 terraphim-agent search "semantic search examples"
 terraphim-agent chat "help me understand my data"
-terraphim-agent role create research-assistant
+terraphim-agent roles list
 ```
 
 Welcome to the future of privacy-first AI assistance! 🚀
