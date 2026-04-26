@@ -1206,11 +1206,11 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
     let output = resolve_output_config(cli.robot, cli.format.clone());
 
-    // Check for updates on startup (non-blocking, logs warning on failure)
+    // Check for updates on startup (non-blocking, debug logging on failure)
     let rt = Runtime::new()?;
     rt.block_on(async {
         if let Err(e) = check_for_updates_startup("terraphim-agent").await {
-            eprintln!("Update check failed: {}", e);
+            log::debug!("Update check failed: {}", e);
         }
     });
 
