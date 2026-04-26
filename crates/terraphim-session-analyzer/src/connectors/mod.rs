@@ -26,7 +26,9 @@ pub mod opencode;
 pub enum ConnectorStatus {
     /// Connector found with estimated session count
     Available {
+        /// Path to the connector's data directory.
         path: PathBuf,
+        /// Approximate number of sessions available, if determinable.
         sessions_estimate: Option<usize>,
     },
     /// Connector's data directory not found

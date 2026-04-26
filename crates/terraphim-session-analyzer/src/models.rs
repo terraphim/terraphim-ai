@@ -139,113 +139,177 @@ impl AsRef<str> for MessageId {
     }
 }
 
-/// Parse JSONL session entries from Claude Code
+/// A single JSONL entry from a Claude Code session log.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionEntry {
+    /// Unique identifier for this entry.
     pub uuid: String,
+    /// UUID of the parent entry, if any.
     pub parent_uuid: Option<String>,
+    /// Identifier of the session this entry belongs to.
     pub session_id: String,
+    /// ISO-8601 timestamp string.
     pub timestamp: String,
+    /// Source of the entry: `"human"`, `"assistant"`, or `"tool"`.
     pub user_type: String,
+    /// Parsed message payload.
     pub message: Message,
     #[serde(rename = "type")]
+    /// Entry type discriminator (mirrors `user_type` for deserialization).
     pub entry_type: String,
+    /// Working directory at the time the entry was recorded.
     pub cwd: Option<String>,
 }
 
+/// Message payload inside a [`SessionEntry`], tagged by role.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Message {
+    /// A message authored by the human user.
     User {
+        /// Always `"user"`.
         role: String,
+        /// Plain-text content of the user turn.
         content: String,
     },
+    /// A message authored by the assistant.
     Assistant {
+        /// Always `"assistant"`.
         role: String,
+        /// Structured content blocks (text and tool-use).
         content: Vec<ContentBlock>,
         #[serde(default)]
+        /// Message ID assigned by the model API.
         id: Option<String>,
         #[serde(default)]
+        /// Model identifier that generated this turn.
         model: Option<String>,
     },
+    /// The result of a tool invocation returned to the assistant.
     ToolResult {
+        /// Always `"tool"`.
         role: String,
+        /// Tool result content blocks.
         content: Vec<ToolResultContent>,
     },
 }
 
+/// A structured block within an assistant message: plain text or a tool invocation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ContentBlock {
+    /// Plain text produced by the assistant.
     Text {
+        /// The text content.
         text: String,
     },
+    /// A request to invoke a tool.
     ToolUse {
+        /// Tool call identifier.
         id: String,
+        /// Name of the tool being invoked.
         name: String,
+        /// JSON input arguments for the tool.
         input: serde_json::Value,
     },
 }
 
+/// Content returned by a tool invocation, linking back to the originating tool-use ID.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolResultContent {
+    /// Identifier of the tool-use request this result corresponds to.
     pub tool_use_id: String,
     #[serde(rename = "type")]
+    /// MIME or semantic type of the result content.
     pub content_type: String,
+    /// The raw result text returned by the tool.
     pub content: String,
 }
 
 /// Agent invocation tracking
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentInvocation {
+    /// Timestamp when the agent was invoked.
     pub timestamp: Timestamp,
+    /// Type or name of the agent (e.g. `"developer"`, `"rust-developer"`).
     pub agent_type: String,
+    /// Human-readable description of the task the agent performed.
     pub task_description: String,
+    /// Full prompt sent to the agent.
     pub prompt: String,
+    /// List of file paths modified during this invocation.
     pub files_modified: Vec<String>,
+    /// Names of tools used during this invocation.
     pub tools_used: Vec<String>,
+    /// Wall-clock duration of the invocation in milliseconds, if known.
     pub duration_ms: Option<u64>,
+    /// Message ID of the parent turn that triggered this agent.
     pub parent_message_id: String,
+    /// Session this invocation belongs to.
     pub session_id: String,
 }
 
 /// File operations extracted from tool uses
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileOperation {
+    /// Timestamp when the file operation occurred.
     pub timestamp: Timestamp,
+    /// Kind of file operation performed.
     pub operation: FileOpType,
+    /// Absolute or relative path of the file that was operated on.
     pub file_path: String,
+    /// Agent type that performed the operation, if determinable.
     pub agent_context: Option<String>,
+    /// Session this operation belongs to.
     pub session_id: String,
+    /// Message in which this operation was recorded.
     pub message_id: String,
 }
 
 /// Tool invocation extracted from Bash commands
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolInvocation {
+    /// Timestamp when the tool was invoked.
     pub timestamp: Timestamp,
+    /// Name of the tool or executable invoked.
     pub tool_name: String,
+    /// High-level category the tool belongs to.
     pub tool_category: ToolCategory,
+    /// Full command line string as seen in the session log.
     pub command_line: String,
+    /// Positional arguments passed to the tool.
     pub arguments: Vec<String>,
+    /// Named flags passed to the tool, keyed by flag name.
     pub flags: HashMap<String, String>,
+    /// Exit code returned by the process, if captured.
     pub exit_code: Option<i32>,
+    /// Agent type that issued the invocation, if determinable.
     pub agent_context: Option<String>,
+    /// Session this invocation belongs to.
     pub session_id: String,
+    /// Message in which this invocation was recorded.
     pub message_id: String,
 }
 
 /// Category of tool being used
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum ToolCategory {
+    /// Package manager tools such as cargo, npm, or bun.
     PackageManager,
+    /// Build tools such as cargo build or make.
     BuildTool,
+    /// Testing tools such as cargo test or jest.
     Testing,
+    /// Linting and formatting tools such as clippy or eslint.
     Linting,
+    /// Version-control tools such as git.
     Git,
+    /// Cloud deployment tools such as kubectl or terraform.
     CloudDeploy,
+    /// Database tools such as psql or sqlite3.
     Database,
+    /// Any tool that does not fit the named categories.
     Other(String),
 }
 
@@ -271,26 +335,44 @@ impl ToolCategory {
 /// Statistics for a specific tool
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolStatistics {
+    /// Name of the tool these statistics describe.
     pub tool_name: String,
+    /// Category the tool belongs to.
     pub category: ToolCategory,
+    /// Total number of times the tool was invoked across all sessions.
     pub total_invocations: u32,
+    /// Agent types that used this tool.
     pub agents_using: Vec<String>,
+    /// Number of invocations that exited with code 0.
     pub success_count: u32,
+    /// Number of invocations that exited with a non-zero code.
     pub failure_count: u32,
+    /// Timestamp of the earliest recorded invocation.
     pub first_seen: Timestamp,
+    /// Timestamp of the most recent recorded invocation.
     pub last_seen: Timestamp,
+    /// Representative command-line patterns observed for this tool.
     pub command_patterns: Vec<String>,
+    /// Session IDs in which this tool was used.
     pub sessions: Vec<String>,
 }
 
+/// The kind of file system operation performed via a tool call.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum FileOpType {
+    /// File was read from disk.
     Read,
+    /// File was written (created or overwritten).
     Write,
+    /// File was partially edited in-place.
     Edit,
+    /// Multiple edits were applied to a file in a single call.
     MultiEdit,
+    /// File was deleted.
     Delete,
+    /// A glob pattern was used to enumerate matching paths.
     Glob,
+    /// File contents were searched with a pattern.
     Grep,
 }
 
@@ -314,88 +396,136 @@ impl FromStr for FileOpType {
 /// Analysis results for a session
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SessionAnalysis {
+    /// Unique identifier of the analysed session.
     pub session_id: String,
+    /// Filesystem path of the project directory for the session.
     pub project_path: String,
+    /// Timestamp of the first event in the session.
     pub start_time: Timestamp,
+    /// Timestamp of the last event in the session.
     pub end_time: Timestamp,
+    /// Total session duration in milliseconds.
     pub duration_ms: u64,
+    /// All agent invocations recorded during the session.
     pub agents: Vec<AgentInvocation>,
+    /// All file operations recorded during the session.
     pub file_operations: Vec<FileOperation>,
+    /// Mapping from file path to the agents attributed to that file.
     pub file_to_agents: IndexMap<String, Vec<AgentAttribution>>,
+    /// Per-agent statistics keyed by agent type name.
     pub agent_stats: IndexMap<String, AgentStatistics>,
+    /// Detected collaboration patterns between agents.
     pub collaboration_patterns: Vec<CollaborationPattern>,
 }
 
 /// Attribution of a file to an agent
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentAttribution {
+    /// Type or name of the agent attributed to this file.
     pub agent_type: String,
+    /// Percentage of file changes attributed to this agent (0.0–100.0).
     pub contribution_percent: f32,
+    /// Confidence in the attribution estimate (0.0–1.0).
     pub confidence_score: f32,
+    /// Names of file operations this agent performed on the file.
     pub operations: Vec<String>,
+    /// Timestamp of the agent's earliest interaction with the file.
     pub first_interaction: Timestamp,
+    /// Timestamp of the agent's most recent interaction with the file.
     pub last_interaction: Timestamp,
 }
 
 /// Statistics for an individual agent
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentStatistics {
+    /// Type or name of the agent these statistics describe.
     pub agent_type: String,
+    /// Total number of times this agent was invoked.
     pub total_invocations: u32,
+    /// Cumulative wall-clock time spent in this agent across all invocations (ms).
     pub total_duration_ms: u64,
+    /// Number of distinct files this agent interacted with.
     pub files_touched: u32,
+    /// Names of tools this agent used.
     pub tools_used: Vec<String>,
+    /// Timestamp of the agent's earliest recorded invocation.
     pub first_seen: Timestamp,
+    /// Timestamp of the agent's most recent recorded invocation.
     pub last_seen: Timestamp,
 }
 
 /// Collaboration patterns between agents
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CollaborationPattern {
+    /// Short identifier for the type of collaboration pattern detected.
     pub pattern_type: String,
+    /// Agent types involved in this collaboration pattern.
     pub agents: Vec<String>,
+    /// Human-readable explanation of the pattern.
     pub description: String,
+    /// Number of times this pattern was observed.
     pub frequency: u32,
+    /// Confidence score for the pattern detection (0.0–1.0).
     pub confidence: f32,
 }
 
 /// Correlation between agents and tools
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentToolCorrelation {
+    /// Agent type involved in the correlation.
     pub agent_type: String,
+    /// Tool name involved in the correlation.
     pub tool_name: String,
+    /// Number of times this agent used this tool.
     pub usage_count: u32,
+    /// Fraction of invocations that succeeded (0.0–1.0).
     pub success_rate: f32,
+    /// Mean number of invocations per session for this agent-tool pair.
     pub average_invocations_per_session: f32,
 }
 
 /// Complete tool usage analysis
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ToolAnalysis {
+    /// Identifier of the session this analysis covers.
     pub session_id: String,
+    /// Total number of tool invocations across the session.
     pub total_tool_invocations: u32,
+    /// Per-tool statistics keyed by tool name.
     pub tool_statistics: IndexMap<String, ToolStatistics>,
+    /// Observed correlations between agent types and specific tools.
     pub agent_tool_correlations: Vec<AgentToolCorrelation>,
+    /// Frequently observed sequences of tool calls.
     pub tool_chains: Vec<ToolChain>,
+    /// Invocation counts aggregated by tool category.
     pub category_breakdown: IndexMap<ToolCategory, u32>,
 }
 
 /// Sequence of tools used together
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolChain {
+    /// Ordered list of tool names forming this chain.
     pub tools: Vec<String>,
+    /// Number of times this exact chain was observed.
     pub frequency: u32,
+    /// Mean elapsed time between consecutive tool calls in the chain (ms).
     pub average_time_between_ms: u64,
+    /// Agent type most commonly associated with this chain, if determinable.
     pub typical_agent: Option<String>,
+    /// Fraction of chain executions that completed without error (0.0–1.0).
     pub success_rate: f32,
 }
 
 /// Configuration for the analyzer
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AnalyzerConfig {
+    /// Filesystem directories to scan for session JSONL files.
     pub session_dirs: Vec<String>,
+    /// Minimum confidence score required to attribute an action to an agent.
     pub agent_confidence_threshold: f32,
+    /// Time window (ms) within which file operations are attributed to the preceding agent.
     pub file_attribution_window_ms: u64,
+    /// Glob patterns for paths to exclude from analysis.
     pub exclude_patterns: Vec<String>,
 }
 

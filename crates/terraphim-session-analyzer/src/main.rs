@@ -1,3 +1,5 @@
+//! `tsa` — CLI binary for analysing Claude Code session logs.
+
 mod analyzer;
 mod models;
 mod parser;

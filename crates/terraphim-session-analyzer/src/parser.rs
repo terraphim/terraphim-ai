@@ -1,3 +1,5 @@
+//! Session log parser: reads JSONL files and converts raw entries into typed model objects.
+
 use crate::models::{
     AgentInvocation, ContentBlock, FileOpType, FileOperation, Message, SessionEntry, ToolCategory,
     ToolInvocation, extract_file_path, parse_timestamp,
@@ -11,6 +13,7 @@ use std::io::{BufRead, BufReader};
 use std::path::Path;
 use tracing::{debug, info, warn};
 
+/// Parses a single session log file into typed invocation and file-operation records.
 pub struct SessionParser {
     entries: Vec<SessionEntry>,
     session_id: String,
@@ -480,23 +483,31 @@ fn extract_from_bash_command(
     None
 }
 
-/// Used in integration tests and public API
+/// A single event in the chronological timeline of a session.
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct TimelineEvent {
+    /// When the event occurred.
     pub timestamp: jiff::Timestamp,
+    /// Discriminator for the kind of event.
     pub event_type: TimelineEventType,
+    /// Human-readable description of the event.
     pub description: String,
+    /// Agent involved, if applicable.
     pub agent: Option<String>,
+    /// File involved, if applicable.
     pub file: Option<String>,
 }
 
-/// Used in integration tests and public API
+/// Kinds of events that can appear in a session timeline.
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub enum TimelineEventType {
+    /// An agent was invoked via the Task tool.
     AgentInvocation,
+    /// A file was read or written.
     FileOperation,
+    /// A human user message was sent.
     UserMessage,
 }
 

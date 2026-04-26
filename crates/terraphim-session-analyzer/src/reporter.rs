@@ -1,3 +1,5 @@
+//! Report generation: formats analysis results as terminal output, JSON, CSV, and Markdown.
+
 use crate::models::{
     AgentAttribution, AgentStatistics, AgentToolCorrelation, CollaborationPattern, SessionAnalysis,
     ToolAnalysis,
@@ -12,16 +14,19 @@ use tabled::{
     settings::{Modify, Style, Width, object::Columns},
 };
 
+/// Formats session analysis results as terminal output, JSON, CSV, and Markdown.
 pub struct Reporter {
     show_colors: bool,
 }
 
 impl Reporter {
+    /// Create a new `Reporter` with colour output enabled.
     #[must_use]
     pub fn new() -> Self {
         Self { show_colors: true }
     }
 
+    /// Override the colour output setting.
     #[must_use]
     pub fn with_colors(mut self, show_colors: bool) -> Self {
         self.show_colors = show_colors;
@@ -374,6 +379,7 @@ impl Reporter {
         }
     }
 
+    /// Return an icon character for the given agent type name.
     pub fn format_agent_icon(&self, agent_type: &str) -> String {
         match agent_type {
             "architect" => "🏗️".to_string(),
