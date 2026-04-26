@@ -126,7 +126,7 @@ fn all_exit_calls_use_typed_exit_codes() {
     let content = std::fs::read_to_string(&main_path).expect("Failed to read main.rs");
 
     // Count process::exit calls
-    let exit_call_count = content.matches("process::exit(").count();
+    let _exit_call_count = content.matches("process::exit(").count();
 
     // Count typed ExitCode calls
     let typed_exit_count = content.matches("ExitCode::").count();

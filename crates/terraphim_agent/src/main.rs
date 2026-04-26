@@ -897,11 +897,14 @@ enum Command {
     /// Start listener mode for AI agent communication (offline-only)
     Listen {
         /// Agent identity/name for this listener instance
-        #[arg(long, required = true)]
-        identity: String,
+        #[arg(long)]
+        identity: Option<String>,
         /// Optional listener configuration JSON file
         #[arg(long)]
         config: Option<String>,
+        /// Hidden: --server is not valid for listen mode; captured here to emit a clear error
+        #[arg(long, hide = true, default_value_t = false)]
+        server: bool,
     },
 }
 
@@ -1473,13 +1476,25 @@ fn main() -> Result<()> {
             rt.block_on(repl::run_repl_offline_mode())
         }
 
-        Some(Command::Listen { identity, config }) => {
-            // Listen mode is offline-only - reject --server flag
-            if cli.server {
+        Some(Command::Listen {
+            identity,
+            config,
+            server: local_server,
+        }) => {
+            // Listen mode is offline-only - reject --server flag (global or local position).
+            // Check this before requiring --identity so the error message is clear.
+            if cli.server || local_server {
                 eprintln!("error: listen mode does not support --server flag");
                 eprintln!("The listener runs in offline mode only.");
                 std::process::exit(robot::exit_codes::ExitCode::ErrorUsage.code().into());
             }
+            let identity = match identity {
+                Some(id) => id,
+                None => {
+                    eprintln!("error: --identity <IDENTITY> is required for listen mode");
+                    std::process::exit(robot::exit_codes::ExitCode::ErrorUsage.code().into());
+                }
+            };
             let listener_config = match config.as_deref() {
                 Some(path) => listener::ListenerConfig::load_from_path(path)?,
                 None => listener::ListenerConfig::for_identity(identity.clone()),
@@ -2724,8 +2739,14 @@ async fn run_offline_command(
             }
         }
 
-        Command::Listen { identity, config } => {
-            println!("listener would start with identity: {}", identity);
+        Command::Listen {
+            identity,
+            config,
+            server: _,
+        } => {
+            if let Some(ref id) = identity {
+                println!("listener would start with identity: {}", id);
+            }
             if let Some(path) = config.as_deref() {
                 println!("listener config: {}", path);
             }
