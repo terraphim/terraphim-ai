@@ -1,0 +1,170 @@
+# PR-test-guardian agent template (ADF Phase 2e, Refs #954)
+#
+# Mention-dispatched via DispatchTask::ReviewPr, fan-out entry
+# `pr-test-guardian` with context `adf/test`. Reads ADF_PR_* env overrides
+# injected by handle_review_pr, fetches the PR diff, applies a path filter
+# (`**/tests/**` or `crates/**/src/**`); when the diff carries no
+# test-relevant changes it posts `adf/test` = success with description
+# "n/a — no test-relevant changes" and exits zero ("skip-with-success" so
+# branch protection on `adf/test` never wedges PRs that touch only docs or
+# config).
+#
+# When test-relevant changes ARE present, invokes claude with the `testing`
+# skill on the diff and posts a structured PR comment plus an `adf/test`
+# commit status reflecting the verdict.
+#
+# NO schedule field -- this is event-driven, not cron.
+# Subscription-only models only (C1 constraint).
+
+[[agents]]
+name = "pr-test-guardian"
+layer = "Growth"
+cli_tool = "/home/alex/.local/bin/claude"
+model = "sonnet"
+fallback_model = "kimi-for-coding/k2p5"
+persona = "Carthos"
+skill_chain = ["testing"]
+project = "terraphim"
+max_cpu_seconds = 1800
+grace_period_secs = 30
+task = '''
+source ~/.profile
+
+# Context injected by handle_review_pr (ROC v1 Step D):
+#   ADF_PR_NUMBER, ADF_PR_HEAD_SHA, ADF_PR_PROJECT, ADF_PR_AUTHOR,
+#   ADF_PR_DIFF_LOC, ADF_PR_TITLE
+if [ -z "${ADF_PR_NUMBER:-}" ] || [ -z "${ADF_PR_PROJECT:-}" ] \
+  || [ -z "${ADF_PR_HEAD_SHA:-}" ]; then
+  echo "pr-test-guardian: missing ADF_PR_NUMBER/ADF_PR_PROJECT/ADF_PR_HEAD_SHA; exit" >&2
+  exit 1
+fi
+
+HEAD_SHORT=$(echo "$ADF_PR_HEAD_SHA" | cut -c1-7)
+
+# Idempotency: skip re-review if a comment referencing the same head_sha
+# already exists within the last 2 hours.
+EXISTING=$(curl -sf -H "Authorization: token $GITEA_TOKEN" \
+  "$GITEA_URL/api/v1/repos/$GITEA_OWNER/$GITEA_REPO/issues/$ADF_PR_NUMBER/comments" 2>/dev/null \
+  | python3 -c '
+import json, sys, datetime, os
+head_short = os.environ.get("HEAD_SHORT", "")
+cs = json.load(sys.stdin)
+now = datetime.datetime.now(datetime.timezone.utc)
+recent = [
+  c for c in cs
+  if ("Last test-reviewed commit: " + head_short) in c.get("body", "")
+  and (now - datetime.datetime.fromisoformat(
+    c["created_at"].replace("Z", "+00:00")
+  )).total_seconds() < 7200
+]
+print("yes" if recent else "no")
+' 2>/dev/null || echo "no")
+
+if [ "$EXISTING" = "yes" ]; then
+  echo "pr-test-guardian: same head_sha already test-reviewed in last 2h; skip; exit"
+  exit 0
+fi
+
+# Fetch the PR diff (capped at 2000 lines to bound the prompt).
+cd "$GITEA_WORKING_DIR"
+git fetch gitea "pull/$ADF_PR_NUMBER/head:pr-$ADF_PR_NUMBER" 2>/dev/null || true
+PR_DIFF=$(git diff "main...pr-$ADF_PR_NUMBER" 2>/dev/null | head -2000)
+
+# === PATH FILTER ===
+# List files touched by the PR. If none match `**/tests/**` or
+# `crates/**/src/**`, skip-with-success: post adf/test=success and exit 0
+# so branch protection on adf/test does not wedge pure-docs/pure-config PRs.
+CHANGED_FILES=$(git diff --name-only "main...pr-$ADF_PR_NUMBER" 2>/dev/null)
+TEST_RELEVANT=$(echo "$CHANGED_FILES" | grep -E '(^|/)tests/|^crates/[^/]+/src/' || true)
+
+if [ -z "$TEST_RELEVANT" ]; then
+  echo "pr-test-guardian: no test-relevant paths touched; posting skip-with-success"
+  curl -fsS -X POST \
+    -H "Authorization: token $GITEA_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d '{"state":"success","context":"adf/test","description":"n/a — no test-relevant changes"}' \
+    "$GITEA_URL/api/v1/repos/$GITEA_OWNER/$GITEA_REPO/statuses/$ADF_PR_HEAD_SHA" \
+    >/dev/null 2>&1 || \
+    echo "pr-test-guardian: status post failed (skip-with-success) -- non-fatal" >&2
+  exit 0
+fi
+
+REVIEW_PROMPT="You are reviewing tests in PR #$ADF_PR_NUMBER on $GITEA_OWNER/$GITEA_REPO. Apply the testing skill.
+
+PR metadata:
+- Title: $ADF_PR_TITLE
+- Author: $ADF_PR_AUTHOR
+- Head SHA: $ADF_PR_HEAD_SHA
+- Diff LOC: $ADF_PR_DIFF_LOC
+
+Test-relevant files changed:
+$TEST_RELEVANT
+
+PR diff (first 2000 lines):
+\`\`\`diff
+$PR_DIFF
+\`\`\`
+
+Post your test review as a single gtr comment on PR #$ADF_PR_NUMBER. Required structure:
+- <h3>Test Review Summary</h3>
+- <h3>Coverage: present|partial|missing</h3>
+- <h3>Verdict: pass|concerns|fail</h3>
+- <h3>Findings</h3> (with P0/P1/P2 prefixes)
+- <sub>Last test-reviewed commit: $HEAD_SHORT | Test Reviews (1)</sub>
+
+Rules:
+- Do NOT use --dangerously-skip-permissions
+- Do NOT mention agent handles with the adf colon prefix
+- Do NOT mock, bypass tests, or skip hooks
+- One comment per round; batch all findings
+
+Post the completed review with:
+  gtr comment --owner \"\$GITEA_OWNER\" --repo \"\$GITEA_REPO\" --issue \"$ADF_PR_NUMBER\" --body-file /tmp/pr-test-review-$ADF_PR_NUMBER.md"
+
+REVIEW_OUTPUT=$(echo "$REVIEW_PROMPT" | /home/alex/.local/bin/claude -p \
+  --allowedTools "Bash,Read,Grep,Glob" \
+  2>&1)
+echo "$REVIEW_OUTPUT"
+
+echo "pr-test-guardian: verdict posted on PR #$ADF_PR_NUMBER"
+
+# Derive the verdict from the rendered review file or the raw output.
+REVIEW_FILE="/tmp/pr-test-review-$ADF_PR_NUMBER.md"
+SCORE_TEXT=""
+if [ -f "$REVIEW_FILE" ]; then
+  SCORE_TEXT=$(cat "$REVIEW_FILE")
+fi
+SCORE_TEXT="$SCORE_TEXT
+$REVIEW_OUTPUT"
+
+VERDICT=$(echo "$SCORE_TEXT" \
+  | grep -oiE 'Verdict:[[:space:]]*(pass|concerns|fail)' \
+  | grep -oiE '(pass|concerns|fail)' \
+  | head -1 \
+  | tr '[:upper:]' '[:lower:]')
+
+if [ -z "$VERDICT" ]; then
+  STATE=success
+  DESC="test review posted; manual gate"
+elif [ "$VERDICT" = "pass" ]; then
+  STATE=success
+  DESC="tests look good"
+elif [ "$VERDICT" = "concerns" ]; then
+  STATE=success
+  DESC="tests reviewed -- concerns flagged"
+else
+  STATE=failure
+  DESC="tests failed review -- blocking"
+fi
+
+# Best-effort: never fail the agent run if the status post errors.
+curl -fsS -X POST \
+  -H "Authorization: token $GITEA_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{\"state\":\"$STATE\",\"context\":\"adf/test\",\"description\":\"$DESC\"}" \
+  "$GITEA_URL/api/v1/repos/$GITEA_OWNER/$GITEA_REPO/statuses/$ADF_PR_HEAD_SHA" \
+  >/dev/null 2>&1 || \
+  echo "pr-test-guardian: status post failed (state=$STATE) -- non-fatal" >&2
+
+echo "pr-test-guardian: posted adf/test status state=$STATE"
+'''
