@@ -2019,7 +2019,69 @@ impl AgentOrchestrator {
             "ReviewPr spawned pr-reviewer"
         );
 
+        // ADF Phase 1 (issue #928): post `pending` commit status so the
+        // PR's "checks" gate in Gitea reflects that the agent is running.
+        // The agent itself transitions the status to success/failure/error
+        // when its task script finishes (see scripts/adf-setup/agents/pr-reviewer.toml).
+        // Best-effort: never fail the spawn if the status post errors.
+        self.post_pr_reviewer_pending_status(&head_sha, pr_number, &project)
+            .await;
+
         Ok(())
+    }
+
+    /// Post a `pending` commit status for the `adf/pr-reviewer` context.
+    ///
+    /// Best-effort helper used by [`Self::handle_review_pr`] — when the
+    /// workflow tracker isn't configured (e.g. in unit tests) or the API
+    /// call fails, we log and return without surfacing the error. The agent
+    /// owns the final state transition.
+    async fn post_pr_reviewer_pending_status(
+        &mut self,
+        head_sha: &str,
+        pr_number: u64,
+        project: &str,
+    ) {
+        let tracker = match self.get_or_init_pre_check_tracker() {
+            Some(t) => t,
+            None => {
+                debug!(
+                    pr_number,
+                    project, "ReviewPr: no workflow tracker configured; skipping pending status"
+                );
+                return;
+            }
+        };
+        let owner = tracker.owner().to_string();
+        let repo = tracker.repo().to_string();
+        let result = tracker
+            .set_commit_status(
+                &owner,
+                &repo,
+                head_sha,
+                terraphim_tracker::StatusState::Pending,
+                "adf/pr-reviewer",
+                "pr-reviewer dispatched",
+                None,
+            )
+            .await;
+        match result {
+            Ok(()) => {
+                info!(
+                    pr_number,
+                    project, head_sha, "ReviewPr: posted adf/pr-reviewer pending status"
+                );
+            }
+            Err(e) => {
+                warn!(
+                    error = %e,
+                    pr_number,
+                    project,
+                    head_sha,
+                    "ReviewPr: failed to post adf/pr-reviewer pending status"
+                );
+            }
+        }
     }
 
     /// Evaluate the pre-check strategy for an agent.
@@ -7218,6 +7280,99 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             "session id should be scoped to the agent, got: {}",
             managed.session_id
         );
+    }
+
+    /// When a workflow tracker is configured, `handle_review_pr` must POST
+    /// a `pending` commit status with context `adf/pr-reviewer` for the
+    /// PR head SHA after spawning. Verifies issue #928 (ADF Phase 1).
+    #[tokio::test]
+    async fn reviewpr_dispatch_posts_pending_status_when_tracker_configured() {
+        use axum::{
+            extract::{Path, State},
+            http::StatusCode,
+            response::IntoResponse,
+            routing::post,
+            Router,
+        };
+        use std::sync::atomic::{AtomicUsize, Ordering as AOrdering};
+        use std::sync::Arc;
+        use tokio::net::TcpListener;
+
+        #[derive(Default)]
+        struct Captured {
+            calls: AtomicUsize,
+            last_path: std::sync::Mutex<Option<String>>,
+            last_body: std::sync::Mutex<Option<serde_json::Value>>,
+        }
+
+        async fn capture(
+            Path((owner, repo, sha)): Path<(String, String, String)>,
+            State(captured): State<Arc<Captured>>,
+            body: axum::body::Bytes,
+        ) -> impl IntoResponse {
+            captured.calls.fetch_add(1, AOrdering::SeqCst);
+            *captured.last_path.lock().unwrap() =
+                Some(format!("/api/v1/repos/{}/{}/statuses/{}", owner, repo, sha));
+            if let Ok(parsed) = serde_json::from_slice::<serde_json::Value>(&body) {
+                *captured.last_body.lock().unwrap() = Some(parsed);
+            }
+            StatusCode::CREATED
+        }
+
+        let captured = Arc::new(Captured::default());
+        let app = Router::new()
+            .route("/api/v1/repos/{owner}/{repo}/statuses/{sha}", post(capture))
+            .with_state(captured.clone());
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            axum::serve(listener, app).await.ok();
+        });
+        let base_url = format!("http://{}", addr);
+
+        // Build the standard review-pr config and bolt on a workflow that
+        // points at the loopback Gitea endpoint above. Tests with no
+        // workflow already cover the silent skip-path (other reviewpr_*).
+        let (mut config, _tmp) = review_pr_config("echo");
+        config.workflow = Some(crate::config::WorkflowConfig {
+            enabled: true,
+            poll_interval_secs: 60,
+            workflow_file: std::path::PathBuf::from("/tmp/workflow.md"),
+            tracker: crate::config::TrackerConfig {
+                kind: "gitea".to_string(),
+                endpoint: base_url.clone(),
+                api_key: "test-token".to_string(),
+                owner: "fakeowner".to_string(),
+                repo: "fakerepo".to_string(),
+                project_slug: None,
+                use_robot_api: false,
+                states: crate::config::TrackerStates::default(),
+            },
+            concurrency: crate::config::ConcurrencyConfig::default(),
+        });
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        orch.handle_review_pr(review_pr_task()).await.unwrap();
+
+        // Allow the loopback server to receive the POST.
+        for _ in 0..50 {
+            if captured.calls.load(AOrdering::SeqCst) > 0 {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        assert_eq!(
+            captured.calls.load(AOrdering::SeqCst),
+            1,
+            "exactly one pending status post expected"
+        );
+        assert_eq!(
+            captured.last_path.lock().unwrap().as_deref(),
+            Some("/api/v1/repos/fakeowner/fakerepo/statuses/deadbeef1234")
+        );
+        let body = captured.last_body.lock().unwrap().clone().unwrap();
+        assert_eq!(body["state"], "pending");
+        assert_eq!(body["context"], "adf/pr-reviewer");
     }
 
     /// A banned provider configured on the pr-reviewer agent must be
