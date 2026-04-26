@@ -81,7 +81,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `terraphim_file_search`: replaced unresolvable `[ScoringContext]` link with plain backtick in `KgPathScorer` doc.
   - `terraphim_tracker`: backtick-escaped bare URL in `LinearConfig::endpoint` doc.
 
+- **Doc-gap audit 2026-04-26 (round 6 — session-analyzer)**: `terraphim-session-analyzer` had 118 undocumented public items discovered during workspace scan; resolved to 0.
+  - `analyzer.rs`: added `//!` module doc, `///` for `Analyzer` struct and all 5 fields of `SummaryStats`.
+  - `models.rs`: added `//!` module doc; documented `AgentType`, `MessageId` structs and their `new`/`as_str` methods; `SessionId::new`/`as_str`; all 8 `SessionEntry` fields; `Message` enum with all variant fields; `ContentBlock` enum with all variant fields; plus all remaining public structs, enums, variants, and fields across the full models surface.
+  - `parser.rs`: added `//!` module doc, `///` for `SessionParser`, `TimelineEvent` (all fields), `TimelineEventType` (all variants).
+  - `reporter.rs`: added `//!` module doc, `///` for `Reporter`, `new()`, `with_colors()`, `format_agent_icon()`.
+  - `connectors/mod.rs`: documented `Available::path` and `Available::sessions_estimate` fields.
+  - `main.rs` (binary): added `//!` crate doc.
+- **Spec-validation report** generated at `reports/spec-validation-20260426.md` (`b4a39831`).
+- **Tech lead gate artefact** added at `.docs/tech_lead_gate_20260426.md` (`69da3c6c`).
+
 ### Fixed
+- **Listen-mode `--server` guard** (`fix(agent): accept listen --server locally`, `21634c5b`, Refs #860): `--server` is now a hidden local arg on the `Listen` variant so clap accepts it; the handler checks it first and emits the correct `"listen mode does not support --server flag"` message with `ExitCode::ErrorUsage` (2).
 - **Auth heuristic** in `classify_error` tightened to prevent false positives from "author", "authority", and path-prefixed strings like `auth_tokens.json` (`73455ec7`)
 - **Test formatting** in `classify_error_tests` aligned with `cargo fmt` style (`568f06b5`)
 - **Exit code assertions** in F1.2 integration tests aligned with exit-code contract (`b3229f7b`)
