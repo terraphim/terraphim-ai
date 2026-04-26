@@ -1,0 +1,38 @@
+{
+  "ref": "refs/heads/main",
+  "before": "0000000000000000000000000000000000000001",
+  "after": "abc123def456abc123def456abc123def456abcd",
+  "compare_url": "",
+  "commits": [
+    {
+      "id": "111111111111111111111111111111111111aaaa",
+      "message": "first commit",
+      "added": [],
+      "removed": [],
+      "modified": ["a.rs", "b.rs"]
+    },
+    {
+      "id": "222222222222222222222222222222222222bbbb",
+      "message": "second commit",
+      "added": ["c.rs"],
+      "removed": [],
+      "modified": ["a.rs"]
+    }
+  ],
+  "pusher": {
+    "id": 7,
+    "login": "alex"
+  },
+  "repository": {
+    "id": 1,
+    "name": "terraphim-ai",
+    "full_name": "terraphim/terraphim-ai",
+    "owner": {
+      "login": "terraphim"
+    }
+  },
+  "sender": {
+    "id": 7,
+    "login": "alex"
+  }
+}
