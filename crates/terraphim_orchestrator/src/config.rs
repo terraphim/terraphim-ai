@@ -188,6 +188,54 @@ pub struct OrchestratorConfig {
     /// Shared learning system configuration.
     #[serde(default)]
     pub learning: LearningConfig,
+    /// PR-fan-out dispatch configuration (ADF Phase 2, plan §5).
+    ///
+    /// Lists the agents that should be dispatched on a Gitea
+    /// `pull_request.opened` event. When omitted, the orchestrator falls back
+    /// to the legacy single-agent behaviour (just `pr-reviewer`) so existing
+    /// deployments continue to work without a config edit.
+    #[serde(default)]
+    pub pr_dispatch: Option<PrDispatchConfig>,
+}
+
+/// PR-fan-out routing table for the `pull_request.opened` event (ADF Phase 2,
+/// per `.docs/plan-adf-agents-replace-gitea-actions.md` §5).
+///
+/// Each entry names an agent (resolved against [`OrchestratorConfig::agents`]
+/// for the PR's project) and the Gitea commit-status `context` the orchestrator
+/// must POST `pending` for after a successful spawn. Agents that don't resolve
+/// or that fail their per-agent subscription / budget gate are skipped silently
+/// — no `pending` is posted for them, otherwise an unresolved status would
+/// block the PR forever.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PrDispatchConfig {
+    /// Ordered list of agents to fan out on PR open. An empty list means
+    /// "no fan-out" — different from the absent-block default which keeps
+    /// the legacy `pr-reviewer`-only behaviour.
+    #[serde(default)]
+    pub agents_on_pr_open: Vec<PrDispatchEntry>,
+}
+
+/// One row in [`PrDispatchConfig::agents_on_pr_open`].
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PrDispatchEntry {
+    /// Agent name (matched against `AgentDefinition.name` for the PR project).
+    pub name: String,
+    /// Gitea commit-status context (e.g. `adf/build`, `adf/pr-reviewer`).
+    pub context: String,
+}
+
+impl PrDispatchConfig {
+    /// Default fan-out used when no `[pr_dispatch]` block is present in the
+    /// config — preserves legacy behaviour by dispatching only `pr-reviewer`.
+    pub fn legacy_default() -> Self {
+        Self {
+            agents_on_pr_open: vec![PrDispatchEntry {
+                name: "pr-reviewer".to_string(),
+                context: "adf/pr-reviewer".to_string(),
+            }],
+        }
+    }
 }
 
 /// Configuration for the shared learning system.
@@ -979,6 +1027,20 @@ impl OrchestratorConfig {
     /// Find a project definition by id.
     pub fn project_by_id(&self, id: &str) -> Option<&Project> {
         self.projects.iter().find(|p| p.id == id)
+    }
+
+    /// Effective PR-fan-out list for the `pull_request.opened` event.
+    ///
+    /// Returns a clone of [`PrDispatchConfig::agents_on_pr_open`] when the
+    /// `[pr_dispatch]` block is configured, otherwise the legacy single
+    /// `pr-reviewer` entry. This keeps existing deployments that have not
+    /// adopted the fan-out config working unchanged after Phase 2 lands
+    /// (issue #944, plan §5).
+    pub fn agents_on_pr_open(&self) -> Vec<PrDispatchEntry> {
+        match self.pr_dispatch.as_ref() {
+            Some(d) => d.agents_on_pr_open.clone(),
+            None => PrDispatchConfig::legacy_default().agents_on_pr_open,
+        }
     }
 
     /// Resolve the effective working directory for an agent: the project's
@@ -2210,5 +2272,115 @@ task = "t"
         // And the allowed bare forms still pass.
         validate_model_provider("ok", "model", "sonnet").expect("sonnet is a bare claude CLI");
         validate_model_provider("ok", "model", "anthropic").expect("anthropic bare passes");
+    }
+
+    /// ADF Phase 2 (issue #944): when no `[pr_dispatch]` block is present in
+    /// the config TOML, the field deserialises to `None` so the orchestrator
+    /// can fall back to the legacy single-agent default. This preserves
+    /// backward compatibility for every existing deployment that has not yet
+    /// adopted the fan-out config.
+    #[test]
+    fn pr_dispatch_absent_block_yields_none() {
+        let toml_str = r#"
+working_dir = "/tmp/pr-dispatch-default-test"
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 2 * * *"
+repo_path = "/tmp"
+"#;
+        let cfg = OrchestratorConfig::from_toml(toml_str).unwrap();
+        assert!(cfg.pr_dispatch.is_none());
+    }
+
+    /// `legacy_default()` returns a single `pr-reviewer` entry with the
+    /// canonical `adf/pr-reviewer` context. The orchestrator uses this when
+    /// the config block is absent.
+    #[test]
+    fn pr_dispatch_legacy_default_lists_only_pr_reviewer() {
+        let dft = PrDispatchConfig::legacy_default();
+        assert_eq!(dft.agents_on_pr_open.len(), 1);
+        assert_eq!(dft.agents_on_pr_open[0].name, "pr-reviewer");
+        assert_eq!(dft.agents_on_pr_open[0].context, "adf/pr-reviewer");
+    }
+
+    /// `agents_on_pr_open()` returns the legacy default when no
+    /// `[pr_dispatch]` block is configured. This is the path every
+    /// pre-Phase-2 deployment hits, so legacy single-agent dispatch must
+    /// keep working without a config edit.
+    #[test]
+    fn pr_dispatch_accessor_returns_legacy_when_block_absent() {
+        let toml_str = r#"
+working_dir = "/tmp/pr-dispatch-accessor-test"
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 2 * * *"
+repo_path = "/tmp"
+"#;
+        let cfg = OrchestratorConfig::from_toml(toml_str).unwrap();
+        let list = cfg.agents_on_pr_open();
+        assert_eq!(list.len(), 1, "legacy default must be a single entry");
+        assert_eq!(list[0].name, "pr-reviewer");
+        assert_eq!(list[0].context, "adf/pr-reviewer");
+    }
+
+    /// `agents_on_pr_open()` honours the configured list verbatim when
+    /// `[pr_dispatch]` is present.
+    #[test]
+    fn pr_dispatch_accessor_returns_configured_list_when_present() {
+        let toml_str = r#"
+working_dir = "/tmp/pr-dispatch-accessor-configured"
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 2 * * *"
+repo_path = "/tmp"
+
+[pr_dispatch]
+agents_on_pr_open = [
+    { name = "build-runner", context = "adf/build" },
+    { name = "pr-reviewer", context = "adf/pr-reviewer" },
+]
+"#;
+        let cfg = OrchestratorConfig::from_toml(toml_str).unwrap();
+        let list = cfg.agents_on_pr_open();
+        assert_eq!(list.len(), 2);
+        assert_eq!(list[0].name, "build-runner");
+        assert_eq!(list[1].name, "pr-reviewer");
+    }
+
+    /// A configured `[pr_dispatch]` block with two entries deserialises to
+    /// the canonical Phase 2 D2 minimal shape: build-runner + pr-reviewer.
+    #[test]
+    fn pr_dispatch_block_parses_two_entry_list() {
+        let toml_str = r#"
+working_dir = "/tmp/pr-dispatch-parse-test"
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 2 * * *"
+repo_path = "/tmp"
+
+[pr_dispatch]
+agents_on_pr_open = [
+    { name = "build-runner", context = "adf/build" },
+    { name = "pr-reviewer", context = "adf/pr-reviewer" },
+]
+"#;
+        let cfg = OrchestratorConfig::from_toml(toml_str).unwrap();
+        let dispatch = cfg
+            .pr_dispatch
+            .as_ref()
+            .expect("pr_dispatch block must deserialise when present");
+        assert_eq!(dispatch.agents_on_pr_open.len(), 2);
+        assert_eq!(dispatch.agents_on_pr_open[0].name, "build-runner");
+        assert_eq!(dispatch.agents_on_pr_open[0].context, "adf/build");
+        assert_eq!(dispatch.agents_on_pr_open[1].name, "pr-reviewer");
+        assert_eq!(dispatch.agents_on_pr_open[1].context, "adf/pr-reviewer");
     }
 }

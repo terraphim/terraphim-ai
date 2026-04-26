@@ -93,6 +93,7 @@ fn test_config_with_pause(pause_dir: PathBuf, threshold: u32) -> OrchestratorCon
         fleet_escalation_repo: None,
         post_merge_gate: None,
         learning: terraphim_orchestrator::LearningConfig::default(),
+        pr_dispatch: None,
     }
 }
 
