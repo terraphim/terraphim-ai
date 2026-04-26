@@ -1,0 +1,18 @@
+{
+  "id": "Embedded",
+  "global_shortcut": "Ctrl+X",
+  "default_role": "No KG Role",
+  "selected_role": "No KG Role",
+  "roles": {
+    "No KG Role": {
+      "shortname": "NoKG",
+      "name": "No KG Role",
+      "relevance_function": "terraphim-graph",
+      "terraphim_it": true,
+      "theme": "default",
+      "kg": null,
+      "llm_enabled": false,
+      "haystacks": []
+    }
+  }
+}

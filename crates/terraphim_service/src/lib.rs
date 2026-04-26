@@ -496,11 +496,11 @@ impl TerraphimService {
                     }
                 }
             } else {
-                log::debug!(
-                    "Role '{}' has no knowledge graph configured, returning empty thesaurus",
+                log::debug!("Role '{}' has no knowledge graph configured", role_name);
+                Err(ServiceError::Config(format!(
+                    "Knowledge graph not configured for role '{}'",
                     role_name
-                );
-                Ok(Thesaurus::new(role_name.as_lowercase().to_string()))
+                )))
             }
         }
 
