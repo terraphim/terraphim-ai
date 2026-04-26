@@ -25,6 +25,7 @@ use rustyline::Editor;
 #[cfg(feature = "repl")]
 use colored::Colorize;
 
+/// Interactive REPL handler that dispatches [`ReplCommand`]s to the service layer.
 pub struct ReplHandler {
     service: Option<TuiService>,
     #[cfg(feature = "server")]
@@ -35,6 +36,7 @@ pub struct ReplHandler {
 }
 
 impl ReplHandler {
+    /// Create a handler backed by a local [`TuiService`] (offline / embedded mode).
     pub fn new_offline(service: TuiService) -> Self {
         #[cfg(feature = "repl-mcp")]
         let mcp_handler = {
@@ -52,6 +54,7 @@ impl ReplHandler {
         }
     }
 
+    /// Create a handler that proxies commands to a remote Terraphim server (requires `server` feature).
     #[cfg(feature = "server")]
     pub fn new_server(api_client: ApiClient) -> Self {
         Self {
@@ -63,6 +66,7 @@ impl ReplHandler {
         }
     }
 
+    /// Run the interactive REPL loop until the user quits (requires `repl` feature).
     #[cfg(feature = "repl")]
     pub async fn run(&mut self) -> Result<()> {
         use rustyline::completion::{Completer, Pair};

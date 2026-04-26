@@ -1,3 +1,5 @@
+//! `TuiService` -- thin wrapper around [`terraphim_service::TerraphimService`] for the agent TUI.
+
 use anyhow::Result;
 use std::sync::Arc;
 use terraphim_config::{Config, ConfigBuilder, ConfigId, ConfigState};

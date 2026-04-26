@@ -363,16 +363,24 @@ pub struct CapabilitiesData {
     pub index_status: Option<IndexStatus>,
 }
 
-/// Feature flags
+/// Feature flags indicating which capabilities are available at runtime.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FeatureFlags {
+    /// Full-text and semantic search enabled.
     pub search: bool,
+    /// LLM chat completion enabled.
     pub chat: bool,
+    /// MCP tool discovery and invocation enabled.
     pub mcp_tools: bool,
+    /// Local file read/write operations enabled.
     pub file_operations: bool,
+    /// Outbound HTTP / web operations enabled.
     pub web_operations: bool,
+    /// Firecracker micro-VM execution enabled.
     pub vm_execution: bool,
+    /// Session history search index enabled.
     pub session_search: bool,
+    /// Knowledge-graph automata and concept matching enabled.
     pub knowledge_graph: bool,
 }
 

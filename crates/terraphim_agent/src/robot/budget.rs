@@ -1,3 +1,5 @@
+//! Token-budget tracking and enforcement for robot-mode output.
+
 #![allow(dead_code)]
 
 use serde::{Deserialize, Serialize};

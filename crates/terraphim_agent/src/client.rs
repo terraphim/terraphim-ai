@@ -1,3 +1,5 @@
+//! HTTP client for communicating with a remote Terraphim server (requires `server` feature).
+
 use anyhow::Result;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};

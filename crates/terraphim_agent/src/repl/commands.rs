@@ -35,77 +35,98 @@ pub enum ReplCommand {
         top_k: Option<usize>,
     },
 
-    // Chat commands (requires 'llm' feature)
+    /// Start or continue an LLM chat session (requires `llm` feature).
     #[cfg(feature = "llm")]
     Chat {
+        /// Optional opening message; opens blank chat when `None`.
         message: Option<String>,
     },
 
+    /// Summarise a document or search result (requires `llm` feature).
     #[cfg(feature = "llm")]
     Summarize {
+        /// Path or identifier of the target to summarise.
         target: String,
     },
 
-    // MCP commands (requires 'repl-mcp' feature)
+    /// Autocomplete a term against the knowledge-graph thesaurus (requires `repl-mcp`).
     #[cfg(feature = "repl-mcp")]
     Autocomplete {
+        /// Prefix to complete.
         query: String,
+        /// Maximum number of suggestions to return.
         limit: Option<usize>,
     },
 
+    /// Extract concept terms from free text (requires `repl-mcp`).
     #[cfg(feature = "repl-mcp")]
     Extract {
+        /// Text to analyse.
         text: String,
+        /// When `true`, exclude the matched term itself from the returned set.
         exclude_term: bool,
     },
 
+    /// Find all occurrences of a term in the indexed corpus (requires `repl-mcp`).
     #[cfg(feature = "repl-mcp")]
     Find {
+        /// Term to search for.
         text: String,
     },
 
+    /// Replace terms in text using the thesaurus (requires `repl-mcp`).
     #[cfg(feature = "repl-mcp")]
     Replace {
+        /// Input text whose terms will be replaced.
         text: String,
+        /// Output format (`json`, `markdown`, etc.); defaults to plain text.
         format: Option<String>,
     },
 
+    /// Display the thesaurus for a role (requires `repl-mcp`).
     #[cfg(feature = "repl-mcp")]
     Thesaurus {
+        /// Role whose thesaurus to display; uses the active role when `None`.
         role: Option<String>,
     },
 
-    // File commands (requires 'repl-file' feature)
+    /// File system operations (requires `repl-file` feature).
     #[cfg(feature = "repl-file")]
     File {
+        /// Which file operation to perform.
         subcommand: FileSubcommand,
     },
 
-    // Web commands (requires 'repl-web' feature)
+    /// HTTP / web operations (requires `repl-web` feature).
     #[cfg(feature = "repl-web")]
     Web {
+        /// Which web operation to perform.
         subcommand: WebSubcommand,
     },
 
-    // VM commands (requires 'firecracker' feature)
+    /// Micro-VM management via Firecracker (requires `firecracker` feature).
     #[cfg(feature = "firecracker")]
     Vm {
+        /// Which VM operation to perform.
         subcommand: VmSubcommand,
     },
 
-    // Robot mode commands (for AI agents)
+    /// Machine-readable self-documentation for AI agent integration.
     Robot {
+        /// Which documentation aspect to emit.
         subcommand: RobotSubcommand,
     },
 
-    // Session commands (requires 'repl-sessions' feature)
+    /// Session history search and management (requires `repl-sessions` feature).
     #[cfg(feature = "repl-sessions")]
     Sessions {
+        /// Which session operation to perform.
         subcommand: SessionsSubcommand,
     },
 
-    // Update management commands (always available)
+    /// Software update management.
     Update {
+        /// Which update operation to perform.
         subcommand: UpdateSubcommand,
     },
 
@@ -122,15 +143,22 @@ pub enum ReplCommand {
     Clear,
 }
 
+/// Sub-operations for the `robot` REPL command.
 #[derive(Debug, Clone, PartialEq)]
 pub enum RobotSubcommand {
-    /// Get capabilities summary
+    /// Emit the full capability manifest as JSON.
     Capabilities,
-    /// Get schema for a command (or all commands)
-    Schemas { command: Option<String> },
-    /// Get examples for a command
-    Examples { command: Option<String> },
-    /// List exit codes
+    /// Emit JSON Schema for one command, or all commands when `command` is `None`.
+    Schemas {
+        /// Name of the command to describe; `None` means all commands.
+        command: Option<String>,
+    },
+    /// Emit usage examples for one command, or all commands when `command` is `None`.
+    Examples {
+        /// Name of the command to show examples for; `None` means all commands.
+        command: Option<String>,
+    },
+    /// Emit the exit-code table as structured JSON.
     ExitCodes,
 }
 
@@ -141,8 +169,11 @@ pub enum UpdateSubcommand {
     Check,
     /// Install available updates
     Install,
-    /// Rollback to a previous version
-    Rollback { version: String },
+    /// Rollback to a previous version.
+    Rollback {
+        /// Version string to roll back to (e.g. `"0.9.1"`).
+        version: String,
+    },
     /// List available backup versions
     List,
 }
