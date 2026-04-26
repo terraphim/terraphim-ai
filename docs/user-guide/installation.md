@@ -12,7 +12,7 @@ cargo install terraphim-agent
 terraphim-agent --help
 ```
 
-**Features**: Complete CLI with 14 commands, TUI interface, advanced configuration
+**Features**: Complete CLI with 18 commands, TUI interface, advanced configuration
 
 ### Option 2: Node.js Package (Web Integration)
 **Best for**: Web developers, JavaScript projects, real-time search
@@ -198,7 +198,7 @@ terraphim-agent search --help
 mkdir -p ~/.config/terraphim
 
 # Initialize with defaults
-terraphim-agent init
+terraphim-agent setup
 
 # Verify configuration
 cat ~/.config/terraphim/config.toml
