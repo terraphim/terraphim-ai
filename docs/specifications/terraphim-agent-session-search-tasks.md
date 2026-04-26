@@ -2,7 +2,7 @@
 
 > **Version**: 1.2.0
 > **Created**: 2025-12-03
-> **Updated**: 2025-12-04
+> **Updated**: 2026-04-26
 > **Status**: Phase 3 Complete
 
 ## Overview
@@ -156,31 +156,31 @@ This document tracks implementation tasks for the Session Search and Robot Mode 
 
 #### Subtasks
 
-- [ ] **1.4.1** Update `ReplHandler` for robot mode
+- [x] **1.4.1** Update `ReplHandler` for robot mode
   - Add `--robot` flag to main
   - Add `--format` flag support
   - Thread robot config through handlers
 
-- [ ] **1.4.2** Update command parsing
+- [x] **1.4.2** Update command parsing
   - Replace direct `FromStr` with `ForgivingParser`
   - Handle `ParseResult` variants
   - Display auto-correction messages
 
-- [ ] **1.4.3** Update command output
+- [x] **1.4.3** Update command output
   - Detect robot mode in handlers
   - Format output based on config
   - Return appropriate exit codes
 
-- [ ] **1.4.4** Add `robot` command to REPL
+- [x] **1.4.4** Add `robot` command to REPL
   - `/robot capabilities`
   - `/robot schemas`
   - `/robot examples`
 
 #### Acceptance Criteria
 
-- [ ] Interactive mode shows auto-correction messages
-- [ ] Robot mode returns pure JSON
-- [ ] Exit codes propagate correctly
+- [x] Interactive mode shows auto-correction messages
+- [x] Robot mode returns pure JSON
+- [x] Exit codes propagate correctly
 
 ---
 
@@ -192,31 +192,31 @@ This document tracks implementation tasks for the Session Search and Robot Mode 
 
 #### Subtasks
 
-- [ ] **1.5.1** Implement token estimation
+- [x] **1.5.1** Implement token estimation
   - Simple character-based estimation (4 chars ≈ 1 token)
   - Optional tiktoken integration
 
-- [ ] **1.5.2** Implement field filtering
+- [x] **1.5.2** Implement field filtering
   - `FieldMode::Full`
   - `FieldMode::Summary`
   - `FieldMode::Minimal`
   - `FieldMode::Custom(fields)`
 
-- [ ] **1.5.3** Implement content truncation
+- [x] **1.5.3** Implement content truncation
   - `--max-content-length` flag
   - Add `_truncated` indicators
   - Track original lengths
 
-- [ ] **1.5.4** Implement result limiting
+- [x] **1.5.4** Implement result limiting
   - `--max-results` flag
   - `--max-tokens` flag
   - Pagination metadata
 
 #### Acceptance Criteria
 
-- [ ] `--max-tokens 1000` limits output appropriately
-- [ ] Truncated fields have indicators
-- [ ] Pagination works correctly
+- [x] `--max-tokens 1000` limits output appropriately
+- [x] Truncated fields have indicators
+- [x] Pagination works correctly
 
 ---
 
@@ -624,8 +624,8 @@ Phase 3:
 | 1.1 | ✅ Complete | - | Robot output infrastructure |
 | 1.2 | ✅ Complete | - | Forgiving CLI parser |
 | 1.3 | ✅ Complete | - | Self-documentation API |
-| 1.4 | 🔄 Partial | - | --robot/--format flags added; REPL dispatch pending |
-| 1.5 | Not Started | - | Token budget |
+| 1.4 | ✅ Complete | - | REPL robot mode, forgiving parser, /robot command |
+| 1.5 | ✅ Complete | - | Token budget, field filtering, truncation, pagination |
 | 1.6 | Not Started | - | Tests |
 
 ### Phase 2 Status
