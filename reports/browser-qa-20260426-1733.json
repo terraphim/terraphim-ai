@@ -1,0 +1,42 @@
+{
+  "run": {
+    "date": "2026-04-26",
+    "time": "17:33 CEST",
+    "agent": "Echo (Twin Maintainer)",
+    "scenario_file": "/opt/ai-dark-factory/scenarios/browser-qa-current.md"
+  },
+  "scenarios": [
+    {
+      "id": "S1",
+      "name": "Smoke Test - Terraphim Dashboard",
+      "url": "http://localhost:3000",
+      "status": "PASS",
+      "error": null,
+      "title": "Gitea: Git with a cup of tea",
+      "url_actual": "http://localhost:3000/",
+      "navigation_present": true,
+      "navigation_items": ["Home", "Explore", "Help", "Register"],
+      "screenshot": "/home/alex/.dev-browser/tmp/scenario1.png",
+      "notes": "Page loads correctly. Navigation bar confirmed present. Service is Gitea instance on port 3000."
+    },
+    {
+      "id": "S2",
+      "name": "Health Check Endpoints",
+      "url": "http://localhost:8080/health",
+      "status": "FAIL",
+      "error": "Response body contains 'status':'healthy' but scenario expects 'status':'ok'",
+      "body_received": "{\"service\":\"fcctl-web\",\"status\":\"healthy\",\"timestamp\":\"2026-04-26T15:34:01.696846706Z\"}",
+      "has_status_ok": false,
+      "has_status_healthy": true,
+      "service_responding": true,
+      "screenshot": "/home/alex/.dev-browser/tmp/scenario2.png",
+      "notes": "Service fcctl-web IS responding on port 8080. Status field value is 'healthy' not 'ok'. Scenario spec may need updating, or service needs alignment."
+    }
+  ],
+  "summary": {
+    "total": 2,
+    "pass": 1,
+    "fail": 1,
+    "pass_rate": "50%"
+  }
+}
