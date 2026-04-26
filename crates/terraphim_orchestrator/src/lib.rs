@@ -6397,6 +6397,7 @@ mod tests {
             fleet_escalation_repo: None,
             post_merge_gate: None,
             learning: config::LearningConfig::default(),
+            pr_dispatch: None,
         }
     }
 
@@ -6629,6 +6630,7 @@ task = "test"
             fleet_escalation_repo: None,
             post_merge_gate: None,
             learning: config::LearningConfig::default(),
+            pr_dispatch: None,
         }
     }
 
@@ -7466,6 +7468,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             fleet_escalation_repo: None,
             post_merge_gate: None,
             learning: config::LearningConfig::default(),
+            pr_dispatch: None,
         };
         (config, tmp)
     }
