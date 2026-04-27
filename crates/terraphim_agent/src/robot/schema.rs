@@ -53,6 +53,12 @@ pub struct ResponseMeta {
     pub timestamp: DateTime<Utc>,
     /// Version of terraphim-agent
     pub version: String,
+    /// The search query (present for search commands)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub query: Option<String>,
+    /// The role used for the search (present for search commands)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub role: Option<String>,
     /// Auto-correction info if command was corrected
     #[serde(skip_serializing_if = "Option::is_none")]
     pub auto_corrected: Option<AutoCorrection>,
@@ -72,6 +78,8 @@ impl ResponseMeta {
             elapsed_ms: 0,
             timestamp: Utc::now(),
             version: env!("CARGO_PKG_VERSION").to_string(),
+            query: None,
+            role: None,
             auto_corrected: None,
             pagination: None,
             token_budget: None,
@@ -81,6 +89,18 @@ impl ResponseMeta {
     /// Set elapsed time
     pub fn with_elapsed(mut self, elapsed_ms: u64) -> Self {
         self.elapsed_ms = elapsed_ms;
+        self
+    }
+
+    /// Set the search query
+    pub fn with_query(mut self, query: impl Into<String>) -> Self {
+        self.query = Some(query.into());
+        self
+    }
+
+    /// Set the role used for the search
+    pub fn with_role(mut self, role: impl Into<String>) -> Self {
+        self.role = Some(role.into());
         self
     }
 
@@ -492,5 +512,34 @@ mod tests {
         let error = RobotError::no_results("missing query");
         let json = serde_json::to_string(&error).unwrap();
         assert!(json.contains("missing query"));
+    }
+
+    #[test]
+    fn test_meta_with_query_and_role() {
+        let meta = ResponseMeta::new("search")
+            .with_query("rust programming")
+            .with_role("developer");
+        assert_eq!(meta.query.as_deref(), Some("rust programming"));
+        assert_eq!(meta.role.as_deref(), Some("developer"));
+    }
+
+    #[test]
+    fn test_meta_serialization_omits_none() {
+        let meta = ResponseMeta::new("search");
+        let json = serde_json::to_string(&meta).unwrap();
+        assert!(!json.contains("\"query\""));
+        assert!(!json.contains("\"role\""));
+    }
+
+    #[test]
+    fn test_meta_serialization_includes_query_role() {
+        let meta = ResponseMeta::new("search")
+            .with_query("test query")
+            .with_role("engineer");
+        let json = serde_json::to_string(&meta).unwrap();
+        assert!(json.contains("\"query\""));
+        assert!(json.contains("\"role\""));
+        assert!(json.contains("test query"));
+        assert!(json.contains("engineer"));
     }
 }
