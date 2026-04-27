@@ -379,10 +379,11 @@ mod performance_tests {
 
         let duration = start.elapsed();
 
-        // Should complete quickly (less than 50ms for 10000 validations)
+        // 500ms threshold accommodates debug builds and loaded CI environments.
+        // This is a stub test exercising HashMap ops, not real validation logic.
         assert!(
-            duration.as_millis() < 50,
-            "Validating 10000 parameter sets should take less than 50ms, took {:?}",
+            duration.as_millis() < 500,
+            "Validating 10000 parameter sets should take less than 500ms, took {:?}",
             duration
         );
     }
