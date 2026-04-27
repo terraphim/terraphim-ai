@@ -1,3 +1,8 @@
+//! AI agent runtime for Terraphim — REPL, robot mode, and learning capture.
+//!
+//! Provides the `terraphim-agent` CLI binary with interactive and non-interactive
+//! operation modes, a token-budget engine, forgiving CLI parsing, and a shared
+//! learning store backed by the knowledge graph.
 #[cfg(feature = "server")]
 pub mod client;
 pub mod onboarding;

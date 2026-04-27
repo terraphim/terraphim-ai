@@ -1,3 +1,8 @@
+//! Haystack indexing and search orchestration middleware.
+//!
+//! Coordinates document ingestion from heterogeneous sources (filesystem, Atlassian,
+//! JMAP, Discourse), thesaurus construction, and knowledge-graph index updates.
+//! Sits between the service layer and the raw haystack connectors.
 use serde_json as json;
 use terraphim_automata::builder::BuilderError;
 use terraphim_config::TerraphimConfigError;

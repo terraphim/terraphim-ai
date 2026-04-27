@@ -1,3 +1,8 @@
+//! Configuration management — role definitions, haystack settings, and LLM routing.
+//!
+//! Loads JSON role configurations, resolves environment-variable overrides,
+//! and exposes a thread-safe [`ConfigState`] used across the entire workspace.
+//! Supports multiple relevance functions and optional feature flags such as OpenRouter.
 use std::{path::PathBuf, sync::Arc};
 
 use terraphim_automata::{

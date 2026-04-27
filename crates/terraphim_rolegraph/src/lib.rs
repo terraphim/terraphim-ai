@@ -1,3 +1,8 @@
+//! Per-role knowledge graph with node, edge, and document relationships.
+//!
+//! Builds and queries a directed graph where concepts (nodes) are linked by
+//! semantic edges derived from the thesaurus.  Each role maintains an independent
+//! graph so that search results are personalised to a user's domain.
 use ahash::AHashMap;
 use itertools::Itertools;
 use regex::Regex;

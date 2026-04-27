@@ -1,3 +1,9 @@
+//! Document storage abstraction with transparent multi-backend cache warm-up.
+//!
+//! Provides [`DeviceStorage`] which wraps one or more backends (memory, dashmap,
+//! SQLite, S3) ordered by speed.  Reads from slower backends are automatically
+//! written back to the fastest available backend using a fire-and-forget pattern.
+//! Objects over 1 MB are compressed with zstd before caching.
 pub mod compression;
 pub mod conversation;
 pub mod document;

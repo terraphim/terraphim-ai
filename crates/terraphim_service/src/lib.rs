@@ -1,3 +1,8 @@
+//! Core service layer — search orchestration, LLM integration, and document management.
+//!
+//! Implements the main search pipeline: haystack indexing, relevance scoring
+//! (BM25, TerraphimGraph), AI summarisation via OpenRouter or Ollama, and the
+//! HTTP API handlers consumed by `terraphim_server`.
 use ahash::AHashMap;
 use terraphim_automata::builder::{Logseq, ThesaurusBuilder};
 use terraphim_automata::load_thesaurus;

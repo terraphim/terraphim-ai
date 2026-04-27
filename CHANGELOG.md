@@ -5,6 +5,69 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.15.0] - 2026-04-27
+
+### Added
+
+#### Shared Learning Store and Knowledge Graph Integration
+- **`SharedLearningStore`** in `terraphim_agent` implementing `LearningStore` with hybrid graph scoring
+- **L0 trust level** and `LearningStore` trait in `terraphim_types` (#846)
+- **Learning store wired into orchestrator agent lifecycle** (#848, #849)
+- **`LearningStore` on `SharedLearningStore`** with Aho-Corasick graph hybrid scoring (#850)
+
+#### Robot Mode and Forgiving CLI
+- **`RobotFormatter`** wired into CLI search; `ForgivingParser` integrated into REPL (#843)
+- **Robot mode JSON output** in session commands (#840)
+- **Token budget management engine** for robot mode (#707)
+- **`BudgetEngine`, `FieldMode`, `OutputFormat`, `RobotConfig`, `RobotResponse`** types
+
+#### Sessions and Real-time Ingestion
+- **`SessionConnector::watch()`** for real-time session file ingestion (#839)
+- **Auto-import sessions** on first use (#707)
+- **Robot mode JSON output** in session commands
+
+#### Codebase Evaluation
+- **Manifest types and TOML/YAML loader** in `terraphim_codebase_eval` (#844)
+- **`MetricsRunner`** with clippy, test, and tokei delta reporting
+
+#### Firecracker CI Infrastructure
+- **Firecracker-accelerated CI workflow** with dedicated Hetzner bigbox runner
+- **Shared Rust build cache** via sccache + SeaweedFS S3 on fcbr0
+- **VM-cargo-probe job** for end-to-end infrastructure validation
+- **Rust-CI VM image** with sccache + SeaweedFS integration
+
+#### Documentation (6 crates)
+- Added `//!` module-level documentation to: `terraphim_agent`, `terraphim_service`,
+  `terraphim_middleware`, `terraphim_rolegraph`, `terraphim_config`, `terraphim_persistence`,
+  `terraphim_mcp_server`
+- 1625 doc warnings fixed in prior run (2944 → 1319, 55% reduction)
+
+#### Linear Tracker Integration
+- **`LinearTracker`** for Linear.app issue lifecycle management
+
+### Fixed
+- **`RobotResponse` formatting** in chained command output
+- **Exit classifier** trusts `exit_code=0` over pattern matches in orchestrator
+- **Config lock release** during I/O to prevent deadlocks
+- **`parse_chained_command`** identifies failing subcommand via exit code
+- **LLM integration tests** for live environment
+- **Desktop frontend** TypeScript errors resolved
+- **Kimi and ZAI fallback routes** added to `review_tier` (#328)
+
+### Changed
+- **Build system**: `zlob` is now the default linker, with Zig 0.16 + Darwin workaround
+- **Test performance**: Agent and server built once; binaries exec'd directly (no re-builds per test)
+- **CI routing**: vm-cargo-probe routed through `/api/llm/execute`
+
+### Dependencies
+- `teloxide` 0.13 → 0.17
+- `jiff` 0.1 → 0.2
+- `dialoguer` 0.11 → 0.12
+- `bollard` 0.18 → 0.20
+- `tower` 0.4 → 0.5
+- `config` 0.14 → 0.15
+- `indicatif` 0.17 → 0.18
+
 ## [1.14.0] - 2026-03-22
 
 ### Added

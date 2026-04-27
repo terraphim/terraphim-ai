@@ -1,3 +1,9 @@
+//! MCP (Model Context Protocol) server exposing Terraphim tools to AI assistants.
+//!
+//! Implements the MCP server protocol over stdio and SSE transports, surfacing
+//! `terraphim_automata` and `terraphim_rolegraph` capabilities as MCP tools:
+//! autocomplete, fuzzy search, text matching, thesaurus management, and graph
+//! path connectivity checks.
 use anyhow::Result;
 use base64::Engine;
 use fff_search::external_scorer::ExternalScorer;
