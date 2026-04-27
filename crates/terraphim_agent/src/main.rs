@@ -1869,8 +1869,10 @@ async fn run_offline_command(
                     wildcard_fallback: false,
                 };
 
-                let meta =
-                    ResponseMeta::new("search").with_elapsed(start.elapsed().as_millis() as u64);
+                let meta = ResponseMeta::new("search")
+                    .with_elapsed(start.elapsed().as_millis() as u64)
+                    .with_query(&query)
+                    .with_role(role_name.as_str());
                 let response = RobotResponse::success(data, meta);
                 let output_str = formatter.format(&response)?;
                 println!("{}", output_str);
@@ -3706,6 +3708,7 @@ async fn run_server_command(
                 config_res.config.selected_role
             };
 
+            let role_for_meta = role_name.clone();
             let q = if let Some(additional_terms) = terms {
                 // Multi-term query with logical operators
                 let search_terms: Vec<NormalizedTermValue> = additional_terms
@@ -3821,8 +3824,10 @@ async fn run_server_command(
                     wildcard_fallback: false,
                 };
 
-                let meta =
-                    ResponseMeta::new("search").with_elapsed(start.elapsed().as_millis() as u64);
+                let meta = ResponseMeta::new("search")
+                    .with_elapsed(start.elapsed().as_millis() as u64)
+                    .with_query(&query)
+                    .with_role(role_for_meta.as_str());
                 let response = RobotResponse::success(data, meta);
                 let output_str = formatter.format(&response)?;
                 println!("{}", output_str);
