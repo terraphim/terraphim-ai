@@ -160,7 +160,7 @@ fn test_search_results_data_concepts_matched_serialised() {
     assert!(json.contains("concepts_matched"));
     assert!(json.contains("rust"));
     assert!(json.contains("async"));
-    assert!(!json.contains("wildcard_fallback"));
+    assert!(json.contains("\"wildcard_fallback\":false"));
 }
 
 #[test]
