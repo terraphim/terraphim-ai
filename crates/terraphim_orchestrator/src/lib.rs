@@ -8295,6 +8295,283 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
         );
     }
 
+    /// Phase 2b helper: extend `review_pr_config_with_fanout` with a third
+    /// project-scoped `pr-spec-validator` agent and a three-entry
+    /// `[pr_dispatch]` block (build-runner, pr-reviewer, pr-spec-validator).
+    fn review_pr_config_with_spec_fanout(cli_tool: &str) -> (OrchestratorConfig, TempDir) {
+        let (mut config, tmp) = review_pr_config_with_fanout(cli_tool);
+        config.agents.push(AgentDefinition {
+            name: "pr-spec-validator".to_string(),
+            layer: AgentLayer::Safety,
+            cli_tool: cli_tool.to_string(),
+            task: "spec".to_string(),
+            model: None,
+            schedule: None,
+            capabilities: vec!["review".to_string()],
+            max_memory_bytes: None,
+            budget_monthly_cents: None,
+            provider: None,
+            persona: None,
+            terraphim_role: None,
+            skill_chain: vec!["requirements-traceability".to_string()],
+            sfia_skills: vec![],
+            fallback_provider: None,
+            fallback_model: None,
+            grace_period_secs: None,
+            max_cpu_seconds: None,
+            pre_check: None,
+            gitea_issue: None,
+            project: Some("alpha".to_string()),
+        });
+        config.pr_dispatch = Some(crate::config::PrDispatchConfig {
+            agents_on_pr_open: vec![
+                crate::config::PrDispatchEntry {
+                    name: "build-runner".to_string(),
+                    context: "adf/build".to_string(),
+                },
+                crate::config::PrDispatchEntry {
+                    name: "pr-reviewer".to_string(),
+                    context: "adf/pr-reviewer".to_string(),
+                },
+                crate::config::PrDispatchEntry {
+                    name: "pr-spec-validator".to_string(),
+                    context: "adf/spec".to_string(),
+                },
+            ],
+        });
+        (config, tmp)
+    }
+
+    /// ADF Phase 2b (Refs #950): a `pull_request.opened` event with
+    /// `pr-spec-validator` in `agents_on_pr_open` must spawn the agent.
+    /// Verifies the existing fan-out loop's generic `_` arm (which routes
+    /// any non-`build-runner` entry through `dispatch_pr_reviewer_for_pr`
+    /// by name) handles the new context cleanly without code change.
+    #[tokio::test]
+    async fn handle_review_pr_spawns_pr_spec_validator_when_configured() {
+        let (config, _tmp) = review_pr_config_with_spec_fanout("echo");
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        orch.handle_review_pr(review_pr_task()).await.unwrap();
+
+        assert!(
+            orch.active_agents.contains_key("pr-spec-validator"),
+            "pr-spec-validator must be spawned; active_agents: {:?}",
+            orch.active_agents.keys().collect::<Vec<_>>()
+        );
+        // Spec-validator is a PR-event agent, so it must receive the
+        // `ADF_PR_*` env (not `ADF_PUSH_*`). Verified via session_id
+        // scoping; the env wiring itself is exercised by the existing
+        // `reviewpr_dispatch_sets_env_vars` test through the same
+        // dispatch helper.
+        let managed = orch.active_agents.get("pr-spec-validator").unwrap();
+        assert!(
+            managed.session_id.starts_with("pr-spec-validator-"),
+            "session id should be scoped to the agent, got: {}",
+            managed.session_id
+        );
+    }
+
+    /// ADF Phase 2b (Refs #950): when a workflow tracker is configured,
+    /// `pr-spec-validator`'s spawn must POST a `pending` commit status
+    /// with context `adf/spec` against the PR head SHA.
+    #[tokio::test]
+    async fn handle_review_pr_pending_status_posted_for_spec_context() {
+        use axum::{
+            extract::{Path, State},
+            http::StatusCode,
+            response::IntoResponse,
+            routing::post,
+            Router,
+        };
+        use std::sync::atomic::{AtomicUsize, Ordering as AOrdering};
+        use std::sync::Arc;
+        use tokio::net::TcpListener;
+
+        #[derive(Default)]
+        struct Captured {
+            calls: AtomicUsize,
+            contexts: std::sync::Mutex<Vec<String>>,
+            states: std::sync::Mutex<Vec<String>>,
+        }
+
+        async fn capture(
+            Path((_owner, _repo, _sha)): Path<(String, String, String)>,
+            State(captured): State<Arc<Captured>>,
+            body: axum::body::Bytes,
+        ) -> impl IntoResponse {
+            captured.calls.fetch_add(1, AOrdering::SeqCst);
+            if let Ok(parsed) = serde_json::from_slice::<serde_json::Value>(&body) {
+                if let Some(ctx) = parsed.get("context").and_then(|v| v.as_str()) {
+                    captured.contexts.lock().unwrap().push(ctx.to_string());
+                }
+                if let Some(st) = parsed.get("state").and_then(|v| v.as_str()) {
+                    captured.states.lock().unwrap().push(st.to_string());
+                }
+            }
+            StatusCode::CREATED
+        }
+
+        let captured = Arc::new(Captured::default());
+        let app = Router::new()
+            .route("/api/v1/repos/{owner}/{repo}/statuses/{sha}", post(capture))
+            .with_state(captured.clone());
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            axum::serve(listener, app).await.ok();
+        });
+        let base_url = format!("http://{}", addr);
+
+        let (mut config, _tmp) = review_pr_config_with_spec_fanout("echo");
+        config.workflow = Some(crate::config::WorkflowConfig {
+            enabled: true,
+            poll_interval_secs: 60,
+            workflow_file: std::path::PathBuf::from("/tmp/workflow.md"),
+            tracker: crate::config::TrackerConfig {
+                kind: "gitea".to_string(),
+                endpoint: base_url.clone(),
+                api_key: "test-token".to_string(),
+                owner: "fakeowner".to_string(),
+                repo: "fakerepo".to_string(),
+                project_slug: None,
+                use_robot_api: false,
+                states: crate::config::TrackerStates::default(),
+            },
+            concurrency: crate::config::ConcurrencyConfig::default(),
+        });
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        orch.handle_review_pr(review_pr_task()).await.unwrap();
+
+        // Expect three POSTs (one per fan-out agent).
+        for _ in 0..150 {
+            if captured.calls.load(AOrdering::SeqCst) >= 3 {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        let contexts = captured.contexts.lock().unwrap().clone();
+        assert!(
+            contexts.iter().any(|c| c == "adf/spec"),
+            "adf/spec pending status missing; got: {contexts:?}"
+        );
+        let states = captured.states.lock().unwrap().clone();
+        assert!(
+            states.iter().all(|s| s == "pending"),
+            "all initial statuses must be pending; got: {states:?}"
+        );
+    }
+
+    /// ADF Phase 2b (Refs #950): when `pr-spec-validator` is gated out by
+    /// the runtime subscription allow-list, its `pending` must NOT be
+    /// posted -- otherwise `adf/spec` (a required check on `main`) would
+    /// hang indefinitely. Other fan-out entries still post their pendings.
+    #[tokio::test]
+    async fn handle_review_pr_spec_validator_skipped_does_not_post_pending() {
+        use axum::{
+            extract::{Path, State},
+            http::StatusCode,
+            response::IntoResponse,
+            routing::post,
+            Router,
+        };
+        use std::sync::atomic::{AtomicUsize, Ordering as AOrdering};
+        use std::sync::Arc;
+        use tokio::net::TcpListener;
+
+        #[derive(Default)]
+        struct Captured {
+            calls: AtomicUsize,
+            contexts: std::sync::Mutex<Vec<String>>,
+        }
+
+        async fn capture(
+            Path((_owner, _repo, _sha)): Path<(String, String, String)>,
+            State(captured): State<Arc<Captured>>,
+            body: axum::body::Bytes,
+        ) -> impl IntoResponse {
+            captured.calls.fetch_add(1, AOrdering::SeqCst);
+            if let Ok(parsed) = serde_json::from_slice::<serde_json::Value>(&body) {
+                if let Some(ctx) = parsed.get("context").and_then(|v| v.as_str()) {
+                    captured.contexts.lock().unwrap().push(ctx.to_string());
+                }
+            }
+            StatusCode::CREATED
+        }
+
+        let captured = Arc::new(Captured::default());
+        let app = Router::new()
+            .route("/api/v1/repos/{owner}/{repo}/statuses/{sha}", post(capture))
+            .with_state(captured.clone());
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            axum::serve(listener, app).await.ok();
+        });
+        let base_url = format!("http://{}", addr);
+
+        let (mut config, _tmp) = review_pr_config_with_spec_fanout("echo");
+        // Stamp a banned model on pr-spec-validator AFTER load-time
+        // validation so the runtime allow-list gate is the one that
+        // short-circuits the spawn. The other agents stay clean.
+        let svc = config
+            .agents
+            .iter_mut()
+            .find(|a| a.name == "pr-spec-validator")
+            .unwrap();
+        svc.model = Some("google/gemini-2".to_string());
+
+        config.workflow = Some(crate::config::WorkflowConfig {
+            enabled: true,
+            poll_interval_secs: 60,
+            workflow_file: std::path::PathBuf::from("/tmp/workflow.md"),
+            tracker: crate::config::TrackerConfig {
+                kind: "gitea".to_string(),
+                endpoint: base_url.clone(),
+                api_key: "test-token".to_string(),
+                owner: "fakeowner".to_string(),
+                repo: "fakerepo".to_string(),
+                project_slug: None,
+                use_robot_api: false,
+                states: crate::config::TrackerStates::default(),
+            },
+            concurrency: crate::config::ConcurrencyConfig::default(),
+        });
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        orch.handle_review_pr(review_pr_task()).await.unwrap();
+
+        // Wait for the two non-skipped POSTs, then a small grace window
+        // for any erroneous adf/spec POST to surface.
+        for _ in 0..150 {
+            if captured.calls.load(AOrdering::SeqCst) >= 2 {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        tokio::time::sleep(Duration::from_millis(150)).await;
+
+        let contexts = captured.contexts.lock().unwrap().clone();
+        assert!(
+            !contexts.iter().any(|c| c == "adf/spec"),
+            "skipped pr-spec-validator must NOT post adf/spec pending; got: {contexts:?}"
+        );
+        assert!(
+            !orch.active_agents.contains_key("pr-spec-validator"),
+            "pr-spec-validator must not be in active_agents when subscription gate rejects"
+        );
+        // Sanity: the other two agents still spawned + posted.
+        assert!(
+            contexts.iter().any(|c| c == "adf/pr-reviewer"),
+            "pr-reviewer must still post its pending; got: {contexts:?}"
+        );
+        assert!(
+            contexts.iter().any(|c| c == "adf/build"),
+            "build-runner must still post its pending; got: {contexts:?}"
+        );
+    }
+
     #[test]
     fn test_learning_config_default_disabled() {
         let cfg = config::LearningConfig::default();
