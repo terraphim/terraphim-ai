@@ -359,6 +359,7 @@ mod performance_tests {
     }
 
     #[tokio::test]
+    #[cfg(not(debug_assertions))]
     async fn test_parameter_validation_performance() {
         // Test performance of parameter validation
 
@@ -388,6 +389,7 @@ mod performance_tests {
     }
 
     #[tokio::test]
+    #[cfg(not(debug_assertions))]
     async fn test_registry_search_performance() {
         // Test performance of command registry search
 

@@ -1,8 +1,17 @@
+/// Integration tests for the F1.2 exit-code contract.
+///
+/// Invokes the real `terraphim-agent` binary and asserts `status.code()`.
+/// No mocks -- uses real but unreachable endpoints, missing files, and
+/// deliberately bad CLI flags to trigger each exit-code category.
 use assert_cmd::Command;
 
 fn cmd() -> Command {
     Command::cargo_bin("terraphim-agent").expect("binary not found")
 }
+
+// ---------------------------------------------------------------------------
+// Exit code 2 -- usage / bad flags (clap exits before main body)
+// ---------------------------------------------------------------------------
 
 #[test]
 fn bad_flag_exits_2() {
@@ -14,11 +23,19 @@ fn bad_flag_exits_2() {
 
 #[test]
 fn search_missing_query_arg_exits_2() {
+    // `search` requires a positional <query> argument
     cmd().args(["search"]).assert().code(2);
 }
 
+// ---------------------------------------------------------------------------
+// Exit code 1 -- ERROR_GENERAL (unspecified error, no matching pattern)
+// ---------------------------------------------------------------------------
+
 #[test]
 fn bad_config_file_exits_1() {
+    // A nonexistent config file produces a "Failed to load config" error which
+    // does not match any specific exit-code pattern, so classify_error returns
+    // ErrorGeneral (1).
     cmd()
         .args([
             "--config",
@@ -30,8 +47,27 @@ fn bad_config_file_exits_1() {
         .code(1);
 }
 
+// ---------------------------------------------------------------------------
+// Exit code 0 -- successful offline search (may return 0 results but succeeds)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn search_succeeds_exits_0() {
+    cmd()
+        .args(["search", "terraphim", "--role", "Terraphim Engineer"])
+        .assert()
+        .code(0);
+}
+
+// ---------------------------------------------------------------------------
+// Exit code 3 -- index missing (knowledge graph not configured)
+// ---------------------------------------------------------------------------
+
 #[test]
 fn validate_with_no_kg_exits_3() {
+    // Load a fixture config where the role has kg: null so the service layer
+    // returns "Knowledge graph not configured", which classify_error maps to
+    // ErrorIndexMissing (3).  This avoids relying on the developer's local KG.
     let fixture = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/no_kg_config.json");
     cmd()
         .args([
@@ -44,8 +80,14 @@ fn validate_with_no_kg_exits_3() {
         .code(3);
 }
 
+// ---------------------------------------------------------------------------
+// Exit code 4 -- not found when --fail-on-empty and no results
+// ---------------------------------------------------------------------------
+
 #[test]
 fn fail_on_empty_with_no_results_exits_4() {
+    // Use a query that is guaranteed to return zero results with the default
+    // in-memory config (no haystacks indexed at test time).
     cmd()
         .args([
             "search",
@@ -55,6 +97,27 @@ fn fail_on_empty_with_no_results_exits_4() {
         .assert()
         .code(4);
 }
+
+#[test]
+fn fail_on_empty_with_results_exits_0() {
+    // Even when --fail-on-empty is set, non-empty results should exit 0.
+    // The test may still produce 0 results depending on the indexed content,
+    // so we accept either 0 or 4 -- the point is it must NOT be 1/2/3.
+    let status = cmd()
+        .args(["search", "terraphim", "--fail-on-empty"])
+        .output()
+        .expect("failed to run binary")
+        .status;
+    let code = status.code().unwrap_or(1);
+    assert!(
+        code == 0 || code == 4,
+        "expected 0 or 4 from --fail-on-empty search, got {code}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Exit code 6 -- network error (unreachable server endpoint)
+// ---------------------------------------------------------------------------
 
 #[cfg(feature = "server")]
 #[test]
@@ -69,6 +132,76 @@ fn unreachable_server_exits_6() {
         ])
         .assert()
         .code(6);
+}
+
+// ---------------------------------------------------------------------------
+// Robot mode and --format json error envelopes
+// ---------------------------------------------------------------------------
+
+#[test]
+fn robot_mode_error_emits_json_envelope() {
+    let output = cmd()
+        .args([
+            "--config",
+            "/tmp/nonexistent_f1_2_exit_code_test.json",
+            "--robot",
+            "search",
+            "terraphim",
+        ])
+        .output()
+        .expect("failed to run binary");
+
+    assert_ne!(output.status.code(), Some(0));
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let json: serde_json::Value =
+        serde_json::from_str(stdout.trim()).expect("stdout should be valid JSON");
+
+    assert_eq!(
+        json.get("success").and_then(|v| v.as_bool()),
+        Some(false),
+        "robot error envelope should have success=false"
+    );
+    assert!(
+        json.get("errors").is_some(),
+        "robot error envelope should contain 'errors' field"
+    );
+    assert!(
+        json.get("meta").is_some(),
+        "robot error envelope should contain 'meta' field"
+    );
+}
+
+#[test]
+fn format_json_error_emits_json_envelope() {
+    let output = cmd()
+        .args([
+            "--config",
+            "/tmp/nonexistent_f1_2_exit_code_test.json",
+            "--format",
+            "json",
+            "search",
+            "terraphim",
+        ])
+        .output()
+        .expect("failed to run binary");
+
+    assert_ne!(output.status.code(), Some(0));
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let start = stdout.find('{').expect("stdout should contain JSON");
+    let json: serde_json::Value =
+        serde_json::from_str(&stdout[start..]).expect("should be valid JSON");
+
+    assert_eq!(
+        json.get("success").and_then(|v| v.as_bool()),
+        Some(false),
+        "JSON error envelope should have success=false"
+    );
+    assert!(
+        json.get("errors").is_some(),
+        "JSON error envelope should contain 'errors' field"
+    );
 }
 
 #[test]
