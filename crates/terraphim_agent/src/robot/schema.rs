@@ -378,6 +378,43 @@ pub struct IndexStatus {
     pub last_updated: Option<DateTime<Utc>>,
 }
 
+/// Data for `roles list` response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RolesData {
+    /// Available roles
+    pub roles: Vec<RoleItem>,
+    /// Currently selected role
+    pub selected: String,
+}
+
+/// A single role entry in the roles list
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RoleItem {
+    /// Full role name
+    pub name: String,
+    /// Short alias (if any)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub shortname: Option<String>,
+    /// Whether this is the currently selected role
+    pub selected: bool,
+}
+
+/// Data for `graph` response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GraphData {
+    /// Concepts from the role graph
+    pub concepts: Vec<String>,
+    /// Role used
+    pub role: String,
+}
+
+/// Data for `roles select` confirmation response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RoleSelectData {
+    /// The role that was selected
+    pub selected: String,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

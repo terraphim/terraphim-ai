@@ -24,5 +24,6 @@ pub use exit_codes::ExitCode;
 pub use output::{FieldMode, OutputFormat, RobotConfig, RobotFormatter};
 #[allow(unused_imports)]
 pub use schema::{
-    AutoCorrection, Pagination, ResponseMeta, RobotError, RobotResponse, TokenBudget,
+    AutoCorrection, GraphData, Pagination, ResponseMeta, RobotError, RobotResponse, RoleItem,
+    RoleSelectData, RolesData, TokenBudget,
 };

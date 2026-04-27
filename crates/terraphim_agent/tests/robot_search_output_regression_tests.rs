@@ -292,3 +292,126 @@ fn search_format_json_compact_produces_single_line_output() -> Result<()> {
     );
     Ok(())
 }
+
+// ── Issue #1013: --format json on roles/config/graph ────────────────────────
+
+#[test]
+#[serial]
+fn roles_list_format_json_emits_robot_envelope() -> Result<()> {
+    let (stdout, stderr, code) = run_agent_command(&["--format", "json", "roles", "list"])?;
+    assert_eq!(
+        code, 0,
+        "roles list --format json should succeed; stderr={}",
+        stderr
+    );
+    let json: serde_json::Value =
+        serde_json::from_str(&stdout).context("roles list --format json: stdout not valid JSON")?;
+    assert!(
+        json.get("success")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false),
+        "envelope should have success=true"
+    );
+    let roles = json
+        .pointer("/data/roles")
+        .and_then(|v| v.as_array())
+        .context("envelope should contain /data/roles array")?;
+    assert!(
+        !roles.is_empty(),
+        "roles list should return at least one role"
+    );
+    let first = roles[0].as_object().expect("each role should be an object");
+    assert!(first.contains_key("name"), "role should have 'name' field");
+    assert!(
+        first.contains_key("selected"),
+        "role should have 'selected' field"
+    );
+    assert!(
+        json.pointer("/data/selected")
+            .and_then(|v| v.as_str())
+            .is_some(),
+        "envelope should contain /data/selected string"
+    );
+    Ok(())
+}
+
+#[test]
+#[serial]
+fn roles_list_robot_flag_emits_robot_envelope() -> Result<()> {
+    let (stdout, stderr, code) = run_agent_command(&["--robot", "roles", "list"])?;
+    assert_eq!(
+        code, 0,
+        "roles list --robot should succeed; stderr={}",
+        stderr
+    );
+    let json: serde_json::Value =
+        serde_json::from_str(&stdout).context("roles list --robot: stdout not valid JSON")?;
+    assert!(
+        json.get("success")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false),
+        "envelope should have success=true"
+    );
+    Ok(())
+}
+
+#[test]
+#[serial]
+fn config_show_format_json_emits_robot_envelope() -> Result<()> {
+    let (stdout, stderr, code) = run_agent_command(&["--format", "json", "config", "show"])?;
+    assert_eq!(
+        code, 0,
+        "config show --format json should succeed; stderr={}",
+        stderr
+    );
+    let json: serde_json::Value = serde_json::from_str(&stdout)
+        .context("config show --format json: stdout not valid JSON")?;
+    assert!(
+        json.get("success")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false),
+        "envelope should have success=true"
+    );
+    assert!(
+        json.get("data").is_some(),
+        "envelope should contain 'data' field"
+    );
+    assert_eq!(
+        json.pointer("/meta/command").and_then(|v| v.as_str()),
+        Some("config show"),
+        "meta.command should be 'config show'"
+    );
+    Ok(())
+}
+
+#[test]
+#[serial]
+fn graph_format_json_emits_robot_envelope() -> Result<()> {
+    let (stdout, stderr, code) = run_agent_command(&["--format", "json", "graph"])?;
+    assert_eq!(
+        code, 0,
+        "graph --format json should succeed; stderr={}",
+        stderr
+    );
+    let json: serde_json::Value =
+        serde_json::from_str(&stdout).context("graph --format json: stdout not valid JSON")?;
+    assert!(
+        json.get("success")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false),
+        "envelope should have success=true"
+    );
+    assert!(
+        json.pointer("/data/concepts")
+            .and_then(|v| v.as_array())
+            .is_some(),
+        "envelope should contain /data/concepts array"
+    );
+    assert!(
+        json.pointer("/data/role")
+            .and_then(|v| v.as_str())
+            .is_some(),
+        "envelope should contain /data/role string"
+    );
+    Ok(())
+}

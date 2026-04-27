@@ -1935,16 +1935,42 @@ async fn run_offline_command(
                 RolesSub::List => {
                     let roles_with_info = service.list_roles_with_info().await;
                     let selected = service.get_selected_role().await;
-                    for (name, shortname) in roles_with_info {
-                        let marker = if name == selected.to_string() {
-                            "*"
-                        } else {
-                            " "
+                    if output.is_machine_readable() {
+                        use crate::robot::schema::{RoleItem, RolesData};
+                        let roles: Vec<RoleItem> = roles_with_info
+                            .into_iter()
+                            .map(|(name, shortname)| RoleItem {
+                                selected: name == selected.to_string(),
+                                name,
+                                shortname,
+                            })
+                            .collect();
+                        let data = RolesData {
+                            selected: selected.to_string(),
+                            roles,
                         };
-                        if let Some(short) = shortname {
-                            println!("{} {} ({})", marker, name, short);
+                        let response = robot::RobotResponse::success(
+                            data,
+                            robot::ResponseMeta::new("roles list"),
+                        );
+                        let json = if matches!(output.mode, CommandOutputMode::JsonCompact) {
+                            serde_json::to_string(&response)?
                         } else {
-                            println!("{} {}", marker, name);
+                            serde_json::to_string_pretty(&response)?
+                        };
+                        println!("{}", json);
+                    } else {
+                        for (name, shortname) in roles_with_info {
+                            let marker = if name == selected.to_string() {
+                                "*"
+                            } else {
+                                " "
+                            };
+                            if let Some(short) = shortname {
+                                println!("{} {} ({})", marker, name, short);
+                            } else {
+                                println!("{} {}", marker, name);
+                            }
                         }
                     }
                 }
@@ -1961,7 +1987,24 @@ async fn run_offline_command(
                         })?;
                     service.update_selected_role(role_name.clone()).await?;
                     service.save_config().await?;
-                    println!("selected:{}", role_name);
+                    if output.is_machine_readable() {
+                        use crate::robot::schema::RoleSelectData;
+                        let data = RoleSelectData {
+                            selected: role_name.to_string(),
+                        };
+                        let response = robot::RobotResponse::success(
+                            data,
+                            robot::ResponseMeta::new("roles select"),
+                        );
+                        let json = if matches!(output.mode, CommandOutputMode::JsonCompact) {
+                            serde_json::to_string(&response)?
+                        } else {
+                            serde_json::to_string_pretty(&response)?
+                        };
+                        println!("{}", json);
+                    } else {
+                        println!("selected:{}", role_name);
+                    }
                 }
             }
             Ok(())
@@ -1970,7 +2013,21 @@ async fn run_offline_command(
             match sub {
                 ConfigSub::Show => {
                     let config = service.get_config().await;
-                    println!("{}", serde_json::to_string_pretty(&config)?);
+                    if output.is_machine_readable() {
+                        let config_value = serde_json::to_value(&config)?;
+                        let response = robot::RobotResponse::success(
+                            config_value,
+                            robot::ResponseMeta::new("config show"),
+                        );
+                        let json = if matches!(output.mode, CommandOutputMode::JsonCompact) {
+                            serde_json::to_string(&response)?
+                        } else {
+                            serde_json::to_string_pretty(&response)?
+                        };
+                        println!("{}", json);
+                    } else {
+                        println!("{}", serde_json::to_string_pretty(&config)?);
+                    }
                 }
                 ConfigSub::Set { key, value } => match key.as_str() {
                     "selected_role" => {
@@ -2019,8 +2076,24 @@ async fn run_offline_command(
             let role_name = service.resolve_role(role.as_deref()).await?;
 
             let concepts = service.get_role_graph_top_k(&role_name, top_k).await?;
-            for concept in concepts {
-                println!("{}", concept);
+            if output.is_machine_readable() {
+                use crate::robot::schema::GraphData;
+                let data = GraphData {
+                    concepts,
+                    role: role_name.to_string(),
+                };
+                let response =
+                    robot::RobotResponse::success(data, robot::ResponseMeta::new("graph"));
+                let json = if matches!(output.mode, CommandOutputMode::JsonCompact) {
+                    serde_json::to_string(&response)?
+                } else {
+                    serde_json::to_string_pretty(&response)?
+                };
+                println!("{}", json);
+            } else {
+                for concept in concepts {
+                    println!("{}", concept);
+                }
             }
             Ok(())
         }
@@ -3917,16 +3990,44 @@ async fn run_server_command(
                 RolesSub::List => {
                     let cfg = api.get_config().await?;
                     let selected = cfg.config.selected_role.to_string();
-                    for (name, role) in cfg.config.roles.iter() {
-                        let marker = if name.to_string() == selected {
-                            "*"
-                        } else {
-                            " "
+                    if output.is_machine_readable() {
+                        use crate::robot::schema::{RoleItem, RolesData};
+                        let roles: Vec<RoleItem> = cfg
+                            .config
+                            .roles
+                            .iter()
+                            .map(|(name, role)| RoleItem {
+                                selected: name.to_string() == selected,
+                                name: name.to_string(),
+                                shortname: role.shortname.clone(),
+                            })
+                            .collect();
+                        let data = RolesData {
+                            selected: selected.clone(),
+                            roles,
                         };
-                        if let Some(ref short) = role.shortname {
-                            println!("{} {} ({})", marker, name, short);
+                        let response = robot::RobotResponse::success(
+                            data,
+                            robot::ResponseMeta::new("roles list"),
+                        );
+                        let json = if matches!(output.mode, CommandOutputMode::JsonCompact) {
+                            serde_json::to_string(&response)?
                         } else {
-                            println!("{} {}", marker, name);
+                            serde_json::to_string_pretty(&response)?
+                        };
+                        println!("{}", json);
+                    } else {
+                        for (name, role) in cfg.config.roles.iter() {
+                            let marker = if name.to_string() == selected {
+                                "*"
+                            } else {
+                                " "
+                            };
+                            if let Some(ref short) = role.shortname {
+                                println!("{} {} ({})", marker, name, short);
+                            } else {
+                                println!("{} {}", marker, name);
+                            }
                         }
                     }
                 }
@@ -3972,7 +4073,24 @@ async fn run_server_command(
                         }
                     };
                     let _ = api.update_selected_role(&role_name).await?;
-                    println!("selected:{}", role_name);
+                    if output.is_machine_readable() {
+                        use crate::robot::schema::RoleSelectData;
+                        let data = RoleSelectData {
+                            selected: role_name.clone(),
+                        };
+                        let response = robot::RobotResponse::success(
+                            data,
+                            robot::ResponseMeta::new("roles select"),
+                        );
+                        let json = if matches!(output.mode, CommandOutputMode::JsonCompact) {
+                            serde_json::to_string(&response)?
+                        } else {
+                            serde_json::to_string_pretty(&response)?
+                        };
+                        println!("{}", json);
+                    } else {
+                        println!("selected:{}", role_name);
+                    }
                 }
             }
             Ok(())
@@ -3981,7 +4099,21 @@ async fn run_server_command(
             match sub {
                 ConfigSub::Show => {
                     let cfg = api.get_config().await?;
-                    println!("{}", serde_json::to_string_pretty(&cfg.config)?);
+                    if output.is_machine_readable() {
+                        let config_value = serde_json::to_value(&cfg.config)?;
+                        let response = robot::RobotResponse::success(
+                            config_value,
+                            robot::ResponseMeta::new("config show"),
+                        );
+                        let json = if matches!(output.mode, CommandOutputMode::JsonCompact) {
+                            serde_json::to_string(&response)?
+                        } else {
+                            serde_json::to_string_pretty(&response)?
+                        };
+                        println!("{}", json);
+                    } else {
+                        println!("{}", serde_json::to_string_pretty(&cfg.config)?);
+                    }
                 }
                 ConfigSub::Set { key, value } => {
                     let mut cfg = api.get_config().await?.config;
@@ -4019,8 +4151,29 @@ async fn run_server_command(
             let mut nodes_sorted = graph_res.nodes.clone();
             #[allow(clippy::unnecessary_sort_by)]
             nodes_sorted.sort_by(|a, b| b.rank.cmp(&a.rank));
-            for node in nodes_sorted.into_iter().take(top_k) {
-                println!("{}", node.label);
+            if output.is_machine_readable() {
+                use crate::robot::schema::GraphData;
+                let concepts: Vec<String> = nodes_sorted
+                    .into_iter()
+                    .take(top_k)
+                    .map(|n| n.label)
+                    .collect();
+                let data = GraphData {
+                    concepts,
+                    role: role_name.clone(),
+                };
+                let response =
+                    robot::RobotResponse::success(data, robot::ResponseMeta::new("graph"));
+                let json = if matches!(output.mode, CommandOutputMode::JsonCompact) {
+                    serde_json::to_string(&response)?
+                } else {
+                    serde_json::to_string_pretty(&response)?
+                };
+                println!("{}", json);
+            } else {
+                for node in nodes_sorted.into_iter().take(top_k) {
+                    println!("{}", node.label);
+                }
             }
             Ok(())
         }
