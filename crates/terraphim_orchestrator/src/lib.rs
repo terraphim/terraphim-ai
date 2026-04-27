@@ -2001,7 +2001,11 @@ impl AgentOrchestrator {
             }
         });
 
-        let mut request = SpawnRequest::new(primary_provider, &task_string);
+        // Issue #1020: pass the TOML `task` body (script / system prompt)
+        // to the spawner -- not the runtime informational summary.
+        // The summary is layered as ADF_TASK_SUMMARY env so future TOML
+        // scripts can reference it without a code change.
+        let mut request = SpawnRequest::new(primary_provider, &def.task);
         if !routed_model.is_empty() {
             request = request.with_primary_model(&routed_model);
         }
@@ -2023,7 +2027,8 @@ impl AgentOrchestrator {
 
         let base_ctx =
             build_spawn_context_for_agent(&self.config, &def, self.output_poster.as_ref());
-        let spawn_ctx = pr_dispatch::layer_pr_env(base_ctx, req);
+        let spawn_ctx = pr_dispatch::layer_pr_env(base_ctx, req)
+            .with_env("ADF_TASK_SUMMARY", task_string.clone());
 
         let handle = self
             .spawner
@@ -2176,7 +2181,12 @@ impl AgentOrchestrator {
             pr_number, head_sha, req.diff_loc, project, req.author_login,
         );
 
-        let mut request = SpawnRequest::new(primary_provider, &task_string);
+        // Issue #1020: pass the TOML `task` body (the bash script that
+        // does git fetch / rch exec / curl status post) to the spawner
+        // -- not the runtime informational summary, which would have
+        // been interpreted as `bash -c "Build/test verdict ..."` and
+        // exited 127 on the first non-existent command.
+        let mut request = SpawnRequest::new(primary_provider, &def.task);
 
         let mut limits = ResourceLimits::default();
         if let Some(max_cpu) = def.max_cpu_seconds {
@@ -2194,6 +2204,8 @@ impl AgentOrchestrator {
         // is empty because the ReviewPr dispatch task does not carry
         // the PR base SHA — the build-runner script only requires
         // `ADF_PUSH_SHA` and `ADF_PUSH_REF`.
+        // ADF_TASK_SUMMARY exposes the runtime summary so the task can
+        // log it without a code change (issue #1020).
         let mut spawn_ctx =
             build_spawn_context_for_agent(&self.config, &def, self.output_poster.as_ref());
         spawn_ctx = spawn_ctx
@@ -2202,7 +2214,8 @@ impl AgentOrchestrator {
             .with_env("ADF_PUSH_PROJECT", project.clone())
             .with_env("ADF_PUSH_BEFORE_SHA", String::new())
             .with_env("ADF_PUSH_PUSHER", req.author_login.clone())
-            .with_env("ADF_PUSH_FILES", String::new());
+            .with_env("ADF_PUSH_FILES", String::new())
+            .with_env("ADF_TASK_SUMMARY", task_string.clone());
 
         let handle = self
             .spawner
@@ -2439,7 +2452,10 @@ impl AgentOrchestrator {
             pusher_login,
         );
 
-        let mut request = SpawnRequest::new(primary_provider, &task_string);
+        // Issue #1020: pass the TOML `task` body (build-runner bash
+        // script) to the spawner -- not the runtime informational
+        // summary. The summary is layered as ADF_TASK_SUMMARY env.
+        let mut request = SpawnRequest::new(primary_provider, &def.task);
 
         let mut limits = ResourceLimits::default();
         if let Some(max_cpu) = def.max_cpu_seconds {
@@ -2459,7 +2475,8 @@ impl AgentOrchestrator {
             .with_env("ADF_PUSH_PROJECT", project.clone())
             .with_env("ADF_PUSH_BEFORE_SHA", before_sha.clone())
             .with_env("ADF_PUSH_PUSHER", pusher_login.clone())
-            .with_env("ADF_PUSH_FILES", files_changed.join("\n"));
+            .with_env("ADF_PUSH_FILES", files_changed.join("\n"))
+            .with_env("ADF_TASK_SUMMARY", task_string.clone());
 
         let handle = self
             .spawner
