@@ -17,21 +17,33 @@ use uuid::Uuid;
 
 use crate::AppState;
 
+/// Multi-agent coordination handlers.
 pub mod multi_agent_handlers;
+/// Optimisation workflow pattern.
 pub mod optimization;
+/// Orchestration workflow pattern.
 pub mod orchestration;
+/// Parallel workflow pattern.
 pub mod parallel;
+/// Prompt-chain workflow pattern.
 pub mod prompt_chain;
+/// Routing workflow pattern.
 pub mod routing;
+/// VM execution workflow pattern.
 pub mod vm_execution;
+/// WebSocket upgrade and subscription handlers.
 pub mod websocket;
 
 /// LLM configuration used by workflow execution steps.
 #[derive(Debug, Deserialize, Clone)]
 pub struct LlmConfig {
+    /// LLM provider identifier (e.g. `"ollama"`, `"openrouter"`).
     pub llm_provider: Option<String>,
+    /// Model name to request from the provider.
     pub llm_model: Option<String>,
+    /// Base URL for the provider's API endpoint.
     pub llm_base_url: Option<String>,
+    /// Sampling temperature controlling output randomness.
     pub llm_temperature: Option<f64>,
 }
 
@@ -49,55 +61,85 @@ impl Default for LlmConfig {
 /// Per-step workflow configuration.
 #[derive(Debug, Deserialize, Clone)]
 pub struct StepConfig {
+    /// Unique identifier for this step.
     pub id: String,
+    /// Human-readable step label.
     pub name: String,
+    /// Prompt template to send to the LLM for this step.
     pub prompt: String,
+    /// Optional role override for this step.
     pub role: Option<String>,
+    /// Optional system prompt to prepend for this step.
     pub system_prompt: Option<String>,
+    /// Optional LLM configuration override for this step.
     pub llm_config: Option<LlmConfig>,
 }
 
 /// Request payload for workflow execution.
 #[derive(Debug, Deserialize)]
 pub struct WorkflowRequest {
+    /// User-facing prompt to drive the workflow.
     pub prompt: String,
+    /// Role name to use for this execution.
     pub role: Option<String>,
+    /// Overall role applied across the entire workflow.
     pub overall_role: Option<String>,
+    /// Arbitrary extra configuration as JSON.
     pub config: Option<serde_json::Value>,
+    /// Global LLM configuration overriding crate defaults.
     pub llm_config: Option<LlmConfig>,
-    pub steps: Option<Vec<StepConfig>>, // Per-step configuration
+    /// Per-step configuration list.
+    pub steps: Option<Vec<StepConfig>>,
 }
 
 /// Response returned by workflow execution endpoints.
 #[derive(Debug, Serialize)]
 pub struct WorkflowResponse {
+    /// Unique identifier for the executed workflow session.
     pub workflow_id: String,
+    /// Whether the workflow completed without error.
     pub success: bool,
+    /// Result payload produced by the workflow.
     pub result: Option<serde_json::Value>,
+    /// Error message if the workflow failed.
     pub error: Option<String>,
+    /// Execution metadata including timing and step counts.
     pub metadata: WorkflowMetadata,
 }
 
 /// Metadata returned alongside workflow execution results.
 #[derive(Debug, Serialize)]
 pub struct WorkflowMetadata {
+    /// Wall-clock time the workflow took to complete, in milliseconds.
     pub execution_time_ms: u64,
+    /// Workflow pattern identifier (e.g. `"prompt_chain"`, `"parallel"`).
     pub pattern: String,
+    /// Number of steps executed.
     pub steps: usize,
+    /// Role used for this execution.
     pub role: String,
+    /// Overall role applied across the workflow.
     pub overall_role: String,
 }
 
 /// Current status for a workflow session.
 #[derive(Debug, Clone, Serialize)]
 pub struct WorkflowStatus {
+    /// Workflow session identifier.
     pub id: String,
+    /// Current lifecycle state of the workflow.
     pub status: ExecutionStatus,
+    /// Completion percentage in the range `[0.0, 100.0]`.
     pub progress: f64,
+    /// Name of the step currently executing, if any.
     pub current_step: Option<String>,
+    /// UTC timestamp when the workflow started.
     pub started_at: chrono::DateTime<chrono::Utc>,
+    /// UTC timestamp when the workflow finished, if complete.
     pub completed_at: Option<chrono::DateTime<chrono::Utc>>,
+    /// Result payload once the workflow has completed.
     pub result: Option<serde_json::Value>,
+    /// Error message if the workflow failed.
     pub error: Option<String>,
 }
 
@@ -105,20 +147,30 @@ pub struct WorkflowStatus {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecutionStatus {
+    /// Workflow has been created but not yet started.
     Pending,
+    /// Workflow is actively executing.
     Running,
+    /// Workflow finished successfully.
     Completed,
+    /// Workflow finished with an error.
     Failed,
+    /// Workflow was cancelled before completion.
     Cancelled,
 }
 
 /// Broadcast message sent to WebSocket subscribers.
 #[derive(Debug, Clone, Serialize)]
 pub struct WebSocketMessage {
+    /// Event type string (e.g. `"workflow_started"`, `"step_completed"`).
     pub message_type: String,
+    /// Identifier of the workflow that triggered this message, if applicable.
     pub workflow_id: Option<String>,
+    /// Identifier of the WebSocket session this message targets, if applicable.
     pub session_id: Option<String>,
+    /// Arbitrary event payload as JSON.
     pub data: serde_json::Value,
+    /// UTC timestamp when this message was emitted.
     pub timestamp: chrono::DateTime<chrono::Utc>,
 }
 
@@ -249,6 +301,7 @@ pub async fn update_workflow_status(
     }
 }
 
+/// Create a new workflow session entry and broadcast a `workflow_started` event.
 pub async fn create_workflow_session(
     sessions: &WorkflowSessions,
     broadcaster: &WebSocketBroadcaster,
@@ -283,6 +336,7 @@ pub async fn create_workflow_session(
     let _ = broadcaster.send(message);
 }
 
+/// Mark a workflow session as completed and broadcast the result.
 pub async fn complete_workflow_session(
     sessions: &WorkflowSessions,
     broadcaster: &WebSocketBroadcaster,
@@ -316,6 +370,7 @@ pub async fn complete_workflow_session(
     }
 }
 
+/// Mark a workflow session as failed and broadcast the error.
 pub async fn fail_workflow_session(
     sessions: &WorkflowSessions,
     broadcaster: &WebSocketBroadcaster,

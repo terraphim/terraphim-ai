@@ -18,6 +18,7 @@ struct ChainStep {
     duration_ms: u64,
 }
 
+/// Execute a prompt-chain workflow and return the chained results.
 pub async fn execute_prompt_chain(
     State(state): State<AppState>,
     Json(request): Json<WorkflowRequest>,

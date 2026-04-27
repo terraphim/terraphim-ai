@@ -160,6 +160,7 @@ struct PlateauAnalysis {
     break_strategy: String,
 }
 
+/// Execute an optimisation workflow and return results.
 pub async fn execute_optimization(
     State(state): State<AppState>,
     Json(request): Json<WorkflowRequest>,

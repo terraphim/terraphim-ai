@@ -8,6 +8,7 @@ use super::{
 };
 use crate::AppState;
 
+/// Execute a VM-sandboxed workflow demonstration.
 pub async fn execute_vm_execution_demo(
     State(state): State<AppState>,
     Json(request): Json<WorkflowRequest>,

@@ -166,6 +166,7 @@ struct ExecutionEvent {
     metadata: serde_json::Value,
 }
 
+/// Execute an orchestration workflow and return results.
 pub async fn execute_orchestration(
     State(state): State<AppState>,
     Json(request): Json<WorkflowRequest>,

@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Documentation (round 8 doc-gap audit 2026-04-27)
+- **112 missing-doc warnings resolved** across `terraphim_server` -- all public items now carry doc comments; `RUSTDOCFLAGS="-W missing-docs" cargo doc --no-deps` reports 0 warnings
+- **`terraphim_server/src/lib.rs`** -- added crate-level `//!` module doc
+- **`terraphim_server/src/api.rs`** -- added struct/field docs for `SearchResponse`, `GraphNodeDto`, `GraphEdgeDto`, `RoleGraphResponseDto`, and all 13 conversation-context DTOs (`CreateConversationRequest` through `DeleteContextResponse`)
+- **`terraphim_server/src/workflows/mod.rs`** -- added field docs for `LlmConfig`, `StepConfig`, `WorkflowRequest`, `WorkflowResponse`, `WorkflowMetadata`, `WorkflowStatus`, `WebSocketMessage`; variant docs for `ExecutionStatus`; sub-module line docs; function docs for `create_workflow_session`, `complete_workflow_session`, `fail_workflow_session`
+- **`terraphim_server/src/workflows/websocket.rs`** -- added struct doc for `WebSocketSession`; function docs for `websocket_handler`, `broadcast_workflow_event`, `notify_workflow_progress`, `notify_workflow_completion`, `notify_workflow_started`, `websocket_health_check`, `get_websocket_stats`
+- **Workflow handler entry points** -- added single-line function docs to `optimization::execute_optimization`, `orchestration::execute_orchestration`, `parallel::execute_parallel`, `prompt_chain::execute_prompt_chain`, `routing::execute_routing`, `vm_execution::execute_vm_execution_demo`, `multi_agent_handlers::MultiAgentOrchestrator::execute_vm_execution_demo`
+
+#### Recent commits (since round 7)
+- `60aa6e0` feat(spec-validator): wildcard fallback serialisation fix (Refs #851)
+- `a63237e` fix: formatting from cargo fmt
+- `e92219f` fix(agent): correct test assertion for wildcard_fallback serialisation Refs #851
+- `0fe135e` docs(orchestrator): add field docs to GiteaOutputConfig, SfiaSkillRef, CostSnapshot
+- `e22d285` fix(orchestrator): handle_webhook_dispatch falls back to project mentions config
+
 #### Agent CLI Enhancements
 - **Exit code table** in top-level `--help` output for CLI reference (F1.2 AC5)
 - **RobotFormatter integration** in CLI search functionality for structured output (`7d64f126`)

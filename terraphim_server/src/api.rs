@@ -62,6 +62,7 @@ pub(crate) async fn _list_documents(
     (StatusCode::OK, Json("Ok"))
 }
 
+/// Response returned by document search endpoints.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SearchResponse {
     /// Status of the search
@@ -212,25 +213,36 @@ pub(crate) async fn update_selected_role(
     }))
 }
 
-// NOTE: RoleGraph visualisation DTOs
+/// RoleGraph node for visualisation responses.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GraphNodeDto {
+    /// Node identifier.
     pub id: u64,
+    /// Display label for the node.
     pub label: String,
+    /// PageRank-derived importance score.
     pub rank: u64,
 }
 
+/// RoleGraph directed edge for visualisation responses.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GraphEdgeDto {
+    /// Source node identifier.
     pub source: u64,
+    /// Target node identifier.
     pub target: u64,
+    /// Edge importance score.
     pub rank: u64,
 }
 
+/// Response payload for RoleGraph visualisation endpoints.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct RoleGraphResponseDto {
+    /// Request status.
     pub status: Status,
+    /// Graph nodes.
     pub nodes: Vec<GraphNodeDto>,
+    /// Graph edges.
     pub edges: Vec<GraphEdgeDto>,
 }
 
@@ -1833,102 +1845,139 @@ pub static CONTEXT_MANAGER: std::sync::LazyLock<tokio::sync::Mutex<ContextManage
 /// Request to create a new conversation
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CreateConversationRequest {
+    /// Human-readable title for the new conversation.
     pub title: String,
+    /// Role name to associate with the conversation.
     pub role: String,
 }
 
 /// Response for conversation creation
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CreateConversationResponse {
+    /// Request status.
     pub status: Status,
+    /// Newly assigned conversation identifier on success.
     pub conversation_id: Option<String>,
+    /// Error message on failure.
     pub error: Option<String>,
 }
 
 /// Request to list conversations
 #[derive(Debug, Deserialize)]
 pub struct ListConversationsQuery {
+    /// Maximum number of conversations to return.
     pub limit: Option<usize>,
 }
 
 /// Response for listing conversations
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ListConversationsResponse {
+    /// Request status.
     pub status: Status,
+    /// Summaries of matching conversations.
     pub conversations: Vec<ConversationSummary>,
+    /// Error message on failure.
     pub error: Option<String>,
 }
 
 /// Response for getting a single conversation
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GetConversationResponse {
+    /// Request status.
     pub status: Status,
+    /// Full conversation data on success.
     pub conversation: Option<terraphim_types::Conversation>,
+    /// Error message on failure.
     pub error: Option<String>,
 }
 
 /// Request to add a message to a conversation
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AddMessageRequest {
+    /// Message text to append.
     pub content: String,
-    pub role: Option<String>, // Default to "user"
+    /// Role of the message author; defaults to `"user"` if absent.
+    pub role: Option<String>,
 }
 
 /// Response for adding a message
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AddMessageResponse {
+    /// Request status.
     pub status: Status,
+    /// Identifier of the newly created message on success.
     pub message_id: Option<String>,
+    /// Error message on failure.
     pub error: Option<String>,
 }
 
 /// Request to add context to a conversation
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AddContextRequest {
-    pub context_type: String, // "document" | "search_result" | "user_input"
+    /// Context kind: `"document"`, `"search_result"`, or `"user_input"`.
+    pub context_type: String,
+    /// Display title for this context item.
     pub title: String,
+    /// Optional short summary of the context.
     pub summary: Option<String>,
+    /// Full context content text.
     pub content: String,
+    /// Arbitrary key-value metadata.
     pub metadata: Option<std::collections::HashMap<String, String>>,
 }
 
 /// Response for adding context
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AddContextResponse {
+    /// Request status.
     pub status: Status,
+    /// Error message on failure.
     pub error: Option<String>,
 }
 
 /// Request to add search results as context
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AddSearchContextRequest {
+    /// Query string that produced these results.
     pub query: String,
+    /// Documents to attach as context.
     pub documents: Vec<Document>,
+    /// Maximum number of documents to store.
     pub limit: Option<usize>,
 }
 
 /// Request to update context in a conversation
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct UpdateContextRequest {
+    /// Updated context kind, if changing.
     pub context_type: Option<String>,
+    /// Updated display title, if changing.
     pub title: Option<String>,
+    /// Updated summary, if changing.
     pub summary: Option<String>,
+    /// Updated content text, if changing.
     pub content: Option<String>,
+    /// Updated metadata, if changing.
     pub metadata: Option<std::collections::HashMap<String, String>>,
 }
 
 /// Response for updating context
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct UpdateContextResponse {
+    /// Request status.
     pub status: Status,
+    /// Updated context item on success.
     pub context: Option<terraphim_types::ContextItem>,
+    /// Error message on failure.
     pub error: Option<String>,
 }
 
 /// Response for deleting context
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DeleteContextResponse {
+    /// Request status.
     pub status: Status,
+    /// Error message on failure.
     pub error: Option<String>,
 }
 

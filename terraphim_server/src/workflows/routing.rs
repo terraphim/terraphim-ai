@@ -21,6 +21,7 @@ struct RouteOption {
     speed: String,
 }
 
+/// Execute a routing workflow, selecting the appropriate handler for the request.
 pub async fn execute_routing(
     State(state): State<AppState>,
     Json(request): Json<WorkflowRequest>,

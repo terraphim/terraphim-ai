@@ -75,6 +75,7 @@ struct ExecutionSummary {
     diversity_score: f64,
 }
 
+/// Execute a parallel workflow and return aggregated results.
 pub async fn execute_parallel(
     State(state): State<AppState>,
     Json(request): Json<WorkflowRequest>,

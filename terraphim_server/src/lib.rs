@@ -1,3 +1,4 @@
+//! Terraphim HTTP API server -- request routing, handlers, and shared state.
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
