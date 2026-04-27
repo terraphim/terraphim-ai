@@ -1,6 +1,7 @@
 use terraphim_agent::forgiving::{AliasRegistry, ForgivingParser};
 use terraphim_agent::robot::{
-    ExitCode, FieldMode, OutputFormat, ResponseMeta, RobotConfig, RobotFormatter, RobotResponse,
+    schema::SearchResultsData, ExitCode, FieldMode, OutputFormat, ResponseMeta, RobotConfig,
+    RobotFormatter, RobotResponse,
 };
 
 #[test]
@@ -145,4 +146,33 @@ fn test_truncation_with_budget() {
     let (truncated, was_truncated) = formatter.truncate_content(&long_content);
     assert!(was_truncated);
     assert!(truncated.len() <= 53);
+}
+
+#[test]
+fn test_search_results_data_concepts_matched_serialised() {
+    let data = SearchResultsData {
+        results: vec![],
+        total_matches: 1,
+        concepts_matched: vec!["rust".to_string(), "async".to_string()],
+        wildcard_fallback: false,
+    };
+    let json = serde_json::to_string(&data).unwrap();
+    assert!(json.contains("concepts_matched"));
+    assert!(json.contains("rust"));
+    assert!(json.contains("async"));
+    assert!(!json.contains("wildcard_fallback"));
+}
+
+#[test]
+fn test_search_results_data_wildcard_fallback_when_empty() {
+    let data = SearchResultsData {
+        results: vec![],
+        total_matches: 0,
+        concepts_matched: vec![],
+        wildcard_fallback: true,
+    };
+    let json = serde_json::to_string(&data).unwrap();
+    assert!(json.contains("wildcard_fallback"));
+    assert!(json.contains("true"));
+    assert!(!json.contains("concepts_matched"));
 }

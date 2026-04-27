@@ -1874,11 +1874,13 @@ async fn run_offline_command(
                     })
                     .collect();
 
+                let concepts =
+                    service.extract_concepts_from_query(&role_name, &query).await;
                 let data = SearchResultsData {
                     results: items,
                     total_matches: total,
-                    concepts_matched: vec![],
-                    wildcard_fallback: false,
+                    concepts_matched: concepts,
+                    wildcard_fallback: result_count == 0,
                 };
 
                 let meta =
@@ -3823,7 +3825,7 @@ async fn run_server_command(
                     results: items,
                     total_matches: total,
                     concepts_matched: vec![],
-                    wildcard_fallback: false,
+                    wildcard_fallback: res_count == 0,
                 };
 
                 let meta =
