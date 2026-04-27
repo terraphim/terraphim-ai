@@ -1823,7 +1823,7 @@ impl AgentOrchestrator {
         // — a `pending` from a skipped agent would block the PR forever.
         // When `[pr_dispatch]` is absent the legacy default ships a single
         // pr-reviewer entry, preserving pre-Phase-2 behaviour.
-        let entries = self.config.agents_on_pr_open();
+        let entries = self.config.agents_on_pr_open_for_project(&project);
         for entry in entries {
             let spawned = match entry.name.as_str() {
                 "build-runner" => self.dispatch_build_runner_for_pr(&req).await?,
@@ -6627,6 +6627,7 @@ mod tests {
             post_merge_gate: None,
             learning: config::LearningConfig::default(),
             pr_dispatch: None,
+            pr_dispatch_per_project: Default::default(),
         }
     }
 
@@ -6860,6 +6861,7 @@ task = "test"
             post_merge_gate: None,
             learning: config::LearningConfig::default(),
             pr_dispatch: None,
+            pr_dispatch_per_project: Default::default(),
         }
     }
 
@@ -7698,6 +7700,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             post_merge_gate: None,
             learning: config::LearningConfig::default(),
             pr_dispatch: None,
+            pr_dispatch_per_project: Default::default(),
         };
         (config, tmp)
     }
@@ -7913,8 +7916,16 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
     }
 
     /// Helper: extend a `review_pr_config` setup with a project-scoped
-    /// `build-runner` agent and a Phase 2 D2 `[pr_dispatch]` block listing
-    /// both agents. Used by the fan-out tests below.
+    /// `build-runner` agent and a Phase 2 D2 fan-out list. After issue
+    /// #962 the dispatch table lives in `pr_dispatch_per_project`, keyed
+    /// by the project id ("alpha" in these fixtures); the top-level
+    /// `pr_dispatch` field is left as `None` to exercise the new
+    /// per-project lookup branch end-to-end. Sibling tests
+    /// (`handle_review_pr_skips_missing_agents`,
+    /// `handle_review_pr_pending_status_posted_per_agent`,
+    /// `handle_review_pr_skipped_agent_does_not_post_pending`) keep
+    /// populating the top-level `pr_dispatch` field directly to
+    /// exercise the backward-compat fallback path.
     fn review_pr_config_with_fanout(cli_tool: &str) -> (OrchestratorConfig, TempDir) {
         let (mut config, tmp) = review_pr_config(cli_tool);
         config.agents.push(AgentDefinition {
@@ -7940,18 +7951,21 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             gitea_issue: None,
             project: Some("alpha".to_string()),
         });
-        config.pr_dispatch = Some(crate::config::PrDispatchConfig {
-            agents_on_pr_open: vec![
-                crate::config::PrDispatchEntry {
-                    name: "build-runner".to_string(),
-                    context: "adf/build".to_string(),
-                },
-                crate::config::PrDispatchEntry {
-                    name: "pr-reviewer".to_string(),
-                    context: "adf/pr-reviewer".to_string(),
-                },
-            ],
-        });
+        config.pr_dispatch_per_project.insert(
+            "alpha".to_string(),
+            crate::config::PrDispatchConfig {
+                agents_on_pr_open: vec![
+                    crate::config::PrDispatchEntry {
+                        name: "build-runner".to_string(),
+                        context: "adf/build".to_string(),
+                    },
+                    crate::config::PrDispatchEntry {
+                        name: "pr-reviewer".to_string(),
+                        context: "adf/pr-reviewer".to_string(),
+                    },
+                ],
+            },
+        );
         (config, tmp)
     }
 
