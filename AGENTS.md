@@ -159,7 +159,7 @@ Parse: `file:line:col` → location | 💡 → how to fix | Exit 0/1 → pass/fa
 - ❌ Full scan per edit → ✅ Scope to file
 - ❌ Fix symptom (`if (x) { x.y }`) → ✅ Root cause (`x?.y`)
 ````
-Use 'bd' for task tracking
+Use gitea-robot MCP tools for task tracking
 
 <!-- GITEA_PAGERANK_WORKFLOW_START -->
 
@@ -247,6 +247,71 @@ Use ONLY subscription-based models:
 
 <!-- GITEA_PAGERANK_WORKFLOW_END -->
 
+<!-- REMOTE_SYNC_PROTOCOL_START -->
+
+## Remote Sync Protocol
+
+### Dual-Remote Architecture
+
+This repository has two remotes that MUST stay in sync:
+- **origin** (GitHub: `github.com/terraphim/terraphim-ai`) - primary, push here first
+- **gitea** (Gitea: `git.terraphim.cloud/terraphim/terraphim-ai`) - mirror, push after origin succeeds
+
+### Mandatory Push Sequence
+
+Every push to main MUST follow this order:
+
+```bash
+git fetch origin
+git merge origin/main --no-edit
+git push origin main
+git push gitea main
+```
+
+**Rules:**
+1. Never force-push to either remote
+2. Always merge origin into local before pushing (prevents divergence)
+3. If origin push fails, do NOT push to gitea -- fix the issue first
+4. If gitea push is blocked by branch protection, create a PR using the status-check workaround:
+   ```bash
+   # Temporarily disable status checks (admin only)
+   curl -X PATCH "$GITEA_URL/api/v1/repos/terraphim/terraphim-ai/branch_protections/main" \
+     -H "Authorization: token $GITEA_TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"enable_status_check": false}'
+   # Merge PR, then re-enable
+   curl -X PATCH "$GITEA_URL/api/v1/repos/terraphim/terraphim-ai/branch_protections/main" \
+     -H "Authorization: token $GITEA_TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"enable_status_check": true, "status_check_contexts": ["adf/build", "adf/pr-reviewer"]}'
+   ```
+
+### Convergence Verification
+
+After pushing, verify both remotes are content-identical:
+
+```bash
+git diff origin/main gitea/main --stat  # Must be empty
+```
+
+### Divergence Recovery
+
+If remotes diverge:
+1. Fetch both: `git fetch origin && git fetch gitea`
+2. Diff: `git diff origin/main gitea/main --stat`
+3. Merge the richer branch into local
+4. Push to both remotes using the mandatory sequence above
+
+### Issue Hygiene
+
+- Check for duplicates before creating issues (search existing first)
+- One issue per task -- no overlapping tickets
+- Close issues immediately when work is verified on both remotes
+- Close agent-generated issues without clear acceptance criteria
+- Autonomous agents can generate duplicate noise -- batch-close with comment explaining reason
+
+<!-- REMOTE_SYNC_PROTOCOL_END -->
+
 ## Landing the Plane (Session Completion)
 
 **When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
@@ -256,12 +321,13 @@ Use ONLY subscription-based models:
 1. **File issues for remaining work** - Create issues for anything that needs follow-up
 2. **Run quality gates** (if code changed) - Tests, linters, builds
 3. **Update issue status** - Close finished work, update in-progress items
-4. **PUSH TO REMOTE** - This is MANDATORY:
+4. **PUSH TO BOTH REMOTES** - This is MANDATORY:
    ```bash
-   git pull --rebase
-   bd sync
-   git push
-   git status  # MUST show "up to date with origin"
+   git fetch origin
+   git merge origin/main --no-edit
+   git push origin main
+   git push gitea main
+   git diff origin/main gitea/main --stat  # Must be empty
    ```
 5. **Clean up** - Clear stashes, prune remote branches
 6. **Verify** - All changes committed AND pushed
