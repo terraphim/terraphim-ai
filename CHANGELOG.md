@@ -36,10 +36,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **VM-cargo-probe job** for end-to-end infrastructure validation
 - **Rust-CI VM image** with sccache + SeaweedFS integration
 
-#### Documentation (6 crates)
+#### Documentation (13 crates)
 - Added `//!` module-level documentation to: `terraphim_agent`, `terraphim_service`,
   `terraphim_middleware`, `terraphim_rolegraph`, `terraphim_config`, `terraphim_persistence`,
   `terraphim_mcp_server`
+- Added `//!` module-level documentation to: `terraphim_settings`, `haystack_core`,
+  `haystack_atlassian`, `haystack_discourse`, `haystack_jmap`, `terraphim_kg_linter`,
+  `terraphim_file_search`
 - 1625 doc warnings fixed in prior run (2944 → 1319, 55% reduction)
 
 #### Linear Tracker Integration

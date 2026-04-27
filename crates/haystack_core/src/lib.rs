@@ -1,3 +1,8 @@
+//! Core abstraction layer for Terraphim haystack providers.
+//!
+//! Defines the [`HaystackProvider`] trait that all data-source integrations
+//! (Atlassian, Discourse, JMAP, Ripgrep, etc.) implement. A provider accepts
+//! a [`terraphim_types::SearchQuery`] and returns a list of [`terraphim_types::Document`]s.
 use terraphim_types::{Document, SearchQuery};
 
 pub trait HaystackProvider {

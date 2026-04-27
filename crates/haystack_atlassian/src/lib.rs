@@ -1,3 +1,8 @@
+//! Atlassian haystack integration for Terraphim AI.
+//!
+//! Implements [`haystack_core::HaystackProvider`] for Confluence (wiki pages)
+//! and Jira (issues). Authentication uses API tokens over HTTPS. See the
+//! `confluence` and `jira` sub-modules for endpoint details.
 use anyhow::Result;
 use haystack_core::HaystackProvider;
 use terraphim_types::{Document, SearchQuery};

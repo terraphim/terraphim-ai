@@ -1,3 +1,9 @@
+//! Knowledge-graph schema linter for Terraphim AI.
+//!
+//! Validates YAML knowledge-graph definition files against the expected schema,
+//! checks for duplicate entries, and verifies that all referenced terms exist
+//! in the Aho-Corasick automata. Returns structured [`LintError`]s for CI
+//! and pre-commit enforcement.
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 

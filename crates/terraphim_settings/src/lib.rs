@@ -1,3 +1,8 @@
+//! Device and server settings for Terraphim AI.
+//!
+//! Provides [`DeviceSettings`], loaded from TOML files and environment variables
+//! via [`twelf`]. Supports optional 1Password secret injection when the
+//! `onepassword` feature is enabled.
 use directories::ProjectDirs;
 use serde::de::{self, Deserializer};
 use serde::{Deserialize, Serialize};

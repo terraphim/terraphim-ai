@@ -1,3 +1,9 @@
+//! JMAP email haystack integration for Terraphim AI.
+//!
+//! Implements [`haystack_core::HaystackProvider`] using the JMAP protocol
+//! (RFC 8620) to search email messages. Establishes a [`Session`], discovers
+//! the API endpoint via capability negotiation, and maps results to
+//! [`terraphim_types::Document`]s.
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
