@@ -264,9 +264,13 @@ fn default_true_routing() -> bool {
 /// Configuration for posting agent output to Gitea issues.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GiteaOutputConfig {
+    /// Base URL of the Gitea instance (e.g. `https://git.example.com`).
     pub base_url: String,
+    /// API token with issue-comment write access.
     pub token: String,
+    /// Repository owner (organisation or user).
     pub owner: String,
+    /// Repository name.
     pub repo: String,
     /// Path to JSON file mapping agent names to Gitea API tokens.
     /// When present, agents post comments under their own Gitea user.
@@ -399,7 +403,9 @@ fn default_quickwit_flush_interval_secs() -> u64 {
 /// Lightweight reference to an SFIA skill code and level.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SfiaSkillRef {
+    /// Four-letter SFIA skill code (e.g. `"PROG"`, `"TEST"`).
     pub code: String,
+    /// SFIA responsibility level 1–7.
     pub level: u8,
 }
 

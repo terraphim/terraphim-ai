@@ -91,8 +91,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Spec-validation report** generated at `reports/spec-validation-20260426.md` (`b4a39831`).
 - **Tech lead gate artefact** added at `.docs/tech_lead_gate_20260426.md` (`69da3c6c`).
 - **Doc-gap audit 2026-04-26 (round 7 — full workspace re-scan)**: Comprehensive grep-based audit of all 54 crates reveals 3,165 undocumented public items. No crate has `#![warn(missing_docs)]`, so `cargo doc` emits 0 warnings — the debt is invisible to the compiler. Top 10 worst offenders: `terraphim_agent` (338), `terraphim_orchestrator` (244), `terraphim_multi_agent` (191), `terraphim_validation` (156), `terraphim_types` (117), `terraphim-session-analyzer` (117), `terraphim_agent_evolution` (116), `terraphim_tinyclaw` (78), `terraphim_agent_application` (74), `terraphim_rlm` (63). Tracked in Gitea #931.
+- **Doc-gap audit 2026-04-27 (round 8 — targeted field docs)**: Added field-level `///` docs to `GiteaOutputConfig` (`base_url`, `token`, `owner`, `repo`), `SfiaSkillRef` (`code`, `level`), and `CostSnapshot` (`agent_name`, `spent_usd`, `budget_cents`, `verdict`) in `terraphim_orchestrator`. Workspace scan now shows 3,196 gaps across 55 crates (re-scan reflects crate count change).
 
 ### Fixed
+- **Orchestrator webhook dispatch** now falls back to project-level `mentions` config when top-level `config.mentions` is absent (multi-project setups); prevents silently dropped `@adf:` dispatches (`e22d285a`, Fixes #951).
 - **Listen-mode `--server` guard** (`fix(agent): accept listen --server locally`, `21634c5b`, Refs #860): `--server` is now a hidden local arg on the `Listen` variant so clap accepts it; the handler checks it first and emits the correct `"listen mode does not support --server flag"` message with `ExitCode::ErrorUsage` (2).
 - **Auth heuristic** in `classify_error` tightened to prevent false positives from "author", "authority", and path-prefixed strings like `auth_tokens.json` (`73455ec7`)
 - **Test formatting** in `classify_error_tests` aligned with `cargo fmt` style (`568f06b5`)

@@ -316,9 +316,13 @@ impl AgentCost {
 /// Snapshot of an agent's cost status (for serialization).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CostSnapshot {
+    /// Name of the agent this snapshot belongs to.
     pub agent_name: String,
+    /// Total USD spent by this agent in the current period.
     pub spent_usd: f64,
+    /// Optional budget ceiling in US cents; `None` means unlimited.
     pub budget_cents: Option<u64>,
+    /// Human-readable budget verdict (`"ok"`, `"warn"`, `"over"`).
     pub verdict: String,
 }
 
