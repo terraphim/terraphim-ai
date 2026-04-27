@@ -5,6 +5,56 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.17.0] - 2026-04-27
+
+### Added
+
+#### ADF Orchestrator Framework
+- **New `terraphim_orchestrator` crate** (v1.8.0) -- Autonomous Development Flow orchestrator
+- **Multi-agent coordination** with mention-chain support for Gitea
+- **PR lifecycle management** -- fan-out to build-runner + pr-reviewer on PR open
+- **Push webhook handling** with build-runner spawning
+- **Compound-RICE scoring** with Themis persona for issue prioritisation
+- **Runtime guardian, upstream synchronizer, and meta-learning agent templates**
+
+#### Session Connectors
+- **OpenCode and Codex JSONL session connectors** for real-time session ingestion
+- **ClineConnector** for VS Code extension sessions
+- **SessionConnector::watch()** for live session monitoring
+- **BM25-ranked session search** with search-index feature
+
+#### Learning Store & Knowledge Graph
+- **SharedLearningStore** with graph hybrid scoring
+- **LearningInjector** and `learn inject` CLI command
+- **Knowledge graph validation workflows** for pre/post-LLM quality gates
+- **NormalizedTerm metadata** and `learn export-kg` command
+
+#### CI Infrastructure
+- **Firecracker-accelerated CI** with VM lifecycle management
+- **Shared Rust build cache** via sccache + SeaweedFS S3 on fcbr0
+- **Bigbox runner support** with rch dispatch for build queue management
+- **Zig 0.16.0 compilation** for zlob feature (SIMD glob matching)
+
+#### Robot Mode & Auto-Routing
+- **Token budget management engine** for robot mode output
+- **Auto-route on search** when --role is unset (thesaurus-scored)
+- **RobotFormatter** wired into CLI search with JSON/JSONL/table output
+- **ForgivingParser** integrated into REPL for typo-tolerant commands
+
+### Fixed
+- **zlob compilation** -- Zig 0.16.0 build with Darwin linker workaround
+- **Security advisories** -- RUSTSEC-2024-0421, 2026-0098/0099/0104 resolved
+- **REPL role selection** -- reads from service instead of hardcoded "Default"
+- **CLI exit codes** -- listen --server exits with ERROR_USAGE (2) not 1
+- **Graceful degradation** for roles without KG
+- **Flaky tests** -- removed data-dependent assertions, fixed timing issues
+
+### Changed
+- **Workspace version** bumped to 1.17.0
+- **Default features** -- zlob enabled by default on terraphim_file_search and terraphim_mcp_server
+- **CI workflow** -- migrated to bigbox + SeaweedFS + rch dispatch
+- **Dependency updates** -- removed dead trust-dns-resolver, ring deps
+
 ## [1.14.0] - 2026-03-22
 
 ### Added
