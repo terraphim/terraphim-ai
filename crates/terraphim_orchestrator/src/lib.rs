@@ -8902,4 +8902,280 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             "build-runner must still post its pending; got: {contexts:?}"
         );
     }
+    /// ADF Phase 2d (issue #955): helper that wires `pr-compliance-watchdog`
+    /// alongside the existing `pr-reviewer` agent and a `[pr_dispatch]` block
+    /// listing both agents on PR open. Standalone -- does not reuse the
+    /// Phase 2 `review_pr_config_with_fanout` helper -- so the assertion
+    /// surface stays tight (exactly two pending POSTs: `adf/pr-reviewer`
+    /// and `adf/compliance`).
+    fn review_pr_config_with_compliance_fanout(cli_tool: &str) -> (OrchestratorConfig, TempDir) {
+        let (mut config, tmp) = review_pr_config(cli_tool);
+        config.agents.push(AgentDefinition {
+            name: "pr-compliance-watchdog".to_string(),
+            layer: AgentLayer::Growth,
+            cli_tool: cli_tool.to_string(),
+            task: "compliance".to_string(),
+            model: None,
+            schedule: None,
+            capabilities: vec!["compliance".to_string()],
+            max_memory_bytes: None,
+            budget_monthly_cents: None,
+            provider: None,
+            persona: None,
+            terraphim_role: None,
+            skill_chain: vec!["responsible-ai".to_string()],
+            sfia_skills: vec![],
+            fallback_provider: None,
+            fallback_model: None,
+            grace_period_secs: None,
+            max_cpu_seconds: None,
+            pre_check: None,
+            gitea_issue: None,
+            project: Some("alpha".to_string()),
+        });
+        config.pr_dispatch = Some(crate::config::PrDispatchConfig {
+            agents_on_pr_open: vec![
+                crate::config::PrDispatchEntry {
+                    name: "pr-reviewer".to_string(),
+                    context: "adf/pr-reviewer".to_string(),
+                },
+                crate::config::PrDispatchEntry {
+                    name: "pr-compliance-watchdog".to_string(),
+                    context: "adf/compliance".to_string(),
+                },
+            ],
+        });
+        (config, tmp)
+    }
+
+    /// ADF Phase 2d (issue #955): when `pr-compliance-watchdog` is listed in
+    /// `agents_on_pr_open`, the generic `_` arm in `handle_review_pr` must
+    /// route through `dispatch_pr_reviewer_for_pr` and spawn the agent. No
+    /// new Rust dispatch code is needed -- this test asserts that property.
+    #[tokio::test]
+    async fn handle_review_pr_spawns_pr_compliance_watchdog_when_configured() {
+        let (config, _tmp) = review_pr_config_with_compliance_fanout("echo");
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        orch.handle_review_pr(review_pr_task()).await.unwrap();
+
+        assert!(
+            orch.active_agents.contains_key("pr-reviewer"),
+            "pr-reviewer must spawn alongside the new compliance agent; active_agents: {:?}",
+            orch.active_agents.keys().collect::<Vec<_>>()
+        );
+        assert!(
+            orch.active_agents.contains_key("pr-compliance-watchdog"),
+            "pr-compliance-watchdog must be spawned by the generic fan-out arm; active_agents: {:?}",
+            orch.active_agents.keys().collect::<Vec<_>>()
+        );
+    }
+
+    /// ADF Phase 2d: with the workflow tracker pointed at a loopback Gitea,
+    /// each fan-out agent that successfully spawns must POST exactly one
+    /// `pending` commit status. The compliance agent must use the
+    /// `adf/compliance` context (a hung pending under any other context
+    /// would block the PR forever once branch protection requires it).
+    #[tokio::test]
+    async fn handle_review_pr_pending_status_posted_for_compliance_context() {
+        use axum::{
+            extract::{Path, State},
+            http::StatusCode,
+            response::IntoResponse,
+            routing::post,
+            Router,
+        };
+        use std::sync::atomic::{AtomicUsize, Ordering as AOrdering};
+        use std::sync::Arc;
+        use tokio::net::TcpListener;
+
+        #[derive(Default)]
+        struct Captured {
+            calls: AtomicUsize,
+            contexts: std::sync::Mutex<Vec<String>>,
+            states: std::sync::Mutex<Vec<String>>,
+        }
+
+        async fn capture(
+            Path((_owner, _repo, _sha)): Path<(String, String, String)>,
+            State(captured): State<Arc<Captured>>,
+            body: axum::body::Bytes,
+        ) -> impl IntoResponse {
+            captured.calls.fetch_add(1, AOrdering::SeqCst);
+            if let Ok(parsed) = serde_json::from_slice::<serde_json::Value>(&body) {
+                if let Some(ctx) = parsed.get("context").and_then(|v| v.as_str()) {
+                    captured.contexts.lock().unwrap().push(ctx.to_string());
+                }
+                if let Some(st) = parsed.get("state").and_then(|v| v.as_str()) {
+                    captured.states.lock().unwrap().push(st.to_string());
+                }
+            }
+            StatusCode::CREATED
+        }
+
+        let captured = Arc::new(Captured::default());
+        let app = Router::new()
+            .route("/api/v1/repos/{owner}/{repo}/statuses/{sha}", post(capture))
+            .with_state(captured.clone());
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            axum::serve(listener, app).await.ok();
+        });
+        let base_url = format!("http://{}", addr);
+
+        let (mut config, _tmp) = review_pr_config_with_compliance_fanout("echo");
+        config.workflow = Some(crate::config::WorkflowConfig {
+            enabled: true,
+            poll_interval_secs: 60,
+            workflow_file: std::path::PathBuf::from("/tmp/workflow.md"),
+            tracker: crate::config::TrackerConfig {
+                kind: "gitea".to_string(),
+                endpoint: base_url.clone(),
+                api_key: "test-token".to_string(),
+                owner: "fakeowner".to_string(),
+                repo: "fakerepo".to_string(),
+                project_slug: None,
+                use_robot_api: false,
+                states: crate::config::TrackerStates::default(),
+            },
+            concurrency: crate::config::ConcurrencyConfig::default(),
+        });
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        orch.handle_review_pr(review_pr_task()).await.unwrap();
+
+        for _ in 0..100 {
+            if captured.calls.load(AOrdering::SeqCst) >= 2 {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        assert_eq!(
+            captured.calls.load(AOrdering::SeqCst),
+            2,
+            "exactly two pending status posts expected (pr-reviewer + compliance)"
+        );
+        let contexts = captured.contexts.lock().unwrap().clone();
+        assert!(
+            contexts.iter().any(|c| c == "adf/pr-reviewer"),
+            "adf/pr-reviewer pending status missing; got: {contexts:?}"
+        );
+        assert!(
+            contexts.iter().any(|c| c == "adf/compliance"),
+            "adf/compliance pending status missing; got: {contexts:?}"
+        );
+        let states = captured.states.lock().unwrap().clone();
+        assert!(
+            states.iter().all(|s| s == "pending"),
+            "all initial statuses must be pending; got: {states:?}"
+        );
+    }
+
+    /// ADF Phase 2d: when the compliance agent is gated out by the C1/C3
+    /// subscription allow-list (banned static model stamped post-validation),
+    /// the orchestrator must NOT post an `adf/compliance` pending status. A
+    /// hung pending under a required context would block the PR forever.
+    /// `pr-reviewer` (the un-gated peer) still spawns and posts its own
+    /// pending. Note: this test exercises the orchestrator-layer skip; the
+    /// TOML-level path-filter skip-with-success is a separate, shell-only
+    /// behaviour and is not asserted here.
+    #[tokio::test]
+    async fn handle_review_pr_compliance_watchdog_skipped_does_not_post_pending() {
+        use axum::{
+            extract::{Path, State},
+            http::StatusCode,
+            response::IntoResponse,
+            routing::post,
+            Router,
+        };
+        use std::sync::atomic::{AtomicUsize, Ordering as AOrdering};
+        use std::sync::Arc;
+        use tokio::net::TcpListener;
+
+        #[derive(Default)]
+        struct Captured {
+            calls: AtomicUsize,
+            contexts: std::sync::Mutex<Vec<String>>,
+        }
+
+        async fn capture(
+            Path((_owner, _repo, _sha)): Path<(String, String, String)>,
+            State(captured): State<Arc<Captured>>,
+            body: axum::body::Bytes,
+        ) -> impl IntoResponse {
+            captured.calls.fetch_add(1, AOrdering::SeqCst);
+            if let Ok(parsed) = serde_json::from_slice::<serde_json::Value>(&body) {
+                if let Some(ctx) = parsed.get("context").and_then(|v| v.as_str()) {
+                    captured.contexts.lock().unwrap().push(ctx.to_string());
+                }
+            }
+            StatusCode::CREATED
+        }
+
+        let captured = Arc::new(Captured::default());
+        let app = Router::new()
+            .route("/api/v1/repos/{owner}/{repo}/statuses/{sha}", post(capture))
+            .with_state(captured.clone());
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            axum::serve(listener, app).await.ok();
+        });
+        let base_url = format!("http://{}", addr);
+
+        let (mut config, _tmp) = review_pr_config_with_compliance_fanout("echo");
+        // Stamp a banned static model on pr-compliance-watchdog AFTER load-time
+        // validation so the runtime subscription allow-list gate is the path
+        // that rejects the spawn.
+        let watchdog = config
+            .agents
+            .iter_mut()
+            .find(|a| a.name == "pr-compliance-watchdog")
+            .unwrap();
+        watchdog.model = Some("google/gemini-2".to_string());
+
+        config.workflow = Some(crate::config::WorkflowConfig {
+            enabled: true,
+            poll_interval_secs: 60,
+            workflow_file: std::path::PathBuf::from("/tmp/workflow.md"),
+            tracker: crate::config::TrackerConfig {
+                kind: "gitea".to_string(),
+                endpoint: base_url.clone(),
+                api_key: "test-token".to_string(),
+                owner: "fakeowner".to_string(),
+                repo: "fakerepo".to_string(),
+                project_slug: None,
+                use_robot_api: false,
+                states: crate::config::TrackerStates::default(),
+            },
+            concurrency: crate::config::ConcurrencyConfig::default(),
+        });
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        orch.handle_review_pr(review_pr_task()).await.unwrap();
+
+        for _ in 0..100 {
+            if captured.calls.load(AOrdering::SeqCst) >= 1 {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        // Grace window so an erroneous adf/compliance POST has time to surface.
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        let contexts = captured.contexts.lock().unwrap().clone();
+        assert!(
+            contexts.iter().any(|c| c == "adf/pr-reviewer"),
+            "pr-reviewer must still post its pending status; got: {contexts:?}"
+        );
+        assert!(
+            !contexts.iter().any(|c| c == "adf/compliance"),
+            "skipped pr-compliance-watchdog must NOT post adf/compliance pending; got: {contexts:?}"
+        );
+        assert!(
+            !orch.active_agents.contains_key("pr-compliance-watchdog"),
+            "pr-compliance-watchdog must not be in active_agents when subscription gate rejects"
+        );
+    }
 }
