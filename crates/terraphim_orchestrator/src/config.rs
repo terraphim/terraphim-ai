@@ -196,6 +196,18 @@ pub struct OrchestratorConfig {
     /// deployments continue to work without a config edit.
     #[serde(default)]
     pub pr_dispatch: Option<PrDispatchConfig>,
+    /// Per-project PR-fan-out tables, aggregated from `[pr_dispatch]` blocks
+    /// declared inside `IncludeFragment`s (issue #962). Populated by
+    /// `from_file` after include expansion; deliberately not exposed to TOML
+    /// (`skip_deserializing`) -- the operator authors per-project blocks
+    /// inside their `conf.d/<project>.toml`, not at the top level.
+    ///
+    /// Lookup precedence in [`OrchestratorConfig::agents_on_pr_open_for_project`]:
+    /// 1. this map keyed by project id;
+    /// 2. top-level [`OrchestratorConfig::pr_dispatch`] (backward-compat fallback);
+    /// 3. [`PrDispatchConfig::legacy_default`].
+    #[serde(default, skip_deserializing)]
+    pub pr_dispatch_per_project: std::collections::HashMap<String, PrDispatchConfig>,
 }
 
 /// PR-fan-out routing table for the `pull_request.opened` event (ADF Phase 2,
@@ -889,7 +901,13 @@ fn default_project_circuit_breaker_threshold() -> u32 {
 }
 
 /// Partial config parsed from `include`d files. Only project definitions,
-/// agents, and flows are merged in; all top-level globals are ignored.
+/// agents, flows, and the optional per-include `pr_dispatch` block are
+/// merged in; all top-level globals are ignored.
+///
+/// `pr_dispatch` carried inside an include applies to every project
+/// declared in the same fragment -- see
+/// `.docs/design-pr-dispatch-per-project.md` for the aggregation rule
+/// (Gitea issue #962).
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct IncludeFragment {
@@ -899,6 +917,8 @@ struct IncludeFragment {
     agents: Vec<AgentDefinition>,
     #[serde(default)]
     flows: Vec<crate::flow::config::FlowDefinition>,
+    #[serde(default)]
+    pr_dispatch: Option<PrDispatchConfig>,
 }
 
 /// Subscription-only LLM providers allowed by constraint C1.
@@ -1029,18 +1049,30 @@ impl OrchestratorConfig {
         self.projects.iter().find(|p| p.id == id)
     }
 
-    /// Effective PR-fan-out list for the `pull_request.opened` event.
+    /// Effective PR-fan-out list for the `pull_request.opened` event,
+    /// resolved for a specific project.
     ///
-    /// Returns a clone of [`PrDispatchConfig::agents_on_pr_open`] when the
-    /// `[pr_dispatch]` block is configured, otherwise the legacy single
-    /// `pr-reviewer` entry. This keeps existing deployments that have not
-    /// adopted the fan-out config working unchanged after Phase 2 lands
-    /// (issue #944, plan §5).
-    pub fn agents_on_pr_open(&self) -> Vec<PrDispatchEntry> {
-        match self.pr_dispatch.as_ref() {
-            Some(d) => d.agents_on_pr_open.clone(),
-            None => PrDispatchConfig::legacy_default().agents_on_pr_open,
+    /// Lookup precedence (issue #962, see
+    /// `.docs/design-pr-dispatch-per-project.md`):
+    /// 1. `pr_dispatch_per_project[project]` -- per-project block declared
+    ///    inside the project's `conf.d/<project>.toml`. First preference,
+    ///    needed for multi-project fleets where each project picks its own
+    ///    fan-out.
+    /// 2. Top-level [`OrchestratorConfig::pr_dispatch`] -- backward-compat
+    ///    fallback. Configs that declared `[pr_dispatch]` at the top level
+    ///    of `orchestrator.toml` continue to work; that block now means
+    ///    "default for any project without its own block".
+    /// 3. [`PrDispatchConfig::legacy_default`] -- single `pr-reviewer`
+    ///    entry. Preserves pre-Phase-2 behaviour for fleets that never
+    ///    declared a `[pr_dispatch]` block at all.
+    pub fn agents_on_pr_open_for_project(&self, project: &str) -> Vec<PrDispatchEntry> {
+        if let Some(d) = self.pr_dispatch_per_project.get(project) {
+            return d.agents_on_pr_open.clone();
         }
+        if let Some(d) = self.pr_dispatch.as_ref() {
+            return d.agents_on_pr_open.clone();
+        }
+        PrDispatchConfig::legacy_default().agents_on_pr_open
     }
 
     /// Resolve the effective working directory for an agent: the project's
@@ -1110,6 +1142,25 @@ impl OrchestratorConfig {
                         include_path.display()
                     ))
                 })?;
+                // Aggregate per-include `pr_dispatch` blocks against every
+                // project declared in the same fragment (issue #962).
+                // A `[pr_dispatch]` block in an include without any
+                // `[[projects]]` is orphaned -- log a warn and drop it
+                // rather than silently losing the operator's intent.
+                if let Some(dispatch) = fragment.pr_dispatch.as_ref() {
+                    if fragment.projects.is_empty() {
+                        tracing::warn!(
+                            include_path = %include_path.display(),
+                            "pr_dispatch block in include without projects; ignored"
+                        );
+                    } else {
+                        for project in &fragment.projects {
+                            config
+                                .pr_dispatch_per_project
+                                .insert(project.id.clone(), dispatch.clone());
+                        }
+                    }
+                }
                 config.projects.extend(fragment.projects);
                 config.agents.extend(fragment.agents);
                 config.flows.extend(fragment.flows);
@@ -2305,12 +2356,11 @@ repo_path = "/tmp"
         assert_eq!(dft.agents_on_pr_open[0].context, "adf/pr-reviewer");
     }
 
-    /// `agents_on_pr_open()` returns the legacy default when no
-    /// `[pr_dispatch]` block is configured. This is the path every
-    /// pre-Phase-2 deployment hits, so legacy single-agent dispatch must
-    /// keep working without a config edit.
+    /// `agents_on_pr_open_for_project()` falls all the way through to the
+    /// legacy default when neither a per-project block nor a top-level block
+    /// exists. Pre-Phase-2 deployments must keep working without any edit.
     #[test]
-    fn pr_dispatch_accessor_returns_legacy_when_block_absent() {
+    fn agents_on_pr_open_for_project_falls_back_to_legacy_default() {
         let toml_str = r#"
 working_dir = "/tmp/pr-dispatch-accessor-test"
 
@@ -2321,16 +2371,18 @@ schedule = "0 2 * * *"
 repo_path = "/tmp"
 "#;
         let cfg = OrchestratorConfig::from_toml(toml_str).unwrap();
-        let list = cfg.agents_on_pr_open();
+        let list = cfg.agents_on_pr_open_for_project("any-project");
         assert_eq!(list.len(), 1, "legacy default must be a single entry");
         assert_eq!(list[0].name, "pr-reviewer");
         assert_eq!(list[0].context, "adf/pr-reviewer");
     }
 
-    /// `agents_on_pr_open()` honours the configured list verbatim when
-    /// `[pr_dispatch]` is present.
+    /// `agents_on_pr_open_for_project()` falls back to the top-level
+    /// `[pr_dispatch]` block when no per-project block is registered for the
+    /// requested project. Backward-compat for fleets that authored the
+    /// global block in `orchestrator.toml`.
     #[test]
-    fn pr_dispatch_accessor_returns_configured_list_when_present() {
+    fn agents_on_pr_open_for_project_falls_back_to_top_level_block() {
         let toml_str = r#"
 working_dir = "/tmp/pr-dispatch-accessor-configured"
 
@@ -2347,10 +2399,66 @@ agents_on_pr_open = [
 ]
 "#;
         let cfg = OrchestratorConfig::from_toml(toml_str).unwrap();
-        let list = cfg.agents_on_pr_open();
+        let list = cfg.agents_on_pr_open_for_project("any-project");
         assert_eq!(list.len(), 2);
         assert_eq!(list[0].name, "build-runner");
         assert_eq!(list[1].name, "pr-reviewer");
+    }
+
+    /// `agents_on_pr_open_for_project()` returns the per-project block in
+    /// preference to the top-level fallback when both are present. This is
+    /// the multi-project path: each project's `conf.d/<project>.toml`
+    /// declares its own block and that block wins.
+    #[test]
+    fn agents_on_pr_open_for_project_returns_per_project_block() {
+        let mut cfg = OrchestratorConfig::from_toml(
+            r#"
+working_dir = "/tmp/per-project"
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 2 * * *"
+repo_path = "/tmp"
+
+[pr_dispatch]
+agents_on_pr_open = [
+    { name = "pr-reviewer", context = "adf/pr-reviewer" },
+]
+"#,
+        )
+        .unwrap();
+        cfg.pr_dispatch_per_project.insert(
+            "alpha".to_string(),
+            PrDispatchConfig {
+                agents_on_pr_open: vec![
+                    PrDispatchEntry {
+                        name: "build-runner".to_string(),
+                        context: "adf/build".to_string(),
+                    },
+                    PrDispatchEntry {
+                        name: "pr-reviewer".to_string(),
+                        context: "adf/pr-reviewer".to_string(),
+                    },
+                ],
+            },
+        );
+
+        let alpha = cfg.agents_on_pr_open_for_project("alpha");
+        assert_eq!(
+            alpha.len(),
+            2,
+            "per-project block must override the top-level fallback for alpha"
+        );
+        assert_eq!(alpha[0].name, "build-runner");
+
+        let other = cfg.agents_on_pr_open_for_project("beta");
+        assert_eq!(
+            other.len(),
+            1,
+            "beta has no per-project block so the top-level fallback applies"
+        );
+        assert_eq!(other[0].name, "pr-reviewer");
     }
 
     /// A configured `[pr_dispatch]` block with two entries deserialises to
@@ -2382,5 +2490,177 @@ agents_on_pr_open = [
         assert_eq!(dispatch.agents_on_pr_open[0].context, "adf/build");
         assert_eq!(dispatch.agents_on_pr_open[1].name, "pr-reviewer");
         assert_eq!(dispatch.agents_on_pr_open[1].context, "adf/pr-reviewer");
+    }
+
+    /// Issue #962: an `IncludeFragment` (the per-include conf.d shape) must
+    /// accept its own `[pr_dispatch]` block. Until this test passed, the
+    /// `#[serde(deny_unknown_fields)]` guard on `IncludeFragment` rejected
+    /// any conf.d file that tried to declare per-project fan-out -- which is
+    /// exactly the failure observed on bigbox when `terraphim.toml` got a
+    /// `[pr_dispatch]` block. See `.docs/design-pr-dispatch-per-project.md`.
+    #[test]
+    fn include_fragment_parses_pr_dispatch_block() {
+        let toml_str = r#"
+[[projects]]
+id = "terraphim"
+working_dir = "/tmp/terraphim"
+
+[[agents]]
+name = "pr-reviewer"
+layer = "Safety"
+cli_tool = "echo"
+task = "review"
+project = "terraphim"
+
+[pr_dispatch]
+agents_on_pr_open = [
+    { name = "build-runner", context = "adf/build" },
+    { name = "pr-reviewer", context = "adf/pr-reviewer" },
+]
+"#;
+        let fragment: IncludeFragment =
+            toml::from_str(toml_str).expect("IncludeFragment must accept pr_dispatch block");
+        assert_eq!(fragment.projects.len(), 1);
+        assert_eq!(fragment.projects[0].id, "terraphim");
+        assert_eq!(fragment.agents.len(), 1);
+        let dispatch = fragment
+            .pr_dispatch
+            .expect("pr_dispatch block must deserialise inside an include");
+        assert_eq!(dispatch.agents_on_pr_open.len(), 2);
+        assert_eq!(dispatch.agents_on_pr_open[0].name, "build-runner");
+        assert_eq!(dispatch.agents_on_pr_open[0].context, "adf/build");
+        assert_eq!(dispatch.agents_on_pr_open[1].name, "pr-reviewer");
+        assert_eq!(dispatch.agents_on_pr_open[1].context, "adf/pr-reviewer");
+    }
+
+    /// Issue #962 Step 2: `from_file` walks every include fragment, finds
+    /// each `[pr_dispatch]` block, and indexes it under every project id
+    /// declared in the same fragment. Two include files (one per project)
+    /// each carrying their own block must produce a two-entry map.
+    #[test]
+    fn from_file_aggregates_pr_dispatch_from_includes() {
+        use tempfile::TempDir;
+
+        let tmp = TempDir::new().unwrap();
+        let conf_d = tmp.path().join("conf.d");
+        std::fs::create_dir(&conf_d).unwrap();
+
+        std::fs::write(
+            conf_d.join("alpha.toml"),
+            r#"
+[[projects]]
+id = "alpha"
+working_dir = "/tmp/alpha"
+
+[pr_dispatch]
+agents_on_pr_open = [
+    { name = "build-runner", context = "adf/build" },
+    { name = "pr-reviewer", context = "adf/pr-reviewer" },
+]
+"#,
+        )
+        .unwrap();
+
+        std::fs::write(
+            conf_d.join("beta.toml"),
+            r#"
+[[projects]]
+id = "beta"
+working_dir = "/tmp/beta"
+
+[pr_dispatch]
+agents_on_pr_open = [
+    { name = "pr-reviewer", context = "adf/pr-reviewer" },
+]
+"#,
+        )
+        .unwrap();
+
+        let base_path = tmp.path().join("orchestrator.toml");
+        std::fs::write(
+            &base_path,
+            r#"
+working_dir = "/tmp/o"
+include = ["conf.d/*.toml"]
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp/o"
+"#,
+        )
+        .unwrap();
+
+        let cfg = OrchestratorConfig::from_file(&base_path).unwrap();
+        assert_eq!(
+            cfg.projects.len(),
+            2,
+            "include expansion must merge both project blocks; got: {:?}",
+            cfg.projects.iter().map(|p| &p.id).collect::<Vec<_>>()
+        );
+        assert_eq!(
+            cfg.pr_dispatch_per_project.len(),
+            2,
+            "both per-project blocks must be aggregated; map keys: {:?}",
+            cfg.pr_dispatch_per_project.keys().collect::<Vec<_>>()
+        );
+        let alpha = cfg
+            .pr_dispatch_per_project
+            .get("alpha")
+            .expect("alpha block must be present");
+        assert_eq!(alpha.agents_on_pr_open.len(), 2);
+        assert_eq!(alpha.agents_on_pr_open[0].name, "build-runner");
+        let beta = cfg
+            .pr_dispatch_per_project
+            .get("beta")
+            .expect("beta block must be present");
+        assert_eq!(beta.agents_on_pr_open.len(), 1);
+        assert_eq!(beta.agents_on_pr_open[0].name, "pr-reviewer");
+    }
+
+    /// Issue #962 Step 2: a `[pr_dispatch]` block in an include file with no
+    /// `[[projects]]` is orphaned -- nothing to key it under. The load must
+    /// succeed (don't break existing fleets) but the map stays empty and a
+    /// warn is logged.
+    #[test]
+    fn from_file_warns_when_pr_dispatch_in_include_has_no_projects() {
+        use tempfile::TempDir;
+
+        let tmp = TempDir::new().unwrap();
+        let conf_d = tmp.path().join("conf.d");
+        std::fs::create_dir(&conf_d).unwrap();
+        std::fs::write(
+            conf_d.join("orphan.toml"),
+            r#"
+[pr_dispatch]
+agents_on_pr_open = [
+    { name = "pr-reviewer", context = "adf/pr-reviewer" },
+]
+"#,
+        )
+        .unwrap();
+
+        let base_path = tmp.path().join("orchestrator.toml");
+        std::fs::write(
+            &base_path,
+            r#"
+working_dir = "/tmp/o"
+include = ["conf.d/*.toml"]
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp/o"
+"#,
+        )
+        .unwrap();
+
+        let cfg = OrchestratorConfig::from_file(&base_path).unwrap();
+        assert!(
+            cfg.pr_dispatch_per_project.is_empty(),
+            "orphan pr_dispatch (no projects) must not pollute the map"
+        );
     }
 }
