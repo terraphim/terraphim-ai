@@ -1,3 +1,8 @@
+//! Markdown parsing utilities for Terraphim document ingestion.
+//!
+//! Converts Markdown files into [`terraphim_types::Document`] values, extracts heading trees,
+//! and splits content into chunks aligned to heading boundaries for downstream indexing.
+
 use std::collections::HashSet;
 use std::ops::Range;
 use std::str::FromStr;

@@ -1,3 +1,8 @@
+//! Python bindings for `terraphim_automata` via PyO3.
+//!
+//! Exposes autocomplete, fuzzy search, text matching, and thesaurus loading functions to Python.
+//! Build with `maturin` to produce a `.so`/`.pyd` wheel.
+
 use ::terraphim_automata::autocomplete::{
     AutocompleteConfig, AutocompleteIndex, AutocompleteResult, autocomplete_search,
     build_autocomplete_index, deserialize_autocomplete_index, fuzzy_autocomplete_search,

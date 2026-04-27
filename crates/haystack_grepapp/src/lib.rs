@@ -1,3 +1,8 @@
+//! Haystack provider for [grep.app](https://grep.app) code search across public GitHub repositories.
+//!
+//! Implements [`haystack_core::HaystackProvider`] to integrate grep.app's search API into the
+//! Terraphim search pipeline. Supports optional language, repository, and path filters.
+
 use anyhow::Result;
 use haystack_core::HaystackProvider;
 use terraphim_types::{Document, SearchQuery};

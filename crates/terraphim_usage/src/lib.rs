@@ -1,3 +1,8 @@
+//! LLM provider usage tracking and cost reporting for Terraphim AI.
+//!
+//! Aggregates token usage and cost data from multiple providers (OpenRouter, Anthropic, Ollama)
+//! and formats the results for display or export. Feature-gated: `cli`, `providers`, `persistence`.
+
 #[cfg(feature = "cli")]
 pub mod cli;
 pub mod formatter;

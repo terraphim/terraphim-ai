@@ -1,3 +1,8 @@
+//! Build argument management for the Terraphim AI workspace.
+//!
+//! Centralises Cargo feature flags, cross-compilation targets, and Docker/Earthly build arguments
+//! into a single `BuildConfig` type that generates correct CLI invocations for each build system.
+
 pub mod cli;
 /// Terraphim Build Argument Management
 ///

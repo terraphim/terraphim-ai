@@ -1,3 +1,8 @@
+//! Python bindings for `terraphim_rolegraph` via PyO3.
+//!
+//! Exposes knowledge-graph node/edge access, thesaurus loading, and document ranking to Python.
+//! Build with `maturin` to produce a `.so`/`.pyd` wheel.
+
 use std::collections::{HashMap, HashSet};
 
 use pyo3::exceptions::{PyRuntimeError, PyValueError};

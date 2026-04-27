@@ -1,3 +1,8 @@
+//! Claude Code usage tracking via the `ccusage` CLI tool.
+//!
+//! Provides a thin async wrapper around the `ccusage` Node.js CLI, parsing its JSON output
+//! into structured cost and token usage summaries per session and project.
+
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
