@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Token budget flags wired to `Search` command** in `terraphim_agent` CLI — `--max-tokens`,
   `--budget-mode`, and related flags now propagate to the robot-mode budget engine (Refs #672)
 
+### Fixed
+- **Pagination and token budget** propagated into search response; test alignments corrected
+  in `terraphim_agent` search contract (Refs #672)
+
 ### Documentation
 - Module-level `//!` docs added to 8 crates: `haystack_grepapp`, `terraphim-markdown-parser`,
   `terraphim_automata_py`, `terraphim_build_args`, `terraphim_ccusage`, `terraphim_lsp`,
