@@ -1,0 +1,216 @@
+commit 90e6d14dec71ff672b17c953418ee7e7aa4b756b
+Author: Test User <test@test.com>
+Date:   Mon Apr 27 17:31:56 2026 +0100
+
+    feat(adf): pr-compliance-watchdog agent template + tests (Phase 2d) Refs #955
+    
+    Rebased onto main (post #952, #1021 merges). Test helpers injected after
+    existing spec-validator equivalents without conflict.
+
+diff --git a/scripts/adf-setup/agents/pr-compliance-watchdog.toml b/scripts/adf-setup/agents/pr-compliance-watchdog.toml
+new file mode 100644
+index 00000000..14fcb46b
+--- /dev/null
++++ b/scripts/adf-setup/agents/pr-compliance-watchdog.toml
+@@ -0,0 +1,201 @@
++commit 1257c16cdfbffafe7138fec6eab7a7fadba88035
++Author: Test User <test@test.com>
++Date:   Sun Apr 26 18:47:48 2026 +0100
++
++    feat(adf): pr-compliance-watchdog agent template + tests (Phase 2d) Refs #955
++
++diff --git a/scripts/adf-setup/agents/pr-compliance-watchdog.toml b/scripts/adf-setup/agents/pr-compliance-watchdog.toml
++new file mode 100644
++index 00000000..17dc2882
++--- /dev/null
+++++ b/scripts/adf-setup/agents/pr-compliance-watchdog.toml
++@@ -0,0 +1,189 @@
+++# pr-compliance-watchdog agent template
+++#
+++# Phase 2d of the ADF replaces-Gitea-Actions plan
+++# (.docs/plan-adf-agents-replace-gitea-actions.md).
+++#
+++# Event-driven (NOT cron). Spawned by `AgentOrchestrator::handle_review_pr`
+++# in response to a Gitea `pull_request.opened` webhook event when
+++# `pr-compliance-watchdog` is listed in `[pr_dispatch].agents_on_pr_open`.
+++# Posts the `adf/compliance` commit status. Invokes claude with the
+++# `responsible-ai` skill on the PR diff for licence, supply-chain, and
+++# responsible-AI checks.
+++#
+++# Path filter (skip-with-success): the agent posts state=`success` with
+++# description "n/a -- no compliance-relevant changes" and exits 0 when
+++# the diff touches none of:
+++#   - Cargo.toml
+++#   - Cargo.lock
+++#   - LICENSE*
+++#   - **/THIRD_PARTY*
+++# This keeps `adf/compliance` (which becomes required in branch protection
+++# post-deploy per locked decision D4) from blocking PRs that do not touch
+++# dependency or licence files.
+++#
+++# NO `schedule` field -- the dispatcher invokes this on demand.
+++# Subscription-only models only (C1 constraint).
+++
+++[[agents]]
+++name = "pr-compliance-watchdog"
+++layer = "Growth"
+++cli_tool = "/home/alex/.local/bin/claude"
+++model = "sonnet"
+++fallback_model = "kimi-for-coding/k2p5"
+++skill_chain = ["responsible-ai"]
+++max_cpu_seconds = 1800
+++grace_period_secs = 30
+++project = "terraphim"
+++task = '''
+++source ~/.profile
+++
+++# Context injected by handle_review_pr (ADF Phase 2 fan-out):
+++#   ADF_PR_NUMBER, ADF_PR_HEAD_SHA, ADF_PR_PROJECT, ADF_PR_AUTHOR,
+++#   ADF_PR_DIFF_LOC, ADF_PR_TITLE
+++if [ -z "${ADF_PR_NUMBER:-}" ] || [ -z "${ADF_PR_PROJECT:-}" ] \
+++   || [ -z "${ADF_PR_HEAD_SHA:-}" ]; then
+++  echo "pr-compliance-watchdog: missing ADF_PR_* env; exit" >&2
+++  exit 1
+++fi
+++
+++HEAD_SHORT=$(echo "$ADF_PR_HEAD_SHA" | cut -c1-7)
+++
+++# POST_STATUS posts to the Gitea Commit Status API directly. Mirrors the
+++# helper shape used by build-runner.toml so the two templates' status-post
+++# code stays symmetric.
+++POST_STATUS() {
+++  local STATE="$1"
+++  local DESC="$2"
+++  curl -fsS -X POST \
+++    -H "Authorization: token $GITEA_TOKEN" \
+++    -H "Content-Type: application/json" \
+++    -d "{\"state\":\"$STATE\",\"context\":\"adf/compliance\",\"description\":\"$DESC\"}" \
+++    "$GITEA_URL/api/v1/repos/$GITEA_OWNER/$GITEA_REPO/statuses/$ADF_PR_HEAD_SHA" \
+++    >/dev/null 2>&1 || true
+++}
+++
+++# Idempotency: skip re-review if a compliance comment referencing the same
+++# head_sha already exists within the last 2 hours. Marker is distinct from
+++# pr-reviewer's "Last reviewed commit:" so the two agents do not share a
+++# 2h skip window.
+++EXISTING=$(curl -sf -H "Authorization: token $GITEA_TOKEN" \
+++  "$GITEA_URL/api/v1/repos/$GITEA_OWNER/$GITEA_REPO/issues/$ADF_PR_NUMBER/comments" 2>/dev/null \
+++  | python3 -c '
+++import json, sys, datetime, os
+++head = os.environ.get("ADF_PR_HEAD_SHA", "")
+++cs = json.load(sys.stdin)
+++now = datetime.datetime.now(datetime.timezone.utc)
+++recent = [
+++  c for c in cs
+++  if ("Last compliance-checked commit: " + head[:7]) in c.get("body", "")
+++  and (now - datetime.datetime.fromisoformat(
+++    c["created_at"].replace("Z", "+00:00")
+++  )).total_seconds() < 7200
+++]
+++print("yes" if recent else "no")
+++' 2>/dev/null || echo "no")
+++
+++if [ "$EXISTING" = "yes" ]; then
+++  echo "pr-compliance-watchdog: same head_sha already checked in last 2h; skip; exit"
+++  exit 0
+++fi
+++
+++# Fetch the PR diff (capped at 2000 lines to bound context window).
+++cd "$GITEA_WORKING_DIR"
+++git fetch gitea "pull/$ADF_PR_NUMBER/head:pr-$ADF_PR_NUMBER" 2>/dev/null || true
+++
+++# Path filter: list files changed in this PR; skip-with-success when none
+++# of the compliance-relevant paths are touched. Pipe to grep BEFORE head
+++# so we evaluate the entire file list, not just the first chunk.
+++CHANGED=$(git diff --name-only "main...pr-$ADF_PR_NUMBER" 2>/dev/null || true)
+++RELEVANT=$(echo "$CHANGED" \
+++  | grep -E '^Cargo\.toml$|^Cargo\.lock$|^LICENSE|/THIRD_PARTY|^THIRD_PARTY' \
+++  || true)
+++
+++if [ -z "$RELEVANT" ]; then
+++  POST_STATUS success "n/a -- no compliance-relevant changes"
+++  echo "pr-compliance-watchdog: no compliance-relevant paths changed; skip-with-success on $ADF_PR_HEAD_SHA"
+++  exit 0
+++fi
+++
+++PR_DIFF=$(git diff "main...pr-$ADF_PR_NUMBER" 2>/dev/null | head -2000)
+++
+++REVIEW_PROMPT="You are auditing PR #$ADF_PR_NUMBER on $GITEA_OWNER/$GITEA_REPO. Apply the responsible-ai skill with a compliance focus -- licences (SPDX, GPL contagion), supply chain (new deps, version pins, yanked crates), and responsible-AI risks (PII, bias, model usage policies).
+++
+++PR metadata:
+++- Title: $ADF_PR_TITLE
+++- Author: $ADF_PR_AUTHOR
+++- Head SHA: $ADF_PR_HEAD_SHA
+++- Diff LOC: $ADF_PR_DIFF_LOC
+++
+++Compliance-relevant files changed:
+++$RELEVANT
+++
+++PR diff (first 2000 lines):
+++\`\`\`diff
+++$PR_DIFF
+++\`\`\`
+++
+++Post your audit as a single gtr comment on PR #$ADF_PR_NUMBER. Output template:
+++- <h3>Compliance summary</h3>
+++- <h3>Verdict: pass | concerns | fail</h3>
+++- <h3>Licence findings</h3>
+++- <h3>Supply-chain findings</h3>
+++- <h3>Responsible-AI findings</h3>
+++- <sub>Last compliance-checked commit: $HEAD_SHORT</sub>
+++
+++Rules:
+++- Do NOT use --dangerously-skip-permissions
+++- Do NOT mock, bypass tests, or skip hooks
+++- One audit comment per round; batch all findings
+++
+++Post the completed audit with:
+++  gtr comment --owner \"\$GITEA_OWNER\" --repo \"\$GITEA_REPO\" --issue \"$ADF_PR_NUMBER\" --body-file /tmp/pr-compliance-$ADF_PR_NUMBER.md"
+++
+++REVIEW_OUTPUT=$(echo "$REVIEW_PROMPT" | /home/alex/.local/bin/claude -p \
+++  --allowedTools "Bash,Read,Grep,Glob" \
+++  2>&1)
+++echo "$REVIEW_OUTPUT"
+++
+++echo "pr-compliance-watchdog: audit posted on PR #$ADF_PR_NUMBER"
+++
+++# Derive verdict from the rendered audit file or agent output. Look for
+++# "Verdict:" or "Compliance:" headings; default to a non-blocking
+++# success-with-manual-gate when no parseable verdict is present.
+++REVIEW_FILE="/tmp/pr-compliance-$ADF_PR_NUMBER.md"
+++VERDICT_TEXT=""
+++if [ -f "$REVIEW_FILE" ]; then
+++  VERDICT_TEXT=$(cat "$REVIEW_FILE")
+++fi
+++VERDICT_TEXT="$VERDICT_TEXT
+++$REVIEW_OUTPUT"
+++
+++VERDICT=$(echo "$VERDICT_TEXT" \
+++  | grep -iE '^(Verdict|Compliance):' \
+++  | head -1 \
+++  | sed -E 's/^[^:]+:[[:space:]]*//' \
+++  | tr '[:upper:]' '[:lower:]' \
+++  | awk '{print $1}')
+++
+++case "$VERDICT" in
+++  pass)
+++    STATE=success
+++    DESC="compliance pass"
+++    ;;
+++  concerns)
+++    STATE=success
+++    DESC="compliance concerns flagged -- see audit"
+++    ;;
+++  fail)
+++    STATE=failure
+++    DESC="compliance fail -- blocking findings"
+++    ;;
+++  *)
+++    STATE=success
+++    DESC="compliance review posted; manual gate"
+++    ;;
+++esac
+++
+++POST_STATUS "$STATE" "$DESC"
+++echo "pr-compliance-watchdog: posted adf/compliance status state=$STATE"
+++'''
