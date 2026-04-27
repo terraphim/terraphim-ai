@@ -1,7 +1,7 @@
 use terraphim_agent::forgiving::{AliasRegistry, ForgivingParser};
 use terraphim_agent::robot::{
-    schema::SearchResultsData, ExitCode, FieldMode, OutputFormat, ResponseMeta, RobotConfig,
-    RobotFormatter, RobotResponse,
+    ExitCode, FieldMode, OutputFormat, ResponseMeta, RobotConfig, RobotFormatter, RobotResponse,
+    schema::SearchResultsData,
 };
 
 #[test]

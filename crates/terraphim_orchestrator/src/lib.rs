@@ -2229,7 +2229,10 @@ impl AgentOrchestrator {
         // Fall back to the first project-level mentions config when the top-level
         // config is absent (multi-project configs put mentions under [projects.mentions]).
         let mention_cfg = self.config.mentions.as_ref().or_else(|| {
-            self.config.projects.iter().find_map(|p| p.mentions.as_ref())
+            self.config
+                .projects
+                .iter()
+                .find_map(|p| p.mentions.as_ref())
         });
         let mention_cfg = match mention_cfg {
             Some(cfg) => cfg,

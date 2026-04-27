@@ -1874,8 +1874,9 @@ async fn run_offline_command(
                     })
                     .collect();
 
-                let concepts =
-                    service.extract_concepts_from_query(&role_name, &query).await;
+                let concepts = service
+                    .extract_concepts_from_query(&role_name, &query)
+                    .await;
                 let data = SearchResultsData {
                     results: items,
                     total_matches: total,

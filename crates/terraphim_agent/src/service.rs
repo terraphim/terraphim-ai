@@ -362,17 +362,20 @@ impl TuiService {
             Ok(t) => t,
             Err(_) => return Vec::new(),
         };
-        let matched =
-            match terraphim_automata::find_matches(query, thesaurus, false) {
-                Ok(m) => m,
-                Err(_) => return Vec::new(),
-            };
+        let matched = match terraphim_automata::find_matches(query, thesaurus, false) {
+            Ok(m) => m,
+            Err(_) => return Vec::new(),
+        };
         let mut seen = std::collections::HashSet::new();
         matched
             .into_iter()
             .filter_map(|m| {
                 let name = m.normalized_term.value.to_string();
-                if seen.insert(name.clone()) { Some(name) } else { None }
+                if seen.insert(name.clone()) {
+                    Some(name)
+                } else {
+                    None
+                }
             })
             .collect()
     }
