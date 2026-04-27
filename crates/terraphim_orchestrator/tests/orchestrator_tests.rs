@@ -162,6 +162,7 @@ fn test_config() -> OrchestratorConfig {
         post_merge_gate: None,
         learning: terraphim_orchestrator::LearningConfig::default(),
         pr_dispatch: None,
+        pr_dispatch_per_project: Default::default(),
     }
 }
 
