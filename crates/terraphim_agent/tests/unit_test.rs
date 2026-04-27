@@ -214,19 +214,10 @@ fn test_summarize_request_serialization() {
 fn test_thesaurus_response_deserialization() {
     let json_response = r#"{
         "status": "success",
-        "terms": [
-            {
-                "id": "term1",
-                "nterm": "machine learning",
-                "url": "http://example.com/ml"
-            },
-            {
-                "id": "term2",
-                "nterm": "artificial intelligence",
-                "url": null
-            }
-        ],
-        "total": 2
+        "thesaurus": {
+            "machine learning": "artificial intelligence",
+            "ML": "machine learning"
+        }
     }"#;
 
     let response: Result<ThesaurusResponse, _> = serde_json::from_str(json_response);
@@ -237,18 +228,12 @@ fn test_thesaurus_response_deserialization() {
 
     let thesaurus_response = response.unwrap();
     assert_eq!(thesaurus_response.status, "success");
-    assert_eq!(thesaurus_response.total, 2);
-    assert_eq!(thesaurus_response.terms.len(), 2);
+    assert!(thesaurus_response.error.is_none());
 
-    let term1 = &thesaurus_response.terms[0];
-    assert_eq!(term1.id, "term1");
-    assert_eq!(term1.nterm, "machine learning");
-    assert_eq!(term1.url.as_ref().unwrap(), "http://example.com/ml");
-
-    let term2 = &thesaurus_response.terms[1];
-    assert_eq!(term2.id, "term2");
-    assert_eq!(term2.nterm, "artificial intelligence");
-    assert!(term2.url.is_none());
+    let thesaurus = thesaurus_response.thesaurus.as_ref().unwrap();
+    assert_eq!(thesaurus.len(), 2);
+    assert_eq!(thesaurus["machine learning"], "artificial intelligence");
+    assert_eq!(thesaurus["ML"], "machine learning");
 }
 
 /// Test AutocompleteResponse deserialization

@@ -389,8 +389,8 @@ async fn test_server_mode_with_custom_url() -> Result<()> {
     let code = output.status.code().unwrap_or(-1);
 
     assert_eq!(
-        code, 1,
-        "Should fail with custom URL when no server running"
+        code, 6,
+        "Should fail with ErrorNetwork (6) when no server running"
     );
     assert!(
         stderr.contains("Connection refused") || stderr.contains("connect error"),

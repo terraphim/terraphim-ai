@@ -1880,6 +1880,8 @@ async fn run_offline_command(
 
                 let budgeted = budget_engine.apply(&items)?;
                 let total = results.len();
+                let pagination = budgeted.pagination.clone();
+                let token_budget = budgeted.token_budget.clone();
 
                 let data = SearchResultsData {
                     results: budgeted
@@ -1892,8 +1894,12 @@ async fn run_offline_command(
                     wildcard_fallback: false,
                 };
 
-                let meta =
+                let mut meta =
                     ResponseMeta::new("search").with_elapsed(start.elapsed().as_millis() as u64);
+                meta = meta.with_pagination(pagination);
+                if let Some(tb) = token_budget {
+                    meta = meta.with_token_budget(tb);
+                }
                 let response =
                     RobotResponse::success(data, meta).with_context(&query, role_name.as_str());
                 let output_str = formatter.format(&response)?;
