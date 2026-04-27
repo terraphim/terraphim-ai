@@ -433,6 +433,41 @@ impl ApiClient {
         Ok(body)
     }
 
+    /// Extract concepts matched by a query using the server's thesaurus for the given role.
+    ///
+    /// Fetches the thesaurus from the server, builds a local automaton, and returns the
+    /// deduplicated list of concept names matched in `query`.  Returns an empty vec when
+    /// the thesaurus is unavailable or the query matches nothing.
+    pub async fn extract_concepts_from_query(&self, role_name: &str, query: &str) -> Vec<String> {
+        let thesaurus_res = match self.get_thesaurus(role_name).await {
+            Ok(t) => t,
+            Err(_) => return Vec::new(),
+        };
+        use terraphim_types::{NormalizedTerm, NormalizedTermValue, Thesaurus};
+        let mut thesaurus = Thesaurus::new(role_name.to_string());
+        for (i, entry) in thesaurus_res.terms.into_iter().enumerate() {
+            let key = NormalizedTermValue::new(entry.nterm);
+            let value = NormalizedTerm::new(i as u64, key.clone());
+            thesaurus.insert(key, value);
+        }
+        let matched = match terraphim_automata::find_matches(query, thesaurus, false) {
+            Ok(m) => m,
+            Err(_) => return Vec::new(),
+        };
+        let mut seen = std::collections::HashSet::new();
+        matched
+            .into_iter()
+            .filter_map(|m| {
+                let name = m.normalized_term.value.to_string();
+                if seen.insert(name.clone()) {
+                    Some(name)
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
     pub async fn get_autocomplete(
         &self,
         role_name: &str,

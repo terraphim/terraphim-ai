@@ -3822,10 +3822,16 @@ async fn run_server_command(
                     })
                     .collect();
 
+                let role_str = q
+                    .role
+                    .as_ref()
+                    .map(|r| r.as_str().to_owned())
+                    .unwrap_or_default();
+                let concepts = api.extract_concepts_from_query(&role_str, &query).await;
                 let data = SearchResultsData {
                     results: items,
                     total_matches: total,
-                    concepts_matched: vec![],
+                    concepts_matched: concepts,
                     wildcard_fallback: res_count == 0,
                 };
 
