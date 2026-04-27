@@ -705,6 +705,15 @@ enum Command {
         limit: usize,
         #[arg(long, default_value_t = false)]
         fail_on_empty: bool,
+        /// Maximum tokens for the entire response (character-based estimation: ~4 chars = 1 token)
+        #[arg(long)]
+        max_tokens: Option<usize>,
+        /// Maximum number of results to return (overrides limit for robot output)
+        #[arg(long)]
+        max_results: Option<usize>,
+        /// Maximum content length per result before truncation
+        #[arg(long)]
+        max_content_length: Option<usize>,
     },
     /// Manage roles (list, select)
     Roles {
@@ -1750,6 +1759,9 @@ async fn run_offline_command(
             role,
             limit,
             fail_on_empty,
+            max_tokens,
+            max_results,
+            max_content_length,
         } => {
             let (role_name, auto) = service
                 .resolve_or_auto_route(role.as_deref(), &query)
@@ -1814,21 +1826,25 @@ async fn run_offline_command(
                     CommandOutputMode::JsonCompact => crate::robot::output::OutputFormat::Minimal,
                     _ => crate::robot::output::OutputFormat::Json,
                 };
+                let effective_max_results = max_results.unwrap_or(limit);
                 let mut robot_config = RobotConfig::new()
                     .with_format(robot_format)
-                    .with_max_results(limit);
-                if output.robot {
-                    robot_config = robot_config
-                        .with_max_content_length(2000)
-                        .with_max_tokens(8000);
+                    .with_max_results(effective_max_results);
+                if let Some(mt) = max_tokens {
+                    robot_config = robot_config.with_max_tokens(mt);
+                } else if output.robot {
+                    robot_config = robot_config.with_max_tokens(8000);
+                }
+                if let Some(mcl) = max_content_length {
+                    robot_config = robot_config.with_max_content_length(mcl);
+                } else if output.robot {
+                    robot_config = robot_config.with_max_content_length(2000);
                 }
 
                 let formatter = RobotFormatter::new(robot_config.clone());
-                let max_results = robot_config.max_results.unwrap_or(limit);
-                let truncated_results: Vec<_> = results.into_iter().take(max_results).collect();
-                let total = truncated_results.len();
+                let budget_engine = crate::robot::budget::BudgetEngine::new(robot_config.clone());
 
-                let items: Vec<SearchResultItem> = truncated_results
+                let items: Vec<SearchResultItem> = results
                     .iter()
                     .enumerate()
                     .map(|(i, doc)| {
@@ -1862,8 +1878,15 @@ async fn run_offline_command(
                     })
                     .collect();
 
+                let budgeted = budget_engine.apply(&items)?;
+                let total = results.len();
+
                 let data = SearchResultsData {
-                    results: items,
+                    results: budgeted
+                        .results
+                        .into_iter()
+                        .filter_map(|v| serde_json::from_value(v).ok())
+                        .collect(),
                     total_matches: total,
                     concepts_matched: vec![],
                     wildcard_fallback: false,
@@ -2014,9 +2037,22 @@ async fn run_offline_command(
         } => {
             let role_name = service.resolve_role(role.as_deref()).await?;
 
-            let results = service
+            let results = match service
                 .extract_paragraphs(&role_name, &text, exclude_term)
-                .await?;
+                .await
+            {
+                Ok(r) => r,
+                Err(e) => {
+                    let msg = e.to_string();
+                    if msg.contains("Knowledge graph not configured")
+                        || msg.contains("not configured")
+                    {
+                        eprintln!("Note: {}", msg);
+                        return Ok(());
+                    }
+                    return Err(e);
+                }
+            };
 
             if results.is_empty() {
                 println!("No matches found in the text.");
@@ -3698,6 +3734,9 @@ async fn run_server_command(
             role,
             limit,
             fail_on_empty: _,
+            max_tokens,
+            max_results,
+            max_content_length,
         } => {
             // Get selected role from server if not specified
             let role_name = if let Some(role) = role {
@@ -3767,21 +3806,27 @@ async fn run_server_command(
                     CommandOutputMode::JsonCompact => crate::robot::output::OutputFormat::Minimal,
                     _ => crate::robot::output::OutputFormat::Json,
                 };
+                let effective_max_results = max_results.unwrap_or(limit);
                 let mut robot_config = RobotConfig::new()
                     .with_format(robot_format)
-                    .with_max_results(limit);
-                if output.robot {
-                    robot_config = robot_config
-                        .with_max_content_length(2000)
-                        .with_max_tokens(8000);
+                    .with_max_results(effective_max_results);
+                if let Some(mt) = max_tokens {
+                    robot_config = robot_config.with_max_tokens(mt);
+                } else if output.robot {
+                    robot_config = robot_config.with_max_tokens(8000);
+                }
+                if let Some(mcl) = max_content_length {
+                    robot_config = robot_config.with_max_content_length(mcl);
+                } else if output.robot {
+                    robot_config = robot_config.with_max_content_length(2000);
                 }
 
                 let formatter = RobotFormatter::new(robot_config.clone());
-                let max_results = robot_config.max_results.unwrap_or(limit);
-                let truncated_results: Vec<_> = res.results.into_iter().take(max_results).collect();
-                let total = truncated_results.len();
+                let budget_engine = crate::robot::budget::BudgetEngine::new(robot_config.clone());
+                let total_results = res.results.len();
 
-                let items: Vec<SearchResultItem> = truncated_results
+                let items: Vec<SearchResultItem> = res
+                    .results
                     .iter()
                     .enumerate()
                     .map(|(i, doc)| {
@@ -3815,9 +3860,15 @@ async fn run_server_command(
                     })
                     .collect();
 
+                let budgeted = budget_engine.apply(&items)?;
+
                 let data = SearchResultsData {
-                    results: items,
-                    total_matches: total,
+                    results: budgeted
+                        .results
+                        .into_iter()
+                        .filter_map(|v| serde_json::from_value(v).ok())
+                        .collect(),
+                    total_matches: total_results,
                     concepts_matched: vec![],
                     wildcard_fallback: false,
                 };
@@ -4007,15 +4058,17 @@ async fn run_server_command(
 
             // Build thesaurus from response
             let mut thesaurus = terraphim_types::Thesaurus::new(format!("role-{}", role_name));
-            for entry in thesaurus_res.terms {
-                let normalized_term = terraphim_types::NormalizedTerm::new(
-                    1u64, // Simple ID for CLI usage
-                    terraphim_types::NormalizedTermValue::from(entry.nterm.clone()),
-                );
-                thesaurus.insert(
-                    terraphim_types::NormalizedTermValue::from(entry.nterm),
-                    normalized_term,
-                );
+            if let Some(entries) = thesaurus_res.thesaurus {
+                for (nterm, _value) in entries {
+                    let normalized_term = terraphim_types::NormalizedTerm::new(
+                        1u64, // Simple ID for CLI usage
+                        terraphim_types::NormalizedTermValue::from(nterm.clone()),
+                    );
+                    thesaurus.insert(
+                        terraphim_types::NormalizedTermValue::from(nterm),
+                        normalized_term,
+                    );
+                }
             }
 
             // Extract paragraphs using automata
