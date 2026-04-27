@@ -249,6 +249,7 @@ impl McpToolIndex {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(debug_assertions))]
     use std::time::Instant;
 
     fn create_test_tool(name: &str, description: &str, server: &str) -> McpToolEntry {
@@ -374,6 +375,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(debug_assertions))]
     fn test_discovery_latency_benchmark() {
         let mut index = McpToolIndex::new(PathBuf::from("/tmp/test-benchmark.json"));
 
