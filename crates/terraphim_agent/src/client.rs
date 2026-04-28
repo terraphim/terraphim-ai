@@ -154,6 +154,8 @@ pub struct RoleGraphResponseDto {
     pub status: String,
     pub nodes: Vec<GraphNodeDto>,
     pub edges: Vec<GraphEdgeDto>,
+    #[serde(default)]
+    pub pinned_node_ids: Vec<u64>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

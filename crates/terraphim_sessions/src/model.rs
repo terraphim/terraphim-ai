@@ -57,7 +57,7 @@ impl std::fmt::Display for MessageRole {
 }
 
 /// Content block within a message
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ContentBlock {
     /// Plain text content
@@ -72,10 +72,82 @@ pub enum ContentBlock {
     ToolResult {
         tool_use_id: String,
         content: String,
-        is_error: bool,
+        exit_code: i32,
     },
     /// Image content
     Image { source: String },
+}
+
+impl<'de> serde::Deserialize<'de> for ContentBlock {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(serde::Deserialize)]
+        struct ContentBlockHelper {
+            #[serde(rename = "type")]
+            kind: String,
+            text: Option<String>,
+            id: Option<String>,
+            name: Option<String>,
+            input: Option<serde_json::Value>,
+            tool_use_id: Option<String>,
+            content: Option<String>,
+            #[serde(default)]
+            is_error: Option<bool>,
+            #[serde(default)]
+            exit_code: Option<i32>,
+            source: Option<String>,
+        }
+
+        let helper = ContentBlockHelper::deserialize(deserializer)?;
+
+        match helper.kind.as_str() {
+            "text" => Ok(ContentBlock::Text {
+                text: helper
+                    .text
+                    .ok_or_else(|| serde::de::Error::missing_field("text"))?,
+            }),
+            "tool_use" => Ok(ContentBlock::ToolUse {
+                id: helper
+                    .id
+                    .ok_or_else(|| serde::de::Error::missing_field("id"))?,
+                name: helper
+                    .name
+                    .ok_or_else(|| serde::de::Error::missing_field("name"))?,
+                input: helper
+                    .input
+                    .ok_or_else(|| serde::de::Error::missing_field("input"))?,
+            }),
+            "tool_result" => {
+                let exit_code = if let Some(code) = helper.exit_code {
+                    code
+                } else if let Some(is_err) = helper.is_error {
+                    if is_err { 1 } else { 0 }
+                } else {
+                    0
+                };
+                Ok(ContentBlock::ToolResult {
+                    tool_use_id: helper
+                        .tool_use_id
+                        .ok_or_else(|| serde::de::Error::missing_field("tool_use_id"))?,
+                    content: helper
+                        .content
+                        .ok_or_else(|| serde::de::Error::missing_field("content"))?,
+                    exit_code,
+                })
+            }
+            "image" => Ok(ContentBlock::Image {
+                source: helper
+                    .source
+                    .ok_or_else(|| serde::de::Error::missing_field("source"))?,
+            }),
+            _ => Err(serde::de::Error::unknown_variant(
+                &helper.kind,
+                &["text", "tool_use", "tool_result", "image"],
+            )),
+        }
+    }
 }
 
 impl ContentBlock {

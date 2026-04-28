@@ -386,6 +386,41 @@ impl TuiService {
         }
     }
 
+    /// Get the pinned concepts for a specific role
+    ///
+    /// Returns only the concepts that are marked as pinned in the role graph.
+    pub async fn get_role_graph_pinned(&self, role_name: &RoleName) -> Result<Vec<String>> {
+        log::info!("Getting pinned concepts for role {}", role_name);
+
+        if let Some(rolegraph_sync) = self.config_state.roles.get(role_name) {
+            let rolegraph = rolegraph_sync.lock().await;
+            let pinned_ids: std::collections::HashSet<u64> =
+                rolegraph.get_pinned_node_ids().iter().copied().collect();
+
+            let pinned_concepts: Vec<String> = rolegraph
+                .nodes_map()
+                .keys()
+                .filter(|node_id| pinned_ids.contains(node_id))
+                .filter_map(|node_id| {
+                    rolegraph
+                        .ac_reverse_nterm
+                        .get(node_id)
+                        .map(|term| term.to_string())
+                })
+                .collect();
+
+            log::debug!(
+                "Found {} pinned concepts for role {}",
+                pinned_concepts.len(),
+                role_name
+            );
+            Ok(pinned_concepts)
+        } else {
+            log::warn!("Role graph not found for role {}", role_name);
+            Ok(Vec::new())
+        }
+    }
+
     /// Generate chat response using LLM
     #[cfg(feature = "llm")]
     pub async fn chat(

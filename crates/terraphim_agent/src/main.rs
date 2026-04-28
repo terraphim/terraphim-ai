@@ -713,6 +713,9 @@ enum Command {
         limit: usize,
         #[arg(long, default_value_t = false)]
         fail_on_empty: bool,
+        /// Include pinned KG entries in results
+        #[arg(long, default_value_t = false)]
+        include_pinned: bool,
     },
     /// Manage roles (list, select)
     Roles {
@@ -730,6 +733,9 @@ enum Command {
         role: Option<String>,
         #[arg(long, default_value_t = 50)]
         top_k: usize,
+        /// Show only pinned entries
+        #[arg(long, default_value_t = false)]
+        pinned: bool,
     },
     /// Chat with the AI using a specific role
     #[cfg(feature = "llm")]
@@ -1986,6 +1992,7 @@ async fn run_offline_command(
             role,
             limit,
             fail_on_empty,
+            include_pinned,
         } => {
             let (role_name, auto) = service
                 .resolve_or_auto_route(role.as_deref(), &query)
@@ -2026,7 +2033,7 @@ async fn run_offline_command(
                     operator: operator.map(|op| op.into()),
                     skip: Some(0),
                     limit: Some(limit),
-                    include_pinned: false,
+                    include_pinned,
                     role: Some(role_name.clone()),
                     layer: Layer::default(),
                 };
@@ -2223,12 +2230,23 @@ async fn run_offline_command(
             }
             Ok(())
         }
-        Command::Graph { role, top_k } => {
+        Command::Graph {
+            role,
+            top_k,
+            pinned,
+        } => {
             let role_name = service.resolve_role(role.as_deref()).await?;
 
-            let concepts = service.get_role_graph_top_k(&role_name, top_k).await?;
-            for concept in concepts {
-                println!("{}", concept);
+            if pinned {
+                let pinned_concepts = service.get_role_graph_pinned(&role_name).await?;
+                for concept in pinned_concepts {
+                    println!("{}", concept);
+                }
+            } else {
+                let concepts = service.get_role_graph_top_k(&role_name, top_k).await?;
+                for concept in concepts {
+                    println!("{}", concept);
+                }
             }
             Ok(())
         }
@@ -3055,7 +3073,12 @@ async fn run_learn_command(sub: LearnSub) -> Result<()> {
             } else {
                 &storage_loc
             };
-            match learnings::query_all_entries_semantic(storage_dir, &pattern, exact, semantic) {
+            let query_result = if semantic {
+                learnings::query_all_entries_semantic(storage_dir, &pattern, exact, semantic)
+            } else {
+                learnings::query_all_entries(storage_dir, &pattern, exact)
+            };
+            match query_result {
                 Ok(entries) => {
                     if entries.is_empty() {
                         println!("No learnings matching '{}'.", pattern);
@@ -3938,6 +3961,7 @@ async fn run_server_command(
             role,
             limit,
             fail_on_empty: _,
+            include_pinned,
         } => {
             // Get selected role from server if not specified
             let role_name = if let Some(role) = role {
@@ -3963,7 +3987,7 @@ async fn run_server_command(
                     limit: Some(limit),
                     role: Some(role_name),
                     layer: Layer::default(),
-                    include_pinned: false,
+                    include_pinned,
                 }
             } else {
                 // Single term query (backward compatibility)
@@ -3975,7 +3999,7 @@ async fn run_server_command(
                     limit: Some(limit),
                     role: Some(role_name),
                     layer: Layer::default(),
-                    include_pinned: false,
+                    include_pinned,
                 }
             };
 
@@ -4188,7 +4212,11 @@ async fn run_server_command(
             }
             Ok(())
         }
-        Command::Graph { role, top_k } => {
+        Command::Graph {
+            role,
+            top_k,
+            pinned,
+        } => {
             let role_name = if let Some(role) = role {
                 role
             } else {
@@ -4197,11 +4225,21 @@ async fn run_server_command(
             };
 
             let graph_res = api.rolegraph(Some(&role_name)).await?;
-            let mut nodes_sorted = graph_res.nodes.clone();
-            #[allow(clippy::unnecessary_sort_by)]
-            nodes_sorted.sort_by(|a, b| b.rank.cmp(&a.rank));
-            for node in nodes_sorted.into_iter().take(top_k) {
-                println!("{}", node.label);
+            if pinned {
+                let pinned_ids: std::collections::HashSet<u64> =
+                    graph_res.pinned_node_ids.iter().copied().collect();
+                for node in graph_res.nodes {
+                    if pinned_ids.contains(&node.id) {
+                        println!("{}", node.label);
+                    }
+                }
+            } else {
+                let mut nodes_sorted = graph_res.nodes;
+                #[allow(clippy::unnecessary_sort_by)]
+                nodes_sorted.sort_by(|a, b| b.rank.cmp(&a.rank));
+                for node in nodes_sorted.into_iter().take(top_k) {
+                    println!("{}", node.label);
+                }
             }
             Ok(())
         }
