@@ -37,15 +37,13 @@ pub mod suggest;
 pub use procedure::ProcedureStore;
 pub use replay::{StepOutcome, replay_procedure};
 
-pub use capture::{
-    CorrectionType, LearningSource, capture_correction, capture_failed_command, correct_learning,
-    list_all_entries, query_all_entries_semantic,
-};
-// Re-export for testing and external use
+// Re-export public API types and functions
 #[allow(unused_imports)]
 pub use capture::{
-    CapturedLearning, ImportanceScore, LearningContext, LearningError, annotate_with_entities,
-    annotate_with_thesaurus, query_all_entries,
+    CapturedLearning, CorrectionEvent, CorrectionType, ImportanceScore, LearningContext,
+    LearningEntry, LearningError, LearningSource, annotate_with_entities, annotate_with_thesaurus,
+    capture_correction, capture_failed_command, correct_learning, list_all_entries,
+    query_all_entries, query_all_entries_semantic,
 };
 // Re-export KG thesaurus building utilities for use by hook validation pipeline
 pub(crate) use capture::{build_kg_thesaurus_from_dir, find_kg_dir};
