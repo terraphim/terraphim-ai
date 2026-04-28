@@ -49,8 +49,9 @@ fn listen_mode_with_server_flag_exits_error_usage() {
 
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
-        stderr.contains("listen mode does not support --server flag"),
-        "Should output appropriate error message"
+        stderr.contains("unexpected argument '--server'"),
+        "Should output clap's unexpected argument error message, got: {}",
+        stderr
     );
 }
 
