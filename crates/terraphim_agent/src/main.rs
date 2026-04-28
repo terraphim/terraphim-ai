@@ -1886,16 +1886,40 @@ async fn run_offline_command(
                 RolesSub::List => {
                     let roles_with_info = service.list_roles_with_info().await;
                     let selected = service.get_selected_role().await;
-                    for (name, shortname) in roles_with_info {
-                        let marker = if name == selected.to_string() {
-                            "*"
-                        } else {
-                            " "
+                    if output.is_machine_readable() {
+                        use crate::robot::schema::{RoleInfo, RolesListData};
+                        use crate::robot::{ResponseMeta, RobotResponse};
+                        use std::time::Instant;
+
+                        let start = Instant::now();
+                        let roles: Vec<RoleInfo> = roles_with_info
+                            .into_iter()
+                            .map(|(name, shortname)| RoleInfo {
+                                name: name.clone(),
+                                shortname,
+                                selected: name == selected.to_string(),
+                            })
+                            .collect();
+                        let data = RolesListData {
+                            roles,
+                            selected: selected.to_string(),
                         };
-                        if let Some(short) = shortname {
-                            println!("{} {} ({})", marker, name, short);
-                        } else {
-                            println!("{} {}", marker, name);
+                        let meta = ResponseMeta::new("roles list")
+                            .with_elapsed(start.elapsed().as_millis() as u64);
+                        let response = RobotResponse::success(data, meta);
+                        println!("{}", serde_json::to_string_pretty(&response)?);
+                    } else {
+                        for (name, shortname) in roles_with_info {
+                            let marker = if name == selected.to_string() {
+                                "*"
+                            } else {
+                                " "
+                            };
+                            if let Some(short) = shortname {
+                                println!("{} {} ({})", marker, name, short);
+                            } else {
+                                println!("{} {}", marker, name);
+                            }
                         }
                     }
                 }
@@ -1912,7 +1936,22 @@ async fn run_offline_command(
                         })?;
                     service.update_selected_role(role_name.clone()).await?;
                     service.save_config().await?;
-                    println!("selected:{}", role_name);
+                    if output.is_machine_readable() {
+                        use crate::robot::schema::RoleSelectData;
+                        use crate::robot::{ResponseMeta, RobotResponse};
+                        use std::time::Instant;
+
+                        let start = Instant::now();
+                        let data = RoleSelectData {
+                            selected: role_name.to_string(),
+                        };
+                        let meta = ResponseMeta::new("roles select")
+                            .with_elapsed(start.elapsed().as_millis() as u64);
+                        let response = RobotResponse::success(data, meta);
+                        println!("{}", serde_json::to_string_pretty(&response)?);
+                    } else {
+                        println!("selected:{}", role_name);
+                    }
                 }
             }
             Ok(())
@@ -1921,14 +1960,46 @@ async fn run_offline_command(
             match sub {
                 ConfigSub::Show => {
                     let config = service.get_config().await;
-                    println!("{}", serde_json::to_string_pretty(&config)?);
+                    if output.is_machine_readable() {
+                        use crate::robot::schema::ConfigShowData;
+                        use crate::robot::{ResponseMeta, RobotResponse};
+                        use std::time::Instant;
+
+                        let start = Instant::now();
+                        let config_value = serde_json::to_value(&config)?;
+                        let data = ConfigShowData {
+                            config: config_value,
+                        };
+                        let meta = ResponseMeta::new("config show")
+                            .with_elapsed(start.elapsed().as_millis() as u64);
+                        let response = RobotResponse::success(data, meta);
+                        println!("{}", serde_json::to_string_pretty(&response)?);
+                    } else {
+                        println!("{}", serde_json::to_string_pretty(&config)?);
+                    }
                 }
                 ConfigSub::Set { key, value } => match key.as_str() {
                     "selected_role" => {
                         let role_name = RoleName::new(&value);
                         service.update_selected_role(role_name).await?;
                         service.save_config().await?;
-                        println!("updated selected_role to {}", value);
+                        if output.is_machine_readable() {
+                            use crate::robot::schema::ConfigSetData;
+                            use crate::robot::{ResponseMeta, RobotResponse};
+                            use std::time::Instant;
+
+                            let start = Instant::now();
+                            let data = ConfigSetData {
+                                key: key.clone(),
+                                value: value.clone(),
+                            };
+                            let meta = ResponseMeta::new("config set")
+                                .with_elapsed(start.elapsed().as_millis() as u64);
+                            let response = RobotResponse::success(data, meta);
+                            println!("{}", serde_json::to_string_pretty(&response)?);
+                        } else {
+                            println!("updated selected_role to {}", value);
+                        }
                     }
                     _ => {
                         println!("unsupported key: {}", key);
@@ -1944,10 +2015,26 @@ async fn run_offline_command(
                     match &ds.role_config {
                         Some(path) => match service.reload_from_json(path).await {
                             Ok(count) => {
-                                println!(
-                                    "Reloaded {} role(s) from '{}' and saved to persistence",
-                                    count, path
-                                );
+                                if output.is_machine_readable() {
+                                    use crate::robot::schema::ConfigReloadData;
+                                    use crate::robot::{ResponseMeta, RobotResponse};
+                                    use std::time::Instant;
+
+                                    let start = Instant::now();
+                                    let data = ConfigReloadData {
+                                        count,
+                                        path: path.clone(),
+                                    };
+                                    let meta = ResponseMeta::new("config reload")
+                                        .with_elapsed(start.elapsed().as_millis() as u64);
+                                    let response = RobotResponse::success(data, meta);
+                                    println!("{}", serde_json::to_string_pretty(&response)?);
+                                } else {
+                                    println!(
+                                        "Reloaded {} role(s) from '{}' and saved to persistence",
+                                        count, path
+                                    );
+                                }
                             }
                             Err(e) => {
                                 eprintln!("Failed to reload from '{}': {:?}", path, e);
@@ -1970,8 +2057,24 @@ async fn run_offline_command(
             let role_name = service.resolve_role(role.as_deref()).await?;
 
             let concepts = service.get_role_graph_top_k(&role_name, top_k).await?;
-            for concept in concepts {
-                println!("{}", concept);
+            if output.is_machine_readable() {
+                use crate::robot::schema::GraphData;
+                use crate::robot::{ResponseMeta, RobotResponse};
+                use std::time::Instant;
+
+                let start = Instant::now();
+                let data = GraphData {
+                    role: role_name.to_string(),
+                    concepts,
+                };
+                let meta =
+                    ResponseMeta::new("graph").with_elapsed(start.elapsed().as_millis() as u64);
+                let response = RobotResponse::success(data, meta);
+                println!("{}", serde_json::to_string_pretty(&response)?);
+            } else {
+                for concept in concepts {
+                    println!("{}", concept);
+                }
             }
             Ok(())
         }

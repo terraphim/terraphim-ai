@@ -361,6 +361,68 @@ pub struct IndexStatus {
     pub last_updated: Option<DateTime<Utc>>,
 }
 
+/// Roles list response data
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RolesListData {
+    /// Available roles
+    pub roles: Vec<RoleInfo>,
+    /// Currently selected role
+    pub selected: String,
+}
+
+/// Individual role information
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RoleInfo {
+    /// Role name
+    pub name: String,
+    /// Shortname alias (if any)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub shortname: Option<String>,
+    /// Whether this role is currently selected
+    pub selected: bool,
+}
+
+/// Role select response data
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RoleSelectData {
+    /// The selected role name
+    pub selected: String,
+}
+
+/// Config show response data
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConfigShowData {
+    /// The current configuration as JSON
+    pub config: serde_json::Value,
+}
+
+/// Config set response data
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConfigSetData {
+    /// Key that was updated
+    pub key: String,
+    /// New value
+    pub value: String,
+}
+
+/// Config reload response data
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConfigReloadData {
+    /// Number of roles reloaded
+    pub count: usize,
+    /// Path to the roles file
+    pub path: String,
+}
+
+/// Graph response data
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GraphData {
+    /// Role name
+    pub role: String,
+    /// Top-k concepts
+    pub concepts: Vec<String>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

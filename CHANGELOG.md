@@ -5,6 +5,91 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.16.37] - 2026-04-28
+
+### Added
+
+#### Autonomous Development Fleet (ADF) Orchestrator
+- **PR review automation** -- pr-reviewer agent with structural-semantic review, verdict parser, and auto-merge criteria
+- **Build-runner agent** -- push-gate build verification with PR fan-out wiring
+- **Exit-code contract** (`classify_error`) -- F1.2 exit classification with KG-boosted error signatures
+- **Per-provider error-signature classifier** -- distinguishes throttle vs flake vs auth failures
+- **Provider budget tracker** -- hour+day cost windows with `should_pause` gate
+- **Mention-chain coordination** -- multi-repo Gitea mention dispatch with cursor-based polling
+- **Post-merge test gate** -- automated verification after merge completion
+- **Project-meta pre-dispatch scope check** -- Tier 3 validation before agent spawn
+- **Pause flag + circuit breaker** -- fleet-wide pause and per-project circuit breaker
+- **Meta-prompts** -- project-meta and fleet-meta prompt injection
+- **Telemetry persistence** -- async telemetry-aware routing with batch lock acquisition
+- **adfc-ctl CLI** -- binary for ADF orchestrator control and `adf --check` dry-run
+
+#### Firecracker CI Infrastructure
+- **Firecracker-accelerated CI workflow** -- VM-based Rust builds with SSH execution
+- **Shared rust build cache** -- sccache + SeaweedFS S3 backend on fcbr0 bridge
+- **VM cargo probe** -- guest-side compilation verification
+- **zlob feature** -- zig-based linking with Darwin linker workaround
+
+#### Session Connectors
+- **OpenCode JSONL connector** -- session ingestion from OpenCode agent logs
+- **Codex JSONL connector** -- session ingestion from Codex agent logs
+- **ClineConnector** -- VS Code extension session support
+- **AiderConnector** -- Aider session integration
+- **SessionConnector::watch()** -- real-time session ingestion with filesystem watching
+- **Robot mode JSON output** -- structured JSON for session commands
+
+#### Learning and Knowledge Graph
+- **Shared learning store** -- `SharedLearningStore` with graph hybrid scoring via `terraphim_persistence`
+- **LearningInjector** -- `learn inject` CLI for manual knowledge injection
+- **MarkdownLearningStore** -- markdown-backed learning persistence
+- **Procedure memory** -- procedural capture with replay engine and dry-run support
+- **Entity annotation** -- KG-based entity extraction in learning captures
+- **Suggestion approval workflow** -- batch operations for learning corrections
+- **Live thesaurus compilation** -- captured corrections fed back into automata
+
+#### Routing and Provider Management
+- **KG-driven model routing** -- provider probing with role-graph based model selection
+- **Auto-route on search** -- automatic role selection when `--role` is unset
+- **Token budget management engine** -- robot-mode token tracking with budget enforcement
+- **Cost-aware nightwatch** -- integrated token tracking in orchestrator
+- **JMAP feature** -- JSON Meta Application Protocol support for mail integration
+
+#### Tracker and Gitea Integration
+- **Commit status API** -- `set_commit_status` for Gitea status posting
+- **PR comment read/write** -- `post_comment` and `fetch_comments` on GiteaTracker
+- **Auto-assign on mention** -- assigns issues to agents on @-mention dispatch
+- **Per-agent Gitea tokens** -- individual token injection into spawn environment
+
+#### terraphim-markdown-parser
+- **Heading hierarchy** -- nested heading extraction with parent-child relationships
+- **Section classification** -- educational content chunking with configurable `SectionConfig`
+- **MatchStrategy** -- configurable matching strategies for heading identification
+- **Iterative normalise** -- improved normalisation pipeline
+
+#### terraphim_file_search
+- **KgPathScorer** -- knowledge-graph boosted file search scoring
+- **terraphim_grep tool** -- KG-aware grep with directory watching
+- **Criterion benchmarks** -- performance benchmarks for KG scoring
+
+#### terraphim_codebase_eval
+- **Manifest types** -- TOML/YAML loader for codebase evaluation manifests
+
+### Changed
+- **Multi-project config schema** -- `Project` struct with include-glob loader
+- **SpawnContext** -- per-call working directory threading through spawn API
+- **FlowDefinition.project** -- made required field (breaking: D14)
+- **Provider probe TTL** -- default 300s -> 1800s (5min -> 30min)
+- **Kimi provider** -- bumped registration to k2p6
+
+### Fixed
+- **RUSTSEC-2026-0098/0099/0097** -- rustls-webpki and ring dependency updates
+- **RUSTSEC-2026-0104** -- added to audit ignore list
+- **RUSTSEC-2026-0049** -- rustls upgrade with webpki git patch
+- **UTF-8 safe snippet truncation** -- safe truncation for multi-byte characters
+- **WalkDir depth limit** -- added slug collision guard for export-kg
+- **Graceful degradation** -- roles without KG no longer panic
+- **CLI exit codes** -- `listen --server` returns ERROR_USAGE (2) not 1
+- **Duplicate functions** -- removed stale re-exports from cherry-pick merge
+
 ## [1.14.0] - 2026-03-22
 
 ### Added
