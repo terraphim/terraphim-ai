@@ -897,11 +897,14 @@ enum Command {
     /// Start listener mode for AI agent communication (offline-only)
     Listen {
         /// Agent identity/name for this listener instance
-        #[arg(long, required = true)]
-        identity: String,
+        #[arg(long)]
+        identity: Option<String>,
         /// Optional listener configuration JSON file
         #[arg(long)]
         config: Option<String>,
+        /// Start in server mode (rejected -- listen is offline-only)
+        #[arg(long)]
+        server: bool,
     },
 
     /// Robot mode self-documentation commands
@@ -1715,13 +1718,24 @@ fn main() -> Result<()> {
             rt.block_on(repl::run_repl_offline_mode())
         }
 
-        Some(Command::Listen { identity, config }) => {
+        Some(Command::Listen {
+            identity,
+            config,
+            server,
+        }) => {
             // Listen mode is offline-only - reject --server flag
-            if cli.server {
+            if server {
                 eprintln!("error: listen mode does not support --server flag");
                 eprintln!("The listener runs in offline mode only.");
                 std::process::exit(2);
             }
+            let identity = match identity {
+                Some(id) => id,
+                None => {
+                    eprintln!("error: --identity is required for listen mode");
+                    std::process::exit(2);
+                }
+            };
             let listener_config = match config.as_deref() {
                 Some(path) => listener::ListenerConfig::load_from_path(path)?,
                 None => listener::ListenerConfig::for_identity(identity.clone()),
@@ -2978,8 +2992,12 @@ async fn run_offline_command(
             }
         }
 
-        Command::Listen { identity, config } => {
-            println!("listener would start with identity: {}", identity);
+        Command::Listen {
+            identity, config, ..
+        } => {
+            if let Some(id) = identity {
+                println!("listener would start with identity: {}", id);
+            }
             if let Some(path) = config.as_deref() {
                 println!("listener config: {}", path);
             }
