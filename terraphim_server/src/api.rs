@@ -232,6 +232,8 @@ pub struct RoleGraphResponseDto {
     pub status: Status,
     pub nodes: Vec<GraphNodeDto>,
     pub edges: Vec<GraphEdgeDto>,
+    #[serde(default)]
+    pub pinned_node_ids: Vec<u64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -293,10 +295,13 @@ pub(crate) async fn get_rolegraph(
         })
         .collect();
 
+    let pinned_node_ids = rolegraph.get_pinned_node_ids().to_vec();
+
     Ok(Json(RoleGraphResponseDto {
         status: Status::Success,
         nodes,
         edges,
+        pinned_node_ids,
     }))
 }
 
