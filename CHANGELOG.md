@@ -9,15 +9,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **LLM pre/post hooks** wired in agent command handlers for multi-agent coordination (Refs #451)
 - **Self-Documentation API** exposed via robot CLI subcommand (Refs #1011)
 - **ForgivingParser** integrated into CLI command dispatch for typo-tolerant command parsing (Refs #1012)
 - **MS Teams SDK test suite** with comprehensive SDK tests (Refs #1034)
+- **Tantivy index** for session search with BM25 ranking (Refs #1039)
+- **Token budget flags** wired to Search command for robot mode output control (Refs #672)
+- **JSON format support** on roles/config/graph commands in robot mode (Refs #1013)
+- **ADF operations guide** and blog post for PR fan-out deployment
+- **ADF agent fleet reference** documentation
 
 ### Fixed
 
+- **RUSTSEC-2026-0049** eliminated by switching serenity to native-tls (Refs #418)
 - **Spec gaps** addressed and resolved across ADF orchestrator templates (Refs #1040)
 - **Global concurrency limits** enforced in orchestrator to prevent task/memory exhaustion (Refs #664)
 - **listen_mode test assertion** updated to match clap error output (Refs #1044)
+- **Robot response formatting** corrected in chaining logic
+- **MCP latency benchmarks** gated behind release builds to prevent debug flake (Refs #672, Refs #987)
+- **Pagination and token budget** wired into search response with test alignments (Refs #672)
+- **Performance benchmark thresholds** raised and redundant attributes removed (Refs #987)
+
+### Changed
+
+- **Robot mode** now honours --format json for consistent machine-readable output
+- **Orchestrator** uses KG-routed model in Quickwit logs and AgentRunRecord
+- **CLI exit codes** aligned with F1.2 contract (typed ExitCode, not bare exit(1)) (Refs #860)
+- **Learning store** implemented on SharedLearningStore with markdown backend
+- **Token budget management** engine active for robot mode output control
 
 ## [1.17.0] - 2026-04-27
 
