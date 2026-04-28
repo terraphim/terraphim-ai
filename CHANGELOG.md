@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Spec gaps** addressed and resolved across ADF orchestrator templates (Refs #1040)
 - **Global concurrency limits** enforced in orchestrator to prevent task/memory exhaustion (Refs #664)
 - **listen_mode test assertion** updated to match clap error output (Refs #1044)
 
