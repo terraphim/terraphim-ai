@@ -7,7 +7,7 @@ use std::process::Command;
 #[test]
 fn help_flag_exits_success() {
     let output = Command::new("cargo")
-        .args(&["run", "-p", "terraphim_agent", "--", "--help"])
+        .args(["run", "-p", "terraphim_agent", "--", "--help"])
         .output()
         .expect("Failed to execute terraphim-agent --help");
 
@@ -21,7 +21,7 @@ fn help_flag_exits_success() {
 #[test]
 fn invalid_subcommand_exits_with_error_usage() {
     let output = Command::new("cargo")
-        .args(&["run", "-p", "terraphim_agent", "--", "invalid-subcommand"])
+        .args(["run", "-p", "terraphim_agent", "--", "invalid-subcommand"])
         .output()
         .expect("Failed to execute terraphim-agent with invalid subcommand");
 
@@ -36,7 +36,7 @@ fn invalid_subcommand_exits_with_error_usage() {
 #[test]
 fn listen_mode_with_server_flag_exits_error_usage() {
     let output = Command::new("cargo")
-        .args(&["run", "-p", "terraphim_agent", "--", "listen", "--server"])
+        .args(["run", "-p", "terraphim_agent", "--", "listen", "--server"])
         .output()
         .expect("Failed to execute listen mode with --server flag");
 

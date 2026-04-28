@@ -466,7 +466,7 @@ async fn test_forgiving_parser_auto_correction() -> Result<()> {
     );
 
     // Should produce search-like output (results or "No results" / empty indicator)
-    let output = format!("{}", stdout);
+    let output = stdout.to_string();
     assert!(
         !output.contains("unrecognized subcommand") && !output.contains("error: unrecognized"),
         "Should not show clap unknown-subcommand error: {}",
@@ -496,7 +496,7 @@ async fn test_forgiving_parser_alias_expansion() -> Result<()> {
     );
 
     // Should not show clap unknown-subcommand error
-    let output = format!("{}", stdout);
+    let output = stdout.to_string();
     assert!(
         !output.contains("unrecognized subcommand") && !output.contains("error: unrecognized"),
         "Should not show clap unknown-subcommand error: {}",
@@ -519,7 +519,7 @@ async fn test_forgiving_parser_case_insensitive() -> Result<()> {
     );
 
     // Should not show clap unknown-subcommand error
-    let output = format!("{}", stdout);
+    let output = stdout.to_string();
     assert!(
         !output.contains("unrecognized subcommand") && !output.contains("error: unrecognized"),
         "Should not show clap unknown-subcommand error: {}",

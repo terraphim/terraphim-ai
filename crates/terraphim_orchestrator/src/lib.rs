@@ -8414,6 +8414,17 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             gitea_issue: None,
             project: Some("alpha".to_string()),
         });
+        // The per-project block takes precedence over the top-level block,
+        // so we must update both to keep them in sync.
+        config
+            .pr_dispatch_per_project
+            .get_mut("alpha")
+            .unwrap()
+            .agents_on_pr_open
+            .push(crate::config::PrDispatchEntry {
+                name: "pr-spec-validator".to_string(),
+                context: "adf/spec".to_string(),
+            });
         config.pr_dispatch = Some(crate::config::PrDispatchConfig {
             agents_on_pr_open: vec![
                 crate::config::PrDispatchEntry {
@@ -8743,6 +8754,17 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             gitea_issue: None,
             project: Some("alpha".to_string()),
         });
+        // The per-project block takes precedence over the top-level block,
+        // so we must update both to keep them in sync.
+        config
+            .pr_dispatch_per_project
+            .get_mut("alpha")
+            .unwrap()
+            .agents_on_pr_open
+            .push(crate::config::PrDispatchEntry {
+                name: "pr-test-guardian".to_string(),
+                context: "adf/test".to_string(),
+            });
         config.pr_dispatch = Some(crate::config::PrDispatchConfig {
             agents_on_pr_open: vec![
                 crate::config::PrDispatchEntry {
@@ -9303,6 +9325,17 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             gitea_issue: None,
             project: Some("alpha".to_string()),
         });
+        // The per-project block takes precedence over the top-level block,
+        // so we must update both to keep them in sync.
+        config
+            .pr_dispatch_per_project
+            .get_mut("alpha")
+            .unwrap()
+            .agents_on_pr_open
+            .push(crate::config::PrDispatchEntry {
+                name: "pr-security-sentinel".to_string(),
+                context: "adf/security".to_string(),
+            });
         config.pr_dispatch = Some(crate::config::PrDispatchConfig {
             agents_on_pr_open: vec![
                 crate::config::PrDispatchEntry {

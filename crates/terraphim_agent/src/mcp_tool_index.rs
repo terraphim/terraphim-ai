@@ -249,7 +249,6 @@ impl McpToolIndex {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::Instant;
 
     fn create_test_tool(name: &str, description: &str, server: &str) -> McpToolEntry {
         McpToolEntry::new(name, description, server)
