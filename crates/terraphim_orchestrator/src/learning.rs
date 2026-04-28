@@ -1112,9 +1112,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_learning_store_trait_impl() {
-        use terraphim_types::shared_learning::{
-            LearningSource, LearningStore as _, SharedLearning,
-        };
+        use terraphim_types::shared_learning::{LearningSource, SharedLearning};
 
         let store = SharedLearningStore::in_memory();
         let dyn_store: &dyn terraphim_types::shared_learning::LearningStore = &store;
