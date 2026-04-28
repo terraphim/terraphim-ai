@@ -8414,22 +8414,25 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             gitea_issue: None,
             project: Some("alpha".to_string()),
         });
-        config.pr_dispatch = Some(crate::config::PrDispatchConfig {
-            agents_on_pr_open: vec![
-                crate::config::PrDispatchEntry {
-                    name: "build-runner".to_string(),
-                    context: "adf/build".to_string(),
-                },
-                crate::config::PrDispatchEntry {
-                    name: "pr-reviewer".to_string(),
-                    context: "adf/pr-reviewer".to_string(),
-                },
-                crate::config::PrDispatchEntry {
-                    name: "pr-spec-validator".to_string(),
-                    context: "adf/spec".to_string(),
-                },
-            ],
-        });
+        config.pr_dispatch_per_project.insert(
+            "alpha".to_string(),
+            crate::config::PrDispatchConfig {
+                agents_on_pr_open: vec![
+                    crate::config::PrDispatchEntry {
+                        name: "build-runner".to_string(),
+                        context: "adf/build".to_string(),
+                    },
+                    crate::config::PrDispatchEntry {
+                        name: "pr-reviewer".to_string(),
+                        context: "adf/pr-reviewer".to_string(),
+                    },
+                    crate::config::PrDispatchEntry {
+                        name: "pr-spec-validator".to_string(),
+                        context: "adf/spec".to_string(),
+                    },
+                ],
+            },
+        );
         (config, tmp)
     }
 
@@ -8743,22 +8746,25 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             gitea_issue: None,
             project: Some("alpha".to_string()),
         });
-        config.pr_dispatch = Some(crate::config::PrDispatchConfig {
-            agents_on_pr_open: vec![
-                crate::config::PrDispatchEntry {
-                    name: "build-runner".to_string(),
-                    context: "adf/build".to_string(),
-                },
-                crate::config::PrDispatchEntry {
-                    name: "pr-reviewer".to_string(),
-                    context: "adf/pr-reviewer".to_string(),
-                },
-                crate::config::PrDispatchEntry {
-                    name: "pr-test-guardian".to_string(),
-                    context: "adf/test".to_string(),
-                },
-            ],
-        });
+        config.pr_dispatch_per_project.insert(
+            "alpha".to_string(),
+            crate::config::PrDispatchConfig {
+                agents_on_pr_open: vec![
+                    crate::config::PrDispatchEntry {
+                        name: "build-runner".to_string(),
+                        context: "adf/build".to_string(),
+                    },
+                    crate::config::PrDispatchEntry {
+                        name: "pr-reviewer".to_string(),
+                        context: "adf/pr-reviewer".to_string(),
+                    },
+                    crate::config::PrDispatchEntry {
+                        name: "pr-test-guardian".to_string(),
+                        context: "adf/test".to_string(),
+                    },
+                ],
+            },
+        );
         (config, tmp)
     }
 
@@ -9024,18 +9030,21 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             gitea_issue: None,
             project: Some("alpha".to_string()),
         });
-        config.pr_dispatch = Some(crate::config::PrDispatchConfig {
-            agents_on_pr_open: vec![
-                crate::config::PrDispatchEntry {
-                    name: "pr-reviewer".to_string(),
-                    context: "adf/pr-reviewer".to_string(),
-                },
-                crate::config::PrDispatchEntry {
-                    name: "pr-compliance-watchdog".to_string(),
-                    context: "adf/compliance".to_string(),
-                },
-            ],
-        });
+        config.pr_dispatch_per_project.insert(
+            "alpha".to_string(),
+            crate::config::PrDispatchConfig {
+                agents_on_pr_open: vec![
+                    crate::config::PrDispatchEntry {
+                        name: "pr-reviewer".to_string(),
+                        context: "adf/pr-reviewer".to_string(),
+                    },
+                    crate::config::PrDispatchEntry {
+                        name: "pr-compliance-watchdog".to_string(),
+                        context: "adf/compliance".to_string(),
+                    },
+                ],
+            },
+        );
         (config, tmp)
     }
 
@@ -9303,22 +9312,25 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             gitea_issue: None,
             project: Some("alpha".to_string()),
         });
-        config.pr_dispatch = Some(crate::config::PrDispatchConfig {
-            agents_on_pr_open: vec![
-                crate::config::PrDispatchEntry {
-                    name: "build-runner".to_string(),
-                    context: "adf/build".to_string(),
-                },
-                crate::config::PrDispatchEntry {
-                    name: "pr-reviewer".to_string(),
-                    context: "adf/pr-reviewer".to_string(),
-                },
-                crate::config::PrDispatchEntry {
-                    name: "pr-security-sentinel".to_string(),
-                    context: "adf/security".to_string(),
-                },
-            ],
-        });
+        config.pr_dispatch_per_project.insert(
+            "alpha".to_string(),
+            crate::config::PrDispatchConfig {
+                agents_on_pr_open: vec![
+                    crate::config::PrDispatchEntry {
+                        name: "build-runner".to_string(),
+                        context: "adf/build".to_string(),
+                    },
+                    crate::config::PrDispatchEntry {
+                        name: "pr-reviewer".to_string(),
+                        context: "adf/pr-reviewer".to_string(),
+                    },
+                    crate::config::PrDispatchEntry {
+                        name: "pr-security-sentinel".to_string(),
+                        context: "adf/security".to_string(),
+                    },
+                ],
+            },
+        );
         (config, tmp)
     }
 
