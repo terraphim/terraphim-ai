@@ -114,7 +114,7 @@ impl SummarizationAgent {
             .with_max_tokens(max_tokens);
 
         debug!("Sending summarization request to LLM");
-        let response = self.llm_client.generate(request).await?;
+        let response = self.execute_llm_with_hooks(request).await?;
 
         info!("Generated summary of {} characters", response.content.len());
         Ok(response.content.trim().to_string())
@@ -152,7 +152,7 @@ impl SummarizationAgent {
             .with_temperature(0.3)
             .with_max_tokens(600);
 
-        let response = self.llm_client.generate(request).await?;
+        let response = self.execute_llm_with_hooks(request).await?;
         Ok(response.content.trim().to_string())
     }
 
@@ -221,6 +221,100 @@ impl SummarizationAgent {
     /// Access the LLM client
     pub fn llm_client(&self) -> &GenAiLlmClient {
         &self.llm_client
+    }
+
+    /// Execute an LLM request with pre/post hook validation
+    async fn execute_llm_with_hooks(
+        &self,
+        request: LlmRequest,
+    ) -> MultiAgentResult<crate::LlmResponse> {
+        use crate::vm_execution::hooks::{HookDecision, PostLlmContext, PreLlmContext};
+
+        // Extract prompt from the first user message
+        let prompt = request
+            .messages
+            .iter()
+            .find(|m| m.role == crate::llm_types::MessageRole::User)
+            .map(|m| m.content.clone())
+            .unwrap_or_default();
+
+        // Pre-LLM hook
+        let pre_context = PreLlmContext {
+            prompt: prompt.clone(),
+            agent_id: self.terraphim_agent.agent_id.to_string(),
+            conversation_history: vec![],
+            token_count: request.max_tokens.unwrap_or(0) as usize,
+        };
+
+        let pre_decision = self
+            .terraphim_agent
+            .hook_manager
+            .run_pre_llm(&pre_context)
+            .await?;
+
+        let final_prompt = match pre_decision {
+            HookDecision::Block { reason } => {
+                return Err(crate::MultiAgentError::HookValidation(reason));
+            }
+            HookDecision::Modify { transformed_code } => {
+                tracing::info!("Summarization LLM prompt modified by pre-llm hook");
+                transformed_code
+            }
+            HookDecision::AskUser { prompt } => {
+                tracing::warn!("User confirmation required by pre-llm hook: {}", prompt);
+                prompt
+            }
+            HookDecision::Allow => prompt.clone(),
+        };
+
+        // If the prompt was modified, create a new request
+        let final_request = if final_prompt != prompt {
+            let mut modified_messages = request.messages.clone();
+            if let Some(first_user) = modified_messages
+                .iter_mut()
+                .find(|m| m.role == crate::llm_types::MessageRole::User)
+            {
+                first_user.content = final_prompt;
+            }
+            let mut req = LlmRequest::new(modified_messages);
+            if let Some(temp) = request.temperature {
+                req = req.with_temperature(temp);
+            }
+            if let Some(max_tok) = request.max_tokens {
+                req = req.with_max_tokens(max_tok);
+            }
+            req
+        } else {
+            request
+        };
+
+        // Execute LLM call
+        let response = self.llm_client.generate(final_request).await?;
+
+        // Post-LLM hook
+        let post_context = PostLlmContext {
+            prompt: prompt.clone(),
+            response: response.content.clone(),
+            agent_id: self.terraphim_agent.agent_id.to_string(),
+            token_count: response.usage.total_tokens as usize,
+            model: response.model.clone(),
+        };
+
+        let post_decision = self
+            .terraphim_agent
+            .hook_manager
+            .run_post_llm(&post_context)
+            .await?;
+
+        match post_decision {
+            HookDecision::Block { reason } => Err(crate::MultiAgentError::HookValidation(reason)),
+            HookDecision::Modify { transformed_code } => {
+                let mut modified_response = response;
+                modified_response.content = transformed_code;
+                Ok(modified_response)
+            }
+            _ => Ok(response),
+        }
     }
 }
 
