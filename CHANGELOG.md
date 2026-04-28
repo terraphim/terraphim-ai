@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Self-Documentation API** exposed via robot CLI subcommand (Refs #1011)
+- **ForgivingParser** integrated into CLI command dispatch for typo-tolerant command parsing (Refs #1012)
+- **MS Teams SDK test suite** with comprehensive SDK tests (Refs #1034)
+
+### Fixed
+
+- **Global concurrency limits** enforced in orchestrator to prevent task/memory exhaustion (Refs #664)
+- **listen_mode test assertion** updated to match clap error output (Refs #1044)
+
 ## [1.17.0] - 2026-04-27
 
 ### Added
