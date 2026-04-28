@@ -162,6 +162,40 @@ impl ConcurrencyController {
         self.acquire(AgentMode::MentionDriven, project).await
     }
 
+    /// Try to acquire a generic slot without mode-specific quota checks.
+    ///
+    /// Only enforces the global semaphore and per-project caps. Used when the
+    /// caller does not know the agent mode (e.g. `spawn_agent` is shared across
+    /// cron, mention, and issue-driven paths).
+    pub async fn acquire_any(&self, project: &str) -> Option<AgentPermit> {
+        if !self
+            .project_has_capacity(AgentMode::TimeDriven, project)
+            .await
+        {
+            return None;
+        }
+        let global_permit = match self.global.clone().try_acquire_owned() {
+            Ok(p) => p,
+            Err(_) => {
+                tracing::debug!("global concurrency limit reached");
+                return None;
+            }
+        };
+        {
+            let mut counts = self.running.lock().await;
+            counts.time_driven += 1;
+            let entry = counts.per_project.entry(project.to_string()).or_default();
+            entry.total += 1;
+        }
+        tracing::debug!(project, "acquired generic concurrency slot");
+        Some(AgentPermit {
+            _global: global_permit,
+            mode: AgentMode::TimeDriven,
+            project: project.to_string(),
+            running: self.running.clone(),
+        })
+    }
+
     /// Get current running counts (time_driven, issue_driven).
     pub async fn running_counts(&self) -> (usize, usize) {
         let counts = self.running.lock().await;

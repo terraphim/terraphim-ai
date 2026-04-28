@@ -528,3 +528,90 @@ async fn test_forgiving_parser_case_insensitive() -> Result<()> {
 
     Ok(())
 }
+
+#[tokio::test]
+#[serial]
+async fn test_robot_capabilities_json() -> Result<()> {
+    let (stdout, stderr, code) =
+        run_offline_command(&["robot", "capabilities", "--format", "json"])?;
+
+    assert_eq!(
+        code, 0,
+        "robot capabilities should succeed, stderr: {}",
+        stderr
+    );
+
+    // Should output valid JSON
+    let json: serde_json::Value = serde_json::from_str(&stdout).expect("Should be valid JSON");
+    assert!(json.get("name").is_some(), "Should have name field");
+    assert!(json.get("version").is_some(), "Should have version field");
+    assert!(json.get("commands").is_some(), "Should have commands field");
+
+    Ok(())
+}
+
+#[tokio::test]
+#[serial]
+async fn test_robot_schemas_json() -> Result<()> {
+    let (stdout, stderr, code) =
+        run_offline_command(&["robot", "schemas", "search", "--format", "json"])?;
+
+    assert_eq!(
+        code, 0,
+        "robot schemas search should succeed, stderr: {}",
+        stderr
+    );
+
+    // Should output valid JSON schema
+    let json: serde_json::Value = serde_json::from_str(&stdout).expect("Should be valid JSON");
+    assert!(json.get("name").is_some(), "Should have name field");
+    assert!(
+        json.get("arguments").is_some(),
+        "Should have arguments field"
+    );
+
+    Ok(())
+}
+
+#[tokio::test]
+#[serial]
+async fn test_robot_examples_text() -> Result<()> {
+    let (stdout, stderr, code) = run_offline_command(&["robot", "examples", "search"])?;
+
+    assert_eq!(
+        code, 0,
+        "robot examples search should succeed, stderr: {}",
+        stderr
+    );
+
+    // Should output readable text (not error)
+    assert!(
+        !stdout.starts_with("error:") && !stdout.starts_with("Error:"),
+        "Should not show error: {}",
+        stdout
+    );
+    assert!(!stdout.is_empty(), "Should have output");
+
+    Ok(())
+}
+
+#[tokio::test]
+#[serial]
+async fn test_robot_capabilities_all_formats() -> Result<()> {
+    for format in ["json", "table", "minimal"] {
+        let (stdout, stderr, code) =
+            run_offline_command(&["robot", "capabilities", "--format", format])?;
+        assert_eq!(
+            code, 0,
+            "robot capabilities --format {} should succeed, stderr: {}",
+            format, stderr
+        );
+        assert!(
+            !stdout.is_empty(),
+            "Should have output for format {}",
+            format
+        );
+    }
+
+    Ok(())
+}

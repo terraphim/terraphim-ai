@@ -156,6 +156,9 @@ struct ManagedAgent {
     mention_chain_id: Option<String>,
     mention_depth: Option<u32>,
     mention_parent_agent: Option<String>,
+    /// Concurrency permit held while the agent is running. Released on drop.
+    #[allow(dead_code)]
+    concurrency_permit: Option<concurrency::AgentPermit>,
 }
 
 #[cfg(not(test))]
@@ -275,6 +278,8 @@ pub struct AgentOrchestrator {
     /// Agent name -> learning IDs injected at spawn time, used to record
     /// outcome feedback at exit.
     injected_learning_ids: HashMap<String, Vec<String>>,
+    /// Global concurrency controller enforcing agent limits and fairness.
+    concurrency_controller: concurrency::ConcurrencyController,
 }
 
 /// Build the composite restart-state key for an agent definition.
@@ -322,6 +327,57 @@ fn build_provider_budget_tracker(
         "provider budget tracker initialised"
     );
     Ok(Some(Arc::new(tracker)))
+}
+
+/// Build the global concurrency controller from orchestrator config.
+///
+/// Uses `workflow.concurrency` when workflow mode is configured; otherwise
+/// falls back to sensible defaults (global_max = 10, time_max = 10,
+/// issue_max = 5, round-robin fairness).
+fn build_concurrency_controller(config: &OrchestratorConfig) -> concurrency::ConcurrencyController {
+    let (global_max, time_max, issue_max, fairness) = config
+        .workflow
+        .as_ref()
+        .map(|w| {
+            (
+                w.concurrency.global_max,
+                w.concurrency.global_max, // time-driven shares global pool
+                w.concurrency.issue_max,
+                w.concurrency
+                    .fairness
+                    .parse::<concurrency::FairnessPolicy>()
+                    .unwrap_or(concurrency::FairnessPolicy::RoundRobin),
+            )
+        })
+        .unwrap_or((10, 10, 5, concurrency::FairnessPolicy::RoundRobin));
+
+    let quotas = concurrency::ModeQuotas {
+        time_max,
+        issue_max,
+    };
+
+    let project_caps: HashMap<String, concurrency::ProjectCaps> = config
+        .projects
+        .iter()
+        .filter_map(|p| {
+            p.max_concurrent_agents.map(|max| {
+                (
+                    p.id.clone(),
+                    concurrency::ProjectCaps {
+                        max_concurrent_agents: max,
+                        max_concurrent_mention_agents: p.max_concurrent_mention_agents,
+                    },
+                )
+            })
+        })
+        .collect();
+
+    concurrency::ConcurrencyController::with_project_caps(
+        global_max,
+        quotas,
+        fairness,
+        project_caps,
+    )
 }
 
 /// Build the per-project runtime map consumed by
@@ -595,7 +651,7 @@ impl AgentOrchestrator {
         // MentionCursor loaded lazily on first poll (async)
 
         Ok(Self {
-            config,
+            config: config.clone(),
             spawner,
             router,
             nightwatch,
@@ -658,6 +714,7 @@ impl AgentOrchestrator {
             learning_store: None,
             learning_config,
             injected_learning_ids: HashMap::new(),
+            concurrency_controller: build_concurrency_controller(&config),
         })
     }
 
@@ -1707,6 +1764,22 @@ impl AgentOrchestrator {
         }
         request = request.with_resource_limits(limits);
 
+        // === CONCURRENCY GATE ===
+        let project_id = def
+            .project
+            .as_deref()
+            .unwrap_or(crate::dispatcher::LEGACY_PROJECT_ID);
+        let permit = self.concurrency_controller.acquire_any(project_id).await;
+        if permit.is_none() {
+            warn!(
+                agent = %def.name,
+                project = %project_id,
+                active = self.active_agents.len(),
+                "skipping spawn: global concurrency limit reached"
+            );
+            return Ok(());
+        }
+
         let spawn_ctx =
             build_spawn_context_for_agent(&self.config, def, self.output_poster.as_ref());
         let handle = self
@@ -1743,6 +1816,7 @@ impl AgentOrchestrator {
                 mention_chain_id: None,
                 mention_depth: None,
                 mention_parent_agent: None,
+                concurrency_permit: permit,
             },
         );
 
@@ -2065,6 +2139,7 @@ impl AgentOrchestrator {
                 mention_chain_id: None,
                 mention_depth: None,
                 mention_parent_agent: None,
+                concurrency_permit: None,
             },
         );
 
@@ -2248,6 +2323,7 @@ impl AgentOrchestrator {
                 mention_chain_id: None,
                 mention_depth: None,
                 mention_parent_agent: None,
+                concurrency_permit: None,
             },
         );
 
@@ -2509,6 +2585,7 @@ impl AgentOrchestrator {
                 mention_chain_id: None,
                 mention_depth: None,
                 mention_parent_agent: None,
+                concurrency_permit: None,
             },
         );
 
