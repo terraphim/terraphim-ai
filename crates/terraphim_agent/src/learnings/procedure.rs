@@ -474,16 +474,16 @@ pub fn extract_bash_commands_from_session(
     use terraphim_sessions::ContentBlock;
 
     // Collect all ToolResult blocks indexed by tool_use_id
-    let mut results: std::collections::HashMap<&str, bool> = std::collections::HashMap::new();
+    let mut results: std::collections::HashMap<&str, i32> = std::collections::HashMap::new();
     for msg in &session.messages {
         for block in &msg.blocks {
             if let ContentBlock::ToolResult {
                 tool_use_id,
-                is_error,
+                exit_code,
                 ..
             } = block
             {
-                results.insert(tool_use_id.as_str(), *is_error);
+                results.insert(tool_use_id.as_str(), *exit_code);
             }
         }
     }
@@ -495,8 +495,7 @@ pub fn extract_bash_commands_from_session(
             if let ContentBlock::ToolUse { id, name, input } = block {
                 if name == "Bash" {
                     if let Some(cmd) = input.get("command").and_then(|v| v.as_str()) {
-                        let is_error = results.get(id.as_str()).copied().unwrap_or(false);
-                        let exit_code = if is_error { 1 } else { 0 };
+                        let exit_code = results.get(id.as_str()).copied().unwrap_or(0);
                         commands.push((cmd.to_string(), exit_code));
                     }
                 }
@@ -1005,7 +1004,7 @@ mod tests {
         msg2.blocks.push(ContentBlock::ToolResult {
             tool_use_id: "tu1".to_string(),
             content: "success".to_string(),
-            is_error: false,
+            exit_code: 0,
         });
 
         let mut msg3 = Message::text(2, MessageRole::Assistant, "testing");
@@ -1019,7 +1018,7 @@ mod tests {
         msg4.blocks.push(ContentBlock::ToolResult {
             tool_use_id: "tu2".to_string(),
             content: "error".to_string(),
-            is_error: true,
+            exit_code: 1,
         });
 
         // Non-Bash tool use should be ignored
@@ -1060,14 +1059,14 @@ mod tests {
         let mut messages = Vec::new();
 
         let bash_cmds = vec![
-            ("tu1", "ls -la", false),
-            ("tu2", "cargo build --release", false),
-            ("tu3", "cargo test", true), // failed
-            ("tu4", "cd /tmp", false),   // trivial
-            ("tu5", "cargo clippy", false),
+            ("tu1", "ls -la", 0),
+            ("tu2", "cargo build --release", 0),
+            ("tu3", "cargo test", 1), // failed
+            ("tu4", "cd /tmp", 0),    // trivial
+            ("tu5", "cargo clippy", 0),
         ];
 
-        for (id, cmd, is_error) in &bash_cmds {
+        for (id, cmd, exit_code) in &bash_cmds {
             let mut tool_msg = Message::text(messages.len(), MessageRole::Assistant, "cmd");
             tool_msg.blocks.push(ContentBlock::ToolUse {
                 id: id.to_string(),
@@ -1080,7 +1079,7 @@ mod tests {
             result_msg.blocks.push(ContentBlock::ToolResult {
                 tool_use_id: id.to_string(),
                 content: "output".to_string(),
-                is_error: *is_error,
+                exit_code: *exit_code,
             });
             messages.push(result_msg);
         }
