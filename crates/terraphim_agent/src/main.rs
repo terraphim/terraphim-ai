@@ -545,6 +545,14 @@ pub enum OutputFormat {
     JsonCompact,
 }
 
+#[derive(clap::ValueEnum, Debug, Clone, Default)]
+enum RobotFormat {
+    #[default]
+    Json,
+    Table,
+    Minimal,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum CommandOutputMode {
     Human,
@@ -889,6 +897,12 @@ enum Command {
         #[arg(long)]
         config: Option<String>,
     },
+
+    /// Robot mode self-documentation commands
+    Robot {
+        #[command(subcommand)]
+        sub: RobotSub,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -1212,6 +1226,32 @@ enum SessionsSub {
     },
     /// Show session statistics (auto-imports if cache is empty)
     Stats,
+}
+
+#[derive(Subcommand, Debug)]
+enum RobotSub {
+    /// Show robot capabilities
+    Capabilities {
+        /// Output format
+        #[arg(long, value_enum, default_value_t = RobotFormat::Json)]
+        format: RobotFormat,
+    },
+    /// Show command schemas
+    Schemas {
+        /// Command name to get schema for (all commands if omitted)
+        command: Option<String>,
+        /// Output format
+        #[arg(long, value_enum, default_value_t = RobotFormat::Json)]
+        format: RobotFormat,
+    },
+    /// Show command examples
+    Examples {
+        /// Command name to get examples for (all commands if omitted)
+        command: Option<String>,
+        /// Output format
+        #[arg(long, value_enum, default_value_t = RobotFormat::Table)]
+        format: RobotFormat,
+    },
 }
 
 fn emit_robot_error_and_exit(
@@ -1540,6 +1580,67 @@ fn apply_forgiving_parsing(args: &[String]) -> Vec<String> {
     }
 }
 
+/// Format a value using robot mode output formatting.
+fn format_robot_output<T: Serialize>(value: &T, format: RobotFormat) -> Result<String> {
+    let robot_format = match format {
+        RobotFormat::Json => robot::output::OutputFormat::Json,
+        RobotFormat::Table => robot::output::OutputFormat::Table,
+        RobotFormat::Minimal => robot::output::OutputFormat::Minimal,
+    };
+    let config = robot::output::RobotConfig::new().with_format(robot_format);
+    let formatter = robot::output::RobotFormatter::new(config);
+    formatter
+        .format(value)
+        .map_err(|e| anyhow::anyhow!("Failed to format output: {}", e))
+}
+
+/// Handle robot mode self-documentation commands.
+fn handle_robot_command(sub: RobotSub) -> Result<()> {
+    let docs = robot::SelfDocumentation::new();
+
+    match sub {
+        RobotSub::Capabilities { format } => {
+            let caps = docs.capabilities_data();
+            let output = format_robot_output(&caps, format)?;
+            println!("{}", output);
+        }
+        RobotSub::Schemas { command, format } => {
+            if let Some(cmd) = command {
+                if let Some(schema) = docs.schema(&cmd) {
+                    let output = format_robot_output(&schema, format)?;
+                    println!("{}", output);
+                } else {
+                    return Err(anyhow::anyhow!("Unknown command: {}", cmd));
+                }
+            } else {
+                let schemas = docs.all_schemas();
+                let output = format_robot_output(&schemas, format)?;
+                println!("{}", output);
+            }
+        }
+        RobotSub::Examples { command, format } => {
+            if let Some(cmd) = command {
+                if let Some(examples) = docs.examples(&cmd) {
+                    let output = format_robot_output(&examples, format)?;
+                    println!("{}", output);
+                } else {
+                    return Err(anyhow::anyhow!("Unknown command: {}", cmd));
+                }
+            } else {
+                let all_examples: Vec<_> = docs
+                    .all_schemas()
+                    .iter()
+                    .flat_map(|s| &s.examples)
+                    .collect();
+                let output = format_robot_output(&all_examples, format)?;
+                println!("{}", output);
+            }
+        }
+    }
+
+    Ok(())
+}
+
 fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().collect();
     let corrected_args = apply_forgiving_parsing(&args);
@@ -1631,6 +1732,10 @@ fn main() -> Result<()> {
                 return Ok(());
             }
             rt.block_on(listener::run_listener(listener_config))
+        }
+        Some(Command::Robot { sub }) => {
+            handle_robot_command(sub)?;
+            Ok(())
         }
         Some(command) => {
             let rt = Runtime::new()?;
@@ -2869,6 +2974,9 @@ async fn run_offline_command(
         #[cfg(feature = "repl")]
         Command::Repl { .. } => {
             unreachable!("REPL mode should be handled above")
+        }
+        Command::Robot { .. } => {
+            unreachable!("Robot commands are handled in main()")
         }
     }
 }
@@ -4589,6 +4697,9 @@ async fn run_server_command(
             eprintln!("error: listen mode is not available in server mode");
             eprintln!("The listener runs in offline mode only.");
             std::process::exit(1);
+        }
+        Command::Robot { .. } => {
+            unreachable!("Robot commands are handled in main()")
         }
     }
 }
