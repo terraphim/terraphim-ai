@@ -41,8 +41,11 @@ enrichment = ["terraphim_automata", "terraphim_rolegraph", "terraphim_types"]
 # Enable BM25-ranked session search via terraphim_types score module
 search-index = ["terraphim_types"]
 
+# Enable Tantivy-based full-text index for session search
+tantivy-index = ["dep:tantivy"]
+
 # All features
-full = ["tsa-full", "extra-connectors", "enrichment", "search-index"]
+full = ["tsa-full", "extra-connectors", "enrichment", "search-index", "tantivy-index"]
 
 [dependencies]
 # Core dependencies
@@ -80,6 +83,9 @@ terraphim-markdown-parser = { path = "../terraphim-markdown-parser", optional = 
 terraphim_automata = { version = ">=1.4.10", path = "../terraphim_automata", optional = true }
 terraphim_rolegraph = { version = ">=1.4.10", path = "../terraphim_rolegraph", optional = true }
 terraphim_types = { version = ">=1.4.10", path = "../terraphim_types", optional = true }
+
+# Feature-gated: Tantivy full-text search index
+tantivy = { version = "0.24", optional = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

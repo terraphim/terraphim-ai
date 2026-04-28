@@ -40,6 +40,9 @@ pub mod enrichment;
 #[cfg(feature = "search-index")]
 pub mod search;
 
+#[cfg(feature = "tantivy-index")]
+pub mod index;
+
 // Re-exports for convenience
 pub use connector::{ConnectorRegistry, ConnectorStatus, ImportOptions, SessionConnector};
 pub use model::{
@@ -58,6 +61,9 @@ pub use search::{search_sessions, session_to_document};
 
 #[cfg(all(feature = "search-index", feature = "enrichment"))]
 pub use search::search_sessions_hybrid;
+
+#[cfg(feature = "tantivy-index")]
+pub use index::{SessionIndex, SessionIndexWriter, SessionSearchResult};
 
 /// Crate version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
