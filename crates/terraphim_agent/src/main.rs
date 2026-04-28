@@ -1411,8 +1411,139 @@ mod classify_error_tests {
     }
 }
 
+/// Build a ForgivingParser with the actual CLI subcommands.
+fn build_cli_forgiving_parser() -> forgiving::ForgivingParser {
+    let mut commands = vec![
+        "search",
+        "roles",
+        "config",
+        "graph",
+        "extract",
+        "replace",
+        "validate",
+        "suggest",
+        "hook",
+        "guard",
+        "interactive",
+        "setup",
+        "check-update",
+        "update",
+        "learn",
+        "listen",
+    ];
+
+    #[cfg(feature = "llm")]
+    commands.push("chat");
+
+    #[cfg(feature = "repl")]
+    commands.push("repl");
+
+    #[cfg(feature = "repl-sessions")]
+    commands.push("sessions");
+
+    let parser = forgiving::ForgivingParser::new(commands.into_iter().map(String::from).collect());
+
+    let mut aliases = forgiving::AliasRegistry::empty();
+    aliases.add("q", "search");
+    aliases.add("s", "search");
+    aliases.add("query", "search");
+    aliases.add("find", "search");
+    aliases.add("r", "roles");
+    aliases.add("role", "roles");
+    aliases.add("c", "config");
+    aliases.add("cfg", "config");
+    aliases.add("g", "graph");
+    aliases.add("kg", "graph");
+    aliases.add("i", "interactive");
+
+    parser.with_aliases(aliases)
+}
+
+/// Apply forgiving parsing to CLI arguments.
+///
+/// Intercepts the subcommand argument before clap sees it, applying:
+/// - Alias expansion (e.g. `q` -> `search`)
+/// - Auto-correction (e.g. `serach` -> `search`)
+/// - Case-insensitive matching (e.g. `SEARCH` -> `search`)
+///
+/// Prints correction notifications to stderr.
+fn apply_forgiving_parsing(args: &[String]) -> Vec<String> {
+    if args.len() < 2 {
+        return args.to_vec();
+    }
+
+    let mut subcommand_idx = None;
+    let mut skip_next = false;
+
+    for (i, arg) in args.iter().enumerate().skip(1) {
+        if skip_next {
+            skip_next = false;
+            continue;
+        }
+
+        if arg.starts_with('-') {
+            match arg.as_str() {
+                "--server-url" | "--format" | "--config" => {
+                    skip_next = true;
+                }
+                _ => {}
+            }
+            continue;
+        }
+
+        subcommand_idx = Some(i);
+        break;
+    }
+
+    let idx = match subcommand_idx {
+        Some(i) => i,
+        None => return args.to_vec(),
+    };
+
+    let input = &args[idx];
+    let parser = build_cli_forgiving_parser();
+    let result = parser.parse(input);
+
+    let corrected_cmd = match &result {
+        forgiving::ParseResult::AliasExpanded {
+            command, original, ..
+        } => {
+            if command != original {
+                eprintln!("Note: '{}' expanded to '{}'", original, command);
+            }
+            Some(command.clone())
+        }
+        forgiving::ParseResult::AutoCorrected {
+            command, original, ..
+        } => {
+            eprintln!("Note: '{}' auto-corrected to '{}'", original, command);
+            Some(command.clone())
+        }
+        forgiving::ParseResult::Exact {
+            command, original, ..
+        } => {
+            if command != original {
+                Some(command.clone())
+            } else {
+                None
+            }
+        }
+        _ => None,
+    };
+
+    if let Some(cmd) = corrected_cmd {
+        let mut corrected = args.to_vec();
+        corrected[idx] = cmd;
+        corrected
+    } else {
+        args.to_vec()
+    }
+}
+
 fn main() -> Result<()> {
-    let cli = Cli::parse();
+    let args: Vec<String> = std::env::args().collect();
+    let corrected_args = apply_forgiving_parsing(&args);
+    let cli = Cli::parse_from(corrected_args);
     let output = resolve_output_config(cli.robot, cli.format.clone());
 
     // Check for updates on startup (non-blocking, debug logging on failure)

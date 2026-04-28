@@ -445,3 +445,86 @@ async fn test_offline_mode_is_default() -> Result<()> {
 
     Ok(())
 }
+
+#[tokio::test]
+#[serial]
+async fn test_forgiving_parser_auto_correction() -> Result<()> {
+    let (stdout, stderr, code) = run_offline_command(&["serach", "test query"])?;
+
+    // Should auto-correct and either succeed or fail gracefully (not crash)
+    assert!(
+        code == 0 || code == 1,
+        "Auto-corrected command should not crash, stderr: {}",
+        stderr
+    );
+
+    // Should print correction notification to stderr
+    assert!(
+        stderr.contains("auto-corrected"),
+        "Should notify about auto-correction in stderr: {}",
+        stderr
+    );
+
+    // Should produce search-like output (results or "No results" / empty indicator)
+    let output = format!("{}", stdout);
+    assert!(
+        !output.contains("unrecognized subcommand") && !output.contains("error: unrecognized"),
+        "Should not show clap unknown-subcommand error: {}",
+        output
+    );
+
+    Ok(())
+}
+
+#[tokio::test]
+#[serial]
+async fn test_forgiving_parser_alias_expansion() -> Result<()> {
+    let (stdout, stderr, code) = run_offline_command(&["q", "test query"])?;
+
+    // Should expand alias and either succeed or fail gracefully
+    assert!(
+        code == 0 || code == 1,
+        "Alias-expanded command should not crash, stderr: {}",
+        stderr
+    );
+
+    // Should print expansion notification to stderr
+    assert!(
+        stderr.contains("expanded") || stderr.contains("auto-corrected"),
+        "Should notify about alias expansion in stderr: {}",
+        stderr
+    );
+
+    // Should not show clap unknown-subcommand error
+    let output = format!("{}", stdout);
+    assert!(
+        !output.contains("unrecognized subcommand") && !output.contains("error: unrecognized"),
+        "Should not show clap unknown-subcommand error: {}",
+        output
+    );
+
+    Ok(())
+}
+
+#[tokio::test]
+#[serial]
+async fn test_forgiving_parser_case_insensitive() -> Result<()> {
+    let (stdout, stderr, code) = run_offline_command(&["SEARCH", "test query"])?;
+
+    // Should match case-insensitively and either succeed or fail gracefully
+    assert!(
+        code == 0 || code == 1,
+        "Case-insensitive command should not crash, stderr: {}",
+        stderr
+    );
+
+    // Should not show clap unknown-subcommand error
+    let output = format!("{}", stdout);
+    assert!(
+        !output.contains("unrecognized subcommand") && !output.contains("error: unrecognized"),
+        "Should not show clap unknown-subcommand error: {}",
+        output
+    );
+
+    Ok(())
+}
