@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use ahash::AHashMap;
 use serde_json::Value;
+use terraphim_types::LlmResult;
 
 #[cfg(feature = "llm_router")]
 pub use self::router_config::{MergedRouterConfig, RouterMode};
@@ -50,6 +51,16 @@ pub trait LlmClient: Send + Sync {
         Err(crate::ServiceError::Config(
             "Chat completion not supported by this provider".to_string(),
         ))
+    }
+
+    /// Perform a chat completion and return usage metadata when available.
+    async fn chat_completion_with_usage(
+        &self,
+        messages: Vec<serde_json::Value>,
+        opts: ChatOptions,
+    ) -> ServiceResult<LlmResult> {
+        let content = self.chat_completion(messages, opts).await?;
+        Ok(LlmResult::new(content))
     }
 
     // Reserved for future: streaming chat
@@ -107,7 +118,15 @@ pub fn build_llm_from_role(role: &terraphim_config::Role) -> Option<Arc<dyn LlmC
                         return client;
                     }
                     "openrouter" => {
-                        // Would implement similar nested extraction for OpenRouter
+                        return None;
+                    }
+                    #[cfg(feature = "genai")]
+                    "genai" => {
+                        let model = get_string_extra(&nested_map, "llm_model");
+                        if let Some(m) = model {
+                            let p = GenAiClient::provider_for_model(&m).to_string();
+                            return Some(Arc::new(GenAiClient::new(p, m)) as Arc<dyn LlmClient>);
+                        }
                         return None;
                     }
                     _ => {}
@@ -132,7 +151,22 @@ pub fn build_llm_from_role(role: &terraphim_config::Role) -> Option<Arc<dyn LlmC
             "openrouter" => {
                 return build_openrouter_from_role(role).or_else(|| build_ollama_from_role(role));
             }
+            "genai" => {
+                return build_genai_from_role(role);
+            }
             _ => {}
+        }
+    }
+
+    // Try genai client first when feature is enabled (provides usage tracking)
+    #[cfg(feature = "genai")]
+    {
+        let model = get_string_extra(&role.extra, "llm_model").or_else(|| role.llm_model.clone());
+        if model.is_some() {
+            if let Some(client) = build_genai_from_role(role) {
+                log::debug!("Built genai client as primary provider");
+                return Some(client);
+            }
         }
     }
 
@@ -635,6 +669,159 @@ fn build_ollama_from_role(_role: &terraphim_config::Role) -> Option<Arc<dyn LlmC
     None
 }
 
+// ---------------- GenAI Client (fork with usage tracking) ----------------
+
+#[cfg(feature = "genai")]
+struct GenAiClient {
+    client: genai::Client,
+    model: String,
+    provider: String,
+}
+
+#[cfg(feature = "genai")]
+impl GenAiClient {
+    fn new(provider: String, model: String) -> Self {
+        let client = genai::Client::default();
+        Self {
+            client,
+            model,
+            provider,
+        }
+    }
+
+    fn provider_for_model(model: &str) -> &'static str {
+        if model.starts_with("ollama/") || model.contains("llama") || model.contains("gemma") {
+            "ollama"
+        } else if model.starts_with("anthropic/") || model.starts_with("claude") {
+            "anthropic"
+        } else if model.starts_with("openai/") || model.starts_with("gpt") {
+            "openai"
+        } else if model.starts_with("google/") || model.starts_with("gemini") {
+            "google"
+        } else {
+            "openrouter"
+        }
+    }
+}
+
+#[cfg(feature = "genai")]
+#[async_trait::async_trait]
+impl LlmClient for GenAiClient {
+    fn name(&self) -> &'static str {
+        "genai"
+    }
+
+    async fn summarize(&self, content: &str, opts: SummarizeOptions) -> ServiceResult<String> {
+        let messages = vec![genai::chat::ChatMessage::user(format!(
+            "Summarize the following in {} characters or less:\n\n{}",
+            opts.max_length, content
+        ))];
+        let chat_req = genai::chat::ChatRequest::new(messages);
+        let mut chat_opts = genai::chat::ChatOptions::default();
+        chat_opts = chat_opts.with_max_tokens(opts.max_length as u32);
+
+        let chat_res = self
+            .client
+            .exec_chat(&self.model, chat_req, Some(&chat_opts))
+            .await
+            .map_err(|e| crate::ServiceError::Config(format!("genai error: {}", e)))?;
+
+        let summary = chat_res
+            .content
+            .joined_texts()
+            .or_else(|| chat_res.content.first_text().map(|s| s.to_string()))
+            .unwrap_or_default();
+        Ok(summary)
+    }
+
+    async fn chat_completion(
+        &self,
+        messages: Vec<serde_json::Value>,
+        opts: ChatOptions,
+    ) -> ServiceResult<String> {
+        let result = self.chat_completion_with_usage(messages, opts).await?;
+        Ok(result.content)
+    }
+
+    async fn chat_completion_with_usage(
+        &self,
+        messages: Vec<serde_json::Value>,
+        opts: ChatOptions,
+    ) -> ServiceResult<LlmResult> {
+        let start = std::time::Instant::now();
+
+        let chat_messages: Vec<genai::chat::ChatMessage> = messages
+            .iter()
+            .filter_map(|m| {
+                let role = m.get("role")?.as_str()?;
+                let content = m.get("content")?.as_str()?;
+                match role {
+                    "system" => Some(genai::chat::ChatMessage::system(content)),
+                    "assistant" => Some(genai::chat::ChatMessage::assistant(content)),
+                    _ => Some(genai::chat::ChatMessage::user(content)),
+                }
+            })
+            .collect();
+
+        let chat_req = genai::chat::ChatRequest::new(chat_messages);
+        let mut chat_opts = genai::chat::ChatOptions::default();
+        if let Some(max_tokens) = opts.max_tokens {
+            chat_opts = chat_opts.with_max_tokens(max_tokens);
+        }
+        if let Some(temp) = opts.temperature {
+            chat_opts = chat_opts.with_temperature(temp as f64);
+        }
+
+        let chat_res = self
+            .client
+            .exec_chat(&self.model, chat_req, Some(&chat_opts))
+            .await
+            .map_err(|e| crate::ServiceError::Config(format!("genai error: {}", e)))?;
+
+        let content = chat_res
+            .content
+            .joined_texts()
+            .or_else(|| chat_res.content.first_text().map(|s| s.to_string()))
+            .unwrap_or_default();
+
+        let latency_ms = start.elapsed().as_millis() as u64;
+
+        let usage = terraphim_types::LlmUsage {
+            input_tokens: chat_res.usage.prompt_tokens.unwrap_or(0) as u64,
+            output_tokens: chat_res.usage.completion_tokens.unwrap_or(0) as u64,
+            model: self.model.clone(),
+            provider: self.provider.clone(),
+            cost_usd: None,
+            latency_ms,
+        };
+
+        Ok(LlmResult::new(content).with_usage(usage))
+    }
+}
+
+#[cfg(feature = "genai")]
+fn build_genai_from_role(role: &terraphim_config::Role) -> Option<Arc<dyn LlmClient>> {
+    let model = get_string_extra(&role.extra, "llm_model")
+        .or_else(|| role.llm_model.clone())
+        .unwrap_or_else(|| "ollama/gemma3:270m".to_string());
+
+    let provider = get_string_extra(&role.extra, "llm_provider")
+        .unwrap_or_else(|| GenAiClient::provider_for_model(&model).to_string());
+
+    log::debug!(
+        "Building genai client: model={}, provider={}",
+        model,
+        provider
+    );
+
+    Some(Arc::new(GenAiClient::new(provider, model)) as Arc<dyn LlmClient>)
+}
+
+#[cfg(not(feature = "genai"))]
+fn build_genai_from_role(_role: &terraphim_config::Role) -> Option<Arc<dyn LlmClient>> {
+    None
+}
+
 #[cfg(test)]
 mod llm_router_tests {
     use super::*;
@@ -672,9 +859,10 @@ mod llm_router_tests {
         role.extra
             .insert("llm_model".to_string(), serde_json::json!("llama3.1"));
         let client = build_llm_from_role(&role);
-        // When llm_router_enabled is false, should return static Ollama client
         assert!(client.is_some());
-        // Client name should be "ollama" when routing disabled
+        #[cfg(feature = "genai")]
+        assert_eq!(client.unwrap().name(), "genai");
+        #[cfg(not(feature = "genai"))]
         assert_eq!(client.unwrap().name(), "ollama");
     }
 
@@ -689,8 +877,24 @@ mod llm_router_tests {
 
         let client = build_llm_from_role(&role);
         assert!(client.is_some());
-        // Client name should be "routed_llm" when routing enabled
+        #[cfg(feature = "genai")]
+        assert_eq!(client.unwrap().name(), "genai");
+        #[cfg(not(feature = "genai"))]
         assert_eq!(client.unwrap().name(), "routed_llm");
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "genai")]
+    async fn test_genai_explicit_provider() {
+        let mut role = create_test_role();
+        role.llm_enabled = true;
+        role.extra
+            .insert("llm_provider".to_string(), serde_json::json!("genai"));
+        role.extra
+            .insert("llm_model".to_string(), serde_json::json!("openai/gpt-4o"));
+        let client = build_llm_from_role(&role);
+        assert!(client.is_some());
+        assert_eq!(client.unwrap().name(), "genai");
     }
 
     #[tokio::test]

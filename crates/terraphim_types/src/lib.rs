@@ -111,6 +111,10 @@ pub use procedure::*;
 pub mod persona;
 pub use persona::{CharacteristicDef, PersonaDefinition, PersonaLoadError, SfiaSkillDef};
 
+// LLM usage tracking types for cost monitoring
+pub mod llm_usage;
+pub use llm_usage::{LlmResult, LlmUsage, ModelPricing};
+
 // Review finding types for multi-agent code review
 pub mod review;
 pub use review::{
