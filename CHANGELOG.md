@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Session debouncing** for `SessionConnector::watch()` to eliminate duplicate emissions (Refs #815)
 - **LLM pre/post hooks** wired in agent command handlers for multi-agent coordination (Refs #451)
 - **Self-Documentation API** exposed via robot CLI subcommand (Refs #1011)
 - **ForgivingParser** integrated into CLI command dispatch for typo-tolerant command parsing (Refs #1012)
@@ -16,8 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Tantivy index** for session search with BM25 ranking (Refs #1039)
 - **Token budget flags** wired to Search command for robot mode output control (Refs #672)
 - **JSON format support** on roles/config/graph commands in robot mode (Refs #1013)
+- **ResponseMeta** extended with `query` and `role` fields for richer robot output (Refs #1026)
 - **ADF operations guide** and blog post for PR fan-out deployment
 - **ADF agent fleet reference** documentation
+- **PR security sentinel** agent template for automated security review on PR open (Phase 2c) (Refs #953)
+- **PR compliance watchdog** agent template for compliance validation on PR open (Phase 2d) (Refs #955)
+- **PR test guardian** agent template for test gate enforcement on PR open (Phase 2e) (Refs #954)
+- **Per-project PR dispatch** via `IncludeFragment` for scoped agent spawning (Refs #962)
+- **Spawner task-body fix** -- agents now spawned with TOML task body, not runtime task_string (Refs #1020)
 
 ### Fixed
 
@@ -29,6 +36,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **MCP latency benchmarks** gated behind release builds to prevent debug flake (Refs #672, Refs #987)
 - **Pagination and token budget** wired into search response with test alignments (Refs #672)
 - **Performance benchmark thresholds** raised and redundant attributes removed (Refs #987)
+- **Clippy warnings** resolved across workspace crates
+- **Duplicate test functions** resolved after origin merge
+- **Robot search output contract** regression fixed (Refs #905)
+- **Spawner task-body** -- agents now receive proper TOML task body instead of runtime string (Refs #1020)
 
 ### Changed
 
@@ -37,6 +48,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **CLI exit codes** aligned with F1.2 contract (typed ExitCode, not bare exit(1)) (Refs #860)
 - **Learning store** implemented on SharedLearningStore with markdown backend
 - **Token budget management** engine active for robot mode output control
+- **PR dispatch** refactored to use `IncludeFragment` for per-project scoping (Refs #962)
+- **Test ranking knowledge graph fixture** added for agent testing
 
 ## [1.17.0] - 2026-04-27
 
