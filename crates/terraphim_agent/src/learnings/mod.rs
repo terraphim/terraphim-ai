@@ -58,7 +58,7 @@ pub use compile::{compile_corrections_to_thesaurus, merge_thesauruses, write_the
 pub use export_kg::{CorrectionTypeFilter, export_corrections_as_kg};
 
 #[allow(unused_imports)]
-pub use redaction::redact_secrets;
+pub use redaction::{RedactionConfig, redact, redact_secrets};
 
 // Hook types for AI agent integration
 pub use hook::{AgentFormat, LearnHookType, process_hook_input_with_type};

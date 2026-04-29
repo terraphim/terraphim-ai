@@ -2128,7 +2128,7 @@ mod tests {
 
         // Secret should be redacted
         assert!(!content.contains("MOCK_AKSK_0123456789ABCDEF"));
-        assert!(content.contains("[AWS_KEY_REDACTED]") || content.contains("[ENV_REDACTED]"));
+        assert!(content.contains("[REDACTED:aws-key]") || content.contains("[REDACTED:env]"));
     }
 
     #[test]
