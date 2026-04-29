@@ -9,8 +9,10 @@ use anyhow::{Context, Result};
 use async_trait::async_trait;
 use notify::{Event, EventKind, RecursiveMode, Watcher, recommended_watcher};
 use serde::Deserialize;
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
 
 /// Native Claude Code session connector
@@ -125,16 +127,25 @@ impl SessionConnector for NativeClaudeConnector {
     }
 
     async fn watch(&self) -> Result<mpsc::Receiver<Session>> {
-        let (tx, rx) = mpsc::channel(32);
         let base_path = self
             .default_path()
             .ok_or_else(|| anyhow::anyhow!("No default path found for watch"))?;
+        self.watch_path(base_path).await
+    }
+}
+
+impl NativeClaudeConnector {
+    /// Watch a specific path for new sessions (internal, testable entry-point).
+    async fn watch_path(&self, base_path: PathBuf) -> Result<mpsc::Receiver<Session>> {
+        let (tx, rx) = mpsc::channel(32);
 
         if !base_path.exists() {
             anyhow::bail!("Watch path does not exist: {}", base_path.display());
         }
 
         let path = Arc::new(base_path);
+        // Debounce window: only emit after this much quiescence.
+        const DEBOUNCE: Duration = Duration::from_millis(200);
 
         tokio::task::spawn_blocking(move || -> Result<()> {
             let (watcher_tx, watcher_rx) = std::sync::mpsc::channel();
@@ -149,47 +160,103 @@ impl SessionConnector for NativeClaudeConnector {
                 path.display()
             );
 
-            for res in watcher_rx {
-                match res {
-                    Ok(event) => {
-                        if let Event {
-                            kind: EventKind::Create(_) | EventKind::Modify(_),
-                            paths,
-                            ..
-                        } = event
-                        {
-                            for path in paths {
-                                if path.extension().is_some_and(|ext| ext == "jsonl") {
-                                    let tx = tx.clone();
-                                    let path_clone = path.clone();
+            // Per-path dedup state: (last messages.len(), last_emitted_at).
+            // Key = PathBuf, value = (msg_count, Instant).
+            let seen = Arc::new(std::sync::Mutex::new(
+                HashMap::<PathBuf, (usize, Instant)>::new(),
+            ));
 
-                                    tokio::spawn(async move {
-                                        let connector = NativeClaudeConnector;
-                                        match connector.parse_session_file(&path_clone).await {
-                                            Ok(Some(session)) => {
-                                                if tx.send(session).await.is_err() {
+            loop {
+                match watcher_rx.recv_timeout(Duration::from_secs(1)) {
+                    Ok(res) => match res {
+                        Ok(event) => {
+                            if let Event {
+                                kind: EventKind::Create(_) | EventKind::Modify(_),
+                                paths,
+                                ..
+                            } = event
+                            {
+                                for path in paths {
+                                    if path.extension().is_some_and(|ext| ext == "jsonl") {
+                                        let tx = tx.clone();
+                                        let path_clone = path.clone();
+                                        let seen = Arc::clone(&seen);
+
+                                        tokio::spawn(async move {
+                                            let connector = NativeClaudeConnector;
+                                            match connector.parse_session_file(&path_clone).await {
+                                                Ok(Some(session)) => {
+                                                    let now = Instant::now();
+                                                    let msg_count = session.messages.len();
+                                                    let should_emit = {
+                                                        let guard = seen.lock();
+                                                        match guard {
+                                                            Ok(mut map) => {
+                                                                match map.get(&path_clone) {
+                                                                    Some((prev_count, last_at))
+                                                                        if msg_count
+                                                                            <= *prev_count
+                                                                            || now
+                                                                                .duration_since(
+                                                                                    *last_at,
+                                                                                )
+                                                                                < DEBOUNCE =>
+                                                                    {
+                                                                        // Duplicate or within debounce window.
+                                                                        false
+                                                                    }
+                                                                    _ => {
+                                                                        map.insert(
+                                                                            path_clone,
+                                                                            (msg_count, now),
+                                                                        );
+                                                                        true
+                                                                    }
+                                                                }
+                                                            }
+                                                            Err(_) => {
+                                                                // Lock poisoned; emit anyway to avoid
+                                                                // losing data.
+                                                                true
+                                                            }
+                                                        }
+                                                    };
+                                                    if should_emit
+                                                        && tx.send(session).await.is_err()
+                                                    {
+                                                        tracing::warn!(
+                                                            "Failed to send session from watch"
+                                                        );
+                                                    }
+                                                }
+                                                Ok(None) => {}
+                                                Err(e) => {
                                                     tracing::warn!(
-                                                        "Failed to send session from watch"
+                                                        "Failed to parse new session {}: {}",
+                                                        path_clone.display(),
+                                                        e
                                                     );
                                                 }
                                             }
-                                            Ok(None) => {}
-                                            Err(e) => {
-                                                tracing::warn!(
-                                                    "Failed to parse new session {}: {}",
-                                                    path_clone.display(),
-                                                    e
-                                                );
-                                            }
-                                        }
-                                    });
+                                        });
+                                    }
                                 }
                             }
                         }
+                        Err(e) => {
+                            tracing::warn!("Watch error: {}", e);
+                        }
+                    },
+                    Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                        // No events for 1 second. If the receiver has been
+                        // dropped, exit gracefully so tests don't hang.
+                        if tx.is_closed() {
+                            tracing::debug!("Watch receiver dropped; shutting down watcher");
+                            break;
+                        }
+                        continue;
                     }
-                    Err(e) => {
-                        tracing::warn!("Watch error: {}", e);
-                    }
+                    Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
                 }
             }
 
@@ -564,5 +631,102 @@ mod tests {
     async fn test_supports_watch() {
         let connector = NativeClaudeConnector;
         assert!(connector.supports_watch());
+    }
+
+    /// Integration test: appending N lines rapidly to an existing JSONL file
+    /// must not emit N duplicate sessions. With the 200 ms debounce window
+    /// rapid appends should be coalesced into at most a small constant
+    /// number of emissions (ideally one) per quiescent period.
+    #[tokio::test]
+    async fn test_watch_dedup_on_append() {
+        let dir = tempfile::tempdir().unwrap();
+        let file_path = dir.path().join("watch-test.jsonl");
+
+        // Pre-create the file so the watcher sees a Modify (not Create) on
+        // append, which is the scenario the bug report describes.
+        {
+            use std::io::Write;
+            let initial = [
+                r#"{"sessionId":"sess1","cwd":"/project","timestamp":"2024-01-15T10:00:00Z","message":{"role":"user","content":"hello"}}"#,
+                r#"{"sessionId":"sess1","cwd":"/project","timestamp":"2024-01-15T10:00:05Z","message":{"role":"assistant","content":[{"type":"text","text":"hi"}]}}"#,
+                "", // trailing newline so appends start on a fresh line
+            ]
+            .join("\n");
+            let mut file = std::fs::File::create(&file_path).unwrap();
+            file.write_all(initial.as_bytes()).unwrap();
+            file.sync_all().unwrap();
+        }
+
+        let connector = NativeClaudeConnector;
+        let mut rx = connector
+            .watch_path(dir.path().to_path_buf())
+            .await
+            .unwrap();
+
+        // Give the watcher time to register.
+        tokio::time::sleep(Duration::from_millis(150)).await;
+
+        // Append 3 lines in rapid succession (single sync block).
+        {
+            use std::io::Write;
+            let mut file = std::fs::OpenOptions::new()
+                .append(true)
+                .open(&file_path)
+                .unwrap();
+            for i in 0..3 {
+                let line = format!(
+                    r#"{{"sessionId":"sess1","cwd":"/project","timestamp":"2024-01-15T10:00:0{}Z","message":{{"role":"user","content":"msg {}"}}}}"#,
+                    6 + i,
+                    i
+                );
+                file.write_all((line + "\n").as_bytes()).unwrap();
+            }
+            file.sync_all().unwrap();
+        }
+
+        // Verify the file on disk has 5 messages.
+        let disk_session = connector
+            .parse_session_file(&file_path)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            disk_session.messages.len(),
+            5,
+            "File on disk should have 5 messages immediately after sync"
+        );
+
+        // Wait for the debounce window plus a margin for event delivery.
+        tokio::time::sleep(Duration::from_millis(500)).await;
+
+        // Collect every session emitted by the watcher (with a short timeout
+        // so the test terminates even if the channel never closes).
+        let mut sessions = Vec::new();
+        loop {
+            match tokio::time::timeout(Duration::from_millis(100), rx.recv()).await {
+                Ok(Some(session)) => {
+                    sessions.push(session);
+                }
+                Ok(None) | Err(_) => break,
+            }
+        }
+
+        // The append must not trigger one emission per line; at most a
+        // small constant number of emissions is acceptable.
+        assert!(
+            sessions.len() <= 2,
+            "Expected at most 2 watch emissions for the append, got {}. \
+             Duplicate suppression failed.",
+            sessions.len()
+        );
+
+        // The final emitted session should contain all 5 messages.
+        if let Some(last) = sessions.last() {
+            assert_eq!(
+                last.messages.len(),
+                5,
+                "Final session should have 5 messages (2 initial + 3 appended)"
+            );
+        }
     }
 }

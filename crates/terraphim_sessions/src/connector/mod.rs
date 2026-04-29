@@ -125,6 +125,15 @@ pub trait SessionConnector: Send + Sync {
     ///
     /// Returns a receiver that emits sessions as they are detected.
     /// Default implementation returns an error if not supported.
+    ///
+    /// # Dedup Contract
+    ///
+    /// Implementations that watch append-only files (e.g. JSONL) MUST
+    /// deduplicate rapid successive `Modify` events so that appending
+    /// N lines to the same file produces at most ONE `Session` emission
+    /// per quiescent period. The recommended dedup key is
+    /// `session_id + messages.len()` (or a per-path byte offset). A
+    /// short debounce window (100–250 ms) is sufficient.
     async fn watch(&self) -> Result<mpsc::Receiver<Session>> {
         anyhow::bail!("Watch not supported for this connector")
     }
