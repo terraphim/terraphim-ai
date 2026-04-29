@@ -7664,6 +7664,75 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
         assert_eq!(composed, Some("claude-opus-4-6".to_string()));
     }
 
+    #[test]
+    fn parse_reset_time_relative_hours() {
+        let result = parse_reset_time("resets in 2 hours");
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn parse_reset_time_relative_minutes() {
+        let result = parse_reset_time("resets in 30 minutes");
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn parse_reset_time_utc_format() {
+        let result = parse_reset_time("resets at 14:00 UTC");
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn parse_reset_time_fallback_generic() {
+        let result = parse_reset_time("resets 2am Europe/Berlin");
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn parse_reset_time_no_match() {
+        let result = parse_reset_time("something unrelated");
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn rate_limit_window_block_and_check() {
+        let mut window = ProviderRateLimitWindow::new();
+        assert!(!window.is_blocked("claude-code"));
+        window.block_until("claude-code", std::time::Instant::now() + std::time::Duration::from_secs(3600));
+        assert!(window.is_blocked("claude-code"));
+        assert!(!window.is_blocked("kimi"));
+    }
+
+    #[test]
+    fn rate_limit_window_expired_unblocks() {
+        let mut window = ProviderRateLimitWindow::new();
+        window.block_until("claude-code", std::time::Instant::now() + std::time::Duration::from_millis(1));
+        std::thread::sleep(std::time::Duration::from_millis(5));
+        assert!(!window.is_blocked("claude-code"));
+    }
+
+    #[test]
+    fn rate_limit_window_blocked_providers_list() {
+        let mut window = ProviderRateLimitWindow::new();
+        window.block_until("claude-code", std::time::Instant::now() + std::time::Duration::from_secs(3600));
+        window.block_until("anthropic", std::time::Instant::now() + std::time::Duration::from_secs(3600));
+        let blocked = window.blocked_providers();
+        assert_eq!(blocked.len(), 2);
+        assert!(blocked.contains(&"claude-code".to_string()));
+        assert!(blocked.contains(&"anthropic".to_string()));
+    }
+
+    #[test]
+    fn rate_limit_window_clean_expired() {
+        let mut window = ProviderRateLimitWindow::new();
+        window.block_until("expired", std::time::Instant::now() + std::time::Duration::from_millis(1));
+        window.block_until("active", std::time::Instant::now() + std::time::Duration::from_secs(3600));
+        std::thread::sleep(std::time::Duration::from_millis(5));
+        window.clean_expired();
+        assert!(!window.is_blocked("expired"));
+        assert!(window.is_blocked("active"));
+    }
+
     #[tokio::test]
     async fn test_wall_clock_timeout_kills_agent() {
         let mut config = test_config_fast_lifecycle();
