@@ -1,0 +1,185 @@
+name: Sentrux Quality Gate
+on:
+  pull_request:
+    branches: [ main, develop ]
+    types: [ opened, synchronize, reopened ]
+  push:
+    branches: [ main, develop ]
+
+concurrency:
+  group: sentrux-quality-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GITEA_URL: https://git.terraphim.cloud
+  GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+
+jobs:
+  quality-check:
+    name: Structural Quality Check
+    runs-on: [self-hosted, bigbox]
+    timeout-minutes: 5
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          clean: true
+
+      - name: Run Sentrux Check
+        id: sentrux
+        run: |
+          # Run sentrux and capture output
+          OUTPUT=$(sentrux check . 2>&1)
+          echo "$OUTPUT"
+          
+          # Extract quality signal
+          QUALITY=$(echo "$OUTPUT" | grep "Quality:" | awk '{print $2}')
+          echo "quality=$QUALITY" >> $GITHUB_OUTPUT
+          
+          # Count violations
+          VIOLATIONS=$(echo "$OUTPUT" | grep "violation(s) found" | awk '{print $2}')
+          echo "violations=$VIOLATIONS" >> $GITHUB_OUTPUT
+          
+          # Determine status
+          if echo "$OUTPUT" | grep -q "✗.*violation"; then
+            echo "status=fail" >> $GITHUB_OUTPUT
+          else
+            echo "status=pass" >> $GITHUB_OUTPUT
+          fi
+          
+          # Save full output for comment
+          echo "output<<EOF" >> $GITHUB_OUTPUT
+          echo "$OUTPUT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Fetch Baseline (PR only)
+        if: github.event_name == 'pull_request'
+        id: baseline
+        run: |
+          # Try to get baseline from wiki
+          BASELINE=$(curl -s -H "Authorization: token $GITEA_TOKEN" \
+            "$GITEA_URL/api/v1/repos/${{ github.repository }}/wiki/sentrux-baseline" 2>/dev/null | \
+            python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('content','').strip())" 2>/dev/null || echo "0")
+          
+          if [ "$BASELINE" = "0" ] || [ -z "$BASELINE" ]; then
+            echo "baseline=0" >> $GITHUB_OUTPUT
+            echo "No baseline found"
+          else
+            echo "baseline=$BASELINE" >> $GITHUB_OUTPUT
+            echo "Baseline: $BASELINE"
+          fi
+
+      - name: Calculate Delta (PR only)
+        if: github.event_name == 'pull_request'
+        id: delta
+        run: |
+          CURRENT=${{ steps.sentrux.outputs.quality }}
+          BASELINE=${{ steps.baseline.outputs.baseline }}
+          
+          if [ "$BASELINE" = "0" ] || [ -z "$BASELINE" ]; then
+            echo "delta=unknown" >> $GITHUB_OUTPUT
+            echo "degraded=false" >> $GITHUB_OUTPUT
+          else
+            DELTA=$((CURRENT - BASELINE))
+            echo "delta=$DELTA" >> $GITHUB_OUTPUT
+            
+            if [ $DELTA -lt -100 ]; then
+              echo "degraded=true" >> $GITHUB_OUTPUT
+            else
+              echo "degraded=false" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      - name: Save Baseline (main/develop push only)
+        if: github.event_name == 'push'
+        run: |
+          CURRENT=${{ steps.sentrux.outputs.quality }}
+          REPO="${{ github.repository }}"
+          
+          # Create or update wiki page with baseline
+          curl -s -X POST -H "Authorization: token $GITEA_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"title\":\"sentrux-baseline\",\"content\":\"$CURRENT\",\"message\":\"Update baseline: $CURRENT\"}" \
+            "$GITEA_URL/api/v1/repos/$REPO/wiki/new" 2>/dev/null || \
+          curl -s -X POST -H "Authorization: token $GITEA_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"content\":\"$CURRENT\",\"message\":\"Update baseline: $CURRENT\"}" \
+            "$GITEA_URL/api/v1/repos/$REPO/wiki/sentrux-baseline" 2>/dev/null || true
+          
+          echo "Baseline saved: $CURRENT"
+
+      - name: Post PR Comment
+        if: github.event_name == 'pull_request' && always()
+        run: |
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          REPO="${{ github.repository }}"
+          QUALITY="${{ steps.sentrux.outputs.quality }}"
+          VIOLATIONS="${{ steps.sentrux.outputs.violations }}"
+          STATUS="${{ steps.sentrux.outputs.status }}"
+          DELTA="${{ steps.delta.outputs.delta }}"
+          DEGRADED="${{ steps.delta.outputs.degraded }}"
+          
+          # Build comment body
+          if [ "$STATUS" = "pass" ]; then
+            STATUS_ICON="✅"
+          else
+            STATUS_ICON="❌"
+          fi
+          
+          if [ "$DEGRADED" = "true" ]; then
+            DELTA_ICON="🔴"
+          elif [ "$DEGRADED" = "false" ] && [ "$DELTA" != "unknown" ]; then
+            DELTA_ICON="🟢"
+          else
+            DELTA_ICON="⚪"
+          fi
+          
+          COMMENT="## Sentrux Quality Gate $STATUS_ICON
+
+**Quality Signal:** $QUALITY / 10000
+**Violations:** $VIOLATIONS
+**Status:** $STATUS
+"
+          
+          if [ "$DELTA" != "unknown" ]; then
+            COMMENT="${COMMENT}**Delta:** $DELTA_ICON $DELTA points (baseline: $BASELINE)
+"
+            if [ "$DEGRADED" = "true" ]; then
+              COMMENT="${COMMENT}
+🔴 **Quality degraded by more than 100 points!**
+"
+            fi
+          else
+            COMMENT="${COMMENT}**Delta:** No baseline available
+"
+          fi
+          
+          COMMENT="${COMMENT}
+<details>
+<summary>Full Report</summary>
+
+\`\`\`
+${{ steps.sentrux.outputs.output }}
+\`\`\`
+</details>
+"
+          
+          # Post comment
+          curl -s -X POST -H "Authorization: token $GITEA_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"body\":\"$COMMENT\"}" \
+            "$GITEA_URL/api/v1/repos/$REPO/issues/$PR_NUMBER/comments" > /dev/null
+
+      - name: Fail on Quality Degradation
+        if: github.event_name == 'pull_request' && steps.delta.outputs.degraded == 'true'
+        run: |
+          echo "Quality degraded by more than 100 points. Blocking merge."
+          exit 1
+
+      - name: Fail on Rule Violations
+        if: steps.sentrux.outputs.status == 'fail'
+        run: |
+          echo "Architectural rule violations found. Blocking merge."
+          exit 1

@@ -482,6 +482,18 @@ pub fn is_subscription_limit_error(error: &str) -> bool {
         || lower.contains("billing limit")
         || lower.contains("usage limit")
         || lower.contains("subscription limit")
+        || lower.contains("hit your limit")
+        || lower.contains("you've hit your limit")
+        || lower.contains("plan limit")
+        || lower.contains("tier limit")
+        || lower.contains("usage cap")
+        || lower.contains("daily limit")
+        || lower.contains("hourly limit")
+        || lower.contains("out of quota")
+        || lower.contains("quota exhausted")
+        || lower.contains("subscription quota")
+        || lower.contains("insufficient balance")
+        || lower.contains("insufficient_quota")
 }
 
 #[cfg(test)]

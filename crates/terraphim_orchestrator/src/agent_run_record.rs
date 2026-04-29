@@ -256,6 +256,18 @@ const EXIT_CLASS_PATTERNS: &[PatternDef] = &[
             "quota exceeded",
             "rate_limit_exceeded",
             "throttled",
+            "hit your limit",
+            "you've hit your limit",
+            "plan limit",
+            "tier limit",
+            "usage cap",
+            "daily limit",
+            "hourly limit",
+            "out of quota",
+            "quota exhausted",
+            "subscription quota",
+            "insufficient balance",
+            "insufficient_quota",
         ],
     },
     PatternDef {
@@ -289,8 +301,9 @@ const EXIT_CLASS_PATTERNS: &[PatternDef] = &[
             "invalid api key",
             "invalid_api_key",
             "model_not_found",
-            "insufficient_quota",
             "content_policy_violation",
+            "model overloaded",
+            "server error",
         ],
     },
     PatternDef {
@@ -932,6 +945,62 @@ mod tests {
             &[],
         );
         assert_eq!(result.exit_class, ExitClass::ResourceExhaustion);
+    }
+
+    #[test]
+    fn classify_quota_hit_your_limit() {
+        let c = classifier();
+        let result = c.classify(
+            Some(1),
+            &[],
+            &["You've hit your limit - resets 2am Europe/Berlin".to_string()],
+        );
+        assert_eq!(result.exit_class, ExitClass::RateLimit);
+        assert!(result.confidence > 0.0);
+    }
+
+    #[test]
+    fn classify_quota_plan_limit() {
+        let c = classifier();
+        let result = c.classify(
+            Some(1),
+            &["Error: plan limit reached for this billing cycle".to_string()],
+            &[],
+        );
+        assert_eq!(result.exit_class, ExitClass::RateLimit);
+    }
+
+    #[test]
+    fn classify_quota_out_of_quota() {
+        let c = classifier();
+        let result = c.classify(
+            Some(1),
+            &[],
+            &["out of quota: cannot process request".to_string()],
+        );
+        assert_eq!(result.exit_class, ExitClass::RateLimit);
+    }
+
+    #[test]
+    fn classify_quota_insufficient_quota_is_rate_limit() {
+        let c = classifier();
+        let result = c.classify(
+            Some(1),
+            &["insufficient_quota".to_string()],
+            &[],
+        );
+        assert_eq!(result.exit_class, ExitClass::RateLimit);
+    }
+
+    #[test]
+    fn classify_quota_resets_at() {
+        let c = classifier();
+        let result = c.classify(
+            Some(1),
+            &[],
+            &["rate limited: resets at 14:00 UTC".to_string()],
+        );
+        assert_eq!(result.exit_class, ExitClass::RateLimit);
     }
 
     #[tokio::test]
