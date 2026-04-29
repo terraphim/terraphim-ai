@@ -157,11 +157,10 @@ mod tests {
         let result = rt.block_on(provider.fetch_usage());
         assert!(result.is_err());
         let err = result.unwrap_err();
-        match err {
-            UsageError::ProviderNotFound(msg) => {
-                assert!(msg.contains("not found"));
-            }
-            _ => panic!("Expected ProviderNotFound, got {:?}", err),
-        }
+        assert!(
+            matches!(err, UsageError::ProviderNotFound(ref msg) if msg.contains("not found")),
+            "Expected ProviderNotFound, got {:?}",
+            err
+        );
     }
 }
