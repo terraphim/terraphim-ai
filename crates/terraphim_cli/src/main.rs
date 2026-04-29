@@ -944,7 +944,25 @@ fn format_as_text(value: &serde_json::Value) -> Result<String> {
 
 #[cfg(feature = "usage")]
 async fn handle_usage(action: terraphim_usage::cli::UsageAction) -> Result<serde_json::Value> {
-    let registry = terraphim_usage::UsageRegistry::new();
+    let mut registry = terraphim_usage::UsageRegistry::new();
+
+    #[cfg(feature = "usage")]
+    {
+        registry.register(Box::new(
+            terraphim_usage::providers::claude::ClaudeProvider::new(),
+        ));
+        registry.register(Box::new(
+            terraphim_usage::providers::opencode_go::OpenCodeGoProvider::new(),
+        ));
+        registry.register(Box::new(
+            terraphim_usage::providers::minimax::MiniMaxProvider::new(),
+        ));
+        registry.register(Box::new(terraphim_usage::providers::zai::ZaiProvider::new()));
+        registry.register(Box::new(
+            terraphim_usage::providers::ccusage::CcusageProvider::new(),
+        ));
+    }
+
     let output = terraphim_usage::cli::execute_usage_action(action, &registry)
         .await
         .map_err(|e| anyhow::anyhow!("{}", e))?;

@@ -207,6 +207,10 @@ impl TokenUsageTracker {
         let end = now;
         self.get_usage_in_period(start, end)
     }
+
+    pub fn drain_records(&mut self) -> Vec<TokenUsageRecord> {
+        std::mem::take(&mut self.records)
+    }
 }
 
 /// Usage statistics for a time period

@@ -18,15 +18,17 @@ indicatif = { version = "0.17", optional = true }
 tracing = { workspace = true }
 
 async-trait = { workspace = true }
+toml = "0.8"
 
 which = "6.0"
 terraphim_persistence = { path = "../terraphim_persistence", optional = true }
 terraphim_types = { path = "../terraphim_types" }
 terraphim_settings = { path = "../terraphim_settings" }
+terraphim_ccusage = { path = "../terraphim_ccusage", optional = true }
 opendal = { version = "0.54", optional = true }
 
 [features]
 default = ["persistence", "providers"]
-persistence = ["dep:terraphim_persistence", "dep:opendal"]  # Enable storage via terraphim_persistence
-cli = ["dep:clap", "dep:colored", "dep:indicatif"]  # Enable CLI commands
-providers = ["dep:reqwest"]  # Enable external provider API fetchers
+persistence = ["dep:terraphim_persistence", "dep:opendal"]
+cli = ["dep:clap", "dep:colored", "dep:indicatif"]
+providers = ["dep:reqwest", "dep:terraphim_ccusage"]
