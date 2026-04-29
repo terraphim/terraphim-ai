@@ -2,6 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use terraphim_persistence::Persistable;
+use terraphim_types::LlmUsage;
 
 /// Persistable record for agent-level metrics
 ///
@@ -192,6 +193,31 @@ impl ExecutionRecord {
             ),
             timestamp.format("%Y%m%d_%H%M%S_%f")
         )
+    }
+
+    /// Convert from LlmUsage (terraphim_types) into an ExecutionRecord
+    pub fn from_llm_usage(usage: &LlmUsage, agent_name: &str) -> Self {
+        let now = Utc::now();
+        let cost_sub_cents = usage
+            .cost_usd
+            .map(|c| (c * 1_000_000.0) as i64)
+            .unwrap_or(0);
+        Self {
+            key: Self::create_key(agent_name, &now),
+            agent_name: agent_name.to_string(),
+            input_tokens: usage.input_tokens as i64,
+            output_tokens: usage.output_tokens as i64,
+            total_tokens: (usage.input_tokens + usage.output_tokens) as i64,
+            cost_sub_cents,
+            model: Some(usage.model.clone()),
+            provider: Some(usage.provider.clone()),
+            success: true,
+            error_message: None,
+            latency_ms: Some(usage.latency_ms as i64),
+            started_at: now.to_rfc3339(),
+            completed_at: Some(now.to_rfc3339()),
+            gitea_issue: None,
+        }
     }
 }
 
