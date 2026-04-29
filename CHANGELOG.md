@@ -50,6 +50,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Token budget management** engine active for robot mode output control
 - **PR dispatch** refactored to use `IncludeFragment` for per-project scoping (Refs #962)
 - **Test ranking knowledge graph fixture** added for agent testing
+- **LLM cost tracking** foundation with genai fork integration (Refs #1075)
+- **Spec validation** report for 2026-04-29 documenting 3 fixed, 5 remaining gaps
+- **Documentation gap report** generated for 2026-04-29 identifying 43 warnings across workspace
+
+### Fixed
+
+- **`--server` flag** on listen subcommand now routes through custom error handler
 
 ## [1.17.0] - 2026-04-27
 
