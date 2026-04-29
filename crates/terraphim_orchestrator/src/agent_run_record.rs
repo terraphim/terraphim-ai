@@ -263,8 +263,6 @@ const EXIT_CLASS_PATTERNS: &[PatternDef] = &[
             "usage cap",
             "daily limit",
             "hourly limit",
-            "resets at",
-            "resets in",
             "out of quota",
             "quota exhausted",
             "subscription quota",
