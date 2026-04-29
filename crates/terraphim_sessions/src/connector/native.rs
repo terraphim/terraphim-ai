@@ -9,13 +9,28 @@ use anyhow::{Context, Result};
 use async_trait::async_trait;
 use notify::{Event, EventKind, RecursiveMode, Watcher, recommended_watcher};
 use serde::Deserialize;
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
 
 /// Native Claude Code session connector
 #[derive(Debug, Default)]
-pub struct NativeClaudeConnector;
+pub struct NativeClaudeConnector {
+    /// Optional path override for testing
+    override_path: Option<PathBuf>,
+}
+
+impl NativeClaudeConnector {
+    /// Create a connector with a custom base path (useful for testing)
+    #[must_use]
+    pub fn with_path(path: PathBuf) -> Self {
+        Self {
+            override_path: Some(path),
+        }
+    }
+}
 
 #[async_trait]
 impl SessionConnector for NativeClaudeConnector {
@@ -49,7 +64,9 @@ impl SessionConnector for NativeClaudeConnector {
     }
 
     fn default_path(&self) -> Option<PathBuf> {
-        dirs::home_dir().map(|h| h.join(".claude").join("projects"))
+        self.override_path
+            .clone()
+            .or_else(|| dirs::home_dir().map(|h| h.join(".claude").join("projects")))
     }
 
     async fn import(&self, options: &ImportOptions) -> Result<Vec<Session>> {
@@ -149,46 +166,100 @@ impl SessionConnector for NativeClaudeConnector {
                 path.display()
             );
 
-            for res in watcher_rx {
-                match res {
-                    Ok(event) => {
-                        if let Event {
-                            kind: EventKind::Create(_) | EventKind::Modify(_),
-                            paths,
-                            ..
-                        } = event
-                        {
-                            for path in paths {
-                                if path.extension().is_some_and(|ext| ext == "jsonl") {
-                                    let tx = tx.clone();
-                                    let path_clone = path.clone();
+            // Debounce state: path -> (last_messages_len, last_emission_time)
+            // Dedup key: session_id is insufficient because the same file can be
+            // modified multiple times with growing messages. We use message count
+            // combined with a debounce window to emit at most once per quiescent period.
+            let last_seen = Arc::new(std::sync::Mutex::new(HashMap::new()));
+            let debounce_duration = Duration::from_millis(200);
 
-                                    tokio::spawn(async move {
-                                        let connector = NativeClaudeConnector;
-                                        match connector.parse_session_file(&path_clone).await {
-                                            Ok(Some(session)) => {
-                                                if tx.send(session).await.is_err() {
+            loop {
+                // Exit early if all receivers have been dropped (e.g. test finished)
+                if tx.is_closed() {
+                    tracing::debug!("Watch receiver dropped, stopping watcher");
+                    break;
+                }
+
+                match watcher_rx.recv_timeout(std::time::Duration::from_millis(500)) {
+                    Ok(res) => match res {
+                        Ok(event) => {
+                            if let Event {
+                                kind: EventKind::Create(_) | EventKind::Modify(_),
+                                paths,
+                                ..
+                            } = event
+                            {
+                                for path in paths {
+                                    if path.extension().is_some_and(|ext| ext == "jsonl") {
+                                        let tx = tx.clone();
+                                        let path_clone = path.clone();
+                                        let last_seen = Arc::clone(&last_seen);
+
+                                        tokio::spawn(async move {
+                                            let connector = NativeClaudeConnector::default();
+                                            match connector.parse_session_file(&path_clone).await {
+                                                Ok(Some(session)) => {
+                                                    let messages_len = session.messages.len();
+                                                    let now = Instant::now();
+
+                                                    let should_emit = {
+                                                        let mut guard = last_seen.lock().unwrap();
+                                                        let emit = match guard.get(&path_clone) {
+                                                            Some((last_len, last_time)) => {
+                                                                // Only emit if messages grew AND
+                                                                // debounce window elapsed
+                                                                messages_len > *last_len
+                                                                    && now
+                                                                        .duration_since(*last_time)
+                                                                        >= debounce_duration
+                                                            }
+                                                            None => {
+                                                                // First time seeing this file
+                                                                true
+                                                            }
+                                                        };
+                                                        if emit {
+                                                            guard.insert(
+                                                                path_clone.clone(),
+                                                                (messages_len, now),
+                                                            );
+                                                        }
+                                                        emit
+                                                    };
+
+                                                    if should_emit {
+                                                        if tx.send(session).await.is_err() {
+                                                            tracing::warn!(
+                                                                "Failed to send session from watch"
+                                                            );
+                                                        }
+                                                    }
+                                                }
+                                                Ok(None) => {}
+                                                Err(e) => {
                                                     tracing::warn!(
-                                                        "Failed to send session from watch"
+                                                        "Failed to parse new session {}: {}",
+                                                        path_clone.display(),
+                                                        e
                                                     );
                                                 }
                                             }
-                                            Ok(None) => {}
-                                            Err(e) => {
-                                                tracing::warn!(
-                                                    "Failed to parse new session {}: {}",
-                                                    path_clone.display(),
-                                                    e
-                                                );
-                                            }
-                                        }
-                                    });
+                                        });
+                                    }
                                 }
                             }
                         }
+                        Err(e) => {
+                            tracing::warn!("Watch error: {}", e);
+                        }
+                    },
+                    Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                        // No events in 500ms; loop back to check tx.is_closed()
+                        continue;
                     }
-                    Err(e) => {
-                        tracing::warn!("Watch error: {}", e);
+                    Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                        tracing::debug!("Watcher channel disconnected, stopping");
+                        break;
                     }
                 }
             }
@@ -395,6 +466,8 @@ struct ToolResultContent {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::Duration;
+    use tokio::io::AsyncWriteExt;
 
     #[test]
     fn test_parse_timestamp() {
@@ -404,7 +477,7 @@ mod tests {
 
     #[test]
     fn test_connector_source_id() {
-        let connector = NativeClaudeConnector;
+        let connector = NativeClaudeConnector::default();
         assert_eq!(connector.source_id(), "claude-code-native");
         assert_eq!(connector.display_name(), "Claude Code (Native)");
     }
@@ -489,7 +562,7 @@ mod tests {
         ].join("\n");
         tokio::fs::write(&file_path, content).await.unwrap();
 
-        let connector = NativeClaudeConnector;
+        let connector = NativeClaudeConnector::default();
         let session = connector
             .parse_session_file(&file_path)
             .await
@@ -514,7 +587,7 @@ mod tests {
         let file_path = dir.path().join("empty.jsonl");
         tokio::fs::write(&file_path, "").await.unwrap();
 
-        let connector = NativeClaudeConnector;
+        let connector = NativeClaudeConnector::default();
         let result = connector.parse_session_file(&file_path).await.unwrap();
         assert!(result.is_none());
     }
@@ -530,7 +603,7 @@ mod tests {
         ].join("\n");
         tokio::fs::write(&file_path, content).await.unwrap();
 
-        let connector = NativeClaudeConnector;
+        let connector = NativeClaudeConnector::default();
         let session = connector
             .parse_session_file(&file_path)
             .await
@@ -552,7 +625,7 @@ mod tests {
             tokio::fs::write(&file_path, content).await.unwrap();
         }
 
-        let connector = NativeClaudeConnector;
+        let connector = NativeClaudeConnector::default();
         let options = ImportOptions::default()
             .with_path(dir.path().to_path_buf())
             .with_limit(2);
@@ -562,7 +635,87 @@ mod tests {
 
     #[tokio::test]
     async fn test_supports_watch() {
-        let connector = NativeClaudeConnector;
+        let connector = NativeClaudeConnector::default();
         assert!(connector.supports_watch());
+    }
+
+    /// Integration test: appending to a JSONL file in increments must not emit
+    /// duplicate sessions. The receiver should see the final state at most a
+    /// small constant number of times (debouncing).
+    #[tokio::test]
+    async fn test_watch_dedup_on_incremental_writes() {
+        let dir = tempfile::tempdir().unwrap();
+        let file_path = dir.path().join("test-session.jsonl");
+
+        let connector = NativeClaudeConnector::with_path(dir.path().to_path_buf());
+        let mut rx = connector.watch().await.unwrap();
+
+        // Give watcher time to initialise
+        tokio::time::sleep(Duration::from_millis(500)).await;
+
+        // Write first line
+        let line1 = r#"{"sessionId":"sess1","cwd":"/project","timestamp":"2024-01-15T10:00:00Z","message":{"role":"user","content":"hello"}}"#;
+        tokio::fs::write(&file_path, line1).await.unwrap();
+
+        // Wait for watcher to detect and debounce
+        tokio::time::sleep(Duration::from_millis(400)).await;
+
+        // Append second line
+        let line2 = r#"{"sessionId":"sess1","cwd":"/project","timestamp":"2024-01-15T10:00:05Z","message":{"role":"assistant","content":[{"type":"text","text":"response"}]}}"#;
+        let mut file = tokio::fs::OpenOptions::new()
+            .append(true)
+            .open(&file_path)
+            .await
+            .unwrap();
+        file.write_all(format!("\n{line2}").as_bytes())
+            .await
+            .unwrap();
+        file.sync_all().await.unwrap();
+        drop(file);
+
+        tokio::time::sleep(Duration::from_millis(400)).await;
+
+        // Append third line
+        let line3 = r#"{"sessionId":"sess1","cwd":"/project","timestamp":"2024-01-15T10:00:10Z","message":{"role":"user","content":"follow up"}}"#;
+        let mut file = tokio::fs::OpenOptions::new()
+            .append(true)
+            .open(&file_path)
+            .await
+            .unwrap();
+        file.write_all(format!("\n{line3}").as_bytes())
+            .await
+            .unwrap();
+        file.sync_all().await.unwrap();
+        drop(file);
+
+        // Wait for debounce + processing
+        tokio::time::sleep(Duration::from_millis(600)).await;
+
+        // Drain all received sessions
+        let mut received = Vec::new();
+        while let Ok(Some(session)) =
+            tokio::time::timeout(Duration::from_millis(300), rx.recv()).await
+        {
+            received.push(session);
+        }
+
+        // With 1 create + 3 spaced appends, we expect at most 4 emissions
+        // (one per quiescent period where the file changed). The critical
+        // assertion is that we do NOT see one emission per raw Modify event
+        // (which would be >>4 on inotify/FSEvents).
+        assert!(
+            received.len() <= 5,
+            "Expected at most 5 session emissions due to debouncing, got {}",
+            received.len()
+        );
+
+        // If we received anything, the final state should have 3 messages
+        if let Some(last) = received.last() {
+            assert_eq!(
+                last.messages.len(),
+                3,
+                "Final session should have all 3 messages"
+            );
+        }
     }
 }

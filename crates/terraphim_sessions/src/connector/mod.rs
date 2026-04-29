@@ -143,7 +143,7 @@ impl ConnectorRegistry {
         let mut connectors: Vec<Box<dyn SessionConnector>> = Vec::new();
 
         // Add native Claude Code connector (always available)
-        connectors.push(Box::new(NativeClaudeConnector));
+        connectors.push(Box::new(NativeClaudeConnector::default()));
 
         // Add Aider connector if feature enabled
         #[cfg(feature = "aider-connector")]
