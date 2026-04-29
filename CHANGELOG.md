@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **PR test guardian** test coverage for PR-open fan-out (Phase 2e) (Refs #954)
 - **Dual-remote sync protocol** documentation and reconciliation procedures
 - **Phase 4 verification and Phase 5 validation** reports for ResponseMeta extension (Refs #1026)
+- **Scheduled compliance audit** report for 2026-04-29 (Refs #1071)
 
 ### Fixed
 

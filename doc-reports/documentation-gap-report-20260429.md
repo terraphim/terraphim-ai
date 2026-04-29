@@ -1,96 +1,84 @@
-# Documentation Gap Report
+## Documentation Gap Report
 
-**Generated:** 2026-04-29
+**Generated:** 2026-04-29T$(date -u +%H:%M:%SZ)
 **Agent:** documentation-generator (Ferrox)
-**Run:** Recurring scan on issue #1046
+**Previous Report:** 2026-04-28
 
-## Summary
+### Summary
 
-Systematic scan of 11 primary workspace crates reveals **923 missing documentation items** and **53 rustdoc warnings** (excluding the unused tokio-tungstenite patch warning).
+| Metric | 2026-04-28 | 2026-04-29 | Delta |
+|--------|------------|------------|-------|
+| Crates scanned | ~45 | ~45 | -- |
+| Crates with module docs | ~18 | ~22 | +4 |
+| Crates missing module docs | 27 | 23 | -4 |
+| rustdoc warnings | ~60 | 43 | -17 |
 
-| Metric | Count |
-|--------|-------|
-| Crates scanned | 11 |
-| Total missing docs | 923 |
-| Total rustdoc warnings | 53 |
-| Crates with zero missing docs | 0 |
-| Most impacted crate | terraphim_orchestrator (430 missing) |
+### Module Documentation Status
 
-## Missing Documentation by Crate
+23 crates still lack `//!` module documentation in `lib.rs`:
 
-| Crate | Missing Docs | Warnings | Severity |
-|-------|-------------|----------|----------|
-| terraphim_orchestrator | 430 | 16 | Critical |
-| terraphim_service | 114 | 3 | High |
-| terraphim_tinyclaw | 104 | 3 | High |
-| terraphim_types | 79 | 5 | High |
-| terraphim_middleware | 40 | 7 | Medium |
-| terraphim_config | 38 | 1 | Medium |
-| terraphim_tracker | 35 | 4 | Medium |
-| terraphim_persistence | 30 | 4 | Medium |
-| terraphim_router | 28 | 3 | Medium |
-| terraphim_rolegraph | 22 | 4 | Medium |
-| terraphim_file_search | 3 | 3 | Low |
+**Core Types and Services:**
+- `crates/terraphim_service/src/lib.rs` -- LLM service abstractions
+- `crates/terraphim_settings/src/lib.rs` -- Device and user settings
+- `crates/terraphim_config/src/lib.rs` -- Configuration management
+- `crates/terraphim_persistence/src/lib.rs` -- Persistence traits
 
-## Rustdoc Warnings Breakdown
+**Agent Infrastructure:**
+- `crates/terraphim_agent/src/lib.rs` -- Main agent crate
+- `crates/terraphim_mcp_server/src/lib.rs` -- MCP server
+- `crates/terraphim_middleware/src/lib.rs` -- Middleware components
 
-### Unresolved Links (17)
-These are broken intra-doc links that will confuse users:
+**Haystack Providers:**
+- `crates/haystack_core/src/lib.rs` -- Provider trait
+- `crates/haystack_atlassian/src/lib.rs` -- Confluence/Jira
+- `crates/haystack_discourse/src/lib.rs` -- Discourse forum
+- `crates/haystack_grepapp/src/lib.rs` -- Grep.app search
+- `crates/haystack_jmap/src/lib.rs` -- JMAP protocol
 
-- `terraphim_types`: `HgncGene`, `HgncNormalizer` (2)
-- `terraphim_service`: `kg:term` (1)
-- `terraphim_middleware`: `Message` (1)
-- `terraphim_orchestrator`: `RoutingDecisionEngine::decide_route`, `DispatchTask::AutoMerge` (x3), `AgentOrchestrator::poll_pending_reviews`, `GateConfig`, `handle_post_merge_test_gate_for_project` (7)
-- `terraphim_tracker`: `set_commit_status` (1)
-- `terraphim_rolegraph`: `new`, `from_serializable` (2)
-- `terraphim_router`: `with_change_notifications` (1)
-- `terraphim_file_search`: `ScoringContext` (1)
+**Knowledge Graph:**
+- `crates/terraphim_rolegraph/src/lib.rs` -- Role graph core
+- `crates/terraphim_atomic_client/src/lib.rs` -- Atomic Data client
 
-### Unclosed HTML Tags (9)
-These will render incorrectly in generated docs:
+**Utilities and Tools:**
+- `crates/terraphim_file_search/src/lib.rs`
+- `crates/terraphim-markdown-parser/src/lib.rs`
+- `crates/terraphim_build_args/src/lib.rs`
+- `crates/terraphim_ccusage/src/lib.rs`
+- `crates/terraphim_usage/src/lib.rs`
+- `crates/terraphim_onepassword_cli/src/lib.rs`
+- `crates/terraphim_kg_linter/src/lib.rs`
+- `crates/terraphim_lsp/src/lib.rs`
 
-- `terraphim_middleware`: `Message` (1)
-- `terraphim_persistence`: `DeviceStorage` (2)
-- `terraphim_orchestrator`: `name` (4), `HandoffContext` (1)
-- `terraphim_service`: `DeviceStorage` (1)
+**Bindings and FFI:**
+- `crates/terraphim_automata_py/src/lib.rs`
+- `crates/terraphim_rolegraph_py/src/lib.rs`
 
-### URLs Not Hyperlinked (7)
-Plain URLs in docs that should be markdown links:
+### rustdoc Warnings by Crate
 
-- `terraphim_types` (1)
-- `terraphim_middleware` (4)
-- `terraphim_tracker` (1)
-- `terraphim_rolegraph` (1)
+| Crate | Warnings | Categories |
+|-------|----------|------------|
+| `terraphim_orchestrator` | 14 | Unresolved links, private item refs, unclosed HTML |
+| `terraphim_middleware` | 5 | Unresolved links, non-hyperlink URLs, unclosed HTML |
+| `terraphim_types` | 3 | Unresolved links, non-hyperlink URLs |
+| `terraphim_persistence` | 2 | Unresolved links |
+| `terraphim_rolegraph` | 2 | Unresolved links |
+| `terraphim_tracker` | 2 | Unresolved links, non-hyperlink URLs |
+| `terraphim_service` | 1 | Unresolved link |
+| `terraphim_router` | 1 | Unresolved link |
+| `terraphim_file_search` | 1 | Non-hyperlink URL |
+| `terraphim_tinyclaw` | 1 | Non-hyperlink URL |
 
-### Private Item Links (2)
-Public docs linking to private items:
+### CHANGELOG Status
 
-- `terraphim_orchestrator`: `resolve_mention` links to private `MENTION_RE`
-- `terraphim_orchestrator`: `poll_pending_reviews` links to private `AgentOrchestrator::reconcile_tick`
+CHANGELOG.md updated: added compliance audit entry (Refs #1071).
 
-## Recommendations
+### Recommendations
 
-### Priority 1: Fix Broken Links (1-2 days)
-The 17 unresolved links are user-facing defects. Most are simple renames or missing `pub` visibility.
-
-### Priority 2: Add Crate-Level Docs (2-3 days)
-All 11 crates lack `#![deny(missing_docs)]` enforcement. Start with:
-1. `terraphim_orchestrator` -- add module docs to all 14 modules
-2. `terraphim_service` -- document all 8 modules and core traits
-3. `terraphim_tinyclaw` -- document the 4 modules
-
-### Priority 3: Enforce at CI Gate
-Add `cargo doc --workspace --no-deps -D warnings` to CI after warnings drop below 10.
-
-## CHANGELOG Status
-
-CHANGELOG.md updated with commits since v1.17.0 (2026-04-27). New entries added for:
-- Session debouncing, PR security/compliance/test guardian templates
-- Spawner task-body fix, per-project PR dispatch
-- Clippy fixes, test alignment fixes
-
-## Report Location
-
-`doc-reports/documentation-gap-report-20260429.md`
+**Priority 1:** Fix rustdoc warnings in `terraphim_orchestrator` (14 warnings)
+**Priority 2:** Add module docs to core infrastructure (`terraphim_service`, `terraphim_config`, `terraphim_persistence`)
+**Priority 3:** Add module docs to haystack providers (all `haystack_*` crates)
+**Priority 4:** Resolve remaining rustdoc unresolved links across workspace
 
 Theme-ID: doc-gap
+
+@adf:reviewer please action this finding.
