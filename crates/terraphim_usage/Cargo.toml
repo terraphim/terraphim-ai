@@ -8,6 +8,7 @@ license = "Apache-2.0 OR MIT"
 serde = { workspace = true }
 serde_json = { workspace = true }
 chrono = { workspace = true }
+jiff = "0.2"
 thiserror = { workspace = true }
 anyhow = { workspace = true }
 reqwest = { workspace = true, optional = true }

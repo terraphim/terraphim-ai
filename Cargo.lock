@@ -9479,6 +9479,7 @@ dependencies = [
  "clap",
  "colored 2.2.0",
  "indicatif 0.17.11",
+ "jiff",
  "opendal",
  "reqwest 0.12.28",
  "serde",
