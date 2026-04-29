@@ -38,7 +38,10 @@ except ImportError:
     try:
         import tomli as tomllib  # type: ignore[no-redef]
     except ImportError:
-        print("ERROR: tomllib not available. Use Python 3.11+ or install tomli.", file=sys.stderr)
+        print(
+            "ERROR: tomllib not available. Use Python 3.11+ or install tomli.",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
 import tomli_w
@@ -72,6 +75,8 @@ BASE_GLOBAL_KEYS = {
     "compound_review",
     "routing",
     "webhook",
+    "mentions",
+    "pr_dispatch",
 }
 
 # Per-project keys that belong in [[projects]] entries.
@@ -80,13 +85,13 @@ PROJECT_LEVEL_KEYS = {
     "gitea",
     "quickwit",
     "workflow",
-    "mentions",
 }
 
 
 # ---------------------------------------------------------------------------
 # Filename -> project_id mapping
 # ---------------------------------------------------------------------------
+
 
 def project_id_from_path(path: Path) -> str:
     """Derive project_id from the input filename stem.
@@ -111,6 +116,7 @@ def project_id_from_path(path: Path) -> str:
 # ---------------------------------------------------------------------------
 # Validation
 # ---------------------------------------------------------------------------
+
 
 def _is_banned(model_value: str) -> bool:
     """Return True if the model value starts with a banned prefix."""
@@ -155,9 +161,11 @@ def validate_models(data: dict, source_path: Path) -> None:
 # Transformation helpers
 # ---------------------------------------------------------------------------
 
+
 def _deep_copy(obj):
     """Return a plain Python deep copy without external deps."""
     import copy
+
     return copy.deepcopy(obj)
 
 
@@ -261,6 +269,7 @@ def build_base_doc(inputs: list[tuple[Path, dict]], include_glob: str) -> dict:
 # TOML serialisation helper
 # ---------------------------------------------------------------------------
 
+
 def _normalise(obj):
     """Recursively normalise types for tomli_w serialisation.
 
@@ -284,6 +293,7 @@ def serialise_toml(doc: dict) -> bytes:
 # ---------------------------------------------------------------------------
 # Main logic
 # ---------------------------------------------------------------------------
+
 
 def run(
     input_paths: list[Path],
@@ -342,6 +352,7 @@ def run(
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(

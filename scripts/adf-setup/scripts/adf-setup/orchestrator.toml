@@ -37,6 +37,21 @@ probe_ttl_secs = 300
 probe_results_dir = "/home/alex/.terraphim/benchmark-results"
 probe_on_startup = true
 
+[mentions]
+poll_modulo = 2
+max_dispatches_per_tick = 3
+max_concurrent_mention_agents = 8
+
+[pr_dispatch]
+agents_on_pr_open = [
+    { name = "build-runner", context = "adf/build" },
+    { name = "pr-reviewer", context = "adf/pr-reviewer" },
+    { name = "pr-spec-validator", context = "adf/spec" },
+    { name = "pr-security-sentinel", context = "adf/security" },
+    { name = "pr-compliance-watchdog", context = "adf/compliance" },
+    { name = "pr-test-guardian", context = "adf/test" },
+]
+
 [webhook]
 bind = "172.18.0.1:9091"
 secret = "85af336ebec99fe512871106650bce179f9a2b218f40576f76d5ff0a55e7af9a"

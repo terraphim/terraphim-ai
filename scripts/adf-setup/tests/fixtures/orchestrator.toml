@@ -49,6 +49,21 @@ api_key = "fixture-token-not-real"
 owner = "terraphim"
 repo = "terraphim-ai"
 
+[mentions]
+poll_modulo = 2
+max_dispatches_per_tick = 3
+max_concurrent_mention_agents = 8
+
+[pr_dispatch]
+agents_on_pr_open = [
+    { name = "build-runner", context = "adf/build" },
+    { name = "pr-reviewer", context = "adf/pr-reviewer" },
+    { name = "pr-spec-validator", context = "adf/spec" },
+    { name = "pr-security-sentinel", context = "adf/security" },
+    { name = "pr-compliance-watchdog", context = "adf/compliance" },
+    { name = "pr-test-guardian", context = "adf/test" },
+]
+
 [[agents]]
 name = "security-sentinel"
 layer = "Safety"
