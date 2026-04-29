@@ -726,13 +726,13 @@ mod tests {
         // Verify redaction removes the AWS key
         let redacted = redact_secrets(&json);
         assert!(!redacted.contains(&aws_key));
-        assert!(redacted.contains("[AWS_KEY_REDACTED]"));
+        assert!(redacted.contains("[REDACTED:aws-key]"));
 
         // Verify the redacted output is still valid JSON
         let parsed = HookInput::from_json(&redacted).unwrap();
         assert_eq!(parsed.tool_name, "Bash");
         assert_eq!(parsed.tool_result.exit_code, 1);
-        assert!(parsed.tool_result.stderr.contains("[AWS_KEY_REDACTED]"));
+        assert!(parsed.tool_result.stderr.contains("[REDACTED:aws-key]"));
     }
 
     #[test]
