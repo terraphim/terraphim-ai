@@ -248,6 +248,8 @@ pub struct AgentOrchestrator {
     /// are absent from the map and classify as
     /// [`error_signatures::ErrorKind::Unknown`] (fail-safe).
     provider_error_signatures: error_signatures::ProviderSignatureMap,
+    provider_rate_limits: ProviderRateLimitWindow,
+    retry_counts: HashMap<String, u32>,
     /// Dedupe set of [`error_signatures::unknown_dedupe_key`] values so we
     /// don't open a new `[ADF]` Gitea issue for every retry of the same
     /// stderr shape. Process-lifetime in-memory; intentional since the
@@ -293,6 +295,93 @@ fn agent_key(def: &AgentDefinition) -> (String, String) {
             .unwrap_or_else(|| crate::dispatcher::LEGACY_PROJECT_ID.to_string()),
         def.name.clone(),
     )
+}
+
+struct ProviderRateLimitWindow {
+    blocked_until: HashMap<String, Instant>,
+}
+
+impl ProviderRateLimitWindow {
+    fn new() -> Self {
+        Self {
+            blocked_until: HashMap::new(),
+        }
+    }
+
+    fn block_until(&mut self, provider: &str, until: Instant) {
+        self.blocked_until.insert(provider.to_string(), until);
+    }
+
+    #[allow(dead_code)]
+    fn is_blocked(&self, provider: &str) -> bool {
+        self.blocked_until
+            .get(provider)
+            .is_some_and(|until| Instant::now() < *until)
+    }
+
+    fn blocked_providers(&self) -> Vec<String> {
+        let now = Instant::now();
+        self.blocked_until
+            .iter()
+            .filter(|(_, until)| **until > now)
+            .map(|(k, _)| k.clone())
+            .collect()
+    }
+
+    fn clean_expired(&mut self) {
+        let now = Instant::now();
+        self.blocked_until.retain(|_, until| *until > now);
+    }
+}
+
+fn parse_reset_time(quota_line: &str) -> Option<Instant> {
+    let line = quota_line.to_lowercase();
+
+    if let Some(idx) = line.find("resets in ") {
+        let rest = &line[idx + "resets in ".len()..];
+        if let Ok(n) = rest
+            .chars()
+            .take_while(|c| c.is_ascii_digit())
+            .collect::<String>()
+            .parse::<u64>()
+        {
+            if rest.contains("hour") {
+                return Some(Instant::now() + Duration::from_secs(n * 3600));
+            }
+            if rest.contains("minute") {
+                return Some(Instant::now() + Duration::from_secs(n * 60));
+            }
+        }
+    }
+
+    if let Some(idx) = line.find("resets at ") {
+        let rest = &line[idx + "resets at ".len()..];
+        if let Some(time_str) = rest.strip_suffix(" utc").or_else(|| rest.strip_suffix(" utc.")) {
+            if let Ok(hour_min) = chrono::NaiveTime::parse_from_str(time_str.trim(), "%H:%M") {
+                let now = chrono::Utc::now();
+                let mut target_date = now.date_naive();
+                let target = target_date.and_time(hour_min);
+                let mut target_utc = chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(
+                    target, chrono::Utc,
+                );
+                if target_utc <= now {
+                    target_date += chrono::Duration::days(1);
+                    let target = target_date.and_time(hour_min);
+                    target_utc = chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(
+                        target, chrono::Utc,
+                    );
+                }
+                let delta = (target_utc - now).to_std().ok()?;
+                return Some(Instant::now() + delta);
+            }
+        }
+    }
+
+    if line.contains("resets ") {
+        return Some(Instant::now() + Duration::from_secs(3600));
+    }
+
+    None
 }
 
 /// Build the optional provider-level hour/day budget tracker from the
@@ -703,6 +792,8 @@ impl AgentOrchestrator {
             telemetry_store,
             provider_budget_tracker,
             provider_error_signatures,
+            provider_rate_limits: ProviderRateLimitWindow::new(),
+            retry_counts: HashMap::new(),
             unknown_error_dedupe: Arc::new(Mutex::new(std::collections::HashSet::new())),
             project_failure_counter,
             pause_dir,
@@ -4981,6 +5072,8 @@ impl AgentOrchestrator {
 
     /// Periodic reconciliation: detect exits, check cron, evaluate drift, drain output.
     async fn reconcile_tick(&mut self) {
+        self.provider_rate_limits.clean_expired();
+
         // Check wall-clock timeouts and respawn with fallback
         self.poll_wall_timeouts().await;
 
@@ -5348,6 +5441,7 @@ impl AgentOrchestrator {
         }
 
         // Drain output from exiting agents BEFORE removing them
+        let mut quota_exits: std::collections::HashSet<String> = std::collections::HashSet::new();
         let mut exit_telemetry: Vec<(String, control_plane::telemetry::CompletionEvent)> =
             Vec::new();
         for (name, def, status) in &exited {
@@ -5451,6 +5545,10 @@ impl AgentOrchestrator {
                 mention_parent_agent,
             };
 
+            if record.exit_class == ExitClass::RateLimit {
+                quota_exits.insert(name.clone());
+            }
+
             info!(
                 agent = %name,
                 exit_code = ?status.code(),
@@ -5490,6 +5588,50 @@ impl AgentOrchestrator {
                     }
                 }
                 self.injected_learning_ids.remove(name);
+            }
+
+            let stderr_text = stderr_lines.join("\n");
+            let output_text = output_lines.join("\n");
+            let is_quota_exit = record.exit_class == ExitClass::RateLimit
+                || control_plane::output_parser::parse_stderr_for_limit_errors(&stderr_text)
+                    .is_some()
+                || control_plane::telemetry::is_subscription_limit_error(&output_text);
+            if is_quota_exit {
+                let effective_provider = def
+                    .provider
+                    .as_deref()
+                    .or_else(|| {
+                        routed_model
+                            .as_deref()
+                            .and_then(|m| provider_budget::provider_key_for_model(m))
+                    });
+
+                if let Some(provider_key) = effective_provider {
+                    warn!(
+                        agent = %name,
+                        provider = %provider_key,
+                        model = ?routed_model,
+                        "quota exit detected; recording provider failure and blocking"
+                    );
+                    self.provider_health.record_failure(provider_key);
+                    if let Some(tracker) = self.provider_budget_tracker.as_ref() {
+                        tracker.force_exhaust(provider_key);
+                    }
+
+                    let quota_line = stderr_lines
+                        .iter()
+                        .chain(stdout_lines.iter())
+                        .find(|l| l.to_lowercase().contains("resets "))
+                        .map(|s| s.as_str())
+                        .unwrap_or("");
+                    if let Some(reset_time) = parse_reset_time(quota_line) {
+                        info!(
+                            provider = %provider_key,
+                            "blocking provider until rate-limit window expires"
+                        );
+                        self.provider_rate_limits.block_until(provider_key, reset_time);
+                    }
+                }
             }
 
             // D-3: Feed exit classification into provider health circuit breaker
@@ -5626,7 +5768,60 @@ impl AgentOrchestrator {
                 .get(&name)
                 .and_then(|m| m.worktree_path.clone());
             self.active_agents.remove(&name);
-            self.handle_agent_exit(&name, &def, status);
+
+            if quota_exits.contains(&name) {
+                let mut local_unhealthy = self.provider_health.unhealthy_providers();
+                local_unhealthy.extend(self.provider_rate_limits.blocked_providers());
+
+                let respawned = if let Some(ref kg_router) = self.kg_router {
+                    if let Some(decision) = kg_router.route_agent(&def.task) {
+                        if let Some(healthy_route) =
+                            decision.first_healthy_route(&local_unhealthy)
+                        {
+                            let retry_count =
+                                self.retry_counts.entry(name.clone()).or_insert(0);
+                            if *retry_count < 3 {
+                                *retry_count += 1;
+                                let retry_name = format!("{}-retry-{}", name, retry_count);
+                                let mut fallback_def = def.clone();
+                                fallback_def.name = retry_name;
+                                fallback_def.model = Some(healthy_route.model.clone());
+                                fallback_def.provider = Some(healthy_route.provider.clone());
+                                fallback_def.fallback_provider = None;
+                                fallback_def.fallback_model = None;
+                                info!(
+                                    agent = %name,
+                                    retry_name = %fallback_def.name,
+                                    fallback_model = %healthy_route.model,
+                                    fallback_provider = %healthy_route.provider,
+                                    "respawning quota-exited agent via KG fallback route"
+                                );
+                                if let Err(e) = self.spawn_agent(&fallback_def).await {
+                                    error!(agent = %fallback_def.name, error = %e, "failed to spawn KG fallback agent");
+                                }
+                                true
+                            } else {
+                                warn!(agent = %name, retries = retry_count, "max retries reached, agent exits permanently");
+                                self.retry_counts.remove(&name);
+                                false
+                            }
+                        } else {
+                            info!(agent = %name, "no healthy KG route available, agent exits permanently");
+                            false
+                        }
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                };
+
+                if !respawned {
+                    self.handle_agent_exit(&name, &def, status);
+                }
+            } else {
+                self.handle_agent_exit(&name, &def, status);
+            }
             self.record_project_meta_exit(&def, status).await;
 
             // Auto-commit in the agent's working directory (worktree or shared)
