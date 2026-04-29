@@ -249,7 +249,7 @@ pub struct AgentOrchestrator {
     /// [`error_signatures::ErrorKind::Unknown`] (fail-safe).
     provider_error_signatures: error_signatures::ProviderSignatureMap,
     provider_rate_limits: ProviderRateLimitWindow,
-    retry_counts: HashMap<String, u32>,
+    retry_counts: HashMap<String, (u32, Instant)>,
     /// Dedupe set of [`error_signatures::unknown_dedupe_key`] values so we
     /// don't open a new `[ADF]` Gitea issue for every retry of the same
     /// stderr shape. Process-lifetime in-memory; intentional since the
@@ -5073,6 +5073,7 @@ impl AgentOrchestrator {
     /// Periodic reconciliation: detect exits, check cron, evaluate drift, drain output.
     async fn reconcile_tick(&mut self) {
         self.provider_rate_limits.clean_expired();
+        self.retry_counts.retain(|_, (_, ts)| ts.elapsed() < Duration::from_secs(3600));
 
         // Check wall-clock timeouts and respawn with fallback
         self.poll_wall_timeouts().await;
@@ -5590,13 +5591,12 @@ impl AgentOrchestrator {
                 self.injected_learning_ids.remove(name);
             }
 
-            let stderr_text = stderr_lines.join("\n");
-            let output_text = output_lines.join("\n");
-            let is_quota_exit = record.exit_class == ExitClass::RateLimit
-                || control_plane::output_parser::parse_stderr_for_limit_errors(&stderr_text)
-                    .is_some()
-                || control_plane::telemetry::is_subscription_limit_error(&output_text);
-            if is_quota_exit {
+            let mut quota_provider_recorded: Option<String> = None;
+            if record.exit_class == ExitClass::RateLimit {
+                let stderr_text = stderr_lines.join("\n");
+                let output_text = output_lines.join("\n");
+                let _secondary_confirms = control_plane::output_parser::parse_stderr_for_limit_errors(&stderr_text).is_some()
+                    || control_plane::telemetry::is_subscription_limit_error(&output_text);
                 let effective_provider = def
                     .provider
                     .as_deref()
@@ -5631,14 +5631,19 @@ impl AgentOrchestrator {
                         );
                         self.provider_rate_limits.block_until(provider_key, reset_time);
                     }
+                    quota_provider_recorded = Some(provider_key.to_string());
                 }
             }
 
             // D-3: Feed exit classification into provider health circuit breaker
             if let Some(ref provider) = def.provider {
+                let already_recorded_by_quota = quota_provider_recorded.as_deref() == Some(provider.as_str());
                 match record.exit_class {
                     ExitClass::ModelError | ExitClass::RateLimit => {
-                        self.provider_health.record_failure(provider);
+                        #[allow(clippy::collapsible_match)]
+                        if !already_recorded_by_quota {
+                            self.provider_health.record_failure(provider);
+                        }
                     }
                     ExitClass::Success | ExitClass::EmptySuccess => {
                         self.provider_health.record_success(provider);
@@ -5779,10 +5784,11 @@ impl AgentOrchestrator {
                             decision.first_healthy_route(&local_unhealthy)
                         {
                             let retry_count =
-                                self.retry_counts.entry(name.clone()).or_insert(0);
-                            if *retry_count < 3 {
-                                *retry_count += 1;
-                                let retry_name = format!("{}-retry-{}", name, retry_count);
+                                self.retry_counts.entry(name.clone()).or_insert((0, Instant::now()));
+                            if retry_count.0 < 3 {
+                                retry_count.0 += 1;
+                                retry_count.1 = Instant::now();
+                                let retry_name = format!("{}-retry-{}", name, retry_count.0);
                                 let mut fallback_def = def.clone();
                                 fallback_def.name = retry_name;
                                 fallback_def.model = Some(healthy_route.model.clone());
@@ -5801,7 +5807,7 @@ impl AgentOrchestrator {
                                 }
                                 true
                             } else {
-                                warn!(agent = %name, retries = retry_count, "max retries reached, agent exits permanently");
+                                warn!(agent = %name, retries = retry_count.0, "max retries reached, agent exits permanently");
                                 self.retry_counts.remove(&name);
                                 false
                             }
