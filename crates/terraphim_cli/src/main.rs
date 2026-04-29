@@ -937,8 +937,9 @@ async fn handle_rollback(version: &str) -> Result<serde_json::Value> {
 
 /// Format JSON as human-readable text (for --format text)
 fn format_as_text(value: &serde_json::Value) -> Result<String> {
-    // This is a simplified text formatter
-    // Could be enhanced with better formatting
+    if let Some(s) = value.get("output").and_then(|v| v.as_str()) {
+        return Ok(s.to_string());
+    }
     Ok(format!("{:#}", value))
 }
 

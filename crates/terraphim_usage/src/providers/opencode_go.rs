@@ -69,7 +69,7 @@ impl UsageProvider for OpenCodeGoProvider {
                 });
             }
 
-            let query = "SELECT role, COUNT(*) as count, SUM(CASE WHEN cost IS NOT NULL THEN cost ELSE 0 END) as total_cost FROM message GROUP BY role";
+            let query = "SELECT json_extract(data, '$.role') as role, COUNT(*) as count, SUM(CASE WHEN json_extract(data, '$.cost') IS NOT NULL THEN json_extract(data, '$.cost') ELSE 0 END) as total_cost, SUM(json_extract(data, '$.tokens.input')) as input_tokens, SUM(json_extract(data, '$.tokens.output')) as output_tokens FROM message GROUP BY json_extract(data, '$.role')";
 
             let json_str = self
                 .query_sqlite(query)
@@ -83,6 +83,8 @@ impl UsageProvider for OpenCodeGoProvider {
             let mut total_cost: f64 = 0.0;
             let mut total_messages: i64 = 0;
             let mut assistant_count: i64 = 0;
+            let mut input_tokens: i64 = 0;
+            let mut output_tokens: i64 = 0;
 
             for row in &rows {
                 if let Some(cost) = row.get("total_cost").and_then(|v| v.as_f64()) {
@@ -90,6 +92,12 @@ impl UsageProvider for OpenCodeGoProvider {
                 }
                 if let Some(count) = row.get("count").and_then(|v| v.as_i64()) {
                     total_messages += count;
+                }
+                if let Some(tokens) = row.get("input_tokens").and_then(|v| v.as_i64()) {
+                    input_tokens += tokens;
+                }
+                if let Some(tokens) = row.get("output_tokens").and_then(|v| v.as_i64()) {
+                    output_tokens += tokens;
                 }
                 if row
                     .get("role")
@@ -119,6 +127,13 @@ impl UsageProvider for OpenCodeGoProvider {
                     "{} total ({} assistant responses)",
                     total_messages, assistant_count
                 ),
+                color: None,
+                subtitle: None,
+            });
+
+            lines.push(MetricLine::Text {
+                label: "Tokens".to_string(),
+                value: format!("{} in / {} out", input_tokens, output_tokens),
                 color: None,
                 subtitle: None,
             });
