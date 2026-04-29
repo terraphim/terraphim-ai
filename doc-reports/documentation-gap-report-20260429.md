@@ -1,96 +1,128 @@
 # Documentation Gap Report
 
-**Generated:** 2026-04-29
+**Generated:** 2026-04-29T10:47:08Z
 **Agent:** documentation-generator (Ferrox)
 **Run:** Recurring scan on issue #1046
 
 ## Summary
 
-Systematic scan of 11 primary workspace crates reveals **923 missing documentation items** and **53 rustdoc warnings** (excluding the unused tokio-tungstenite patch warning).
+Systematic scan of 24 workspace crates reveals **~1,773 missing documentation items**.
 
 | Metric | Count |
 |--------|-------|
-| Crates scanned | 11 |
-| Total missing docs | 923 |
-| Total rustdoc warnings | 53 |
-| Crates with zero missing docs | 0 |
-| Most impacted crate | terraphim_orchestrator (430 missing) |
+| Crates scanned | 24 |
+| Total missing docs | ~1,773 |
+| Crates with zero missing docs | 3 |
+| Most impacted crate | terraphim_validation (443 missing) |
 
 ## Missing Documentation by Crate
 
-| Crate | Missing Docs | Warnings | Severity |
-|-------|-------------|----------|----------|
-| terraphim_orchestrator | 430 | 16 | Critical |
-| terraphim_service | 114 | 3 | High |
-| terraphim_tinyclaw | 104 | 3 | High |
-| terraphim_types | 79 | 5 | High |
-| terraphim_middleware | 40 | 7 | Medium |
-| terraphim_config | 38 | 1 | Medium |
-| terraphim_tracker | 35 | 4 | Medium |
-| terraphim_persistence | 30 | 4 | Medium |
-| terraphim_router | 28 | 3 | Medium |
-| terraphim_rolegraph | 22 | 4 | Medium |
-| terraphim_file_search | 3 | 3 | Low |
+| Crate | Missing Docs | Severity |
+|-------|-------------|----------|
+| terraphim_validation | 443 | Critical |
+| terraphim_orchestrator | 430 | Critical |
+| terraphim_server | 138 | High |
+| terraphim_service | 114 | High |
+| terraphim_tinyclaw | 104 | High |
+| terraphim_agent | 99 | High |
+| terraphim_types | 98 | High |
+| terraphim_automata | 87 | High |
+| terraphim_usage | 82 | Medium |
+| terraphim_middleware | 40 | Medium |
+| terraphim_kg_orchestration | 40 | Medium |
+| terraphim_config | 38 | Medium |
+| terraphim_tracker | 35 | Medium |
+| terraphim_persistence | 30 | Medium |
+| terraphim_ccusage | 29 | Medium |
+| terraphim_router | 28 | Medium |
+| terraphim_rolegraph | 22 | Medium |
+| terraphim_sessions | 13 | Low |
+| terraphim_workspace | 11 | Low |
+| terraphim_settings | 8 | Low |
+| terraphim_mcp_server | 8 | Low |
+| terraphim_file_search | 3 | Low |
+| terraphim_cli | 0 | Complete |
+| terraphim_hooks | 0 | Complete |
+| terraphim_markdown_parser | 0 | Complete |
 
-## Rustdoc Warnings Breakdown
+## Detailed Findings
 
-### Unresolved Links (17)
-These are broken intra-doc links that will confuse users:
+### terraphim_validation (443 missing)
+- **Types:** Enum variants (quality gate states, severity levels)
+- **Structs:** Validation rule definitions, report structures
+- **Functions:** Quality gate evaluators, rule engines
+- **Impact:** Zero API docs for quality gate system -- consumers cannot discover validation APIs
 
-- `terraphim_types`: `HgncGene`, `HgncNormalizer` (2)
-- `terraphim_service`: `kg:term` (1)
-- `terraphim_middleware`: `Message` (1)
-- `terraphim_orchestrator`: `RoutingDecisionEngine::decide_route`, `DispatchTask::AutoMerge` (x3), `AgentOrchestrator::poll_pending_reviews`, `GateConfig`, `handle_post_merge_test_gate_for_project` (7)
-- `terraphim_tracker`: `set_commit_status` (1)
-- `terraphim_rolegraph`: `new`, `from_serializable` (2)
-- `terraphim_router`: `with_change_notifications` (1)
-- `terraphim_file_search`: `ScoringContext` (1)
+### terraphim_orchestrator (430 missing)
+- **Modules:** All submodules undocumented
+- **Structs:** Agent templates, webhook handlers, task dispatchers
+- **Fields:** Configuration fields on orchestrator state
+- **Impact:** ADF orchestrator is entirely opaque -- no contributor can understand the agent lifecycle
 
-### Unclosed HTML Tags (9)
-These will render incorrectly in generated docs:
+### terraphim_server (138 missing)
+- **Modules:** Route modules, middleware modules
+- **Structs:** Server configuration, state containers
+- **Impact:** Main server binary lacks module-level docs
 
-- `terraphim_middleware`: `Message` (1)
-- `terraphim_persistence`: `DeviceStorage` (2)
-- `terraphim_orchestrator`: `name` (4), `HandoffContext` (1)
-- `terraphim_service`: `DeviceStorage` (1)
+### terraphim_service (114 missing)
+- **Modules:** Service submodules
+- **Types:** Core service enums and structs
+- **Impact:** Core business logic undocumented
 
-### URLs Not Hyperlinked (7)
-Plain URLs in docs that should be markdown links:
+### terraphim_tinyclaw (104 missing)
+- **Structs:** Claw engine state, rule definitions
+- **Functions:** Matching engine, scoring functions
+- **Impact:** TinyClaw rule engine has no discoverable API
 
-- `terraphim_types` (1)
-- `terraphim_middleware` (4)
-- `terraphim_tracker` (1)
-- `terraphim_rolegraph` (1)
+### terraphim_agent (99 missing)
+- **Modules:** Agent subsystems
+- **Types:** Agent state, event types
+- **Impact:** Primary agent crate lacks entry-point documentation
 
-### Private Item Links (2)
-Public docs linking to private items:
-
-- `terraphim_orchestrator`: `resolve_mention` links to private `MENTION_RE`
-- `terraphim_orchestrator`: `poll_pending_reviews` links to private `AgentOrchestrator::reconcile_tick`
+### terraphim_types (98 missing)
+- **Modules:** Type submodules
+- **Structs:** Shared data structures
+- **Fields:** Public struct fields
+- **Impact:** Foundation types used across workspace are undocumented
 
 ## Recommendations
 
-### Priority 1: Fix Broken Links (1-2 days)
-The 17 unresolved links are user-facing defects. Most are simple renames or missing `pub` visibility.
+1. **Immediate (P0):** Add module-level docs (`//!`) to `terraphim_validation` and `terraphim_orchestrator` root lib.rs files
+2. **Short-term (P1):** Document all public structs and enums in `terraphim_server`, `terraphim_service`, `terraphim_agent`, `terraphim_types`
+3. **Medium-term (P2):** Complete docs for `terraphim_tinyclaw`, `terraphim_automata`, `terraphim_usage`
+4. **Process:** Enable `#![warn(missing_docs)]` in all crate lib.rs files to prevent regression
+5. **CI:** Add `cargo rustdoc -- -D missing-docs` gate to CI once per-crate thresholds are met
 
-### Priority 2: Add Crate-Level Docs (2-3 days)
-All 11 crates lack `#![deny(missing_docs)]` enforcement. Start with:
-1. `terraphim_orchestrator` -- add module docs to all 14 modules
-2. `terraphim_service` -- document all 8 modules and core traits
-3. `terraphim_tinyclaw` -- document the 4 modules
+## API Reference Snippets
 
-### Priority 3: Enforce at CI Gate
-Add `cargo doc --workspace --no-deps -D warnings` to CI after warnings drop below 10.
+### terraphim_types
+```rust
+use terraphim_types::{Article, IndexedArticle, SearchQuery};
 
-## CHANGELOG Status
+// SearchQuery is the primary input type for all search operations
+let query = SearchQuery::new("rust async");
 
-CHANGELOG.md updated with commits since v1.17.0 (2026-04-27). New entries added for:
-- Session debouncing, PR security/compliance/test guardian templates
-- Spawner task-body fix, per-project PR dispatch
-- Clippy fixes, test alignment fixes
+// Articles are the core document type
+let article = Article::default();
+```
 
-## Report Location
+### terraphim_service
+```rust
+use terraphim_service::TerraphimService;
 
-`doc-reports/documentation-gap-report-20260429.md`
+// Main service orchestrator
+let service = TerraphimService::new(config).await?;
+let results = service.search(query).await?;
+```
 
-Theme-ID: doc-gap
+### terraphim_config
+```rust
+use terraphim_config::Config;
+
+// Load configuration from default paths
+let config = Config::load().await?;
+```
+
+---
+
+**Theme-ID:** doc-gap

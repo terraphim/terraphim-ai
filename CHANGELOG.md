@@ -52,7 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Test ranking knowledge graph fixture** added for agent testing
 - **LLM cost tracking** foundation with genai fork integration (Refs #1075)
 - **Spec validation** report for 2026-04-29 documenting 3 fixed, 5 remaining gaps
-- **Documentation gap report** generated for 2026-04-29 identifying 43 warnings across workspace
+- **Documentation gap report** generated for 2026-04-29 identifying ~1,773 missing docs across 24 crates (up from 923 in prior scan)
 
 ### Fixed
 
