@@ -193,25 +193,61 @@ You should see a line like:
 In `suggest` mode the command still executes as `npm install express`; in
 `apply` mode the agent actually runs `bun add express`.
 
-## 6. Capturing user corrections (preview)
+## 6. Phase 2: user-prompt-submit wiring
 
-`terraphim-agent learn hook --format <claude|codex|opencode>` has three
-modes driven by `--learn-hook-type`:
+`terraphim-agent learn hook --learn-hook-type user-prompt-submit` scans
+the user's prompt for tool-preference patterns and records a
+`CorrectionType::ToolPreference` correction under
+`~/.local/share/terraphim/learnings/correction-*.md` (or the configured
+project fallback). Supported patterns:
 
-- `post-tool-use` -- the default, captures failed Bash commands as
-  learnings. This is already wired into the OpenCode plugin's
-  `tool.execute.after` callback.
-- `pre-tool-use` -- warns if the command matches a past failure pattern.
-  Does not block.
-- `user-prompt-submit` -- scans the user's prompt for patterns like "use X
-  instead of Y" or "prefer X over Y" and records a `ToolPreference`
-  correction under
-  `~/Library/Application Support/terraphim/learnings/correction-*.md`.
+| Pattern | Example | Captured |
+|---------|---------|----------|
+| use X instead of Y | "use uv instead of pip" | (pip -> uv) |
+| use X not Y | "use cargo not make" | (make -> cargo) |
+| prefer X over Y | "prefer bunx over npx" | (npx -> bunx) |
 
-At present these corrections are stored but **not yet fed back** into the
-replacement thesaurus. Closing that loop is tracked as future work -- see
-the accompanying GitHub issue "Learning-driven command correction: Phase 2
-& 3".
+Patterns that start with a personal pronoun (e.g. "I prefer tea over
+coffee") are intentionally ignored so that personal preferences do not
+pollute the tool-preference corpus.
+
+### 6.1 Claude Code shell hook
+
+Copy `examples/claude-code-hooks/user-prompt-submit-hook.sh` into your
+Claude Code hooks directory and reference it in `claude-settings.json`:
+
+```json
+{
+  "userPromptSubmit": {
+    "command": "/path/to/user-prompt-submit-hook.sh"
+  }
+}
+```
+
+The script pipes the prompt JSON into `terraphim-agent learn hook
+--learn-hook-type user-prompt-submit` and always passes the original
+input through unchanged (fail-open).
+
+### 6.2 OpenCode plugin
+
+Copy `examples/opencode-plugin/user-prompt-submit.js` into
+`~/.config/opencode/plugin/` (or `plugins/`). The plugin normalises the
+OpenCode user-prompt payload to `{"user_prompt":"..."}` and invokes the
+same CLI entry point.
+
+### 6.3 Verify capture
+
+After running one of the hooks with a tool-preference prompt, check the
+learnings directory:
+
+```bash
+ls ~/.local/share/terraphim/learnings/correction-*.md
+```
+
+Each file is a markdown document with front-matter containing the
+original tool, the corrected tool, and the `tool-preference` type tag.
+These files feed Phase 3 (`terraphim-agent learn compile`) which
+aggregates them into a thesaurus JSON for the `replace` command.
 
 ## Troubleshooting
 

@@ -202,11 +202,11 @@ fn process_user_prompt_submit(json: &str) {
         None => return,
     };
 
-    // Look for correction patterns: "use X instead of Y", "don't use X", "prefer X over Y"
+    // Look for correction patterns: "use X instead of Y", "use X not Y", "prefer X over Y"
     if let Some((original, corrected)) = parse_correction_pattern(prompt) {
         let config = LearningCaptureConfig::default();
         if let Err(e) = crate::learnings::capture_correction(
-            crate::learnings::CorrectionType::Other("user-prompt".to_string()),
+            crate::learnings::CorrectionType::ToolPreference,
             &original,
             &corrected,
             &format!("Auto-captured from user prompt: {}", prompt),
@@ -221,36 +221,59 @@ fn process_user_prompt_submit(json: &str) {
 ///
 /// Supports patterns:
 /// - "use X instead of Y"  -> (Y, X)
+/// - "use X not Y"         -> (Y, X)
 /// - "prefer X over Y"     -> (Y, X)
 ///
 /// Returns None if no pattern matches.
 fn parse_correction_pattern(text: &str) -> Option<(String, String)> {
     let lower = text.to_lowercase();
+    let trimmed = lower.trim_start();
 
-    // "use X instead of Y"
-    if let Some(use_idx) = lower.find("use ") {
-        if let Some(instead_idx) = lower.find(" instead of ") {
-            let corrected = text[use_idx + 4..instead_idx].trim().to_string();
-            let original = text[instead_idx + 12..]
-                .trim()
-                .trim_end_matches('.')
-                .to_string();
-            if !corrected.is_empty() && !original.is_empty() {
-                return Some((original, corrected));
+    // "use X instead of Y" (must start with "use")
+    if let Some(use_idx) = trimmed.find("use ") {
+        if use_idx == 0 {
+            let text_after_use =
+                &text[text.to_lowercase().trim_start().find("use ").unwrap() + 4..];
+            let lower_after_use = text_after_use.to_lowercase();
+            if let Some(instead_idx) = lower_after_use.find(" instead of ") {
+                let corrected = text_after_use[..instead_idx].trim().to_string();
+                let original = text_after_use[instead_idx + 12..]
+                    .trim()
+                    .trim_end_matches('.')
+                    .to_string();
+                if !corrected.is_empty() && !original.is_empty() {
+                    return Some((original, corrected));
+                }
+            }
+            // "use X not Y"
+            if let Some(not_idx) = lower_after_use.find(" not ") {
+                let corrected = text_after_use[..not_idx].trim().to_string();
+                let original = text_after_use[not_idx + 5..]
+                    .trim()
+                    .trim_end_matches('.')
+                    .to_string();
+                if !corrected.is_empty() && !original.is_empty() {
+                    return Some((original, corrected));
+                }
             }
         }
     }
 
-    // "prefer X over Y"
-    if let Some(prefer_idx) = lower.find("prefer ") {
-        if let Some(over_idx) = lower.find(" over ") {
-            let corrected = text[prefer_idx + 7..over_idx].trim().to_string();
-            let original = text[over_idx + 6..]
-                .trim()
-                .trim_end_matches('.')
-                .to_string();
-            if !corrected.is_empty() && !original.is_empty() {
-                return Some((original, corrected));
+    // "prefer X over Y" (must start with "prefer")
+    if let Some(prefer_idx) = trimmed.find("prefer ") {
+        if prefer_idx == 0 {
+            let text_after_prefer =
+                &text[text.to_lowercase().trim_start().find("prefer ").unwrap() + 7..];
+            let lower_after_prefer = text_after_prefer.to_lowercase();
+            if let Some(over_idx) = lower_after_prefer.find(" over ") {
+                let corrected = text_after_prefer[..over_idx].trim().to_string();
+                let original = text_after_prefer[over_idx + 6..]
+                    .trim()
+                    .trim_end_matches('.')
+                    .to_string();
+                if !corrected.is_empty() && !original.is_empty() {
+                    return Some((original, corrected));
+                }
             }
         }
     }
@@ -764,9 +787,17 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_correction_pattern_use_not() {
+        let result = parse_correction_pattern("use uv not pip");
+        assert_eq!(result, Some(("pip".to_string(), "uv".to_string())));
+    }
+
+    #[test]
     fn test_parse_correction_pattern_no_match() {
         assert!(parse_correction_pattern("hello world").is_none());
         assert!(parse_correction_pattern("this is fine").is_none());
+        // "I prefer tea over coffee" is a preference, not a tool correction
+        assert!(parse_correction_pattern("I prefer tea over coffee").is_none());
     }
 
     #[test]

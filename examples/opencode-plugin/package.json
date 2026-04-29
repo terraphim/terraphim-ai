@@ -1,0 +1,8 @@
+{
+  "name": "terraphim-user-prompt-submit",
+  "version": "1.0.0",
+  "description": "OpenCode plugin that captures user tool-preference corrections from prompts",
+  "main": "user-prompt-submit.js",
+  "keywords": ["terraphim", "opencode", "learning", "hook"],
+  "license": "MIT"
+}
