@@ -109,13 +109,28 @@ impl CcusageClient {
             CcusageProvider::Codex => "@ccusage/codex@18.0.10",
         };
 
-        let mut args = vec![
-            "dlx".to_string(),
-            package.to_string(),
-            "--".to_string(),
-            "--since".to_string(),
-            since.to_string(),
-        ];
+        let runner_cmd = if runner == "bun" {
+            "bunx".to_string()
+        } else {
+            runner.clone()
+        };
+
+        let mut args = if runner == "bun" {
+            vec![
+                package.to_string(),
+                "--".to_string(),
+                "--since".to_string(),
+                since.to_string(),
+            ]
+        } else {
+            vec![
+                "dlx".to_string(),
+                package.to_string(),
+                "--".to_string(),
+                "--since".to_string(),
+                since.to_string(),
+            ]
+        };
 
         if let Some(u) = until {
             args.push("--until".to_string());
@@ -127,9 +142,9 @@ impl CcusageClient {
             args.push(home.to_string_lossy().to_string());
         }
 
-        tracing::info!("Running ccusage: {} {}", runner, args.join(" "));
+        tracing::info!("Running ccusage: {} {}", runner_cmd, args.join(" "));
 
-        let output = std::process::Command::new(&runner)
+        let output = std::process::Command::new(&runner_cmd)
             .args(&args)
             .output()
             .map_err(CcusageError::IoError)?;

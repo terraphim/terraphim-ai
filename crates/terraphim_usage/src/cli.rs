@@ -24,8 +24,8 @@ pub enum UsageAction {
     Show {
         #[arg(short, long)]
         provider: Option<String>,
-        #[arg(short, long, default_value = "text")]
-        format: String,
+        #[arg(long, default_value = "text", visible_alias = "fmt")]
+        output_format: String,
     },
     History {
         #[arg(long)]
@@ -40,12 +40,12 @@ pub enum UsageAction {
         model: Option<String>,
         #[arg(long, help = "Group results by model")]
         by_model: bool,
-        #[arg(short, long, default_value = "text")]
-        format: String,
+        #[arg(long, default_value = "text", visible_alias = "fmt")]
+        output_format: String,
     },
     Export {
-        #[arg(short, long, default_value = "json")]
-        format: String,
+        #[arg(long, default_value = "json", visible_alias = "fmt")]
+        output_format: String,
         #[arg(short, long)]
         output: Option<String>,
     },
@@ -58,8 +58,8 @@ pub enum UsageAction {
         threshold: u8,
     },
     Budgets {
-        #[arg(short, long, default_value = "text")]
-        format: String,
+        #[arg(long, default_value = "text", visible_alias = "fmt")]
+        output_format: String,
     },
 }
 
@@ -93,21 +93,44 @@ fn today_date() -> String {
 }
 
 fn now_timestamp() -> String {
-    Zoned::now().strftime("%Y-%m-%d %H:%M UTC").to_string()
+    let ts = jiff::Timestamp::now();
+    ts.strftime("%Y-%m-%d %H:%M UTC").to_string()
 }
 
 fn parse_period(period: &str) -> Option<i64> {
     let period = period.to_lowercase();
     if let Some(num) = period.strip_suffix('d') {
-        return num.parse().ok();
+        let days: i64 = num.parse().ok()?;
+        return if days > 0 && days <= 3650 {
+            Some(days)
+        } else {
+            None
+        };
     }
     if let Some(num) = period.strip_suffix('w') {
-        return num.parse::<i64>().ok().map(|n| n * 7);
+        let weeks: i64 = num.parse().ok()?;
+        let days = weeks * 7;
+        return if days > 0 && days <= 3650 {
+            Some(days)
+        } else {
+            None
+        };
     }
     if let Some(num) = period.strip_suffix('m') {
-        return num.parse::<i64>().ok().map(|n| n * 30);
+        let months: i64 = num.parse().ok()?;
+        let days = months * 30;
+        return if days > 0 && days <= 3650 {
+            Some(days)
+        } else {
+            None
+        };
     }
-    period.parse().ok()
+    let days: i64 = period.parse().ok()?;
+    if days > 0 && days <= 3650 {
+        Some(days)
+    } else {
+        None
+    }
 }
 
 struct ModelAggregation {
@@ -121,7 +144,10 @@ pub async fn execute_usage_action(
     registry: &UsageRegistry,
 ) -> Result<String, Box<dyn std::error::Error>> {
     match action {
-        UsageAction::Show { provider, format } => execute_show(provider, format, registry).await,
+        UsageAction::Show {
+            provider,
+            output_format,
+        } => execute_show(provider, output_format, registry).await,
         UsageAction::History {
             since,
             until,
@@ -129,15 +155,18 @@ pub async fn execute_usage_action(
             provider,
             model,
             by_model,
-            format,
-        } => execute_history(since, until, last, provider, model, by_model, format).await,
-        UsageAction::Export { format, output: _ } => execute_export(format).await,
+            output_format,
+        } => execute_history(since, until, last, provider, model, by_model, output_format).await,
+        UsageAction::Export {
+            output_format,
+            output: _,
+        } => execute_export(output_format).await,
         UsageAction::Alert {
             provider,
             budget,
             threshold,
         } => execute_alert(provider, budget, threshold).await,
-        UsageAction::Budgets { format } => execute_budgets(format).await,
+        UsageAction::Budgets { output_format } => execute_budgets(output_format).await,
     }
 }
 
@@ -378,11 +407,15 @@ fn format_by_model(
 }
 
 fn truncate(s: &str, max_len: usize) -> String {
-    if s.len() <= max_len {
-        s.to_string()
-    } else {
-        format!("{}...", &s[..max_len - 3])
+    if s.chars().count() <= max_len {
+        return s.to_string();
     }
+    let end: usize = s
+        .char_indices()
+        .nth(max_len.saturating_sub(3))
+        .map(|(i, _)| i)
+        .unwrap_or(s.len());
+    format!("{}...", &s[..end])
 }
 
 #[cfg(not(feature = "persistence"))]
@@ -453,6 +486,7 @@ async fn execute_alert(
 
         let executions = store.query_executions(&month_start, None, None).await?;
         let spent: f64 = executions.iter().map(|e| e.cost_usd()).sum();
+        let spent = if spent.abs() < 0.005 { 0.0 } else { spent };
         let pct = if budget_usd > 0.0 {
             (spent / budget_usd) * 100.0
         } else {
@@ -602,6 +636,9 @@ mod tests {
     #[test]
     fn test_parse_period_invalid() {
         assert_eq!(parse_period("abc"), None);
+        assert_eq!(parse_period("0"), None);
+        assert_eq!(parse_period("-5d"), None);
+        assert_eq!(parse_period("9999d"), None);
     }
 
     #[test]
@@ -643,5 +680,19 @@ mod tests {
             truncate("a_very_long_model_name_that_exceeds_limit", 20),
             "a_very_long_model..."
         );
+    }
+
+    #[test]
+    fn test_truncate_multibyte() {
+        let model = "openai/\u{1f525}-turbo";
+        let truncated = truncate(model, 10);
+        assert!(truncated.ends_with("..."));
+        assert!(truncated.len() <= 20);
+    }
+
+    #[test]
+    fn test_truncate_exact_boundary() {
+        assert_eq!(truncate("12345", 5), "12345");
+        assert_eq!(truncate("123456", 5), "12...");
     }
 }
