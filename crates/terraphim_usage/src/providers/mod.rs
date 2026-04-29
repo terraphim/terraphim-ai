@@ -1,4 +1,6 @@
 #[cfg(feature = "providers")]
+pub mod ccusage;
+#[cfg(feature = "providers")]
 pub mod claude;
 #[cfg(feature = "providers")]
 pub mod kimi;

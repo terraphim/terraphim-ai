@@ -1,6 +1,7 @@
 #[cfg(feature = "cli")]
 pub mod cli;
 pub mod formatter;
+pub mod pricing;
 #[cfg(feature = "providers")]
 pub mod providers;
 #[cfg(feature = "persistence")]

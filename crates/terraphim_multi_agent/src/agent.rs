@@ -313,6 +313,35 @@ impl TerraphimAgent {
         Ok(())
     }
 
+    pub async fn flush_usage(&self) {
+        let records = {
+            let mut tracker = self.token_tracker.write().await;
+            tracker.drain_records()
+        };
+
+        if records.is_empty() {
+            return;
+        }
+
+        let store = terraphim_usage::store::UsageStore::new();
+        let agent_name = self.role_config.name.to_string();
+        for record in records {
+            let llm_usage = terraphim_types::LlmUsage {
+                input_tokens: record.input_tokens,
+                output_tokens: record.output_tokens,
+                model: record.model.clone(),
+                provider: String::new(),
+                cost_usd: Some(record.cost_usd),
+                latency_ms: record.duration_ms,
+            };
+            let execution =
+                terraphim_usage::store::ExecutionRecord::from_llm_usage(&llm_usage, &agent_name);
+            if let Err(e) = store.save_execution(&execution).await {
+                tracing::warn!("Failed to persist usage record: {}", e);
+            }
+        }
+    }
+
     /// Process a command using Rig framework
     pub async fn process_command(&self, input: CommandInput) -> MultiAgentResult<CommandOutput> {
         {
@@ -1054,6 +1083,32 @@ impl TerraphimAgent {
 
         // Execute LLM call
         let response = self.llm_client.generate(final_request).await?;
+
+        // Record token usage in tracker
+        {
+            let cost_usd = {
+                let pricing = terraphim_usage::pricing::PricingTable::load_default_path();
+                pricing
+                    .calculate_cost(
+                        &response.model,
+                        response.usage.input_tokens,
+                        response.usage.output_tokens,
+                    )
+                    .unwrap_or(0.0)
+            };
+
+            let record = crate::tracking::TokenUsageRecord::new(
+                self.agent_id,
+                response.model.clone(),
+                response.usage.input_tokens,
+                response.usage.output_tokens,
+                cost_usd,
+                response.duration_ms,
+            );
+
+            let mut tracker = self.token_tracker.write().await;
+            tracker.record_usage(record);
+        }
 
         // Post-LLM hook
         let post_context = PostLlmContext {

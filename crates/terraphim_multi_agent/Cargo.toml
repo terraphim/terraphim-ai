@@ -47,6 +47,7 @@ terraphim_persistence = { path = "../terraphim_persistence" }
 terraphim_agent_evolution = { path = "../terraphim_agent_evolution" }
 terraphim_service = { path = "../terraphim_service" }
 terraphim_agent_registry = { path = "../terraphim_agent_registry" }
+terraphim_usage = { path = "../terraphim_usage" }
 
 # Firecracker VM dependencies (optional, feature-gated)
 # Note: fcctl-repl has its own workspace dependencies that may conflict
