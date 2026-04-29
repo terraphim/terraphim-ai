@@ -36,7 +36,16 @@ fn invalid_subcommand_exits_with_error_usage() {
 #[test]
 fn listen_mode_with_server_flag_exits_error_usage() {
     let output = Command::new("cargo")
-        .args(["run", "-p", "terraphim_agent", "--", "listen", "--server"])
+        .args([
+            "run",
+            "-p",
+            "terraphim_agent",
+            "--",
+            "listen",
+            "--identity",
+            "test",
+            "--server",
+        ])
         .output()
         .expect("Failed to execute listen mode with --server flag");
 
@@ -50,7 +59,8 @@ fn listen_mode_with_server_flag_exits_error_usage() {
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
         stderr.contains("listen mode does not support --server flag"),
-        "Should output appropriate error message"
+        "Should output appropriate error message. stderr was: {}",
+        stderr
     );
 }
 
