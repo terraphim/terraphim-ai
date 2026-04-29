@@ -452,18 +452,20 @@ impl AgentPool {
     pub async fn shutdown(&self) -> MultiAgentResult<()> {
         log::info!("Shutting down agent pool");
 
-        // Clear all agents
         {
             let mut available = self.available_agents.write().await;
-            available.clear();
+            for agent in available.drain(..) {
+                agent.agent.flush_usage().await;
+            }
         }
 
         {
             let mut busy = self.busy_agents.write().await;
-            busy.clear();
+            for (_id, agent) in busy.drain() {
+                agent.agent.flush_usage().await;
+            }
         }
 
-        // Update final stats
         {
             let mut stats = self.stats.write().await;
             stats.current_pool_size = 0;
