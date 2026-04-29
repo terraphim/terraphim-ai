@@ -25,6 +25,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **PR test guardian** agent template for test gate enforcement on PR open (Phase 2e) (Refs #954)
 - **Per-project PR dispatch** via `IncludeFragment` for scoped agent spawning (Refs #962)
 - **Spawner task-body fix** -- agents now spawned with TOML task body, not runtime task_string (Refs #1020)
+- **CorrectionEvent** public exports for structured correction telemetry (Refs #1054)
+- **Regression tests** for non-search command JSON output in robot mode
+- **PR security sentinel** test coverage for PR-open fan-out (Phase 2c) (Refs #953)
+- **PR test guardian** test coverage for PR-open fan-out (Phase 2e) (Refs #954)
+- **Dual-remote sync protocol** documentation and reconciliation procedures
+- **Phase 4 verification and Phase 5 validation** reports for ResponseMeta extension (Refs #1026)
 
 ### Fixed
 
@@ -40,6 +46,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Duplicate test functions** resolved after origin merge
 - **Robot search output contract** regression fixed (Refs #905)
 - **Spawner task-body** -- agents now receive proper TOML task body instead of runtime string (Refs #1020)
+- **`--server` flag** made global and listen mode integration test fixed (Refs #673)
+- **Clippy warnings** resolved and PR dispatch test helpers corrected
+- **Unused `LearningStore` import** removed from orchestrator
 
 ### Changed
 

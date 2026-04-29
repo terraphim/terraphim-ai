@@ -674,10 +674,10 @@ fn print_json_output<T: Serialize>(value: &T, mode: CommandOutputMode) -> Result
 )]
 struct Cli {
     /// Use server API mode instead of self-contained offline mode
-    #[arg(long, default_value_t = false)]
+    #[arg(long, default_value_t = false, global = true)]
     server: bool,
     /// Server URL for API mode
-    #[arg(long, default_value = "http://localhost:8000")]
+    #[arg(long, default_value = "http://localhost:8000", global = true)]
     server_url: String,
     /// Enable transparent background mode
     #[arg(long, default_value_t = false)]
