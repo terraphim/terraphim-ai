@@ -579,6 +579,19 @@ pub struct AgentDefinition {
     #[serde(default)]
     pub gitea_issue: Option<u64>,
 
+    /// True if this agent must NOT be dispatched from comment mentions.
+    /// Used for event-only agents like `build-runner` that are spawned only
+    /// by `handle_push` with `ADF_PUSH_*` context. When true:
+    ///   - `handle_webhook_dispatch::SpawnAgent` rejects any mention of this
+    ///     agent and logs an explicit rejection.
+    ///   - The post-exit OutputPoster hook skips publishing stdout/stderr to
+    ///     `gitea_issue` even if it is somehow set, because event-only agents
+    ///     post their verdict via a different channel (e.g. the Gitea Commit
+    ///     Status API).
+    /// Default `false` keeps existing LLM agents mention-dispatchable.
+    #[serde(default)]
+    pub event_only: bool,
+
     /// Project this agent belongs to. Must match a `Project.id` when any
     /// projects are defined. `None` means the agent is global / legacy
     /// single-project mode; mixing per-project and global agents is
@@ -2661,6 +2674,57 @@ repo_path = "/tmp/o"
         assert!(
             cfg.pr_dispatch_per_project.is_empty(),
             "orphan pr_dispatch (no projects) must not pollute the map"
+        );
+    }
+
+    #[test]
+    fn test_agent_definition_event_only_default_false() {
+        let toml_str = r#"
+working_dir = "/tmp/terraphim"
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 2 * * *"
+repo_path = "/tmp/repo"
+
+[[agents]]
+name = "llm-agent"
+layer = "Growth"
+cli_tool = "codex"
+task = "Do something"
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        assert_eq!(config.agents.len(), 1);
+        assert!(
+            !config.agents[0].event_only,
+            "event_only must default to false when not specified in TOML"
+        );
+    }
+
+    #[test]
+    fn test_agent_definition_event_only_true_round_trip() {
+        let toml_str = r#"
+working_dir = "/tmp/terraphim"
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 2 * * *"
+repo_path = "/tmp/repo"
+
+[[agents]]
+name = "build-runner"
+layer = "Core"
+cli_tool = "/bin/bash"
+event_only = true
+task = "build"
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        assert_eq!(config.agents.len(), 1);
+        assert!(
+            config.agents[0].event_only,
+            "event_only must survive TOML round-trip when set to true"
         );
     }
 }

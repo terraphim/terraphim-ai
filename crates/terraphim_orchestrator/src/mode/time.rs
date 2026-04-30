@@ -189,6 +189,7 @@ mod tests {
             pre_check: None,
 
             gitea_issue: None,
+            event_only: false,
 
             project: None,
         }

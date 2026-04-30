@@ -6664,6 +6664,7 @@ mod tests {
                     pre_check: None,
 
                     gitea_issue: None,
+                    event_only: false,
 
                     project: None,
                 },
@@ -6689,6 +6690,7 @@ mod tests {
                     pre_check: None,
 
                     gitea_issue: None,
+                    event_only: false,
 
                     project: None,
                 },
@@ -6924,6 +6926,7 @@ task = "test"
                 pre_check: None,
 
                 gitea_issue: None,
+                event_only: false,
 
                 project: None,
             }],
@@ -7037,6 +7040,7 @@ task = "test"
             pre_check: None,
 
             gitea_issue: None,
+            event_only: false,
 
             project: None,
         }];
@@ -7241,6 +7245,7 @@ task = "test"
             pre_check: None,
 
             gitea_issue: None,
+            event_only: false,
 
             project: None,
         }];
@@ -7328,6 +7333,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             pre_check: None,
 
             gitea_issue: None,
+            event_only: false,
 
             project: None,
         }];
@@ -7494,6 +7500,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             max_cpu_seconds: Some(1), // 1 second timeout
             pre_check: None,
             gitea_issue: None,
+            event_only: false,
             project: None,
         }];
         let mut orch = AgentOrchestrator::new(config).unwrap();
@@ -7660,6 +7667,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             max_cpu_seconds: None,
             pre_check: None,
             gitea_issue: None,
+            event_only: false,
             project: None,
         }];
 
@@ -7753,6 +7761,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
                 max_cpu_seconds: None,
                 pre_check: None,
                 gitea_issue: None,
+                event_only: false,
                 project: Some("alpha".to_string()),
             }],
             restart_cooldown_secs: 0,
@@ -8043,6 +8052,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             max_cpu_seconds: None,
             pre_check: None,
             gitea_issue: None,
+            event_only: false,
             project: Some("alpha".to_string()),
         });
         config.pr_dispatch_per_project.insert(
@@ -8412,6 +8422,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             max_cpu_seconds: None,
             pre_check: None,
             gitea_issue: None,
+            event_only: false,
             project: Some("alpha".to_string()),
         });
         // The per-project block takes precedence over the top-level block,
@@ -8752,6 +8763,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             max_cpu_seconds: None,
             pre_check: None,
             gitea_issue: None,
+            event_only: false,
             project: Some("alpha".to_string()),
         });
         // The per-project block takes precedence over the top-level block,
@@ -9044,6 +9056,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             max_cpu_seconds: None,
             pre_check: None,
             gitea_issue: None,
+            event_only: false,
             project: Some("alpha".to_string()),
         });
         config.pr_dispatch = Some(crate::config::PrDispatchConfig {
@@ -9323,6 +9336,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             max_cpu_seconds: None,
             pre_check: None,
             gitea_issue: None,
+            event_only: false,
             project: Some("alpha".to_string()),
         });
         // The per-project block takes precedence over the top-level block,
