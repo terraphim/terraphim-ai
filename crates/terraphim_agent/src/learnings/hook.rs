@@ -20,7 +20,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::learnings::redaction::contains_secrets;
@@ -102,12 +102,23 @@ pub async fn process_hook_input_with_type(
             process_pre_tool_use(&buffer);
         }
         LearnHookType::PostToolUse => {
-            // Parse JSON and capture failures (existing behavior)
+            // Parse JSON and capture failures or buffer successes.
             match HookInput::from_json(&buffer) {
                 Ok(input) => {
                     if input.should_capture() {
                         if let Err(e) = capture_from_hook(&input) {
                             log::debug!("Hook capture failed: {}", e);
+                        }
+                    } else if input.should_capture_success() {
+                        if let Some(command) = input.command() {
+                            let config = LearningCaptureConfig::default();
+                            let session_id = std::env::var("CLAUDE_SESSION_ID")
+                                .or_else(|_| std::env::var("TERM_SESSION_ID"))
+                                .unwrap_or_else(|_| "default".to_string());
+                            let buf =
+                                SessionCommandBuffer::new(&session_id, &config.storage_location());
+                            buf.append(command, &input.tool_result.stdout);
+                            log::debug!("Buffered successful command for session '{}'", session_id);
                         }
                     }
                 }
@@ -372,7 +383,7 @@ impl HookInput {
         serde_json::from_str(json)
     }
 
-    /// Check if this input should be captured as a learning.
+    /// Check if this input should be captured as a failure learning.
     ///
     /// Returns true if:
     /// - The tool is "Bash" (command execution)
@@ -383,6 +394,19 @@ impl HookInput {
     /// true if the failed command should be captured, false otherwise.
     pub fn should_capture(&self) -> bool {
         self.tool_name == "Bash" && self.tool_result.exit_code != 0
+    }
+
+    /// Check if this successful command should be buffered for procedure learning.
+    ///
+    /// Returns true if:
+    /// - The tool is "Bash" (command execution)
+    /// - The exit code is zero (success)
+    ///
+    /// Successful commands are accumulated in a [`SessionCommandBuffer`] so that
+    /// a procedure can be extracted from them later (e.g., via
+    /// `learn procedure from-session`).
+    pub fn should_capture_success(&self) -> bool {
+        self.tool_name == "Bash" && self.tool_result.exit_code == 0
     }
 
     /// Get combined error output (stdout + stderr).
@@ -414,6 +438,76 @@ impl HookInput {
     /// Some(&str) if a command is present, None otherwise.
     pub fn command(&self) -> Option<&str> {
         self.tool_input.command.as_deref()
+    }
+}
+
+/// A single successful command entry persisted for procedure extraction.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SuccessEntry {
+    /// The command that succeeded.
+    pub command: String,
+    /// Standard output captured from the successful run.
+    pub stdout: String,
+}
+
+/// File-backed buffer that accumulates successful Bash commands within a session.
+///
+/// Each session writes to a JSONL file keyed by `session_id`. The accumulated
+/// entries can be replayed later to create a procedure via
+/// `terraphim-agent learn procedure from-session`.
+///
+/// The buffer is append-only and fail-open: write errors are logged but never
+/// propagate to the hook caller.
+pub struct SessionCommandBuffer {
+    path: PathBuf,
+}
+
+#[allow(dead_code)]
+impl SessionCommandBuffer {
+    /// Create a buffer rooted in `storage_dir` for the given `session_id`.
+    pub fn new(session_id: &str, storage_dir: &std::path::Path) -> Self {
+        let path = storage_dir.join(format!("session-success-{session_id}.jsonl"));
+        Self { path }
+    }
+
+    /// Append a successful command to the buffer.
+    ///
+    /// Creates the file on first write. Appends a single JSONL line.
+    /// Errors are silently dropped (fail-open).
+    pub fn append(&self, command: &str, stdout: &str) {
+        let entry = SuccessEntry {
+            command: command.to_string(),
+            stdout: stdout.to_string(),
+        };
+        if let Ok(line) = serde_json::to_string(&entry) {
+            use std::io::Write;
+            if let Ok(mut f) = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(&self.path)
+            {
+                let _ = writeln!(f, "{}", line);
+            }
+        }
+    }
+
+    /// Read all buffered entries.
+    ///
+    /// Returns an empty vec if the file does not exist or cannot be read.
+    pub fn read(&self) -> Vec<SuccessEntry> {
+        let content = match std::fs::read_to_string(&self.path) {
+            Ok(c) => c,
+            Err(_) => return Vec::new(),
+        };
+        content
+            .lines()
+            .filter_map(|line| serde_json::from_str(line).ok())
+            .collect()
+    }
+
+    /// Path to the underlying JSONL file.
+    pub fn path(&self) -> &PathBuf {
+        &self.path
     }
 }
 
@@ -468,7 +562,67 @@ mod tests {
                 stderr: String::new(),
             },
         };
+        // Successful commands are NOT failure-captured but ARE success-captured.
         assert!(!input.should_capture());
+        assert!(input.should_capture_success());
+    }
+
+    #[test]
+    fn test_should_capture_success_only_for_bash_exit_zero() {
+        // Non-Bash tool with exit 0 should NOT be success-captured.
+        let non_bash = HookInput {
+            tool_name: "Edit".to_string(),
+            tool_input: ToolInput {
+                command: None,
+                extra: HashMap::new(),
+            },
+            tool_result: ToolResult {
+                exit_code: 0,
+                stdout: String::new(),
+                stderr: String::new(),
+            },
+        };
+        assert!(!non_bash.should_capture_success());
+
+        // Bash with non-zero exit code is a failure, not a success.
+        let bash_fail = HookInput {
+            tool_name: "Bash".to_string(),
+            tool_input: ToolInput {
+                command: Some("false".to_string()),
+                extra: HashMap::new(),
+            },
+            tool_result: ToolResult {
+                exit_code: 1,
+                stdout: String::new(),
+                stderr: String::new(),
+            },
+        };
+        assert!(!bash_fail.should_capture_success());
+    }
+
+    #[test]
+    fn test_session_command_buffer_append_and_read() {
+        let dir = tempfile::tempdir().unwrap();
+        let storage = dir.path().to_path_buf();
+        let buf = SessionCommandBuffer::new("test-session", &storage);
+
+        buf.append("cargo build", "Compiling...");
+        buf.append("cargo test", "test result: ok");
+
+        let entries = buf.read();
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].command, "cargo build");
+        assert_eq!(entries[0].stdout, "Compiling...");
+        assert_eq!(entries[1].command, "cargo test");
+        assert_eq!(entries[1].stdout, "test result: ok");
+    }
+
+    #[test]
+    fn test_session_command_buffer_empty_on_missing_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let storage = dir.path().to_path_buf();
+        let buf = SessionCommandBuffer::new("nonexistent-session", &storage);
+        assert!(buf.read().is_empty());
     }
 
     #[test]
