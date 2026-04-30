@@ -3412,6 +3412,18 @@ impl AgentOrchestrator {
                             comment_id = comment.id,
                             "dispatching qualified mention-driven agent"
                         );
+                        // Event-only agents (e.g. build-runner) must not be dispatched
+                        // from comment mentions. Reject before any spawn-related work.
+                        if def.event_only {
+                            info!(
+                                agent = %token.agent,
+                                issue = comment.issue_number,
+                                comment_id = comment.id,
+                                "poll mention dispatch rejected: agent is event-only (push/event-driven), not mention-dispatchable"
+                            );
+                            cursor.dispatches_this_tick += 1;
+                            continue;
+                        }
                         if self
                             .should_skip_dispatch(&token.agent, comment.issue_number)
                             .await
@@ -3562,6 +3574,18 @@ impl AgentOrchestrator {
                         if let Some(def) =
                             mention::resolve_mention(None, project_id, &agent_name, &agents)
                         {
+                            // Event-only agents (e.g. build-runner) must not be dispatched
+                            // from comment mentions. Reject before any spawn-related work.
+                            if def.event_only {
+                                info!(
+                                    agent = %agent_name,
+                                    issue = issue_number,
+                                    comment_id = comment_id,
+                                    "poll mention dispatch rejected: agent is event-only (push/event-driven), not mention-dispatchable"
+                                );
+                                cursor.dispatches_this_tick += 1;
+                                continue;
+                            }
                             if self.should_skip_dispatch(&agent_name, issue_number).await {
                                 cursor.dispatches_this_tick += 1;
                                 continue;
@@ -3665,6 +3689,18 @@ impl AgentOrchestrator {
 
                             if let Some(def) = agents.iter().find(|a| a.name == agent_name).cloned()
                             {
+                                // Event-only agents (e.g. build-runner) must not be dispatched
+                                // from persona mentions. Reject before any spawn-related work.
+                                if def.event_only {
+                                    info!(
+                                        persona = %persona_name,
+                                        agent = %agent_name,
+                                        issue = issue_number,
+                                        "poll mention dispatch rejected: persona-resolved agent is event-only (push/event-driven), not mention-dispatchable"
+                                    );
+                                    cursor.dispatches_this_tick += 1;
+                                    continue;
+                                }
                                 // Dedup: check Gitea assignment + active_agents before spawning
                                 if self.should_skip_dispatch(&agent_name, issue_number).await {
                                     cursor.dispatches_this_tick += 1;
