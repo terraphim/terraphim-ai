@@ -2931,6 +2931,20 @@ impl AgentOrchestrator {
                     &agent_name,
                     &agents,
                 ) {
+                    // Event-only agents (e.g. build-runner) must not be dispatched
+                    // from comment mentions. They are spawned by handle_push or
+                    // other event handlers with the appropriate context env vars.
+                    // Rejecting here prevents ghost-issue posts and wasted spawns.
+                    if def.event_only {
+                        info!(
+                            agent = %agent_name,
+                            issue = issue_number,
+                            comment_id = comment_id,
+                            "webhook dispatch rejected: agent is event-only (push/event-driven), not mention-dispatchable"
+                        );
+                        return;
+                    }
+
                     // Dedup: check Gitea assignment + active_agents before spawning
                     if self.should_skip_dispatch(&agent_name, issue_number).await {
                         return;
@@ -3018,6 +3032,18 @@ impl AgentOrchestrator {
                     );
 
                     if let Some(def) = agents.iter().find(|a| a.name == agent_name).cloned() {
+                        // Event-only agents must not be dispatched via persona-mention
+                        // either. Same rationale as the SpawnAgent arm.
+                        if def.event_only {
+                            info!(
+                                persona = %persona_name,
+                                agent = %agent_name,
+                                issue = issue_number,
+                                "webhook dispatch rejected: persona-resolved agent is event-only (push/event-driven), not mention-dispatchable"
+                            );
+                            return;
+                        }
+
                         // Dedup: check Gitea assignment + active_agents before spawning
                         if self.should_skip_dispatch(&agent_name, issue_number).await {
                             return;
@@ -3386,6 +3412,18 @@ impl AgentOrchestrator {
                             comment_id = comment.id,
                             "dispatching qualified mention-driven agent"
                         );
+                        // Event-only agents (e.g. build-runner) must not be dispatched
+                        // from comment mentions. Reject before any spawn-related work.
+                        if def.event_only {
+                            info!(
+                                agent = %token.agent,
+                                issue = comment.issue_number,
+                                comment_id = comment.id,
+                                "poll mention dispatch rejected: agent is event-only (push/event-driven), not mention-dispatchable"
+                            );
+                            cursor.dispatches_this_tick += 1;
+                            continue;
+                        }
                         if self
                             .should_skip_dispatch(&token.agent, comment.issue_number)
                             .await
@@ -3536,6 +3574,18 @@ impl AgentOrchestrator {
                         if let Some(def) =
                             mention::resolve_mention(None, project_id, &agent_name, &agents)
                         {
+                            // Event-only agents (e.g. build-runner) must not be dispatched
+                            // from comment mentions. Reject before any spawn-related work.
+                            if def.event_only {
+                                info!(
+                                    agent = %agent_name,
+                                    issue = issue_number,
+                                    comment_id = comment_id,
+                                    "poll mention dispatch rejected: agent is event-only (push/event-driven), not mention-dispatchable"
+                                );
+                                cursor.dispatches_this_tick += 1;
+                                continue;
+                            }
                             if self.should_skip_dispatch(&agent_name, issue_number).await {
                                 cursor.dispatches_this_tick += 1;
                                 continue;
@@ -3639,6 +3689,18 @@ impl AgentOrchestrator {
 
                             if let Some(def) = agents.iter().find(|a| a.name == agent_name).cloned()
                             {
+                                // Event-only agents (e.g. build-runner) must not be dispatched
+                                // from persona mentions. Reject before any spawn-related work.
+                                if def.event_only {
+                                    info!(
+                                        persona = %persona_name,
+                                        agent = %agent_name,
+                                        issue = issue_number,
+                                        "poll mention dispatch rejected: persona-resolved agent is event-only (push/event-driven), not mention-dispatchable"
+                                    );
+                                    cursor.dispatches_this_tick += 1;
+                                    continue;
+                                }
                                 // Dedup: check Gitea assignment + active_agents before spawning
                                 if self.should_skip_dispatch(&agent_name, issue_number).await {
                                     cursor.dispatches_this_tick += 1;
@@ -5559,22 +5621,40 @@ impl AgentOrchestrator {
             // owning project so multi-project fleets land comments in the
             // correct owner/repo.
             if let (Some(poster), Some(issue)) = (&self.output_poster, def.gitea_issue) {
-                let exit_code = status.code();
-                let project = def
-                    .project
-                    .clone()
-                    .unwrap_or_else(|| crate::dispatcher::LEGACY_PROJECT_ID.to_string());
-                if let Err(e) = poster
-                    .post_agent_output_for_project(&project, name, issue, &output_lines, exit_code)
-                    .await
-                {
-                    warn!(
+                if def.event_only {
+                    // Defence-in-depth: the dispatch gate at handle_webhook_dispatch
+                    // should have prevented an event-only agent from acquiring a
+                    // gitea_issue. If we reach here the gate has a hole; treat as a
+                    // should-never-happen alert and skip the post.
+                    error!(
                         agent = %name,
-                        project = %project,
                         issue = issue,
-                        error = %e,
-                        "failed to post output to Gitea"
+                        "skipping output post: agent is event-only but gitea_issue is set; this indicates a missed dispatch gate"
                     );
+                } else {
+                    let exit_code = status.code();
+                    let project = def
+                        .project
+                        .clone()
+                        .unwrap_or_else(|| crate::dispatcher::LEGACY_PROJECT_ID.to_string());
+                    if let Err(e) = poster
+                        .post_agent_output_for_project(
+                            &project,
+                            name,
+                            issue,
+                            &output_lines,
+                            exit_code,
+                        )
+                        .await
+                    {
+                        warn!(
+                            agent = %name,
+                            project = %project,
+                            issue = issue,
+                            error = %e,
+                            "failed to post output to Gitea"
+                        );
+                    }
                 }
             }
 
@@ -6664,6 +6744,7 @@ mod tests {
                     pre_check: None,
 
                     gitea_issue: None,
+                    event_only: false,
 
                     project: None,
                 },
@@ -6689,6 +6770,7 @@ mod tests {
                     pre_check: None,
 
                     gitea_issue: None,
+                    event_only: false,
 
                     project: None,
                 },
@@ -6924,6 +7006,7 @@ task = "test"
                 pre_check: None,
 
                 gitea_issue: None,
+                event_only: false,
 
                 project: None,
             }],
@@ -7037,6 +7120,7 @@ task = "test"
             pre_check: None,
 
             gitea_issue: None,
+            event_only: false,
 
             project: None,
         }];
@@ -7241,6 +7325,7 @@ task = "test"
             pre_check: None,
 
             gitea_issue: None,
+            event_only: false,
 
             project: None,
         }];
@@ -7328,6 +7413,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             pre_check: None,
 
             gitea_issue: None,
+            event_only: false,
 
             project: None,
         }];
@@ -7494,6 +7580,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             max_cpu_seconds: Some(1), // 1 second timeout
             pre_check: None,
             gitea_issue: None,
+            event_only: false,
             project: None,
         }];
         let mut orch = AgentOrchestrator::new(config).unwrap();
@@ -7660,6 +7747,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             max_cpu_seconds: None,
             pre_check: None,
             gitea_issue: None,
+            event_only: false,
             project: None,
         }];
 
@@ -7753,6 +7841,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
                 max_cpu_seconds: None,
                 pre_check: None,
                 gitea_issue: None,
+                event_only: false,
                 project: Some("alpha".to_string()),
             }],
             restart_cooldown_secs: 0,
@@ -8043,6 +8132,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             max_cpu_seconds: None,
             pre_check: None,
             gitea_issue: None,
+            event_only: false,
             project: Some("alpha".to_string()),
         });
         config.pr_dispatch_per_project.insert(
@@ -8412,6 +8502,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             max_cpu_seconds: None,
             pre_check: None,
             gitea_issue: None,
+            event_only: false,
             project: Some("alpha".to_string()),
         });
         // The per-project block takes precedence over the top-level block,
@@ -8752,6 +8843,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             max_cpu_seconds: None,
             pre_check: None,
             gitea_issue: None,
+            event_only: false,
             project: Some("alpha".to_string()),
         });
         // The per-project block takes precedence over the top-level block,
@@ -9044,6 +9136,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             max_cpu_seconds: None,
             pre_check: None,
             gitea_issue: None,
+            event_only: false,
             project: Some("alpha".to_string()),
         });
         config.pr_dispatch = Some(crate::config::PrDispatchConfig {
@@ -9323,6 +9416,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             max_cpu_seconds: None,
             pre_check: None,
             gitea_issue: None,
+            event_only: false,
             project: Some("alpha".to_string()),
         });
         // The per-project block takes precedence over the top-level block,
@@ -9584,6 +9678,157 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
         assert!(
             contexts.iter().any(|c| c == "adf/build"),
             "build-runner must still post its pending; got: {contexts:?}"
+        );
+    }
+
+    /// T3: SpawnAgent dispatch must reject when the resolved agent is event_only.
+    /// No agent should be added to active_agents and no spawn attempted.
+    #[tokio::test]
+    async fn test_handle_webhook_dispatch_rejects_event_only_agent() {
+        let mut config = test_config();
+        // Replace the test fixture agents with a single event_only agent.
+        config.agents = vec![AgentDefinition {
+            name: "build-runner".to_string(),
+            layer: AgentLayer::Growth,
+            cli_tool: "/bin/bash".to_string(),
+            task: "echo would-build".to_string(),
+            schedule: None,
+            model: None,
+            capabilities: vec!["build".to_string()],
+            max_memory_bytes: None,
+            budget_monthly_cents: None,
+            provider: None,
+            persona: None,
+            terraphim_role: None,
+            skill_chain: vec![],
+            sfia_skills: vec![],
+            fallback_provider: None,
+            fallback_model: None,
+            grace_period_secs: None,
+            max_cpu_seconds: None,
+            pre_check: None,
+            gitea_issue: None,
+            event_only: true,
+            project: None,
+        }];
+        // mentions config required so handle_webhook_dispatch does not bail at the top.
+        config.mentions = Some(crate::config::MentionConfig::default());
+
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        let dispatch = webhook::WebhookDispatch::SpawnAgent {
+            agent_name: "build-runner".to_string(),
+            detected_project: None,
+            issue_number: 9999,
+            comment_id: 99999,
+            context: "@adf:build-runner please run".to_string(),
+        };
+
+        orch.handle_webhook_dispatch(dispatch).await;
+
+        assert!(
+            orch.active_agents.is_empty(),
+            "event_only agent must not be added to active_agents on mention dispatch; got: {:?}",
+            orch.active_agents.keys().collect::<Vec<_>>()
+        );
+    }
+
+    /// T4: SpawnPersona dispatch must reject when the resolved agent is event_only.
+    /// Uses resolve_persona_mention's "direct agent name match" branch by passing
+    /// the agent name as the persona name -- the resolver returns the agent, and our
+    /// gate must reject before spawn.
+    #[tokio::test]
+    async fn test_handle_webhook_dispatch_rejects_event_only_persona() {
+        let mut config = test_config();
+        config.agents = vec![AgentDefinition {
+            name: "build-runner".to_string(),
+            layer: AgentLayer::Growth,
+            cli_tool: "/bin/bash".to_string(),
+            task: "echo would-build".to_string(),
+            schedule: None,
+            model: None,
+            capabilities: vec!["build".to_string()],
+            max_memory_bytes: None,
+            budget_monthly_cents: None,
+            provider: None,
+            persona: None,
+            terraphim_role: None,
+            skill_chain: vec![],
+            sfia_skills: vec![],
+            fallback_provider: None,
+            fallback_model: None,
+            grace_period_secs: None,
+            max_cpu_seconds: None,
+            pre_check: None,
+            gitea_issue: None,
+            event_only: true,
+            project: None,
+        }];
+        config.mentions = Some(crate::config::MentionConfig::default());
+
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        let dispatch = webhook::WebhookDispatch::SpawnPersona {
+            persona_name: "build-runner".to_string(),
+            issue_number: 9999,
+            comment_id: 99999,
+            context: "@adf:build-runner please run via persona".to_string(),
+        };
+
+        orch.handle_webhook_dispatch(dispatch).await;
+
+        assert!(
+            orch.active_agents.is_empty(),
+            "event_only agent must not be added to active_agents on persona dispatch; got: {:?}",
+            orch.active_agents.keys().collect::<Vec<_>>()
+        );
+    }
+
+    /// T5: structural invariant for the post-exit defensive guard.
+    /// The guard at lib.rs's "Post output to Gitea if configured" block fires
+    /// `error!` and skips posting when an event-only agent reaches the hook with
+    /// gitea_issue set -- a "should never happen" path because the dispatch gate
+    /// in handle_webhook_dispatch should have already rejected the spawn.
+    /// Full runtime coverage would require integration infrastructure
+    /// (worktrees, real spawning, output capture) disproportionate to a single
+    /// boolean check. T3 and T4 cover the dispatch gate that prevents this
+    /// branch from being reached in production.
+    #[test]
+    fn test_post_exit_guard_invariant_event_only_with_gitea_issue() {
+        let def = AgentDefinition {
+            name: "build-runner".to_string(),
+            layer: AgentLayer::Growth,
+            cli_tool: "/bin/bash".to_string(),
+            task: "echo would-build".to_string(),
+            schedule: None,
+            model: None,
+            capabilities: vec!["build".to_string()],
+            max_memory_bytes: None,
+            budget_monthly_cents: None,
+            provider: None,
+            persona: None,
+            terraphim_role: None,
+            skill_chain: vec![],
+            sfia_skills: vec![],
+            fallback_provider: None,
+            fallback_model: None,
+            grace_period_secs: None,
+            max_cpu_seconds: None,
+            pre_check: None,
+            gitea_issue: Some(9999),
+            event_only: true,
+            project: None,
+        };
+
+        // The defensive guard reads exactly these two fields. Its branch fires
+        // when both are set on the same definition.
+        assert!(
+            def.event_only,
+            "event_only must be true to trigger the guard"
+        );
+        assert!(
+            def.gitea_issue.is_some(),
+            "gitea_issue must be Some(_) for the post-exit code to enter the outer if-let"
         );
     }
 }

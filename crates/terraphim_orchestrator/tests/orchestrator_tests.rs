@@ -80,6 +80,7 @@ fn test_config() -> OrchestratorConfig {
                 pre_check: None,
 
                 gitea_issue: None,
+                event_only: false,
 
                 project: None,
             },
@@ -105,6 +106,7 @@ fn test_config() -> OrchestratorConfig {
                 pre_check: None,
 
                 gitea_issue: None,
+                event_only: false,
 
                 project: None,
             },
@@ -130,6 +132,7 @@ fn test_config() -> OrchestratorConfig {
                 pre_check: None,
 
                 gitea_issue: None,
+                event_only: false,
 
                 project: None,
             },
