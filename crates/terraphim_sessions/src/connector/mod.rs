@@ -121,9 +121,21 @@ pub trait SessionConnector: Send + Sync {
         false
     }
 
-    /// Start watching for new sessions in real-time
+    /// Start watching for new sessions in real-time.
     ///
-    /// Returns a receiver that emits sessions as they are detected.
+    /// Returns a receiver channel that emits sessions as they are detected.
+    ///
+    /// **Dedup contract**: implementations MUST deduplicate rapid file-system
+    /// events to avoid emitting the same session repeatedly on every `Modify`
+    /// notification (which occurs on each line flush with inotify/FSEvents).
+    /// The canonical strategy is to track `(path → messages.len)` and only
+    /// emit when `messages.len` has grown AND a short debounce window (≈250 ms)
+    /// has elapsed since the last emission for that path. Alternative: track
+    /// byte offset per path and parse only newly appended bytes.
+    ///
+    /// Callers may still see at most one emission per quiescent write period
+    /// rather than a single emission across N appends, which is acceptable.
+    ///
     /// Default implementation returns an error if not supported.
     async fn watch(&self) -> Result<mpsc::Receiver<Session>> {
         anyhow::bail!("Watch not supported for this connector")

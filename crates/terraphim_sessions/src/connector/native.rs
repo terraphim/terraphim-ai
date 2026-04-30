@@ -227,12 +227,12 @@ impl SessionConnector for NativeClaudeConnector {
                                                         emit
                                                     };
 
-                                                    if should_emit {
-                                                        if tx.send(session).await.is_err() {
-                                                            tracing::warn!(
-                                                                "Failed to send session from watch"
-                                                            );
-                                                        }
+                                                    if should_emit
+                                                        && tx.send(session).await.is_err()
+                                                    {
+                                                        tracing::warn!(
+                                                            "Failed to send session from watch"
+                                                        );
                                                     }
                                                 }
                                                 Ok(None) => {}
