@@ -5602,7 +5602,13 @@ impl AgentOrchestrator {
                         .clone()
                         .unwrap_or_else(|| crate::dispatcher::LEGACY_PROJECT_ID.to_string());
                     if let Err(e) = poster
-                        .post_agent_output_for_project(&project, name, issue, &output_lines, exit_code)
+                        .post_agent_output_for_project(
+                            &project,
+                            name,
+                            issue,
+                            &output_lines,
+                            exit_code,
+                        )
                         .await
                     {
                         warn!(
@@ -9780,7 +9786,10 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
 
         // The defensive guard reads exactly these two fields. Its branch fires
         // when both are set on the same definition.
-        assert!(def.event_only, "event_only must be true to trigger the guard");
+        assert!(
+            def.event_only,
+            "event_only must be true to trigger the guard"
+        );
         assert!(
             def.gitea_issue.is_some(),
             "gitea_issue must be Some(_) for the post-exit code to enter the outer if-let"
