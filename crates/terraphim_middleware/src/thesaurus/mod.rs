@@ -39,6 +39,8 @@ use terraphim_rolegraph::DEFAULT_TRIGGER_THRESHOLD;
 use crate::Result;
 use std::path::PathBuf;
 
+/// Builds or refreshes the thesaurus for the role identified in `search_query`,
+/// indexing all configured haystacks and persisting the result.
 pub async fn build_thesaurus_from_haystack(
     config_state: &mut ConfigState,
     search_query: &SearchQuery,

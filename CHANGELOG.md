@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Trigger index and success capture** wired in agent and middleware (Refs #1066)
 - **Session debouncing** for `SessionConnector::watch()` to eliminate duplicate emissions (Refs #815)
 - **LLM pre/post hooks** wired in agent command handlers for multi-agent coordination (Refs #451)
 - **Self-Documentation API** exposed via robot CLI subcommand (Refs #1011)
@@ -28,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **ThesaurusResponse** aligned with server API contract -- `thesaurus` field is now `Option<HashMap<String,String>>` matching actual server response shape (Fixes #1092)
 - **RUSTSEC-2026-0049** eliminated by switching serenity to native-tls (Refs #418)
 - **Spec gaps** addressed and resolved across ADF orchestrator templates (Refs #1040)
 - **Global concurrency limits** enforced in orchestrator to prevent task/memory exhaustion (Refs #664)

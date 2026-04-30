@@ -34,6 +34,7 @@ pub use indexer::{search_haystacks, RipgrepIndexer};
 // #[cfg(test)]
 // mod tests; // Removed - no tests module
 
+/// Errors that can occur in the middleware layer.
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("Serde deserialization error: {0}")]
@@ -64,4 +65,5 @@ pub enum Error {
     Validation(String),
 }
 
+/// Convenience alias for `Result<T, middleware::Error>`.
 pub type Result<T> = std::result::Result<T, Error>;
