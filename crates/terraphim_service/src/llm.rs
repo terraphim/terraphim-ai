@@ -17,22 +17,33 @@ mod router_config;
 
 use crate::Result as ServiceResult;
 
+/// Options controlling the length of generated summaries.
 #[derive(Clone, Debug)]
 pub struct SummarizeOptions {
+    /// Maximum character length of the generated summary.
     pub max_length: usize,
 }
 
+/// Options for chat-completion requests.
 #[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub struct ChatOptions {
+    /// Maximum number of tokens in the model response.
     pub max_tokens: Option<u32>,
+    /// Sampling temperature (0.0 = deterministic, 1.0 = creative).
     pub temperature: Option<f32>,
 }
 
+/// Trait implemented by all LLM provider backends (Ollama, OpenRouter, proxy).
+///
+/// Implementors must be `Send + Sync` so they can be held behind an `Arc`
+/// and shared across async tasks.
 #[async_trait::async_trait]
 pub trait LlmClient: Send + Sync {
+    /// Short identifier for this provider, e.g. `"ollama"` or `"openrouter"`.
     fn name(&self) -> &'static str;
 
+    /// Summarise `content` to at most `opts.max_length` characters.
     async fn summarize(&self, content: &str, opts: SummarizeOptions) -> ServiceResult<String>;
 
     /// List available models for this provider (best-effort)

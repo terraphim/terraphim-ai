@@ -81,24 +81,31 @@ fn normalize_filename_to_id(filename: &str) -> String {
     re.replace_all(filename, "").to_lowercase()
 }
 
+/// Top-level error type for the Terraphim service layer.
 #[derive(thiserror::Error, Debug)]
 pub enum ServiceError {
+    /// Haystack indexing or search failed in the middleware layer.
     #[error("Middleware error: {0}")]
     Middleware(#[from] terraphim_middleware::Error),
 
+    /// OpenDAL storage operator returned an error.
     #[error("OpenDal error: {0}")]
     OpenDal(Box<opendal::Error>),
 
+    /// Persistence layer (DeviceStorage) returned an error.
     #[error("Persistence error: {0}")]
     Persistence(#[from] terraphim_persistence::Error),
 
+    /// Configuration is missing or malformed.
     #[error("Config error: {0}")]
     Config(String),
 
+    /// OpenRouter API returned an error (requires `openrouter` feature).
     #[cfg(feature = "openrouter")]
     #[error("OpenRouter error: {0}")]
     OpenRouter(#[from] crate::openrouter::OpenRouterError),
 
+    /// Propagated from the common error type.
     #[error("Common error: {0}")]
     Common(#[from] crate::error::CommonError),
 }
@@ -136,6 +143,7 @@ impl crate::error::TerraphimError for ServiceError {
     }
 }
 
+/// Convenience alias -- `Result<T>` in this crate wraps [`ServiceError`].
 pub type Result<T> = std::result::Result<T, ServiceError>;
 
 pub struct TerraphimService {
@@ -595,7 +603,7 @@ impl TerraphimService {
     /// Preprocess document content to create clickable KG links when terraphim_it is enabled
     ///
     /// This function replaces KG terms in the document body with markdown links
-    /// in the format [term](kg:term) which can be intercepted by the frontend
+    /// in the format `[term](kg:term)` which can be intercepted by the frontend
     /// to display KG documents when clicked.
     pub async fn preprocess_document_content(
         &mut self,
