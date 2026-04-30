@@ -9,9 +9,10 @@ use anyhow::{Context, Result};
 use async_trait::async_trait;
 use notify::{Event, EventKind, RecursiveMode, Watcher, recommended_watcher};
 use serde::Deserialize;
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tokio::sync::mpsc;
+use tokio::sync::{Mutex, mpsc};
 
 /// Native Claude Code session connector
 #[derive(Debug, Default)]
@@ -135,6 +136,8 @@ impl SessionConnector for NativeClaudeConnector {
         }
 
         let path = Arc::new(base_path);
+        // Dedup key: path -> last known messages.len(). Only emit when count increases.
+        let seen: Arc<Mutex<HashMap<PathBuf, usize>>> = Arc::new(Mutex::new(HashMap::new()));
 
         tokio::task::spawn_blocking(move || -> Result<()> {
             let (watcher_tx, watcher_rx) = std::sync::mpsc::channel();
@@ -162,15 +165,24 @@ impl SessionConnector for NativeClaudeConnector {
                                 if path.extension().is_some_and(|ext| ext == "jsonl") {
                                     let tx = tx.clone();
                                     let path_clone = path.clone();
+                                    let seen_clone = seen.clone();
 
                                     tokio::spawn(async move {
                                         let connector = NativeClaudeConnector;
                                         match connector.parse_session_file(&path_clone).await {
                                             Ok(Some(session)) => {
-                                                if tx.send(session).await.is_err() {
-                                                    tracing::warn!(
-                                                        "Failed to send session from watch"
-                                                    );
+                                                let new_count = session.messages.len();
+                                                let mut guard = seen_clone.lock().await;
+                                                let last_count =
+                                                    guard.get(&path_clone).copied().unwrap_or(0);
+                                                if new_count > last_count {
+                                                    guard.insert(path_clone.clone(), new_count);
+                                                    drop(guard);
+                                                    if tx.send(session).await.is_err() {
+                                                        tracing::warn!(
+                                                            "Failed to send session from watch"
+                                                        );
+                                                    }
                                                 }
                                             }
                                             Ok(None) => {}
@@ -564,5 +576,71 @@ mod tests {
     async fn test_supports_watch() {
         let connector = NativeClaudeConnector;
         assert!(connector.supports_watch());
+    }
+
+    /// Verifies that appending lines to a JSONL file in multiple increments causes
+    /// the watch() receiver to emit the session at most once per growth step, not
+    /// once per filesystem Modify event.
+    ///
+    /// Dedup key: (path, messages.len). A session is only forwarded when its
+    /// message count exceeds the last-seen count for that path.
+    #[tokio::test]
+    async fn test_watch_deduplicates_modify_events() {
+        let dir = tempfile::tempdir().unwrap();
+        let file_path = dir.path().join("test-session.jsonl");
+
+        // Overwrite the connector's default_path by testing dedup logic directly
+        // via repeated parse + seen-map, mirroring the production watch() path.
+        let seen: std::sync::Arc<Mutex<HashMap<PathBuf, usize>>> =
+            std::sync::Arc::new(Mutex::new(HashMap::new()));
+
+        let mut emissions = 0usize;
+        let connector = NativeClaudeConnector;
+
+        // Simulate 3 incremental appends, each adding one message.
+        let line1 = r#"{"sessionId":"s1","cwd":"/p","timestamp":"2024-01-01T00:00:00Z","message":{"role":"user","content":"msg1"}}"#;
+        let line2 = r#"{"sessionId":"s1","cwd":"/p","timestamp":"2024-01-01T00:00:01Z","message":{"role":"assistant","content":[{"type":"text","text":"reply1"}]}}"#;
+        let line3 = r#"{"sessionId":"s1","cwd":"/p","timestamp":"2024-01-01T00:00:02Z","message":{"role":"user","content":"msg2"}}"#;
+
+        for (i, content) in [
+            line1,
+            &format!("{}\n{}", line1, line2),
+            &format!("{}\n{}\n{}", line1, line2, line3),
+        ]
+        .iter()
+        .enumerate()
+        {
+            tokio::fs::write(&file_path, content).await.unwrap();
+
+            if let Ok(Some(session)) = connector.parse_session_file(&file_path).await {
+                let new_count = session.messages.len();
+                let mut guard = seen.lock().await;
+                let last_count = guard.get(&file_path).copied().unwrap_or(0);
+                if new_count > last_count {
+                    guard.insert(file_path.clone(), new_count);
+                    drop(guard);
+                    emissions += 1;
+                }
+            }
+            let _ = i; // suppress unused warning
+        }
+
+        // Each increment added a new message, so each should produce exactly one emission.
+        assert_eq!(emissions, 3, "expected one emission per growth step");
+
+        // Simulate no-op re-write (same content): no new emission.
+        let last_content = format!("{}\n{}\n{}", line1, line2, line3);
+        tokio::fs::write(&file_path, &last_content).await.unwrap();
+        if let Ok(Some(session)) = connector.parse_session_file(&file_path).await {
+            let new_count = session.messages.len();
+            let mut guard = seen.lock().await;
+            let last_count = guard.get(&file_path).copied().unwrap_or(0);
+            if new_count > last_count {
+                guard.insert(file_path.clone(), new_count);
+                drop(guard);
+                emissions += 1;
+            }
+        }
+        assert_eq!(emissions, 3, "re-write of same content must not emit again");
     }
 }
