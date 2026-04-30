@@ -23,6 +23,7 @@ cli_tool = "/bin/bash"
 max_cpu_seconds = 1800
 grace_period_secs = 30
 capabilities = ["build", "test", "deterministic-ci"]
+event_only = true
 project = "terraphim"
 task = '''
 source ~/.profile
@@ -30,8 +31,21 @@ source ~/.profile
 # Context injected by handle_push:
 #   ADF_PUSH_SHA, ADF_PUSH_REF, ADF_PUSH_PROJECT,
 #   ADF_PUSH_BEFORE_SHA, ADF_PUSH_PUSHER, ADF_PUSH_FILES (newline list).
-if [ -z "${ADF_PUSH_SHA:-}" ] || [ -z "${ADF_PUSH_REF:-}" ]; then
-  echo "build-runner: missing ADF_PUSH_SHA or ADF_PUSH_REF; exit" >&2
+# Defence-in-depth: build-runner must be spawned by handle_push with full
+# ADF_PUSH_* env. The orchestrator's event_only gate prevents mention
+# dispatch; this guard catches any future dispatch path that forgets.
+if [ -z "${ADF_PUSH_SHA:-}" ]; then
+  echo "build-runner: missing ADF_PUSH_SHA; cannot post commit status; exit" >&2
+  exit 1
+fi
+if [ -z "${ADF_PUSH_REF:-}" ]; then
+  echo "build-runner: ADF_PUSH_SHA=$ADF_PUSH_SHA but ADF_PUSH_REF missing" >&2
+  curl -fsS -X POST \
+    -H "Authorization: token $GITEA_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d "{\"state\":\"error\",\"context\":\"adf/build\",\"description\":\"build-runner spawned without REF\"}" \
+    "$GITEA_URL/api/v1/repos/$GITEA_OWNER/$GITEA_REPO/statuses/$ADF_PUSH_SHA" \
+    >/dev/null 2>&1 || true
   exit 1
 fi
 
