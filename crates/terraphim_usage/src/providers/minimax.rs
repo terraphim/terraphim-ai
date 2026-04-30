@@ -39,6 +39,7 @@ struct MiniMaxModelRemains {
     plan: Option<String>,
 }
 
+/// Usage provider for the MiniMax LLM platform
 pub struct MiniMaxProvider {
     api_key: Option<String>,
     cn_api_key: Option<String>,
@@ -46,6 +47,7 @@ pub struct MiniMaxProvider {
 }
 
 impl MiniMaxProvider {
+    /// Create a provider reading the API key from `MINIMAX_API_KEY` or `MINIMAX_API_TOKEN`
     pub fn new() -> Self {
         Self {
             api_key: std::env::var("MINIMAX_API_KEY")
@@ -59,6 +61,7 @@ impl MiniMaxProvider {
         }
     }
 
+    /// Create a provider with an explicit API key
     pub fn with_api_key(api_key: String) -> Self {
         Self {
             api_key: Some(api_key),

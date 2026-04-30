@@ -1,12 +1,15 @@
 use std::path::Path;
 use terraphim_types::ModelPricing;
 
+/// Collection of per-model token pricing entries used for cost calculation
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct PricingTable {
+    /// Ordered list of pricing entries; later entries with the same pattern override earlier ones
     pub entries: Vec<ModelPricing>,
 }
 
 impl PricingTable {
+    /// Return a table pre-populated with hard-coded pricing for all major models
     pub fn embedded_defaults() -> Self {
         Self {
             entries: vec![
@@ -124,6 +127,8 @@ impl PricingTable {
         }
     }
 
+    /// Load a pricing table from a TOML file, merging with embedded defaults.
+    /// Falls back to defaults if the file is missing or unparseable.
     pub fn load(path: &Path) -> Self {
         match std::fs::read_to_string(path) {
             Ok(content) => match toml::from_str::<PricingTable>(&content) {
@@ -141,12 +146,15 @@ impl PricingTable {
         }
     }
 
+    /// Load from `~/.config/terraphim/pricing.toml`, falling back to embedded defaults
     pub fn load_default_path() -> Self {
         let home = std::env::var("HOME").unwrap_or_default();
         let path = Path::new(&home).join(".config/terraphim/pricing.toml");
         Self::load(&path)
     }
 
+    /// Find the best-matching pricing entry for a given model identifier.
+    /// Glob patterns ending in `*` are matched by longest prefix; exact matches take priority.
     pub fn find_pricing(&self, model: &str) -> Option<&ModelPricing> {
         let model_lower = model.to_lowercase();
         let mut best_match: Option<&ModelPricing> = None;
@@ -167,6 +175,8 @@ impl PricingTable {
         best_match
     }
 
+    /// Calculate the total cost in US dollars for a given model and token counts.
+    /// Returns `None` if no pricing entry matches the model.
     pub fn calculate_cost(
         &self,
         model: &str,

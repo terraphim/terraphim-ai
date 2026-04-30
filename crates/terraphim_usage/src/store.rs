@@ -287,8 +287,11 @@ pub struct BudgetSnapshotRecord {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum BudgetVerdict {
+    /// Spend is below the warning threshold
     WithinBudget,
+    /// Spend is between the warning threshold and the hard limit
     ApproachingLimit,
+    /// Spend has exceeded the configured hard limit
     Exceeded,
 }
 

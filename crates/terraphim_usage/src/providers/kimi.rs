@@ -1,8 +1,10 @@
 use crate::{ProviderUsage, Result, UsageError, UsageProvider};
 
+/// Usage provider for Moonshot Kimi (stub — API integration pending)
 pub struct KimiProvider;
 
 impl KimiProvider {
+    /// Create a new Kimi provider instance
     pub fn new() -> Self {
         Self
     }

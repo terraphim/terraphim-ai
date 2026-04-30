@@ -42,7 +42,9 @@ use tokio::sync::mpsc;
 pub enum ConnectorStatus {
     /// Connector found with estimated session count
     Available {
+        /// Filesystem path to the connector's data directory
         path: PathBuf,
+        /// Approximate number of sessions found (None if not determined)
         sessions_estimate: Option<usize>,
     },
     /// Connector's data directory not found

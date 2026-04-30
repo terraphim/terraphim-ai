@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Rustdoc coverage** improved for `terraphim_sessions`: field-level docs added to `ConnectorStatus`, `ContentBlock` variants, and `FileOperation`; `SessionMetadata::new` documented
+- **Rustdoc coverage** improved for `terraphim_usage`: crate-level docs, module-level docs, and field/method docs added to all public items across `lib.rs`, `formatter.rs`, `pricing.rs`, `store.rs`, and all provider structs
 - **Rustdoc coverage** improved: module-level docs added to `terraphim_mcp_server`; field-level docs added to `ReviewFinding`, `ReviewAgentOutput`, `BudgetEngine`, `BudgetedResults`, and `BudgetError`
 - **Session debouncing** for `SessionConnector::watch()` to eliminate duplicate emissions (Refs #815)
 - **LLM pre/post hooks** wired in agent command handlers for multi-agent coordination (Refs #451)
