@@ -39,6 +39,7 @@ fn agent(name: &str, project: Option<&str>) -> AgentDefinition {
         max_cpu_seconds: None,
         pre_check: None,
         gitea_issue: None,
+        event_only: false,
         project: project.map(|s| s.to_string()),
     }
 }

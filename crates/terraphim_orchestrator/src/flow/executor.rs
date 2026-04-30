@@ -238,6 +238,7 @@ impl FlowExecutor {
             max_cpu_seconds: None,
             pre_check: None,
             gitea_issue: None,
+            event_only: false,
             project: None,
         };
 
