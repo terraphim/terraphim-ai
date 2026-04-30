@@ -146,6 +146,7 @@ fn to_cla_options(options: &ImportOptions) -> ClaImportOptions {
 // Placeholder for when tsa-full is not enabled
 #[cfg(not(feature = "tsa-full"))]
 #[derive(Debug, Default)]
+/// Stub connector used when the `tsa-full` feature is disabled.
 pub struct ClaCursorConnector;
 
 #[cfg(not(feature = "tsa-full"))]

@@ -1,3 +1,15 @@
+//! Middleware layer for Terraphim AI.
+//!
+//! Orchestrates haystack indexing, document processing, and search across
+//! multiple data sources. Acts as the coordination layer between the service
+//! and individual haystack integrations.
+//!
+//! ## Key exports
+//!
+//! - [`search_haystacks`] -- fan-out search across all configured haystacks
+//! - [`RipgrepIndexer`] -- local filesystem indexer backed by ripgrep
+//! - [`QueryRsHaystackIndexer`] -- Rust docs and Reddit community search
+//! - [`thesaurus`] -- thesaurus building from haystack content
 use serde_json as json;
 use terraphim_automata::builder::BuilderError;
 use terraphim_config::TerraphimConfigError;
@@ -22,6 +34,7 @@ pub use indexer::{search_haystacks, RipgrepIndexer};
 // #[cfg(test)]
 // mod tests; // Removed - no tests module
 
+/// Errors that can occur in the middleware layer.
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("Serde deserialization error: {0}")]
@@ -52,4 +65,5 @@ pub enum Error {
     Validation(String),
 }
 
+/// Convenience alias for `Result<T, middleware::Error>`.
 pub type Result<T> = std::result::Result<T, Error>;

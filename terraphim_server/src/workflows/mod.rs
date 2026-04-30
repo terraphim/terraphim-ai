@@ -1,3 +1,9 @@
+//! Workflow execution patterns and session management for the Terraphim server.
+//!
+//! Provides prompt-chain, routing, parallel, orchestration, optimisation, and
+//! VM-sandboxed execution workflows, together with a shared [`WorkflowSessions`]
+//! registry and WebSocket broadcast infrastructure.
+
 use axum::{
     Router,
     extract::{Path, State},
@@ -12,21 +18,33 @@ use uuid::Uuid;
 
 use crate::AppState;
 
+/// Multi-agent workflow handlers.
 pub mod multi_agent_handlers;
+/// Workflow optimisation patterns.
 pub mod optimization;
+/// Agent orchestration workflow.
 pub mod orchestration;
+/// Parallel workflow execution.
 pub mod parallel;
+/// Prompt-chain workflow execution.
 pub mod prompt_chain;
+/// Routing-based workflow execution.
 pub mod routing;
+/// VM-sandboxed workflow execution.
 pub mod vm_execution;
+/// WebSocket transport for workflow progress events.
 pub mod websocket;
 
-// LLM configuration for workflow execution
+/// LLM provider configuration for a single workflow or step.
 #[derive(Debug, Deserialize, Clone)]
 pub struct LlmConfig {
+    /// LLM provider identifier (e.g. `"ollama"`, `"openrouter"`).
     pub llm_provider: Option<String>,
+    /// Model name understood by the provider.
     pub llm_model: Option<String>,
+    /// Base URL for the provider API.
     pub llm_base_url: Option<String>,
+    /// Sampling temperature (0.0 – 1.0).
     pub llm_temperature: Option<f64>,
 }
 
@@ -41,83 +59,128 @@ impl Default for LlmConfig {
     }
 }
 
-// Step configuration for per-step customization
+/// Per-step configuration overriding top-level workflow settings.
 #[derive(Debug, Deserialize, Clone)]
 pub struct StepConfig {
+    /// Unique step identifier within the workflow.
     pub id: String,
+    /// Human-readable step name.
     pub name: String,
+    /// Prompt template for this step.
     pub prompt: String,
+    /// Optional role override for this step.
     pub role: Option<String>,
+    /// Optional system-prompt override for this step.
     pub system_prompt: Option<String>,
+    /// Optional LLM configuration override for this step.
     pub llm_config: Option<LlmConfig>,
 }
 
-// Workflow execution request/response types
+/// Request body for workflow execution endpoints.
 #[derive(Debug, Deserialize)]
 pub struct WorkflowRequest {
+    /// User prompt or task description.
     pub prompt: String,
+    /// Terraphim role used for knowledge-graph context.
     pub role: Option<String>,
+    /// Overall orchestrator role when running multi-step workflows.
     pub overall_role: Option<String>,
+    /// Arbitrary workflow-specific configuration.
     pub config: Option<serde_json::Value>,
+    /// Default LLM configuration for the workflow.
     pub llm_config: Option<LlmConfig>,
-    pub steps: Option<Vec<StepConfig>>, // Per-step configuration
+    /// Per-step configuration overrides.
+    pub steps: Option<Vec<StepConfig>>,
 }
 
+/// Response returned by workflow execution endpoints.
 #[derive(Debug, Serialize)]
 pub struct WorkflowResponse {
+    /// Unique identifier assigned to this workflow run.
     pub workflow_id: String,
+    /// Whether the workflow completed without error.
     pub success: bool,
+    /// Workflow output payload on success.
     pub result: Option<serde_json::Value>,
+    /// Error description on failure.
     pub error: Option<String>,
+    /// Execution metrics and context.
     pub metadata: WorkflowMetadata,
 }
 
+/// Metrics and context attached to a [`WorkflowResponse`].
 #[derive(Debug, Serialize)]
 pub struct WorkflowMetadata {
+    /// Wall-clock time from start to completion in milliseconds.
     pub execution_time_ms: u64,
+    /// Workflow pattern name (e.g. `"prompt-chain"`, `"parallel"`).
     pub pattern: String,
+    /// Number of steps executed.
     pub steps: usize,
+    /// Terraphim role used.
     pub role: String,
+    /// Overall orchestrator role used.
     pub overall_role: String,
 }
 
-// Workflow status types
+/// Live status of a running or completed workflow.
 #[derive(Debug, Clone, Serialize)]
 pub struct WorkflowStatus {
+    /// Workflow identifier.
     pub id: String,
+    /// Current execution state.
     pub status: ExecutionStatus,
+    /// Completion fraction in the range `[0.0, 100.0]`.
     pub progress: f64,
+    /// Name of the step currently executing, if any.
     pub current_step: Option<String>,
+    /// UTC timestamp when the workflow started.
     pub started_at: chrono::DateTime<chrono::Utc>,
+    /// UTC timestamp when the workflow finished, if complete.
     pub completed_at: Option<chrono::DateTime<chrono::Utc>>,
+    /// Final result payload, populated on completion.
     pub result: Option<serde_json::Value>,
+    /// Error description, populated on failure.
     pub error: Option<String>,
 }
 
+/// Lifecycle state of a workflow execution.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecutionStatus {
+    /// Queued but not yet started.
     Pending,
+    /// Currently executing.
     Running,
+    /// Finished successfully.
     Completed,
+    /// Finished with an error.
     Failed,
+    /// Cancelled before completion.
     Cancelled,
 }
 
-// WebSocket message types
+/// Message broadcast over WebSocket for workflow progress events.
 #[derive(Debug, Clone, Serialize)]
 pub struct WebSocketMessage {
+    /// Event type (e.g. `"workflow_started"`, `"workflow_progress"`).
     pub message_type: String,
+    /// Workflow this message relates to, if applicable.
     pub workflow_id: Option<String>,
+    /// WebSocket session this message relates to, if applicable.
     pub session_id: Option<String>,
+    /// Event-specific payload.
     pub data: serde_json::Value,
+    /// UTC timestamp when the message was emitted.
     pub timestamp: chrono::DateTime<chrono::Utc>,
 }
 
-// Workflow session management
+/// Shared map of active and completed workflow sessions.
 pub type WorkflowSessions = RwLock<HashMap<String, WorkflowStatus>>;
+/// Broadcast channel for WebSocket workflow events.
 pub type WebSocketBroadcaster = broadcast::Sender<WebSocketMessage>;
 
+/// Builds the Axum router that mounts all workflow and WebSocket endpoints.
 pub fn create_router() -> Router<AppState> {
     Router::new()
         // Workflow execution endpoints
@@ -197,11 +260,12 @@ async fn list_workflows(State(state): State<AppState>) -> Json<Vec<WorkflowStatu
     Json(workflows)
 }
 
-// Utility functions
+/// Generates a unique workflow identifier prefixed with `workflow_`.
 pub fn generate_workflow_id() -> String {
     format!("workflow_{}", Uuid::new_v4())
 }
 
+/// Updates the status and progress of a workflow session and broadcasts the change over WebSocket.
 pub async fn update_workflow_status(
     sessions: &WorkflowSessions,
     broadcaster: &WebSocketBroadcaster,
@@ -238,6 +302,7 @@ pub async fn update_workflow_status(
     }
 }
 
+/// Creates a new workflow session and broadcasts a `workflow_started` event.
 pub async fn create_workflow_session(
     sessions: &WorkflowSessions,
     broadcaster: &WebSocketBroadcaster,
@@ -272,6 +337,7 @@ pub async fn create_workflow_session(
     let _ = broadcaster.send(message);
 }
 
+/// Marks a workflow session as completed and broadcasts the result over WebSocket.
 pub async fn complete_workflow_session(
     sessions: &WorkflowSessions,
     broadcaster: &WebSocketBroadcaster,
@@ -305,6 +371,7 @@ pub async fn complete_workflow_session(
     }
 }
 
+/// Marks a workflow session as failed and broadcasts the error over WebSocket.
 pub async fn fail_workflow_session(
     sessions: &WorkflowSessions,
     broadcaster: &WebSocketBroadcaster,

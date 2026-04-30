@@ -1,3 +1,31 @@
+//! Storage abstraction layer for Terraphim AI.
+//!
+//! Provides a unified interface over multiple storage backends (memory, dashmap,
+//! SQLite, S3) via OpenDAL operators. Handles transparent cache write-back:
+//! when data is loaded from a slower backend, it is automatically written to
+//! the fastest available backend for subsequent requests.
+//!
+//! ## Key types
+//!
+//! - `DeviceStorage` -- singleton storage handle; use `DeviceStorage::instance()` in production
+//!   and `DeviceStorage::init_memory_only()` in tests
+//! - `Persistable` -- trait implemented by all persisted domain types
+//!
+//! ## Cache write-back
+//!
+//! Objects over 1 MB are compressed with zstd before caching.
+//! Deserialization failures on cached entries trigger cache eviction and
+//! a re-fetch from the persistent backend.
+//!
+//! ## Example
+//!
+//! ```rust,ignore
+//! use terraphim_persistence::DeviceStorage;
+//!
+//! let storage = DeviceStorage::init_memory_only().await?;
+//! storage.save(&doc).await?;
+//! let loaded: Document = storage.load(&doc.id).await?;
+//! ```
 pub mod compression;
 pub mod conversation;
 pub mod document;

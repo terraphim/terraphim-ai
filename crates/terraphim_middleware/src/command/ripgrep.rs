@@ -17,6 +17,7 @@ use tokio::process::Command;
 
 use crate::Result;
 
+/// A single record in ripgrep's JSON Lines output stream.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash)]
 #[serde(tag = "type", content = "data")]
 #[serde(rename_all = "snake_case")]
@@ -149,6 +150,7 @@ pub fn json_decode(jsonlines: &str) -> Result<Vec<Message>> {
         .collect::<std::result::Result<Vec<Message>, serde_json::Error>>()?)
 }
 
+/// Wraps the `rg` binary and returns parsed [`Message`] output.
 pub struct RipgrepCommand {
     command: String,
     default_args: Vec<String>,
@@ -204,14 +206,12 @@ impl RipgrepCommand {
         self.run_with_extra_args(needle, haystack, &[]).await
     }
 
-    /// Runs ripgrep to find `needle` in `haystack` with additional command-line arguments
+    /// Runs ripgrep to find `needle` in `haystack` with additional command-line arguments.
     ///
-    /// This method allows passing extra ripgrep arguments like filtering by tags.
-    /// For example, to search only in files containing the tag #rust, you could pass
-    /// extra_args like ["--glob", "*#rust*"] or use ripgrep patterns.
+    /// Extra args are validated against a whitelist of safe ripgrep flags to prevent
+    /// command injection. Returns parsed [`Message`] output.
     ///
-    /// Returns a Vec of Messages, which correspond to ripgrep's internal JSON output.
-    /// Checks if a flag is a safe, known ripgrep option
+    /// Checks if a flag is a safe, known ripgrep option.
     fn is_safe_ripgrep_flag(&self, flag: &str) -> bool {
         // Whitelist of safe ripgrep flags
         matches!(
@@ -242,6 +242,7 @@ impl RipgrepCommand {
         )
     }
 
+    /// Runs ripgrep with `extra_args` appended after the default arguments.
     pub async fn run_with_extra_args(
         &self,
         needle: &str,

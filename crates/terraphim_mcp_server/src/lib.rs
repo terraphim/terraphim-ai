@@ -30,6 +30,7 @@ pub mod resource_mapper;
 use crate::resource_mapper::TerraphimResourceMapper;
 
 #[derive(Error, Debug)]
+/// Errors that can occur in the Terraphim MCP server.
 pub enum TerraphimMcpError {
     #[error("Service error: {0}")]
     Service(#[from] terraphim_service::ServiceError),

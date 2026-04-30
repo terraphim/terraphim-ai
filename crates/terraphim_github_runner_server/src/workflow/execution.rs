@@ -21,6 +21,7 @@ struct FirecrackerVmProvider {
 }
 
 impl FirecrackerVmProvider {
+    /// Creates a new provider targeting the given fcctl-web API endpoint.
     pub fn new(api_base_url: String, auth_token: Option<String>, client: Arc<Client>) -> Self {
         Self {
             api_base_url,

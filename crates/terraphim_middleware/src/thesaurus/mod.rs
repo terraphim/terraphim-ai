@@ -33,9 +33,14 @@ use terraphim_rolegraph::{RoleGraph, RoleGraphSync};
 use terraphim_types::SearchQuery;
 use terraphim_types::{RoleName, Thesaurus};
 
+use ahash::AHashMap;
+use terraphim_rolegraph::DEFAULT_TRIGGER_THRESHOLD;
+
 use crate::Result;
 use std::path::PathBuf;
 
+/// Builds or refreshes the thesaurus for the role identified in `search_query`,
+/// indexing all configured haystacks and persisting the result.
 pub async fn build_thesaurus_from_haystack(
     config_state: &mut ConfigState,
     search_query: &SearchQuery,
@@ -86,9 +91,29 @@ async fn update_thesaurus(
     thesaurus: Thesaurus,
 ) -> Result<()> {
     log::debug!("Updating thesaurus for role: {}", role_name);
+
+    // Extract trigger descriptions and pinned node IDs from thesaurus entries
+    // before moving ownership into RoleGraph::new().
+    let mut triggers: AHashMap<u64, String> = AHashMap::new();
+    let mut pinned: Vec<u64> = Vec::new();
+    for (_key, term) in &thesaurus {
+        if let Some(ref trigger_desc) = term.trigger {
+            triggers.insert(term.id, trigger_desc.clone());
+        }
+        if term.pinned {
+            pinned.push(term.id);
+        }
+    }
+
     let rolegraph = RoleGraph::new(role_name.clone(), thesaurus).await;
     match rolegraph {
-        Ok(rolegraph) => {
+        Ok(mut rolegraph) => {
+            // Populate the TF-IDF trigger index so the two-pass fallback search
+            // is active in production (not just in tests).
+            if !triggers.is_empty() || !pinned.is_empty() {
+                rolegraph.load_trigger_index(triggers, pinned, DEFAULT_TRIGGER_THRESHOLD);
+                log::debug!("Trigger index loaded for role '{}'", role_name);
+            }
             let rolegraph_value = RoleGraphSync::from(rolegraph);
             // Actually update the config_state.roles, not just a local copy
             config_state

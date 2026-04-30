@@ -81,6 +81,7 @@ pub struct RoundRobin {
 }
 
 impl RoundRobin {
+    /// Creates a new `RoundRobin` strategy starting at index zero.
     pub fn new() -> Self {
         Self {
             index: std::sync::atomic::AtomicUsize::new(0),

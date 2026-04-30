@@ -3,6 +3,7 @@ use crate::Result;
 use terraphim_config::Haystack;
 use terraphim_types::Index;
 
+/// Indexes email via JMAP as Terraphim documents.
 #[derive(Debug, Clone, Default)]
 pub struct JmapHaystackIndexer;
 

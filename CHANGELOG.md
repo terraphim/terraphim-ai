@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Trigger index and success capture** wired in agent and middleware (Refs #1066)
 - **Session debouncing** for `SessionConnector::watch()` to eliminate duplicate emissions (Refs #815)
 - **LLM pre/post hooks** wired in agent command handlers for multi-agent coordination (Refs #451)
 - **Self-Documentation API** exposed via robot CLI subcommand (Refs #1011)
@@ -28,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **ThesaurusResponse** aligned with server API contract -- `thesaurus` field is now `Option<HashMap<String,String>>` matching actual server response shape (Fixes #1092)
 - **RUSTSEC-2026-0049** eliminated by switching serenity to native-tls (Refs #418)
 - **Spec gaps** addressed and resolved across ADF orchestrator templates (Refs #1040)
 - **Global concurrency limits** enforced in orchestrator to prevent task/memory exhaustion (Refs #664)
@@ -53,10 +55,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **LLM cost tracking** foundation with genai fork integration (Refs #1075)
 - **Spec validation** report for 2026-04-29 documenting 3 fixed, 5 remaining gaps
 - **Documentation gap report** generated for 2026-04-29 identifying 43 warnings across workspace
+- **Sentrux quality gate** CI workflow added for automated compliance checks
+- **Orchestrator quota-to-fallback v2** with Graph router respawn on quota exhaustion (Refs #1084)
+- **user-prompt-submit hook** wired into Terraphim AI and OpenCode plugins (Refs #674)
+- **LLM usage Phases B+C** -- history grouping, spend aggregation, and budget alerts (Refs #1075)
+- **Crate-level rustdoc** added to terraphim_service, terraphim_middleware, terraphim_config, terraphim_persistence, terraphim_agent
+- **Single-gap rustdoc** fixed in haystack_core, terraphim_cli, terraphim_mcp_server, terraphim_agent_evolution, terraphim_github_runner_server, terraphim_kg_orchestration, terraphim_onepassword_cli, terraphim_router
+- **Session connector rustdoc** added to ClineConnector, ClineMessage, ModelInfo, ClaCursorConnector, and SessionMetadata::new in terraphim_sessions
+- **Documentation gap audit** 2026-04-30: 700 undocumented public items across 41 crates identified (Theme-ID: doc-gap)
 
 ### Fixed
 
 - **`--server` flag** on listen subcommand now routes through custom error handler
+- **Orchestrator PR review** P1/P2 findings addressed
+- **multi_agent pool shutdown** -- `flush_usage` now called on pool shutdown
+- **Usage provider queries** -- JSON wrapping and clap arg clash resolved
 
 ## [1.17.0] - 2026-04-27
 

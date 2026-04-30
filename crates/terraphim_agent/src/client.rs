@@ -193,17 +193,11 @@ pub struct SummarizeResponse {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ThesaurusEntry {
-    pub id: String,
-    pub nterm: String,
-    pub url: Option<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ThesaurusResponse {
     pub status: String,
-    pub terms: Vec<ThesaurusEntry>,
-    pub total: usize,
+    #[serde(default)]
+    pub thesaurus: Option<std::collections::HashMap<String, String>>,
+    pub error: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

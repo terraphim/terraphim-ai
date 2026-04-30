@@ -1,3 +1,23 @@
+//! Configuration management for Terraphim AI.
+//!
+//! Handles role-based configuration, haystack settings, and LLM provider routing.
+//! Configuration is loaded from JSON files and persisted through the
+//! `terraphim_persistence` layer.
+//!
+//! ## Key types
+//!
+//! - `Config` -- top-level configuration holding all roles and settings
+//! - `Role` -- per-user search profile with haystack list and relevance function
+//! - `ConfigState` -- shared, thread-safe handle used across the service layer
+//! - [`llm_router`] -- model routing and provider selection configuration
+//!
+//! ## Config loading
+//!
+//! ```rust,ignore
+//! use terraphim_config::TerraphimConfig;
+//!
+//! let config = TerraphimConfig::load_from_file("terraphim_engineer_config.json").await?;
+//! ```
 use std::{path::PathBuf, sync::Arc};
 
 use terraphim_automata::{

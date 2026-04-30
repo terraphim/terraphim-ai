@@ -984,11 +984,7 @@ mod tests {
     #[test]
     fn classify_quota_insufficient_quota_is_rate_limit() {
         let c = classifier();
-        let result = c.classify(
-            Some(1),
-            &["insufficient_quota".to_string()],
-            &[],
-        );
+        let result = c.classify(Some(1), &["insufficient_quota".to_string()], &[]);
         assert_eq!(result.exit_class, ExitClass::RateLimit);
     }
 

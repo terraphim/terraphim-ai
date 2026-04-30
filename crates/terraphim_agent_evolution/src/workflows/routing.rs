@@ -66,6 +66,7 @@ pub struct TaskRouter {
 }
 
 impl TaskRouter {
+    /// Creates a new `TaskRouter` with the given routing configuration.
     pub fn new(config: RouteConfig) -> Self {
         Self { config }
     }
