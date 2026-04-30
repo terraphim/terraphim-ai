@@ -699,23 +699,28 @@ mod tests {
             received.push(session);
         }
 
-        // With 1 create + 3 spaced appends, we expect at most 4 emissions
-        // (one per quiescent period where the file changed). The critical
-        // assertion is that we do NOT see one emission per raw Modify event
-        // (which would be >>4 on inotify/FSEvents).
+        // Must have received at least one emission.
         assert!(
-            received.len() <= 5,
-            "Expected at most 5 session emissions due to debouncing, got {}",
+            !received.is_empty(),
+            "Expected at least one session emission, got none"
+        );
+
+        // With 3 spaced writes (each gap > debounce window), we expect at most
+        // 4 emissions (one per quiescent epoch plus at most one extra).
+        // The critical assertion is that we do NOT see one emission per raw
+        // Modify event (which would be >>4 on inotify/FSEvents).
+        assert!(
+            received.len() <= 4,
+            "Expected at most 4 session emissions due to debouncing, got {}",
             received.len()
         );
 
-        // If we received anything, the final state should have 3 messages
-        if let Some(last) = received.last() {
-            assert_eq!(
-                last.messages.len(),
-                3,
-                "Final session should have all 3 messages"
-            );
-        }
+        // The final received state must have all 3 messages.
+        let last = received.last().unwrap();
+        assert_eq!(
+            last.messages.len(),
+            3,
+            "Final session should have all 3 messages"
+        );
     }
 }
