@@ -3032,6 +3032,18 @@ impl AgentOrchestrator {
                     );
 
                     if let Some(def) = agents.iter().find(|a| a.name == agent_name).cloned() {
+                        // Event-only agents must not be dispatched via persona-mention
+                        // either. Same rationale as the SpawnAgent arm.
+                        if def.event_only {
+                            info!(
+                                persona = %persona_name,
+                                agent = %agent_name,
+                                issue = issue_number,
+                                "webhook dispatch rejected: persona-resolved agent is event-only (push/event-driven), not mention-dispatchable"
+                            );
+                            return;
+                        }
+
                         // Dedup: check Gitea assignment + active_agents before spawning
                         if self.should_skip_dispatch(&agent_name, issue_number).await {
                             return;
@@ -9663,6 +9675,57 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
         assert!(
             orch.active_agents.is_empty(),
             "event_only agent must not be added to active_agents on mention dispatch; got: {:?}",
+            orch.active_agents.keys().collect::<Vec<_>>()
+        );
+    }
+
+    /// T4: SpawnPersona dispatch must reject when the resolved agent is event_only.
+    /// Uses resolve_persona_mention's "direct agent name match" branch by passing
+    /// the agent name as the persona name -- the resolver returns the agent, and our
+    /// gate must reject before spawn.
+    #[tokio::test]
+    async fn test_handle_webhook_dispatch_rejects_event_only_persona() {
+        let mut config = test_config();
+        config.agents = vec![AgentDefinition {
+            name: "build-runner".to_string(),
+            layer: AgentLayer::Growth,
+            cli_tool: "/bin/bash".to_string(),
+            task: "echo would-build".to_string(),
+            schedule: None,
+            model: None,
+            capabilities: vec!["build".to_string()],
+            max_memory_bytes: None,
+            budget_monthly_cents: None,
+            provider: None,
+            persona: None,
+            terraphim_role: None,
+            skill_chain: vec![],
+            sfia_skills: vec![],
+            fallback_provider: None,
+            fallback_model: None,
+            grace_period_secs: None,
+            max_cpu_seconds: None,
+            pre_check: None,
+            gitea_issue: None,
+            event_only: true,
+            project: None,
+        }];
+        config.mentions = Some(crate::config::MentionConfig::default());
+
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        let dispatch = webhook::WebhookDispatch::SpawnPersona {
+            persona_name: "build-runner".to_string(),
+            issue_number: 9999,
+            comment_id: 99999,
+            context: "@adf:build-runner please run via persona".to_string(),
+        };
+
+        orch.handle_webhook_dispatch(dispatch).await;
+
+        assert!(
+            orch.active_agents.is_empty(),
+            "event_only agent must not be added to active_agents on persona dispatch; got: {:?}",
             orch.active_agents.keys().collect::<Vec<_>>()
         );
     }
