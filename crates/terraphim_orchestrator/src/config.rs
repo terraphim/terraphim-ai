@@ -588,6 +588,7 @@ pub struct AgentDefinition {
     ///     `gitea_issue` even if it is somehow set, because event-only agents
     ///     post their verdict via a different channel (e.g. the Gitea Commit
     ///     Status API).
+    ///
     /// Default `false` keeps existing LLM agents mention-dispatchable.
     #[serde(default)]
     pub event_only: bool,
