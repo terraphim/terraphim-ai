@@ -235,6 +235,7 @@ pub struct SessionMetadata {
 }
 
 impl SessionMetadata {
+    /// Creates a new `SessionMetadata` with the given project path, model name, tags, and extra data.
     pub fn new(
         project_path: Option<String>,
         model: Option<String>,

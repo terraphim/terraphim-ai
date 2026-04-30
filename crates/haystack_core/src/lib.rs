@@ -1,5 +1,6 @@
 use terraphim_types::{Document, SearchQuery};
 
+/// Abstraction over a data source that can search and return documents.
 pub trait HaystackProvider {
     type Error: std::fmt::Display + std::fmt::Debug + Send + Sync + 'static;
 

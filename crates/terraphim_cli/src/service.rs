@@ -14,6 +14,7 @@ use terraphim_types::{
 };
 use tokio::sync::Mutex;
 
+/// Service wrapper that exposes Terraphim search and configuration capabilities to the CLI.
 #[derive(Clone)]
 pub struct CliService {
     config_state: ConfigState,

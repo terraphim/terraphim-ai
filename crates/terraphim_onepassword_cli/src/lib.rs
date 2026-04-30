@@ -234,6 +234,7 @@ impl SecretLoader for OnePasswordLoader {
 pub struct EnvironmentLoader;
 
 impl EnvironmentLoader {
+    /// Creates a new `EnvironmentLoader`.
     pub fn new() -> Self {
         Self
     }

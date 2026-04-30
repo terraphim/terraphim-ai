@@ -201,6 +201,7 @@ pub struct ExampleAgent {
 }
 
 impl ExampleAgent {
+    /// Creates an example agent with the given identifier and capability list.
     pub fn new(agent_id: String, capabilities: Vec<String>) -> Self {
         Self {
             agent_id,

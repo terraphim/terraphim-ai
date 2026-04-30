@@ -13,6 +13,7 @@ use walkdir::WalkDir;
 use super::{ConnectorStatus, ImportOptions, SessionConnector};
 use crate::model::{Message, MessageRole, Session, SessionMetadata};
 
+/// Session connector for the Cline VS Code extension.
 #[derive(Debug)]
 pub struct ClineConnector {
     default_path: PathBuf,
@@ -53,6 +54,7 @@ struct ApiMessage {
     content: serde_json::Value,
 }
 
+/// A single message entry from a Cline conversation file.
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ClineMessage {
@@ -73,6 +75,7 @@ pub struct ClineMessage {
     model_info: Option<ModelInfo>,
 }
 
+/// Model identity information embedded in a Cline message.
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModelInfo {
@@ -84,6 +87,7 @@ pub struct ModelInfo {
 }
 
 impl ClineConnector {
+    /// Creates a new connector pointing at the default Cline global storage path.
     pub fn new() -> Self {
         Self {
             default_path: cline_global_storage_path(),

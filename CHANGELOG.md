@@ -58,6 +58,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **user-prompt-submit hook** wired into Terraphim AI and OpenCode plugins (Refs #674)
 - **LLM usage Phases B+C** -- history grouping, spend aggregation, and budget alerts (Refs #1075)
 - **Crate-level rustdoc** added to terraphim_service, terraphim_middleware, terraphim_config, terraphim_persistence, terraphim_agent
+- **Single-gap rustdoc** fixed in haystack_core, terraphim_cli, terraphim_mcp_server, terraphim_agent_evolution, terraphim_github_runner_server, terraphim_kg_orchestration, terraphim_onepassword_cli, terraphim_router
+- **Session connector rustdoc** added to ClineConnector, ClineMessage, ModelInfo, ClaCursorConnector, and SessionMetadata::new in terraphim_sessions
+- **Documentation gap audit** 2026-04-30: 700 undocumented public items across 41 crates identified (Theme-ID: doc-gap)
 
 ### Fixed
 
