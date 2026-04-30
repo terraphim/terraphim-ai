@@ -9,7 +9,7 @@
 //! - **LLM Routing**: [`RoutingRule`], [`RoutingDecision`], [`Priority`]
 //! - **Multi-Agent Coordination**: [`MultiAgentContext`], [`AgentInfo`]
 //! - **Dynamic Ontology**: [`SchemaSignal`], [`ExtractedEntity`], [`CoverageSignal`], [`GroundingMetadata`]
-//! - **HGNC Gene Normalization**: [`HgncGene`], [`HgncNormalizer`]
+//! - **HGNC Gene Normalization**: `HgncGene`, `HgncNormalizer`
 //!
 //! # Features
 //!
@@ -2506,7 +2506,7 @@ pub struct OntologyEntityType {
     pub id: String,
     /// Human-readable label
     pub label: String,
-    /// Canonical URI prefix for grounding (e.g., "https://schema.org/Chapter")
+    /// Canonical URI prefix for grounding (e.g., `<https://schema.org/Chapter>`)
     #[serde(default)]
     pub uri_prefix: Option<String>,
     /// Alternative names / synonyms for matching

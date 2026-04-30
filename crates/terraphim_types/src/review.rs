@@ -31,14 +31,21 @@ pub enum FindingCategory {
 /// A single structured finding from a review agent.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReviewFinding {
+    /// Path to the file containing the finding, relative to the repository root.
     pub file: String,
+    /// Line number within the file (0 means file-level finding).
     #[serde(default)]
     pub line: u32,
+    /// How severe this finding is.
     pub severity: FindingSeverity,
+    /// Which review category this finding belongs to.
     pub category: FindingCategory,
+    /// Human-readable description of the issue.
     pub finding: String,
+    /// Optional actionable suggestion for resolving the finding.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub suggestion: Option<String>,
+    /// Agent confidence in this finding, in [0.0, 1.0]. Defaults to 0.5.
     #[serde(default = "default_confidence")]
     pub confidence: f64,
 }
@@ -50,9 +57,13 @@ fn default_confidence() -> f64 {
 /// Output schema for a single review agent's results.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReviewAgentOutput {
+    /// Identifier of the agent that produced this output (e.g. `"security-audit"`).
     pub agent: String,
+    /// Individual findings raised by this agent.
     pub findings: Vec<ReviewFinding>,
+    /// Short prose summary of the review outcome.
     pub summary: String,
+    /// `true` if the agent considers the changeset acceptable despite any findings.
     pub pass: bool,
 }
 

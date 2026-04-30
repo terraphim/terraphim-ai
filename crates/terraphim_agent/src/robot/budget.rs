@@ -1,21 +1,35 @@
+//! Token-budget enforcement for robot-mode search output.
+//!
+//! [`BudgetEngine`] applies result caps, field filtering, and token-budget
+//! truncation to a slice of [`SearchResultItem`]s, producing a
+//! [`BudgetedResults`] value ready for serialisation.
+
 use serde::{Deserialize, Serialize};
 
 use super::output::{FieldMode, RobotConfig, RobotFormatter};
 use super::schema::{Pagination, SearchResultItem, TokenBudget};
 
+/// Search results after token-budget and pagination constraints have been applied.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BudgetedResults {
+    /// The (possibly truncated) result items serialised as JSON values.
     pub results: Vec<serde_json::Value>,
+    /// Pagination metadata describing total count and truncation state.
     pub pagination: Pagination,
+    /// Token-budget metadata, present when a budget was requested.
     pub token_budget: Option<TokenBudget>,
 }
 
+/// Errors that can occur while applying budget constraints.
 #[derive(Debug, thiserror::Error)]
 pub enum BudgetError {
     #[error("serialization error: {0}")]
     Serialization(#[from] serde_json::Error),
 }
 
+/// Applies field filtering, result caps, and token-budget truncation to search results.
+///
+/// Constructed from a [`RobotConfig`] and reused across multiple `apply` calls.
 pub struct BudgetEngine {
     config: RobotConfig,
     formatter: RobotFormatter,

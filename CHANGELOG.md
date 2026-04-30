@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Rustdoc coverage** improved: module-level docs added to `terraphim_mcp_server`; field-level docs added to `ReviewFinding`, `ReviewAgentOutput`, `BudgetEngine`, `BudgetedResults`, and `BudgetError`
 - **Session debouncing** for `SessionConnector::watch()` to eliminate duplicate emissions (Refs #815)
 - **LLM pre/post hooks** wired in agent command handlers for multi-agent coordination (Refs #451)
 - **Self-Documentation API** exposed via robot CLI subcommand (Refs #1011)

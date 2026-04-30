@@ -1,3 +1,26 @@
+//! MCP (Model Context Protocol) server for Terraphim AI.
+//!
+//! Exposes Terraphim search, autocomplete, and knowledge-graph operations as MCP
+//! tools and resources consumable by any MCP-aware client (Claude Desktop, VS Code
+//! extensions, etc.).
+//!
+//! # Architecture
+//!
+//! [`McpService`] implements the [`rmcp::ServerHandler`] trait and delegates to
+//! [`terraphim_service::TerraphimService`] for search and AI operations.  Resource
+//! listing is handled by [`resource_mapper::TerraphimResourceMapper`].
+//!
+//! Two transports are supported at the binary layer:
+//! - **stdio** -- for local tool use (e.g. `claude mcp add terraphim-mcp stdio`).
+//! - **SSE/HTTP** -- for remote or multi-client deployments.
+//!
+//! # Example
+//!
+//! ```bash
+//! # Start in stdio mode (used by Claude Desktop)
+//! terraphim-mcp-server --transport stdio
+//! ```
+
 use anyhow::Result;
 use base64::Engine;
 use fff_search::external_scorer::ExternalScorer;
@@ -29,6 +52,7 @@ pub mod resource_mapper;
 
 use crate::resource_mapper::TerraphimResourceMapper;
 
+/// Errors produced by the MCP service layer.
 #[derive(Error, Debug)]
 pub enum TerraphimMcpError {
     #[error("Service error: {0}")]
