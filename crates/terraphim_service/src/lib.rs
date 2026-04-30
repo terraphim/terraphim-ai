@@ -1,3 +1,20 @@
+//! Service layer for Terraphim AI.
+//!
+//! Provides document search, knowledge graph construction, and LLM integration.
+//! Sits between the HTTP server and the underlying middleware/persistence crates.
+//!
+//! ## Key modules
+//!
+//! - [`auto_route`] -- automatic role selection based on query context
+//! - [`llm`] -- generic LLM client (Ollama, OpenRouter)
+//!
+//! ## Example
+//!
+//! ```rust,ignore
+//! use terraphim_service::auto_route::auto_select_role;
+//!
+//! let role = auto_select_role(&config_state, &query).await?;
+//! ```
 use ahash::AHashMap;
 use terraphim_automata::builder::{Logseq, ThesaurusBuilder};
 use terraphim_automata::load_thesaurus;

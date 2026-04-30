@@ -53,10 +53,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **LLM cost tracking** foundation with genai fork integration (Refs #1075)
 - **Spec validation** report for 2026-04-29 documenting 3 fixed, 5 remaining gaps
 - **Documentation gap report** generated for 2026-04-29 identifying 43 warnings across workspace
+- **Sentrux quality gate** CI workflow added for automated compliance checks
+- **Orchestrator quota-to-fallback v2** with Graph router respawn on quota exhaustion (Refs #1084)
+- **user-prompt-submit hook** wired into Terraphim AI and OpenCode plugins (Refs #674)
+- **LLM usage Phases B+C** -- history grouping, spend aggregation, and budget alerts (Refs #1075)
+- **Crate-level rustdoc** added to terraphim_service, terraphim_middleware, terraphim_config, terraphim_persistence, terraphim_agent
 
 ### Fixed
 
 - **`--server` flag** on listen subcommand now routes through custom error handler
+- **Orchestrator PR review** P1/P2 findings addressed
+- **multi_agent pool shutdown** -- `flush_usage` now called on pool shutdown
+- **Usage provider queries** -- JSON wrapping and clap arg clash resolved
 
 ## [1.17.0] - 2026-04-27
 

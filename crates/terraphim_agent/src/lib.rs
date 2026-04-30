@@ -1,3 +1,21 @@
+//! Terraphim AI agent runtime.
+//!
+//! Provides the interactive TUI, robot mode CLI, MCP tool index, and
+//! forgiving command parser used by the `terraphim-agent` binary.
+//!
+//! ## Key modules
+//!
+//! - [`robot`] -- machine-readable (JSON) output for AI agent integration
+//! - [`forgiving`] -- typo-tolerant command dispatcher
+//! - [`mcp_tool_index`] -- discovery and search of available MCP tools
+//! - [`service`] -- search and session management backend
+//! - [`onboarding`] -- first-run setup and configuration wizard
+//!
+//! ## Features
+//!
+//! - `server` -- enables the HTTP client for remote agent communication
+//! - `repl` -- full interactive REPL with command history
+//! - `shared-learning` -- cross-session learning store
 #[cfg(feature = "server")]
 pub mod client;
 pub mod onboarding;

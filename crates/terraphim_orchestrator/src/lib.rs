@@ -356,19 +356,22 @@ fn parse_reset_time(quota_line: &str) -> Option<Instant> {
 
     if let Some(idx) = line.find("resets at ") {
         let rest = &line[idx + "resets at ".len()..];
-        if let Some(time_str) = rest.strip_suffix(" utc").or_else(|| rest.strip_suffix(" utc.")) {
+        if let Some(time_str) = rest
+            .strip_suffix(" utc")
+            .or_else(|| rest.strip_suffix(" utc."))
+        {
             if let Ok(hour_min) = chrono::NaiveTime::parse_from_str(time_str.trim(), "%H:%M") {
                 let now = chrono::Utc::now();
                 let mut target_date = now.date_naive();
                 let target = target_date.and_time(hour_min);
-                let mut target_utc = chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(
-                    target, chrono::Utc,
-                );
+                let mut target_utc =
+                    chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(target, chrono::Utc);
                 if target_utc <= now {
                     target_date += chrono::Duration::days(1);
                     let target = target_date.and_time(hour_min);
                     target_utc = chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(
-                        target, chrono::Utc,
+                        target,
+                        chrono::Utc,
                     );
                 }
                 let delta = (target_utc - now).to_std().ok()?;
@@ -5073,7 +5076,8 @@ impl AgentOrchestrator {
     /// Periodic reconciliation: detect exits, check cron, evaluate drift, drain output.
     async fn reconcile_tick(&mut self) {
         self.provider_rate_limits.clean_expired();
-        self.retry_counts.retain(|_, (_, ts)| ts.elapsed() < Duration::from_secs(3600));
+        self.retry_counts
+            .retain(|_, (_, ts)| ts.elapsed() < Duration::from_secs(3600));
 
         // Check wall-clock timeouts and respawn with fallback
         self.poll_wall_timeouts().await;
@@ -5595,16 +5599,15 @@ impl AgentOrchestrator {
             if record.exit_class == ExitClass::RateLimit {
                 let stderr_text = stderr_lines.join("\n");
                 let output_text = output_lines.join("\n");
-                let _secondary_confirms = control_plane::output_parser::parse_stderr_for_limit_errors(&stderr_text).is_some()
-                    || control_plane::telemetry::is_subscription_limit_error(&output_text);
-                let effective_provider = def
-                    .provider
-                    .as_deref()
-                    .or_else(|| {
-                        routed_model
-                            .as_deref()
-                            .and_then(|m| provider_budget::provider_key_for_model(m))
-                    });
+                let _secondary_confirms =
+                    control_plane::output_parser::parse_stderr_for_limit_errors(&stderr_text)
+                        .is_some()
+                        || control_plane::telemetry::is_subscription_limit_error(&output_text);
+                let effective_provider = def.provider.as_deref().or_else(|| {
+                    routed_model
+                        .as_deref()
+                        .and_then(|m| provider_budget::provider_key_for_model(m))
+                });
 
                 if let Some(provider_key) = effective_provider {
                     warn!(
@@ -5629,7 +5632,8 @@ impl AgentOrchestrator {
                             provider = %provider_key,
                             "blocking provider until rate-limit window expires"
                         );
-                        self.provider_rate_limits.block_until(provider_key, reset_time);
+                        self.provider_rate_limits
+                            .block_until(provider_key, reset_time);
                     }
                     quota_provider_recorded = Some(provider_key.to_string());
                 }
@@ -5637,9 +5641,11 @@ impl AgentOrchestrator {
 
             // D-3: Feed exit classification into provider health circuit breaker
             if let Some(ref provider) = def.provider {
-                let already_recorded_by_quota = quota_provider_recorded.as_deref() == Some(provider.as_str());
+                let already_recorded_by_quota =
+                    quota_provider_recorded.as_deref() == Some(provider.as_str());
                 match record.exit_class {
-                    ExitClass::ModelError | ExitClass::RateLimit => {
+                    ExitClass::ModelError | ExitClass::RateLimit =>
+                    {
                         #[allow(clippy::collapsible_match)]
                         if !already_recorded_by_quota {
                             self.provider_health.record_failure(provider);
@@ -5780,11 +5786,12 @@ impl AgentOrchestrator {
 
                 let respawned = if let Some(ref kg_router) = self.kg_router {
                     if let Some(decision) = kg_router.route_agent(&def.task) {
-                        if let Some(healthy_route) =
-                            decision.first_healthy_route(&local_unhealthy)
+                        if let Some(healthy_route) = decision.first_healthy_route(&local_unhealthy)
                         {
-                            let retry_count =
-                                self.retry_counts.entry(name.clone()).or_insert((0, Instant::now()));
+                            let retry_count = self
+                                .retry_counts
+                                .entry(name.clone())
+                                .or_insert((0, Instant::now()));
                             if retry_count.0 < 3 {
                                 retry_count.0 += 1;
                                 retry_count.1 = Instant::now();
@@ -7704,7 +7711,10 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
     fn rate_limit_window_block_and_check() {
         let mut window = ProviderRateLimitWindow::new();
         assert!(!window.is_blocked("claude-code"));
-        window.block_until("claude-code", std::time::Instant::now() + std::time::Duration::from_secs(3600));
+        window.block_until(
+            "claude-code",
+            std::time::Instant::now() + std::time::Duration::from_secs(3600),
+        );
         assert!(window.is_blocked("claude-code"));
         assert!(!window.is_blocked("kimi"));
     }
@@ -7712,7 +7722,10 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
     #[test]
     fn rate_limit_window_expired_unblocks() {
         let mut window = ProviderRateLimitWindow::new();
-        window.block_until("claude-code", std::time::Instant::now() + std::time::Duration::from_millis(1));
+        window.block_until(
+            "claude-code",
+            std::time::Instant::now() + std::time::Duration::from_millis(1),
+        );
         std::thread::sleep(std::time::Duration::from_millis(5));
         assert!(!window.is_blocked("claude-code"));
     }
@@ -7720,8 +7733,14 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
     #[test]
     fn rate_limit_window_blocked_providers_list() {
         let mut window = ProviderRateLimitWindow::new();
-        window.block_until("claude-code", std::time::Instant::now() + std::time::Duration::from_secs(3600));
-        window.block_until("anthropic", std::time::Instant::now() + std::time::Duration::from_secs(3600));
+        window.block_until(
+            "claude-code",
+            std::time::Instant::now() + std::time::Duration::from_secs(3600),
+        );
+        window.block_until(
+            "anthropic",
+            std::time::Instant::now() + std::time::Duration::from_secs(3600),
+        );
         let blocked = window.blocked_providers();
         assert_eq!(blocked.len(), 2);
         assert!(blocked.contains(&"claude-code".to_string()));
@@ -7731,8 +7750,14 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
     #[test]
     fn rate_limit_window_clean_expired() {
         let mut window = ProviderRateLimitWindow::new();
-        window.block_until("expired", std::time::Instant::now() + std::time::Duration::from_millis(1));
-        window.block_until("active", std::time::Instant::now() + std::time::Duration::from_secs(3600));
+        window.block_until(
+            "expired",
+            std::time::Instant::now() + std::time::Duration::from_millis(1),
+        );
+        window.block_until(
+            "active",
+            std::time::Instant::now() + std::time::Duration::from_secs(3600),
+        );
         std::thread::sleep(std::time::Duration::from_millis(5));
         window.clean_expired();
         assert!(!window.is_blocked("expired"));
