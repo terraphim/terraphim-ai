@@ -209,24 +209,16 @@ fn test_summarize_request_serialization() {
     assert!(json_str.contains("TestRole"));
 }
 
-/// Test ThesaurusResponse deserialization
+/// Test ThesaurusResponse deserialization (server format: thesaurus HashMap)
 #[test]
 fn test_thesaurus_response_deserialization() {
     let json_response = r#"{
-        "status": "success",
-        "terms": [
-            {
-                "id": "term1",
-                "nterm": "machine learning",
-                "url": "http://example.com/ml"
-            },
-            {
-                "id": "term2",
-                "nterm": "artificial intelligence",
-                "url": null
-            }
-        ],
-        "total": 2
+        "status": "Success",
+        "thesaurus": {
+            "machine learning": "ml",
+            "artificial intelligence": "ai"
+        },
+        "error": null
     }"#;
 
     let response: Result<ThesaurusResponse, _> = serde_json::from_str(json_response);
@@ -236,19 +228,12 @@ fn test_thesaurus_response_deserialization() {
     );
 
     let thesaurus_response = response.unwrap();
-    assert_eq!(thesaurus_response.status, "success");
-    assert_eq!(thesaurus_response.total, 2);
-    assert_eq!(thesaurus_response.terms.len(), 2);
-
-    let term1 = &thesaurus_response.terms[0];
-    assert_eq!(term1.id, "term1");
-    assert_eq!(term1.nterm, "machine learning");
-    assert_eq!(term1.url.as_ref().unwrap(), "http://example.com/ml");
-
-    let term2 = &thesaurus_response.terms[1];
-    assert_eq!(term2.id, "term2");
-    assert_eq!(term2.nterm, "artificial intelligence");
-    assert!(term2.url.is_none());
+    assert_eq!(thesaurus_response.status, "Success");
+    let map = thesaurus_response.thesaurus.unwrap();
+    assert_eq!(map.len(), 2);
+    assert_eq!(map.get("machine learning").unwrap(), "ml");
+    assert_eq!(map.get("artificial intelligence").unwrap(), "ai");
+    assert!(thesaurus_response.error.is_none());
 }
 
 /// Test AutocompleteResponse deserialization

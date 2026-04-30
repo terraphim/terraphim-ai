@@ -4299,17 +4299,19 @@ async fn run_server_command(
             // Get the thesaurus from the server for the role
             let thesaurus_res = api.get_thesaurus(&role_name).await?;
 
-            // Build thesaurus from response
+            // Build thesaurus from server response (HashMap<key, nterm_value>)
             let mut thesaurus = terraphim_types::Thesaurus::new(format!("role-{}", role_name));
-            for entry in thesaurus_res.terms {
-                let normalized_term = terraphim_types::NormalizedTerm::new(
-                    1u64, // Simple ID for CLI usage
-                    terraphim_types::NormalizedTermValue::from(entry.nterm.clone()),
-                );
-                thesaurus.insert(
-                    terraphim_types::NormalizedTermValue::from(entry.nterm),
-                    normalized_term,
-                );
+            if let Some(map) = thesaurus_res.thesaurus {
+                for (key, nterm_value) in map {
+                    let normalized_term = terraphim_types::NormalizedTerm::new(
+                        1u64,
+                        terraphim_types::NormalizedTermValue::from(nterm_value),
+                    );
+                    thesaurus.insert(
+                        terraphim_types::NormalizedTermValue::from(key),
+                        normalized_term,
+                    );
+                }
             }
 
             // Extract paragraphs using automata
