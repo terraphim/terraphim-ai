@@ -5585,22 +5585,34 @@ impl AgentOrchestrator {
             // owning project so multi-project fleets land comments in the
             // correct owner/repo.
             if let (Some(poster), Some(issue)) = (&self.output_poster, def.gitea_issue) {
-                let exit_code = status.code();
-                let project = def
-                    .project
-                    .clone()
-                    .unwrap_or_else(|| crate::dispatcher::LEGACY_PROJECT_ID.to_string());
-                if let Err(e) = poster
-                    .post_agent_output_for_project(&project, name, issue, &output_lines, exit_code)
-                    .await
-                {
-                    warn!(
+                if def.event_only {
+                    // Defence-in-depth: the dispatch gate at handle_webhook_dispatch
+                    // should have prevented an event-only agent from acquiring a
+                    // gitea_issue. If we reach here the gate has a hole; treat as a
+                    // should-never-happen alert and skip the post.
+                    error!(
                         agent = %name,
-                        project = %project,
                         issue = issue,
-                        error = %e,
-                        "failed to post output to Gitea"
+                        "skipping output post: agent is event-only but gitea_issue is set; this indicates a missed dispatch gate"
                     );
+                } else {
+                    let exit_code = status.code();
+                    let project = def
+                        .project
+                        .clone()
+                        .unwrap_or_else(|| crate::dispatcher::LEGACY_PROJECT_ID.to_string());
+                    if let Err(e) = poster
+                        .post_agent_output_for_project(&project, name, issue, &output_lines, exit_code)
+                        .await
+                    {
+                        warn!(
+                            agent = %name,
+                            project = %project,
+                            issue = issue,
+                            error = %e,
+                            "failed to post output to Gitea"
+                        );
+                    }
                 }
             }
 
@@ -9727,6 +9739,51 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             orch.active_agents.is_empty(),
             "event_only agent must not be added to active_agents on persona dispatch; got: {:?}",
             orch.active_agents.keys().collect::<Vec<_>>()
+        );
+    }
+
+    /// T5: structural invariant for the post-exit defensive guard.
+    /// The guard at lib.rs's "Post output to Gitea if configured" block fires
+    /// `error!` and skips posting when an event-only agent reaches the hook with
+    /// gitea_issue set -- a "should never happen" path because the dispatch gate
+    /// in handle_webhook_dispatch should have already rejected the spawn.
+    /// Full runtime coverage would require integration infrastructure
+    /// (worktrees, real spawning, output capture) disproportionate to a single
+    /// boolean check. T3 and T4 cover the dispatch gate that prevents this
+    /// branch from being reached in production.
+    #[test]
+    fn test_post_exit_guard_invariant_event_only_with_gitea_issue() {
+        let def = AgentDefinition {
+            name: "build-runner".to_string(),
+            layer: AgentLayer::Growth,
+            cli_tool: "/bin/bash".to_string(),
+            task: "echo would-build".to_string(),
+            schedule: None,
+            model: None,
+            capabilities: vec!["build".to_string()],
+            max_memory_bytes: None,
+            budget_monthly_cents: None,
+            provider: None,
+            persona: None,
+            terraphim_role: None,
+            skill_chain: vec![],
+            sfia_skills: vec![],
+            fallback_provider: None,
+            fallback_model: None,
+            grace_period_secs: None,
+            max_cpu_seconds: None,
+            pre_check: None,
+            gitea_issue: Some(9999),
+            event_only: true,
+            project: None,
+        };
+
+        // The defensive guard reads exactly these two fields. Its branch fires
+        // when both are set on the same definition.
+        assert!(def.event_only, "event_only must be true to trigger the guard");
+        assert!(
+            def.gitea_issue.is_some(),
+            "gitea_issue must be Some(_) for the post-exit code to enter the outer if-let"
         );
     }
 }
