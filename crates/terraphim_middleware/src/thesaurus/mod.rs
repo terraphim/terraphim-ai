@@ -27,7 +27,6 @@
 
 pub use terraphim_automata::builder::{Logseq, ThesaurusBuilder};
 use terraphim_config::ConfigState;
-use terraphim_config::Role;
 use terraphim_persistence::Persistable;
 use terraphim_rolegraph::{RoleGraph, RoleGraphSync};
 use terraphim_types::SearchQuery;
@@ -48,9 +47,21 @@ pub async fn build_thesaurus_from_haystack(
     let default_role = config.default_role.clone();
     let role_name = search_query.role.clone().unwrap_or_default();
     log::debug!("Role name: {}", role_name);
-    let role: &mut Role = &mut roles
+    let role = roles
         .get(&role_name)
-        .unwrap_or(&roles[&default_role])
+        .or_else(|| roles.get(&default_role))
+        .or_else(|| roles.values().next())
+        .ok_or_else(|| {
+            crate::Error::RoleNotFound(format!(
+                "No role found: requested='{}', default='{}', available={:?}",
+                role_name,
+                default_role,
+                roles
+                    .keys()
+                    .map(|k| k.original.as_str())
+                    .collect::<Vec<_>>()
+            ))
+        })?
         .to_owned();
     log::debug!("Role: {:?}", role);
     for haystack in &role.haystacks {
