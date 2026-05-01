@@ -1150,6 +1150,67 @@ impl GiteaTracker {
         }
     }
 
+    /// List all commit statuses posted against a SHA.
+    ///
+    /// `GET /api/v1/repos/{owner}/{repo}/commits/{sha}/statuses`
+    pub async fn list_commit_statuses(
+        &self,
+        owner: &str,
+        repo: &str,
+        sha: &str,
+    ) -> Result<Vec<CommitStatusEntry>> {
+        let url = format!(
+            "{}/api/v1/repos/{}/{}/commits/{}/statuses",
+            self.config.base_url, owner, repo, sha
+        );
+        let response = self
+            .build_request(reqwest::Method::GET, &url)
+            .send()
+            .await?;
+        if !response.status().is_success() {
+            let status = response.status();
+            let text = response.text().await.unwrap_or_default();
+            return Err(TrackerError::Api {
+                message: format!(
+                    "Gitea list_commit_statuses error {} on {}/{}@{}: {}",
+                    status, owner, repo, sha, text
+                ),
+            });
+        }
+        let entries: Vec<CommitStatusEntry> = response.json().await.map_err(TrackerError::Http)?;
+        Ok(entries)
+    }
+
+    /// Fetch branch protection rules for a branch.
+    ///
+    /// `GET /api/v1/repos/{owner}/{repo}/branch_protections/{branch}`
+    pub async fn get_branch_protection(
+        &self,
+        owner: &str,
+        repo: &str,
+        branch: &str,
+    ) -> Result<BranchProtection> {
+        let url = format!(
+            "{}/api/v1/repos/{}/{}/branch_protections/{}",
+            self.config.base_url, owner, repo, branch
+        );
+        let response = self
+            .build_request(reqwest::Method::GET, &url)
+            .send()
+            .await?;
+        if !response.status().is_success() {
+            let status = response.status();
+            let text = response.text().await.unwrap_or_default();
+            return Err(TrackerError::Api {
+                message: format!(
+                    "Gitea get_branch_protection error {} on {}/{} branch {}: {}",
+                    status, owner, repo, branch, text
+                ),
+            });
+        }
+        response.json().await.map_err(TrackerError::Http)
+    }
+
     /// Check if an error indicates gitea-robot is unavailable.
     fn is_robot_unavailable_error(error: &TrackerError) -> bool {
         let err_str = error.to_string().to_lowercase();
@@ -1265,6 +1326,26 @@ pub struct GiteaPrSummary {
     /// Total diff size in lines (`additions + deletions`). Defaults to 0 when
     /// Gitea does not report a value.
     pub diff_loc: u32,
+}
+
+/// A single commit status entry returned by `GET /repos/{owner}/{repo}/commits/{sha}/statuses`.
+#[derive(Debug, Clone, Deserialize)]
+pub struct CommitStatusEntry {
+    pub context: String,
+    pub state: String,
+    #[serde(default)]
+    pub description: Option<String>,
+    #[serde(default)]
+    pub target_url: Option<String>,
+}
+
+/// Branch protection rules returned by `GET /repos/{owner}/{repo}/branch_protections/{branch}`.
+#[derive(Debug, Clone, Deserialize)]
+pub struct BranchProtection {
+    #[serde(default)]
+    pub enable_status_check: bool,
+    #[serde(default)]
+    pub status_check_contexts: Vec<String>,
 }
 
 /// Raw pull-request response from the Gitea API.
