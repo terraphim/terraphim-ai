@@ -1557,7 +1557,10 @@ mod tests {
             created_at: Some("2024-01-15T10:30:00Z".into()),
             updated_at: Some("2024-01-15T11:00:00Z".into()),
             labels: Some(vec![
-                GiteaLabel { id: 1, name: "bug".into() },
+                GiteaLabel {
+                    id: 1,
+                    name: "bug".into(),
+                },
                 GiteaLabel {
                     id: 2,
                     name: "Priority:High".into(),
@@ -1591,7 +1594,10 @@ mod tests {
             created_at: None,
             updated_at: None,
             labels: Some(vec![
-                GiteaLabel { id: 1, name: "BUG".into() },
+                GiteaLabel {
+                    id: 1,
+                    name: "BUG".into(),
+                },
                 GiteaLabel {
                     id: 2,
                     name: "FEATURE".into(),
