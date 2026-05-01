@@ -160,6 +160,9 @@ struct ManagedAgent {
     /// Concurrency permit held while the agent is running. Released on drop.
     #[allow(dead_code)]
     concurrency_permit: Option<concurrency::AgentPermit>,
+    /// When set, post a terminal commit status on agent exit.
+    /// Tuple of (head_sha, context).
+    commit_status_post: Option<(String, String)>,
 }
 
 #[cfg(not(test))]
@@ -1912,6 +1915,7 @@ impl AgentOrchestrator {
                 mention_depth: None,
                 mention_parent_agent: None,
                 concurrency_permit: permit,
+                commit_status_post: None,
             },
         );
 
@@ -1995,8 +1999,14 @@ impl AgentOrchestrator {
         let entries = self.config.agents_on_pr_open_for_project(&project);
         for entry in entries {
             let spawned = match entry.name.as_str() {
-                "build-runner" => self.dispatch_build_runner_for_pr(&req).await?,
-                _ => self.dispatch_pr_reviewer_for_pr(&req, &entry.name).await?,
+                "build-runner" => {
+                    self.dispatch_build_runner_for_pr(&req, &entry.context)
+                        .await?
+                }
+                _ => {
+                    self.dispatch_pr_reviewer_for_pr(&req, &entry.name, &entry.context)
+                        .await?
+                }
             };
             if spawned {
                 self.post_pending_status(
@@ -2025,6 +2035,7 @@ impl AgentOrchestrator {
         &mut self,
         req: &pr_dispatch::ReviewPrRequest,
         agent_name: &str,
+        commit_status_context: &str,
     ) -> Result<bool, OrchestratorError> {
         let pr_number = req.pr_number;
         let project = req.project.clone();
@@ -2235,6 +2246,7 @@ impl AgentOrchestrator {
                 mention_depth: None,
                 mention_parent_agent: None,
                 concurrency_permit: None,
+                commit_status_post: Some((head_sha.clone(), commit_status_context.to_string())),
             },
         );
 
@@ -2265,6 +2277,7 @@ impl AgentOrchestrator {
     async fn dispatch_build_runner_for_pr(
         &mut self,
         req: &pr_dispatch::ReviewPrRequest,
+        commit_status_context: &str,
     ) -> Result<bool, OrchestratorError> {
         let pr_number = req.pr_number;
         let project = req.project.clone();
@@ -2419,6 +2432,7 @@ impl AgentOrchestrator {
                 mention_depth: None,
                 mention_parent_agent: None,
                 concurrency_permit: None,
+                commit_status_post: Some((head_sha.clone(), commit_status_context.to_string())),
             },
         );
 
@@ -2492,6 +2506,45 @@ impl AgentOrchestrator {
                     head_sha,
                     context,
                     "ReviewPr: failed to post pending status"
+                );
+            }
+        }
+    }
+
+    /// Post a terminal (success/failure) commit status for an agent that
+    /// exited. Best-effort: logs on failure but does not propagate errors.
+    async fn post_terminal_commit_status(
+        &mut self,
+        head_sha: &str,
+        context: &str,
+        state: terraphim_tracker::StatusState,
+        description: &str,
+    ) {
+        let tracker = match self.get_or_init_pre_check_tracker() {
+            Some(t) => t,
+            None => {
+                debug!(
+                    head_sha,
+                    context, "post_terminal_commit_status: no workflow tracker; skipping"
+                );
+                return;
+            }
+        };
+        let owner = tracker.owner().to_string();
+        let repo = tracker.repo().to_string();
+        match tracker
+            .set_commit_status(&owner, &repo, head_sha, state, context, description, None)
+            .await
+        {
+            Ok(()) => {
+                info!(head_sha, context, "posted terminal commit status");
+            }
+            Err(e) => {
+                warn!(
+                    error = %e,
+                    head_sha,
+                    context,
+                    "failed to post terminal commit status"
                 );
             }
         }
@@ -2681,6 +2734,7 @@ impl AgentOrchestrator {
                 mention_depth: None,
                 mention_parent_agent: None,
                 concurrency_permit: None,
+                commit_status_post: None,
             },
         );
 
@@ -6159,10 +6213,31 @@ impl AgentOrchestrator {
         // NOW remove from active_agents and handle exits.
         // Capture worktree_path before removing so we can commit + clean up.
         for (name, def, status) in exited {
-            let worktree_path = self
-                .active_agents
-                .get(&name)
-                .and_then(|m| m.worktree_path.clone());
+            let (worktree_path, commit_status_post) = {
+                let agent = self.active_agents.get(&name);
+                (
+                    agent.and_then(|m| m.worktree_path.clone()),
+                    agent.and_then(|m| m.commit_status_post.clone()),
+                )
+            };
+
+            // Post terminal commit status if this agent was dispatched with one.
+            if let Some((ref head_sha, ref context)) = commit_status_post {
+                let exit_success = status.success();
+                let state = if exit_success {
+                    terraphim_tracker::StatusState::Success
+                } else {
+                    terraphim_tracker::StatusState::Failure
+                };
+                let description = if exit_success {
+                    format!("{} passed", def.name)
+                } else {
+                    format!("{} failed (exit {})", def.name, status.code().unwrap_or(-1))
+                };
+                self.post_terminal_commit_status(head_sha, context, state, &description)
+                    .await;
+            }
+
             self.active_agents.remove(&name);
 
             if quota_exits.contains(&name) {
