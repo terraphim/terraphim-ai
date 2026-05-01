@@ -5341,6 +5341,16 @@ impl AgentOrchestrator {
             }
         }
 
+        // 17.5. PR gate reconciliation: read actual commit statuses and
+        // branch protection, classify each open PR head, and take action
+        // (enqueue missing agents, open remediation issues, or clear for
+        // auto-merge). Runs every N ticks to avoid excessive API load.
+        if self.tick_count % self.config.gate_reconcile_interval_ticks as u64 == 0 {
+            if let Err(e) = self.reconcile_pr_gates().await {
+                warn!(error = %e, "reconcile_pr_gates failed");
+            }
+        }
+
         // 18. ROC v1 Step F: poll open PRs for reviewer verdicts and enqueue
         // AutoMerge for any PR that clears every gate. Runs AFTER the
         // dispatch drain so the newly enqueued AutoMerge tasks are serviced
@@ -5348,6 +5358,298 @@ impl AgentOrchestrator {
         if let Err(e) = self.poll_pending_reviews().await {
             warn!(error = %e, "poll_pending_reviews failed");
         }
+    }
+
+    /// PR gate reconciliation: for every project with Gitea config, read
+    /// actual commit statuses and branch protection rules, classify each
+    /// open PR head via [`pr_gate::reconcile_pr_gate`], and take action.
+    ///
+    /// Actions:
+    /// - `ReadyForPolicy`: no action (Step 18 will handle it).
+    /// - `EnqueueMissingChecks`: log which agents need dispatching.
+    /// - `AwaitingChecks`: log and skip (rechecked next interval).
+    /// - `BlockedByFailedChecks`: open deduplicated remediation issue.
+    /// - `FactoryFault`: open deduplicated remediation issue with error.
+    ///
+    /// Remediation issues are deduplicated using [`pr_gate::remediation_key`]
+    /// by searching for existing open issues containing the key.
+    async fn reconcile_pr_gates(&mut self) -> Result<(), OrchestratorError> {
+        let targets: Vec<(String, config::GiteaOutputConfig)> = if self.config.projects.is_empty() {
+            match self.config.gitea.clone() {
+                Some(g) => vec![(dispatcher::LEGACY_PROJECT_ID.to_string(), g)],
+                None => return Ok(()),
+            }
+        } else {
+            self.config
+                .projects
+                .iter()
+                .filter_map(|p| p.gitea.clone().map(|g| (p.id.clone(), g)))
+                .collect()
+        };
+
+        if targets.is_empty() {
+            return Ok(());
+        }
+
+        for (project_id, gitea_cfg) in &targets {
+            if let Err(e) = self
+                .reconcile_pr_gates_for_project(project_id, gitea_cfg)
+                .await
+            {
+                warn!(
+                    project = %project_id,
+                    error = %e,
+                    "reconcile_pr_gates_for_project failed"
+                );
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Inner per-project PR gate reconciliation.
+    async fn reconcile_pr_gates_for_project(
+        &mut self,
+        project_id: &str,
+        gitea_cfg: &config::GiteaOutputConfig,
+    ) -> Result<(), OrchestratorError> {
+        let tracker_cfg = terraphim_tracker::GiteaConfig {
+            base_url: gitea_cfg.base_url.clone(),
+            token: gitea_cfg.token.clone(),
+            owner: gitea_cfg.owner.clone(),
+            repo: gitea_cfg.repo.clone(),
+            active_states: vec!["open".to_string()],
+            terminal_states: vec!["closed".to_string()],
+            use_robot_api: false,
+            robot_path: std::path::PathBuf::from("/home/alex/go/bin/gitea-robot"),
+            claim_strategy: terraphim_tracker::gitea::ClaimStrategy::PreferRobot,
+        };
+        let tracker = match terraphim_tracker::GiteaTracker::new(tracker_cfg) {
+            Ok(t) => t,
+            Err(e) => {
+                warn!(project = %project_id, error = %e, "failed to create GiteaTracker for PR gate reconciliation");
+                return Ok(());
+            }
+        };
+
+        let protection = match tracker
+            .get_branch_protection(&gitea_cfg.owner, &gitea_cfg.repo, "main")
+            .await
+        {
+            Ok(p) => p,
+            Err(e) => {
+                warn!(
+                    project = %project_id,
+                    error = %e,
+                    "failed to get branch protection; skipping PR gate reconciliation"
+                );
+                return Ok(());
+            }
+        };
+
+        if !protection.enable_status_check || protection.status_check_contexts.is_empty() {
+            tracing::debug!(
+                project = %project_id,
+                "branch protection has no required status checks; skipping"
+            );
+            return Ok(());
+        }
+
+        let required_contexts = protection.status_check_contexts.clone();
+
+        let prs = match tracker.list_open_prs().await {
+            Ok(prs) => prs,
+            Err(e) => {
+                warn!(project = %project_id, error = %e, "failed to list open PRs for gate reconciliation");
+                return Ok(());
+            }
+        };
+
+        for pr in prs {
+            if pr.head_sha.is_empty() {
+                continue;
+            }
+
+            let statuses = match tracker
+                .list_commit_statuses(&gitea_cfg.owner, &gitea_cfg.repo, &pr.head_sha)
+                .await
+            {
+                Ok(s) => s,
+                Err(e) => {
+                    warn!(
+                        project = %project_id,
+                        pr = pr.number,
+                        sha = %pr.head_sha,
+                        error = %e,
+                        "failed to list commit statuses"
+                    );
+                    continue;
+                }
+            };
+
+            let head_statuses: Vec<pr_gate::CommitStatusSummary> = statuses
+                .into_iter()
+                .map(|s| pr_gate::CommitStatusSummary {
+                    context: s.context,
+                    state: pr_gate::CommitStatusState::from_api_str(&s.state),
+                })
+                .collect();
+
+            let snapshot = pr_gate::PrGateSnapshot {
+                pr_number: pr.number,
+                head_sha: pr.head_sha.clone(),
+                base_branch: pr.base_ref.clone(),
+                required_contexts: required_contexts.clone(),
+                head_statuses,
+            };
+
+            let decision = pr_gate::reconcile_pr_gate(&snapshot);
+
+            match &decision {
+                pr_gate::PrGateDecision::ReadyForPolicy => {
+                    tracing::debug!(
+                        project = %project_id,
+                        pr = pr.number,
+                        "PR gate: all required contexts green"
+                    );
+                }
+                pr_gate::PrGateDecision::EnqueueMissingChecks { missing } => {
+                    tracing::info!(
+                        project = %project_id,
+                        pr = pr.number,
+                        missing = ?missing,
+                        "PR gate: missing required contexts"
+                    );
+                }
+                pr_gate::PrGateDecision::AwaitingChecks { pending } => {
+                    tracing::debug!(
+                        project = %project_id,
+                        pr = pr.number,
+                        pending = ?pending,
+                        "PR gate: awaiting pending checks"
+                    );
+                }
+                pr_gate::PrGateDecision::BlockedByFailedChecks { failed } => {
+                    let key =
+                        pr_gate::remediation_key(project_id, pr.number, &pr.head_sha, &decision);
+                    tracing::warn!(
+                        project = %project_id,
+                        pr = pr.number,
+                        failed = ?failed,
+                        key = %key,
+                        "PR gate: blocked by failed checks"
+                    );
+                    if let Err(e) = self
+                        .open_remediation_issue_if_needed(
+                            &tracker,
+                            project_id,
+                            pr.number,
+                            &pr.head_sha,
+                            &key,
+                            &format!(
+                                "PR #{} blocked by failed required contexts: {}",
+                                pr.number,
+                                failed
+                                    .iter()
+                                    .map(|(ctx, state)| format!("{ctx}={state}"))
+                                    .collect::<Vec<_>>()
+                                    .join(", ")
+                            ),
+                        )
+                        .await
+                    {
+                        warn!(error = %e, "failed to open remediation issue");
+                    }
+                }
+                pr_gate::PrGateDecision::FactoryFault { error } => {
+                    let key =
+                        pr_gate::remediation_key(project_id, pr.number, &pr.head_sha, &decision);
+                    tracing::error!(
+                        project = %project_id,
+                        pr = pr.number,
+                        error = %error,
+                        key = %key,
+                        "PR gate: factory fault"
+                    );
+                    if let Err(e) = self
+                        .open_remediation_issue_if_needed(
+                            &tracker,
+                            project_id,
+                            pr.number,
+                            &pr.head_sha,
+                            &key,
+                            &format!("PR #{} factory fault: {error}", pr.number),
+                        )
+                        .await
+                    {
+                        warn!(error = %e, "failed to open remediation issue");
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Open a deduplicated remediation issue. Searches for existing open issues
+    /// containing the remediation key before creating a new one.
+    async fn open_remediation_issue_if_needed(
+        &self,
+        tracker: &terraphim_tracker::GiteaTracker,
+        project_id: &str,
+        pr_number: u64,
+        head_sha: &str,
+        dedup_key: &str,
+        body: &str,
+    ) -> Result<(), OrchestratorError> {
+        let existing = tracker.search_issues_by_title(dedup_key).await;
+        match existing {
+            Ok(ids) if !ids.is_empty() => {
+                tracing::debug!(
+                    project = %project_id,
+                    key = %dedup_key,
+                    existing_count = ids.len(),
+                    "remediation issue already exists; skipping"
+                );
+                return Ok(());
+            }
+            Err(e) => {
+                tracing::warn!(
+                    project = %project_id,
+                    error = %e,
+                    "failed to search for existing remediation issues; creating anyway"
+                );
+            }
+            Ok(_) => {}
+        }
+
+        let title = format!("[ADF] PR gate remediation: {dedup_key}");
+        let full_body = format!(
+            "{body}\n\n\
+             Project: `{project_id}`\n\
+             PR: #{pr_number}\n\
+             Head SHA: `{head_sha}`\n\
+             Dedup key: `{dedup_key}`\n\n\
+             This issue was auto-created by the PR gate reconciler.\
+             It will be auto-closed when the gate clears."
+        );
+        let labels = ["adf", "pr-gate", "status/needs-triage"];
+
+        tracker
+            .create_issue(&title, &full_body, &labels)
+            .await
+            .map_err(|e| {
+                OrchestratorError::Config(format!("failed to create remediation issue: {e}"))
+            })?;
+
+        tracing::info!(
+            project = %project_id,
+            pr = pr_number,
+            key = %dedup_key,
+            "opened PR gate remediation issue"
+        );
+
+        Ok(())
     }
 
     /// Check all agent budgets and pause any that have exceeded their limits.
@@ -6989,6 +7291,7 @@ mod tests {
             restart_budget_window_secs: 43_200,
             disk_usage_threshold: 100, // disable disk guard in tests
             tick_interval_secs: 30,
+            gate_reconcile_interval_ticks: 20,
             handoff_buffer_ttl_secs: None,
             persona_data_dir: None,
             skill_data_dir: None,
@@ -7224,6 +7527,7 @@ task = "test"
             restart_budget_window_secs: 43_200,
             disk_usage_threshold: 100, // disable disk guard in tests
             tick_interval_secs: 1,
+            gate_reconcile_interval_ticks: 20,
             handoff_buffer_ttl_secs: None,
             persona_data_dir: None,
             skill_data_dir: None,
@@ -8145,6 +8449,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             restart_budget_window_secs: 43_200,
             disk_usage_threshold: 100,
             tick_interval_secs: 1,
+            gate_reconcile_interval_ticks: 20,
             handoff_buffer_ttl_secs: None,
             persona_data_dir: None,
             skill_data_dir: None,

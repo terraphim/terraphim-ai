@@ -99,6 +99,10 @@ pub struct OrchestratorConfig {
     /// Reconciliation tick interval in seconds.
     #[serde(default = "default_tick_interval")]
     pub tick_interval_secs: u64,
+    /// How many reconcile ticks between PR gate reconciliation runs.
+    /// Default: 20 (~10 minutes at 30s tick, ~20 minutes at 60s tick).
+    #[serde(default = "default_gate_reconcile_interval_ticks")]
+    pub gate_reconcile_interval_ticks: u32,
     /// Default TTL in seconds for handoff buffer entries (None = 86400).
     #[serde(default)]
     pub handoff_buffer_ttl_secs: Option<u64>,
@@ -908,6 +912,10 @@ fn default_disk_usage_threshold() -> u8 {
 
 fn default_tick_interval() -> u64 {
     30
+}
+
+fn default_gate_reconcile_interval_ticks() -> u32 {
+    20
 }
 
 fn default_project_circuit_breaker_threshold() -> u32 {
