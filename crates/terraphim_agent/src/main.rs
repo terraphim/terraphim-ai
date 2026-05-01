@@ -4301,15 +4301,17 @@ async fn run_server_command(
 
             // Build thesaurus from response
             let mut thesaurus = terraphim_types::Thesaurus::new(format!("role-{}", role_name));
-            for entry in thesaurus_res.terms {
-                let normalized_term = terraphim_types::NormalizedTerm::new(
-                    1u64, // Simple ID for CLI usage
-                    terraphim_types::NormalizedTermValue::from(entry.nterm.clone()),
-                );
-                thesaurus.insert(
-                    terraphim_types::NormalizedTermValue::from(entry.nterm),
-                    normalized_term,
-                );
+            if let Some(entries) = &thesaurus_res.thesaurus {
+                for value in entries.values() {
+                    let normalized_term = terraphim_types::NormalizedTerm::new(
+                        1u64,
+                        terraphim_types::NormalizedTermValue::from(value.clone()),
+                    );
+                    thesaurus.insert(
+                        terraphim_types::NormalizedTermValue::from(value.clone()),
+                        normalized_term,
+                    );
+                }
             }
 
             // Extract paragraphs using automata

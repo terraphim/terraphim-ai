@@ -166,6 +166,7 @@ fn test_config() -> OrchestratorConfig {
         learning: terraphim_orchestrator::LearningConfig::default(),
         pr_dispatch: None,
         pr_dispatch_per_project: Default::default(),
+        gate_reconcile_interval_ticks: 20,
     }
 }
 

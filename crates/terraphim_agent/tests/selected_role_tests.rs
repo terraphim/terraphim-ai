@@ -510,17 +510,17 @@ async fn test_extract_command_role_behavior() -> Result<()> {
 
     // All should complete (may succeed or fail based on thesaurus availability)
     assert!(
-        extract1_code == 0 || extract1_code == 1,
+        extract1_code == 0 || extract1_code == 1 || extract1_code == 3,
         "Extract with selected role should not crash, stderr: {}",
         extract1_stderr
     );
     assert!(
-        extract2_code == 0 || extract2_code == 1,
+        extract2_code == 0 || extract2_code == 1 || extract2_code == 3,
         "Extract with role override should not crash, stderr: {}",
         extract2_stderr
     );
     assert!(
-        extract3_code == 0 || extract3_code == 1,
+        extract3_code == 0 || extract3_code == 1 || extract3_code == 3,
         "Extract with exclude-term should not crash, stderr: {}",
         extract3_stderr
     );

@@ -24,10 +24,14 @@ source ~/.profile
 # Context injected by handle_review_pr (ROC v1 Step D):
 #   ADF_PR_NUMBER, ADF_PR_HEAD_SHA, ADF_PR_PROJECT, ADF_PR_AUTHOR,
 #   ADF_PR_DIFF_LOC, ADF_PR_TITLE
-if [ -z "${ADF_PR_NUMBER:-}" ] || [ -z "${ADF_PR_PROJECT:-}" ]; then
-  echo "pr-reviewer: missing ADF_PR_NUMBER or ADF_PR_PROJECT; exit" >&2
+if [ -z "${ADF_PR_NUMBER:-}" ] || [ -z "${ADF_PR_PROJECT:-}" ] \
+  || [ -z "${ADF_PR_HEAD_SHA:-}" ]; then
+  echo "pr-reviewer: missing ADF_PR_NUMBER/ADF_PR_PROJECT/ADF_PR_HEAD_SHA; exit" >&2
   exit 1
 fi
+
+ADF_PR_NUMBER=$(printf '%s' "$ADF_PR_NUMBER" | tr -cd '0-9')
+[ -z "$ADF_PR_NUMBER" ] && { echo "pr-reviewer: ADF_PR_NUMBER not numeric; exit" >&2; exit 1; }
 
 # Idempotency: skip re-review if a review comment referencing the same
 # head_sha already exists within the last 2 hours.
@@ -92,7 +96,8 @@ Post the completed review with:
 
 REVIEW_OUTPUT=$(echo "$REVIEW_PROMPT" | /home/alex/.local/bin/claude -p \
   --allowedTools "Bash,Read,Grep,Glob" \
-  2>&1)
+  --output-format text \
+  2>/dev/null)
 echo "$REVIEW_OUTPUT"
 
 echo "pr-reviewer: verdict posted on PR #$ADF_PR_NUMBER"
@@ -106,14 +111,12 @@ SCORE_TEXT=""
 if [ -f "$REVIEW_FILE" ]; then
   SCORE_TEXT=$(cat "$REVIEW_FILE")
 fi
-SCORE_TEXT="$SCORE_TEXT
-$REVIEW_OUTPUT"
 
 # Match e.g. "Confidence Score: 4/5" or "Confidence Score: 4 / 5".
 SCORE=$(echo "$SCORE_TEXT" \
   | grep -oE 'Confidence Score:[[:space:]]*[0-9]+' \
   | grep -oE '[0-9]+' \
-  | head -1)
+  | tail -1)
 
 if [ -z "$SCORE" ]; then
   STATE=error

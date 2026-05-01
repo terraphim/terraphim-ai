@@ -46,10 +46,14 @@ source ~/.profile
 # Context injected by handle_review_pr (Phase 2 fan-out):
 #   ADF_PR_NUMBER, ADF_PR_HEAD_SHA, ADF_PR_PROJECT, ADF_PR_AUTHOR,
 #   ADF_PR_DIFF_LOC, ADF_PR_TITLE
-if [ -z "${ADF_PR_NUMBER:-}" ] || [ -z "${ADF_PR_PROJECT:-}" ]; then
-  echo "pr-security-sentinel: missing ADF_PR_NUMBER or ADF_PR_PROJECT; exit" >&2
+if [ -z "${ADF_PR_NUMBER:-}" ] || [ -z "${ADF_PR_PROJECT:-}" ] \
+  || [ -z "${ADF_PR_HEAD_SHA:-}" ]; then
+  echo "pr-security-sentinel: missing ADF_PR_NUMBER/ADF_PR_PROJECT/ADF_PR_HEAD_SHA; exit" >&2
   exit 1
 fi
+
+ADF_PR_NUMBER=$(printf '%s' "$ADF_PR_NUMBER" | tr -cd '0-9')
+[ -z "$ADF_PR_NUMBER" ] && { echo "pr-security-sentinel: ADF_PR_NUMBER not numeric; exit" >&2; exit 1; }
 
 HEAD_SHORT=$(echo "$ADF_PR_HEAD_SHA" | cut -c1-7)
 
@@ -194,13 +198,13 @@ $REVIEW_OUTPUT"
 VERDICT=$(echo "$SCORE_TEXT" \
   | grep -oE 'Verdict:[[:space:]]*(pass|concerns|fail)' \
   | grep -oE '(pass|concerns|fail)' \
-  | head -1)
+  | tail -1)
 
 if [ -z "$VERDICT" ]; then
   RISK=$(echo "$SCORE_TEXT" \
     | grep -oE 'Risk:[[:space:]]*(low|medium|high|critical)' \
     | grep -oE '(low|medium|high|critical)' \
-    | head -1)
+    | tail -1)
   case "$RISK" in
     critical|high) VERDICT="fail" ;;
     medium)        VERDICT="concerns" ;;

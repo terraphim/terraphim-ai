@@ -39,6 +39,9 @@ if [ -z "${ADF_PR_NUMBER:-}" ] || [ -z "${ADF_PR_PROJECT:-}" ] \
   exit 1
 fi
 
+ADF_PR_NUMBER=$(printf '%s' "$ADF_PR_NUMBER" | tr -cd '0-9')
+[ -z "$ADF_PR_NUMBER" ] && { echo "pr-test-guardian: ADF_PR_NUMBER not numeric; exit" >&2; exit 1; }
+
 HEAD_SHORT=$(echo "$ADF_PR_HEAD_SHA" | cut -c1-7)
 
 # Idempotency: skip re-review if a comment referencing the same head_sha
@@ -47,7 +50,8 @@ EXISTING=$(curl -sf -H "Authorization: token $GITEA_TOKEN" \
   "$GITEA_URL/api/v1/repos/$GITEA_OWNER/$GITEA_REPO/issues/$ADF_PR_NUMBER/comments" 2>/dev/null \
   | python3 -c '
 import json, sys, datetime, os
-head_short = os.environ.get("HEAD_SHORT", "")
+head = os.environ.get("ADF_PR_HEAD_SHA", "")
+head_short = head[:7]
 cs = json.load(sys.stdin)
 now = datetime.datetime.now(datetime.timezone.utc)
 recent = [

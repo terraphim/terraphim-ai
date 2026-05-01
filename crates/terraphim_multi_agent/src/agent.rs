@@ -1345,7 +1345,7 @@ mod tests {
 
         DeviceStorage::init_memory_only().await.unwrap();
         let persistence = DeviceStorage::arc_memory_only().await.unwrap();
-        let agent = TerraphimAgent::new(role, persistence, None).await.unwrap();
+        let _agent = TerraphimAgent::new(role, persistence, None).await.unwrap();
 
         // Verify hook_manager is initialized and accessible
         // (hook_manager field is present and functional - verified by usage in other tests)

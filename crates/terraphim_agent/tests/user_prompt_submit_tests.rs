@@ -77,9 +77,7 @@ fn find_correction_files(home: &str) -> Vec<std::path::PathBuf> {
         .filter(|path| {
             path.file_name()
                 .and_then(|n| n.to_str())
-                .map_or(false, |name| {
-                    name.starts_with("correction-") && name.ends_with(".md")
-                })
+                .is_some_and(|name| name.starts_with("correction-") && name.ends_with(".md"))
         })
         .collect()
 }
