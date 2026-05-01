@@ -188,6 +188,7 @@ pub struct GiteaIssue {
 /// Gitea label.
 #[derive(Debug, Deserialize)]
 pub struct GiteaLabel {
+    pub id: i64,
     pub name: String,
 }
 
@@ -400,7 +401,6 @@ impl GiteaTracker {
             .json(&serde_json::json!({
                 "title": title,
                 "body": body,
-                "labels": labels,
             }))
             .send()
             .await?;
@@ -411,7 +411,76 @@ impl GiteaTracker {
                 message: format!("Gitea create_issue error {}: {}", status, text),
             });
         }
+        let issue: GiteaIssue = response.json().await?;
+
+        if !labels.is_empty() {
+            if let Err(e) = self.set_issue_labels(issue.number, labels).await {
+                tracing::warn!(
+                    issue_number = issue.number,
+                    labels = ?labels,
+                    error = %e,
+                    "failed to set labels on newly created issue"
+                );
+            }
+        }
+
+        Ok(issue)
+    }
+
+    pub async fn list_labels(&self) -> Result<Vec<GiteaLabel>> {
+        let url = format!(
+            "{}/api/v1/repos/{}/{}/labels",
+            self.config.base_url, self.config.owner, self.config.repo
+        );
+        let response = self
+            .build_request(reqwest::Method::GET, &url)
+            .query(&[("limit", "50")])
+            .send()
+            .await?;
+        if !response.status().is_success() {
+            let status = response.status();
+            let text = response.text().await.unwrap_or_default();
+            return Err(TrackerError::Api {
+                message: format!("Gitea list_labels error {}: {}", status, text),
+            });
+        }
         response.json().await.map_err(TrackerError::Http)
+    }
+
+    pub async fn set_issue_labels(
+        &self,
+        issue_number: u64,
+        label_names: &[&str],
+    ) -> Result<Vec<i64>> {
+        let all_labels = self.list_labels().await?;
+        let mut label_ids: Vec<i64> = Vec::new();
+        for name in label_names {
+            if let Some(found) = all_labels.iter().find(|l| l.name == *name) {
+                label_ids.push(found.id);
+            } else {
+                tracing::warn!(label = %name, "label not found in repository, skipping");
+            }
+        }
+        if label_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let url = format!(
+            "{}/api/v1/repos/{}/{}/issues/{}/labels",
+            self.config.base_url, self.config.owner, self.config.repo, issue_number
+        );
+        let response = self
+            .build_request(reqwest::Method::PUT, &url)
+            .json(&serde_json::json!({ "labels": label_ids }))
+            .send()
+            .await?;
+        if !response.status().is_success() {
+            let status = response.status();
+            let text = response.text().await.unwrap_or_default();
+            return Err(TrackerError::Api {
+                message: format!("Gitea set_issue_labels error {}: {}", status, text),
+            });
+        }
+        Ok(label_ids)
     }
 
     /// Assign a Gitea issue to one or more users.
@@ -1488,8 +1557,9 @@ mod tests {
             created_at: Some("2024-01-15T10:30:00Z".into()),
             updated_at: Some("2024-01-15T11:00:00Z".into()),
             labels: Some(vec![
-                GiteaLabel { name: "bug".into() },
+                GiteaLabel { id: 1, name: "bug".into() },
                 GiteaLabel {
+                    id: 2,
                     name: "Priority:High".into(),
                 },
             ]),
@@ -1521,8 +1591,9 @@ mod tests {
             created_at: None,
             updated_at: None,
             labels: Some(vec![
-                GiteaLabel { name: "BUG".into() },
+                GiteaLabel { id: 1, name: "BUG".into() },
                 GiteaLabel {
+                    id: 2,
                     name: "FEATURE".into(),
                 },
             ]),
