@@ -1337,6 +1337,8 @@ pub struct CommitStatusEntry {
     pub description: Option<String>,
     #[serde(default)]
     pub target_url: Option<String>,
+    #[serde(default)]
+    pub created_at: Option<String>,
 }
 
 /// Branch protection rules returned by `GET /repos/{owner}/{repo}/branch_protections/{branch}`.

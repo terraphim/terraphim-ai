@@ -5492,6 +5492,7 @@ impl AgentOrchestrator {
                 .map(|s| pr_gate::CommitStatusSummary {
                     context: s.context,
                     state: pr_gate::CommitStatusState::from_api_str(&s.state),
+                    created_at_unix: s.created_at.and_then(|ts| ts.parse::<i64>().ok()),
                 })
                 .collect();
 
@@ -5501,6 +5502,7 @@ impl AgentOrchestrator {
                 base_branch: pr.base_ref.clone(),
                 required_contexts: required_contexts.clone(),
                 head_statuses,
+                now_unix: chrono::Utc::now().timestamp(),
             };
 
             let decision = pr_gate::reconcile_pr_gate(&snapshot);

@@ -37,7 +37,12 @@ impl CommitStatusState {
 pub struct CommitStatusSummary {
     pub context: String,
     pub state: CommitStatusState,
+    /// Unix timestamp (seconds) when the status was created, if available.
+    pub created_at_unix: Option<i64>,
 }
+
+/// Default stale pending timeout in seconds (60 minutes).
+pub const STALE_PENDING_TIMEOUT_SECS: i64 = 3600;
 
 /// Snapshot of everything the reconciler needs to classify a PR head.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -49,6 +54,8 @@ pub struct PrGateSnapshot {
     pub required_contexts: Vec<String>,
     /// Commit statuses actually posted on the head SHA.
     pub head_statuses: Vec<CommitStatusSummary>,
+    /// Current time as Unix timestamp (seconds). Used for stale pending detection.
+    pub now_unix: i64,
 }
 
 /// Deterministic classification of a PR head's gate state.
@@ -82,6 +89,22 @@ pub fn reconcile_pr_gate(snapshot: &PrGateSnapshot) -> PrGateDecision {
     let missing = missing_required_contexts(&snapshot.required_contexts, &snapshot.head_statuses);
     if !missing.is_empty() {
         return PrGateDecision::EnqueueMissingChecks { missing };
+    }
+
+    let stale = stale_pending_contexts(
+        &snapshot.required_contexts,
+        &snapshot.head_statuses,
+        snapshot.now_unix,
+        STALE_PENDING_TIMEOUT_SECS,
+    );
+    if !stale.is_empty() {
+        return PrGateDecision::FactoryFault {
+            error: format!(
+                "stale pending contexts (>{:>0}min): {}",
+                STALE_PENDING_TIMEOUT_SECS / 60,
+                stale.join(", ")
+            ),
+        };
     }
 
     let pending = pending_required_contexts(&snapshot.required_contexts, &snapshot.head_statuses);
@@ -126,6 +149,36 @@ pub fn pending_required_contexts(
             status_map
                 .get(ctx.as_str())
                 .is_some_and(|state| !state.is_terminal())
+        })
+        .cloned()
+        .collect()
+}
+
+/// Compute which required contexts have been pending longer than the timeout.
+/// Uses `created_at_unix` from the status entry and `now_unix` from the snapshot.
+pub fn stale_pending_contexts(
+    required: &[String],
+    statuses: &[CommitStatusSummary],
+    now_unix: i64,
+    timeout_secs: i64,
+) -> Vec<String> {
+    let status_map: std::collections::HashMap<&str, (&CommitStatusState, Option<i64>)> = statuses
+        .iter()
+        .map(|s| (s.context.as_str(), (&s.state, s.created_at_unix)))
+        .collect();
+    required
+        .iter()
+        .filter(|ctx| {
+            let Some((state, created)) = status_map.get(ctx.as_str()) else {
+                return false;
+            };
+            if state.is_terminal() {
+                return false;
+            }
+            let Some(created_ts) = created else {
+                return false;
+            };
+            now_unix - created_ts > timeout_secs
         })
         .cloned()
         .collect()
@@ -213,11 +266,23 @@ mod tests {
     }
 
     fn statuses(items: &[(&str, CommitStatusState)]) -> Vec<CommitStatusSummary> {
+        statuses_with_times(
+            &items
+                .iter()
+                .map(|(ctx, state)| (*ctx, *state, None))
+                .collect::<Vec<_>>(),
+        )
+    }
+
+    fn statuses_with_times(
+        items: &[(&str, CommitStatusState, Option<i64>)],
+    ) -> Vec<CommitStatusSummary> {
         items
             .iter()
-            .map(|(ctx, state)| CommitStatusSummary {
+            .map(|(ctx, state, ts)| CommitStatusSummary {
                 context: ctx.to_string(),
                 state: *state,
+                created_at_unix: *ts,
             })
             .collect()
     }
@@ -229,6 +294,23 @@ mod tests {
             base_branch: "main".into(),
             required_contexts: required(req),
             head_statuses: statuses(sts),
+            now_unix: 10_000,
+        }
+    }
+
+    fn snapshot_ctx_with_times(
+        pr: u64,
+        req: &[&str],
+        sts: &[(&str, CommitStatusState, Option<i64>)],
+        now_unix: i64,
+    ) -> PrGateSnapshot {
+        PrGateSnapshot {
+            pr_number: pr,
+            head_sha: sha("abc123def456"),
+            base_branch: "main".into(),
+            required_contexts: required(req),
+            head_statuses: statuses_with_times(sts),
+            now_unix,
         }
     }
 
@@ -240,6 +322,7 @@ mod tests {
             base_branch: "main".into(),
             required_contexts: vec![],
             head_statuses: vec![],
+            now_unix: 10_000,
         };
         assert_eq!(reconcile_pr_gate(&snap), PrGateDecision::ReadyForPolicy);
     }
@@ -448,5 +531,63 @@ mod tests {
         let key1 = remediation_key("p", 42, "aaa111", &d1);
         let key2 = remediation_key("p", 42, "bbb222", &d1);
         assert_ne!(key1, key2);
+    }
+
+    #[test]
+    fn stale_pending_triggers_factory_fault() {
+        let snap = snapshot_ctx_with_times(
+            42,
+            &["adf/build", "adf/pr-reviewer"],
+            &[
+                ("adf/build", CommitStatusState::Pending, Some(5_000)),
+                ("adf/pr-reviewer", CommitStatusState::Success, Some(5_000)),
+            ],
+            10_000,
+        );
+        let decision = reconcile_pr_gate(&snap);
+        match &decision {
+            PrGateDecision::FactoryFault { error } => {
+                assert!(error.contains("adf/build"));
+                assert!(error.contains("stale pending"));
+            }
+            other => panic!("expected FactoryFault, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn recent_pending_does_not_trigger_stale() {
+        let snap = snapshot_ctx_with_times(
+            42,
+            &["adf/build", "adf/pr-reviewer"],
+            &[
+                ("adf/build", CommitStatusState::Pending, Some(9_500)),
+                ("adf/pr-reviewer", CommitStatusState::Success, Some(5_000)),
+            ],
+            10_000,
+        );
+        let decision = reconcile_pr_gate(&snap);
+        assert_eq!(
+            decision,
+            PrGateDecision::AwaitingChecks {
+                pending: vec!["adf/build".into()]
+            }
+        );
+    }
+
+    #[test]
+    fn stale_without_created_at_does_not_trigger() {
+        let snap = snapshot_ctx_with_times(
+            42,
+            &["adf/build"],
+            &[("adf/build", CommitStatusState::Pending, None)],
+            10_000,
+        );
+        let decision = reconcile_pr_gate(&snap);
+        assert_eq!(
+            decision,
+            PrGateDecision::AwaitingChecks {
+                pending: vec!["adf/build".into()]
+            }
+        );
     }
 }
