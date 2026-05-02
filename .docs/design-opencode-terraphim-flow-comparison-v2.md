@@ -4,29 +4,32 @@
 
 Compare OpenCode frontend development assistance across three configurations:
 - **Flow A**: Terraphim + Ripgrep haystack (local content search)
-- **Flow B**: Terraphim + FFF haystack (fuzzy file find + KG-scored content grep)
+- **Flow B**: Terraphim + FFF MCP tools (direct `terraphim_find_files`/`terraphim_grep`)
 - **Flow C**: Control (no Terraphim - default OpenCode search)
 
 **Task**: Build an accessible navigation component in a Svelte project with iterative refinement.
 
 **Metrics**: Relevance (WCAG compliance, pattern quality), Efficiency (time, iterations, tool calls).
 
+**Status**: Setup complete. Experiment ready to run.
+
 ---
 
 ## 1. Key Findings from Research
 
-### FFF vs Ripgrep Haystacks
+### CRITICAL: FFF is NOT a Haystack
 
-| Aspect | Ripgrep Haystack | FFF Haystack |
-|--------|------------------|--------------|
-| **Purpose** | Content search (what files contain X) | File finding (by path) + content search |
-| **Matching** | Regex-based content search | Fuzzy path matching + Aho-Corasick content |
-| **Scoring** | Standard TF-IDF | Frecency (frequency + recency) + KG path boost |
-| **KG Integration** | Concept matching in content | Concept matching in file paths AND content |
-| **Speed** | Fast for content | Fast for frequent files (frecency cache) |
-| **MCP Tools** | Via terraphim_middleware | `terraphim_find_files`, `terraphim_grep`, `terraphim_multi_grep` |
+FFF (Fast File Finder) provides MCP tools, NOT a haystack ServiceType:
 
-**Conclusion**: FFF is NOT a drop-in Ripgrep replacement. FFF excels at file discovery by path with frecency, while Ripgrep excels at exhaustive content search. For the experiment, we test both as separate haystack configurations.
+| Aspect | Ripgrep Haystack | FFF MCP Tools |
+|--------|------------------|----------------|
+| **Type** | Haystack ServiceType | MCP tools |
+| **Purpose** | Content search | File finding + grep |
+| **Interface** | `terraphim search` command | Direct MCP tool calls |
+| **KG Scoring** | Relevance function | kg_scorer (path boost) |
+| **Tools** | Via middleware | `terraphim_find_files`, `terraphim_grep` |
+
+**Conclusion**: FFF and Ripgrep are complementary. Flow A uses Ripgrep haystack. Flow B uses FFF MCP tools directly.
 
 ### Frontend KG Status
 
