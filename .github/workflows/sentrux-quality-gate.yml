@@ -22,7 +22,7 @@ jobs:
     
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
           fetch-depth: 1
           clean: true
@@ -136,35 +136,33 @@ jobs:
             DELTA_ICON="⚪"
           fi
           
-          COMMENT="## Sentrux Quality Gate $STATUS_ICON
-
-**Quality Signal:** $QUALITY / 10000
-**Violations:** $VIOLATIONS
-**Status:** $STATUS
-"
+          # Write comment to file to avoid YAML parsing issues with markdown
+          printf '%s\n' '## Sentrux Quality Gate '"$STATUS_ICON"'' > /tmp/comment.md
+          printf '%s\n' '' >> /tmp/comment.md
+          printf '%s\n' '**Quality Signal:** '"$QUALITY"' / 10000' >> /tmp/comment.md
+          printf '%s\n' '**Violations:** '"$VIOLATIONS"'' >> /tmp/comment.md
+          printf '%s\n' '**Status:** '"$STATUS"'' >> /tmp/comment.md
           
           if [ "$DELTA" != "unknown" ]; then
-            COMMENT="${COMMENT}**Delta:** $DELTA_ICON $DELTA points (baseline: $BASELINE)
-"
+            echo "**Delta:** $DELTA_ICON $DELTA points (baseline: $BASELINE)" >> /tmp/comment.md
             if [ "$DEGRADED" = "true" ]; then
-              COMMENT="${COMMENT}
-🔴 **Quality degraded by more than 100 points!**
-"
+              echo "" >> /tmp/comment.md
+              echo "🔴 **Quality degraded by more than 100 points!**" >> /tmp/comment.md
             fi
           else
-            COMMENT="${COMMENT}**Delta:** No baseline available
-"
+            echo "**Delta:** No baseline available" >> /tmp/comment.md
           fi
           
-          COMMENT="${COMMENT}
-<details>
-<summary>Full Report</summary>
+          printf '%s\n' '' >> /tmp/comment.md
+          printf '%s\n' '<details>' >> /tmp/comment.md
+          printf '%s\n' '<summary>Full Report</summary>' >> /tmp/comment.md
+          printf '%s\n' '' >> /tmp/comment.md
+          printf '%s\n' '```' >> /tmp/comment.md
+          printf '%s\n' '${{ steps.sentrux.outputs.output }}' >> /tmp/comment.md
+          printf '%s\n' '```' >> /tmp/comment.md
+          printf '%s\n' '</details>' >> /tmp/comment.md
 
-\`\`\`
-${{ steps.sentrux.outputs.output }}
-\`\`\`
-</details>
-"
+          COMMENT=$(cat /tmp/comment.md)
           
           # Post comment
           curl -s -X POST -H "Authorization: token $GITEA_TOKEN" \
