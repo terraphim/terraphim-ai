@@ -121,10 +121,20 @@ pub trait SessionConnector: Send + Sync {
         false
     }
 
-    /// Start watching for new sessions in real-time
+    /// Start watching for new sessions in real-time.
     ///
-    /// Returns a receiver that emits sessions as they are detected.
+    /// Returns a receiver that emits `Session` values as they are detected.
     /// Default implementation returns an error if not supported.
+    ///
+    /// ## Dedup contract
+    ///
+    /// Implementations MUST NOT emit the same session state more than once.
+    /// The dedup key is `(source_path, messages.len)`: a session is only
+    /// forwarded when `messages.len` grows beyond the last emitted value for
+    /// that path.  A 150 ms debounce is applied before each parse so that
+    /// rapid sequential `Modify` events (common on both macOS/FSEvents and
+    /// Linux/inotify for append-only writes) are collapsed into a single
+    /// emission once writes quiesce.
     async fn watch(&self) -> Result<mpsc::Receiver<Session>> {
         anyhow::bail!("Watch not supported for this connector")
     }

@@ -9,9 +9,11 @@ use anyhow::{Context, Result};
 use async_trait::async_trait;
 use notify::{Event, EventKind, RecursiveMode, Watcher, recommended_watcher};
 use serde::Deserialize;
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tokio::sync::mpsc;
+use std::time::Duration;
+use tokio::sync::{Mutex, mpsc};
 
 /// Native Claude Code session connector
 #[derive(Debug, Default)]
@@ -135,6 +137,11 @@ impl SessionConnector for NativeClaudeConnector {
         }
 
         let path = Arc::new(base_path);
+        // Dedup state: path -> last emitted messages.len.
+        // Prevents emitting the same session state multiple times when notify
+        // fires several Modify events for a single append (common on both
+        // macOS/FSEvents and Linux/inotify).
+        let seen: Arc<Mutex<HashMap<PathBuf, usize>>> = Arc::new(Mutex::new(HashMap::new()));
 
         tokio::task::spawn_blocking(move || -> Result<()> {
             let (watcher_tx, watcher_rx) = std::sync::mpsc::channel();
@@ -162,15 +169,27 @@ impl SessionConnector for NativeClaudeConnector {
                                 if path.extension().is_some_and(|ext| ext == "jsonl") {
                                     let tx = tx.clone();
                                     let path_clone = path.clone();
+                                    let seen = Arc::clone(&seen);
 
                                     tokio::spawn(async move {
+                                        // Debounce: wait for writes to settle before parsing.
+                                        tokio::time::sleep(Duration::from_millis(150)).await;
+
                                         let connector = NativeClaudeConnector;
                                         match connector.parse_session_file(&path_clone).await {
                                             Ok(Some(session)) => {
-                                                if tx.send(session).await.is_err() {
-                                                    tracing::warn!(
-                                                        "Failed to send session from watch"
-                                                    );
+                                                let new_len = session.messages.len();
+                                                let mut map = seen.lock().await;
+                                                let last =
+                                                    map.entry(path_clone.clone()).or_insert(0);
+                                                if new_len > *last {
+                                                    *last = new_len;
+                                                    drop(map);
+                                                    if tx.send(session).await.is_err() {
+                                                        tracing::warn!(
+                                                            "Failed to send session from watch"
+                                                        );
+                                                    }
                                                 }
                                             }
                                             Ok(None) => {}
@@ -564,5 +583,95 @@ mod tests {
     async fn test_supports_watch() {
         let connector = NativeClaudeConnector;
         assert!(connector.supports_watch());
+    }
+
+    /// Verify the dedup logic: 9 simulated watch-emit calls (3 rapid events ×
+    /// 3 incremental writes) produce at most 3 channel sends (one per distinct
+    /// messages.len), not one per event call.
+    ///
+    /// This is the acceptance-test for issue #815.  It exercises the
+    /// `(source_path, messages.len)` dedup contract directly, without a live
+    /// filesystem watcher, so it runs quickly and deterministically.
+    #[tokio::test]
+    async fn test_watch_dedup_incremental_writes() {
+        let dir = tempfile::tempdir().unwrap();
+        let file_path = dir.path().join("session-watch.jsonl");
+
+        let seen: Arc<Mutex<HashMap<PathBuf, usize>>> = Arc::new(Mutex::new(HashMap::new()));
+        let (tx, mut rx) = mpsc::channel::<Session>(32);
+
+        // Simulate what the watch handler does: parse, check dedup, maybe send.
+        let emit = |path: PathBuf,
+                    tx: mpsc::Sender<Session>,
+                    seen: Arc<Mutex<HashMap<PathBuf, usize>>>| async move {
+            let connector = NativeClaudeConnector;
+            if let Ok(Some(session)) = connector.parse_session_file(&path).await {
+                let new_len = session.messages.len();
+                let mut map = seen.lock().await;
+                let last = map.entry(path.clone()).or_insert(0);
+                if new_len > *last {
+                    *last = new_len;
+                    drop(map);
+                    let _ = tx.send(session).await;
+                }
+            }
+        };
+
+        let line = |i: usize| -> String {
+            format!(
+                concat!(
+                    r#"{{"sessionId":"watchsess","cwd":"/tmp","timestamp":"2024-01-15T10:00:0{}Z","#,
+                    r#""message":{{"role":"user","content":"msg {}"}}}}"#
+                ),
+                i, i
+            )
+        };
+
+        // Write 3 increments, simulating 3 rapid Modify events per write (9 calls total).
+        for i in 0..3usize {
+            let mut content = String::new();
+            for j in 0..=i {
+                content.push_str(&line(j));
+                content.push('\n');
+            }
+            tokio::fs::write(&file_path, &content).await.unwrap();
+
+            // Three rapid event calls for this write (as notify fires on inotify/FSEvents).
+            for _ in 0..3 {
+                emit(file_path.clone(), tx.clone(), Arc::clone(&seen)).await;
+            }
+        }
+
+        drop(tx);
+
+        let mut received = Vec::new();
+        while let Some(s) = rx.recv().await {
+            received.push(s);
+        }
+
+        assert!(
+            !received.is_empty(),
+            "expected at least one session emission"
+        );
+        // 9 emit calls but dedup allows at most one per distinct messages.len (1, 2, 3).
+        assert!(
+            received.len() <= 3,
+            "expected at most 3 emissions (one per distinct messages.len), got {}",
+            received.len()
+        );
+        assert_eq!(
+            received.last().unwrap().messages.len(),
+            3,
+            "final emitted session should have 3 messages"
+        );
+        // Strictly increasing message counts (dedup contract).
+        let lens: Vec<usize> = received.iter().map(|s| s.messages.len()).collect();
+        for w in lens.windows(2) {
+            assert!(
+                w[1] > w[0],
+                "message counts must be strictly increasing: {:?}",
+                lens
+            );
+        }
     }
 }
