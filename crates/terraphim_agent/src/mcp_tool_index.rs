@@ -35,6 +35,9 @@ use std::path::{Path, PathBuf};
 use terraphim_automata::find_matches;
 use terraphim_types::{McpToolEntry, NormalizedTerm, NormalizedTermValue, Thesaurus};
 
+#[cfg(not(debug_assertions))]
+use std::time::Instant;
+
 /// Index of MCP tools for searchable discovery.
 ///
 /// The index stores tools and provides fast search capabilities using
