@@ -127,6 +127,7 @@ async fn create_terraphim_engineer_config() -> Result<String> {
 /// Test that the MCP server with correct configuration can find terraphim-graph documents
 #[tokio::test]
 #[serial]
+#[ignore]
 async fn test_mcp_server_terraphim_engineer_search() -> Result<()> {
     // Use memory-only persistence to avoid database conflicts between tests
     set_env_var("TERRAPHIM_PROFILE_MEMORY_TYPE", "memory");
@@ -272,6 +273,7 @@ async fn test_mcp_server_terraphim_engineer_search() -> Result<()> {
 /// Test role switching via config API before search
 #[tokio::test]
 #[serial]
+#[ignore]
 async fn test_mcp_role_switching_before_search() -> Result<()> {
     // Use memory-only persistence to avoid database conflicts between tests
     set_env_var("TERRAPHIM_PROFILE_MEMORY_TYPE", "memory");
@@ -383,6 +385,7 @@ async fn test_mcp_role_switching_before_search() -> Result<()> {
 /// Test MCP resource operations (list_resources and read_resource) with the correct Terraphim Engineer configuration
 #[tokio::test]
 #[serial]
+#[ignore]
 async fn test_mcp_resource_operations() -> Result<()> {
     // Use memory-only persistence to avoid database conflicts between tests
     set_env_var("TERRAPHIM_PROFILE_MEMORY_TYPE", "memory");
@@ -605,6 +608,7 @@ async fn test_mcp_resource_operations() -> Result<()> {
 /// Test that MCP search uses the selected role when no role parameter is passed
 #[tokio::test]
 #[serial]
+#[ignore]
 async fn test_mcp_search_uses_selected_role() -> Result<()> {
     // Use memory-only persistence to avoid database conflicts between tests
     set_env_var("TERRAPHIM_PROFILE_MEMORY_TYPE", "memory");

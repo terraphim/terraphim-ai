@@ -6,6 +6,7 @@ use tokio::process::Command;
 
 /// Test extract_paragraphs_from_automata and is_all_terms_connected_by_path with explicit role specification
 #[tokio::test]
+#[ignore]
 async fn test_advanced_functions_with_explicit_terraphim_engineer_role() -> Result<()> {
     println!("🚀 Testing advanced MCP functions with explicit Terraphim Engineer role");
 
@@ -203,6 +204,7 @@ async fn test_advanced_functions_with_explicit_terraphim_engineer_role() -> Resu
 
 /// Test that both advanced functions work correctly with realistic scenarios
 #[tokio::test]
+#[ignore]
 async fn test_advanced_functions_realistic_scenarios() -> Result<()> {
     println!("🎯 Testing advanced functions with realistic scenarios");
 

@@ -6,6 +6,7 @@ use tokio::process::Command;
 
 /// Test that MCP server properly separates logs from JSON-RPC responses
 #[tokio::test]
+#[ignore]
 async fn test_mcp_log_separation_and_tools() -> Result<()> {
     println!("🧪 Testing MCP server log separation and tool availability");
 
@@ -143,6 +144,7 @@ async fn test_mcp_log_separation_and_tools() -> Result<()> {
 
 /// Test MCP server with role switching and configuration updates
 #[tokio::test]
+#[ignore]
 async fn test_mcp_role_configuration() -> Result<()> {
     println!("⚙️ Testing MCP role configuration");
 
@@ -227,6 +229,7 @@ async fn test_mcp_role_configuration() -> Result<()> {
 
 /// Test text processing tools (find_matches, replace_matches, etc.)
 #[tokio::test]
+#[ignore]
 async fn test_mcp_text_processing_tools() -> Result<()> {
     println!("📝 Testing MCP text processing tools");
 

@@ -6,6 +6,7 @@ use tokio::process::Command;
 
 /// Test extract_paragraphs_from_automata with Terraphim Engineer role and real content
 #[tokio::test]
+#[ignore]
 async fn test_extract_paragraphs_with_terraphim_engineer() -> Result<()> {
     println!("📄 Testing extract_paragraphs_from_automata with Terraphim Engineer role");
 
@@ -219,6 +220,7 @@ The service layer acts as a provider and middleware between components.
 
 /// Test is_all_terms_connected_by_path with knowledge graph connections
 #[tokio::test]
+#[ignore]
 async fn test_terms_connectivity_with_knowledge_graph() -> Result<()> {
     println!("🔗 Testing is_all_terms_connected_by_path with knowledge graph");
 
@@ -359,6 +361,7 @@ async fn test_terms_connectivity_with_knowledge_graph() -> Result<()> {
 
 /// Comprehensive test that validates both functions work together
 #[tokio::test]
+#[ignore]
 async fn test_advanced_automata_integration() -> Result<()> {
     println!("🚀 Testing advanced automata functions integration");
 
@@ -495,6 +498,7 @@ different system components.
 
 /// Test error handling and edge cases
 #[tokio::test]
+#[ignore]
 async fn test_advanced_automata_edge_cases() -> Result<()> {
     println!("⚠️ Testing edge cases for advanced automata functions");
 

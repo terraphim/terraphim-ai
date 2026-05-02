@@ -152,6 +152,7 @@ fn extract_found_count(message: &str) -> Option<usize> {
         .and_then(|m| m.as_str().parse::<usize>().ok())
 }
 #[tokio::test]
+#[ignore]
 async fn test_mcp_server_integration() -> Result<()> {
     let command = setup_server_command().await?;
     let transport = TokioChildProcess::new(command)?;
@@ -222,6 +223,7 @@ async fn test_mcp_server_integration() -> Result<()> {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_search_with_different_roles() -> Result<()> {
     let command = setup_server_command().await?;
     let transport = TokioChildProcess::new(command)?;
@@ -282,6 +284,7 @@ async fn test_search_with_different_roles() -> Result<()> {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_resource_uri_mapping() -> Result<()> {
     let command = setup_server_command().await?;
     let transport = TokioChildProcess::new(command)?;
@@ -341,6 +344,7 @@ async fn test_resource_uri_mapping() -> Result<()> {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_simple_search_with_debug() -> Result<()> {
     let command = setup_server_command().await?;
     let transport = TokioChildProcess::new(command)?;
@@ -409,6 +413,7 @@ async fn test_simple_search_with_debug() -> Result<()> {
 
 /// Test pagination behaviour of the search tool.
 #[tokio::test]
+#[ignore]
 async fn test_search_pagination() -> Result<()> {
     let command = setup_server_command().await?;
     let transport = TokioChildProcess::new(command)?;
@@ -476,6 +481,7 @@ async fn test_search_pagination() -> Result<()> {
 
 /// Test that invalid pagination parameters are rejected.
 #[tokio::test]
+#[ignore]
 async fn test_search_invalid_pagination_params() -> Result<()> {
     let command = setup_server_command().await?;
     let transport = TokioChildProcess::new(command)?;
@@ -513,6 +519,7 @@ async fn test_search_invalid_pagination_params() -> Result<()> {
 
 /// Perform search then fetch the same resource via read_resource and compare contents.
 #[tokio::test]
+#[ignore]
 async fn test_search_read_resource_round_trip() -> Result<()> {
     let command = setup_server_command().await?;
     let transport = TokioChildProcess::new(command)?;

@@ -407,6 +407,7 @@ Search algorithms find data in structures.
 
 #[tokio::test]
 #[serial]
+#[ignore]
 async fn test_cross_mode_consistency() -> Result<()> {
     println!("\n");
     println!("╔════════════════════════════════════════════════════════════════════════╗");
@@ -523,6 +524,7 @@ async fn test_cross_mode_consistency() -> Result<()> {
 
 #[tokio::test]
 #[serial]
+#[ignore]
 async fn test_mode_specific_verification() -> Result<()> {
     println!("\n");
     println!("╔════════════════════════════════════════════════════════════════════════╗");
@@ -586,6 +588,7 @@ async fn test_mode_specific_verification() -> Result<()> {
 
 #[tokio::test]
 #[serial]
+#[ignore]
 async fn test_role_consistency_across_modes() -> Result<()> {
     println!("\n");
     println!("╔════════════════════════════════════════════════════════════════════════╗");

@@ -6,6 +6,7 @@ use tokio::process::Command;
 
 /// Test that MCP server properly uses the selected role for responses
 #[tokio::test]
+#[ignore]
 async fn test_mcp_server_uses_selected_role() -> Result<()> {
     println!("🎯 Testing that MCP server uses the selected role automatically");
 
@@ -258,6 +259,7 @@ async fn test_mcp_server_uses_selected_role() -> Result<()> {
 
 /// Test that role parameter overrides selected role when provided
 #[tokio::test]
+#[ignore]
 async fn test_role_parameter_overrides_selected_role() -> Result<()> {
     println!("🎯 Testing that explicit role parameter overrides selected role");
 

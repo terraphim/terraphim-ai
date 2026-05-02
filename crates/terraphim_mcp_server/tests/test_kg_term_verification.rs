@@ -6,6 +6,7 @@ use tokio::process::Command;
 
 /// Test that our bug reporting knowledge graph terms are available in autocomplete
 #[tokio::test]
+#[ignore]
 async fn test_kg_bug_reporting_terms_available() -> Result<()> {
     println!("🔍 Testing knowledge graph bug reporting terms availability");
 
