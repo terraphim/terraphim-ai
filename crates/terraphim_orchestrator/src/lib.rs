@@ -1051,7 +1051,12 @@ impl AgentOrchestrator {
             tokio::spawn(async move {
                 let mut rx = rx;
                 while let Some(event) = rx.recv().await {
-                    if sched_tx.lock().unwrap().send(LoopEvent::Schedule(event)).is_err() {
+                    if sched_tx
+                        .lock()
+                        .unwrap()
+                        .send(LoopEvent::Schedule(event))
+                        .is_err()
+                    {
                         break;
                     }
                 }
@@ -1064,7 +1069,12 @@ impl AgentOrchestrator {
             tokio::spawn(async move {
                 let mut rx = rx;
                 while let Some(alert) = rx.recv().await {
-                    if alert_tx.lock().unwrap().send(LoopEvent::DriftAlert(alert)).is_err() {
+                    if alert_tx
+                        .lock()
+                        .unwrap()
+                        .send(LoopEvent::DriftAlert(alert))
+                        .is_err()
+                    {
                         break;
                     }
                 }
@@ -1073,14 +1083,10 @@ impl AgentOrchestrator {
 
         let tick_stx = loop_tx.clone();
         let tick_interval_secs = tick_interval;
-        std::thread::spawn(move || {
-            let mut tick_num: u64 = 0;
-            loop {
-                std::thread::sleep(std::time::Duration::from_secs(tick_interval_secs));
-                tick_num += 1;
-                if tick_stx.lock().unwrap().send(LoopEvent::Tick).is_err() {
-                    break;
-                }
+        std::thread::spawn(move || loop {
+            std::thread::sleep(std::time::Duration::from_secs(tick_interval_secs));
+            if tick_stx.lock().unwrap().send(LoopEvent::Tick).is_err() {
+                break;
             }
         });
 
@@ -1090,16 +1096,19 @@ impl AgentOrchestrator {
             tokio::spawn(async move {
                 let mut rx = rx;
                 while let Some(dispatch) = rx.recv().await {
-                    if wh_tx.lock().unwrap().send(LoopEvent::Webhook(dispatch)).is_err() {
+                    if wh_tx
+                        .lock()
+                        .unwrap()
+                        .send(LoopEvent::Webhook(dispatch))
+                        .is_err()
+                    {
                         break;
                     }
                 }
             });
         }
 
-        let reconcile_timeout = Duration::from_secs(
-            (self.config.tick_interval_secs as u64).max(30) * 3,
-        );
+        let reconcile_timeout = Duration::from_secs(self.config.tick_interval_secs.max(30) * 3);
 
         loop {
             if self.shutdown_requested {
@@ -1137,12 +1146,7 @@ impl AgentOrchestrator {
                     self.handle_drift_alert(alert).await;
                 }
                 Ok(LoopEvent::Tick) => {
-                    match tokio::time::timeout(
-                        reconcile_timeout,
-                        self.reconcile_tick(),
-                    )
-                    .await
-                    {
+                    match tokio::time::timeout(reconcile_timeout, self.reconcile_tick()).await {
                         Ok(()) => {}
                         Err(_) => {
                             warn!(
