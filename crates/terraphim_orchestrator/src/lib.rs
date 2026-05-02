@@ -1034,68 +1034,130 @@ impl AgentOrchestrator {
             });
         }
 
-        // Reconciliation tick interval
-        let mut tick = tokio::time::interval(Duration::from_secs(self.config.tick_interval_secs));
+        enum LoopEvent {
+            Tick,
+            Schedule(ScheduleEvent),
+            DriftAlert(DriftAlert),
+            Webhook(webhook::WebhookDispatch),
+        }
 
-        // Main reconciliation loop
+        let tick_interval = self.config.tick_interval_secs;
+        let (loop_tx, loop_rx) = std::sync::mpsc::channel::<LoopEvent>();
+        let loop_tx = Arc::new(std::sync::Mutex::new(loop_tx));
+
+        let sched_tx = loop_tx.clone();
+        let sched_rx = self.scheduler.take_event_rx();
+        if let Some(rx) = sched_rx {
+            tokio::spawn(async move {
+                let mut rx = rx;
+                while let Some(event) = rx.recv().await {
+                    if sched_tx.lock().unwrap().send(LoopEvent::Schedule(event)).is_err() {
+                        break;
+                    }
+                }
+            });
+        }
+
+        let alert_tx = loop_tx.clone();
+        let alert_rx = self.nightwatch.take_alert_rx();
+        if let Some(rx) = alert_rx {
+            tokio::spawn(async move {
+                let mut rx = rx;
+                while let Some(alert) = rx.recv().await {
+                    if alert_tx.lock().unwrap().send(LoopEvent::DriftAlert(alert)).is_err() {
+                        break;
+                    }
+                }
+            });
+        }
+
+        let tick_stx = loop_tx.clone();
+        let tick_interval_secs = tick_interval;
+        std::thread::spawn(move || {
+            let mut tick_num: u64 = 0;
+            loop {
+                std::thread::sleep(std::time::Duration::from_secs(tick_interval_secs));
+                tick_num += 1;
+                if tick_stx.lock().unwrap().send(LoopEvent::Tick).is_err() {
+                    break;
+                }
+            }
+        });
+
+        let webhook_rx = self.webhook_dispatch_rx.take();
+        if let Some(rx) = webhook_rx {
+            let wh_tx = loop_tx.clone();
+            tokio::spawn(async move {
+                let mut rx = rx;
+                while let Some(dispatch) = rx.recv().await {
+                    if wh_tx.lock().unwrap().send(LoopEvent::Webhook(dispatch)).is_err() {
+                        break;
+                    }
+                }
+            });
+        }
+
+        let reconcile_timeout = Duration::from_secs(
+            (self.config.tick_interval_secs as u64).max(30) * 3,
+        );
+
         loop {
             if self.shutdown_requested {
                 info!("shutdown requested, stopping reconciliation loop");
                 break;
             }
 
-            // Drain any pending webhook dispatches before select
-            let pending_dispatches: Vec<_> = if let Some(ref mut rx) = self.webhook_dispatch_rx {
-                let mut batch = Vec::new();
-                while let Ok(dispatch) = rx.try_recv() {
-                    batch.push(dispatch);
-                }
-                batch
-            } else {
-                Vec::new()
-            };
-            // Collect comment_ids for cursor marking (belt-and-suspenders dedup)
-            let webhook_comment_ids: Vec<u64> =
-                pending_dispatches.iter().map(|d| d.comment_id()).collect();
-            for dispatch in pending_dispatches {
-                self.handle_webhook_dispatch(dispatch).await;
-            }
-            // Mark webhook-dispatched comments in every project cursor so
-            // each project's poller skips them without needing another
-            // Gitea API call. The webhook payload does not yet carry a
-            // project id, so we stamp all known cursors (plus the legacy
-            // fallback) to stay correct across both modes.
-            if !webhook_comment_ids.is_empty() {
-                let project_ids: Vec<String> = if self.config.projects.is_empty() {
-                    vec![dispatcher::LEGACY_PROJECT_ID.to_string()]
-                } else {
-                    self.config.projects.iter().map(|p| p.id.clone()).collect()
-                };
-                for pid in &project_ids {
-                    let cursor = self
-                        .mention_cursors
-                        .entry(pid.clone())
-                        .or_insert_with(mention::MentionCursor::now);
-                    for cid in &webhook_comment_ids {
-                        cursor.mark_processed(*cid);
+            match loop_rx.recv_timeout(reconcile_timeout) {
+                Ok(LoopEvent::Webhook(dispatch)) => {
+                    let comment_id = dispatch.comment_id();
+                    self.handle_webhook_dispatch(dispatch).await;
+                    let project_ids: Vec<String> = if self.config.projects.is_empty() {
+                        vec![dispatcher::LEGACY_PROJECT_ID.to_string()]
+                    } else {
+                        self.config.projects.iter().map(|p| p.id.clone()).collect()
+                    };
+                    for pid in &project_ids {
+                        let cursor = self
+                            .mention_cursors
+                            .entry(pid.clone())
+                            .or_insert_with(mention::MentionCursor::now);
+                        cursor.mark_processed(comment_id);
                     }
-                }
-                for pid in &project_ids {
-                    if let Some(cursor) = self.mention_cursors.get(pid) {
-                        cursor.save(pid).await;
+                    for pid in &project_ids {
+                        if let Some(cursor) = self.mention_cursors.get(pid) {
+                            cursor.save(pid).await;
+                        }
                     }
+                    let _ = loop_tx.lock().unwrap().send(LoopEvent::Tick);
                 }
-            }
-
-            tokio::select! {
-                event = self.scheduler.next_event() => {
+                Ok(LoopEvent::Schedule(event)) => {
                     self.handle_schedule_event(event).await;
                 }
-                alert = self.nightwatch.next_alert() => {
+                Ok(LoopEvent::DriftAlert(alert)) => {
                     self.handle_drift_alert(alert).await;
                 }
-                _ = tick.tick() => {
-                    self.reconcile_tick().await;
+                Ok(LoopEvent::Tick) => {
+                    match tokio::time::timeout(
+                        reconcile_timeout,
+                        self.reconcile_tick(),
+                    )
+                    .await
+                    {
+                        Ok(()) => {}
+                        Err(_) => {
+                            warn!(
+                                timeout_secs = reconcile_timeout.as_secs(),
+                                "reconcile_tick exceeded timeout, forcing continuation"
+                            );
+                        }
+                    }
+                }
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                    warn!("loop: recv timeout, no events received");
+                }
+                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                    info!("all event sources closed, exiting loop");
+                    break;
                 }
             }
         }
@@ -5220,6 +5282,8 @@ impl AgentOrchestrator {
 
     /// Periodic reconciliation: detect exits, check cron, evaluate drift, drain output.
     async fn reconcile_tick(&mut self) {
+        let tick_start = Instant::now();
+
         self.provider_rate_limits.clean_expired();
         self.retry_counts
             .retain(|_, (_, ts)| ts.elapsed() < Duration::from_secs(3600));
@@ -5440,6 +5504,12 @@ impl AgentOrchestrator {
         if let Err(e) = self.poll_pending_reviews().await {
             warn!(error = %e, "poll_pending_reviews failed");
         }
+
+        info!(
+            tick = self.tick_count,
+            elapsed_ms = tick_start.elapsed().as_millis() as u64,
+            "reconcile_tick complete"
+        );
     }
 
     /// PR gate reconciliation: for every project with Gitea config, read

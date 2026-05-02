@@ -77,6 +77,11 @@ impl TimeScheduler {
         })
     }
 
+    pub fn take_event_rx(&mut self) -> Option<mpsc::Receiver<ScheduleEvent>> {
+        let (_, rx) = mpsc::channel(1);
+        Some(std::mem::replace(&mut self.event_rx, rx))
+    }
+
     /// Get the next scheduled event (async, used in select!).
     pub async fn next_event(&mut self) -> ScheduleEvent {
         self.event_rx

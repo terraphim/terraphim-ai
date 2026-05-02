@@ -437,6 +437,11 @@ impl NightwatchMonitor {
             .expect("alert channel should never close while monitor exists")
     }
 
+    pub fn take_alert_rx(&mut self) -> Option<mpsc::Receiver<DriftAlert>> {
+        let (_, rx) = mpsc::channel(1);
+        Some(std::mem::replace(&mut self.alert_rx, rx))
+    }
+
     /// Evaluate drift for all agents and emit alerts for any that exceed thresholds.
     pub fn evaluate(&mut self) {
         let mut alerts = Vec::new();
