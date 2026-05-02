@@ -124,21 +124,3 @@ pi-session-*.html
 
 # Client project data - never track
 projects/odilo/
-# build-runner test
-# build-runner test 2
-# build-runner test 3
-# build-runner test 3
-# e2e test 4
-# e2e test 6
-# e2e test 7
-# e2e test 8
-# e2e test 9
-# e2e final test
-# agent logging test
-# agent logging test 2
-# webhook recreate v2
-# webhook secret fix
-# e2e pipeline test
-# secret test
-# streaming log test
-# streaming log test
