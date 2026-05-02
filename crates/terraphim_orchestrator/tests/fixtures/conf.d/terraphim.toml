@@ -1134,8 +1134,8 @@ if [ -z "${ADF_PUSH_REF:-}" ]; then
 fi
 
 cd "$GITEA_WORKING_DIR"
-git fetch origin "$ADF_PUSH_REF" || true
-git checkout "$ADF_PUSH_SHA"
+git fetch --prune origin "$ADF_PUSH_REF" 2>/dev/null || true
+git checkout -f "$ADF_PUSH_SHA"
 
 # POST_STATUS posts to the Gitea Commit Status API directly. This is
 # the same endpoint Phase 1 will wrap in `set_commit_status`; using
