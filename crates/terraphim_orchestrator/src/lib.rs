@@ -144,28 +144,28 @@ pub struct AgentStatus {
 }
 
 /// Runtime state for a managed agent.
- struct ManagedAgent {
-     definition: AgentDefinition,
-     handle: AgentHandle,
-     started_at: Instant,
-     restart_count: u32,
-     output_rx: broadcast::Receiver<OutputEvent>,
-     spawned_by_mention: bool,
-     worktree_path: Option<PathBuf>,
-     routed_model: Option<String>,
-     session_id: String,
-     mention_chain_id: Option<String>,
-     mention_depth: Option<u32>,
-     mention_parent_agent: Option<String>,
-     /// Concurrency permit held while the agent is running. Released on drop.
-     #[allow(dead_code)]
-     concurrency_permit: Option<concurrency::AgentPermit>,
-     /// When set, post a terminal commit status on agent exit.
-     /// Tuple of (head_sha, context).
-     commit_status_post: Option<(String, String)>,
-     /// Temp file path for streaming agent output. Renamed to final path on exit.
-     output_tmp_path: Option<PathBuf>,
- }
+struct ManagedAgent {
+    definition: AgentDefinition,
+    handle: AgentHandle,
+    started_at: Instant,
+    restart_count: u32,
+    output_rx: broadcast::Receiver<OutputEvent>,
+    spawned_by_mention: bool,
+    worktree_path: Option<PathBuf>,
+    routed_model: Option<String>,
+    session_id: String,
+    mention_chain_id: Option<String>,
+    mention_depth: Option<u32>,
+    mention_parent_agent: Option<String>,
+    /// Concurrency permit held while the agent is running. Released on drop.
+    #[allow(dead_code)]
+    concurrency_permit: Option<concurrency::AgentPermit>,
+    /// When set, post a terminal commit status on agent exit.
+    /// Tuple of (head_sha, context).
+    commit_status_post: Option<(String, String)>,
+    /// Temp file path for streaming agent output. Renamed to final path on exit.
+    output_tmp_path: Option<PathBuf>,
+}
 
 #[cfg(not(test))]
 #[derive(Debug, Default, serde::Serialize, serde::Deserialize)]
@@ -882,11 +882,7 @@ impl AgentOrchestrator {
     /// Open a temp log file for an agent and spawn a background task that
     /// continuously drains its output broadcast into the file.  Returns the
     /// temp-file path so it can be renamed to the final name on exit.
-    fn start_output_log_drain(
-        &self,
-        agent_name: &str,
-        handle: &AgentHandle,
-    ) -> Option<PathBuf> {
+    fn start_output_log_drain(&self, agent_name: &str, handle: &AgentHandle) -> Option<PathBuf> {
         let _ = std::fs::create_dir_all(&self.agent_log_dir);
         let ts = chrono::Utc::now().format("%Y%m%dT%H%M%SZ");
         let tmp_name = format!(".tmp-{}-{}.log", agent_name, ts);
