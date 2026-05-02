@@ -25,13 +25,13 @@ env:
 jobs:
   verify-versions:
     name: Verify version consistency
-    runs-on: ubuntu-22.04
+    runs-on: [self-hosted, bigbox]
     continue-on-error: true
     outputs:
       version: ${{ steps.extract.outputs.version }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -103,23 +103,23 @@ jobs:
       matrix:
         include:
           # Linux builds
-          - os: ubuntu-22.04
+          - os: [self-hosted, bigbox]
             target: x86_64-unknown-linux-gnu
             use_cross: false
-          - os: ubuntu-22.04
+          - os: [self-hosted, bigbox]
             target: x86_64-unknown-linux-musl
             use_cross: true
-          - os: ubuntu-22.04
+          - os: [self-hosted, bigbox]
             target: aarch64-unknown-linux-musl
             use_cross: true
-          - os: ubuntu-22.04
+          - os: [self-hosted, bigbox]
             target: armv7-unknown-linux-musleabihf
             use_cross: true
           # macOS builds
           - os: [self-hosted, macOS]
             target: x86_64-apple-darwin
             use_cross: false
-          - os: macos-14
+          - os: [self-hosted, macOS]
             target: aarch64-apple-darwin
             use_cross: false
           # Windows builds
@@ -142,7 +142,7 @@ jobs:
           echo "Cleanup completed"
 
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -373,7 +373,7 @@ jobs:
     runs-on: [self-hosted, macOS]
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Download universal macOS binaries
         uses: actions/download-artifact@v4
@@ -442,10 +442,10 @@ jobs:
 
   build-debian-packages:
     name: Build Debian packages
-    runs-on: ubuntu-22.04
+    runs-on: [self-hosted, bigbox]
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -548,7 +548,7 @@ jobs:
       contents: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Download binary artifacts
         uses: actions/download-artifact@v4
@@ -883,7 +883,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
