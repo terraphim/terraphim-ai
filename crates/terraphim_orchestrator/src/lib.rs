@@ -286,6 +286,9 @@ pub struct AgentOrchestrator {
     injected_learning_ids: HashMap<String, Vec<String>>,
     /// Global concurrency controller enforcing agent limits and fairness.
     concurrency_controller: concurrency::ConcurrencyController,
+    /// Directory for per-agent output log files. Each completed agent run
+    /// writes its stdout+stderr to `<agent_log_dir>/<name>-<timestamp>.log`.
+    agent_log_dir: PathBuf,
 }
 
 /// Build the composite restart-state key for an agent definition.
@@ -813,6 +816,14 @@ impl AgentOrchestrator {
             learning_config,
             injected_learning_ids: HashMap::new(),
             concurrency_controller: build_concurrency_controller(&config),
+            agent_log_dir: {
+                let adf_logs = std::path::PathBuf::from("/opt/ai-dark-factory/logs/agents");
+                if adf_logs.parent().map(|p| p.exists()).unwrap_or(false) {
+                    adf_logs
+                } else {
+                    config.working_dir.join("logs").join("agents")
+                }
+            },
         })
     }
 
@@ -6269,6 +6280,34 @@ impl AgentOrchestrator {
                             "failed to post output to Gitea"
                         );
                     }
+                }
+            }
+
+            // Write agent output to a per-run log file so it is always
+            // reviewable, even for event-only agents (build-runner) that
+            // skip the Gitea comment path above.
+            {
+                let _ = std::fs::create_dir_all(&self.agent_log_dir);
+                let ts = chrono::Utc::now().format("%Y%m%dT%H%M%SZ");
+                let filename = format!("{}-{}.log", name, ts);
+                let path = self.agent_log_dir.join(&filename);
+                let mut content = String::with_capacity(output_lines.len() * 120);
+                content.push_str(&format!(
+                    "# agent: {}\n# exit_code: {:?}\n# exit_class: {}\n# wall_time: {:.1}s\n# model: {}\n\n",
+                    name,
+                    status.code(),
+                    record.exit_class,
+                    record.wall_time_secs,
+                    record.model_used.as_deref().unwrap_or("n/a"),
+                ));
+                for line in &output_lines {
+                    content.push_str(line);
+                    content.push('\n');
+                }
+                if let Err(e) = std::fs::write(&path, &content) {
+                    warn!(agent = %name, path = %path.display(), error = %e, "failed to write agent output log");
+                } else {
+                    debug!(agent = %name, path = %path.display(), "wrote agent output log");
                 }
             }
 
