@@ -115,7 +115,7 @@ fn main() -> Result<()> {
     }
 
     // Sort by module count (descending)
-    semantic_groups.sort_by(|a, b| b.count.cmp(&a.count));
+    semantic_groups.sort_by_key(|b| std::cmp::Reverse(b.count));
 
     // Filter by concept if specified
     if let Some(filter) = &cli.concept {
@@ -159,8 +159,8 @@ fn main() -> Result<()> {
         }
     }
 
-    if cli.output.is_some() {
-        info!("Output written to: {}", cli.output.unwrap().display());
+    if let Some(ref path) = cli.output {
+        info!("Output written to: {}", path.display());
     }
 
     Ok(())
