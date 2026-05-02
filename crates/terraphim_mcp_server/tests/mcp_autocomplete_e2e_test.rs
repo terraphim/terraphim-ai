@@ -122,14 +122,12 @@ async fn start_mcp_server() -> Result<TokioChildProcess> {
 
     if std::env::var_os("CI").is_some() {
         cmd.arg("--features").arg("zlob");
+        cmd.arg("--release");
     }
 
     cmd.stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped());
-
-    // Allow server to start up
-    tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
 
     let transport = TokioChildProcess::new(cmd)?;
     Ok(transport)

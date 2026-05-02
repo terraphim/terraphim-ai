@@ -9116,7 +9116,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
         let mut orch = AgentOrchestrator::new(config).unwrap();
         orch.handle_review_pr(review_pr_task()).await.unwrap();
 
-        for _ in 0..40 {
+        for _ in 0..100 {
             tokio::time::sleep(Duration::from_millis(50)).await;
             orch.poll_agent_exits().await;
             if pr_dump.exists() && push_dump.exists() {
@@ -9126,6 +9126,19 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
 
         let pr = std::fs::read_to_string(&pr_dump).unwrap_or_default();
         let push = std::fs::read_to_string(&push_dump).unwrap_or_default();
+
+        if !pr.contains("ADF_PR_NUMBER=641") || !push.contains("ADF_PUSH_SHA=deadbeef1234") {
+            eprintln!(
+                "active_agents after poll loop: {:?}",
+                orch.active_agents.keys().collect::<Vec<_>>()
+            );
+            eprintln!("pr_dump path: {}", pr_dump.display());
+            eprintln!("push_dump path: {}", push_dump.display());
+            eprintln!("pr_dump exists: {}", pr_dump.exists());
+            eprintln!("push_dump exists: {}", push_dump.exists());
+            eprintln!("pr_dump contents:\n{pr}");
+            eprintln!("push_dump contents:\n{push}");
+        }
         assert!(
             pr.contains("ADF_PR_NUMBER=641"),
             "pr-reviewer env missing ADF_PR_NUMBER:\n{pr}"

@@ -1174,6 +1174,7 @@ fi
 
 /home/alex/.local/bin/rch exec -- cargo fmt --all -- --check
 /home/alex/.local/bin/rch exec -- cargo clippy --workspace --all-targets -- -D warnings
+/home/alex/.local/bin/rch exec -- cargo build --workspace
 /home/alex/.local/bin/rch exec -- cargo test --workspace --no-fail-fast
 
 # Sentrux quality check after build - save baseline

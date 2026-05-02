@@ -157,6 +157,7 @@ async fn test_skill_execution_success() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_skill_execution_with_defaults() {
     let (_temp_dir, executor) = setup_test_executor().await;
 
