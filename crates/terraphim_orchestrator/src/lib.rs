@@ -144,26 +144,28 @@ pub struct AgentStatus {
 }
 
 /// Runtime state for a managed agent.
-struct ManagedAgent {
-    definition: AgentDefinition,
-    handle: AgentHandle,
-    started_at: Instant,
-    restart_count: u32,
-    output_rx: broadcast::Receiver<OutputEvent>,
-    spawned_by_mention: bool,
-    worktree_path: Option<PathBuf>,
-    routed_model: Option<String>,
-    session_id: String,
-    mention_chain_id: Option<String>,
-    mention_depth: Option<u32>,
-    mention_parent_agent: Option<String>,
-    /// Concurrency permit held while the agent is running. Released on drop.
-    #[allow(dead_code)]
-    concurrency_permit: Option<concurrency::AgentPermit>,
-    /// When set, post a terminal commit status on agent exit.
-    /// Tuple of (head_sha, context).
-    commit_status_post: Option<(String, String)>,
-}
+ struct ManagedAgent {
+     definition: AgentDefinition,
+     handle: AgentHandle,
+     started_at: Instant,
+     restart_count: u32,
+     output_rx: broadcast::Receiver<OutputEvent>,
+     spawned_by_mention: bool,
+     worktree_path: Option<PathBuf>,
+     routed_model: Option<String>,
+     session_id: String,
+     mention_chain_id: Option<String>,
+     mention_depth: Option<u32>,
+     mention_parent_agent: Option<String>,
+     /// Concurrency permit held while the agent is running. Released on drop.
+     #[allow(dead_code)]
+     concurrency_permit: Option<concurrency::AgentPermit>,
+     /// When set, post a terminal commit status on agent exit.
+     /// Tuple of (head_sha, context).
+     commit_status_post: Option<(String, String)>,
+     /// Temp file path for streaming agent output. Renamed to final path on exit.
+     output_tmp_path: Option<PathBuf>,
+ }
 
 #[cfg(not(test))]
 #[derive(Debug, Default, serde::Serialize, serde::Deserialize)]
@@ -875,6 +877,60 @@ impl AgentOrchestrator {
 
     fn restart_budget_window_secs(&self) -> i64 {
         self.config.restart_budget_window_secs as i64
+    }
+
+    /// Open a temp log file for an agent and spawn a background task that
+    /// continuously drains its output broadcast into the file.  Returns the
+    /// temp-file path so it can be renamed to the final name on exit.
+    fn start_output_log_drain(
+        &self,
+        agent_name: &str,
+        handle: &AgentHandle,
+    ) -> Option<PathBuf> {
+        let _ = std::fs::create_dir_all(&self.agent_log_dir);
+        let ts = chrono::Utc::now().format("%Y%m%dT%H%M%SZ");
+        let tmp_name = format!(".tmp-{}-{}.log", agent_name, ts);
+        let tmp_path = self.agent_log_dir.join(&tmp_name);
+
+        let file = match std::fs::File::create(&tmp_path) {
+            Ok(f) => f,
+            Err(e) => {
+                warn!(agent = %agent_name, error = %e, "failed to create output log temp file");
+                return None;
+            }
+        };
+
+        let mut rx = handle.subscribe_output();
+        let name = agent_name.to_string();
+        let path = tmp_path.clone();
+
+        tokio::spawn(async move {
+            use std::io::Write;
+            let mut writer = std::io::BufWriter::new(file);
+            loop {
+                match rx.recv().await {
+                    Ok(event) => match &event {
+                        crate::OutputEvent::Stdout { line, .. } => {
+                            let _ = writeln!(writer, "{}", line);
+                        }
+                        crate::OutputEvent::Stderr { line, .. } => {
+                            let _ = writeln!(writer, "[stderr] {}", line);
+                        }
+                        _ => {}
+                    },
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                        let _ = writeln!(writer, "[... {} output lines dropped ...]", n);
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                        break;
+                    }
+                }
+            }
+            let _ = writer.flush();
+            debug!(agent = %name, path = %path.display(), "output log drain finished");
+        });
+
+        Some(tmp_path)
     }
 
     fn current_restart_count(&mut self, key: &(String, String)) -> u32 {
@@ -1969,6 +2025,10 @@ impl AgentOrchestrator {
         // Subscribe to the output broadcast for nightwatch drain
         let output_rx = handle.subscribe_output();
 
+        // Open a streaming log file and spawn a background drain task so
+        // output is captured to disk even when the tick interval is long.
+        let output_tmp_path = self.start_output_log_drain(&def.name, &handle);
+
         // Get the restart count from the orchestrator-level counter
         let restart_count = self
             .restart_counts
@@ -1993,6 +2053,7 @@ impl AgentOrchestrator {
                 mention_parent_agent: None,
                 concurrency_permit: permit,
                 commit_status_post: None,
+                output_tmp_path,
             },
         );
 
@@ -2297,6 +2358,7 @@ impl AgentOrchestrator {
             })?;
 
         let output_rx = handle.subscribe_output();
+        let output_tmp_path = self.start_output_log_drain(&def.name, &handle);
         let restart_count = self
             .restart_counts
             .get(&agent_key(&def))
@@ -2324,6 +2386,7 @@ impl AgentOrchestrator {
                 mention_parent_agent: None,
                 concurrency_permit: None,
                 commit_status_post: Some((head_sha.clone(), commit_status_context.to_string())),
+                output_tmp_path,
             },
         );
 
@@ -2497,6 +2560,7 @@ impl AgentOrchestrator {
             })?;
 
         let output_rx = handle.subscribe_output();
+        let output_tmp_path = self.start_output_log_drain(&def.name, &handle);
         let restart_count = self
             .restart_counts
             .get(&agent_key(&def))
@@ -2520,6 +2584,7 @@ impl AgentOrchestrator {
                 mention_parent_agent: None,
                 concurrency_permit: None,
                 commit_status_post: Some((head_sha.clone(), commit_status_context.to_string())),
+                output_tmp_path,
             },
         );
 
@@ -2808,6 +2873,7 @@ impl AgentOrchestrator {
             })?;
 
         let output_rx = handle.subscribe_output();
+        let output_tmp_path = self.start_output_log_drain(&def.name, &handle);
         let restart_count = self
             .restart_counts
             .get(&agent_key(&def))
@@ -2831,6 +2897,7 @@ impl AgentOrchestrator {
                 mention_parent_agent: None,
                 concurrency_permit: None,
                 commit_status_post: Some((after_sha.clone(), "adf/build".to_string())),
+                output_tmp_path,
             },
         );
 
@@ -5987,6 +6054,7 @@ impl AgentOrchestrator {
             let mut stdout_lines: Vec<String> = Vec::new();
             let mut stderr_lines: Vec<String> = Vec::new();
             let mut output_lines: Vec<String> = Vec::new();
+            let mut agent_tmp_path: Option<PathBuf> = None;
             if let Some(managed) = self.active_agents.get_mut(name) {
                 let cli_tool = managed.definition.cli_tool.clone();
                 let session_id = managed.session_id.clone();
@@ -5995,6 +6063,7 @@ impl AgentOrchestrator {
                     .clone()
                     .or_else(|| managed.definition.model.clone())
                     .unwrap_or_default();
+                agent_tmp_path = managed.output_tmp_path.take();
 
                 while let Ok(event) = managed.output_rx.try_recv() {
                     self.nightwatch.observe(name, &event);
@@ -6283,31 +6352,52 @@ impl AgentOrchestrator {
                 }
             }
 
-            // Write agent output to a per-run log file so it is always
-            // reviewable, even for event-only agents (build-runner) that
-            // skip the Gitea comment path above.
+            // Finalise the agent output log: prepend header to the temp file
+            // written by the background drain task, then rename to final path.
             {
                 let _ = std::fs::create_dir_all(&self.agent_log_dir);
                 let ts = chrono::Utc::now().format("%Y%m%dT%H%M%SZ");
                 let filename = format!("{}-{}.log", name, ts);
-                let path = self.agent_log_dir.join(&filename);
-                let mut content = String::with_capacity(output_lines.len() * 120);
-                content.push_str(&format!(
-                    "# agent: {}\n# exit_code: {:?}\n# exit_class: {}\n# wall_time: {:.1}s\n# model: {}\n\n",
-                    name,
-                    status.code(),
-                    record.exit_class,
-                    record.wall_time_secs,
-                    record.model_used.as_deref().unwrap_or("n/a"),
-                ));
-                for line in &output_lines {
-                    content.push_str(line);
-                    content.push('\n');
-                }
-                if let Err(e) = std::fs::write(&path, &content) {
-                    warn!(agent = %name, path = %path.display(), error = %e, "failed to write agent output log");
+                let final_path = self.agent_log_dir.join(&filename);
+
+                if let Some(ref tmp_path) = agent_tmp_path {
+                    // The drain task wrote raw output lines.  Read them back,
+                    // prepend the header, and write the final file.
+                    let body = std::fs::read_to_string(tmp_path).unwrap_or_default();
+                    let header = format!(
+                        "# agent: {}\n# exit_code: {:?}\n# exit_class: {}\n# wall_time: {:.1}s\n# model: {}\n\n",
+                        name,
+                        status.code(),
+                        record.exit_class,
+                        record.wall_time_secs,
+                        record.model_used.as_deref().unwrap_or("n/a"),
+                    );
+                    let final_content = format!("{}{}", header, body);
+                    if let Err(e) = std::fs::write(&final_path, &final_content) {
+                        warn!(agent = %name, path = %final_path.display(), error = %e, "failed to write agent output log");
+                    } else {
+                        debug!(agent = %name, path = %final_path.display(), "wrote agent output log");
+                    }
+                    let _ = std::fs::remove_file(tmp_path);
                 } else {
-                    debug!(agent = %name, path = %path.display(), "wrote agent output log");
+                    // Fallback: no drain task (shouldn't happen), write from
+                    // the in-memory output_lines instead.
+                    let mut content = String::with_capacity(output_lines.len() * 120);
+                    content.push_str(&format!(
+                        "# agent: {}\n# exit_code: {:?}\n# exit_class: {}\n# wall_time: {:.1}s\n# model: {}\n\n",
+                        name,
+                        status.code(),
+                        record.exit_class,
+                        record.wall_time_secs,
+                        record.model_used.as_deref().unwrap_or("n/a"),
+                    ));
+                    for line in &output_lines {
+                        content.push_str(line);
+                        content.push('\n');
+                    }
+                    if let Err(e) = std::fs::write(&final_path, &content) {
+                        warn!(agent = %name, path = %final_path.display(), error = %e, "failed to write agent output log (fallback)");
+                    }
                 }
             }
 
