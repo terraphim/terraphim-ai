@@ -1203,7 +1203,8 @@ impl OrchestratorConfig {
     pub fn load_and_validate(
         path: impl AsRef<std::path::Path>,
     ) -> Result<Self, crate::error::OrchestratorError> {
-        let cfg = Self::from_file(path)?;
+        let mut cfg = Self::from_file(path)?;
+        cfg.substitute_env_vars();
         cfg.validate()?;
         Ok(cfg)
     }

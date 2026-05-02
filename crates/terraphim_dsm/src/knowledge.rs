@@ -59,7 +59,7 @@ impl KnowledgeGraph {
             .filter_map(|e| e.ok())
         {
             let path = entry.path();
-            if path.extension().map_or(false, |ext| ext == "md") {
+            if path.extension().is_some_and(|ext| ext == "md") {
                 if let Ok(content) = std::fs::read_to_string(path) {
                     let concept = self.parse_concept_file(path, &content);
                     self.concepts.insert(concept.name.clone(), concept);
@@ -196,11 +196,11 @@ mod tests {
         // Create a test concept file
         let mut concept_file = std::fs::File::create(kg_dir.join("Authentication.md")).unwrap();
         writeln!(concept_file, "# Authentication").unwrap();
-        writeln!(concept_file, "").unwrap();
+        writeln!(concept_file).unwrap();
         writeln!(concept_file, "Authentication and authorization concepts").unwrap();
-        writeln!(concept_file, "").unwrap();
+        writeln!(concept_file).unwrap();
         writeln!(concept_file, "synonyms:: auth, login, identity").unwrap();
-        writeln!(concept_file, "").unwrap();
+        writeln!(concept_file).unwrap();
         writeln!(concept_file, "## Related Concepts").unwrap();
         writeln!(concept_file, "- Security").unwrap();
         writeln!(concept_file, "- Identity").unwrap();
