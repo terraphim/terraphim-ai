@@ -141,6 +141,14 @@ impl WebhookDispatch {
     }
 }
 
+fn deserialize_null_default_vec<'de, D, T>(deserializer: D) -> Result<Vec<T>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: serde::Deserialize<'de>,
+{
+    Option::<Vec<T>>::deserialize(deserializer).map(|v| v.unwrap_or_default())
+}
+
 /// Gitea webhook payload for `push` events (Phase 3).
 #[derive(Debug, Deserialize)]
 pub struct GiteaPushPayload {
@@ -148,14 +156,16 @@ pub struct GiteaPushPayload {
     pub ref_name: String,
     pub before: String,
     pub after: String,
+    #[serde(default)]
     pub pusher: GiteaPusher,
     pub repository: GiteaRepository,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_null_default_vec")]
     pub commits: Vec<GiteaPushCommit>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Default, Deserialize)]
 pub struct GiteaPusher {
+    #[serde(default)]
     pub login: String,
 }
 
