@@ -2753,9 +2753,18 @@ impl AgentOrchestrator {
                 mention_depth: None,
                 mention_parent_agent: None,
                 concurrency_permit: None,
-                commit_status_post: None,
+                commit_status_post: Some((after_sha.clone(), "adf/build".to_string())),
             },
         );
+
+        self.post_pending_status(
+            &after_sha,
+            0,
+            &project,
+            "adf/build",
+            "build-runner dispatched",
+        )
+        .await;
 
         info!(
             agent = %def.name,
