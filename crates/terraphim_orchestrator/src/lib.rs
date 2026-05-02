@@ -2283,6 +2283,16 @@ impl AgentOrchestrator {
         let project = req.project.clone();
         let head_sha = req.head_sha.clone();
 
+        if self.active_agents.contains_key("build-runner") {
+            info!(
+                pr_number,
+                project = %project,
+                head_sha = %head_sha,
+                "ReviewPr skipped build-runner: already active from concurrent push dispatch"
+            );
+            return Ok(false);
+        }
+
         // Look up the build-runner agent for this project. Missing must
         // skip silently — no `pending` posted by the caller.
         let def =
@@ -2602,6 +2612,15 @@ impl AgentOrchestrator {
                     return Ok(());
                 }
             };
+
+        if self.active_agents.contains_key("build-runner") {
+            info!(
+                project = %project,
+                after_sha = %after_sha,
+                "Push skipped build-runner: already active from concurrent dispatch"
+            );
+            return Ok(());
+        }
 
         // === STATIC ALLOW-LIST GATE ===
         // build-runner is bash-only (no LLM), so def.model is normally None
