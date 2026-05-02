@@ -449,15 +449,12 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_secret_explicit() {
+    fn test_resolve_secret() {
         std::env::remove_var("ADF_WEBHOOK_SECRET");
         let result = resolve_secret(Some("mysecret"), "unused-host-in-unit-test");
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "mysecret");
-    }
 
-    #[test]
-    fn test_resolve_secret_from_env() {
         std::env::set_var("ADF_WEBHOOK_SECRET", "env-secret");
         let result = resolve_secret(None, "unused-host-in-unit-test");
         std::env::remove_var("ADF_WEBHOOK_SECRET");
