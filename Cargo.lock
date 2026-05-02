@@ -8788,6 +8788,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "terraphim_dsm"
+version = "1.17.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "dirs 5.0.1",
+ "log",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tracing",
+ "tracing-subscriber",
+ "walkdir",
+]
+
+[[package]]
 name = "terraphim_file_search"
 version = "1.17.0"
 dependencies = [

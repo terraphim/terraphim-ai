@@ -1,0 +1,25 @@
+[package]
+name = "terraphim_dsm"
+version.workspace = true
+edition.workspace = true
+description = "Semantic module grouping using Terraphim knowledge graphs (sentrux companion tool)"
+license = "MIT"
+repository = "https://github.com/terraphim/terraphim-ai"
+
+[[bin]]
+name = "terraphim_dsm"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+walkdir = "2"
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+log = "0.4"
+dirs = "5"
+
+[dev-dependencies]
+tempfile = "3"
