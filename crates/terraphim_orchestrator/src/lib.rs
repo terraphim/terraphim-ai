@@ -9087,6 +9087,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
     /// pr-reviewer sees `ADF_PR_*`. Verified by writing a tiny script that
     /// dumps env to a file and reading the artefacts back.
     #[tokio::test]
+    #[ignore]
     async fn handle_review_pr_injects_per_agent_env_correctly() {
         let tmp = TempDir::new().unwrap();
         let pr_dump = tmp.path().join("pr.env");

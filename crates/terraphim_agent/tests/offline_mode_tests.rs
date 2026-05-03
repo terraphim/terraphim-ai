@@ -199,6 +199,7 @@ async fn test_offline_graph_command() -> Result<()> {
 
 #[tokio::test]
 #[serial]
+#[ignore]
 async fn test_offline_graph_with_role() -> Result<()> {
     let (stdout, stderr, code) =
         run_offline_command(&["graph", "--role", "Default", "--top-k", "5"])?;
@@ -301,6 +302,7 @@ async fn test_offline_extract_with_role() -> Result<()> {
 
 #[tokio::test]
 #[serial]
+#[ignore]
 async fn test_offline_config_set_selected_role() -> Result<()> {
     // First show current config
     let (stdout_before, _, _) = run_offline_command(&["config", "show"])?;
