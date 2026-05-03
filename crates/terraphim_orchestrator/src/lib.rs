@@ -9115,11 +9115,17 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
         // Allow agents time to spawn before polling
         tokio::time::sleep(Duration::from_secs(2)).await;
 
-        for _ in 0..600 {
+        for i in 0..600 {
             tokio::time::sleep(Duration::from_millis(50)).await;
             orch.poll_agent_exits().await;
             if pr_dump.exists() && push_dump.exists() {
                 break;
+            }
+            if i == 100 {
+                eprintln!(
+                    "Still waiting after 5s. Active agents: {:?}",
+                    orch.active_agents.keys().collect::<Vec<_>>()
+                );
             }
         }
 
