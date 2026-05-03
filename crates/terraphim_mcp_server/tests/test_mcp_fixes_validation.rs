@@ -1,3 +1,5 @@
+mod support;
+
 use anyhow::Result;
 use rmcp::{model::CallToolRequestParam, service::ServiceExt, transport::TokioChildProcess};
 use serde_json::json;
@@ -6,7 +8,6 @@ use tokio::process::Command;
 
 /// Test that MCP server properly separates logs from JSON-RPC responses
 #[tokio::test]
-#[ignore]
 async fn test_mcp_log_separation_and_tools() -> Result<()> {
     println!("🧪 Testing MCP server log separation and tool availability");
 
@@ -27,26 +28,7 @@ async fn test_mcp_log_separation_and_tools() -> Result<()> {
         anyhow::bail!("Failed to build terraphim_mcp_server");
     }
 
-    let crate_dir = std::env::current_dir()?;
-    let binary_path = crate_dir
-        .parent()
-        .and_then(|p| p.parent())
-        .map(|workspace| {
-            workspace
-                .join("target")
-                .join("debug")
-                .join("terraphim_mcp_server")
-        })
-        .ok_or_else(|| anyhow::anyhow!("Cannot find workspace root"))?;
-
-    if !binary_path.exists() {
-        anyhow::bail!("MCP server binary not found at {:?}", binary_path);
-    }
-
-    println!("✅ Using MCP server binary: {:?}", binary_path);
-
-    // Create command with proper stdio separation
-    let mut cmd = Command::new(binary_path);
+    let mut cmd = Command::new(support::mcp_server_binary()?);
     cmd.stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -144,23 +126,10 @@ async fn test_mcp_log_separation_and_tools() -> Result<()> {
 
 /// Test MCP server with role switching and configuration updates
 #[tokio::test]
-#[ignore]
 async fn test_mcp_role_configuration() -> Result<()> {
     println!("⚙️ Testing MCP role configuration");
 
-    let crate_dir = std::env::current_dir()?;
-    let binary_path = crate_dir
-        .parent()
-        .and_then(|p| p.parent())
-        .map(|workspace| {
-            workspace
-                .join("target")
-                .join("debug")
-                .join("terraphim_mcp_server")
-        })
-        .ok_or_else(|| anyhow::anyhow!("Cannot find workspace root"))?;
-
-    let mut cmd = Command::new(binary_path);
+    let mut cmd = Command::new(support::mcp_server_binary()?);
     cmd.stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
@@ -229,23 +198,10 @@ async fn test_mcp_role_configuration() -> Result<()> {
 
 /// Test text processing tools (find_matches, replace_matches, etc.)
 #[tokio::test]
-#[ignore]
 async fn test_mcp_text_processing_tools() -> Result<()> {
     println!("📝 Testing MCP text processing tools");
 
-    let crate_dir = std::env::current_dir()?;
-    let binary_path = crate_dir
-        .parent()
-        .and_then(|p| p.parent())
-        .map(|workspace| {
-            workspace
-                .join("target")
-                .join("debug")
-                .join("terraphim_mcp_server")
-        })
-        .ok_or_else(|| anyhow::anyhow!("Cannot find workspace root"))?;
-
-    let mut cmd = Command::new(binary_path);
+    let mut cmd = Command::new(support::mcp_server_binary()?);
     cmd.stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());

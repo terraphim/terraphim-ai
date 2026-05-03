@@ -453,7 +453,6 @@ fn test_extract_with_known_technical_terms() -> Result<()> {
 
 #[test]
 #[serial]
-#[ignore]
 fn test_extract_error_conditions() -> Result<()> {
     println!("Testing extract error handling");
 

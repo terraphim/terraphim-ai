@@ -1175,6 +1175,16 @@ fi
 /home/alex/.local/bin/rch exec -- cargo fmt --all -- --check
 /home/alex/.local/bin/rch exec -- cargo clippy --workspace --all-targets -- -D warnings
 /home/alex/.local/bin/rch exec -- cargo build --workspace
+
+# Pre-build binaries that integration tests expect to find.  When tests run
+# via rch the nested `cargo build` inside the test binary may hit a different
+# worker or a stale target directory.  Exporting absolute paths lets tests
+# short-circuit to the already-built artefact.
+TERRAPHIM_AGENT_BIN="$PWD/target/debug/terraphim-agent"
+TERRAPHIM_SERVER_BIN="$PWD/target/debug/terraphim_server"
+TERRAPHIM_MCP_SERVER_BIN="$PWD/target/debug/terraphim_mcp_server"
+export TERRAPHIM_AGENT_BIN TERRAPHIM_SERVER_BIN TERRAPHIM_MCP_SERVER_BIN
+
 /home/alex/.local/bin/rch exec -- cargo test --workspace --no-fail-fast
 
 # Sentrux quality check after build - save baseline

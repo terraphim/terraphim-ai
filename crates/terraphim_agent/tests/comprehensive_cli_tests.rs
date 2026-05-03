@@ -168,7 +168,6 @@ fn test_search_with_role_and_limit() -> Result<()> {
 
 #[test]
 #[serial]
-#[ignore]
 fn test_roles_management() -> Result<()> {
     println!("👤 Testing roles management commands");
 
@@ -302,7 +301,6 @@ fn test_config_management() -> Result<()> {
 
 #[test]
 #[serial]
-#[ignore]
 fn test_graph_command() -> Result<()> {
     println!("🕸️ Testing graph command");
 
@@ -352,7 +350,6 @@ fn test_graph_command() -> Result<()> {
 
 #[test]
 #[serial]
-#[ignore]
 fn test_chat_command() -> Result<()> {
     println!("💬 Testing chat command");
 

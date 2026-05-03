@@ -8,6 +8,10 @@ use std::path::Path;
 use std::process::{Command, Stdio};
 
 fn agent_binary() -> String {
+    if let Ok(bin) = std::env::var("TERRAPHIM_AGENT_BIN") {
+        return bin;
+    }
+
     let output = Command::new("cargo")
         .args(["build", "-p", "terraphim_agent"])
         .output()
@@ -90,7 +94,6 @@ fn clear_correction_files(home: &str) {
 }
 
 #[test]
-#[ignore]
 fn user_prompt_submit_use_instead_of_creates_tool_preference() {
     let binary = agent_binary();
     let tmp = tempfile::tempdir().expect("create temp dir");
@@ -127,7 +130,6 @@ fn user_prompt_submit_use_instead_of_creates_tool_preference() {
 }
 
 #[test]
-#[ignore]
 fn user_prompt_submit_use_not_creates_tool_preference() {
     let binary = agent_binary();
     let tmp = tempfile::tempdir().expect("create temp dir");
@@ -164,7 +166,6 @@ fn user_prompt_submit_use_not_creates_tool_preference() {
 }
 
 #[test]
-#[ignore]
 fn user_prompt_submit_prefer_over_creates_tool_preference() {
     let binary = agent_binary();
     let tmp = tempfile::tempdir().expect("create temp dir");
@@ -201,7 +202,6 @@ fn user_prompt_submit_prefer_over_creates_tool_preference() {
 }
 
 #[test]
-#[ignore]
 fn user_prompt_submit_personal_preference_does_not_capture() {
     let binary = agent_binary();
     let tmp = tempfile::tempdir().expect("create temp dir");

@@ -1,3 +1,5 @@
+mod support;
+
 use anyhow::Result;
 use rmcp::{model::CallToolRequestParam, service::ServiceExt, transport::TokioChildProcess};
 use serde_json::json;
@@ -6,23 +8,10 @@ use tokio::process::Command;
 
 /// Test that our bug reporting knowledge graph terms are available in autocomplete
 #[tokio::test]
-#[ignore]
 async fn test_kg_bug_reporting_terms_available() -> Result<()> {
     println!("🔍 Testing knowledge graph bug reporting terms availability");
 
-    let crate_dir = std::env::current_dir()?;
-    let binary_path = crate_dir
-        .parent()
-        .and_then(|p| p.parent())
-        .map(|workspace| {
-            workspace
-                .join("target")
-                .join("debug")
-                .join("terraphim_mcp_server")
-        })
-        .ok_or_else(|| anyhow::anyhow!("Cannot find workspace root"))?;
-
-    let mut cmd = Command::new(binary_path);
+    let mut cmd = Command::new(support::mcp_server_binary()?);
     cmd.stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())

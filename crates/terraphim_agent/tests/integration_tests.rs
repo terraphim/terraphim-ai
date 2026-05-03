@@ -25,6 +25,12 @@ static SERVER_BINARY: OnceLock<Result<PathBuf, String>> = OnceLock::new();
 fn agent_binary_path() -> Result<PathBuf> {
     AGENT_BINARY
         .get_or_init(|| {
+            if let Ok(bin) = std::env::var("TERRAPHIM_AGENT_BIN") {
+                let path = PathBuf::from(bin);
+                if path.exists() {
+                    return Ok(path);
+                }
+            }
             let workspace = get_workspace_root().map_err(|e| e.to_string())?;
             let status = Command::new("cargo")
                 .args([
@@ -51,6 +57,12 @@ fn agent_binary_path() -> Result<PathBuf> {
 fn server_binary_path() -> Result<PathBuf> {
     SERVER_BINARY
         .get_or_init(|| {
+            if let Ok(bin) = std::env::var("TERRAPHIM_SERVER_BIN") {
+                let path = PathBuf::from(bin);
+                if path.exists() {
+                    return Ok(path);
+                }
+            }
             let workspace = get_workspace_root().map_err(|e| e.to_string())?;
             let status = Command::new("cargo")
                 .args([
@@ -246,7 +258,6 @@ fn cleanup_test_files() -> Result<()> {
 
 #[tokio::test]
 #[serial]
-#[ignore]
 async fn test_end_to_end_offline_workflow() -> Result<()> {
     cleanup_test_files()?;
 
@@ -356,7 +367,6 @@ async fn test_end_to_end_offline_workflow() -> Result<()> {
 
 #[tokio::test]
 #[serial]
-#[ignore]
 async fn test_end_to_end_server_workflow() -> Result<()> {
     println!("=== Testing Complete Server Workflow ===");
 
@@ -574,7 +584,6 @@ async fn test_end_to_end_server_workflow() -> Result<()> {
 
 #[tokio::test]
 #[serial]
-#[ignore]
 async fn test_offline_vs_server_mode_comparison() -> Result<()> {
     cleanup_test_files()?;
     println!("=== Comparing Offline vs Server Modes ===");
@@ -658,7 +667,6 @@ async fn test_offline_vs_server_mode_comparison() -> Result<()> {
 
 #[tokio::test]
 #[serial]
-#[ignore]
 async fn test_role_consistency_across_commands() -> Result<()> {
     cleanup_test_files()?;
     println!("=== Testing Role Consistency ===");
@@ -749,7 +757,6 @@ async fn test_role_consistency_across_commands() -> Result<()> {
 
 #[tokio::test]
 #[serial]
-#[ignore]
 async fn test_full_feature_matrix() -> Result<()> {
     cleanup_test_files()?;
     println!("=== Testing Full Feature Matrix ===");

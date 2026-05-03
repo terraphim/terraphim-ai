@@ -27,6 +27,15 @@ static AGENT_BINARY: OnceLock<Result<PathBuf, String>> = OnceLock::new();
 fn agent_binary() -> Result<PathBuf> {
     AGENT_BINARY
         .get_or_init(|| {
+            // Allow build environments (e.g. CI, rch) to inject the pre-built
+            // binary path so tests do not need to spawn a nested cargo build.
+            if let Ok(bin) = std::env::var("TERRAPHIM_AGENT_BIN") {
+                let path = PathBuf::from(bin);
+                if path.exists() {
+                    return Ok(path);
+                }
+            }
+
             let status = Command::new("cargo")
                 .args(["build", "-p", "terraphim_agent", "--bin", "terraphim-agent"])
                 .status()
@@ -169,7 +178,6 @@ fn assert_search_envelope(value: &Value, expected_limit: usize) {
 
 #[test]
 #[serial]
-#[ignore]
 fn search_robot_mode_emits_parseable_json_envelope() -> Result<()> {
     let query = "terraphim";
     let limit = 5usize;
@@ -188,7 +196,6 @@ fn search_robot_mode_emits_parseable_json_envelope() -> Result<()> {
 
 #[test]
 #[serial]
-#[ignore]
 fn search_format_json_emits_parseable_json_envelope() -> Result<()> {
     let query = "terraphim";
     let limit = 5usize;
@@ -208,7 +215,6 @@ fn search_format_json_emits_parseable_json_envelope() -> Result<()> {
 
 #[test]
 #[serial]
-#[ignore]
 fn search_format_json_compact_emits_parseable_json_envelope() -> Result<()> {
     let query = "terraphim";
     let limit = 5usize;
@@ -228,7 +234,6 @@ fn search_format_json_compact_emits_parseable_json_envelope() -> Result<()> {
 
 #[test]
 #[serial]
-#[ignore]
 fn search_robot_json_results_carry_optional_preview_url() -> Result<()> {
     let query = "terraphim";
     let (stdout, stderr, code) = run_agent_command(&["--robot", "search", query, "--limit", "3"])?;
@@ -267,7 +272,6 @@ fn search_robot_json_results_carry_optional_preview_url() -> Result<()> {
 
 #[test]
 #[serial]
-#[ignore]
 fn search_format_json_compact_produces_single_line_output() -> Result<()> {
     let query = "terraphim";
     let (stdout, stderr, code) =

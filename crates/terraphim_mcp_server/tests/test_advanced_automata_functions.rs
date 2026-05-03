@@ -1,3 +1,5 @@
+mod support;
+
 use anyhow::Result;
 use rmcp::{model::CallToolRequestParam, service::ServiceExt, transport::TokioChildProcess};
 use serde_json::json;
@@ -6,23 +8,10 @@ use tokio::process::Command;
 
 /// Test extract_paragraphs_from_automata with Terraphim Engineer role and real content
 #[tokio::test]
-#[ignore]
 async fn test_extract_paragraphs_with_terraphim_engineer() -> Result<()> {
     println!("📄 Testing extract_paragraphs_from_automata with Terraphim Engineer role");
 
-    let crate_dir = std::env::current_dir()?;
-    let binary_path = crate_dir
-        .parent()
-        .and_then(|p| p.parent())
-        .map(|workspace| {
-            workspace
-                .join("target")
-                .join("debug")
-                .join("terraphim_mcp_server")
-        })
-        .ok_or_else(|| anyhow::anyhow!("Cannot find workspace root"))?;
-
-    let mut cmd = Command::new(binary_path);
+    let mut cmd = Command::new(support::mcp_server_binary()?);
     cmd.stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -220,23 +209,10 @@ The service layer acts as a provider and middleware between components.
 
 /// Test is_all_terms_connected_by_path with knowledge graph connections
 #[tokio::test]
-#[ignore]
 async fn test_terms_connectivity_with_knowledge_graph() -> Result<()> {
     println!("🔗 Testing is_all_terms_connected_by_path with knowledge graph");
 
-    let crate_dir = std::env::current_dir()?;
-    let binary_path = crate_dir
-        .parent()
-        .and_then(|p| p.parent())
-        .map(|workspace| {
-            workspace
-                .join("target")
-                .join("debug")
-                .join("terraphim_mcp_server")
-        })
-        .ok_or_else(|| anyhow::anyhow!("Cannot find workspace root"))?;
-
-    let mut cmd = Command::new(binary_path);
+    let mut cmd = Command::new(support::mcp_server_binary()?);
     cmd.stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -361,23 +337,10 @@ async fn test_terms_connectivity_with_knowledge_graph() -> Result<()> {
 
 /// Comprehensive test that validates both functions work together
 #[tokio::test]
-#[ignore]
 async fn test_advanced_automata_integration() -> Result<()> {
     println!("🚀 Testing advanced automata functions integration");
 
-    let crate_dir = std::env::current_dir()?;
-    let binary_path = crate_dir
-        .parent()
-        .and_then(|p| p.parent())
-        .map(|workspace| {
-            workspace
-                .join("target")
-                .join("debug")
-                .join("terraphim_mcp_server")
-        })
-        .ok_or_else(|| anyhow::anyhow!("Cannot find workspace root"))?;
-
-    let mut cmd = Command::new(binary_path);
+    let mut cmd = Command::new(support::mcp_server_binary()?);
     cmd.stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -498,23 +461,10 @@ different system components.
 
 /// Test error handling and edge cases
 #[tokio::test]
-#[ignore]
 async fn test_advanced_automata_edge_cases() -> Result<()> {
     println!("⚠️ Testing edge cases for advanced automata functions");
 
-    let crate_dir = std::env::current_dir()?;
-    let binary_path = crate_dir
-        .parent()
-        .and_then(|p| p.parent())
-        .map(|workspace| {
-            workspace
-                .join("target")
-                .join("debug")
-                .join("terraphim_mcp_server")
-        })
-        .ok_or_else(|| anyhow::anyhow!("Cannot find workspace root"))?;
-
-    let mut cmd = Command::new(binary_path);
+    let mut cmd = Command::new(support::mcp_server_binary()?);
     cmd.stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())

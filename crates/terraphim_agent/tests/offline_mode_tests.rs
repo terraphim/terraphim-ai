@@ -199,10 +199,9 @@ async fn test_offline_graph_command() -> Result<()> {
 
 #[tokio::test]
 #[serial]
-#[ignore]
 async fn test_offline_graph_with_role() -> Result<()> {
     let (stdout, stderr, code) =
-        run_offline_command(&["graph", "--role", "Default", "--top-k", "5"])?;
+        run_offline_command(&["graph", "--role", "Terraphim Engineer", "--top-k", "5"])?;
 
     // Graph command with role should succeed
     assert_eq!(
@@ -302,7 +301,6 @@ async fn test_offline_extract_with_role() -> Result<()> {
 
 #[tokio::test]
 #[serial]
-#[ignore]
 async fn test_offline_config_set_selected_role() -> Result<()> {
     // First show current config
     let (stdout_before, _, _) = run_offline_command(&["config", "show"])?;
@@ -310,7 +308,7 @@ async fn test_offline_config_set_selected_role() -> Result<()> {
 
     // Set selected role
     let (stdout, stderr, code) =
-        run_offline_command(&["config", "set", "selected_role", "Default"])?;
+        run_offline_command(&["config", "set", "selected_role", "Terraphim Engineer"])?;
 
     assert_eq!(code, 0, "Config set should succeed, stderr: {}", stderr);
 
@@ -320,7 +318,7 @@ async fn test_offline_config_set_selected_role() -> Result<()> {
         .collect();
     let response = output_lines.join("\n");
     assert!(
-        response.contains("updated selected_role to Default"),
+        response.contains("updated selected_role to Terraphim Engineer"),
         "Should confirm role update: {}",
         response
     );

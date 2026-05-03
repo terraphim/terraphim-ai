@@ -10,6 +10,23 @@ use terraphim_config::{ConfigBuilder, Haystack, ServiceType};
 use tokio::process::Command;
 
 async fn setup_server_command() -> Result<Command> {
+    // Allow CI / build environments to inject a pre-built binary path so tests
+    // do not need to spawn a nested cargo build.
+    if let Ok(bin) = std::env::var("TERRAPHIM_MCP_SERVER_BIN") {
+        let path = std::path::PathBuf::from(bin);
+        if path.exists() {
+            println!("🚀 Using pre-built server binary at {:?}", path);
+            let mut command = Command::new(path);
+            command
+                .env("RUST_BACKTRACE", "1")
+                .env("RUST_LOG", "debug")
+                .stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped());
+            return Ok(command);
+        }
+    }
+
     // Build the server first to ensure the binary is up-to-date
     let mut build = Command::new("cargo");
     build
@@ -152,7 +169,6 @@ fn extract_found_count(message: &str) -> Option<usize> {
         .and_then(|m| m.as_str().parse::<usize>().ok())
 }
 #[tokio::test]
-#[ignore]
 async fn test_mcp_server_integration() -> Result<()> {
     let command = setup_server_command().await?;
     let transport = TokioChildProcess::new(command)?;
@@ -223,7 +239,6 @@ async fn test_mcp_server_integration() -> Result<()> {
 }
 
 #[tokio::test]
-#[ignore]
 async fn test_search_with_different_roles() -> Result<()> {
     let command = setup_server_command().await?;
     let transport = TokioChildProcess::new(command)?;
@@ -284,7 +299,6 @@ async fn test_search_with_different_roles() -> Result<()> {
 }
 
 #[tokio::test]
-#[ignore]
 async fn test_resource_uri_mapping() -> Result<()> {
     let command = setup_server_command().await?;
     let transport = TokioChildProcess::new(command)?;
@@ -344,7 +358,6 @@ async fn test_resource_uri_mapping() -> Result<()> {
 }
 
 #[tokio::test]
-#[ignore]
 async fn test_simple_search_with_debug() -> Result<()> {
     let command = setup_server_command().await?;
     let transport = TokioChildProcess::new(command)?;
@@ -413,7 +426,6 @@ async fn test_simple_search_with_debug() -> Result<()> {
 
 /// Test pagination behaviour of the search tool.
 #[tokio::test]
-#[ignore]
 async fn test_search_pagination() -> Result<()> {
     let command = setup_server_command().await?;
     let transport = TokioChildProcess::new(command)?;
@@ -481,7 +493,6 @@ async fn test_search_pagination() -> Result<()> {
 
 /// Test that invalid pagination parameters are rejected.
 #[tokio::test]
-#[ignore]
 async fn test_search_invalid_pagination_params() -> Result<()> {
     let command = setup_server_command().await?;
     let transport = TokioChildProcess::new(command)?;
@@ -519,7 +530,6 @@ async fn test_search_invalid_pagination_params() -> Result<()> {
 
 /// Perform search then fetch the same resource via read_resource and compare contents.
 #[tokio::test]
-#[ignore]
 async fn test_search_read_resource_round_trip() -> Result<()> {
     let command = setup_server_command().await?;
     let transport = TokioChildProcess::new(command)?;

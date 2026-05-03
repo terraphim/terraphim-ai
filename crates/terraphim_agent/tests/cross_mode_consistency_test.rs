@@ -51,6 +51,13 @@ fn get_workspace_root() -> Result<PathBuf> {
 
 /// Pre-compile server binary for fast startup
 fn ensure_server_binary() -> Result<PathBuf> {
+    if let Ok(bin) = std::env::var("TERRAPHIM_SERVER_BIN") {
+        let path = PathBuf::from(bin);
+        if path.exists() {
+            return Ok(path);
+        }
+    }
+
     let workspace_root = get_workspace_root()?;
     let binary_path = workspace_root.join("target/debug/terraphim_server");
 
@@ -407,7 +414,6 @@ Search algorithms find data in structures.
 
 #[tokio::test]
 #[serial]
-#[ignore]
 async fn test_cross_mode_consistency() -> Result<()> {
     println!("\n");
     println!("╔════════════════════════════════════════════════════════════════════════╗");
@@ -524,7 +530,6 @@ async fn test_cross_mode_consistency() -> Result<()> {
 
 #[tokio::test]
 #[serial]
-#[ignore]
 async fn test_mode_specific_verification() -> Result<()> {
     println!("\n");
     println!("╔════════════════════════════════════════════════════════════════════════╗");
@@ -588,7 +593,6 @@ async fn test_mode_specific_verification() -> Result<()> {
 
 #[tokio::test]
 #[serial]
-#[ignore]
 async fn test_role_consistency_across_modes() -> Result<()> {
     println!("\n");
     println!("╔════════════════════════════════════════════════════════════════════════╗");

@@ -127,7 +127,6 @@ async fn create_terraphim_engineer_config() -> Result<String> {
 /// Test that the MCP server with correct configuration can find terraphim-graph documents
 #[tokio::test]
 #[serial]
-#[ignore]
 async fn test_mcp_server_terraphim_engineer_search() -> Result<()> {
     // Use memory-only persistence to avoid database conflicts between tests
     set_env_var("TERRAPHIM_PROFILE_MEMORY_TYPE", "memory");
@@ -139,15 +138,22 @@ async fn test_mcp_server_terraphim_engineer_search() -> Result<()> {
     println!("✅ Created Terraphim Engineer configuration");
 
     // 2. Start MCP server with custom configuration
-    let server_binary = std::env::current_dir()?
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .join("target/debug/terraphim_mcp_server");
+    let server_binary = if let Ok(bin) = std::env::var("TERRAPHIM_MCP_SERVER_BIN") {
+        std::path::PathBuf::from(bin)
+    } else {
+        std::env::current_dir()?
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("target/debug/terraphim_mcp_server")
+    };
 
     if !server_binary.exists() {
-        panic!("MCP server binary not found. Run: cargo build -p terraphim_mcp_server");
+        panic!(
+            "MCP server binary not found at {:?}. Run: cargo build -p terraphim_mcp_server",
+            server_binary
+        );
     }
 
     let mut cmd = Command::new(&server_binary);
@@ -273,19 +279,22 @@ async fn test_mcp_server_terraphim_engineer_search() -> Result<()> {
 /// Test role switching via config API before search
 #[tokio::test]
 #[serial]
-#[ignore]
 async fn test_mcp_role_switching_before_search() -> Result<()> {
     // Use memory-only persistence to avoid database conflicts between tests
     set_env_var("TERRAPHIM_PROFILE_MEMORY_TYPE", "memory");
 
     println!("🔄 Testing role switching via config API...");
 
-    let server_binary = std::env::current_dir()?
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .join("target/debug/terraphim_mcp_server");
+    let server_binary = if let Ok(bin) = std::env::var("TERRAPHIM_MCP_SERVER_BIN") {
+        std::path::PathBuf::from(bin)
+    } else {
+        std::env::current_dir()?
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("target/debug/terraphim_mcp_server")
+    };
 
     let mut cmd = Command::new(&server_binary);
     cmd.stdin(std::process::Stdio::piped())
@@ -385,7 +394,6 @@ async fn test_mcp_role_switching_before_search() -> Result<()> {
 /// Test MCP resource operations (list_resources and read_resource) with the correct Terraphim Engineer configuration
 #[tokio::test]
 #[serial]
-#[ignore]
 async fn test_mcp_resource_operations() -> Result<()> {
     // Use memory-only persistence to avoid database conflicts between tests
     set_env_var("TERRAPHIM_PROFILE_MEMORY_TYPE", "memory");
@@ -393,15 +401,22 @@ async fn test_mcp_resource_operations() -> Result<()> {
     println!("🧪 Testing MCP resource operations with Terraphim Engineer configuration...");
 
     // Start MCP server (using same pattern as existing working test)
-    let server_binary = std::env::current_dir()?
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .join("target/debug/terraphim_mcp_server");
+    let server_binary = if let Ok(bin) = std::env::var("TERRAPHIM_MCP_SERVER_BIN") {
+        std::path::PathBuf::from(bin)
+    } else {
+        std::env::current_dir()?
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("target/debug/terraphim_mcp_server")
+    };
 
     if !server_binary.exists() {
-        panic!("MCP server binary not found. Run: cargo build -p terraphim_mcp_server");
+        panic!(
+            "MCP server binary not found at {:?}. Run: cargo build -p terraphim_mcp_server",
+            server_binary
+        );
     }
 
     let mut cmd = Command::new(&server_binary);
@@ -608,7 +623,6 @@ async fn test_mcp_resource_operations() -> Result<()> {
 /// Test that MCP search uses the selected role when no role parameter is passed
 #[tokio::test]
 #[serial]
-#[ignore]
 async fn test_mcp_search_uses_selected_role() -> Result<()> {
     // Use memory-only persistence to avoid database conflicts between tests
     set_env_var("TERRAPHIM_PROFILE_MEMORY_TYPE", "memory");
@@ -616,15 +630,22 @@ async fn test_mcp_search_uses_selected_role() -> Result<()> {
     println!("🧪 Testing MCP search uses selected role when no role parameter passed...");
 
     // Start MCP server
-    let server_binary = std::env::current_dir()?
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .join("target/debug/terraphim_mcp_server");
+    let server_binary = if let Ok(bin) = std::env::var("TERRAPHIM_MCP_SERVER_BIN") {
+        std::path::PathBuf::from(bin)
+    } else {
+        std::env::current_dir()?
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("target/debug/terraphim_mcp_server")
+    };
 
     if !server_binary.exists() {
-        panic!("MCP server binary not found. Run: cargo build -p terraphim_mcp_server");
+        panic!(
+            "MCP server binary not found at {:?}. Run: cargo build -p terraphim_mcp_server",
+            server_binary
+        );
     }
 
     let mut cmd = Command::new(&server_binary);
