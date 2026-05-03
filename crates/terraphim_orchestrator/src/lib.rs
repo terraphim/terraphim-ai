@@ -278,6 +278,10 @@ pub struct AgentOrchestrator {
     /// Per-project dedupe set of `(pr_number, head_sha)` already enqueued
     /// for auto-merge so the same revision is never dispatched twice.
     auto_merge_enqueued: pr_poller::AutoMergeDedupeSet,
+    /// TTL-based dedupe cache for auto-merge failure issues. Prevents
+    /// duplicate `[ADF] Auto-merge failed` issues for the same PR within
+    /// a 24-hour window.
+    auto_merge_failure_dedupe: pr_poller::AutoMergeFailureDedupe,
     /// Shared learning store. `None` when `learning.enabled = false` or
     /// when initialisation failed (graceful degradation).
     learning_store: Option<learning::SharedLearningStore>,
@@ -814,6 +818,9 @@ impl AgentOrchestrator {
                 pr_poller::PR_POLL_MIN_INTERVAL,
             ),
             auto_merge_enqueued: pr_poller::AutoMergeDedupeSet::new(),
+            auto_merge_failure_dedupe: pr_poller::AutoMergeFailureDedupe::new(
+                std::time::Duration::from_secs(86400),
+            ),
             learning_store: None,
             learning_config,
             injected_learning_ids: HashMap::new(),
@@ -4538,24 +4545,44 @@ impl AgentOrchestrator {
                     "pr_auto_merge_failed"
                 );
 
-                // 4. Open an [ADF] tracking issue with the failure reason.
-                let title = format!("[ADF] Auto-merge failed for PR #{pr_number}");
-                let body = format!(
-                    "AutoMerge handler failed to merge PR #{pr_number} on project `{project}`.\n\n\
-                     Head SHA: `{head_sha}`\n\n\
-                     Error: {e}\n\n\
-                     The PR was left open; a human needs to investigate (merge conflict, \
-                     protected branch, permissions, transient API failure).\n\n\
-                     Refs: ROC v1 Step G handler, adf-fleet#35."
-                );
-                let labels = ["adf", "auto-merge-failed", "status/needs-triage"];
-                if let Err(issue_err) = tracker.open_failure_issue(&title, &body, &labels).await {
-                    warn!(
+                // 4. Open an [ADF] tracking issue with the failure reason,
+                //    unless we already created one for this (project, pr, sha)
+                //    within the TTL window.
+                if self
+                    .auto_merge_failure_dedupe
+                    .is_recent(&project, pr_number, &head_sha)
+                {
+                    info!(
                         pr_number,
                         project = %project,
-                        error = %issue_err,
-                        "AutoMerge failure issue creation also failed; nothing to retry automatically"
+                        head = %head_sha,
+                        "AutoMerge failure issue already exists for this PR/SHA; skipping duplicate"
                     );
+                } else {
+                    let title = format!("[ADF] Auto-merge failed for PR #{pr_number}");
+                    let body = format!(
+                        "AutoMerge handler failed to merge PR #{pr_number} on project `{project}`.\n\n\
+                         Head SHA: `{head_sha}`\n\n\
+                         Error: {e}\n\n\
+                         The PR was left open; a human needs to investigate (merge conflict, \
+                         protected branch, permissions, transient API failure).\n\n\
+                         Refs: ROC v1 Step G handler, adf-fleet#35."
+                    );
+                    let labels = ["adf", "auto-merge-failed", "status/needs-triage"];
+                    match tracker.open_failure_issue(&title, &body, &labels).await {
+                        Ok(_issue_number) => {
+                            self.auto_merge_failure_dedupe
+                                .record(&project, pr_number, &head_sha);
+                        }
+                        Err(issue_err) => {
+                            warn!(
+                                pr_number,
+                                project = %project,
+                                error = %issue_err,
+                                "AutoMerge failure issue creation also failed; nothing to retry automatically"
+                            );
+                        }
+                    }
                 }
 
                 Ok(())

@@ -348,6 +348,54 @@ impl AutoMergeDedupeSet {
     }
 }
 
+/// TTL-based dedupe cache for auto-merge failure issues.
+///
+/// Prevents the creation of duplicate `[ADF] Auto-merge failed` issues when
+/// the same PR fails multiple times within a short window (e.g. protected
+/// branch blocking every tick). Each entry expires after `ttl` so that a
+/// genuine new failure after a long gap can still be tracked.
+#[derive(Debug)]
+pub struct AutoMergeFailureDedupe {
+    /// `(project, pr_number, head_sha)` -> `Instant` when the failure issue
+    /// was created.
+    entries: HashMap<(String, u64, String), Instant>,
+    /// How long an entry stays valid.
+    ttl: Duration,
+}
+
+impl AutoMergeFailureDedupe {
+    /// Create a new cache with the given TTL.
+    pub fn new(ttl: Duration) -> Self {
+        Self {
+            entries: HashMap::new(),
+            ttl,
+        }
+    }
+
+    /// Check whether a failure issue has already been created for this
+    /// `(project, pr_number, head_sha)` within the TTL window.
+    ///
+    /// Also purges expired entries as a side effect.
+    pub fn is_recent(&mut self, project: &str, pr_number: u64, head_sha: &str) -> bool {
+        self.purge_expired();
+        let key = (project.to_string(), pr_number, head_sha.to_string());
+        self.entries.contains_key(&key)
+    }
+
+    /// Record that a failure issue was just created for this PR.
+    pub fn record(&mut self, project: &str, pr_number: u64, head_sha: &str) {
+        let key = (project.to_string(), pr_number, head_sha.to_string());
+        self.entries.insert(key, Instant::now());
+    }
+
+    /// Remove entries older than `self.ttl`.
+    fn purge_expired(&mut self) {
+        let now = Instant::now();
+        self.entries
+            .retain(|_, created| now.duration_since(*created) < self.ttl);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -439,5 +487,26 @@ mod tests {
         assert!(!set.record_if_new("p", 1, "sha"));
         assert!(set.record_if_new("p", 1, "sha2"));
         assert!(set.record_if_new("q", 1, "sha"));
+    }
+
+    #[test]
+    fn failure_dedupe_blocks_duplicate_within_ttl() {
+        let mut cache = AutoMergeFailureDedupe::new(Duration::from_secs(300));
+        assert!(!cache.is_recent("p", 1, "sha"));
+        cache.record("p", 1, "sha");
+        assert!(cache.is_recent("p", 1, "sha"));
+        // Different SHA or PR is allowed.
+        assert!(!cache.is_recent("p", 1, "sha2"));
+        assert!(!cache.is_recent("p", 2, "sha"));
+        assert!(!cache.is_recent("q", 1, "sha"));
+    }
+
+    #[test]
+    fn failure_dedupe_allows_recreate_after_ttl() {
+        let mut cache = AutoMergeFailureDedupe::new(Duration::from_millis(50));
+        cache.record("p", 1, "sha");
+        assert!(cache.is_recent("p", 1, "sha"));
+        std::thread::sleep(Duration::from_millis(60));
+        assert!(!cache.is_recent("p", 1, "sha"));
     }
 }

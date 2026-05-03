@@ -117,7 +117,15 @@ pub fn parse_verdict(body: &str, comment_id: u64) -> Result<ReviewVerdict, Verdi
     // The `Inline Findings` heading is required — without it we cannot be
     // confident the review is complete. We accept either the literal HTML
     // heading or the markdown fallback, which some reviewers emit.
-    if !body.contains("<h3>Inline Findings</h3>") && !body.contains("### Inline Findings") {
+    //
+    // To tolerate minor HTML variations (attributes, extra whitespace) we
+    // normalise the body before matching:
+    //   1. Strip any attributes from `<h3 ...>` tags.
+    //   2. Collapse whitespace inside the tag.
+    let normalised = strip_h3_attributes(body);
+    if !normalised.contains("<h3>Inline Findings</h3>")
+        && !body.contains("### Inline Findings")
+    {
         return Err(VerdictParseError::MissingFindings);
     }
 
@@ -201,6 +209,63 @@ pub fn evaluate(
 /// considered non-agent for auto-merge purposes.
 pub fn author_is_agent(login: &str) -> bool {
     matches!(login, "claude-code" | "root") || login.starts_with("adf-")
+}
+
+/// Strip HTML attributes from `<h3 ...>` tags so that formatting variations
+/// such as `<h3 class="x">` or `<h3  id="y" >` are normalised to `<h3>`.
+///
+/// This is intentionally conservative: it only touches `<h3` tags and
+/// preserves everything else, including whitespace inside the heading text.
+fn strip_h3_attributes(body: &str) -> String {
+    let mut result = String::with_capacity(body.len());
+    let mut chars = body.chars().peekable();
+
+    while let Some(c) = chars.next() {
+        result.push(c);
+        // Look for the start of an h3 tag.
+        if c == '<' {
+            if chars.peek() == Some(&'h') || chars.peek() == Some(&'H') {
+                // Check next two characters case-insensitively.
+                let mut tag = String::new();
+                tag.push('<');
+                if let Some(ch) = chars.next() {
+                    tag.push(ch);
+                    if ch == 'h' || ch == 'H' {
+                        if let Some(ch) = chars.next() {
+                            tag.push(ch);
+                            if ch == '3' {
+                                // We have `<h3` or `<H3`. Now consume until `>`.
+                                result.push_str("h3");
+                                // Skip any attributes.
+                                loop {
+                                    match chars.next() {
+                                        Some('>') => {
+                                            result.push('>');
+                                            break;
+                                        }
+                                        Some(other) => {
+                                            // Drop attribute characters.
+                                            let _ = other;
+                                        }
+                                        None => break,
+                                    }
+                                }
+                                continue;
+                            } else {
+                                result.push_str(&tag[1..]);
+                            }
+                        } else {
+                            result.push_str(&tag[1..]);
+                        }
+                    } else {
+                        result.push_str(&tag[1..]);
+                    }
+                }
+            }
+        }
+    }
+
+    result
 }
 
 fn parse_confidence(body: &str) -> Result<u8, VerdictParseError> {
@@ -307,5 +372,38 @@ mod tests {
         let body = "<h3>Confidence Score: 7/5</h3>\n<h3>Inline Findings</h3>\n<sub>Last reviewed commit: abc123</sub>";
         let err = parse_verdict(body, 1).unwrap_err();
         assert_eq!(err, VerdictParseError::ConfidenceOutOfRange(7));
+    }
+
+    #[test]
+    fn strip_h3_attributes_removes_classes_and_ids() {
+        let input = r#"<h3 class="foo">Confidence Score: 5/5</h3>\n<h3 id="bar" class="baz">Inline Findings</h3>"#;
+        let got = strip_h3_attributes(input);
+        assert!(got.contains("<h3>Confidence Score: 5/5</h3>"));
+        assert!(got.contains("<h3>Inline Findings</h3>"));
+        assert!(!got.contains("class=\"foo\""));
+        assert!(!got.contains("id=\"bar\""));
+    }
+
+    #[test]
+    fn parse_verdict_accepts_h3_with_attributes() {
+        let body = r#"<h3 class="foo">Confidence Score: 5/5</h3>
+<h3 id="bar" class="baz">Inline Findings</h3>
+<sub>Last reviewed commit: abc123</sub>"#;
+        let verdict = parse_verdict(body, 42).expect("should parse with attributes in h3");
+        assert_eq!(verdict.confidence, 5);
+        assert_eq!(verdict.p0_count, 0);
+        assert_eq!(verdict.comment_id, 42);
+        assert_eq!(verdict.commit_short_hash, "abc123");
+    }
+
+    #[test]
+    fn strip_h3_attributes_leaves_other_tags_intact() {
+        let input = r#"<h2 class="x">Summary</h2>\n<h3 class="y">Inline Findings</h3>\n<p class="z">text</p>"#;
+        let got = strip_h3_attributes(input);
+        // h2 and p tags keep their attributes.
+        assert!(got.contains("<h2 class=\"x\">Summary</h2>"));
+        assert!(got.contains("<p class=\"z\">text</p>"));
+        // h3 tag is stripped.
+        assert!(got.contains("<h3>Inline Findings</h3>"));
     }
 }

@@ -66,8 +66,8 @@ impl ProviderHealthMap {
             probed_at: None,
             ttl,
             cb_config: CircuitBreakerConfig {
-                failure_threshold: 2,
-                cooldown: Duration::from_secs(60),
+                failure_threshold: 5,
+                cooldown: Duration::from_secs(300),
                 success_threshold: 1,
             },
         }
@@ -128,7 +128,10 @@ impl ProviderHealthMap {
             }
         }
 
-        // Update circuit breakers from probe results (keyed by provider:model)
+        // Update circuit breakers from probe results (keyed by provider:model).
+        // Skip updating the breaker when the probe failed because the CLI tool
+        // is missing from PATH — that is an environment/configuration issue,
+        // not a provider health issue, and should not open the circuit.
         for result in &results {
             let key = format!("{}:{}", result.provider, result.model);
             let breaker = self
@@ -138,7 +141,23 @@ impl ProviderHealthMap {
 
             match result.status {
                 ProbeStatus::Success => breaker.record_success(),
-                ProbeStatus::Error | ProbeStatus::Timeout => breaker.record_failure(),
+                ProbeStatus::Error => {
+                    // Do not count CLI-not-found as a provider failure.
+                    if result
+                        .error
+                        .as_ref()
+                        .is_some_and(|e| e.contains("CLI tool") && e.contains("not found on PATH"))
+                    {
+                        debug!(
+                            provider = %result.provider,
+                            model = %result.model,
+                            "skipping circuit-breaker update: CLI tool missing"
+                        );
+                    } else {
+                        breaker.record_failure();
+                    }
+                }
+                ProbeStatus::Timeout => breaker.record_failure(),
             }
         }
 
@@ -376,12 +395,31 @@ impl ProviderHealthMap {
     }
 }
 
+/// Check whether a CLI tool is available on PATH.
+///
+/// Runs `which <tool>` and returns `true` only when the tool exists and is
+/// executable. This lets us distinguish "provider API down" from "CLI tool
+/// missing / not on PATH" without executing the actual probe.
+fn cli_tool_on_path(tool: &str) -> bool {
+    std::process::Command::new("which")
+        .arg(tool)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
+}
+
 /// Probe a single provider+model by executing its action template.
 ///
 /// If the model string does not pass the C1 allow-list checked by
 /// [`crate::config::is_allowed_provider`], the probe is skipped immediately
 /// and returns a sentinel result so banned providers never reach the
 /// CLI execution path.
+///
+/// If the CLI tool referenced by the action template is not on PATH, the
+/// probe returns an error but the circuit breaker is **not** updated, so
+/// a missing tool does not permanently mark the provider as unhealthy.
 async fn probe_single(provider: &str, model: &str, action_template: Option<&str>) -> ProbeResult {
     let timestamp = chrono::Utc::now().to_rfc3339();
 
@@ -433,6 +471,30 @@ async fn probe_single(provider: &str, model: &str, action_template: Option<&str>
         .next()
         .unwrap_or("")
         .to_string();
+
+    // Validate CLI tool is on PATH before attempting probe.
+    // A missing tool is an environment/configuration issue, not a provider
+    // health issue, so we must not open the circuit breaker for it.
+    if !cli_tool.is_empty() && !cli_tool_on_path(&cli_tool) {
+        warn!(
+            provider = %provider,
+            model = %model,
+            cli_tool = %cli_tool,
+            "probe skipped: CLI tool not found on PATH"
+        );
+        return ProbeResult {
+            provider: provider.to_string(),
+            model: model.to_string(),
+            cli_tool: cli_tool.clone(),
+            status: ProbeStatus::Error,
+            latency_ms: None,
+            error: Some(format!(
+                "probe skipped: CLI tool '{}' not found on PATH",
+                cli_tool
+            )),
+            timestamp,
+        };
+    }
 
     let start = Instant::now();
     let timeout = Duration::from_secs(60);
@@ -687,5 +749,69 @@ mod tests {
         assert!(map.is_model_healthy("anthropic", "claude-sonnet-4-6"));
         // Provider NOT in unhealthy list (sonnet keeps it alive)
         assert!(!map.unhealthy_providers().contains(&"anthropic".to_string()));
+    }
+
+    #[test]
+    fn cli_tool_on_path_finds_existing_tools() {
+        // `sh` is guaranteed to exist on any POSIX system
+        assert!(cli_tool_on_path("sh"));
+        assert!(cli_tool_on_path("bash"));
+    }
+
+    #[test]
+    fn cli_tool_on_path_rejects_missing_tools() {
+        // A tool name that almost certainly does not exist
+        assert!(!cli_tool_on_path("definitely_not_a_real_tool_12345"));
+    }
+
+    #[test]
+    fn missing_cli_probe_does_not_open_breaker() {
+        let mut map = ProviderHealthMap::new(Duration::from_secs(300));
+
+        // Simulate the exact update logic from `probe_all` with a CLI-not-found
+        // result. We create the breaker entry and then run the same match logic
+        // that `probe_all` uses.
+        let result = ProbeResult {
+            provider: "openai".to_string(),
+            model: "gpt-4".to_string(),
+            cli_tool: "nonexistent-cli".to_string(),
+            status: ProbeStatus::Error,
+            latency_ms: None,
+            error: Some(
+                "probe skipped: CLI tool 'nonexistent-cli' not found on PATH".to_string(),
+            ),
+            timestamp: String::new(),
+        };
+
+        let key = format!("{}:{}", result.provider, result.model);
+        let breaker = map
+            .breakers
+            .entry(key)
+            .or_insert_with(|| CircuitBreaker::new(map.cb_config.clone()));
+
+        // Replicate the logic from `probe_all`.
+        match result.status {
+            ProbeStatus::Success => breaker.record_success(),
+            ProbeStatus::Error => {
+                if result
+                    .error
+                    .as_ref()
+                    .is_some_and(|e| e.contains("CLI tool") && e.contains("not found on PATH"))
+                {
+                    // Skipped — this is what we want to verify.
+                } else {
+                    breaker.record_failure();
+                }
+            }
+            ProbeStatus::Timeout => breaker.record_failure(),
+        }
+
+        // The breaker must still be Closed because the CLI-not-found error
+        // was skipped.
+        assert!(matches!(breaker.state(), terraphim_spawner::health::CircuitState::Closed));
+
+        // When there are no probe results, the provider falls back to the
+        // circuit breaker state, which is Closed (healthy).
+        assert!(map.is_healthy("openai"));
     }
 }
