@@ -221,43 +221,41 @@ fn strip_h3_attributes(body: &str) -> String {
     while let Some(c) = chars.next() {
         result.push(c);
         // Look for the start of an h3 tag.
-        if c == '<' {
-            if chars.peek() == Some(&'h') || chars.peek() == Some(&'H') {
-                // Check next two characters case-insensitively.
-                let mut tag = String::new();
-                tag.push('<');
-                if let Some(ch) = chars.next() {
-                    tag.push(ch);
-                    if ch == 'h' || ch == 'H' {
-                        if let Some(ch) = chars.next() {
-                            tag.push(ch);
-                            if ch == '3' {
-                                // We have `<h3` or `<H3`. Now consume until `>`.
-                                result.push_str("h3");
-                                // Skip any attributes.
-                                loop {
-                                    match chars.next() {
-                                        Some('>') => {
-                                            result.push('>');
-                                            break;
-                                        }
-                                        Some(other) => {
-                                            // Drop attribute characters.
-                                            let _ = other;
-                                        }
-                                        None => break,
+        if c == '<' && (chars.peek() == Some(&'h') || chars.peek() == Some(&'H')) {
+            // Check next two characters case-insensitively.
+            let mut tag = String::new();
+            tag.push('<');
+            if let Some(ch) = chars.next() {
+                tag.push(ch);
+                if ch == 'h' || ch == 'H' {
+                    if let Some(ch) = chars.next() {
+                        tag.push(ch);
+                        if ch == '3' {
+                            // We have `<h3` or `<H3`. Now consume until `>`.
+                            result.push_str("h3");
+                            // Skip any attributes.
+                            loop {
+                                match chars.next() {
+                                    Some('>') => {
+                                        result.push('>');
+                                        break;
                                     }
+                                    Some(other) => {
+                                        // Drop attribute characters.
+                                        let _ = other;
+                                    }
+                                    None => break,
                                 }
-                                continue;
-                            } else {
-                                result.push_str(&tag[1..]);
                             }
+                            continue;
                         } else {
                             result.push_str(&tag[1..]);
                         }
                     } else {
                         result.push_str(&tag[1..]);
                     }
+                } else {
+                    result.push_str(&tag[1..]);
                 }
             }
         }
