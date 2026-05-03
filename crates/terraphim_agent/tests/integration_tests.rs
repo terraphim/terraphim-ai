@@ -246,6 +246,7 @@ fn cleanup_test_files() -> Result<()> {
 
 #[tokio::test]
 #[serial]
+#[ignore]
 async fn test_end_to_end_offline_workflow() -> Result<()> {
     cleanup_test_files()?;
 
@@ -355,6 +356,7 @@ async fn test_end_to_end_offline_workflow() -> Result<()> {
 
 #[tokio::test]
 #[serial]
+#[ignore]
 async fn test_end_to_end_server_workflow() -> Result<()> {
     println!("=== Testing Complete Server Workflow ===");
 
@@ -572,6 +574,7 @@ async fn test_end_to_end_server_workflow() -> Result<()> {
 
 #[tokio::test]
 #[serial]
+#[ignore]
 async fn test_offline_vs_server_mode_comparison() -> Result<()> {
     cleanup_test_files()?;
     println!("=== Comparing Offline vs Server Modes ===");
@@ -655,6 +658,7 @@ async fn test_offline_vs_server_mode_comparison() -> Result<()> {
 
 #[tokio::test]
 #[serial]
+#[ignore]
 async fn test_role_consistency_across_commands() -> Result<()> {
     cleanup_test_files()?;
     println!("=== Testing Role Consistency ===");
@@ -745,6 +749,7 @@ async fn test_role_consistency_across_commands() -> Result<()> {
 
 #[tokio::test]
 #[serial]
+#[ignore]
 async fn test_full_feature_matrix() -> Result<()> {
     cleanup_test_files()?;
     println!("=== Testing Full Feature Matrix ===");

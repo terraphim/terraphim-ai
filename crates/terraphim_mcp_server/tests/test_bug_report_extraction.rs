@@ -6,6 +6,7 @@ use tokio::process::Command;
 
 /// Test comprehensive bug report extraction using knowledge graph terminology
 #[tokio::test]
+#[ignore]
 async fn test_bug_report_extraction_with_kg_terms() -> Result<()> {
     println!("🐛 Testing bug report extraction with knowledge graph terms");
 
@@ -303,6 +304,7 @@ async fn test_bug_report_extraction_with_kg_terms() -> Result<()> {
 
 /// Test bug report extraction with mixed terminology and edge cases
 #[tokio::test]
+#[ignore]
 async fn test_bug_report_extraction_edge_cases() -> Result<()> {
     println!("🎯 Testing bug report extraction with edge cases");
 

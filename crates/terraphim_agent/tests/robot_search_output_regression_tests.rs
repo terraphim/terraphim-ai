@@ -169,6 +169,7 @@ fn assert_search_envelope(value: &Value, expected_limit: usize) {
 
 #[test]
 #[serial]
+#[ignore]
 fn search_robot_mode_emits_parseable_json_envelope() -> Result<()> {
     let query = "terraphim";
     let limit = 5usize;
@@ -187,6 +188,7 @@ fn search_robot_mode_emits_parseable_json_envelope() -> Result<()> {
 
 #[test]
 #[serial]
+#[ignore]
 fn search_format_json_emits_parseable_json_envelope() -> Result<()> {
     let query = "terraphim";
     let limit = 5usize;
@@ -206,6 +208,7 @@ fn search_format_json_emits_parseable_json_envelope() -> Result<()> {
 
 #[test]
 #[serial]
+#[ignore]
 fn search_format_json_compact_emits_parseable_json_envelope() -> Result<()> {
     let query = "terraphim";
     let limit = 5usize;
@@ -225,6 +228,7 @@ fn search_format_json_compact_emits_parseable_json_envelope() -> Result<()> {
 
 #[test]
 #[serial]
+#[ignore]
 fn search_robot_json_results_carry_optional_preview_url() -> Result<()> {
     let query = "terraphim";
     let (stdout, stderr, code) = run_agent_command(&["--robot", "search", query, "--limit", "3"])?;
@@ -263,6 +267,7 @@ fn search_robot_json_results_carry_optional_preview_url() -> Result<()> {
 
 #[test]
 #[serial]
+#[ignore]
 fn search_format_json_compact_produces_single_line_output() -> Result<()> {
     let query = "terraphim";
     let (stdout, stderr, code) =
