@@ -9093,13 +9093,16 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
         let push_dump = tmp.path().join("push.env");
         // Single shell script that picks which dump to write based on which
         // env vars are present. Avoids needing two separate cliTools.
+        // NOTE: Check for ADF_PR_NUMBER first because child processes inherit
+        // the parent environment (cargo test inherits from build-runner which
+        // has ADF_PUSH_SHA set), so absence of ADF_PUSH_SHA is not reliable.
         let script_path = tmp.path().join("dump-env.sh");
         let all_dump = tmp.path().join("all.env");
         let script_body = format!(
-            "#!/bin/sh\nenv > {}\nif [ -n \"$ADF_PUSH_SHA\" ]; then env | grep '^ADF_PUSH_' > {}\nelse env | grep '^ADF_PR_' > {}\nfi\n",
+            "#!/bin/sh\nenv > {}\nif [ -n \"$ADF_PR_NUMBER\" ]; then env | grep '^ADF_PR_' > {}\nelse env | grep '^ADF_PUSH_' > {}\nfi\n",
             all_dump.display(),
-            push_dump.display(),
             pr_dump.display(),
+            push_dump.display(),
         );
         std::fs::write(&script_path, script_body).unwrap();
         #[cfg(unix)]
