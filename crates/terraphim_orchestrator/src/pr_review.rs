@@ -123,9 +123,7 @@ pub fn parse_verdict(body: &str, comment_id: u64) -> Result<ReviewVerdict, Verdi
     //   1. Strip any attributes from `<h3 ...>` tags.
     //   2. Collapse whitespace inside the tag.
     let normalised = strip_h3_attributes(body);
-    if !normalised.contains("<h3>Inline Findings</h3>")
-        && !body.contains("### Inline Findings")
-    {
+    if !normalised.contains("<h3>Inline Findings</h3>") && !body.contains("### Inline Findings") {
         return Err(VerdictParseError::MissingFindings);
     }
 

@@ -777,9 +777,7 @@ mod tests {
             cli_tool: "nonexistent-cli".to_string(),
             status: ProbeStatus::Error,
             latency_ms: None,
-            error: Some(
-                "probe skipped: CLI tool 'nonexistent-cli' not found on PATH".to_string(),
-            ),
+            error: Some("probe skipped: CLI tool 'nonexistent-cli' not found on PATH".to_string()),
             timestamp: String::new(),
         };
 
@@ -808,7 +806,10 @@ mod tests {
 
         // The breaker must still be Closed because the CLI-not-found error
         // was skipped.
-        assert!(matches!(breaker.state(), terraphim_spawner::health::CircuitState::Closed));
+        assert!(matches!(
+            breaker.state(),
+            terraphim_spawner::health::CircuitState::Closed
+        ));
 
         // When there are no probe results, the provider falls back to the
         // circuit breaker state, which is Closed (healthy).
