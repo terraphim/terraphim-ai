@@ -1176,10 +1176,11 @@ fi
 /home/alex/.local/bin/rch exec -- cargo clippy --workspace --all-targets -- -D warnings
 /home/alex/.local/bin/rch exec -- cargo build --workspace
 
-# Pre-build binaries that integration tests expect to find.  When tests run
-# via rch the nested `cargo build` inside the test binary may hit a different
-# worker or a stale target directory.  Exporting absolute paths lets tests
-# short-circuit to the already-built artefact.
+# Build binaries locally (not via rch) so integration tests can find them.
+# rch syncs compilation artifacts but does not guarantee the final binary
+# executable is present in the local target directory.
+cargo build --bin terraphim-agent --bin terraphim_server --bin terraphim_mcp_server 2>&1 || true
+
 TERRAPHIM_AGENT_BIN="$PWD/target/debug/terraphim-agent"
 TERRAPHIM_SERVER_BIN="$PWD/target/debug/terraphim_server"
 TERRAPHIM_MCP_SERVER_BIN="$PWD/target/debug/terraphim_mcp_server"
