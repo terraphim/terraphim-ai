@@ -658,7 +658,7 @@ async fn test_role_switching() -> Result<()> {
     // Only test with Default role which is reliable
     // Quickwit Logs requires external Quickwit server
     // Test Engineer has terraphim-graph which can timeout
-    let roles = vec!["Default"];
+    let roles = vec!["Terraphim Engineer"];
 
     for cycle in 1..=2 {
         println!("\n--- Switch cycle {} ---", cycle);

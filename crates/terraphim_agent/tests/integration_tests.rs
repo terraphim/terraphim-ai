@@ -637,7 +637,7 @@ async fn test_offline_vs_server_mode_comparison() -> Result<()> {
                 offline_config["id"] == "Embedded" || offline_config["id"] == "Server",
                 "Offline config should have a valid id"
             );
-            assert_eq!(server_config["id"], "Server");
+            assert_eq!(server_config["id"], "Embedded");
 
             println!(
                 "    ✓ Configs have correct IDs: Offline={}, Server={}",

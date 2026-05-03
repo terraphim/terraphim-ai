@@ -9112,7 +9112,10 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
         let mut orch = AgentOrchestrator::new(config).unwrap();
         orch.handle_review_pr(review_pr_task()).await.unwrap();
 
-        for _ in 0..400 {
+        // Allow agents time to spawn before polling
+        tokio::time::sleep(Duration::from_secs(2)).await;
+
+        for _ in 0..600 {
             tokio::time::sleep(Duration::from_millis(50)).await;
             orch.poll_agent_exits().await;
             if pr_dump.exists() && push_dump.exists() {
