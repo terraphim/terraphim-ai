@@ -472,9 +472,9 @@ async fn test_knowledge_graph_ranking_impact() -> Result<()> {
         search_via_server(&api_client, "machine learning", "Default").await?;
     println!("  Title-scorer: {} results", title_docs.len());
 
-    // KG-enabled
+    // KG-enabled - use Terraphim Engineer which exists in default config
     let (kg_docs, kg_ranks) =
-        search_via_server(&api_client, "machine learning", "Test Engineer").await?;
+        search_via_server(&api_client, "machine learning", "Terraphim Engineer").await?;
     println!("  KG (terraphim-graph): {} results", kg_docs.len());
 
     // CLI mode comparison - disabled for now (CLI has incompatible arguments)
@@ -658,7 +658,7 @@ async fn test_role_switching() -> Result<()> {
     // Only test with Default role which is reliable
     // Quickwit Logs requires external Quickwit server
     // Test Engineer has terraphim-graph which can timeout
-    let roles = vec!["Terraphim Engineer"];
+    let roles = vec!["Default"];
 
     for cycle in 1..=2 {
         println!("\n--- Switch cycle {} ---", cycle);

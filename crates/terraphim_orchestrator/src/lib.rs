@@ -9092,10 +9092,12 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
         let pr_dump = tmp.path().join("pr.env");
         let push_dump = tmp.path().join("push.env");
         // Single shell script that picks which dump to write based on which
-        // env vars are present. Avoids needing two separate cli_tools.
+        // env vars are present. Avoids needing two separate cliTools.
         let script_path = tmp.path().join("dump-env.sh");
+        let all_dump = tmp.path().join("all.env");
         let script_body = format!(
-            "#!/bin/sh\nif [ -n \"$ADF_PUSH_SHA\" ]; then env | grep '^ADF_PUSH_' > {}\nelse env | grep '^ADF_PR_' > {}\nfi\n",
+            "#!/bin/sh\nenv > {}\nif [ -n \"$ADF_PUSH_SHA\" ]; then env | grep '^ADF_PUSH_' > {}\nelse env | grep '^ADF_PR_' > {}\nfi\n",
+            all_dump.display(),
             push_dump.display(),
             pr_dump.display(),
         );
@@ -9132,6 +9134,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
         let pr = std::fs::read_to_string(&pr_dump).unwrap_or_default();
         let push = std::fs::read_to_string(&push_dump).unwrap_or_default();
 
+        let all_env = std::fs::read_to_string(&all_dump).unwrap_or_default();
         if !pr.contains("ADF_PR_NUMBER=641") || !push.contains("ADF_PUSH_SHA=deadbeef1234") {
             eprintln!(
                 "active_agents after poll loop: {:?}",
@@ -9143,6 +9146,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             eprintln!("push_dump exists: {}", push_dump.exists());
             eprintln!("pr_dump contents:\n{pr}");
             eprintln!("push_dump contents:\n{push}");
+            eprintln!("all env dump:\n{all_env}");
         }
         assert!(
             pr.contains("ADF_PR_NUMBER=641"),
