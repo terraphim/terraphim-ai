@@ -533,6 +533,7 @@ fn build_spawn_context_for_agent(
         .with_env("ADF_WORKING_DIR", working_dir_str);
     if let Some(gitea) = project.gitea.as_ref() {
         ctx = ctx
+            .with_env("GITEA_URL", gitea.base_url.clone())
             .with_env("GITEA_OWNER", gitea.owner.clone())
             .with_env("GITEA_REPO", gitea.repo.clone());
     }
