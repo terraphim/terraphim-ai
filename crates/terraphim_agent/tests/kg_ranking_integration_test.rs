@@ -266,7 +266,24 @@ async fn search_via_server(
     query: &str,
     role: &str,
 ) -> Result<(Vec<Document>, Vec<f64>)> {
-    client.update_selected_role(role).await?;
+    // Retry role switch with backoff - server may need time to initialise
+    let mut retries = 0;
+    loop {
+        match client.update_selected_role(role).await {
+            Ok(_) => break,
+            Err(e) => {
+                retries += 1;
+                if retries >= 5 {
+                    return Err(anyhow::anyhow!(
+                        "Failed to switch to role '{}' after retries: {}",
+                        role,
+                        e
+                    ));
+                }
+                thread::sleep(Duration::from_secs(1));
+            }
+        }
+    }
     thread::sleep(Duration::from_millis(500));
 
     let search_query = SearchQuery {
@@ -472,9 +489,9 @@ async fn test_knowledge_graph_ranking_impact() -> Result<()> {
         search_via_server(&api_client, "machine learning", "Default").await?;
     println!("  Title-scorer: {} results", title_docs.len());
 
-    // KG-enabled - use Terraphim Engineer which exists in default config
+    // KG-enabled - use Test Engineer which has terraphim-graph in test config
     let (kg_docs, kg_ranks) =
-        search_via_server(&api_client, "machine learning", "Terraphim Engineer").await?;
+        search_via_server(&api_client, "machine learning", "Test Engineer").await?;
     println!("  KG (terraphim-graph): {} results", kg_docs.len());
 
     // CLI mode comparison - disabled for now (CLI has incompatible arguments)

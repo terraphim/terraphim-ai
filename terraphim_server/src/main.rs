@@ -153,6 +153,10 @@ async fn run_server(args: Args) -> Result<()> {
         });
 
     let mut config = {
+        // Remember whether an explicit --config was provided so we can skip
+        // loading persisted config later.
+        let has_custom_config = args.config.is_some();
+
         // Use custom config file if provided, otherwise determine from role
         let config_path = if let Some(custom_config) = args.config {
             std::path::PathBuf::from(custom_config)
@@ -191,21 +195,30 @@ async fn run_server(args: Args) -> Result<()> {
                     match serde_json::from_str::<terraphim_config::Config>(&config_content) {
                         Ok(mut role_config) => {
                             log::info!("✅ Successfully loaded {} role configuration", args.role);
-                            // Try to load saved config, but if it fails, use the role config as fallback
-                            match role_config.load().await {
-                                Ok(saved_config) => {
-                                    log::info!(
-                                        "✅ Successfully loaded saved configuration from disk"
-                                    );
-                                    saved_config
-                                }
-                                Err(e) => {
-                                    log::info!(
-                                        "No saved config found, using {} role config: {:?}",
-                                        args.role,
-                                        e
-                                    );
-                                    role_config
+                            // Only load saved config from disk when no explicit --config is
+                            // provided. When the user passes --config, they expect the
+                            // specified file to be used exactly as-is.
+                            if has_custom_config {
+                                log::info!(
+                                    "Custom config provided via --config; skipping persisted config load"
+                                );
+                                role_config
+                            } else {
+                                match role_config.load().await {
+                                    Ok(saved_config) => {
+                                        log::info!(
+                                            "✅ Successfully loaded saved configuration from disk"
+                                        );
+                                        saved_config
+                                    }
+                                    Err(e) => {
+                                        log::info!(
+                                            "No saved config found, using {} role config: {:?}",
+                                            args.role,
+                                            e
+                                        );
+                                        role_config
+                                    }
                                 }
                             }
                         }
