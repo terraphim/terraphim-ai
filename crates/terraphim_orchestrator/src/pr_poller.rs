@@ -215,7 +215,29 @@ pub fn is_pr_reviewer_comment(comment: &PrComment) -> bool {
     if comment.user_login == PR_REVIEWER_LOGIN {
         return true;
     }
-    comment.body.contains("Last reviewed commit:")
+    comment.body.contains("Last reviewed commit:") && !is_non_reviewer_agent_comment(&comment.body)
+}
+
+/// Known heading prefixes emitted by non-reviewer ADF agents (security,
+/// audit, traceability). Used to exclude comments that contain the
+/// `Last reviewed commit:` footer but are not structural-pr-review output.
+const NON_REVIEWER_HEADING_PREFIXES: &[&str] = &[
+    "security_checklist Summary",
+    "Security Audit Summary",
+    "Requirements Traceability Summary",
+    "Quality Gate Report",
+];
+
+/// Return `true` when the comment body starts with a known non-reviewer
+/// agent heading, indicating it was produced by a different ADF skill.
+fn is_non_reviewer_agent_comment(body: &str) -> bool {
+    let trimmed = body.trim();
+    for prefix in NON_REVIEWER_HEADING_PREFIXES {
+        if trimmed.starts_with(prefix) {
+            return true;
+        }
+    }
+    false
 }
 
 /// Return the latest [`PrComment`] authored by the pr-reviewer, or `None`
@@ -431,6 +453,61 @@ mod tests {
             1,
             "random-user",
             "body\n<sub>Last reviewed commit: abc123</sub>",
+            "2026-01-01T00:00:00Z",
+        );
+        assert!(is_pr_reviewer_comment(&c));
+    }
+
+    #[test]
+    fn is_pr_reviewer_comment_rejects_security_checklist() {
+        let c = comment(
+            1,
+            "random-user",
+            "security_checklist Summary\n<sub>Last reviewed commit: abc123</sub>",
+            "2026-01-01T00:00:00Z",
+        );
+        assert!(!is_pr_reviewer_comment(&c));
+    }
+
+    #[test]
+    fn is_pr_reviewer_comment_rejects_security_audit() {
+        let c = comment(
+            1,
+            "random-user",
+            "Security Audit Summary\n<sub>Last reviewed commit: abc123</sub>",
+            "2026-01-01T00:00:00Z",
+        );
+        assert!(!is_pr_reviewer_comment(&c));
+    }
+
+    #[test]
+    fn is_pr_reviewer_comment_rejects_requirements_traceability() {
+        let c = comment(
+            1,
+            "random-user",
+            "Requirements Traceability Summary\n<sub>Last reviewed commit: abc123</sub>",
+            "2026-01-01T00:00:00Z",
+        );
+        assert!(!is_pr_reviewer_comment(&c));
+    }
+
+    #[test]
+    fn is_pr_reviewer_comment_rejects_quality_gate_report() {
+        let c = comment(
+            1,
+            "random-user",
+            "Quality Gate Report\n<sub>Last reviewed commit: abc123</sub>",
+            "2026-01-01T00:00:00Z",
+        );
+        assert!(!is_pr_reviewer_comment(&c));
+    }
+
+    #[test]
+    fn pr_reviewer_login_overrides_non_reviewer_heading() {
+        let c = comment(
+            1,
+            PR_REVIEWER_LOGIN,
+            "security_checklist Summary\n<sub>Last reviewed commit: abc123</sub>",
             "2026-01-01T00:00:00Z",
         );
         assert!(is_pr_reviewer_comment(&c));
