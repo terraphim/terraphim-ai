@@ -1,117 +1,99 @@
 # Documentation Gap Report
 
-**Generated**: 2026-05-05 05:43 CEST
-**Agent**: documentation-generator (Ferrox)
-**Issue**: #1183
+**Generated:** 2026-05-05T00:00:00Z
+**Agent:** documentation-generator (Ferrox)
+**Command:** `cargo rustdoc -p <crate> --lib -- -D missing-docs`
 
-## Summary
+## Executive Summary
 
 | Metric | Count |
 |--------|-------|
-| Crates scanned | 10 |
-| Total missing doc comments | 306 |
-| Most affected crate | terraphim_agent (126) |
-| Least affected crate | terraphim_config, terraphim_service (0) |
+| Total missing documentation warnings | **1,058** |
+| Crates scanned | 12 |
+| Crates with zero warnings | 1 (terraphim_hooks) |
+| Worst offender | terraphim_orchestrator (445 warnings) |
 
 ## Per-Crate Breakdown
 
-| Crate | Missing Items | Severity |
+| Crate | Missing Docs | Severity |
 |-------|--------------|----------|
-| terraphim_agent | 126 | High |
-| terraphim_orchestrator | 87 | High |
-| terraphim_middleware | 35 | Medium |
-| terraphim_router | 17 | Medium |
-| terraphim_persistence | 16 | Medium |
-| terraphim_types | 14 | Low |
-| terraphim_rolegraph | 10 | Low |
-| haystack_core | 1 | Low |
-| terraphim_config | 0 | Clean |
-| terraphim_service | 0 | Clean |
+| terraphim_orchestrator | 445 | Critical |
+| terraphim_server | 138 | High |
+| terraphim_service | 114 | High |
+| terraphim_agent | 99 | High |
+| terraphim_types | 98 | High |
+| terraphim_config | 38 | Medium |
+| terraphim_middleware | 40 | Medium |
+| terraphim_persistence | 30 | Medium |
+| terraphim_router | 28 | Medium |
+| terraphim_rolegraph | 22 | Medium |
+| haystack_core | 4 | Low |
+| terraphim_hooks | 0 | Clean |
 
-## High-Impact Targets
+## Critical Gaps (terraphim_orchestrator)
 
-### terraphim_agent (126 items)
-**Priority**: Critical -- this is the primary user-facing crate.
+The orchestrator crate has the highest documentation debt. Key un-documented items:
 
-Key undocumented items:
-- `OutputFormat` enum and all robot output structs (`SourcesOutput`, `SessionListOutput`, etc.)
-- `ApiClient` and all DTOs (`SearchResponse`, `ConfigResponse`, `ChatMessage`, etc.)
-- `ReplHandler` constructors (`new_offline`, `new_server`)
-- `TuiService` public interface
-- All command enums (`ReplCommand`, `RobotSubcommand`, `RoleSubcommand`, etc.)
-- `ForgivingParser` and `AliasRegistry`
-- `BudgetEngine` and `BudgetedResults`
-- `SharedLearningStore` and scoring functions
+- Crate-level documentation (`src/lib.rs:1`)
+- Core modules: `adf_commands`, `agent_run_record`, `config`, `control_plane`
+- Event structs in `control_plane/events.rs`
+- Policy and routing modules in `control_plane/`
 
-### terraphim_orchestrator (87 items)
-**Priority**: High -- core ADF infrastructure.
+### Sample Locations
 
-Key undocumented items:
-- All submodule re-exports (35+ `pub mod` declarations)
-- `GiteaConnection`, `ListenerConfig`, `DelegationPolicy`
-- `FlowExecutor`, `FlowDefinition`, `FlowStepDef`
-- `RoutingDecisionEngine`, `DispatchContext`, `RouteCandidate`
-- `TelemetryStore` and `TelemetrySummary`
-- `Nightwatch` alert system
-- `MentionChain` and `OutputPoster`
-
-### terraphim_middleware (35 items)
-**Priority**: Medium.
-
-Key undocumented items:
-- All haystack indexer re-exports (`AiAssistantHaystackIndexer`, `ClickUpHaystackIndexer`, etc.)
-- `RipgrepCommand` and `Message` enum
-- `Error` enum and `Result` type alias
-
-## API Reference Snippets
-
-### terraphim_agent::robot
-
-```rust
-/// Output format for robot mode machine-readable responses.
-pub enum OutputFormat {
-    Json,
-    // ...
-}
-
-/// Token budget engine for controlling robot output size.
-pub struct BudgetEngine {
-    // ...
-}
-
-/// Applies token budget constraints to search results.
-pub fn apply(&self, results: &[SearchResultItem]) -> Result<BudgetedResults, BudgetError>;
+```
+crates/terraphim_orchestrator/src/lib.rs:33-64       -- core re-exports
+crates/terraphim_orchestrator/src/adf_commands.rs:14  -- command enum variants
+crates/terraphim_orchestrator/src/config.rs:14-390    -- configuration structs
+crates/terraphim_orchestrator/src/control_plane/events.rs:213-218  -- event fields
+crates/terraphim_orchestrator/src/control_plane/routing.rs:17-19   -- routing types
+crates/terraphim_orchestrator/src/agent_run_record.rs:560-566      -- record fields
 ```
 
-### terraphim_orchestrator::flow
+## High-Priority Gaps (terraphim_server)
 
-```rust
-/// Executor for multi-step agent workflows.
-pub struct FlowExecutor {
-    // ...
-}
+The server crate has 138 missing docs. Key areas:
 
-/// Definition of a workflow with typed steps.
-pub struct FlowDefinition {
-    // ...
-}
+- Crate-level documentation (`src/lib.rs:1`)
+- API structs and handlers (`src/api.rs`)
+- Webhook payload structs with many undocumented fields
+
+### Sample Locations
+
+```
+terraphim_server/src/lib.rs:1          -- crate docs
+terraphim_server/src/lib.rs:139        -- core struct
+terraphim_server/src/api.rs:66-236     -- API types
+terraphim_server/src/api.rs:1841-1911  -- webhook payload structs
 ```
 
-## CHANGELOG Update
+## High-Priority Gaps (terraphim_service)
 
-Updated [Unreleased] section with:
-- Streaming output log drain (Refs #1219)
-- Agent output persistence to per-run log files
-- GITEA_URL injection from project config
-- ADF fleet DEGRADED alert fix (#1233)
-- CI pipeline degradation fixes
-- Service-dependent test ignore markers
+The service crate has 114 missing docs. Key areas:
+
+- Crate-level documentation
+- Multiple modules without module docs
+- Core enums and structs
+
+## High-Priority Gaps (terraphim_agent)
+
+The agent crate has 99 missing docs. Key areas:
+
+- Robot module (`src/robot/`) -- budget, docs, formatter submodules
+- Service struct fields
+- Core types in `lib.rs`
 
 ## Recommendations
 
-1. **Priority 1**: Document `terraphim_agent` public API -- this is the primary CLI/SDK interface
-2. **Priority 2**: Document `terraphim_orchestrator` module structure and key types
-3. **Priority 3**: Add module-level docs (`//!`) to all `lib.rs` files in affected crates
-4. **Enable `#![warn(missing_docs)]`** in CI to prevent regression
+1. **Immediate (this sprint):** Document `terraphim_orchestrator` crate-level and public API surface
+2. **Short-term (next sprint):** Address `terraphim_server` API structs and `terraphim_service` modules
+3. **Medium-term:** Enforce `#![warn(missing_docs)]` in CI to prevent regression
+4. **Long-term:** Consider `#![deny(missing_docs)]` for new crates
 
-Theme-ID: doc-gap
+## CHANGELOG Update
+
+Updated CHANGELOG.md with:
+- New documentation gap report entry for 2026-05-05
+- Recent commits: orchestrator event loop refactor, DSM KG refactor, build-runner dedup
+- Version bump to 1.17.1
+- OpenCode + Terraphim experiment results
