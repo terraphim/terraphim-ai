@@ -155,6 +155,7 @@ mod tests {
             cli_tool: "codex".to_string(),
             task: "test task".to_string(),
             model: None,
+            default_tier: None,
             schedule: schedule.map(String::from),
             capabilities: vec![],
             max_memory_bytes: None,

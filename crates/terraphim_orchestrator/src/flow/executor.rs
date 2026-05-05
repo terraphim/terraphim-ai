@@ -223,6 +223,7 @@ impl FlowExecutor {
             cli_tool: cli_tool.clone(),
             task: task.clone(),
             model: step.model.clone(),
+            default_tier: None,
             schedule: None,
             capabilities: vec![],
             max_memory_bytes: None,

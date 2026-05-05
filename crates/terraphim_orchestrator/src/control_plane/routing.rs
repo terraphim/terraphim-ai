@@ -75,6 +75,9 @@ pub struct DispatchContext {
     pub cli_tool: String,
     pub layer: crate::config::AgentLayer,
     pub session_id: Option<String>,
+    /// Default KG tier concept for this agent (e.g., "review_tier").
+    /// Passed through to KG router for tier-biased routing.
+    pub default_tier: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -190,7 +193,8 @@ impl RoutingDecisionEngine {
             None => return Vec::new(),
         };
 
-        let decision = match kg_router.route_agent(&ctx.task) {
+        let decision = match kg_router.route_agent_with_tier(&ctx.task, ctx.default_tier.as_deref())
+        {
             Some(d) => d,
             None => return Vec::new(),
         };
@@ -591,6 +595,7 @@ mod tests {
             cli_tool: cli_tool.to_string(),
             layer: crate::config::AgentLayer::Core,
             session_id: None,
+            default_tier: None,
         }
     }
 
@@ -606,6 +611,7 @@ mod tests {
             cli_tool: "opencode".to_string(),
             layer: crate::config::AgentLayer::Core,
             session_id: None,
+            default_tier: None,
         }
     }
 
@@ -665,6 +671,7 @@ mod tests {
             cli_tool: "codex".to_string(),
             layer: crate::config::AgentLayer::Core,
             session_id: None,
+            default_tier: None,
         };
         let decision = engine.decide_route(&ctx, &BudgetVerdict::Uncapped).await;
 
@@ -719,6 +726,7 @@ mod tests {
             cli_tool: "opencode".to_string(),
             layer: crate::config::AgentLayer::Core,
             session_id: None,
+            default_tier: None,
         };
         let decision = engine.decide_route(&ctx, &BudgetVerdict::Uncapped).await;
 
@@ -811,6 +819,7 @@ mod tests {
             cli_tool: "claude".to_string(),
             layer: crate::config::AgentLayer::Safety,
             session_id: Some("sess-123".to_string()),
+            default_tier: None,
         };
         assert_eq!(ctx.session_id, Some("sess-123".to_string()));
     }

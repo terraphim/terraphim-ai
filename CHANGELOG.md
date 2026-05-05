@@ -57,6 +57,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **`--server` flag** on listen subcommand now routes through custom error handler
+- **Orchestrator** injects GITEA_URL from project config into agent spawn context
+- **Orchestrator** dedup build-runner dispatch to prevent concurrent target dir writes
+- **Orchestrator** posts adf/build commit status from handle_push dispatch
+- **Orchestrator** replaces tokio::select! event loop with std::sync::mpsc for simpler concurrency
+- **Orchestrator** removes dead tick_num counter and redundant u64 cast
+- **Orchestrator** calls substitute_env_vars in load_and_validate
+- **Orchestrator** merges racy env-var tests into single sequential test
+- **Orchestrator** addresses ADF fleet DEGRADED alert (#1233)
+- **Orchestrator** wires trigger index loading and adds kg list --pinned command
+- **Server/tests** respects --config flag and uses correct test roles
+- **Integration tests** fixed for binary discovery and env setup, service-dependent tests marked #[ignore]
+- **Tracker** resolves Gitea labels as int IDs instead of string names (#1139)
+- **Middleware** replaces thesaurus panic with safe role fallback
+- **Multi-agent** wires flush_usage into pool shutdown
+- **DSM** clippy warnings resolved for Rust 1.95
+- **Clippy** warnings resolved across workspace (nested if collapse in pr_review.rs)
+- **All test failures** resolved for CI/CD pipeline
+
+### Added
+
+- **Orchestrator** PR gate reconciler module with tracker status APIs and stale pending timeout (Phase 4)
+- **Orchestrator** orchestrator-managed terminal commit status posting (Phase 5)
+- **Orchestrator** streaming output log drain for reliable agent capture
+- **Orchestrator** persists agent output to per-run log files
+- **Orchestrator** event_only flag on AgentDefinition with gated webhook spawning
+- **LLM cost tracking** Phases B+C with history grouping, spend aggregation and budget alerts (Refs #1075)
+- **Terraphim DSM** refactored to knowledge graph semantic grouping tool
+- **OpenCode + Terraphim** experiment results documentation
+- **FFF vs Ripgrep** clarification and frontend developer role setup documentation
 
 ## [1.17.0] - 2026-04-27
 
