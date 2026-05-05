@@ -727,6 +727,11 @@ pub struct AgentDefinition {
     pub schedule: Option<String>,
     /// Model to use with the CLI tool (e.g., "o3" for codex, "sonnet" for claude).
     pub model: Option<String>,
+    /// Default KG tier concept for this agent (e.g., "review_tier" or "review").
+    /// When KG routing matches a different tier with confidence below the
+    /// escalation threshold, the router falls back to this tier instead.
+    #[serde(default)]
+    pub default_tier: Option<String>,
     /// Capabilities this agent provides.
     #[serde(default)]
     pub capabilities: Vec<String>,
