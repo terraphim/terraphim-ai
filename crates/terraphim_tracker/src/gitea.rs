@@ -1401,6 +1401,7 @@ pub struct GiteaPrSummary {
 #[derive(Debug, Clone, Deserialize)]
 pub struct CommitStatusEntry {
     pub context: String,
+    #[serde(rename = "status")]
     pub state: String,
     #[serde(default)]
     pub description: Option<String>,
@@ -2569,5 +2570,21 @@ mod tests {
             // target_url=Some must be sent through unchanged.
             assert_eq!(body["target_url"], "https://example.com/report");
         }
+    }
+
+    #[test]
+    fn commit_status_entry_deserialises_status_field() {
+        let json = r#"{"id":33,"status":"failure","context":"ci-native.yml / lint","description":"ok","target_url":"/logs","created_at":"2026-05-01T00:00:00Z"}"#;
+        let entry: CommitStatusEntry = serde_json::from_str(json).expect("should deserialise");
+        assert_eq!(entry.state, "failure");
+        assert_eq!(entry.context, "ci-native.yml / lint");
+    }
+
+    #[test]
+    fn commit_status_entry_deserialises_pending() {
+        let json = r#"{"id":34,"status":"pending","context":"adf/pr-reviewer"}"#;
+        let entry: CommitStatusEntry = serde_json::from_str(json).expect("should deserialise");
+        assert_eq!(entry.state, "pending");
+        assert_eq!(entry.context, "adf/pr-reviewer");
     }
 }

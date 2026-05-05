@@ -24,6 +24,10 @@ use serial_test::serial;
 use terraphim_agent::client::ApiClient;
 use terraphim_types::{Document, Layer, NormalizedTermValue, RoleName, SearchQuery};
 
+use tokio::sync::OnceCell;
+
+static SHARED_SERVER_URL: OnceCell<String> = OnceCell::const_new();
+
 /// Get workspace root directory
 fn get_workspace_root() -> Result<PathBuf> {
     // Try to find workspace root by looking for Cargo.toml with workspace definition
@@ -189,10 +193,28 @@ async fn start_test_server() -> Result<(Child, String)> {
     Err(anyhow::anyhow!("Server failed to start within 60s"))
 }
 
-/// Clean up test resources
-fn cleanup_test_resources(mut server: Child) -> Result<()> {
-    let _ = server.kill();
+/// Get or start a shared test server instance across all tests.
+///
+/// Spawning a server per test causes `cargo test --workspace` to time out
+/// (>10 min) because each startup rebuilds the rolegraph from 29 KG files.
+/// A single shared server eliminates redundant startup and keeps total
+/// runtime under 60 s.
+async fn get_shared_server_url() -> &'static String {
+    SHARED_SERVER_URL
+        .get_or_init(|| async {
+            let (_server, url) = start_test_server()
+                .await
+                .expect("Failed to start shared test server");
+            // Drop the Child handle; the server process continues to run
+            // independently.  The OS will reap it when the test runner exits.
+            url
+        })
+        .await
+}
 
+/// Clean up test resources (directories and files).  Does **not** kill the
+/// shared server so subsequent tests can reuse it.
+fn cleanup_test_resources() -> Result<()> {
     let test_dirs = vec![
         "/tmp/terraphim_sqlite",
         "/tmp/dashmaptest",
@@ -461,8 +483,8 @@ async fn test_knowledge_graph_ranking_impact() -> Result<()> {
     create_test_knowledge_graph()?;
 
     println!("Step 1: Starting test server...");
-    let (server, server_url) = start_test_server().await?;
-    let api_client = ApiClient::new(&server_url);
+    let server_url = get_shared_server_url().await;
+    let api_client = ApiClient::new(server_url);
 
     thread::sleep(Duration::from_secs(3));
 
@@ -605,7 +627,7 @@ async fn test_knowledge_graph_ranking_impact() -> Result<()> {
     );
     println!("\n✅ Knowledge Graph Ranking Impact Test PASSED");
 
-    cleanup_test_resources(server)?;
+    cleanup_test_resources()?;
     Ok(())
 }
 
@@ -617,8 +639,8 @@ async fn test_term_specific_boosting() -> Result<()> {
     println!("╚════════════════════════════════════════════════════════════════════════╝\n");
 
     create_test_knowledge_graph()?;
-    let (server, server_url) = start_test_server().await?;
-    let client = ApiClient::new(&server_url);
+    let server_url = get_shared_server_url().await;
+    let client = ApiClient::new(server_url);
 
     // Wait longer for KG initialization (lightweight test KG initializes faster)
     println!("Waiting for server and KG initialization...");
@@ -653,7 +675,7 @@ async fn test_term_specific_boosting() -> Result<()> {
         test_terms.len()
     );
 
-    cleanup_test_resources(server)?;
+    cleanup_test_resources()?;
     Ok(())
 }
 
@@ -665,8 +687,8 @@ async fn test_role_switching() -> Result<()> {
     println!("╚════════════════════════════════════════════════════════════════════════╝\n");
 
     create_test_knowledge_graph()?;
-    let (server, server_url) = start_test_server().await?;
-    let client = ApiClient::new(&server_url);
+    let server_url = get_shared_server_url().await;
+    let client = ApiClient::new(server_url);
 
     // Wait longer for KG initialization
     println!("Waiting for server and KG initialization...");
@@ -753,6 +775,6 @@ async fn test_role_switching() -> Result<()> {
 
     println!("\n✅ Role Switching Test PASSED");
 
-    cleanup_test_resources(server)?;
+    cleanup_test_resources()?;
     Ok(())
 }

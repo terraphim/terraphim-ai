@@ -4,9 +4,38 @@
 
 use anyhow::Result;
 use serial_test::serial;
-use std::process::{Child, Command};
+use std::process::{Child, Command, Output};
 use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
+
+/// Run a command with a timeout, killing the child if it exceeds the deadline.
+fn run_command_with_timeout(cmd: &mut Command, timeout: Duration) -> Result<Output> {
+    let child = cmd.spawn()?;
+    let pid = child.id();
+
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let result = child.wait_with_output();
+        let _ = tx.send(result);
+    });
+
+    match rx.recv_timeout(timeout) {
+        Ok(Ok(output)) => Ok(output),
+        Ok(Err(e)) => Err(anyhow::anyhow!("Process wait error: {e}")),
+        Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+            // Best-effort kill so the test fails fast instead of hanging forever.
+            let _ = Command::new("kill")
+                .args(["-TERM", &pid.to_string()])
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .status();
+            Err(anyhow::anyhow!("Command timed out after {timeout:?}"))
+        }
+        Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+            Err(anyhow::anyhow!("Process monitoring thread disconnected"))
+        }
+    }
+}
 
 #[path = "support/binary.rs"]
 mod binary;
@@ -119,7 +148,7 @@ fn run_extract_command_with_port(args: &[&str], port: u16) -> Result<(String, St
         )
         .env("TERRAPHIM_SERVER_HOSTNAME", format!("127.0.0.1:{}", port));
 
-    let output = cmd.output()?;
+    let output = run_command_with_timeout(&mut cmd, Duration::from_secs(5))?;
 
     Ok((
         String::from_utf8_lossy(&output.stdout).to_string(),
@@ -476,7 +505,7 @@ fn test_extract_error_conditions() -> Result<()> {
         let mut cmd = Command::new(&binary);
         cmd.arg("extract").args(&args);
 
-        let output = cmd.output()?;
+        let output = run_command_with_timeout(&mut cmd, Duration::from_secs(5))?;
         let exit_code = output.status.code().unwrap_or(-1);
 
         match case_name {

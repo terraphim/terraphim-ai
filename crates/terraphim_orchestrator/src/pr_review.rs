@@ -123,7 +123,11 @@ pub fn parse_verdict(body: &str, comment_id: u64) -> Result<ReviewVerdict, Verdi
     //   1. Strip any attributes from `<h3 ...>` tags.
     //   2. Collapse whitespace inside the tag.
     let normalised = strip_h3_attributes(body);
-    if !normalised.contains("<h3>Inline Findings</h3>") && !body.contains("### Inline Findings") {
+    let has_findings = normalised.contains("<h3>Inline Findings</h3>")
+        || normalised.contains("<h3>Findings</h3>")
+        || body.contains("### Inline Findings")
+        || body.contains("### Findings");
+    if !has_findings {
         return Err(VerdictParseError::MissingFindings);
     }
 
@@ -396,10 +400,51 @@ mod tests {
     fn strip_h3_attributes_leaves_other_tags_intact() {
         let input = r#"<h2 class="x">Summary</h2>\n<h3 class="y">Inline Findings</h3>\n<p class="z">text</p>"#;
         let got = strip_h3_attributes(input);
-        // h2 and p tags keep their attributes.
         assert!(got.contains("<h2 class=\"x\">Summary</h2>"));
         assert!(got.contains("<p class=\"z\">text</p>"));
-        // h3 tag is stripped.
         assert!(got.contains("<h3>Inline Findings</h3>"));
+    }
+
+    #[test]
+    fn parse_verdict_accepts_findings_without_inline() {
+        let body = "<h3>Confidence Score: 5/5</h3>\n<h3>Findings</h3>\n<sub>Last reviewed commit: abc123</sub>";
+        let verdict = parse_verdict(body, 1).expect("should parse with Findings heading");
+        assert_eq!(verdict.confidence, 5);
+        assert_eq!(verdict.p0_count, 0);
+    }
+
+    #[test]
+    fn parse_verdict_accepts_markdown_findings_without_inline() {
+        let body = "### Confidence Score: 4/5\n\n### Findings\n\n<sub>Last reviewed commit: deadbeef</sub>";
+        let verdict = parse_verdict(body, 2).expect("should parse with markdown Findings");
+        assert_eq!(verdict.confidence, 4);
+        assert_eq!(verdict.commit_short_hash, "deadbeef");
+    }
+
+    #[test]
+    fn parse_verdict_rejects_missing_findings_entirely() {
+        let body = "<h3>Confidence Score: 5/5</h3>\n<sub>Last reviewed commit: abc123</sub>";
+        let err = parse_verdict(body, 1).unwrap_err();
+        assert_eq!(err, VerdictParseError::MissingFindings);
+    }
+
+    #[test]
+    fn parse_verdict_accepts_findings_with_attributes() {
+        let body = r#"<h3 class="section">Confidence Score: 5/5</h3>
+<h3 id="findings" class="section">Findings</h3>
+<sub>Last reviewed commit: abc123</sub>"#;
+        let verdict = parse_verdict(body, 1).expect("should parse Findings with h3 attributes");
+        assert_eq!(verdict.confidence, 5);
+        assert_eq!(verdict.p0_count, 0);
+    }
+
+    #[test]
+    fn parse_verdict_counts_p0_in_findings_section() {
+        let body = "<h3>Confidence Score: 3/5</h3>\n<h3>Findings</h3>\n**P0 SQL injection in login**:\n**P1 Missing CSRF token**:\n<sub>Last reviewed commit: abc123</sub>";
+        let verdict = parse_verdict(body, 10).unwrap();
+        assert_eq!(verdict.confidence, 3);
+        assert_eq!(verdict.p0_count, 1);
+        assert_eq!(verdict.p1_count, 1);
+        assert_eq!(verdict.p2_count, 0);
     }
 }

@@ -25,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **PR test guardian** agent template for test gate enforcement on PR open (Phase 2e) (Refs #954)
 - **Per-project PR dispatch** via `IncludeFragment` for scoped agent spawning (Refs #962)
 - **Spawner task-body fix** -- agents now spawned with TOML task body, not runtime task_string (Refs #1020)
+- **OpenCode + Terraphim experiment results** documenting FFF vs Ripgrep performance comparison
+- **Frontend developer role setup** experiment documentation and clarification
 
 ### Fixed
 
@@ -40,6 +42,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Duplicate test functions** resolved after origin merge
 - **Robot search output contract** regression fixed (Refs #905)
 - **Spawner task-body** -- agents now receive proper TOML task body instead of runtime string (Refs #1020)
+- **ADF fleet DEGRADED alert** addressed with null-safe webhook payload handling (#1233)
+- **CI pipeline degradation** resolved -- 5 fixes for test binary discovery and env setup
+- **Service-dependent tests** marked #[ignore] for CI stability pending testcontainers
+- **Null pusher/commits** handling in Gitea push webhook payloads for robustness
+- **Integration test assertions** aligned with orchestrator output format changes
+- **Test timeouts** added to child process invocations in `extract_functionality_validation` for CI stability (Refs #1245)
 
 ### Changed
 
@@ -52,7 +60,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Test ranking knowledge graph fixture** added for agent testing
 - **LLM cost tracking** foundation with genai fork integration (Refs #1075)
 - **Spec validation** report for 2026-04-29 documenting 3 fixed, 5 remaining gaps
-- **Documentation gap report** generated for 2026-04-29 identifying 43 warnings across workspace
+- **Documentation gap report** generated for 2026-05-05 identifying 1,058 missing docs across 12 crates (orchestrator: 445, server: 138, service: 114, agent: 99, types: 98)
+- **GITEA_URL injection** from project config into agent spawn context for orchestrator
+- **Streaming output log drain** for reliable agent output capture (Refs #1219)
+- **Agent output persistence** to per-run log files for post-hoc debugging
+- **Quickwit stdout/stderr drain** with jiff timestamps for structured log shipping
+- **Orchestrator event loop** refactored from `tokio::select!` to `std::sync::mpsc` for determinism
+- **Terraphim DSM** refactored to knowledge graph semantic grouping tool
+- **Build-runner dispatch** deduplicated to prevent concurrent target directory writes
+- **Version** bumped to 1.17.1
 
 ### Fixed
 
@@ -82,6 +98,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Orchestrator** streaming output log drain for reliable agent capture
 - **Orchestrator** persists agent output to per-run log files
 - **Orchestrator** event_only flag on AgentDefinition with gated webhook spawning
+- **Orchestrator** agent role-aware tier routing with default_tier per agent (Refs #409)
 - **LLM cost tracking** Phases B+C with history grouping, spend aggregation and budget alerts (Refs #1075)
 - **Terraphim DSM** refactored to knowledge graph semantic grouping tool
 - **OpenCode + Terraphim** experiment results documentation
