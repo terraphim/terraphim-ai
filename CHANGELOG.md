@@ -53,42 +53,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **LLM cost tracking** foundation with genai fork integration (Refs #1075)
 - **Spec validation** report for 2026-04-29 documenting 3 fixed, 5 remaining gaps
 - **Documentation gap report** generated for 2026-04-29 identifying 43 warnings across workspace
-- **Build-runner agent output logging** -- per-run log files with streaming drain for reliable capture
-- **GITEA_URL injection** from project config into agent spawn context
-- **Streaming output log drain** for build-runner agent output capture
-
-### Documentation
-
-- **Documentation gap audit** for 2026-05-05 identifying 1056 missing doc items across 11 crates
-- **API reference snippets** generated for core public interfaces
 
 ### Fixed
 
 - **`--server` flag** on listen subcommand now routes through custom error handler
-- **ADF CI pipeline degradation** resolved with 5 orchestrator fixes
-- **ADF fleet DEGRADED alert** addressed (#1233)
-- **Server tests** now respect --config flag and use correct test roles
-- **Integration tests** fixed for binary discovery and environment setup
-- **Service-dependent tests** marked with #[ignore] for CI stability
-- **Null pusher/commits** handled in Gitea push webhook payloads
-- **Build-runner git checkout** robustness improved
-- **Clippy warnings** resolved for Rust 1.95 in terraphim_dsm
-- **Documentation warnings** fixed across terraphim_persistence, terraphim_rolegraph, terraphim_types, terraphim_router
-- **Streaming output log drain** for reliable agent output capture
-- **Per-run log files** for build-runner agent output with streaming drain
-- **GITEA_URL injection** from project config into agent spawn context
-- **Build-runner agent output logging** -- per-run log files with streaming drain for reliable capture
-- **ADF CI pipeline degradation** resolved with 5 orchestrator fixes (Refs #1233)
-- **Integration tests** fixed for binary discovery and environment setup
-- **Service-dependent tests** marked with `#[ignore]` for CI stability
-- **Null pusher/commits** handled in Gitea push webhook payloads
-- **Server tests** now respect `--config` flag and use correct test roles
-
-### Changed
-
-- **Orchestrator formatting** cleaned up
-- **CI pipeline** verified with build-runner e2e tests
-- **Test .gitignore** cleaned of debris
 
 ## [1.17.0] - 2026-04-27
 
