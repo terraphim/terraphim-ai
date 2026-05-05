@@ -47,6 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Service-dependent tests** marked #[ignore] for CI stability pending testcontainers
 - **Null pusher/commits** handling in Gitea push webhook payloads for robustness
 - **Integration test assertions** aligned with orchestrator output format changes
+- **Test timeouts** added to child process invocations in `extract_functionality_validation` for CI stability (Refs #1245)
 
 ### Changed
 
