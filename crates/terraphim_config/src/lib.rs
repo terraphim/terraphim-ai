@@ -3,7 +3,7 @@ use std::{path::PathBuf, sync::Arc};
 use terraphim_automata::{
     AutomataPath,
     builder::{Logseq, ThesaurusBuilder},
-    load_thesaurus,
+    load_thesaurus, parse_markdown_directives_dir,
 };
 use terraphim_persistence::Persistable;
 use terraphim_rolegraph::{RoleGraph, RoleGraphSync};
@@ -945,6 +945,53 @@ impl Persistable for Config {
 }
 
 /// ConfigState for the Terraphim (Actor)
+/// Extract trigger and pinned directives from KG markdown files.
+///
+/// Parses markdown directives from the given directory, looks up each concept
+/// in the thesaurus to obtain its node ID, and returns a map of node IDs to
+/// trigger text plus a list of pinned node IDs.
+fn extract_triggers_from_kg(
+    kg_path: &PathBuf,
+    thesaurus: &terraphim_types::Thesaurus,
+) -> (ahash::AHashMap<u64, String>, Vec<u64>) {
+    let mut triggers = ahash::AHashMap::new();
+    let mut pinned = Vec::new();
+
+    let parsed = match parse_markdown_directives_dir(kg_path.as_path()) {
+        Ok(result) => result,
+        Err(err) => {
+            log::warn!(
+                "Failed to parse markdown directives from {:?}: {}",
+                kg_path,
+                err
+            );
+            return (triggers, pinned);
+        }
+    };
+
+    for (concept_name, directives) in parsed.directives {
+        let normalized_value = terraphim_types::NormalizedTermValue::new(concept_name.clone());
+        if let Some(term) = thesaurus.get(&normalized_value) {
+            let node_id = term.id;
+            if let Some(trigger_text) = directives.trigger {
+                if !trigger_text.trim().is_empty() {
+                    triggers.insert(node_id, trigger_text.trim().to_string());
+                }
+            }
+            if directives.pinned {
+                pinned.push(node_id);
+            }
+        } else {
+            log::debug!(
+                "Concept '{}' not found in thesaurus for trigger extraction",
+                concept_name
+            );
+        }
+    }
+
+    (triggers, pinned)
+}
+
 /// Config state can be updated using the API or Atomic Server
 ///
 /// Holds the Terraphim Config and the RoleGraphs
@@ -979,8 +1026,22 @@ impl ConfigState {
                         match load_thesaurus(automata_path).await {
                             Ok(thesaurus) => {
                                 log::info!("Successfully loaded thesaurus from automata path");
-                                let rolegraph =
-                                    RoleGraph::new(role_name.clone(), thesaurus).await?;
+                                let mut rolegraph =
+                                    RoleGraph::new(role_name.clone(), thesaurus.clone()).await?;
+                                // Load trigger/pinned directives from local KG if available
+                                if let Some(kg_local) = &kg.knowledge_graph_local {
+                                    let (triggers, pinned) =
+                                        extract_triggers_from_kg(&kg_local.path, &thesaurus);
+                                    if !triggers.is_empty() || !pinned.is_empty() {
+                                        log::info!(
+                                            "Loading {} triggers and {} pinned entries for role {} from local KG",
+                                            triggers.len(),
+                                            pinned.len(),
+                                            role_name
+                                        );
+                                        rolegraph.load_trigger_index(triggers, pinned, 0.3);
+                                    }
+                                }
                                 roles.insert(role_name.clone(), RoleGraphSync::from(rolegraph));
                             }
                             Err(e) => {
@@ -1004,9 +1065,24 @@ impl ConfigState {
                                                 "Successfully built thesaurus from local KG fallback for role {}",
                                                 role_name
                                             );
-                                            let rolegraph =
-                                                RoleGraph::new(role_name.clone(), thesaurus)
-                                                    .await?;
+                                            let mut rolegraph = RoleGraph::new(
+                                                role_name.clone(),
+                                                thesaurus.clone(),
+                                            )
+                                            .await?;
+                                            let (triggers, pinned) = extract_triggers_from_kg(
+                                                &kg_local.path,
+                                                &thesaurus,
+                                            );
+                                            if !triggers.is_empty() || !pinned.is_empty() {
+                                                log::info!(
+                                                    "Loading {} triggers and {} pinned entries for role {} from local KG fallback",
+                                                    triggers.len(),
+                                                    pinned.len(),
+                                                    role_name
+                                                );
+                                                rolegraph.load_trigger_index(triggers, pinned, 0.3);
+                                            }
                                             roles.insert(
                                                 role_name.clone(),
                                                 RoleGraphSync::from(rolegraph),
@@ -1040,8 +1116,19 @@ impl ConfigState {
                                     "Successfully built thesaurus from local KG for role {}",
                                     role_name
                                 );
-                                let rolegraph =
-                                    RoleGraph::new(role_name.clone(), thesaurus).await?;
+                                let mut rolegraph =
+                                    RoleGraph::new(role_name.clone(), thesaurus.clone()).await?;
+                                let (triggers, pinned) =
+                                    extract_triggers_from_kg(&kg_local.path, &thesaurus);
+                                if !triggers.is_empty() || !pinned.is_empty() {
+                                    log::info!(
+                                        "Loading {} triggers and {} pinned entries for role {} from local KG",
+                                        triggers.len(),
+                                        pinned.len(),
+                                        role_name
+                                    );
+                                    rolegraph.load_trigger_index(triggers, pinned, 0.3);
+                                }
                                 roles.insert(role_name.clone(), RoleGraphSync::from(rolegraph));
                             }
                             Err(e) => {
