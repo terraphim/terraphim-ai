@@ -179,11 +179,11 @@ pub struct GiteaPusher {
 
 #[derive(Debug, Deserialize)]
 pub struct GiteaPushCommit {
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_null_default_vec")]
     pub added: Vec<String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_null_default_vec")]
     pub removed: Vec<String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_null_default_vec")]
     pub modified: Vec<String>,
 }
 
@@ -584,5 +584,32 @@ mod tests {
         let result = mac.finalize();
         let sig = format!("sha256={}", hex::encode(result.into_bytes()));
         assert!(verify_signature(secret, body, &sig));
+    }
+
+    #[test]
+    fn test_push_commit_null_file_arrays() {
+        let payload = r#"{"ref":"refs/heads/main","before":"aaa","after":"bbb","repository":{"full_name":"test/repo"},"commits":[{"added":null,"removed":null,"modified":null}]}"#;
+        let parsed: GiteaPushPayload =
+            serde_json::from_str(payload).expect("should parse null arrays");
+        assert!(parsed.commits[0].added.is_empty());
+        assert!(parsed.commits[0].removed.is_empty());
+        assert!(parsed.commits[0].modified.is_empty());
+    }
+
+    #[test]
+    fn test_push_commit_empty_file_arrays() {
+        let payload = r#"{"ref":"refs/heads/main","before":"aaa","after":"bbb","repository":{"full_name":"test/repo"},"commits":[{"added":[],"removed":[],"modified":[]}]}"#;
+        let parsed: GiteaPushPayload =
+            serde_json::from_str(payload).expect("should parse empty arrays");
+        assert!(parsed.commits[0].added.is_empty());
+    }
+
+    #[test]
+    fn test_push_commit_normal_file_arrays() {
+        let payload = r#"{"ref":"refs/heads/main","before":"aaa","after":"bbb","repository":{"full_name":"test/repo"},"commits":[{"added":["foo.rs"],"removed":[],"modified":["bar.rs"]}]}"#;
+        let parsed: GiteaPushPayload =
+            serde_json::from_str(payload).expect("should parse populated arrays");
+        assert_eq!(parsed.commits[0].added, vec!["foo.rs"]);
+        assert_eq!(parsed.commits[0].modified, vec!["bar.rs"]);
     }
 }
