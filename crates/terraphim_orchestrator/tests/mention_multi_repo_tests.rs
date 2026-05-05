@@ -25,6 +25,7 @@ fn agent(name: &str, project: Option<&str>) -> AgentDefinition {
         task: "t".to_string(),
         schedule: None,
         model: None,
+        default_tier: None,
         capabilities: vec![],
         max_memory_bytes: None,
         budget_monthly_cents: None,

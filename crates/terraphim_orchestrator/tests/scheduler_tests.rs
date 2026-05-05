@@ -7,6 +7,7 @@ fn make_agent(name: &str, layer: AgentLayer, schedule: Option<&str>) -> AgentDef
         cli_tool: "echo".to_string(),
         task: "test task".to_string(),
         model: None,
+        default_tier: None,
         schedule: schedule.map(String::from),
         capabilities: vec![],
         max_memory_bytes: None,
