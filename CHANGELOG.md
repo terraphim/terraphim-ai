@@ -40,6 +40,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Duplicate test functions** resolved after origin merge
 - **Robot search output contract** regression fixed (Refs #905)
 - **Spawner task-body** -- agents now receive proper TOML task body instead of runtime string (Refs #1020)
+- **ADF fleet DEGRADED alert** addressed with null-safe webhook payload handling (#1233)
+- **CI pipeline degradation** resolved -- 5 fixes for test binary discovery and env setup
+- **Service-dependent tests** marked #[ignore] for CI stability pending testcontainers
+- **Null pusher/commits** handling in Gitea push webhook payloads for robustness
+- **Integration test assertions** aligned with orchestrator output format changes
 
 ### Changed
 
@@ -53,6 +58,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **LLM cost tracking** foundation with genai fork integration (Refs #1075)
 - **Spec validation** report for 2026-04-29 documenting 3 fixed, 5 remaining gaps
 - **Documentation gap report** generated for 2026-04-29 identifying 43 warnings across workspace
+- **GITEA_URL injection** from project config into agent spawn context for orchestrator
+- **Streaming output log drain** for reliable agent output capture (Refs #1219)
+- **Agent output persistence** to per-run log files for post-hoc debugging
+- **Quickwit stdout/stderr drain** with jiff timestamps for structured log shipping
 
 ### Fixed
 
