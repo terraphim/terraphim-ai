@@ -27,6 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Spawner task-body fix** -- agents now spawned with TOML task body, not runtime task_string (Refs #1020)
 - **OpenCode + Terraphim experiment results** documenting FFF vs Ripgrep performance comparison
 - **Frontend developer role setup** experiment documentation and clarification
+- **Compiled thesaurus cache invalidation** via SHA-256 source hash tracking on KG markdown edits (Refs #945)
+- **`terraphim-agent cache flush`** CLI subcommand for manual cache eviction by role (Refs #945)
 
 ### Fixed
 

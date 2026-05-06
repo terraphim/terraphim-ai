@@ -1,45 +1,45 @@
 # Documentation Gap Report
 
-**Generated:** 2026-05-06T05:45:11Z
+**Generated:** 2026-05-06T06:56:29Z
 
-**Total gaps:** 3010
+**Total gaps:** 3138
 
 ## Summary by Crate
 
 | Crate | Gaps |
 |-------|------|
-| terraphim_agent | 444 |
+| terraphim_agent | 452 |
 | terraphim_orchestrator | 303 |
-| terraphim_multi_agent | 214 |
-| terraphim_types | 169 |
-| terraphim_validation | 162 |
+| terraphim_multi_agent | 237 |
+| terraphim_validation | 189 |
+| terraphim_types | 173 |
 | terraphim-session-analyzer | 136 |
-| terraphim_agent_evolution | 118 |
-| terraphim_service | 91 |
+| terraphim_agent_evolution | 129 |
+| terraphim_service | 92 |
+| terraphim_agent_application | 83 |
 | terraphim_rlm | 81 |
 | terraphim_tinyclaw | 81 |
-| terraphim_automata | 77 |
-| terraphim_agent_application | 76 |
-| terraphim_agent_registry | 63 |
+| terraphim_automata | 78 |
+| terraphim_agent_registry | 71 |
+| terraphim_task_decomposition | 64 |
 | terraphim_usage | 60 |
-| terraphim_task_decomposition | 58 |
 | terraphim_github_runner | 57 |
 | terraphim_sessions | 57 |
 | terraphim_middleware | 54 |
 | terraphim_symphony | 54 |
-| terraphim_goal_alignment | 47 |
+| terraphim_goal_alignment | 53 |
+| terraphim_agent_messaging | 46 |
 | terraphim_router | 46 |
-| terraphim_agent_messaging | 41 |
-| terraphim_atomic_client | 34 |
-| terraphim_build_args | 32 |
+| terraphim_build_args | 39 |
+| terraphim_atomic_client | 36 |
+| terraphim_agent_supervisor | 33 |
+| terraphim_kg_agents | 33 |
+| terraphim_kg_orchestration | 33 |
 | haystack_atlassian | 31 |
-| terraphim_kg_agents | 31 |
 | terraphim_rolegraph | 31 |
 | terraphim_spawner | 30 |
-| terraphim_agent_supervisor | 29 |
 | terraphim_update | 29 |
 | terraphim_tracker | 28 |
-| terraphim_kg_orchestration | 27 |
 | terraphim_persistence | 24 |
 | terraphim-markdown-parser | 22 |
 | terraphim_config | 22 |
@@ -66,57 +66,8 @@
 
 ## Detailed Findings
 
-### terraphim_agent (444 gaps)
+### terraphim_agent (452 gaps)
 
-- `src/listener.rs:10`  `pub struct AgentIdentity {`
-- `src/listener.rs:19`  `pub fn new(agent_name: impl Into<String>) -> Self {`
-- `src/listener.rs:27`  `pub fn resolved_gitea_login(&self) -> &str {`
-- `src/listener.rs:31`  `pub fn accepted_target_names(&self) -> Vec<String> {`
-- `src/listener.rs:41`  `pub enum NotificationRuleKind {`
-- `src/listener.rs:50`  `pub struct NotificationRule {`
-- `src/listener.rs:62`  `pub struct DelegationPolicy {`
-- `src/listener.rs:95`  `pub struct DispatchConfig {`
-- `src/listener.rs:133`  `pub struct GiteaConnection {`
-- `src/listener.rs:142`  `pub struct ListenerConfig {`
-- `src/listener.rs:167`  `pub fn for_identity(agent_name: impl Into<String>) -> Self {`
-- `src/listener.rs:184`  `pub fn validate(&self) -> Result<()> {`
-- `src/listener.rs:223`  `pub fn load_from_path(path: impl AsRef<Path>) -> Result<Self> {`
-- `src/listener.rs:1280`  `pub fn new(config: ListenerConfig) -> Result<Self> {`
-- `src/listener.rs:1352`  `pub async fn run_forever(mut self) -> Result<()> {`
-- `src/listener.rs:1363`  `pub async fn run_once(mut self) -> Result<()> {`
-- `src/listener.rs:1367`  `pub async fn poll_once(&mut self) -> Result<()> {`
-- `src/listener.rs:1723`  `pub async fn handoff_issue(`
-- `src/listener.rs:1733`  `pub async fn handoff_issue_with_context(`
-- `src/listener.rs:1766`  `pub async fn run_listener(config: ListenerConfig) -> Result<()> {`
-- `src/guard_patterns.rs:24`  `pub enum GuardDecision {`
-- `src/guard_patterns.rs:32`  `pub struct GuardResult {`
-- `src/guard_patterns.rs:120`  `pub fn default_suspicious_json() -> &'static str {`
-- `src/main.rs:224`  `pub enum HookType {`
-- `src/main.rs:237`  `pub enum BoundaryMode {`
-- `src/main.rs:538`  `pub enum OutputFormat {`
-- `src/main.rs:595`  `pub struct SourcesOutput {`
-- `src/main.rs:601`  `pub struct SourceEntry {`
-- `src/main.rs:608`  `pub struct SessionListOutput {`
-- `src/main.rs:615`  `pub struct SessionEntry {`
-- `src/main.rs:623`  `pub struct SessionSearchOutput {`
-- `src/main.rs:631`  `pub struct SessionSearchEntry {`
-- `src/main.rs:639`  `pub struct SessionStatsOutput {`
-- `src/tui_backend.rs:19`  `pub enum TuiBackend {`
-- `src/tui_backend.rs:111`  `pub async fn summarize(`
-- `src/tui_backend.rs:133`  `pub async fn switch_role(&self, role: &str) -> Result<Config> {`
-- `src/lib.rs:2`  `pub mod client;`
-- `src/lib.rs:3`  `pub mod onboarding;`
-- `src/lib.rs:4`  `pub mod service;`
-- `src/lib.rs:6`  `pub mod shared_learning;`
-- `src/lib.rs:7`  `pub mod tui_backend;`
-- `src/lib.rs:10`  `pub mod robot;`
-- `src/lib.rs:13`  `pub mod forgiving;`
-- `src/lib.rs:16`  `pub mod mcp_tool_index;`
-- `src/lib.rs:19`  `pub mod repl;`
-- `src/lib.rs:22`  `pub mod commands;`
-- `src/lib.rs:28`  `pub use robot::{`
-- `src/lib.rs:34`  `pub use forgiving::{AliasRegistry, ForgivingParser, ParseResult};`
-- `src/lib.rs:49`  `pub use std::str::FromStr;`
 - `src/client.rs:7`  `pub struct ApiClient {`
 - `src/client.rs:13`  `pub fn new(base_url: impl Into<String>) -> Self {`
 - `src/client.rs:32`  `pub async fn health(&self) -> Result<()> {`
@@ -176,131 +127,233 @@
 - `src/client.rs:599`  `pub async fn get_vm_metrics(&self, vm_id: &str) -> Result<VmMetricsResponse> {`
 - `src/client.rs:611`  `pub async fn get_all_vm_metrics(&self) -> Result<Vec<VmMetricsResponse>> {`
 - `src/client.rs:622`  `pub async fn execute_agent_task(`
-- `src/mcp_tool_index.rs:44`  `pub struct McpToolIndex {`
-- `src/service.rs:13`  `pub struct TuiService {`
-- `src/service.rs:269`  `pub async fn resolve_or_auto_route(`
-- `src/service.rs:426`  `pub async fn chat(`
-- `src/service.rs:502`  `pub async fn autocomplete(`
-- `src/service.rs:541`  `pub async fn replace_matches(`
-- `src/service.rs:557`  `pub async fn summarize(&self, role_name: &RoleName, content: &str) -> Result<Str`
-- `src/service.rs:838`  `pub struct ConnectivityResult {`
-- `src/service.rs:846`  `pub struct FuzzySuggestion {`
-- `src/service.rs:853`  `pub struct ChecklistResult {`
-- `src/kg_validation.rs:22`  `pub struct ValidationFinding {`
-- `src/kg_validation.rs:34`  `pub struct KgValidationResult {`
-- `src/robot/mod.rs:7`  `pub mod budget;`
-- `src/robot/mod.rs:9`  `pub mod docs;`
-- `src/robot/mod.rs:11`  `pub mod exit_codes;`
-- `src/robot/mod.rs:13`  `pub mod output;`
-- `src/robot/mod.rs:15`  `pub mod schema;`
-- `src/robot/mod.rs:18`  `pub use budget::{BudgetEngine, BudgetError, BudgetedResults};`
-- `src/robot/mod.rs:20`  `pub use docs::{ArgumentDoc, Capabilities, CommandDoc, ExampleDoc, FlagDoc, SelfD`
-- `src/robot/mod.rs:22`  `pub use exit_codes::ExitCode;`
-- `src/robot/mod.rs:24`  `pub use output::{FieldMode, OutputFormat, RobotConfig, RobotFormatter};`
-- `src/robot/mod.rs:26`  `pub use schema::{`
-- `src/robot/schema.rs:10`  `pub struct RobotResponse<T: Serialize> {`
-- `src/robot/schema.rs:47`  `pub struct ResponseMeta {`
-- `src/robot/schema.rs:128`  `pub struct AutoCorrection {`
-- `src/robot/schema.rs:139`  `pub struct Pagination {`
-- `src/robot/schema.rs:164`  `pub struct TokenBudget {`
-- `src/robot/schema.rs:193`  `pub struct RobotError {`
-- `src/robot/schema.rs:284`  `pub struct SearchResultsData {`
-- `src/robot/schema.rs:299`  `pub struct SearchResultItem {`
-- `src/robot/schema.rs:327`  `pub struct CapabilitiesData {`
-- `src/robot/schema.rs:347`  `pub struct FeatureFlags {`
-- `src/robot/schema.rs:375`  `pub struct IndexStatus {`
-- `src/robot/budget.rs:7`  `pub struct BudgetedResults {`
-- `src/robot/budget.rs:14`  `pub enum BudgetError {`
-- `src/robot/budget.rs:19`  `pub struct BudgetEngine {`
-- `src/robot/budget.rs:37`  `pub fn new(config: RobotConfig) -> Self {`
-- `src/robot/budget.rs:42`  `pub fn apply(&self, results: &[SearchResultItem]) -> Result<BudgetedResults, Bud`
-- `src/robot/output.rs:9`  `pub enum OutputFormat {`
-- `src/robot/output.rs:63`  `pub enum FieldMode {`
-- `src/robot/output.rs:100`  `pub struct RobotConfig {`
-- `src/robot/exit_codes.rs:11`  `pub enum ExitCode {`
-- `src/robot/docs.rs:12`  `pub struct SelfDocumentation {`
-- `src/robot/docs.rs:588`  `pub struct Capabilities {`
-- `src/robot/docs.rs:599`  `pub struct CommandDoc {`
-- `src/robot/docs.rs:611`  `pub struct ArgumentDoc {`
-- `src/robot/docs.rs:623`  `pub struct FlagDoc {`
-- `src/robot/docs.rs:636`  `pub struct ExampleDoc {`
+- `src/commands/hooks.rs:14`  `pub struct LoggingHook {`
+- `src/commands/hooks.rs:19`  `pub fn new() -> Self {`
+- `src/commands/hooks.rs:25`  `pub fn with_file<P: AsRef<Path>>(log_file: P) -> Self {`
+- `src/commands/hooks.rs:87`  `pub struct PreflightCheckHook {`
+- `src/commands/hooks.rs:93`  `pub fn new() -> Self {`
+- `src/commands/hooks.rs:99`  `pub fn with_allowed_dirs<P: AsRef<Path>>(dirs: Vec<P>) -> Self {`
+- `src/commands/hooks.rs:106`  `pub fn with_blocked_commands(mut self, commands: Vec<String>) -> Self {`
+- `src/commands/hooks.rs:191`  `pub fn new() -> Self {`
+- `src/commands/hooks.rs:197`  `pub fn with_webhook(mut self, webhook_url: String) -> Self {`
+- `src/commands/hooks.rs:202`  `pub fn with_important_commands(mut self, commands: Vec<String>) -> Self {`
+- `src/commands/hooks.rs:251`  `pub struct EnvironmentHook {`
+- `src/commands/hooks.rs:256`  `pub fn new() -> Self {`
+- `src/commands/hooks.rs:262`  `pub fn with_env<K: Into<String>, V: Into<String>>(mut self, key: K, value: V) ->`
+- `src/commands/hooks.rs:267`  `pub fn with_env_map(mut self, env_vars: std::collections::HashMap<String, String`
+- `src/commands/hooks.rs:320`  `pub fn new<P: AsRef<Path>>(backup_dir: P) -> Self {`
+- `src/commands/hooks.rs:327`  `pub fn with_backup_commands(mut self, commands: Vec<String>) -> Self {`
+- `src/commands/hooks.rs:412`  `pub struct ResourceMonitoringHook {`
+- `src/commands/hooks.rs:418`  `pub fn new() -> Self {`
+- `src/commands/hooks.rs:424`  `pub fn with_memory_limit(mut self, limit_mb: u64) -> Self {`
+- `src/commands/hooks.rs:429`  `pub fn with_duration_limit(mut self, limit_seconds: u64) -> Self {`
+- `src/commands/hooks.rs:484`  `pub fn new<P: AsRef<Path>>(repo_path: P) -> Self {`
+- `src/commands/hooks.rs:491`  `pub fn with_auto_commit(mut self, auto_commit: bool) -> Self {`
+- `src/commands/markdown_parser.rs:19`  `pub struct EnrichedParsedCommand {`
+- `src/commands/markdown_parser.rs:28`  `pub struct EnrichedContent {`
+- `src/commands/markdown_parser.rs:43`  `pub struct ContentMetrics {`
+- `src/commands/markdown_parser.rs:58`  `pub struct MarkdownCommandParser {`
+- `src/commands/mod.rs:7`  `pub mod hooks;`
+- `src/commands/mod.rs:8`  `pub mod markdown_parser;`
+- `src/commands/mod.rs:9`  `pub mod registry;`
+- `src/commands/mod.rs:10`  `pub mod validator;`
+- `src/commands/mod.rs:13`  `pub use executor::CommandExecutor;`
+- `src/commands/mod.rs:14`  `pub use registry::CommandRegistry;`
+- `src/commands/mod.rs:15`  `pub use validator::CommandValidator;`
+- `src/commands/mod.rs:21`  `pub mod modes;`
+- `src/commands/mod.rs:28`  `pub enum ExecutionMode {`
+- `src/commands/mod.rs:40`  `pub struct CommandParameter {`
+- `src/commands/mod.rs:89`  `pub struct ParameterValidation {`
+- `src/commands/mod.rs:102`  `pub struct CommandDefinition {`
+- `src/commands/mod.rs:153`  `pub enum RiskLevel {`
+- `src/commands/mod.rs:163`  `pub struct ResourceLimits {`
+- `src/commands/mod.rs:177`  `pub struct ParsedCommand {`
+- `src/commands/mod.rs:190`  `pub enum CommandValidationError {`
+- `src/commands/mod.rs:218`  `pub enum CommandExecutionError {`
+- `src/commands/mod.rs:246`  `pub struct CommandExecutionResult {`
+- `src/commands/mod.rs:265`  `pub struct ResourceUsage {`
+- `src/commands/mod.rs:280`  `pub enum CommandRegistryError {`
+- `src/commands/mod.rs:311`  `pub struct HookContext {`
+- `src/commands/mod.rs:322`  `pub struct HookResult {`
+- `src/commands/mod.rs:331`  `pub trait CommandHook {`
+- `src/commands/mod.rs:432`  `pub fn parse_error(path: impl AsRef<std::path::Path>, error: impl Into<String>) `
+- `src/commands/mod.rs:436`  `pub fn invalid_frontmatter(`
+- `src/commands/modes/firecracker.rs:26`  `pub struct VmSettings {`
+- `src/commands/modes/hybrid.rs:25`  `pub struct RiskAssessmentSettings {`
+- `src/commands/modes/hybrid.rs:458`  `pub struct ExecutionStats {`
+- `src/commands/modes/mod.rs:9`  `pub mod hybrid;`
+- `src/commands/modes/mod.rs:10`  `pub mod local;`
+- `src/commands/modes/mod.rs:12`  `pub use firecracker::FirecrackerExecutor;`
+- `src/commands/modes/mod.rs:13`  `pub use hybrid::HybridExecutor;`
+- `src/commands/modes/mod.rs:14`  `pub use local::LocalExecutor;`
+- `src/commands/modes/mod.rs:22`  `pub trait CommandExecutor {`
+- `src/commands/modes/mod.rs:39`  `pub struct ExecutorCapabilities {`
+- `src/commands/registry.rs:23`  `pub struct CommandRegistry {`
+- `src/commands/registry.rs:478`  `pub struct RegistryStats {`
+- `src/commands/registry.rs:533`  `pub struct CommandDiscoveryResult {`
+- `src/commands/validator.rs:16`  `pub struct SecurityEvent {`
+- `src/commands/validator.rs:27`  `pub enum SecurityAction {`
+- `src/commands/validator.rs:38`  `pub enum SecurityResult {`
+- `src/commands/validator.rs:46`  `pub struct RateLimit {`
+- `src/commands/validator.rs:54`  `pub struct TimeRestrictions {`
+- `src/commands/validator.rs:62`  `pub struct MaintenanceWindow {`
+- `src/commands/validator.rs:620`  `pub struct SecurityStats {`
+- `src/forgiving/aliases.rs:36`  `pub struct AliasRegistry {`
 - `src/forgiving/mod.rs:8`  `pub mod aliases;`
 - `src/forgiving/mod.rs:10`  `pub mod parser;`
 - `src/forgiving/mod.rs:12`  `pub mod suggestions;`
 - `src/forgiving/mod.rs:15`  `pub use aliases::{AliasRegistry, DEFAULT_ALIASES};`
 - `src/forgiving/mod.rs:17`  `pub use parser::{ForgivingParser, ParseResult};`
 - `src/forgiving/mod.rs:19`  `pub use suggestions::CommandSuggestion;`
-- `src/forgiving/aliases.rs:36`  `pub struct AliasRegistry {`
 - `src/forgiving/parser.rs:10`  `pub enum ParseResult {`
 - `src/forgiving/parser.rs:128`  `pub struct ForgivingParser {`
 - `src/forgiving/suggestions.rs:10`  `pub struct CommandSuggestion {`
-- `src/shared_learning/mod.rs:26`  `pub use markdown_store::{MarkdownLearningStore, MarkdownStoreConfig, MarkdownSto`
-- `src/shared_learning/mod.rs:27`  `pub use store::{SharedLearningStore, StoreConfig};`
-- `src/shared_learning/mod.rs:28`  `pub use terraphim_types::shared_learning::SuggestionStatus;`
-- `src/shared_learning/mod.rs:29`  `pub use types::{LearningSource as SharedLearningSource, SharedLearning, TrustLev`
-- `src/shared_learning/mod.rs:30`  `pub use wiki_sync::{GiteaWikiClient, WikiSyncError};`
-- `src/shared_learning/mod.rs:33`  `pub use terraphim_types::shared_learning::LearningStore;`
-- `src/shared_learning/mod.rs:36`  `pub mod injector;`
-- `src/shared_learning/mod.rs:38`  `pub use injector::{InjectionError, InjectionResult, InjectorConfig, LearningInje`
-- `src/shared_learning/wiki_sync.rs:11`  `pub enum WikiSyncError {`
-- `src/shared_learning/wiki_sync.rs:28`  `pub struct GiteaWikiConfig {`
-- `src/shared_learning/wiki_sync.rs:92`  `pub enum SyncResult {`
-- `src/shared_learning/wiki_sync.rs:329`  `pub struct WikiSyncService {`
-- `src/shared_learning/wiki_sync.rs:372`  `pub struct WikiSyncReport {`
-- `src/shared_learning/markdown_store.rs:16`  `pub enum MarkdownStoreError {`
-- `src/shared_learning/markdown_store.rs:32`  `pub struct MarkdownStoreConfig {`
-- `src/shared_learning/markdown_store.rs:59`  `pub struct MarkdownLearningStore {`
-- `src/shared_learning/injector.rs:15`  `pub enum InjectionError {`
-- `src/shared_learning/injector.rs:37`  `pub struct InjectorConfig {`
-- `src/shared_learning/injector.rs:99`  `pub struct InjectionResult {`
-- `src/shared_learning/injector.rs:121`  `pub fn new() -> Self {`
-- `src/shared_learning/injector.rs:132`  `pub fn merge(&mut self, other: InjectionResult) {`
-- `src/shared_learning/injector.rs:144`  `pub struct LearningInjector {`
-- `src/shared_learning/injector.rs:149`  `pub fn new(config: InjectorConfig) -> Self {`
-- `src/shared_learning/store.rs:16`  `pub use terraphim_types::shared_learning::StoreError;`
-- `src/shared_learning/store.rs:26`  `pub struct StoreConfig {`
-- `src/shared_learning/store.rs:43`  `pub fn with_similarity_threshold(mut self, threshold: f64) -> Self {`
-- `src/shared_learning/store.rs:48`  `pub fn with_markdown_config(mut self, config: MarkdownStoreConfig) -> Self {`
-- `src/shared_learning/store.rs:62`  `pub fn new(total_docs: usize, avg_doc_len: f64) -> Self {`
-- `src/shared_learning/store.rs:88`  `pub fn score(&mut self, query: &str, doc: &str, doc_freqs: &HashMap<String, usiz`
-- `src/shared_learning/store.rs:126`  `pub fn normalize_score(&self, score: f64, query_len: usize) -> f64 {`
-- `src/shared_learning/store.rs:135`  `pub struct SharedLearningStore {`
-- `src/shared_learning/store.rs:144`  `pub async fn open(config: StoreConfig) -> Result<Self, StoreError> {`
-- `src/shared_learning/store.rs:195`  `pub async fn insert(&self, learning: SharedLearning) -> Result<(), StoreError> {`
-- `src/shared_learning/store.rs:202`  `pub async fn store_with_dedup(`
-- `src/shared_learning/store.rs:306`  `pub async fn get(&self, id: &str) -> Result<SharedLearning, StoreError> {`
-- `src/shared_learning/store.rs:314`  `pub async fn list_all(&self) -> Result<Vec<SharedLearning>, StoreError> {`
-- `src/shared_learning/store.rs:319`  `pub async fn list_by_trust_level(`
-- `src/shared_learning/store.rs:331`  `pub async fn promote_to_l2(&self, id: &str) -> Result<(), StoreError> {`
-- `src/shared_learning/store.rs:345`  `pub async fn promote_to_l3(&self, id: &str) -> Result<(), StoreError> {`
-- `src/shared_learning/store.rs:359`  `pub async fn list_pending(&self) -> Result<Vec<SharedLearning>, StoreError> {`
-- `src/shared_learning/store.rs:363`  `pub async fn list_by_status(`
-- `src/shared_learning/store.rs:375`  `pub async fn approve(&self, id: &str) -> Result<(), StoreError> {`
-- `src/shared_learning/store.rs:390`  `pub async fn reject(&self, id: &str, reason: Option<&str>) -> Result<(), StoreEr`
-- `src/shared_learning/store.rs:406`  `pub async fn record_application(`
-- `src/shared_learning/store.rs:436`  `pub async fn find_similar(`
-- `src/shared_learning/store.rs:492`  `pub async fn suggest(`
-- `src/shared_learning/store.rs:552`  `pub async fn close(&self) {`
-- `src/shared_learning/store.rs:557`  `pub fn set_role_graph(&mut self, graph: terraphim_rolegraph::RoleGraph) {`
-- `src/shared_learning/store.rs:562`  `pub fn role_graph(&self) -> Option<&std::sync::RwLock<terraphim_rolegraph::RoleG`
-- `src/shared_learning/store.rs:737`  `pub enum StoreResult {`
+- `src/guard_patterns.rs:24`  `pub enum GuardDecision {`
+- `src/guard_patterns.rs:32`  `pub struct GuardResult {`
+- `src/guard_patterns.rs:120`  `pub fn default_suspicious_json() -> &'static str {`
+- `src/kg_validation.rs:22`  `pub struct ValidationFinding {`
+- `src/kg_validation.rs:34`  `pub struct KgValidationResult {`
+- `src/learnings/capture.rs:22`  `pub enum LearningError {`
+- `src/learnings/capture.rs:35`  `pub enum LearningSource {`
+- `src/learnings/capture.rs:44`  `pub enum CorrectionType {`
+- `src/learnings/capture.rs:102`  `pub struct ImportanceScore {`
+- `src/learnings/capture.rs:169`  `pub struct LearningContext {`
+- `src/learnings/capture.rs:195`  `pub struct CapturedLearning {`
+- `src/learnings/capture.rs:258`  `pub fn with_correction(mut self, correction: String) -> Self {`
+- `src/learnings/capture.rs:502`  `pub struct CorrectionEvent {`
+- `src/learnings/capture.rs:548`  `pub fn with_session_id(mut self, session_id: String) -> Self {`
+- `src/learnings/capture.rs:867`  `pub fn annotate_with_thesaurus(text: &str, thesaurus: terraphim_types::Thesaurus`
+- `src/learnings/capture.rs:1129`  `pub fn list_learnings(`
+- `src/learnings/capture.rs:1225`  `pub enum LearningEntry {`
+- `src/learnings/capture.rs:1232`  `pub fn source(&self) -> &LearningSource {`
+- `src/learnings/capture.rs:1241`  `pub fn id(&self) -> &str {`
+- `src/learnings/capture.rs:1249`  `pub fn captured_at(&self) -> chrono::DateTime<chrono::Utc> {`
+- `src/learnings/capture.rs:1515`  `pub struct ScoredEntry {`
+- `src/learnings/capture.rs:1525`  `pub fn format_suggestion(&self) -> String {`
+- `src/learnings/capture.rs:1546`  `pub struct TranscriptEntry {`
+- `src/learnings/capture.rs:1643`  `pub fn auto_extract_corrections(`
+- `src/learnings/capture.rs:1780`  `pub fn suggest_learnings(`
+- `src/learnings/export_kg.rs:14`  `pub enum CorrectionTypeFilter {`
+- `src/learnings/export_kg.rs:215`  `pub fn export_corrections_as_kg(`
+- `src/learnings/hook.rs:33`  `pub enum LearnHookType {`
+- `src/learnings/hook.rs:45`  `pub enum AgentFormat {`
+- `src/learnings/hook.rs:287`  `pub enum HookError {`
+- `src/learnings/hook.rs:306`  `pub struct HookInput {`
+- `src/learnings/hook.rs:321`  `pub struct ToolInput {`
+- `src/learnings/hook.rs:334`  `pub struct ToolResult {`
+- `src/learnings/install.rs:21`  `pub enum AgentType {`
+- `src/learnings/install.rs:130`  `pub enum InstallError {`
+- `src/learnings/install.rs:241`  `pub async fn uninstall_hook(agent: AgentType) -> Result<(), InstallError> {`
+- `src/learnings/install.rs:276`  `pub fn is_hook_installed(agent: AgentType) -> bool {`
+- `src/learnings/install.rs:286`  `pub fn get_installation_status() -> Vec<(AgentType, bool)> {`
+- `src/learnings/mod.rs:27`  `pub mod compile;`
+- `src/learnings/mod.rs:28`  `pub mod export_kg;`
+- `src/learnings/mod.rs:35`  `pub mod suggest;`
+- `src/learnings/mod.rs:37`  `pub use procedure::ProcedureStore;`
+- `src/learnings/mod.rs:38`  `pub use replay::{StepOutcome, replay_procedure};`
+- `src/learnings/mod.rs:40`  `pub use capture::{`
+- `src/learnings/mod.rs:46`  `pub use capture::{`
+- `src/learnings/mod.rs:55`  `pub use compile::{compile_corrections_to_thesaurus, merge_thesauruses, write_the`
+- `src/learnings/mod.rs:58`  `pub use export_kg::{CorrectionTypeFilter, export_corrections_as_kg};`
+- `src/learnings/mod.rs:61`  `pub use redaction::redact_secrets;`
+- `src/learnings/mod.rs:64`  `pub use hook::{AgentFormat, LearnHookType, process_hook_input_with_type};`
+- `src/learnings/mod.rs:67`  `pub use install::{AgentType, install_hook};`
+- `src/learnings/mod.rs:73`  `pub struct LearningCaptureConfig {`
+- `src/learnings/mod.rs:113`  `pub fn new(project_dir: PathBuf, global_dir: PathBuf) -> Self {`
+- `src/learnings/procedure.rs:50`  `pub enum HealthStatus {`
+- `src/learnings/procedure.rs:74`  `pub struct ProcedureHealthReport {`
+- `src/learnings/procedure.rs:142`  `pub fn save_with_dedup(`
+- `src/learnings/procedure.rs:253`  `pub fn find_by_title(&self, query: &str) -> io::Result<Vec<CapturedProcedure>> {`
+- `src/learnings/procedure.rs:362`  `pub fn delete(&self, id: &str) -> io::Result<bool> {`
+- `src/learnings/procedure.rs:382`  `pub const TRIVIAL_COMMANDS: &[&str] = &[`
+- `src/learnings/procedure.rs:412`  `pub fn from_session_commands(`
+- `src/learnings/procedure.rs:471`  `pub fn extract_bash_commands_from_session(`
+- `src/learnings/replay.rs:15`  `pub enum StepOutcome {`
+- `src/learnings/replay.rs:26`  `pub struct ReplayResult {`
+- `src/learnings/suggest.rs:10`  `pub struct SuggestionMetricsEntry {`
+- `src/learnings/suggest.rs:19`  `pub struct SuggestionMetricsSummary {`
+- `src/learnings/suggest.rs:27`  `pub struct SuggestionMetrics {`
+- `src/learnings/suggest.rs:32`  `pub fn new(metrics_path: PathBuf) -> Self {`
+- `src/learnings/suggest.rs:36`  `pub fn default_path() -> PathBuf {`
+- `src/learnings/suggest.rs:43`  `pub fn append(&self, entry: SuggestionMetricsEntry) -> std::io::Result<()> {`
+- `src/learnings/suggest.rs:56`  `pub fn read_recent(&self, limit: usize) -> std::io::Result<Vec<SuggestionMetrics`
+- `src/learnings/suggest.rs:74`  `pub fn summary(&self) -> std::io::Result<SuggestionMetricsSummary> {`
+- `src/lib.rs:2`  `pub mod client;`
+- `src/lib.rs:3`  `pub mod onboarding;`
+- `src/lib.rs:4`  `pub mod service;`
+- `src/lib.rs:6`  `pub mod shared_learning;`
+- `src/lib.rs:7`  `pub mod tui_backend;`
+- `src/lib.rs:10`  `pub mod robot;`
+- `src/lib.rs:13`  `pub mod forgiving;`
+- `src/lib.rs:16`  `pub mod mcp_tool_index;`
+- `src/lib.rs:19`  `pub mod repl;`
+- `src/lib.rs:22`  `pub mod commands;`
+- `src/lib.rs:25`  `pub use client::*;`
+- `src/lib.rs:28`  `pub use robot::{`
+- `src/lib.rs:34`  `pub use forgiving::{AliasRegistry, ForgivingParser, ParseResult};`
+- `src/lib.rs:37`  `pub use repl::*;`
+- `src/lib.rs:40`  `pub use commands::*;`
+- `src/lib.rs:44`  `pub mod test_exports {`
+- `src/lib.rs:46`  `pub use crate::repl::*;`
+- `src/lib.rs:49`  `pub use std::str::FromStr;`
+- `src/lib.rs:52`  `pub use crate::commands::*;`
+- `src/lib.rs:54`  `pub use crate::forgiving::*;`
+- `src/lib.rs:55`  `pub use crate::robot::*;`
+- `src/listener.rs:10`  `pub struct AgentIdentity {`
+- `src/listener.rs:19`  `pub fn new(agent_name: impl Into<String>) -> Self {`
+- `src/listener.rs:27`  `pub fn resolved_gitea_login(&self) -> &str {`
+- `src/listener.rs:31`  `pub fn accepted_target_names(&self) -> Vec<String> {`
+- `src/listener.rs:41`  `pub enum NotificationRuleKind {`
+- `src/listener.rs:50`  `pub struct NotificationRule {`
+- `src/listener.rs:62`  `pub struct DelegationPolicy {`
+- `src/listener.rs:95`  `pub struct DispatchConfig {`
+- `src/listener.rs:133`  `pub struct GiteaConnection {`
+- `src/listener.rs:142`  `pub struct ListenerConfig {`
+- `src/listener.rs:167`  `pub fn for_identity(agent_name: impl Into<String>) -> Self {`
+- `src/listener.rs:184`  `pub fn validate(&self) -> Result<()> {`
+- `src/listener.rs:223`  `pub fn load_from_path(path: impl AsRef<Path>) -> Result<Self> {`
+- `src/listener.rs:1280`  `pub fn new(config: ListenerConfig) -> Result<Self> {`
+- `src/listener.rs:1352`  `pub async fn run_forever(mut self) -> Result<()> {`
+- `src/listener.rs:1363`  `pub async fn run_once(mut self) -> Result<()> {`
+- `src/listener.rs:1367`  `pub async fn poll_once(&mut self) -> Result<()> {`
+- `src/listener.rs:1723`  `pub async fn handoff_issue(`
+- `src/listener.rs:1733`  `pub async fn handoff_issue_with_context(`
+- `src/listener.rs:1766`  `pub async fn run_listener(config: ListenerConfig) -> Result<()> {`
+- `src/main.rs:224`  `pub enum HookType {`
+- `src/main.rs:237`  `pub enum BoundaryMode {`
+- `src/main.rs:538`  `pub enum OutputFormat {`
+- `src/main.rs:595`  `pub struct SourcesOutput {`
+- `src/main.rs:601`  `pub struct SourceEntry {`
+- `src/main.rs:608`  `pub struct SessionListOutput {`
+- `src/main.rs:615`  `pub struct SessionEntry {`
+- `src/main.rs:623`  `pub struct SessionSearchOutput {`
+- `src/main.rs:631`  `pub struct SessionSearchEntry {`
+- `src/main.rs:639`  `pub struct SessionStatsOutput {`
+- `src/mcp_tool_index.rs:44`  `pub struct McpToolIndex {`
 - `src/onboarding/mod.rs:26`  `pub use templates::{ConfigTemplate, TemplateRegistry};`
 - `src/onboarding/mod.rs:27`  `pub use wizard::{SetupMode, SetupResult, apply_template, run_setup_wizard};`
 - `src/onboarding/mod.rs:33`  `pub enum OnboardingError {`
+- `src/onboarding/prompts.rs:469`  `pub struct LlmConfig {`
 - `src/onboarding/templates.rs:20`  `pub struct ConfigTemplate {`
 - `src/onboarding/templates.rs:375`  `pub struct TemplateRegistry {`
+- `src/onboarding/validation.rs:12`  `pub enum ValidationError {`
 - `src/onboarding/wizard.rs:20`  `pub enum SetupResult {`
 - `src/onboarding/wizard.rs:42`  `pub enum SetupMode {`
 - `src/onboarding/wizard.rs:51`  `pub enum QuickStartChoice {`
-- `src/onboarding/prompts.rs:469`  `pub struct LlmConfig {`
-- `src/onboarding/validation.rs:12`  `pub enum ValidationError {`
-- `src/repl/mod.rs:8`  `pub mod commands;`
-- `src/repl/mod.rs:11`  `pub mod handler;`
-- `src/repl/mod.rs:14`  `pub mod web_operations;`
-- `src/repl/mod.rs:17`  `pub mod chat;`
-- `src/repl/mod.rs:20`  `pub mod mcp_tools;`
-- `src/repl/mod.rs:23`  `pub use handler::run_repl_offline_mode;`
-- `src/repl/mod.rs:26`  `pub use handler::run_repl_server_mode;`
+- `src/repl/chat.rs:7`  `pub struct ChatHandler {`
+- `src/repl/chat.rs:14`  `pub fn new() -> Self {`
+- `src/repl/chat.rs:18`  `pub async fn send_message(&self, message: &str) -> anyhow::Result<String> {`
+- `src/repl/commands.rs:7`  `pub enum ReplCommand {`
+- `src/repl/commands.rs:110`  `pub enum RobotSubcommand {`
+- `src/repl/commands.rs:123`  `pub enum UpdateSubcommand {`
+- `src/repl/commands.rs:135`  `pub enum ConfigSubcommand {`
+- `src/repl/commands.rs:141`  `pub enum RoleSubcommand {`
+- `src/repl/commands.rs:148`  `pub enum FileSubcommand {`
+- `src/repl/commands.rs:156`  `pub enum SessionsSubcommand {`
+- `src/repl/commands.rs:200`  `pub enum VmSubcommand {`
+- `src/repl/commands.rs:236`  `pub enum WebSubcommand {`
+- `src/repl/commands.rs:286`  `pub enum WebConfigSubcommand {`
+- `src/repl/commands.rs:1387`  `pub fn available_commands() -> Vec<&'static str> {`
 - `src/repl/file_operations.rs:13`  `pub enum FileCategory {`
 - `src/repl/file_operations.rs:58`  `pub struct SemanticMetadata {`
 - `src/repl/file_operations.rs:79`  `pub struct FileEntity {`
@@ -336,25 +389,19 @@
 - `src/repl/file_operations.rs:873`  `pub fn add_summarization(mut self) -> Self {`
 - `src/repl/file_operations.rs:880`  `pub fn add_entity_extraction(mut self) -> Self {`
 - `src/repl/file_operations.rs:890`  `pub fn build(self) -> FileOperationConfig {`
-- `src/repl/commands.rs:7`  `pub enum ReplCommand {`
-- `src/repl/commands.rs:110`  `pub enum RobotSubcommand {`
-- `src/repl/commands.rs:123`  `pub enum UpdateSubcommand {`
-- `src/repl/commands.rs:135`  `pub enum ConfigSubcommand {`
-- `src/repl/commands.rs:141`  `pub enum RoleSubcommand {`
-- `src/repl/commands.rs:148`  `pub enum FileSubcommand {`
-- `src/repl/commands.rs:156`  `pub enum SessionsSubcommand {`
-- `src/repl/commands.rs:200`  `pub enum VmSubcommand {`
-- `src/repl/commands.rs:236`  `pub enum WebSubcommand {`
-- `src/repl/commands.rs:286`  `pub enum WebConfigSubcommand {`
-- `src/repl/commands.rs:1387`  `pub fn available_commands() -> Vec<&'static str> {`
 - `src/repl/handler.rs:28`  `pub struct ReplHandler {`
 - `src/repl/handler.rs:38`  `pub fn new_offline(service: TuiService) -> Self {`
 - `src/repl/handler.rs:56`  `pub fn new_server(api_client: ApiClient) -> Self {`
 - `src/repl/handler.rs:67`  `pub async fn run(&mut self) -> Result<()> {`
 - `src/repl/handler.rs:197`  `pub async fn run(&mut self) -> Result<()> {`
-- `src/repl/chat.rs:7`  `pub struct ChatHandler {`
-- `src/repl/chat.rs:14`  `pub fn new() -> Self {`
-- `src/repl/chat.rs:18`  `pub async fn send_message(&self, message: &str) -> anyhow::Result<String> {`
+- `src/repl/mcp_tools.rs:18`  `pub struct McpToolsHandler {`
+- `src/repl/mod.rs:8`  `pub mod commands;`
+- `src/repl/mod.rs:11`  `pub mod handler;`
+- `src/repl/mod.rs:14`  `pub mod web_operations;`
+- `src/repl/mod.rs:17`  `pub mod chat;`
+- `src/repl/mod.rs:20`  `pub mod mcp_tools;`
+- `src/repl/mod.rs:23`  `pub use handler::run_repl_offline_mode;`
+- `src/repl/mod.rs:26`  `pub use handler::run_repl_server_mode;`
 - `src/repl/web_operations.rs:15`  `pub enum WebOperationType {`
 - `src/repl/web_operations.rs:60`  `pub struct WebOperationRequest {`
 - `src/repl/web_operations.rs:70`  `pub struct ProxyConfig {`
@@ -375,193 +422,123 @@
 - `src/repl/web_operations.rs:295`  `pub fn proxy(mut self, proxy: ProxyConfig) -> Self {`
 - `src/repl/web_operations.rs:300`  `pub fn build(self) -> WebOperationRequest {`
 - `src/repl/web_operations.rs:550`  `pub enum OperationComplexity {`
-- `src/repl/mcp_tools.rs:18`  `pub struct McpToolsHandler {`
-- `src/commands/mod.rs:7`  `pub mod hooks;`
-- `src/commands/mod.rs:8`  `pub mod markdown_parser;`
-- `src/commands/mod.rs:9`  `pub mod registry;`
-- `src/commands/mod.rs:10`  `pub mod validator;`
-- `src/commands/mod.rs:13`  `pub use executor::CommandExecutor;`
-- `src/commands/mod.rs:14`  `pub use registry::CommandRegistry;`
-- `src/commands/mod.rs:15`  `pub use validator::CommandValidator;`
-- `src/commands/mod.rs:21`  `pub mod modes;`
-- `src/commands/mod.rs:28`  `pub enum ExecutionMode {`
-- `src/commands/mod.rs:40`  `pub struct CommandParameter {`
-- `src/commands/mod.rs:89`  `pub struct ParameterValidation {`
-- `src/commands/mod.rs:102`  `pub struct CommandDefinition {`
-- `src/commands/mod.rs:153`  `pub enum RiskLevel {`
-- `src/commands/mod.rs:163`  `pub struct ResourceLimits {`
-- `src/commands/mod.rs:177`  `pub struct ParsedCommand {`
-- `src/commands/mod.rs:190`  `pub enum CommandValidationError {`
-- `src/commands/mod.rs:218`  `pub enum CommandExecutionError {`
-- `src/commands/mod.rs:246`  `pub struct CommandExecutionResult {`
-- `src/commands/mod.rs:265`  `pub struct ResourceUsage {`
-- `src/commands/mod.rs:280`  `pub enum CommandRegistryError {`
-- `src/commands/mod.rs:311`  `pub struct HookContext {`
-- `src/commands/mod.rs:322`  `pub struct HookResult {`
-- `src/commands/mod.rs:331`  `pub trait CommandHook {`
-- `src/commands/mod.rs:432`  `pub fn parse_error(path: impl AsRef<std::path::Path>, error: impl Into<String>) `
-- `src/commands/mod.rs:436`  `pub fn invalid_frontmatter(`
-- `src/commands/registry.rs:23`  `pub struct CommandRegistry {`
-- `src/commands/registry.rs:478`  `pub struct RegistryStats {`
-- `src/commands/registry.rs:533`  `pub struct CommandDiscoveryResult {`
-- `src/commands/hooks.rs:14`  `pub struct LoggingHook {`
-- `src/commands/hooks.rs:19`  `pub fn new() -> Self {`
-- `src/commands/hooks.rs:25`  `pub fn with_file<P: AsRef<Path>>(log_file: P) -> Self {`
-- `src/commands/hooks.rs:87`  `pub struct PreflightCheckHook {`
-- `src/commands/hooks.rs:93`  `pub fn new() -> Self {`
-- `src/commands/hooks.rs:99`  `pub fn with_allowed_dirs<P: AsRef<Path>>(dirs: Vec<P>) -> Self {`
-- `src/commands/hooks.rs:106`  `pub fn with_blocked_commands(mut self, commands: Vec<String>) -> Self {`
-- `src/commands/hooks.rs:191`  `pub fn new() -> Self {`
-- `src/commands/hooks.rs:197`  `pub fn with_webhook(mut self, webhook_url: String) -> Self {`
-- `src/commands/hooks.rs:202`  `pub fn with_important_commands(mut self, commands: Vec<String>) -> Self {`
-- `src/commands/hooks.rs:251`  `pub struct EnvironmentHook {`
-- `src/commands/hooks.rs:256`  `pub fn new() -> Self {`
-- `src/commands/hooks.rs:262`  `pub fn with_env<K: Into<String>, V: Into<String>>(mut self, key: K, value: V) ->`
-- `src/commands/hooks.rs:267`  `pub fn with_env_map(mut self, env_vars: std::collections::HashMap<String, String`
-- `src/commands/hooks.rs:320`  `pub fn new<P: AsRef<Path>>(backup_dir: P) -> Self {`
-- `src/commands/hooks.rs:327`  `pub fn with_backup_commands(mut self, commands: Vec<String>) -> Self {`
-- `src/commands/hooks.rs:412`  `pub struct ResourceMonitoringHook {`
-- `src/commands/hooks.rs:418`  `pub fn new() -> Self {`
-- `src/commands/hooks.rs:424`  `pub fn with_memory_limit(mut self, limit_mb: u64) -> Self {`
-- `src/commands/hooks.rs:429`  `pub fn with_duration_limit(mut self, limit_seconds: u64) -> Self {`
-- `src/commands/hooks.rs:484`  `pub fn new<P: AsRef<Path>>(repo_path: P) -> Self {`
-- `src/commands/hooks.rs:491`  `pub fn with_auto_commit(mut self, auto_commit: bool) -> Self {`
-- `src/commands/validator.rs:16`  `pub struct SecurityEvent {`
-- `src/commands/validator.rs:27`  `pub enum SecurityAction {`
-- `src/commands/validator.rs:38`  `pub enum SecurityResult {`
-- `src/commands/validator.rs:46`  `pub struct RateLimit {`
-- `src/commands/validator.rs:54`  `pub struct TimeRestrictions {`
-- `src/commands/validator.rs:62`  `pub struct MaintenanceWindow {`
-- `src/commands/validator.rs:620`  `pub struct SecurityStats {`
-- `src/commands/markdown_parser.rs:19`  `pub struct EnrichedParsedCommand {`
-- `src/commands/markdown_parser.rs:28`  `pub struct EnrichedContent {`
-- `src/commands/markdown_parser.rs:43`  `pub struct ContentMetrics {`
-- `src/commands/markdown_parser.rs:58`  `pub struct MarkdownCommandParser {`
-- `src/learnings/mod.rs:27`  `pub mod compile;`
-- `src/learnings/mod.rs:28`  `pub mod export_kg;`
-- `src/learnings/mod.rs:35`  `pub mod suggest;`
-- `src/learnings/mod.rs:37`  `pub use procedure::ProcedureStore;`
-- `src/learnings/mod.rs:38`  `pub use replay::{StepOutcome, replay_procedure};`
-- `src/learnings/mod.rs:40`  `pub use capture::{`
-- `src/learnings/mod.rs:46`  `pub use capture::{`
-- `src/learnings/mod.rs:55`  `pub use compile::{compile_corrections_to_thesaurus, merge_thesauruses, write_the`
-- `src/learnings/mod.rs:58`  `pub use export_kg::{CorrectionTypeFilter, export_corrections_as_kg};`
-- `src/learnings/mod.rs:61`  `pub use redaction::redact_secrets;`
-- `src/learnings/mod.rs:64`  `pub use hook::{AgentFormat, LearnHookType, process_hook_input_with_type};`
-- `src/learnings/mod.rs:67`  `pub use install::{AgentType, install_hook};`
-- `src/learnings/mod.rs:73`  `pub struct LearningCaptureConfig {`
-- `src/learnings/mod.rs:113`  `pub fn new(project_dir: PathBuf, global_dir: PathBuf) -> Self {`
-- `src/learnings/capture.rs:22`  `pub enum LearningError {`
-- `src/learnings/capture.rs:35`  `pub enum LearningSource {`
-- `src/learnings/capture.rs:44`  `pub enum CorrectionType {`
-- `src/learnings/capture.rs:102`  `pub struct ImportanceScore {`
-- `src/learnings/capture.rs:169`  `pub struct LearningContext {`
-- `src/learnings/capture.rs:195`  `pub struct CapturedLearning {`
-- `src/learnings/capture.rs:258`  `pub fn with_correction(mut self, correction: String) -> Self {`
-- `src/learnings/capture.rs:502`  `pub struct CorrectionEvent {`
-- `src/learnings/capture.rs:548`  `pub fn with_session_id(mut self, session_id: String) -> Self {`
-- `src/learnings/capture.rs:867`  `pub fn annotate_with_thesaurus(text: &str, thesaurus: terraphim_types::Thesaurus`
-- `src/learnings/capture.rs:1129`  `pub fn list_learnings(`
-- `src/learnings/capture.rs:1225`  `pub enum LearningEntry {`
-- `src/learnings/capture.rs:1232`  `pub fn source(&self) -> &LearningSource {`
-- `src/learnings/capture.rs:1241`  `pub fn id(&self) -> &str {`
-- `src/learnings/capture.rs:1249`  `pub fn captured_at(&self) -> chrono::DateTime<chrono::Utc> {`
-- `src/learnings/capture.rs:1515`  `pub struct ScoredEntry {`
-- `src/learnings/capture.rs:1525`  `pub fn format_suggestion(&self) -> String {`
-- `src/learnings/capture.rs:1546`  `pub struct TranscriptEntry {`
-- `src/learnings/capture.rs:1643`  `pub fn auto_extract_corrections(`
-- `src/learnings/capture.rs:1780`  `pub fn suggest_learnings(`
-- `src/learnings/replay.rs:15`  `pub enum StepOutcome {`
-- `src/learnings/replay.rs:26`  `pub struct ReplayResult {`
-- `src/learnings/export_kg.rs:14`  `pub enum CorrectionTypeFilter {`
-- `src/learnings/export_kg.rs:215`  `pub fn export_corrections_as_kg(`
-- `src/learnings/hook.rs:33`  `pub enum LearnHookType {`
-- `src/learnings/hook.rs:45`  `pub enum AgentFormat {`
-- `src/learnings/hook.rs:287`  `pub enum HookError {`
-- `src/learnings/hook.rs:306`  `pub struct HookInput {`
-- `src/learnings/hook.rs:321`  `pub struct ToolInput {`
-- `src/learnings/hook.rs:334`  `pub struct ToolResult {`
-- `src/learnings/procedure.rs:50`  `pub enum HealthStatus {`
-- `src/learnings/procedure.rs:74`  `pub struct ProcedureHealthReport {`
-- `src/learnings/procedure.rs:142`  `pub fn save_with_dedup(`
-- `src/learnings/procedure.rs:253`  `pub fn find_by_title(&self, query: &str) -> io::Result<Vec<CapturedProcedure>> {`
-- `src/learnings/procedure.rs:362`  `pub fn delete(&self, id: &str) -> io::Result<bool> {`
-- `src/learnings/procedure.rs:382`  `pub const TRIVIAL_COMMANDS: &[&str] = &[`
-- `src/learnings/procedure.rs:412`  `pub fn from_session_commands(`
-- `src/learnings/procedure.rs:471`  `pub fn extract_bash_commands_from_session(`
-- `src/learnings/install.rs:21`  `pub enum AgentType {`
-- `src/learnings/install.rs:130`  `pub enum InstallError {`
-- `src/learnings/install.rs:241`  `pub async fn uninstall_hook(agent: AgentType) -> Result<(), InstallError> {`
-- `src/learnings/install.rs:276`  `pub fn is_hook_installed(agent: AgentType) -> bool {`
-- `src/learnings/install.rs:286`  `pub fn get_installation_status() -> Vec<(AgentType, bool)> {`
-- `src/learnings/suggest.rs:10`  `pub struct SuggestionMetricsEntry {`
-- `src/learnings/suggest.rs:19`  `pub struct SuggestionMetricsSummary {`
-- `src/learnings/suggest.rs:27`  `pub struct SuggestionMetrics {`
-- `src/learnings/suggest.rs:32`  `pub fn new(metrics_path: PathBuf) -> Self {`
-- `src/learnings/suggest.rs:36`  `pub fn default_path() -> PathBuf {`
-- `src/learnings/suggest.rs:43`  `pub fn append(&self, entry: SuggestionMetricsEntry) -> std::io::Result<()> {`
-- `src/learnings/suggest.rs:56`  `pub fn read_recent(&self, limit: usize) -> std::io::Result<Vec<SuggestionMetrics`
-- `src/learnings/suggest.rs:74`  `pub fn summary(&self) -> std::io::Result<SuggestionMetricsSummary> {`
-- `src/commands/modes/mod.rs:9`  `pub mod hybrid;`
-- `src/commands/modes/mod.rs:10`  `pub mod local;`
-- `src/commands/modes/mod.rs:12`  `pub use firecracker::FirecrackerExecutor;`
-- `src/commands/modes/mod.rs:13`  `pub use hybrid::HybridExecutor;`
-- `src/commands/modes/mod.rs:14`  `pub use local::LocalExecutor;`
-- `src/commands/modes/mod.rs:22`  `pub trait CommandExecutor {`
-- `src/commands/modes/mod.rs:39`  `pub struct ExecutorCapabilities {`
-- `src/commands/modes/firecracker.rs:26`  `pub struct VmSettings {`
-- `src/commands/modes/hybrid.rs:25`  `pub struct RiskAssessmentSettings {`
-- `src/commands/modes/hybrid.rs:458`  `pub struct ExecutionStats {`
+- `src/robot/budget.rs:7`  `pub struct BudgetedResults {`
+- `src/robot/budget.rs:14`  `pub enum BudgetError {`
+- `src/robot/budget.rs:19`  `pub struct BudgetEngine {`
+- `src/robot/budget.rs:37`  `pub fn new(config: RobotConfig) -> Self {`
+- `src/robot/budget.rs:42`  `pub fn apply(&self, results: &[SearchResultItem]) -> Result<BudgetedResults, Bud`
+- `src/robot/docs.rs:12`  `pub struct SelfDocumentation {`
+- `src/robot/docs.rs:588`  `pub struct Capabilities {`
+- `src/robot/docs.rs:599`  `pub struct CommandDoc {`
+- `src/robot/docs.rs:611`  `pub struct ArgumentDoc {`
+- `src/robot/docs.rs:623`  `pub struct FlagDoc {`
+- `src/robot/docs.rs:636`  `pub struct ExampleDoc {`
+- `src/robot/exit_codes.rs:11`  `pub enum ExitCode {`
+- `src/robot/mod.rs:7`  `pub mod budget;`
+- `src/robot/mod.rs:9`  `pub mod docs;`
+- `src/robot/mod.rs:11`  `pub mod exit_codes;`
+- `src/robot/mod.rs:13`  `pub mod output;`
+- `src/robot/mod.rs:15`  `pub mod schema;`
+- `src/robot/mod.rs:18`  `pub use budget::{BudgetEngine, BudgetError, BudgetedResults};`
+- `src/robot/mod.rs:20`  `pub use docs::{ArgumentDoc, Capabilities, CommandDoc, ExampleDoc, FlagDoc, SelfD`
+- `src/robot/mod.rs:22`  `pub use exit_codes::ExitCode;`
+- `src/robot/mod.rs:24`  `pub use output::{FieldMode, OutputFormat, RobotConfig, RobotFormatter};`
+- `src/robot/mod.rs:26`  `pub use schema::{`
+- `src/robot/output.rs:9`  `pub enum OutputFormat {`
+- `src/robot/output.rs:63`  `pub enum FieldMode {`
+- `src/robot/output.rs:100`  `pub struct RobotConfig {`
+- `src/robot/schema.rs:10`  `pub struct RobotResponse<T: Serialize> {`
+- `src/robot/schema.rs:47`  `pub struct ResponseMeta {`
+- `src/robot/schema.rs:128`  `pub struct AutoCorrection {`
+- `src/robot/schema.rs:139`  `pub struct Pagination {`
+- `src/robot/schema.rs:164`  `pub struct TokenBudget {`
+- `src/robot/schema.rs:193`  `pub struct RobotError {`
+- `src/robot/schema.rs:284`  `pub struct SearchResultsData {`
+- `src/robot/schema.rs:299`  `pub struct SearchResultItem {`
+- `src/robot/schema.rs:327`  `pub struct CapabilitiesData {`
+- `src/robot/schema.rs:347`  `pub struct FeatureFlags {`
+- `src/robot/schema.rs:375`  `pub struct IndexStatus {`
+- `src/service.rs:13`  `pub struct TuiService {`
+- `src/service.rs:269`  `pub async fn resolve_or_auto_route(`
+- `src/service.rs:426`  `pub async fn chat(`
+- `src/service.rs:502`  `pub async fn autocomplete(`
+- `src/service.rs:541`  `pub async fn replace_matches(`
+- `src/service.rs:557`  `pub async fn summarize(&self, role_name: &RoleName, content: &str) -> Result<Str`
+- `src/service.rs:838`  `pub struct ConnectivityResult {`
+- `src/service.rs:846`  `pub struct FuzzySuggestion {`
+- `src/service.rs:853`  `pub struct ChecklistResult {`
+- `src/shared_learning/injector.rs:15`  `pub enum InjectionError {`
+- `src/shared_learning/injector.rs:37`  `pub struct InjectorConfig {`
+- `src/shared_learning/injector.rs:99`  `pub struct InjectionResult {`
+- `src/shared_learning/injector.rs:121`  `pub fn new() -> Self {`
+- `src/shared_learning/injector.rs:132`  `pub fn merge(&mut self, other: InjectionResult) {`
+- `src/shared_learning/injector.rs:144`  `pub struct LearningInjector {`
+- `src/shared_learning/injector.rs:149`  `pub fn new(config: InjectorConfig) -> Self {`
+- `src/shared_learning/markdown_store.rs:16`  `pub enum MarkdownStoreError {`
+- `src/shared_learning/markdown_store.rs:32`  `pub struct MarkdownStoreConfig {`
+- `src/shared_learning/markdown_store.rs:59`  `pub struct MarkdownLearningStore {`
+- `src/shared_learning/mod.rs:26`  `pub use markdown_store::{MarkdownLearningStore, MarkdownStoreConfig, MarkdownSto`
+- `src/shared_learning/mod.rs:27`  `pub use store::{SharedLearningStore, StoreConfig};`
+- `src/shared_learning/mod.rs:28`  `pub use terraphim_types::shared_learning::SuggestionStatus;`
+- `src/shared_learning/mod.rs:29`  `pub use types::{LearningSource as SharedLearningSource, SharedLearning, TrustLev`
+- `src/shared_learning/mod.rs:30`  `pub use wiki_sync::{GiteaWikiClient, WikiSyncError};`
+- `src/shared_learning/mod.rs:33`  `pub use terraphim_types::shared_learning::LearningStore;`
+- `src/shared_learning/mod.rs:36`  `pub mod injector;`
+- `src/shared_learning/mod.rs:38`  `pub use injector::{InjectionError, InjectionResult, InjectorConfig, LearningInje`
+- `src/shared_learning/store.rs:16`  `pub use terraphim_types::shared_learning::StoreError;`
+- `src/shared_learning/store.rs:26`  `pub struct StoreConfig {`
+- `src/shared_learning/store.rs:43`  `pub fn with_similarity_threshold(mut self, threshold: f64) -> Self {`
+- `src/shared_learning/store.rs:48`  `pub fn with_markdown_config(mut self, config: MarkdownStoreConfig) -> Self {`
+- `src/shared_learning/store.rs:62`  `pub fn new(total_docs: usize, avg_doc_len: f64) -> Self {`
+- `src/shared_learning/store.rs:88`  `pub fn score(&mut self, query: &str, doc: &str, doc_freqs: &HashMap<String, usiz`
+- `src/shared_learning/store.rs:126`  `pub fn normalize_score(&self, score: f64, query_len: usize) -> f64 {`
+- `src/shared_learning/store.rs:135`  `pub struct SharedLearningStore {`
+- `src/shared_learning/store.rs:144`  `pub async fn open(config: StoreConfig) -> Result<Self, StoreError> {`
+- `src/shared_learning/store.rs:195`  `pub async fn insert(&self, learning: SharedLearning) -> Result<(), StoreError> {`
+- `src/shared_learning/store.rs:202`  `pub async fn store_with_dedup(`
+- `src/shared_learning/store.rs:306`  `pub async fn get(&self, id: &str) -> Result<SharedLearning, StoreError> {`
+- `src/shared_learning/store.rs:314`  `pub async fn list_all(&self) -> Result<Vec<SharedLearning>, StoreError> {`
+- `src/shared_learning/store.rs:319`  `pub async fn list_by_trust_level(`
+- `src/shared_learning/store.rs:331`  `pub async fn promote_to_l2(&self, id: &str) -> Result<(), StoreError> {`
+- `src/shared_learning/store.rs:345`  `pub async fn promote_to_l3(&self, id: &str) -> Result<(), StoreError> {`
+- `src/shared_learning/store.rs:359`  `pub async fn list_pending(&self) -> Result<Vec<SharedLearning>, StoreError> {`
+- `src/shared_learning/store.rs:363`  `pub async fn list_by_status(`
+- `src/shared_learning/store.rs:375`  `pub async fn approve(&self, id: &str) -> Result<(), StoreError> {`
+- `src/shared_learning/store.rs:390`  `pub async fn reject(&self, id: &str, reason: Option<&str>) -> Result<(), StoreEr`
+- `src/shared_learning/store.rs:406`  `pub async fn record_application(`
+- `src/shared_learning/store.rs:436`  `pub async fn find_similar(`
+- `src/shared_learning/store.rs:492`  `pub async fn suggest(`
+- `src/shared_learning/store.rs:552`  `pub async fn close(&self) {`
+- `src/shared_learning/store.rs:557`  `pub fn set_role_graph(&mut self, graph: terraphim_rolegraph::RoleGraph) {`
+- `src/shared_learning/store.rs:562`  `pub fn role_graph(&self) -> Option<&std::sync::RwLock<terraphim_rolegraph::RoleG`
+- `src/shared_learning/store.rs:737`  `pub enum StoreResult {`
+- `src/shared_learning/wiki_sync.rs:11`  `pub enum WikiSyncError {`
+- `src/shared_learning/wiki_sync.rs:28`  `pub struct GiteaWikiConfig {`
+- `src/shared_learning/wiki_sync.rs:92`  `pub enum SyncResult {`
+- `src/shared_learning/wiki_sync.rs:329`  `pub struct WikiSyncService {`
+- `src/shared_learning/wiki_sync.rs:372`  `pub struct WikiSyncReport {`
+- `src/tui_backend.rs:19`  `pub enum TuiBackend {`
+- `src/tui_backend.rs:111`  `pub async fn summarize(`
+- `src/tui_backend.rs:133`  `pub async fn switch_role(&self, role: &str) -> Result<Config> {`
 
 ### terraphim_orchestrator (303 gaps)
 
-- `src/pr_dispatch.rs:23`  `pub struct ReviewPrRequest {`
-- `src/project_control.rs:57`  `pub enum ShouldPause {`
-- `src/project_control.rs:79`  `pub struct ProjectFailureCounter {`
-- `src/error_signatures.rs:32`  `pub enum ErrorKind {`
-- `src/error_signatures.rs:54`  `pub struct ProviderErrorSignatures {`
-- `src/error_signatures.rs:65`  `pub struct CompileError {`
-- `src/error_signatures.rs:89`  `pub struct CompiledSignatures {`
-- `src/mention.rs:30`  `pub enum MentionResolution {`
-- `src/mention.rs:37`  `pub struct MentionTokens {`
-- `src/mention.rs:63`  `pub struct DetectedMention {`
-- `src/mention.rs:99`  `pub struct MentionCursor {`
-- `src/mention.rs:165`  `pub async fn load_or_now(project_id: &str) -> Self {`
-- `src/mention.rs:545`  `pub fn new(max_dispatches_per_issue: u32) -> Self {`
-- `src/scheduler.rs:12`  `pub enum ScheduleEvent {`
-- `src/scheduler.rs:32`  `pub struct TimeScheduler {`
-- `src/scheduler.rs:80`  `pub fn take_event_rx(&mut self) -> Option<mpsc::Receiver<ScheduleEvent>> {`
-- `src/scope.rs:21`  `pub struct ScopeReservation {`
-- `src/scope.rs:79`  `pub struct ScopeRegistry {`
-- `src/scope.rs:207`  `pub struct WorktreeManager {`
-- `src/mention_chain.rs:16`  `pub enum MentionChainError {`
-- `src/mention_chain.rs:125`  `pub struct MentionContextArgs {`
-- `src/pr_poller.rs:52`  `pub struct PrSummary {`
-- `src/pr_poller.rs:63`  `pub struct PrComment {`
-- `src/pr_poller.rs:76`  `pub trait PrTracker: Send + Sync {`
-- `src/pr_poller.rs:86`  `pub struct MergeOutcome {`
-- `src/pr_poller.rs:100`  `pub trait AutoMergeExecutor: PrTracker {`
-- `src/pr_poller.rs:124`  `pub fn new(inner: terraphim_tracker::GiteaTracker) -> Self {`
-- `src/pr_poller.rs:197`  `pub enum EvaluationOutcome {`
-- `src/pr_poller.rs:313`  `pub struct PrPollRateLimiter {`
-- `src/pr_poller.rs:319`  `pub fn new(min_interval: Duration) -> Self {`
-- `src/pr_poller.rs:344`  `pub struct AutoMergeDedupeSet {`
-- `src/pr_poller.rs:349`  `pub fn new() -> Self {`
-- `src/pr_poller.rs:380`  `pub struct AutoMergeFailureDedupe {`
-- `src/provider_budget.rs:31`  `pub struct ProviderBudgetConfig {`
-- `src/provider_budget.rs:48`  `pub struct WindowState {`
-- `src/provider_budget.rs:57`  `pub struct ProviderSnapshotEntry {`
-- `src/provider_budget.rs:64`  `pub struct ProviderBudgetSnapshot {`
-- `src/provider_budget.rs:86`  `pub struct ProviderBudgetTracker {`
-- `src/provider_budget.rs:264`  `pub fn is_empty(&self) -> bool {`
+- `src/adf_commands.rs:12`  `pub enum AdfCommand {`
+- `src/agent_run_record.rs:49`  `pub enum ExitClass {`
+- `src/agent_run_record.rs:120`  `pub enum RunTrigger {`
+- `src/agent_run_record.rs:151`  `pub struct AgentRunRecord {`
+- `src/agent_run_record.rs:518`  `pub struct ExitClassification {`
+- `src/agent_run_record.rs:535`  `pub trait RunRecordPersistence: Send + Sync {`
+- `src/agent_run_record.rs:558`  `pub enum RunRecordError {`
+- `src/agent_run_record.rs:571`  `pub struct InMemoryRunRecordStore {`
 - `src/compound.rs:26`  `pub struct ReviewGroupDef {`
 - `src/compound.rs:56`  `pub struct SwarmConfig {`
 - `src/compound.rs:133`  `pub struct CompoundReviewResult {`
 - `src/compound.rs:232`  `pub struct CompoundReviewWorkflow {`
-- `src/pr_gate.rs:11`  `pub enum CommitStatusState {`
-- `src/pr_gate.rs:37`  `pub struct CommitStatusSummary {`
-- `src/pr_gate.rs:49`  `pub struct PrGateSnapshot {`
-- `src/pr_gate.rs:63`  `pub enum PrGateDecision {`
+- `src/concurrency.rs:12`  `pub struct ConcurrencyController {`
+- `src/concurrency.rs:28`  `pub struct ModeQuotas {`
+- `src/concurrency.rs:37`  `pub struct ProjectCaps {`
+- `src/concurrency.rs:62`  `pub enum FairnessPolicy {`
 - `src/config.rs:9`  `pub enum PreCheckStrategy {`
 - `src/config.rs:39`  `pub struct Project {`
 - `src/config.rs:72`  `pub struct OrchestratorConfig {`
@@ -583,6 +560,104 @@
 - `src/config.rs:807`  `pub struct TrackerConfig {`
 - `src/config.rs:831`  `pub struct TrackerStates {`
 - `src/config.rs:851`  `pub struct ConcurrencyConfig {`
+- `src/control_plane/events.rs:15`  `pub enum EventOrigin {`
+- `src/control_plane/events.rs:26`  `pub enum CommandKind {`
+- `src/control_plane/events.rs:46`  `pub struct NormalizedAgentEvent {`
+- `src/control_plane/events.rs:212`  `pub struct WebhookContext {`
+- `src/control_plane/mod.rs:16`  `pub mod output_parser;`
+- `src/control_plane/mod.rs:17`  `pub mod policy;`
+- `src/control_plane/mod.rs:18`  `pub mod routing;`
+- `src/control_plane/mod.rs:19`  `pub mod telemetry;`
+- `src/control_plane/mod.rs:20`  `pub mod telemetry_persist;`
+- `src/control_plane/mod.rs:22`  `pub use events::{`
+- `src/control_plane/mod.rs:26`  `pub use routing::{DispatchContext, RouteCandidate, RoutingDecision, RoutingDecis`
+- `src/control_plane/mod.rs:27`  `pub use telemetry::{CompletionEvent, TelemetryStore, TelemetrySummary};`
+- `src/control_plane/output_parser.rs:12`  `pub enum ParsedOutput {`
+- `src/control_plane/policy.rs:15`  `pub struct PolicyResult {`
+- `src/control_plane/policy.rs:24`  `pub struct ScoredCandidate {`
+- `src/control_plane/policy.rs:32`  `pub struct PolicyConfig {`
+- `src/control_plane/policy.rs:58`  `pub fn new() -> Self {`
+- `src/control_plane/routing.rs:17`  `pub enum RouteSource {`
+- `src/control_plane/routing.rs:38`  `pub enum BudgetPressure {`
+- `src/control_plane/routing.rs:45`  `pub fn from_verdict(verdict: &BudgetVerdict) -> Self {`
+- `src/control_plane/routing.rs:53`  `pub fn cost_penalty(&self, cost_level: &CostLevel) -> f64 {`
+- `src/control_plane/routing.rs:71`  `pub struct DispatchContext {`
+- `src/control_plane/routing.rs:81`  `pub struct RouteCandidate {`
+- `src/control_plane/routing.rs:90`  `pub struct RoutingDecision {`
+- `src/control_plane/routing.rs:128`  `pub struct RoutingDecisionEngine {`
+- `src/control_plane/routing.rs:141`  `pub fn new(`
+- `src/control_plane/routing.rs:156`  `pub fn with_provider_budget(`
+- `src/control_plane/routing.rs:288`  `pub async fn decide_route(`
+- `src/control_plane/telemetry.rs:14`  `pub struct CompletionEvent {`
+- `src/control_plane/telemetry.rs:35`  `pub struct TokenBreakdown {`
+- `src/control_plane/telemetry.rs:46`  `pub struct ModelPerformanceSnapshot {`
+- `src/control_plane/telemetry.rs:70`  `pub fn empty(model: &str, window_secs: u64) -> Self {`
+- `src/control_plane/telemetry.rs:85`  `pub fn is_stale(&self, max_staleness_secs: u64) -> bool {`
+- `src/control_plane/telemetry.rs:95`  `pub fn is_subscription_limited(&self) -> bool {`
+- `src/control_plane/telemetry.rs:109`  `pub struct UsageSnapshot {`
+- `src/control_plane/telemetry.rs:124`  `pub struct ModelUsage {`
+- `src/control_plane/telemetry.rs:133`  `pub fn merge(&mut self, other: &ModelUsage) {`
+- `src/control_plane/telemetry.rs:147`  `pub struct TelemetrySummary {`
+- `src/control_plane/telemetry.rs:238`  `pub struct TelemetryStore {`
+- `src/control_plane/telemetry.rs:255`  `pub fn new(window_secs: u64) -> Self {`
+- `src/control_plane/telemetry.rs:266`  `pub fn with_subscription_limit_ttl(self, ttl_secs: u64) -> Self {`
+- `src/cost_tracker.rs:12`  `pub enum BudgetVerdict {`
+- `src/cost_tracker.rs:58`  `pub struct ExecutionMetrics {`
+- `src/cost_tracker.rs:138`  `pub struct AgentMetrics {`
+- `src/cost_tracker.rs:318`  `pub struct CostSnapshot {`
+- `src/dispatcher.rs:14`  `pub enum DispatchTask {`
+- `src/dispatcher.rs:155`  `pub struct DispatcherStats {`
+- `src/dual_mode.rs:21`  `pub struct SharedState {`
+- `src/dual_mode.rs:32`  `pub struct DualModeStats {`
+- `src/dual_mode.rs:45`  `pub struct AgentId {`
+- `src/dual_mode.rs:54`  `pub enum ExecutionMode {`
+- `src/dual_mode.rs:72`  `pub enum SpawnTask {`
+- `src/error.rs:6`  `pub enum OrchestratorError {`
+- `src/error_signatures.rs:32`  `pub enum ErrorKind {`
+- `src/error_signatures.rs:54`  `pub struct ProviderErrorSignatures {`
+- `src/error_signatures.rs:65`  `pub struct CompileError {`
+- `src/error_signatures.rs:89`  `pub struct CompiledSignatures {`
+- `src/flow/config.rs:4`  `pub struct FlowDefinition {`
+- `src/flow/config.rs:30`  `pub struct FlowStepDef {`
+- `src/flow/config.rs:71`  `pub enum StepKind {`
+- `src/flow/config.rs:80`  `pub enum FailStrategy {`
+- `src/flow/envelope.rs:7`  `pub struct StepEnvelope {`
+- `src/flow/executor.rs:20`  `pub struct ProjectRuntime {`
+- `src/flow/executor.rs:26`  `pub struct FlowExecutor {`
+- `src/flow/executor.rs:36`  `pub fn new(working_dir: PathBuf, flow_state_dir: PathBuf) -> Self {`
+- `src/flow/mod.rs:1`  `pub mod config;`
+- `src/flow/mod.rs:2`  `pub mod envelope;`
+- `src/flow/mod.rs:3`  `pub mod executor;`
+- `src/flow/mod.rs:4`  `pub mod state;`
+- `src/flow/mod.rs:5`  `pub mod token_parser;`
+- `src/flow/state.rs:9`  `pub struct FlowRunState {`
+- `src/flow/state.rs:23`  `pub enum FlowRunStatus {`
+- `src/flow/state.rs:32`  `pub fn new(flow_name: &str) -> Self {`
+- `src/flow/state.rs:45`  `pub fn failed(flow_name: &str, reason: &str) -> Self {`
+- `src/flow/state.rs:53`  `pub fn step_output(&self, step_name: &str) -> Option<&StepEnvelope> {`
+- `src/flow/state.rs:59`  `pub fn save_to_file(&self, dir: &Path) -> std::io::Result<PathBuf> {`
+- `src/flow/state.rs:70`  `pub fn load_from_file(path: &Path) -> std::io::Result<Self> {`
+- `src/flow/token_parser.rs:11`  `pub struct TokenUsage {`
+- `src/flow/token_parser.rs:107`  `pub fn parse_claude_output(output: &str) -> TokenUsage {`
+- `src/flow/token_parser.rs:113`  `pub fn parse_codex_output(output: &str) -> TokenUsage {`
+- `src/handoff.rs:12`  `pub struct HandoffContext {`
+- `src/handoff.rs:142`  `pub struct HandoffBuffer {`
+- `src/handoff.rs:230`  `pub struct HandoffLedger {`
+- `src/kg_router.rs:22`  `pub struct KgRouteDecision {`
+- `src/kg_router.rs:73`  `pub struct KgRouter {`
+- `src/kg_router.rs:306`  `pub enum KgRouterError {`
+- `src/learning.rs:40`  `pub enum LearningError {`
+- `src/learning.rs:63`  `pub enum TrustLevel {`
+- `src/learning.rs:102`  `pub enum LearningCategory {`
+- `src/learning.rs:147`  `pub struct Learning {`
+- `src/learning.rs:167`  `pub struct NewLearning {`
+- `src/learning.rs:185`  `pub trait LearningPersistence: Send + Sync {`
+- `src/learning.rs:228`  `pub fn new() -> Self {`
+- `src/learning.rs:675`  `pub async fn get(&self, id: &str) -> Result<Option<Learning>, LearningError> {`
+- `src/learning.rs:679`  `pub async fn query_relevant(&self, agent_name: &str) -> Result<Vec<Learning>, Le`
+- `src/learning.rs:685`  `pub async fn record_applied(&self, id: &str) -> Result<(), LearningError> {`
+- `src/learning.rs:689`  `pub async fn record_effective(&self, id: &str) -> Result<(), LearningError> {`
+- `src/learning.rs:693`  `pub async fn archive_stale(&self, max_age_days: u32) -> Result<usize, LearningEr`
 - `src/lib.rs:32`  `pub mod agent_run_record;`
 - `src/lib.rs:33`  `pub mod compound;`
 - `src/lib.rs:34`  `pub mod concurrency;`
@@ -650,39 +725,40 @@
 - `src/lib.rs:7484`  `pub fn pause_dir_for_test(&self) -> &std::path::Path {`
 - `src/lib.rs:7497`  `pub async fn simulate_project_meta_failures_for_test(`
 - `src/lib.rs:7518`  `pub fn reset_project_meta_counter_for_test(&mut self, project_id: &str) {`
-- `src/pr_review.rs:29`  `pub struct ReviewVerdict {`
-- `src/pr_review.rs:53`  `pub struct AutoMergeCriteria {`
-- `src/pr_review.rs:77`  `pub struct PrMetadata {`
-- `src/pr_review.rs:87`  `pub enum AutoMergeDecision {`
-- `src/pr_review.rs:98`  `pub enum VerdictParseError {`
-- `src/agent_run_record.rs:49`  `pub enum ExitClass {`
-- `src/agent_run_record.rs:120`  `pub enum RunTrigger {`
-- `src/agent_run_record.rs:151`  `pub struct AgentRunRecord {`
-- `src/agent_run_record.rs:518`  `pub struct ExitClassification {`
-- `src/agent_run_record.rs:535`  `pub trait RunRecordPersistence: Send + Sync {`
-- `src/agent_run_record.rs:558`  `pub enum RunRecordError {`
-- `src/agent_run_record.rs:571`  `pub struct InMemoryRunRecordStore {`
-- `src/learning.rs:40`  `pub enum LearningError {`
-- `src/learning.rs:63`  `pub enum TrustLevel {`
-- `src/learning.rs:102`  `pub enum LearningCategory {`
-- `src/learning.rs:147`  `pub struct Learning {`
-- `src/learning.rs:167`  `pub struct NewLearning {`
-- `src/learning.rs:185`  `pub trait LearningPersistence: Send + Sync {`
-- `src/learning.rs:228`  `pub fn new() -> Self {`
-- `src/learning.rs:675`  `pub async fn get(&self, id: &str) -> Result<Option<Learning>, LearningError> {`
-- `src/learning.rs:679`  `pub async fn query_relevant(&self, agent_name: &str) -> Result<Vec<Learning>, Le`
-- `src/learning.rs:685`  `pub async fn record_applied(&self, id: &str) -> Result<(), LearningError> {`
-- `src/learning.rs:689`  `pub async fn record_effective(&self, id: &str) -> Result<(), LearningError> {`
-- `src/learning.rs:693`  `pub async fn archive_stale(&self, max_age_days: u32) -> Result<usize, LearningEr`
-- `src/webhook.rs:36`  `pub struct GiteaUser {`
-- `src/webhook.rs:48`  `pub struct GiteaRepository {`
-- `src/webhook.rs:54`  `pub struct GiteaPullRequestPayload {`
-- `src/webhook.rs:62`  `pub struct PullRequestFields {`
-- `src/webhook.rs:73`  `pub struct PrRef {`
-- `src/webhook.rs:162`  `pub struct GiteaPushPayload {`
-- `src/webhook.rs:175`  `pub struct GiteaPusher {`
-- `src/webhook.rs:181`  `pub struct GiteaPushCommit {`
-- `src/webhook.rs:192`  `pub struct WebhookState {`
+- `src/mention.rs:30`  `pub enum MentionResolution {`
+- `src/mention.rs:37`  `pub struct MentionTokens {`
+- `src/mention.rs:63`  `pub struct DetectedMention {`
+- `src/mention.rs:99`  `pub struct MentionCursor {`
+- `src/mention.rs:165`  `pub async fn load_or_now(project_id: &str) -> Self {`
+- `src/mention.rs:545`  `pub fn new(max_dispatches_per_issue: u32) -> Self {`
+- `src/mention_chain.rs:16`  `pub enum MentionChainError {`
+- `src/mention_chain.rs:125`  `pub struct MentionContextArgs {`
+- `src/meta_coordinator.rs:27`  `pub struct AgentSelectionRule {`
+- `src/meta_coordinator.rs:96`  `pub struct CandidateIssue {`
+- `src/meta_coordinator.rs:109`  `pub enum DispatchResult {`
+- `src/meta_coordinator.rs:412`  `pub struct MetaCoordinatorStats {`
+- `src/metrics_persistence.rs:14`  `pub struct PersistedAgentMetrics {`
+- `src/metrics_persistence.rs:39`  `pub struct MetricsPersistenceConfig {`
+- `src/metrics_persistence.rs:57`  `pub trait MetricsPersistence: Send + Sync {`
+- `src/metrics_persistence.rs:89`  `pub enum MetricsPersistenceError {`
+- `src/mode/mod.rs:8`  `pub mod time;`
+- `src/mode/mod.rs:10`  `pub use issue::IssueMode;`
+- `src/mode/mod.rs:11`  `pub use time::TimeMode;`
+- `src/nightwatch.rs:12`  `pub struct Claim {`
+- `src/nightwatch.rs:24`  `pub struct ReasoningCertificate {`
+- `src/nightwatch.rs:53`  `pub struct DualPanelResult {`
+- `src/nightwatch.rs:205`  `pub struct DriftMetrics {`
+- `src/nightwatch.rs:222`  `pub struct DriftScore {`
+- `src/nightwatch.rs:231`  `pub enum CorrectionLevel {`
+- `src/nightwatch.rs:246`  `pub struct DriftAlert {`
+- `src/nightwatch.rs:254`  `pub enum CorrectionAction {`
+- `src/nightwatch.rs:440`  `pub fn take_alert_rx(&mut self) -> Option<mpsc::Receiver<DriftAlert>> {`
+- `src/nightwatch.rs:580`  `pub struct RateLimitTracker {`
+- `src/nightwatch.rs:587`  `pub struct RateLimitWindow {`
+- `src/persona.rs:13`  `pub struct PersonaRegistry {`
+- `src/persona.rs:112`  `pub enum MetapromptRenderError {`
+- `src/persona.rs:128`  `pub struct MetapromptRenderer {`
+- `src/persona.rs:201`  `pub fn test_persona() -> PersonaDefinition {`
 - `src/post_merge_gate.rs:37`  `pub struct CommandOutput {`
 - `src/post_merge_gate.rs:50`  `pub enum CommandError {`
 - `src/post_merge_gate.rs:62`  `pub trait CommandRunner: Send + Sync {`
@@ -698,129 +774,88 @@
 - `src/post_merge_gate.rs:451`  `pub fn push_ok(&self, code: i32, stdout: &str, stderr: &str) {`
 - `src/post_merge_gate.rs:460`  `pub fn push_err(&self, err: CommandError) {`
 - `src/post_merge_gate.rs:464`  `pub fn calls(&self) -> Vec<CallRecord> {`
+- `src/pr_dispatch.rs:23`  `pub struct ReviewPrRequest {`
+- `src/pr_gate.rs:11`  `pub enum CommitStatusState {`
+- `src/pr_gate.rs:37`  `pub struct CommitStatusSummary {`
+- `src/pr_gate.rs:49`  `pub struct PrGateSnapshot {`
+- `src/pr_gate.rs:63`  `pub enum PrGateDecision {`
+- `src/pr_poller.rs:52`  `pub struct PrSummary {`
+- `src/pr_poller.rs:63`  `pub struct PrComment {`
+- `src/pr_poller.rs:76`  `pub trait PrTracker: Send + Sync {`
+- `src/pr_poller.rs:86`  `pub struct MergeOutcome {`
+- `src/pr_poller.rs:100`  `pub trait AutoMergeExecutor: PrTracker {`
+- `src/pr_poller.rs:124`  `pub fn new(inner: terraphim_tracker::GiteaTracker) -> Self {`
+- `src/pr_poller.rs:197`  `pub enum EvaluationOutcome {`
+- `src/pr_poller.rs:313`  `pub struct PrPollRateLimiter {`
+- `src/pr_poller.rs:319`  `pub fn new(min_interval: Duration) -> Self {`
+- `src/pr_poller.rs:344`  `pub struct AutoMergeDedupeSet {`
+- `src/pr_poller.rs:349`  `pub fn new() -> Self {`
+- `src/pr_poller.rs:380`  `pub struct AutoMergeFailureDedupe {`
+- `src/pr_review.rs:29`  `pub struct ReviewVerdict {`
+- `src/pr_review.rs:53`  `pub struct AutoMergeCriteria {`
+- `src/pr_review.rs:77`  `pub struct PrMetadata {`
+- `src/pr_review.rs:87`  `pub enum AutoMergeDecision {`
+- `src/pr_review.rs:98`  `pub enum VerdictParseError {`
+- `src/project_control.rs:57`  `pub enum ShouldPause {`
+- `src/project_control.rs:79`  `pub struct ProjectFailureCounter {`
+- `src/provider_budget.rs:31`  `pub struct ProviderBudgetConfig {`
+- `src/provider_budget.rs:48`  `pub struct WindowState {`
+- `src/provider_budget.rs:57`  `pub struct ProviderSnapshotEntry {`
+- `src/provider_budget.rs:64`  `pub struct ProviderBudgetSnapshot {`
+- `src/provider_budget.rs:86`  `pub struct ProviderBudgetTracker {`
+- `src/provider_budget.rs:264`  `pub fn is_empty(&self) -> bool {`
+- `src/provider_probe.rs:17`  `pub struct ProbeResult {`
+- `src/provider_probe.rs:30`  `pub enum ProbeStatus {`
 - `src/quickwit.rs:30`  `pub struct LogDocument {`
 - `src/quickwit.rs:72`  `pub enum QuickwitError {`
 - `src/quickwit.rs:106`  `pub enum OrchestratorEvent {`
 - `src/quickwit.rs:149`  `pub struct QuickwitSink {`
 - `src/quickwit.rs:284`  `pub struct QuickwitFleetSink {`
-- `src/handoff.rs:12`  `pub struct HandoffContext {`
-- `src/handoff.rs:142`  `pub struct HandoffBuffer {`
-- `src/handoff.rs:230`  `pub struct HandoffLedger {`
-- `src/persona.rs:13`  `pub struct PersonaRegistry {`
-- `src/persona.rs:112`  `pub enum MetapromptRenderError {`
-- `src/persona.rs:128`  `pub struct MetapromptRenderer {`
-- `src/persona.rs:201`  `pub fn test_persona() -> PersonaDefinition {`
-- `src/concurrency.rs:12`  `pub struct ConcurrencyController {`
-- `src/concurrency.rs:28`  `pub struct ModeQuotas {`
-- `src/concurrency.rs:37`  `pub struct ProjectCaps {`
-- `src/concurrency.rs:62`  `pub enum FairnessPolicy {`
-- `src/dispatcher.rs:14`  `pub enum DispatchTask {`
-- `src/dispatcher.rs:155`  `pub struct DispatcherStats {`
-- `src/provider_probe.rs:17`  `pub struct ProbeResult {`
-- `src/provider_probe.rs:30`  `pub enum ProbeStatus {`
-- `src/adf_commands.rs:12`  `pub enum AdfCommand {`
-- `src/meta_coordinator.rs:27`  `pub struct AgentSelectionRule {`
-- `src/meta_coordinator.rs:96`  `pub struct CandidateIssue {`
-- `src/meta_coordinator.rs:109`  `pub enum DispatchResult {`
-- `src/meta_coordinator.rs:412`  `pub struct MetaCoordinatorStats {`
-- `src/error.rs:6`  `pub enum OrchestratorError {`
-- `src/cost_tracker.rs:12`  `pub enum BudgetVerdict {`
-- `src/cost_tracker.rs:58`  `pub struct ExecutionMetrics {`
-- `src/cost_tracker.rs:138`  `pub struct AgentMetrics {`
-- `src/cost_tracker.rs:318`  `pub struct CostSnapshot {`
-- `src/dual_mode.rs:21`  `pub struct SharedState {`
-- `src/dual_mode.rs:32`  `pub struct DualModeStats {`
-- `src/dual_mode.rs:45`  `pub struct AgentId {`
-- `src/dual_mode.rs:54`  `pub enum ExecutionMode {`
-- `src/dual_mode.rs:72`  `pub enum SpawnTask {`
-- `src/nightwatch.rs:12`  `pub struct Claim {`
-- `src/nightwatch.rs:24`  `pub struct ReasoningCertificate {`
-- `src/nightwatch.rs:53`  `pub struct DualPanelResult {`
-- `src/nightwatch.rs:205`  `pub struct DriftMetrics {`
-- `src/nightwatch.rs:222`  `pub struct DriftScore {`
-- `src/nightwatch.rs:231`  `pub enum CorrectionLevel {`
-- `src/nightwatch.rs:246`  `pub struct DriftAlert {`
-- `src/nightwatch.rs:254`  `pub enum CorrectionAction {`
-- `src/nightwatch.rs:440`  `pub fn take_alert_rx(&mut self) -> Option<mpsc::Receiver<DriftAlert>> {`
-- `src/nightwatch.rs:580`  `pub struct RateLimitTracker {`
-- `src/nightwatch.rs:587`  `pub struct RateLimitWindow {`
-- `src/kg_router.rs:22`  `pub struct KgRouteDecision {`
-- `src/kg_router.rs:73`  `pub struct KgRouter {`
-- `src/kg_router.rs:306`  `pub enum KgRouterError {`
-- `src/metrics_persistence.rs:14`  `pub struct PersistedAgentMetrics {`
-- `src/metrics_persistence.rs:39`  `pub struct MetricsPersistenceConfig {`
-- `src/metrics_persistence.rs:57`  `pub trait MetricsPersistence: Send + Sync {`
-- `src/metrics_persistence.rs:89`  `pub enum MetricsPersistenceError {`
-- `src/mode/mod.rs:8`  `pub mod time;`
-- `src/mode/mod.rs:10`  `pub use issue::IssueMode;`
-- `src/mode/mod.rs:11`  `pub use time::TimeMode;`
-- `src/control_plane/mod.rs:16`  `pub mod output_parser;`
-- `src/control_plane/mod.rs:17`  `pub mod policy;`
-- `src/control_plane/mod.rs:18`  `pub mod routing;`
-- `src/control_plane/mod.rs:19`  `pub mod telemetry;`
-- `src/control_plane/mod.rs:20`  `pub mod telemetry_persist;`
-- `src/control_plane/mod.rs:22`  `pub use events::{`
-- `src/control_plane/mod.rs:26`  `pub use routing::{DispatchContext, RouteCandidate, RoutingDecision, RoutingDecis`
-- `src/control_plane/mod.rs:27`  `pub use telemetry::{CompletionEvent, TelemetryStore, TelemetrySummary};`
-- `src/control_plane/routing.rs:17`  `pub enum RouteSource {`
-- `src/control_plane/routing.rs:38`  `pub enum BudgetPressure {`
-- `src/control_plane/routing.rs:45`  `pub fn from_verdict(verdict: &BudgetVerdict) -> Self {`
-- `src/control_plane/routing.rs:53`  `pub fn cost_penalty(&self, cost_level: &CostLevel) -> f64 {`
-- `src/control_plane/routing.rs:71`  `pub struct DispatchContext {`
-- `src/control_plane/routing.rs:81`  `pub struct RouteCandidate {`
-- `src/control_plane/routing.rs:90`  `pub struct RoutingDecision {`
-- `src/control_plane/routing.rs:128`  `pub struct RoutingDecisionEngine {`
-- `src/control_plane/routing.rs:141`  `pub fn new(`
-- `src/control_plane/routing.rs:156`  `pub fn with_provider_budget(`
-- `src/control_plane/routing.rs:288`  `pub async fn decide_route(`
-- `src/control_plane/output_parser.rs:12`  `pub enum ParsedOutput {`
-- `src/control_plane/telemetry.rs:14`  `pub struct CompletionEvent {`
-- `src/control_plane/telemetry.rs:35`  `pub struct TokenBreakdown {`
-- `src/control_plane/telemetry.rs:46`  `pub struct ModelPerformanceSnapshot {`
-- `src/control_plane/telemetry.rs:70`  `pub fn empty(model: &str, window_secs: u64) -> Self {`
-- `src/control_plane/telemetry.rs:85`  `pub fn is_stale(&self, max_staleness_secs: u64) -> bool {`
-- `src/control_plane/telemetry.rs:95`  `pub fn is_subscription_limited(&self) -> bool {`
-- `src/control_plane/telemetry.rs:109`  `pub struct UsageSnapshot {`
-- `src/control_plane/telemetry.rs:124`  `pub struct ModelUsage {`
-- `src/control_plane/telemetry.rs:133`  `pub fn merge(&mut self, other: &ModelUsage) {`
-- `src/control_plane/telemetry.rs:147`  `pub struct TelemetrySummary {`
-- `src/control_plane/telemetry.rs:238`  `pub struct TelemetryStore {`
-- `src/control_plane/telemetry.rs:255`  `pub fn new(window_secs: u64) -> Self {`
-- `src/control_plane/telemetry.rs:266`  `pub fn with_subscription_limit_ttl(self, ttl_secs: u64) -> Self {`
-- `src/control_plane/policy.rs:15`  `pub struct PolicyResult {`
-- `src/control_plane/policy.rs:24`  `pub struct ScoredCandidate {`
-- `src/control_plane/policy.rs:32`  `pub struct PolicyConfig {`
-- `src/control_plane/policy.rs:58`  `pub fn new() -> Self {`
-- `src/control_plane/events.rs:15`  `pub enum EventOrigin {`
-- `src/control_plane/events.rs:26`  `pub enum CommandKind {`
-- `src/control_plane/events.rs:46`  `pub struct NormalizedAgentEvent {`
-- `src/control_plane/events.rs:212`  `pub struct WebhookContext {`
-- `src/flow/mod.rs:1`  `pub mod config;`
-- `src/flow/mod.rs:2`  `pub mod envelope;`
-- `src/flow/mod.rs:3`  `pub mod executor;`
-- `src/flow/mod.rs:4`  `pub mod state;`
-- `src/flow/mod.rs:5`  `pub mod token_parser;`
-- `src/flow/executor.rs:20`  `pub struct ProjectRuntime {`
-- `src/flow/executor.rs:26`  `pub struct FlowExecutor {`
-- `src/flow/executor.rs:36`  `pub fn new(working_dir: PathBuf, flow_state_dir: PathBuf) -> Self {`
-- `src/flow/envelope.rs:7`  `pub struct StepEnvelope {`
-- `src/flow/config.rs:4`  `pub struct FlowDefinition {`
-- `src/flow/config.rs:30`  `pub struct FlowStepDef {`
-- `src/flow/config.rs:71`  `pub enum StepKind {`
-- `src/flow/config.rs:80`  `pub enum FailStrategy {`
-- `src/flow/token_parser.rs:11`  `pub struct TokenUsage {`
-- `src/flow/token_parser.rs:107`  `pub fn parse_claude_output(output: &str) -> TokenUsage {`
-- `src/flow/token_parser.rs:113`  `pub fn parse_codex_output(output: &str) -> TokenUsage {`
-- `src/flow/state.rs:9`  `pub struct FlowRunState {`
-- `src/flow/state.rs:23`  `pub enum FlowRunStatus {`
-- `src/flow/state.rs:32`  `pub fn new(flow_name: &str) -> Self {`
-- `src/flow/state.rs:45`  `pub fn failed(flow_name: &str, reason: &str) -> Self {`
-- `src/flow/state.rs:53`  `pub fn step_output(&self, step_name: &str) -> Option<&StepEnvelope> {`
-- `src/flow/state.rs:59`  `pub fn save_to_file(&self, dir: &Path) -> std::io::Result<PathBuf> {`
-- `src/flow/state.rs:70`  `pub fn load_from_file(path: &Path) -> std::io::Result<Self> {`
+- `src/scheduler.rs:12`  `pub enum ScheduleEvent {`
+- `src/scheduler.rs:32`  `pub struct TimeScheduler {`
+- `src/scheduler.rs:80`  `pub fn take_event_rx(&mut self) -> Option<mpsc::Receiver<ScheduleEvent>> {`
+- `src/scope.rs:21`  `pub struct ScopeReservation {`
+- `src/scope.rs:79`  `pub struct ScopeRegistry {`
+- `src/scope.rs:207`  `pub struct WorktreeManager {`
+- `src/webhook.rs:36`  `pub struct GiteaUser {`
+- `src/webhook.rs:48`  `pub struct GiteaRepository {`
+- `src/webhook.rs:54`  `pub struct GiteaPullRequestPayload {`
+- `src/webhook.rs:62`  `pub struct PullRequestFields {`
+- `src/webhook.rs:73`  `pub struct PrRef {`
+- `src/webhook.rs:162`  `pub struct GiteaPushPayload {`
+- `src/webhook.rs:175`  `pub struct GiteaPusher {`
+- `src/webhook.rs:181`  `pub struct GiteaPushCommit {`
+- `src/webhook.rs:192`  `pub struct WebhookState {`
 
-### terraphim_multi_agent (214 gaps)
+### terraphim_multi_agent (237 gaps)
 
+- `src/agent.rs:22`  `pub struct AgentGoals {`
+- `src/agent.rs:34`  `pub fn new(global_goal: String, individual_goals: Vec<String>) -> Self {`
+- `src/agent.rs:43`  `pub fn update_alignment_score(&mut self, score: f64) {`
+- `src/agent.rs:48`  `pub fn add_individual_goal(&mut self, goal: String) {`
+- `src/agent.rs:56`  `pub enum AgentStatus {`
+- `src/agent.rs:75`  `pub struct AgentConfig {`
+- `src/agent.rs:114`  `pub struct TerraphimAgent {`
+- `src/agent.rs:316`  `pub async fn flush_usage(&self) {`
+- `src/agents/chat_agent.rs:16`  `pub struct ChatConfig {`
+- `src/agents/chat_agent.rs:43`  `pub struct ChatMessage {`
+- `src/agents/chat_agent.rs:53`  `pub enum ChatMessageRole {`
+- `src/agents/chat_agent.rs:60`  `pub fn user(content: String) -> Self {`
+- `src/agents/chat_agent.rs:70`  `pub fn assistant(content: String) -> Self {`
+- `src/agents/chat_agent.rs:80`  `pub fn system(content: String) -> Self {`
+- `src/agents/chat_agent.rs:93`  `pub struct ChatSession {`
+- `src/agents/chat_agent.rs:108`  `pub fn new() -> Self {`
+- `src/agents/chat_agent.rs:118`  `pub fn add_message(&mut self, message: ChatMessage) {`
+- `src/agents/chat_agent.rs:123`  `pub fn get_recent_messages(&self, count: usize) -> Vec<&ChatMessage> {`
+- `src/agents/mod.rs:7`  `pub mod ontology_agents;`
+- `src/agents/mod.rs:8`  `pub mod summarization_agent;`
+- `src/agents/mod.rs:10`  `pub use chat_agent::*;`
+- `src/agents/mod.rs:11`  `pub use ontology_agents::*;`
+- `src/agents/mod.rs:12`  `pub use summarization_agent::*;`
+- `src/agents/mod.rs:15`  `pub use crate::{GenAiLlmClient, MultiAgentError, MultiAgentResult, TerraphimAgen`
+- `src/agents/ontology_agents.rs:18`  `pub struct OntologyAgentConfig {`
+- `src/agents/summarization_agent.rs:13`  `pub struct SummarizationConfig {`
+- `src/agents/summarization_agent.rs:36`  `pub enum SummaryStyle {`
 - `src/context.rs:12`  `pub struct ContextItem {`
 - `src/context.rs:30`  `pub fn new(`
 - `src/context.rs:47`  `pub fn with_metadata(mut self, metadata: ContextMetadata) -> Self {`
@@ -832,9 +867,13 @@
 - `src/context.rs:397`  `pub struct ContextSnapshot {`
 - `src/context.rs:413`  `pub fn from_context(context: &AgentContext, trigger: SnapshotTrigger) -> Self {`
 - `src/context.rs:427`  `pub enum SnapshotTrigger {`
-- `src/prompt_sanitizer.rs:57`  `pub struct SanitizedPrompt {`
-- `src/prompt_sanitizer.rs:63`  `pub fn sanitize_system_prompt(prompt: &str) -> SanitizedPrompt {`
-- `src/prompt_sanitizer.rs:135`  `pub fn validate_system_prompt(prompt: &str) -> Result<(), String> {`
+- `src/error.rs:7`  `pub enum MultiAgentError {`
+- `src/genai_llm_client.rs:17`  `pub struct GenAiLlmClient {`
+- `src/genai_llm_client.rs:25`  `pub struct ProviderConfig {`
+- `src/genai_llm_client.rs:30`  `pub fn ollama(model: Option<String>) -> Self {`
+- `src/genai_llm_client.rs:36`  `pub fn openai(model: Option<String>) -> Self {`
+- `src/genai_llm_client.rs:42`  `pub fn anthropic(model: Option<String>) -> Self {`
+- `src/genai_llm_client.rs:48`  `pub fn openrouter(model: Option<String>) -> Self {`
 - `src/history.rs:12`  `pub struct CommandRecord {`
 - `src/history.rs:46`  `pub fn new(agent_id: AgentId, input: CommandInput) -> Self {`
 - `src/history.rs:132`  `pub struct CommandInput {`
@@ -872,32 +911,6 @@
 - `src/history.rs:505`  `pub struct CommandHistory {`
 - `src/history.rs:517`  `pub fn new(agent_id: AgentId, max_records: usize) -> Self {`
 - `src/history.rs:647`  `pub struct CommandStatistics {`
-- `src/genai_llm_client.rs:17`  `pub struct GenAiLlmClient {`
-- `src/genai_llm_client.rs:25`  `pub struct ProviderConfig {`
-- `src/genai_llm_client.rs:30`  `pub fn ollama(model: Option<String>) -> Self {`
-- `src/genai_llm_client.rs:36`  `pub fn openai(model: Option<String>) -> Self {`
-- `src/genai_llm_client.rs:42`  `pub fn anthropic(model: Option<String>) -> Self {`
-- `src/genai_llm_client.rs:48`  `pub fn openrouter(model: Option<String>) -> Self {`
-- `src/tracking.rs:12`  `pub struct CostRecord {`
-- `src/tracking.rs:22`  `pub struct TokenUsageRecord {`
-- `src/tracking.rs:46`  `pub fn new(`
-- `src/tracking.rs:68`  `pub fn with_quality_score(mut self, score: f64) -> Self {`
-- `src/tracking.rs:76`  `pub struct ModelPricing {`
-- `src/tracking.rs:90`  `pub fn calculate_cost(&self, input_tokens: u64, output_tokens: u64) -> f64 {`
-- `src/tracking.rs:99`  `pub struct TokenUsageTracker {`
-- `src/tracking.rs:121`  `pub fn new(agent_id: AgentId) -> Self {`
-- `src/tracking.rs:211`  `pub fn drain_records(&mut self) -> Vec<TokenUsageRecord> {`
-- `src/tracking.rs:218`  `pub struct UsageStats {`
-- `src/tracking.rs:232`  `pub struct BudgetAlert {`
-- `src/tracking.rs:249`  `pub enum AlertWindow {`
-- `src/tracking.rs:258`  `pub enum AlertAction {`
-- `src/tracking.rs:268`  `pub struct CostTracker {`
-- `src/tracking.rs:288`  `pub fn new() -> Self {`
-- `src/pool.rs:20`  `pub struct LoadMetrics {`
-- `src/pool.rs:29`  `pub fn new() -> Self {`
-- `src/pool.rs:48`  `pub struct PoolConfig {`
-- `src/pool.rs:84`  `pub enum LoadBalancingStrategy {`
-- `src/pool.rs:180`  `pub struct PoolStats {`
 - `src/lib.rs:31`  `pub mod agents;`
 - `src/lib.rs:32`  `pub mod context;`
 - `src/lib.rs:33`  `pub mod error;`
@@ -911,6 +924,19 @@
 - `src/lib.rs:43`  `pub mod tracking;`
 - `src/lib.rs:44`  `pub mod workflows;`
 - `src/lib.rs:47`  `pub use terraphim_agent_registry::{`
+- `src/lib.rs:54`  `pub use agent::*;`
+- `src/lib.rs:55`  `pub use agents::*;`
+- `src/lib.rs:56`  `pub use context::*;`
+- `src/lib.rs:57`  `pub use error::*;`
+- `src/lib.rs:58`  `pub use genai_llm_client::*;`
+- `src/lib.rs:59`  `pub use history::*;`
+- `src/lib.rs:60`  `pub use llm_types::*;`
+- `src/lib.rs:61`  `pub use prompt_sanitizer::*;`
+- `src/lib.rs:64`  `pub use pool::*;`
+- `src/lib.rs:65`  `pub use pool_manager::*;`
+- `src/lib.rs:66`  `pub use tracking::*;`
+- `src/lib.rs:67`  `pub use workflows::*;`
+- `src/lib.rs:77`  `pub mod test_utils {`
 - `src/lib.rs:83`  `pub fn create_test_role() -> Role {`
 - `src/lib.rs:99`  `pub async fn create_test_agent_simple() -> Result<TerraphimAgent, MultiAgentErro`
 - `src/lib.rs:114`  `pub async fn create_test_agent() -> Result<TerraphimAgent, MultiAgentError> {`
@@ -930,63 +956,35 @@
 - `src/llm_types.rs:108`  `pub fn zero() -> Self {`
 - `src/llm_types.rs:119`  `pub struct LlmResponse {`
 - `src/llm_types.rs:130`  `pub fn new(content: String) -> Self {`
-- `src/error.rs:7`  `pub enum MultiAgentError {`
-- `src/workflows_old.rs:8`  `pub enum MultiAgentWorkflow {`
-- `src/workflows_old.rs:39`  `pub enum HandoffStrategy {`
-- `src/workflows_old.rs:47`  `pub struct RoutingRules {`
-- `src/workflows_old.rs:55`  `pub struct ComplexityRule {`
-- `src/workflows_old.rs:63`  `pub struct CostConstraints {`
-- `src/workflows_old.rs:70`  `pub enum AggregationStrategy {`
-- `src/workflows_old.rs:79`  `pub async fn execute(&self, _task: &str) -> MultiAgentResult<String> {`
-- `src/agent.rs:22`  `pub struct AgentGoals {`
-- `src/agent.rs:34`  `pub fn new(global_goal: String, individual_goals: Vec<String>) -> Self {`
-- `src/agent.rs:43`  `pub fn update_alignment_score(&mut self, score: f64) {`
-- `src/agent.rs:48`  `pub fn add_individual_goal(&mut self, goal: String) {`
-- `src/agent.rs:56`  `pub enum AgentStatus {`
-- `src/agent.rs:75`  `pub struct AgentConfig {`
-- `src/agent.rs:114`  `pub struct TerraphimAgent {`
-- `src/agent.rs:316`  `pub async fn flush_usage(&self) {`
+- `src/pool.rs:20`  `pub struct LoadMetrics {`
+- `src/pool.rs:29`  `pub fn new() -> Self {`
+- `src/pool.rs:48`  `pub struct PoolConfig {`
+- `src/pool.rs:84`  `pub enum LoadBalancingStrategy {`
+- `src/pool.rs:180`  `pub struct PoolStats {`
 - `src/pool_manager.rs:19`  `pub struct PoolManagerConfig {`
 - `src/pool_manager.rs:46`  `pub struct PoolInfo {`
 - `src/pool_manager.rs:72`  `pub struct GlobalStats {`
-- `src/workflows/ontology_workflow.rs:21`  `pub struct OntologyWorkflowResult {`
-- `src/workflows/ontology_workflow.rs:34`  `pub struct OntologyWorkflowMetadata {`
-- `src/workflows/ontology_workflow.rs:49`  `pub enum OntologyAgentRole {`
-- `src/workflows/ontology_workflow.rs:76`  `pub struct OntologyWorkflowConfig {`
-- `src/agents/mod.rs:7`  `pub mod ontology_agents;`
-- `src/agents/mod.rs:8`  `pub mod summarization_agent;`
-- `src/agents/mod.rs:15`  `pub use crate::{GenAiLlmClient, MultiAgentError, MultiAgentResult, TerraphimAgen`
-- `src/agents/summarization_agent.rs:13`  `pub struct SummarizationConfig {`
-- `src/agents/summarization_agent.rs:36`  `pub enum SummaryStyle {`
-- `src/agents/chat_agent.rs:16`  `pub struct ChatConfig {`
-- `src/agents/chat_agent.rs:43`  `pub struct ChatMessage {`
-- `src/agents/chat_agent.rs:53`  `pub enum ChatMessageRole {`
-- `src/agents/chat_agent.rs:60`  `pub fn user(content: String) -> Self {`
-- `src/agents/chat_agent.rs:70`  `pub fn assistant(content: String) -> Self {`
-- `src/agents/chat_agent.rs:80`  `pub fn system(content: String) -> Self {`
-- `src/agents/chat_agent.rs:93`  `pub struct ChatSession {`
-- `src/agents/chat_agent.rs:108`  `pub fn new() -> Self {`
-- `src/agents/chat_agent.rs:118`  `pub fn add_message(&mut self, message: ChatMessage) {`
-- `src/agents/chat_agent.rs:123`  `pub fn get_recent_messages(&self, count: usize) -> Vec<&ChatMessage> {`
-- `src/agents/ontology_agents.rs:18`  `pub struct OntologyAgentConfig {`
-- `src/vm_execution/mod.rs:1`  `pub mod client;`
-- `src/vm_execution/mod.rs:2`  `pub mod code_extractor;`
-- `src/vm_execution/mod.rs:3`  `pub mod config_helpers;`
-- `src/vm_execution/mod.rs:4`  `pub mod fcctl_bridge;`
-- `src/vm_execution/mod.rs:5`  `pub mod hooks;`
-- `src/vm_execution/mod.rs:6`  `pub mod models;`
-- `src/vm_execution/mod.rs:7`  `pub mod session_adapter;`
-- `src/vm_execution/session_adapter.rs:12`  `pub struct DirectSessionAdapter {`
-- `src/vm_execution/session_adapter.rs:30`  `pub fn new(data_dir: PathBuf, fcctl_api_url: String) -> Self {`
-- `src/vm_execution/session_adapter.rs:38`  `pub async fn get_or_create_session(`
-- `src/vm_execution/session_adapter.rs:107`  `pub async fn execute_command_direct(`
-- `src/vm_execution/session_adapter.rs:165`  `pub async fn create_snapshot_direct(`
-- `src/vm_execution/session_adapter.rs:221`  `pub async fn rollback_direct(`
-- `src/vm_execution/session_adapter.rs:269`  `pub async fn get_session_info(&self, session_id: &str) -> Option<SessionInfo> {`
-- `src/vm_execution/session_adapter.rs:279`  `pub async fn get_connection_info(&self, session_id: &str) -> Result<String, VmEx`
-- `src/vm_execution/session_adapter.rs:311`  `pub async fn close_session(&self, session_id: &str) -> Result<(), VmExecutionErr`
-- `src/vm_execution/session_adapter.rs:336`  `pub async fn list_sessions(&self) -> Vec<SessionInfo> {`
-- `src/vm_execution/session_adapter.rs:351`  `pub struct SessionInfo {`
+- `src/prompt_sanitizer.rs:57`  `pub struct SanitizedPrompt {`
+- `src/prompt_sanitizer.rs:63`  `pub fn sanitize_system_prompt(prompt: &str) -> SanitizedPrompt {`
+- `src/prompt_sanitizer.rs:135`  `pub fn validate_system_prompt(prompt: &str) -> Result<(), String> {`
+- `src/tracking.rs:12`  `pub struct CostRecord {`
+- `src/tracking.rs:22`  `pub struct TokenUsageRecord {`
+- `src/tracking.rs:46`  `pub fn new(`
+- `src/tracking.rs:68`  `pub fn with_quality_score(mut self, score: f64) -> Self {`
+- `src/tracking.rs:76`  `pub struct ModelPricing {`
+- `src/tracking.rs:90`  `pub fn calculate_cost(&self, input_tokens: u64, output_tokens: u64) -> f64 {`
+- `src/tracking.rs:99`  `pub struct TokenUsageTracker {`
+- `src/tracking.rs:121`  `pub fn new(agent_id: AgentId) -> Self {`
+- `src/tracking.rs:211`  `pub fn drain_records(&mut self) -> Vec<TokenUsageRecord> {`
+- `src/tracking.rs:218`  `pub struct UsageStats {`
+- `src/tracking.rs:232`  `pub struct BudgetAlert {`
+- `src/tracking.rs:249`  `pub enum AlertWindow {`
+- `src/tracking.rs:258`  `pub enum AlertAction {`
+- `src/tracking.rs:268`  `pub struct CostTracker {`
+- `src/tracking.rs:288`  `pub fn new() -> Self {`
+- `src/vm_execution/client.rs:16`  `pub struct VmExecutionClient {`
+- `src/vm_execution/client.rs:67`  `pub fn with_hook_manager(mut self, hook_manager: Arc<HookManager>) -> Self {`
+- `src/vm_execution/code_extractor.rs:9`  `pub struct CodeBlockExtractor {`
 - `src/vm_execution/fcctl_bridge.rs:12`  `pub struct FcctlBridge {`
 - `src/vm_execution/fcctl_bridge.rs:31`  `pub fn new(config: HistoryConfig, api_base_url: String) -> Self {`
 - `src/vm_execution/fcctl_bridge.rs:51`  `pub async fn track_execution(`
@@ -1015,7 +1013,20 @@
 - `src/vm_execution/hooks.rs:314`  `pub struct DependencyInjectorHook {`
 - `src/vm_execution/hooks.rs:319`  `pub fn new(inject_imports: bool) -> Self {`
 - `src/vm_execution/hooks.rs:364`  `pub struct OutputSanitizerHook;`
-- `src/vm_execution/code_extractor.rs:9`  `pub struct CodeBlockExtractor {`
+- `src/vm_execution/mod.rs:1`  `pub mod client;`
+- `src/vm_execution/mod.rs:2`  `pub mod code_extractor;`
+- `src/vm_execution/mod.rs:3`  `pub mod config_helpers;`
+- `src/vm_execution/mod.rs:4`  `pub mod fcctl_bridge;`
+- `src/vm_execution/mod.rs:5`  `pub mod hooks;`
+- `src/vm_execution/mod.rs:6`  `pub mod models;`
+- `src/vm_execution/mod.rs:7`  `pub mod session_adapter;`
+- `src/vm_execution/mod.rs:9`  `pub use client::*;`
+- `src/vm_execution/mod.rs:10`  `pub use code_extractor::*;`
+- `src/vm_execution/mod.rs:11`  `pub use config_helpers::*;`
+- `src/vm_execution/mod.rs:12`  `pub use fcctl_bridge::*;`
+- `src/vm_execution/mod.rs:13`  `pub use hooks::*;`
+- `src/vm_execution/mod.rs:14`  `pub use models::*;`
+- `src/vm_execution/mod.rs:15`  `pub use session_adapter::*;`
 - `src/vm_execution/models.rs:6`  `pub struct VmExecutionConfig {`
 - `src/vm_execution/models.rs:32`  `pub struct HistoryConfig {`
 - `src/vm_execution/models.rs:87`  `pub struct CodeBlock {`
@@ -1033,22 +1044,241 @@
 - `src/vm_execution/models.rs:306`  `pub struct RollbackRequest {`
 - `src/vm_execution/models.rs:317`  `pub struct RollbackResponse {`
 - `src/vm_execution/models.rs:334`  `pub enum VmExecutionError {`
-- `src/vm_execution/client.rs:16`  `pub struct VmExecutionClient {`
-- `src/vm_execution/client.rs:67`  `pub fn with_hook_manager(mut self, hook_manager: Arc<HookManager>) -> Self {`
+- `src/vm_execution/session_adapter.rs:12`  `pub struct DirectSessionAdapter {`
+- `src/vm_execution/session_adapter.rs:30`  `pub fn new(data_dir: PathBuf, fcctl_api_url: String) -> Self {`
+- `src/vm_execution/session_adapter.rs:38`  `pub async fn get_or_create_session(`
+- `src/vm_execution/session_adapter.rs:107`  `pub async fn execute_command_direct(`
+- `src/vm_execution/session_adapter.rs:165`  `pub async fn create_snapshot_direct(`
+- `src/vm_execution/session_adapter.rs:221`  `pub async fn rollback_direct(`
+- `src/vm_execution/session_adapter.rs:269`  `pub async fn get_session_info(&self, session_id: &str) -> Option<SessionInfo> {`
+- `src/vm_execution/session_adapter.rs:279`  `pub async fn get_connection_info(&self, session_id: &str) -> Result<String, VmEx`
+- `src/vm_execution/session_adapter.rs:311`  `pub async fn close_session(&self, session_id: &str) -> Result<(), VmExecutionErr`
+- `src/vm_execution/session_adapter.rs:336`  `pub async fn list_sessions(&self) -> Vec<SessionInfo> {`
+- `src/vm_execution/session_adapter.rs:351`  `pub struct SessionInfo {`
+- `src/workflows/ontology_workflow.rs:21`  `pub struct OntologyWorkflowResult {`
+- `src/workflows/ontology_workflow.rs:34`  `pub struct OntologyWorkflowMetadata {`
+- `src/workflows/ontology_workflow.rs:49`  `pub enum OntologyAgentRole {`
+- `src/workflows/ontology_workflow.rs:76`  `pub struct OntologyWorkflowConfig {`
+- `src/workflows_old.rs:8`  `pub enum MultiAgentWorkflow {`
+- `src/workflows_old.rs:39`  `pub enum HandoffStrategy {`
+- `src/workflows_old.rs:47`  `pub struct RoutingRules {`
+- `src/workflows_old.rs:55`  `pub struct ComplexityRule {`
+- `src/workflows_old.rs:63`  `pub struct CostConstraints {`
+- `src/workflows_old.rs:70`  `pub enum AggregationStrategy {`
+- `src/workflows_old.rs:79`  `pub async fn execute(&self, _task: &str) -> MultiAgentResult<String> {`
 
-### terraphim_types (169 gaps)
+### terraphim_validation (189 gaps)
 
-- `src/medical_types.rs:36`  `pub enum MedicalNodeType {`
-- `src/medical_types.rs:141`  `pub enum MedicalEdgeType {`
-- `src/medical_types.rs:383`  `pub struct MedicalNodeMetadata {`
+- `src/artifacts/mod.rs:16`  `pub enum Platform {`
+- `src/artifacts/mod.rs:52`  `pub enum PlatformFamily {`
+- `src/artifacts/mod.rs:60`  `pub enum ArtifactType {`
+- `src/artifacts/mod.rs:75`  `pub struct ReleaseArtifact {`
+- `src/artifacts/mod.rs:253`  `pub struct ArtifactStatistics {`
+- `src/bin/terraphim-desktop-ui-tester.rs:26`  `pub enum DesktopUICommands {`
+- `src/bin/terraphim-validation.rs:19`  `pub struct Cli {`
+- `src/bin/terraphim-validation.rs:37`  `pub enum Commands {`
+- `src/lib.rs:14`  `pub mod artifacts;`
+- `src/lib.rs:15`  `pub mod orchestrator;`
+- `src/lib.rs:16`  `pub mod performance;`
+- `src/lib.rs:17`  `pub mod reporting;`
+- `src/lib.rs:18`  `pub mod testing;`
+- `src/lib.rs:19`  `pub mod validators;`
+- `src/lib.rs:22`  `pub use artifacts::{ArtifactType, Platform, ReleaseArtifact};`
+- `src/lib.rs:23`  `pub use orchestrator::ValidationOrchestrator;`
+- `src/lib.rs:24`  `pub use reporting::{ReportFormat, ValidationReport};`
+- `src/lib.rs:25`  `pub use validators::{ValidationResult, ValidationStatus};`
+- `src/orchestrator/mod.rs:19`  `pub struct ValidationConfig {`
+- `src/performance/benchmarking.rs:25`  `pub struct BenchmarkConfig {`
+- `src/performance/benchmarking.rs:44`  `pub struct PerformanceSLO {`
+- `src/performance/benchmarking.rs:69`  `pub struct BenchmarkResult {`
+- `src/performance/benchmarking.rs:92`  `pub struct ResourceUsage {`
+- `src/performance/benchmarking.rs:113`  `pub struct BenchmarkReport {`
+- `src/performance/benchmarking.rs:130`  `pub struct SLOCompliance {`
+- `src/performance/benchmarking.rs:141`  `pub struct SLOViolation {`
+- `src/performance/benchmarking.rs:154`  `pub enum ViolationSeverity {`
+- `src/performance/benchmarking.rs:162`  `pub struct SystemInfo {`
+- `src/performance/benchmarking.rs:175`  `pub struct PerformanceTrends {`
+- `src/performance/ci_integration.rs:17`  `pub struct PerformanceGateConfig {`
+- `src/performance/ci_integration.rs:32`  `pub struct PerformanceGate {`
+- `src/performance/ci_integration.rs:47`  `pub enum ComparisonOperator {`
+- `src/performance/ci_integration.rs:57`  `pub enum GateSeverity {`
+- `src/performance/ci_integration.rs:64`  `pub struct ReportConfig {`
+- `src/performance/ci_integration.rs:454`  `pub struct CIPerformanceResult {`
+- `src/performance/ci_integration.rs:467`  `pub struct GateResults {`
+- `src/performance/ci_integration.rs:476`  `pub struct GateFailure {`
+- `src/performance/mod.rs:6`  `pub mod ci_integration;`
+- `src/reporting/mod.rs:13`  `pub enum ReportFormat {`
+- `src/reporting/mod.rs:35`  `pub struct ValidationReport {`
+- `src/reporting/mod.rs:339`  `pub struct ReportMetadata {`
+- `src/testing/desktop_ui/accessibility.rs:12`  `pub struct AccessibilityTestConfig {`
+- `src/testing/desktop_ui/accessibility.rs:21`  `pub enum WCAGLevel {`
+- `src/testing/desktop_ui/accessibility.rs:28`  `pub struct ScreenReader {`
+- `src/testing/desktop_ui/accessibility.rs:35`  `pub struct KeyboardConfig {`
+- `src/testing/desktop_ui/accessibility.rs:42`  `pub struct KeyboardShortcut {`
+- `src/testing/desktop_ui/accessibility.rs:49`  `pub struct ContrastConfig {`
+- `src/testing/desktop_ui/accessibility.rs:56`  `pub struct FocusConfig {`
+- `src/testing/desktop_ui/accessibility.rs:68`  `pub fn new(config: AccessibilityTestConfig) -> Self {`
+- `src/testing/desktop_ui/auto_updater.rs:14`  `pub struct AutoUpdaterTestConfig {`
+- `src/testing/desktop_ui/components.rs:12`  `pub struct ComponentTestConfig {`
+- `src/testing/desktop_ui/components.rs:19`  `pub struct ComponentTimeouts {`
+- `src/testing/desktop_ui/components.rs:31`  `pub fn new(config: ComponentTestConfig) -> Self {`
+- `src/testing/desktop_ui/cross_platform.rs:10`  `pub enum TestValidationStatus {`
+- `src/testing/desktop_ui/cross_platform.rs:19`  `pub struct TestValidationResult {`
+- `src/testing/desktop_ui/cross_platform.rs:30`  `pub struct CrossPlatformTestConfig {`
+- `src/testing/desktop_ui/cross_platform.rs:38`  `pub struct MacOSTestConfig {`
+- `src/testing/desktop_ui/cross_platform.rs:51`  `pub struct TouchBarConfig {`
+- `src/testing/desktop_ui/cross_platform.rs:59`  `pub struct WindowsTestConfig {`
+- `src/testing/desktop_ui/cross_platform.rs:73`  `pub struct LinuxTestConfig {`
+- `src/testing/desktop_ui/cross_platform.rs:92`  `pub fn new(config: CrossPlatformTestConfig) -> Self {`
+- `src/testing/desktop_ui/harness.rs:17`  `pub struct DesktopUITestConfig {`
+- `src/testing/desktop_ui/harness.rs:33`  `pub struct PlaywrightConfig {`
+- `src/testing/desktop_ui/harness.rs:42`  `pub struct Viewport {`
+- `src/testing/desktop_ui/harness.rs:48`  `pub struct WindowConfig {`
+- `src/testing/desktop_ui/harness.rs:56`  `pub struct VisualConfig {`
+- `src/testing/desktop_ui/harness.rs:64`  `pub struct TestTimeouts {`
+- `src/testing/desktop_ui/harness.rs:72`  `pub struct PlatformConfig {`
+- `src/testing/desktop_ui/harness.rs:79`  `pub struct MacOSConfig {`
+- `src/testing/desktop_ui/harness.rs:85`  `pub struct WindowsConfig {`
+- `src/testing/desktop_ui/harness.rs:91`  `pub struct LinuxConfig {`
+- `src/testing/desktop_ui/integration.rs:13`  `pub struct IntegrationTestConfig {`
+- `src/testing/desktop_ui/integration.rs:22`  `pub struct ServerIntegrationConfig {`
+- `src/testing/desktop_ui/integration.rs:30`  `pub struct FileOperationConfig {`
+- `src/testing/desktop_ui/integration.rs:38`  `pub struct ExternalLinkConfig {`
+- `src/testing/desktop_ui/integration.rs:45`  `pub struct KeyboardShortcutConfig {`
+- `src/testing/desktop_ui/integration.rs:52`  `pub struct KeyboardShortcut {`
+- `src/testing/desktop_ui/integration.rs:59`  `pub enum ShortcutScope {`
+- `src/testing/desktop_ui/integration.rs:66`  `pub struct NetworkConfig {`
+- `src/testing/desktop_ui/integration.rs:78`  `pub fn new(config: IntegrationTestConfig) -> Self {`
+- `src/testing/desktop_ui/mod.rs:16`  `pub mod accessibility;`
+- `src/testing/desktop_ui/mod.rs:17`  `pub mod auto_updater;`
+- `src/testing/desktop_ui/mod.rs:18`  `pub mod components;`
+- `src/testing/desktop_ui/mod.rs:19`  `pub mod cross_platform;`
+- `src/testing/desktop_ui/mod.rs:20`  `pub mod harness;`
+- `src/testing/desktop_ui/mod.rs:21`  `pub mod integration;`
+- `src/testing/desktop_ui/mod.rs:22`  `pub mod orchestrator;`
+- `src/testing/desktop_ui/mod.rs:23`  `pub mod performance;`
+- `src/testing/desktop_ui/mod.rs:24`  `pub mod utils;`
+- `src/testing/desktop_ui/mod.rs:28`  `pub struct UITestResult {`
+- `src/testing/desktop_ui/mod.rs:37`  `pub enum UITestStatus {`
+- `src/testing/desktop_ui/mod.rs:56`  `pub use accessibility::{AccessibilityTestConfig, AccessibilityTester};`
+- `src/testing/desktop_ui/mod.rs:57`  `pub use auto_updater::{AutoUpdaterTestConfig, AutoUpdaterTester};`
+- `src/testing/desktop_ui/mod.rs:58`  `pub use components::{ComponentTestConfig, UIComponentTester};`
+- `src/testing/desktop_ui/mod.rs:59`  `pub use cross_platform::{CrossPlatformTestConfig, CrossPlatformUITester};`
+- `src/testing/desktop_ui/mod.rs:60`  `pub use harness::{DesktopUITestConfig, DesktopUITestHarness};`
+- `src/testing/desktop_ui/mod.rs:61`  `pub use integration::{IntegrationTestConfig, IntegrationTester};`
+- `src/testing/desktop_ui/mod.rs:62`  `pub use orchestrator::{DesktopUITestOrchestrator, DesktopUITestSuiteConfig, Test`
+- `src/testing/desktop_ui/mod.rs:63`  `pub use performance::{PerformanceResults, PerformanceTestConfig, PerformanceTest`
+- `src/testing/desktop_ui/mod.rs:64`  `pub use utils::{`
+- `src/testing/desktop_ui/orchestrator.rs:48`  `pub struct DesktopUITestSuiteConfig {`
+- `src/testing/desktop_ui/orchestrator.rs:60`  `pub struct TestOutputConfig {`
+- `src/testing/desktop_ui/orchestrator.rs:75`  `pub fn new(config: DesktopUITestSuiteConfig) -> Self {`
+- `src/testing/desktop_ui/orchestrator.rs:431`  `pub struct TestSuiteResults {`
+- `src/testing/desktop_ui/performance.rs:13`  `pub struct PerformanceTestConfig {`
+- `src/testing/desktop_ui/performance.rs:21`  `pub struct StartupConfig {`
+- `src/testing/desktop_ui/performance.rs:28`  `pub struct MemoryConfig {`
+- `src/testing/desktop_ui/performance.rs:36`  `pub struct ResponsivenessConfig {`
+- `src/testing/desktop_ui/performance.rs:43`  `pub struct BenchmarkConfig {`
+- `src/testing/desktop_ui/performance.rs:50`  `pub struct BenchmarkOperation {`
+- `src/testing/desktop_ui/performance.rs:58`  `pub struct PerformanceResults {`
+- `src/testing/desktop_ui/performance.rs:67`  `pub struct BenchmarkResult {`
+- `src/testing/desktop_ui/performance.rs:81`  `pub fn new(config: PerformanceTestConfig) -> Self {`
+- `src/testing/desktop_ui/utils.rs:99`  `pub struct ScreenshotComparison {`
+- `src/testing/desktop_ui/utils.rs:228`  `pub enum Platform {`
+- `src/testing/desktop_ui/utils.rs:236`  `pub struct PlatformPaths {`
+- `src/testing/desktop_ui/utils.rs:339`  `pub struct AggregatedResults {`
+- `src/testing/mod.rs:6`  `pub mod fixtures;`
+- `src/testing/mod.rs:7`  `pub mod server_api;`
+- `src/testing/mod.rs:8`  `pub mod tui;`
+- `src/testing/mod.rs:9`  `pub mod utils;`
+- `src/testing/mod.rs:11`  `pub use desktop_ui::*;`
+- `src/testing/mod.rs:12`  `pub use fixtures::*;`
+- `src/testing/mod.rs:13`  `pub use server_api::*;`
+- `src/testing/mod.rs:14`  `pub use tui::*;`
+- `src/testing/mod.rs:15`  `pub use utils::*;`
+- `src/testing/mod.rs:18`  `pub use anyhow::Result;`
+- `src/testing/mod.rs:21`  `pub use crate::validators::{Severity, ValidationIssue, ValidationResult, Validat`
+- `src/testing/server_api/endpoints.rs:14`  `pub mod health_tests {`
+- `src/testing/server_api/endpoints.rs:34`  `pub mod document_tests {`
+- `src/testing/server_api/endpoints.rs:63`  `pub mod config_tests {`
+- `src/testing/server_api/performance.rs:13`  `pub struct PerformanceResults {`
+- `src/testing/server_api/security.rs:18`  `pub mod sql_injection_tests {`
+- `src/testing/server_api/security.rs:109`  `pub mod xss_tests {`
+- `src/testing/server_api/security.rs:193`  `pub mod path_traversal_tests {`
+- `src/testing/server_api/security.rs:254`  `pub mod rate_limiting_tests {`
+- `src/testing/server_api/security.rs:323`  `pub mod input_validation_tests {`
+- `src/testing/server_api/security.rs:443`  `pub mod command_injection_tests {`
+- `src/testing/server_api/validation.rs:27`  `pub enum ValidationError {`
+- `src/testing/server_api.rs:7`  `pub mod fixtures;`
+- `src/testing/server_api.rs:8`  `pub mod harness;`
+- `src/testing/server_api.rs:9`  `pub mod performance;`
+- `src/testing/server_api.rs:10`  `pub mod security;`
+- `src/testing/server_api.rs:11`  `pub mod validation;`
+- `src/testing/server_api.rs:13`  `pub use endpoints::*;`
+- `src/testing/server_api.rs:14`  `pub use fixtures::*;`
+- `src/testing/server_api.rs:15`  `pub use harness::*;`
+- `src/testing/server_api.rs:16`  `pub use performance::*;`
+- `src/testing/server_api.rs:17`  `pub use security::*;`
+- `src/testing/server_api.rs:18`  `pub use validation::*;`
+- `src/testing/tui/command_simulator.rs:17`  `pub struct CommandExecutionResult {`
+- `src/testing/tui/cross_platform.rs:12`  `pub struct PlatformTestResult {`
+- `src/testing/tui/cross_platform.rs:25`  `pub enum ColorSupport {`
+- `src/testing/tui/cross_platform.rs:34`  `pub struct CrossPlatformResults {`
+- `src/testing/tui/cross_platform.rs:43`  `pub struct TerminalCapabilities {`
+- `src/testing/tui/harness.rs:18`  `pub struct TuiTestConfig {`
+- `src/testing/tui/harness.rs:399`  `pub struct TuiCommandResult {`
+- `src/testing/tui/harness.rs:410`  `pub struct TuiTestSuiteResults {`
+- `src/testing/tui/integration.rs:18`  `pub struct IntegrationTestConfig {`
+- `src/testing/tui/integration.rs:46`  `pub struct IntegrationTestResults {`
+- `src/testing/tui/mock_terminal.rs:14`  `pub struct TerminalSize {`
+- `src/testing/tui/mock_terminal.rs:20`  `pub fn new(width: u16, height: u16) -> Self {`
+- `src/testing/tui/mock_terminal.rs:27`  `pub struct CursorPosition {`
+- `src/testing/tui/mock_terminal.rs:33`  `pub fn new(x: u16, y: u16) -> Self {`
+- `src/testing/tui/mod.rs:7`  `pub mod cross_platform;`
+- `src/testing/tui/mod.rs:8`  `pub mod harness;`
+- `src/testing/tui/mod.rs:9`  `pub mod integration;`
+- `src/testing/tui/mod.rs:10`  `pub mod mock_terminal;`
+- `src/testing/tui/mod.rs:11`  `pub mod output_validator;`
+- `src/testing/tui/mod.rs:12`  `pub mod performance_monitor;`
+- `src/testing/tui/mod.rs:14`  `pub use command_simulator::*;`
+- `src/testing/tui/mod.rs:15`  `pub use cross_platform::*;`
+- `src/testing/tui/mod.rs:16`  `pub use harness::*;`
+- `src/testing/tui/mod.rs:17`  `pub use integration::*;`
+- `src/testing/tui/mod.rs:18`  `pub use mock_terminal::*;`
+- `src/testing/tui/mod.rs:19`  `pub use output_validator::*;`
+- `src/testing/tui/mod.rs:20`  `pub use performance_monitor::*;`
+- `src/testing/tui/output_validator.rs:12`  `pub struct ValidationResult {`
+- `src/testing/tui/performance_monitor.rs:13`  `pub struct PerformanceMetrics {`
+- `src/testing/tui/performance_monitor.rs:25`  `pub struct MemoryStats {`
+- `src/testing/tui/performance_monitor.rs:33`  `pub struct PerformanceResults {`
+- `src/testing/tui/performance_monitor.rs:42`  `pub struct PerformanceSLO {`
+- `src/testing/tui/performance_monitor.rs:373`  `pub struct StressTestResults {`
+- `src/validators/mod.rs:13`  `pub enum ValidationStatus {`
+- `src/validators/mod.rs:60`  `pub enum Severity {`
+- `src/validators/mod.rs:80`  `pub struct ValidationIssue {`
+- `src/validators/mod.rs:121`  `pub struct ValidationResult {`
+- `src/validators/mod.rs:214`  `pub struct ValidationSummary {`
+- `src/validators/mod.rs:333`  `pub struct ValidationStatistics {`
+
+### terraphim_types (173 gaps)
+
+- `src/capability.rs:12`  `pub enum Capability {`
+- `src/capability.rs:59`  `pub enum ProviderType {`
+- `src/capability.rs:81`  `pub enum CostLevel {`
+- `src/capability.rs:93`  `pub enum Latency {`
+- `src/capability.rs:104`  `pub struct Provider {`
+- `src/capability.rs:189`  `pub struct ProcessId(pub u64);`
 - `src/hgnc.rs:12`  `pub struct HgncGene {`
 - `src/lib.rs:84`  `pub mod medical_types;`
+- `src/lib.rs:86`  `pub use medical_types::*;`
 - `src/lib.rs:90`  `pub mod hgnc;`
 - `src/lib.rs:94`  `pub mod shared_learning;`
 - `src/lib.rs:97`  `pub mod capability;`
+- `src/lib.rs:98`  `pub use capability::*;`
 - `src/lib.rs:100`  `pub mod score;`
 - `src/lib.rs:103`  `pub mod mcp_tool;`
+- `src/lib.rs:104`  `pub use mcp_tool::*;`
 - `src/lib.rs:107`  `pub mod procedure;`
+- `src/lib.rs:108`  `pub use procedure::*;`
 - `src/lib.rs:111`  `pub mod persona;`
 - `src/lib.rs:112`  `pub use persona::{CharacteristicDef, PersonaDefinition, PersonaLoadError, SfiaSk`
 - `src/lib.rs:115`  `pub mod llm_usage;`
@@ -1069,77 +1299,57 @@
 - `src/lib.rs:639`  `pub fn new(id: u64, document_id: String) -> Self {`
 - `src/lib.rs:656`  `pub struct Node {`
 - `src/lib.rs:707`  `pub struct Thesaurus {`
-- `src/lib.rs:750`  `pub fn keys(`
-- `src/lib.rs:772`  `pub struct Index {`
-- `src/lib.rs:865`  `pub struct QualityScore {`
-- `src/lib.rs:917`  `pub struct IndexedDocument {`
-- `src/lib.rs:935`  `pub fn to_json_string(&self) -> Result<String, serde_json::Error> {`
-- `src/lib.rs:938`  `pub fn from_document(document: Document) -> Self {`
-- `src/lib.rs:954`  `pub enum LogicalOperator {`
-- `src/lib.rs:972`  `pub enum Layer {`
-- `src/lib.rs:1087`  `pub struct SearchQuery {`
-- `src/lib.rs:1170`  `pub enum RelevanceFunction {`
-- `src/lib.rs:1200`  `pub enum KnowledgeGraphInputType {`
-- `src/lib.rs:1215`  `pub struct ConversationId(pub String);`
-- `src/lib.rs:1218`  `pub fn new() -> Self {`
-- `src/lib.rs:1222`  `pub fn from_string(id: String) -> Self {`
-- `src/lib.rs:1226`  `pub fn as_str(&self) -> &str {`
-- `src/lib.rs:1247`  `pub enum ContextType {`
-- `src/lib.rs:1268`  `pub struct MessageId(pub String);`
-- `src/lib.rs:1271`  `pub fn new() -> Self {`
-- `src/lib.rs:1275`  `pub fn from_string(id: String) -> Self {`
-- `src/lib.rs:1279`  `pub fn as_str(&self) -> &str {`
-- `src/lib.rs:1300`  `pub struct ContextItem {`
-- `src/lib.rs:1528`  `pub struct KGTermDefinition {`
-- `src/lib.rs:1555`  `pub struct KGIndexInfo {`
-- `src/lib.rs:1575`  `pub struct ChatMessage {`
-- `src/lib.rs:1647`  `pub struct Conversation {`
-- `src/lib.rs:1717`  `pub struct ConversationSummary {`
-- `src/lib.rs:1777`  `pub struct ContextHistory {`
-- `src/lib.rs:1785`  `pub fn new(max_entries: usize) -> Self {`
-- `src/lib.rs:1839`  `pub struct ContextHistoryEntry {`
-- `src/lib.rs:1856`  `pub enum ContextUsageType {`
-- `src/lib.rs:1876`  `pub struct Priority(pub u8);`
-- `src/lib.rs:1942`  `pub struct RoutingRule {`
-- `src/lib.rs:2042`  `pub struct PatternMatch {`
-- `src/lib.rs:2106`  `pub struct RoutingDecision {`
-- `src/lib.rs:2188`  `pub enum RoutingScenario {`
-- `src/lib.rs:2247`  `pub struct MultiAgentContext {`
-- `src/lib.rs:2265`  `pub fn new() -> Self {`
-- `src/lib.rs:2321`  `pub struct AgentInfo {`
-- `src/lib.rs:2338`  `pub struct AgentCommunication {`
-- `src/lib.rs:2356`  `pub enum NormalizationMethod {`
-- `src/lib.rs:2368`  `pub struct GroundingMetadata {`
-- `src/lib.rs:2402`  `pub struct CoverageSignal {`
-- `src/lib.rs:2438`  `pub enum EntityType {`
-- `src/lib.rs:2452`  `pub enum RelationshipType {`
-- `src/lib.rs:2463`  `pub struct ExtractedEntity {`
-- `src/lib.rs:2476`  `pub struct ExtractedRelationship {`
-- `src/lib.rs:2489`  `pub struct SchemaSignal {`
-- `src/lib.rs:2504`  `pub struct OntologyEntityType {`
-- `src/lib.rs:2522`  `pub struct OntologyRelationshipType {`
-- `src/lib.rs:2535`  `pub struct OntologyAntiPattern {`
-- `src/lib.rs:2548`  `pub struct OntologySchema {`
-- `src/shared_learning.rs:23`  `pub enum TrustLevel {`
-- `src/shared_learning.rs:36`  `pub fn as_str(&self) -> &'static str {`
-- `src/shared_learning.rs:45`  `pub fn weight(&self) -> u8 {`
-- `src/shared_learning.rs:54`  `pub fn allows_wiki_sync(&self) -> bool {`
-- `src/shared_learning.rs:58`  `pub fn display_name(&self) -> &'static str {`
-- `src/shared_learning.rs:95`  `pub enum TrustLevelError {`
-- `src/shared_learning.rs:103`  `pub enum LearningCategory {`
-- `src/shared_learning.rs:154`  `pub fn new() -> Self {`
-- `src/shared_learning.rs:284`  `pub struct QualityMetrics {`
-- `src/shared_learning.rs:341`  `pub enum SuggestionStatus {`
-- `src/shared_learning.rs:374`  `pub enum LearningSource {`
-- `src/shared_learning.rs:407`  `pub struct SharedLearning {`
-- `src/shared_learning.rs:664`  `pub enum StoreError {`
-- `src/persona.rs:46`  `pub struct PersonaDefinition {`
-- `src/persona.rs:79`  `pub struct CharacteristicDef {`
-- `src/persona.rs:91`  `pub struct SfiaSkillDef {`
-- `src/persona.rs:200`  `pub enum PersonaLoadError {`
-- `src/procedure.rs:32`  `pub struct ProcedureStep {`
-- `src/procedure.rs:51`  `pub struct ProcedureConfidence {`
-- `src/procedure.rs:114`  `pub struct CapturedProcedure {`
+- `src/lib.rs:761`  `pub fn keys(`
+- `src/lib.rs:783`  `pub struct Index {`
+- `src/lib.rs:876`  `pub struct QualityScore {`
+- `src/lib.rs:928`  `pub struct IndexedDocument {`
+- `src/lib.rs:946`  `pub fn to_json_string(&self) -> Result<String, serde_json::Error> {`
+- `src/lib.rs:949`  `pub fn from_document(document: Document) -> Self {`
+- `src/lib.rs:965`  `pub enum LogicalOperator {`
+- `src/lib.rs:983`  `pub enum Layer {`
+- `src/lib.rs:1098`  `pub struct SearchQuery {`
+- `src/lib.rs:1181`  `pub enum RelevanceFunction {`
+- `src/lib.rs:1211`  `pub enum KnowledgeGraphInputType {`
+- `src/lib.rs:1226`  `pub struct ConversationId(pub String);`
+- `src/lib.rs:1229`  `pub fn new() -> Self {`
+- `src/lib.rs:1233`  `pub fn from_string(id: String) -> Self {`
+- `src/lib.rs:1237`  `pub fn as_str(&self) -> &str {`
+- `src/lib.rs:1258`  `pub enum ContextType {`
+- `src/lib.rs:1279`  `pub struct MessageId(pub String);`
+- `src/lib.rs:1282`  `pub fn new() -> Self {`
+- `src/lib.rs:1286`  `pub fn from_string(id: String) -> Self {`
+- `src/lib.rs:1290`  `pub fn as_str(&self) -> &str {`
+- `src/lib.rs:1311`  `pub struct ContextItem {`
+- `src/lib.rs:1539`  `pub struct KGTermDefinition {`
+- `src/lib.rs:1566`  `pub struct KGIndexInfo {`
+- `src/lib.rs:1586`  `pub struct ChatMessage {`
+- `src/lib.rs:1658`  `pub struct Conversation {`
+- `src/lib.rs:1728`  `pub struct ConversationSummary {`
+- `src/lib.rs:1788`  `pub struct ContextHistory {`
+- `src/lib.rs:1796`  `pub fn new(max_entries: usize) -> Self {`
+- `src/lib.rs:1850`  `pub struct ContextHistoryEntry {`
+- `src/lib.rs:1867`  `pub enum ContextUsageType {`
+- `src/lib.rs:1887`  `pub struct Priority(pub u8);`
+- `src/lib.rs:1953`  `pub struct RoutingRule {`
+- `src/lib.rs:2053`  `pub struct PatternMatch {`
+- `src/lib.rs:2117`  `pub struct RoutingDecision {`
+- `src/lib.rs:2199`  `pub enum RoutingScenario {`
+- `src/lib.rs:2258`  `pub struct MultiAgentContext {`
+- `src/lib.rs:2276`  `pub fn new() -> Self {`
+- `src/lib.rs:2332`  `pub struct AgentInfo {`
+- `src/lib.rs:2349`  `pub struct AgentCommunication {`
+- `src/lib.rs:2367`  `pub enum NormalizationMethod {`
+- `src/lib.rs:2379`  `pub struct GroundingMetadata {`
+- `src/lib.rs:2413`  `pub struct CoverageSignal {`
+- `src/lib.rs:2449`  `pub enum EntityType {`
+- `src/lib.rs:2463`  `pub enum RelationshipType {`
+- `src/lib.rs:2474`  `pub struct ExtractedEntity {`
+- `src/lib.rs:2487`  `pub struct ExtractedRelationship {`
+- `src/lib.rs:2500`  `pub struct SchemaSignal {`
+- `src/lib.rs:2515`  `pub struct OntologyEntityType {`
+- `src/lib.rs:2533`  `pub struct OntologyRelationshipType {`
+- `src/lib.rs:2546`  `pub struct OntologyAntiPattern {`
+- `src/lib.rs:2559`  `pub struct OntologySchema {`
 - `src/llm_usage.rs:6`  `pub struct LlmUsage {`
 - `src/llm_usage.rs:16`  `pub fn total_tokens(&self) -> u64 {`
 - `src/llm_usage.rs:20`  `pub fn with_cost(mut self, cost_usd: f64) -> Self {`
@@ -1148,17 +1358,32 @@
 - `src/llm_usage.rs:40`  `pub fn with_usage(mut self, usage: LlmUsage) -> Self {`
 - `src/llm_usage.rs:47`  `pub struct ModelPricing {`
 - `src/llm_usage.rs:54`  `pub fn calculate_cost(&self, input_tokens: u64, output_tokens: u64) -> f64 {`
-- `src/capability.rs:12`  `pub enum Capability {`
-- `src/capability.rs:59`  `pub enum ProviderType {`
-- `src/capability.rs:81`  `pub enum CostLevel {`
-- `src/capability.rs:93`  `pub enum Latency {`
-- `src/capability.rs:104`  `pub struct Provider {`
-- `src/capability.rs:189`  `pub struct ProcessId(pub u64);`
+- `src/mcp_tool.rs:28`  `pub struct McpToolEntry {`
+- `src/medical_types.rs:36`  `pub enum MedicalNodeType {`
+- `src/medical_types.rs:141`  `pub enum MedicalEdgeType {`
+- `src/medical_types.rs:383`  `pub struct MedicalNodeMetadata {`
+- `src/persona.rs:46`  `pub struct PersonaDefinition {`
+- `src/persona.rs:79`  `pub struct CharacteristicDef {`
+- `src/persona.rs:91`  `pub struct SfiaSkillDef {`
+- `src/persona.rs:200`  `pub enum PersonaLoadError {`
+- `src/procedure.rs:32`  `pub struct ProcedureStep {`
+- `src/procedure.rs:51`  `pub struct ProcedureConfidence {`
+- `src/procedure.rs:114`  `pub struct CapturedProcedure {`
 - `src/review.rs:11`  `pub enum FindingSeverity {`
 - `src/review.rs:22`  `pub enum FindingCategory {`
 - `src/review.rs:33`  `pub struct ReviewFinding {`
 - `src/review.rs:52`  `pub struct ReviewAgentOutput {`
-- `src/mcp_tool.rs:28`  `pub struct McpToolEntry {`
+- `src/score/bm25.rs:9`  `pub struct BM25FScorer {`
+- `src/score/bm25.rs:31`  `pub fn with_params(params: BM25Params, weights: FieldWeights) -> Self {`
+- `src/score/bm25.rs:175`  `pub struct BM25PlusScorer {`
+- `src/score/bm25.rs:195`  `pub fn with_params(params: BM25Params) -> Self {`
+- `src/score/bm25_additional.rs:8`  `pub struct OkapiBM25Scorer {`
+- `src/score/bm25_additional.rs:28`  `pub fn with_params(params: BM25Params) -> Self {`
+- `src/score/bm25_additional.rs:119`  `pub struct TFIDFScorer {`
+- `src/score/bm25_additional.rs:195`  `pub struct JaccardScorer {`
+- `src/score/bm25_additional.rs:249`  `pub struct QueryRatioScorer {`
+- `src/score/common.rs:12`  `pub struct BM25Params {`
+- `src/score/common.rs:39`  `pub struct FieldWeights {`
 - `src/score/mod.rs:1`  `pub mod bm25;`
 - `src/score/mod.rs:2`  `pub mod bm25_additional;`
 - `src/score/mod.rs:3`  `pub mod common;`
@@ -1181,8 +1406,9 @@
 - `src/score/mod.rs:207`  `pub fn similarity(mut self, sim: Similarity) -> Query {`
 - `src/score/mod.rs:230`  `pub enum Similarity {`
 - `src/score/mod.rs:239`  `pub fn similarity(&self, q1: &str, q2: &str) -> f64 {`
-- `src/score/common.rs:12`  `pub struct BM25Params {`
-- `src/score/common.rs:39`  `pub struct FieldWeights {`
+- `src/score/names.rs:10`  `pub enum QueryScorer {`
+- `src/score/names.rs:47`  `pub fn possible_names() -> &'static [&'static str] {`
+- `src/score/names.rs:85`  `pub enum NgramType {`
 - `src/score/scored.rs:7`  `pub struct SearchResults<T>(Vec<Scored<T>>);`
 - `src/score/scored.rs:30`  `pub fn normalize(&mut self) {`
 - `src/score/scored.rs:60`  `pub fn trim(&mut self, size: usize) {`
@@ -1195,188 +1421,57 @@
 - `src/score/scored.rs:150`  `pub fn map<U, F: FnOnce(T) -> U>(self, f: F) -> Scored<U> {`
 - `src/score/scored.rs:162`  `pub fn map_score<F: FnOnce(f64) -> f64>(self, f: F) -> Scored<T> {`
 - `src/score/scored.rs:181`  `pub fn into_pair(self) -> (f64, T) {`
-- `src/score/bm25.rs:9`  `pub struct BM25FScorer {`
-- `src/score/bm25.rs:31`  `pub fn with_params(params: BM25Params, weights: FieldWeights) -> Self {`
-- `src/score/bm25.rs:175`  `pub struct BM25PlusScorer {`
-- `src/score/bm25.rs:195`  `pub fn with_params(params: BM25Params) -> Self {`
-- `src/score/names.rs:10`  `pub enum QueryScorer {`
-- `src/score/names.rs:47`  `pub fn possible_names() -> &'static [&'static str] {`
-- `src/score/names.rs:85`  `pub enum NgramType {`
-- `src/score/bm25_additional.rs:8`  `pub struct OkapiBM25Scorer {`
-- `src/score/bm25_additional.rs:28`  `pub fn with_params(params: BM25Params) -> Self {`
-- `src/score/bm25_additional.rs:119`  `pub struct TFIDFScorer {`
-- `src/score/bm25_additional.rs:195`  `pub struct JaccardScorer {`
-- `src/score/bm25_additional.rs:249`  `pub struct QueryRatioScorer {`
-
-### terraphim_validation (162 gaps)
-
-- `src/lib.rs:14`  `pub mod artifacts;`
-- `src/lib.rs:15`  `pub mod orchestrator;`
-- `src/lib.rs:16`  `pub mod performance;`
-- `src/lib.rs:17`  `pub mod reporting;`
-- `src/lib.rs:18`  `pub mod testing;`
-- `src/lib.rs:19`  `pub mod validators;`
-- `src/lib.rs:22`  `pub use artifacts::{ArtifactType, Platform, ReleaseArtifact};`
-- `src/lib.rs:23`  `pub use orchestrator::ValidationOrchestrator;`
-- `src/lib.rs:24`  `pub use reporting::{ReportFormat, ValidationReport};`
-- `src/lib.rs:25`  `pub use validators::{ValidationResult, ValidationStatus};`
-- `src/reporting/mod.rs:13`  `pub enum ReportFormat {`
-- `src/reporting/mod.rs:35`  `pub struct ValidationReport {`
-- `src/reporting/mod.rs:339`  `pub struct ReportMetadata {`
-- `src/testing/mod.rs:6`  `pub mod fixtures;`
-- `src/testing/mod.rs:7`  `pub mod server_api;`
-- `src/testing/mod.rs:8`  `pub mod tui;`
-- `src/testing/mod.rs:9`  `pub mod utils;`
-- `src/testing/mod.rs:18`  `pub use anyhow::Result;`
-- `src/testing/mod.rs:21`  `pub use crate::validators::{Severity, ValidationIssue, ValidationResult, Validat`
-- `src/testing/server_api.rs:7`  `pub mod fixtures;`
-- `src/testing/server_api.rs:8`  `pub mod harness;`
-- `src/testing/server_api.rs:9`  `pub mod performance;`
-- `src/testing/server_api.rs:10`  `pub mod security;`
-- `src/testing/server_api.rs:11`  `pub mod validation;`
-- `src/orchestrator/mod.rs:19`  `pub struct ValidationConfig {`
-- `src/artifacts/mod.rs:16`  `pub enum Platform {`
-- `src/artifacts/mod.rs:52`  `pub enum PlatformFamily {`
-- `src/artifacts/mod.rs:60`  `pub enum ArtifactType {`
-- `src/artifacts/mod.rs:75`  `pub struct ReleaseArtifact {`
-- `src/artifacts/mod.rs:253`  `pub struct ArtifactStatistics {`
-- `src/validators/mod.rs:13`  `pub enum ValidationStatus {`
-- `src/validators/mod.rs:60`  `pub enum Severity {`
-- `src/validators/mod.rs:80`  `pub struct ValidationIssue {`
-- `src/validators/mod.rs:121`  `pub struct ValidationResult {`
-- `src/validators/mod.rs:214`  `pub struct ValidationSummary {`
-- `src/validators/mod.rs:333`  `pub struct ValidationStatistics {`
-- `src/bin/terraphim-validation.rs:19`  `pub struct Cli {`
-- `src/bin/terraphim-validation.rs:37`  `pub enum Commands {`
-- `src/bin/terraphim-desktop-ui-tester.rs:26`  `pub enum DesktopUICommands {`
-- `src/performance/mod.rs:6`  `pub mod ci_integration;`
-- `src/performance/ci_integration.rs:17`  `pub struct PerformanceGateConfig {`
-- `src/performance/ci_integration.rs:32`  `pub struct PerformanceGate {`
-- `src/performance/ci_integration.rs:47`  `pub enum ComparisonOperator {`
-- `src/performance/ci_integration.rs:57`  `pub enum GateSeverity {`
-- `src/performance/ci_integration.rs:64`  `pub struct ReportConfig {`
-- `src/performance/ci_integration.rs:454`  `pub struct CIPerformanceResult {`
-- `src/performance/ci_integration.rs:467`  `pub struct GateResults {`
-- `src/performance/ci_integration.rs:476`  `pub struct GateFailure {`
-- `src/performance/benchmarking.rs:25`  `pub struct BenchmarkConfig {`
-- `src/performance/benchmarking.rs:44`  `pub struct PerformanceSLO {`
-- `src/performance/benchmarking.rs:69`  `pub struct BenchmarkResult {`
-- `src/performance/benchmarking.rs:92`  `pub struct ResourceUsage {`
-- `src/performance/benchmarking.rs:113`  `pub struct BenchmarkReport {`
-- `src/performance/benchmarking.rs:130`  `pub struct SLOCompliance {`
-- `src/performance/benchmarking.rs:141`  `pub struct SLOViolation {`
-- `src/performance/benchmarking.rs:154`  `pub enum ViolationSeverity {`
-- `src/performance/benchmarking.rs:162`  `pub struct SystemInfo {`
-- `src/performance/benchmarking.rs:175`  `pub struct PerformanceTrends {`
-- `src/testing/desktop_ui/mod.rs:16`  `pub mod accessibility;`
-- `src/testing/desktop_ui/mod.rs:17`  `pub mod auto_updater;`
-- `src/testing/desktop_ui/mod.rs:18`  `pub mod components;`
-- `src/testing/desktop_ui/mod.rs:19`  `pub mod cross_platform;`
-- `src/testing/desktop_ui/mod.rs:20`  `pub mod harness;`
-- `src/testing/desktop_ui/mod.rs:21`  `pub mod integration;`
-- `src/testing/desktop_ui/mod.rs:22`  `pub mod orchestrator;`
-- `src/testing/desktop_ui/mod.rs:23`  `pub mod performance;`
-- `src/testing/desktop_ui/mod.rs:24`  `pub mod utils;`
-- `src/testing/desktop_ui/mod.rs:28`  `pub struct UITestResult {`
-- `src/testing/desktop_ui/mod.rs:37`  `pub enum UITestStatus {`
-- `src/testing/desktop_ui/mod.rs:56`  `pub use accessibility::{AccessibilityTestConfig, AccessibilityTester};`
-- `src/testing/desktop_ui/mod.rs:57`  `pub use auto_updater::{AutoUpdaterTestConfig, AutoUpdaterTester};`
-- `src/testing/desktop_ui/mod.rs:58`  `pub use components::{ComponentTestConfig, UIComponentTester};`
-- `src/testing/desktop_ui/mod.rs:59`  `pub use cross_platform::{CrossPlatformTestConfig, CrossPlatformUITester};`
-- `src/testing/desktop_ui/mod.rs:60`  `pub use harness::{DesktopUITestConfig, DesktopUITestHarness};`
-- `src/testing/desktop_ui/mod.rs:61`  `pub use integration::{IntegrationTestConfig, IntegrationTester};`
-- `src/testing/desktop_ui/mod.rs:62`  `pub use orchestrator::{DesktopUITestOrchestrator, DesktopUITestSuiteConfig, Test`
-- `src/testing/desktop_ui/mod.rs:63`  `pub use performance::{PerformanceResults, PerformanceTestConfig, PerformanceTest`
-- `src/testing/desktop_ui/mod.rs:64`  `pub use utils::{`
-- `src/testing/desktop_ui/components.rs:12`  `pub struct ComponentTestConfig {`
-- `src/testing/desktop_ui/components.rs:19`  `pub struct ComponentTimeouts {`
-- `src/testing/desktop_ui/components.rs:31`  `pub fn new(config: ComponentTestConfig) -> Self {`
-- `src/testing/desktop_ui/cross_platform.rs:10`  `pub enum TestValidationStatus {`
-- `src/testing/desktop_ui/cross_platform.rs:19`  `pub struct TestValidationResult {`
-- `src/testing/desktop_ui/cross_platform.rs:30`  `pub struct CrossPlatformTestConfig {`
-- `src/testing/desktop_ui/cross_platform.rs:38`  `pub struct MacOSTestConfig {`
-- `src/testing/desktop_ui/cross_platform.rs:51`  `pub struct TouchBarConfig {`
-- `src/testing/desktop_ui/cross_platform.rs:59`  `pub struct WindowsTestConfig {`
-- `src/testing/desktop_ui/cross_platform.rs:73`  `pub struct LinuxTestConfig {`
-- `src/testing/desktop_ui/cross_platform.rs:92`  `pub fn new(config: CrossPlatformTestConfig) -> Self {`
-- `src/testing/desktop_ui/orchestrator.rs:48`  `pub struct DesktopUITestSuiteConfig {`
-- `src/testing/desktop_ui/orchestrator.rs:60`  `pub struct TestOutputConfig {`
-- `src/testing/desktop_ui/orchestrator.rs:75`  `pub fn new(config: DesktopUITestSuiteConfig) -> Self {`
-- `src/testing/desktop_ui/orchestrator.rs:431`  `pub struct TestSuiteResults {`
-- `src/testing/desktop_ui/harness.rs:17`  `pub struct DesktopUITestConfig {`
-- `src/testing/desktop_ui/harness.rs:33`  `pub struct PlaywrightConfig {`
-- `src/testing/desktop_ui/harness.rs:42`  `pub struct Viewport {`
-- `src/testing/desktop_ui/harness.rs:48`  `pub struct WindowConfig {`
-- `src/testing/desktop_ui/harness.rs:56`  `pub struct VisualConfig {`
-- `src/testing/desktop_ui/harness.rs:64`  `pub struct TestTimeouts {`
-- `src/testing/desktop_ui/harness.rs:72`  `pub struct PlatformConfig {`
-- `src/testing/desktop_ui/harness.rs:79`  `pub struct MacOSConfig {`
-- `src/testing/desktop_ui/harness.rs:85`  `pub struct WindowsConfig {`
-- `src/testing/desktop_ui/harness.rs:91`  `pub struct LinuxConfig {`
-- `src/testing/desktop_ui/performance.rs:13`  `pub struct PerformanceTestConfig {`
-- `src/testing/desktop_ui/performance.rs:21`  `pub struct StartupConfig {`
-- `src/testing/desktop_ui/performance.rs:28`  `pub struct MemoryConfig {`
-- `src/testing/desktop_ui/performance.rs:36`  `pub struct ResponsivenessConfig {`
-- `src/testing/desktop_ui/performance.rs:43`  `pub struct BenchmarkConfig {`
-- `src/testing/desktop_ui/performance.rs:50`  `pub struct BenchmarkOperation {`
-- `src/testing/desktop_ui/performance.rs:58`  `pub struct PerformanceResults {`
-- `src/testing/desktop_ui/performance.rs:67`  `pub struct BenchmarkResult {`
-- `src/testing/desktop_ui/performance.rs:81`  `pub fn new(config: PerformanceTestConfig) -> Self {`
-- `src/testing/desktop_ui/integration.rs:13`  `pub struct IntegrationTestConfig {`
-- `src/testing/desktop_ui/integration.rs:22`  `pub struct ServerIntegrationConfig {`
-- `src/testing/desktop_ui/integration.rs:30`  `pub struct FileOperationConfig {`
-- `src/testing/desktop_ui/integration.rs:38`  `pub struct ExternalLinkConfig {`
-- `src/testing/desktop_ui/integration.rs:45`  `pub struct KeyboardShortcutConfig {`
-- `src/testing/desktop_ui/integration.rs:52`  `pub struct KeyboardShortcut {`
-- `src/testing/desktop_ui/integration.rs:59`  `pub enum ShortcutScope {`
-- `src/testing/desktop_ui/integration.rs:66`  `pub struct NetworkConfig {`
-- `src/testing/desktop_ui/integration.rs:78`  `pub fn new(config: IntegrationTestConfig) -> Self {`
-- `src/testing/desktop_ui/auto_updater.rs:14`  `pub struct AutoUpdaterTestConfig {`
-- `src/testing/desktop_ui/utils.rs:99`  `pub struct ScreenshotComparison {`
-- `src/testing/desktop_ui/utils.rs:228`  `pub enum Platform {`
-- `src/testing/desktop_ui/utils.rs:236`  `pub struct PlatformPaths {`
-- `src/testing/desktop_ui/utils.rs:339`  `pub struct AggregatedResults {`
-- `src/testing/desktop_ui/accessibility.rs:12`  `pub struct AccessibilityTestConfig {`
-- `src/testing/desktop_ui/accessibility.rs:21`  `pub enum WCAGLevel {`
-- `src/testing/desktop_ui/accessibility.rs:28`  `pub struct ScreenReader {`
-- `src/testing/desktop_ui/accessibility.rs:35`  `pub struct KeyboardConfig {`
-- `src/testing/desktop_ui/accessibility.rs:42`  `pub struct KeyboardShortcut {`
-- `src/testing/desktop_ui/accessibility.rs:49`  `pub struct ContrastConfig {`
-- `src/testing/desktop_ui/accessibility.rs:56`  `pub struct FocusConfig {`
-- `src/testing/desktop_ui/accessibility.rs:68`  `pub fn new(config: AccessibilityTestConfig) -> Self {`
-- `src/testing/server_api/performance.rs:13`  `pub struct PerformanceResults {`
-- `src/testing/server_api/validation.rs:27`  `pub enum ValidationError {`
-- `src/testing/tui/mod.rs:7`  `pub mod cross_platform;`
-- `src/testing/tui/mod.rs:8`  `pub mod harness;`
-- `src/testing/tui/mod.rs:9`  `pub mod integration;`
-- `src/testing/tui/mod.rs:10`  `pub mod mock_terminal;`
-- `src/testing/tui/mod.rs:11`  `pub mod output_validator;`
-- `src/testing/tui/mod.rs:12`  `pub mod performance_monitor;`
-- `src/testing/tui/command_simulator.rs:17`  `pub struct CommandExecutionResult {`
-- `src/testing/tui/performance_monitor.rs:13`  `pub struct PerformanceMetrics {`
-- `src/testing/tui/performance_monitor.rs:25`  `pub struct MemoryStats {`
-- `src/testing/tui/performance_monitor.rs:33`  `pub struct PerformanceResults {`
-- `src/testing/tui/performance_monitor.rs:42`  `pub struct PerformanceSLO {`
-- `src/testing/tui/performance_monitor.rs:373`  `pub struct StressTestResults {`
-- `src/testing/tui/output_validator.rs:12`  `pub struct ValidationResult {`
-- `src/testing/tui/cross_platform.rs:12`  `pub struct PlatformTestResult {`
-- `src/testing/tui/cross_platform.rs:25`  `pub enum ColorSupport {`
-- `src/testing/tui/cross_platform.rs:34`  `pub struct CrossPlatformResults {`
-- `src/testing/tui/cross_platform.rs:43`  `pub struct TerminalCapabilities {`
-- `src/testing/tui/harness.rs:18`  `pub struct TuiTestConfig {`
-- `src/testing/tui/harness.rs:399`  `pub struct TuiCommandResult {`
-- `src/testing/tui/harness.rs:410`  `pub struct TuiTestSuiteResults {`
-- `src/testing/tui/integration.rs:18`  `pub struct IntegrationTestConfig {`
-- `src/testing/tui/integration.rs:46`  `pub struct IntegrationTestResults {`
-- `src/testing/tui/mock_terminal.rs:14`  `pub struct TerminalSize {`
-- `src/testing/tui/mock_terminal.rs:20`  `pub fn new(width: u16, height: u16) -> Self {`
-- `src/testing/tui/mock_terminal.rs:27`  `pub struct CursorPosition {`
-- `src/testing/tui/mock_terminal.rs:33`  `pub fn new(x: u16, y: u16) -> Self {`
+- `src/shared_learning.rs:23`  `pub enum TrustLevel {`
+- `src/shared_learning.rs:36`  `pub fn as_str(&self) -> &'static str {`
+- `src/shared_learning.rs:45`  `pub fn weight(&self) -> u8 {`
+- `src/shared_learning.rs:54`  `pub fn allows_wiki_sync(&self) -> bool {`
+- `src/shared_learning.rs:58`  `pub fn display_name(&self) -> &'static str {`
+- `src/shared_learning.rs:95`  `pub enum TrustLevelError {`
+- `src/shared_learning.rs:103`  `pub enum LearningCategory {`
+- `src/shared_learning.rs:154`  `pub fn new() -> Self {`
+- `src/shared_learning.rs:284`  `pub struct QualityMetrics {`
+- `src/shared_learning.rs:341`  `pub enum SuggestionStatus {`
+- `src/shared_learning.rs:374`  `pub enum LearningSource {`
+- `src/shared_learning.rs:407`  `pub struct SharedLearning {`
+- `src/shared_learning.rs:664`  `pub enum StoreError {`
 
 ### terraphim-session-analyzer (136 gaps)
 
-- `src/tool_analyzer.rs:134`  `pub fn is_actual_tool(tool_name: &str) -> bool {`
-- `src/tool_analyzer.rs:146`  `pub fn calculate_tool_statistics(`
+- `src/analyzer.rs:14`  `pub struct Analyzer {`
+- `src/analyzer.rs:58`  `pub fn with_config(mut self, config: AnalyzerConfig) -> Self {`
+- `src/analyzer.rs:571`  `pub fn calculate_agent_tool_correlations(`
+- `src/analyzer.rs:644`  `pub fn calculate_tool_statistics(`
+- `src/analyzer.rs:726`  `pub fn calculate_category_breakdown(`
+- `src/analyzer.rs:763`  `pub fn detect_tool_chains(`
+- `src/analyzer.rs:940`  `pub struct SummaryStats {`
+- `src/connectors/aider.rs:30`  `pub struct AiderConnector;`
+- `src/connectors/codex.rs:25`  `pub struct CodexConnector;`
+- `src/connectors/cursor.rs:30`  `pub struct CursorConnector;`
+- `src/connectors/mod.rs:16`  `pub mod aider;`
+- `src/connectors/mod.rs:18`  `pub mod codex;`
+- `src/connectors/mod.rs:20`  `pub mod cursor;`
+- `src/connectors/mod.rs:22`  `pub mod opencode;`
+- `src/connectors/mod.rs:26`  `pub enum ConnectorStatus {`
+- `src/connectors/mod.rs:58`  `pub struct ImportOptions {`
+- `src/connectors/mod.rs:73`  `pub struct NormalizedSession {`
+- `src/connectors/mod.rs:94`  `pub struct NormalizedMessage {`
+- `src/connectors/mod.rs:117`  `pub fn new() -> Self {`
+- `src/connectors/mod.rs:136`  `pub fn connectors(&self) -> &[Box<dyn SessionConnector>] {`
+- `src/connectors/mod.rs:142`  `pub fn get(&self, source_id: &str) -> Option<&dyn SessionConnector> {`
+- `src/connectors/mod.rs:166`  `pub struct ClaudeCodeConnector;`
+- `src/connectors/opencode.rs:20`  `pub struct OpenCodeConnector;`
+- `src/kg/builder.rs:13`  `pub struct KnowledgeGraphBuilder {`
+- `src/kg/builder.rs:24`  `pub fn new() -> Self {`
+- `src/kg/builder.rs:46`  `pub fn from_tool_invocations(tools: &[ToolInvocation]) -> Self {`
+- `src/kg/mod.rs:35`  `pub mod query;`
+- `src/kg/mod.rs:36`  `pub mod search;`
+- `src/kg/mod.rs:38`  `pub use builder::KnowledgeGraphBuilder;`
+- `src/kg/mod.rs:39`  `pub use query::{QueryNode, QueryParser};`
+- `src/kg/mod.rs:40`  `pub use search::{KnowledgeGraphSearch, SearchResult};`
+- `src/kg/query.rs:5`  `pub enum QueryNode {`
+- `src/kg/search.rs:17`  `pub struct KnowledgeGraphSearch {`
+- `src/kg/search.rs:23`  `pub struct SearchResult {`
+- `src/kg/search.rs:40`  `pub fn new(builder: KnowledgeGraphBuilder) -> Self {`
 - `src/lib.rs:38`  `pub mod models;`
 - `src/lib.rs:39`  `pub mod parser;`
 - `src/lib.rs:40`  `pub mod patterns;`
@@ -1395,13 +1490,6 @@
 - `src/lib.rs:150`  `pub fn total_session_time(analyses: &[SessionAnalysis]) -> u64 {`
 - `src/lib.rs:156`  `pub fn most_productive_session(analyses: &[SessionAnalysis]) -> Option<&SessionA`
 - `src/lib.rs:162`  `pub fn sessions_with_agent<'a>(`
-- `src/analyzer.rs:14`  `pub struct Analyzer {`
-- `src/analyzer.rs:58`  `pub fn with_config(mut self, config: AnalyzerConfig) -> Self {`
-- `src/analyzer.rs:571`  `pub fn calculate_agent_tool_correlations(`
-- `src/analyzer.rs:644`  `pub fn calculate_tool_statistics(`
-- `src/analyzer.rs:726`  `pub fn calculate_category_breakdown(`
-- `src/analyzer.rs:763`  `pub fn detect_tool_chains(`
-- `src/analyzer.rs:940`  `pub struct SummaryStats {`
 - `src/models.rs:10`  `pub struct SessionId(String);`
 - `src/models.rs:15`  `pub fn new(id: String) -> Self {`
 - `src/models.rs:21`  `pub fn as_str(&self) -> &str {`
@@ -1446,43 +1534,6 @@
 - `src/parser.rs:396`  `pub fn build_timeline(&self) -> Vec<TimelineEvent> {`
 - `src/parser.rs:486`  `pub struct TimelineEvent {`
 - `src/parser.rs:497`  `pub enum TimelineEventType {`
-- `src/reporter.rs:15`  `pub struct Reporter {`
-- `src/reporter.rs:21`  `pub fn new() -> Self {`
-- `src/reporter.rs:26`  `pub fn with_colors(mut self, show_colors: bool) -> Self {`
-- `src/reporter.rs:377`  `pub fn format_agent_icon(&self, agent_type: &str) -> String {`
-- `src/reporter.rs:433`  `pub fn print_tool_analysis(`
-- `src/connectors/mod.rs:16`  `pub mod aider;`
-- `src/connectors/mod.rs:18`  `pub mod codex;`
-- `src/connectors/mod.rs:20`  `pub mod cursor;`
-- `src/connectors/mod.rs:22`  `pub mod opencode;`
-- `src/connectors/mod.rs:26`  `pub enum ConnectorStatus {`
-- `src/connectors/mod.rs:58`  `pub struct ImportOptions {`
-- `src/connectors/mod.rs:73`  `pub struct NormalizedSession {`
-- `src/connectors/mod.rs:94`  `pub struct NormalizedMessage {`
-- `src/connectors/mod.rs:117`  `pub fn new() -> Self {`
-- `src/connectors/mod.rs:136`  `pub fn connectors(&self) -> &[Box<dyn SessionConnector>] {`
-- `src/connectors/mod.rs:142`  `pub fn get(&self, source_id: &str) -> Option<&dyn SessionConnector> {`
-- `src/connectors/mod.rs:166`  `pub struct ClaudeCodeConnector;`
-- `src/connectors/opencode.rs:20`  `pub struct OpenCodeConnector;`
-- `src/connectors/cursor.rs:30`  `pub struct CursorConnector;`
-- `src/connectors/codex.rs:25`  `pub struct CodexConnector;`
-- `src/connectors/aider.rs:30`  `pub struct AiderConnector;`
-- `src/patterns/mod.rs:36`  `pub mod loader;`
-- `src/patterns/mod.rs:37`  `pub mod matcher;`
-- `src/patterns/mod.rs:40`  `pub use loader::load_all_patterns;`
-- `src/patterns/mod.rs:42`  `pub use loader::{ToolMetadata, ToolPattern};`
-- `src/patterns/mod.rs:44`  `pub use loader::{load_patterns, load_user_patterns};`
-- `src/patterns/mod.rs:45`  `pub use matcher::{AhoCorasickMatcher, PatternMatcher};`
-- `src/patterns/mod.rs:47`  `pub use matcher::{ToolMatch, create_matcher};`
-- `src/patterns/mod.rs:51`  `pub use knowledge_graph::{LearnedPattern, PatternLearner, infer_category_from_co`
-- `src/patterns/mod.rs:56`  `pub use knowledge_graph::{KnowledgeGraph, RelationType, ToolRelationship};`
-- `src/patterns/loader.rs:11`  `pub struct ToolPattern {`
-- `src/patterns/loader.rs:24`  `pub struct ToolMetadata {`
-- `src/patterns/matcher.rs:39`  `pub struct ToolMatch<'a> {`
-- `src/patterns/matcher.rs:87`  `pub fn new() -> Self {`
-- `src/patterns/matcher.rs:164`  `pub struct TerraphimMatcher {`
-- `src/patterns/matcher.rs:186`  `pub fn new() -> Self {`
-- `src/patterns/matcher.rs:299`  `pub fn create_matcher() -> Box<dyn PatternMatcher> {`
 - `src/patterns/knowledge_graph.rs:46`  `pub struct PatternLearner {`
 - `src/patterns/knowledge_graph.rs:56`  `pub struct CandidatePattern {`
 - `src/patterns/knowledge_graph.rs:78`  `pub struct LearnedPattern {`
@@ -1499,21 +1550,69 @@
 - `src/patterns/knowledge_graph.rs:567`  `pub fn new() -> Self {`
 - `src/patterns/knowledge_graph.rs:598`  `pub fn build_from_chains(chains: &[ToolChain]) -> Self {`
 - `src/patterns/knowledge_graph.rs:734`  `pub fn get_relationships_for_tool(&self, tool_name: &str) -> Vec<&ToolRelationsh`
-- `src/kg/mod.rs:35`  `pub mod query;`
-- `src/kg/mod.rs:36`  `pub mod search;`
-- `src/kg/mod.rs:38`  `pub use builder::KnowledgeGraphBuilder;`
-- `src/kg/mod.rs:39`  `pub use query::{QueryNode, QueryParser};`
-- `src/kg/mod.rs:40`  `pub use search::{KnowledgeGraphSearch, SearchResult};`
-- `src/kg/query.rs:5`  `pub enum QueryNode {`
-- `src/kg/builder.rs:13`  `pub struct KnowledgeGraphBuilder {`
-- `src/kg/builder.rs:24`  `pub fn new() -> Self {`
-- `src/kg/builder.rs:46`  `pub fn from_tool_invocations(tools: &[ToolInvocation]) -> Self {`
-- `src/kg/search.rs:17`  `pub struct KnowledgeGraphSearch {`
-- `src/kg/search.rs:23`  `pub struct SearchResult {`
-- `src/kg/search.rs:40`  `pub fn new(builder: KnowledgeGraphBuilder) -> Self {`
+- `src/patterns/loader.rs:11`  `pub struct ToolPattern {`
+- `src/patterns/loader.rs:24`  `pub struct ToolMetadata {`
+- `src/patterns/matcher.rs:39`  `pub struct ToolMatch<'a> {`
+- `src/patterns/matcher.rs:87`  `pub fn new() -> Self {`
+- `src/patterns/matcher.rs:164`  `pub struct TerraphimMatcher {`
+- `src/patterns/matcher.rs:186`  `pub fn new() -> Self {`
+- `src/patterns/matcher.rs:299`  `pub fn create_matcher() -> Box<dyn PatternMatcher> {`
+- `src/patterns/mod.rs:36`  `pub mod loader;`
+- `src/patterns/mod.rs:37`  `pub mod matcher;`
+- `src/patterns/mod.rs:40`  `pub use loader::load_all_patterns;`
+- `src/patterns/mod.rs:42`  `pub use loader::{ToolMetadata, ToolPattern};`
+- `src/patterns/mod.rs:44`  `pub use loader::{load_patterns, load_user_patterns};`
+- `src/patterns/mod.rs:45`  `pub use matcher::{AhoCorasickMatcher, PatternMatcher};`
+- `src/patterns/mod.rs:47`  `pub use matcher::{ToolMatch, create_matcher};`
+- `src/patterns/mod.rs:51`  `pub use knowledge_graph::{LearnedPattern, PatternLearner, infer_category_from_co`
+- `src/patterns/mod.rs:56`  `pub use knowledge_graph::{KnowledgeGraph, RelationType, ToolRelationship};`
+- `src/reporter.rs:15`  `pub struct Reporter {`
+- `src/reporter.rs:21`  `pub fn new() -> Self {`
+- `src/reporter.rs:26`  `pub fn with_colors(mut self, show_colors: bool) -> Self {`
+- `src/reporter.rs:377`  `pub fn format_agent_icon(&self, agent_type: &str) -> String {`
+- `src/reporter.rs:433`  `pub fn print_tool_analysis(`
+- `src/tool_analyzer.rs:134`  `pub fn is_actual_tool(tool_name: &str) -> bool {`
+- `src/tool_analyzer.rs:146`  `pub fn calculate_tool_statistics(`
 
-### terraphim_agent_evolution (118 gaps)
+### terraphim_agent_evolution (129 gaps)
 
+- `src/error.rs:7`  `pub enum EvolutionError {`
+- `src/evolution.rs:11`  `pub struct AgentEvolutionSystem {`
+- `src/evolution.rs:228`  `pub struct AgentSnapshot {`
+- `src/evolution.rs:239`  `pub struct EvolutionIndex {`
+- `src/evolution.rs:289`  `pub struct EvolutionSummary {`
+- `src/evolution.rs:301`  `pub struct MemoryGrowthMetrics {`
+- `src/evolution.rs:310`  `pub enum AlignmentTrend {`
+- `src/lessons.rs:15`  `pub struct LessonsEvolution {`
+- `src/lessons.rs:132`  `pub struct LessonsState {`
+- `src/lessons.rs:391`  `pub struct Lesson {`
+- `src/lessons.rs:472`  `pub enum LessonCategory {`
+- `src/lessons.rs:482`  `pub enum ImpactLevel {`
+- `src/lessons.rs:491`  `pub struct Evidence {`
+- `src/lessons.rs:502`  `pub enum EvidenceSource {`
+- `src/lessons.rs:512`  `pub enum EvidenceOutcome {`
+- `src/lessons.rs:521`  `pub struct ApplicationResult {`
+- `src/lessons.rs:531`  `pub struct LessonsMetadata {`
+- `src/lessons.rs:556`  `pub struct VersionedLessons {`
+- `src/lessons.rs:602`  `pub struct CurrentLessonsState {`
+- `src/lib.rs:25`  `pub mod evolution;`
+- `src/lib.rs:26`  `pub mod integration;`
+- `src/lib.rs:27`  `pub mod lessons;`
+- `src/lib.rs:28`  `pub mod llm_adapter;`
+- `src/lib.rs:29`  `pub mod memory;`
+- `src/lib.rs:30`  `pub mod tasks;`
+- `src/lib.rs:31`  `pub mod viewer;`
+- `src/lib.rs:32`  `pub mod workflows;`
+- `src/lib.rs:34`  `pub use error::*;`
+- `src/lib.rs:35`  `pub use evolution::*;`
+- `src/lib.rs:36`  `pub use integration::*;`
+- `src/lib.rs:37`  `pub use lessons::*;`
+- `src/lib.rs:38`  `pub use llm_adapter::*;`
+- `src/lib.rs:39`  `pub use memory::*;`
+- `src/lib.rs:40`  `pub use tasks::*;`
+- `src/lib.rs:41`  `pub use viewer::*;`
+- `src/llm_adapter.rs:14`  `pub struct CompletionOptions {`
+- `src/llm_adapter.rs:32`  `pub trait LlmAdapter: Send + Sync {`
 - `src/memory.rs:14`  `pub struct MemoryEvolution {`
 - `src/memory.rs:179`  `pub struct MemoryState {`
 - `src/memory.rs:315`  `pub struct MemoryItem {`
@@ -1530,18 +1629,6 @@
 - `src/memory.rs:449`  `pub struct ConsolidationResult {`
 - `src/memory.rs:459`  `pub struct VersionedMemory {`
 - `src/memory.rs:505`  `pub struct CurrentMemoryState {`
-- `src/lessons.rs:15`  `pub struct LessonsEvolution {`
-- `src/lessons.rs:132`  `pub struct LessonsState {`
-- `src/lessons.rs:391`  `pub struct Lesson {`
-- `src/lessons.rs:472`  `pub enum LessonCategory {`
-- `src/lessons.rs:482`  `pub enum ImpactLevel {`
-- `src/lessons.rs:491`  `pub struct Evidence {`
-- `src/lessons.rs:502`  `pub enum EvidenceSource {`
-- `src/lessons.rs:512`  `pub enum EvidenceOutcome {`
-- `src/lessons.rs:521`  `pub struct ApplicationResult {`
-- `src/lessons.rs:531`  `pub struct LessonsMetadata {`
-- `src/lessons.rs:556`  `pub struct VersionedLessons {`
-- `src/lessons.rs:602`  `pub struct CurrentLessonsState {`
 - `src/tasks.rs:25`  `pub struct TasksEvolution {`
 - `src/tasks.rs:177`  `pub struct TasksState {`
 - `src/tasks.rs:406`  `pub struct AgentTask {`
@@ -1554,14 +1641,6 @@
 - `src/tasks.rs:534`  `pub struct WorkflowStep {`
 - `src/tasks.rs:541`  `pub struct VersionedTaskList {`
 - `src/tasks.rs:587`  `pub struct CurrentTasksState {`
-- `src/lib.rs:25`  `pub mod evolution;`
-- `src/lib.rs:26`  `pub mod integration;`
-- `src/lib.rs:27`  `pub mod lessons;`
-- `src/lib.rs:28`  `pub mod llm_adapter;`
-- `src/lib.rs:29`  `pub mod memory;`
-- `src/lib.rs:30`  `pub mod tasks;`
-- `src/lib.rs:31`  `pub mod viewer;`
-- `src/lib.rs:32`  `pub mod workflows;`
 - `src/viewer.rs:180`  `pub struct EvolutionTimeline {`
 - `src/viewer.rs:194`  `pub struct EvolutionEvent {`
 - `src/viewer.rs:203`  `pub enum EventType {`
@@ -1580,21 +1659,23 @@
 - `src/viewer.rs:378`  `pub enum TrendDirection {`
 - `src/viewer.rs:386`  `pub struct LearningHighlight {`
 - `src/viewer.rs:394`  `pub struct AlignmentAnalysis {`
-- `src/llm_adapter.rs:14`  `pub struct CompletionOptions {`
-- `src/llm_adapter.rs:32`  `pub trait LlmAdapter: Send + Sync {`
-- `src/evolution.rs:11`  `pub struct AgentEvolutionSystem {`
-- `src/evolution.rs:228`  `pub struct AgentSnapshot {`
-- `src/evolution.rs:239`  `pub struct EvolutionIndex {`
-- `src/evolution.rs:289`  `pub struct EvolutionSummary {`
-- `src/evolution.rs:301`  `pub struct MemoryGrowthMetrics {`
-- `src/evolution.rs:310`  `pub enum AlignmentTrend {`
-- `src/error.rs:7`  `pub enum EvolutionError {`
+- `src/workflows/evaluator_optimizer.rs:31`  `pub struct OptimizationConfig {`
+- `src/workflows/evaluator_optimizer.rs:60`  `pub enum OptimizationStrategy {`
+- `src/workflows/evaluator_optimizer.rs:73`  `pub enum EvaluationCriterion {`
+- `src/workflows/evaluator_optimizer.rs:86`  `pub struct Evaluation {`
+- `src/workflows/evaluator_optimizer.rs:98`  `pub struct OptimizationAction {`
+- `src/workflows/evaluator_optimizer.rs:107`  `pub enum ActionType {`
+- `src/workflows/evaluator_optimizer.rs:119`  `pub enum ActionPriority {`
+- `src/workflows/evaluator_optimizer.rs:128`  `pub struct OptimizationIteration {`
 - `src/workflows/mod.rs:11`  `pub mod orchestrator_workers;`
 - `src/workflows/mod.rs:12`  `pub mod parallelization;`
 - `src/workflows/mod.rs:13`  `pub mod prompt_chaining;`
 - `src/workflows/mod.rs:14`  `pub mod routing;`
+- `src/workflows/mod.rs:16`  `pub use evaluator_optimizer::*;`
 - `src/workflows/mod.rs:17`  `pub use orchestrator_workers::{`
 - `src/workflows/mod.rs:22`  `pub use parallelization::{`
+- `src/workflows/mod.rs:26`  `pub use prompt_chaining::*;`
+- `src/workflows/mod.rs:27`  `pub use routing::*;`
 - `src/workflows/mod.rs:38`  `pub trait WorkflowPattern: Send + Sync {`
 - `src/workflows/mod.rs:54`  `pub struct WorkflowInput {`
 - `src/workflows/mod.rs:65`  `pub struct WorkflowOutput {`
@@ -1605,11 +1686,6 @@
 - `src/workflows/mod.rs:141`  `pub enum StepType {`
 - `src/workflows/mod.rs:152`  `pub struct TaskAnalysis {`
 - `src/workflows/mod.rs:163`  `pub enum TaskComplexity {`
-- `src/workflows/prompt_chaining.rs:29`  `pub struct ChainConfig {`
-- `src/workflows/prompt_chaining.rs:49`  `pub struct ChainLink {`
-- `src/workflows/routing.rs:31`  `pub struct RouteConfig {`
-- `src/workflows/routing.rs:53`  `pub struct Route {`
-- `src/workflows/routing.rs:69`  `pub fn new(config: RouteConfig) -> Self {`
 - `src/workflows/orchestrator_workers.rs:33`  `pub struct OrchestrationConfig {`
 - `src/workflows/orchestrator_workers.rs:57`  `pub enum CoordinationStrategy {`
 - `src/workflows/orchestrator_workers.rs:70`  `pub enum WorkerRole {`
@@ -1619,30 +1695,40 @@
 - `src/workflows/orchestrator_workers.rs:114`  `pub struct WorkerResult {`
 - `src/workflows/orchestrator_workers.rs:127`  `pub struct CoordinationMessage {`
 - `src/workflows/orchestrator_workers.rs:136`  `pub enum MessageType {`
-- `src/workflows/evaluator_optimizer.rs:31`  `pub struct OptimizationConfig {`
-- `src/workflows/evaluator_optimizer.rs:60`  `pub enum OptimizationStrategy {`
-- `src/workflows/evaluator_optimizer.rs:73`  `pub enum EvaluationCriterion {`
-- `src/workflows/evaluator_optimizer.rs:86`  `pub struct Evaluation {`
-- `src/workflows/evaluator_optimizer.rs:98`  `pub struct OptimizationAction {`
-- `src/workflows/evaluator_optimizer.rs:107`  `pub enum ActionType {`
-- `src/workflows/evaluator_optimizer.rs:119`  `pub enum ActionPriority {`
-- `src/workflows/evaluator_optimizer.rs:128`  `pub struct OptimizationIteration {`
 - `src/workflows/parallelization.rs:32`  `pub struct ParallelConfig {`
 - `src/workflows/parallelization.rs:54`  `pub enum AggregationStrategy {`
 - `src/workflows/parallelization.rs:69`  `pub struct ParallelTask {`
 - `src/workflows/parallelization.rs:79`  `pub enum TaskPriority {`
 - `src/workflows/parallelization.rs:88`  `pub struct ParallelTaskResult {`
+- `src/workflows/prompt_chaining.rs:29`  `pub struct ChainConfig {`
+- `src/workflows/prompt_chaining.rs:49`  `pub struct ChainLink {`
+- `src/workflows/routing.rs:31`  `pub struct RouteConfig {`
+- `src/workflows/routing.rs:53`  `pub struct Route {`
+- `src/workflows/routing.rs:69`  `pub fn new(config: RouteConfig) -> Self {`
 
-### terraphim_service (91 gaps)
+### terraphim_service (92 gaps)
 
-- `src/context.rs:20`  `pub struct ContextConfig {`
-- `src/openrouter.rs:11`  `pub enum OpenRouterError {`
-- `src/openrouter.rs:36`  `pub type Result<T> = std::result::Result<T, OpenRouterError>;`
-- `src/openrouter.rs:44`  `pub struct OpenRouterService {`
-- `src/openrouter.rs:395`  `pub struct OpenRouterService;`
 - `src/auto_route.rs:51`  `pub struct AutoRouteContext {`
 - `src/auto_route.rs:78`  `pub enum AutoRouteReason {`
 - `src/auto_route.rs:94`  `pub struct AutoRouteResult {`
+- `src/context.rs:20`  `pub struct ContextConfig {`
+- `src/conversation_service.rs:14`  `pub struct ConversationFilter {`
+- `src/conversation_service.rs:31`  `pub struct ConversationStatistics {`
+- `src/error.rs:28`  `pub enum ErrorCategory {`
+- `src/error.rs:47`  `pub enum CommonError {`
+- `src/error.rs:116`  `pub fn network(message: impl Into<String>) -> Self {`
+- `src/error.rs:123`  `pub fn network_with_source(`
+- `src/error.rs:133`  `pub fn config(message: impl Into<String>) -> Self {`
+- `src/error.rs:140`  `pub fn config_field(message: impl Into<String>, field: impl Into<String>) -> Sel`
+- `src/error.rs:147`  `pub fn validation(message: impl Into<String>) -> Self {`
+- `src/error.rs:154`  `pub fn validation_field(message: impl Into<String>, field: impl Into<String>) ->`
+- `src/error.rs:161`  `pub fn auth(message: impl Into<String>) -> Self {`
+- `src/error.rs:167`  `pub fn storage(message: impl Into<String>) -> Self {`
+- `src/error.rs:174`  `pub fn storage_with_source(`
+- `src/error.rs:184`  `pub fn integration(service: impl Into<String>, message: impl Into<String>) -> Se`
+- `src/error.rs:192`  `pub fn integration_with_source(`
+- `src/error.rs:204`  `pub fn system(message: impl Into<String>) -> Self {`
+- `src/error.rs:211`  `pub fn system_with_source(`
 - `src/lib.rs:16`  `pub mod auto_route;`
 - `src/lib.rs:17`  `pub use auto_route::{`
 - `src/lib.rs:23`  `pub mod openrouter;`
@@ -1660,16 +1746,36 @@
 - `src/lib.rs:68`  `pub enum ServiceError {`
 - `src/lib.rs:122`  `pub type Result<T> = std::result::Result<T, ServiceError>;`
 - `src/lib.rs:124`  `pub struct TerraphimService {`
-- `src/lib.rs:2721`  `pub async fn generate_document_summary(`
-- `src/lib.rs:2767`  `pub async fn generate_document_summary(`
-- `src/lib.rs:2787`  `pub async fn get_role(&self, role_name: &RoleName) -> Result<Role> {`
-- `src/logging.rs:40`  `pub enum LoggingConfig {`
-- `src/logging.rs:117`  `pub fn init_tracing_logging(level: tracing::Level) {`
+- `src/lib.rs:2800`  `pub async fn generate_document_summary(`
+- `src/lib.rs:2846`  `pub async fn generate_document_summary(`
+- `src/lib.rs:2866`  `pub async fn get_role(&self, role_name: &RoleName) -> Result<Role> {`
+- `src/llm/proxy_client.rs:19`  `pub struct ProxyClientConfig {`
+- `src/llm/proxy_client.rs:45`  `pub struct ProxyLlmClient {`
+- `src/llm/proxy_client.rs:65`  `pub fn is_proxy_mode(&self) -> bool {`
+- `src/llm/proxy_client.rs:71`  `pub fn name(&self) -> &'static str {`
+- `src/llm/router_config.rs:7`  `pub use terraphim_config::llm_router::{LlmRouterConfig, RouterMode, RouterStrate`
+- `src/llm/router_config.rs:11`  `pub struct MergedRouterConfig {`
+- `src/llm.rs:8`  `pub use self::router_config::{MergedRouterConfig, RouterMode};`
+- `src/llm.rs:21`  `pub struct SummarizeOptions {`
+- `src/llm.rs:27`  `pub struct ChatOptions {`
+- `src/llm.rs:33`  `pub trait LlmClient: Send + Sync {`
 - `src/llm_proxy.rs:14`  `pub enum LlmProxyError {`
 - `src/llm_proxy.rs:31`  `pub type Result<T> = std::result::Result<T, LlmProxyError>;`
 - `src/llm_proxy.rs:35`  `pub struct ProxyConfig {`
 - `src/llm_proxy.rs:86`  `pub struct LlmProxyClient {`
 - `src/llm_proxy.rs:115`  `pub fn new_no_auto_configure(default_provider: String) -> Result<Self> {`
+- `src/logging.rs:40`  `pub enum LoggingConfig {`
+- `src/logging.rs:117`  `pub fn init_tracing_logging(level: tracing::Level) {`
+- `src/openrouter.rs:11`  `pub enum OpenRouterError {`
+- `src/openrouter.rs:36`  `pub type Result<T> = std::result::Result<T, OpenRouterError>;`
+- `src/openrouter.rs:44`  `pub struct OpenRouterService {`
+- `src/openrouter.rs:395`  `pub struct OpenRouterService;`
+- `src/queue_based_rate_limiter.rs:20`  `pub struct QueueBasedTokenBucketLimiter {`
+- `src/queue_based_rate_limiter.rs:230`  `pub struct QueueBasedRateLimiterManager {`
+- `src/rate_limiter.rs:12`  `pub struct TokenBucketLimiter {`
+- `src/rate_limiter.rs:155`  `pub struct RateLimiterManager {`
+- `src/score/mod.rs:1`  `pub use terraphim_types::score::*;`
+- `src/summarization_manager.rs:78`  `pub async fn summarize_document_with_config(`
 - `src/summarization_queue.rs:15`  `pub struct TaskId(pub Uuid);`
 - `src/summarization_queue.rs:24`  `pub fn new() -> Self {`
 - `src/summarization_queue.rs:37`  `pub enum Priority {`
@@ -1694,61 +1800,113 @@
 - `src/summarization_queue.rs:267`  `pub struct QueueStats {`
 - `src/summarization_queue.rs:292`  `pub struct RateLimiterStatus {`
 - `src/summarization_queue.rs:305`  `pub enum SubmitResult {`
-- `src/summarization_manager.rs:78`  `pub async fn summarize_document_with_config(`
-- `src/llm.rs:8`  `pub use self::router_config::{MergedRouterConfig, RouterMode};`
-- `src/llm.rs:21`  `pub struct SummarizeOptions {`
-- `src/llm.rs:27`  `pub struct ChatOptions {`
-- `src/llm.rs:33`  `pub trait LlmClient: Send + Sync {`
-- `src/rate_limiter.rs:12`  `pub struct TokenBucketLimiter {`
-- `src/rate_limiter.rs:155`  `pub struct RateLimiterManager {`
-- `src/error.rs:28`  `pub enum ErrorCategory {`
-- `src/error.rs:47`  `pub enum CommonError {`
-- `src/error.rs:116`  `pub fn network(message: impl Into<String>) -> Self {`
-- `src/error.rs:123`  `pub fn network_with_source(`
-- `src/error.rs:133`  `pub fn config(message: impl Into<String>) -> Self {`
-- `src/error.rs:140`  `pub fn config_field(message: impl Into<String>, field: impl Into<String>) -> Sel`
-- `src/error.rs:147`  `pub fn validation(message: impl Into<String>) -> Self {`
-- `src/error.rs:154`  `pub fn validation_field(message: impl Into<String>, field: impl Into<String>) ->`
-- `src/error.rs:161`  `pub fn auth(message: impl Into<String>) -> Self {`
-- `src/error.rs:167`  `pub fn storage(message: impl Into<String>) -> Self {`
-- `src/error.rs:174`  `pub fn storage_with_source(`
-- `src/error.rs:184`  `pub fn integration(service: impl Into<String>, message: impl Into<String>) -> Se`
-- `src/error.rs:192`  `pub fn integration_with_source(`
-- `src/error.rs:204`  `pub fn system(message: impl Into<String>) -> Self {`
-- `src/error.rs:211`  `pub fn system_with_source(`
-- `src/conversation_service.rs:14`  `pub struct ConversationFilter {`
-- `src/conversation_service.rs:31`  `pub struct ConversationStatistics {`
-- `src/queue_based_rate_limiter.rs:20`  `pub struct QueueBasedTokenBucketLimiter {`
-- `src/queue_based_rate_limiter.rs:230`  `pub struct QueueBasedRateLimiterManager {`
-- `src/llm/router_config.rs:7`  `pub use terraphim_config::llm_router::{LlmRouterConfig, RouterMode, RouterStrate`
-- `src/llm/router_config.rs:11`  `pub struct MergedRouterConfig {`
-- `src/llm/proxy_client.rs:19`  `pub struct ProxyClientConfig {`
-- `src/llm/proxy_client.rs:45`  `pub struct ProxyLlmClient {`
-- `src/llm/proxy_client.rs:65`  `pub fn is_proxy_mode(&self) -> bool {`
-- `src/llm/proxy_client.rs:71`  `pub fn name(&self) -> &'static str {`
+
+### terraphim_agent_application (83 gaps)
+
+- `src/application.rs:24`  `pub trait Application: Send + Sync {`
+- `src/application.rs:68`  `pub struct ApplicationState {`
+- `src/application.rs:89`  `pub enum ApplicationStatus {`
+- `src/application.rs:106`  `pub struct HealthStatus {`
+- `src/application.rs:119`  `pub enum HealthLevel {`
+- `src/application.rs:128`  `pub struct ComponentHealth {`
+- `src/application.rs:141`  `pub struct HealthMetrics {`
+- `src/application.rs:160`  `pub struct AgentInfo {`
+- `src/application.rs:179`  `pub struct SupervisorInfo {`
+- `src/application.rs:194`  `pub struct SystemMetrics {`
+- `src/application.rs:213`  `pub enum SystemMessage {`
+- `src/config.rs:18`  `pub struct ApplicationConfig {`
+- `src/config.rs:39`  `pub struct ApplicationMetadata {`
+- `src/config.rs:54`  `pub struct SupervisionConfig {`
+- `src/config.rs:69`  `pub struct DeploymentConfig {`
+- `src/config.rs:84`  `pub struct ScalingThresholds {`
+- `src/config.rs:101`  `pub struct HealthConfig {`
+- `src/config.rs:116`  `pub struct AlertThresholds {`
+- `src/config.rs:129`  `pub struct HotReloadConfig {`
+- `src/config.rs:144`  `pub struct LoggingConfig {`
+- `src/config.rs:159`  `pub struct ResourceConfig {`
+- `src/config.rs:174`  `pub struct AgentConfig {`
+- `src/config.rs:187`  `pub struct ResourceLimits {`
+- `src/config.rs:281`  `pub struct ConfigurationChange {`
+- `src/config.rs:296`  `pub enum ConfigurationChangeType {`
+- `src/deployment.rs:14`  `pub trait DeploymentManagement: Send + Sync {`
+- `src/deployment.rs:47`  `pub struct AgentDeploymentSpec {`
+- `src/deployment.rs:60`  `pub struct ResourceRequirements {`
+- `src/deployment.rs:71`  `pub enum DeploymentStrategy {`
+- `src/deployment.rs:84`  `pub struct AgentDeploymentInfo {`
+- `src/deployment.rs:99`  `pub struct DeploymentStatus {`
+- `src/deployment.rs:112`  `pub struct ResourceUsage {`
+- `src/deployment.rs:123`  `pub struct ResourceUtilization {`
+- `src/diagnostics.rs:16`  `pub trait DiagnosticsManagement: Send + Sync {`
+- `src/diagnostics.rs:48`  `pub struct DiagnosticsReport {`
+- `src/diagnostics.rs:65`  `pub struct SystemHealth {`
+- `src/diagnostics.rs:78`  `pub enum HealthStatus {`
+- `src/diagnostics.rs:88`  `pub struct ComponentHealth {`
+- `src/diagnostics.rs:103`  `pub struct HealthIssue {`
+- `src/diagnostics.rs:118`  `pub enum IssueSeverity {`
+- `src/diagnostics.rs:127`  `pub struct SystemMetrics {`
+- `src/diagnostics.rs:142`  `pub struct CpuMetrics {`
+- `src/diagnostics.rs:157`  `pub struct MemoryMetrics {`
+- `src/diagnostics.rs:172`  `pub struct DiskMetrics {`
+- `src/diagnostics.rs:189`  `pub struct NetworkMetrics {`
+- `src/diagnostics.rs:204`  `pub struct ApplicationMetrics {`
+- `src/diagnostics.rs:221`  `pub struct PerformanceReport {`
+- `src/diagnostics.rs:236`  `pub struct ThroughputMetrics {`
+- `src/diagnostics.rs:249`  `pub struct LatencyMetrics {`
+- `src/diagnostics.rs:262`  `pub struct EfficiencyMetrics {`
+- `src/diagnostics.rs:275`  `pub struct PerformanceTrends {`
+- `src/diagnostics.rs:288`  `pub struct ResourceUtilization {`
+- `src/diagnostics.rs:303`  `pub struct DiagnosticCheck {`
+- `src/diagnostics.rs:320`  `pub enum CheckType {`
+- `src/diagnostics.rs:335`  `pub struct CheckResult {`
+- `src/diagnostics.rs:352`  `pub struct MetricsSnapshot {`
+- `src/error.rs:7`  `pub enum ApplicationError {`
+- `src/hot_reload.rs:16`  `pub trait HotReloadManagement: Send + Sync {`
+- `src/hot_reload.rs:51`  `pub struct ComponentSpec {`
+- `src/hot_reload.rs:68`  `pub enum ComponentType {`
+- `src/hot_reload.rs:83`  `pub enum ReloadStrategy {`
+- `src/hot_reload.rs:96`  `pub struct ReloadEvent {`
+- `src/hot_reload.rs:113`  `pub enum ReloadType {`
+- `src/hot_reload.rs:126`  `pub struct ReloadStatus {`
+- `src/hot_reload.rs:141`  `pub struct ReloadStatistics {`
+- `src/lib.rs:24`  `pub mod application;`
+- `src/lib.rs:25`  `pub mod config;`
+- `src/lib.rs:26`  `pub mod deployment;`
+- `src/lib.rs:27`  `pub mod diagnostics;`
+- `src/lib.rs:28`  `pub mod error;`
+- `src/lib.rs:29`  `pub mod hot_reload;`
+- `src/lib.rs:30`  `pub mod lifecycle;`
+- `src/lib.rs:32`  `pub use application::*;`
+- `src/lib.rs:33`  `pub use config::*;`
+- `src/lib.rs:34`  `pub use deployment::*;`
+- `src/lib.rs:35`  `pub use diagnostics::*;`
+- `src/lib.rs:36`  `pub use error::*;`
+- `src/lib.rs:37`  `pub use hot_reload::*;`
+- `src/lib.rs:38`  `pub use lifecycle::*;`
+- `src/lib.rs:41`  `pub use terraphim_agent_supervisor::{AgentPid, SupervisorId};`
+- `src/lib.rs:42`  `pub use terraphim_kg_orchestration::SupervisionTreeOrchestrator;`
+- `src/lifecycle.rs:14`  `pub trait LifecycleManagement: Send + Sync {`
+- `src/lifecycle.rs:38`  `pub struct LifecycleStatus {`
 
 ### terraphim_rlm (81 gaps)
 
-- `src/logger.rs:28`  `pub enum TrajectoryEvent {`
-- `src/logger.rs:361`  `pub struct TrajectoryLoggerConfig {`
-- `src/logger.rs:647`  `pub fn log_command_executed(`
-- `src/logger.rs:681`  `pub fn log_query_complete(`
-- `src/llm_bridge.rs:34`  `pub struct QueryRequest {`
-- `src/llm_bridge.rs:58`  `pub struct QueryResponse {`
-- `src/llm_bridge.rs:73`  `pub struct BatchedQueryRequest {`
-- `src/llm_bridge.rs:80`  `pub struct BatchedQueryResponse {`
-- `src/llm_bridge.rs:91`  `pub struct LlmBridgeConfig {`
-- `src/rlm.rs:789`  `pub struct LlmQueryResult {`
-- `src/rlm.rs:800`  `pub struct SessionStatus {`
-- `src/query_loop.rs:24`  `pub use crate::llm_bridge::QueryResponse as LlmResponse;`
-- `src/query_loop.rs:31`  `pub struct QueryLoopResult {`
-- `src/query_loop.rs:48`  `pub enum TerminationReason {`
-- `src/query_loop.rs:69`  `pub struct QueryLoopConfig {`
+- `src/budget.rs:199`  `pub fn reset(&self) {`
 - `src/config.rs:10`  `pub struct RlmConfig {`
 - `src/config.rs:278`  `pub enum KgStrictness {`
 - `src/config.rs:313`  `pub enum BackendType {`
 - `src/config.rs:335`  `pub enum SessionModel {`
 - `src/config.rs:345`  `pub struct BackendSessionConfig {`
+- `src/error.rs:11`  `pub enum RlmError {`
+- `src/error.rs:290`  `pub struct McpError {`
+- `src/executor/context.rs:14`  `pub struct SnapshotId {`
+- `src/executor/context.rs:45`  `pub struct ExecutionContext {`
+- `src/executor/context.rs:137`  `pub struct ExecutionResult {`
+- `src/executor/context.rs:226`  `pub struct ValidationResult {`
+- `src/executor/context.rs:281`  `pub enum Capability {`
+- `src/executor/mod.rs:27`  `pub use context::{Capability, ExecutionContext, ExecutionResult, SnapshotId, Val`
+- `src/executor/mod.rs:28`  `pub use firecracker::FirecrackerExecutor;`
+- `src/executor/mod.rs:29`  `pub use ssh::SshExecutor;`
+- `src/executor/mod.rs:30`  `pub use r#trait::ExecutionEnvironment;`
+- `src/executor/trait.rs:33`  `pub trait ExecutionEnvironment: Send + Sync {`
 - `src/lib.rs:53`  `pub mod config;`
 - `src/lib.rs:54`  `pub mod error;`
 - `src/lib.rs:55`  `pub mod types;`
@@ -1775,20 +1933,29 @@
 - `src/lib.rs:108`  `pub use session::{SessionManager, SessionStats};`
 - `src/lib.rs:109`  `pub use types::{`
 - `src/lib.rs:114`  `pub use validator::{`
-- `src/budget.rs:199`  `pub fn reset(&self) {`
-- `src/validator.rs:36`  `pub struct ValidatorConfig {`
-- `src/validator.rs:82`  `pub struct ValidationResult {`
-- `src/validator.rs:166`  `pub struct ValidationContext {`
-- `src/session.rs:465`  `pub struct SessionStats {`
-- `src/parser.rs:23`  `pub struct CommandParser {`
+- `src/llm_bridge.rs:34`  `pub struct QueryRequest {`
+- `src/llm_bridge.rs:58`  `pub struct QueryResponse {`
+- `src/llm_bridge.rs:73`  `pub struct BatchedQueryRequest {`
+- `src/llm_bridge.rs:80`  `pub struct BatchedQueryResponse {`
+- `src/llm_bridge.rs:91`  `pub struct LlmBridgeConfig {`
+- `src/logger.rs:28`  `pub enum TrajectoryEvent {`
+- `src/logger.rs:361`  `pub struct TrajectoryLoggerConfig {`
+- `src/logger.rs:647`  `pub fn log_command_executed(`
+- `src/logger.rs:681`  `pub fn log_query_complete(`
 - `src/mcp_tools.rs:25`  `pub struct RlmMcpService {`
 - `src/mcp_tools.rs:776`  `pub struct RlmCodeResponse {`
 - `src/mcp_tools.rs:786`  `pub struct RlmBashResponse {`
 - `src/mcp_tools.rs:796`  `pub struct RlmQueryResponse {`
 - `src/mcp_tools.rs:804`  `pub struct RlmContextResponse {`
 - `src/mcp_tools.rs:816`  `pub struct RlmSnapshotResponse {`
-- `src/error.rs:11`  `pub enum RlmError {`
-- `src/error.rs:290`  `pub struct McpError {`
+- `src/parser.rs:23`  `pub struct CommandParser {`
+- `src/query_loop.rs:24`  `pub use crate::llm_bridge::QueryResponse as LlmResponse;`
+- `src/query_loop.rs:31`  `pub struct QueryLoopResult {`
+- `src/query_loop.rs:48`  `pub enum TerminationReason {`
+- `src/query_loop.rs:69`  `pub struct QueryLoopConfig {`
+- `src/rlm.rs:789`  `pub struct LlmQueryResult {`
+- `src/rlm.rs:800`  `pub struct SessionStatus {`
+- `src/session.rs:465`  `pub struct SessionStats {`
 - `src/types.rs:16`  `pub struct SessionId(pub Ulid);`
 - `src/types.rs:54`  `pub enum SessionState {`
 - `src/types.rs:72`  `pub struct SessionInfo {`
@@ -1800,21 +1967,33 @@
 - `src/types.rs:281`  `pub struct QueryMetadata {`
 - `src/types.rs:333`  `pub struct CommandHistory {`
 - `src/types.rs:362`  `pub struct CommandHistoryEntry {`
-- `src/executor/context.rs:14`  `pub struct SnapshotId {`
-- `src/executor/context.rs:45`  `pub struct ExecutionContext {`
-- `src/executor/context.rs:137`  `pub struct ExecutionResult {`
-- `src/executor/context.rs:226`  `pub struct ValidationResult {`
-- `src/executor/context.rs:281`  `pub enum Capability {`
-- `src/executor/mod.rs:27`  `pub use context::{Capability, ExecutionContext, ExecutionResult, SnapshotId, Val`
-- `src/executor/mod.rs:28`  `pub use firecracker::FirecrackerExecutor;`
-- `src/executor/mod.rs:29`  `pub use ssh::SshExecutor;`
-- `src/executor/mod.rs:30`  `pub use r#trait::ExecutionEnvironment;`
-- `src/executor/trait.rs:33`  `pub trait ExecutionEnvironment: Send + Sync {`
+- `src/validator.rs:36`  `pub struct ValidatorConfig {`
+- `src/validator.rs:82`  `pub struct ValidationResult {`
+- `src/validator.rs:166`  `pub struct ValidationContext {`
 
 ### terraphim_tinyclaw (81 gaps)
 
+- `src/agent/agent_loop.rs:20`  `pub struct ToolCallingConfig {`
+- `src/agent/execution_guard.rs:9`  `pub enum GuardDecision {`
+- `src/agent/execution_guard.rs:202`  `pub fn to_error(&self, tool_name: &str, decision: GuardDecision) -> Result<(), T`
+- `src/agent/mod.rs:4`  `pub mod execution_guard;`
+- `src/agent/mod.rs:5`  `pub mod proxy_client;`
+- `src/agent/proxy_client.rs:12`  `pub struct ProxyClientConfig {`
+- `src/agent/proxy_client.rs:233`  `pub struct Message {`
+- `src/agent/proxy_client.rs:266`  `pub struct ToolDefinition {`
+- `src/agent/proxy_client.rs:274`  `pub struct ProxyResponse {`
+- `src/agent/proxy_client.rs:284`  `pub struct TokenUsage {`
 - `src/bus.rs:8`  `pub struct InboundMessage {`
 - `src/bus.rs:70`  `pub struct OutboundMessage {`
+- `src/channel.rs:9`  `pub trait Channel: Send + Sync {`
+- `src/channels/mod.rs:4`  `pub mod telegram;`
+- `src/channels/mod.rs:7`  `pub mod discord;`
+- `src/channels/mod.rs:10`  `pub mod slack;`
+- `src/channels/mod.rs:17`  `pub mod cli;`
+- `src/commands/mod.rs:13`  `pub enum CommandError {`
+- `src/commands/mod.rs:34`  `pub struct MarkdownCommand {`
+- `src/commands/mod.rs:51`  `pub struct CommandArgument {`
+- `src/commands/mod.rs:67`  `pub enum CommandStep {`
 - `src/config.rs:6`  `pub struct Config {`
 - `src/config.rs:49`  `pub struct AgentConfig {`
 - `src/config.rs:81`  `pub fn validate(&self) -> anyhow::Result<()> {`
@@ -1848,13 +2027,12 @@
 - `src/session.rs:56`  `pub enum MessageRole {`
 - `src/session.rs:65`  `pub struct Session {`
 - `src/session.rs:303`  `pub struct SessionInfo {`
-- `src/channel.rs:9`  `pub trait Channel: Send + Sync {`
+- `src/skills/executor.rs:17`  `pub enum SkillError {`
 - `src/skills/mod.rs:7`  `pub mod monitor;`
 - `src/skills/mod.rs:8`  `pub mod types;`
 - `src/skills/mod.rs:11`  `pub use executor::SkillExecutor;`
 - `src/skills/mod.rs:13`  `pub use monitor::{ExecutionReport, ProgressTracker, SkillMonitor};`
 - `src/skills/mod.rs:15`  `pub use types::{Skill, SkillInput, SkillResult, SkillStatus, SkillStep};`
-- `src/skills/executor.rs:17`  `pub enum SkillError {`
 - `src/skills/monitor.rs:12`  `pub struct SkillMonitor {`
 - `src/skills/monitor.rs:177`  `pub struct ExecutionReport {`
 - `src/skills/monitor.rs:194`  `pub struct StepReport {`
@@ -1876,37 +2054,29 @@
 - `src/tools/mod.rs:34`  `pub enum ToolError {`
 - `src/tools/mod.rs:59`  `pub trait Tool: Send + Sync {`
 - `src/tools/web.rs:7`  `pub trait SearchProvider: Send + Sync {`
-- `src/commands/mod.rs:13`  `pub enum CommandError {`
-- `src/commands/mod.rs:34`  `pub struct MarkdownCommand {`
-- `src/commands/mod.rs:51`  `pub struct CommandArgument {`
-- `src/commands/mod.rs:67`  `pub enum CommandStep {`
-- `src/agent/mod.rs:4`  `pub mod execution_guard;`
-- `src/agent/mod.rs:5`  `pub mod proxy_client;`
-- `src/agent/execution_guard.rs:9`  `pub enum GuardDecision {`
-- `src/agent/execution_guard.rs:202`  `pub fn to_error(&self, tool_name: &str, decision: GuardDecision) -> Result<(), T`
-- `src/agent/proxy_client.rs:12`  `pub struct ProxyClientConfig {`
-- `src/agent/proxy_client.rs:233`  `pub struct Message {`
-- `src/agent/proxy_client.rs:266`  `pub struct ToolDefinition {`
-- `src/agent/proxy_client.rs:274`  `pub struct ProxyResponse {`
-- `src/agent/proxy_client.rs:284`  `pub struct TokenUsage {`
-- `src/agent/agent_loop.rs:20`  `pub struct ToolCallingConfig {`
-- `src/channels/mod.rs:4`  `pub mod telegram;`
-- `src/channels/mod.rs:7`  `pub mod discord;`
-- `src/channels/mod.rs:10`  `pub mod slack;`
-- `src/channels/mod.rs:17`  `pub mod cli;`
 
-### terraphim_automata (77 gaps)
+### terraphim_automata (78 gaps)
 
-- `src/umls.rs:14`  `pub struct UmlsConcept {`
-- `src/umls.rs:47`  `pub struct UmlsDataset {`
-- `src/umls.rs:141`  `pub struct UmlsStats {`
-- `src/umls_extractor.rs:10`  `pub struct UmlsMatch {`
-- `src/umls_extractor.rs:175`  `pub struct UmlsExtractorStats {`
-- `src/markdown_directives.rs:9`  `pub struct MarkdownDirectiveWarning {`
-- `src/markdown_directives.rs:16`  `pub struct MarkdownDirectivesParseResult {`
-- `src/markdown_directives.rs:21`  `pub fn parse_markdown_directives_dir(root: &Path) -> crate::Result<MarkdownDirec`
-- `src/url_protector.rs:55`  `pub struct ProtectedUrl {`
-- `src/url_protector.rs:64`  `pub struct UrlProtector;`
+- `src/autocomplete.rs:12`  `pub struct AutocompleteIndex {`
+- `src/autocomplete.rs:23`  `pub struct AutocompleteMetadata {`
+- `src/autocomplete.rs:41`  `pub struct AutocompleteResult {`
+- `src/autocomplete.rs:51`  `pub struct AutocompleteConfig {`
+- `src/autocomplete.rs:173`  `pub async fn load_autocomplete_index(`
+- `src/autocomplete.rs:436`  `pub fn fuzzy_autocomplete_search_jaro_winkler(`
+- `src/builder.rs:19`  `pub enum BuilderError {`
+- `src/builder.rs:28`  `pub type Result<T> = std::result::Result<T, BuilderError>;`
+- `src/builder.rs:99`  `pub struct Logseq {`
+- `src/builder.rs:142`  `pub struct LogseqService {`
+- `src/builder.rs:161`  `pub async fn get_raw_messages(&self, needle: &str, haystack: &Path) -> Result<Ve`
+- `src/builder.rs:288`  `pub enum Message {`
+- `src/builder.rs:297`  `pub struct Begin {`
+- `src/builder.rs:308`  `pub struct End {`
+- `src/builder.rs:315`  `pub struct Summary {`
+- `src/builder.rs:321`  `pub struct Match {`
+- `src/builder.rs:332`  `pub struct Context {`
+- `src/builder.rs:343`  `pub struct SubMatch {`
+- `src/builder.rs:352`  `pub enum Data {`
+- `src/builder.rs:386`  `pub fn json_decode(jsonlines: &str) -> Result<Vec<Message>> {`
 - `src/evaluation.rs:17`  `pub struct GroundTruthDocument {`
 - `src/evaluation.rs:28`  `pub struct ExpectedMatch {`
 - `src/evaluation.rs:37`  `pub struct ClassificationMetrics {`
@@ -1934,6 +2104,7 @@
 - `src/lib.rs:153`  `pub use snomed::{SemanticType, SnomedConcept, SnomedMatch};`
 - `src/lib.rs:155`  `pub use umls::{UmlsConcept, UmlsDataset, UmlsStats};`
 - `src/lib.rs:157`  `pub use umls_extractor::{UmlsExtractor, UmlsExtractorStats, UmlsMatch};`
+- `src/lib.rs:160`  `pub mod autocomplete_helpers {`
 - `src/lib.rs:162`  `pub fn iter_metadata(`
 - `src/lib.rs:167`  `pub fn get_metadata<'a>(`
 - `src/lib.rs:176`  `pub use autocomplete::load_autocomplete_index;`
@@ -1943,119 +2114,70 @@
 - `src/lib.rs:343`  `pub async fn load_thesaurus_from_json_and_replace_async(`
 - `src/lib.rs:425`  `pub async fn load_thesaurus(automata_path: &AutomataPath) -> Result<Thesaurus> {`
 - `src/lib.rs:478`  `pub fn load_thesaurus(automata_path: &AutomataPath) -> Result<Thesaurus> {`
-- `src/builder.rs:19`  `pub enum BuilderError {`
-- `src/builder.rs:28`  `pub type Result<T> = std::result::Result<T, BuilderError>;`
-- `src/builder.rs:46`  `pub struct Logseq {`
-- `src/builder.rs:70`  `pub struct LogseqService {`
-- `src/builder.rs:89`  `pub async fn get_raw_messages(&self, needle: &str, haystack: &Path) -> Result<Ve`
-- `src/builder.rs:216`  `pub enum Message {`
-- `src/builder.rs:225`  `pub struct Begin {`
-- `src/builder.rs:236`  `pub struct End {`
-- `src/builder.rs:243`  `pub struct Summary {`
-- `src/builder.rs:249`  `pub struct Match {`
-- `src/builder.rs:260`  `pub struct Context {`
-- `src/builder.rs:271`  `pub struct SubMatch {`
-- `src/builder.rs:280`  `pub enum Data {`
-- `src/builder.rs:314`  `pub fn json_decode(jsonlines: &str) -> Result<Vec<Message>> {`
+- `src/markdown_directives.rs:9`  `pub struct MarkdownDirectiveWarning {`
+- `src/markdown_directives.rs:16`  `pub struct MarkdownDirectivesParseResult {`
+- `src/markdown_directives.rs:21`  `pub fn parse_markdown_directives_dir(root: &Path) -> crate::Result<MarkdownDirec`
 - `src/matcher.rs:9`  `pub struct Matched {`
 - `src/matcher.rs:18`  `pub fn find_matches(`
 - `src/matcher.rs:83`  `pub enum LinkType {`
+- `src/medical_artifact.rs:25`  `pub struct PatternMeta {`
+- `src/medical_artifact.rs:32`  `pub struct ArtifactHeader {`
+- `src/medical_extractor.rs:200`  `pub struct ExtractedEntity {`
 - `src/snomed.rs:11`  `pub enum SemanticType {`
 - `src/snomed.rs:35`  `pub struct SnomedConcept {`
 - `src/snomed.rs:52`  `pub fn new(id: u64, term: String, semantic_type: SemanticType) -> Self {`
 - `src/snomed.rs:65`  `pub struct SnomedMatch {`
 - `src/snomed.rs:82`  `pub struct SnomedSubset {`
-- `src/autocomplete.rs:12`  `pub struct AutocompleteIndex {`
-- `src/autocomplete.rs:23`  `pub struct AutocompleteMetadata {`
-- `src/autocomplete.rs:41`  `pub struct AutocompleteResult {`
-- `src/autocomplete.rs:51`  `pub struct AutocompleteConfig {`
-- `src/autocomplete.rs:173`  `pub async fn load_autocomplete_index(`
-- `src/autocomplete.rs:436`  `pub fn fuzzy_autocomplete_search_jaro_winkler(`
-- `src/medical_extractor.rs:200`  `pub struct ExtractedEntity {`
-- `src/medical_artifact.rs:25`  `pub struct PatternMeta {`
-- `src/medical_artifact.rs:32`  `pub struct ArtifactHeader {`
+- `src/umls.rs:14`  `pub struct UmlsConcept {`
+- `src/umls.rs:47`  `pub struct UmlsDataset {`
+- `src/umls.rs:141`  `pub struct UmlsStats {`
+- `src/umls_extractor.rs:10`  `pub struct UmlsMatch {`
+- `src/umls_extractor.rs:175`  `pub struct UmlsExtractorStats {`
+- `src/url_protector.rs:55`  `pub struct ProtectedUrl {`
+- `src/url_protector.rs:64`  `pub struct UrlProtector;`
 
-### terraphim_agent_application (76 gaps)
+### terraphim_agent_registry (71 gaps)
 
-- `src/application.rs:24`  `pub trait Application: Send + Sync {`
-- `src/application.rs:68`  `pub struct ApplicationState {`
-- `src/application.rs:89`  `pub enum ApplicationStatus {`
-- `src/application.rs:106`  `pub struct HealthStatus {`
-- `src/application.rs:119`  `pub enum HealthLevel {`
-- `src/application.rs:128`  `pub struct ComponentHealth {`
-- `src/application.rs:141`  `pub struct HealthMetrics {`
-- `src/application.rs:160`  `pub struct AgentInfo {`
-- `src/application.rs:179`  `pub struct SupervisorInfo {`
-- `src/application.rs:194`  `pub struct SystemMetrics {`
-- `src/application.rs:213`  `pub enum SystemMessage {`
-- `src/lifecycle.rs:14`  `pub trait LifecycleManagement: Send + Sync {`
-- `src/lifecycle.rs:38`  `pub struct LifecycleStatus {`
-- `src/config.rs:18`  `pub struct ApplicationConfig {`
-- `src/config.rs:39`  `pub struct ApplicationMetadata {`
-- `src/config.rs:54`  `pub struct SupervisionConfig {`
-- `src/config.rs:69`  `pub struct DeploymentConfig {`
-- `src/config.rs:84`  `pub struct ScalingThresholds {`
-- `src/config.rs:101`  `pub struct HealthConfig {`
-- `src/config.rs:116`  `pub struct AlertThresholds {`
-- `src/config.rs:129`  `pub struct HotReloadConfig {`
-- `src/config.rs:144`  `pub struct LoggingConfig {`
-- `src/config.rs:159`  `pub struct ResourceConfig {`
-- `src/config.rs:174`  `pub struct AgentConfig {`
-- `src/config.rs:187`  `pub struct ResourceLimits {`
-- `src/config.rs:281`  `pub struct ConfigurationChange {`
-- `src/config.rs:296`  `pub enum ConfigurationChangeType {`
-- `src/hot_reload.rs:16`  `pub trait HotReloadManagement: Send + Sync {`
-- `src/hot_reload.rs:51`  `pub struct ComponentSpec {`
-- `src/hot_reload.rs:68`  `pub enum ComponentType {`
-- `src/hot_reload.rs:83`  `pub enum ReloadStrategy {`
-- `src/hot_reload.rs:96`  `pub struct ReloadEvent {`
-- `src/hot_reload.rs:113`  `pub enum ReloadType {`
-- `src/hot_reload.rs:126`  `pub struct ReloadStatus {`
-- `src/hot_reload.rs:141`  `pub struct ReloadStatistics {`
-- `src/lib.rs:24`  `pub mod application;`
-- `src/lib.rs:25`  `pub mod config;`
-- `src/lib.rs:26`  `pub mod deployment;`
-- `src/lib.rs:27`  `pub mod diagnostics;`
-- `src/lib.rs:28`  `pub mod error;`
-- `src/lib.rs:29`  `pub mod hot_reload;`
-- `src/lib.rs:30`  `pub mod lifecycle;`
-- `src/lib.rs:41`  `pub use terraphim_agent_supervisor::{AgentPid, SupervisorId};`
-- `src/lib.rs:42`  `pub use terraphim_kg_orchestration::SupervisionTreeOrchestrator;`
-- `src/error.rs:7`  `pub enum ApplicationError {`
-- `src/deployment.rs:14`  `pub trait DeploymentManagement: Send + Sync {`
-- `src/deployment.rs:47`  `pub struct AgentDeploymentSpec {`
-- `src/deployment.rs:60`  `pub struct ResourceRequirements {`
-- `src/deployment.rs:71`  `pub enum DeploymentStrategy {`
-- `src/deployment.rs:84`  `pub struct AgentDeploymentInfo {`
-- `src/deployment.rs:99`  `pub struct DeploymentStatus {`
-- `src/deployment.rs:112`  `pub struct ResourceUsage {`
-- `src/deployment.rs:123`  `pub struct ResourceUtilization {`
-- `src/diagnostics.rs:16`  `pub trait DiagnosticsManagement: Send + Sync {`
-- `src/diagnostics.rs:48`  `pub struct DiagnosticsReport {`
-- `src/diagnostics.rs:65`  `pub struct SystemHealth {`
-- `src/diagnostics.rs:78`  `pub enum HealthStatus {`
-- `src/diagnostics.rs:88`  `pub struct ComponentHealth {`
-- `src/diagnostics.rs:103`  `pub struct HealthIssue {`
-- `src/diagnostics.rs:118`  `pub enum IssueSeverity {`
-- `src/diagnostics.rs:127`  `pub struct SystemMetrics {`
-- `src/diagnostics.rs:142`  `pub struct CpuMetrics {`
-- `src/diagnostics.rs:157`  `pub struct MemoryMetrics {`
-- `src/diagnostics.rs:172`  `pub struct DiskMetrics {`
-- `src/diagnostics.rs:189`  `pub struct NetworkMetrics {`
-- `src/diagnostics.rs:204`  `pub struct ApplicationMetrics {`
-- `src/diagnostics.rs:221`  `pub struct PerformanceReport {`
-- `src/diagnostics.rs:236`  `pub struct ThroughputMetrics {`
-- `src/diagnostics.rs:249`  `pub struct LatencyMetrics {`
-- `src/diagnostics.rs:262`  `pub struct EfficiencyMetrics {`
-- `src/diagnostics.rs:275`  `pub struct PerformanceTrends {`
-- `src/diagnostics.rs:288`  `pub struct ResourceUtilization {`
-- `src/diagnostics.rs:303`  `pub struct DiagnosticCheck {`
-- `src/diagnostics.rs:320`  `pub enum CheckType {`
-- `src/diagnostics.rs:335`  `pub struct CheckResult {`
-- `src/diagnostics.rs:352`  `pub struct MetricsSnapshot {`
-
-### terraphim_agent_registry (63 gaps)
-
+- `src/capabilities.rs:26`  `pub struct CapabilityQuery {`
+- `src/capabilities.rs:43`  `pub struct IORequirements {`
+- `src/capabilities.rs:54`  `pub struct CapabilityMatch {`
+- `src/capabilities.rs:67`  `pub struct CapabilityMatchDetails {`
+- `src/capabilities.rs:84`  `pub struct CapabilityTemplate {`
+- `src/capabilities.rs:618`  `pub struct CapabilityRegistryStats {`
+- `src/discovery.rs:17`  `pub enum DiscoveryAlgorithm {`
+- `src/discovery.rs:32`  `pub struct DiscoveryContext {`
+- `src/discovery.rs:45`  `pub struct UserPreferences {`
+- `src/discovery.rs:249`  `pub fn new(similarity_threshold: f64) -> Self {`
+- `src/error.rs:8`  `pub enum RegistryError {`
+- `src/error.rs:86`  `pub enum ErrorCategory {`
+- `src/knowledge_graph.rs:17`  `pub struct KnowledgeGraphIntegration {`
+- `src/knowledge_graph.rs:30`  `pub struct AutomataConfig {`
+- `src/knowledge_graph.rs:54`  `pub struct SimilarityThresholds {`
+- `src/knowledge_graph.rs:78`  `pub struct QueryResult {`
+- `src/knowledge_graph.rs:93`  `pub struct ConnectivityResult {`
+- `src/knowledge_graph.rs:106`  `pub struct AgentDiscoveryQuery {`
+- `src/knowledge_graph.rs:125`  `pub struct AgentDiscoveryResult {`
+- `src/knowledge_graph.rs:136`  `pub struct AgentMatch {`
+- `src/knowledge_graph.rs:149`  `pub struct ScoreBreakdown {`
+- `src/knowledge_graph.rs:164`  `pub struct QueryAnalysis {`
+- `src/lib.rs:21`  `pub use terraphim_agent_supervisor::{AgentPid, SupervisorId};`
+- `src/lib.rs:22`  `pub use terraphim_agent_supervisor::{AgentSpec, RestartStrategy};`
+- `src/lib.rs:25`  `pub type GenAgentResult<T> = Result<T, Box<dyn std::error::Error + Send + Sync>>`
+- `src/lib.rs:26`  `pub use terraphim_types::*;`
+- `src/lib.rs:28`  `pub mod capabilities;`
+- `src/lib.rs:29`  `pub mod discovery;`
+- `src/lib.rs:30`  `pub mod error;`
+- `src/lib.rs:31`  `pub mod knowledge_graph;`
+- `src/lib.rs:32`  `pub mod matching;`
+- `src/lib.rs:33`  `pub mod metadata;`
+- `src/lib.rs:34`  `pub mod registry;`
+- `src/lib.rs:36`  `pub use capabilities::*;`
+- `src/lib.rs:37`  `pub use discovery::*;`
+- `src/lib.rs:38`  `pub use error::*;`
+- `src/lib.rs:39`  `pub use knowledge_graph::*;`
+- `src/lib.rs:40`  `pub use matching::*;`
+- `src/lib.rs:41`  `pub use metadata::*;`
+- `src/lib.rs:42`  `pub use registry::*;`
 - `src/matching.rs:45`  `pub struct MockAutomata;`
 - `src/matching.rs:46`  `pub type Automata = MockAutomata;`
 - `src/matching.rs:52`  `pub struct Task {`
@@ -2068,37 +2190,6 @@
 - `src/matching.rs:164`  `pub trait KnowledgeGraphAgentMatcher: Send + Sync {`
 - `src/matching.rs:197`  `pub struct TerraphimKnowledgeGraphMatcher {`
 - `src/matching.rs:210`  `pub struct MatchingConfig {`
-- `src/registry.rs:22`  `pub trait AgentRegistry: Send + Sync {`
-- `src/registry.rs:77`  `pub struct RegistryConfig {`
-- `src/registry.rs:104`  `pub struct RegistryStatistics {`
-- `src/registry.rs:464`  `pub fn new() -> Self {`
-- `src/registry.rs:473`  `pub fn with_role_graph(mut self, role_graph: Arc<RoleGraph>) -> Self {`
-- `src/registry.rs:478`  `pub fn with_config(mut self, config: RegistryConfig) -> Self {`
-- `src/registry.rs:483`  `pub fn with_automata_config(mut self, automata_config: AutomataConfig) -> Self {`
-- `src/registry.rs:488`  `pub fn with_similarity_thresholds(`
-- `src/registry.rs:496`  `pub fn build(self) -> RegistryResult<KnowledgeGraphAgentRegistry> {`
-- `src/lib.rs:21`  `pub use terraphim_agent_supervisor::{AgentPid, SupervisorId};`
-- `src/lib.rs:22`  `pub use terraphim_agent_supervisor::{AgentSpec, RestartStrategy};`
-- `src/lib.rs:25`  `pub type GenAgentResult<T> = Result<T, Box<dyn std::error::Error + Send + Sync>>`
-- `src/lib.rs:28`  `pub mod capabilities;`
-- `src/lib.rs:29`  `pub mod discovery;`
-- `src/lib.rs:30`  `pub mod error;`
-- `src/lib.rs:31`  `pub mod knowledge_graph;`
-- `src/lib.rs:32`  `pub mod matching;`
-- `src/lib.rs:33`  `pub mod metadata;`
-- `src/lib.rs:34`  `pub mod registry;`
-- `src/discovery.rs:17`  `pub enum DiscoveryAlgorithm {`
-- `src/discovery.rs:32`  `pub struct DiscoveryContext {`
-- `src/discovery.rs:45`  `pub struct UserPreferences {`
-- `src/discovery.rs:249`  `pub fn new(similarity_threshold: f64) -> Self {`
-- `src/capabilities.rs:26`  `pub struct CapabilityQuery {`
-- `src/capabilities.rs:43`  `pub struct IORequirements {`
-- `src/capabilities.rs:54`  `pub struct CapabilityMatch {`
-- `src/capabilities.rs:67`  `pub struct CapabilityMatchDetails {`
-- `src/capabilities.rs:84`  `pub struct CapabilityTemplate {`
-- `src/capabilities.rs:618`  `pub struct CapabilityRegistryStats {`
-- `src/error.rs:8`  `pub enum RegistryError {`
-- `src/error.rs:86`  `pub enum ErrorCategory {`
 - `src/metadata.rs:16`  `pub struct AgentRole {`
 - `src/metadata.rs:36`  `pub fn new(role_id: String, name: String, description: String) -> Self {`
 - `src/metadata.rs:72`  `pub struct AgentCapability {`
@@ -2109,16 +2200,82 @@
 - `src/metadata.rs:194`  `pub struct AgentLifecycle {`
 - `src/metadata.rs:227`  `pub struct KnowledgeContext {`
 - `src/metadata.rs:244`  `pub struct AgentStatistics {`
-- `src/knowledge_graph.rs:17`  `pub struct KnowledgeGraphIntegration {`
-- `src/knowledge_graph.rs:30`  `pub struct AutomataConfig {`
-- `src/knowledge_graph.rs:54`  `pub struct SimilarityThresholds {`
+- `src/registry.rs:22`  `pub trait AgentRegistry: Send + Sync {`
+- `src/registry.rs:77`  `pub struct RegistryConfig {`
+- `src/registry.rs:104`  `pub struct RegistryStatistics {`
+- `src/registry.rs:464`  `pub fn new() -> Self {`
+- `src/registry.rs:473`  `pub fn with_role_graph(mut self, role_graph: Arc<RoleGraph>) -> Self {`
+- `src/registry.rs:478`  `pub fn with_config(mut self, config: RegistryConfig) -> Self {`
+- `src/registry.rs:483`  `pub fn with_automata_config(mut self, automata_config: AutomataConfig) -> Self {`
+- `src/registry.rs:488`  `pub fn with_similarity_thresholds(`
+- `src/registry.rs:496`  `pub fn build(self) -> RegistryResult<KnowledgeGraphAgentRegistry> {`
+
+### terraphim_task_decomposition (64 gaps)
+
+- `src/analysis.rs:52`  `pub struct TaskAnalysis {`
+- `src/analysis.rs:75`  `pub struct ComplexityFactor {`
+- `src/analysis.rs:88`  `pub enum ComplexityCategory {`
+- `src/analysis.rs:105`  `pub struct RiskFactor {`
+- `src/analysis.rs:122`  `pub enum RiskCategory {`
+- `src/analysis.rs:137`  `pub struct AnalysisConfig {`
+- `src/analysis.rs:167`  `pub trait TaskAnalyzer: Send + Sync {`
+- `src/decomposition.rs:52`  `pub enum DecompositionStrategy {`
+- `src/decomposition.rs:65`  `pub struct DecompositionConfig {`
+- `src/decomposition.rs:98`  `pub struct DecompositionResult {`
+- `src/decomposition.rs:111`  `pub struct DecompositionMetadata {`
+- `src/decomposition.rs:130`  `pub trait TaskDecomposer: Send + Sync {`
+- `src/error.rs:8`  `pub enum TaskDecompositionError {`
+- `src/error.rs:96`  `pub enum ErrorCategory {`
+- `src/knowledge_graph.rs:52`  `pub struct KnowledgeGraphQuery {`
+- `src/knowledge_graph.rs:65`  `pub enum QueryType {`
 - `src/knowledge_graph.rs:78`  `pub struct QueryResult {`
-- `src/knowledge_graph.rs:93`  `pub struct ConnectivityResult {`
-- `src/knowledge_graph.rs:106`  `pub struct AgentDiscoveryQuery {`
-- `src/knowledge_graph.rs:125`  `pub struct AgentDiscoveryResult {`
-- `src/knowledge_graph.rs:136`  `pub struct AgentMatch {`
-- `src/knowledge_graph.rs:149`  `pub struct ScoreBreakdown {`
-- `src/knowledge_graph.rs:164`  `pub struct QueryAnalysis {`
+- `src/knowledge_graph.rs:89`  `pub enum QueryResultData {`
+- `src/knowledge_graph.rs:102`  `pub struct ConceptResult {`
+- `src/knowledge_graph.rs:115`  `pub struct ConnectivityResult {`
+- `src/knowledge_graph.rs:128`  `pub struct SemanticPath {`
+- `src/knowledge_graph.rs:141`  `pub struct QueryMetadata {`
+- `src/knowledge_graph.rs:154`  `pub trait KnowledgeGraphIntegration: Send + Sync {`
+- `src/knowledge_graph.rs:194`  `pub struct KnowledgeGraphConfig {`
+- `src/lib.rs:24`  `pub type AgentPid = String;`
+- `src/lib.rs:25`  `pub type AgentMetadata = std::collections::HashMap<String, String>;`
+- `src/lib.rs:26`  `pub type Goal = String;`
+- `src/lib.rs:27`  `pub type GoalId = String;`
+- `src/lib.rs:28`  `pub use terraphim_types::*;`
+- `src/lib.rs:32`  `pub struct MockAutomata;`
+- `src/lib.rs:33`  `pub type Automata = MockAutomata;`
+- `src/lib.rs:35`  `pub mod analysis;`
+- `src/lib.rs:36`  `pub mod decomposition;`
+- `src/lib.rs:37`  `pub mod error;`
+- `src/lib.rs:38`  `pub mod knowledge_graph;`
+- `src/lib.rs:39`  `pub mod planning;`
+- `src/lib.rs:40`  `pub mod system;`
+- `src/lib.rs:41`  `pub mod tasks;`
+- `src/lib.rs:43`  `pub use analysis::*;`
+- `src/lib.rs:44`  `pub use decomposition::{`
+- `src/lib.rs:48`  `pub use error::*;`
+- `src/lib.rs:49`  `pub use knowledge_graph::{`
+- `src/lib.rs:53`  `pub use planning::*;`
+- `src/lib.rs:54`  `pub use system::*;`
+- `src/lib.rs:55`  `pub use tasks::*;`
+- `src/planning.rs:22`  `pub struct ExecutionPlan {`
+- `src/planning.rs:39`  `pub struct ExecutionPhase {`
+- `src/planning.rs:54`  `pub struct ResourceRequirements {`
+- `src/planning.rs:84`  `pub struct PlanMetadata {`
+- `src/planning.rs:103`  `pub enum OptimizationStrategy {`
+- `src/planning.rs:118`  `pub struct PlanningConfig {`
+- `src/planning.rs:148`  `pub trait ExecutionPlanner: Send + Sync {`
+- `src/system.rs:26`  `pub struct TaskDecompositionWorkflow {`
+- `src/system.rs:41`  `pub struct WorkflowMetadata {`
+- `src/system.rs:58`  `pub struct TaskDecompositionSystemConfig {`
+- `src/system.rs:88`  `pub trait TaskDecompositionSystem: Send + Sync {`
+- `src/tasks.rs:18`  `pub struct Task {`
+- `src/tasks.rs:51`  `pub enum TaskComplexity {`
+- `src/tasks.rs:91`  `pub struct TaskKnowledgeContext {`
+- `src/tasks.rs:110`  `pub struct TaskConstraint {`
+- `src/tasks.rs:125`  `pub enum TaskConstraintType {`
+- `src/tasks.rs:144`  `pub enum TaskStatus {`
+- `src/tasks.rs:165`  `pub struct TaskMetadata {`
+- `src/tasks.rs:207`  `pub struct SuccessCriterion {`
 
 ### terraphim_usage (60 gaps)
 
@@ -2126,6 +2283,9 @@
 - `src/cli.rs:15`  `pub enum Commands {`
 - `src/cli.rs:23`  `pub enum UsageAction {`
 - `src/cli.rs:142`  `pub async fn execute_usage_action(`
+- `src/formatter.rs:4`  `pub fn format_usage_text(usage: &ProviderUsage) -> String {`
+- `src/formatter.rs:59`  `pub fn format_usage_json(usage: &ProviderUsage) -> Result<String, serde_json::Er`
+- `src/formatter.rs:63`  `pub fn format_usage_csv(usages: &[ProviderUsage]) -> String {`
 - `src/lib.rs:2`  `pub mod cli;`
 - `src/lib.rs:3`  `pub mod formatter;`
 - `src/lib.rs:4`  `pub mod pricing;`
@@ -2143,23 +2303,22 @@
 - `src/lib.rs:106`  `pub fn get(&self, id: &str) -> Option<&dyn UsageProvider> {`
 - `src/lib.rs:110`  `pub fn all(&self) -> Vec<&dyn UsageProvider> {`
 - `src/lib.rs:114`  `pub fn ids(&self) -> Vec<&str> {`
-- `src/formatter.rs:4`  `pub fn format_usage_text(usage: &ProviderUsage) -> String {`
-- `src/formatter.rs:59`  `pub fn format_usage_json(usage: &ProviderUsage) -> Result<String, serde_json::Er`
-- `src/formatter.rs:63`  `pub fn format_usage_csv(usages: &[ProviderUsage]) -> String {`
 - `src/pricing.rs:5`  `pub struct PricingTable {`
 - `src/pricing.rs:10`  `pub fn embedded_defaults() -> Self {`
 - `src/pricing.rs:127`  `pub fn load(path: &Path) -> Self {`
 - `src/pricing.rs:144`  `pub fn load_default_path() -> Self {`
 - `src/pricing.rs:150`  `pub fn find_pricing(&self, model: &str) -> Option<&ModelPricing> {`
 - `src/pricing.rs:170`  `pub fn calculate_cost(`
-- `src/store.rs:12`  `pub struct AgentMetricsRecord {`
-- `src/store.rs:135`  `pub struct ExecutionRecord {`
-- `src/store.rs:269`  `pub struct BudgetSnapshotRecord {`
-- `src/store.rs:289`  `pub enum BudgetVerdict {`
-- `src/store.rs:381`  `pub struct ProviderUsageSnapshot {`
-- `src/store.rs:464`  `pub struct UsageStore;`
-- `src/store.rs:793`  `pub struct UsageExport {`
-- `src/store.rs:808`  `pub struct AlertConfig {`
+- `src/providers/ccusage.rs:4`  `pub struct CcusageProvider {`
+- `src/providers/ccusage.rs:9`  `pub fn new() -> Self {`
+- `src/providers/claude.rs:5`  `pub struct ClaudeProvider {`
+- `src/providers/claude.rs:12`  `pub fn new() -> Self {`
+- `src/providers/claude.rs:23`  `pub fn with_credentials_path(path: PathBuf) -> Self {`
+- `src/providers/kimi.rs:3`  `pub struct KimiProvider;`
+- `src/providers/kimi.rs:6`  `pub fn new() -> Self {`
+- `src/providers/minimax.rs:42`  `pub struct MiniMaxProvider {`
+- `src/providers/minimax.rs:49`  `pub fn new() -> Self {`
+- `src/providers/minimax.rs:62`  `pub fn with_api_key(api_key: String) -> Self {`
 - `src/providers/mod.rs:2`  `pub mod ccusage;`
 - `src/providers/mod.rs:4`  `pub mod claude;`
 - `src/providers/mod.rs:6`  `pub mod kimi;`
@@ -2169,83 +2328,36 @@
 - `src/providers/opencode_go.rs:4`  `pub struct OpenCodeGoProvider {`
 - `src/providers/opencode_go.rs:9`  `pub fn new() -> Self {`
 - `src/providers/opencode_go.rs:16`  `pub fn with_db_path(path: PathBuf) -> Self {`
-- `src/providers/claude.rs:5`  `pub struct ClaudeProvider {`
-- `src/providers/claude.rs:12`  `pub fn new() -> Self {`
-- `src/providers/claude.rs:23`  `pub fn with_credentials_path(path: PathBuf) -> Self {`
-- `src/providers/minimax.rs:42`  `pub struct MiniMaxProvider {`
-- `src/providers/minimax.rs:49`  `pub fn new() -> Self {`
-- `src/providers/minimax.rs:62`  `pub fn with_api_key(api_key: String) -> Self {`
 - `src/providers/zai.rs:62`  `pub struct ZaiProvider {`
 - `src/providers/zai.rs:68`  `pub fn new() -> Self {`
 - `src/providers/zai.rs:80`  `pub fn with_api_key(api_key: String) -> Self {`
-- `src/providers/kimi.rs:3`  `pub struct KimiProvider;`
-- `src/providers/kimi.rs:6`  `pub fn new() -> Self {`
-- `src/providers/ccusage.rs:4`  `pub struct CcusageProvider {`
-- `src/providers/ccusage.rs:9`  `pub fn new() -> Self {`
-
-### terraphim_task_decomposition (58 gaps)
-
-- `src/analysis.rs:52`  `pub struct TaskAnalysis {`
-- `src/analysis.rs:75`  `pub struct ComplexityFactor {`
-- `src/analysis.rs:88`  `pub enum ComplexityCategory {`
-- `src/analysis.rs:105`  `pub struct RiskFactor {`
-- `src/analysis.rs:122`  `pub enum RiskCategory {`
-- `src/analysis.rs:137`  `pub struct AnalysisConfig {`
-- `src/analysis.rs:167`  `pub trait TaskAnalyzer: Send + Sync {`
-- `src/planning.rs:22`  `pub struct ExecutionPlan {`
-- `src/planning.rs:39`  `pub struct ExecutionPhase {`
-- `src/planning.rs:54`  `pub struct ResourceRequirements {`
-- `src/planning.rs:84`  `pub struct PlanMetadata {`
-- `src/planning.rs:103`  `pub enum OptimizationStrategy {`
-- `src/planning.rs:118`  `pub struct PlanningConfig {`
-- `src/planning.rs:148`  `pub trait ExecutionPlanner: Send + Sync {`
-- `src/tasks.rs:18`  `pub struct Task {`
-- `src/tasks.rs:51`  `pub enum TaskComplexity {`
-- `src/tasks.rs:91`  `pub struct TaskKnowledgeContext {`
-- `src/tasks.rs:110`  `pub struct TaskConstraint {`
-- `src/tasks.rs:125`  `pub enum TaskConstraintType {`
-- `src/tasks.rs:144`  `pub enum TaskStatus {`
-- `src/tasks.rs:165`  `pub struct TaskMetadata {`
-- `src/tasks.rs:207`  `pub struct SuccessCriterion {`
-- `src/lib.rs:24`  `pub type AgentPid = String;`
-- `src/lib.rs:25`  `pub type AgentMetadata = std::collections::HashMap<String, String>;`
-- `src/lib.rs:26`  `pub type Goal = String;`
-- `src/lib.rs:27`  `pub type GoalId = String;`
-- `src/lib.rs:32`  `pub struct MockAutomata;`
-- `src/lib.rs:33`  `pub type Automata = MockAutomata;`
-- `src/lib.rs:35`  `pub mod analysis;`
-- `src/lib.rs:36`  `pub mod decomposition;`
-- `src/lib.rs:37`  `pub mod error;`
-- `src/lib.rs:38`  `pub mod knowledge_graph;`
-- `src/lib.rs:39`  `pub mod planning;`
-- `src/lib.rs:40`  `pub mod system;`
-- `src/lib.rs:41`  `pub mod tasks;`
-- `src/lib.rs:44`  `pub use decomposition::{`
-- `src/lib.rs:49`  `pub use knowledge_graph::{`
-- `src/decomposition.rs:52`  `pub enum DecompositionStrategy {`
-- `src/decomposition.rs:65`  `pub struct DecompositionConfig {`
-- `src/decomposition.rs:98`  `pub struct DecompositionResult {`
-- `src/decomposition.rs:111`  `pub struct DecompositionMetadata {`
-- `src/decomposition.rs:130`  `pub trait TaskDecomposer: Send + Sync {`
-- `src/system.rs:26`  `pub struct TaskDecompositionWorkflow {`
-- `src/system.rs:41`  `pub struct WorkflowMetadata {`
-- `src/system.rs:58`  `pub struct TaskDecompositionSystemConfig {`
-- `src/system.rs:88`  `pub trait TaskDecompositionSystem: Send + Sync {`
-- `src/error.rs:8`  `pub enum TaskDecompositionError {`
-- `src/error.rs:96`  `pub enum ErrorCategory {`
-- `src/knowledge_graph.rs:52`  `pub struct KnowledgeGraphQuery {`
-- `src/knowledge_graph.rs:65`  `pub enum QueryType {`
-- `src/knowledge_graph.rs:78`  `pub struct QueryResult {`
-- `src/knowledge_graph.rs:89`  `pub enum QueryResultData {`
-- `src/knowledge_graph.rs:102`  `pub struct ConceptResult {`
-- `src/knowledge_graph.rs:115`  `pub struct ConnectivityResult {`
-- `src/knowledge_graph.rs:128`  `pub struct SemanticPath {`
-- `src/knowledge_graph.rs:141`  `pub struct QueryMetadata {`
-- `src/knowledge_graph.rs:154`  `pub trait KnowledgeGraphIntegration: Send + Sync {`
-- `src/knowledge_graph.rs:194`  `pub struct KnowledgeGraphConfig {`
+- `src/store.rs:12`  `pub struct AgentMetricsRecord {`
+- `src/store.rs:135`  `pub struct ExecutionRecord {`
+- `src/store.rs:269`  `pub struct BudgetSnapshotRecord {`
+- `src/store.rs:289`  `pub enum BudgetVerdict {`
+- `src/store.rs:381`  `pub struct ProviderUsageSnapshot {`
+- `src/store.rs:464`  `pub struct UsageStore;`
+- `src/store.rs:793`  `pub struct UsageExport {`
+- `src/store.rs:808`  `pub struct AlertConfig {`
 
 ### terraphim_github_runner (57 gaps)
 
+- `src/error.rs:10`  `pub enum GitHubRunnerError {`
+- `src/learning/coordinator.rs:25`  `pub trait LearningCoordinator: Send + Sync {`
+- `src/learning/coordinator.rs:60`  `pub struct WorkflowOptimization {`
+- `src/learning/coordinator.rs:75`  `pub enum OptimizationType {`
+- `src/learning/coordinator.rs:90`  `pub struct ApplicableLesson {`
+- `src/learning/coordinator.rs:105`  `pub struct FailureTracker {`
+- `src/learning/coordinator.rs:122`  `pub struct SuccessPattern {`
+- `src/learning/coordinator.rs:325`  `pub struct LearningStats {`
+- `src/learning/coordinator.rs:607`  `pub struct EvolutionLearningCoordinator {`
+- `src/learning/knowledge_graph.rs:37`  `pub struct CommandGraphStats {`
+- `src/learning/mod.rs:10`  `pub mod knowledge_graph;`
+- `src/learning/mod.rs:11`  `pub mod thesaurus;`
+- `src/learning/mod.rs:13`  `pub use coordinator::{`
+- `src/learning/mod.rs:18`  `pub use knowledge_graph::{CommandGraphStats, CommandKnowledgeGraph};`
+- `src/learning/mod.rs:19`  `pub use thesaurus::{build_command_thesaurus, get_command_id, normalize_command};`
+- `src/learning/mod.rs:22`  `pub use coordinator::EvolutionLearningCoordinator;`
 - `src/lib.rs:42`  `pub mod models;`
 - `src/lib.rs:45`  `pub mod learning;`
 - `src/lib.rs:46`  `pub mod session;`
@@ -2269,43 +2381,57 @@
 - `src/models.rs:243`  `pub enum ExecutionStatus {`
 - `src/models.rs:254`  `pub struct WorkflowResult {`
 - `src/models.rs:372`  `pub struct RunnerConfig {`
-- `src/error.rs:10`  `pub enum GitHubRunnerError {`
-- `src/workflow/mod.rs:9`  `pub mod parser;`
-- `src/workflow/mod.rs:10`  `pub mod vm_executor;`
-- `src/workflow/mod.rs:12`  `pub use executor::{`
-- `src/workflow/mod.rs:15`  `pub use parser::{ParsedWorkflow, WorkflowParser, WorkflowStep};`
-- `src/workflow/mod.rs:16`  `pub use vm_executor::{SimulatedVmExecutor, VmCommandExecutor};`
-- `src/workflow/executor.rs:17`  `pub trait CommandExecutor: Send + Sync {`
-- `src/workflow/executor.rs:36`  `pub struct CommandResult {`
-- `src/workflow/executor.rs:136`  `pub struct WorkflowExecutorConfig {`
-- `src/workflow/parser.rs:45`  `pub struct ParsedWorkflow {`
-- `src/workflow/parser.rs:78`  `pub struct WorkflowStep {`
-- `src/workflow/vm_executor.rs:266`  `pub struct ExecutionLogEntry {`
-- `src/workflow/vm_executor.rs:281`  `pub fn new() -> Self {`
-- `src/session/mod.rs:9`  `pub use manager::{`
 - `src/session/manager.rs:16`  `pub struct Session {`
 - `src/session/manager.rs:35`  `pub enum SessionState {`
 - `src/session/manager.rs:56`  `pub trait VmProvider: Send + Sync {`
 - `src/session/manager.rs:82`  `pub struct SessionManagerConfig {`
 - `src/session/manager.rs:314`  `pub struct SessionStats {`
-- `src/learning/mod.rs:10`  `pub mod knowledge_graph;`
-- `src/learning/mod.rs:11`  `pub mod thesaurus;`
-- `src/learning/mod.rs:13`  `pub use coordinator::{`
-- `src/learning/mod.rs:18`  `pub use knowledge_graph::{CommandGraphStats, CommandKnowledgeGraph};`
-- `src/learning/mod.rs:19`  `pub use thesaurus::{build_command_thesaurus, get_command_id, normalize_command};`
-- `src/learning/mod.rs:22`  `pub use coordinator::EvolutionLearningCoordinator;`
-- `src/learning/coordinator.rs:25`  `pub trait LearningCoordinator: Send + Sync {`
-- `src/learning/coordinator.rs:60`  `pub struct WorkflowOptimization {`
-- `src/learning/coordinator.rs:75`  `pub enum OptimizationType {`
-- `src/learning/coordinator.rs:90`  `pub struct ApplicableLesson {`
-- `src/learning/coordinator.rs:105`  `pub struct FailureTracker {`
-- `src/learning/coordinator.rs:122`  `pub struct SuccessPattern {`
-- `src/learning/coordinator.rs:325`  `pub struct LearningStats {`
-- `src/learning/coordinator.rs:607`  `pub struct EvolutionLearningCoordinator {`
-- `src/learning/knowledge_graph.rs:37`  `pub struct CommandGraphStats {`
+- `src/session/mod.rs:9`  `pub use manager::{`
+- `src/workflow/executor.rs:17`  `pub trait CommandExecutor: Send + Sync {`
+- `src/workflow/executor.rs:36`  `pub struct CommandResult {`
+- `src/workflow/executor.rs:136`  `pub struct WorkflowExecutorConfig {`
+- `src/workflow/mod.rs:9`  `pub mod parser;`
+- `src/workflow/mod.rs:10`  `pub mod vm_executor;`
+- `src/workflow/mod.rs:12`  `pub use executor::{`
+- `src/workflow/mod.rs:15`  `pub use parser::{ParsedWorkflow, WorkflowParser, WorkflowStep};`
+- `src/workflow/mod.rs:16`  `pub use vm_executor::{SimulatedVmExecutor, VmCommandExecutor};`
+- `src/workflow/parser.rs:45`  `pub struct ParsedWorkflow {`
+- `src/workflow/parser.rs:78`  `pub struct WorkflowStep {`
+- `src/workflow/vm_executor.rs:266`  `pub struct ExecutionLogEntry {`
+- `src/workflow/vm_executor.rs:281`  `pub fn new() -> Self {`
 
 ### terraphim_sessions (57 gaps)
 
+- `src/cla/connector.rs:21`  `pub struct ClaClaudeConnector {`
+- `src/cla/connector.rs:80`  `pub struct ClaCursorConnector {`
+- `src/cla/connector.rs:149`  `pub struct ClaCursorConnector;`
+- `src/cla/mod.rs:8`  `pub use connector::{ClaClaudeConnector, ClaCursorConnector};`
+- `src/connector/aider.rs:19`  `pub struct AiderConnector;`
+- `src/connector/cline.rs:17`  `pub struct ClineConnector {`
+- `src/connector/cline.rs:58`  `pub struct ClineMessage {`
+- `src/connector/cline.rs:78`  `pub struct ModelInfo {`
+- `src/connector/cline.rs:87`  `pub fn new() -> Self {`
+- `src/connector/codex.rs:24`  `pub struct CodexConnector;`
+- `src/connector/mod.rs:20`  `pub use native::NativeClaudeConnector;`
+- `src/connector/mod.rs:23`  `pub use aider::AiderConnector;`
+- `src/connector/mod.rs:26`  `pub use cline::ClineConnector;`
+- `src/connector/mod.rs:29`  `pub use opencode::OpenCodeConnector;`
+- `src/connector/mod.rs:32`  `pub use codex::CodexConnector;`
+- `src/connector/mod.rs:42`  `pub enum ConnectorStatus {`
+- `src/connector/mod.rs:63`  `pub struct ImportOptions {`
+- `src/connector/mod.rs:103`  `pub trait SessionConnector: Send + Sync {`
+- `src/connector/mod.rs:142`  `pub fn new() -> Self {`
+- `src/connector/mod.rs:178`  `pub fn connectors(&self) -> &[Box<dyn SessionConnector>] {`
+- `src/connector/mod.rs:184`  `pub fn get(&self, source_id: &str) -> Option<&dyn SessionConnector> {`
+- `src/connector/native.rs:18`  `pub struct NativeClaudeConnector;`
+- `src/connector/opencode.rs:20`  `pub struct OpenCodeConnector;`
+- `src/enrichment/concept.rs:10`  `pub struct ConceptOccurrence {`
+- `src/enrichment/concept.rs:23`  `pub struct ConceptMatch {`
+- `src/enrichment/concept.rs:76`  `pub struct SessionConcepts {`
+- `src/enrichment/enricher.rs:15`  `pub struct EnrichmentConfig {`
+- `src/enrichment/enricher.rs:42`  `pub struct EnrichmentResult {`
+- `src/enrichment/mod.rs:29`  `pub use concept::{ConceptMatch, ConceptOccurrence, SessionConcepts};`
+- `src/enrichment/mod.rs:30`  `pub use enricher::{`
 - `src/lib.rs:31`  `pub mod model;`
 - `src/lib.rs:32`  `pub mod service;`
 - `src/lib.rs:35`  `pub mod cla;`
@@ -2325,6 +2451,7 @@
 - `src/model.rs:257`  `pub struct Session {`
 - `src/model.rs:755`  `pub enum FileOperation {`
 - `src/model.rs:771`  `pub struct FileAccess {`
+- `src/search.rs:158`  `pub fn search_sessions_hybrid(`
 - `src/service.rs:28`  `pub fn new() -> Self {`
 - `src/service.rs:39`  `pub fn with_registry(registry: ConnectorRegistry) -> Self {`
 - `src/service.rs:60`  `pub fn is_auto_import_enabled(&self) -> bool {`
@@ -2332,57 +2459,9 @@
 - `src/service.rs:193`  `pub async fn search_with_thesaurus(`
 - `src/service.rs:410`  `pub struct SourceInfo {`
 - `src/service.rs:428`  `pub struct SessionStatistics {`
-- `src/search.rs:158`  `pub fn search_sessions_hybrid(`
-- `src/cla/mod.rs:8`  `pub use connector::{ClaClaudeConnector, ClaCursorConnector};`
-- `src/cla/connector.rs:21`  `pub struct ClaClaudeConnector {`
-- `src/cla/connector.rs:80`  `pub struct ClaCursorConnector {`
-- `src/cla/connector.rs:149`  `pub struct ClaCursorConnector;`
-- `src/enrichment/mod.rs:29`  `pub use concept::{ConceptMatch, ConceptOccurrence, SessionConcepts};`
-- `src/enrichment/mod.rs:30`  `pub use enricher::{`
-- `src/enrichment/enricher.rs:15`  `pub struct EnrichmentConfig {`
-- `src/enrichment/enricher.rs:42`  `pub struct EnrichmentResult {`
-- `src/enrichment/concept.rs:10`  `pub struct ConceptOccurrence {`
-- `src/enrichment/concept.rs:23`  `pub struct ConceptMatch {`
-- `src/enrichment/concept.rs:76`  `pub struct SessionConcepts {`
-- `src/connector/mod.rs:20`  `pub use native::NativeClaudeConnector;`
-- `src/connector/mod.rs:23`  `pub use aider::AiderConnector;`
-- `src/connector/mod.rs:26`  `pub use cline::ClineConnector;`
-- `src/connector/mod.rs:29`  `pub use opencode::OpenCodeConnector;`
-- `src/connector/mod.rs:32`  `pub use codex::CodexConnector;`
-- `src/connector/mod.rs:42`  `pub enum ConnectorStatus {`
-- `src/connector/mod.rs:63`  `pub struct ImportOptions {`
-- `src/connector/mod.rs:103`  `pub trait SessionConnector: Send + Sync {`
-- `src/connector/mod.rs:142`  `pub fn new() -> Self {`
-- `src/connector/mod.rs:178`  `pub fn connectors(&self) -> &[Box<dyn SessionConnector>] {`
-- `src/connector/mod.rs:184`  `pub fn get(&self, source_id: &str) -> Option<&dyn SessionConnector> {`
-- `src/connector/native.rs:18`  `pub struct NativeClaudeConnector;`
-- `src/connector/opencode.rs:20`  `pub struct OpenCodeConnector;`
-- `src/connector/cline.rs:17`  `pub struct ClineConnector {`
-- `src/connector/cline.rs:58`  `pub struct ClineMessage {`
-- `src/connector/cline.rs:78`  `pub struct ModelInfo {`
-- `src/connector/cline.rs:87`  `pub fn new() -> Self {`
-- `src/connector/codex.rs:24`  `pub struct CodexConnector;`
-- `src/connector/aider.rs:19`  `pub struct AiderConnector;`
 
 ### terraphim_middleware (54 gaps)
 
-- `src/lib.rs:5`  `pub mod command;`
-- `src/lib.rs:6`  `pub mod haystack;`
-- `src/lib.rs:7`  `pub mod indexer;`
-- `src/lib.rs:8`  `pub mod thesaurus;`
-- `src/lib.rs:11`  `pub mod learning_indexer;`
-- `src/lib.rs:14`  `pub mod learning_query;`
-- `src/lib.rs:17`  `pub mod feedback_loop;`
-- `src/lib.rs:19`  `pub use haystack::QueryRsHaystackIndexer;`
-- `src/lib.rs:20`  `pub use indexer::{search_haystacks, RipgrepIndexer};`
-- `src/lib.rs:26`  `pub enum Error {`
-- `src/lib.rs:55`  `pub type Result<T> = std::result::Result<T, Error>;`
-- `src/learning_indexer.rs:13`  `pub struct LearningIndexerConfig {`
-- `src/learning_indexer.rs:122`  `pub enum LearningIndexError {`
-- `src/feedback_loop.rs:26`  `pub struct FeedbackConfig {`
-- `src/feedback_loop.rs:108`  `pub enum FeedbackError {`
-- `src/indexer/mod.rs:18`  `pub use ripgrep::RipgrepIndexer;`
-- `src/indexer/ripgrep.rs:29`  `pub struct RipgrepIndexer {}`
 - `src/command/mod.rs:1`  `pub mod ripgrep;`
 - `src/command/ripgrep.rs:23`  `pub enum Message {`
 - `src/command/ripgrep.rs:34`  `pub struct Begin {`
@@ -2394,7 +2473,14 @@
 - `src/command/ripgrep.rs:107`  `pub enum Data {`
 - `src/command/ripgrep.rs:152`  `pub struct RipgrepCommand {`
 - `src/command/ripgrep.rs:245`  `pub async fn run_with_extra_args(`
-- `src/thesaurus/mod.rs:38`  `pub async fn build_thesaurus_from_haystack(`
+- `src/feedback_loop.rs:26`  `pub struct FeedbackConfig {`
+- `src/feedback_loop.rs:108`  `pub enum FeedbackError {`
+- `src/haystack/ai_assistant.rs:34`  `pub struct AiAssistantHaystackIndexer;`
+- `src/haystack/atomic.rs:10`  `pub struct AtomicHaystackIndexer {`
+- `src/haystack/clickup.rs:10`  `pub struct ClickUpHaystackIndexer {`
+- `src/haystack/grep_app.rs:9`  `pub struct GrepAppHaystackIndexer {`
+- `src/haystack/jmap.rs:7`  `pub struct JmapHaystackIndexer;`
+- `src/haystack/mcp.rs:10`  `pub struct McpHaystackIndexer;`
 - `src/haystack/mod.rs:2`  `pub mod ai_assistant;`
 - `src/haystack/mod.rs:3`  `pub mod clickup;`
 - `src/haystack/mod.rs:5`  `pub mod grep_app;`
@@ -2411,18 +2497,34 @@
 - `src/haystack/mod.rs:20`  `pub use perplexity::PerplexityHaystackIndexer;`
 - `src/haystack/mod.rs:21`  `pub use query_rs::QueryRsHaystackIndexer;`
 - `src/haystack/mod.rs:22`  `pub use quickwit::QuickwitHaystackIndexer;`
-- `src/haystack/ai_assistant.rs:34`  `pub struct AiAssistantHaystackIndexer;`
-- `src/haystack/jmap.rs:7`  `pub struct JmapHaystackIndexer;`
-- `src/haystack/grep_app.rs:9`  `pub struct GrepAppHaystackIndexer {`
 - `src/haystack/perplexity.rs:99`  `pub struct PerplexityHaystackIndexer {`
-- `src/haystack/quickwit.rs:52`  `pub struct QuickwitHaystackIndexer {`
 - `src/haystack/query_rs.rs:51`  `pub struct QueryRsHaystackIndexer {`
-- `src/haystack/clickup.rs:10`  `pub struct ClickUpHaystackIndexer {`
-- `src/haystack/atomic.rs:10`  `pub struct AtomicHaystackIndexer {`
-- `src/haystack/mcp.rs:10`  `pub struct McpHaystackIndexer;`
+- `src/haystack/quickwit.rs:52`  `pub struct QuickwitHaystackIndexer {`
+- `src/indexer/mod.rs:18`  `pub use ripgrep::RipgrepIndexer;`
+- `src/indexer/ripgrep.rs:29`  `pub struct RipgrepIndexer {}`
+- `src/learning_indexer.rs:13`  `pub struct LearningIndexerConfig {`
+- `src/learning_indexer.rs:122`  `pub enum LearningIndexError {`
+- `src/lib.rs:5`  `pub mod command;`
+- `src/lib.rs:6`  `pub mod haystack;`
+- `src/lib.rs:7`  `pub mod indexer;`
+- `src/lib.rs:8`  `pub mod thesaurus;`
+- `src/lib.rs:11`  `pub mod learning_indexer;`
+- `src/lib.rs:14`  `pub mod learning_query;`
+- `src/lib.rs:17`  `pub mod feedback_loop;`
+- `src/lib.rs:19`  `pub use haystack::QueryRsHaystackIndexer;`
+- `src/lib.rs:20`  `pub use indexer::{search_haystacks, RipgrepIndexer};`
+- `src/lib.rs:26`  `pub enum Error {`
+- `src/lib.rs:55`  `pub type Result<T> = std::result::Result<T, Error>;`
+- `src/thesaurus/mod.rs:38`  `pub async fn build_thesaurus_from_haystack(`
 
 ### terraphim_symphony (54 gaps)
 
+- `src/config/mod.rs:7`  `pub mod workflow;`
+- `src/config/mod.rs:10`  `pub mod watcher;`
+- `src/config/mod.rs:22`  `pub struct ServiceConfig {`
+- `src/config/watcher.rs:13`  `pub struct WorkflowChanged {`
+- `src/config/workflow.rs:10`  `pub struct WorkflowDefinition {`
+- `src/error.rs:5`  `pub enum SymphonyError {`
 - `src/lib.rs:8`  `pub mod api;`
 - `src/lib.rs:9`  `pub mod config;`
 - `src/lib.rs:10`  `pub mod error;`
@@ -2435,10 +2537,6 @@
 - `src/lib.rs:18`  `pub use runner::{`
 - `src/lib.rs:22`  `pub use tracker::{Issue, IssueTracker};`
 - `src/lib.rs:23`  `pub use workspace::WorkspaceManager;`
-- `src/error.rs:5`  `pub enum SymphonyError {`
-- `src/tracker/mod.rs:17`  `pub struct Issue {`
-- `src/tracker/mod.rs:48`  `pub struct BlockerRef {`
-- `src/tracker/mod.rs:63`  `pub trait IssueTracker: Send + Sync {`
 - `src/orchestrator/mod.rs:7`  `pub mod reconcile;`
 - `src/orchestrator/mod.rs:8`  `pub mod state;`
 - `src/orchestrator/mod.rs:10`  `pub use state::{OrchestratorRuntimeState, StateSnapshot};`
@@ -2448,19 +2546,12 @@
 - `src/orchestrator/state.rs:160`  `pub struct SnapshotCounts {`
 - `src/orchestrator/state.rs:166`  `pub struct RunningSnapshot {`
 - `src/orchestrator/state.rs:180`  `pub struct RetrySnapshot {`
-- `src/workspace/mod.rs:16`  `pub struct WorkspaceInfo {`
-- `src/config/mod.rs:7`  `pub mod workflow;`
-- `src/config/mod.rs:10`  `pub mod watcher;`
-- `src/config/mod.rs:22`  `pub struct ServiceConfig {`
-- `src/config/workflow.rs:10`  `pub struct WorkflowDefinition {`
-- `src/config/watcher.rs:13`  `pub struct WorkflowChanged {`
+- `src/runner/claude_code.rs:26`  `pub struct ClaudeCodeEvent {`
 - `src/runner/mod.rs:7`  `pub mod protocol;`
 - `src/runner/mod.rs:8`  `pub mod session;`
 - `src/runner/mod.rs:10`  `pub use claude_code::ClaudeCodeSession;`
 - `src/runner/mod.rs:11`  `pub use protocol::{`
 - `src/runner/mod.rs:15`  `pub use session::{CodexSession, WorkerOutcome};`
-- `src/runner/claude_code.rs:26`  `pub struct ClaudeCodeEvent {`
-- `src/runner/session.rs:21`  `pub enum WorkerOutcome {`
 - `src/runner/protocol.rs:12`  `pub struct JsonRpcRequest {`
 - `src/runner/protocol.rs:24`  `pub struct JsonRpcResponse {`
 - `src/runner/protocol.rs:37`  `pub struct JsonRpcNotification {`
@@ -2477,18 +2568,14 @@
 - `src/runner/protocol.rs:249`  `pub fn correlation_id(&self) -> Uuid {`
 - `src/runner/protocol.rs:258`  `pub fn to_jsonl(&self) -> Result<String, serde_json::Error> {`
 - `src/runner/protocol.rs:262`  `pub fn from_jsonl(line: &str) -> Result<Self, serde_json::Error> {`
+- `src/runner/session.rs:21`  `pub enum WorkerOutcome {`
+- `src/tracker/mod.rs:17`  `pub struct Issue {`
+- `src/tracker/mod.rs:48`  `pub struct BlockerRef {`
+- `src/tracker/mod.rs:63`  `pub trait IssueTracker: Send + Sync {`
+- `src/workspace/mod.rs:16`  `pub struct WorkspaceInfo {`
 
-### terraphim_goal_alignment (47 gaps)
+### terraphim_goal_alignment (53 gaps)
 
-- `src/goals.rs:19`  `pub struct Goal {`
-- `src/goals.rs:46`  `pub enum GoalLevel {`
-- `src/goals.rs:91`  `pub struct GoalConstraint {`
-- `src/goals.rs:106`  `pub enum ConstraintType {`
-- `src/goals.rs:125`  `pub struct GoalKnowledgeContext {`
-- `src/goals.rs:142`  `pub enum GoalStatus {`
-- `src/goals.rs:159`  `pub struct GoalMetadata {`
-- `src/goals.rs:204`  `pub struct SuccessCriterion {`
-- `src/goals.rs:489`  `pub struct GoalHierarchy {`
 - `src/alignment.rs:41`  `pub struct AlignmentConfig {`
 - `src/alignment.rs:71`  `pub struct AlignmentStatistics {`
 - `src/alignment.rs:110`  `pub struct GoalAlignmentRequest {`
@@ -2501,16 +2588,17 @@
 - `src/conflicts.rs:50`  `pub struct ConflictResolution {`
 - `src/conflicts.rs:65`  `pub enum ResolutionType {`
 - `src/conflicts.rs:311`  `pub fn new(similarity_threshold: f64) -> Self {`
-- `src/lib.rs:23`  `pub use terraphim_agent_registry::{AgentMetadata, AgentPid, SupervisorId};`
-- `src/lib.rs:25`  `pub type GenAgentResult<T> = Result<T, Box<dyn std::error::Error + Send + Sync>>`
-- `src/lib.rs:28`  `pub mod alignment;`
-- `src/lib.rs:29`  `pub mod conflicts;`
-- `src/lib.rs:30`  `pub mod error;`
-- `src/lib.rs:31`  `pub mod goals;`
-- `src/lib.rs:32`  `pub mod knowledge_graph;`
-- `src/lib.rs:33`  `pub mod propagation;`
 - `src/error.rs:8`  `pub enum GoalAlignmentError {`
 - `src/error.rs:96`  `pub enum ErrorCategory {`
+- `src/goals.rs:19`  `pub struct Goal {`
+- `src/goals.rs:46`  `pub enum GoalLevel {`
+- `src/goals.rs:91`  `pub struct GoalConstraint {`
+- `src/goals.rs:106`  `pub enum ConstraintType {`
+- `src/goals.rs:125`  `pub struct GoalKnowledgeContext {`
+- `src/goals.rs:142`  `pub enum GoalStatus {`
+- `src/goals.rs:159`  `pub struct GoalMetadata {`
+- `src/goals.rs:204`  `pub struct SuccessCriterion {`
+- `src/goals.rs:489`  `pub struct GoalHierarchy {`
 - `src/knowledge_graph.rs:32`  `pub struct AutomataConfig {`
 - `src/knowledge_graph.rs:56`  `pub struct SimilarityThresholds {`
 - `src/knowledge_graph.rs:80`  `pub struct AnalysisResult {`
@@ -2527,22 +2615,77 @@
 - `src/knowledge_graph.rs:243`  `pub enum ConnectivityIssueType {`
 - `src/knowledge_graph.rs:256`  `pub struct AlignmentRecommendation {`
 - `src/knowledge_graph.rs:271`  `pub enum RecommendationType {`
+- `src/lib.rs:23`  `pub use terraphim_agent_registry::{AgentMetadata, AgentPid, SupervisorId};`
+- `src/lib.rs:25`  `pub type GenAgentResult<T> = Result<T, Box<dyn std::error::Error + Send + Sync>>`
+- `src/lib.rs:26`  `pub use terraphim_types::*;`
+- `src/lib.rs:28`  `pub mod alignment;`
+- `src/lib.rs:29`  `pub mod conflicts;`
+- `src/lib.rs:30`  `pub mod error;`
+- `src/lib.rs:31`  `pub mod goals;`
+- `src/lib.rs:32`  `pub mod knowledge_graph;`
+- `src/lib.rs:33`  `pub mod propagation;`
+- `src/lib.rs:35`  `pub use alignment::*;`
+- `src/lib.rs:36`  `pub use conflicts::*;`
+- `src/lib.rs:37`  `pub use error::*;`
+- `src/lib.rs:38`  `pub use goals::*;`
+- `src/lib.rs:39`  `pub use knowledge_graph::*;`
+
+### terraphim_agent_messaging (46 gaps)
+
+- `src/delivery.rs:16`  `pub enum DeliveryGuarantee {`
+- `src/delivery.rs:28`  `pub enum DeliveryStatus {`
+- `src/delivery.rs:39`  `pub struct DeliveryRecord {`
+- `src/delivery.rs:53`  `pub fn new(message_id: MessageId, from: Option<AgentPid>, to: AgentPid) -> Self `
+- `src/delivery.rs:68`  `pub fn mark_in_transit(&mut self) {`
+- `src/delivery.rs:74`  `pub fn mark_delivered(&mut self) {`
+- `src/delivery.rs:79`  `pub fn mark_acknowledged(&mut self) {`
+- `src/delivery.rs:84`  `pub fn mark_failed(&mut self, error: String) {`
+- `src/delivery.rs:89`  `pub fn mark_expired(&mut self) {`
+- `src/delivery.rs:93`  `pub fn is_final_state(&self) -> bool {`
+- `src/delivery.rs:103`  `pub struct DeliveryConfig {`
+- `src/delivery.rs:381`  `pub struct DeliveryStats {`
+- `src/delivery.rs:393`  `pub fn success_rate(&self) -> f64 {`
+- `src/delivery.rs:401`  `pub fn failure_rate(&self) -> f64 {`
+- `src/delivery.rs:409`  `pub fn average_attempts(&self) -> f64 {`
+- `src/error.rs:8`  `pub enum MessagingError {`
+- `src/error.rs:76`  `pub enum ErrorCategory {`
+- `src/lib.rs:16`  `pub mod error;`
+- `src/lib.rs:17`  `pub mod mailbox;`
+- `src/lib.rs:18`  `pub mod message;`
+- `src/lib.rs:19`  `pub mod router;`
+- `src/lib.rs:21`  `pub use delivery::*;`
+- `src/lib.rs:22`  `pub use error::*;`
+- `src/lib.rs:23`  `pub use mailbox::*;`
+- `src/lib.rs:24`  `pub use message::*;`
+- `src/lib.rs:25`  `pub use router::*;`
+- `src/lib.rs:28`  `pub use terraphim_agent_supervisor::{AgentPid, SupervisorId};`
+- `src/mailbox.rs:15`  `pub struct MailboxConfig {`
+- `src/mailbox.rs:39`  `pub struct MailboxStats {`
+- `src/mailbox.rs:51`  `pub fn new(agent_id: AgentPid) -> Self {`
+- `src/mailbox.rs:64`  `pub fn record_message_received(&mut self) {`
+- `src/mailbox.rs:71`  `pub fn record_message_processed(&mut self, processing_time: std::time::Duration)`
+- `src/mailbox.rs:260`  `pub struct MailboxSender {`
+- `src/message.rs:17`  `pub struct MessageId(pub Uuid);`
+- `src/message.rs:20`  `pub fn new() -> Self {`
+- `src/message.rs:24`  `pub fn as_str(&self) -> String {`
+- `src/message.rs:43`  `pub enum MessagePriority {`
+- `src/message.rs:53`  `pub struct DeliveryOptions {`
+- `src/message.rs:80`  `pub enum AgentMessage {`
+- `src/message.rs:205`  `pub enum SystemInfo {`
+- `src/message.rs:241`  `pub struct MessageEnvelope {`
+- `src/message.rs:305`  `pub fn new(payload: T) -> Self {`
+- `src/message.rs:314`  `pub fn with_from(mut self, from: AgentPid) -> Self {`
+- `src/router.rs:20`  `pub struct RouterConfig {`
+- `src/router.rs:40`  `pub struct RouterStats {`
+- `src/router.rs:50`  `pub trait MessageRouter: Send + Sync {`
 
 ### terraphim_router (46 gaps)
 
-- `src/metrics.rs:13`  `pub struct RouterMetrics {`
-- `src/metrics.rs:170`  `pub struct Timer {`
-- `src/registry.rs:21`  `pub enum RegistryEvent {`
-- `src/registry.rs:32`  `pub struct ProviderRegistry {`
-- `src/registry.rs:43`  `pub struct MarkdownProvider {`
-- `src/registry.rs:54`  `pub struct ProviderFrontmatter {`
-- `src/registry.rs:358`  `pub async fn with_persistence(registry_id: &str) -> Result<Self, RoutingError> {`
-- `src/registry.rs:388`  `pub async fn add_provider_persisted(`
-- `src/registry.rs:399`  `pub async fn remove_provider_persisted(`
-- `src/registry.rs:445`  `pub struct PersistedProviderRegistry {`
-- `src/keyword.rs:11`  `pub struct KeywordRouter {`
+- `src/engine.rs:266`  `pub struct Router {`
 - `src/fallback.rs:12`  `pub enum FallbackStrategy {`
 - `src/fallback.rs:26`  `pub struct FallbackRouter {`
+- `src/keyword.rs:11`  `pub struct KeywordRouter {`
+- `src/knowledge_graph.rs:12`  `pub struct KnowledgeGraphRouter {`
 - `src/lib.rs:24`  `pub mod discovery;`
 - `src/lib.rs:25`  `pub mod engine;`
 - `src/lib.rs:26`  `pub mod fallback;`
@@ -2562,13 +2705,21 @@
 - `src/lib.rs:43`  `pub use registry::{ProviderRegistry, RegistryEvent};`
 - `src/lib.rs:44`  `pub use strategy::{`
 - `src/lib.rs:48`  `pub use types::{RoutingContext, RoutingDecision, RoutingError, RoutingResult};`
+- `src/metrics.rs:13`  `pub struct RouterMetrics {`
+- `src/metrics.rs:170`  `pub struct Timer {`
+- `src/registry.rs:21`  `pub enum RegistryEvent {`
+- `src/registry.rs:32`  `pub struct ProviderRegistry {`
+- `src/registry.rs:43`  `pub struct MarkdownProvider {`
+- `src/registry.rs:54`  `pub struct ProviderFrontmatter {`
+- `src/registry.rs:358`  `pub async fn with_persistence(registry_id: &str) -> Result<Self, RoutingError> {`
+- `src/registry.rs:388`  `pub async fn add_provider_persisted(`
+- `src/registry.rs:399`  `pub async fn remove_provider_persisted(`
+- `src/registry.rs:445`  `pub struct PersistedProviderRegistry {`
 - `src/strategy.rs:19`  `pub struct CostOptimized;`
 - `src/strategy.rs:39`  `pub struct LatencyOptimized;`
 - `src/strategy.rs:59`  `pub struct CapabilityFirst;`
 - `src/strategy.rs:79`  `pub struct RoundRobin {`
 - `src/strategy.rs:84`  `pub fn new() -> Self {`
-- `src/engine.rs:266`  `pub struct Router {`
-- `src/knowledge_graph.rs:12`  `pub struct KnowledgeGraphRouter {`
 - `src/types.rs:10`  `pub struct RoutingDecision {`
 - `src/types.rs:23`  `pub enum RoutingReason {`
 - `src/types.rs:55`  `pub struct RoutingContext {`
@@ -2577,56 +2728,57 @@
 - `src/types.rs:102`  `pub enum RoutingError {`
 - `src/types.rs:124`  `pub struct Task {`
 
-### terraphim_agent_messaging (41 gaps)
+### terraphim_build_args (39 gaps)
 
-- `src/message.rs:17`  `pub struct MessageId(pub Uuid);`
-- `src/message.rs:20`  `pub fn new() -> Self {`
-- `src/message.rs:24`  `pub fn as_str(&self) -> String {`
-- `src/message.rs:43`  `pub enum MessagePriority {`
-- `src/message.rs:53`  `pub struct DeliveryOptions {`
-- `src/message.rs:80`  `pub enum AgentMessage {`
-- `src/message.rs:205`  `pub enum SystemInfo {`
-- `src/message.rs:241`  `pub struct MessageEnvelope {`
-- `src/message.rs:305`  `pub fn new(payload: T) -> Self {`
-- `src/message.rs:314`  `pub fn with_from(mut self, from: AgentPid) -> Self {`
-- `src/lib.rs:16`  `pub mod error;`
-- `src/lib.rs:17`  `pub mod mailbox;`
-- `src/lib.rs:18`  `pub mod message;`
-- `src/lib.rs:19`  `pub mod router;`
-- `src/lib.rs:28`  `pub use terraphim_agent_supervisor::{AgentPid, SupervisorId};`
-- `src/delivery.rs:16`  `pub enum DeliveryGuarantee {`
-- `src/delivery.rs:28`  `pub enum DeliveryStatus {`
-- `src/delivery.rs:39`  `pub struct DeliveryRecord {`
-- `src/delivery.rs:53`  `pub fn new(message_id: MessageId, from: Option<AgentPid>, to: AgentPid) -> Self `
-- `src/delivery.rs:68`  `pub fn mark_in_transit(&mut self) {`
-- `src/delivery.rs:74`  `pub fn mark_delivered(&mut self) {`
-- `src/delivery.rs:79`  `pub fn mark_acknowledged(&mut self) {`
-- `src/delivery.rs:84`  `pub fn mark_failed(&mut self, error: String) {`
-- `src/delivery.rs:89`  `pub fn mark_expired(&mut self) {`
-- `src/delivery.rs:93`  `pub fn is_final_state(&self) -> bool {`
-- `src/delivery.rs:103`  `pub struct DeliveryConfig {`
-- `src/delivery.rs:381`  `pub struct DeliveryStats {`
-- `src/delivery.rs:393`  `pub fn success_rate(&self) -> f64 {`
-- `src/delivery.rs:401`  `pub fn failure_rate(&self) -> f64 {`
-- `src/delivery.rs:409`  `pub fn average_attempts(&self) -> f64 {`
-- `src/error.rs:8`  `pub enum MessagingError {`
-- `src/error.rs:76`  `pub enum ErrorCategory {`
-- `src/router.rs:20`  `pub struct RouterConfig {`
-- `src/router.rs:40`  `pub struct RouterStats {`
-- `src/router.rs:50`  `pub trait MessageRouter: Send + Sync {`
-- `src/mailbox.rs:15`  `pub struct MailboxConfig {`
-- `src/mailbox.rs:39`  `pub struct MailboxStats {`
-- `src/mailbox.rs:51`  `pub fn new(agent_id: AgentPid) -> Self {`
-- `src/mailbox.rs:64`  `pub fn record_message_received(&mut self) {`
-- `src/mailbox.rs:71`  `pub fn record_message_processed(&mut self, processing_time: std::time::Duration)`
-- `src/mailbox.rs:260`  `pub struct MailboxSender {`
+- `src/cli.rs:14`  `pub fn new() -> Self {`
+- `src/config.rs:15`  `pub fn new() -> Self {`
+- `src/environment.rs:12`  `pub struct Environment {`
+- `src/error.rs:12`  `pub enum Error {`
+- `src/features.rs:12`  `pub struct FeatureSet {`
+- `src/features.rs:25`  `pub struct FeatureConstraints {`
+- `src/features.rs:41`  `pub enum FeatureCategory {`
+- `src/generator.rs:14`  `pub fn new() -> Self {`
+- `src/lib.rs:1`  `pub mod cli;`
+- `src/lib.rs:33`  `pub mod environment;`
+- `src/lib.rs:34`  `pub mod error;`
+- `src/lib.rs:35`  `pub mod features;`
+- `src/lib.rs:36`  `pub mod generator;`
+- `src/lib.rs:37`  `pub mod targets;`
+- `src/lib.rs:38`  `pub mod validation;`
+- `src/lib.rs:40`  `pub use config::*;`
+- `src/lib.rs:41`  `pub use environment::*;`
+- `src/lib.rs:42`  `pub use error::*;`
+- `src/lib.rs:43`  `pub use features::*;`
+- `src/lib.rs:44`  `pub use generator::*;`
+- `src/lib.rs:45`  `pub use targets::*;`
+- `src/lib.rs:46`  `pub use validation::*;`
+- `src/lib.rs:55`  `pub struct BuildConfig {`
+- `src/lib.rs:80`  `pub struct DockerBuildArgs {`
+- `src/lib.rs:106`  `pub struct WorkspaceConfig {`
+- `src/lib.rs:125`  `pub struct BuildMetadata {`
+- `src/lib.rs:356`  `pub struct BuildConfigBuilder {`
+- `src/lib.rs:367`  `pub fn new() -> Self {`
+- `src/lib.rs:371`  `pub fn target(mut self, target: BuildTarget) -> Self {`
+- `src/lib.rs:376`  `pub fn features(mut self, features: FeatureSet) -> Self {`
+- `src/lib.rs:381`  `pub fn environment(mut self, env: &str) -> Self {`
+- `src/lib.rs:386`  `pub fn custom_arg(mut self, key: &str, value: &str) -> Self {`
+- `src/lib.rs:391`  `pub fn docker_args(mut self, docker_args: DockerBuildArgs) -> Self {`
+- `src/lib.rs:396`  `pub fn workspace(mut self, workspace: WorkspaceConfig) -> Self {`
+- `src/lib.rs:401`  `pub fn metadata(mut self, metadata: BuildMetadata) -> Self {`
+- `src/lib.rs:406`  `pub fn build(self) -> Result<BuildConfig> {`
+- `src/targets.rs:12`  `pub enum BuildTarget {`
+- `src/targets.rs:30`  `pub enum BuildProfile {`
+- `src/validation.rs:16`  `pub fn new() -> Self {`
 
-### terraphim_atomic_client (34 gaps)
+### terraphim_atomic_client (36 gaps)
 
 - `src/auth.rs:27`  `pub fn get_authentication_headers(`
 - `src/auth.rs:62`  `pub fn get_authentication_headers(`
 - `src/auth.rs:84`  `pub struct Agent {`
-- `src/time_utils.rs:1`  `pub fn unix_timestamp_secs() -> i64 {`
+- `src/error.rs:10`  `pub enum AtomicError {`
+- `src/error.rs:66`  `pub type Result<T> = std::result::Result<T, AtomicError>;`
+- `src/http.rs:6`  `pub mod native {`
+- `src/http.rs:97`  `pub mod wasm {`
 - `src/lib.rs:52`  `pub mod http;`
 - `src/lib.rs:53`  `pub mod store;`
 - `src/lib.rs:54`  `pub mod time_utils;`
@@ -2651,69 +2803,122 @@
 - `src/store.rs:475`  `pub async fn collection_by_class(`
 - `src/store.rs:656`  `pub struct SearchOpts {`
 - `src/store.rs:669`  `pub struct QueryOpts {`
-- `src/error.rs:10`  `pub enum AtomicError {`
-- `src/error.rs:66`  `pub type Result<T> = std::result::Result<T, AtomicError>;`
+- `src/time_utils.rs:1`  `pub fn unix_timestamp_secs() -> i64 {`
 - `src/types.rs:9`  `pub struct Config {`
 - `src/types.rs:76`  `pub struct Resource {`
 - `src/types.rs:89`  `pub struct Commit {`
 - `src/types.rs:356`  `pub struct CommitBuilder {`
 
-### terraphim_build_args (32 gaps)
+### terraphim_agent_supervisor (33 gaps)
 
-- `src/cli.rs:14`  `pub fn new() -> Self {`
-- `src/environment.rs:12`  `pub struct Environment {`
-- `src/config.rs:15`  `pub fn new() -> Self {`
-- `src/lib.rs:1`  `pub mod cli;`
-- `src/lib.rs:33`  `pub mod environment;`
-- `src/lib.rs:34`  `pub mod error;`
-- `src/lib.rs:35`  `pub mod features;`
-- `src/lib.rs:36`  `pub mod generator;`
-- `src/lib.rs:37`  `pub mod targets;`
-- `src/lib.rs:38`  `pub mod validation;`
-- `src/lib.rs:55`  `pub struct BuildConfig {`
-- `src/lib.rs:80`  `pub struct DockerBuildArgs {`
-- `src/lib.rs:106`  `pub struct WorkspaceConfig {`
-- `src/lib.rs:125`  `pub struct BuildMetadata {`
-- `src/lib.rs:356`  `pub struct BuildConfigBuilder {`
-- `src/lib.rs:367`  `pub fn new() -> Self {`
-- `src/lib.rs:371`  `pub fn target(mut self, target: BuildTarget) -> Self {`
-- `src/lib.rs:376`  `pub fn features(mut self, features: FeatureSet) -> Self {`
-- `src/lib.rs:381`  `pub fn environment(mut self, env: &str) -> Self {`
-- `src/lib.rs:386`  `pub fn custom_arg(mut self, key: &str, value: &str) -> Self {`
-- `src/lib.rs:391`  `pub fn docker_args(mut self, docker_args: DockerBuildArgs) -> Self {`
-- `src/lib.rs:396`  `pub fn workspace(mut self, workspace: WorkspaceConfig) -> Self {`
-- `src/lib.rs:401`  `pub fn metadata(mut self, metadata: BuildMetadata) -> Self {`
-- `src/lib.rs:406`  `pub fn build(self) -> Result<BuildConfig> {`
-- `src/features.rs:12`  `pub struct FeatureSet {`
-- `src/features.rs:25`  `pub struct FeatureConstraints {`
-- `src/features.rs:41`  `pub enum FeatureCategory {`
-- `src/generator.rs:14`  `pub fn new() -> Self {`
-- `src/error.rs:12`  `pub enum Error {`
-- `src/targets.rs:12`  `pub enum BuildTarget {`
-- `src/targets.rs:30`  `pub enum BuildProfile {`
-- `src/validation.rs:16`  `pub fn new() -> Self {`
+- `src/agent.rs:16`  `pub trait SupervisedAgent: Send + Sync {`
+- `src/agent.rs:47`  `pub struct AgentSpec {`
+- `src/agent.rs:84`  `pub struct SupervisedAgentInfo {`
+- `src/agent.rs:145`  `pub trait AgentFactory: Send + Sync {`
+- `src/agent.rs:158`  `pub struct TestAgent {`
+- `src/agent.rs:172`  `pub fn new() -> Self {`
+- `src/error.rs:8`  `pub enum SupervisionError {`
+- `src/error.rs:96`  `pub enum ErrorCategory {`
+- `src/lib.rs:18`  `pub mod agent;`
+- `src/lib.rs:19`  `pub mod error;`
+- `src/lib.rs:20`  `pub mod restart_strategy;`
+- `src/lib.rs:21`  `pub mod supervisor;`
+- `src/lib.rs:23`  `pub use agent::*;`
+- `src/lib.rs:24`  `pub use error::*;`
+- `src/lib.rs:25`  `pub use restart_strategy::*;`
+- `src/lib.rs:26`  `pub use supervisor::*;`
+- `src/lib.rs:30`  `pub struct AgentPid(pub Uuid);`
+- `src/lib.rs:33`  `pub fn new() -> Self {`
+- `src/lib.rs:37`  `pub fn as_str(&self) -> String {`
+- `src/lib.rs:56`  `pub struct SupervisorId(pub Uuid);`
+- `src/lib.rs:59`  `pub fn new() -> Self {`
+- `src/lib.rs:63`  `pub fn as_str(&self) -> String {`
+- `src/lib.rs:82`  `pub enum AgentStatus {`
+- `src/lib.rs:93`  `pub enum ExitReason {`
+- `src/lib.rs:104`  `pub enum TerminateReason {`
+- `src/lib.rs:114`  `pub enum SystemMessage {`
+- `src/lib.rs:124`  `pub struct InitArgs {`
+- `src/restart_strategy.rs:10`  `pub enum RestartStrategy {`
+- `src/restart_strategy.rs:22`  `pub struct RestartIntensity {`
+- `src/restart_strategy.rs:94`  `pub struct RestartPolicy {`
+- `src/supervisor.rs:21`  `pub struct SupervisorConfig {`
+- `src/supervisor.rs:48`  `pub enum SupervisorStatus {`
+- `src/supervisor.rs:58`  `pub struct RestartEntry {`
+
+### terraphim_kg_agents (33 gaps)
+
+- `src/coordination.rs:25`  `pub enum CoordinationMessage {`
+- `src/coordination.rs:54`  `pub struct CoordinationState {`
+- `src/coordination.rs:67`  `pub struct WorkflowExecution {`
+- `src/coordination.rs:88`  `pub enum TaskExecutionStatus {`
+- `src/coordination.rs:99`  `pub enum WorkflowStatus {`
+- `src/coordination.rs:109`  `pub struct WorkflowIssue {`
+- `src/coordination.rs:126`  `pub enum IssueType {`
+- `src/coordination.rs:136`  `pub struct AgentAvailability {`
+- `src/coordination.rs:153`  `pub struct AgentPerformance {`
+- `src/coordination.rs:177`  `pub struct CoordinationStats {`
+- `src/coordination.rs:204`  `pub struct CoordinationConfig {`
+- `src/error.rs:12`  `pub enum KgAgentError {`
+- `src/lib.rs:22`  `pub use terraphim_agent_registry::{AgentMetadata, AgentPid, SupervisorId};`
+- `src/lib.rs:24`  `pub type GenAgentResult<T> = Result<T, Box<dyn std::error::Error + Send + Sync>>`
+- `src/lib.rs:27`  `pub enum GenAgentError {`
+- `src/lib.rs:31`  `pub use terraphim_types::*;`
+- `src/lib.rs:37`  `pub mod error;`
+- `src/lib.rs:42`  `pub use error::*;`
+- `src/planning.rs:24`  `pub enum PlanningMessage {`
+- `src/planning.rs:43`  `pub struct PlanningState {`
+- `src/planning.rs:54`  `pub struct ExecutionPlan {`
+- `src/planning.rs:75`  `pub enum PlanStatus {`
+- `src/planning.rs:86`  `pub struct PlanningFeedback {`
+- `src/planning.rs:99`  `pub struct TaskExecutionResult {`
+- `src/planning.rs:112`  `pub struct PlanningStats {`
+- `src/planning.rs:136`  `pub struct PlanningConfig {`
+- `src/worker.rs:22`  `pub enum WorkerMessage {`
+- `src/worker.rs:42`  `pub struct WorkerState {`
+- `src/worker.rs:57`  `pub enum WorkerStatus {`
+- `src/worker.rs:66`  `pub struct DomainSpecialization {`
+- `src/worker.rs:83`  `pub struct TaskExecution {`
+- `src/worker.rs:104`  `pub struct WorkerMetrics {`
+- `src/worker.rs:131`  `pub struct WorkerConfig {`
+
+### terraphim_kg_orchestration (33 gaps)
+
+- `src/agent.rs:14`  `pub trait SimpleAgent: Send + Sync {`
+- `src/agent.rs:60`  `pub struct TaskResult {`
+- `src/agent.rs:149`  `pub enum TaskExecutionStatus {`
+- `src/agent.rs:162`  `pub enum AgentStatus {`
+- `src/agent.rs:175`  `pub struct AgentMetadata {`
+- `src/agent.rs:204`  `pub fn new(agent_id: String, capabilities: Vec<String>) -> Self {`
+- `src/coordinator.rs:121`  `pub struct WorkflowResult {`
+- `src/coordinator.rs:202`  `pub enum WorkflowStatus {`
+- `src/error.rs:8`  `pub enum OrchestrationError {`
+- `src/error.rs:96`  `pub enum ErrorCategory {`
+- `src/lib.rs:24`  `pub mod coordinator;`
+- `src/lib.rs:25`  `pub mod error;`
+- `src/lib.rs:26`  `pub mod pool;`
+- `src/lib.rs:27`  `pub mod scheduler;`
+- `src/lib.rs:28`  `pub mod supervision;`
+- `src/lib.rs:30`  `pub use agent::*;`
+- `src/lib.rs:31`  `pub use coordinator::*;`
+- `src/lib.rs:32`  `pub use error::*;`
+- `src/lib.rs:33`  `pub use pool::*;`
+- `src/lib.rs:34`  `pub use scheduler::*;`
+- `src/lib.rs:35`  `pub use supervision::*;`
+- `src/lib.rs:38`  `pub use terraphim_task_decomposition::{`
+- `src/scheduler.rs:125`  `pub struct ScheduledWorkflow {`
+- `src/supervision.rs:53`  `pub struct SupervisionOrchestrationConfig {`
+- `src/supervision.rs:89`  `pub struct WorkflowExecution {`
+- `src/supervision.rs:108`  `pub struct SupervisedWorkflow {`
+- `src/supervision.rs:129`  `pub struct RecoveryAction {`
+- `src/supervision.rs:144`  `pub enum RecoveryActionType {`
+- `src/supervision.rs:154`  `pub enum SupervisionMessage {`
+- `src/supervision.rs:181`  `pub trait SupervisionOrchestration: Send + Sync {`
+- `src/supervision.rs:224`  `pub struct SupervisionStatus {`
+- `src/supervision.rs:241`  `pub enum HealthStatus {`
+- `src/supervision.rs:250`  `pub struct RestartStatistics {`
 
 ### haystack_atlassian (31 gaps)
 
-- `src/lib.rs:5`  `pub mod confluence;`
-- `src/lib.rs:6`  `pub mod jira;`
-- `src/lib.rs:8`  `pub struct ConfluenceClient {`
-- `src/lib.rs:14`  `pub struct JiraClient {`
-- `src/lib.rs:21`  `pub fn new(base_url: String, username: String, token: String) -> Self {`
-- `src/lib.rs:31`  `pub fn new(base_url: String, username: String, token: String) -> Self {`
-- `src/lib.rs:141`  `pub struct AtlassianClient;`
-- `src/jira.rs:7`  `pub struct Issue {`
-- `src/jira.rs:14`  `pub struct Fields {`
-- `src/jira.rs:35`  `pub struct IssueType {`
-- `src/jira.rs:40`  `pub struct Component {`
-- `src/jira.rs:45`  `pub struct Version {`
-- `src/jira.rs:50`  `pub struct Resolution {`
-- `src/jira.rs:55`  `pub struct Status {`
-- `src/jira.rs:60`  `pub struct Priority {`
-- `src/jira.rs:65`  `pub struct User {`
-- `src/jira.rs:72`  `pub async fn get_issue(`
-- `src/jira.rs:118`  `pub async fn search(`
-- `src/jira.rs:183`  `pub async fn get_project_issues(`
 - `src/confluence.rs:7`  `pub struct SearchResult {`
 - `src/confluence.rs:22`  `pub struct Space {`
 - `src/confluence.rs:30`  `pub struct Links {`
@@ -2726,46 +2931,34 @@
 - `src/confluence.rs:92`  `pub async fn search(`
 - `src/confluence.rs:146`  `pub async fn get_page(`
 - `src/confluence.rs:182`  `pub async fn get_comments(`
-
-### terraphim_kg_agents (31 gaps)
-
-- `src/planning.rs:24`  `pub enum PlanningMessage {`
-- `src/planning.rs:43`  `pub struct PlanningState {`
-- `src/planning.rs:54`  `pub struct ExecutionPlan {`
-- `src/planning.rs:75`  `pub enum PlanStatus {`
-- `src/planning.rs:86`  `pub struct PlanningFeedback {`
-- `src/planning.rs:99`  `pub struct TaskExecutionResult {`
-- `src/planning.rs:112`  `pub struct PlanningStats {`
-- `src/planning.rs:136`  `pub struct PlanningConfig {`
-- `src/coordination.rs:25`  `pub enum CoordinationMessage {`
-- `src/coordination.rs:54`  `pub struct CoordinationState {`
-- `src/coordination.rs:67`  `pub struct WorkflowExecution {`
-- `src/coordination.rs:88`  `pub enum TaskExecutionStatus {`
-- `src/coordination.rs:99`  `pub enum WorkflowStatus {`
-- `src/coordination.rs:109`  `pub struct WorkflowIssue {`
-- `src/coordination.rs:126`  `pub enum IssueType {`
-- `src/coordination.rs:136`  `pub struct AgentAvailability {`
-- `src/coordination.rs:153`  `pub struct AgentPerformance {`
-- `src/coordination.rs:177`  `pub struct CoordinationStats {`
-- `src/coordination.rs:204`  `pub struct CoordinationConfig {`
-- `src/lib.rs:22`  `pub use terraphim_agent_registry::{AgentMetadata, AgentPid, SupervisorId};`
-- `src/lib.rs:24`  `pub type GenAgentResult<T> = Result<T, Box<dyn std::error::Error + Send + Sync>>`
-- `src/lib.rs:27`  `pub enum GenAgentError {`
-- `src/lib.rs:37`  `pub mod error;`
-- `src/error.rs:12`  `pub enum KgAgentError {`
-- `src/worker.rs:22`  `pub enum WorkerMessage {`
-- `src/worker.rs:42`  `pub struct WorkerState {`
-- `src/worker.rs:57`  `pub enum WorkerStatus {`
-- `src/worker.rs:66`  `pub struct DomainSpecialization {`
-- `src/worker.rs:83`  `pub struct TaskExecution {`
-- `src/worker.rs:104`  `pub struct WorkerMetrics {`
-- `src/worker.rs:131`  `pub struct WorkerConfig {`
+- `src/jira.rs:7`  `pub struct Issue {`
+- `src/jira.rs:14`  `pub struct Fields {`
+- `src/jira.rs:35`  `pub struct IssueType {`
+- `src/jira.rs:40`  `pub struct Component {`
+- `src/jira.rs:45`  `pub struct Version {`
+- `src/jira.rs:50`  `pub struct Resolution {`
+- `src/jira.rs:55`  `pub struct Status {`
+- `src/jira.rs:60`  `pub struct Priority {`
+- `src/jira.rs:65`  `pub struct User {`
+- `src/jira.rs:72`  `pub async fn get_issue(`
+- `src/jira.rs:118`  `pub async fn search(`
+- `src/jira.rs:183`  `pub async fn get_project_issues(`
+- `src/lib.rs:5`  `pub mod confluence;`
+- `src/lib.rs:6`  `pub mod jira;`
+- `src/lib.rs:8`  `pub struct ConfluenceClient {`
+- `src/lib.rs:14`  `pub struct JiraClient {`
+- `src/lib.rs:21`  `pub fn new(base_url: String, username: String, token: String) -> Self {`
+- `src/lib.rs:31`  `pub fn new(base_url: String, username: String, token: String) -> Self {`
+- `src/lib.rs:141`  `pub struct AtlassianClient;`
 
 ### terraphim_rolegraph (31 gaps)
 
-- `src/symbolic_embeddings.rs:23`  `pub struct SymbolicEmbedding {`
-- `src/symbolic_embeddings.rs:100`  `pub struct SymbolicEmbeddingIndex {`
-- `src/medical.rs:26`  `pub enum MedicalRoleGraphError {`
+- `src/input.rs:1`  `pub const TEST1: &str = include_str!("../data/system_operator_cc/test1.md");`
+- `src/input.rs:2`  `pub const TEST12: &str = include_str!("../data/system_operator_cc/test12.md");`
+- `src/input.rs:3`  `pub const TEST123: &str = include_str!("../data/system_operator_cc/test123.md");`
+- `src/input.rs:4`  `pub const TEST1234: &str = include_str!("../data/system_operator_cc/test1234.md"`
+- `src/input.rs:5`  `pub const TEST12345: &str = include_str!("../data/system_operator_cc/test12345.m`
+- `src/input.rs:6`  `pub const TEST_CORPUS: &[&str] = &[TEST1, TEST12, TEST123, TEST1234, TEST12345];`
 - `src/lib.rs:10`  `pub mod input;`
 - `src/lib.rs:13`  `pub mod medical;`
 - `src/lib.rs:15`  `pub mod medical_loaders;`
@@ -2785,23 +2978,26 @@
 - `src/lib.rs:1368`  `pub fn split_paragraphs(paragraphs: &str) -> Vec<&str> {`
 - `src/lib.rs:1380`  `pub fn magic_pair(x: u64, y: u64) -> u64 {`
 - `src/lib.rs:1386`  `pub fn magic_unpair(z: u64) -> (u64, u64) {`
-- `src/input.rs:1`  `pub const TEST1: &str = include_str!("../data/system_operator_cc/test1.md");`
-- `src/input.rs:2`  `pub const TEST12: &str = include_str!("../data/system_operator_cc/test12.md");`
-- `src/input.rs:3`  `pub const TEST123: &str = include_str!("../data/system_operator_cc/test123.md");`
-- `src/input.rs:4`  `pub const TEST1234: &str = include_str!("../data/system_operator_cc/test1234.md"`
-- `src/input.rs:5`  `pub const TEST12345: &str = include_str!("../data/system_operator_cc/test12345.m`
-- `src/input.rs:6`  `pub const TEST_CORPUS: &[&str] = &[TEST1, TEST12, TEST123, TEST1234, TEST12345];`
+- `src/medical.rs:26`  `pub enum MedicalRoleGraphError {`
 - `src/medical_loaders.rs:25`  `pub struct ImportStats {`
 - `src/medical_loaders.rs:87`  `pub struct PrimeKgConfig {`
 - `src/medical_loaders.rs:286`  `pub struct SnomedConfig {`
+- `src/symbolic_embeddings.rs:23`  `pub struct SymbolicEmbedding {`
+- `src/symbolic_embeddings.rs:100`  `pub struct SymbolicEmbeddingIndex {`
 
 ### terraphim_spawner (30 gaps)
 
-- `src/mention.rs:15`  `pub struct MentionRouter {`
-- `src/mention.rs:26`  `pub struct MentionEvent {`
+- `src/audit.rs:13`  `pub enum AuditEvent {`
 - `src/config.rs:12`  `pub struct ResourceLimits {`
 - `src/config.rs:25`  `pub struct AgentConfig {`
 - `src/config.rs:172`  `pub enum ValidationError {`
+- `src/health.rs:13`  `pub enum HealthStatus {`
+- `src/health.rs:48`  `pub enum CircuitState {`
+- `src/health.rs:69`  `pub struct CircuitBreakerConfig {`
+- `src/health.rs:90`  `pub struct CircuitBreaker {`
+- `src/health.rs:196`  `pub struct HealthRecord {`
+- `src/health.rs:205`  `pub struct HealthHistory {`
+- `src/health.rs:305`  `pub struct HealthChecker {`
 - `src/lib.rs:25`  `pub struct SpawnContext {`
 - `src/lib.rs:53`  `pub mod audit;`
 - `src/lib.rs:54`  `pub mod config;`
@@ -2817,68 +3013,20 @@
 - `src/lib.rs:94`  `pub struct SpawnRequest {`
 - `src/lib.rs:158`  `pub struct AgentHandle {`
 - `src/lib.rs:395`  `pub struct AgentSpawner {`
+- `src/mention.rs:15`  `pub struct MentionRouter {`
+- `src/mention.rs:26`  `pub struct MentionEvent {`
 - `src/output.rs:12`  `pub enum OutputEvent {`
 - `src/output.rs:32`  `pub struct OutputCapture {`
-- `src/health.rs:13`  `pub enum HealthStatus {`
-- `src/health.rs:48`  `pub enum CircuitState {`
-- `src/health.rs:69`  `pub struct CircuitBreakerConfig {`
-- `src/health.rs:90`  `pub struct CircuitBreaker {`
-- `src/health.rs:196`  `pub struct HealthRecord {`
-- `src/health.rs:205`  `pub struct HealthHistory {`
-- `src/health.rs:305`  `pub struct HealthChecker {`
-- `src/audit.rs:13`  `pub enum AuditEvent {`
-
-### terraphim_agent_supervisor (29 gaps)
-
-- `src/restart_strategy.rs:10`  `pub enum RestartStrategy {`
-- `src/restart_strategy.rs:22`  `pub struct RestartIntensity {`
-- `src/restart_strategy.rs:94`  `pub struct RestartPolicy {`
-- `src/lib.rs:18`  `pub mod agent;`
-- `src/lib.rs:19`  `pub mod error;`
-- `src/lib.rs:20`  `pub mod restart_strategy;`
-- `src/lib.rs:21`  `pub mod supervisor;`
-- `src/lib.rs:30`  `pub struct AgentPid(pub Uuid);`
-- `src/lib.rs:33`  `pub fn new() -> Self {`
-- `src/lib.rs:37`  `pub fn as_str(&self) -> String {`
-- `src/lib.rs:56`  `pub struct SupervisorId(pub Uuid);`
-- `src/lib.rs:59`  `pub fn new() -> Self {`
-- `src/lib.rs:63`  `pub fn as_str(&self) -> String {`
-- `src/lib.rs:82`  `pub enum AgentStatus {`
-- `src/lib.rs:93`  `pub enum ExitReason {`
-- `src/lib.rs:104`  `pub enum TerminateReason {`
-- `src/lib.rs:114`  `pub enum SystemMessage {`
-- `src/lib.rs:124`  `pub struct InitArgs {`
-- `src/supervisor.rs:21`  `pub struct SupervisorConfig {`
-- `src/supervisor.rs:48`  `pub enum SupervisorStatus {`
-- `src/supervisor.rs:58`  `pub struct RestartEntry {`
-- `src/error.rs:8`  `pub enum SupervisionError {`
-- `src/error.rs:96`  `pub enum ErrorCategory {`
-- `src/agent.rs:16`  `pub trait SupervisedAgent: Send + Sync {`
-- `src/agent.rs:47`  `pub struct AgentSpec {`
-- `src/agent.rs:84`  `pub struct SupervisedAgentInfo {`
-- `src/agent.rs:145`  `pub trait AgentFactory: Send + Sync {`
-- `src/agent.rs:158`  `pub struct TestAgent {`
-- `src/agent.rs:172`  `pub fn new() -> Self {`
 
 ### terraphim_update (29 gaps)
 
-- `src/rollback.rs:22`  `pub struct Backup {`
-- `src/rollback.rs:66`  `pub struct BackupManager {`
-- `src/scheduler.rs:16`  `pub enum UpdateNotification {`
-- `src/scheduler.rs:42`  `pub enum UpdateCheckResult {`
-- `src/notification.rs:11`  `pub enum UpdateAction {`
-- `src/notification.rs:193`  `pub fn alert() -> &'static str {`
-- `src/notification.rs:197`  `pub fn success() -> &'static str {`
-- `src/notification.rs:201`  `pub fn error() -> &'static str {`
-- `src/notification.rs:205`  `pub fn check() -> &'static str {`
-- `src/signature.rs:17`  `pub use zipsign_api::ZipsignError;`
-- `src/signature.rs:44`  `pub struct KeyMetadata {`
-- `src/signature.rs:78`  `pub enum VerificationResult {`
 - `src/config.rs:24`  `pub struct UpdateConfig {`
 - `src/config.rs:67`  `pub struct UpdateInfo {`
 - `src/config.rs:112`  `pub struct UpdateHistory {`
 - `src/config.rs:193`  `pub struct UpdateCheckEntry {`
 - `src/config.rs:206`  `pub enum UpdateCheckResult {`
+- `src/downloader.rs:29`  `pub struct DownloadConfig {`
+- `src/downloader.rs:97`  `pub struct DownloadResult {`
 - `src/lib.rs:7`  `pub mod downloader;`
 - `src/lib.rs:8`  `pub mod notification;`
 - `src/lib.rs:9`  `pub mod platform;`
@@ -2889,23 +3037,21 @@
 - `src/lib.rs:27`  `pub enum UpdateStatus {`
 - `src/lib.rs:90`  `pub struct UpdaterConfig {`
 - `src/lib.rs:1137`  `pub struct UpdateAvailableInfo {`
-- `src/downloader.rs:29`  `pub struct DownloadConfig {`
-- `src/downloader.rs:97`  `pub struct DownloadResult {`
+- `src/notification.rs:11`  `pub enum UpdateAction {`
+- `src/notification.rs:193`  `pub fn alert() -> &'static str {`
+- `src/notification.rs:197`  `pub fn success() -> &'static str {`
+- `src/notification.rs:201`  `pub fn error() -> &'static str {`
+- `src/notification.rs:205`  `pub fn check() -> &'static str {`
+- `src/rollback.rs:22`  `pub struct Backup {`
+- `src/rollback.rs:66`  `pub struct BackupManager {`
+- `src/scheduler.rs:16`  `pub enum UpdateNotification {`
+- `src/scheduler.rs:42`  `pub enum UpdateCheckResult {`
+- `src/signature.rs:17`  `pub use zipsign_api::ZipsignError;`
+- `src/signature.rs:44`  `pub struct KeyMetadata {`
+- `src/signature.rs:78`  `pub enum VerificationResult {`
 
 ### terraphim_tracker (28 gaps)
 
-- `src/linear.rs:13`  `pub struct LinearConfig {`
-- `src/lib.rs:7`  `pub mod linear;`
-- `src/lib.rs:8`  `pub mod pagerank;`
-- `src/lib.rs:10`  `pub use gitea::{`
-- `src/lib.rs:14`  `pub use linear::{LinearConfig, LinearTracker};`
-- `src/lib.rs:15`  `pub use pagerank::{PagerankClient, PagerankScore};`
-- `src/lib.rs:23`  `pub struct Issue {`
-- `src/lib.rs:54`  `pub struct BlockerRef {`
-- `src/lib.rs:65`  `pub trait IssueTracker: Send + Sync {`
-- `src/lib.rs:78`  `pub enum TrackerError {`
-- `src/pagerank.rs:7`  `pub struct PagerankScore {`
-- `src/pagerank.rs:26`  `pub struct ReadyResponse {`
 - `src/gitea.rs:14`  `pub enum ClaimResult {`
 - `src/gitea.rs:32`  `pub enum ClaimStrategy {`
 - `src/gitea.rs:46`  `pub enum MergeStyle {`
@@ -2922,42 +3068,21 @@
 - `src/gitea.rs:1386`  `pub struct GiteaPrSummary {`
 - `src/gitea.rs:1402`  `pub struct CommitStatusEntry {`
 - `src/gitea.rs:1416`  `pub struct BranchProtection {`
-
-### terraphim_kg_orchestration (27 gaps)
-
-- `src/coordinator.rs:121`  `pub struct WorkflowResult {`
-- `src/coordinator.rs:202`  `pub enum WorkflowStatus {`
-- `src/scheduler.rs:125`  `pub struct ScheduledWorkflow {`
-- `src/lib.rs:24`  `pub mod coordinator;`
-- `src/lib.rs:25`  `pub mod error;`
-- `src/lib.rs:26`  `pub mod pool;`
-- `src/lib.rs:27`  `pub mod scheduler;`
-- `src/lib.rs:28`  `pub mod supervision;`
-- `src/lib.rs:38`  `pub use terraphim_task_decomposition::{`
-- `src/error.rs:8`  `pub enum OrchestrationError {`
-- `src/error.rs:96`  `pub enum ErrorCategory {`
-- `src/supervision.rs:53`  `pub struct SupervisionOrchestrationConfig {`
-- `src/supervision.rs:89`  `pub struct WorkflowExecution {`
-- `src/supervision.rs:108`  `pub struct SupervisedWorkflow {`
-- `src/supervision.rs:129`  `pub struct RecoveryAction {`
-- `src/supervision.rs:144`  `pub enum RecoveryActionType {`
-- `src/supervision.rs:154`  `pub enum SupervisionMessage {`
-- `src/supervision.rs:181`  `pub trait SupervisionOrchestration: Send + Sync {`
-- `src/supervision.rs:224`  `pub struct SupervisionStatus {`
-- `src/supervision.rs:241`  `pub enum HealthStatus {`
-- `src/supervision.rs:250`  `pub struct RestartStatistics {`
-- `src/agent.rs:14`  `pub trait SimpleAgent: Send + Sync {`
-- `src/agent.rs:60`  `pub struct TaskResult {`
-- `src/agent.rs:149`  `pub enum TaskExecutionStatus {`
-- `src/agent.rs:162`  `pub enum AgentStatus {`
-- `src/agent.rs:175`  `pub struct AgentMetadata {`
-- `src/agent.rs:204`  `pub fn new(agent_id: String, capabilities: Vec<String>) -> Self {`
+- `src/lib.rs:7`  `pub mod linear;`
+- `src/lib.rs:8`  `pub mod pagerank;`
+- `src/lib.rs:10`  `pub use gitea::{`
+- `src/lib.rs:14`  `pub use linear::{LinearConfig, LinearTracker};`
+- `src/lib.rs:15`  `pub use pagerank::{PagerankClient, PagerankScore};`
+- `src/lib.rs:23`  `pub struct Issue {`
+- `src/lib.rs:54`  `pub struct BlockerRef {`
+- `src/lib.rs:65`  `pub trait IssueTracker: Send + Sync {`
+- `src/lib.rs:78`  `pub enum TrackerError {`
+- `src/linear.rs:13`  `pub struct LinearConfig {`
+- `src/pagerank.rs:7`  `pub struct PagerankScore {`
+- `src/pagerank.rs:26`  `pub struct ReadyResponse {`
 
 ### terraphim_persistence (24 gaps)
 
-- `src/memory.rs:52`  `pub fn create_multi_profile_device_settings() -> Result<DeviceSettings> {`
-- `src/settings.rs:164`  `pub async fn parse_profile(`
-- `src/settings.rs:349`  `pub async fn parse_profiles(`
 - `src/conversation.rs:10`  `pub trait ConversationPersistence: Send + Sync {`
 - `src/conversation.rs:32`  `pub struct ConversationIndex {`
 - `src/conversation.rs:42`  `pub fn new() -> Self {`
@@ -2966,6 +3091,8 @@
 - `src/conversation.rs:61`  `pub fn get(&self, id: &ConversationId) -> Option<&ConversationSummary> {`
 - `src/conversation.rs:65`  `pub fn list(&self) -> Vec<ConversationSummary> {`
 - `src/conversation.rs:83`  `pub fn new() -> Self {`
+- `src/error.rs:4`  `pub enum Error {`
+- `src/error.rs:36`  `pub type Result<T> = std::result::Result<T, Error>;`
 - `src/lib.rs:1`  `pub mod compression;`
 - `src/lib.rs:2`  `pub mod conversation;`
 - `src/lib.rs:3`  `pub mod document;`
@@ -2977,22 +3104,14 @@
 - `src/lib.rs:41`  `pub struct DeviceStorage {`
 - `src/lib.rs:47`  `pub async fn instance() -> Result<&'static DeviceStorage> {`
 - `src/lib.rs:194`  `pub trait Persistable: Serialize + DeserializeOwned {`
-- `src/error.rs:4`  `pub enum Error {`
-- `src/error.rs:36`  `pub type Result<T> = std::result::Result<T, Error>;`
+- `src/memory.rs:52`  `pub fn create_multi_profile_device_settings() -> Result<DeviceSettings> {`
+- `src/settings.rs:164`  `pub async fn parse_profile(`
+- `src/settings.rs:349`  `pub async fn parse_profiles(`
 
 ### terraphim-markdown-parser (22 gaps)
 
 - `src/chunk.rs:7`  `pub struct ContentChunk {`
 - `src/chunk.rs:22`  `pub fn chunk_by_headings(`
-- `src/lib.rs:11`  `pub mod chunk;`
-- `src/lib.rs:12`  `pub mod heading;`
-- `src/lib.rs:14`  `pub use chunk::{ContentChunk, chunk_by_headings};`
-- `src/lib.rs:15`  `pub use heading::{`
-- `src/lib.rs:20`  `pub const TERRAPHIM_BLOCK_ID_PREFIX: &str = "terraphim:block-id:";`
-- `src/lib.rs:69`  `pub enum BlockKind {`
-- `src/lib.rs:75`  `pub struct Block {`
-- `src/lib.rs:93`  `pub struct NormalizedMarkdown {`
-- `src/lib.rs:100`  `pub enum MarkdownParserError {`
 - `src/heading.rs:11`  `pub enum MatchStrategy {`
 - `src/heading.rs:19`  `pub enum SectionType {`
 - `src/heading.rs:38`  `pub struct SectionPattern {`
@@ -3004,12 +3123,18 @@
 - `src/heading.rs:125`  `pub fn build_heading_tree(`
 - `src/heading.rs:137`  `pub fn classify_sections(tree: &mut HeadingTree, config: &SectionConfig) {`
 - `src/heading.rs:150`  `pub struct RawHeading {`
+- `src/lib.rs:11`  `pub mod chunk;`
+- `src/lib.rs:12`  `pub mod heading;`
+- `src/lib.rs:14`  `pub use chunk::{ContentChunk, chunk_by_headings};`
+- `src/lib.rs:15`  `pub use heading::{`
+- `src/lib.rs:20`  `pub const TERRAPHIM_BLOCK_ID_PREFIX: &str = "terraphim:block-id:";`
+- `src/lib.rs:69`  `pub enum BlockKind {`
+- `src/lib.rs:75`  `pub struct Block {`
+- `src/lib.rs:93`  `pub struct NormalizedMarkdown {`
+- `src/lib.rs:100`  `pub enum MarkdownParserError {`
 
 ### terraphim_config (22 gaps)
 
-- `src/llm_router.rs:10`  `pub struct LlmRouterConfig {`
-- `src/llm_router.rs:56`  `pub enum RouterMode {`
-- `src/llm_router.rs:69`  `pub enum RouterStrategy {`
 - `src/lib.rs:29`  `pub mod llm_router;`
 - `src/lib.rs:31`  `pub type Result<T> = std::result::Result<T, TerraphimConfigError>;`
 - `src/lib.rs:38`  `pub enum TerraphimConfigError {`
@@ -3029,9 +3154,14 @@
 - `src/lib.rs:838`  `pub struct Config {`
 - `src/lib.rs:952`  `pub struct ConfigState {`
 - `src/lib.rs:1077`  `pub async fn get_selected_role(&self) -> RoleName {`
+- `src/llm_router.rs:10`  `pub struct LlmRouterConfig {`
+- `src/llm_router.rs:56`  `pub enum RouterMode {`
+- `src/llm_router.rs:69`  `pub enum RouterStrategy {`
 
 ### haystack_grepapp (15 gaps)
 
+- `src/client.rs:11`  `pub struct GrepAppClient {`
+- `src/client.rs:18`  `pub struct SearchParams {`
 - `src/lib.rs:8`  `pub use client::{GrepAppClient, SearchParams};`
 - `src/lib.rs:9`  `pub use models::{Hit, SearchResponse};`
 - `src/models.rs:5`  `pub struct SearchResponse {`
@@ -3045,8 +3175,6 @@
 - `src/models.rs:76`  `pub struct PathField {`
 - `src/models.rs:83`  `pub struct BranchField {`
 - `src/models.rs:90`  `pub struct ContentField {`
-- `src/client.rs:11`  `pub struct GrepAppClient {`
-- `src/client.rs:18`  `pub struct SearchParams {`
 
 ### terraphim_kg_linter (15 gaps)
 
@@ -3068,6 +3196,9 @@
 
 ### terraphim_codebase_eval (13 gaps)
 
+- `src/error.rs:7`  `pub enum ManifestError {`
+- `src/lib.rs:21`  `pub use error::ManifestError;`
+- `src/lib.rs:22`  `pub use manifest::{`
 - `src/manifest.rs:11`  `pub enum BaselineOrCandidate {`
 - `src/manifest.rs:20`  `pub struct HaystackDescriptor {`
 - `src/manifest.rs:36`  `pub struct ScoringWeights {`
@@ -3078,28 +3209,28 @@
 - `src/manifest.rs:115`  `pub struct MetricRecord {`
 - `src/manifest.rs:136`  `pub struct Thresholds {`
 - `src/manifest.rs:175`  `pub struct EvaluationManifest {`
-- `src/lib.rs:21`  `pub use error::ManifestError;`
-- `src/lib.rs:22`  `pub use manifest::{`
-- `src/error.rs:7`  `pub enum ManifestError {`
 
 ### terraphim_hooks (13 gaps)
 
-- `src/validation_types.rs:11`  `pub enum ValidationOutcome {`
-- `src/validation_types.rs:25`  `pub struct ValidationError {`
-- `src/validation_types.rs:35`  `pub struct ValidationResult {`
+- `src/discovery.rs:7`  `pub enum BinaryLocation {`
 - `src/lib.rs:11`  `pub use discovery::{BinaryLocation, discover_binary};`
 - `src/lib.rs:12`  `pub use replacement::{HookResult, LinkType, ReplacementService};`
 - `src/lib.rs:13`  `pub use validation::ValidationService;`
 - `src/lib.rs:14`  `pub use validation_types::{ValidationError, ValidationOutcome, ValidationResult}`
 - `src/lib.rs:18`  `pub use terraphim_types::Thesaurus;`
-- `src/discovery.rs:7`  `pub enum BinaryLocation {`
 - `src/replacement.rs:13`  `pub enum ReplacementError {`
 - `src/replacement.rs:22`  `pub struct HookResult {`
 - `src/replacement.rs:75`  `pub struct ReplacementService {`
 - `src/validation.rs:17`  `pub struct ValidationService {`
+- `src/validation_types.rs:11`  `pub enum ValidationOutcome {`
+- `src/validation_types.rs:25`  `pub struct ValidationError {`
+- `src/validation_types.rs:35`  `pub struct ValidationResult {`
 
 ### haystack_discourse (11 gaps)
 
+- `src/client.rs:7`  `pub struct DiscourseClient {`
+- `src/client.rs:15`  `pub fn new(base_url: &str, api_key: &str, api_username: &str) -> Result<Self> {`
+- `src/client.rs:55`  `pub async fn search_posts(&self, query: &str, limit: u32) -> Result<Vec<Post>> {`
 - `src/lib.rs:4`  `pub use client::DiscourseClient;`
 - `src/lib.rs:5`  `pub use models::Post;`
 - `src/models.rs:4`  `pub struct Post {`
@@ -3108,9 +3239,6 @@
 - `src/models.rs:32`  `pub struct TopicResponse {`
 - `src/models.rs:41`  `pub struct PostDetailsResponse {`
 - `src/models.rs:46`  `pub struct PostDetails {`
-- `src/client.rs:7`  `pub struct DiscourseClient {`
-- `src/client.rs:15`  `pub fn new(base_url: &str, api_key: &str, api_username: &str) -> Result<Self> {`
-- `src/client.rs:55`  `pub async fn search_posts(&self, query: &str, limit: u32) -> Result<Vec<Post>> {`
 
 ### terraphim_ccusage (11 gaps)
 
@@ -3128,6 +3256,7 @@
 
 ### terraphim_negative_contribution (10 gaps)
 
+- `src/exclusion.rs:7`  `pub fn is_non_production(path: &str, full_content: &str) -> bool {`
 - `src/lib.rs:6`  `pub use exclusion::is_non_production;`
 - `src/lib.rs:7`  `pub use scanner::NegativeContributionScanner;`
 - `src/scanner.rs:13`  `pub struct NegativeContributionScanner {`
@@ -3137,18 +3266,17 @@
 - `src/scanner.rs:71`  `pub fn scan_files(&self, files: &[(String, String)]) -> Vec<ReviewFinding> {`
 - `src/scanner.rs:78`  `pub fn scan_to_output(&self, files: &[(String, String)]) -> ReviewAgentOutput {`
 - `src/scanner.rs:103`  `pub fn thesaurus(&self) -> &Thesaurus {`
-- `src/exclusion.rs:7`  `pub fn is_non_production(path: &str, full_content: &str) -> bool {`
 
 ### terraphim_github_runner_server (8 gaps)
 
+- `src/config/mod.rs:7`  `pub struct Settings {`
+- `src/webhook/mod.rs:1`  `pub mod signature;`
+- `src/webhook/mod.rs:3`  `pub use signature::verify_signature;`
+- `src/workflow/execution.rs:24`  `pub fn new(api_base_url: String, auth_token: Option<String>, client: Arc<Client>`
 - `src/workflow/mod.rs:1`  `pub mod discovery;`
 - `src/workflow/mod.rs:2`  `pub mod execution;`
 - `src/workflow/mod.rs:4`  `pub use discovery::discover_workflows_for_event;`
 - `src/workflow/mod.rs:5`  `pub use execution::execute_workflows_in_vms;`
-- `src/workflow/execution.rs:24`  `pub fn new(api_base_url: String, auth_token: Option<String>, client: Arc<Client>`
-- `src/webhook/mod.rs:1`  `pub mod signature;`
-- `src/webhook/mod.rs:3`  `pub use signature::verify_signature;`
-- `src/config/mod.rs:7`  `pub struct Settings {`
 
 ### terraphim_rolegraph_py (7 gaps)
 
@@ -3214,10 +3342,10 @@
 
 ### terraphim_mcp_server (4 gaps)
 
-- `src/resource_mapper.rs:10`  `pub struct TerraphimResourceMapper;`
 - `src/lib.rs:28`  `pub mod resource_mapper;`
 - `src/lib.rs:33`  `pub enum TerraphimMcpError {`
 - `src/lib.rs:54`  `pub struct McpService {`
+- `src/resource_mapper.rs:10`  `pub struct TerraphimResourceMapper;`
 
 ### terraphim_test_utils (4 gaps)
 
