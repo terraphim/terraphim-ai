@@ -587,6 +587,65 @@ fn resolve_output_config(robot: bool, format: OutputFormat) -> CommandOutputConf
     CommandOutputConfig { mode, robot }
 }
 
+/// Output types for robot mode on CLI commands that previously only printed plain text.
+mod command_output {
+    use serde::Serialize;
+
+    #[derive(Debug, Serialize)]
+    pub struct RolesOutput {
+        pub roles: Vec<RoleInfo>,
+        pub selected: String,
+    }
+
+    #[derive(Debug, Serialize)]
+    pub struct RoleInfo {
+        pub name: String,
+        pub shortname: Option<String>,
+        pub selected: bool,
+    }
+
+    #[derive(Debug, Serialize)]
+    pub struct RolesSelectOutput {
+        pub selected: String,
+    }
+
+    #[derive(Debug, Serialize)]
+    pub struct ConfigSetOutput {
+        pub key: String,
+        pub value: String,
+    }
+
+    #[derive(Debug, Serialize)]
+    pub struct ConfigReloadOutput {
+        pub count: usize,
+        pub path: String,
+    }
+
+    #[derive(Debug, Serialize)]
+    pub struct GraphOutput {
+        pub concepts: Vec<String>,
+        pub role: String,
+        pub pinned: bool,
+    }
+
+    #[derive(Debug, Serialize)]
+    pub struct ExtractMatch {
+        pub term: String,
+        pub paragraph: String,
+    }
+
+    #[derive(Debug, Serialize)]
+    pub struct ExtractOutput {
+        pub matches: Vec<ExtractMatch>,
+        pub count: usize,
+    }
+
+    #[derive(Debug, Serialize)]
+    pub struct ChatOutput {
+        pub response: String,
+    }
+}
+
 #[cfg(feature = "repl-sessions")]
 mod session_output {
     use serde::Serialize;
@@ -653,6 +712,35 @@ fn print_json_output<T: Serialize>(value: &T, mode: CommandOutputMode) -> Result
         CommandOutputMode::JsonCompact => serde_json::to_string(value)?,
     };
     println!("{}", out);
+    Ok(())
+}
+
+/// Emit a value wrapped in the standard RobotResponse envelope for robot mode.
+fn emit_robot_response<T: Serialize>(
+    data: T,
+    command: &str,
+    start: std::time::Instant,
+    output: CommandOutputConfig,
+) -> Result<()> {
+    use crate::robot::schema::{ResponseMeta, RobotResponse};
+    use crate::robot::{RobotConfig, RobotFormatter};
+
+    let robot_format = match output.mode {
+        CommandOutputMode::JsonCompact => crate::robot::output::OutputFormat::Minimal,
+        _ => crate::robot::output::OutputFormat::Json,
+    };
+    let mut robot_config = RobotConfig::new().with_format(robot_format);
+    if output.robot {
+        robot_config = robot_config
+            .with_max_content_length(2000)
+            .with_max_tokens(8000);
+    }
+    let formatter = RobotFormatter::new(robot_config);
+
+    let meta = ResponseMeta::new(command).with_elapsed(start.elapsed().as_millis() as u64);
+    let response = RobotResponse::success(data, meta);
+    let output_str = formatter.format(&response)?;
+    println!("{}", output_str);
     Ok(())
 }
 
@@ -2160,25 +2248,43 @@ async fn run_offline_command(
             Ok(())
         }
         Command::Roles { sub } => {
+            use command_output::{RoleInfo, RolesOutput, RolesSelectOutput};
             match sub {
                 RolesSub::List => {
+                    let start = std::time::Instant::now();
                     let roles_with_info = service.list_roles_with_info().await;
                     let selected = service.get_selected_role().await;
-                    for (name, shortname) in roles_with_info {
-                        let marker = if name == selected.to_string() {
-                            "*"
-                        } else {
-                            " "
+                    if output.is_machine_readable() {
+                        let roles: Vec<RoleInfo> = roles_with_info
+                            .into_iter()
+                            .map(|(name, shortname)| RoleInfo {
+                                name: name.clone(),
+                                shortname,
+                                selected: name == selected.to_string(),
+                            })
+                            .collect();
+                        let payload = RolesOutput {
+                            roles,
+                            selected: selected.to_string(),
                         };
-                        if let Some(short) = shortname {
-                            println!("{} {} ({})", marker, name, short);
-                        } else {
-                            println!("{} {}", marker, name);
+                        emit_robot_response(payload, "roles list", start, output)?;
+                    } else {
+                        for (name, shortname) in roles_with_info {
+                            let marker = if name == selected.to_string() {
+                                "*"
+                            } else {
+                                " "
+                            };
+                            if let Some(short) = shortname {
+                                println!("{} {} ({})", marker, name, short);
+                            } else {
+                                println!("{} {}", marker, name);
+                            }
                         }
                     }
                 }
                 RolesSub::Select { name } => {
-                    // Find role by name or shortname
+                    let start = std::time::Instant::now();
                     let role_name = service
                         .find_role_by_name_or_shortname(&name)
                         .await
@@ -2190,25 +2296,50 @@ async fn run_offline_command(
                         })?;
                     service.update_selected_role(role_name.clone()).await?;
                     service.save_config().await?;
-                    println!("selected:{}", role_name);
+                    if output.is_machine_readable() {
+                        let payload = RolesSelectOutput {
+                            selected: role_name.to_string(),
+                        };
+                        emit_robot_response(payload, "roles select", start, output)?;
+                    } else {
+                        println!("selected:{}", role_name);
+                    }
                 }
             }
             Ok(())
         }
         Command::Config { sub } => {
+            use command_output::{ConfigReloadOutput, ConfigSetOutput};
             match sub {
                 ConfigSub::Show => {
+                    let start = std::time::Instant::now();
                     let config = service.get_config().await;
-                    println!("{}", serde_json::to_string_pretty(&config)?);
+                    if output.is_machine_readable() {
+                        emit_robot_response(config, "config show", start, output)?;
+                    } else {
+                        println!("{}", serde_json::to_string_pretty(&config)?);
+                    }
                 }
                 ConfigSub::Set { key, value } => match key.as_str() {
                     "selected_role" => {
+                        let start = std::time::Instant::now();
                         let role_name = RoleName::new(&value);
                         service.update_selected_role(role_name).await?;
                         service.save_config().await?;
-                        println!("updated selected_role to {}", value);
+                        if output.is_machine_readable() {
+                            let payload = ConfigSetOutput {
+                                key: key.clone(),
+                                value: value.clone(),
+                            };
+                            emit_robot_response(payload, "config set", start, output)?;
+                        } else {
+                            println!("updated selected_role to {}", value);
+                        }
                     }
                     _ => {
+                        if output.is_machine_readable() {
+                            return Err(anyhow::anyhow!("unsupported key: {}", key));
+                        }
                         println!("unsupported key: {}", key);
                     }
                 },
@@ -2217,15 +2348,24 @@ async fn run_offline_command(
                     unreachable!("config validate is handled before TuiService init");
                 }
                 ConfigSub::Reload => {
+                    let start = std::time::Instant::now();
                     let ds = terraphim_settings::DeviceSettings::load_from_env_and_file(None)
                         .unwrap_or_else(|_| terraphim_settings::DeviceSettings::default_embedded());
                     match &ds.role_config {
                         Some(path) => match service.reload_from_json(path).await {
                             Ok(count) => {
-                                println!(
-                                    "Reloaded {} role(s) from '{}' and saved to persistence",
-                                    count, path
-                                );
+                                if output.is_machine_readable() {
+                                    let payload = ConfigReloadOutput {
+                                        count,
+                                        path: path.clone(),
+                                    };
+                                    emit_robot_response(payload, "config reload", start, output)?;
+                                } else {
+                                    println!(
+                                        "Reloaded {} role(s) from '{}' and saved to persistence",
+                                        count, path
+                                    );
+                                }
                             }
                             Err(e) => {
                                 eprintln!("Failed to reload from '{}': {:?}", path, e);
@@ -2249,15 +2389,24 @@ async fn run_offline_command(
             top_k,
             pinned,
         } => {
+            use command_output::GraphOutput;
+            let start = std::time::Instant::now();
             let role_name = service.resolve_role(role.as_deref()).await?;
 
-            if pinned {
-                let pinned_concepts = service.get_role_graph_pinned(&role_name).await?;
-                for concept in pinned_concepts {
-                    println!("{}", concept);
-                }
+            let concepts = if pinned {
+                service.get_role_graph_pinned(&role_name).await?
             } else {
-                let concepts = service.get_role_graph_top_k(&role_name, top_k).await?;
+                service.get_role_graph_top_k(&role_name, top_k).await?
+            };
+
+            if output.is_machine_readable() {
+                let payload = GraphOutput {
+                    concepts: concepts.clone(),
+                    role: role_name.to_string(),
+                    pinned,
+                };
+                emit_robot_response(payload, "graph", start, output)?;
+            } else {
                 for concept in concepts {
                     println!("{}", concept);
                 }
@@ -2270,10 +2419,17 @@ async fn run_offline_command(
             prompt,
             model,
         } => {
+            use command_output::ChatOutput;
+            let start = std::time::Instant::now();
             let role_name = service.resolve_role(role.as_deref()).await?;
 
             let response = service.chat(&role_name, &prompt, model).await?;
-            println!("{}", response);
+            if output.is_machine_readable() {
+                let payload = ChatOutput { response };
+                emit_robot_response(payload, "chat", start, output)?;
+            } else {
+                println!("{}", response);
+            }
             Ok(())
         }
         Command::Extract {
@@ -2281,13 +2437,28 @@ async fn run_offline_command(
             role,
             exclude_term,
         } => {
+            use command_output::{ExtractMatch, ExtractOutput};
+            let start = std::time::Instant::now();
             let role_name = service.resolve_role(role.as_deref()).await?;
 
             let results = service
                 .extract_paragraphs(&role_name, &text, exclude_term)
                 .await?;
 
-            if results.is_empty() {
+            if output.is_machine_readable() {
+                let matches: Vec<ExtractMatch> = results
+                    .iter()
+                    .map(|(term, paragraph)| ExtractMatch {
+                        term: term.clone(),
+                        paragraph: paragraph.clone(),
+                    })
+                    .collect();
+                let payload = ExtractOutput {
+                    count: matches.len(),
+                    matches,
+                };
+                emit_robot_response(payload, "extract", start, output)?;
+            } else if results.is_empty() {
                 println!("No matches found in the text.");
             } else {
                 println!("Found {} paragraph(s):", results.len());
@@ -2307,6 +2478,7 @@ async fn run_offline_command(
             json,
             fail_open,
         } => {
+            let start = std::time::Instant::now();
             let input_text = match text {
                 Some(t) => t,
                 None => {
@@ -2334,7 +2506,9 @@ async fn run_offline_command(
                             input_text.clone(),
                             e.to_string(),
                         );
-                        if json {
+                        if output.is_machine_readable() {
+                            emit_robot_response(hook_result, "replace", start, output)?;
+                        } else if json {
                             println!("{}", serde_json::to_string(&hook_result)?);
                         } else {
                             eprintln!("Warning: {}", e);
@@ -2410,7 +2584,9 @@ async fn run_offline_command(
                 }
             };
 
-            if json {
+            if output.is_machine_readable() {
+                emit_robot_response(hook_result, "replace", start, output)?;
+            } else if json {
                 println!("{}", serde_json::to_string(&hook_result)?);
             } else {
                 if let Some(ref err) = hook_result.error {
