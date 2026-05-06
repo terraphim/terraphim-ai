@@ -126,3 +126,39 @@ fn learn_capture_succeeds_from_tmp_dir() {
         String::from_utf8_lossy(&output.stderr),
     );
 }
+
+#[test]
+fn learn_correction_succeeds_from_tmp_dir() {
+    let binary = match agent_binary() {
+        Some(b) => b,
+        None => return,
+    };
+    let tmp = tempfile::tempdir().expect("create temp dir");
+
+    let output = match Command::new(&binary)
+        .args([
+            "learn",
+            "correction",
+            "--original",
+            "agent-suggestion",
+            "--corrected",
+            "user-fix",
+            "--correction-type",
+            "naming",
+            "--context",
+            "tmp-dir-test",
+        ])
+        .current_dir(tmp.path())
+        .output()
+    {
+        Ok(o) => o,
+        Err(_) => return,
+    };
+
+    assert!(
+        output.status.success(),
+        "learn correction should succeed from temp dir.\nstdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+    );
+}
