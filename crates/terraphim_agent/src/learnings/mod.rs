@@ -44,8 +44,8 @@ pub use capture::{
 // Re-export for testing and external use
 #[allow(unused_imports)]
 pub use capture::{
-    CapturedLearning, ImportanceScore, LearningContext, LearningError, annotate_with_entities,
-    annotate_with_thesaurus, query_all_entries,
+    CapturedLearning, CorrectionEvent, ImportanceScore, LearningContext, LearningEntry,
+    LearningError, annotate_with_entities, annotate_with_thesaurus, query_all_entries,
 };
 // Re-export KG thesaurus building utilities for use by hook validation pipeline
 pub(crate) use capture::{build_kg_thesaurus_from_dir, find_kg_dir};
