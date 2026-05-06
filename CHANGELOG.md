@@ -72,6 +72,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Supervisor escalation** -- added `escalated` state field to enforce `NoRestartAfterEscalation` invariant (Refs #255)
+- **Test dependencies** -- added `server` feature to `terraphim_agent` dev-dependency for CI stability (Refs #1260)
 - **`--server` flag** on listen subcommand now routes through custom error handler
 - **Dead `tick_num` counter** removed and redundant `u64` cast eliminated in orchestrator (Ref #1239)
 - **Gitea labels** resolved as integer IDs instead of string names (#1139)
