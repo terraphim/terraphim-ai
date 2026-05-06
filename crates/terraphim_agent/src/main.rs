@@ -907,10 +907,26 @@ enum Command {
         server: bool,
     },
 
+    /// Manage the compiled thesaurus cache
+    Cache {
+        #[command(subcommand)]
+        sub: CacheSub,
+    },
+
     /// Robot mode self-documentation commands
     Robot {
         #[command(subcommand)]
         sub: RobotSub,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum CacheSub {
+    /// Flush (delete) compiled thesaurus cache entries
+    Flush {
+        /// Specific role to flush (if omitted, flushes all cached thesauri)
+        #[arg(long)]
+        role: Option<String>,
     },
 }
 
@@ -1479,6 +1495,7 @@ fn build_cli_forgiving_parser() -> forgiving::ForgivingParser {
         "update",
         "learn",
         "listen",
+        "cache",
     ];
 
     #[cfg(feature = "llm")]
@@ -1988,6 +2005,11 @@ async fn run_offline_command(
     } = &command
     {
         return run_config_validate().await;
+    }
+
+    // Cache is stateless - handle before TuiService initialization
+    if let Command::Cache { sub } = &command {
+        return run_cache_command(sub).await;
     }
 
     // Learn is stateless - handle before TuiService initialization.
@@ -3013,6 +3035,58 @@ async fn run_offline_command(
         }
         Command::Robot { .. } => {
             unreachable!("Robot commands are handled in main()")
+        }
+        Command::Cache { .. } => {
+            unreachable!("Cache commands are handled before TuiService initialization")
+        }
+    }
+}
+
+async fn run_cache_command(sub: &CacheSub) -> Result<()> {
+    use terraphim_persistence::DeviceStorage;
+
+    match sub {
+        CacheSub::Flush { role } => {
+            let storage = DeviceStorage::instance().await?;
+            let fastest_op = &storage.fastest_op;
+
+            if let Some(role_name) = role {
+                let key = format!("thesaurus_{}.json", role_name.to_lowercase());
+                match fastest_op.delete(&key).await {
+                    Ok(_) => {
+                        println!("Flushed cache for role: {}", role_name);
+                    }
+                    Err(e) => {
+                        eprintln!("Failed to flush cache for role '{}': {}", role_name, e);
+                        std::process::exit(1);
+                    }
+                }
+            } else {
+                // Flush all thesaurus entries
+                let prefix = "thesaurus_";
+                match fastest_op.list(prefix).await {
+                    Ok(entries) => {
+                        let mut count = 0;
+                        for entry in entries {
+                            let path = entry.path();
+                            if path.ends_with(".json") {
+                                match fastest_op.delete(path).await {
+                                    Ok(_) => count += 1,
+                                    Err(e) => {
+                                        log::warn!("Failed to delete '{}': {}", path, e);
+                                    }
+                                }
+                            }
+                        }
+                        println!("Flushed {} cached thesaurus entries", count);
+                    }
+                    Err(e) => {
+                        eprintln!("Failed to list cache entries: {}", e);
+                        std::process::exit(1);
+                    }
+                }
+            }
+            Ok(())
         }
     }
 }
@@ -4758,6 +4832,11 @@ async fn run_server_command(
         }
         Command::Robot { .. } => {
             unreachable!("Robot commands are handled in main()")
+        }
+        Command::Cache { .. } => {
+            eprintln!("error: cache commands are not available in server mode");
+            eprintln!("Cache management runs in offline mode only.");
+            std::process::exit(1);
         }
     }
 }

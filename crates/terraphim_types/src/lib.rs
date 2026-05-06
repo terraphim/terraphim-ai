@@ -709,6 +709,10 @@ pub struct Thesaurus {
     name: String,
     /// The inner hashmap of normalized terms
     data: AHashMap<NormalizedTermValue, NormalizedTerm>,
+    /// SHA-256 hash of the source markdown files used to build this thesaurus.
+    /// Used for cache invalidation: when the hash changes, the thesaurus is rebuilt.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_hash: Option<String>,
 }
 
 impl Thesaurus {
@@ -717,7 +721,14 @@ impl Thesaurus {
         Self {
             name,
             data: AHashMap::new(),
+            source_hash: None,
         }
+    }
+
+    /// Set the source hash for cache invalidation tracking.
+    pub fn with_source_hash(mut self, hash: String) -> Self {
+        self.source_hash = Some(hash);
+        self
     }
 
     /// Get the name of the thesaurus
@@ -3232,5 +3243,30 @@ mod tests {
         let doc: IndexedDocument = serde_json::from_str(json).unwrap();
         assert_eq!(doc.id, "doc-1");
         assert!(doc.quality_score.is_none());
+    }
+
+    #[test]
+    fn test_thesaurus_source_hash_roundtrip() {
+        let mut thesaurus = Thesaurus::new("test".to_string());
+        thesaurus.source_hash = Some("abc123".to_string());
+
+        let json = serde_json::to_string(&thesaurus).unwrap();
+        let deserialized: Thesaurus = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(thesaurus.source_hash, deserialized.source_hash);
+    }
+
+    #[test]
+    fn test_thesaurus_source_hash_backward_compat() {
+        // Old thesaurus JSON without source_hash should deserialize with None
+        let json = r#"{"name":"test","data":{}}"#;
+        let thesaurus: Thesaurus = serde_json::from_str(json).unwrap();
+        assert!(thesaurus.source_hash.is_none());
+    }
+
+    #[test]
+    fn test_thesaurus_with_source_hash() {
+        let thesaurus = Thesaurus::new("test".to_string()).with_source_hash("hash123".to_string());
+        assert_eq!(thesaurus.source_hash, Some("hash123".to_string()));
     }
 }
