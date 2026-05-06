@@ -4,38 +4,9 @@
 
 use anyhow::Result;
 use serial_test::serial;
-use std::process::{Child, Command, Output};
+use std::process::{Child, Command};
 use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
-
-/// Run a command with a timeout, killing the child if it exceeds the deadline.
-fn run_command_with_timeout(cmd: &mut Command, timeout: Duration) -> Result<Output> {
-    let child = cmd.spawn()?;
-    let pid = child.id();
-
-    let (tx, rx) = std::sync::mpsc::channel();
-    std::thread::spawn(move || {
-        let result = child.wait_with_output();
-        let _ = tx.send(result);
-    });
-
-    match rx.recv_timeout(timeout) {
-        Ok(Ok(output)) => Ok(output),
-        Ok(Err(e)) => Err(anyhow::anyhow!("Process wait error: {e}")),
-        Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
-            // Best-effort kill so the test fails fast instead of hanging forever.
-            let _ = Command::new("kill")
-                .args(["-TERM", &pid.to_string()])
-                .stdout(std::process::Stdio::null())
-                .stderr(std::process::Stdio::null())
-                .status();
-            Err(anyhow::anyhow!("Command timed out after {timeout:?}"))
-        }
-        Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
-            Err(anyhow::anyhow!("Process monitoring thread disconnected"))
-        }
-    }
-}
 
 #[path = "support/binary.rs"]
 mod binary;
@@ -55,14 +26,16 @@ fn start_test_server() -> Result<(Child, u16)> {
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped());
 
-    let child = cmd.spawn()?;
+    let mut child = cmd.spawn()?;
 
     let client = reqwest::blocking::Client::new();
     let health_url = format!("http://127.0.0.1:{}/health", port);
 
     let mut retries = 10;
     let mut backoff = Duration::from_millis(50);
-    while retries > 0 {
+    let max_wait = Duration::from_secs(30);
+    let start = std::time::Instant::now();
+    while retries > 0 && start.elapsed() < max_wait {
         if let Ok(response) = client
             .get(&health_url)
             .timeout(Duration::from_secs(2))
@@ -75,10 +48,17 @@ fn start_test_server() -> Result<(Child, u16)> {
         }
         std::thread::sleep(backoff);
         backoff = backoff.saturating_mul(2);
+        backoff = std::cmp::min(backoff, Duration::from_secs(2));
         retries -= 1;
     }
 
-    Err(anyhow::anyhow!("Server failed to start on port {}", port))
+    // Kill the child process if it failed to start
+    let _ = child.kill();
+    Err(anyhow::anyhow!(
+        "Server failed to start on port {} after {:?}",
+        port,
+        start.elapsed()
+    ))
 }
 
 /// Find an available port
@@ -111,19 +91,6 @@ fn ensure_server_running() -> Result<u16> {
     }
 }
 
-/// Detect if running in CI environment (GitHub Actions, Docker containers in CI, etc.)
-#[allow(dead_code)]
-fn is_ci_environment() -> bool {
-    // Check standard CI environment variables
-    std::env::var("CI").is_ok()
-        || std::env::var("GITHUB_ACTIONS").is_ok()
-        // Check if running as root in a container (common in CI Docker containers)
-        || (std::env::var("USER").as_deref() == Ok("root")
-            && std::path::Path::new("/.dockerenv").exists())
-        // Check if the home directory is /root (typical for CI containers)
-        || std::env::var("HOME").as_deref() == Ok("/root")
-}
-
 /// Check if stderr contains CI-expected errors (KG/thesaurus build failures)
 fn is_ci_expected_error(stderr: &str) -> bool {
     stderr.contains("Failed to build thesaurus")
@@ -138,6 +105,7 @@ fn is_ci_expected_error(stderr: &str) -> bool {
         || stderr.contains("Connection reset")
 }
 
+/// Run extract command with a 30-second timeout to prevent hangs in CI.
 fn run_extract_command_with_port(args: &[&str], port: u16) -> Result<(String, String, i32)> {
     let mut cmd = Command::new(agent_binary());
     cmd.arg("extract")
@@ -148,18 +116,43 @@ fn run_extract_command_with_port(args: &[&str], port: u16) -> Result<(String, St
         )
         .env("TERRAPHIM_SERVER_HOSTNAME", format!("127.0.0.1:{}", port));
 
-    let output = run_command_with_timeout(&mut cmd, Duration::from_secs(5))?;
+    let mut child = cmd.spawn()?;
+    let start = std::time::Instant::now();
+    let timeout = Duration::from_secs(30);
 
-    Ok((
-        String::from_utf8_lossy(&output.stdout).to_string(),
-        String::from_utf8_lossy(&output.stderr).to_string(),
-        output.status.code().unwrap_or(-1),
-    ))
-}
-
-#[allow(dead_code)]
-fn run_extract_command(args: &[&str]) -> Result<(String, String, i32)> {
-    run_extract_command_with_port(args, 8000)
+    loop {
+        if start.elapsed() >= timeout {
+            let _ = child.kill();
+            return Err(anyhow::anyhow!(
+                "extract command timed out after {:?}",
+                timeout
+            ));
+        }
+        match child.try_wait()? {
+            Some(status) => {
+                let stdout = {
+                    use std::io::Read;
+                    let mut buf = Vec::new();
+                    if let Some(mut out) = child.stdout.take() {
+                        out.read_to_end(&mut buf).ok();
+                    }
+                    String::from_utf8_lossy(&buf).to_string()
+                };
+                let stderr = {
+                    use std::io::Read;
+                    let mut buf = Vec::new();
+                    if let Some(mut err) = child.stderr.take() {
+                        err.read_to_end(&mut buf).ok();
+                    }
+                    String::from_utf8_lossy(&buf).to_string()
+                };
+                return Ok((stdout, stderr, status.code().unwrap_or(-1)));
+            }
+            None => {
+                std::thread::sleep(Duration::from_millis(100));
+            }
+        }
+    }
 }
 
 /// Extract clean output without log messages
@@ -505,7 +498,7 @@ fn test_extract_error_conditions() -> Result<()> {
         let mut cmd = Command::new(&binary);
         cmd.arg("extract").args(&args);
 
-        let output = run_command_with_timeout(&mut cmd, Duration::from_secs(5))?;
+        let output = cmd.output()?;
         let exit_code = output.status.code().unwrap_or(-1);
 
         match case_name {

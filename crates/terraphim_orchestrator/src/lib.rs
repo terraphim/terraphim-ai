@@ -278,10 +278,6 @@ pub struct AgentOrchestrator {
     /// Per-project dedupe set of `(pr_number, head_sha)` already enqueued
     /// for auto-merge so the same revision is never dispatched twice.
     auto_merge_enqueued: pr_poller::AutoMergeDedupeSet,
-    /// TTL-based dedupe cache for auto-merge failure issues. Prevents
-    /// duplicate `[ADF] Auto-merge failed` issues for the same PR within
-    /// a 24-hour window.
-    auto_merge_failure_dedupe: pr_poller::AutoMergeFailureDedupe,
     /// Shared learning store. `None` when `learning.enabled = false` or
     /// when initialisation failed (graceful degradation).
     learning_store: Option<learning::SharedLearningStore>,
@@ -533,7 +529,6 @@ fn build_spawn_context_for_agent(
         .with_env("ADF_WORKING_DIR", working_dir_str);
     if let Some(gitea) = project.gitea.as_ref() {
         ctx = ctx
-            .with_env("GITEA_URL", gitea.base_url.clone())
             .with_env("GITEA_OWNER", gitea.owner.clone())
             .with_env("GITEA_REPO", gitea.repo.clone());
     }
@@ -819,9 +814,6 @@ impl AgentOrchestrator {
                 pr_poller::PR_POLL_MIN_INTERVAL,
             ),
             auto_merge_enqueued: pr_poller::AutoMergeDedupeSet::new(),
-            auto_merge_failure_dedupe: pr_poller::AutoMergeFailureDedupe::new(
-                std::time::Duration::from_secs(86400),
-            ),
             learning_store: None,
             learning_config,
             injected_learning_ids: HashMap::new(),
@@ -1035,7 +1027,8 @@ impl AgentOrchestrator {
         {
             if let Some(ref kg_router) = self.kg_router {
                 info!("running startup provider probe via KG action:: templates");
-                self.provider_health.probe_all(kg_router).await;
+                let blocked = self.provider_rate_limits.blocked_providers();
+                self.provider_health.probe_all(kg_router, &blocked).await;
 
                 // Save probe results if directory configured
                 if let Some(ref dir) = self
@@ -4546,44 +4539,24 @@ impl AgentOrchestrator {
                     "pr_auto_merge_failed"
                 );
 
-                // 4. Open an [ADF] tracking issue with the failure reason,
-                //    unless we already created one for this (project, pr, sha)
-                //    within the TTL window.
-                if self
-                    .auto_merge_failure_dedupe
-                    .is_recent(&project, pr_number, &head_sha)
-                {
-                    info!(
+                // 4. Open an [ADF] tracking issue with the failure reason.
+                let title = format!("[ADF] Auto-merge failed for PR #{pr_number}");
+                let body = format!(
+                    "AutoMerge handler failed to merge PR #{pr_number} on project `{project}`.\n\n\
+                     Head SHA: `{head_sha}`\n\n\
+                     Error: {e}\n\n\
+                     The PR was left open; a human needs to investigate (merge conflict, \
+                     protected branch, permissions, transient API failure).\n\n\
+                     Refs: ROC v1 Step G handler, adf-fleet#35."
+                );
+                let labels = ["adf", "auto-merge-failed", "status/needs-triage"];
+                if let Err(issue_err) = tracker.open_failure_issue(&title, &body, &labels).await {
+                    warn!(
                         pr_number,
                         project = %project,
-                        head = %head_sha,
-                        "AutoMerge failure issue already exists for this PR/SHA; skipping duplicate"
+                        error = %issue_err,
+                        "AutoMerge failure issue creation also failed; nothing to retry automatically"
                     );
-                } else {
-                    let title = format!("[ADF] Auto-merge failed for PR #{pr_number}");
-                    let body = format!(
-                        "AutoMerge handler failed to merge PR #{pr_number} on project `{project}`.\n\n\
-                         Head SHA: `{head_sha}`\n\n\
-                         Error: {e}\n\n\
-                         The PR was left open; a human needs to investigate (merge conflict, \
-                         protected branch, permissions, transient API failure).\n\n\
-                         Refs: ROC v1 Step G handler, adf-fleet#35."
-                    );
-                    let labels = ["adf", "auto-merge-failed", "status/needs-triage"];
-                    match tracker.open_failure_issue(&title, &body, &labels).await {
-                        Ok(_issue_number) => {
-                            self.auto_merge_failure_dedupe
-                                .record(&project, pr_number, &head_sha);
-                        }
-                        Err(issue_err) => {
-                            warn!(
-                                pr_number,
-                                project = %project,
-                                error = %issue_err,
-                                "AutoMerge failure issue creation also failed; nothing to retry automatically"
-                            );
-                        }
-                    }
                 }
 
                 Ok(())
@@ -5491,7 +5464,8 @@ impl AgentOrchestrator {
         // 13. D-2: Re-probe providers if cached results are stale
         if self.provider_health.is_stale() {
             if let Some(ref kg_router) = self.kg_router {
-                self.provider_health.probe_all(kg_router).await;
+                let blocked = self.provider_rate_limits.blocked_providers();
+                self.provider_health.probe_all(kg_router, &blocked).await;
                 if let Some(ref dir) = self
                     .config
                     .routing
@@ -9120,17 +9094,12 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
         let pr_dump = tmp.path().join("pr.env");
         let push_dump = tmp.path().join("push.env");
         // Single shell script that picks which dump to write based on which
-        // env vars are present. Avoids needing two separate cliTools.
-        // NOTE: Check for ADF_PR_NUMBER first because child processes inherit
-        // the parent environment (cargo test inherits from build-runner which
-        // has ADF_PUSH_SHA set), so absence of ADF_PUSH_SHA is not reliable.
+        // env vars are present. Avoids needing two separate cli_tools.
         let script_path = tmp.path().join("dump-env.sh");
-        let all_dump = tmp.path().join("all.env");
         let script_body = format!(
-            "#!/bin/sh\nenv > {}\nif [ -n \"$ADF_PR_NUMBER\" ]; then env | grep '^ADF_PR_' > {}\nelse env | grep '^ADF_PUSH_' > {}\nfi\n",
-            all_dump.display(),
-            pr_dump.display(),
+            "#!/bin/sh\nif [ -n \"$ADF_PUSH_SHA\" ]; then env | grep '^ADF_PUSH_' > {}\nelse env | grep '^ADF_PR_' > {}\nfi\n",
             push_dump.display(),
+            pr_dump.display(),
         );
         std::fs::write(&script_path, script_body).unwrap();
         #[cfg(unix)]
@@ -9145,40 +9114,16 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
         let mut orch = AgentOrchestrator::new(config).unwrap();
         orch.handle_review_pr(review_pr_task()).await.unwrap();
 
-        // Allow agents time to spawn before polling
-        tokio::time::sleep(Duration::from_secs(2)).await;
-
-        for i in 0..600 {
+        for _ in 0..40 {
             tokio::time::sleep(Duration::from_millis(50)).await;
             orch.poll_agent_exits().await;
             if pr_dump.exists() && push_dump.exists() {
                 break;
             }
-            if i == 100 {
-                eprintln!(
-                    "Still waiting after 5s. Active agents: {:?}",
-                    orch.active_agents.keys().collect::<Vec<_>>()
-                );
-            }
         }
 
         let pr = std::fs::read_to_string(&pr_dump).unwrap_or_default();
         let push = std::fs::read_to_string(&push_dump).unwrap_or_default();
-
-        let all_env = std::fs::read_to_string(&all_dump).unwrap_or_default();
-        if !pr.contains("ADF_PR_NUMBER=641") || !push.contains("ADF_PUSH_SHA=deadbeef1234") {
-            eprintln!(
-                "active_agents after poll loop: {:?}",
-                orch.active_agents.keys().collect::<Vec<_>>()
-            );
-            eprintln!("pr_dump path: {}", pr_dump.display());
-            eprintln!("push_dump path: {}", push_dump.display());
-            eprintln!("pr_dump exists: {}", pr_dump.exists());
-            eprintln!("push_dump exists: {}", push_dump.exists());
-            eprintln!("pr_dump contents:\n{pr}");
-            eprintln!("push_dump contents:\n{push}");
-            eprintln!("all env dump:\n{all_env}");
-        }
         assert!(
             pr.contains("ADF_PR_NUMBER=641"),
             "pr-reviewer env missing ADF_PR_NUMBER:\n{pr}"

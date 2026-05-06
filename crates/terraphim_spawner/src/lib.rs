@@ -259,6 +259,8 @@ impl AgentHandle {
                     "Process did not exit within grace period, sending SIGKILL"
                 );
                 self.child.kill().await?;
+                // Reap the process to prevent zombies (ignore errors)
+                let _ = self.child.wait().await;
                 tracing::info!(
                     target: "terraphim_spawner::audit",
                     event = %AuditEvent::AgentTerminated {
@@ -277,6 +279,8 @@ impl AgentHandle {
     pub async fn kill(mut self) -> Result<(), SpawnerError> {
         self.health_checker.mark_terminated();
         self.child.kill().await?;
+        // Reap the process to prevent zombies (ignore errors -- process may already be gone)
+        let _ = self.child.wait().await;
         Ok(())
     }
 

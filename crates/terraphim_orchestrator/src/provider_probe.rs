@@ -66,8 +66,8 @@ impl ProviderHealthMap {
             probed_at: None,
             ttl,
             cb_config: CircuitBreakerConfig {
-                failure_threshold: 5,
-                cooldown: Duration::from_secs(300),
+                failure_threshold: 2,
+                cooldown: Duration::from_secs(60),
                 success_threshold: 1,
             },
         }
@@ -85,7 +85,10 @@ impl ProviderHealthMap {
     /// Extracts unique `(provider, model, action)` triples from the router's
     /// rules, executes each action template with a test prompt via
     /// `tokio::process::Command`, and records results.
-    pub async fn probe_all(&mut self, kg_router: &KgRouter) {
+    ///
+    /// Providers listed in `skip_providers` are not probed (e.g. rate-limited
+    /// providers where a probe would certainly waste tokens and time).
+    pub async fn probe_all(&mut self, kg_router: &KgRouter, skip_providers: &[String]) {
         let mut seen = HashMap::new();
         let mut tasks = Vec::new();
 
@@ -111,6 +114,16 @@ impl ProviderHealthMap {
                 }
             }
 
+            // Skip providers that are currently rate-limited.
+            if skip_providers.contains(&rule.provider) {
+                debug!(
+                    provider = %rule.provider,
+                    model = %rule.model,
+                    "probe skipped: provider is rate-limited"
+                );
+                continue;
+            }
+
             let provider = rule.provider.clone();
             let model = rule.model.clone();
             let action = rule.action.clone();
@@ -128,10 +141,7 @@ impl ProviderHealthMap {
             }
         }
 
-        // Update circuit breakers from probe results (keyed by provider:model).
-        // Skip updating the breaker when the probe failed because the CLI tool
-        // is missing from PATH — that is an environment/configuration issue,
-        // not a provider health issue, and should not open the circuit.
+        // Update circuit breakers from probe results (keyed by provider:model)
         for result in &results {
             let key = format!("{}:{}", result.provider, result.model);
             let breaker = self
@@ -141,23 +151,7 @@ impl ProviderHealthMap {
 
             match result.status {
                 ProbeStatus::Success => breaker.record_success(),
-                ProbeStatus::Error => {
-                    // Do not count CLI-not-found as a provider failure.
-                    if result
-                        .error
-                        .as_ref()
-                        .is_some_and(|e| e.contains("CLI tool") && e.contains("not found on PATH"))
-                    {
-                        debug!(
-                            provider = %result.provider,
-                            model = %result.model,
-                            "skipping circuit-breaker update: CLI tool missing"
-                        );
-                    } else {
-                        breaker.record_failure();
-                    }
-                }
-                ProbeStatus::Timeout => breaker.record_failure(),
+                ProbeStatus::Error | ProbeStatus::Timeout => breaker.record_failure(),
             }
         }
 
@@ -395,31 +389,12 @@ impl ProviderHealthMap {
     }
 }
 
-/// Check whether a CLI tool is available on PATH.
-///
-/// Runs `which <tool>` and returns `true` only when the tool exists and is
-/// executable. This lets us distinguish "provider API down" from "CLI tool
-/// missing / not on PATH" without executing the actual probe.
-fn cli_tool_on_path(tool: &str) -> bool {
-    std::process::Command::new("which")
-        .arg(tool)
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .status()
-        .map(|s| s.success())
-        .unwrap_or(false)
-}
-
 /// Probe a single provider+model by executing its action template.
 ///
 /// If the model string does not pass the C1 allow-list checked by
 /// [`crate::config::is_allowed_provider`], the probe is skipped immediately
 /// and returns a sentinel result so banned providers never reach the
 /// CLI execution path.
-///
-/// If the CLI tool referenced by the action template is not on PATH, the
-/// probe returns an error but the circuit breaker is **not** updated, so
-/// a missing tool does not permanently mark the provider as unhealthy.
 async fn probe_single(provider: &str, model: &str, action_template: Option<&str>) -> ProbeResult {
     let timestamp = chrono::Utc::now().to_rfc3339();
 
@@ -472,30 +447,6 @@ async fn probe_single(provider: &str, model: &str, action_template: Option<&str>
         .unwrap_or("")
         .to_string();
 
-    // Validate CLI tool is on PATH before attempting probe.
-    // A missing tool is an environment/configuration issue, not a provider
-    // health issue, so we must not open the circuit breaker for it.
-    if !cli_tool.is_empty() && !cli_tool_on_path(&cli_tool) {
-        warn!(
-            provider = %provider,
-            model = %model,
-            cli_tool = %cli_tool,
-            "probe skipped: CLI tool not found on PATH"
-        );
-        return ProbeResult {
-            provider: provider.to_string(),
-            model: model.to_string(),
-            cli_tool: cli_tool.clone(),
-            status: ProbeStatus::Error,
-            latency_ms: None,
-            error: Some(format!(
-                "probe skipped: CLI tool '{}' not found on PATH",
-                cli_tool
-            )),
-            timestamp,
-        };
-    }
-
     let start = Instant::now();
     let timeout = Duration::from_secs(60);
 
@@ -511,7 +462,7 @@ async fn probe_single(provider: &str, model: &str, action_template: Option<&str>
     // if the probe hangs.  Previously the timeout dropped the future without
     // terminating the underlying bash/opencode process, causing task
     // accumulation in systemd (observed: 1 244 leaked tasks).
-    let child = match tokio::process::Command::new("bash")
+    let mut child = match tokio::process::Command::new("bash")
         .arg("-c")
         .arg(&action)
         .env(
@@ -539,14 +490,39 @@ async fn probe_single(provider: &str, model: &str, action_template: Option<&str>
         }
     };
 
-    let pid = child.id();
-    let result = tokio::time::timeout(timeout, child.wait_with_output()).await;
+    // Take stdout/stderr before waiting so we can read them asynchronously
+    // while the process runs. This prevents pipe deadlock and lets us keep
+    // the child handle alive for explicit kill on timeout.
+    let stdout = child.stdout.take();
+    let stderr = child.stderr.take();
+
+    let stdout_task = tokio::spawn(async move {
+        let mut buf = Vec::new();
+        if let Some(mut out) = stdout {
+            use tokio::io::AsyncReadExt;
+            out.read_to_end(&mut buf).await.ok();
+        }
+        buf
+    });
+
+    let stderr_task = tokio::spawn(async move {
+        let mut buf = Vec::new();
+        if let Some(mut err) = stderr {
+            use tokio::io::AsyncReadExt;
+            err.read_to_end(&mut buf).await.ok();
+        }
+        buf
+    });
+
+    let wait_result = tokio::time::timeout(timeout, child.wait()).await;
 
     let latency_ms = start.elapsed().as_millis() as u64;
 
-    match result {
-        Ok(Ok(output)) => {
-            if output.status.success() {
+    match wait_result {
+        Ok(Ok(status)) => {
+            let _stdout = stdout_task.await.unwrap_or_default();
+            let stderr = stderr_task.await.unwrap_or_default();
+            if status.success() {
                 info!(provider, model, latency_ms, "probe success");
                 ProbeResult {
                     provider: provider.to_string(),
@@ -558,11 +534,13 @@ async fn probe_single(provider: &str, model: &str, action_template: Option<&str>
                     timestamp,
                 }
             } else {
-                let stderr = String::from_utf8_lossy(&output.stderr);
                 let err = format!(
                     "exit {}: {}",
-                    output.status,
-                    stderr.chars().take(200).collect::<String>()
+                    status,
+                    String::from_utf8_lossy(&stderr)
+                        .chars()
+                        .take(200)
+                        .collect::<String>()
                 );
                 warn!(provider, model, error = %err, "probe failed");
                 ProbeResult {
@@ -577,6 +555,8 @@ async fn probe_single(provider: &str, model: &str, action_template: Option<&str>
             }
         }
         Ok(Err(e)) => {
+            let _ = stdout_task.await;
+            let _ = stderr_task.await;
             let err = format!("wait failed: {e}");
             warn!(provider, model, error = %err, "probe failed");
             ProbeResult {
@@ -590,14 +570,12 @@ async fn probe_single(provider: &str, model: &str, action_template: Option<&str>
             }
         }
         Err(_) => {
-            // Timeout: the bash/opencode process is still running.  Explicitly
-            // SIGKILL it to prevent process leaks.
-            if let Some(pid) = pid {
-                let _ = std::process::Command::new("kill")
-                    .arg("-9")
-                    .arg(pid.to_string())
-                    .spawn();
-            }
+            // Timeout: the bash/opencode process is still running.
+            // Explicitly kill it to prevent process leaks. No subprocess
+            // is spawned -- we call Child::kill() directly.
+            let _ = child.kill().await;
+            let _ = stdout_task.await;
+            let _ = stderr_task.await;
             warn!(provider, model, "probe timed out after 60s");
             ProbeResult {
                 provider: provider.to_string(),
@@ -749,70 +727,5 @@ mod tests {
         assert!(map.is_model_healthy("anthropic", "claude-sonnet-4-6"));
         // Provider NOT in unhealthy list (sonnet keeps it alive)
         assert!(!map.unhealthy_providers().contains(&"anthropic".to_string()));
-    }
-
-    #[test]
-    fn cli_tool_on_path_finds_existing_tools() {
-        // `sh` is guaranteed to exist on any POSIX system
-        assert!(cli_tool_on_path("sh"));
-        assert!(cli_tool_on_path("bash"));
-    }
-
-    #[test]
-    fn cli_tool_on_path_rejects_missing_tools() {
-        // A tool name that almost certainly does not exist
-        assert!(!cli_tool_on_path("definitely_not_a_real_tool_12345"));
-    }
-
-    #[test]
-    fn missing_cli_probe_does_not_open_breaker() {
-        let mut map = ProviderHealthMap::new(Duration::from_secs(300));
-
-        // Simulate the exact update logic from `probe_all` with a CLI-not-found
-        // result. We create the breaker entry and then run the same match logic
-        // that `probe_all` uses.
-        let result = ProbeResult {
-            provider: "openai".to_string(),
-            model: "gpt-4".to_string(),
-            cli_tool: "nonexistent-cli".to_string(),
-            status: ProbeStatus::Error,
-            latency_ms: None,
-            error: Some("probe skipped: CLI tool 'nonexistent-cli' not found on PATH".to_string()),
-            timestamp: String::new(),
-        };
-
-        let key = format!("{}:{}", result.provider, result.model);
-        let breaker = map
-            .breakers
-            .entry(key)
-            .or_insert_with(|| CircuitBreaker::new(map.cb_config.clone()));
-
-        // Replicate the logic from `probe_all`.
-        match result.status {
-            ProbeStatus::Success => breaker.record_success(),
-            ProbeStatus::Error => {
-                if result
-                    .error
-                    .as_ref()
-                    .is_some_and(|e| e.contains("CLI tool") && e.contains("not found on PATH"))
-                {
-                    // Skipped — this is what we want to verify.
-                } else {
-                    breaker.record_failure();
-                }
-            }
-            ProbeStatus::Timeout => breaker.record_failure(),
-        }
-
-        // The breaker must still be Closed because the CLI-not-found error
-        // was skipped.
-        assert!(matches!(
-            breaker.state(),
-            terraphim_spawner::health::CircuitState::Closed
-        ));
-
-        // When there are no probe results, the provider falls back to the
-        // circuit breaker state, which is Closed (healthy).
-        assert!(map.is_healthy("openai"));
     }
 }
