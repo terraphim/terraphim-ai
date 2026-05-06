@@ -27,6 +27,10 @@ fn create_wrangler_thesaurus() -> Thesaurus {
             id,
             value: NormalizedTermValue::from(normalized),
             url: Some("https://developers.cloudflare.com/workers/wrangler/".to_string()),
+            action: None,
+            priority: None,
+            trigger: None,
+            pinned: false,
         };
         thesaurus.insert(NormalizedTermValue::from(pattern), normalized_term);
     }
@@ -76,6 +80,10 @@ fn create_comprehensive_thesaurus() -> Thesaurus {
             id,
             value: NormalizedTermValue::from(normalized),
             url: Some(url.to_string()),
+            action: None,
+            priority: None,
+            trigger: None,
+            pinned: false,
         };
         thesaurus.insert(NormalizedTermValue::from(pattern), normalized_term);
     }
@@ -231,6 +239,10 @@ fn test_leftmost_longest_matching() {
             id: 1,
             value: NormalizedTermValue::from("npm"),
             url: Some("https://npmjs.com".to_string()),
+            action: None,
+            priority: None,
+            trigger: None,
+            pinned: false,
         },
     );
 
@@ -241,6 +253,10 @@ fn test_leftmost_longest_matching() {
             id: 2,
             value: NormalizedTermValue::from("npm-install"),
             url: Some("https://npmjs.com/install".to_string()),
+            action: None,
+            priority: None,
+            trigger: None,
+            pinned: false,
         },
     );
 
@@ -369,6 +385,10 @@ fn test_terraphim_automata_performance() {
                 id: i,
                 value: NormalizedTermValue::from(pattern.as_str()),
                 url: Some(format!("https://example.com/{}", i)),
+                action: None,
+                priority: None,
+                trigger: None,
+                pinned: false,
             },
         );
     }

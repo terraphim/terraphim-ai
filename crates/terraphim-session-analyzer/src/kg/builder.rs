@@ -91,6 +91,10 @@ impl KnowledgeGraphBuilder {
                 value: NormalizedTermValue::from(concept_name.as_str()),
                 display_value: None,
                 url: Some(format!("concept://{concept_name}")),
+                action: None,
+                priority: None,
+                trigger: None,
+                pinned: false,
             };
 
             self.thesaurus

@@ -215,6 +215,10 @@ impl TerraphimMatcher {
                     value: NormalizedTermValue::from(tool.name.as_str()),
                     display_value: None,
                     url: tool.metadata.description.as_ref().map(|d| d.to_string()),
+                    action: None,
+                    priority: None,
+                    trigger: None,
+                    pinned: false,
                 };
 
                 // Insert the pattern -> normalized term mapping

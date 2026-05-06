@@ -317,6 +317,10 @@ mod tests {
                 value: NormalizedTermValue::from(normalized),
                 display_value: None,
                 url: Some(format!("https://example.com/{}", key)),
+                action: None,
+                priority: None,
+                trigger: None,
+                pinned: false,
             };
             thesaurus.insert(NormalizedTermValue::from(key), term);
         }
