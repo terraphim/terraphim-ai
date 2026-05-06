@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Spec validation report** for 2026-05-05 documenting fixed and remaining gaps (Refs #1254)
 - **Session debouncing** for `SessionConnector::watch()` to eliminate duplicate emissions (Refs #815)
 - **LLM pre/post hooks** wired in agent command handlers for multi-agent coordination (Refs #451)
 - **Self-Documentation API** exposed via robot CLI subcommand (Refs #1011)
@@ -48,6 +49,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Null pusher/commits** handling in Gitea push webhook payloads for robustness
 - **Integration test assertions** aligned with orchestrator output format changes
 - **Test timeouts** added to child process invocations in `extract_functionality_validation` for CI stability (Refs #1245)
+- **Supervisor escalated state** field added to enforce `NoRestartAfterEscalation` invariant (Refs #255)
+- **Server feature** added to `terraphim_agent` dev-dependency for test compilation (Refs #1260)
+- **Shared server instance** across `kg_ranking_integration_test` for test isolation (Refs #1239)
+- **Robot mode** wired to all CLI commands with `--robot` and `--format` flags (Refs #1256)
+- **Documentation gap report** for 2026-05-06 identifying 3,985 missing docs across 46 crates
 
 ### Changed
 
