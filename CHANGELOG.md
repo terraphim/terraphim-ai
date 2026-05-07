@@ -60,6 +60,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Test ranking knowledge graph fixture** added for agent testing
 - **LLM cost tracking** foundation with genai fork integration (Refs #1075)
 - **Spec validation** report for 2026-04-29 documenting 3 fixed, 5 remaining gaps
+- **Documentation gap report** generated for 2026-05-07 identifying 307 missing docs across 9 crates (agent: 139, types: 76, orchestrator: 54, automata: 23, config: 15) -- 45% reduction from 2026-04-29 baseline of 564
 - **Documentation gap report** generated for 2026-05-05 identifying 1,058 missing docs across 12 crates (orchestrator: 445, server: 138, service: 114, agent: 99, types: 98)
 - **GITEA_URL injection** from project config into agent spawn context for orchestrator
 - **Streaming output log drain** for reliable agent output capture (Refs #1219)
@@ -77,6 +78,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`--server` flag** on listen subcommand now routes through custom error handler
 - **Dead `tick_num` counter** removed and redundant `u64` cast eliminated in orchestrator (Ref #1239)
 - **Gitea labels** resolved as integer IDs instead of string names (#1139)
+- **`meta_coordinator` module** wired into `terraphim_orchestrator` `lib.rs` -- module and its seven unit tests were unreachable before this fix (Refs #1275)
 
 ## [1.17.0] - 2026-04-27
 
