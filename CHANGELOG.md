@@ -60,6 +60,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Test ranking knowledge graph fixture** added for agent testing
 - **LLM cost tracking** foundation with genai fork integration (Refs #1075)
 - **Spec validation** report for 2026-04-29 documenting 3 fixed, 5 remaining gaps
+- **Spec validation** report for PR #1291 (meta_coordinator wiring fix) -- PASS verdict, closes META-001 blocker; two pre-existing follow-ups noted (missing plans/ spec doc, last_cleanup mutation bug) (Refs #1275)
+- **Documentation gap report v3** generated for 2026-05-07 (workspace-wide scan) -- 940 total undocumented public items across 37 crates (terraphim_agent: 160, terraphim_orchestrator: 86, terraphim_types: 110, terraphim_multi_agent: 85, terraphim_usage: 51, terraphim_service: 49, terraphim_config: 47, terraphim_automata: 33); 15 crates missing crate-level //! docs
+- **Spec validation** report for 2026-05-07 -- FAIL: 2 persistent gaps (single-agent-listener operational gap, meta-coordinator spec coverage gap); 0 new gaps; provider_probe.rs hardening assessed as in-scope for #1233
+- **Documentation gap report v2** generated for 2026-05-07 extending scan to include `pub fn` -- 395 total gaps (agent: 189, orchestrator: 61, types: 48, service: 39, automata: 23, persistence: 12, config: 11, middleware: 8, rolegraph: 4); service and persistence API entry points identified as critical
+- **Documentation gap report** generated for 2026-05-07 identifying 307 missing docs across 9 crates (agent: 139, types: 76, orchestrator: 54, automata: 23, config: 15) -- 45% reduction from 2026-04-29 baseline of 564
 - **Documentation gap report** generated for 2026-05-05 identifying 1,058 missing docs across 12 crates (orchestrator: 445, server: 138, service: 114, agent: 99, types: 98)
 - **GITEA_URL injection** from project config into agent spawn context for orchestrator
 - **Streaming output log drain** for reliable agent output capture (Refs #1219)
