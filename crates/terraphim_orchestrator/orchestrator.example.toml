@@ -3,6 +3,14 @@
 # Copy to orchestrator.toml and adjust paths for your environment.
 # Full 13-agent fleet with persona-specific knowledge graphs,
 # terraphim-agent pre-checks, and disciplined engineering skill chains.
+#
+# SECURITY: After copying, restrict permissions on this file and on the
+# agent tokens file. Both contain secrets (webhook HMAC secret and API tokens).
+#
+#   chmod 600 orchestrator.toml
+#   chmod 600 /opt/ai-dark-factory/agent_tokens.json
+#
+# The orchestrator logs an error at startup if either file is world-readable.
 
 working_dir = "/opt/ai-dark-factory/workspace"
 persona_data_dir = "/opt/ai-dark-factory/personas"
