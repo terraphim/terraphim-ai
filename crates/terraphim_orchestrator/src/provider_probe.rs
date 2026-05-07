@@ -859,4 +859,39 @@ mod tests {
         ));
         assert!(map.is_healthy("github-copilot"));
     }
+
+    #[test]
+    fn no_template_probe_does_not_open_breaker() {
+        let mut map = ProviderHealthMap::new(Duration::from_secs(300));
+
+        // A provider whose routing rules have no action:: template returns this
+        // error from probe_single.  It must NOT accumulate failures against the
+        // circuit breaker — the provider API was never contacted.
+        let error_msg = "no action:: template defined".to_string();
+        let result = ProbeResult {
+            provider: "unknown-provider".to_string(),
+            model: "unknown-provider/some-model".to_string(),
+            cli_tool: String::new(),
+            status: ProbeStatus::Error,
+            latency_ms: None,
+            error: Some(error_msg.clone()),
+            timestamp: String::new(),
+        };
+
+        let key = format!("{}:{}", result.provider, result.model);
+        let breaker = map
+            .breakers
+            .entry(key)
+            .or_insert_with(|| CircuitBreaker::new(map.cb_config.clone()));
+
+        if !is_environment_error(&error_msg) {
+            breaker.record_failure();
+        }
+
+        assert!(matches!(
+            breaker.state(),
+            terraphim_spawner::health::CircuitState::Closed
+        ));
+        assert!(map.is_healthy("unknown-provider"));
+    }
 }
