@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **meta_coordinator module** wired into orchestrator lib.rs public API surface (Refs #1275)
 - **RUSTSEC-2026-0049** eliminated by switching serenity to native-tls (Refs #418)
 - **Spec gaps** addressed and resolved across ADF orchestrator templates (Refs #1040)
 - **Global concurrency limits** enforced in orchestrator to prevent task/memory exhaustion (Refs #664)
