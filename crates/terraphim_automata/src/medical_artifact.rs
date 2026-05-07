@@ -8,6 +8,12 @@
 //!   [header_bytes: bincode(ArtifactHeader)]
 //!   for each shard in header.shard_byte_lengths:
 //!     [shard_bytes: raw daachorse bytes]
+//!
+//! Integrity: `ArtifactHeader.shard_checksums` holds one SHA-256 digest per
+//! shard. `load_umls_artifact` verifies every shard before returning it, so
+//! callers of `deserialize_unchecked` can rely on byte provenance.
+
+use sha2::{Digest, Sha256};
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -38,9 +44,15 @@ pub struct ArtifactHeader {
     pub total_patterns: usize,
     /// Raw byte length of each daachorse shard (order matches shard_metadata)
     pub shard_byte_lengths: Vec<usize>,
+    /// SHA-256 digest of each shard's raw bytes; verified before
+    /// `deserialize_unchecked` is called on the bytes.
+    pub shard_checksums: Vec<[u8; 32]>,
 }
 
-/// Save a UMLS artifact: header (bincode) + shard bytes, compressed with zstd
+/// Save a UMLS artifact: header (bincode) + shard bytes, compressed with zstd.
+///
+/// Computes SHA-256 of each shard and stores digests in the header so that
+/// `load_umls_artifact` can verify integrity before any unsafe deserialization.
 pub fn save_umls_artifact(
     header: &ArtifactHeader,
     shard_bytes: &[Vec<u8>],
@@ -50,6 +62,11 @@ pub fn save_umls_artifact(
         header.shard_byte_lengths.len(),
         shard_bytes.len(),
         "shard_byte_lengths must match shard_bytes count"
+    );
+    assert_eq!(
+        header.shard_checksums.len(),
+        shard_bytes.len(),
+        "shard_checksums must match shard_bytes count"
     );
 
     // Encode header with bincode
@@ -107,10 +124,27 @@ pub fn load_umls_artifact(path: &Path) -> anyhow::Result<(ArtifactHeader, Vec<Ve
     // Deserialize header
     let header: ArtifactHeader = bincode::deserialize(&raw[8..8 + header_len])?;
 
-    // Read each shard's raw bytes
+    // Validate checksum count matches shard count
+    if header.shard_checksums.len() != header.shard_byte_lengths.len() {
+        anyhow::bail!(
+            "Artifact corrupt: {} checksums for {} shards",
+            header.shard_checksums.len(),
+            header.shard_byte_lengths.len()
+        );
+    }
+
+    // Read each shard's raw bytes and verify SHA-256 integrity before returning.
+    // This establishes the safety precondition for the caller's
+    // `deserialize_unchecked`: bytes that pass verification were produced by
+    // `serialize()` on the same machine and have not been tampered with.
     let mut offset = 8 + header_len;
     let mut shard_bytes = Vec::with_capacity(header.shard_byte_lengths.len());
-    for (i, &shard_len) in header.shard_byte_lengths.iter().enumerate() {
+    for (i, (&shard_len, expected_checksum)) in header
+        .shard_byte_lengths
+        .iter()
+        .zip(header.shard_checksums.iter())
+        .enumerate()
+    {
         if offset + shard_len > raw.len() {
             anyhow::bail!(
                 "Shard {} truncated: expected {} bytes at offset {}, have {}",
@@ -120,7 +154,15 @@ pub fn load_umls_artifact(path: &Path) -> anyhow::Result<(ArtifactHeader, Vec<Ve
                 raw.len() - offset
             );
         }
-        shard_bytes.push(raw[offset..offset + shard_len].to_vec());
+        let shard_slice = &raw[offset..offset + shard_len];
+        let actual_checksum: [u8; 32] = Sha256::digest(shard_slice).into();
+        if &actual_checksum != expected_checksum {
+            anyhow::bail!(
+                "Shard {} checksum mismatch: artifact may be corrupt or tampered with",
+                i
+            );
+        }
+        shard_bytes.push(shard_slice.to_vec());
         offset += shard_len;
     }
 
@@ -144,7 +186,7 @@ mod tests {
     use super::*;
     use tempfile::tempdir;
 
-    fn make_test_header() -> ArtifactHeader {
+    fn make_test_header(shard_bytes: &[Vec<u8>]) -> ArtifactHeader {
         ArtifactHeader {
             shard_metadata: vec![
                 vec![
@@ -175,7 +217,11 @@ mod tests {
                 m
             },
             total_patterns: 3,
-            shard_byte_lengths: vec![10, 8],
+            shard_byte_lengths: shard_bytes.iter().map(|b| b.len()).collect(),
+            shard_checksums: shard_bytes
+                .iter()
+                .map(|b| Sha256::digest(b).into())
+                .collect(),
         }
     }
 
@@ -184,8 +230,8 @@ mod tests {
         let dir = tempdir().unwrap();
         let path = dir.path().join("umls.bin.zst");
 
-        let header = make_test_header();
         let shard_bytes = vec![vec![1u8; 10], vec![2u8; 8]];
+        let header = make_test_header(&shard_bytes);
 
         save_umls_artifact(&header, &shard_bytes, &path).unwrap();
         assert!(path.exists());
@@ -200,13 +246,39 @@ mod tests {
     }
 
     #[test]
+    fn test_artifact_checksum_mismatch_rejected() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("tampered.bin.zst");
+
+        let shard_bytes = vec![vec![1u8; 10], vec![2u8; 8]];
+        let header = make_test_header(&shard_bytes);
+        save_umls_artifact(&header, &shard_bytes, &path).unwrap();
+
+        // Load, tamper with shard bytes in the decompressed payload, recompress
+        let compressed = std::fs::read(&path).unwrap();
+        let mut raw = zstd::decode_all(&compressed[..]).unwrap();
+        // Flip one byte in the first shard (after header)
+        let header_len =
+            u64::from_le_bytes(raw[..8].try_into().unwrap()) as usize;
+        raw[8 + header_len] ^= 0xFF;
+        let recompressed = zstd::encode_all(&raw[..], 3).unwrap();
+        std::fs::write(&path, recompressed).unwrap();
+
+        let result = load_umls_artifact(&path);
+        assert!(result.is_err(), "tampered artifact must be rejected");
+        let msg = result.err().unwrap().to_string();
+        assert!(msg.contains("checksum mismatch"), "error: {}", msg);
+    }
+
+    #[test]
     fn test_artifact_exists() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("test.bin.zst");
         assert!(!artifact_exists(&path));
 
-        let header = make_test_header();
-        save_umls_artifact(&header, &[vec![0u8; 10], vec![0u8; 8]], &path).unwrap();
+        let shard_bytes = vec![vec![0u8; 10], vec![0u8; 8]];
+        let header = make_test_header(&shard_bytes);
+        save_umls_artifact(&header, &shard_bytes, &path).unwrap();
         assert!(artifact_exists(&path));
     }
 }
