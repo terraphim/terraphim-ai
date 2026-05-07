@@ -45,6 +45,7 @@ pub mod kg_router;
 pub mod learning;
 pub mod mention;
 pub mod mention_chain;
+pub mod meta_coordinator;
 pub mod metrics_persistence;
 pub mod mode;
 pub mod nightwatch;
@@ -87,6 +88,10 @@ pub use mention::{
 };
 pub use mention_chain::{
     MentionChainError, MentionChainTracker, MentionContextArgs, DEFAULT_MAX_MENTION_DEPTH,
+};
+pub use meta_coordinator::{
+    AgentSelectionRule, CandidateIssue, DispatchResult, MetaCoordinator, MetaCoordinatorStats,
+    ProjectDispatchState,
 };
 pub use metrics_persistence::{
     InMemoryMetricsPersistence, MetricsPersistence, MetricsPersistenceConfig,
