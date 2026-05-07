@@ -843,10 +843,13 @@ async fn test_full_feature_matrix() -> Result<()> {
             println!("  ✓ {}: completed", test_name);
         }
 
-        // Configuration tests - use an existing role
+        // Configuration tests - use the canonical default role that is always present
+        // in terraphim_engineer_config.json (the role pointed to by TERRAPHIM_ROLE_CONFIG
+        // in apply_hermetic_env). "Default" was removed from some branch configs; use
+        // "Terraphim Engineer" which is the `default_role` and is guaranteed to exist.
         let config_tests = vec![(
             "config-set-role",
-            vec!["config", "set", "selected_role", "Default"],
+            vec!["config", "set", "selected_role", "Terraphim Engineer"],
         )];
 
         for (test_name, args) in config_tests {
