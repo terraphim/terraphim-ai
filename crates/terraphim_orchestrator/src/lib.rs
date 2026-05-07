@@ -12,6 +12,7 @@
 //! - **HandoffBuffer**: Inter-agent state transfer with TTL management
 //! - **CostTracker**: Budget enforcement and spending monitoring
 //! - **NightwatchMonitor**: Drift detection and rate limiting
+//! - **MetaCoordinator**: Cross-project issue-driven agent dispatch with PageRank prioritisation
 //!
 //! # Example
 //!
@@ -45,6 +46,7 @@ pub mod kg_router;
 pub mod learning;
 pub mod mention;
 pub mod mention_chain;
+pub mod meta_coordinator;
 pub mod metrics_persistence;
 pub mod mode;
 pub mod nightwatch;
