@@ -61,6 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **LLM cost tracking** foundation with genai fork integration (Refs #1075)
 - **Spec validation** report for 2026-04-29 documenting 3 fixed, 5 remaining gaps
 - **Spec validation** report for 2026-05-07 -- FAIL: 2 persistent gaps (single-agent-listener operational gap, meta-coordinator spec coverage gap); 0 new gaps; provider_probe.rs hardening assessed as in-scope for #1233
+- **Documentation gap report v4** generated for 2026-05-07 -- full workspace scan (55 crates, ~2,450 missing items); critical crates: agent (371), orchestrator (236), validation (116), types (148), multi_agent (191); 8 crates at 100% gap rate; `reports/doc-gap-report-20260507-v4.md`
 - **Documentation gap report v2** generated for 2026-05-07 extending scan to include `pub fn` -- 395 total gaps (agent: 189, orchestrator: 61, types: 48, service: 39, automata: 23, persistence: 12, config: 11, middleware: 8, rolegraph: 4); service and persistence API entry points identified as critical
 - **Documentation gap report** generated for 2026-05-07 identifying 307 missing docs across 9 crates (agent: 139, types: 76, orchestrator: 54, automata: 23, config: 15) -- 45% reduction from 2026-04-29 baseline of 564
 - **Documentation gap report** generated for 2026-05-05 identifying 1,058 missing docs across 12 crates (orchestrator: 445, server: 138, service: 114, agent: 99, types: 98)
@@ -75,6 +76,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Circuit-breaker environment error exemption** -- `is_environment_error()` extracted from inline logic in `provider_probe.rs`; now exempts C1 allow-list failures and missing routing templates in addition to CLI-not-found errors (Refs #446)
 - **Supervisor escalation** -- added `escalated` state field to enforce `NoRestartAfterEscalation` invariant (Refs #255)
 - **Test dependencies** -- added `server` feature to `terraphim_agent` dev-dependency for CI stability (Refs #1260)
 - **`--server` flag** on listen subcommand now routes through custom error handler
