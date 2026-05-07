@@ -32,14 +32,16 @@ services:
     container_name: terraphim-ollama
     restart: unless-stopped
     ports:
-      # Bind only to localhost to prevent unintended public exposure of the AI inference engine.
-      # Internal docker-compose services use the terraphim-network and do not need host port access.
+      # Host port bound to 127.0.0.1 only — Ollama must not be reachable from outside
+      # the host without authentication. Any external access must go through a reverse
+      # proxy that enforces authentication (GDPR requirement, see issue #1313).
       - "127.0.0.1:11434:11434"
     volumes:
       - ./ollama:/root/.ollama
     environment:
-      # OLLAMA_HOST binds the container's listener on all interfaces for intra-container networking.
-      # External access is restricted by the port binding above (127.0.0.1 only).
+      # OLLAMA_HOST=0.0.0.0 inside the container is required for intra-container
+      # networking (other services in terraphim-network connecting to ollama:11434).
+      # External exposure is controlled exclusively by the host port binding above.
       - OLLAMA_HOST=0.0.0.0
     networks:
       - terraphim-network
@@ -52,10 +54,22 @@ services:
     container_name: terraphim-redis
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      # Bind to localhost only — Redis must not be reachable from outside the host.
+      # Other containers on terraphim-network reach Redis directly via the Docker
+      # network without going through the host port; this binding serves local tooling.
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis-data:/data
-    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --requirepass ${REDIS_PASSWORD}
+      --bind 0.0.0.0
+      --protected-mode no
     networks:
       - terraphim-network
     profiles:

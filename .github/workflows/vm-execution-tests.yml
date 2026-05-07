@@ -121,7 +121,7 @@ jobs:
       if: steps.redis_check.outputs.redis_available == 'false'
       run: |
         docker run -d --name ci-redis-${{ github.run_id }} \
-          -p 6380:6379 \
+          -p 127.0.0.1:6380:6379 \
           --health-cmd "redis-cli ping" \
           --health-interval 10s \
           --health-timeout 5s \
