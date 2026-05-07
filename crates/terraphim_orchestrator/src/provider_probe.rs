@@ -142,16 +142,15 @@ impl ProviderHealthMap {
             match result.status {
                 ProbeStatus::Success => breaker.record_success(),
                 ProbeStatus::Error => {
-                    // Do not count CLI-not-found as a provider failure.
-                    if result
-                        .error
-                        .as_ref()
-                        .is_some_and(|e| e.contains("CLI tool") && e.contains("not found on PATH"))
-                    {
+                    // Do not count environment/configuration errors as provider
+                    // failures — they do not indicate that the API is down.
+                    let err = result.error.as_deref().unwrap_or("");
+                    if is_environment_error(err) {
                         debug!(
                             provider = %result.provider,
                             model = %result.model,
-                            "skipping circuit-breaker update: CLI tool missing"
+                            error = %err,
+                            "skipping circuit-breaker update: environment/config error"
                         );
                     } else {
                         breaker.record_failure();
@@ -393,6 +392,21 @@ impl ProviderHealthMap {
         );
         Ok(())
     }
+}
+
+/// Determine whether a probe error represents an environment/configuration
+/// issue rather than a genuine provider health failure.
+///
+/// These errors must not update the circuit breaker because they reflect
+/// local setup problems (missing tool, routing config, C1 allow-list) —
+/// not transient API unavailability.
+fn is_environment_error(error: &str) -> bool {
+    // CLI tool absent from PATH: local environment issue.
+    (error.contains("CLI tool") && error.contains("not found on PATH"))
+        // Provider not in C1 subscription allow-list: configuration issue.
+        || error.contains("not in C1 allow-list")
+        // No action:: template defined in routing rules: routing config issue.
+        || error.contains("no action:: template defined")
 }
 
 /// Check whether a CLI tool is available on PATH.
@@ -765,19 +779,32 @@ mod tests {
     }
 
     #[test]
+    fn is_environment_error_classifications() {
+        assert!(is_environment_error(
+            "probe skipped: CLI tool 'opencode' not found on PATH"
+        ));
+        assert!(is_environment_error(
+            "probe skipped: provider not in C1 allow-list"
+        ));
+        assert!(is_environment_error("no action:: template defined"));
+        assert!(!is_environment_error("exit 1: authentication failed"));
+        assert!(!is_environment_error("exit 1: connection timeout"));
+    }
+
+    #[test]
     fn missing_cli_probe_does_not_open_breaker() {
         let mut map = ProviderHealthMap::new(Duration::from_secs(300));
 
-        // Simulate the exact update logic from `probe_all` with a CLI-not-found
-        // result. We create the breaker entry and then run the same match logic
-        // that `probe_all` uses.
+        // Simulate a CLI-not-found error result and apply the same exemption
+        // logic used in probe_all via is_environment_error.
+        let error_msg = "probe skipped: CLI tool 'nonexistent-cli' not found on PATH".to_string();
         let result = ProbeResult {
             provider: "openai".to_string(),
             model: "gpt-4".to_string(),
             cli_tool: "nonexistent-cli".to_string(),
             status: ProbeStatus::Error,
             latency_ms: None,
-            error: Some("probe skipped: CLI tool 'nonexistent-cli' not found on PATH".to_string()),
+            error: Some(error_msg.clone()),
             timestamp: String::new(),
         };
 
@@ -787,32 +814,49 @@ mod tests {
             .entry(key)
             .or_insert_with(|| CircuitBreaker::new(map.cb_config.clone()));
 
-        // Replicate the logic from `probe_all`.
-        match result.status {
-            ProbeStatus::Success => breaker.record_success(),
-            ProbeStatus::Error => {
-                if result
-                    .error
-                    .as_ref()
-                    .is_some_and(|e| e.contains("CLI tool") && e.contains("not found on PATH"))
-                {
-                    // Skipped — this is what we want to verify.
-                } else {
-                    breaker.record_failure();
-                }
-            }
-            ProbeStatus::Timeout => breaker.record_failure(),
+        if !is_environment_error(&error_msg) {
+            breaker.record_failure();
         }
 
-        // The breaker must still be Closed because the CLI-not-found error
-        // was skipped.
         assert!(matches!(
             breaker.state(),
             terraphim_spawner::health::CircuitState::Closed
         ));
-
-        // When there are no probe results, the provider falls back to the
-        // circuit breaker state, which is Closed (healthy).
         assert!(map.is_healthy("openai"));
+    }
+
+    #[test]
+    fn c1_blocked_probe_does_not_open_breaker() {
+        let mut map = ProviderHealthMap::new(Duration::from_secs(300));
+
+        // A banned provider hits the C1 gate and returns this error.
+        // It must NOT accumulate failures against the circuit breaker —
+        // the provider API was never contacted.
+        let error_msg = "probe skipped: provider not in C1 allow-list".to_string();
+        let result = ProbeResult {
+            provider: "github-copilot".to_string(),
+            model: "github-copilot/gpt-4o".to_string(),
+            cli_tool: String::new(),
+            status: ProbeStatus::Error,
+            latency_ms: None,
+            error: Some(error_msg.clone()),
+            timestamp: String::new(),
+        };
+
+        let key = format!("{}:{}", result.provider, result.model);
+        let breaker = map
+            .breakers
+            .entry(key)
+            .or_insert_with(|| CircuitBreaker::new(map.cb_config.clone()));
+
+        if !is_environment_error(&error_msg) {
+            breaker.record_failure();
+        }
+
+        assert!(matches!(
+            breaker.state(),
+            terraphim_spawner::health::CircuitState::Closed
+        ));
+        assert!(map.is_healthy("github-copilot"));
     }
 }
