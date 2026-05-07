@@ -234,6 +234,7 @@ impl TriggerIndex {
         )
     }
 
+    /// Returns `true` if the trigger set contains no entries.
     pub fn is_empty(&self) -> bool {
         self.triggers.is_empty()
     }
@@ -1100,6 +1101,9 @@ impl RoleGraph {
         self.documents.contains_key(document_id)
     }
 
+    /// Record a co-occurrence between concept nodes `x` and `y` for the given document.
+    ///
+    /// Creates the edge if absent; increments both node ranks if the edge already exists.
     pub fn add_or_update_document(&mut self, document_id: &str, x: u64, y: u64) {
         let edge_id = magic_pair(x, y);
         let edge = self.init_or_update_edge(edge_id, document_id);
@@ -1365,6 +1369,10 @@ impl From<RoleGraph> for RoleGraphSync {
 static RE: std::sync::LazyLock<Regex> =
     std::sync::LazyLock::new(|| Regex::new(r"[?!|]\s+").unwrap());
 
+/// Split a block of text into individual sentence fragments.
+///
+/// Uses Unicode sentence-boundary segmentation followed by splitting on `?`, `!`, and `|`
+/// punctuation. Empty fragments are discarded.
 pub fn split_paragraphs(paragraphs: &str) -> Vec<&str> {
     let sentences = UnicodeSegmentation::split_sentence_bounds(paragraphs);
     let parts =

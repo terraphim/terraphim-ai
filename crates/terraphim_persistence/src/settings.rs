@@ -161,6 +161,9 @@ fn create_memory_operator() -> OpendalResult<Operator> {
     Ok(Operator::new(builder)?.finish())
 }
 
+/// Initialise an OpenDAL [`Operator`] for a named profile and measure its I/O speed.
+///
+/// Returns the operator and its measured read latency in nanoseconds.
 pub async fn parse_profile(
     settings: &DeviceSettings,
     profile_name: &str,
@@ -346,6 +349,8 @@ pub async fn parse_profile(
     Ok((op, speed))
 }
 
+/// Initialise all profiles defined in `settings`, returning a map of profile name to operator and
+/// its measured I/O latency.
 pub async fn parse_profiles(
     settings: &DeviceSettings,
 ) -> Result<HashMap<String, (Operator, u128)>> {

@@ -149,6 +149,7 @@ pub fn json_decode(jsonlines: &str) -> Result<Vec<Message>> {
         .collect::<std::result::Result<Vec<Message>, serde_json::Error>>()?)
 }
 
+/// Ripgrep search command wrapper with input validation and structured JSON output parsing.
 pub struct RipgrepCommand {
     command: String,
     default_args: Vec<String>,
@@ -242,6 +243,10 @@ impl RipgrepCommand {
         )
     }
 
+    /// Run ripgrep with additional caller-supplied arguments appended after the defaults.
+    ///
+    /// Only arguments matching the known-safe allowlist are accepted; others are rejected
+    /// with a [`crate::Error::Validation`] error to prevent command injection.
     pub async fn run_with_extra_args(
         &self,
         needle: &str,

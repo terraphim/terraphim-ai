@@ -39,6 +39,7 @@ pub struct ConversationIndex {
 }
 
 impl ConversationIndex {
+    /// Create a new empty index stamped with the current UTC time.
     pub fn new() -> Self {
         Self {
             version: "1.0.0".to_string(),
@@ -47,12 +48,14 @@ impl ConversationIndex {
         }
     }
 
+    /// Insert or replace a conversation summary, updating the `updated_at` timestamp.
     pub fn add(&mut self, summary: ConversationSummary) {
         self.conversations
             .insert(summary.id.as_str().to_string(), summary);
         self.updated_at = chrono::Utc::now();
     }
 
+    /// Remove the conversation with the given ID, if present.
     pub fn remove(&mut self, id: &ConversationId) {
         self.conversations.remove(id.as_str());
         self.updated_at = chrono::Utc::now();

@@ -52,4 +52,5 @@ pub enum Error {
     Validation(String),
 }
 
+/// Convenience alias for `Result<T, Error>` used throughout this crate.
 pub type Result<T> = std::result::Result<T, Error>;

@@ -18,6 +18,10 @@ pub struct MarkdownDirectivesParseResult {
     pub warnings: Vec<MarkdownDirectiveWarning>,
 }
 
+/// Recursively parse `##` YAML-front-matter directives from all Markdown files under `root`.
+///
+/// Returns a map of file paths to their parsed [`MarkdownDirectives`] and a list of
+/// non-fatal warnings for files that could not be read or parsed.
 pub fn parse_markdown_directives_dir(root: &Path) -> crate::Result<MarkdownDirectivesParseResult> {
     let mut directives = HashMap::new();
     let mut warnings = Vec::new();

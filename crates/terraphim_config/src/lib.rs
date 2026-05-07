@@ -28,6 +28,7 @@ use crate::llm_router::LlmRouterConfig;
 // LLM Router configuration
 pub mod llm_router;
 
+/// Convenience alias for `Result<T, TerraphimConfigError>` used throughout this crate.
 pub type Result<T> = std::result::Result<T, TerraphimConfigError>;
 
 use opendal::Result as OpendalResult;
@@ -441,8 +442,8 @@ pub struct KnowledgeGraph {
     pub public: bool,
     pub publish: bool,
 }
-/// check KG set correctly
 impl KnowledgeGraph {
+    /// Returns `true` if at least one knowledge-graph source (automata path or local KG) is configured.
     pub fn is_set(&self) -> bool {
         self.automata_path.is_some() || self.knowledge_graph_local.is_some()
     }
@@ -490,6 +491,7 @@ impl ConfigBuilder {
             settings_path: PathBuf::new(),
         }
     }
+    /// Create a new `ConfigBuilder` pre-configured for the given [`ConfigId`].
     pub fn new_with_id(id: ConfigId) -> Self {
         let device_settings = match id {
             ConfigId::Embedded => DeviceSettings::default_embedded(),

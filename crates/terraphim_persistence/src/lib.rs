@@ -37,6 +37,11 @@ pub use error::{Error, Result};
 
 static DEVICE_STORAGE: AsyncOnceCell<DeviceStorage> = AsyncOnceCell::new();
 
+/// Persistent device storage providing access to documents, roles, conversation history, and settings.
+///
+/// Implemented as a process-wide singleton. Use [`DeviceStorage::instance`] to obtain
+/// the shared handle, or [`DeviceStorage::init_memory_only`] for an isolated in-process store
+/// suitable for tests.
 #[derive(Debug)]
 pub struct DeviceStorage {
     pub ops: HashMap<String, (Operator, u128)>,
@@ -44,6 +49,7 @@ pub struct DeviceStorage {
 }
 
 impl DeviceStorage {
+    /// Return the global `DeviceStorage` instance, initialising it on first call.
     pub async fn instance() -> Result<&'static DeviceStorage> {
         let storage = DEVICE_STORAGE
             .get_or_try_init(async {

@@ -159,11 +159,13 @@ pub use umls_extractor::{UmlsExtractor, UmlsExtractorStats, UmlsMatch};
 // Re-export helpers for metadata iteration to support graph-embedding expansions in consumers
 pub mod autocomplete_helpers {
     use super::autocomplete::{AutocompleteIndex, AutocompleteMetadata};
+    /// Iterate over all `(term, metadata)` pairs in the autocomplete index.
     pub fn iter_metadata(
         index: &AutocompleteIndex,
     ) -> impl Iterator<Item = (&str, &AutocompleteMetadata)> {
         index.metadata_iter()
     }
+    /// Look up the metadata for a specific `term` in the autocomplete index.
     pub fn get_metadata<'a>(
         index: &'a AutocompleteIndex,
         term: &str,
