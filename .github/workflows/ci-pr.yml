@@ -155,7 +155,7 @@ jobs:
   rust-format:
     name: Rust Format Check
     runs-on: [self-hosted, bigbox]
-    timeout-minutes: 2
+    timeout-minutes: 5
     needs: changes
     if: needs.changes.outputs.rust-changed == 'true'
     env:
@@ -233,6 +233,14 @@ jobs:
           # Check key binaries compile
           /home/alex/.local/bin/rch exec -- cargo check --package terraphim_server
           /home/alex/.local/bin/rch exec -- cargo check --package terraphim_mcp_server --features zlob
+
+      - name: Check rustdoc (gate intra-doc link regressions)
+        run: |
+          # RUSTDOCFLAGS="-D warnings" is set in job env; exits non-zero on any doc warning.
+          # --lib excludes binary targets which have no public API surface.
+          /home/alex/.local/bin/rch exec -- cargo doc --no-deps --workspace --lib
+        env:
+          RUSTDOCFLAGS: "-D warnings"
 
       - name: sccache stats
         if: always()

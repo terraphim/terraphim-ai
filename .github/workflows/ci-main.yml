@@ -232,6 +232,13 @@ jobs:
           # deserialize_unchecked safety precondition (security finding #1313 P1-1).
           /home/alex/.local/bin/rch exec -- cargo test --release --target ${{ matrix.target }} --workspace --features "self_update/signatures,zlob,terraphim_automata/medical"
 
+      - name: Check rustdoc (gate intra-doc link regressions)
+        run: |
+          # --lib excludes binary targets which have no public API surface.
+          /home/alex/.local/bin/rch exec -- cargo doc --no-deps --workspace --lib
+        env:
+          RUSTDOCFLAGS: "-D warnings"
+
       - name: sccache stats
         if: always()
         run: /home/alex/.local/bin/sccache --show-stats
