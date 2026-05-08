@@ -4,7 +4,7 @@
 **Author:** root  
 **Head SHA:** 0adaa20  
 **Validator:** Carthos (Domain Architect)  
-**Date:** 2026-05-08 07:27 CEST
+**Date:** 2026-05-08
 
 ---
 
@@ -18,11 +18,11 @@ Implementation is correct in both guarded paths. Config accessor is unit-tested.
 
 | Req ID | Requirement | Design Ref | Impl Ref | Tests | Evidence | Status |
 |-------:|-------------|------------|----------|-------|----------|--------|
-| REQ-251-001 | RetryBound guard on poll-failure path in `on_retry_timer` | Gitea #251 §Fix | `orchestrator/mod.rs:588–604` | None | Diff line ~+596: `if next >= max_attempts { claimed.remove }` | ⚠️ |
-| REQ-251-002 | RetryBound guard on no-slots path in `on_retry_timer` | Gitea #251 §Fix | `orchestrator/mod.rs:620–633` | None | Diff line ~+622: `if next >= max_attempts { claimed.remove }` | ⚠️ |
+| REQ-251-001 | RetryBound guard on poll-failure path in `on_retry_timer` | Gitea #251; TLA+ `RetryBound` invariant | `orchestrator/mod.rs:588–604` — `if next >= max_attempts { claimed.remove }` | None | Diff line ~+596: guard present, no Rust test | ⚠️ |
+| REQ-251-002 | RetryBound guard on no-slots path in `on_retry_timer` | Gitea #251; comment `// TLA+ RetryGiveUp` in code | `orchestrator/mod.rs:620–633` — same guard pattern | None | Diff line ~+622: guard present, no Rust test | ⚠️ |
 | REQ-251-003 | `max_retry_attempts()` config accessor, default 10 | Gitea #251 §Expected Behaviour | `config/mod.rs:184–191` | `max_retry_attempts_default`, `max_retry_attempts_configurable` | `config/mod.rs:533–546` | ✅ |
-| REQ-251-004 | TLA+ `RetryBound` invariant: `retryCount[i] <= MaxRetries` holds at runtime | TLA+ spec `specs/symphony/SymphonyOrchestrator.tla:127–134` (external repo) | Both paths in `orchestrator/mod.rs` | No Rust integration test | Model proves invariant for 9,983 states (referenced in issue); no Rust regression test | ⚠️ |
-| CONF-251-001 | `agent.max_retry_attempts` YAML key is configurable | Commit message (WORKFLOW.md mention) | `config/mod.rs:188` | `max_retry_attempts_configurable` | `config/mod.rs:544` | ✅ |
+| REQ-251-004 | TLA+ `RetryBound` invariant: `retryCount[i] <= MaxRetries` holds at runtime | TLA+ spec `specs/symphony/SymphonyOrchestrator.tla` (external repo); no ADR | Both guarded paths in `orchestrator/mod.rs` | No Rust integration test | Formal model proves invariant over state space; no Rust regression test links to it | ⚠️ |
+| CONF-251-001 | `agent.max_retry_attempts` YAML key is configurable | Commit message (WORKFLOW.md mention); Rustdoc on accessor | `config/mod.rs:188` | `max_retry_attempts_configurable` | `config/mod.rs:544` | ✅ |
 
 ---
 
@@ -48,7 +48,7 @@ The retry semantics (backoff, MaxRetries, claimed-set lifecycle) live entirely i
 
 ---
 
-**Persistent v5 gaps (unchanged):**
+**Persistent gaps (unchanged from previous cycle):**
 
 | Gap | Status |
 |-----|--------|
@@ -61,4 +61,4 @@ The retry semantics (backoff, MaxRetries, claimed-set lifecycle) live entirely i
 
 <sub>Last spec-validated commit: 0adaa20  
 PR #1349 verdict: concerns — two config unit tests present; orchestrator claimed-set release on retry exhaustion is unverified by Rust test.  
-Persistent v5 gaps: 3 blockers, 1 follow-up (all unchanged — PR #1291 and PR #1343 remain unmerged).</sub>
+Persistent gaps: 3 blockers, 1 follow-up (all unchanged — PR #1291 and PR #1343 remain unmerged).</sub>
