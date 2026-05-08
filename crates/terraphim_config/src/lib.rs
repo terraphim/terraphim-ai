@@ -7,7 +7,7 @@
 //!
 //! 1. Explicit path via `TERRAPHIM_CONFIG` environment variable
 //! 2. Saved config retrieved from the persistence layer
-//! 3. Hard-coded defaults in [`terraphim_server/default/`]
+//! 3. Hard-coded defaults in `terraphim_server/default/`
 //!
 //! # Key Types
 //!

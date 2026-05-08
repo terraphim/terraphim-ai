@@ -113,7 +113,7 @@ impl GiteaConfig {
 
 /// State of a Gitea commit status, mirroring the Gitea API enum.
 ///
-/// Used by [`GiteaTracker::set_commit_status`] to mark a commit's check
+/// Used by `GiteaTracker::set_commit_status` to mark a commit's check
 /// state for a given context (e.g. `adf/pr-reviewer`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StatusState {
@@ -235,7 +235,7 @@ impl GiteaTracker {
         })
     }
 
-    /// Override the retry backoff sequence used by [`set_commit_status`].
+    /// Override the retry backoff sequence used by `set_commit_status`.
     ///
     /// Intended for tests; production callers get the default `1s, 2s, 4s`.
     /// An empty vector disables retries entirely.
