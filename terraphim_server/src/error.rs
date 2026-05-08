@@ -113,5 +113,5 @@ where
     }
 }
 
-/// Convenience alias for handler return types; errors are automatically converted to [`ApiError`].
+/// Convenience alias for handler return types; errors are automatically converted to `ApiError`.
 pub type Result<T> = std::result::Result<T, ApiError>;
