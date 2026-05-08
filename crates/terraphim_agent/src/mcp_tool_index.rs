@@ -279,8 +279,8 @@ mod tests {
 
     #[test]
     fn test_tool_index_save_and_load() {
-        let temp_dir = std::env::temp_dir();
-        let index_path = temp_dir.join("test-mcp-index.json");
+        let temp_dir = tempfile::TempDir::new().expect("Failed to create temp dir");
+        let index_path = temp_dir.path().join("mcp-index.json");
 
         // Create and save
         {
@@ -293,14 +293,12 @@ mod tests {
 
         // Load and verify
         {
-            let index = McpToolIndex::load(index_path.clone()).expect("Failed to load index");
+            let index = McpToolIndex::load(index_path).expect("Failed to load index");
             assert_eq!(index.tool_count(), 1);
             assert_eq!(index.tools[0].name, "search_files");
             assert_eq!(index.tools[0].tags, vec!["search", "filesystem"]);
         }
-
-        // Cleanup
-        let _ = std::fs::remove_file(&index_path);
+        // temp_dir cleaned up automatically on drop
     }
 
     #[test]
