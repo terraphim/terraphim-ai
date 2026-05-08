@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Intra-doc link fixes** resolved broken rustdoc links and unclosed HTML tag warnings across `terraphim_orchestrator`, `terraphim_types`, `terraphim_tracker` — cargo doc now produces zero warnings on all core crates
+- **Unique tempdir** in `test_tool_index_save_and_load` to eliminate cross-run state pollution (Refs #1340)
 - **Module-level rustdoc** added to `terraphim_dsm` and `terraphim_github_runner_server` — the final two binary crates lacking a crate-level `//!` comment
 - **Module-level rustdoc** added to 17 previously undocumented crates: `terraphim_service`, `terraphim_settings`, `terraphim_agent`, `terraphim_file_search`, `terraphim_kg_linter`, `terraphim_ccusage`, `terraphim_usage`, `terraphim_build_args`, `terraphim_lsp`, `terraphim_automata_py`, `terraphim_rolegraph_py`, `terraphim-markdown-parser`, `haystack_core`, `haystack_atlassian`, `haystack_discourse`, `haystack_grepapp`, `haystack_jmap` — all workspace crates now have crate-level `//!` documentation
 - **Module-level rustdoc** added to five previously undocumented crates: `terraphim_persistence`, `terraphim_mcp_server`, `terraphim_config`, `terraphim_rolegraph`, `terraphim_middleware`
