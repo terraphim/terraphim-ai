@@ -1,3 +1,7 @@
+//! Haystack integration for grep.app code-search.
+//!
+//! Implements [`HaystackProvider`] over the grep.app API, exposing public
+//! code-search results as Terraphim documents.
 use anyhow::Result;
 use haystack_core::HaystackProvider;
 use terraphim_types::{Document, SearchQuery};

@@ -1,3 +1,8 @@
+//! Claude Code usage tracking and cost reporting for Terraphim AI.
+//!
+//! Parses Claude Code session JSONL files, aggregates token counts and
+//! costs by project and session, and formats reports for the terminal or
+//! robot-mode JSON output.
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;

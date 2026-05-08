@@ -1,3 +1,7 @@
+//! Haystack integration for Atlassian products (Confluence, Jira).
+//!
+//! Implements [`HaystackProvider`] over the Confluence REST API, enabling
+//! full-text search of Confluence spaces as a Terraphim haystack source.
 use anyhow::Result;
 use haystack_core::HaystackProvider;
 use terraphim_types::{Document, SearchQuery};

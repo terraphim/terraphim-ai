@@ -1,3 +1,7 @@
+//! Haystack integration for email via JMAP.
+//!
+//! Implements [`HaystackProvider`] over a JMAP mail server, allowing email
+//! messages and threads to be searched as Terraphim haystack documents.
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

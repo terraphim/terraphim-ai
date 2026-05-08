@@ -1,3 +1,8 @@
+//! Main service layer for Terraphim AI.
+//!
+//! Provides document search, indexing, and AI-assisted summarisation across
+//! multiple haystack backends. Integrates the knowledge graph, thesaurus,
+//! and relevance-scoring pipeline into a single async service facade.
 use ahash::AHashMap;
 use terraphim_automata::builder::{Logseq, ThesaurusBuilder};
 use terraphim_automata::load_thesaurus;

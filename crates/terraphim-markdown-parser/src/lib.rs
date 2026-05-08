@@ -1,3 +1,7 @@
+//! Markdown parser for Terraphim knowledge-graph documents.
+//!
+//! Converts markdown files into typed [`terraphim_types::Document`] values,
+//! extracting titles, tags, and body text for indexing and search.
 use std::collections::HashSet;
 use std::ops::Range;
 use std::str::FromStr;

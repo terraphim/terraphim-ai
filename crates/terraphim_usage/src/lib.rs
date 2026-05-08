@@ -1,3 +1,8 @@
+//! LLM usage metering and pricing for Terraphim AI.
+//!
+//! Tracks token consumption across providers (OpenRouter, Ollama, …), applies
+//! per-model pricing tables, and persists usage records. Optional `cli` and
+//! `providers` feature flags unlock the reporting CLI and provider adapters.
 #[cfg(feature = "cli")]
 pub mod cli;
 pub mod formatter;

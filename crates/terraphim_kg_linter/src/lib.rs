@@ -1,3 +1,8 @@
+//! Knowledge-graph linter for Terraphim markdown KG files.
+//!
+//! Validates KG markdown files for structural correctness: checks synonym
+//! declarations, detects orphaned nodes, and reports schema violations.
+//! Used in CI via the `terraphim-kg-linter` binary.
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
