@@ -803,17 +803,24 @@ async fn test_full_feature_matrix() -> Result<()> {
             ("search-default", vec!["search", "test", "--limit", "2"]),
             (
                 "search-with-role",
-                vec!["search", "test", "--role", "Default", "--limit", "2"],
+                vec![
+                    "search",
+                    "test",
+                    "--role",
+                    "Terraphim Engineer",
+                    "--limit",
+                    "2",
+                ],
             ),
             ("graph-default", vec!["graph", "--top-k", "3"]),
             (
                 "graph-with-role",
-                vec!["graph", "--role", "Default", "--top-k", "3"],
+                vec!["graph", "--role", "Terraphim Engineer", "--top-k", "3"],
             ),
             ("chat-default", vec!["chat", "test message"]),
             (
                 "chat-with-role",
-                vec!["chat", "test message", "--role", "Default"],
+                vec!["chat", "test message", "--role", "Terraphim Engineer"],
             ),
             (
                 "extract-default",
@@ -825,7 +832,7 @@ async fn test_full_feature_matrix() -> Result<()> {
                     "extract",
                     "test text",
                     "--role",
-                    "Default",
+                    "Terraphim Engineer",
                     "--exclude-term",
                 ],
             ),
@@ -843,10 +850,10 @@ async fn test_full_feature_matrix() -> Result<()> {
             println!("  ✓ {}: completed", test_name);
         }
 
-        // Configuration tests - use an existing role
+        // Configuration tests - use the canonical role from terraphim_engineer_config.json
         let config_tests = vec![(
             "config-set-role",
-            vec!["config", "set", "selected_role", "Default"],
+            vec!["config", "set", "selected_role", "Terraphim Engineer"],
         )];
 
         for (test_name, args) in config_tests {
