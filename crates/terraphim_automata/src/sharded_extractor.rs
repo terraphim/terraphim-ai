@@ -493,4 +493,73 @@ mod tests {
             cold_cuis
         );
     }
+
+    /// Verify that a tampered artifact file is rejected with an error, not a panic.
+    ///
+    /// Safety invariant: `deserialize_unchecked` is only reached after SHA-256
+    /// checksum verification passes in `load_umls_artifact`. Tampering with shard
+    /// bytes causes the checksum gate to fire, returning `Err` before the unsafe
+    /// call is ever executed. This test proves that the safety precondition holds.
+    ///
+    /// Acceptance criterion for #1322: "corrupted artefact bytes are rejected
+    /// without panic".
+    #[test]
+    fn test_load_from_artifact_rejects_tampered_shard() {
+        let dataset = create_test_dataset();
+        let extractor = ShardedUmlsExtractor::from_dataset(&dataset).unwrap();
+
+        let dir = tempfile::tempdir().unwrap();
+        let artifact_path = dir.path().join("tampered.bin.zst");
+
+        extractor.save_to_artifact(&artifact_path).unwrap();
+
+        // Decompress the artifact, flip one byte in the first shard's region,
+        // then recompress so the checksum no longer matches.
+        let compressed = std::fs::read(&artifact_path).unwrap();
+        let mut raw = zstd::decode_all(&compressed[..]).unwrap();
+        let header_len = u64::from_le_bytes(raw[..8].try_into().unwrap()) as usize;
+        let shard_start = 8 + header_len;
+        assert!(
+            shard_start < raw.len(),
+            "Artifact too small to contain a shard byte"
+        );
+        raw[shard_start] ^= 0xFF;
+        let recompressed = zstd::encode_all(&raw[..], 3).unwrap();
+        std::fs::write(&artifact_path, recompressed).unwrap();
+
+        // Must return an error, not panic or cause undefined behaviour.
+        let result = ShardedUmlsExtractor::load_from_artifact(&artifact_path);
+        match result {
+            Ok(_) => panic!("Tampered artifact must be rejected; got Ok"),
+            Err(e) => {
+                let msg = e.to_string();
+                assert!(
+                    msg.contains("checksum mismatch"),
+                    "Expected checksum mismatch error, got: {msg}"
+                );
+            }
+        }
+    }
+
+    /// Verify that a truncated artifact file is rejected with an error, not a panic.
+    #[test]
+    fn test_load_from_artifact_rejects_truncated_file() {
+        let dataset = create_test_dataset();
+        let extractor = ShardedUmlsExtractor::from_dataset(&dataset).unwrap();
+
+        let dir = tempfile::tempdir().unwrap();
+        let artifact_path = dir.path().join("truncated.bin.zst");
+
+        extractor.save_to_artifact(&artifact_path).unwrap();
+
+        let full_data = std::fs::read(&artifact_path).unwrap();
+        // Keep only the first half of the compressed bytes — guaranteed to fail.
+        std::fs::write(&artifact_path, &full_data[..full_data.len() / 2]).unwrap();
+
+        let result = ShardedUmlsExtractor::load_from_artifact(&artifact_path);
+        assert!(
+            result.is_err(),
+            "Truncated artifact must be rejected; got Ok"
+        );
+    }
 }
