@@ -233,8 +233,10 @@ jobs:
           /home/alex/.local/bin/rch exec -- cargo test --release --target ${{ matrix.target }} --workspace --features "self_update/signatures,zlob,terraphim_automata/medical"
 
       - name: Check rustdoc (gate intra-doc link regressions)
+        if: matrix.target == 'x86_64-unknown-linux-gnu'
         run: |
           # --lib excludes binary targets which have no public API surface.
+          # Runs once (x86_64 only): rustdoc output is target-independent for lib crates.
           /home/alex/.local/bin/rch exec -- cargo doc --no-deps --workspace --lib
         env:
           RUSTDOCFLAGS: "-D warnings"
