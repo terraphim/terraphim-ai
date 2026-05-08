@@ -210,12 +210,11 @@ impl TerraphimMatcher {
                 pattern_id += 1;
 
                 // Create a normalized term for this pattern
-                let normalized_term = NormalizedTerm {
-                    id: pattern_id,
-                    value: NormalizedTermValue::from(tool.name.as_str()),
-                    display_value: None,
-                    url: tool.metadata.description.as_ref().map(|d| d.to_string()),
-                };
+                let mut normalized_term =
+                    NormalizedTerm::new(pattern_id, NormalizedTermValue::from(tool.name.as_str()));
+                if let Some(desc) = tool.metadata.description.as_ref() {
+                    normalized_term = normalized_term.with_url(desc.to_string());
+                }
 
                 // Insert the pattern -> normalized term mapping
                 thesaurus.insert(NormalizedTermValue::from(pattern.as_str()), normalized_term);

@@ -22,12 +22,8 @@ fn create_wrangler_thesaurus() -> Thesaurus {
     ];
 
     for (pattern, normalized, id) in wrangler_patterns {
-        let normalized_term = NormalizedTerm {
-            display_value: None,
-            id,
-            value: NormalizedTermValue::from(normalized),
-            url: Some("https://developers.cloudflare.com/workers/wrangler/".to_string()),
-        };
+        let normalized_term = NormalizedTerm::new(id, NormalizedTermValue::from(normalized))
+            .with_url("https://developers.cloudflare.com/workers/wrangler/".to_string());
         thesaurus.insert(NormalizedTermValue::from(pattern), normalized_term);
     }
 
@@ -71,12 +67,8 @@ fn create_comprehensive_thesaurus() -> Thesaurus {
     ];
 
     for (pattern, normalized, id, url) in patterns {
-        let normalized_term = NormalizedTerm {
-            display_value: None,
-            id,
-            value: NormalizedTermValue::from(normalized),
-            url: Some(url.to_string()),
-        };
+        let normalized_term = NormalizedTerm::new(id, NormalizedTermValue::from(normalized))
+            .with_url(url.to_string());
         thesaurus.insert(NormalizedTermValue::from(pattern), normalized_term);
     }
 
@@ -226,22 +218,14 @@ fn test_leftmost_longest_matching() {
     // Add overlapping patterns
     thesaurus.insert(
         NormalizedTermValue::from("npm"),
-        NormalizedTerm {
-            display_value: None,
-            id: 1,
-            value: NormalizedTermValue::from("npm"),
-            url: Some("https://npmjs.com".to_string()),
-        },
+        NormalizedTerm::new(1, NormalizedTermValue::from("npm"))
+            .with_url("https://npmjs.com".to_string()),
     );
 
     thesaurus.insert(
         NormalizedTermValue::from("npm install"),
-        NormalizedTerm {
-            display_value: None,
-            id: 2,
-            value: NormalizedTermValue::from("npm-install"),
-            url: Some("https://npmjs.com/install".to_string()),
-        },
+        NormalizedTerm::new(2, NormalizedTermValue::from("npm-install"))
+            .with_url("https://npmjs.com/install".to_string()),
     );
 
     let text = "npm install packages";
@@ -364,12 +348,8 @@ fn test_terraphim_automata_performance() {
         let pattern = format!("tool_{}", i);
         thesaurus.insert(
             NormalizedTermValue::from(pattern.as_str()),
-            NormalizedTerm {
-                display_value: None,
-                id: i,
-                value: NormalizedTermValue::from(pattern.as_str()),
-                url: Some(format!("https://example.com/{}", i)),
-            },
+            NormalizedTerm::new(i, NormalizedTermValue::from(pattern.as_str()))
+                .with_url(format!("https://example.com/{i}")),
         );
     }
 
