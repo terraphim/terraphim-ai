@@ -55,5 +55,19 @@ Estimated undocumented public items by crate (items lacking `///` before `pub fn
 
 **Total estimated missing docs: ~1,013**
 
+## Update — 2026-05-08T08:52:44Z (v2)
+
+Five additional rustdoc warnings eliminated:
+
+| Crate | File | Warning | Fix |
+|-------|------|---------|-----|
+| `terraphim_persistence` | `lib.rs:15` | Broken link `ConversationPersistence` | Qualified to `conversation::ConversationPersistence` |
+| `terraphim_persistence` | `lib.rs:97` | Unclosed HTML `Arc<DeviceStorage>` | Backtick-escaped |
+| `terraphim_persistence` | `lib.rs:113` | Unclosed HTML `Arc<DeviceStorage>` | Backtick-escaped |
+| `terraphim_rolegraph` | `lib.rs:361` | Broken link `new` | Qualified to `Self::new` |
+| `terraphim_rolegraph` | `lib.rs:436` | Broken link `from_serializable` | Qualified to `Self::from_serializable` |
+
+**Workspace status: zero rustdoc warnings.**
+
 Theme-ID: doc-gap
 @adf:reviewer please action this finding.

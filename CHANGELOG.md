@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Intra-doc link fixes** resolved broken rustdoc links and unclosed HTML tag warnings across `terraphim_persistence` (`ConversationPersistence` qualified path, `Arc<DeviceStorage>` backtick-escaped) and `terraphim_rolegraph` (`Self::new`, `Self::from_serializable` qualified links) — workspace `cargo doc` now produces zero rustdoc warnings
 - **Intra-doc link fixes** resolved broken rustdoc links and unclosed HTML tag warnings across `terraphim_orchestrator`, `terraphim_types`, `terraphim_tracker` — cargo doc now produces zero warnings on all core crates
 - **Unique tempdir** in `test_tool_index_save_and_load` to eliminate cross-run state pollution (Refs #1340)
 - **Module-level rustdoc** added to `terraphim_dsm` and `terraphim_github_runner_server` — the final two binary crates lacking a crate-level `//!` comment
