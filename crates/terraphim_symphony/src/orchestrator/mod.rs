@@ -581,18 +581,31 @@ impl SymphonyOrchestrator {
             None => return,
         };
 
+        let max_attempts = self.config.max_retry_attempts();
+
         // Fetch current candidates
         let candidates = match self.tracker.fetch_candidate_issues().await {
             Ok(c) => c,
             Err(e) => {
                 warn!(issue_id, "retry poll failed: {e}");
-                self.schedule_retry(
-                    issue_id,
-                    &retry_entry.identifier,
-                    retry_entry.attempt + 1,
-                    Some(format!("retry poll failed: {e}")),
-                    false,
-                );
+                let next = retry_entry.attempt + 1;
+                if next >= max_attempts {
+                    warn!(
+                        issue_id,
+                        next,
+                        max_attempts,
+                        "max retry attempts reached on poll failure; releasing claim"
+                    );
+                    self.state.claimed.remove(issue_id);
+                } else {
+                    self.schedule_retry(
+                        issue_id,
+                        &retry_entry.identifier,
+                        next,
+                        Some(format!("retry poll failed: {e}")),
+                        false,
+                    );
+                }
                 return;
             }
         };
@@ -607,14 +620,26 @@ impl SymphonyOrchestrator {
                 self.state.claimed.remove(issue_id);
             }
             Some(issue) => {
+                let next = retry_entry.attempt + 1;
                 if self.state.available_slots() == 0 {
-                    self.schedule_retry(
-                        issue_id,
-                        &issue.identifier,
-                        retry_entry.attempt + 1,
-                        Some("no available orchestrator slots".into()),
-                        false,
-                    );
+                    if next >= max_attempts {
+                        // TLA+ RetryGiveUp: release claim when RetryBound reached
+                        warn!(
+                            issue_id,
+                            next,
+                            max_attempts,
+                            "max retry attempts reached during slot shortage; releasing claim"
+                        );
+                        self.state.claimed.remove(issue_id);
+                    } else {
+                        self.schedule_retry(
+                            issue_id,
+                            &issue.identifier,
+                            next,
+                            Some("no available orchestrator slots".into()),
+                            false,
+                        );
+                    }
                 } else {
                     self.dispatch_issue(issue, Some(retry_entry.attempt)).await;
                 }
