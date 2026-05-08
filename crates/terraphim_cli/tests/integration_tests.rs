@@ -8,7 +8,6 @@ use assert_cmd::Command;
 #[allow(unused_imports)] // Used in test assertions
 use predicates::prelude::*;
 use serial_test::serial;
-use std::process::Command as StdCommand;
 
 /// Get a command for the terraphim-cli binary
 #[allow(deprecated)] // cargo_bin is deprecated but still functional
@@ -16,18 +15,20 @@ fn cli_command() -> Command {
     Command::cargo_bin("terraphim-cli").unwrap()
 }
 
-/// Helper to run CLI and get JSON output
+/// Helper to run CLI and get JSON output.
+///
+/// Uses the pre-built binary via assert_cmd with a 30-second timeout so tests
+/// never hang indefinitely when the service cannot initialise.
 fn run_cli_json(args: &[&str]) -> Result<serde_json::Value, String> {
-    let output = StdCommand::new("cargo")
-        .args(["run", "-p", "terraphim-cli", "--"])
+    let output = cli_command()
         .args(args)
+        .timeout(std::time::Duration::from_secs(30))
         .output()
         .map_err(|e| format!("Failed to execute: {}", e))?;
 
     let stdout = String::from_utf8_lossy(&output.stdout);
 
     if !output.status.success() {
-        // Command failed - return error even if output is valid JSON (error object)
         return Err(format!(
             "Command failed with exit code {:?}: {}",
             output.status.code(),
@@ -692,9 +693,9 @@ mod output_format_tests {
     #[test]
     #[serial]
     fn test_json_pretty_output() {
-        let output = StdCommand::new("cargo")
-            .args(["run", "-p", "terraphim-cli", "--"])
+        let output = cli_command()
             .args(["--format", "json-pretty", "config"])
+            .timeout(std::time::Duration::from_secs(30))
             .output()
             .expect("Failed to execute");
 
@@ -709,9 +710,9 @@ mod output_format_tests {
     #[test]
     #[serial]
     fn test_text_output() {
-        let output = StdCommand::new("cargo")
-            .args(["run", "-p", "terraphim-cli", "--"])
+        let output = cli_command()
             .args(["--format", "text", "config"])
+            .timeout(std::time::Duration::from_secs(30))
             .output()
             .expect("Failed to execute");
 

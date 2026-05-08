@@ -230,7 +230,7 @@ jobs:
           # zlob feature required: fff-search build.rs panics when CI=true without zlob.
           # terraphim_automata/medical required: SHA-256 checksum verification tests for the
           # deserialize_unchecked safety precondition (security finding #1313 P1-1).
-          /home/alex/.local/bin/rch exec -- cargo test --release --target ${{ matrix.target }} --workspace --features "self_update/signatures,zlob,terraphim_automata/medical"
+          /home/alex/.local/bin/rch exec -- cargo test --release --no-fail-fast --target ${{ matrix.target }} --workspace --features "self_update/signatures,zlob,terraphim_automata/medical"
 
       - name: sccache stats
         if: always()
