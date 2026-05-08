@@ -258,8 +258,7 @@ mod tests {
         let compressed = std::fs::read(&path).unwrap();
         let mut raw = zstd::decode_all(&compressed[..]).unwrap();
         // Flip one byte in the first shard (after header)
-        let header_len =
-            u64::from_le_bytes(raw[..8].try_into().unwrap()) as usize;
+        let header_len = u64::from_le_bytes(raw[..8].try_into().unwrap()) as usize;
         raw[8 + header_len] ^= 0xFF;
         let recompressed = zstd::encode_all(&raw[..], 3).unwrap();
         std::fs::write(&path, recompressed).unwrap();
