@@ -1,3 +1,8 @@
+//! HTTP server for the Terraphim AI platform.
+//!
+//! This crate provides the Axum-based web server that exposes the Terraphim
+//! search, document, knowledge-graph, and conversation APIs. It also manages
+//! workflow sessions and WebSocket broadcasting for real-time updates.
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -136,6 +141,7 @@ fn create_document_description(content: &str) -> Option<String> {
 mod api;
 mod error;
 
+/// Workflow session management and WebSocket broadcasting infrastructure.
 pub mod workflows;
 
 pub use api::{
@@ -174,14 +180,24 @@ mod assets {
 #[cfg(not(feature = "embedded-assets"))]
 use assets::Asset as Assets;
 
-// Extended application state that includes workflow management
+/// Extended application state shared across all Axum request handlers.
+///
+/// Holds the global configuration, active workflow sessions, and the
+/// WebSocket broadcaster used for streaming real-time events to clients.
 #[derive(Clone)]
 pub struct AppState {
+    /// Live configuration state including roles, haystacks, and selected role.
     pub config_state: ConfigState,
+    /// Registry of active workflow sessions keyed by session identifier.
     pub workflow_sessions: Arc<workflows::WorkflowSessions>,
+    /// Broadcast channel sender for pushing events to all connected WebSocket clients.
     pub websocket_broadcaster: workflows::WebSocketBroadcaster,
 }
 
+/// Start the Axum HTTP server and bind it to `server_hostname`.
+///
+/// Initialises all role graphs, sets up CORS, mounts API routes, and begins
+/// serving requests. Returns when the server terminates or encounters a fatal error.
 pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigState) -> Result<()> {
     log::info!("Starting axum server");
 
@@ -647,6 +663,10 @@ async fn not_found() -> Response {
     (StatusCode::NOT_FOUND, "404").into_response()
 }
 
+/// Build a minimal Axum router suitable for integration tests.
+///
+/// Creates an in-memory configuration, initialises the necessary state, and
+/// returns a [`Router`] that can be driven by `axum_test` or `tower::ServiceExt`.
 pub async fn build_router_for_tests() -> Router {
     use terraphim_config::ConfigBuilder;
 

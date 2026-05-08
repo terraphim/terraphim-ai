@@ -21,6 +21,7 @@ struct RouteOption {
     speed: String,
 }
 
+/// Axum handler that dispatches a routing-based workflow and returns the result.
 pub async fn execute_routing(
     State(state): State<AppState>,
     Json(request): Json<WorkflowRequest>,

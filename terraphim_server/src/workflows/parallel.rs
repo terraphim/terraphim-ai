@@ -75,6 +75,7 @@ struct ExecutionSummary {
     diversity_score: f64,
 }
 
+/// Axum handler that executes a parallel workflow pattern and returns the aggregated result.
 pub async fn execute_parallel(
     State(state): State<AppState>,
     Json(request): Json<WorkflowRequest>,

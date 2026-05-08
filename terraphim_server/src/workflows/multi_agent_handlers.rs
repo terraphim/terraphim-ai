@@ -1248,6 +1248,7 @@ impl MultiAgentWorkflowExecutor {
         Ok(role.clone())
     }
 
+    /// Execute a demonstration workflow step using a sandboxed VM environment.
     #[allow(clippy::too_many_arguments)]
     pub async fn execute_vm_execution_demo(
         &self,

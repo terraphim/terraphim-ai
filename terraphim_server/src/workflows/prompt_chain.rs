@@ -18,6 +18,7 @@ struct ChainStep {
     duration_ms: u64,
 }
 
+/// Axum handler that executes a sequential prompt-chain workflow and returns the final result.
 pub async fn execute_prompt_chain(
     State(state): State<AppState>,
     Json(request): Json<WorkflowRequest>,

@@ -8,6 +8,7 @@ use super::{
 };
 use crate::AppState;
 
+/// Axum handler that runs a demonstration workflow step inside a sandboxed VM environment.
 pub async fn execute_vm_execution_demo(
     State(state): State<AppState>,
     Json(request): Json<WorkflowRequest>,

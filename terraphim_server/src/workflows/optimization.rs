@@ -160,6 +160,7 @@ struct PlateauAnalysis {
     break_strategy: String,
 }
 
+/// Axum handler that executes an optimisation workflow and returns the result.
 pub async fn execute_optimization(
     State(state): State<AppState>,
     Json(request): Json<WorkflowRequest>,

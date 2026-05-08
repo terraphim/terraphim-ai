@@ -166,6 +166,7 @@ struct ExecutionEvent {
     metadata: serde_json::Value,
 }
 
+/// Axum handler that executes an orchestration workflow and returns the result.
 pub async fn execute_orchestration(
     State(state): State<AppState>,
     Json(request): Json<WorkflowRequest>,

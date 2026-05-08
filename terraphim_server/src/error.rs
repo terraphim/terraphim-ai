@@ -6,21 +6,30 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use terraphim_service::error::{CommonError, ErrorCategory, TerraphimError};
 
+/// High-level outcome indicator returned in every API response payload.
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy)]
 pub enum Status {
+    /// The operation completed successfully.
     #[serde(rename = "success")]
     Success,
+    /// The operation partially succeeded; some items may have failed.
     #[serde(rename = "partial_success")]
     PartialSuccess,
+    /// The operation failed; see the accompanying `message` field for details.
     #[serde(rename = "error")]
     Error,
 }
 
+/// JSON body returned for failed API requests.
 #[derive(Debug, Serialize)]
 pub struct ErrorResponse {
+    /// Always `Status::Error` for this response type.
     pub status: Status,
+    /// Human-readable description of what went wrong.
     pub message: String,
+    /// Machine-readable error category (e.g. `"validation"`, `"network"`).
     pub category: Option<String>,
+    /// Whether the caller may safely retry the request.
     pub recoverable: Option<bool>,
 }
 
@@ -104,4 +113,5 @@ where
     }
 }
 
+/// Convenience alias for handler return types; errors are automatically converted to [`ApiError`].
 pub type Result<T> = std::result::Result<T, ApiError>;
