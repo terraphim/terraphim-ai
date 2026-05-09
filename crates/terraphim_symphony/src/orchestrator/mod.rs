@@ -581,18 +581,30 @@ impl SymphonyOrchestrator {
             None => return,
         };
 
+        let max_retries = self.config.max_retry_attempts();
+
         // Fetch current candidates
         let candidates = match self.tracker.fetch_candidate_issues().await {
             Ok(c) => c,
             Err(e) => {
                 warn!(issue_id, "retry poll failed: {e}");
-                self.schedule_retry(
-                    issue_id,
-                    &retry_entry.identifier,
-                    retry_entry.attempt + 1,
-                    Some(format!("retry poll failed: {e}")),
-                    false,
-                );
+                let next_attempt = retry_entry.attempt + 1;
+                if next_attempt > max_retries {
+                    warn!(
+                        issue_id,
+                        attempt = retry_entry.attempt,
+                        "max retries exhausted after poll failure, releasing claim"
+                    );
+                    self.state.claimed.remove(issue_id);
+                } else {
+                    self.schedule_retry(
+                        issue_id,
+                        &retry_entry.identifier,
+                        next_attempt,
+                        Some(format!("retry poll failed: {e}")),
+                        false,
+                    );
+                }
                 return;
             }
         };
@@ -608,13 +620,23 @@ impl SymphonyOrchestrator {
             }
             Some(issue) => {
                 if self.state.available_slots() == 0 {
-                    self.schedule_retry(
-                        issue_id,
-                        &issue.identifier,
-                        retry_entry.attempt + 1,
-                        Some("no available orchestrator slots".into()),
-                        false,
-                    );
+                    let next_attempt = retry_entry.attempt + 1;
+                    if next_attempt > max_retries {
+                        warn!(
+                            issue_id,
+                            attempt = retry_entry.attempt,
+                            "max retries exhausted waiting for a slot, releasing claim"
+                        );
+                        self.state.claimed.remove(issue_id);
+                    } else {
+                        self.schedule_retry(
+                            issue_id,
+                            &issue.identifier,
+                            next_attempt,
+                            Some("no available orchestrator slots".into()),
+                            false,
+                        );
+                    }
                 } else {
                     self.dispatch_issue(issue, Some(retry_entry.attempt)).await;
                 }
@@ -794,5 +816,245 @@ impl SymphonyOrchestrator {
         }
 
         self.state.claimed.clear();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::ServiceConfig;
+    use crate::config::workflow::WorkflowDefinition;
+    use crate::error::SymphonyError;
+    use crate::runner::{TokenCounts, WorkerOutcome};
+    use crate::tracker::{Issue, IssueTracker};
+    use crate::workspace::WorkspaceManager;
+    use async_trait::async_trait;
+    use chrono::Utc;
+
+    // ---------------------------------------------------------------------------
+    // Test tracker implementations (real trait impls, not mocks)
+    // ---------------------------------------------------------------------------
+
+    /// A tracker that always returns a fixed list of issues.
+    struct OkTracker {
+        issues: Vec<Issue>,
+    }
+
+    impl OkTracker {
+        fn with_issue(id: &str, identifier: &str) -> Self {
+            Self {
+                issues: vec![Issue {
+                    id: id.into(),
+                    identifier: identifier.into(),
+                    title: "Test issue".into(),
+                    description: None,
+                    priority: None,
+                    state: "Todo".into(),
+                    branch_name: None,
+                    url: None,
+                    labels: vec![],
+                    blocked_by: vec![],
+                    pagerank_score: None,
+                    created_at: Some(Utc::now()),
+                    updated_at: Some(Utc::now()),
+                }],
+            }
+        }
+    }
+
+    #[async_trait]
+    impl IssueTracker for OkTracker {
+        async fn fetch_candidate_issues(&self) -> crate::Result<Vec<Issue>> {
+            Ok(self.issues.clone())
+        }
+        async fn fetch_issue_states_by_ids(&self, _ids: &[String]) -> crate::Result<Vec<Issue>> {
+            Ok(self.issues.clone())
+        }
+        async fn fetch_issues_by_states(&self, _states: &[String]) -> crate::Result<Vec<Issue>> {
+            Ok(vec![])
+        }
+    }
+
+    /// A tracker that always returns an error on fetch_candidate_issues.
+    struct ErrTracker;
+
+    #[async_trait]
+    impl IssueTracker for ErrTracker {
+        async fn fetch_candidate_issues(&self) -> crate::Result<Vec<Issue>> {
+            Err(SymphonyError::Tracker {
+                kind: "test".into(),
+                message: "simulated poll failure".into(),
+            })
+        }
+        async fn fetch_issue_states_by_ids(&self, _ids: &[String]) -> crate::Result<Vec<Issue>> {
+            Ok(vec![])
+        }
+        async fn fetch_issues_by_states(&self, _states: &[String]) -> crate::Result<Vec<Issue>> {
+            Ok(vec![])
+        }
+    }
+
+    // ---------------------------------------------------------------------------
+    // Helpers
+    // ---------------------------------------------------------------------------
+
+    fn config_from_yaml(yaml: &str) -> ServiceConfig {
+        let content = format!("---\n{yaml}\n---\nPrompt body.");
+        let workflow = WorkflowDefinition::parse(&content).unwrap();
+        ServiceConfig::from_workflow(workflow)
+    }
+
+    fn config_with_workspace(extra_yaml: &str) -> (ServiceConfig, tempfile::TempDir) {
+        let tmp = tempfile::tempdir().unwrap();
+        let yaml = format!(
+            "workspace:\n  root: {}\n{}",
+            tmp.path().display(),
+            extra_yaml
+        );
+        (config_from_yaml(&yaml), tmp)
+    }
+
+    fn make_orchestrator(
+        config: ServiceConfig,
+        tracker: Box<dyn IssueTracker>,
+    ) -> SymphonyOrchestrator {
+        let workspace_mgr = WorkspaceManager::new(&config).unwrap();
+        SymphonyOrchestrator::new(config, tracker, workspace_mgr)
+    }
+
+    fn dummy_retry_entry(issue_id: &str, identifier: &str, attempt: u32) -> state::RetryEntry {
+        state::RetryEntry {
+            issue_id: issue_id.into(),
+            identifier: identifier.into(),
+            attempt,
+            due_at: tokio::time::Instant::now(),
+            timer_handle: tokio::spawn(async {}),
+            error: None,
+        }
+    }
+
+    fn dummy_running_entry(issue_id: &str) -> state::RunningEntry {
+        let issue = Issue {
+            id: issue_id.into(),
+            identifier: format!("DUMMY-{issue_id}"),
+            title: "dummy".into(),
+            description: None,
+            priority: None,
+            state: "In Progress".into(),
+            branch_name: None,
+            url: None,
+            labels: vec![],
+            blocked_by: vec![],
+            pagerank_score: None,
+            created_at: None,
+            updated_at: None,
+        };
+        state::RunningEntry {
+            issue,
+            session: state::LiveSession::default(),
+            started_at: Utc::now(),
+            retry_attempt: None,
+            worker_handle: tokio::spawn(async {
+                WorkerOutcome::Normal {
+                    turn_count: 0,
+                    tokens: TokenCounts::default(),
+                }
+            }),
+        }
+    }
+
+    // ---------------------------------------------------------------------------
+    // RetryBound regression tests (Refs #251, #1389)
+    // ---------------------------------------------------------------------------
+
+    /// Slot exhaustion at max_retries must release the claim (RetryGiveUp path).
+    #[tokio::test]
+    async fn slot_exhaustion_at_max_retries_releases_claim() {
+        let (config, _tmp) =
+            config_with_workspace("agent:\n  max_retry_attempts: 3\n  max_concurrent_agents: 1");
+        let tracker = OkTracker::with_issue("issue-1", "MT-1");
+        let mut orch = make_orchestrator(config, Box::new(tracker));
+
+        // Saturate the single slot so available_slots() == 0
+        orch.state
+            .running
+            .insert("dummy".into(), dummy_running_entry("dummy"));
+        assert_eq!(orch.state.available_slots(), 0);
+
+        // Claim the issue and place a retry entry at the max attempt boundary
+        orch.state.claimed.insert("issue-1".into());
+        orch.state
+            .retry_attempts
+            .insert("issue-1".into(), dummy_retry_entry("issue-1", "MT-1", 3));
+
+        orch.on_retry_timer("issue-1").await;
+
+        // RetryBound invariant: claim must be released, no further retry scheduled
+        assert!(
+            !orch.state.claimed.contains("issue-1"),
+            "claim must be released at max retries"
+        );
+        assert!(
+            !orch.state.retry_attempts.contains_key("issue-1"),
+            "no retry entry should remain"
+        );
+    }
+
+    /// Poll failure at max_retries must release the claim.
+    #[tokio::test]
+    async fn poll_failure_at_max_retries_releases_claim() {
+        let (config, _tmp) = config_with_workspace("agent:\n  max_retry_attempts: 3");
+        let tracker = ErrTracker;
+        let mut orch = make_orchestrator(config, Box::new(tracker));
+
+        orch.state.claimed.insert("issue-1".into());
+        orch.state
+            .retry_attempts
+            .insert("issue-1".into(), dummy_retry_entry("issue-1", "MT-1", 3));
+
+        orch.on_retry_timer("issue-1").await;
+
+        assert!(
+            !orch.state.claimed.contains("issue-1"),
+            "claim must be released after poll failure at max retries"
+        );
+        assert!(!orch.state.retry_attempts.contains_key("issue-1"));
+    }
+
+    /// Slot exhaustion below max_retries must reschedule (not release the claim).
+    #[tokio::test]
+    async fn slot_exhaustion_below_max_retries_reschedules() {
+        let (config, _tmp) =
+            config_with_workspace("agent:\n  max_retry_attempts: 10\n  max_concurrent_agents: 1");
+        let tracker = OkTracker::with_issue("issue-1", "MT-1");
+        let mut orch = make_orchestrator(config, Box::new(tracker));
+
+        // Saturate the single slot
+        orch.state
+            .running
+            .insert("dummy".into(), dummy_running_entry("dummy"));
+        assert_eq!(orch.state.available_slots(), 0);
+
+        orch.state.claimed.insert("issue-1".into());
+        // attempt 2 is well below max_retries (10)
+        orch.state
+            .retry_attempts
+            .insert("issue-1".into(), dummy_retry_entry("issue-1", "MT-1", 2));
+
+        orch.on_retry_timer("issue-1").await;
+
+        // Claim must still be held and a new retry must be scheduled at attempt 3
+        assert!(
+            orch.state.claimed.contains("issue-1"),
+            "claim must be kept below max retries"
+        );
+        assert!(
+            orch.state.retry_attempts.contains_key("issue-1"),
+            "a new retry must be scheduled"
+        );
+        assert_eq!(
+            orch.state.retry_attempts["issue-1"].attempt, 3,
+            "next retry attempt must be incremented"
+        );
     }
 }

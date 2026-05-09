@@ -181,6 +181,15 @@ impl ServiceConfig {
             .unwrap_or(300_000)
     }
 
+    /// Maximum number of retry attempts before giving up on an issue.
+    ///
+    /// When an issue exceeds this count, the claim is released and retrying stops.
+    /// Corresponds to `agent.max_retry_attempts` in WORKFLOW.md front matter.
+    /// Default: 10.
+    pub fn max_retry_attempts(&self) -> u32 {
+        self.get_u64(&["agent", "max_retry_attempts"]).unwrap_or(10) as u32
+    }
+
     /// Per-state concurrency limits.
     pub fn max_concurrent_agents_by_state(&self) -> HashMap<String, usize> {
         let mut map = HashMap::new();
@@ -522,6 +531,18 @@ mod tests {
     fn max_retry_backoff_default() {
         let cfg = config_from_yaml("tracker:\n  kind: linear");
         assert_eq!(cfg.max_retry_backoff_ms(), 300_000);
+    }
+
+    #[test]
+    fn max_retry_attempts_default() {
+        let cfg = config_from_yaml("tracker:\n  kind: gitea");
+        assert_eq!(cfg.max_retry_attempts(), 10);
+    }
+
+    #[test]
+    fn max_retry_attempts_custom() {
+        let cfg = config_from_yaml("agent:\n  max_retry_attempts: 5");
+        assert_eq!(cfg.max_retry_attempts(), 5);
     }
 
     #[test]
