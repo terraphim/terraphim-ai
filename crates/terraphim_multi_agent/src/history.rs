@@ -43,6 +43,7 @@ pub struct CommandRecord {
 }
 
 impl CommandRecord {
+    /// Creates a new command record for the given agent and input.
     pub fn new(agent_id: AgentId, input: CommandInput) -> Self {
         Self {
             command_id: Uuid::new_v4(),
@@ -145,6 +146,7 @@ pub struct CommandInput {
 }
 
 impl CommandInput {
+    /// Creates a new command input with default source (`User`), normal priority, and no timeout.
     pub fn new(text: String, command_type: CommandType) -> Self {
         Self {
             text,
@@ -156,21 +158,25 @@ impl CommandInput {
         }
     }
 
+    /// Sets the parameters map for this command.
     pub fn with_parameters(mut self, parameters: HashMap<String, serde_json::Value>) -> Self {
         self.parameters = parameters;
         self
     }
 
+    /// Sets the originating source of this command.
     pub fn with_source(mut self, source: CommandSource) -> Self {
         self.source = source;
         self
     }
 
+    /// Sets the execution priority for this command.
     pub fn with_priority(mut self, priority: CommandPriority) -> Self {
         self.priority = priority;
         self
     }
 
+    /// Sets a hard timeout for command execution in milliseconds.
     pub fn with_timeout(mut self, timeout_ms: u64) -> Self {
         self.timeout_ms = Some(timeout_ms);
         self
@@ -268,6 +274,7 @@ pub struct ExecutionStep {
 }
 
 impl ExecutionStep {
+    /// Creates a new execution step in `Running` state.
     pub fn new(name: String) -> Self {
         Self {
             step_id: Uuid::new_v4(),
@@ -281,6 +288,7 @@ impl ExecutionStep {
         }
     }
 
+    /// Transitions this step to `Completed`, recording output and elapsed duration.
     pub fn complete(mut self, output: String, duration_ms: u64) -> Self {
         self.output = Some(output);
         self.duration_ms = duration_ms;
@@ -288,6 +296,7 @@ impl ExecutionStep {
         self
     }
 
+    /// Transitions this step to `Failed`, recording the error and elapsed duration.
     pub fn fail(mut self, error: String, duration_ms: u64) -> Self {
         self.error = Some(error);
         self.duration_ms = duration_ms;
@@ -324,6 +333,7 @@ pub struct CommandOutput {
 }
 
 impl CommandOutput {
+    /// Creates a plain-text output with no structured data or sources.
     pub fn new(text: String) -> Self {
         Self {
             text,
@@ -335,17 +345,20 @@ impl CommandOutput {
         }
     }
 
+    /// Attaches structured JSON data, switching the output type to `Structured`.
     pub fn with_data(mut self, data: serde_json::Value) -> Self {
         self.data = Some(data);
         self.output_type = OutputType::Structured;
         self
     }
 
+    /// Sets the confidence score, clamped to `[0.0, 1.0]`.
     pub fn with_confidence(mut self, confidence: f64) -> Self {
         self.confidence = Some(confidence.clamp(0.0, 1.0));
         self
     }
 
+    /// Sets the list of source references used to produce this output.
     pub fn with_sources(mut self, sources: Vec<String>) -> Self {
         self.sources = sources;
         self
@@ -380,6 +393,7 @@ pub struct CommandError {
 }
 
 impl CommandError {
+    /// Creates a non-recoverable error of the given type with a descriptive message.
     pub fn new(error_type: ErrorType, message: String) -> Self {
         Self {
             error_type,
@@ -391,21 +405,25 @@ impl CommandError {
         }
     }
 
+    /// Attaches an error code string (e.g. an HTTP status or provider-specific code).
     pub fn with_code(mut self, code: String) -> Self {
         self.code = Some(code);
         self
     }
 
+    /// Attaches additional details or a stack trace.
     pub fn with_details(mut self, details: String) -> Self {
         self.details = Some(details);
         self
     }
 
+    /// Marks this error as recoverable so callers may attempt retry logic.
     pub fn recoverable(mut self) -> Self {
         self.recoverable = true;
         self
     }
 
+    /// Sets the list of suggested recovery actions for this error.
     pub fn with_suggestions(mut self, suggestions: Vec<String>) -> Self {
         self.suggestions = suggestions;
         self
@@ -455,6 +473,7 @@ pub struct HistoryContextSnapshot {
 }
 
 impl HistoryContextSnapshot {
+    /// Creates an empty context snapshot for the given agent.
     pub fn empty(agent_id: AgentId) -> Self {
         Self {
             agent_id,
@@ -514,6 +533,7 @@ pub struct CommandHistory {
 }
 
 impl CommandHistory {
+    /// Creates a new command history for the given agent, capped at `max_records` entries.
     pub fn new(agent_id: AgentId, max_records: usize) -> Self {
         Self {
             agent_id,
@@ -642,19 +662,30 @@ impl CommandHistory {
     }
 }
 
-/// Statistics about command history
+/// Aggregate statistics computed over a [`CommandHistory`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CommandStatistics {
+    /// Total number of commands recorded.
     pub total_commands: u64,
+    /// Number of commands that completed without error.
     pub successful_commands: u64,
+    /// Number of commands that completed with an error.
     pub failed_commands: u64,
+    /// Fraction of commands that succeeded (`successful / total`).
     pub success_rate: f64,
+    /// Mean quality score across all commands that have one.
     pub average_quality_score: f64,
+    /// Sum of all command durations in milliseconds.
     pub total_duration_ms: u64,
+    /// Mean command duration in milliseconds.
     pub average_duration_ms: u64,
+    /// Total LLM cost in US dollars across all commands.
     pub total_cost_usd: f64,
+    /// Mean LLM cost per command in US dollars.
     pub average_cost_per_command: f64,
+    /// Total tokens consumed across all commands.
     pub total_tokens: u64,
+    /// Mean tokens consumed per command.
     pub average_tokens_per_command: f64,
 }
 

@@ -24,6 +24,7 @@ pub struct LlmMessage {
 }
 
 impl LlmMessage {
+    /// Creates a system-role message.
     pub fn system(content: String) -> Self {
         Self {
             role: MessageRole::System,
@@ -31,6 +32,7 @@ impl LlmMessage {
         }
     }
 
+    /// Creates a user-role message.
     pub fn user(content: String) -> Self {
         Self {
             role: MessageRole::User,
@@ -38,6 +40,7 @@ impl LlmMessage {
         }
     }
 
+    /// Creates an assistant-role message.
     pub fn assistant(content: String) -> Self {
         Self {
             role: MessageRole::Assistant,
@@ -45,6 +48,7 @@ impl LlmMessage {
         }
     }
 
+    /// Creates a tool-result message.
     pub fn tool(content: String) -> Self {
         Self {
             role: MessageRole::Tool,
@@ -63,6 +67,7 @@ pub struct LlmRequest {
 }
 
 impl LlmRequest {
+    /// Creates a new request with the given messages and no temperature or token limit set.
     pub fn new(messages: Vec<LlmMessage>) -> Self {
         Self {
             messages,
@@ -72,16 +77,19 @@ impl LlmRequest {
         }
     }
 
+    /// Sets the sampling temperature for this request.
     pub fn with_temperature(mut self, temperature: f32) -> Self {
         self.temperature = Some(temperature);
         self
     }
 
+    /// Sets the maximum number of output tokens for this request.
     pub fn with_max_tokens(mut self, max_tokens: u64) -> Self {
         self.max_tokens = Some(max_tokens);
         self
     }
 
+    /// Inserts a key-value pair into the request metadata map.
     pub fn with_metadata(mut self, key: String, value: String) -> Self {
         self.metadata.insert(key, value);
         self
@@ -97,6 +105,7 @@ pub struct TokenUsage {
 }
 
 impl TokenUsage {
+    /// Creates token usage from separate input and output counts; total is computed automatically.
     pub fn new(input_tokens: u64, output_tokens: u64) -> Self {
         Self {
             input_tokens,
@@ -105,6 +114,7 @@ impl TokenUsage {
         }
     }
 
+    /// Returns a zero-usage instance (no tokens consumed).
     pub fn zero() -> Self {
         Self {
             input_tokens: 0,

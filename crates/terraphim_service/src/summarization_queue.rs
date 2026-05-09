@@ -21,6 +21,7 @@ impl Default for TaskId {
 }
 
 impl TaskId {
+    /// Generates a new random task identifier.
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
@@ -80,6 +81,7 @@ pub enum TaskStatus {
 }
 
 impl TaskStatus {
+    /// Returns `true` if this status is a terminal state (Completed, Failed, or Cancelled).
     pub fn is_terminal(&self) -> bool {
         matches!(
             self,
@@ -87,10 +89,12 @@ impl TaskStatus {
         )
     }
 
+    /// Returns `true` if the task is currently being processed.
     pub fn is_processing(&self) -> bool {
         matches!(self, TaskStatus::Processing { .. })
     }
 
+    /// Returns `true` if the task is queued and waiting.
     pub fn is_pending(&self) -> bool {
         matches!(self, TaskStatus::Pending { .. })
     }
@@ -124,6 +128,7 @@ pub struct SummarizationTask {
 }
 
 impl SummarizationTask {
+    /// Creates a new summarization task with default priority, up to 3 retries.
     pub fn new(document: Document, role: Role) -> Self {
         Self {
             id: TaskId::new(),
@@ -140,44 +145,53 @@ impl SummarizationTask {
         }
     }
 
+    /// Sets the scheduling priority for this task.
     pub fn with_priority(mut self, priority: Priority) -> Self {
         self.priority = priority;
         self
     }
 
+    /// Overrides the maximum number of retry attempts (default is 3).
     pub fn with_max_retries(mut self, max_retries: u32) -> Self {
         self.max_retries = max_retries;
         self
     }
 
+    /// Caps the generated summary at the given character length.
     pub fn with_max_summary_length(mut self, length: usize) -> Self {
         self.max_summary_length = Some(length);
         self
     }
 
+    /// When `true`, regenerates the summary even if one already exists.
     pub fn with_force_regenerate(mut self, force: bool) -> Self {
         self.force_regenerate = force;
         self
     }
 
+    /// Sets a webhook URL to notify when the task completes.
     pub fn with_callback_url(mut self, url: String) -> Self {
         self.callback_url = Some(url);
         self
     }
 
+    /// Attaches a global config used for LLM fallback selection.
     pub fn with_config(mut self, config: Config) -> Self {
         self.config = Some(config);
         self
     }
 
+    /// Returns `true` if the task has not yet exhausted its retry budget.
     pub fn can_retry(&self) -> bool {
         self.retry_count < self.max_retries
     }
 
+    /// Increments the retry counter by one.
     pub fn increment_retry(&mut self) {
         self.retry_count += 1;
     }
 
+    /// Returns the effective maximum summary length, defaulting to 250 if unset.
     pub fn get_summary_length(&self) -> usize {
         self.max_summary_length.unwrap_or(250)
     }
