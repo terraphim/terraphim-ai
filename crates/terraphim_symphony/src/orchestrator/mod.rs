@@ -581,18 +581,30 @@ impl SymphonyOrchestrator {
             None => return,
         };
 
+        let max_retries = self.config.max_retry_attempts();
+
         // Fetch current candidates
         let candidates = match self.tracker.fetch_candidate_issues().await {
             Ok(c) => c,
             Err(e) => {
                 warn!(issue_id, "retry poll failed: {e}");
-                self.schedule_retry(
-                    issue_id,
-                    &retry_entry.identifier,
-                    retry_entry.attempt + 1,
-                    Some(format!("retry poll failed: {e}")),
-                    false,
-                );
+                let next_attempt = retry_entry.attempt + 1;
+                if next_attempt > max_retries {
+                    warn!(
+                        issue_id,
+                        attempt = retry_entry.attempt,
+                        "max retries exhausted after poll failure, releasing claim"
+                    );
+                    self.state.claimed.remove(issue_id);
+                } else {
+                    self.schedule_retry(
+                        issue_id,
+                        &retry_entry.identifier,
+                        next_attempt,
+                        Some(format!("retry poll failed: {e}")),
+                        false,
+                    );
+                }
                 return;
             }
         };
@@ -608,13 +620,23 @@ impl SymphonyOrchestrator {
             }
             Some(issue) => {
                 if self.state.available_slots() == 0 {
-                    self.schedule_retry(
-                        issue_id,
-                        &issue.identifier,
-                        retry_entry.attempt + 1,
-                        Some("no available orchestrator slots".into()),
-                        false,
-                    );
+                    let next_attempt = retry_entry.attempt + 1;
+                    if next_attempt > max_retries {
+                        warn!(
+                            issue_id,
+                            attempt = retry_entry.attempt,
+                            "max retries exhausted waiting for a slot, releasing claim"
+                        );
+                        self.state.claimed.remove(issue_id);
+                    } else {
+                        self.schedule_retry(
+                            issue_id,
+                            &issue.identifier,
+                            next_attempt,
+                            Some("no available orchestrator slots".into()),
+                            false,
+                        );
+                    }
                 } else {
                     self.dispatch_issue(issue, Some(retry_entry.attempt)).await;
                 }
