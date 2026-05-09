@@ -97,6 +97,7 @@ pub mod shared_learning;
 pub mod capability;
 pub use capability::*;
 
+/// Relevance scoring algorithms (BM25 variants, name scoring, common utilities).
 pub mod score;
 
 // MCP Tool types for self-learning system
@@ -259,11 +260,12 @@ impl<'de> Deserialize<'de> for RoleName {
 pub struct NormalizedTermValue(String);
 
 impl NormalizedTermValue {
+    /// Creates a new `NormalizedTermValue` by trimming and lower-casing `term`.
     pub fn new(term: String) -> Self {
         let value = term.trim().to_lowercase();
         Self(value)
     }
-    // convert to &str
+    /// Returns the normalised term as a string slice.
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -465,28 +467,41 @@ impl Display for Concept {
     }
 }
 
+/// Classifies the role of a document within the knowledge graph.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DocumentType {
+    /// A knowledge-graph entry (concept definition, thesaurus node).
     #[default]
     KgEntry,
+    /// A general indexable document (article, file, web page).
     Document,
+    /// A configuration document parsed for directives and routes.
     ConfigDocument,
 }
 
+/// Specifies which LLM provider and model to use for a given document or task.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RouteDirective {
+    /// Provider identifier (e.g. `openrouter`, `ollama`).
     pub provider: String,
+    /// Model name as accepted by the provider's API.
     pub model: String,
     /// CLI action template with `{{ model }}` and `{{ prompt }}` placeholders.
     #[serde(default)]
     pub action: Option<String>,
 }
 
+/// Parsed front-matter directives extracted from markdown knowledge-graph files.
+///
+/// These directives control how a document is classified, routed to an LLM,
+/// and prioritised within the knowledge graph.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MarkdownDirectives {
+    /// Document classification: kg_entry, document, or config_document.
     #[serde(default)]
     pub doc_type: DocumentType,
+    /// Synonym terms that map to the same concept in the thesaurus.
     #[serde(default)]
     pub synonyms: Vec<String>,
     /// Primary route (first in the list). Kept for backward compatibility.
@@ -496,10 +511,13 @@ pub struct MarkdownDirectives {
     /// Each route may have an `action::` template for CLI invocation.
     #[serde(default)]
     pub routes: Vec<RouteDirective>,
+    /// Optional priority weight (0–255); higher values surface the document first.
     #[serde(default)]
     pub priority: Option<u8>,
+    /// Optional event trigger that activates this document's routing rules.
     #[serde(default)]
     pub trigger: Option<String>,
+    /// When `true`, the document is always included regardless of relevance score.
     #[serde(default)]
     pub pinned: bool,
     /// First `# Heading` from the markdown file, preserving original case.
@@ -621,6 +639,10 @@ impl Document {
     }
 }
 
+/// A relationship between two concepts in the knowledge graph.
+///
+/// Edges accumulate co-occurrence counts across indexed documents and
+/// are used to compute graph-based relevance scores.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Edge {
     /// ID of the edge (u64)
@@ -636,6 +658,7 @@ pub struct Edge {
 }
 
 impl Edge {
+    /// Creates a new edge with `id`, seeded by a single document occurrence.
     pub fn new(id: u64, document_id: String) -> Self {
         let mut doc_hash = AHashMap::new();
         doc_hash.insert(document_id, 1);
@@ -747,6 +770,7 @@ impl Thesaurus {
         self.data.get(key)
     }
 
+    /// Returns an iterator over all normalised term keys in the thesaurus.
     pub fn keys(
         &self,
     ) -> std::collections::hash_map::Keys<'_, NormalizedTermValue, NormalizedTerm> {
@@ -932,9 +956,11 @@ pub struct IndexedDocument {
 }
 
 impl IndexedDocument {
+    /// Serialises the document to a JSON string.
     pub fn to_json_string(&self) -> Result<String, serde_json::Error> {
         serde_json::to_string(&self)
     }
+    /// Creates an `IndexedDocument` from a `Document`, zeroing rank and matched edges.
     pub fn from_document(document: Document) -> Self {
         IndexedDocument {
             id: document.id,
@@ -1215,14 +1241,17 @@ pub enum KnowledgeGraphInputType {
 pub struct ConversationId(pub String);
 
 impl ConversationId {
+    /// Generates a new random `ConversationId` (UUID v4).
     pub fn new() -> Self {
         Self(uuid::Uuid::new_v4().to_string())
     }
 
+    /// Creates a `ConversationId` from an existing string identifier.
     pub fn from_string(id: String) -> Self {
         Self(id)
     }
 
+    /// Returns the identifier as a string slice.
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -1268,14 +1297,17 @@ pub enum ContextType {
 pub struct MessageId(pub String);
 
 impl MessageId {
+    /// Generates a new random `MessageId` (UUID v4).
     pub fn new() -> Self {
         Self(uuid::Uuid::new_v4().to_string())
     }
 
+    /// Creates a `MessageId` from an existing string identifier.
     pub fn from_string(id: String) -> Self {
         Self(id)
     }
 
+    /// Returns the identifier as a string slice.
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -1569,6 +1601,7 @@ pub struct KGIndexInfo {
     pub version: Option<String>,
 }
 
+/// A single message within a conversation, carrying content, role, and context.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
@@ -1782,6 +1815,7 @@ pub struct ContextHistory {
 }
 
 impl ContextHistory {
+    /// Creates an empty `ContextHistory` capped at `max_entries`.
     pub fn new(max_entries: usize) -> Self {
         Self {
             used_contexts: Vec::new(),
@@ -2262,6 +2296,7 @@ pub struct MultiAgentContext {
 }
 
 impl MultiAgentContext {
+    /// Creates a new `MultiAgentContext` with a fresh session ID and empty state.
     pub fn new() -> Self {
         let now = chrono::Utc::now();
         Self {

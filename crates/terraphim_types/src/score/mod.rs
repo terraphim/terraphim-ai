@@ -1,6 +1,14 @@
+//! Relevance scoring algorithms for document search.
+//!
+//! Provides BM25 variants, name-based scoring, and common scoring utilities
+//! used by the search layer to rank documents against a query.
+/// BM25F and BM25Plus scoring implementations.
 pub mod bm25;
+/// Okapi BM25, TF-IDF, Jaccard, and query-ratio scorers.
 pub mod bm25_additional;
+/// Shared scoring traits and helpers.
 pub mod common;
+/// Query scorer name resolution.
 pub mod names;
 mod scored;
 
@@ -16,6 +24,9 @@ use serde::{Serialize, Serializer};
 
 use crate::Document;
 
+/// Scores and sorts `documents` according to the algorithm specified in `query`.
+///
+/// Falls back to the original order if scoring fails.
 pub fn sort_documents(query: &Query, documents: Vec<Document>) -> Vec<Document> {
     let mut scorer = Scorer::new().with_similarity(query.similarity);
 
@@ -62,6 +73,7 @@ pub fn sort_documents(query: &Query, documents: Vec<Document>) -> Vec<Document> 
     }
 }
 
+/// Orchestrates relevance scoring for a set of documents against a query.
 #[derive(Debug, Default)]
 pub struct Scorer {
     similarity: Similarity,
@@ -69,20 +81,24 @@ pub struct Scorer {
 }
 
 impl Scorer {
+    /// Creates a new `Scorer` with default settings.
     pub fn new() -> Scorer {
         Scorer::default()
     }
 
+    /// Sets the string-similarity metric used for title-based fallback scoring.
     pub fn with_similarity(mut self, similarity: Similarity) -> Scorer {
         self.similarity = similarity;
         self
     }
 
+    /// Attaches a concrete scoring implementation (e.g. BM25 scorer).
     pub fn with_scorer(mut self, scorer: Box<dyn std::any::Any>) -> Scorer {
         self.scorer = Some(scorer);
         self
     }
 
+    /// Scores `documents`, trims to `query.size`, normalises, and returns results.
     pub fn score(
         &mut self,
         query: &Query,
@@ -171,21 +187,29 @@ impl Scorer {
     }
 }
 
+/// Errors that can occur during document scoring.
 #[derive(Debug, thiserror::Error)]
 pub enum ScoreError {
+    /// A scorer-specific error with a descriptive message.
     #[error("scoring error: {0}")]
     Scoring(String),
 }
 
+/// A search query with scoring and similarity configuration.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Query {
+    /// The query term to score documents against.
     pub name: String,
+    /// Which relevance algorithm to apply.
     pub name_scorer: QueryScorer,
+    /// String-similarity metric for title-based fallback.
     pub similarity: Similarity,
+    /// Maximum number of results to return.
     pub size: usize,
 }
 
 impl Query {
+    /// Creates a `Query` for `name` with default scorer, similarity, and size (30).
     pub fn new(name: &str) -> Query {
         Query {
             name: name.to_string(),
@@ -195,15 +219,18 @@ impl Query {
         }
     }
 
+    /// Returns `true` if the query name is empty.
     pub fn is_empty(&self) -> bool {
         self.name.is_empty()
     }
 
+    /// Sets the relevance scoring algorithm.
     pub fn name_scorer(mut self, scorer: QueryScorer) -> Query {
         self.name_scorer = scorer;
         self
     }
 
+    /// Sets the string-similarity metric.
     pub fn similarity(mut self, sim: Similarity) -> Query {
         self.similarity = sim;
         self
@@ -226,16 +253,22 @@ impl fmt::Display for Query {
     }
 }
 
+/// String-similarity metric used to rank documents by title when no field scorer is active.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Default)]
 pub enum Similarity {
+    /// No similarity adjustment; all documents receive a score of 1.0.
     #[default]
     None,
+    /// Normalised Levenshtein edit distance (lower distance = higher score).
     Levenshtein,
+    /// Jaro similarity coefficient.
     Jaro,
+    /// Jaro–Winkler similarity, boosting common prefixes.
     JaroWinkler,
 }
 
 impl Similarity {
+    /// Computes a similarity score in `(0.0, 1.0]` between `q1` and `q2`.
     pub fn similarity(&self, q1: &str, q2: &str) -> f64 {
         let sim = match *self {
             Similarity::None => 1.0,
