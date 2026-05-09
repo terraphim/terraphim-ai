@@ -15,6 +15,7 @@ use cached::proc_macro::cached;
 use serde::Deserialize;
 use terraphim_types::{Concept, NormalizedTerm, NormalizedTermValue, Thesaurus};
 
+/// Errors that can occur while building a [`Thesaurus`] from an external data source.
 #[derive(Error, Debug)]
 pub enum BuilderError {
     #[error("IO error")]
@@ -25,6 +26,7 @@ pub enum BuilderError {
     Indexation(String),
 }
 
+/// Convenience `Result` alias for builder operations.
 pub type Result<T> = std::result::Result<T, BuilderError>;
 
 /// A ThesaurusBuilder receives a path containing
@@ -42,6 +44,7 @@ pub trait ThesaurusBuilder {
 const LOGSEQ_KEY_VALUE_DELIMITER: &str = "::";
 const LOGSEQ_SYNONYMS_KEYWORD: &str = "synonyms";
 
+/// [`ThesaurusBuilder`] that reads Logseq-format key-value pages to populate a thesaurus.
 #[derive(Default)]
 pub struct Logseq {
     #[allow(dead_code)]

@@ -5,19 +5,39 @@ use std::path::{Path, PathBuf};
 use terraphim_types::{DocumentType, MarkdownDirectives, RouteDirective};
 use walkdir::WalkDir;
 
+/// A non-fatal diagnostic emitted while parsing a knowledge-graph markdown file.
+///
+/// Warnings are collected rather than aborting the parse so that a single malformed
+/// directive does not prevent the rest of the file from being processed.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MarkdownDirectiveWarning {
+    /// Path of the markdown file that produced the warning.
     pub path: PathBuf,
+    /// One-based line number of the offending directive, if known.
     pub line: Option<usize>,
+    /// Human-readable description of the problem.
     pub message: String,
 }
 
+/// Result of scanning a directory tree for knowledge-graph markdown directives.
+///
+/// `directives` maps each file stem (e.g. `"bun"` for `bun.md`) to the
+/// [`MarkdownDirectives`] extracted from that file.  `warnings` collects any
+/// non-fatal parse problems encountered during the scan.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct MarkdownDirectivesParseResult {
+    /// Parsed directives keyed by the markdown file stem.
     pub directives: HashMap<String, MarkdownDirectives>,
+    /// Non-fatal warnings accumulated during the parse.
     pub warnings: Vec<MarkdownDirectiveWarning>,
 }
 
+/// Recursively scan `root` for `*.md` files and parse their KG directives.
+///
+/// Returns a [`MarkdownDirectivesParseResult`] containing one entry per file
+/// (keyed by file stem) and any non-fatal warnings encountered.  IO or
+/// directory-walk errors for individual files are demoted to warnings so the
+/// scan continues.
 pub fn parse_markdown_directives_dir(root: &Path) -> crate::Result<MarkdownDirectivesParseResult> {
     let mut directives = HashMap::new();
     let mut warnings = Vec::new();

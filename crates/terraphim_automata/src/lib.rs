@@ -156,14 +156,16 @@ pub use umls::{UmlsConcept, UmlsDataset, UmlsStats};
 #[cfg(feature = "medical")]
 pub use umls_extractor::{UmlsExtractor, UmlsExtractorStats, UmlsMatch};
 
-// Re-export helpers for metadata iteration to support graph-embedding expansions in consumers
+/// Re-export helpers for metadata iteration to support graph-embedding expansions in consumers.
 pub mod autocomplete_helpers {
     use super::autocomplete::{AutocompleteIndex, AutocompleteMetadata};
+    /// Iterate over all `(term, metadata)` pairs in the autocomplete index.
     pub fn iter_metadata(
         index: &AutocompleteIndex,
     ) -> impl Iterator<Item = (&str, &AutocompleteMetadata)> {
         index.metadata_iter()
     }
+    /// Look up metadata for a single term, returning `None` if not found.
     pub fn get_metadata<'a>(
         index: &'a AutocompleteIndex,
         term: &str,

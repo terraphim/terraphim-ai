@@ -259,11 +259,12 @@ impl<'de> Deserialize<'de> for RoleName {
 pub struct NormalizedTermValue(String);
 
 impl NormalizedTermValue {
+    /// Construct a new `NormalizedTermValue` by trimming whitespace and lowercasing `term`.
     pub fn new(term: String) -> Self {
         let value = term.trim().to_lowercase();
         Self(value)
     }
-    // convert to &str
+    /// Return a `&str` view of the normalised value.
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -465,24 +466,38 @@ impl Display for Concept {
     }
 }
 
+/// Classifies how a document participates in the knowledge graph.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DocumentType {
+    /// A knowledge-graph entry (default); drives thesaurus/synonym expansion.
     #[default]
     KgEntry,
+    /// A plain content document to be indexed and searched.
     Document,
+    /// A routing/configuration document; inferred automatically when a `route::` directive is present.
     ConfigDocument,
 }
 
+/// Specifies a provider/model pair used to route a request to an LLM backend.
+///
+/// Parsed from `route::` or `routing::` directives in knowledge-graph markdown files.
+/// An optional `action` field holds a CLI template for invoking the model via a subprocess.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RouteDirective {
+    /// LLM provider identifier (e.g. `"anthropic"`, `"openai"`).
     pub provider: String,
+    /// Model identifier (e.g. `"claude-sonnet-4-6"`).
     pub model: String,
     /// CLI action template with `{{ model }}` and `{{ prompt }}` placeholders.
     #[serde(default)]
     pub action: Option<String>,
 }
 
+/// Directives extracted from a knowledge-graph markdown file's front-matter lines.
+///
+/// Each field maps to a corresponding `key:: value` directive in the markdown source.
+/// See [`DocumentType`] for how `doc_type` is inferred when no explicit `type:::` directive is present.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MarkdownDirectives {
     #[serde(default)]
@@ -621,6 +636,10 @@ impl Document {
     }
 }
 
+/// A directed edge in the knowledge graph, linking two [`Node`]s via co-occurrence.
+///
+/// Each edge records which documents contributed to the co-occurrence (`doc_hash`)
+/// and the aggregated co-occurrence count (`rank`).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Edge {
     /// ID of the edge (u64)
@@ -636,6 +655,7 @@ pub struct Edge {
 }
 
 impl Edge {
+    /// Create a new edge with the given `id`, initialising `doc_hash` with a single document entry.
     pub fn new(id: u64, document_id: String) -> Self {
         let mut doc_hash = AHashMap::new();
         doc_hash.insert(document_id, 1);
@@ -747,6 +767,7 @@ impl Thesaurus {
         self.data.get(key)
     }
 
+    /// Return an iterator over the normalised term keys in the thesaurus.
     pub fn keys(
         &self,
     ) -> std::collections::hash_map::Keys<'_, NormalizedTermValue, NormalizedTerm> {
@@ -932,9 +953,11 @@ pub struct IndexedDocument {
 }
 
 impl IndexedDocument {
+    /// Serialise this document to a JSON string.
     pub fn to_json_string(&self) -> Result<String, serde_json::Error> {
         serde_json::to_string(&self)
     }
+    /// Create a minimal `IndexedDocument` from a `Document`, with empty edge/node sets.
     pub fn from_document(document: Document) -> Self {
         IndexedDocument {
             id: document.id,
@@ -1215,14 +1238,17 @@ pub enum KnowledgeGraphInputType {
 pub struct ConversationId(pub String);
 
 impl ConversationId {
+    /// Generate a new random UUID-based conversation identifier.
     pub fn new() -> Self {
         Self(uuid::Uuid::new_v4().to_string())
     }
 
+    /// Wrap an existing string as a `ConversationId`.
     pub fn from_string(id: String) -> Self {
         Self(id)
     }
 
+    /// Return a `&str` view of the identifier.
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -1268,14 +1294,17 @@ pub enum ContextType {
 pub struct MessageId(pub String);
 
 impl MessageId {
+    /// Generate a new random UUID-based message identifier.
     pub fn new() -> Self {
         Self(uuid::Uuid::new_v4().to_string())
     }
 
+    /// Wrap an existing string as a `MessageId`.
     pub fn from_string(id: String) -> Self {
         Self(id)
     }
 
+    /// Return a `&str` view of the identifier.
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -1569,6 +1598,7 @@ pub struct KGIndexInfo {
     pub version: Option<String>,
 }
 
+/// A single message within a [`Conversation`], carrying role, content, and optional context.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
@@ -1782,6 +1812,7 @@ pub struct ContextHistory {
 }
 
 impl ContextHistory {
+    /// Create a new `ContextHistory` with the specified entry cap.
     pub fn new(max_entries: usize) -> Self {
         Self {
             used_contexts: Vec::new(),
@@ -2262,6 +2293,7 @@ pub struct MultiAgentContext {
 }
 
 impl MultiAgentContext {
+    /// Create a new `MultiAgentContext` with a freshly generated session ID.
     pub fn new() -> Self {
         let now = chrono::Utc::now();
         Self {

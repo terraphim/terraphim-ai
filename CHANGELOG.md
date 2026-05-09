@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`terraphim_types` doc comments** — `NormalizedTermValue::new/as_str`, `DocumentType` variants, `RouteDirective`, `MarkdownDirectives`, `Edge`/`Edge::new`, `Thesaurus::keys`, `IndexedDocument::to_json_string/from_document`, `ConversationId`/`MessageId` constructor methods, `ChatMessage`, `ContextHistory::new`, `MultiAgentContext::new`; all previously undocumented public items in `terraphim_types` now carry `///` doc comments
+- **`terraphim_automata` doc comments** — `MarkdownDirectiveWarning`, `MarkdownDirectivesParseResult`, `parse_markdown_directives_dir`, `BuilderError`, `Result<T>` type alias, `Logseq` struct, and `autocomplete_helpers::{iter_metadata, get_metadata}` module documentation
+- **`fix(agent)`** — populate `concepts_matched` and `wildcard_fallback` fields in robot-mode search envelope (Refs #851)
+- **`fix(tests)`** — replace cargo-run subprocess with `assert_cmd` timeout in integration tests; use Terraphim Engineer role in `test_full_feature_matrix` (Refs #1358)
+- **`docs(terraphim_server)`** — add rustdoc to all public API items; fix private intra-doc link warning in `error.rs`
+- **`docs`** — fix remaining rustdoc warnings across `terraphim_persistence`, `terraphim_rolegraph`, and 11 other crates (Refs #1331)
+- **`docs(reports)`** — add spec-validation and compliance reports 2026-05-08; add security checklist for PR #1349 RetryBound fix
+
 - **`terraphim_server` doc link fix** — resolved `rustdoc::private_intra_doc_links` warning in `error.rs` where the public `Result` alias linked to the private `ApiError` struct; replaced intra-doc link with backtick reference so workspace `cargo doc` produces zero warnings
 - **`terraphim_server` public API documentation** — crate-level `//!` doc, `AppState` struct and field docs, `axum_server` and `build_router_for_tests` function docs, `SearchResponse`, `RoleGraphResponseDto`, `GraphNodeDto`, `GraphEdgeDto` struct and field docs, all conversation management DTOs (`CreateConversationRequest/Response`, `ListConversationsQuery/Response`, `GetConversationResponse`, `AddMessageRequest/Response`, `AddContextRequest/Response`, `AddSearchContextRequest`, `UpdateContextRequest/Response`, `DeleteContextResponse`), `Status` enum variants, `ErrorResponse` fields, and `Result` type alias in `error.rs`
 - **`workflows` module documentation** — all eight sub-module declarations, `LlmConfig`, `StepConfig`, `WorkflowRequest`, `WorkflowResponse`, `WorkflowMetadata`, `WorkflowStatus`, `ExecutionStatus`, `WebSocketMessage` structs/enums with field-level docs, `WorkflowSessions`/`WebSocketBroadcaster` type aliases, and all public utility functions (`create_router`, `generate_workflow_id`, `update_workflow_status`, `create_workflow_session`, `complete_workflow_session`, `fail_workflow_session`)
