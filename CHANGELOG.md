@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`terraphim_symphony` snapshot struct docs** — field-level rustdoc added to `StateSnapshot`, `SnapshotCounts`, `RunningSnapshot`, and `RetrySnapshot`; these observability types are now fully documented with cross-references to `OrchestratorRuntimeState::snapshot`
+- **`terraphim_symphony` gitea.rs redundant link fix** — resolved `rustdoc::redundant_explicit_links` warning in `tracker/gitea.rs` module header; workspace `cargo doc` now produces zero warnings on `terraphim_symphony`
+
+### Fixed
+
+- **`terraphim_symphony` RetryBound invariant** — `RetryBound` is now enforced on slot exhaustion and poll failure, preventing infinite retry loops when no slots are available (Refs #1349)
+- **Integration test subprocess timeout** — replaced blocking `cargo run` subprocess with `assert_cmd` timeout in `integration_tests`; test harness is now reliable under CI load (Refs #1358)
+- **`test_full_feature_matrix` role** — test now uses the Terraphim Engineer role, matching the server default and eliminating role-mismatch failures (Refs #1358)
+
+### Added
+
 - **`terraphim_server` doc link fix** — resolved `rustdoc::private_intra_doc_links` warning in `error.rs` where the public `Result` alias linked to the private `ApiError` struct; replaced intra-doc link with backtick reference so workspace `cargo doc` produces zero warnings
 - **`terraphim_server` public API documentation** — crate-level `//!` doc, `AppState` struct and field docs, `axum_server` and `build_router_for_tests` function docs, `SearchResponse`, `RoleGraphResponseDto`, `GraphNodeDto`, `GraphEdgeDto` struct and field docs, all conversation management DTOs (`CreateConversationRequest/Response`, `ListConversationsQuery/Response`, `GetConversationResponse`, `AddMessageRequest/Response`, `AddContextRequest/Response`, `AddSearchContextRequest`, `UpdateContextRequest/Response`, `DeleteContextResponse`), `Status` enum variants, `ErrorResponse` fields, and `Result` type alias in `error.rs`
 - **`workflows` module documentation** — all eight sub-module declarations, `LlmConfig`, `StepConfig`, `WorkflowRequest`, `WorkflowResponse`, `WorkflowMetadata`, `WorkflowStatus`, `ExecutionStatus`, `WebSocketMessage` structs/enums with field-level docs, `WorkflowSessions`/`WebSocketBroadcaster` type aliases, and all public utility functions (`create_router`, `generate_workflow_id`, `update_workflow_status`, `create_workflow_session`, `complete_workflow_session`, `fail_workflow_session`)

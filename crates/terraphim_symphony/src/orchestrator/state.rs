@@ -146,42 +146,73 @@ pub fn retry_delay_ms(attempt: u32, max_backoff_ms: u64, is_continuation: bool) 
 }
 
 /// Snapshot of the orchestrator state for observability.
+///
+/// Produced by [`OrchestratorRuntimeState::snapshot`] and served by the
+/// status API endpoint.  All wall-clock durations account for currently
+/// running sessions so token totals are always up-to-date.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StateSnapshot {
+    /// UTC timestamp when this snapshot was generated.
     pub generated_at: DateTime<Utc>,
+    /// Summary counts (running, retrying).
     pub counts: SnapshotCounts,
+    /// One entry per currently dispatched issue.
     pub running: Vec<RunningSnapshot>,
+    /// Issues queued for retry with their back-off timers.
     pub retrying: Vec<RetrySnapshot>,
+    /// Cumulative token usage across all completed sessions, plus live
+    /// in-flight elapsed time for any currently running sessions.
     pub codex_totals: TokenTotals,
+    /// Latest rate-limit metadata received from the coding agent, if any.
     pub rate_limits: Option<serde_json::Value>,
 }
 
+/// Summary issue counts within a [`StateSnapshot`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SnapshotCounts {
+    /// Number of issues currently dispatched to a coding agent.
     pub running: usize,
+    /// Number of issues queued in the retry back-off queue.
     pub retrying: usize,
 }
 
+/// Point-in-time view of a single running issue within a [`StateSnapshot`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RunningSnapshot {
+    /// Gitea/Linear internal issue ID.
     pub issue_id: String,
+    /// Human-readable identifier (e.g. `PROJ-123`).
     pub issue_identifier: String,
+    /// Issue state string as reported by the tracker.
     pub state: String,
+    /// Coding-agent session ID (`<thread_id>-<turn_id>`).
     pub session_id: String,
+    /// Number of agent turns started for this issue.
     pub turn_count: u32,
+    /// Last event type received from the agent.
     pub last_event: Option<String>,
+    /// Human-readable summary of the last agent message.
     pub last_message: String,
+    /// When the current dispatch started.
     pub started_at: DateTime<Utc>,
+    /// When the last agent event was received.
     pub last_event_at: Option<DateTime<Utc>>,
+    /// Token usage accumulated so far for this session.
     pub tokens: TokenCounts,
 }
 
+/// Point-in-time view of a single retrying issue within a [`StateSnapshot`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RetrySnapshot {
+    /// Gitea/Linear internal issue ID.
     pub issue_id: String,
+    /// Human-readable identifier (e.g. `PROJ-123`).
     pub issue_identifier: String,
+    /// Retry attempt number (1-based).
     pub attempt: u32,
+    /// Monotonic deadline formatted as a debug string.
     pub due_at: String,
+    /// Error message that triggered this retry, if any.
     pub error: Option<String>,
 }
 

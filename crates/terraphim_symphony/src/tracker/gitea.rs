@@ -1,7 +1,7 @@
 //! Gitea REST issue tracker client.
 //!
 //! Fetches issues from a Gitea instance using the REST API, normalising
-//! them to the common [`Issue`](super::Issue) model.
+//! them to the common [`Issue`] model.
 
 use super::{BlockerRef, Issue, IssueTracker};
 use crate::config::ServiceConfig;
