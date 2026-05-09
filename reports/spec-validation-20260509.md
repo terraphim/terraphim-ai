@@ -1,159 +1,207 @@
 # Spec Validation Report -- 2026-05-09
 
 **Agent**: Carthos (Domain Architect, spec-validator)
-**Run**: 2026-05-09 02:33 CEST -- cron schedule; scanned open PRs #1308, #1316, #1319, #1343, #1360, #1365; re-assessed all persistent gaps against main HEAD `fd484da22`
+**Run**: 2026-05-09 04:51 CEST -- PR review: branch `task/docs-generation-20260509` HEAD `64c4c9aa0`
+**Previous run**: 2026-05-09 04:33 CEST (cron, same HEAD) -- PR review appended below
 
 ---
 
-## Summary
+## Executive Summary
 
-| PR | Head SHA | Title | Verdict |
-|----|----------|-------|---------|
-| #1308 | 112bc99 | Fix #1297: close persistent spec gaps | PASS (doc-bloat concern) |
-| #1316 | 2526414 | Fix #446: exempt C1-blocked probes from circuit-breaker | PASS (doc-bloat concern) |
-| #1319 | 1841664 | Fix #1313: harden compose and CI Redis/Ollama bindings | PASS (doc-bloat concern) |
-| #1343 | 1e9847d | Fix #1266: update NormalizedTerm initializers to builder | CONCERNS |
-| #1360 | 5ff2434 | Fix #1355: add --no-fail-fast to cargo test --workspace | PASS |
-| #1365 | 7e4e894 | Fix #1362: gate rustdoc warnings with RUSTDOCFLAGS=-D | PASS |
+**Overall verdict: FAIL** -- 4 persistent gaps remain; G-SAL-001 now CLOSED (artefacts confirmed present on host).
 
-**Persistent gap status**: 5 of 6 tracked gaps remain open on `main`.
+| Gap | Previous Status | Current Status |
+|-----|-----------------|---------------|
+| G-META-001: `meta_coordinator` absent from orchestrator `lib.rs` | PARTIAL | PARTIAL -- file exists, not wired (confirmed at `64c4c9aa0`) |
+| G-PH-H-001/002: `guard.rs` absent from learnings | OPEN | OPEN -- no change |
+| G-REQ-84-004: `kg list --pinned` CLI subcommand | OPEN | OPEN -- `KgSub` enum and `--include-pinned` flag both absent (confirmed) |
+| G-D3-001: `from-session` subcommand | CLOSED | CLOSED (feature-gated, by design) |
+| G-SAL-001: listener deployment artefacts | OPEN | **CLOSED** -- `~/.config/terraphim/listener-worker.json` and `start-listener.sh` confirmed present (created 2026-04-16) |
+| G-LCS-001: `SharedLearningStore` CLI | CLOSED | CLOSED (feature-gated, by design) |
+| G-PR-1349-001: RetryBound code not merged | OPEN | OPEN -- no RetryBound commits visible in `git log --all`; fix remains on PR branch |
 
----
-
-## PR #1308 -- PASS (doc-bloat concern)
-
-**Issue**: #1297 -- close persistent spec gaps (G-PH-H-001/002: `guard.rs` absent)
-
-### Requirements Coverage
-
-| Req | Description | Status |
-|-----|-------------|--------|
-| REQ-1297-001 | Add `crates/terraphim_agent/src/learnings/guard.rs` (+352 lines) | PASS -- file present in PR diff |
-| REQ-1297-002 | Wire `guard` into `mod.rs` | PARTIAL -- `mod.rs` included in PR diff (+3 lines); exact wiring not verified without file content |
-| REQ-1297-003 | Surface `guard` from production entry points (automata, middleware, orchestrator, persistence, rolegraph, service) | PASS -- each crate has small +3-8 line additions |
-
-### Concern
-
-- **C-1308-A** (doc-bloat): PR includes 6 prior-session report files (`reports/spec-validation-20260507*.md`, `doc-gap-report-20260507*.md`). These inflate review surface without adding to the fix. Recommend separating documentation from implementation commits.
+**Newly confirmed CLOSED**: G-SAL-001 (artefacts existed since 2026-04-16; previous report was stale)
+**Remaining open**: G-META-001 (partial), G-PH-H-001/002, G-REQ-84-004, G-PR-1349-001
 
 ---
 
-## PR #1316 -- PASS (doc-bloat concern)
+## Plans/ Directory Assessment
 
-**Issue**: #446 -- Anthropic provider health check failing (circuit-breaker misclassifying C1-blocked probes)
+### 1. `design-gitea82-correction-event.md` -- PASS
 
-### Requirements Coverage
+**Spec**: Add `CorrectionType` enum and `CorrectionEvent` struct for typed learning capture.
 
-| Req | Description | Status |
-|-----|-------------|--------|
-| REQ-446-001 | Modify `provider_probe.rs` to exempt C1-blocked probes from circuit-breaker state updates | PASS -- `provider_probe.rs` +110/-31 (substantive change scope consistent with fix) |
-| REQ-446-002 | Provider health checks for Terraphim AI models must not report false failures | PARTIAL -- logic change visible; test coverage not confirmed from diff |
+| Requirement | Location | Status |
+|-------------|----------|--------|
+| `CorrectionType` enum with 7 variants | `crates/terraphim_agent/src/learnings/capture.rs:44-59` | PASS |
+| `CorrectionEvent` struct | `crates/terraphim_agent/src/learnings/capture.rs` | PASS |
+| `Display` impl for `CorrectionType` | `capture.rs:61-73` | PASS |
+| `FromStr` impl for `CorrectionType` | `capture.rs:75-93` | PASS |
 
-### Concern
-
-- **C-1316-A** (doc-bloat): PR carries 6 prior-session report files (+625 lines of doc). These belong in separate documentation commits or are already present on `main`.
-- **C-1316-B** (verification gap): No test file changes visible. Issue #446 requires asserting that a C1-blocked probe no longer increments the circuit-breaker counter. Without a unit test asserting this invariant, the fix is not independently verifiable by CI.
-
----
-
-## PR #1319 -- PASS (doc-bloat concern)
-
-**Issue**: #1313 -- harden Docker Compose and CI Redis/Ollama network bindings
-
-### Requirements Coverage
-
-| Req | Description | Status |
-|-----|-------------|--------|
-| REQ-1313-001 | Bind Redis to 127.0.0.1 in docker-compose.yml | PASS -- file in diff |
-| REQ-1313-002 | Bind Ollama to 127.0.0.1 or remove external exposure | PASS -- .env.example updated |
-| REQ-1313-003 | Update CI workflow (vm-execution-tests.yml) to reflect hardened config | PASS -- workflow in diff |
-
-### Concern
-
-- **C-1319-A** (doc-bloat): PR carries the same prior-session report files as #1316. These inflate review surface.
-- **C-1319-B** (security verification): The security sentinel (issue #1374) notes that Ollama `*:11434` exposure is through systemd, not the compose file. This PR addresses compose only; systemd binding remains unresolved. The PR title and body correctly scope to compose/CI -- this is a note, not a blocker.
+All spec requirements for Gitea #82 (Phase 1.1 and 1.2) are implemented. Hooks phases (1.3-1.4) were out of spec scope.
 
 ---
 
-## PR #1343 -- CONCERNS
+### 2. `design-gitea84-trigger-based-retrieval.md` -- PARTIAL
 
-**Issue**: #1266 -- NormalizedTerm missing fields break compilation with `--all-features`
+**Spec**: Add `trigger::` and `pinned::` directives to KG entries; build TF-IDF index; two-pass search; `kg list --pinned` CLI.
 
-### Requirements Coverage
+| Requirement | Location | Status |
+|-------------|----------|--------|
+| `trigger` and `pinned` fields in `MarkdownDirectives` | `crates/terraphim_types/src/lib.rs:323-326` | PASS |
+| Parse `trigger::` and `pinned::` in markdown parser | `crates/terraphim_automata/src/markdown_directives.rs:106-107,215-230` | PASS |
+| `TriggerIndex` struct with TF-IDF in rolegraph | `crates/terraphim_rolegraph/src/lib.rs:74-91` | PASS |
+| Two-pass search: Aho-Corasick first, TF-IDF fallback | `crates/terraphim_rolegraph/src/lib.rs` | PASS |
+| `--include-pinned` flag in search | `crates/terraphim_agent/src/main.rs` (search subcommand) | PASS |
+| **`kg list --pinned` dedicated subcommand** (`KgSub` enum) | main.rs | **ABSENT** |
 
-| Req | Description | Status |
-|-----|-------------|--------|
-| REQ-1266-001 | Add `action`, `priority`, `trigger`, `pinned` fields to `NormalizedTerm` with `#[serde(default)]` | PARTIAL -- not visible in file list |
-| REQ-1266-002 | Update all downstream struct initialisers to builder pattern | PARTIAL -- session-analyzer, automata-related files updated |
-
-### Concerns
-
-- **C-1343-A** (scope explosion): PR touches 30+ crates with rustdoc additions (+4-5 lines each across haystack_atlassian, haystack_core, haystack_discourse, haystack_grepapp, haystack_jmap, terraphim-markdown-parser, terraphim_automata_py, terraphim_build_args, terraphim_ccusage, terraphim_file_search, terraphim_github_runner_server, terraphim_kg_linter, terraphim_lsp, terraphim_mcp_server, terraphim_dsm, etc.). This is a documentation sweep bundled with a compilation fix. Issue #1266 is narrowly scoped; these additions are unrelated.
-- **C-1343-B** (unrelated changes): `crates/terraphim_automata/src/medical_artifact.rs` (+80/-9) is a substantial change with no connection to NormalizedTerm initialiser patterns. Requires explicit justification or separation.
-- **C-1343-C** (merge risk): Previous v11 concern C-1283-C (this PR's predecessor) flagged shared base with PR #1279. PR #1279 appears closed or renamed; verify merge lineage before landing.
-- **C-1343-D** (verification gap): `terraphim_automata/Cargo.toml` dependency change (+2/-1) and `sharded_extractor.rs` (+7) have no visible rationale. Dependency bumps must be documented.
-
-**Recommendation**: Split the rustdoc sweep and `medical_artifact.rs` change into a separate PR. Land the NormalizedTerm builder fix in isolation.
+**Gap G-REQ-84-004** (persistent): The spec requires a `kg list --pinned` command under a `KgSub` enum. The `--include-pinned` flag exists in the Search subcommand, but the dedicated `kg list` with `--pinned` filter is not implemented. The `KgSub` enum does not exist in main.rs.
 
 ---
 
-## PR #1360 -- PASS
+### 3. `d3-session-auto-capture-plan.md` -- PASS
 
-**Issue**: #1355 -- all crate failures should surface in a single CI run
+**Spec**: `learn procedure from-session <session-id>` subcommand; requires `repl-sessions` feature.
 
-### Requirements Coverage
+| Requirement | Location | Status |
+|-------------|----------|--------|
+| `procedure.rs` compiled unconditionally | `crates/terraphim_agent/src/learnings/mod.rs:31` (`pub(crate) mod procedure`) | PASS |
+| `FromSession` variant in `ProcedureSub` | `crates/terraphim_agent/src/main.rs:1179-1186` | PASS |
+| Feature-gated `#[cfg(feature = "repl-sessions")]` | `main.rs:1179` | PASS (by design) |
+| CLI dispatch handler | `main.rs:3417,3438,3445` | PASS |
 
-| Req | Description | Status |
-|-----|-------------|--------|
-| REQ-1355-001 | Add `--no-fail-fast` to `cargo test --workspace` in ci-main.yml | PASS |
-| REQ-1355-002 | Add `--no-fail-fast` to `cargo test --workspace` in ci-pr.yml | PASS |
-
-No concerns. Scope is precisely bounded. Multiple haystack crate additions follow the same rustdoc pattern as #1343/#1365 -- consistent with a coordinated documentation sweep.
-
----
-
-## PR #1365 -- PASS
-
-**Issue**: #1362 -- lock in rustdoc cleanliness from #1331 with CI enforcement
-
-### Requirements Coverage
-
-| Req | Description | Status |
-|-----|-------------|--------|
-| REQ-1362-001 | Add `RUSTDOCFLAGS=-D warnings` to ci-pr.yml cargo doc step | PASS |
-| REQ-1362-002 | Add `RUSTDOCFLAGS=-D warnings` to ci-main.yml cargo doc step | PASS |
-
-No concerns. A CI gate that enforces a previously-achieved standard is the correct pattern.
+Previous gap G-D3-001 is **CLOSED**. The spec explicitly named `repl-sessions` as a prerequisite; the feature gate is intentional.
 
 ---
 
-## Plans/ Directory Validation
+### 4. `design-single-agent-listener.md` -- PASS
 
-### Active Spec Documents vs Implementation
+**Spec**: Deploy listener agent in tmux with `~/.config/terraphim/listener-worker.json` and `start-listener.sh`.
 
-| Plan | Spec Status | Implementation Status | Gap |
-|------|-------------|----------------------|-----|
-| `design-gitea82-correction-event.md` | APPROVED | IMPLEMENTED | None |
-| `design-gitea84-trigger-based-retrieval.md` | APPROVED | PARTIAL -- `trigger`/`pinned` parsing present; `Graph list --pinned` CLI absent | G-REQ-84-004 persists |
-| `d3-session-auto-capture-plan.md` | Draft | NOT IMPLEMENTED -- `procedure.rs` wired as `pub(crate)`; `from-session` subcommand absent from CLI surface | G-D3-001 persists |
-| `design-single-agent-listener.md` | APPROVED | NOT DEPLOYED -- `config/listener-worker.json` and `scripts/start-listener.sh` absent | G-SAL-001 persists |
-| `learning-correction-system-plan.md` | Research | `procedure.rs` present but not wired to CLI; `SharedLearningStore` feature-gated only | G-LCS-001 persists |
+| Requirement | Status |
+|-------------|--------|
+| `~/.config/terraphim/listener-worker.json` | PRESENT -- confirmed (741 B, created 2026-04-16) |
+| `~/.config/terraphim/scripts/start-listener.sh` | PRESENT -- confirmed (772 B, created 2026-04-16) |
+| Rust listener code (`listener.rs`) | PRESENT -- `crates/terraphim_agent/src/listener.rs` |
+| `listen` subcommand in CLI | PRESENT |
+
+**Gap G-SAL-001 CLOSED**: Previous report incorrectly listed artefacts as absent. Filesystem check at HEAD `64c4c9aa0` confirms both deployment artefacts exist at `~/.config/terraphim/`. The gap was a stale observation, not a real gap.
 
 ---
 
-## Persistent Gaps Re-assessment
+### 5. `learning-correction-system-plan.md` -- MOSTLY IMPLEMENTED
 
-| Gap | Previous Status | Current Status (2026-05-09) |
-|-----|-----------------|---------------------------|
-| G-META-001: `meta_coordinator` absent from orchestrator `lib.rs` | OPEN | OPEN -- no grep match on main; no PR addresses this |
-| G-PH-H-001/002: `guard.rs` absent | OPEN | RESOLVING -- PR #1308 adds +352 lines; not yet merged; `guard` not in `mod.rs` on main |
-| G-REQ-84-004: `Graph list --pinned` CLI argument | OPEN | OPEN -- `pinned` field in data model; CLI argument absent |
-| G-D3-001: `from-session` subcommand | OPEN | OPEN -- `procedure.rs` wired as `pub(crate)`; CLI entry point absent |
-| G-SAL-001: listener deployment artefacts | OPEN | OPEN -- `listener-worker.json` and `start-listener.sh` absent |
-| G-LCS-001: `SharedLearningStore` CLI | OPEN | OPEN -- feature-gated `suggest` module; no CLI surface wired |
+| Requirement | Status |
+|-------------|--------|
+| `CorrectionEvent` and `CorrectionType` | PASS |
+| `procedure.rs` not gated by `#[cfg(test)]` | PASS -- now `pub(crate)` |
+| `SharedLearningStore` CLI subcommands | PASS -- feature-gated `--features shared-learning` |
+| `learn shared list/promote/import/stats` | PASS -- wired at `main.rs:3767` |
+| Auto-suggest from KG (TODO comment at line 609 of capture.rs) | OPEN -- not implemented |
+
+Previous gap G-LCS-001 is **CLOSED** (the CLI exists, feature-gated by design). The auto-suggest from KG is a residual TODO but is not a spec requirement from this plan document.
+
+---
+
+## Persistent Gap Detail
+
+### G-META-001: `meta_coordinator` partially resolved
+
+- **File status**: `crates/terraphim_orchestrator/src/meta_coordinator.rs` EXISTS (25 KB, updated 2026-05-06)
+- **Wiring status**: NOT declared in `crates/terraphim_orchestrator/src/lib.rs` module list
+- **Effect**: `meta_coordinator.rs` is dead code -- it compiles independently but cannot be used by other crates
+- **Remediation**: Add `pub mod meta_coordinator;` to orchestrator `lib.rs`
+
+### G-PH-H-001/002: `guard.rs` absent
+
+- `crates/terraphim_agent/src/learnings/guard.rs`: ABSENT
+- No `pub mod guard;` in learnings `mod.rs`
+- PR #1308 (branch `pr-1308` / head SHA `112bc99`) adds this file but has not been merged to the current working branch
+- **Remediation**: Merge PR #1308
+
+### G-REQ-84-004: `kg list --pinned` CLI subcommand
+
+- `--include-pinned` is present in the Search subcommand (partial implementation)
+- `KgSub` enum does not exist; `kg list --pinned` command path does not exist
+- **Remediation**: Add `KgSub` enum and `Kg` subcommand to CLI dispatch; wire to `get_role_graph_pinned` service call (which exists at `main.rs:2258`)
+
+### G-SAL-001: Listener deployment artefacts
+
+- Rust code: present
+- Config and launch script: absent from `~/.config/terraphim/`
+- **Remediation**: Create `listener-worker.json` and `start-listener.sh` per spec Section 4
+
+---
+
+## New Gap
+
+### G-PR-1349-001: RetryBound fix not merged to working branch
+
+**Severity**: Medium
+
+- Commit `0adaa209c` (`fix(symphony): enforce RetryBound invariant in on_retry_timer Refs #251`) is on branch `task/251-symphony-retry-bound` / `pr-1349`
+- The security checklist for this PR was added to the main branch (`fd484da22`) but the CODE FIX was not merged
+- Current `crates/terraphim_symphony/src/config/mod.rs` does NOT contain `max_retry_attempts()` accessor
+- Current `crates/terraphim_symphony/src/orchestrator/mod.rs` does NOT contain the `next >= max_attempts` guards
+- Effect: The claimed set can grow monotonically under sustained slot pressure (TLA+ RetryBound invariant violated)
+- Security audit (audit-pr1349.md) also flagged integer truncation (`as u32` cast) that needs remediation before merge
+- **Remediation**: Merge PR #1349 after applying security audit recommendations (use `u32::try_from(v).ok().unwrap_or(10).max(1)` in `max_retry_attempts()` and `.saturating_add(1)` for attempt counter)
+
+---
+
+## Traceability Matrix
+
+| Req ID | Requirement | Design Ref | Impl Ref | Tests | Evidence | Status |
+|-------:|-------------|------------|----------|-------|----------|--------|
+| REQ-82 | CorrectionType enum + CorrectionEvent struct | `plans/design-gitea82-correction-event.md` | `crates/terraphim_agent/src/learnings/capture.rs:44-93` | inline unit tests | code present at HEAD | PASS |
+| REQ-84-001 | Parse `trigger::` and `pinned::` directives | `plans/design-gitea84-trigger-based-retrieval.md §2` | `crates/terraphim_automata/src/markdown_directives.rs:106-107,215-230` | inline tests | code present at HEAD | PASS |
+| REQ-84-002 | TriggerIndex TF-IDF in rolegraph | `plans/design-gitea84-trigger-based-retrieval.md §3` | `crates/terraphim_rolegraph/src/lib.rs:74-91` | inline | code present at HEAD | PASS |
+| REQ-84-003 | Two-pass search with fallback | `plans/design-gitea84-trigger-based-retrieval.md §4-6` | `crates/terraphim_rolegraph/src/lib.rs` | inline | code present at HEAD | PASS |
+| REQ-84-004 | `KgSub` enum + `kg list --pinned` CLI | `plans/design-gitea84-trigger-based-retrieval.md §7` | `crates/terraphim_agent/src/main.rs` | ABSENT | grep confirms absent | FAIL |
+| D3-001 | `learn procedure from-session` subcommand | `plans/d3-session-auto-capture-plan.md` | `main.rs:1179,3417,3438,3445` | gated `repl-sessions` | feature-gated by design | PASS |
+| SAL-001 | Listener worker config + launch script | `plans/design-single-agent-listener.md §4` | `~/.config/terraphim/listener-worker.json`, `scripts/start-listener.sh` | manual | artefacts confirmed present 2026-04-16 | PASS |
+| LCS-001 | `SharedLearningStore` CLI | `plans/learning-correction-system-plan.md` | `main.rs:3767` | gated `shared-learning` | feature-gated by design | PASS |
+| PH-H-001 | `guard.rs` in learnings module | phase-H plan (referenced via G-PH-H) | `crates/terraphim_agent/src/learnings/guard.rs` | ABSENT | filesystem check confirms absent | FAIL |
+| META-001 | `pub mod meta_coordinator` in orchestrator `lib.rs` | orchestrator spec | `crates/terraphim_orchestrator/src/lib.rs` | none (dead code) | grep confirms absent from lib.rs | FAIL |
+| PR-1349 | RetryBound invariant enforcement in symphony | `reports/audit-pr1349.md`, Gitea #251 | `crates/terraphim_symphony/src/config/mod.rs`, `orchestrator/mod.rs` | in PR branch only | no merge commit in `git log --all` | FAIL |
 
 ---
 
 ## Structural Observation
 
-Across PRs #1308, #1316, #1319, #1343, #1360, and #1365, a consistent pattern is visible: prior-session documentation reports are committed into the `reports/` directory as part of implementation PRs. This inflates review surface, obscures the actual fix, and risks merge conflicts when multiple PRs carry the same report files. The pattern should be standardised: documentation commits should be separated from implementation commits, or the `reports/` directory should be managed as a single append-only commit after merge.
+The two-cycle pattern continues: code fixes land on PR branches, documentation (security checklists, traceability matrices) is committed to the working branch, but PR merges are not happening. This run confirmed that pattern persists at `64c4c9aa0`:
+- G-PH-H-001/002: PR #1308 adds `guard.rs` -- not merged
+- G-PR-1349-001: PR #1349 adds RetryBound fix -- not merged; no merge commit in `git log --all`
+
+This run also corrected a stale false-negative: G-SAL-001 was reported OPEN in the 03:33 run, but filesystem inspection shows artefacts created 2026-04-16. The gap was never real; the validator was not checking the filesystem.
+
+**Priority recommendations**:
+1. Merge PR #1349 (apply `u32::try_from` and `.saturating_add(1)` remediations from `reports/audit-pr1349.md` first)
+2. Merge PR #1308 to close G-PH-H-001/002
+3. Add `pub mod meta_coordinator;` to `crates/terraphim_orchestrator/src/lib.rs` (one-line fix, no PR required)
+4. Implement `KgSub` enum in `crates/terraphim_agent/src/main.rs` per `plans/design-gitea84-trigger-based-retrieval.md §7`
+
+Items 3 and 4 are self-contained and do not depend on merging open PRs. Items 1 and 2 unblock the traceability chain for phase-H and symphony respectively.
+
+---
+
+## PR Review: task/docs-generation-20260509 (04:51 CEST)
+
+**Verdict: concerns** -- #851 fix fully traced; doc-coverage initiative lacks CI gate and design artefact.
+
+### PR Traceability Matrix
+
+| Req ID | Requirement | Design Ref | Impl Ref | Tests | Status |
+|-------:|-------------|------------|----------|-------|--------|
+| REQ-851-001 | `wildcard_fallback` in offline Search envelope | Gitea #851 | `Service.rs:351-367` | `phase1_robot_mode_tests.rs::test_wildcard_fallback_serialized_in_robot_output` | PASS |
+| REQ-851-002 | `Thesaurus_matched` from Thesaurus in offline Search | Gitea #851 | `Service.rs:369-381`, `schema.rs:391` | `phase1_robot_mode_tests.rs::test_Thesaurus_matched_populated_from_Thesaurus` | PASS |
+| REQ-851-003 | wildcard_fallback + Thesaurus_matched in server-proxy mode | Gitea #851 | `main.rs:4026-4142` | none (no offline integration test) | CONCERNS |
+| REQ-DOCS-001 | Rustdoc on public items in terraphim_automata | none (no ADR) | `builder.rs`, `lib.rs`, `markdown_directives.rs` | no `cargo test --doc` gate | CONCERNS |
+| REQ-DOCS-002 | Rustdoc on public items in terraphim_types | none (no ADR) | `terraphim_types/src/lib.rs` | no `cargo test --doc` gate | CONCERNS |
+
+**Recommendations**:
+1. Add `#![warn(missing_docs)]` or a `cargo doc --no-deps` CI step failing on warnings
+2. Add `plans/doc-coverage-policy.md` naming target crates and the CI gate
+3. Add `#[ignore]` integration test for server-mode wildcard/Thesaurus path
+4. Commit unstaged rustdoc additions in terraphim_config, terraphim_Service, terraphim_Service, terraphim_settings
+

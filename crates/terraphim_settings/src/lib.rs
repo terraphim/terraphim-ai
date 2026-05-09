@@ -14,6 +14,7 @@ use twelf::{Layer, config};
 #[cfg(feature = "onepassword")]
 use terraphim_onepassword_cli::{OnePasswordLoader, SecretLoader};
 
+/// Errors that can occur while loading or applying device settings.
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("config error: {0}")]
@@ -29,6 +30,7 @@ pub enum Error {
 
 // Need to name it explicitly to avoid conflict with std::Result
 // which gets used by the `#[config]` macro below.
+/// Convenience alias for `Result<T, Error>` used throughout this crate.
 pub type DeviceSettingsResult<T> = std::result::Result<T, Error>;
 
 /// Default settings file
@@ -232,6 +234,7 @@ impl DeviceSettings {
             Layer::Env(Some(String::from("TERRAPHIM_"))),
         ])?)
     }
+    /// Update the `initialized` flag and persist the settings to disk.
     pub fn update_initialized_flag(
         &mut self,
         settings_path: Option<PathBuf>,

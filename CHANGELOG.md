@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Doc comments: `terraphim_config`, `terraphim_service`, `terraphim_middleware`, `terraphim_settings`** — added `///` doc comments to `TerraphimConfigError`, `Result<T>` (config), `ServiceError`, `Result<T>` (service), `TerraphimService`, `Error` (middleware), `Result<T>` (middleware), `Error` (settings), `DeviceSettingsResult<T>`, `DeviceSettings::update_initialized_flag`, and `Role` field docs (`shortname`, `name`, `terraphim_it`, `theme`, `kg`, `haystacks`)
 - **`terraphim_types` doc comments** — `NormalizedTermValue::new/as_str`, `DocumentType` variants, `RouteDirective`, `MarkdownDirectives`, `Edge`/`Edge::new`, `Thesaurus::keys`, `IndexedDocument::to_json_string/from_document`, `ConversationId`/`MessageId` constructor methods, `ChatMessage`, `ContextHistory::new`, `MultiAgentContext::new`; all previously undocumented public items in `terraphim_types` now carry `///` doc comments
 - **`terraphim_automata` doc comments** — `MarkdownDirectiveWarning`, `MarkdownDirectivesParseResult`, `parse_markdown_directives_dir`, `BuilderError`, `Result<T>` type alias, `Logseq` struct, and `autocomplete_helpers::{iter_metadata, get_metadata}` module documentation
 - **`fix(agent)`** — populate `concepts_matched` and `wildcard_fallback` fields in robot-mode search envelope (Refs #851)

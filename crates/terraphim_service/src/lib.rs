@@ -69,6 +69,7 @@ fn normalize_filename_to_id(filename: &str) -> String {
     re.replace_all(filename, "").to_lowercase()
 }
 
+/// Errors that can be returned by the Terraphim service layer.
 #[derive(thiserror::Error, Debug)]
 pub enum ServiceError {
     #[error("Middleware error: {0}")]
@@ -124,8 +125,13 @@ impl crate::error::TerraphimError for ServiceError {
     }
 }
 
+/// Convenience alias for `Result<T, ServiceError>` used throughout this crate.
 pub type Result<T> = std::result::Result<T, ServiceError>;
 
+/// The main service facade for Terraphim AI.
+///
+/// Wraps configuration state and exposes high-level operations for document
+/// search, thesaurus management, and knowledge graph queries.
 pub struct TerraphimService {
     config_state: ConfigState,
 }

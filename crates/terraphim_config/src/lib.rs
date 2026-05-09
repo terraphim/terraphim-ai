@@ -46,12 +46,14 @@ use crate::llm_router::LlmRouterConfig;
 // LLM Router configuration
 pub mod llm_router;
 
+/// Convenience alias for `Result<T, TerraphimConfigError>` used throughout this crate.
 pub type Result<T> = std::result::Result<T, TerraphimConfigError>;
 
 use opendal::Result as OpendalResult;
 
 type PersistenceResult<T> = std::result::Result<T, terraphim_persistence::Error>;
 
+/// Errors that can occur during configuration loading, validation, and persistence.
 #[derive(Error, Debug)]
 pub enum TerraphimConfigError {
     #[error("Unable to load config")]
@@ -217,13 +219,19 @@ fn default_context_window() -> Option<u64> {
 #[cfg_attr(feature = "typescript", derive(Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct Role {
+    /// Optional short name alias for CLI or URL use
     pub shortname: Option<String>,
+    /// Full role name (case-preserving with lowercase variant for comparisons)
     pub name: RoleName,
     /// The relevance function used to rank search results
     pub relevance_function: RelevanceFunction,
+    /// When `true`, Terraphim processes this role's documents with the knowledge graph
     pub terraphim_it: bool,
+    /// UI theme identifier for the frontend
     pub theme: String,
+    /// Optional knowledge graph configuration for this role
     pub kg: Option<KnowledgeGraph>,
+    /// Ordered list of data sources (haystacks) for this role
     pub haystacks: Vec<Haystack>,
     /// Enable AI-powered article summaries using LLM providers
     #[serde(default)]
