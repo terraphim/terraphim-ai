@@ -4,6 +4,8 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
+use terraphim_types::Thesaurus;
 
 /// Standard response envelope for all robot mode outputs
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -379,6 +381,29 @@ pub struct IndexStatus {
     pub sessions_indexed: usize,
     /// Last update timestamp
     pub last_updated: Option<DateTime<Utc>>,
+}
+
+/// Extract KG concept names matched by `query` using `thesaurus`.
+///
+/// Runs the Aho-Corasick automata on the query string and returns deduplicated
+/// normalized concept names in match order. Returns an empty `Vec` when the
+/// automata produce no matches or the thesaurus is empty.
+pub fn extract_concepts(query: &str, thesaurus: Thesaurus) -> Vec<String> {
+    let Ok(matches) = terraphim_automata::find_matches(query, thesaurus, false) else {
+        return vec![];
+    };
+    let mut seen = HashSet::new();
+    matches
+        .into_iter()
+        .filter_map(|m| {
+            let term = m.normalized_term.value.to_string();
+            if seen.insert(term.clone()) {
+                Some(term)
+            } else {
+                None
+            }
+        })
+        .collect()
 }
 
 #[cfg(test)]

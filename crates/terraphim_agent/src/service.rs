@@ -342,6 +342,44 @@ impl TuiService {
         Ok(service.ensure_thesaurus_loaded(role_name).await?)
     }
 
+    /// Search documents with wildcard fallback when the primary search returns no results.
+    ///
+    /// If the initial search returns 0 documents AND the query has more than one word,
+    /// a secondary search is attempted using only the first word. Returns
+    /// `(results, wildcard_fallback)` where `wildcard_fallback` is `true` when the
+    /// secondary search was used.
+    pub async fn search_with_wildcard_fallback(
+        &self,
+        query: &str,
+        role_name: &RoleName,
+        limit: Option<usize>,
+    ) -> Result<(Vec<Document>, bool)> {
+        let results = self.search_with_role(query, role_name, limit).await?;
+        if !results.is_empty() {
+            return Ok((results, false));
+        }
+        let first_word = query.split_whitespace().next().unwrap_or(query);
+        if first_word.len() < query.len() {
+            let fallback = self.search_with_role(first_word, role_name, limit).await?;
+            return Ok((fallback, true));
+        }
+        Ok((results, false))
+    }
+
+    /// Extract KG concept names matched in `query` using the thesaurus for `role_name`.
+    ///
+    /// Returns an empty `Vec` if the thesaurus is not yet loaded or no concepts match.
+    pub async fn extract_concepts_from_query(
+        &self,
+        query: &str,
+        role_name: &RoleName,
+    ) -> Vec<String> {
+        let Ok(thesaurus) = self.get_thesaurus(role_name).await else {
+            return vec![];
+        };
+        crate::robot::schema::extract_concepts(query, thesaurus)
+    }
+
     /// Get the role graph top-k concepts for a specific role
     ///
     /// Returns the top-k concepts sorted by rank (number of co-occurrences) in descending order.

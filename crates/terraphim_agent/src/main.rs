@@ -2015,7 +2015,7 @@ async fn run_offline_command(
                 eprintln!("{}", format_auto_route_line(ar));
             }
 
-            let results = if let Some(additional_terms) = terms {
+            let (results, wildcard_fallback) = if let Some(additional_terms) = terms {
                 // Multi-term query with logical operators
                 let mut all_terms = vec![query.clone()];
                 all_terms.extend(additional_terms);
@@ -2052,13 +2052,16 @@ async fn run_offline_command(
                     layer: Layer::default(),
                 };
 
-                service.search_with_query(&search_query).await?
+                (service.search_with_query(&search_query).await?, false)
             } else {
-                // Single term query (backward compatibility)
+                // Single term query: use wildcard fallback when no results
                 service
-                    .search_with_role(&query, &role_name, Some(limit))
+                    .search_with_wildcard_fallback(&query, &role_name, Some(limit))
                     .await?
             };
+            let concepts_matched = service
+                .extract_concepts_from_query(&query, &role_name)
+                .await;
 
             let results_count = results.len();
             if output.is_machine_readable() {
@@ -2122,8 +2125,8 @@ async fn run_offline_command(
                 let data = SearchResultsData {
                     results: items,
                     total_matches: total,
-                    concepts_matched: vec![],
-                    wildcard_fallback: false,
+                    concepts_matched,
+                    wildcard_fallback,
                 };
 
                 let meta = ResponseMeta::new("search")
@@ -4023,6 +4026,37 @@ async fn run_server_command(
 
             let res: SearchResponse = api.search(&q).await?;
 
+            // Wildcard fallback: if primary search empty and query is multi-word, try first word
+            let (res, wildcard_fallback_api) = if res.results.is_empty() && q.search_terms.is_none()
+            {
+                let first_word = query.split_whitespace().next().unwrap_or(&query);
+                if first_word.len() < query.len() {
+                    let fallback_q = SearchQuery {
+                        search_term: NormalizedTermValue::from(first_word),
+                        search_terms: None,
+                        operator: None,
+                        skip: Some(0),
+                        limit: Some(limit),
+                        role: q.role.clone(),
+                        layer: Layer::default(),
+                        include_pinned,
+                    };
+                    let fallback = api.search(&fallback_q).await.unwrap_or(res);
+                    (fallback, true)
+                } else {
+                    (res, false)
+                }
+            } else {
+                (res, false)
+            };
+
+            // Extract concepts via server autocomplete (non-fatal on error)
+            let concepts_matched_api: Vec<String> = api
+                .get_autocomplete(role_for_meta.as_str(), &query)
+                .await
+                .map(|r| r.suggestions.into_iter().map(|s| s.text).collect())
+                .unwrap_or_default();
+
             if let Some(ref additional_terms) = q.search_terms {
                 let op_str = match q.operator {
                     Some(LogicalOperator::And) => "AND",
@@ -4101,8 +4135,8 @@ async fn run_server_command(
                 let data = SearchResultsData {
                     results: items,
                     total_matches: total,
-                    concepts_matched: vec![],
-                    wildcard_fallback: false,
+                    concepts_matched: concepts_matched_api,
+                    wildcard_fallback: wildcard_fallback_api,
                 };
 
                 let meta = ResponseMeta::new("search")

@@ -1,4 +1,5 @@
 use terraphim_agent::forgiving::{AliasRegistry, ForgivingParser};
+use terraphim_agent::robot::schema::SearchResultsData;
 use terraphim_agent::robot::{
     ExitCode, FieldMode, OutputFormat, ResponseMeta, RobotConfig, RobotFormatter, RobotResponse,
 };
@@ -145,4 +146,58 @@ fn test_truncation_with_budget() {
     let (truncated, was_truncated) = formatter.truncate_content(&long_content);
     assert!(was_truncated);
     assert!(truncated.len() <= 53);
+}
+
+#[test]
+fn test_concepts_matched_populated_from_thesaurus() {
+    use terraphim_agent::robot::schema::extract_concepts;
+    use terraphim_types::{NormalizedTerm, NormalizedTermValue, Thesaurus};
+
+    // Build a minimal thesaurus with one concept ("rust")
+    let mut thesaurus = Thesaurus::new("test".to_string());
+    let key = NormalizedTermValue::from("rust");
+    let value = NormalizedTerm::new(1, key.clone());
+    thesaurus.insert(key, value);
+
+    // A query containing "rust" should produce at least one matched concept
+    let matched = extract_concepts("learning rust programming", thesaurus);
+    assert!(
+        !matched.is_empty(),
+        "expected at least one matched concept, got empty vec"
+    );
+    assert!(
+        matched.iter().any(|c| c.as_str() == "rust"),
+        "expected 'rust' to be in matched concepts, got: {:?}",
+        matched
+    );
+}
+
+#[test]
+fn test_wildcard_fallback_serialized_in_robot_output() {
+    let data = SearchResultsData {
+        results: vec![],
+        total_matches: 0,
+        concepts_matched: vec!["some-concept".to_string()],
+        wildcard_fallback: true,
+    };
+    let meta = ResponseMeta::new("search");
+    let response = RobotResponse::success(data, meta);
+
+    let formatter = RobotFormatter::new(RobotConfig::new());
+    let output = formatter.format(&response).unwrap();
+
+    // wildcard_fallback=true must appear in the JSON envelope
+    assert!(
+        output.contains("wildcard_fallback"),
+        "wildcard_fallback field missing from JSON output"
+    );
+    assert!(
+        output.contains("true"),
+        "wildcard_fallback should be true in JSON output"
+    );
+    // concepts_matched must carry the concept name
+    assert!(
+        output.contains("some-concept"),
+        "concepts_matched should include 'some-concept' in JSON output"
+    );
 }
