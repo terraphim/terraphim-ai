@@ -187,8 +187,7 @@ impl ServiceConfig {
     /// Corresponds to `agent.max_retry_attempts` in WORKFLOW.md front matter.
     /// Default: 10.
     pub fn max_retry_attempts(&self) -> u32 {
-        self.get_u64(&["agent", "max_retry_attempts"])
-            .unwrap_or(10) as u32
+        self.get_u64(&["agent", "max_retry_attempts"]).unwrap_or(10) as u32
     }
 
     /// Per-state concurrency limits.

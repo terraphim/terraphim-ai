@@ -863,7 +863,8 @@ mod tests {
         }
 
         async fn fetch_issue_states_by_ids(&self, ids: &[String]) -> crate::Result<Vec<Issue>> {
-            Ok(self.issues
+            Ok(self
+                .issues
                 .iter()
                 .filter(|i| ids.contains(&i.id))
                 .cloned()
@@ -893,7 +894,11 @@ mod tests {
         }
     }
 
-    fn config_for_test(tmp: &TempDir, max_retry_attempts: u32, max_concurrent: usize) -> ServiceConfig {
+    fn config_for_test(
+        tmp: &TempDir,
+        max_retry_attempts: u32,
+        max_concurrent: usize,
+    ) -> ServiceConfig {
         let root = tmp.path().display();
         let yaml = format!(
             "tracker:\n  kind: gitea\nworkspace:\n  root: {root}\nagent:\n  max_retry_attempts: {max_retry_attempts}\n  max_concurrent_agents: {max_concurrent}",
@@ -911,7 +916,12 @@ mod tests {
         SymphonyOrchestrator::new(config.clone(), tracker, ws_mgr)
     }
 
-    fn seed_retry_entry(orch: &mut SymphonyOrchestrator, issue_id: &str, identifier: &str, attempt: u32) {
+    fn seed_retry_entry(
+        orch: &mut SymphonyOrchestrator,
+        issue_id: &str,
+        identifier: &str,
+        attempt: u32,
+    ) {
         let tx = orch.retry_fire_tx.clone();
         // Noop timer: tests drive on_retry_timer directly without waiting for timer fires.
         let timer_handle = tokio::spawn(async move {
@@ -925,7 +935,9 @@ mod tests {
             timer_handle,
             error: None,
         };
-        orch.state.retry_attempts.insert(issue_id.to_string(), entry);
+        orch.state
+            .retry_attempts
+            .insert(issue_id.to_string(), entry);
         orch.state.claimed.insert(issue_id.to_string());
     }
 
@@ -942,7 +954,10 @@ mod tests {
 
         // Seed with attempt == max_retry_attempts (1). Next attempt would be 2 > 1.
         seed_retry_entry(&mut orch, "42", "TEST-42", 1);
-        assert!(orch.state.claimed.contains("42"), "pre-condition: claim must be held");
+        assert!(
+            orch.state.claimed.contains("42"),
+            "pre-condition: claim must be held"
+        );
 
         orch.on_retry_timer("42").await;
 
@@ -967,7 +982,10 @@ mod tests {
         let mut orch = make_test_orchestrator(tracker, &config);
 
         seed_retry_entry(&mut orch, "99", "TEST-99", 1);
-        assert!(orch.state.claimed.contains("99"), "pre-condition: claim must be held");
+        assert!(
+            orch.state.claimed.contains("99"),
+            "pre-condition: claim must be held"
+        );
 
         orch.on_retry_timer("99").await;
 
