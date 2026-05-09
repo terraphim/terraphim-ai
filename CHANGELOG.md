@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`terraphim_types` full doc coverage** — zero `missing_docs` warnings across the crate: `score/mod.rs` module header and all public items (`Scorer`, `Query`, `Similarity`, `ScoreError`, `sort_documents`); `llm_usage.rs` struct fields and methods (`LlmUsage`, `LlmResult`, `ModelPricing`); `lib.rs` items (`DocumentType` variants, `RouteDirective` fields, `MarkdownDirectives` struct and fields, `Edge` struct doc and `Edge::new`, `Thesaurus::keys`, `IndexedDocument` methods, `NormalizedTermValue` methods, `ConversationId`/`MessageId` constructors, `ChatMessage` struct, `ContextHistory::new`, `MultiAgentContext::new`); `review.rs` enum variants and struct fields for `FindingSeverity`, `FindingCategory`, `ReviewFinding`, `ReviewAgentOutput`
 - **`terraphim_symphony` snapshot struct docs** — field-level rustdoc added to `StateSnapshot`, `SnapshotCounts`, `RunningSnapshot`, and `RetrySnapshot`; these observability types are now fully documented with cross-references to `OrchestratorRuntimeState::snapshot`
 - **`terraphim_symphony` gitea.rs redundant link fix** — resolved `rustdoc::redundant_explicit_links` warning in `tracker/gitea.rs` module header; workspace `cargo doc` now produces zero warnings on `terraphim_symphony`
 
