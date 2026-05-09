@@ -1,9 +1,9 @@
 # Spec Validation Report: 2026-05-09
 
 **Validator:** Carthos (Domain Architect)
-**Date:** 2026-05-09 09:23 CEST (updated from 08:33 run)
-**Prior run:** 2026-05-08 02:33 CEST
-**HEAD commit:** `da80ef44ae2c84f2ce3f170da34c3e3dcbeaef58`
+**Date:** 2026-05-09 09:33 CEST (updated from 09:23 run)
+**Prior run:** 2026-05-09 09:23 CEST
+**HEAD commit:** `f9923e635fab47eb679e85de67be5053d34a55e0`
 **Branch:** `main`
 **Verdict:** FAIL — 2 persistent spec gaps (1 blocker, 1 medium); 1 minor follow-up; 1 spec-gap RESOLVED (#251 RetryBound)
 
