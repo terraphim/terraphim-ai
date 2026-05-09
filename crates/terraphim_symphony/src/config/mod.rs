@@ -181,6 +181,14 @@ impl ServiceConfig {
             .unwrap_or(300_000)
     }
 
+    /// Maximum number of retry attempts before giving up on an issue.
+    ///
+    /// When an issue exceeds this count the orchestrator releases its claim
+    /// and stops scheduling further retries (RetryGiveUp in TLA+ spec).
+    pub fn max_retry_attempts(&self) -> u32 {
+        self.get_u64(&["agent", "max_retry_attempts"]).unwrap_or(5) as u32
+    }
+
     /// Per-state concurrency limits.
     pub fn max_concurrent_agents_by_state(&self) -> HashMap<String, usize> {
         let mut map = HashMap::new();
