@@ -1050,6 +1050,12 @@ impl AgentOrchestrator {
                         warn!(error = %e, "failed to save probe results");
                     }
                 }
+                
+                // Send probe results to Quickwit for cost-aware routing
+                if let Some(ref sink) = self.quickwit_sink {
+                    let project_id = self.config.projects.first().map(|p| p.id.clone()).unwrap_or_else(|| crate::dispatcher::LEGACY_PROJECT_ID.to_string());
+                    self.provider_health.send_to_quickwit(sink, &project_id).await;
+                }
             }
         }
 
@@ -5506,6 +5512,12 @@ impl AgentOrchestrator {
                     .and_then(|r| r.probe_results_dir.clone())
                 {
                     let _ = self.provider_health.save_results(dir.as_path()).await;
+                }
+                
+                // Send probe results to Quickwit for cost-aware routing
+                if let Some(ref sink) = self.quickwit_sink {
+                    let project_id = self.config.projects.first().map(|p| p.id.clone()).unwrap_or_else(|| crate::dispatcher::LEGACY_PROJECT_ID.to_string());
+                    self.provider_health.send_to_quickwit(sink, &project_id).await;
                 }
             }
         }

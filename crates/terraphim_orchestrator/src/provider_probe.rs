@@ -449,6 +449,38 @@ impl ProviderHealthMap {
         );
         Ok(())
     }
+
+    /// Send probe results to Quickwit for cost-aware routing analytics.
+    pub async fn send_to_quickwit(
+        &self,
+        sink: &crate::quickwit::QuickwitFleetSink,
+        project_id: &str,
+    ) {
+        for result in &self.results {
+            let doc = crate::quickwit::LogDocument {
+                timestamp: result.timestamp.clone(),
+                project_id: project_id.to_string(),
+                level: match result.status {
+                    ProbeStatus::Success => "INFO".to_string(),
+                    _ => "WARN".to_string(),
+                },
+                agent_name: "probe".to_string(),
+                layer: "Core".to_string(),
+                source: "probe".to_string(),
+                message: result.error.clone().unwrap_or_else(|| format!("probe {:?}", result.status)),
+                model: Some(result.model.clone()),
+                cost_usd: Some(0.0), // Probes are zero-cost test calls
+                latency_ms: result.latency_ms,
+                exit_class: Some(format!("{:?}", result.status).to_lowercase()),
+                is_free: true, // Probes don't incur cost
+                ..Default::default()
+            };
+            if let Err(e) = sink.send(doc).await {
+                warn!(error = %e, "failed to send probe result to Quickwit");
+            }
+        }
+        info!(results = self.results.len(), "probe results sent to Quickwit");
+    }
 }
 
 /// Check whether a CLI tool is available on PATH.
