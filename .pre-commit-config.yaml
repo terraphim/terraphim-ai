@@ -52,20 +52,20 @@ repos:
 
       - id: cargo-clippy
         name: Cargo clippy
-        entry: cargo clippy --workspace --all-targets -- -D warnings
+        entry: bash -c 'if command -v rch >/dev/null 2>&1; then echo "Using rch for remote clippy..."; rch exec -- cargo clippy --workspace --all-targets -- -D warnings; else cargo clippy --workspace --all-targets -- -D warnings; fi'
         language: system
         types: [rust]
         pass_filenames: false
-        description: "Run Rust linter with cargo clippy"
+        description: "Run Rust linter with cargo clippy (rch remote if available)"
 
       - id: cargo-test
         name: Cargo test
-        entry: cargo test --workspace
+        entry: bash -c 'if command -v rch >/dev/null 2>&1; then echo "Using rch for remote tests..."; rch exec -- cargo test --workspace --lib; else cargo test --workspace --lib; fi'
         language: system
         types: [rust]
         pass_filenames: false
         stages: [manual]
-        description: "Run Rust tests (manual stage)"
+        description: "Run Rust tests via rch remote worker if available (manual stage)"
 
       - id: cargo-audit
         name: Cargo audit

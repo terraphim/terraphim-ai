@@ -4,7 +4,7 @@
 //! health state (Closed/Open/HalfOpen). The probe executes `action::` templates
 //! from KG routing rules via CLI tools to test the full stack.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
 
 use terraphim_spawner::health::{CircuitBreaker, CircuitBreakerConfig, CircuitState, HealthStatus};
@@ -25,12 +25,13 @@ pub struct ProbeResult {
 }
 
 /// Status of a probe attempt.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ProbeStatus {
     Success,
     Error,
     Timeout,
+    RateLimited,
 }
 
 /// Cached provider availability map with TTL-based refresh.
@@ -45,6 +46,8 @@ pub struct ProviderHealthMap {
     ttl: Duration,
     /// Circuit breaker configuration.
     cb_config: CircuitBreakerConfig,
+    /// Providers currently blocked by rate limits.
+    rate_limited: HashSet<String>,
 }
 
 impl std::fmt::Debug for ProviderHealthMap {
@@ -70,7 +73,13 @@ impl ProviderHealthMap {
                 cooldown: Duration::from_secs(300),
                 success_threshold: 1,
             },
+            rate_limited: HashSet::new(),
         }
+    }
+
+    /// Check if a provider is currently rate-limited.
+    pub fn is_rate_limited(&self, provider: &str) -> bool {
+        self.rate_limited.contains(provider)
     }
 
     /// Check if cached probe results have expired.
@@ -85,9 +94,17 @@ impl ProviderHealthMap {
     /// Extracts unique `(provider, model, action)` triples from the router's
     /// rules, executes each action template with a test prompt via
     /// `tokio::process::Command`, and records results.
-    pub async fn probe_all(&mut self, kg_router: &KgRouter) {
+    pub async fn probe_all(
+        &mut self,
+        kg_router: &KgRouter,
+        is_blocked: &dyn Fn(&str) -> bool,
+    ) {
         let mut seen = HashMap::new();
         let mut tasks = Vec::new();
+        let mut results = Vec::new();
+
+        // Clear rate-limited set; we will rebuild it for this tick.
+        self.rate_limited.clear();
 
         // Collect unique provider+model combos from all KG routing rules
         for rule in kg_router.all_routes() {
@@ -96,6 +113,26 @@ impl ProviderHealthMap {
                 continue;
             }
             seen.insert(key.clone(), true);
+
+            // Skip probing providers that are currently rate-limited.
+            if is_blocked(&rule.provider) {
+                debug!(
+                    provider = %rule.provider,
+                    model = %rule.model,
+                    "probe skipped: provider rate-limited"
+                );
+                self.rate_limited.insert(rule.provider.clone());
+                results.push(ProbeResult {
+                    provider: rule.provider.clone(),
+                    model: rule.model.clone(),
+                    cli_tool: String::new(),
+                    status: ProbeStatus::RateLimited,
+                    latency_ms: None,
+                    error: Some("probe skipped: provider rate-limited".to_string()),
+                    timestamp: chrono::Utc::now().to_rfc3339(),
+                });
+                continue;
+            }
 
             // Skip probing models whose circuit breaker is already Open.
             // Probing a known-unhealthy provider wastes tokens and spawns
@@ -120,7 +157,6 @@ impl ProviderHealthMap {
             }));
         }
 
-        let mut results = Vec::new();
         for task in tasks {
             match task.await {
                 Ok(result) => results.push(result),
@@ -158,6 +194,14 @@ impl ProviderHealthMap {
                     }
                 }
                 ProbeStatus::Timeout => breaker.record_failure(),
+                ProbeStatus::RateLimited => {
+                    // Rate-limited probes are skipped; do not update breaker.
+                    debug!(
+                        provider = %result.provider,
+                        model = %result.model,
+                        "skipping circuit-breaker update: provider rate-limited"
+                    );
+                }
             }
         }
 
@@ -191,6 +235,7 @@ impl ProviderHealthMap {
                 ProbeStatus::Success => HealthStatus::Healthy,
                 ProbeStatus::Error => HealthStatus::Unhealthy,
                 ProbeStatus::Timeout => HealthStatus::Unhealthy,
+                ProbeStatus::RateLimited => HealthStatus::Degraded,
             };
         }
 
@@ -207,6 +252,11 @@ impl ProviderHealthMap {
 
     /// Get aggregate health status for a provider (any model healthy = provider healthy).
     pub fn provider_health(&self, provider: &str) -> HealthStatus {
+        // Rate-limited providers report as Degraded regardless of other state.
+        if self.is_rate_limited(provider) {
+            return HealthStatus::Degraded;
+        }
+
         // Check probe results at model level
         let provider_results: Vec<_> = self
             .results
@@ -297,6 +347,9 @@ impl ProviderHealthMap {
                 unhealthy.push(name);
             }
         }
+
+        // Exclude rate-limited providers; they are not truly "unhealthy".
+        unhealthy.retain(|p| !self.is_rate_limited(p));
 
         unhealthy
     }
@@ -802,6 +855,9 @@ mod tests {
                 }
             }
             ProbeStatus::Timeout => breaker.record_failure(),
+            ProbeStatus::RateLimited => {
+                // Skipped — same as CLI-not-found.
+            }
         }
 
         // The breaker must still be Closed because the CLI-not-found error
@@ -814,5 +870,227 @@ mod tests {
         // When there are no probe results, the provider falls back to the
         // circuit breaker state, which is Closed (healthy).
         assert!(map.is_healthy("openai"));
+    }
+
+    #[test]
+    fn probe_status_rate_limited_serialisation() {
+        let status = ProbeStatus::RateLimited;
+        let json = serde_json::to_string(&status).unwrap();
+        assert_eq!(json, "\"rate_limited\"");
+        let deserialized: ProbeStatus = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized, ProbeStatus::RateLimited);
+    }
+
+    #[tokio::test]
+    async fn probe_skips_rate_limited_provider() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join("test.md"),
+            r#"# Test
+route:: test-provider, test-model
+action:: test-cli-tool --model {{ model }}
+"#,
+        )
+        .unwrap();
+
+        let kg_router = crate::kg_router::KgRouter::load(dir.path()).unwrap();
+        let mut map = ProviderHealthMap::new(Duration::from_secs(300));
+
+        // Block the test provider.
+        map.probe_all(&kg_router, &|provider: &str| provider == "test-provider")
+            .await;
+
+        // Should have recorded a RateLimited result.
+        let result = map
+            .results
+            .iter()
+            .find(|r| r.provider == "test-provider" && r.model == "test-model")
+            .expect("RateLimited result should be recorded");
+        assert_eq!(result.status, ProbeStatus::RateLimited);
+        assert_eq!(
+            result.error,
+            Some("probe skipped: provider rate-limited".to_string())
+        );
+
+        // Provider should be tracked as rate-limited.
+        assert!(map.is_rate_limited("test-provider"));
+
+        // Health should report Degraded.
+        assert_eq!(
+            map.model_health("test-provider", "test-model"),
+            HealthStatus::Degraded
+        );
+        assert_eq!(map.provider_health("test-provider"), HealthStatus::Degraded);
+    }
+
+    #[tokio::test]
+    async fn rate_limit_expiry_triggers_reprobe() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join("test.md"),
+            r#"# Test
+route:: test-provider, test-model
+action:: definitely-not-a-real-cli-12345 --model {{ model }}
+"#,
+        )
+        .unwrap();
+
+        let kg_router = crate::kg_router::KgRouter::load(dir.path()).unwrap();
+        let mut map = ProviderHealthMap::new(Duration::from_secs(300));
+
+        // First call: provider is blocked -> RateLimited.
+        map.probe_all(&kg_router, &|_: &str| true).await;
+        let first_result = map
+            .results
+            .iter()
+            .find(|r| r.provider == "test-provider")
+            .expect("Result should exist");
+        assert_eq!(first_result.status, ProbeStatus::RateLimited);
+
+        // Second call: block has "expired" (is_blocked returns false).
+        // The probe will spawn the CLI, which does not exist, yielding Error.
+        map.probe_all(&kg_router, &|_: &str| false).await;
+        let second_result = map
+            .results
+            .iter()
+            .find(|r| r.provider == "test-provider")
+            .expect("Result should exist");
+
+        // After expiry the provider is re-probed (not skipped due to rate limit).
+        // It may still fail for other reasons (C1 allow-list, CLI not found, etc.),
+        // but it must NOT be RateLimited.
+        assert_ne!(
+            second_result.status,
+            ProbeStatus::RateLimited,
+            "Provider should be re-probed after rate limit expiry, not skipped. Got: {:?}",
+            second_result
+        );
+
+        // Provider is no longer tracked as rate-limited.
+        assert!(!map.is_rate_limited("test-provider"));
+    }
+
+    #[test]
+    fn rate_limited_does_not_open_circuit_breaker() {
+        let mut map = ProviderHealthMap::new(Duration::from_secs(300));
+
+        // Record 4 failures for kimi (threshold is 5)
+        for _ in 0..4 {
+            map.record_failure("kimi");
+        }
+
+        // Simulate the exact update logic from `probe_all` with a RateLimited
+        // result. We create the breaker entry and then run the same match logic.
+        let result = ProbeResult {
+            provider: "kimi".to_string(),
+            model: "kimi-for-coding/k2p5".to_string(),
+            cli_tool: "opencode".to_string(),
+            status: ProbeStatus::RateLimited,
+            latency_ms: None,
+            error: Some("probe skipped: provider rate-limited".to_string()),
+            timestamp: String::new(),
+        };
+
+        let key = format!("{}:{}", result.provider, result.model);
+        let breaker = map
+            .breakers
+            .entry(key)
+            .or_insert_with(|| CircuitBreaker::new(map.cb_config.clone()));
+
+        // Replicate the logic from `probe_all`.
+        match result.status {
+            ProbeStatus::Success => breaker.record_success(),
+            ProbeStatus::Error => {
+                if result
+                    .error
+                    .as_ref()
+                    .is_some_and(|e| e.contains("CLI tool") && e.contains("not found on PATH"))
+                {
+                    // Skipped
+                } else {
+                    breaker.record_failure();
+                }
+            }
+            ProbeStatus::Timeout => breaker.record_failure(),
+            ProbeStatus::RateLimited => {
+                // Skipped — same as CLI-not-found.
+            }
+        }
+
+        // The breaker must still be Closed because the RateLimited error
+        // was skipped (failure count remains at 4, not 5).
+        assert!(matches!(
+            breaker.state(),
+            terraphim_spawner::health::CircuitState::Closed
+        ));
+
+        // Provider is still healthy because the circuit breaker is Closed.
+        assert!(map.is_healthy("kimi"));
+    }
+
+    #[test]
+    fn model_health_returns_degraded_for_rate_limited() {
+        let mut map = ProviderHealthMap::new(Duration::from_secs(300));
+        map.rate_limited.insert("anthropic".to_string());
+        map.results = vec![ProbeResult {
+            provider: "anthropic".to_string(),
+            model: "claude-sonnet".to_string(),
+            cli_tool: "claude".to_string(),
+            status: ProbeStatus::RateLimited,
+            latency_ms: None,
+            error: Some("probe skipped: provider rate-limited".to_string()),
+            timestamp: String::new(),
+        }];
+
+        assert_eq!(
+            map.model_health("anthropic", "claude-sonnet"),
+            HealthStatus::Degraded
+        );
+    }
+
+    #[test]
+    fn provider_health_returns_degraded_for_rate_limited() {
+        let mut map = ProviderHealthMap::new(Duration::from_secs(300));
+        map.rate_limited.insert("anthropic".to_string());
+
+        // Even with no probe results, a rate-limited provider reports Degraded.
+        assert_eq!(
+            map.provider_health("anthropic"),
+            HealthStatus::Degraded
+        );
+    }
+
+    #[test]
+    fn unhealthy_providers_excludes_rate_limited() {
+        let mut map = ProviderHealthMap::new(Duration::from_secs(300));
+
+        // Simulate a provider with all models failing.
+        map.results = vec![
+            ProbeResult {
+                provider: "openai".to_string(),
+                model: "gpt-4".to_string(),
+                cli_tool: "opencode".to_string(),
+                status: ProbeStatus::Error,
+                latency_ms: Some(5000),
+                error: Some("API key invalid".to_string()),
+                timestamp: String::new(),
+            },
+            ProbeResult {
+                provider: "anthropic".to_string(),
+                model: "claude-sonnet".to_string(),
+                cli_tool: "claude".to_string(),
+                status: ProbeStatus::RateLimited,
+                latency_ms: None,
+                error: Some("probe skipped: provider rate-limited".to_string()),
+                timestamp: String::new(),
+            },
+        ];
+
+        // Mark anthropic as rate-limited.
+        map.rate_limited.insert("anthropic".to_string());
+
+        let unhealthy = map.unhealthy_providers();
+        assert!(unhealthy.contains(&"openai".to_string()));
+        assert!(!unhealthy.contains(&"anthropic".to_string()));
     }
 }

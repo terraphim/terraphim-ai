@@ -1035,7 +1035,9 @@ impl AgentOrchestrator {
         {
             if let Some(ref kg_router) = self.kg_router {
                 info!("running startup provider probe via KG action:: templates");
-                self.provider_health.probe_all(kg_router).await;
+                self.provider_health
+                    .probe_all(kg_router, &|p| self.provider_rate_limits.is_blocked(p))
+                    .await;
 
                 // Save probe results if directory configured
                 if let Some(ref dir) = self
@@ -5491,7 +5493,9 @@ impl AgentOrchestrator {
         // 13. D-2: Re-probe providers if cached results are stale
         if self.provider_health.is_stale() {
             if let Some(ref kg_router) = self.kg_router {
-                self.provider_health.probe_all(kg_router).await;
+                self.provider_health
+                    .probe_all(kg_router, &|p| self.provider_rate_limits.is_blocked(p))
+                    .await;
                 if let Some(ref dir) = self
                     .config
                     .routing
