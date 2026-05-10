@@ -1,0 +1,131 @@
+{
+  "groups": [
+    {
+      "concept": "terraphim",
+      "modules": [
+        "terraphim_agent",
+        "terraphim_agent_evolution",
+        "terraphim_agent_registry",
+        "terraphim_agent_supervisor",
+        "terraphim_ai_nodejs",
+        "terraphim_automata",
+        "terraphim_config",
+        "terraphim_dsm",
+        "terraphim-firecracker",
+        "terraphim_hooks",
+        "terraphim_mcp_server",
+        "terraphim_multi_agent",
+        "terraphim_negative_contribution",
+        "terraphim_rlm",
+        "terraphim_router",
+        "terraphim_server",
+        "terraphim_settings",
+        "terraphim_spawner",
+        "terraphim_tinyclaw",
+        "terraphim_tracker",
+        "terraphim_update"
+      ],
+      "count": 21
+    },
+    {
+      "concept": "engagement signal",
+      "modules": [
+        "terraphim_agent_messaging",
+        "terraphim_kg_orchestration",
+        "terraphim_orchestrator",
+        "terraphim-session-analyzer",
+        "terraphim_sessions",
+        "terraphim_test_utils",
+        "terraphim_types"
+      ],
+      "count": 7
+    },
+    {
+      "concept": "learning intent",
+      "modules": [
+        "terraphim_atomic_client",
+        "terraphim-cli",
+        "terraphim_goal_alignment",
+        "terraphim_kg_linter",
+        "terraphim_onepassword_cli"
+      ],
+      "count": 5
+    },
+    {
+      "concept": "readiness signal",
+      "modules": [
+        "terraphim-markdown-parser",
+        "terraphim_persistence"
+      ],
+      "count": 2
+    },
+    {
+      "concept": "typescript",
+      "modules": [
+        "terraphim_codebase_eval",
+        "terraphim_kg_agents"
+      ],
+      "count": 2
+    },
+    {
+      "concept": "professional fees",
+      "modules": [
+        "terraphim_ccusage",
+        "terraphim_usage"
+      ],
+      "count": 2
+    },
+    {
+      "concept": "subscriptions",
+      "modules": [
+        "terraphim_service"
+      ],
+      "count": 1
+    },
+    {
+      "concept": "workspace",
+      "modules": [
+        "terraphim_workspace"
+      ],
+      "count": 1
+    },
+    {
+      "concept": "build-tools",
+      "modules": [
+        "terraphim_middleware"
+      ],
+      "count": 1
+    },
+    {
+      "concept": "accessibility",
+      "modules": [
+        "terraphim_rolegraph"
+      ],
+      "count": 1
+    },
+    {
+      "concept": "forms-validation",
+      "modules": [
+        "terraphim_validation"
+      ],
+      "count": 1
+    },
+    {
+      "concept": "task",
+      "modules": [
+        "terraphim_task_decomposition"
+      ],
+      "count": 1
+    },
+    {
+      "concept": "evaluation artefact",
+      "modules": [
+        "terraphim_file_search"
+      ],
+      "count": 1
+    }
+  ],
+  "total_modules": 49,
+  "uncategorized_count": 3,
+  "knowledge_graph_concepts": 247
+}

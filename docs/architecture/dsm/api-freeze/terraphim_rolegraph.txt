@@ -1,0 +1,153 @@
+warning: patch `tokio-tungstenite v0.28.0 (https://github.com/snapview/tokio-tungstenite.git?tag=v0.28.0#35d110c2)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling syn v2.0.117
+    Checking smallvec v1.15.1
+    Checking stable_deref_trait v1.2.1
+    Checking futures-core v0.3.32
+    Checking bytes v1.11.1
+   Compiling shlex v1.3.0
+   Compiling find-msvc-tools v0.1.9
+    Checking writeable v0.6.3
+    Checking errno v0.3.14
+    Checking socket2 v0.6.3
+    Checking mio v1.2.0
+    Checking slab v0.4.12
+    Checking litemap v0.8.2
+    Checking futures-task v0.3.32
+   Compiling icu_normalizer_data v2.2.0
+    Checking zeroize v1.8.2
+   Compiling icu_properties_data v2.2.0
+    Checking utf8_iter v1.0.4
+    Checking signal-hook-registry v1.4.8
+    Checking rustls-pki-types v1.14.1
+    Checking parking_lot_core v0.9.12
+    Checking futures-channel v0.3.32
+   Compiling cc v1.2.61
+    Checking futures-util v0.3.32
+    Checking getrandom v0.2.17
+   Compiling httparse v1.10.1
+error[E0583]: file not found for module `apple`
+ --> /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cc-1.2.61/src/target.rs:4:1
+  |
+4 | mod apple;
+  | ^^^^^^^^^^
+  |
+  = help: to create the module `apple`, create file "/home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cc-1.2.61/src/target/apple.rs" or "/home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cc-1.2.61/src/target/apple/mod.rs"
+  = note: if there is a `mod apple` elsewhere in the crate already, import it with `use crate::...` instead
+
+error[E0583]: file not found for module `generated`
+ --> /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cc-1.2.61/src/target.rs:5:1
+  |
+5 | mod generated;
+  | ^^^^^^^^^^^^^^
+  |
+  = help: to create the module `generated`, create file "/home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cc-1.2.61/src/target/generated.rs" or "/home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cc-1.2.61/src/target/generated/mod.rs"
+  = note: if there is a `mod generated` elsewhere in the crate already, import it with `use crate::...` instead
+
+error[E0583]: file not found for module `llvm`
+ --> /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cc-1.2.61/src/target.rs:6:1
+  |
+6 | mod llvm;
+  | ^^^^^^^^^
+  |
+  = help: to create the module `llvm`, create file "/home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cc-1.2.61/src/target/llvm.rs" or "/home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cc-1.2.61/src/target/llvm/mod.rs"
+  = note: if there is a `mod llvm` elsewhere in the crate already, import it with `use crate::...` instead
+
+error[E0583]: file not found for module `parser`
+ --> /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cc-1.2.61/src/target.rs:7:1
+  |
+7 | mod parser;
+  | ^^^^^^^^^^^
+  |
+  = help: to create the module `parser`, create file "/home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cc-1.2.61/src/target/parser.rs" or "/home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cc-1.2.61/src/target/parser/mod.rs"
+  = note: if there is a `mod parser` elsewhere in the crate already, import it with `use crate::...` instead
+
+    Checking percent-encoding v2.3.2
+    Checking untrusted v0.9.0
+    Checking try-lock v0.2.5
+    Checking parking_lot v0.12.5
+   Compiling rustls v0.23.39
+    Checking tower-service v0.3.3
+    Checking tracing-core v0.1.36
+    Checking atomic-waker v1.1.2
+    Checking want v0.3.1
+    Checking subtle v2.6.1
+    Checking form_urlencoded v1.2.2
+    Checking sync_wrapper v1.0.2
+    Checking ipnet v2.12.0
+    Checking tower-layer v0.3.3
+    Checking base64 v0.22.1
+error[E0599]: no method named `llvm_target` found for reference `&target::TargetInfo<'_>` in the current scope
+    --> /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cc-1.2.61/src/lib.rs:2320:32
+     |
+2320 |                         target.llvm_target(&self.get_raw_target()?, version.as_deref());
+     |                                ^^^^^^^^^^^ method not found in `&target::TargetInfo<'_>`
+
+error[E0599]: no method named `llvm_target` found for reference `&target::TargetInfo<'_>` in the current scope
+    --> /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cc-1.2.61/src/lib.rs:2334:36
+     |
+2334 | ...                   target.llvm_target(&self.get_raw_target()?, None)
+     |                              ^^^^^^^^^^^ method not found in `&target::TargetInfo<'_>`
+
+    Checking webpki-roots v1.0.7
+    Checking ryu v1.0.23
+error[E0599]: no method named `apple_version_flag` found for struct `target::TargetInfo<'a>` in the current scope
+    --> /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cc-1.2.61/src/lib.rs:2866:30
+     |
+2866 |                 .push(target.apple_version_flag(&min_version).into());
+     |                              ^^^^^^^^^^^^^^^^^^ method not found in `target::TargetInfo<'_>`
+     |
+    ::: /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cc-1.2.61/src/target.rs:15:1
+     |
+  15 | pub(crate) struct TargetInfo<'a> {
+     | -------------------------------- method `apple_version_flag` not found for this struct
+
+    Checking iri-string v0.7.12
+    Checking bitflags v2.11.1
+error[E0599]: no method named `apple_sdk_name` found for struct `target::TargetInfo<'a>` in the current scope
+    --> /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cc-1.2.61/src/lib.rs:2874:24
+     |
+2874 |                 target.apple_sdk_name(),
+     |                        ^^^^^^^^^^^^^^ method not found in `target::TargetInfo<'_>`
+     |
+    ::: /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cc-1.2.61/src/target.rs:15:1
+     |
+  15 | pub(crate) struct TargetInfo<'a> {
+     | -------------------------------- method `apple_sdk_name` not found for this struct
+
+    Checking either v1.15.0
+    Checking unicode-segmentation v1.13.2
+    Checking http v1.4.0
+error[E0599]: no function or associated item named `from_rustc_target` found for struct `target::TargetInfo<'a>` in the current scope
+    --> /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cc-1.2.61/src/lib.rs:3791:29
+     |
+3791 |                 TargetInfo::from_rustc_target(t)
+     |                             ^^^^^^^^^^^^^^^^^ function or associated item not found in `target::TargetInfo<'_>`
+     |
+    ::: /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cc-1.2.61/src/target.rs:15:1
+     |
+  15 | pub(crate) struct TargetInfo<'a> {
+     | -------------------------------- function or associated item `from_rustc_target` not found for this struct
+
+error[E0599]: no method named `apple_sdk_name` found for reference `&target::TargetInfo<'_>` in the current scope
+    --> /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cc-1.2.61/src/lib.rs:4068:26
+     |
+4068 |         let sdk = target.apple_sdk_name();
+     |                          ^^^^^^^^^^^^^^ method not found in `&target::TargetInfo<'_>`
+
+error[E0599]: no method named `apple_sdk_name` found for reference `&target::TargetInfo<'_>` in the current scope
+    --> /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cc-1.2.61/src/lib.rs:4090:26
+     |
+4090 |         let sdk = target.apple_sdk_name();
+     |                          ^^^^^^^^^^^^^^ method not found in `&target::TargetInfo<'_>`
+
+    Checking itertools v0.14.0
+    Checking tracing v0.1.44
+Some errors have detailed explanations: E0583, E0599.
+For more information about an error, try `rustc --explain E0583`.
+error: could not compile `cc` (lib) due to 11 previous errors
+warning: build failed, waiting for other jobs to finish...
+Error: Failed to build rustdoc JSON (see stderr)

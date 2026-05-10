@@ -1,0 +1,951 @@
+warning: patch `tokio-tungstenite v0.28.0 (https://github.com/snapview/tokio-tungstenite.git?tag=v0.28.0#35d110c2)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling syn v2.0.117
+   Compiling libc v0.2.186
+   Compiling strsim v0.11.1
+   Compiling ident_case v1.0.1
+   Compiling parking_lot_core v0.9.12
+   Compiling fnv v1.0.7
+    Checking scopeguard v1.2.0
+    Checking smallvec v1.15.1
+    Checking once_cell v1.21.4
+    Checking futures-sink v0.3.32
+    Checking pin-project-lite v0.2.17
+    Checking futures-core v0.3.32
+    Checking futures-task v0.3.32
+   Compiling thiserror v2.0.18
+    Checking aho-corasick v1.1.4
+    Checking unicode-id v0.3.6
+    Checking regex-syntax v0.8.10
+    Checking lock_api v0.4.14
+   Compiling fst v0.4.7
+    Checking foldhash v0.1.5
+    Checking allocator-api2 v0.2.21
+    Checking futures-io v0.3.32
+    Checking futures-channel v0.3.32
+    Checking futures-util v0.3.32
+    Checking markdown v1.0.0
+    Checking cached_proc_macro_types v0.1.1
+    Checking same-file v1.0.6
+    Checking web-time v1.1.0
+    Checking walkdir v2.5.0
+    Checking hashbrown v0.15.5
+    Checking getrandom v0.3.4
+    Checking getrandom v0.4.2
+    Checking uuid v1.23.1
+    Checking rand_core v0.9.5
+    Checking parking_lot v0.12.5
+    Checking rand_chacha v0.9.0
+    Checking futures v0.3.32
+    Checking rand v0.9.4
+    Checking regex-automata v0.4.14
+   Compiling darling_core v0.20.11
+   Compiling serde_derive_internals v0.29.1
+    Checking regex v1.12.3
+   Compiling serde_derive v1.0.228
+   Compiling thiserror-impl v1.0.69
+   Compiling tokio-macros v2.7.0
+   Compiling thiserror-impl v2.0.18
+   Compiling async-trait v0.1.89
+   Compiling schemars_derive v0.8.22
+    Checking tokio v1.52.1
+    Checking thiserror v1.0.69
+   Compiling darling_macro v0.20.11
+   Compiling darling v0.20.11
+   Compiling cached_proc_macro v0.25.0
+    Checking serde v1.0.228
+    Checking toml_datetime v0.6.11
+    Checking serde_spanned v0.6.9
+    Checking ahash v0.8.12
+    Checking chrono v0.4.44
+    Checking ulid v1.2.1
+    Checking schemars v0.8.22
+    Checking bincode v1.3.3
+    Checking toml_edit v0.22.27
+    Checking cached v0.56.0
+    Checking toml v0.8.23
+    Checking terraphim_types v1.15.0 (/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_types)
+    Checking terraphim-markdown-parser v1.0.0 (/home/alex/projects/terraphim/terraphim-ai/crates/terraphim-markdown-parser)
+ Documenting terraphim_automata v1.15.0 (/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_automata)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 22.52s
+pub mod terraphim_automata
+pub mod terraphim_automata::autocomplete
+pub struct terraphim_automata::autocomplete::AutocompleteConfig
+pub terraphim_automata::autocomplete::AutocompleteConfig::case_sensitive: bool
+pub terraphim_automata::autocomplete::AutocompleteConfig::max_results: usize
+pub terraphim_automata::autocomplete::AutocompleteConfig::min_prefix_length: usize
+impl core::clone::Clone for terraphim_automata::autocomplete::AutocompleteConfig
+pub fn terraphim_automata::autocomplete::AutocompleteConfig::clone(&self) -> terraphim_automata::autocomplete::AutocompleteConfig
+impl core::default::Default for terraphim_automata::autocomplete::AutocompleteConfig
+pub fn terraphim_automata::autocomplete::AutocompleteConfig::default() -> Self
+impl core::fmt::Debug for terraphim_automata::autocomplete::AutocompleteConfig
+pub fn terraphim_automata::autocomplete::AutocompleteConfig::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for terraphim_automata::autocomplete::AutocompleteConfig
+impl core::marker::Send for terraphim_automata::autocomplete::AutocompleteConfig
+impl core::marker::Sync for terraphim_automata::autocomplete::AutocompleteConfig
+impl core::marker::Unpin for terraphim_automata::autocomplete::AutocompleteConfig
+impl core::panic::unwind_safe::RefUnwindSafe for terraphim_automata::autocomplete::AutocompleteConfig
+impl core::panic::unwind_safe::UnwindSafe for terraphim_automata::autocomplete::AutocompleteConfig
+pub struct terraphim_automata::autocomplete::AutocompleteIndex
+impl terraphim_automata::autocomplete::AutocompleteIndex
+pub fn terraphim_automata::autocomplete::AutocompleteIndex::is_empty(&self) -> bool
+pub fn terraphim_automata::autocomplete::AutocompleteIndex::len(&self) -> usize
+pub fn terraphim_automata::autocomplete::AutocompleteIndex::metadata_get(&self, term: &str) -> core::option::Option<&terraphim_automata::autocomplete::AutocompleteMetadata>
+pub fn terraphim_automata::autocomplete::AutocompleteIndex::metadata_iter(&self) -> impl core::iter::traits::iterator::Iterator<Item = (&str, &terraphim_automata::autocomplete::AutocompleteMetadata)>
+pub fn terraphim_automata::autocomplete::AutocompleteIndex::name(&self) -> &str
+impl core::clone::Clone for terraphim_automata::autocomplete::AutocompleteIndex
+pub fn terraphim_automata::autocomplete::AutocompleteIndex::clone(&self) -> terraphim_automata::autocomplete::AutocompleteIndex
+impl core::fmt::Debug for terraphim_automata::autocomplete::AutocompleteIndex
+pub fn terraphim_automata::autocomplete::AutocompleteIndex::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for terraphim_automata::autocomplete::AutocompleteIndex
+impl core::marker::Send for terraphim_automata::autocomplete::AutocompleteIndex
+impl core::marker::Sync for terraphim_automata::autocomplete::AutocompleteIndex
+impl core::marker::Unpin for terraphim_automata::autocomplete::AutocompleteIndex
+impl core::panic::unwind_safe::RefUnwindSafe for terraphim_automata::autocomplete::AutocompleteIndex
+impl core::panic::unwind_safe::UnwindSafe for terraphim_automata::autocomplete::AutocompleteIndex
+pub struct terraphim_automata::autocomplete::AutocompleteMetadata
+pub terraphim_automata::autocomplete::AutocompleteMetadata::action: core::option::Option<alloc::string::String>
+pub terraphim_automata::autocomplete::AutocompleteMetadata::id: u64
+pub terraphim_automata::autocomplete::AutocompleteMetadata::normalized_term: terraphim_types::NormalizedTermValue
+pub terraphim_automata::autocomplete::AutocompleteMetadata::original_term: alloc::string::String
+pub terraphim_automata::autocomplete::AutocompleteMetadata::pinned: bool
+pub terraphim_automata::autocomplete::AutocompleteMetadata::priority: core::option::Option<u8>
+pub terraphim_automata::autocomplete::AutocompleteMetadata::trigger: core::option::Option<alloc::string::String>
+pub terraphim_automata::autocomplete::AutocompleteMetadata::url: core::option::Option<alloc::string::String>
+impl core::clone::Clone for terraphim_automata::autocomplete::AutocompleteMetadata
+pub fn terraphim_automata::autocomplete::AutocompleteMetadata::clone(&self) -> terraphim_automata::autocomplete::AutocompleteMetadata
+impl core::fmt::Debug for terraphim_automata::autocomplete::AutocompleteMetadata
+pub fn terraphim_automata::autocomplete::AutocompleteMetadata::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for terraphim_automata::autocomplete::AutocompleteMetadata
+pub fn terraphim_automata::autocomplete::AutocompleteMetadata::serialize<__S>(&self, __serializer: __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for terraphim_automata::autocomplete::AutocompleteMetadata
+pub fn terraphim_automata::autocomplete::AutocompleteMetadata::deserialize<__D>(__deserializer: __D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for terraphim_automata::autocomplete::AutocompleteMetadata
+impl core::marker::Send for terraphim_automata::autocomplete::AutocompleteMetadata
+impl core::marker::Sync for terraphim_automata::autocomplete::AutocompleteMetadata
+impl core::marker::Unpin for terraphim_automata::autocomplete::AutocompleteMetadata
+impl core::panic::unwind_safe::RefUnwindSafe for terraphim_automata::autocomplete::AutocompleteMetadata
+impl core::panic::unwind_safe::UnwindSafe for terraphim_automata::autocomplete::AutocompleteMetadata
+pub struct terraphim_automata::autocomplete::AutocompleteResult
+pub terraphim_automata::autocomplete::AutocompleteResult::id: u64
+pub terraphim_automata::autocomplete::AutocompleteResult::normalized_term: terraphim_types::NormalizedTermValue
+pub terraphim_automata::autocomplete::AutocompleteResult::score: f64
+pub terraphim_automata::autocomplete::AutocompleteResult::term: alloc::string::String
+pub terraphim_automata::autocomplete::AutocompleteResult::url: core::option::Option<alloc::string::String>
+impl core::clone::Clone for terraphim_automata::autocomplete::AutocompleteResult
+pub fn terraphim_automata::autocomplete::AutocompleteResult::clone(&self) -> terraphim_automata::autocomplete::AutocompleteResult
+impl core::cmp::PartialEq for terraphim_automata::autocomplete::AutocompleteResult
+pub fn terraphim_automata::autocomplete::AutocompleteResult::eq(&self, other: &terraphim_automata::autocomplete::AutocompleteResult) -> bool
+impl core::fmt::Debug for terraphim_automata::autocomplete::AutocompleteResult
+pub fn terraphim_automata::autocomplete::AutocompleteResult::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for terraphim_automata::autocomplete::AutocompleteResult
+impl core::marker::Freeze for terraphim_automata::autocomplete::AutocompleteResult
+impl core::marker::Send for terraphim_automata::autocomplete::AutocompleteResult
+impl core::marker::Sync for terraphim_automata::autocomplete::AutocompleteResult
+impl core::marker::Unpin for terraphim_automata::autocomplete::AutocompleteResult
+impl core::panic::unwind_safe::RefUnwindSafe for terraphim_automata::autocomplete::AutocompleteResult
+impl core::panic::unwind_safe::UnwindSafe for terraphim_automata::autocomplete::AutocompleteResult
+pub fn terraphim_automata::autocomplete::autocomplete_search(index: &terraphim_automata::autocomplete::AutocompleteIndex, prefix: &str, limit: core::option::Option<usize>) -> terraphim_automata::Result<alloc::vec::Vec<terraphim_automata::autocomplete::AutocompleteResult>>
+pub fn terraphim_automata::autocomplete::build_autocomplete_index(thesaurus: terraphim_types::Thesaurus, config: core::option::Option<terraphim_automata::autocomplete::AutocompleteConfig>) -> terraphim_automata::Result<terraphim_automata::autocomplete::AutocompleteIndex>
+pub fn terraphim_automata::autocomplete::deserialize_autocomplete_index(data: &[u8]) -> terraphim_automata::Result<terraphim_automata::autocomplete::AutocompleteIndex>
+pub fn terraphim_automata::autocomplete::fuzzy_autocomplete_search(index: &terraphim_automata::autocomplete::AutocompleteIndex, prefix: &str, min_similarity: f64, limit: core::option::Option<usize>) -> terraphim_automata::Result<alloc::vec::Vec<terraphim_automata::autocomplete::AutocompleteResult>>
+pub fn terraphim_automata::autocomplete::fuzzy_autocomplete_search_jaro_winkler(index: &terraphim_automata::autocomplete::AutocompleteIndex, prefix: &str, min_similarity: f64, limit: core::option::Option<usize>) -> terraphim_automata::Result<alloc::vec::Vec<terraphim_automata::autocomplete::AutocompleteResult>>
+pub fn terraphim_automata::autocomplete::fuzzy_autocomplete_search_levenshtein(index: &terraphim_automata::autocomplete::AutocompleteIndex, prefix: &str, max_edit_distance: usize, limit: core::option::Option<usize>) -> terraphim_automata::Result<alloc::vec::Vec<terraphim_automata::autocomplete::AutocompleteResult>>
+pub fn terraphim_automata::autocomplete::serialize_autocomplete_index(index: &terraphim_automata::autocomplete::AutocompleteIndex) -> terraphim_automata::Result<alloc::vec::Vec<u8>>
+pub mod terraphim_automata::autocomplete_helpers
+pub fn terraphim_automata::autocomplete_helpers::get_metadata<'a>(index: &'a terraphim_automata::autocomplete::AutocompleteIndex, term: &str) -> core::option::Option<&'a terraphim_automata::autocomplete::AutocompleteMetadata>
+pub fn terraphim_automata::autocomplete_helpers::iter_metadata(index: &terraphim_automata::autocomplete::AutocompleteIndex) -> impl core::iter::traits::iterator::Iterator<Item = (&str, &terraphim_automata::autocomplete::AutocompleteMetadata)>
+pub mod terraphim_automata::builder
+pub enum terraphim_automata::builder::BuilderError
+pub terraphim_automata::builder::BuilderError::Indexation(alloc::string::String)
+pub terraphim_automata::builder::BuilderError::Io(std::io::error::Error)
+pub terraphim_automata::builder::BuilderError::Json(serde_json::error::Error)
+impl core::convert::From<serde_json::error::Error> for terraphim_automata::builder::BuilderError
+pub fn terraphim_automata::builder::BuilderError::from(source: serde_json::error::Error) -> Self
+impl core::convert::From<std::io::error::Error> for terraphim_automata::builder::BuilderError
+pub fn terraphim_automata::builder::BuilderError::from(source: std::io::error::Error) -> Self
+impl core::error::Error for terraphim_automata::builder::BuilderError
+pub fn terraphim_automata::builder::BuilderError::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
+impl core::fmt::Debug for terraphim_automata::builder::BuilderError
+pub fn terraphim_automata::builder::BuilderError::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for terraphim_automata::builder::BuilderError
+pub fn terraphim_automata::builder::BuilderError::fmt(&self, __formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for terraphim_automata::builder::BuilderError
+impl core::marker::Send for terraphim_automata::builder::BuilderError
+impl core::marker::Sync for terraphim_automata::builder::BuilderError
+impl core::marker::Unpin for terraphim_automata::builder::BuilderError
+impl !core::panic::unwind_safe::RefUnwindSafe for terraphim_automata::builder::BuilderError
+impl !core::panic::unwind_safe::UnwindSafe for terraphim_automata::builder::BuilderError
+pub enum terraphim_automata::builder::Data
+pub terraphim_automata::builder::Data::Bytes
+pub terraphim_automata::builder::Data::Bytes::bytes: alloc::string::String
+pub terraphim_automata::builder::Data::Text
+pub terraphim_automata::builder::Data::Text::text: alloc::string::String
+impl core::clone::Clone for terraphim_automata::builder::Data
+pub fn terraphim_automata::builder::Data::clone(&self) -> terraphim_automata::builder::Data
+impl core::cmp::Eq for terraphim_automata::builder::Data
+impl core::cmp::PartialEq for terraphim_automata::builder::Data
+pub fn terraphim_automata::builder::Data::eq(&self, other: &terraphim_automata::builder::Data) -> bool
+impl core::fmt::Debug for terraphim_automata::builder::Data
+pub fn terraphim_automata::builder::Data::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for terraphim_automata::builder::Data
+pub fn terraphim_automata::builder::Data::hash<__H: core::hash::Hasher>(&self, state: &mut __H)
+impl core::marker::StructuralPartialEq for terraphim_automata::builder::Data
+impl<'de> serde_core::de::Deserialize<'de> for terraphim_automata::builder::Data
+pub fn terraphim_automata::builder::Data::deserialize<__D>(__deserializer: __D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for terraphim_automata::builder::Data
+impl core::marker::Send for terraphim_automata::builder::Data
+impl core::marker::Sync for terraphim_automata::builder::Data
+impl core::marker::Unpin for terraphim_automata::builder::Data
+impl core::panic::unwind_safe::RefUnwindSafe for terraphim_automata::builder::Data
+impl core::panic::unwind_safe::UnwindSafe for terraphim_automata::builder::Data
+pub enum terraphim_automata::builder::Message
+pub terraphim_automata::builder::Message::Begin(terraphim_automata::builder::Begin)
+pub terraphim_automata::builder::Message::Context(terraphim_automata::builder::Context)
+pub terraphim_automata::builder::Message::End(terraphim_automata::builder::End)
+pub terraphim_automata::builder::Message::Match(terraphim_automata::builder::Match)
+pub terraphim_automata::builder::Message::Summary(terraphim_automata::builder::Summary)
+impl core::clone::Clone for terraphim_automata::builder::Message
+pub fn terraphim_automata::builder::Message::clone(&self) -> terraphim_automata::builder::Message
+impl core::cmp::Eq for terraphim_automata::builder::Message
+impl core::cmp::PartialEq for terraphim_automata::builder::Message
+pub fn terraphim_automata::builder::Message::eq(&self, other: &terraphim_automata::builder::Message) -> bool
+impl core::fmt::Debug for terraphim_automata::builder::Message
+pub fn terraphim_automata::builder::Message::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for terraphim_automata::builder::Message
+pub fn terraphim_automata::builder::Message::hash<__H: core::hash::Hasher>(&self, state: &mut __H)
+impl core::marker::StructuralPartialEq for terraphim_automata::builder::Message
+impl<'de> serde_core::de::Deserialize<'de> for terraphim_automata::builder::Message
+pub fn terraphim_automata::builder::Message::deserialize<__D>(__deserializer: __D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for terraphim_automata::builder::Message
+impl core::marker::Send for terraphim_automata::builder::Message
+impl core::marker::Sync for terraphim_automata::builder::Message
+impl core::marker::Unpin for terraphim_automata::builder::Message
+impl core::panic::unwind_safe::RefUnwindSafe for terraphim_automata::builder::Message
+impl core::panic::unwind_safe::UnwindSafe for terraphim_automata::builder::Message
+pub struct terraphim_automata::builder::Begin
+pub terraphim_automata::builder::Begin::path: core::option::Option<terraphim_automata::builder::Data>
+impl core::clone::Clone for terraphim_automata::builder::Begin
+pub fn terraphim_automata::builder::Begin::clone(&self) -> terraphim_automata::builder::Begin
+impl core::cmp::Eq for terraphim_automata::builder::Begin
+impl core::cmp::PartialEq for terraphim_automata::builder::Begin
+pub fn terraphim_automata::builder::Begin::eq(&self, other: &terraphim_automata::builder::Begin) -> bool
+impl core::fmt::Debug for terraphim_automata::builder::Begin
+pub fn terraphim_automata::builder::Begin::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for terraphim_automata::builder::Begin
+pub fn terraphim_automata::builder::Begin::hash<__H: core::hash::Hasher>(&self, state: &mut __H)
+impl core::marker::StructuralPartialEq for terraphim_automata::builder::Begin
+impl<'de> serde_core::de::Deserialize<'de> for terraphim_automata::builder::Begin
+pub fn terraphim_automata::builder::Begin::deserialize<__D>(__deserializer: __D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for terraphim_automata::builder::Begin
+impl core::marker::Send for terraphim_automata::builder::Begin
+impl core::marker::Sync for terraphim_automata::builder::Begin
+impl core::marker::Unpin for terraphim_automata::builder::Begin
+impl core::panic::unwind_safe::RefUnwindSafe for terraphim_automata::builder::Begin
+impl core::panic::unwind_safe::UnwindSafe for terraphim_automata::builder::Begin
+pub struct terraphim_automata::builder::Context
+pub terraphim_automata::builder::Context::lines: terraphim_automata::builder::Data
+pub terraphim_automata::builder::Context::path: core::option::Option<terraphim_automata::builder::Data>
+impl core::clone::Clone for terraphim_automata::builder::Context
+pub fn terraphim_automata::builder::Context::clone(&self) -> terraphim_automata::builder::Context
+impl core::cmp::Eq for terraphim_automata::builder::Context
+impl core::cmp::PartialEq for terraphim_automata::builder::Context
+pub fn terraphim_automata::builder::Context::eq(&self, other: &terraphim_automata::builder::Context) -> bool
+impl core::fmt::Debug for terraphim_automata::builder::Context
+pub fn terraphim_automata::builder::Context::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for terraphim_automata::builder::Context
+pub fn terraphim_automata::builder::Context::hash<__H: core::hash::Hasher>(&self, state: &mut __H)
+impl core::marker::StructuralPartialEq for terraphim_automata::builder::Context
+impl<'de> serde_core::de::Deserialize<'de> for terraphim_automata::builder::Context
+pub fn terraphim_automata::builder::Context::deserialize<__D>(__deserializer: __D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for terraphim_automata::builder::Context
+impl core::marker::Send for terraphim_automata::builder::Context
+impl core::marker::Sync for terraphim_automata::builder::Context
+impl core::marker::Unpin for terraphim_automata::builder::Context
+impl core::panic::unwind_safe::RefUnwindSafe for terraphim_automata::builder::Context
+impl core::panic::unwind_safe::UnwindSafe for terraphim_automata::builder::Context
+pub struct terraphim_automata::builder::End
+impl core::clone::Clone for terraphim_automata::builder::End
+pub fn terraphim_automata::builder::End::clone(&self) -> terraphim_automata::builder::End
+impl core::cmp::Eq for terraphim_automata::builder::End
+impl core::cmp::PartialEq for terraphim_automata::builder::End
+pub fn terraphim_automata::builder::End::eq(&self, other: &terraphim_automata::builder::End) -> bool
+impl core::fmt::Debug for terraphim_automata::builder::End
+pub fn terraphim_automata::builder::End::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for terraphim_automata::builder::End
+pub fn terraphim_automata::builder::End::hash<__H: core::hash::Hasher>(&self, state: &mut __H)
+impl core::marker::StructuralPartialEq for terraphim_automata::builder::End
+impl<'de> serde_core::de::Deserialize<'de> for terraphim_automata::builder::End
+pub fn terraphim_automata::builder::End::deserialize<__D>(__deserializer: __D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for terraphim_automata::builder::End
+impl core::marker::Send for terraphim_automata::builder::End
+impl core::marker::Sync for terraphim_automata::builder::End
+impl core::marker::Unpin for terraphim_automata::builder::End
+impl core::panic::unwind_safe::RefUnwindSafe for terraphim_automata::builder::End
+impl core::panic::unwind_safe::UnwindSafe for terraphim_automata::builder::End
+pub struct terraphim_automata::builder::Logseq
+impl core::default::Default for terraphim_automata::builder::Logseq
+pub fn terraphim_automata::builder::Logseq::default() -> terraphim_automata::builder::Logseq
+impl terraphim_automata::builder::ThesaurusBuilder for terraphim_automata::builder::Logseq
+pub async fn terraphim_automata::builder::Logseq::build<P: core::convert::Into<std::path::PathBuf> + core::marker::Send>(&self, name: alloc::string::String, haystack: P) -> terraphim_automata::builder::Result<terraphim_types::Thesaurus>
+impl core::marker::Freeze for terraphim_automata::builder::Logseq
+impl core::marker::Send for terraphim_automata::builder::Logseq
+impl core::marker::Sync for terraphim_automata::builder::Logseq
+impl core::marker::Unpin for terraphim_automata::builder::Logseq
+impl core::panic::unwind_safe::RefUnwindSafe for terraphim_automata::builder::Logseq
+impl core::panic::unwind_safe::UnwindSafe for terraphim_automata::builder::Logseq
+pub struct terraphim_automata::builder::LogseqService
+impl core::default::Default for terraphim_automata::builder::LogseqService
+pub fn terraphim_automata::builder::LogseqService::default() -> Self
+impl core::marker::Freeze for terraphim_automata::builder::LogseqService
+impl core::marker::Send for terraphim_automata::builder::LogseqService
+impl core::marker::Sync for terraphim_automata::builder::LogseqService
+impl core::marker::Unpin for terraphim_automata::builder::LogseqService
+impl core::panic::unwind_safe::RefUnwindSafe for terraphim_automata::builder::LogseqService
+impl core::panic::unwind_safe::UnwindSafe for terraphim_automata::builder::LogseqService
+pub struct terraphim_automata::builder::Match
+pub terraphim_automata::builder::Match::lines: terraphim_automata::builder::Data
+pub terraphim_automata::builder::Match::path: core::option::Option<terraphim_automata::builder::Data>
+pub terraphim_automata::builder::Match::submatches: alloc::vec::Vec<terraphim_automata::builder::SubMatch>
+impl core::clone::Clone for terraphim_automata::builder::Match
+pub fn terraphim_automata::builder::Match::clone(&self) -> terraphim_automata::builder::Match
+impl core::cmp::Eq for terraphim_automata::builder::Match
+impl core::cmp::PartialEq for terraphim_automata::builder::Match
+pub fn terraphim_automata::builder::Match::eq(&self, other: &terraphim_automata::builder::Match) -> bool
+impl core::fmt::Debug for terraphim_automata::builder::Match
+pub fn terraphim_automata::builder::Match::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for terraphim_automata::builder::Match
+pub fn terraphim_automata::builder::Match::hash<__H: core::hash::Hasher>(&self, state: &mut __H)
+impl core::marker::StructuralPartialEq for terraphim_automata::builder::Match
+impl<'de> serde_core::de::Deserialize<'de> for terraphim_automata::builder::Match
+pub fn terraphim_automata::builder::Match::deserialize<__D>(__deserializer: __D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for terraphim_automata::builder::Match
+impl core::marker::Send for terraphim_automata::builder::Match
+impl core::marker::Sync for terraphim_automata::builder::Match
+impl core::marker::Unpin for terraphim_automata::builder::Match
+impl core::panic::unwind_safe::RefUnwindSafe for terraphim_automata::builder::Match
+impl core::panic::unwind_safe::UnwindSafe for terraphim_automata::builder::Match
+pub struct terraphim_automata::builder::SubMatch
+impl core::clone::Clone for terraphim_automata::builder::SubMatch
+pub fn terraphim_automata::builder::SubMatch::clone(&self) -> terraphim_automata::builder::SubMatch
+impl core::cmp::Eq for terraphim_automata::builder::SubMatch
+impl core::cmp::PartialEq for terraphim_automata::builder::SubMatch
+pub fn terraphim_automata::builder::SubMatch::eq(&self, other: &terraphim_automata::builder::SubMatch) -> bool
+impl core::fmt::Debug for terraphim_automata::builder::SubMatch
+pub fn terraphim_automata::builder::SubMatch::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for terraphim_automata::builder::SubMatch
+pub fn terraphim_automata::builder::SubMatch::hash<__H: core::hash::Hasher>(&self, state: &mut __H)
+impl core::marker::StructuralPartialEq for terraphim_automata::builder::SubMatch
+impl<'de> serde_core::de::Deserialize<'de> for terraphim_automata::builder::SubMatch
+pub fn terraphim_automata::builder::SubMatch::deserialize<__D>(__deserializer: __D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for terraphim_automata::builder::SubMatch
+impl core::marker::Send for terraphim_automata::builder::SubMatch
+impl core::marker::Sync for terraphim_automata::builder::SubMatch
+impl core::marker::Unpin for terraphim_automata::builder::SubMatch
+impl core::panic::unwind_safe::RefUnwindSafe for terraphim_automata::builder::SubMatch
+impl core::panic::unwind_safe::UnwindSafe for terraphim_automata::builder::SubMatch
+pub struct terraphim_automata::builder::Summary
+impl core::clone::Clone for terraphim_automata::builder::Summary
+pub fn terraphim_automata::builder::Summary::clone(&self) -> terraphim_automata::builder::Summary
+impl core::cmp::Eq for terraphim_automata::builder::Summary
+impl core::cmp::PartialEq for terraphim_automata::builder::Summary
+pub fn terraphim_automata::builder::Summary::eq(&self, other: &terraphim_automata::builder::Summary) -> bool
+impl core::fmt::Debug for terraphim_automata::builder::Summary
+pub fn terraphim_automata::builder::Summary::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for terraphim_automata::builder::Summary
+pub fn terraphim_automata::builder::Summary::hash<__H: core::hash::Hasher>(&self, state: &mut __H)
+impl core::marker::StructuralPartialEq for terraphim_automata::builder::Summary
+impl<'de> serde_core::de::Deserialize<'de> for terraphim_automata::builder::Summary
+pub fn terraphim_automata::builder::Summary::deserialize<__D>(__deserializer: __D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for terraphim_automata::builder::Summary
+impl core::marker::Send for terraphim_automata::builder::Summary
+impl core::marker::Sync for terraphim_automata::builder::Summary
+impl core::marker::Unpin for terraphim_automata::builder::Summary
+impl core::panic::unwind_safe::RefUnwindSafe for terraphim_automata::builder::Summary
+impl core::panic::unwind_safe::UnwindSafe for terraphim_automata::builder::Summary
+pub trait terraphim_automata::builder::ThesaurusBuilder
+pub fn terraphim_automata::builder::ThesaurusBuilder::build<P: core::convert::Into<std::path::PathBuf> + core::marker::Send>(&self, name: alloc::string::String, haystack: P) -> impl core::future::future::Future<Output = terraphim_automata::builder::Result<terraphim_types::Thesaurus>> + core::marker::Send
+impl terraphim_automata::builder::ThesaurusBuilder for terraphim_automata::builder::Logseq
+pub async fn terraphim_automata::builder::Logseq::build<P: core::convert::Into<std::path::PathBuf> + core::marker::Send>(&self, name: alloc::string::String, haystack: P) -> terraphim_automata::builder::Result<terraphim_types::Thesaurus>
+pub fn terraphim_automata::builder::json_decode(jsonlines: &str) -> terraphim_automata::builder::Result<alloc::vec::Vec<terraphim_automata::builder::Message>>
+pub type terraphim_automata::builder::Result<T> = core::result::Result<T, terraphim_automata::builder::BuilderError>
+pub mod terraphim_automata::evaluation
+pub struct terraphim_automata::evaluation::ClassificationMetrics
+pub terraphim_automata::evaluation::ClassificationMetrics::f1: f64
+pub terraphim_automata::evaluation::ClassificationMetrics::false_negatives: usize
+pub terraphim_automata::evaluation::ClassificationMetrics::false_positives: usize
+pub terraphim_automata::evaluation::ClassificationMetrics::precision: f64
+pub terraphim_automata::evaluation::ClassificationMetrics::recall: f64
+pub terraphim_automata::evaluation::ClassificationMetrics::true_positives: usize
+impl core::clone::Clone for terraphim_automata::evaluation::ClassificationMetrics
+pub fn terraphim_automata::evaluation::ClassificationMetrics::clone(&self) -> terraphim_automata::evaluation::ClassificationMetrics
+impl core::fmt::Debug for terraphim_automata::evaluation::ClassificationMetrics
+pub fn terraphim_automata::evaluation::ClassificationMetrics::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for terraphim_automata::evaluation::ClassificationMetrics
+pub fn terraphim_automata::evaluation::ClassificationMetrics::serialize<__S>(&self, __serializer: __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for terraphim_automata::evaluation::ClassificationMetrics
+pub fn terraphim_automata::evaluation::ClassificationMetrics::deserialize<__D>(__deserializer: __D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for terraphim_automata::evaluation::ClassificationMetrics
+impl core::marker::Send for terraphim_automata::evaluation::ClassificationMetrics
+impl core::marker::Sync for terraphim_automata::evaluation::ClassificationMetrics
+impl core::marker::Unpin for terraphim_automata::evaluation::ClassificationMetrics
+impl core::panic::unwind_safe::RefUnwindSafe for terraphim_automata::evaluation::ClassificationMetrics
+impl core::panic::unwind_safe::UnwindSafe for terraphim_automata::evaluation::ClassificationMetrics
+pub struct terraphim_automata::evaluation::EvaluationResult
+pub terraphim_automata::evaluation::EvaluationResult::overall: terraphim_automata::evaluation::ClassificationMetrics
+pub terraphim_automata::evaluation::EvaluationResult::per_term: alloc::vec::Vec<terraphim_automata::evaluation::TermReport>
+pub terraphim_automata::evaluation::EvaluationResult::systematic_errors: alloc::vec::Vec<terraphim_automata::evaluation::SystematicError>
+pub terraphim_automata::evaluation::EvaluationResult::total_documents: usize
+impl core::clone::Clone for terraphim_automata::evaluation::EvaluationResult
+pub fn terraphim_automata::evaluation::EvaluationResult::clone(&self) -> terraphim_automata::evaluation::EvaluationResult
+impl core::fmt::Debug for terraphim_automata::evaluation::EvaluationResult
+pub fn terraphim_automata::evaluation::EvaluationResult::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for terraphim_automata::evaluation::EvaluationResult
+pub fn terraphim_automata::evaluation::EvaluationResult::serialize<__S>(&self, __serializer: __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for terraphim_automata::evaluation::EvaluationResult
+pub fn terraphim_automata::evaluation::EvaluationResult::deserialize<__D>(__deserializer: __D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for terraphim_automata::evaluation::EvaluationResult
+impl core::marker::Send for terraphim_automata::evaluation::EvaluationResult
+impl core::marker::Sync for terraphim_automata::evaluation::EvaluationResult
+impl core::marker::Unpin for terraphim_automata::evaluation::EvaluationResult
+impl core::panic::unwind_safe::RefUnwindSafe for terraphim_automata::evaluation::EvaluationResult
+impl core::panic::unwind_safe::UnwindSafe for terraphim_automata::evaluation::EvaluationResult
+pub struct terraphim_automata::evaluation::ExpectedMatch
+pub terraphim_automata::evaluation::ExpectedMatch::category: core::option::Option<alloc::string::String>
+pub terraphim_automata::evaluation::ExpectedMatch::term: alloc::string::String
+impl core::clone::Clone for terraphim_automata::evaluation::ExpectedMatch
+pub fn terraphim_automata::evaluation::ExpectedMatch::clone(&self) -> terraphim_automata::evaluation::ExpectedMatch
+impl core::fmt::Debug for terraphim_automata::evaluation::ExpectedMatch
+pub fn terraphim_automata::evaluation::ExpectedMatch::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for terraphim_automata::evaluation::ExpectedMatch
+pub fn terraphim_automata::evaluation::ExpectedMatch::serialize<__S>(&self, __serializer: __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for terraphim_automata::evaluation::ExpectedMatch
+pub fn terraphim_automata::evaluation::ExpectedMatch::deserialize<__D>(__deserializer: __D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for terraphim_automata::evaluation::ExpectedMatch
+impl core::marker::Send for terraphim_automata::evaluation::ExpectedMatch
+impl core::marker::Sync for terraphim_automata::evaluation::ExpectedMatch
+impl core::marker::Unpin for terraphim_automata::evaluation::ExpectedMatch
+impl core::panic::unwind_safe::RefUnwindSafe for terraphim_automata::evaluation::ExpectedMatch
+impl core::panic::unwind_safe::UnwindSafe for terraphim_automata::evaluation::ExpectedMatch
+pub struct terraphim_automata::evaluation::GroundTruthDocument
+pub terraphim_automata::evaluation::GroundTruthDocument::expected_terms: alloc::vec::Vec<terraphim_automata::evaluation::ExpectedMatch>
+pub terraphim_automata::evaluation::GroundTruthDocument::id: alloc::string::String
+pub terraphim_automata::evaluation::GroundTruthDocument::text: alloc::string::String
+impl core::clone::Clone for terraphim_automata::evaluation::GroundTruthDocument
+pub fn terraphim_automata::evaluation::GroundTruthDocument::clone(&self) -> terraphim_automata::evaluation::GroundTruthDocument
+impl core::fmt::Debug for terraphim_automata::evaluation::GroundTruthDocument
+pub fn terraphim_automata::evaluation::GroundTruthDocument::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for terraphim_automata::evaluation::GroundTruthDocument
+pub fn terraphim_automata::evaluation::GroundTruthDocument::serialize<__S>(&self, __serializer: __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for terraphim_automata::evaluation::GroundTruthDocument
+pub fn terraphim_automata::evaluation::GroundTruthDocument::deserialize<__D>(__deserializer: __D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for terraphim_automata::evaluation::GroundTruthDocument
+impl core::marker::Send for terraphim_automata::evaluation::GroundTruthDocument
+impl core::marker::Sync for terraphim_automata::evaluation::GroundTruthDocument
+impl core::marker::Unpin for terraphim_automata::evaluation::GroundTruthDocument
+impl core::panic::unwind_safe::RefUnwindSafe for terraphim_automata::evaluation::GroundTruthDocument
+impl core::panic::unwind_safe::UnwindSafe for terraphim_automata::evaluation::GroundTruthDocument
+pub struct terraphim_automata::evaluation::SystematicError
+pub terraphim_automata::evaluation::SystematicError::document_ids: alloc::vec::Vec<alloc::string::String>
+pub terraphim_automata::evaluation::SystematicError::false_positive_count: usize
+pub terraphim_automata::evaluation::SystematicError::term: alloc::string::String
+impl core::clone::Clone for terraphim_automata::evaluation::SystematicError
+pub fn terraphim_automata::evaluation::SystematicError::clone(&self) -> terraphim_automata::evaluation::SystematicError
+impl core::fmt::Debug for terraphim_automata::evaluation::SystematicError
+pub fn terraphim_automata::evaluation::SystematicError::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for terraphim_automata::evaluation::SystematicError
+pub fn terraphim_automata::evaluation::SystematicError::serialize<__S>(&self, __serializer: __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for terraphim_automata::evaluation::SystematicError
+pub fn terraphim_automata::evaluation::SystematicError::deserialize<__D>(__deserializer: __D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for terraphim_automata::evaluation::SystematicError
+impl core::marker::Send for terraphim_automata::evaluation::SystematicError
+impl core::marker::Sync for terraphim_automata::evaluation::SystematicError
+impl core::marker::Unpin for terraphim_automata::evaluation::SystematicError
+impl core::panic::unwind_safe::RefUnwindSafe for terraphim_automata::evaluation::SystematicError
+impl core::panic::unwind_safe::UnwindSafe for terraphim_automata::evaluation::SystematicError
+pub struct terraphim_automata::evaluation::TermReport
+pub terraphim_automata::evaluation::TermReport::metrics: terraphim_automata::evaluation::ClassificationMetrics
+pub terraphim_automata::evaluation::TermReport::term: alloc::string::String
+impl core::clone::Clone for terraphim_automata::evaluation::TermReport
+pub fn terraphim_automata::evaluation::TermReport::clone(&self) -> terraphim_automata::evaluation::TermReport
+impl core::fmt::Debug for terraphim_automata::evaluation::TermReport
+pub fn terraphim_automata::evaluation::TermReport::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for terraphim_automata::evaluation::TermReport
+pub fn terraphim_automata::evaluation::TermReport::serialize<__S>(&self, __serializer: __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for terraphim_automata::evaluation::TermReport
+pub fn terraphim_automata::evaluation::TermReport::deserialize<__D>(__deserializer: __D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for terraphim_automata::evaluation::TermReport
+impl core::marker::Send for terraphim_automata::evaluation::TermReport
+impl core::marker::Sync for terraphim_automata::evaluation::TermReport
+impl core::marker::Unpin for terraphim_automata::evaluation::TermReport
+impl core::panic::unwind_safe::RefUnwindSafe for terraphim_automata::evaluation::TermReport
+impl core::panic::unwind_safe::UnwindSafe for terraphim_automata::evaluation::TermReport
+pub fn terraphim_automata::evaluation::evaluate(ground_truth: &[terraphim_automata::evaluation::GroundTruthDocument], thesaurus: terraphim_types::Thesaurus) -> terraphim_automata::evaluation::EvaluationResult
+pub fn terraphim_automata::evaluation::load_ground_truth(path: &std::path::Path) -> core::result::Result<alloc::vec::Vec<terraphim_automata::evaluation::GroundTruthDocument>, std::io::error::Error>
+pub mod terraphim_automata::markdown_directives
+pub struct terraphim_automata::markdown_directives::MarkdownDirectiveWarning
+pub terraphim_automata::markdown_directives::MarkdownDirectiveWarning::line: core::option::Option<usize>
+pub terraphim_automata::markdown_directives::MarkdownDirectiveWarning::message: alloc::string::String
+pub terraphim_automata::markdown_directives::MarkdownDirectiveWarning::path: std::path::PathBuf
+impl core::clone::Clone for terraphim_automata::markdown_directives::MarkdownDirectiveWarning
+pub fn terraphim_automata::markdown_directives::MarkdownDirectiveWarning::clone(&self) -> terraphim_automata::markdown_directives::MarkdownDirectiveWarning
+impl core::cmp::Eq for terraphim_automata::markdown_directives::MarkdownDirectiveWarning
+impl core::cmp::PartialEq for terraphim_automata::markdown_directives::MarkdownDirectiveWarning
+pub fn terraphim_automata::markdown_directives::MarkdownDirectiveWarning::eq(&self, other: &terraphim_automata::markdown_directives::MarkdownDirectiveWarning) -> bool
+impl core::fmt::Debug for terraphim_automata::markdown_directives::MarkdownDirectiveWarning
+pub fn terraphim_automata::markdown_directives::MarkdownDirectiveWarning::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for terraphim_automata::markdown_directives::MarkdownDirectiveWarning
+impl core::marker::Freeze for terraphim_automata::markdown_directives::MarkdownDirectiveWarning
+impl core::marker::Send for terraphim_automata::markdown_directives::MarkdownDirectiveWarning
+impl core::marker::Sync for terraphim_automata::markdown_directives::MarkdownDirectiveWarning
+impl core::marker::Unpin for terraphim_automata::markdown_directives::MarkdownDirectiveWarning
+impl core::panic::unwind_safe::RefUnwindSafe for terraphim_automata::markdown_directives::MarkdownDirectiveWarning
+impl core::panic::unwind_safe::UnwindSafe for terraphim_automata::markdown_directives::MarkdownDirectiveWarning
+pub struct terraphim_automata::markdown_directives::MarkdownDirectivesParseResult
+pub terraphim_automata::markdown_directives::MarkdownDirectivesParseResult::directives: std::collections::hash::map::HashMap<alloc::string::String, terraphim_types::MarkdownDirectives>
+pub terraphim_automata::markdown_directives::MarkdownDirectivesParseResult::warnings: alloc::vec::Vec<terraphim_automata::markdown_directives::MarkdownDirectiveWarning>
+impl core::clone::Clone for terraphim_automata::markdown_directives::MarkdownDirectivesParseResult
+pub fn terraphim_automata::markdown_directives::MarkdownDirectivesParseResult::clone(&self) -> terraphim_automata::markdown_directives::MarkdownDirectivesParseResult
+impl core::cmp::Eq for terraphim_automata::markdown_directives::MarkdownDirectivesParseResult
+impl core::cmp::PartialEq for terraphim_automata::markdown_directives::MarkdownDirectivesParseResult
+pub fn terraphim_automata::markdown_directives::MarkdownDirectivesParseResult::eq(&self, other: &terraphim_automata::markdown_directives::MarkdownDirectivesParseResult) -> bool
+impl core::default::Default for terraphim_automata::markdown_directives::MarkdownDirectivesParseResult
+pub fn terraphim_automata::markdown_directives::MarkdownDirectivesParseResult::default() -> terraphim_automata::markdown_directives::MarkdownDirectivesParseResult
+impl core::fmt::Debug for terraphim_automata::markdown_directives::MarkdownDirectivesParseResult
+pub fn terraphim_automata::markdown_directives::MarkdownDirectivesParseResult::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for terraphim_automata::markdown_directives::MarkdownDirectivesParseResult
+impl core::marker::Freeze for terraphim_automata::markdown_directives::MarkdownDirectivesParseResult
+impl core::marker::Send for terraphim_automata::markdown_directives::MarkdownDirectivesParseResult
+impl core::marker::Sync for terraphim_automata::markdown_directives::MarkdownDirectivesParseResult
+impl core::marker::Unpin for terraphim_automata::markdown_directives::MarkdownDirectivesParseResult
+impl core::panic::unwind_safe::RefUnwindSafe for terraphim_automata::markdown_directives::MarkdownDirectivesParseResult
+impl core::panic::unwind_safe::UnwindSafe for terraphim_automata::markdown_directives::MarkdownDirectivesParseResult
+pub fn terraphim_automata::markdown_directives::extract_heading_from_path(path: &std::path::Path) -> core::option::Option<alloc::string::String>
+pub fn terraphim_automata::markdown_directives::parse_markdown_directives_dir(root: &std::path::Path) -> terraphim_automata::Result<terraphim_automata::markdown_directives::MarkdownDirectivesParseResult>
+pub mod terraphim_automata::matcher
+pub enum terraphim_automata::matcher::LinkType
+pub terraphim_automata::matcher::LinkType::HTMLLinks
+pub terraphim_automata::matcher::LinkType::MarkdownLinks
+pub terraphim_automata::matcher::LinkType::PlainText
+pub terraphim_automata::matcher::LinkType::WikiLinks
+impl core::clone::Clone for terraphim_automata::matcher::LinkType
+pub fn terraphim_automata::matcher::LinkType::clone(&self) -> terraphim_automata::matcher::LinkType
+impl core::cmp::Eq for terraphim_automata::matcher::LinkType
+impl core::cmp::PartialEq for terraphim_automata::matcher::LinkType
+pub fn terraphim_automata::matcher::LinkType::eq(&self, other: &terraphim_automata::matcher::LinkType) -> bool
+impl core::default::Default for terraphim_automata::matcher::LinkType
+pub fn terraphim_automata::matcher::LinkType::default() -> terraphim_automata::matcher::LinkType
+impl core::fmt::Debug for terraphim_automata::matcher::LinkType
+pub fn terraphim_automata::matcher::LinkType::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for terraphim_automata::matcher::LinkType
+impl core::marker::StructuralPartialEq for terraphim_automata::matcher::LinkType
+impl core::marker::Freeze for terraphim_automata::matcher::LinkType
+impl core::marker::Send for terraphim_automata::matcher::LinkType
+impl core::marker::Sync for terraphim_automata::matcher::LinkType
+impl core::marker::Unpin for terraphim_automata::matcher::LinkType
+impl core::panic::unwind_safe::RefUnwindSafe for terraphim_automata::matcher::LinkType
+impl core::panic::unwind_safe::UnwindSafe for terraphim_automata::matcher::LinkType
+pub struct terraphim_automata::matcher::Matched
+pub terraphim_automata::matcher::Matched::normalized_term: terraphim_types::NormalizedTerm
+pub terraphim_automata::matcher::Matched::pos: core::option::Option<(usize, usize)>
+pub terraphim_automata::matcher::Matched::term: alloc::string::String
+impl core::clone::Clone for terraphim_automata::matcher::Matched
+pub fn terraphim_automata::matcher::Matched::clone(&self) -> terraphim_automata::matcher::Matched
+impl core::cmp::PartialEq for terraphim_automata::matcher::Matched
+pub fn terraphim_automata::matcher::Matched::eq(&self, other: &terraphim_automata::matcher::Matched) -> bool
+impl core::fmt::Debug for terraphim_automata::matcher::Matched
+pub fn terraphim_automata::matcher::Matched::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for terraphim_automata::matcher::Matched
+impl core::marker::Freeze for terraphim_automata::matcher::Matched
+impl core::marker::Send for terraphim_automata::matcher::Matched
+impl core::marker::Sync for terraphim_automata::matcher::Matched
+impl core::marker::Unpin for terraphim_automata::matcher::Matched
+impl core::panic::unwind_safe::RefUnwindSafe for terraphim_automata::matcher::Matched
+impl core::panic::unwind_safe::UnwindSafe for terraphim_automata::matcher::Matched
+pub fn terraphim_automata::matcher::extract_paragraphs_from_automata(text: &str, thesaurus: terraphim_types::Thesaurus, include_term: bool) -> terraphim_automata::Result<alloc::vec::Vec<(terraphim_automata::matcher::Matched, alloc::string::String)>>
+pub fn terraphim_automata::matcher::find_matches(text: &str, thesaurus: terraphim_types::Thesaurus, return_positions: bool) -> terraphim_automata::Result<alloc::vec::Vec<terraphim_automata::matcher::Matched>>
+pub fn terraphim_automata::matcher::replace_matches(text: &str, thesaurus: terraphim_types::Thesaurus, link_type: terraphim_automata::matcher::LinkType) -> terraphim_automata::Result<alloc::vec::Vec<u8>>
+pub mod terraphim_automata::url_protector
+pub struct terraphim_automata::url_protector::ProtectedUrl
+pub terraphim_automata::url_protector::ProtectedUrl::placeholder: alloc::string::String
+pub terraphim_automata::url_protector::ProtectedUrl::url: alloc::string::String
+impl core::clone::Clone for terraphim_automata::url_protector::ProtectedUrl
+pub fn terraphim_automata::url_protector::ProtectedUrl::clone(&self) -> terraphim_automata::url_protector::ProtectedUrl
+impl core::fmt::Debug for terraphim_automata::url_protector::ProtectedUrl
+pub fn terraphim_automata::url_protector::ProtectedUrl::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for terraphim_automata::url_protector::ProtectedUrl
+impl core::marker::Send for terraphim_automata::url_protector::ProtectedUrl
+impl core::marker::Sync for terraphim_automata::url_protector::ProtectedUrl
+impl core::marker::Unpin for terraphim_automata::url_protector::ProtectedUrl
+impl core::panic::unwind_safe::RefUnwindSafe for terraphim_automata::url_protector::ProtectedUrl
+impl core::panic::unwind_safe::UnwindSafe for terraphim_automata::url_protector::ProtectedUrl
+pub struct terraphim_automata::url_protector::UrlProtector
+impl terraphim_automata::url_protector::UrlProtector
+pub fn terraphim_automata::url_protector::UrlProtector::contains_urls(text: &str) -> bool
+pub fn terraphim_automata::url_protector::UrlProtector::mask_urls(&self, text: &str) -> (alloc::string::String, alloc::vec::Vec<terraphim_automata::url_protector::ProtectedUrl>)
+pub fn terraphim_automata::url_protector::UrlProtector::new() -> Self
+pub fn terraphim_automata::url_protector::UrlProtector::restore_urls(&self, text: &str, protected_urls: &[terraphim_automata::url_protector::ProtectedUrl]) -> alloc::string::String
+impl core::clone::Clone for terraphim_automata::url_protector::UrlProtector
+pub fn terraphim_automata::url_protector::UrlProtector::clone(&self) -> terraphim_automata::url_protector::UrlProtector
+impl core::default::Default for terraphim_automata::url_protector::UrlProtector
+pub fn terraphim_automata::url_protector::UrlProtector::default() -> terraphim_automata::url_protector::UrlProtector
+impl core::fmt::Debug for terraphim_automata::url_protector::UrlProtector
+pub fn terraphim_automata::url_protector::UrlProtector::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for terraphim_automata::url_protector::UrlProtector
+impl core::marker::Send for terraphim_automata::url_protector::UrlProtector
+impl core::marker::Sync for terraphim_automata::url_protector::UrlProtector
+impl core::marker::Unpin for terraphim_automata::url_protector::UrlProtector
+impl core::panic::unwind_safe::RefUnwindSafe for terraphim_automata::url_protector::UrlProtector
+impl core::panic::unwind_safe::UnwindSafe for terraphim_automata::url_protector::UrlProtector
+pub fn terraphim_automata::url_protector::with_protected_urls<F>(text: &str, transform: F) -> alloc::string::String where F: core::ops::function::FnOnce(&str) -> alloc::string::String
+pub enum terraphim_automata::AutomataPath
+pub terraphim_automata::AutomataPath::Local(std::path::PathBuf)
+pub terraphim_automata::AutomataPath::Remote(alloc::string::String)
+impl terraphim_automata::AutomataPath
+pub fn terraphim_automata::AutomataPath::from_local<P: core::convert::AsRef<std::path::Path>>(file: P) -> Self
+pub fn terraphim_automata::AutomataPath::from_remote(url: &str) -> terraphim_automata::Result<Self>
+pub fn terraphim_automata::AutomataPath::local_example() -> Self
+pub fn terraphim_automata::AutomataPath::local_example_full() -> Self
+pub fn terraphim_automata::AutomataPath::remote_example() -> Self
+impl core::clone::Clone for terraphim_automata::AutomataPath
+pub fn terraphim_automata::AutomataPath::clone(&self) -> terraphim_automata::AutomataPath
+impl core::cmp::Eq for terraphim_automata::AutomataPath
+impl core::cmp::PartialEq for terraphim_automata::AutomataPath
+pub fn terraphim_automata::AutomataPath::eq(&self, other: &terraphim_automata::AutomataPath) -> bool
+impl core::fmt::Debug for terraphim_automata::AutomataPath
+pub fn terraphim_automata::AutomataPath::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for terraphim_automata::AutomataPath
+pub fn terraphim_automata::AutomataPath::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for terraphim_automata::AutomataPath
+impl serde_core::ser::Serialize for terraphim_automata::AutomataPath
+pub fn terraphim_automata::AutomataPath::serialize<__S>(&self, __serializer: __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for terraphim_automata::AutomataPath
+pub fn terraphim_automata::AutomataPath::deserialize<__D>(__deserializer: __D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for terraphim_automata::AutomataPath
+impl core::marker::Send for terraphim_automata::AutomataPath
+impl core::marker::Sync for terraphim_automata::AutomataPath
+impl core::marker::Unpin for terraphim_automata::AutomataPath
+impl core::panic::unwind_safe::RefUnwindSafe for terraphim_automata::AutomataPath
+impl core::panic::unwind_safe::UnwindSafe for terraphim_automata::AutomataPath
+pub enum terraphim_automata::LinkType
+pub terraphim_automata::LinkType::HTMLLinks
+pub terraphim_automata::LinkType::MarkdownLinks
+pub terraphim_automata::LinkType::PlainText
+pub terraphim_automata::LinkType::WikiLinks
+impl core::clone::Clone for terraphim_automata::matcher::LinkType
+pub fn terraphim_automata::matcher::LinkType::clone(&self) -> terraphim_automata::matcher::LinkType
+impl core::cmp::Eq for terraphim_automata::matcher::LinkType
+impl core::cmp::PartialEq for terraphim_automata::matcher::LinkType
+pub fn terraphim_automata::matcher::LinkType::eq(&self, other: &terraphim_automata::matcher::LinkType) -> bool
+impl core::default::Default for terraphim_automata::matcher::LinkType
+pub fn terraphim_automata::matcher::LinkType::default() -> terraphim_automata::matcher::LinkType
+impl core::fmt::Debug for terraphim_automata::matcher::LinkType
+pub fn terraphim_automata::matcher::LinkType::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for terraphim_automata::matcher::LinkType
+impl core::marker::StructuralPartialEq for terraphim_automata::matcher::LinkType
+impl core::marker::Freeze for terraphim_automata::matcher::LinkType
+impl core::marker::Send for terraphim_automata::matcher::LinkType
+impl core::marker::Sync for terraphim_automata::matcher::LinkType
+impl core::marker::Unpin for terraphim_automata::matcher::LinkType
+impl core::panic::unwind_safe::RefUnwindSafe for terraphim_automata::matcher::LinkType
+impl core::panic::unwind_safe::UnwindSafe for terraphim_automata::matcher::LinkType
+pub enum terraphim_automata::TerraphimAutomataError
+pub terraphim_automata::TerraphimAutomataError::AhoCorasick(aho_corasick::util::error::BuildError)
+pub terraphim_automata::TerraphimAutomataError::Dict(alloc::string::String)
+pub terraphim_automata::TerraphimAutomataError::Fst(fst::error::Error)
+pub terraphim_automata::TerraphimAutomataError::InvalidThesaurus(alloc::string::String)
+pub terraphim_automata::TerraphimAutomataError::Io(std::io::error::Error)
+pub terraphim_automata::TerraphimAutomataError::Serde(serde_json::error::Error)
+impl core::convert::From<aho_corasick::util::error::BuildError> for terraphim_automata::TerraphimAutomataError
+pub fn terraphim_automata::TerraphimAutomataError::from(source: aho_corasick::util::error::BuildError) -> Self
+impl core::convert::From<fst::error::Error> for terraphim_automata::TerraphimAutomataError
+pub fn terraphim_automata::TerraphimAutomataError::from(source: fst::error::Error) -> Self
+impl core::convert::From<serde_json::error::Error> for terraphim_automata::TerraphimAutomataError
+pub fn terraphim_automata::TerraphimAutomataError::from(source: serde_json::error::Error) -> Self
+impl core::convert::From<std::io::error::Error> for terraphim_automata::TerraphimAutomataError
+pub fn terraphim_automata::TerraphimAutomataError::from(source: std::io::error::Error) -> Self
+impl core::error::Error for terraphim_automata::TerraphimAutomataError
+pub fn terraphim_automata::TerraphimAutomataError::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
+impl core::fmt::Debug for terraphim_automata::TerraphimAutomataError
+pub fn terraphim_automata::TerraphimAutomataError::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for terraphim_automata::TerraphimAutomataError
+pub fn terraphim_automata::TerraphimAutomataError::fmt(&self, __formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for terraphim_automata::TerraphimAutomataError
+impl core::marker::Send for terraphim_automata::TerraphimAutomataError
+impl core::marker::Sync for terraphim_automata::TerraphimAutomataError
+impl core::marker::Unpin for terraphim_automata::TerraphimAutomataError
+impl !core::panic::unwind_safe::RefUnwindSafe for terraphim_automata::TerraphimAutomataError
+impl !core::panic::unwind_safe::UnwindSafe for terraphim_automata::TerraphimAutomataError
+pub struct terraphim_automata::AutocompleteConfig
+pub terraphim_automata::AutocompleteConfig::case_sensitive: bool
+pub terraphim_automata::AutocompleteConfig::max_results: usize
+pub terraphim_automata::AutocompleteConfig::min_prefix_length: usize
+impl core::clone::Clone for terraphim_automata::autocomplete::AutocompleteConfig
+pub fn terraphim_automata::autocomplete::AutocompleteConfig::clone(&self) -> terraphim_automata::autocomplete::AutocompleteConfig
+impl core::default::Default for terraphim_automata::autocomplete::AutocompleteConfig
+pub fn terraphim_automata::autocomplete::AutocompleteConfig::default() -> Self
+impl core::fmt::Debug for terraphim_automata::autocomplete::AutocompleteConfig
+pub fn terraphim_automata::autocomplete::AutocompleteConfig::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for terraphim_automata::autocomplete::AutocompleteConfig
+impl core::marker::Send for terraphim_automata::autocomplete::AutocompleteConfig
+impl core::marker::Sync for terraphim_automata::autocomplete::AutocompleteConfig
+impl core::marker::Unpin for terraphim_automata::autocomplete::AutocompleteConfig
+impl core::panic::unwind_safe::RefUnwindSafe for terraphim_automata::autocomplete::AutocompleteConfig
+impl core::panic::unwind_safe::UnwindSafe for terraphim_automata::autocomplete::AutocompleteConfig
+pub struct terraphim_automata::AutocompleteIndex
+impl terraphim_automata::autocomplete::AutocompleteIndex
+pub fn terraphim_automata::autocomplete::AutocompleteIndex::is_empty(&self) -> bool
+pub fn terraphim_automata::autocomplete::AutocompleteIndex::len(&self) -> usize
+pub fn terraphim_automata::autocomplete::AutocompleteIndex::metadata_get(&self, term: &str) -> core::option::Option<&terraphim_automata::autocomplete::AutocompleteMetadata>
+pub fn terraphim_automata::autocomplete::AutocompleteIndex::metadata_iter(&self) -> impl core::iter::traits::iterator::Iterator<Item = (&str, &terraphim_automata::autocomplete::AutocompleteMetadata)>
+pub fn terraphim_automata::autocomplete::AutocompleteIndex::name(&self) -> &str
+impl core::clone::Clone for terraphim_automata::autocomplete::AutocompleteIndex
+pub fn terraphim_automata::autocomplete::AutocompleteIndex::clone(&self) -> terraphim_automata::autocomplete::AutocompleteIndex
+impl core::fmt::Debug for terraphim_automata::autocomplete::AutocompleteIndex
+pub fn terraphim_automata::autocomplete::AutocompleteIndex::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for terraphim_automata::autocomplete::AutocompleteIndex
+impl core::marker::Send for terraphim_automata::autocomplete::AutocompleteIndex
+impl core::marker::Sync for terraphim_automata::autocomplete::AutocompleteIndex
+impl core::marker::Unpin for terraphim_automata::autocomplete::AutocompleteIndex
+impl core::panic::unwind_safe::RefUnwindSafe for terraphim_automata::autocomplete::AutocompleteIndex
+impl core::panic::unwind_safe::UnwindSafe for terraphim_automata::autocomplete::AutocompleteIndex
+pub struct terraphim_automata::AutocompleteMetadata
+pub terraphim_automata::AutocompleteMetadata::action: core::option::Option<alloc::string::String>
+pub terraphim_automata::AutocompleteMetadata::id: u64
+pub terraphim_automata::AutocompleteMetadata::normalized_term: terraphim_types::NormalizedTermValue
+pub terraphim_automata::AutocompleteMetadata::original_term: alloc::string::String
+pub terraphim_automata::AutocompleteMetadata::pinned: bool
+pub terraphim_automata::AutocompleteMetadata::priority: core::option::Option<u8>
+pub terraphim_automata::AutocompleteMetadata::trigger: core::option::Option<alloc::string::String>
+pub terraphim_automata::AutocompleteMetadata::url: core::option::Option<alloc::string::String>
+impl core::clone::Clone for terraphim_automata::autocomplete::AutocompleteMetadata
+pub fn terraphim_automata::autocomplete::AutocompleteMetadata::clone(&self) -> terraphim_automata::autocomplete::AutocompleteMetadata
+impl core::fmt::Debug for terraphim_automata::autocomplete::AutocompleteMetadata
+pub fn terraphim_automata::autocomplete::AutocompleteMetadata::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for terraphim_automata::autocomplete::AutocompleteMetadata
+pub fn terraphim_automata::autocomplete::AutocompleteMetadata::serialize<__S>(&self, __serializer: __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for terraphim_automata::autocomplete::AutocompleteMetadata
+pub fn terraphim_automata::autocomplete::AutocompleteMetadata::deserialize<__D>(__deserializer: __D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for terraphim_automata::autocomplete::AutocompleteMetadata
+impl core::marker::Send for terraphim_automata::autocomplete::AutocompleteMetadata
+impl core::marker::Sync for terraphim_automata::autocomplete::AutocompleteMetadata
+impl core::marker::Unpin for terraphim_automata::autocomplete::AutocompleteMetadata
+impl core::panic::unwind_safe::RefUnwindSafe for terraphim_automata::autocomplete::AutocompleteMetadata
+impl core::panic::unwind_safe::UnwindSafe for terraphim_automata::autocomplete::AutocompleteMetadata
+pub struct terraphim_automata::AutocompleteResult
+pub terraphim_automata::AutocompleteResult::id: u64
+pub terraphim_automata::AutocompleteResult::normalized_term: terraphim_types::NormalizedTermValue
+pub terraphim_automata::AutocompleteResult::score: f64
+pub terraphim_automata::AutocompleteResult::term: alloc::string::String
+pub terraphim_automata::AutocompleteResult::url: core::option::Option<alloc::string::String>
+impl core::clone::Clone for terraphim_automata::autocomplete::AutocompleteResult
+pub fn terraphim_automata::autocomplete::AutocompleteResult::clone(&self) -> terraphim_automata::autocomplete::AutocompleteResult
+impl core::cmp::PartialEq for terraphim_automata::autocomplete::AutocompleteResult
+pub fn terraphim_automata::autocomplete::AutocompleteResult::eq(&self, other: &terraphim_automata::autocomplete::AutocompleteResult) -> bool
+impl core::fmt::Debug for terraphim_automata::autocomplete::AutocompleteResult
+pub fn terraphim_automata::autocomplete::AutocompleteResult::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for terraphim_automata::autocomplete::AutocompleteResult
+impl core::marker::Freeze for terraphim_automata::autocomplete::AutocompleteResult
+impl core::marker::Send for terraphim_automata::autocomplete::AutocompleteResult
+impl core::marker::Sync for terraphim_automata::autocomplete::AutocompleteResult
+impl core::marker::Unpin for terraphim_automata::autocomplete::AutocompleteResult
+impl core::panic::unwind_safe::RefUnwindSafe for terraphim_automata::autocomplete::AutocompleteResult
+impl core::panic::unwind_safe::UnwindSafe for terraphim_automata::autocomplete::AutocompleteResult
+pub struct terraphim_automata::ClassificationMetrics
+pub terraphim_automata::ClassificationMetrics::f1: f64
+pub terraphim_automata::ClassificationMetrics::false_negatives: usize
+pub terraphim_automata::ClassificationMetrics::false_positives: usize
+pub terraphim_automata::ClassificationMetrics::precision: f64
+pub terraphim_automata::ClassificationMetrics::recall: f64
+pub terraphim_automata::ClassificationMetrics::true_positives: usize
+impl core::clone::Clone for terraphim_automata::evaluation::ClassificationMetrics
+pub fn terraphim_automata::evaluation::ClassificationMetrics::clone(&self) -> terraphim_automata::evaluation::ClassificationMetrics
+impl core::fmt::Debug for terraphim_automata::evaluation::ClassificationMetrics
+pub fn terraphim_automata::evaluation::ClassificationMetrics::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for terraphim_automata::evaluation::ClassificationMetrics
+pub fn terraphim_automata::evaluation::ClassificationMetrics::serialize<__S>(&self, __serializer: __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for terraphim_automata::evaluation::ClassificationMetrics
+pub fn terraphim_automata::evaluation::ClassificationMetrics::deserialize<__D>(__deserializer: __D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for terraphim_automata::evaluation::ClassificationMetrics
+impl core::marker::Send for terraphim_automata::evaluation::ClassificationMetrics
+impl core::marker::Sync for terraphim_automata::evaluation::ClassificationMetrics
+impl core::marker::Unpin for terraphim_automata::evaluation::ClassificationMetrics
+impl core::panic::unwind_safe::RefUnwindSafe for terraphim_automata::evaluation::ClassificationMetrics
+impl core::panic::unwind_safe::UnwindSafe for terraphim_automata::evaluation::ClassificationMetrics
+pub struct terraphim_automata::EvaluationResult
+pub terraphim_automata::EvaluationResult::overall: terraphim_automata::evaluation::ClassificationMetrics
+pub terraphim_automata::EvaluationResult::per_term: alloc::vec::Vec<terraphim_automata::evaluation::TermReport>
+pub terraphim_automata::EvaluationResult::systematic_errors: alloc::vec::Vec<terraphim_automata::evaluation::SystematicError>
+pub terraphim_automata::EvaluationResult::total_documents: usize
+impl core::clone::Clone for terraphim_automata::evaluation::EvaluationResult
+pub fn terraphim_automata::evaluation::EvaluationResult::clone(&self) -> terraphim_automata::evaluation::EvaluationResult
+impl core::fmt::Debug for terraphim_automata::evaluation::EvaluationResult
+pub fn terraphim_automata::evaluation::EvaluationResult::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for terraphim_automata::evaluation::EvaluationResult
+pub fn terraphim_automata::evaluation::EvaluationResult::serialize<__S>(&self, __serializer: __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for terraphim_automata::evaluation::EvaluationResult
+pub fn terraphim_automata::evaluation::EvaluationResult::deserialize<__D>(__deserializer: __D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for terraphim_automata::evaluation::EvaluationResult
+impl core::marker::Send for terraphim_automata::evaluation::EvaluationResult
+impl core::marker::Sync for terraphim_automata::evaluation::EvaluationResult
+impl core::marker::Unpin for terraphim_automata::evaluation::EvaluationResult
+impl core::panic::unwind_safe::RefUnwindSafe for terraphim_automata::evaluation::EvaluationResult
+impl core::panic::unwind_safe::UnwindSafe for terraphim_automata::evaluation::EvaluationResult
+pub struct terraphim_automata::ExpectedMatch
+pub terraphim_automata::ExpectedMatch::category: core::option::Option<alloc::string::String>
+pub terraphim_automata::ExpectedMatch::term: alloc::string::String
+impl core::clone::Clone for terraphim_automata::evaluation::ExpectedMatch
+pub fn terraphim_automata::evaluation::ExpectedMatch::clone(&self) -> terraphim_automata::evaluation::ExpectedMatch
+impl core::fmt::Debug for terraphim_automata::evaluation::ExpectedMatch
+pub fn terraphim_automata::evaluation::ExpectedMatch::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for terraphim_automata::evaluation::ExpectedMatch
+pub fn terraphim_automata::evaluation::ExpectedMatch::serialize<__S>(&self, __serializer: __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for terraphim_automata::evaluation::ExpectedMatch
+pub fn terraphim_automata::evaluation::ExpectedMatch::deserialize<__D>(__deserializer: __D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for terraphim_automata::evaluation::ExpectedMatch
+impl core::marker::Send for terraphim_automata::evaluation::ExpectedMatch
+impl core::marker::Sync for terraphim_automata::evaluation::ExpectedMatch
+impl core::marker::Unpin for terraphim_automata::evaluation::ExpectedMatch
+impl core::panic::unwind_safe::RefUnwindSafe for terraphim_automata::evaluation::ExpectedMatch
+impl core::panic::unwind_safe::UnwindSafe for terraphim_automata::evaluation::ExpectedMatch
+pub struct terraphim_automata::GroundTruthDocument
+pub terraphim_automata::GroundTruthDocument::expected_terms: alloc::vec::Vec<terraphim_automata::evaluation::ExpectedMatch>
+pub terraphim_automata::GroundTruthDocument::id: alloc::string::String
+pub terraphim_automata::GroundTruthDocument::text: alloc::string::String
+impl core::clone::Clone for terraphim_automata::evaluation::GroundTruthDocument
+pub fn terraphim_automata::evaluation::GroundTruthDocument::clone(&self) -> terraphim_automata::evaluation::GroundTruthDocument
+impl core::fmt::Debug for terraphim_automata::evaluation::GroundTruthDocument
+pub fn terraphim_automata::evaluation::GroundTruthDocument::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for terraphim_automata::evaluation::GroundTruthDocument
+pub fn terraphim_automata::evaluation::GroundTruthDocument::serialize<__S>(&self, __serializer: __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for terraphim_automata::evaluation::GroundTruthDocument
+pub fn terraphim_automata::evaluation::GroundTruthDocument::deserialize<__D>(__deserializer: __D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for terraphim_automata::evaluation::GroundTruthDocument
+impl core::marker::Send for terraphim_automata::evaluation::GroundTruthDocument
+impl core::marker::Sync for terraphim_automata::evaluation::GroundTruthDocument
+impl core::marker::Unpin for terraphim_automata::evaluation::GroundTruthDocument
+impl core::panic::unwind_safe::RefUnwindSafe for terraphim_automata::evaluation::GroundTruthDocument
+impl core::panic::unwind_safe::UnwindSafe for terraphim_automata::evaluation::GroundTruthDocument
+pub struct terraphim_automata::Logseq
+impl core::default::Default for terraphim_automata::builder::Logseq
+pub fn terraphim_automata::builder::Logseq::default() -> terraphim_automata::builder::Logseq
+impl terraphim_automata::builder::ThesaurusBuilder for terraphim_automata::builder::Logseq
+pub async fn terraphim_automata::builder::Logseq::build<P: core::convert::Into<std::path::PathBuf> + core::marker::Send>(&self, name: alloc::string::String, haystack: P) -> terraphim_automata::builder::Result<terraphim_types::Thesaurus>
+impl core::marker::Freeze for terraphim_automata::builder::Logseq
+impl core::marker::Send for terraphim_automata::builder::Logseq
+impl core::marker::Sync for terraphim_automata::builder::Logseq
+impl core::marker::Unpin for terraphim_automata::builder::Logseq
+impl core::panic::unwind_safe::RefUnwindSafe for terraphim_automata::builder::Logseq
+impl core::panic::unwind_safe::UnwindSafe for terraphim_automata::builder::Logseq
+pub struct terraphim_automata::MarkdownDirectiveWarning
+pub terraphim_automata::MarkdownDirectiveWarning::line: core::option::Option<usize>
+pub terraphim_automata::MarkdownDirectiveWarning::message: alloc::string::String
+pub terraphim_automata::MarkdownDirectiveWarning::path: std::path::PathBuf
+impl core::clone::Clone for terraphim_automata::markdown_directives::MarkdownDirectiveWarning
+pub fn terraphim_automata::markdown_directives::MarkdownDirectiveWarning::clone(&self) -> terraphim_automata::markdown_directives::MarkdownDirectiveWarning
+impl core::cmp::Eq for terraphim_automata::markdown_directives::MarkdownDirectiveWarning
+impl core::cmp::PartialEq for terraphim_automata::markdown_directives::MarkdownDirectiveWarning
+pub fn terraphim_automata::markdown_directives::MarkdownDirectiveWarning::eq(&self, other: &terraphim_automata::markdown_directives::MarkdownDirectiveWarning) -> bool
+impl core::fmt::Debug for terraphim_automata::markdown_directives::MarkdownDirectiveWarning
+pub fn terraphim_automata::markdown_directives::MarkdownDirectiveWarning::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for terraphim_automata::markdown_directives::MarkdownDirectiveWarning
+impl core::marker::Freeze for terraphim_automata::markdown_directives::MarkdownDirectiveWarning
+impl core::marker::Send for terraphim_automata::markdown_directives::MarkdownDirectiveWarning
+impl core::marker::Sync for terraphim_automata::markdown_directives::MarkdownDirectiveWarning
+impl core::marker::Unpin for terraphim_automata::markdown_directives::MarkdownDirectiveWarning
+impl core::panic::unwind_safe::RefUnwindSafe for terraphim_automata::markdown_directives::MarkdownDirectiveWarning
+impl core::panic::unwind_safe::UnwindSafe for terraphim_automata::markdown_directives::MarkdownDirectiveWarning
+pub struct terraphim_automata::MarkdownDirectivesParseResult
+pub terraphim_automata::MarkdownDirectivesParseResult::directives: std::collections::hash::map::HashMap<alloc::string::String, terraphim_types::MarkdownDirectives>
+pub terraphim_automata::MarkdownDirectivesParseResult::warnings: alloc::vec::Vec<terraphim_automata::markdown_directives::MarkdownDirectiveWarning>
+impl core::clone::Clone for terraphim_automata::markdown_directives::MarkdownDirectivesParseResult
+pub fn terraphim_automata::markdown_directives::MarkdownDirectivesParseResult::clone(&self) -> terraphim_automata::markdown_directives::MarkdownDirectivesParseResult
+impl core::cmp::Eq for terraphim_automata::markdown_directives::MarkdownDirectivesParseResult
+impl core::cmp::PartialEq for terraphim_automata::markdown_directives::MarkdownDirectivesParseResult
+pub fn terraphim_automata::markdown_directives::MarkdownDirectivesParseResult::eq(&self, other: &terraphim_automata::markdown_directives::MarkdownDirectivesParseResult) -> bool
+impl core::default::Default for terraphim_automata::markdown_directives::MarkdownDirectivesParseResult
+pub fn terraphim_automata::markdown_directives::MarkdownDirectivesParseResult::default() -> terraphim_automata::markdown_directives::MarkdownDirectivesParseResult
+impl core::fmt::Debug for terraphim_automata::markdown_directives::MarkdownDirectivesParseResult
+pub fn terraphim_automata::markdown_directives::MarkdownDirectivesParseResult::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for terraphim_automata::markdown_directives::MarkdownDirectivesParseResult
+impl core::marker::Freeze for terraphim_automata::markdown_directives::MarkdownDirectivesParseResult
+impl core::marker::Send for terraphim_automata::markdown_directives::MarkdownDirectivesParseResult
+impl core::marker::Sync for terraphim_automata::markdown_directives::MarkdownDirectivesParseResult
+impl core::marker::Unpin for terraphim_automata::markdown_directives::MarkdownDirectivesParseResult
+impl core::panic::unwind_safe::RefUnwindSafe for terraphim_automata::markdown_directives::MarkdownDirectivesParseResult
+impl core::panic::unwind_safe::UnwindSafe for terraphim_automata::markdown_directives::MarkdownDirectivesParseResult
+pub struct terraphim_automata::Matched
+pub terraphim_automata::Matched::normalized_term: terraphim_types::NormalizedTerm
+pub terraphim_automata::Matched::pos: core::option::Option<(usize, usize)>
+pub terraphim_automata::Matched::term: alloc::string::String
+impl core::clone::Clone for terraphim_automata::matcher::Matched
+pub fn terraphim_automata::matcher::Matched::clone(&self) -> terraphim_automata::matcher::Matched
+impl core::cmp::PartialEq for terraphim_automata::matcher::Matched
+pub fn terraphim_automata::matcher::Matched::eq(&self, other: &terraphim_automata::matcher::Matched) -> bool
+impl core::fmt::Debug for terraphim_automata::matcher::Matched
+pub fn terraphim_automata::matcher::Matched::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for terraphim_automata::matcher::Matched
+impl core::marker::Freeze for terraphim_automata::matcher::Matched
+impl core::marker::Send for terraphim_automata::matcher::Matched
+impl core::marker::Sync for terraphim_automata::matcher::Matched
+impl core::marker::Unpin for terraphim_automata::matcher::Matched
+impl core::panic::unwind_safe::RefUnwindSafe for terraphim_automata::matcher::Matched
+impl core::panic::unwind_safe::UnwindSafe for terraphim_automata::matcher::Matched
+pub struct terraphim_automata::SystematicError
+pub terraphim_automata::SystematicError::document_ids: alloc::vec::Vec<alloc::string::String>
+pub terraphim_automata::SystematicError::false_positive_count: usize
+pub terraphim_automata::SystematicError::term: alloc::string::String
+impl core::clone::Clone for terraphim_automata::evaluation::SystematicError
+pub fn terraphim_automata::evaluation::SystematicError::clone(&self) -> terraphim_automata::evaluation::SystematicError
+impl core::fmt::Debug for terraphim_automata::evaluation::SystematicError
+pub fn terraphim_automata::evaluation::SystematicError::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for terraphim_automata::evaluation::SystematicError
+pub fn terraphim_automata::evaluation::SystematicError::serialize<__S>(&self, __serializer: __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for terraphim_automata::evaluation::SystematicError
+pub fn terraphim_automata::evaluation::SystematicError::deserialize<__D>(__deserializer: __D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for terraphim_automata::evaluation::SystematicError
+impl core::marker::Send for terraphim_automata::evaluation::SystematicError
+impl core::marker::Sync for terraphim_automata::evaluation::SystematicError
+impl core::marker::Unpin for terraphim_automata::evaluation::SystematicError
+impl core::panic::unwind_safe::RefUnwindSafe for terraphim_automata::evaluation::SystematicError
+impl core::panic::unwind_safe::UnwindSafe for terraphim_automata::evaluation::SystematicError
+pub struct terraphim_automata::TermReport
+pub terraphim_automata::TermReport::metrics: terraphim_automata::evaluation::ClassificationMetrics
+pub terraphim_automata::TermReport::term: alloc::string::String
+impl core::clone::Clone for terraphim_automata::evaluation::TermReport
+pub fn terraphim_automata::evaluation::TermReport::clone(&self) -> terraphim_automata::evaluation::TermReport
+impl core::fmt::Debug for terraphim_automata::evaluation::TermReport
+pub fn terraphim_automata::evaluation::TermReport::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for terraphim_automata::evaluation::TermReport
+pub fn terraphim_automata::evaluation::TermReport::serialize<__S>(&self, __serializer: __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for terraphim_automata::evaluation::TermReport
+pub fn terraphim_automata::evaluation::TermReport::deserialize<__D>(__deserializer: __D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for terraphim_automata::evaluation::TermReport
+impl core::marker::Send for terraphim_automata::evaluation::TermReport
+impl core::marker::Sync for terraphim_automata::evaluation::TermReport
+impl core::marker::Unpin for terraphim_automata::evaluation::TermReport
+impl core::panic::unwind_safe::RefUnwindSafe for terraphim_automata::evaluation::TermReport
+impl core::panic::unwind_safe::UnwindSafe for terraphim_automata::evaluation::TermReport
+pub trait terraphim_automata::ThesaurusBuilder
+pub fn terraphim_automata::ThesaurusBuilder::build<P: core::convert::Into<std::path::PathBuf> + core::marker::Send>(&self, name: alloc::string::String, haystack: P) -> impl core::future::future::Future<Output = terraphim_automata::builder::Result<terraphim_types::Thesaurus>> + core::marker::Send
+impl terraphim_automata::builder::ThesaurusBuilder for terraphim_automata::builder::Logseq
+pub async fn terraphim_automata::builder::Logseq::build<P: core::convert::Into<std::path::PathBuf> + core::marker::Send>(&self, name: alloc::string::String, haystack: P) -> terraphim_automata::builder::Result<terraphim_types::Thesaurus>
+pub fn terraphim_automata::autocomplete_search(index: &terraphim_automata::autocomplete::AutocompleteIndex, prefix: &str, limit: core::option::Option<usize>) -> terraphim_automata::Result<alloc::vec::Vec<terraphim_automata::autocomplete::AutocompleteResult>>
+pub fn terraphim_automata::build_autocomplete_index(thesaurus: terraphim_types::Thesaurus, config: core::option::Option<terraphim_automata::autocomplete::AutocompleteConfig>) -> terraphim_automata::Result<terraphim_automata::autocomplete::AutocompleteIndex>
+pub fn terraphim_automata::deserialize_autocomplete_index(data: &[u8]) -> terraphim_automata::Result<terraphim_automata::autocomplete::AutocompleteIndex>
+pub fn terraphim_automata::evaluate(ground_truth: &[terraphim_automata::evaluation::GroundTruthDocument], thesaurus: terraphim_types::Thesaurus) -> terraphim_automata::evaluation::EvaluationResult
+pub fn terraphim_automata::extract_paragraphs_from_automata(text: &str, thesaurus: terraphim_types::Thesaurus, include_term: bool) -> terraphim_automata::Result<alloc::vec::Vec<(terraphim_automata::matcher::Matched, alloc::string::String)>>
+pub fn terraphim_automata::find_matches(text: &str, thesaurus: terraphim_types::Thesaurus, return_positions: bool) -> terraphim_automata::Result<alloc::vec::Vec<terraphim_automata::matcher::Matched>>
+pub fn terraphim_automata::fuzzy_autocomplete_search(index: &terraphim_automata::autocomplete::AutocompleteIndex, prefix: &str, min_similarity: f64, limit: core::option::Option<usize>) -> terraphim_automata::Result<alloc::vec::Vec<terraphim_automata::autocomplete::AutocompleteResult>>
+pub fn terraphim_automata::fuzzy_autocomplete_search_levenshtein(index: &terraphim_automata::autocomplete::AutocompleteIndex, prefix: &str, max_edit_distance: usize, limit: core::option::Option<usize>) -> terraphim_automata::Result<alloc::vec::Vec<terraphim_automata::autocomplete::AutocompleteResult>>
+pub fn terraphim_automata::load_ground_truth(path: &std::path::Path) -> core::result::Result<alloc::vec::Vec<terraphim_automata::evaluation::GroundTruthDocument>, std::io::error::Error>
+pub fn terraphim_automata::load_thesaurus(automata_path: &terraphim_automata::AutomataPath) -> terraphim_automata::Result<terraphim_types::Thesaurus>
+pub fn terraphim_automata::load_thesaurus_from_json(json_str: &str) -> terraphim_automata::Result<terraphim_types::Thesaurus>
+pub fn terraphim_automata::load_thesaurus_from_json_and_replace(json_str: &str, content: &str, link_type: terraphim_automata::matcher::LinkType) -> terraphim_automata::Result<alloc::vec::Vec<u8>>
+pub fn terraphim_automata::parse_markdown_directives_dir(root: &std::path::Path) -> terraphim_automata::Result<terraphim_automata::markdown_directives::MarkdownDirectivesParseResult>
+pub fn terraphim_automata::replace_matches(text: &str, thesaurus: terraphim_types::Thesaurus, link_type: terraphim_automata::matcher::LinkType) -> terraphim_automata::Result<alloc::vec::Vec<u8>>
+pub fn terraphim_automata::serialize_autocomplete_index(index: &terraphim_automata::autocomplete::AutocompleteIndex) -> terraphim_automata::Result<alloc::vec::Vec<u8>>
+pub type terraphim_automata::Result<T> = core::result::Result<T, terraphim_automata::TerraphimAutomataError>
