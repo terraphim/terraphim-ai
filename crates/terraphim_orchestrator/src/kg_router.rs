@@ -49,10 +49,19 @@ impl KgRouteDecision {
     }
 
     /// Get the next fallback route, skipping providers in the exclude set.
+    /// Providers are compared by canonical quota key so equivalent providers
+    /// (e.g. anthropic and claude-code) are treated as one unit.
     pub fn first_healthy_route(&self, unhealthy_providers: &[String]) -> Option<&RouteDirective> {
+        let unhealthy_canonical: std::collections::HashSet<&str> = unhealthy_providers
+            .iter()
+            .map(|p| crate::provider_budget::canonical_quota_key(p))
+            .collect();
         self.fallback_routes
             .iter()
-            .find(|r| !unhealthy_providers.contains(&r.provider))
+            .find(|r| {
+                let route_canonical = crate::provider_budget::canonical_quota_key(&r.provider);
+                !unhealthy_canonical.contains(route_canonical)
+            })
     }
 }
 
