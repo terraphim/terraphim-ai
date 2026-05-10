@@ -65,6 +65,24 @@ pub struct LogDocument {
     /// Extra fields (if applicable)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extra: Option<serde_json::Value>,
+    /// Cost in USD for this execution (0.0 if free or unknown)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cost_usd: Option<f64>,
+    /// Latency in milliseconds
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub latency_ms: Option<u64>,
+    /// Input tokens consumed
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tokens_input: Option<u64>,
+    /// Output tokens produced
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tokens_output: Option<u64>,
+    /// Exit classification (e.g., "success", "rate_limit", "model_error")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub exit_class: Option<String>,
+    /// Whether this model is free (zero cost)
+    #[serde(default)]
+    pub is_free: bool,
 }
 
 /// Error type for QuickwitSink operations
@@ -420,6 +438,12 @@ mod tests {
             wall_time_secs: Some(1.5),
             flow_name: None,
             extra: None,
+            cost_usd: None,
+            latency_ms: None,
+            tokens_input: None,
+            tokens_output: None,
+            exit_class: None,
+            is_free: false,
         };
 
         let json = serde_json::to_string(&doc).unwrap();
@@ -484,5 +508,66 @@ mod tests {
         };
         // No sinks registered, no fallback: should succeed silently.
         assert!(fleet.send(doc).await.is_ok());
+    }
+
+    #[test]
+    fn test_log_document_extended_fields_serialize() {
+        let doc = LogDocument {
+            timestamp: "2026-05-10T20:00:00Z".to_string(),
+            project_id: "terraphim-ai".to_string(),
+            level: "INFO".to_string(),
+            agent_name: "test-agent".to_string(),
+            layer: "Core".to_string(),
+            source: "orchestrator".to_string(),
+            message: "test".to_string(),
+            model: Some("kimi-for-coding/k2p5".to_string()),
+            cost_usd: Some(0.005),
+            latency_ms: Some(12345),
+            tokens_input: Some(1000),
+            tokens_output: Some(500),
+            exit_class: Some("success".to_string()),
+            is_free: false,
+            ..Default::default()
+        };
+
+        let json = serde_json::to_string(&doc).unwrap();
+        assert!(json.contains("\"cost_usd\":0.005"));
+        assert!(json.contains("\"latency_ms\":12345"));
+        assert!(json.contains("\"tokens_input\":1000"));
+        assert!(json.contains("\"tokens_output\":500"));
+        assert!(json.contains("\"exit_class\":\"success\""));
+        assert!(json.contains("\"is_free\":false"));
+
+        // Verify roundtrip
+        let deserialized: LogDocument = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.cost_usd, Some(0.005));
+        assert_eq!(deserialized.latency_ms, Some(12345));
+        assert_eq!(deserialized.tokens_input, Some(1000));
+        assert_eq!(deserialized.tokens_output, Some(500));
+        assert_eq!(deserialized.exit_class, Some("success".to_string()));
+        assert!(!deserialized.is_free);
+    }
+
+    #[test]
+    fn test_log_document_free_model_skips_cost_fields() {
+        let doc = LogDocument {
+            timestamp: "2026-05-10T20:00:00Z".to_string(),
+            project_id: "terraphim-ai".to_string(),
+            level: "INFO".to_string(),
+            agent_name: "test-agent".to_string(),
+            layer: "Core".to_string(),
+            source: "orchestrator".to_string(),
+            message: "test".to_string(),
+            is_free: true,
+            ..Default::default()
+        };
+
+        let json = serde_json::to_string(&doc).unwrap();
+        // Free models should not serialize cost/latency/tokens
+        assert!(!json.contains("cost_usd"));
+        assert!(!json.contains("latency_ms"));
+        assert!(!json.contains("tokens_input"));
+        assert!(!json.contains("tokens_output"));
+        assert!(json.contains("\"is_free\":true"));
     }
 }
