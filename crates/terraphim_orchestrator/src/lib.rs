@@ -7053,6 +7053,30 @@ Remove the pause flag once the underlying failure is resolved:\n\n\
                     }
                 }
             }
+            
+            // Send to Quickwit for cost-aware routing analytics
+            if let Some(ref sink) = self.quickwit_sink {
+                let doc = quickwit::LogDocument {
+                    timestamp: event.completed_at.to_rfc3339(),
+                    project_id: self.config.projects.first().map(|p| p.id.clone()).unwrap_or_else(|| crate::dispatcher::LEGACY_PROJECT_ID.to_string()),
+                    level: if event.success { "INFO".to_string() } else { "WARN".to_string() },
+                    agent_name: agent_name.clone(),
+                    layer: "Core".to_string(),
+                    source: "telemetry".to_string(),
+                    message: event.error.clone().unwrap_or_else(|| "completion recorded".to_string()),
+                    model: Some(event.model.clone()),
+                    cost_usd: Some(event.cost_usd),
+                    latency_ms: Some(event.latency_ms),
+                    tokens_input: Some(event.tokens.input),
+                    tokens_output: Some(event.tokens.output),
+                    exit_class: if event.success { Some("success".to_string()) } else { Some("error".to_string()) },
+                    is_free: event.cost_usd == 0.0,
+                    ..Default::default()
+                };
+                if let Err(e) = sink.send(doc).await {
+                    warn!(error = %e, "failed to send telemetry to Quickwit");
+                }
+            }
         }
         // Write all events in one lock acquisition.
         let completion_events: Vec<control_plane::telemetry::CompletionEvent> =
