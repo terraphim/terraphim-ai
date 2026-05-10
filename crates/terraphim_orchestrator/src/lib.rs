@@ -1839,9 +1839,11 @@ impl AgentOrchestrator {
         // For opencode, compose "provider/model" format when both fields are set.
         // opencode requires `-m provider/model` whereas the TOML config stores them
         // separately (provider = "kimi-for-coding", model = "k2p5").
+        // Skip composition if the model already contains a provider prefix (e.g.
+        // from KG routing which returns full model ids like "kimi-for-coding/k2p5").
         let model = if cli_name == "opencode" {
             match (&def.provider, &model) {
-                (Some(provider), Some(m)) => {
+                (Some(provider), Some(m)) if !m.contains('/') => {
                     let composed = format!("{}/{}", provider, m);
                     info!(agent = %def.name, composed_model = %composed, "composed provider/model for opencode");
                     Some(composed)
