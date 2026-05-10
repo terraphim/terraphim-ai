@@ -6235,11 +6235,15 @@ impl AgentOrchestrator {
                     control_plane::output_parser::parse_stderr_for_limit_errors(&stderr_text)
                         .is_some()
                         || control_plane::telemetry::is_subscription_limit_error(&output_text);
-                let effective_provider = def.provider.as_deref().or_else(|| {
-                    routed_model
-                        .as_deref()
-                        .and_then(|m| provider_budget::provider_key_for_model(m))
-                });
+                // Attribution: prefer routed model -> canonical key, fallback to config provider
+                let effective_provider = routed_model
+                    .as_deref()
+                    .map(provider_budget::canonical_key_for_model_or_provider)
+                    .or_else(|| {
+                        def.provider
+                            .as_deref()
+                            .map(provider_budget::canonical_quota_key)
+                    });
 
                 if let Some(provider_key) = effective_provider {
                     warn!(
@@ -6273,18 +6277,19 @@ impl AgentOrchestrator {
 
             // D-3: Feed exit classification into provider health circuit breaker
             if let Some(ref provider) = def.provider {
+                let canonical = provider_budget::canonical_quota_key(provider);
                 let already_recorded_by_quota =
-                    quota_provider_recorded.as_deref() == Some(provider.as_str());
+                    quota_provider_recorded.as_deref() == Some(canonical);
                 match record.exit_class {
                     ExitClass::ModelError | ExitClass::RateLimit =>
                     {
                         #[allow(clippy::collapsible_match)]
                         if !already_recorded_by_quota {
-                            self.provider_health.record_failure(provider);
+                            self.provider_health.record_failure(canonical);
                         }
                     }
                     ExitClass::Success | ExitClass::EmptySuccess => {
-                        self.provider_health.record_success(provider);
+                        self.provider_health.record_success(canonical);
                     }
                     _ => {} // Other exit classes don't affect provider health
                 }
@@ -6300,13 +6305,13 @@ impl AgentOrchestrator {
                     error_signatures::ErrorKind::Throttle => {
                         warn!(
                             agent = %name,
-                            provider = %provider,
+                            provider = %canonical,
                             model = ?record.model_used,
                             "stderr classified as throttle; tripping breaker + exhausting budget"
                         );
-                        self.provider_health.record_failure(provider);
+                        self.provider_health.record_failure(canonical);
                         if let Some(tracker) = self.provider_budget_tracker.as_ref() {
-                            tracker.force_exhaust(provider);
+                            tracker.force_exhaust(canonical);
                         }
                     }
                     error_signatures::ErrorKind::Flake => {
