@@ -1050,11 +1050,18 @@ impl AgentOrchestrator {
                         warn!(error = %e, "failed to save probe results");
                     }
                 }
-                
+
                 // Send probe results to Quickwit for cost-aware routing
                 if let Some(ref sink) = self.quickwit_sink {
-                    let project_id = self.config.projects.first().map(|p| p.id.clone()).unwrap_or_else(|| crate::dispatcher::LEGACY_PROJECT_ID.to_string());
-                    self.provider_health.send_to_quickwit(sink, &project_id).await;
+                    let project_id = self
+                        .config
+                        .projects
+                        .first()
+                        .map(|p| p.id.clone())
+                        .unwrap_or_else(|| crate::dispatcher::LEGACY_PROJECT_ID.to_string());
+                    self.provider_health
+                        .send_to_quickwit(sink, &project_id)
+                        .await;
                 }
             }
         }
@@ -1727,12 +1734,19 @@ impl AgentOrchestrator {
                 .map(|r| std::sync::Arc::new(r.clone()));
             let unhealthy = self.provider_health.unhealthy_providers();
             let telemetry_arc = std::sync::Arc::new(self.telemetry_store.clone());
-            let engine = control_plane::RoutingDecisionEngine::with_provider_budget(
+            let strategy = self
+                .config
+                .routing
+                .as_ref()
+                .map(|r| r.route_selection_strategy)
+                .unwrap_or(crate::control_plane::RouteSelectionStrategy::Fastest);
+            let engine = control_plane::RoutingDecisionEngine::with_provider_budget_and_strategy(
                 kg_arc,
                 unhealthy,
                 terraphim_router::Router::new(),
                 Some(telemetry_arc),
                 self.provider_budget_tracker.clone(),
+                strategy,
             );
             let ctx = control_plane::DispatchContext {
                 agent_name: def.name.clone(),
@@ -2257,12 +2271,19 @@ impl AgentOrchestrator {
             .map(|r| std::sync::Arc::new(r.clone()));
         let unhealthy = self.provider_health.unhealthy_providers();
         let telemetry_arc = std::sync::Arc::new(self.telemetry_store.clone());
-        let engine = control_plane::RoutingDecisionEngine::with_provider_budget(
+        let strategy = self
+            .config
+            .routing
+            .as_ref()
+            .map(|r| r.route_selection_strategy)
+            .unwrap_or(crate::control_plane::RouteSelectionStrategy::Fastest);
+        let engine = control_plane::RoutingDecisionEngine::with_provider_budget_and_strategy(
             kg_arc,
             unhealthy,
             terraphim_router::Router::new(),
             Some(telemetry_arc),
             self.provider_budget_tracker.clone(),
+            strategy,
         );
         let dispatch_ctx = control_plane::DispatchContext {
             agent_name: def.name.clone(),
@@ -5513,11 +5534,18 @@ impl AgentOrchestrator {
                 {
                     let _ = self.provider_health.save_results(dir.as_path()).await;
                 }
-                
+
                 // Send probe results to Quickwit for cost-aware routing
                 if let Some(ref sink) = self.quickwit_sink {
-                    let project_id = self.config.projects.first().map(|p| p.id.clone()).unwrap_or_else(|| crate::dispatcher::LEGACY_PROJECT_ID.to_string());
-                    self.provider_health.send_to_quickwit(sink, &project_id).await;
+                    let project_id = self
+                        .config
+                        .projects
+                        .first()
+                        .map(|p| p.id.clone())
+                        .unwrap_or_else(|| crate::dispatcher::LEGACY_PROJECT_ID.to_string());
+                    self.provider_health
+                        .send_to_quickwit(sink, &project_id)
+                        .await;
                 }
             }
         }
@@ -7065,23 +7093,39 @@ Remove the pause flag once the underlying failure is resolved:\n\n\
                     }
                 }
             }
-            
+
             // Send to Quickwit for cost-aware routing analytics
             if let Some(ref sink) = self.quickwit_sink {
                 let doc = quickwit::LogDocument {
                     timestamp: event.completed_at.to_rfc3339(),
-                    project_id: self.config.projects.first().map(|p| p.id.clone()).unwrap_or_else(|| crate::dispatcher::LEGACY_PROJECT_ID.to_string()),
-                    level: if event.success { "INFO".to_string() } else { "WARN".to_string() },
+                    project_id: self
+                        .config
+                        .projects
+                        .first()
+                        .map(|p| p.id.clone())
+                        .unwrap_or_else(|| crate::dispatcher::LEGACY_PROJECT_ID.to_string()),
+                    level: if event.success {
+                        "INFO".to_string()
+                    } else {
+                        "WARN".to_string()
+                    },
                     agent_name: agent_name.clone(),
                     layer: "Core".to_string(),
                     source: "telemetry".to_string(),
-                    message: event.error.clone().unwrap_or_else(|| "completion recorded".to_string()),
+                    message: event
+                        .error
+                        .clone()
+                        .unwrap_or_else(|| "completion recorded".to_string()),
                     model: Some(event.model.clone()),
                     cost_usd: Some(event.cost_usd),
                     latency_ms: Some(event.latency_ms),
                     tokens_input: Some(event.tokens.input),
                     tokens_output: Some(event.tokens.output),
-                    exit_class: if event.success { Some("success".to_string()) } else { Some("error".to_string()) },
+                    exit_class: if event.success {
+                        Some("success".to_string())
+                    } else {
+                        Some("error".to_string())
+                    },
                     is_free: event.cost_usd == 0.0,
                     ..Default::default()
                 };

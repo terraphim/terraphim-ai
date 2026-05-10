@@ -9,6 +9,18 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
+/// Strategy for selecting the best model based on telemetry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum RouteSelectionStrategy {
+    /// Select the model with lowest average latency.
+    #[default]
+    Fastest,
+    /// Select the model with lowest cost per 1K output tokens.
+    Cheapest,
+    /// Select free models first, then cheapest.
+    FreeThenCheapest,
+}
+
 /// A single model completion event parsed from CLI tool output.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CompletionEvent {
@@ -64,6 +76,10 @@ pub struct ModelPerformanceSnapshot {
     pub subscription_limit_reached: bool,
     /// Time when the subscription limit flag should expire.
     pub subscription_limit_expires_at: Option<DateTime<Utc>>,
+    /// Average cost per 1K output tokens in USD.
+    pub avg_cost_per_1k_tokens: f64,
+    /// Whether this model is free (zero cost).
+    pub is_free: bool,
 }
 
 impl ModelPerformanceSnapshot {
@@ -79,6 +95,8 @@ impl ModelPerformanceSnapshot {
             last_event_at: None,
             subscription_limit_reached: false,
             subscription_limit_expires_at: None,
+            avg_cost_per_1k_tokens: 0.0,
+            is_free: false,
         }
     }
 
@@ -165,13 +183,16 @@ fn compute_snapshot(
 ) -> ModelPerformanceSnapshot {
     let events = inner.events.get(model);
 
-    let (successful, failed, avg_latency) = match events {
-        None => (0u64, 0u64, 0.0),
+    let (successful, failed, avg_latency, total_cost, total_output_tokens, is_free) = match events {
+        None => (0u64, 0u64, 0.0, 0.0, 0u64, false),
         Some(evts) => {
             let mut success_count = 0u64;
             let mut fail_count = 0u64;
             let mut latency_sum = 0.0f64;
             let mut latency_count = 0u64;
+            let mut cost_sum = 0.0f64;
+            let mut output_tokens_sum = 0u64;
+            let mut free = true;
 
             for e in evts {
                 if e.success {
@@ -181,6 +202,11 @@ fn compute_snapshot(
                 } else {
                     fail_count += 1;
                 }
+                cost_sum += e.cost_usd;
+                output_tokens_sum += e.tokens.output;
+                if e.cost_usd > 0.0 {
+                    free = false;
+                }
             }
 
             let avg = if latency_count > 0 {
@@ -189,7 +215,14 @@ fn compute_snapshot(
                 0.0
             };
 
-            (success_count, fail_count, avg)
+            (
+                success_count,
+                fail_count,
+                avg,
+                cost_sum,
+                output_tokens_sum,
+                free,
+            )
         }
     };
 
@@ -215,6 +248,12 @@ fn compute_snapshot(
 
     let subscription_limit_expires_at = inner.subscription_limits.get(model).copied();
 
+    let avg_cost_per_1k = if total_output_tokens > 0 {
+        (total_cost / total_output_tokens as f64) * 1000.0
+    } else {
+        0.0
+    };
+
     ModelPerformanceSnapshot {
         model: model.to_string(),
         successful_completions: successful,
@@ -226,6 +265,8 @@ fn compute_snapshot(
         last_event_at,
         subscription_limit_reached,
         subscription_limit_expires_at,
+        avg_cost_per_1k_tokens: avg_cost_per_1k,
+        is_free,
     }
 }
 
@@ -354,6 +395,44 @@ impl TelemetryStore {
             .keys()
             .map(|m| compute_snapshot(&inner, m, now))
             .collect()
+    }
+
+    /// Select the best model by strategy.
+    ///
+    /// Returns the model identifier and its snapshot, or None if no models
+    /// have telemetry data.
+    pub async fn select_best_model(
+        &self,
+        strategy: RouteSelectionStrategy,
+    ) -> Option<ModelPerformanceSnapshot> {
+        let performances = self.all_model_performances().await;
+        if performances.is_empty() {
+            return None;
+        }
+
+        match strategy {
+            RouteSelectionStrategy::Fastest => performances.into_iter().min_by(|a, b| {
+                a.avg_latency_ms
+                    .partial_cmp(&b.avg_latency_ms)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            }),
+            RouteSelectionStrategy::Cheapest => performances.into_iter().min_by(|a, b| {
+                a.avg_cost_per_1k_tokens
+                    .partial_cmp(&b.avg_cost_per_1k_tokens)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            }),
+            RouteSelectionStrategy::FreeThenCheapest => performances
+                .iter()
+                .find(|p| p.is_free)
+                .cloned()
+                .or_else(|| {
+                    performances.into_iter().min_by(|a, b| {
+                        a.avg_cost_per_1k_tokens
+                            .partial_cmp(&b.avg_cost_per_1k_tokens)
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                    })
+                }),
+        }
     }
 
     /// Record multiple completion events in a single write-lock acquisition.
@@ -653,6 +732,8 @@ mod tests {
                 last_event_at: Some(old_time),
                 subscription_limit_reached: false,
                 subscription_limit_expires_at: None,
+                avg_cost_per_1k_tokens: 0.0,
+                is_free: false,
             }],
             window_secs: 3600,
             exported_at: old_time,

@@ -467,7 +467,10 @@ impl ProviderHealthMap {
                 agent_name: "probe".to_string(),
                 layer: "Core".to_string(),
                 source: "probe".to_string(),
-                message: result.error.clone().unwrap_or_else(|| format!("probe {:?}", result.status)),
+                message: result
+                    .error
+                    .clone()
+                    .unwrap_or_else(|| format!("probe {:?}", result.status)),
                 model: Some(result.model.clone()),
                 cost_usd: Some(0.0), // Probes are zero-cost test calls
                 latency_ms: result.latency_ms,
@@ -479,7 +482,10 @@ impl ProviderHealthMap {
                 warn!(error = %e, "failed to send probe result to Quickwit");
             }
         }
-        info!(results = self.results.len(), "probe results sent to Quickwit");
+        info!(
+            results = self.results.len(),
+            "probe results sent to Quickwit"
+        );
     }
 }
 

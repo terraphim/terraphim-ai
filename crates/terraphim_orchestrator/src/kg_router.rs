@@ -56,12 +56,10 @@ impl KgRouteDecision {
             .iter()
             .map(|p| crate::provider_budget::canonical_quota_key(p))
             .collect();
-        self.fallback_routes
-            .iter()
-            .find(|r| {
-                let route_canonical = crate::provider_budget::canonical_quota_key(&r.provider);
-                !unhealthy_canonical.contains(route_canonical)
-            })
+        self.fallback_routes.iter().find(|r| {
+            let route_canonical = crate::provider_budget::canonical_quota_key(&r.provider);
+            !unhealthy_canonical.contains(route_canonical)
+        })
     }
 }
 
