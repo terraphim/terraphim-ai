@@ -94,11 +94,7 @@ impl ProviderHealthMap {
     /// Extracts unique `(provider, model, action)` triples from the router's
     /// rules, executes each action template with a test prompt via
     /// `tokio::process::Command`, and records results.
-    pub async fn probe_all(
-        &mut self,
-        kg_router: &KgRouter,
-        is_blocked: &dyn Fn(&str) -> bool,
-    ) {
+    pub async fn probe_all(&mut self, kg_router: &KgRouter, is_blocked: &dyn Fn(&str) -> bool) {
         let mut seen = HashMap::new();
         let mut tasks = Vec::new();
         let mut results = Vec::new();
@@ -1054,10 +1050,7 @@ action:: definitely-not-a-real-cli-12345 --model {{ model }}
         map.rate_limited.insert("anthropic".to_string());
 
         // Even with no probe results, a rate-limited provider reports Degraded.
-        assert_eq!(
-            map.provider_health("anthropic"),
-            HealthStatus::Degraded
-        );
+        assert_eq!(map.provider_health("anthropic"), HealthStatus::Degraded);
     }
 
     #[test]
