@@ -1757,7 +1757,8 @@ impl AgentOrchestrator {
         } else if supports_model_flag {
             // KG routing first (phase-aware tier selection from markdown rules).
             // Takes priority over static model config so tier routing controls selection.
-            let unhealthy = self.provider_health.unhealthy_providers();
+            let mut unhealthy = self.provider_health.unhealthy_providers();
+            unhealthy.extend(self.provider_rate_limits.blocked_providers());
             let kg_decision = self.kg_router.as_ref().and_then(|router| {
                 let decision = router.route_agent(&def.task)?;
                 // If primary provider is unhealthy, try fallback routes
@@ -6519,6 +6520,13 @@ impl AgentOrchestrator {
                                 fallback_def.name = retry_name;
                                 fallback_def.model = Some(healthy_route.model.clone());
                                 fallback_def.provider = Some(healthy_route.provider.clone());
+                                // Extract CLI tool from the action template so the retry uses
+                                // the correct CLI for the fallback provider (e.g. opencode for kimi).
+                                if let Some(ref action) = healthy_route.action {
+                                    if let Some(cli) = action.split_whitespace().next() {
+                                        fallback_def.cli_tool = cli.to_string();
+                                    }
+                                }
                                 fallback_def.fallback_provider = None;
                                 fallback_def.fallback_model = None;
                                 info!(
