@@ -24,10 +24,12 @@ route:: kimi, kimi-for-coding/k2p5
 action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"
 
 route:: zai, zai-coding-plan/glm-5-turbo
+is_free:: true
 action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"
 
 route:: openai, openai/gpt-5.4-mini
 action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"
 
 route:: minimax, minimax-coding-plan/MiniMax-M2.5
+is_free:: true
 action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"

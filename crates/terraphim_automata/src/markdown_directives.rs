@@ -173,6 +173,7 @@ fn parse_markdown_directives_content(
                     provider: provider.to_ascii_lowercase(),
                     model: model.to_string(),
                     action: None,
+                    is_free: false,
                 });
             }
             continue;
@@ -192,6 +193,24 @@ fn parse_markdown_directives_content(
                             .to_string(),
                     });
                 }
+            }
+            continue;
+        }
+
+        if lower.starts_with("is_free::") || lower.starts_with("free::") {
+            let value = trimmed[lower.find("::").unwrap() + 2..]
+                .trim()
+                .to_ascii_lowercase();
+            let is_free = matches!(value.as_str(), "true" | "yes" | "1");
+            if let Some(last_route) = routes.last_mut() {
+                last_route.is_free = is_free;
+            } else {
+                warnings.push(MarkdownDirectiveWarning {
+                    path: path.to_path_buf(),
+                    line: Some(idx + 1),
+                    message: "is_free:: directive without a preceding route:: directive"
+                        .to_string(),
+                });
             }
             continue;
         }
@@ -299,6 +318,7 @@ mod tests {
                 provider: "openai".to_string(),
                 model: "gpt-4o".to_string(),
                 action: None,
+                is_free: false,
             })
         );
         assert_eq!(directives.priority, Some(80));
@@ -317,6 +337,49 @@ mod tests {
         assert_eq!(directives.doc_type, DocumentType::ConfigDocument);
         assert!(directives.route.is_some());
         assert!(result.warnings.is_empty());
+    }
+
+    #[test]
+    fn parses_is_free_directive() {
+        let dir = tempdir().unwrap();
+        fs::write(
+            dir.path().join("free.md"),
+            "route:: zai, glm-5-turbo\nis_free:: true\naction:: opencode -m {{ model }}\n",
+        )
+        .unwrap();
+
+        let result = parse_markdown_directives_dir(dir.path()).unwrap();
+        let directives = result.directives.get("free").unwrap();
+        let route = directives.routes.first().unwrap();
+        assert!(route.is_free);
+        assert_eq!(route.provider, "zai");
+        assert_eq!(route.model, "glm-5-turbo");
+    }
+
+    #[test]
+    fn parses_free_alias_directive() {
+        let dir = tempdir().unwrap();
+        fs::write(
+            dir.path().join("free.md"),
+            "route:: zai, glm-5-turbo\nfree:: yes\n",
+        )
+        .unwrap();
+
+        let result = parse_markdown_directives_dir(dir.path()).unwrap();
+        let directives = result.directives.get("free").unwrap();
+        let route = directives.routes.first().unwrap();
+        assert!(route.is_free);
+    }
+
+    #[test]
+    fn is_free_defaults_to_false() {
+        let dir = tempdir().unwrap();
+        fs::write(dir.path().join("paid.md"), "route:: anthropic, sonnet\n").unwrap();
+
+        let result = parse_markdown_directives_dir(dir.path()).unwrap();
+        let directives = result.directives.get("paid").unwrap();
+        let route = directives.routes.first().unwrap();
+        assert!(!route.is_free);
     }
 
     #[test]

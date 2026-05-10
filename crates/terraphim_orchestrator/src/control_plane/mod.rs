@@ -24,4 +24,4 @@ pub use events::{
     NormalizedAgentEvent, WebhookContext,
 };
 pub use routing::{DispatchContext, RouteCandidate, RoutingDecision, RoutingDecisionEngine};
-pub use telemetry::{CompletionEvent, TelemetryStore, TelemetrySummary};
+pub use telemetry::{CompletionEvent, RouteSelectionStrategy, TelemetryStore, TelemetrySummary};

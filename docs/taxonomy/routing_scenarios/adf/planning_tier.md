@@ -26,4 +26,5 @@ route:: openai, openai/gpt-5.4
 action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"
 
 route:: zai, zai-coding-plan/glm-5
+is_free:: true
 action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"

@@ -307,11 +307,13 @@ impl ProviderHealthMap {
     /// List all unhealthy provider names.
     ///
     /// A provider is unhealthy only if ALL its models are unhealthy.
+    /// Returned names are canonicalised via [`canonical_quota_key`].
     pub fn unhealthy_providers(&self) -> Vec<String> {
         let mut providers: HashMap<String, (usize, usize)> = HashMap::new(); // (total, healthy)
 
         for result in &self.results {
-            let entry = providers.entry(result.provider.clone()).or_insert((0, 0));
+            let canonical = crate::provider_budget::canonical_quota_key(&result.provider);
+            let entry = providers.entry(canonical.to_string()).or_insert((0, 0));
             entry.0 += 1;
             if result.status == ProbeStatus::Success {
                 entry.1 += 1;
@@ -328,8 +330,9 @@ impl ProviderHealthMap {
         let mut cb_providers: HashMap<String, (usize, usize)> = HashMap::new();
         for (key, breaker) in &self.breakers {
             if let Some(provider) = key.split(':').next() {
-                if !unhealthy.contains(&provider.to_string()) {
-                    let entry = cb_providers.entry(provider.to_string()).or_insert((0, 0));
+                let canonical = crate::provider_budget::canonical_quota_key(provider);
+                if !unhealthy.contains(&canonical.to_string()) {
+                    let entry = cb_providers.entry(canonical.to_string()).or_insert((0, 0));
                     entry.0 += 1;
                     if breaker.should_allow() {
                         entry.1 += 1;
@@ -353,8 +356,9 @@ impl ProviderHealthMap {
     /// Record a success for a provider (e.g., from ExitClassifier).
     /// Record a success for a provider+model (e.g., from ExitClassifier).
     pub fn record_success(&mut self, provider: &str) {
+        let canonical = crate::provider_budget::canonical_quota_key(provider);
         // Update all circuit breakers for this provider
-        let prefix = format!("{provider}:");
+        let prefix = format!("{canonical}:");
         for (key, breaker) in &mut self.breakers {
             if key.starts_with(&prefix) {
                 breaker.record_success();
@@ -364,7 +368,8 @@ impl ProviderHealthMap {
 
     /// Record a success for a specific model.
     pub fn record_model_success(&mut self, provider: &str, model: &str) {
-        let key = format!("{provider}:{model}");
+        let canonical = crate::provider_budget::canonical_quota_key(provider);
+        let key = format!("{canonical}:{model}");
         if let Some(breaker) = self.breakers.get_mut(&key) {
             breaker.record_success();
         }
@@ -372,7 +377,8 @@ impl ProviderHealthMap {
 
     /// Record a failure for a provider (affects all models for that provider).
     pub fn record_failure(&mut self, provider: &str) {
-        let prefix = format!("{provider}:");
+        let canonical = crate::provider_budget::canonical_quota_key(provider);
+        let prefix = format!("{canonical}:");
         let keys: Vec<String> = self
             .breakers
             .keys()
@@ -387,7 +393,7 @@ impl ProviderHealthMap {
 
         // If no breakers exist for this provider, create one at provider level
         if !self.breakers.keys().any(|k| k.starts_with(&prefix)) {
-            let key = format!("{provider}:*");
+            let key = format!("{canonical}:*");
             let breaker = self
                 .breakers
                 .entry(key)
@@ -396,21 +402,22 @@ impl ProviderHealthMap {
         }
 
         warn!(
-            provider = provider,
+            provider = canonical,
             "provider failure recorded (all models)"
         );
     }
 
     /// Record a failure for a specific model.
     pub fn record_model_failure(&mut self, provider: &str, model: &str) {
-        let key = format!("{provider}:{model}");
+        let canonical = crate::provider_budget::canonical_quota_key(provider);
+        let key = format!("{canonical}:{model}");
         let breaker = self
             .breakers
             .entry(key)
             .or_insert_with(|| CircuitBreaker::new(self.cb_config.clone()));
         breaker.record_failure();
         warn!(
-            provider = provider,
+            provider = canonical,
             model = model,
             state = %breaker.state(),
             "model failure recorded"
@@ -441,6 +448,44 @@ impl ProviderHealthMap {
             "probe results saved"
         );
         Ok(())
+    }
+
+    /// Send probe results to Quickwit for cost-aware routing analytics.
+    pub async fn send_to_quickwit(
+        &self,
+        sink: &crate::quickwit::QuickwitFleetSink,
+        project_id: &str,
+    ) {
+        for result in &self.results {
+            let doc = crate::quickwit::LogDocument {
+                timestamp: result.timestamp.clone(),
+                project_id: project_id.to_string(),
+                level: match result.status {
+                    ProbeStatus::Success => "INFO".to_string(),
+                    _ => "WARN".to_string(),
+                },
+                agent_name: "probe".to_string(),
+                layer: "Core".to_string(),
+                source: "probe".to_string(),
+                message: result
+                    .error
+                    .clone()
+                    .unwrap_or_else(|| format!("probe {:?}", result.status)),
+                model: Some(result.model.clone()),
+                cost_usd: Some(0.0), // Probes are zero-cost test calls
+                latency_ms: result.latency_ms,
+                exit_class: Some(format!("{:?}", result.status).to_lowercase()),
+                is_free: true, // Probes don't incur cost
+                ..Default::default()
+            };
+            if let Err(e) = sink.send(doc).await {
+                warn!(error = %e, "failed to send probe result to Quickwit");
+            }
+        }
+        info!(
+            results = self.results.len(),
+            "probe results sent to Quickwit"
+        );
     }
 }
 

@@ -371,6 +371,15 @@ pub struct RoutingConfig {
     /// Default: `false` (uses inline model selection logic).
     #[serde(default)]
     pub use_routing_engine: bool,
+    /// Strategy for selecting the best model when telemetry data is available.
+    ///
+    /// - `Fastest`: Select the model with lowest average latency.
+    /// - `Cheapest`: Select the model with lowest cost per 1K output tokens.
+    /// - `FreeThenCheapest`: Select free models first, then cheapest.
+    ///
+    /// Default: `Fastest`.
+    #[serde(default)]
+    pub route_selection_strategy: crate::control_plane::RouteSelectionStrategy,
 }
 
 fn default_probe_ttl() -> u64 {

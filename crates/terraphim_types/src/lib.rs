@@ -481,6 +481,9 @@ pub struct RouteDirective {
     /// CLI action template with `{{ model }}` and `{{ prompt }}` placeholders.
     #[serde(default)]
     pub action: Option<String>,
+    /// Whether this model is free (zero cost).
+    #[serde(default)]
+    pub is_free: bool,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]

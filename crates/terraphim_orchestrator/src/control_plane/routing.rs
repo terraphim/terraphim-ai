@@ -5,7 +5,7 @@
 //! recorded in the decision rationale. Budget pressure biases route selection
 //! toward cheaper models when an agent's spend approaches its limit.
 
-use crate::control_plane::telemetry::TelemetryStore;
+use crate::control_plane::telemetry::{RouteSelectionStrategy, TelemetryStore};
 use crate::cost_tracker::BudgetVerdict;
 use crate::kg_router::KgRouter;
 use crate::provider_budget::{provider_key_for_model, ProviderBudgetTracker};
@@ -135,6 +135,8 @@ pub struct RoutingDecisionEngine {
     /// whose provider verdict is `Exhausted` are stripped before scoring
     /// and `NearExhaustion` entries are deprioritised.
     provider_budget: Option<Arc<ProviderBudgetTracker>>,
+    /// Strategy for selecting the best model when telemetry data is available.
+    route_selection_strategy: RouteSelectionStrategy,
 }
 
 impl RoutingDecisionEngine {
@@ -144,12 +146,13 @@ impl RoutingDecisionEngine {
         router: terraphim_router::Router,
         telemetry_store: Option<Arc<TelemetryStore>>,
     ) -> Self {
-        Self::with_provider_budget(
+        Self::with_provider_budget_and_strategy(
             kg_router,
             unhealthy_providers,
             router,
             telemetry_store,
             None,
+            RouteSelectionStrategy::Fastest,
         )
     }
 
@@ -160,12 +163,31 @@ impl RoutingDecisionEngine {
         telemetry_store: Option<Arc<TelemetryStore>>,
         provider_budget: Option<Arc<ProviderBudgetTracker>>,
     ) -> Self {
+        Self::with_provider_budget_and_strategy(
+            kg_router,
+            unhealthy_providers,
+            router,
+            telemetry_store,
+            provider_budget,
+            RouteSelectionStrategy::Fastest,
+        )
+    }
+
+    pub fn with_provider_budget_and_strategy(
+        kg_router: Option<Arc<KgRouter>>,
+        unhealthy_providers: Vec<String>,
+        router: terraphim_router::Router,
+        telemetry_store: Option<Arc<TelemetryStore>>,
+        provider_budget: Option<Arc<ProviderBudgetTracker>>,
+        route_selection_strategy: RouteSelectionStrategy,
+    ) -> Self {
         Self {
             kg_router,
             unhealthy_providers,
             router,
             telemetry_store,
             provider_budget,
+            route_selection_strategy,
         }
     }
 
@@ -470,7 +492,7 @@ impl RoutingDecisionEngine {
             }
         }
 
-        // Apply telemetry-based scoring adjustments
+        // Apply telemetry-based scoring adjustments according to strategy
         let mut telemetry_influenced = false;
         if let Some(ref store) = self.telemetry_store {
             let mut performances = Vec::with_capacity(all_candidates.len());
@@ -482,18 +504,61 @@ impl RoutingDecisionEngine {
                 if perf.is_subscription_limited() {
                     pressured_scores[i] *= 0.1;
                     telemetry_influenced = true;
-                } else if perf.successful_completions > 0 {
-                    let success_bonus = (perf.success_rate - 0.5).max(0.0_f64) * 0.2_f64;
-                    let latency_bonus = if perf.avg_latency_ms > 0.0 && perf.avg_latency_ms < 5000.0
-                    {
-                        (1.0_f64 - perf.avg_latency_ms / 10000.0_f64).max(0.0_f64) * 0.1_f64
-                    } else {
-                        0.0_f64
-                    };
-                    let bonus = success_bonus + latency_bonus;
-                    if bonus > 0.01 {
-                        pressured_scores[i] *= 1.0 + bonus;
-                        telemetry_influenced = true;
+                    continue;
+                }
+
+                if perf.successful_completions == 0 {
+                    continue;
+                }
+
+                match self.route_selection_strategy {
+                    RouteSelectionStrategy::Fastest => {
+                        let latency_bonus = if perf.avg_latency_ms > 0.0 {
+                            let normalized = (perf.avg_latency_ms / 10000.0).min(1.0);
+                            (1.0 - normalized) * 0.3
+                        } else {
+                            0.0
+                        };
+                        let success_bonus = (perf.success_rate - 0.5).max(0.0) * 0.1;
+                        let bonus = latency_bonus + success_bonus;
+                        if bonus > 0.01 {
+                            pressured_scores[i] *= 1.0 + bonus;
+                            telemetry_influenced = true;
+                        }
+                    }
+                    RouteSelectionStrategy::Cheapest => {
+                        let cost_bonus = if perf.avg_cost_per_1k_tokens > 0.0 {
+                            let normalized = (perf.avg_cost_per_1k_tokens / 0.1).min(1.0); // 0.1 USD/1k as max reference
+                            (1.0 - normalized) * 0.3
+                        } else {
+                            0.15 // Small bonus for truly free models with zero cost data
+                        };
+                        let success_bonus = (perf.success_rate - 0.5).max(0.0) * 0.1;
+                        let bonus = cost_bonus + success_bonus;
+                        if bonus > 0.01 {
+                            pressured_scores[i] *= 1.0 + bonus;
+                            telemetry_influenced = true;
+                        }
+                    }
+                    RouteSelectionStrategy::FreeThenCheapest => {
+                        if perf.is_free {
+                            // Strong bonus for free models
+                            pressured_scores[i] *= 1.5;
+                            telemetry_influenced = true;
+                        } else {
+                            let cost_bonus = if perf.avg_cost_per_1k_tokens > 0.0 {
+                                let normalized = (perf.avg_cost_per_1k_tokens / 0.1).min(1.0);
+                                (1.0 - normalized) * 0.2
+                            } else {
+                                0.1
+                            };
+                            let success_bonus = (perf.success_rate - 0.5).max(0.0) * 0.1;
+                            let bonus = cost_bonus + success_bonus;
+                            if bonus > 0.01 {
+                                pressured_scores[i] *= 1.0 + bonus;
+                                telemetry_influenced = true;
+                            }
+                        }
                     }
                 }
             }

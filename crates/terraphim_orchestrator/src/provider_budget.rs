@@ -377,6 +377,52 @@ pub fn provider_key_for_model(provider_or_model: &str) -> Option<&str> {
     Some(provider_or_model)
 }
 
+/// Collapse a provider key into its canonical quota-bearing identity.
+///
+/// Some providers share an upstream subscription. For example, the
+/// `anthropic` provider and `claude-code` CLI route to the same
+/// Anthropic API key, so a quota hit on one means the other is also
+/// exhausted. This helper makes that equivalence explicit.
+///
+/// Unknown providers return their input unchanged.
+///
+/// # Examples
+///
+/// ```
+/// use terraphim_orchestrator::provider_budget::canonical_quota_key;
+///
+/// assert_eq!(canonical_quota_key("anthropic"),  "claude-code");
+/// assert_eq!(canonical_quota_key("claude-code"), "claude-code");
+/// assert_eq!(canonical_quota_key("kimi"),        "kimi");
+/// ```
+pub fn canonical_quota_key(provider: &str) -> &str {
+    match provider {
+        "anthropic" => "claude-code",
+        other => other,
+    }
+}
+
+/// Given a model name or provider name, return the canonical quota key.
+///
+/// This is the composition of [`provider_key_for_model`] +
+/// [`canonical_quota_key`], the single entry-point for attribution and
+/// health tracking.
+///
+/// # Examples
+///
+/// ```
+/// use terraphim_orchestrator::provider_budget::canonical_key_for_model_or_provider;
+///
+/// assert_eq!(canonical_key_for_model_or_provider("sonnet"),          "claude-code");
+/// assert_eq!(canonical_key_for_model_or_provider("anthropic"),       "claude-code");
+/// assert_eq!(canonical_key_for_model_or_provider("claude-code"),     "claude-code");
+/// assert_eq!(canonical_key_for_model_or_provider("kimi-for-coding/k2p5"), "kimi-for-coding");
+/// assert_eq!(canonical_key_for_model_or_provider("opencode-go"),     "opencode-go");
+/// ```
+pub fn canonical_key_for_model_or_provider(input: &str) -> &str {
+    canonical_quota_key(provider_key_for_model(input).unwrap_or(input))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -592,5 +638,47 @@ mod tests {
         assert!(!snap.providers.contains_key("old-provider"));
 
         let _ = fs::remove_file(&path);
+    }
+
+    #[test]
+    fn canonical_quota_key_collapses_anthropic_to_claude_code() {
+        assert_eq!(canonical_quota_key("anthropic"), "claude-code");
+        assert_eq!(canonical_quota_key("claude-code"), "claude-code");
+    }
+
+    #[test]
+    fn canonical_quota_key_passes_through_unknown() {
+        assert_eq!(canonical_quota_key("kimi"), "kimi");
+        assert_eq!(canonical_quota_key("opencode-go"), "opencode-go");
+        assert_eq!(canonical_quota_key("zai"), "zai");
+    }
+
+    #[test]
+    fn canonical_key_for_model_or_provider_composes_correctly() {
+        // Model names -> provider key -> canonical
+        assert_eq!(canonical_key_for_model_or_provider("sonnet"), "claude-code");
+        assert_eq!(canonical_key_for_model_or_provider("opus"), "claude-code");
+        assert_eq!(
+            canonical_key_for_model_or_provider("kimi-for-coding/k2p5"),
+            "kimi-for-coding"
+        );
+        assert_eq!(
+            canonical_key_for_model_or_provider("opencode-go/minimax-m2.5"),
+            "opencode-go"
+        );
+
+        // Provider names -> canonical directly
+        assert_eq!(
+            canonical_key_for_model_or_provider("anthropic"),
+            "claude-code"
+        );
+        assert_eq!(
+            canonical_key_for_model_or_provider("claude-code"),
+            "claude-code"
+        );
+        assert_eq!(canonical_key_for_model_or_provider("kimi"), "kimi");
+
+        // Unknown identifiers -> identity
+        assert_eq!(canonical_key_for_model_or_provider("mystery"), "mystery");
     }
 }
