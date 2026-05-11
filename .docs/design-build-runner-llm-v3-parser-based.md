@@ -361,6 +361,85 @@ kg_role = "DevOps Engineer"
 cache_invalidation_hours = 24
 ```
 
+## terraphim-agent Suggest Integration
+
+### Fuzzy Matching Build Commands
+
+The `terraphim-agent suggest` command provides fuzzy matching that can resolve ambiguous build commands:
+
+```bash
+# User types ambiguous command
+$ terraphim-agent suggest "fmt" --role "DevOps Engineer" --fuzzy
+> format
+> fmt-check
+> rustfmt
+
+# Match against known build actions
+$ terraphim-agent suggest "test" --role "DevOps Engineer" --threshold 0.8
+> test
+> test-all
+> test-integration
+> cargo-test
+```
+
+### Use Cases in Build-Runner
+
+1. **Resolving ambiguous step names**
+   ```yaml
+   # GitHub Actions might use:
+   - run: cargo check
+   # User query: "check" → suggest maps to "lint"
+   ```
+
+2. **Cross-project command discovery**
+   ```bash
+   # Find similar commands across projects
+   $ terraphim-agent suggest "build" --role "DevOps Engineer"
+   > cargo build --workspace      (terraphim-ai)
+   > make all                     (gitea-robot)
+   > npm run build                (atomic-server)
+   ```
+
+3. **Typo correction in BUILD.md**
+   ```markdown
+   # User writes:
+   action:: cargo formt --all
+
+   # Parser detects typo, suggests:
+   > Did you mean: "cargo fmt --all"?
+   ```
+
+### Integration with Parsers
+
+```rust
+use terraphim_automata::suggest::FuzzyMatcher;
+
+pub fn resolve_build_action(
+    raw_command: &str,
+    known_actions: &[BuildAction],
+) -> Option<BuildAction> {
+    // First try exact match
+    if let Some(exact) = known_actions.iter().find(|a| a.command == raw_command) {
+        return Some(exact.clone());
+    }
+
+    // Fall back to fuzzy matching via terraphim-agent
+    let matcher = FuzzyMatcher::new()
+        .with_threshold(0.8);
+
+    let suggestions: Vec<String> = known_actions
+        .iter()
+        .map(|a| a.command.clone())
+        .collect();
+
+    matcher.suggest(raw_command, &suggestions)
+        .first()
+        .cloned()
+        .and_then(|cmd| known_actions.iter().find(|a| a.command == cmd))
+        .cloned()
+}
+```
+
 ## Implementation Plan (Revised)
 
 ### Phase 1: Parser Infrastructure (4h)
