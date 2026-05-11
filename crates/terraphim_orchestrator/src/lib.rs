@@ -58,9 +58,13 @@ pub mod pr_review;
 pub mod project_control;
 pub mod provider_budget;
 pub mod provider_probe;
+pub mod rate_limiter;
 #[cfg(feature = "quickwit")]
 pub mod quickwit;
+#[cfg(feature = "quickwit")]
+pub mod quickwit_bulk;
 pub mod scheduler;
+pub mod worktree_guard;
 pub mod scope;
 pub mod webhook;
 
@@ -101,6 +105,10 @@ pub use nightwatch::{
 pub use output_poster::OutputPoster;
 pub use persona::{MetapromptRenderError, MetapromptRenderer, PersonaRegistry};
 pub use scheduler::{ScheduleEvent, TimeScheduler};
+pub use rate_limiter::{is_rate_limit_backoff_enabled, RateLimiter};
+pub use worktree_guard::{with_worktree_guard, with_worktree_guard_async, WorktreeGuard};
+#[cfg(feature = "quickwit")]
+pub use quickwit_bulk::QuickwitEsBulkSink;
 use terraphim_types::{FindingSeverity, ReviewFinding};
 
 use chrono::Timelike;
@@ -165,6 +173,9 @@ struct ManagedAgent {
     commit_status_post: Option<(String, String)>,
     /// Temp file path for streaming agent output. Renamed to final path on exit.
     output_tmp_path: Option<PathBuf>,
+    /// Worktree guard for automatic cleanup on agent crash.
+    #[allow(dead_code)]
+    worktree_guard: Option<crate::worktree_guard::WorktreeGuard>,
 }
 
 #[cfg(not(test))]
@@ -729,7 +740,8 @@ impl AgentOrchestrator {
             .map(|r| r.probe_ttl_secs)
             .unwrap_or(300);
         let provider_health =
-            provider_probe::ProviderHealthMap::new(std::time::Duration::from_secs(probe_ttl));
+            provider_probe::ProviderHealthMap::new(std::time::Duration::from_secs(probe_ttl))
+                .with_rate_limiter(crate::rate_limiter::RateLimiter::new());
 
         let telemetry_store = control_plane::TelemetryStore::new(3600);
 
@@ -1957,10 +1969,15 @@ impl AgentOrchestrator {
         // Create isolated git worktree for implementation-tier agents that modify code.
         // Review-tier agents (haiku) are read-only and don't need isolation.
         let needs_isolation = model.as_ref().map(|m| !m.contains("haiku")).unwrap_or(true);
-        let worktree_path = if needs_isolation {
-            self.create_agent_worktree(&def.name).await
+        let (worktree_path, worktree_guard) = if needs_isolation {
+            if let Some(path) = self.create_agent_worktree(&def.name).await {
+                let guard = crate::worktree_guard::WorktreeGuard::new(&path);
+                (Some(path), Some(guard))
+            } else {
+                (None, None)
+            }
         } else {
-            None
+            (None, None)
         };
         let agent_working_dir = worktree_path
             .as_ref()
@@ -2075,6 +2092,7 @@ impl AgentOrchestrator {
                 output_rx,
                 spawned_by_mention: false,
                 worktree_path,
+                worktree_guard,
                 routed_model: model.clone(),
                 session_id: format!("{}-{}", def.name, ulid::Ulid::new()),
                 mention_chain_id: None,
@@ -2411,6 +2429,7 @@ impl AgentOrchestrator {
                 output_rx,
                 spawned_by_mention: false,
                 worktree_path: None,
+                worktree_guard: None,
                 routed_model: if routed_model.is_empty() {
                     None
                 } else {
@@ -2613,6 +2632,7 @@ impl AgentOrchestrator {
                 output_rx,
                 spawned_by_mention: false,
                 worktree_path: None,
+                worktree_guard: None,
                 routed_model: None,
                 session_id: format!("{}-{}", def.name, ulid::Ulid::new()),
                 mention_chain_id: None,
@@ -2926,6 +2946,7 @@ impl AgentOrchestrator {
                 output_rx,
                 spawned_by_mention: false,
                 worktree_path: None,
+                worktree_guard: None,
                 routed_model: None,
                 session_id: format!("{}-{}", def.name, ulid::Ulid::new()),
                 mention_chain_id: None,
@@ -6543,6 +6564,16 @@ impl AgentOrchestrator {
                 };
                 self.post_terminal_commit_status(head_sha, context, state, &description)
                     .await;
+            }
+
+            // Disarm worktree guard on success so it doesn't conflict with
+            // the explicit cleanup below.
+            if status.success() {
+                if let Some(agent) = self.active_agents.get_mut(&name) {
+                    if let Some(guard) = agent.worktree_guard.take() {
+                        guard.keep();
+                    }
+                }
             }
 
             self.active_agents.remove(&name);

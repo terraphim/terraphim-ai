@@ -11,6 +11,7 @@ use terraphim_spawner::health::{CircuitBreaker, CircuitBreakerConfig, CircuitSta
 use tracing::{debug, info, warn};
 
 use crate::kg_router::KgRouter;
+use crate::rate_limiter::RateLimiter;
 
 /// Result of probing a single provider+model combination.
 #[derive(Debug, Clone, serde::Serialize)]
@@ -48,6 +49,8 @@ pub struct ProviderHealthMap {
     cb_config: CircuitBreakerConfig,
     /// Providers currently blocked by rate limits.
     rate_limited: HashSet<String>,
+    /// Per-provider rate limiter with exponential backoff.
+    rate_limiter: Option<RateLimiter>,
 }
 
 impl std::fmt::Debug for ProviderHealthMap {
@@ -74,7 +77,14 @@ impl ProviderHealthMap {
                 success_threshold: 1,
             },
             rate_limited: HashSet::new(),
+            rate_limiter: None,
         }
+    }
+
+    /// Set the rate limiter for this health map.
+    pub fn with_rate_limiter(mut self, rate_limiter: RateLimiter) -> Self {
+        self.rate_limiter = Some(rate_limiter);
+        self
     }
 
     /// Check if a provider is currently rate-limited.
@@ -128,6 +138,28 @@ impl ProviderHealthMap {
                     timestamp: chrono::Utc::now().to_rfc3339(),
                 });
                 continue;
+            }
+
+            // Skip probing providers that are in rate limiter backoff.
+            if let Some(ref rate_limiter) = self.rate_limiter {
+                if rate_limiter.is_rate_limited(&rule.provider) {
+                    debug!(
+                        provider = %rule.provider,
+                        model = %rule.model,
+                        "probe skipped: rate limiter backoff"
+                    );
+                    self.rate_limited.insert(rule.provider.clone());
+                    results.push(ProbeResult {
+                        provider: rule.provider.clone(),
+                        model: rule.model.clone(),
+                        cli_tool: String::new(),
+                        status: ProbeStatus::RateLimited,
+                        latency_ms: None,
+                        error: Some("probe skipped: rate limiter backoff".to_string()),
+                        timestamp: chrono::Utc::now().to_rfc3339(),
+                    });
+                    continue;
+                }
             }
 
             // Skip probing models whose circuit breaker is already Open.
@@ -197,6 +229,10 @@ impl ProviderHealthMap {
                         model = %result.model,
                         "skipping circuit-breaker update: provider rate-limited"
                     );
+                    // Record rate limit event in the rate limiter.
+                    if let Some(ref rate_limiter) = self.rate_limiter {
+                        rate_limiter.record_rate_limit(&result.provider);
+                    }
                 }
             }
         }
