@@ -9,7 +9,7 @@ repository = "https://github.com/terraphim/terraphim-ai"
 
 [features]
 default = ["quickwit"]
-quickwit = ["dep:reqwest"]
+quickwit = ["dep:reqwest", "dep:reqwest-middleware", "dep:reqwest-retry"]
 
 [dependencies]
 # Terraphim internal crates
@@ -68,6 +68,8 @@ terraphim_persistence = { path = "../terraphim_persistence", version = "1.4.10",
 
 # Quickwit integration (optional)
 reqwest = { workspace = true, optional = true }
+reqwest-middleware = { workspace = true, optional = true }
+reqwest-retry = { workspace = true, optional = true }
 ulid = "1.2.1"
 
 [dev-dependencies]

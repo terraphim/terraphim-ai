@@ -485,6 +485,9 @@ pub struct QuickwitConfig {
     /// Seconds between forced flushes.
     #[serde(default = "default_quickwit_flush_interval_secs")]
     pub flush_interval_secs: u64,
+    /// Use Elasticsearch-compatible bulk API instead of native ingest.
+    #[serde(default = "default_quickwit_use_es_bulk")]
+    pub use_es_bulk: bool,
 }
 
 #[cfg(feature = "quickwit")]
@@ -496,6 +499,7 @@ impl Default for QuickwitConfig {
             index_id: default_quickwit_index_id(),
             batch_size: default_quickwit_batch_size(),
             flush_interval_secs: default_quickwit_flush_interval_secs(),
+            use_es_bulk: default_quickwit_use_es_bulk(),
         }
     }
 }
@@ -523,6 +527,11 @@ fn default_quickwit_batch_size() -> usize {
 #[cfg(feature = "quickwit")]
 fn default_quickwit_flush_interval_secs() -> u64 {
     5
+}
+
+#[cfg(feature = "quickwit")]
+fn default_quickwit_use_es_bulk() -> bool {
+    false
 }
 
 /// Lightweight reference to an SFIA skill code and level.
