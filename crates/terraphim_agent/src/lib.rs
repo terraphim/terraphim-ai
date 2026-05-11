@@ -1,3 +1,8 @@
+//! Terraphim agent library — TUI, robot mode, and multi-agent coordination.
+//!
+//! Bundles the interactive REPL, robot-mode JSON output, forgiving CLI parser,
+//! MCP tool index, onboarding workflows, and optional shared-learning store.
+//! Feature flags gate heavier subsystems: `server`, `repl`, `shared-learning`.
 #[cfg(feature = "server")]
 pub mod client;
 pub mod onboarding;

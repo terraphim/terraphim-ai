@@ -1,3 +1,8 @@
+//! Device and server settings for Terraphim AI.
+//!
+//! Loads configuration from TOML files, environment variables, and optional
+//! 1Password secrets via the `onepassword` feature flag. Settings follow a
+//! layered precedence: defaults < file < environment < 1Password.
 use directories::ProjectDirs;
 use serde::de::{self, Deserializer};
 use serde::{Deserialize, Serialize};

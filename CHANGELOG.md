@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Module-level rustdoc** added to 17 previously undocumented crates: `terraphim_service`, `terraphim_settings`, `terraphim_agent`, `terraphim_file_search`, `terraphim_kg_linter`, `terraphim_ccusage`, `terraphim_usage`, `terraphim_build_args`, `terraphim_lsp`, `terraphim_automata_py`, `terraphim_rolegraph_py`, `terraphim-markdown-parser`, `haystack_core`, `haystack_atlassian`, `haystack_discourse`, `haystack_grepapp`, `haystack_jmap` — all workspace crates now have crate-level `//!` documentation
 - **Module-level rustdoc** added to five previously undocumented crates: `terraphim_persistence`, `terraphim_mcp_server`, `terraphim_config`, `terraphim_rolegraph`, `terraphim_middleware`
 - **`DeviceStorage` struct doc** explaining singleton pattern, operator ordering, and cache write-back target
 - **`TerraphimMcpError` enum doc** describing the four failure domains covered by MCP server errors
@@ -38,7 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **RUSTSEC-2026-0049** eliminated by switching serenity to native-tls (Refs #418)
+- **World-readable sensitive config files** now emit tracing error/warn at load time via `warn_if_world_readable()` in orchestrator config and all `conf.d` include files (Refs #826)- **RUSTSEC-2026-0049** eliminated by switching serenity to native-tls (Refs #418)
 - **Spec gaps** addressed and resolved across ADF orchestrator templates (Refs #1040)
 - **Global concurrency limits** enforced in orchestrator to prevent task/memory exhaustion (Refs #664)
 - **listen_mode test assertion** updated to match clap error output (Refs #1044)
