@@ -220,14 +220,51 @@ parse_build_md() {
   return 0
 }
 
+# Extract build commands from GitHub Actions workflows
+extract_workflow_commands() {
+  local workflow_dir=".github/workflows"
+  local all_commands=""
+
+  if [ ! -d "$workflow_dir" ]; then
+    return 1
+  fi
+
+  # Find workflows that trigger on push or pull_request
+  for workflow in "$workflow_dir"/*.yml "$workflow_dir"/*.yaml; do
+    [ -f "$workflow" ] || continue
+
+    # Check if workflow triggers on push or pull_request
+    if grep -qE 'on:\s*(push|pull_request|\[.*push.*\]|\[.*pull_request.*\])' "$workflow" 2>/dev/null; then
+      log_info "Detected: GitHub Actions workflow ($workflow)"
+
+      # Extract 'run' commands from steps
+      if command -v yq >/dev/null 2>&1; then
+        local commands
+        commands=$(yq '.jobs[].steps[].run' "$workflow" 2>/dev/null | grep -v null | grep -v '^$')
+        if [ -n "$commands" ]; then
+          all_commands="$all_commands$commands"
+        fi
+      fi
+    fi
+  done
+
+  if [ -n "$all_commands" ]; then
+    echo "$all_commands"
+    return 0
+  fi
+
+  return 1
+}
+
 # Detect CI configuration and extract commands
 detect_and_extract() {
   cd "$ADF_WORKING_DIR"
 
-  # Priority 1: GitHub Actions
-  if [ -f ".github/workflows/ci-pr.yml" ] && command -v yq >/dev/null 2>&1; then
-    log_info "Detected: GitHub Actions workflow (.github/workflows/ci-pr.yml)"
-    yq '.jobs[].steps[].run' .github/workflows/ci-pr.yml | grep -v null | grep -v '^$'
+  # Priority 1: GitHub Actions (all push/PR workflows)
+  local workflow_commands
+  workflow_commands=$(extract_workflow_commands)
+  if [ -n "$workflow_commands" ]; then
+    echo "$workflow_commands"
     return 0
   fi
 
