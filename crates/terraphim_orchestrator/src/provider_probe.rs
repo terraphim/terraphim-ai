@@ -4,14 +4,13 @@
 //! health state (Closed/Open/HalfOpen). The probe executes `action::` templates
 //! from KG routing rules via CLI tools to test the full stack.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
 use terraphim_spawner::health::{CircuitBreaker, CircuitBreakerConfig, CircuitState, HealthStatus};
 use tracing::{debug, info, warn};
 
 use crate::kg_router::KgRouter;
-use crate::rate_limiter::RateLimiter;
 
 /// Result of probing a single provider+model combination.
 #[derive(Debug, Clone, serde::Serialize)]
@@ -26,13 +25,12 @@ pub struct ProbeResult {
 }
 
 /// Status of a probe attempt.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ProbeStatus {
     Success,
     Error,
     Timeout,
-    RateLimited,
 }
 
 /// Cached provider availability map with TTL-based refresh.
@@ -47,10 +45,6 @@ pub struct ProviderHealthMap {
     ttl: Duration,
     /// Circuit breaker configuration.
     cb_config: CircuitBreakerConfig,
-    /// Providers currently blocked by rate limits.
-    rate_limited: HashSet<String>,
-    /// Per-provider rate limiter with exponential backoff.
-    rate_limiter: Option<RateLimiter>,
 }
 
 impl std::fmt::Debug for ProviderHealthMap {
@@ -76,20 +70,7 @@ impl ProviderHealthMap {
                 cooldown: Duration::from_secs(300),
                 success_threshold: 1,
             },
-            rate_limited: HashSet::new(),
-            rate_limiter: None,
         }
-    }
-
-    /// Set the rate limiter for this health map.
-    pub fn with_rate_limiter(mut self, rate_limiter: RateLimiter) -> Self {
-        self.rate_limiter = Some(rate_limiter);
-        self
-    }
-
-    /// Check if a provider is currently rate-limited.
-    pub fn is_rate_limited(&self, provider: &str) -> bool {
-        self.rate_limited.contains(provider)
     }
 
     /// Check if cached probe results have expired.
@@ -104,13 +85,9 @@ impl ProviderHealthMap {
     /// Extracts unique `(provider, model, action)` triples from the router's
     /// rules, executes each action template with a test prompt via
     /// `tokio::process::Command`, and records results.
-    pub async fn probe_all(&mut self, kg_router: &KgRouter, is_blocked: &dyn Fn(&str) -> bool) {
+    pub async fn probe_all(&mut self, kg_router: &KgRouter) {
         let mut seen = HashMap::new();
         let mut tasks = Vec::new();
-        let mut results = Vec::new();
-
-        // Clear rate-limited set; we will rebuild it for this tick.
-        self.rate_limited.clear();
 
         // Collect unique provider+model combos from all KG routing rules
         for rule in kg_router.all_routes() {
@@ -119,48 +96,6 @@ impl ProviderHealthMap {
                 continue;
             }
             seen.insert(key.clone(), true);
-
-            // Skip probing providers that are currently rate-limited.
-            if is_blocked(&rule.provider) {
-                debug!(
-                    provider = %rule.provider,
-                    model = %rule.model,
-                    "probe skipped: provider rate-limited"
-                );
-                self.rate_limited.insert(rule.provider.clone());
-                results.push(ProbeResult {
-                    provider: rule.provider.clone(),
-                    model: rule.model.clone(),
-                    cli_tool: String::new(),
-                    status: ProbeStatus::RateLimited,
-                    latency_ms: None,
-                    error: Some("probe skipped: provider rate-limited".to_string()),
-                    timestamp: chrono::Utc::now().to_rfc3339(),
-                });
-                continue;
-            }
-
-            // Skip probing providers that are in rate limiter backoff.
-            if let Some(ref rate_limiter) = self.rate_limiter {
-                if rate_limiter.is_rate_limited(&rule.provider) {
-                    debug!(
-                        provider = %rule.provider,
-                        model = %rule.model,
-                        "probe skipped: rate limiter backoff"
-                    );
-                    self.rate_limited.insert(rule.provider.clone());
-                    results.push(ProbeResult {
-                        provider: rule.provider.clone(),
-                        model: rule.model.clone(),
-                        cli_tool: String::new(),
-                        status: ProbeStatus::RateLimited,
-                        latency_ms: None,
-                        error: Some("probe skipped: rate limiter backoff".to_string()),
-                        timestamp: chrono::Utc::now().to_rfc3339(),
-                    });
-                    continue;
-                }
-            }
 
             // Skip probing models whose circuit breaker is already Open.
             // Probing a known-unhealthy provider wastes tokens and spawns
@@ -185,6 +120,7 @@ impl ProviderHealthMap {
             }));
         }
 
+        let mut results = Vec::new();
         for task in tasks {
             match task.await {
                 Ok(result) => results.push(result),
@@ -206,34 +142,21 @@ impl ProviderHealthMap {
             match result.status {
                 ProbeStatus::Success => breaker.record_success(),
                 ProbeStatus::Error => {
-                    // Do not count CLI-not-found as a provider failure.
-                    if result
-                        .error
-                        .as_ref()
-                        .is_some_and(|e| e.contains("CLI tool") && e.contains("not found on PATH"))
-                    {
+                    // Do not count environment/configuration errors as provider
+                    // failures — they do not indicate that the API is down.
+                    let err = result.error.as_deref().unwrap_or("");
+                    if is_environment_error(err) {
                         debug!(
                             provider = %result.provider,
                             model = %result.model,
-                            "skipping circuit-breaker update: CLI tool missing"
+                            error = %err,
+                            "skipping circuit-breaker update: environment/config error"
                         );
                     } else {
                         breaker.record_failure();
                     }
                 }
                 ProbeStatus::Timeout => breaker.record_failure(),
-                ProbeStatus::RateLimited => {
-                    // Rate-limited probes are skipped; do not update breaker.
-                    debug!(
-                        provider = %result.provider,
-                        model = %result.model,
-                        "skipping circuit-breaker update: provider rate-limited"
-                    );
-                    // Record rate limit event in the rate limiter.
-                    if let Some(ref rate_limiter) = self.rate_limiter {
-                        rate_limiter.record_rate_limit(&result.provider);
-                    }
-                }
             }
         }
 
@@ -267,7 +190,6 @@ impl ProviderHealthMap {
                 ProbeStatus::Success => HealthStatus::Healthy,
                 ProbeStatus::Error => HealthStatus::Unhealthy,
                 ProbeStatus::Timeout => HealthStatus::Unhealthy,
-                ProbeStatus::RateLimited => HealthStatus::Degraded,
             };
         }
 
@@ -284,11 +206,6 @@ impl ProviderHealthMap {
 
     /// Get aggregate health status for a provider (any model healthy = provider healthy).
     pub fn provider_health(&self, provider: &str) -> HealthStatus {
-        // Rate-limited providers report as Degraded regardless of other state.
-        if self.is_rate_limited(provider) {
-            return HealthStatus::Degraded;
-        }
-
         // Check probe results at model level
         let provider_results: Vec<_> = self
             .results
@@ -343,13 +260,11 @@ impl ProviderHealthMap {
     /// List all unhealthy provider names.
     ///
     /// A provider is unhealthy only if ALL its models are unhealthy.
-    /// Returned names are canonicalised via [`canonical_quota_key`].
     pub fn unhealthy_providers(&self) -> Vec<String> {
         let mut providers: HashMap<String, (usize, usize)> = HashMap::new(); // (total, healthy)
 
         for result in &self.results {
-            let canonical = crate::provider_budget::canonical_quota_key(&result.provider);
-            let entry = providers.entry(canonical.to_string()).or_insert((0, 0));
+            let entry = providers.entry(result.provider.clone()).or_insert((0, 0));
             entry.0 += 1;
             if result.status == ProbeStatus::Success {
                 entry.1 += 1;
@@ -366,9 +281,8 @@ impl ProviderHealthMap {
         let mut cb_providers: HashMap<String, (usize, usize)> = HashMap::new();
         for (key, breaker) in &self.breakers {
             if let Some(provider) = key.split(':').next() {
-                let canonical = crate::provider_budget::canonical_quota_key(provider);
-                if !unhealthy.contains(&canonical.to_string()) {
-                    let entry = cb_providers.entry(canonical.to_string()).or_insert((0, 0));
+                if !unhealthy.contains(&provider.to_string()) {
+                    let entry = cb_providers.entry(provider.to_string()).or_insert((0, 0));
                     entry.0 += 1;
                     if breaker.should_allow() {
                         entry.1 += 1;
@@ -383,18 +297,14 @@ impl ProviderHealthMap {
             }
         }
 
-        // Exclude rate-limited providers; they are not truly "unhealthy".
-        unhealthy.retain(|p| !self.is_rate_limited(p));
-
         unhealthy
     }
 
     /// Record a success for a provider (e.g., from ExitClassifier).
     /// Record a success for a provider+model (e.g., from ExitClassifier).
     pub fn record_success(&mut self, provider: &str) {
-        let canonical = crate::provider_budget::canonical_quota_key(provider);
         // Update all circuit breakers for this provider
-        let prefix = format!("{canonical}:");
+        let prefix = format!("{provider}:");
         for (key, breaker) in &mut self.breakers {
             if key.starts_with(&prefix) {
                 breaker.record_success();
@@ -404,8 +314,7 @@ impl ProviderHealthMap {
 
     /// Record a success for a specific model.
     pub fn record_model_success(&mut self, provider: &str, model: &str) {
-        let canonical = crate::provider_budget::canonical_quota_key(provider);
-        let key = format!("{canonical}:{model}");
+        let key = format!("{provider}:{model}");
         if let Some(breaker) = self.breakers.get_mut(&key) {
             breaker.record_success();
         }
@@ -413,8 +322,7 @@ impl ProviderHealthMap {
 
     /// Record a failure for a provider (affects all models for that provider).
     pub fn record_failure(&mut self, provider: &str) {
-        let canonical = crate::provider_budget::canonical_quota_key(provider);
-        let prefix = format!("{canonical}:");
+        let prefix = format!("{provider}:");
         let keys: Vec<String> = self
             .breakers
             .keys()
@@ -429,7 +337,7 @@ impl ProviderHealthMap {
 
         // If no breakers exist for this provider, create one at provider level
         if !self.breakers.keys().any(|k| k.starts_with(&prefix)) {
-            let key = format!("{canonical}:*");
+            let key = format!("{provider}:*");
             let breaker = self
                 .breakers
                 .entry(key)
@@ -438,22 +346,21 @@ impl ProviderHealthMap {
         }
 
         warn!(
-            provider = canonical,
+            provider = provider,
             "provider failure recorded (all models)"
         );
     }
 
     /// Record a failure for a specific model.
     pub fn record_model_failure(&mut self, provider: &str, model: &str) {
-        let canonical = crate::provider_budget::canonical_quota_key(provider);
-        let key = format!("{canonical}:{model}");
+        let key = format!("{provider}:{model}");
         let breaker = self
             .breakers
             .entry(key)
             .or_insert_with(|| CircuitBreaker::new(self.cb_config.clone()));
         breaker.record_failure();
         warn!(
-            provider = canonical,
+            provider = provider,
             model = model,
             state = %breaker.state(),
             "model failure recorded"
@@ -485,44 +392,21 @@ impl ProviderHealthMap {
         );
         Ok(())
     }
+}
 
-    /// Send probe results to Quickwit for cost-aware routing analytics.
-    pub async fn send_to_quickwit(
-        &self,
-        sink: &crate::quickwit::QuickwitFleetSink,
-        project_id: &str,
-    ) {
-        for result in &self.results {
-            let doc = crate::quickwit::LogDocument {
-                timestamp: result.timestamp.clone(),
-                project_id: project_id.to_string(),
-                level: match result.status {
-                    ProbeStatus::Success => "INFO".to_string(),
-                    _ => "WARN".to_string(),
-                },
-                agent_name: "probe".to_string(),
-                layer: "Core".to_string(),
-                source: "probe".to_string(),
-                message: result
-                    .error
-                    .clone()
-                    .unwrap_or_else(|| format!("probe {:?}", result.status)),
-                model: Some(result.model.clone()),
-                cost_usd: Some(0.0), // Probes are zero-cost test calls
-                latency_ms: result.latency_ms,
-                exit_class: Some(format!("{:?}", result.status).to_lowercase()),
-                is_free: true, // Probes don't incur cost
-                ..Default::default()
-            };
-            if let Err(e) = sink.send(doc).await {
-                warn!(error = %e, "failed to send probe result to Quickwit");
-            }
-        }
-        info!(
-            results = self.results.len(),
-            "probe results sent to Quickwit"
-        );
-    }
+/// Determine whether a probe error represents an environment/configuration
+/// issue rather than a genuine provider health failure.
+///
+/// These errors must not update the circuit breaker because they reflect
+/// local setup problems (missing tool, routing config, C1 allow-list) —
+/// not transient API unavailability.
+fn is_environment_error(error: &str) -> bool {
+    // CLI tool absent from PATH: local environment issue.
+    (error.contains("CLI tool") && error.contains("not found on PATH"))
+        // Provider not in C1 subscription allow-list: configuration issue.
+        || error.contains("not in C1 allow-list")
+        // No action:: template defined in routing rules: routing config issue.
+        || error.contains("no action:: template defined")
 }
 
 /// Check whether a CLI tool is available on PATH.
@@ -895,19 +779,32 @@ mod tests {
     }
 
     #[test]
+    fn is_environment_error_classifications() {
+        assert!(is_environment_error(
+            "probe skipped: CLI tool 'opencode' not found on PATH"
+        ));
+        assert!(is_environment_error(
+            "probe skipped: provider not in C1 allow-list"
+        ));
+        assert!(is_environment_error("no action:: template defined"));
+        assert!(!is_environment_error("exit 1: authentication failed"));
+        assert!(!is_environment_error("exit 1: connection timeout"));
+    }
+
+    #[test]
     fn missing_cli_probe_does_not_open_breaker() {
         let mut map = ProviderHealthMap::new(Duration::from_secs(300));
 
-        // Simulate the exact update logic from `probe_all` with a CLI-not-found
-        // result. We create the breaker entry and then run the same match logic
-        // that `probe_all` uses.
+        // Simulate a CLI-not-found error result and apply the same exemption
+        // logic used in probe_all via is_environment_error.
+        let error_msg = "probe skipped: CLI tool 'nonexistent-cli' not found on PATH".to_string();
         let result = ProbeResult {
             provider: "openai".to_string(),
             model: "gpt-4".to_string(),
             cli_tool: "nonexistent-cli".to_string(),
             status: ProbeStatus::Error,
             latency_ms: None,
-            error: Some("probe skipped: CLI tool 'nonexistent-cli' not found on PATH".to_string()),
+            error: Some(error_msg.clone()),
             timestamp: String::new(),
         };
 
@@ -917,154 +814,32 @@ mod tests {
             .entry(key)
             .or_insert_with(|| CircuitBreaker::new(map.cb_config.clone()));
 
-        // Replicate the logic from `probe_all`.
-        match result.status {
-            ProbeStatus::Success => breaker.record_success(),
-            ProbeStatus::Error => {
-                if result
-                    .error
-                    .as_ref()
-                    .is_some_and(|e| e.contains("CLI tool") && e.contains("not found on PATH"))
-                {
-                    // Skipped — this is what we want to verify.
-                } else {
-                    breaker.record_failure();
-                }
-            }
-            ProbeStatus::Timeout => breaker.record_failure(),
-            ProbeStatus::RateLimited => {
-                // Skipped — same as CLI-not-found.
-            }
+        if !is_environment_error(&error_msg) {
+            breaker.record_failure();
         }
 
-        // The breaker must still be Closed because the CLI-not-found error
-        // was skipped.
         assert!(matches!(
             breaker.state(),
             terraphim_spawner::health::CircuitState::Closed
         ));
-
-        // When there are no probe results, the provider falls back to the
-        // circuit breaker state, which is Closed (healthy).
         assert!(map.is_healthy("openai"));
     }
 
     #[test]
-    fn probe_status_rate_limited_serialisation() {
-        let status = ProbeStatus::RateLimited;
-        let json = serde_json::to_string(&status).unwrap();
-        assert_eq!(json, "\"rate_limited\"");
-        let deserialized: ProbeStatus = serde_json::from_str(&json).unwrap();
-        assert_eq!(deserialized, ProbeStatus::RateLimited);
-    }
-
-    #[tokio::test]
-    async fn probe_skips_rate_limited_provider() {
-        let dir = tempfile::tempdir().unwrap();
-        std::fs::write(
-            dir.path().join("test.md"),
-            r#"# Test
-route:: test-provider, test-model
-action:: test-cli-tool --model {{ model }}
-"#,
-        )
-        .unwrap();
-
-        let kg_router = crate::kg_router::KgRouter::load(dir.path()).unwrap();
+    fn c1_blocked_probe_does_not_open_breaker() {
         let mut map = ProviderHealthMap::new(Duration::from_secs(300));
 
-        // Block the test provider.
-        map.probe_all(&kg_router, &|provider: &str| provider == "test-provider")
-            .await;
-
-        // Should have recorded a RateLimited result.
-        let result = map
-            .results
-            .iter()
-            .find(|r| r.provider == "test-provider" && r.model == "test-model")
-            .expect("RateLimited result should be recorded");
-        assert_eq!(result.status, ProbeStatus::RateLimited);
-        assert_eq!(
-            result.error,
-            Some("probe skipped: provider rate-limited".to_string())
-        );
-
-        // Provider should be tracked as rate-limited.
-        assert!(map.is_rate_limited("test-provider"));
-
-        // Health should report Degraded.
-        assert_eq!(
-            map.model_health("test-provider", "test-model"),
-            HealthStatus::Degraded
-        );
-        assert_eq!(map.provider_health("test-provider"), HealthStatus::Degraded);
-    }
-
-    #[tokio::test]
-    async fn rate_limit_expiry_triggers_reprobe() {
-        let dir = tempfile::tempdir().unwrap();
-        std::fs::write(
-            dir.path().join("test.md"),
-            r#"# Test
-route:: test-provider, test-model
-action:: definitely-not-a-real-cli-12345 --model {{ model }}
-"#,
-        )
-        .unwrap();
-
-        let kg_router = crate::kg_router::KgRouter::load(dir.path()).unwrap();
-        let mut map = ProviderHealthMap::new(Duration::from_secs(300));
-
-        // First call: provider is blocked -> RateLimited.
-        map.probe_all(&kg_router, &|_: &str| true).await;
-        let first_result = map
-            .results
-            .iter()
-            .find(|r| r.provider == "test-provider")
-            .expect("Result should exist");
-        assert_eq!(first_result.status, ProbeStatus::RateLimited);
-
-        // Second call: block has "expired" (is_blocked returns false).
-        // The probe will spawn the CLI, which does not exist, yielding Error.
-        map.probe_all(&kg_router, &|_: &str| false).await;
-        let second_result = map
-            .results
-            .iter()
-            .find(|r| r.provider == "test-provider")
-            .expect("Result should exist");
-
-        // After expiry the provider is re-probed (not skipped due to rate limit).
-        // It may still fail for other reasons (C1 allow-list, CLI not found, etc.),
-        // but it must NOT be RateLimited.
-        assert_ne!(
-            second_result.status,
-            ProbeStatus::RateLimited,
-            "Provider should be re-probed after rate limit expiry, not skipped. Got: {:?}",
-            second_result
-        );
-
-        // Provider is no longer tracked as rate-limited.
-        assert!(!map.is_rate_limited("test-provider"));
-    }
-
-    #[test]
-    fn rate_limited_does_not_open_circuit_breaker() {
-        let mut map = ProviderHealthMap::new(Duration::from_secs(300));
-
-        // Record 4 failures for kimi (threshold is 5)
-        for _ in 0..4 {
-            map.record_failure("kimi");
-        }
-
-        // Simulate the exact update logic from `probe_all` with a RateLimited
-        // result. We create the breaker entry and then run the same match logic.
+        // A banned provider hits the C1 gate and returns this error.
+        // It must NOT accumulate failures against the circuit breaker —
+        // the provider API was never contacted.
+        let error_msg = "probe skipped: provider not in C1 allow-list".to_string();
         let result = ProbeResult {
-            provider: "kimi".to_string(),
-            model: "kimi-for-coding/k2p5".to_string(),
-            cli_tool: "opencode".to_string(),
-            status: ProbeStatus::RateLimited,
+            provider: "github-copilot".to_string(),
+            model: "github-copilot/gpt-4o".to_string(),
+            cli_tool: String::new(),
+            status: ProbeStatus::Error,
             latency_ms: None,
-            error: Some("probe skipped: provider rate-limited".to_string()),
+            error: Some(error_msg.clone()),
             timestamp: String::new(),
         };
 
@@ -1074,97 +849,14 @@ action:: definitely-not-a-real-cli-12345 --model {{ model }}
             .entry(key)
             .or_insert_with(|| CircuitBreaker::new(map.cb_config.clone()));
 
-        // Replicate the logic from `probe_all`.
-        match result.status {
-            ProbeStatus::Success => breaker.record_success(),
-            ProbeStatus::Error => {
-                if result
-                    .error
-                    .as_ref()
-                    .is_some_and(|e| e.contains("CLI tool") && e.contains("not found on PATH"))
-                {
-                    // Skipped
-                } else {
-                    breaker.record_failure();
-                }
-            }
-            ProbeStatus::Timeout => breaker.record_failure(),
-            ProbeStatus::RateLimited => {
-                // Skipped — same as CLI-not-found.
-            }
+        if !is_environment_error(&error_msg) {
+            breaker.record_failure();
         }
 
-        // The breaker must still be Closed because the RateLimited error
-        // was skipped (failure count remains at 4, not 5).
         assert!(matches!(
             breaker.state(),
             terraphim_spawner::health::CircuitState::Closed
         ));
-
-        // Provider is still healthy because the circuit breaker is Closed.
-        assert!(map.is_healthy("kimi"));
-    }
-
-    #[test]
-    fn model_health_returns_degraded_for_rate_limited() {
-        let mut map = ProviderHealthMap::new(Duration::from_secs(300));
-        map.rate_limited.insert("anthropic".to_string());
-        map.results = vec![ProbeResult {
-            provider: "anthropic".to_string(),
-            model: "claude-sonnet".to_string(),
-            cli_tool: "claude".to_string(),
-            status: ProbeStatus::RateLimited,
-            latency_ms: None,
-            error: Some("probe skipped: provider rate-limited".to_string()),
-            timestamp: String::new(),
-        }];
-
-        assert_eq!(
-            map.model_health("anthropic", "claude-sonnet"),
-            HealthStatus::Degraded
-        );
-    }
-
-    #[test]
-    fn provider_health_returns_degraded_for_rate_limited() {
-        let mut map = ProviderHealthMap::new(Duration::from_secs(300));
-        map.rate_limited.insert("anthropic".to_string());
-
-        // Even with no probe results, a rate-limited provider reports Degraded.
-        assert_eq!(map.provider_health("anthropic"), HealthStatus::Degraded);
-    }
-
-    #[test]
-    fn unhealthy_providers_excludes_rate_limited() {
-        let mut map = ProviderHealthMap::new(Duration::from_secs(300));
-
-        // Simulate a provider with all models failing.
-        map.results = vec![
-            ProbeResult {
-                provider: "openai".to_string(),
-                model: "gpt-4".to_string(),
-                cli_tool: "opencode".to_string(),
-                status: ProbeStatus::Error,
-                latency_ms: Some(5000),
-                error: Some("API key invalid".to_string()),
-                timestamp: String::new(),
-            },
-            ProbeResult {
-                provider: "anthropic".to_string(),
-                model: "claude-sonnet".to_string(),
-                cli_tool: "claude".to_string(),
-                status: ProbeStatus::RateLimited,
-                latency_ms: None,
-                error: Some("probe skipped: provider rate-limited".to_string()),
-                timestamp: String::new(),
-            },
-        ];
-
-        // Mark anthropic as rate-limited.
-        map.rate_limited.insert("anthropic".to_string());
-
-        let unhealthy = map.unhealthy_providers();
-        assert!(unhealthy.contains(&"openai".to_string()));
-        assert!(!unhealthy.contains(&"anthropic".to_string()));
+        assert!(map.is_healthy("github-copilot"));
     }
 }
