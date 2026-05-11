@@ -174,6 +174,52 @@ execute_command() {
   fi
 }
 
+# Parse BUILD.md for build sequences
+parse_build_md() {
+  if [ ! -f "BUILD.md" ]; then
+    return 1
+  fi
+
+  log_info "Parsing BUILD.md for build sequence"
+
+  # Extract commands from code blocks under "Default Rust Build Sequence" or similar sections
+  # Look for bash code blocks that contain build commands
+  local in_block=0
+  local block_content=""
+
+  while IFS= read -r line; do
+    # Start of bash code block
+    if [[ "$line" =~ ^'```bash'$ ]]; then
+      in_block=1
+      block_content=""
+      continue
+    fi
+
+    # End of code block
+    if [[ "$line" =~ ^'```'$ ]] && [ "$in_block" -eq 1 ]; then
+      in_block=0
+      # Check if block contains build commands
+      if echo "$block_content" | grep -qE '^(cargo|make|npm|yarn|pnpm|bun|docker|pytest|python|go|rustc)'; then
+        echo "$block_content" | grep -v '^$'
+        return 0
+      fi
+      continue
+    fi
+
+    # Collect block content
+    if [ "$in_block" -eq 1 ]; then
+      block_content="$block_content$line"
+      # Check for multi-line content
+      if [ ${#block_content} -gt 0 ]; then
+        block_content="$block_content"
+      fi
+      echo "$line"
+    fi
+  done < BUILD.md | grep -v '^$' | grep -E '^(cargo|make|npm|yarn|pnpm|bun|docker|pytest|python|go|rustc)' | head -20
+
+  return 0
+}
+
 # Detect CI configuration and extract commands
 detect_and_extract() {
   cd "$ADF_WORKING_DIR"
@@ -185,22 +231,18 @@ detect_and_extract() {
     return 0
   fi
 
-  # Priority 2: Earthfile
-  if [ -f "Earthfile" ]; then
-    log_info "Detected: Earthfile"
-    # Only extract RUN lines (actual shell commands), not ARG/COPY/BUILD
-    grep -E '^\s+RUN\s+' Earthfile | sed 's/^\s*RUN\s*//' | grep -v '^$'
-    return 0
+  # Priority 2: BUILD.md (project-specific build documentation)
+  if [ -f "BUILD.md" ]; then
+    local build_commands
+    build_commands=$(parse_build_md)
+    if [ -n "$build_commands" ]; then
+      log_info "Detected: BUILD.md with build sequence"
+      echo "$build_commands"
+      return 0
+    fi
   fi
 
-  # Priority 3: Makefile
-  if [ -f "Makefile" ] && command -v make >/dev/null 2>&1; then
-    log_info "Detected: Makefile"
-    echo "make"
-    return 0
-  fi
-
-  # Priority 4: Cargo workspace
+  # Priority 3: Cargo workspace (Rust projects)
   if [ -f "Cargo.toml" ]; then
     log_info "Detected: Cargo workspace"
     echo "cargo fmt --all -- --check"
@@ -210,7 +252,22 @@ detect_and_extract() {
     return 0
   fi
 
-  # Priority 5: Package.json
+  # Priority 4: Makefile
+  if [ -f "Makefile" ] && command -v make >/dev/null 2>&1; then
+    log_info "Detected: Makefile"
+    echo "make"
+    return 0
+  fi
+
+  # Priority 5: Earthfile (Docker builds - extract only cargo/build commands)
+  if [ -f "Earthfile" ]; then
+    log_info "Detected: Earthfile"
+    # Only extract RUN lines that contain cargo/build/test commands
+    grep -E '^\s+RUN\s+' Earthfile | sed 's/^\s*RUN\s*//' | grep -E '(cargo|make|npm|yarn|bun|test|build)' | grep -v '^$'
+    return 0
+  fi
+
+  # Priority 6: Package.json
   if [ -f "package.json" ]; then
     log_info "Detected: Node.js project"
     echo "bun install"
