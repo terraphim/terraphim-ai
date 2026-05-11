@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Module-level rustdoc** added to five previously undocumented crates: `terraphim_persistence`, `terraphim_mcp_server`, `terraphim_config`, `terraphim_rolegraph`, `terraphim_middleware`
+- **`DeviceStorage` struct doc** explaining singleton pattern, operator ordering, and cache write-back target
+- **`TerraphimMcpError` enum doc** describing the four failure domains covered by MCP server errors
+- **Security checklist** shard checksum verification before `deserialize_unchecked` (Refs #1313)
+- **ADR-0001** Ollama trust boundary decision documented (Refs #1313, #1318)
+- **CI** `terraphim_automata` medical feature added to workspace test run (Refs #1313)
 - **Session debouncing** for `SessionConnector::watch()` to eliminate duplicate emissions (Refs #815)
 - **LLM pre/post hooks** wired in agent command handlers for multi-agent coordination (Refs #451)
 - **Self-Documentation API** exposed via robot CLI subcommand (Refs #1011)

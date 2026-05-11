@@ -1,3 +1,29 @@
+//! Knowledge graph implementation for per-role semantic search.
+//!
+//! Each [`RoleGraph`] is a directed graph of [`Node`]s (concepts) and [`Edge`]s
+//! (co-occurrence relationships) built from indexed documents. An Aho-Corasick
+//! automaton provides O(n) concept detection over document text.
+//!
+//! # Architecture
+//!
+//! ```text
+//! Thesaurus (JSON)
+//!     |
+//!     v
+//! TriggerIndex (Aho-Corasick patterns)
+//!     |
+//!     v
+//! RoleGraph (nodes + edges + document map)
+//!     |
+//!     v
+//! Ranked search results
+//! ```
+//!
+//! # Key Types
+//!
+//! - [`RoleGraph`] -- the main graph structure; use [`RoleGraph::new`] for async init
+//! - [`TriggerIndex`] -- compiled Aho-Corasick automaton over thesaurus terms
+
 use ahash::AHashMap;
 use itertools::Itertools;
 use regex::Regex;

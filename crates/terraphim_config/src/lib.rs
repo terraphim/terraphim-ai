@@ -1,3 +1,21 @@
+//! Configuration management for Terraphim AI.
+//!
+//! Provides role-based configuration where each [`Role`] describes a user profile with
+//! a set of [`Haystack`]s (data sources), a relevance function, and optional LLM settings.
+//!
+//! # Loading Priority
+//!
+//! 1. Explicit path via `TERRAPHIM_CONFIG` environment variable
+//! 2. Saved config retrieved from the persistence layer
+//! 3. Hard-coded defaults in [`terraphim_server/default/`]
+//!
+//! # Key Types
+//!
+//! - [`Config`] -- top-level configuration holding all roles
+//! - [`Role`] -- user profile with haystacks, relevance function, and theme
+//! - [`Haystack`] -- a data source descriptor (path, service type, extra parameters)
+//! - [`ServiceType`] -- enum of supported haystack backends
+
 use std::{path::PathBuf, sync::Arc};
 
 use terraphim_automata::{

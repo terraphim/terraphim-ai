@@ -1,3 +1,20 @@
+//! Storage abstraction layer for Terraphim AI.
+//!
+//! Provides a unified interface over multiple OpenDAL-backed storage operators
+//! (memory, DashMap, SQLite, S3). Operators are ordered by speed; slower
+//! backends write back to the fastest operator transparently via a fire-and-forget
+//! `tokio::spawn` so the load path is never blocked.
+//!
+//! Objects larger than 1 MB are compressed with zstd before being stored.
+//! If a cached entry fails to deserialise (schema evolution), it is evicted
+//! and the value is re-fetched from the persistent backend.
+//!
+//! # Key Types
+//!
+//! - [`DeviceStorage`] -- singleton wrapping all configured operators
+//! - [`ConversationPersistence`] -- trait for storing and loading conversations
+//! - [`Persistable`] -- blanket trait implemented by every serialisable type
+
 pub mod compression;
 pub mod conversation;
 pub mod document;
@@ -37,6 +54,14 @@ pub use error::{Error, Result};
 
 static DEVICE_STORAGE: AsyncOnceCell<DeviceStorage> = AsyncOnceCell::new();
 
+/// Singleton wrapping all configured storage operators.
+///
+/// Operators are stored in `ops` keyed by name with their latency (ns) as the
+/// second element. `fastest_op` is a pre-resolved clone of the lowest-latency
+/// operator and is used as the cache write-back target.
+///
+/// Obtain the global instance via [`DeviceStorage::instance`]. Use
+/// [`DeviceStorage::init_memory_only`] in tests to avoid touching the filesystem.
 #[derive(Debug)]
 pub struct DeviceStorage {
     pub ops: HashMap<String, (Operator, u128)>,
@@ -44,6 +69,7 @@ pub struct DeviceStorage {
 }
 
 impl DeviceStorage {
+    /// Return the process-wide singleton, initialising it on first call.
     pub async fn instance() -> Result<&'static DeviceStorage> {
         let storage = DEVICE_STORAGE
             .get_or_try_init(async {
