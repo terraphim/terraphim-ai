@@ -38,6 +38,7 @@ wasm-bindgen-futures = { version = "0.4.1", optional = true }
 wasm-bindgen = { version = "0.2.51", optional = true }
 cached = { version = "0.56.0", features = ["proc_macro", "async", "serde", "ahash"] }
 tsify = { version = "0.5", features = ["js"], optional = true }
+sha2 = "0.10"
 walkdir = "2.5"
 daachorse = { version = "1.0", optional = true }
 zstd = { version = "0.13", optional = true }

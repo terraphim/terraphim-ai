@@ -27,6 +27,59 @@ pub enum BuilderError {
 
 pub type Result<T> = std::result::Result<T, BuilderError>;
 
+/// Compute a SHA-256 hash of all markdown files in a directory tree.
+///
+/// Files are processed in sorted order to ensure deterministic output.
+/// The hash incorporates both the relative file path and file content,
+/// so renames and edits are both detected.
+///
+/// Returns `Ok(None)` if the directory does not exist or contains no markdown files.
+pub fn compute_kg_source_hash(dir: &std::path::Path) -> std::io::Result<Option<String>> {
+    use sha2::{Digest, Sha256};
+    use std::io::Read;
+
+    if !dir.exists() {
+        return Ok(None);
+    }
+
+    let mut hasher = Sha256::new();
+    let mut found_any = false;
+
+    let mut entries: Vec<_> = walkdir::WalkDir::new(dir)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| {
+            e.path()
+                .extension()
+                .map(|ext| ext.eq_ignore_ascii_case("md"))
+                .unwrap_or(false)
+        })
+        .collect();
+
+    entries.sort_by_key(|e| e.path().to_path_buf());
+
+    for entry in entries {
+        let path = entry.path();
+        let relative = path.strip_prefix(dir).unwrap_or(path);
+        hasher.update(relative.to_string_lossy().as_bytes());
+        hasher.update(b"\0");
+
+        let mut file = std::fs::File::open(path)?;
+        let mut contents = Vec::new();
+        file.read_to_end(&mut contents)?;
+        hasher.update(&contents);
+        hasher.update(b"\0");
+        found_any = true;
+    }
+
+    if found_any {
+        let result = format!("{:x}", hasher.finalize());
+        Ok(Some(result))
+    } else {
+        Ok(None)
+    }
+}
+
 /// A ThesaurusBuilder receives a path containing
 /// resources (e.g. files) with key-value pairs and returns a `Thesaurus`
 /// (a dictionary with synonyms which map to higher-level concepts)
@@ -61,7 +114,26 @@ impl ThesaurusBuilder for Logseq {
             .await?;
         #[cfg(not(feature = "tokio-runtime"))]
         let messages: Vec<Message> = Vec::new();
-        let thesaurus = index_inner(name, messages);
+        #[allow(unused_mut)]
+        let mut thesaurus = index_inner(name, messages);
+
+        // Compute source hash for cache invalidation
+        #[cfg(feature = "tokio-runtime")]
+        match compute_kg_source_hash(&haystack) {
+            Ok(Some(hash)) => {
+                thesaurus.source_hash = Some(hash);
+            }
+            Ok(None) => {
+                log::debug!(
+                    "No markdown files found in {:?}, source_hash left empty",
+                    haystack
+                );
+            }
+            Err(e) => {
+                log::warn!("Failed to compute source hash for {:?}: {}", haystack, e);
+            }
+        }
+
         Ok(thesaurus)
     }
 }
@@ -315,4 +387,86 @@ pub fn json_decode(jsonlines: &str) -> Result<Vec<Message>> {
     Ok(serde_json::Deserializer::from_str(jsonlines)
         .into_iter()
         .collect::<std::result::Result<Vec<Message>, serde_json::Error>>()?)
+}
+
+#[cfg(test)]
+mod hash_tests {
+    use crate::builder::compute_kg_source_hash;
+    use std::io::Write;
+
+    #[test]
+    fn compute_hash_empty_dir() {
+        let tmp = tempfile::tempdir().unwrap();
+        let result = compute_kg_source_hash(tmp.path()).unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn compute_hash_detects_content_change() {
+        let tmp = tempfile::tempdir().unwrap();
+        let md_path = tmp.path().join("concept.md");
+        {
+            let mut f = std::fs::File::create(&md_path).unwrap();
+            f.write_all(b"synonyms:: foo, bar").unwrap();
+        }
+
+        let hash1 = compute_kg_source_hash(tmp.path()).unwrap().unwrap();
+
+        // Edit the file
+        {
+            let mut f = std::fs::File::create(&md_path).unwrap();
+            f.write_all(b"synonyms:: foo, baz").unwrap();
+        }
+
+        let hash2 = compute_kg_source_hash(tmp.path()).unwrap().unwrap();
+        assert_ne!(hash1, hash2, "Hash should change when file content changes");
+    }
+
+    #[test]
+    fn compute_hash_detects_rename() {
+        let tmp = tempfile::tempdir().unwrap();
+        let md_path = tmp.path().join("concept.md");
+        {
+            let mut f = std::fs::File::create(&md_path).unwrap();
+            f.write_all(b"synonyms:: foo, bar").unwrap();
+        }
+
+        let hash1 = compute_kg_source_hash(tmp.path()).unwrap().unwrap();
+
+        // Rename the file
+        let renamed_path = tmp.path().join("renamed.md");
+        std::fs::rename(&md_path, &renamed_path).unwrap();
+
+        let hash2 = compute_kg_source_hash(tmp.path()).unwrap().unwrap();
+        assert_ne!(hash1, hash2, "Hash should change when file is renamed");
+    }
+
+    #[test]
+    fn compute_hash_ignores_non_md() {
+        let tmp = tempfile::tempdir().unwrap();
+        {
+            let mut f = std::fs::File::create(tmp.path().join("readme.txt")).unwrap();
+            f.write_all(b"synonyms:: foo, bar").unwrap();
+        }
+
+        let result = compute_kg_source_hash(tmp.path()).unwrap();
+        assert!(result.is_none(), "Non-markdown files should be ignored");
+    }
+
+    #[test]
+    fn compute_hash_stable_across_runs() {
+        let tmp = tempfile::tempdir().unwrap();
+        let md_path = tmp.path().join("concept.md");
+        {
+            let mut f = std::fs::File::create(&md_path).unwrap();
+            f.write_all(b"synonyms:: foo, bar").unwrap();
+        }
+
+        let hash1 = compute_kg_source_hash(tmp.path()).unwrap().unwrap();
+        let hash2 = compute_kg_source_hash(tmp.path()).unwrap().unwrap();
+        assert_eq!(
+            hash1, hash2,
+            "Hash should be stable when files don't change"
+        );
+    }
 }
