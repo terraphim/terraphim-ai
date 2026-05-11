@@ -134,21 +134,49 @@ pub fn missing_required_contexts(
         .collect()
 }
 
+/// Groups statuses by context, keeping the latest one for each context.
+///
+/// Prefers entries with a higher `created_at_unix`. If `created_at_unix` is None
+/// for some entries, prefers the ones that have a timestamp. If multiple entries
+/// have None for `created_at_unix`, keeps the last one in the slice.
+fn latest_status_per_context<'a>(
+    statuses: &'a [CommitStatusSummary],
+) -> std::collections::HashMap<&'a str, &'a CommitStatusSummary> {
+    let mut map: std::collections::HashMap<&'a str, &'a CommitStatusSummary> =
+        std::collections::HashMap::new();
+    for status in statuses {
+        let should_replace = match map.get(status.context.as_str()) {
+            None => true,
+            Some(entry) => match (entry.created_at_unix, status.created_at_unix) {
+                // Existing has timestamp, new doesn't -> keep existing
+                (Some(_), None) => false,
+                // Existing doesn't have timestamp, new does -> replace
+                (None, Some(_)) => true,
+                // Both have timestamps -> replace if new is higher
+                (Some(existing), Some(new)) => new > existing,
+                // Neither has timestamp -> keep last one in slice (replace)
+                (None, None) => true,
+            },
+        };
+        if should_replace {
+            map.insert(status.context.as_str(), status);
+        }
+    }
+    map
+}
+
 /// Compute which required contexts are posted but still pending.
 pub fn pending_required_contexts(
     required: &[String],
     statuses: &[CommitStatusSummary],
 ) -> Vec<String> {
-    let status_map: std::collections::HashMap<&str, CommitStatusState> = statuses
-        .iter()
-        .map(|s| (s.context.as_str(), s.state))
-        .collect();
+    let status_map = latest_status_per_context(statuses);
     required
         .iter()
         .filter(|ctx| {
             status_map
                 .get(ctx.as_str())
-                .is_some_and(|state| !state.is_terminal())
+                .is_some_and(|status| !status.state.is_terminal())
         })
         .cloned()
         .collect()
@@ -162,20 +190,17 @@ pub fn stale_pending_contexts(
     now_unix: i64,
     timeout_secs: i64,
 ) -> Vec<String> {
-    let status_map: std::collections::HashMap<&str, (&CommitStatusState, Option<i64>)> = statuses
-        .iter()
-        .map(|s| (s.context.as_str(), (&s.state, s.created_at_unix)))
-        .collect();
+    let status_map = latest_status_per_context(statuses);
     required
         .iter()
         .filter(|ctx| {
-            let Some((state, created)) = status_map.get(ctx.as_str()) else {
+            let Some(status) = status_map.get(ctx.as_str()) else {
                 return false;
             };
-            if state.is_terminal() {
+            if status.state.is_terminal() {
                 return false;
             }
-            let Some(created_ts) = created else {
+            let Some(created_ts) = status.created_at_unix else {
                 return false;
             };
             now_unix - created_ts > timeout_secs
@@ -190,20 +215,20 @@ pub fn failed_required_contexts(
     required: &[String],
     statuses: &[CommitStatusSummary],
 ) -> Vec<(String, String)> {
-    let status_map: std::collections::HashMap<&str, CommitStatusState> = statuses
-        .iter()
-        .map(|s| (s.context.as_str(), s.state))
-        .collect();
+    let status_map = latest_status_per_context(statuses);
     required
         .iter()
         .filter(|ctx| {
-            status_map.get(ctx.as_str()).is_some_and(|state| {
-                matches!(state, CommitStatusState::Failure | CommitStatusState::Error)
+            status_map.get(ctx.as_str()).is_some_and(|status| {
+                matches!(
+                    status.state,
+                    CommitStatusState::Failure | CommitStatusState::Error
+                )
             })
         })
         .map(|ctx| {
-            let state = status_map[ctx.as_str()];
-            let label = match state {
+            let status = status_map[ctx.as_str()];
+            let label = match status.state {
                 CommitStatusState::Failure => "failure",
                 CommitStatusState::Error => "error",
                 _ => unreachable!(),
@@ -589,5 +614,161 @@ mod tests {
                 pending: vec!["adf/build".into()]
             }
         );
+    }
+
+    // ------------------------------------------------------------------
+    // latest_status_per_context helper tests
+    // ------------------------------------------------------------------
+
+    #[test]
+    fn latest_status_per_context_prefers_higher_timestamp() {
+        let statuses = statuses_with_times(&[
+            ("adf/build", CommitStatusState::Failure, Some(1_000)),
+            ("adf/build", CommitStatusState::Success, Some(2_000)),
+        ]);
+        let map = latest_status_per_context(&statuses);
+        assert_eq!(map.len(), 1);
+        assert_eq!(map["adf/build"].state, CommitStatusState::Success);
+        assert_eq!(map["adf/build"].created_at_unix, Some(2_000));
+    }
+
+    #[test]
+    fn latest_status_per_context_prefers_timestamp_over_none() {
+        let statuses = statuses_with_times(&[
+            ("adf/build", CommitStatusState::Success, None),
+            ("adf/build", CommitStatusState::Failure, Some(1_000)),
+        ]);
+        let map = latest_status_per_context(&statuses);
+        assert_eq!(map.len(), 1);
+        assert_eq!(map["adf/build"].state, CommitStatusState::Failure);
+        assert_eq!(map["adf/build"].created_at_unix, Some(1_000));
+    }
+
+    #[test]
+    fn latest_status_per_context_keeps_existing_timestamp_over_none() {
+        let statuses = statuses_with_times(&[
+            ("adf/build", CommitStatusState::Failure, Some(1_000)),
+            ("adf/build", CommitStatusState::Success, None),
+        ]);
+        let map = latest_status_per_context(&statuses);
+        assert_eq!(map.len(), 1);
+        assert_eq!(map["adf/build"].state, CommitStatusState::Failure);
+        assert_eq!(map["adf/build"].created_at_unix, Some(1_000));
+    }
+
+    #[test]
+    fn latest_status_per_context_last_wins_when_both_no_timestamp() {
+        let statuses = statuses_with_times(&[
+            ("adf/build", CommitStatusState::Failure, None),
+            ("adf/build", CommitStatusState::Success, None),
+        ]);
+        let map = latest_status_per_context(&statuses);
+        assert_eq!(map.len(), 1);
+        assert_eq!(map["adf/build"].state, CommitStatusState::Success);
+        assert_eq!(map["adf/build"].created_at_unix, None);
+    }
+
+    #[test]
+    fn latest_status_per_context_different_contexts_independent() {
+        let statuses = statuses_with_times(&[
+            ("adf/build", CommitStatusState::Failure, Some(1_000)),
+            ("adf/build", CommitStatusState::Success, Some(2_000)),
+            ("adf/pr-reviewer", CommitStatusState::Pending, Some(500)),
+            ("adf/pr-reviewer", CommitStatusState::Success, Some(1_500)),
+        ]);
+        let map = latest_status_per_context(&statuses);
+        assert_eq!(map.len(), 2);
+        assert_eq!(map["adf/build"].state, CommitStatusState::Success);
+        assert_eq!(map["adf/pr-reviewer"].state, CommitStatusState::Success);
+    }
+
+    // ------------------------------------------------------------------
+    // Integration: duplicate contexts in gate functions
+    // ------------------------------------------------------------------
+
+    #[test]
+    fn pending_uses_latest_status_for_duplicate_contexts() {
+        let statuses = statuses_with_times(&[
+            ("adf/build", CommitStatusState::Pending, Some(1_000)),
+            ("adf/build", CommitStatusState::Success, Some(2_000)),
+        ]);
+        let pending = pending_required_contexts(&required(&["adf/build"]), &statuses);
+        assert!(pending.is_empty());
+    }
+
+    #[test]
+    fn pending_uses_latest_status_when_still_pending() {
+        let statuses = statuses_with_times(&[
+            ("adf/build", CommitStatusState::Success, Some(1_000)),
+            ("adf/build", CommitStatusState::Pending, Some(2_000)),
+        ]);
+        let pending = pending_required_contexts(&required(&["adf/build"]), &statuses);
+        assert_eq!(pending, vec!["adf/build"]);
+    }
+
+    #[test]
+    fn stale_uses_latest_status_for_duplicate_contexts() {
+        let statuses = statuses_with_times(&[
+            ("adf/build", CommitStatusState::Pending, Some(1_000)),
+            ("adf/build", CommitStatusState::Pending, Some(9_500)),
+        ]);
+        let stale = stale_pending_contexts(
+            &required(&["adf/build"]),
+            &statuses,
+            10_000,
+            STALE_PENDING_TIMEOUT_SECS,
+        );
+        assert!(stale.is_empty());
+    }
+
+    #[test]
+    fn stale_uses_latest_status_when_still_stale() {
+        let statuses = statuses_with_times(&[
+            ("adf/build", CommitStatusState::Pending, Some(9_500)),
+            ("adf/build", CommitStatusState::Pending, Some(1_000)),
+        ]);
+        let stale = stale_pending_contexts(
+            &required(&["adf/build"]),
+            &statuses,
+            10_000,
+            STALE_PENDING_TIMEOUT_SECS,
+        );
+        assert!(stale.is_empty());
+    }
+
+    #[test]
+    fn failed_uses_latest_status_for_duplicate_contexts() {
+        let statuses = statuses_with_times(&[
+            ("adf/build", CommitStatusState::Failure, Some(1_000)),
+            ("adf/build", CommitStatusState::Success, Some(2_000)),
+        ]);
+        let failed = failed_required_contexts(&required(&["adf/build"]), &statuses);
+        assert!(failed.is_empty());
+    }
+
+    #[test]
+    fn failed_uses_latest_status_when_still_failed() {
+        let statuses = statuses_with_times(&[
+            ("adf/build", CommitStatusState::Success, Some(1_000)),
+            ("adf/build", CommitStatusState::Failure, Some(2_000)),
+        ]);
+        let failed = failed_required_contexts(&required(&["adf/build"]), &statuses);
+        assert_eq!(failed, vec![("adf/build".into(), "failure".into())]);
+    }
+
+    #[test]
+    fn reconcile_uses_latest_status_across_duplicate_contexts() {
+        let snap = snapshot_ctx_with_times(
+            42,
+            &["adf/build", "adf/pr-reviewer"],
+            &[
+                ("adf/build", CommitStatusState::Failure, Some(1_000)),
+                ("adf/build", CommitStatusState::Success, Some(2_000)),
+                ("adf/pr-reviewer", CommitStatusState::Pending, Some(1_000)),
+                ("adf/pr-reviewer", CommitStatusState::Success, Some(2_000)),
+            ],
+            10_000,
+        );
+        assert_eq!(reconcile_pr_gate(&snap), PrGateDecision::ReadyForPolicy);
     }
 }
