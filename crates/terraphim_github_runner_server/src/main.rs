@@ -1,3 +1,5 @@
+//! HTTP server that receives GitHub webhook events and dispatches CI workflows to Firecracker microVMs.
+
 use anyhow::Result;
 use salvo::prelude::*;
 use serde::{Deserialize, Serialize};
