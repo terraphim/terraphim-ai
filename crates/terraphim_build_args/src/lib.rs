@@ -1,3 +1,7 @@
+//! Build argument management for Terraphim AI.
+//!
+//! Centralises configuration of build features, targets, and deployment
+//! options so they can be shared across binaries and integration scripts.
 pub mod cli;
 /// Terraphim Build Argument Management
 ///

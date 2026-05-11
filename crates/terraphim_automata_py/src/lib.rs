@@ -1,3 +1,8 @@
+//! Python bindings for `terraphim_automata` via PyO3.
+//!
+//! Exposes autocomplete, fuzzy search, and Aho-Corasick text-matching
+//! functions to Python, enabling use of Terraphim's automata engine
+//! from Python scripts and notebooks.
 use ::terraphim_automata::autocomplete::{
     AutocompleteConfig, AutocompleteIndex, AutocompleteResult, autocomplete_search,
     build_autocomplete_index, deserialize_autocomplete_index, fuzzy_autocomplete_search,

@@ -1,3 +1,16 @@
+//! Haystack indexing and search orchestration for Terraphim AI.
+//!
+//! This crate sits between the raw haystack integrations (Ripgrep, AtomicServer,
+//! ClickUp, Discourse, JMAP …) and the service layer. It owns:
+//!
+//! - **Indexer abstraction** -- [`IndexMiddleware`](indexer::IndexMiddleware) trait
+//!   and [`search_haystacks`] for parallel haystack queries
+//! - **Thesaurus builders** -- converting source documents into automata-compatible JSON
+//! - **Command execution** -- sandboxed invocation of external tools
+//!
+//! Each haystack service is registered via [`terraphim_config::ServiceType`] and
+//! dispatched by [`indexer::search_haystacks`] at query time.
+
 use serde_json as json;
 use terraphim_automata::builder::BuilderError;
 use terraphim_config::TerraphimConfigError;

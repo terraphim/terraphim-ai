@@ -1,3 +1,8 @@
+//! Python bindings for `terraphim_rolegraph` via PyO3.
+//!
+//! Exposes role-based knowledge-graph construction, thesaurus loading, and
+//! graph traversal to Python, enabling interactive KG exploration from
+//! Jupyter notebooks or standalone Python scripts.
 use std::collections::{HashMap, HashSet};
 
 use pyo3::exceptions::{PyRuntimeError, PyValueError};

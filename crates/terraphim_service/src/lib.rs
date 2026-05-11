@@ -1,5 +1,10 @@
+//! Main service layer for Terraphim AI.
+//!
+//! Provides document search, indexing, and AI-assisted summarisation across
+//! multiple haystack backends. Integrates the knowledge graph, thesaurus,
+//! and relevance-scoring pipeline into a single async service facade.
 use ahash::AHashMap;
-use terraphim_automata::builder::{Logseq, ThesaurusBuilder};
+use terraphim_automata::builder::{Logseq, ThesaurusBuilder, compute_kg_source_hash};
 use terraphim_automata::load_thesaurus;
 use terraphim_automata::{LinkType, replace_matches};
 use terraphim_config::{ConfigState, Role};
@@ -513,7 +518,86 @@ impl TerraphimService {
                 Ok(thesaurus) => {
                     log::debug!("Thesaurus loaded: {:?}", thesaurus);
                     log::info!("Rolegraph loaded: for role name {:?}", role_name);
-                    Ok(thesaurus)
+
+                    // Check if the cached thesaurus is stale by comparing source hashes
+                    let is_stale = if let Some(ref cached_hash) = thesaurus.source_hash {
+                        let role = {
+                            let config = self.config_state.config.lock().await;
+                            config.roles.get(role_name).cloned()
+                        };
+                        if let Some(role) = role {
+                            if let Some(ref kg) = role.kg {
+                                if let Some(ref kg_local) = kg.knowledge_graph_local {
+                                    match compute_kg_source_hash(&kg_local.path) {
+                                        Ok(Some(current_hash)) => {
+                                            let stale = current_hash != *cached_hash;
+                                            if stale {
+                                                log::info!(
+                                                    "Thesaurus cache stale for role '{}': hash mismatch (cached {} != current {})",
+                                                    role_name,
+                                                    cached_hash,
+                                                    current_hash
+                                                );
+                                            }
+                                            stale
+                                        }
+                                        Ok(None) => {
+                                            log::debug!(
+                                                "No markdown files found in KG path {:?}",
+                                                kg_local.path
+                                            );
+                                            false
+                                        }
+                                        Err(e) => {
+                                            log::warn!(
+                                                "Failed to compute source hash for role '{}': {}",
+                                                role_name,
+                                                e
+                                            );
+                                            false
+                                        }
+                                    }
+                                } else {
+                                    false
+                                }
+                            } else {
+                                false
+                            }
+                        } else {
+                            false
+                        }
+                    } else {
+                        log::debug!(
+                            "No source_hash in cached thesaurus for role '{}'",
+                            role_name
+                        );
+                        false
+                    };
+
+                    if is_stale {
+                        let mut rolegraphs = self.config_state.roles.clone();
+                        let result = load_thesaurus_from_automata_path(
+                            &self.config_state,
+                            role_name,
+                            &mut rolegraphs,
+                        )
+                        .await;
+
+                        if result.is_ok() {
+                            if let Some(updated_rolegraph) = rolegraphs.get(role_name) {
+                                self.config_state
+                                    .roles
+                                    .insert(role_name.clone(), updated_rolegraph.clone());
+                                log::info!(
+                                    "Updated config_state with rebuilt rolegraph for role: {}",
+                                    role_name
+                                );
+                            }
+                        }
+                        result
+                    } else {
+                        Ok(thesaurus)
+                    }
                 }
                 Err(e) => {
                     // Check if error is "file not found" (expected for optional files)
@@ -578,7 +662,7 @@ impl TerraphimService {
     /// Preprocess document content to create clickable KG links when terraphim_it is enabled
     ///
     /// This function replaces KG terms in the document body with markdown links
-    /// in the format [term](kg:term) which can be intercepted by the frontend
+    /// in the format `[term](kg:term)` which can be intercepted by the frontend
     /// to display KG documents when clicked.
     pub async fn preprocess_document_content(
         &mut self,

@@ -737,6 +737,11 @@ enum Command {
         #[arg(long, default_value_t = false)]
         pinned: bool,
     },
+    /// Manage knowledge graph entries
+    Kg {
+        #[command(subcommand)]
+        sub: KgSub,
+    },
     /// Chat with the AI using a specific role
     #[cfg(feature = "llm")]
     Chat {
@@ -907,10 +912,26 @@ enum Command {
         server: bool,
     },
 
+    /// Manage the compiled thesaurus cache
+    Cache {
+        #[command(subcommand)]
+        sub: CacheSub,
+    },
+
     /// Robot mode self-documentation commands
     Robot {
         #[command(subcommand)]
         sub: RobotSub,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum CacheSub {
+    /// Flush (delete) compiled thesaurus cache entries
+    Flush {
+        /// Specific role to flush (if omitted, flushes all cached thesauri)
+        #[arg(long)]
+        role: Option<String>,
     },
 }
 
@@ -1204,6 +1225,20 @@ enum ConfigSub {
     Reload,
 }
 
+#[derive(Subcommand, Debug)]
+enum KgSub {
+    /// List knowledge graph entries
+    List {
+        #[arg(long)]
+        role: Option<String>,
+        #[arg(long, default_value_t = 50)]
+        top_k: usize,
+        /// Show only pinned entries
+        #[arg(long, default_value_t = false)]
+        pinned: bool,
+    },
+}
+
 /// Get the session cache file path
 #[cfg(feature = "repl-sessions")]
 fn get_session_cache_path() -> std::path::PathBuf {
@@ -1479,6 +1514,7 @@ fn build_cli_forgiving_parser() -> forgiving::ForgivingParser {
         "update",
         "learn",
         "listen",
+        "cache",
     ];
 
     #[cfg(feature = "llm")]
@@ -1990,6 +2026,11 @@ async fn run_offline_command(
         return run_config_validate().await;
     }
 
+    // Cache is stateless - handle before TuiService initialization
+    if let Command::Cache { sub } = &command {
+        return run_cache_command(sub).await;
+    }
+
     // Learn is stateless - handle before TuiService initialization.
     // Must be last early-return because it consumes `command` via destructuring.
     if let Command::Learn { sub } = command {
@@ -2264,6 +2305,28 @@ async fn run_offline_command(
             }
             Ok(())
         }
+        Command::Kg { sub } => match sub {
+            KgSub::List {
+                role,
+                top_k,
+                pinned,
+            } => {
+                let role_name = service.resolve_role(role.as_deref()).await?;
+
+                if pinned {
+                    let pinned_concepts = service.get_role_graph_pinned(&role_name).await?;
+                    for concept in pinned_concepts {
+                        println!("{}", concept);
+                    }
+                } else {
+                    let concepts = service.get_role_graph_top_k(&role_name, top_k).await?;
+                    for concept in concepts {
+                        println!("{}", concept);
+                    }
+                }
+                Ok(())
+            }
+        },
         #[cfg(feature = "llm")]
         Command::Chat {
             role,
@@ -3013,6 +3076,58 @@ async fn run_offline_command(
         }
         Command::Robot { .. } => {
             unreachable!("Robot commands are handled in main()")
+        }
+        Command::Cache { .. } => {
+            unreachable!("Cache commands are handled before TuiService initialization")
+        }
+    }
+}
+
+async fn run_cache_command(sub: &CacheSub) -> Result<()> {
+    use terraphim_persistence::DeviceStorage;
+
+    match sub {
+        CacheSub::Flush { role } => {
+            let storage = DeviceStorage::instance().await?;
+            let fastest_op = &storage.fastest_op;
+
+            if let Some(role_name) = role {
+                let key = format!("thesaurus_{}.json", role_name.to_lowercase());
+                match fastest_op.delete(&key).await {
+                    Ok(_) => {
+                        println!("Flushed cache for role: {}", role_name);
+                    }
+                    Err(e) => {
+                        eprintln!("Failed to flush cache for role '{}': {}", role_name, e);
+                        std::process::exit(1);
+                    }
+                }
+            } else {
+                // Flush all thesaurus entries
+                let prefix = "thesaurus_";
+                match fastest_op.list(prefix).await {
+                    Ok(entries) => {
+                        let mut count = 0;
+                        for entry in entries {
+                            let path = entry.path();
+                            if path.ends_with(".json") {
+                                match fastest_op.delete(path).await {
+                                    Ok(_) => count += 1,
+                                    Err(e) => {
+                                        log::warn!("Failed to delete '{}': {}", path, e);
+                                    }
+                                }
+                            }
+                        }
+                        println!("Flushed {} cached thesaurus entries", count);
+                    }
+                    Err(e) => {
+                        eprintln!("Failed to list cache entries: {}", e);
+                        std::process::exit(1);
+                    }
+                }
+            }
+            Ok(())
         }
     }
 }
@@ -4261,6 +4376,39 @@ async fn run_server_command(
             }
             Ok(())
         }
+        Command::Kg { sub } => match sub {
+            KgSub::List {
+                role,
+                top_k,
+                pinned,
+            } => {
+                let role_name = if let Some(role) = role {
+                    role
+                } else {
+                    let config_res = api.get_config().await?;
+                    config_res.config.selected_role.to_string()
+                };
+
+                let graph_res = api.rolegraph(Some(&role_name)).await?;
+                if pinned {
+                    let pinned_ids: std::collections::HashSet<u64> =
+                        graph_res.pinned_node_ids.iter().copied().collect();
+                    for node in graph_res.nodes {
+                        if pinned_ids.contains(&node.id) {
+                            println!("{}", node.label);
+                        }
+                    }
+                } else {
+                    let mut nodes_sorted = graph_res.nodes;
+                    #[allow(clippy::unnecessary_sort_by)]
+                    nodes_sorted.sort_by(|a, b| b.rank.cmp(&a.rank));
+                    for node in nodes_sorted.into_iter().take(top_k) {
+                        println!("{}", node.label);
+                    }
+                }
+                Ok(())
+            }
+        },
         #[cfg(feature = "llm")]
         Command::Chat {
             role,
@@ -4758,6 +4906,11 @@ async fn run_server_command(
         }
         Command::Robot { .. } => {
             unreachable!("Robot commands are handled in main()")
+        }
+        Command::Cache { .. } => {
+            eprintln!("error: cache commands are not available in server mode");
+            eprintln!("Cache management runs in offline mode only.");
+            std::process::exit(1);
         }
     }
 }

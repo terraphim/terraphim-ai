@@ -280,7 +280,11 @@ mod tests {
     #[test]
     fn test_tool_index_save_and_load() {
         let temp_dir = std::env::temp_dir();
-        let index_path = temp_dir.join("test-mcp-index.json");
+        let unique = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .subsec_nanos();
+        let index_path = temp_dir.join(format!("test-mcp-index-{unique}.json"));
 
         // Create and save
         {

@@ -1,3 +1,8 @@
+//! Core abstraction for haystack search providers.
+//!
+//! Defines the [`HaystackProvider`] trait that all data-source integrations
+//! (Ripgrep, Atlassian, Discourse, JMAP, …) implement to expose a uniform
+//! async search interface over heterogeneous backends.
 use terraphim_types::{Document, SearchQuery};
 
 pub trait HaystackProvider {

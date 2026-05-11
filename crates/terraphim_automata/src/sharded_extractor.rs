@@ -8,6 +8,7 @@
 //! that takes <100ms vs ~842s build time from raw TSV.
 
 use daachorse::DoubleArrayAhoCorasick;
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 
 use crate::medical_artifact::{
@@ -186,11 +187,17 @@ impl ShardedUmlsExtractor {
             })
             .collect();
 
+        let shard_checksums: Vec<[u8; 32]> = shard_bytes
+            .iter()
+            .map(|b| Sha256::digest(b).into())
+            .collect();
+
         let header = ArtifactHeader {
             shard_metadata,
             concept_index: self.concept_index.clone(),
             total_patterns: self.total_patterns,
             shard_byte_lengths: shard_bytes.iter().map(|b: &Vec<u8>| b.len()).collect(),
+            shard_checksums,
         };
 
         save_umls_artifact(&header, &shard_bytes, path)

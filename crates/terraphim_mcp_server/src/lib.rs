@@ -1,3 +1,20 @@
+//! MCP (Model Context Protocol) server for Terraphim AI.
+//!
+//! Exposes Terraphim search, autocomplete, and knowledge-graph functions as MCP
+//! tools so that AI development tools (Claude, Cursor, …) can invoke them via
+//! the standard MCP wire protocol.
+//!
+//! # Transports
+//!
+//! - **stdio** -- for local development and Claude Desktop integration
+//! - **SSE/HTTP** -- for production deployments
+//!
+//! # Key Types
+//!
+//! - [`McpService`] -- `rmcp::ServerHandler` implementation, the main entry point
+//! - [`TerraphimMcpError`] -- unified error type covering service, JSON, I/O, and MCP errors
+//! - [`resource_mapper::TerraphimResourceMapper`] -- maps Terraphim documents to MCP resources
+
 use anyhow::Result;
 use base64::Engine;
 use fff_search::external_scorer::ExternalScorer;
@@ -29,6 +46,11 @@ pub mod resource_mapper;
 
 use crate::resource_mapper::TerraphimResourceMapper;
 
+/// Unified error type for the Terraphim MCP server.
+///
+/// Variants cover the four failure domains: service-layer errors from
+/// [`terraphim_service`], JSON (de)serialisation, MCP protocol errors
+/// ([`ErrorData`]), and general I/O or third-party errors via [`anyhow`].
 #[derive(Error, Debug)]
 pub enum TerraphimMcpError {
     #[error("Service error: {0}")]

@@ -105,7 +105,7 @@
 //!
 //! See the [WASM package](wasm/) for browser usage.
 
-pub use self::builder::{Logseq, ThesaurusBuilder};
+pub use self::builder::{Logseq, ThesaurusBuilder, compute_kg_source_hash};
 pub mod autocomplete;
 pub mod builder;
 pub mod evaluation;

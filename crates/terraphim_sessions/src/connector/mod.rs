@@ -123,18 +123,20 @@ pub trait SessionConnector: Send + Sync {
 
     /// Start watching for new sessions in real-time.
     ///
-    /// Returns a receiver that emits `Session` values as they are detected.
+    /// Returns a receiver that emits sessions as they are detected.
+    ///
+    /// ## Deduplication contract
+    ///
+    /// Implementations MUST debounce rapid filesystem events and deduplicate emissions:
+    /// - Multiple `Modify` events for the same file within a quiescent period (≤ 250 ms)
+    ///   MUST result in at most one session emission per quiescent window.
+    /// - A session is only emitted when its `messages.len()` has increased since the last
+    ///   emission for that path (dedup key: `(path, messages.len)`).
+    ///
+    /// Callers may see a session emitted more than once if the file grows across separate
+    /// quiescent windows, but MUST NOT see repeated emissions carrying identical content.
+    ///
     /// Default implementation returns an error if not supported.
-    ///
-    /// ## Dedup contract
-    ///
-    /// Implementations MUST NOT emit the same session state more than once.
-    /// The dedup key is `(source_path, messages.len)`: a session is only
-    /// forwarded when `messages.len` grows beyond the last emitted value for
-    /// that path.  A 150 ms debounce is applied before each parse so that
-    /// rapid sequential `Modify` events (common on both macOS/FSEvents and
-    /// Linux/inotify for append-only writes) are collapsed into a single
-    /// emission once writes quiesce.
     async fn watch(&self) -> Result<mpsc::Receiver<Session>> {
         anyhow::bail!("Watch not supported for this connector")
     }

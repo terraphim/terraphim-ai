@@ -1,3 +1,5 @@
+//! CLI tool that groups Rust module paths into semantic categories using the Terraphim knowledge graph.
+
 mod knowledge;
 mod models;
 

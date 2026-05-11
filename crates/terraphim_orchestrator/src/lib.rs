@@ -12,6 +12,7 @@
 //! - **HandoffBuffer**: Inter-agent state transfer with TTL management
 //! - **CostTracker**: Budget enforcement and spending monitoring
 //! - **NightwatchMonitor**: Drift detection and rate limiting
+//! - **MetaCoordinator**: Cross-project issue-driven agent dispatch with PageRank prioritisation
 //!
 //! # Example
 //!
@@ -45,6 +46,7 @@ pub mod kg_router;
 pub mod learning;
 pub mod mention;
 pub mod mention_chain;
+pub mod meta_coordinator;
 pub mod metrics_persistence;
 pub mod mode;
 pub mod nightwatch;
@@ -1013,7 +1015,7 @@ impl AgentOrchestrator {
     /// Read-only access to the unified dispatcher queue.
     ///
     /// Integration tests use this to assert that ROC v1 Step F polling
-    /// enqueued the expected [`DispatchTask::AutoMerge`] work without the
+    /// enqueued the expected [`dispatcher::DispatchTask::AutoMerge`] work without the
     /// test itself holding a reference to the internal dispatcher.
     pub fn dispatcher(&self) -> &dispatcher::Dispatcher {
         &self.dispatcher
@@ -4179,11 +4181,11 @@ impl AgentOrchestrator {
     }
 
     /// Poll every project with a Gitea config for open PRs, parse the latest
-    /// structural-pr-review comment, and enqueue [`DispatchTask::AutoMerge`]
+    /// structural-pr-review comment, and enqueue [`dispatcher::DispatchTask::AutoMerge`]
     /// for any PR that clears every gate in
     /// [`pr_review::AutoMergeCriteria::default`].
     ///
-    /// Called once per [`AgentOrchestrator::reconcile_tick`] after the
+    /// Called once per reconcile tick after the
     /// dispatcher has been drained so AutoMerge tasks enqueued here are
     /// serviced on the next tick (deterministic ordering). The method is a
     /// no-op when no project has a `gitea` config.
@@ -4649,10 +4651,10 @@ impl AgentOrchestrator {
     /// Defers the heavy lifting to [`post_merge_gate::run_workspace_tests`]
     /// and [`post_merge_gate::revert_merge`] so those helpers stay fully
     /// testable without orchestrator state. This method resolves the
-    /// project's `working_dir` as `repo_root`, constructs the [`GateConfig`]
+    /// project's `working_dir` as `repo_root`, constructs the [`post_merge_gate::GateConfig`]
     /// (picking up any overrides from `[post_merge_gate]` in
-    /// orchestrator.toml), and funnels the result through
-    /// [`handle_post_merge_test_gate_for_project`] which takes a
+    /// orchestrator.toml), and funnels the result through the inner
+    /// `handle_post_merge_test_gate_for_project` helper which takes a
     /// [`post_merge_gate::CommandRunner`] so integration tests can drive the
     /// full handler with a scripted runner.
     pub async fn handle_post_merge_test_gate(
