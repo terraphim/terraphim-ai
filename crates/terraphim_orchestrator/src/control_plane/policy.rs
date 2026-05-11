@@ -297,6 +297,8 @@ mod tests {
             last_event_at: Some(chrono::Utc::now()),
             subscription_limit_reached: false,
             subscription_limit_expires_at: None,
+            avg_cost_per_1k_tokens: 0.0,
+            is_free: false,
         }
     }
 

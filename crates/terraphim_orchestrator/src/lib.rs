@@ -1050,6 +1050,19 @@ impl AgentOrchestrator {
                         warn!(error = %e, "failed to save probe results");
                     }
                 }
+
+                // Send probe results to Quickwit for cost-aware routing
+                if let Some(ref sink) = self.quickwit_sink {
+                    let project_id = self
+                        .config
+                        .projects
+                        .first()
+                        .map(|p| p.id.clone())
+                        .unwrap_or_else(|| crate::dispatcher::LEGACY_PROJECT_ID.to_string());
+                    self.provider_health
+                        .send_to_quickwit(sink, &project_id)
+                        .await;
+                }
             }
         }
 
@@ -1721,12 +1734,19 @@ impl AgentOrchestrator {
                 .map(|r| std::sync::Arc::new(r.clone()));
             let unhealthy = self.provider_health.unhealthy_providers();
             let telemetry_arc = std::sync::Arc::new(self.telemetry_store.clone());
-            let engine = control_plane::RoutingDecisionEngine::with_provider_budget(
+            let strategy = self
+                .config
+                .routing
+                .as_ref()
+                .map(|r| r.route_selection_strategy)
+                .unwrap_or(crate::control_plane::RouteSelectionStrategy::Fastest);
+            let engine = control_plane::RoutingDecisionEngine::with_provider_budget_and_strategy(
                 kg_arc,
                 unhealthy,
                 terraphim_router::Router::new(),
                 Some(telemetry_arc),
                 self.provider_budget_tracker.clone(),
+                strategy,
             );
             let ctx = control_plane::DispatchContext {
                 agent_name: def.name.clone(),
@@ -1839,9 +1859,11 @@ impl AgentOrchestrator {
         // For opencode, compose "provider/model" format when both fields are set.
         // opencode requires `-m provider/model` whereas the TOML config stores them
         // separately (provider = "kimi-for-coding", model = "k2p5").
+        // Skip composition if the model already contains a provider prefix (e.g.
+        // from KG routing which returns full model ids like "kimi-for-coding/k2p5").
         let model = if cli_name == "opencode" {
             match (&def.provider, &model) {
-                (Some(provider), Some(m)) => {
+                (Some(provider), Some(m)) if !m.contains('/') => {
                     let composed = format!("{}/{}", provider, m);
                     info!(agent = %def.name, composed_model = %composed, "composed provider/model for opencode");
                     Some(composed)
@@ -2249,12 +2271,19 @@ impl AgentOrchestrator {
             .map(|r| std::sync::Arc::new(r.clone()));
         let unhealthy = self.provider_health.unhealthy_providers();
         let telemetry_arc = std::sync::Arc::new(self.telemetry_store.clone());
-        let engine = control_plane::RoutingDecisionEngine::with_provider_budget(
+        let strategy = self
+            .config
+            .routing
+            .as_ref()
+            .map(|r| r.route_selection_strategy)
+            .unwrap_or(crate::control_plane::RouteSelectionStrategy::Fastest);
+        let engine = control_plane::RoutingDecisionEngine::with_provider_budget_and_strategy(
             kg_arc,
             unhealthy,
             terraphim_router::Router::new(),
             Some(telemetry_arc),
             self.provider_budget_tracker.clone(),
+            strategy,
         );
         let dispatch_ctx = control_plane::DispatchContext {
             agent_name: def.name.clone(),
@@ -5505,6 +5534,19 @@ impl AgentOrchestrator {
                 {
                     let _ = self.provider_health.save_results(dir.as_path()).await;
                 }
+
+                // Send probe results to Quickwit for cost-aware routing
+                if let Some(ref sink) = self.quickwit_sink {
+                    let project_id = self
+                        .config
+                        .projects
+                        .first()
+                        .map(|p| p.id.clone())
+                        .unwrap_or_else(|| crate::dispatcher::LEGACY_PROJECT_ID.to_string());
+                    self.provider_health
+                        .send_to_quickwit(sink, &project_id)
+                        .await;
+                }
             }
         }
 
@@ -6235,11 +6277,15 @@ impl AgentOrchestrator {
                     control_plane::output_parser::parse_stderr_for_limit_errors(&stderr_text)
                         .is_some()
                         || control_plane::telemetry::is_subscription_limit_error(&output_text);
-                let effective_provider = def.provider.as_deref().or_else(|| {
-                    routed_model
-                        .as_deref()
-                        .and_then(|m| provider_budget::provider_key_for_model(m))
-                });
+                // Attribution: prefer routed model -> canonical key, fallback to config provider
+                let effective_provider = routed_model
+                    .as_deref()
+                    .map(provider_budget::canonical_key_for_model_or_provider)
+                    .or_else(|| {
+                        def.provider
+                            .as_deref()
+                            .map(provider_budget::canonical_quota_key)
+                    });
 
                 if let Some(provider_key) = effective_provider {
                     warn!(
@@ -6273,18 +6319,19 @@ impl AgentOrchestrator {
 
             // D-3: Feed exit classification into provider health circuit breaker
             if let Some(ref provider) = def.provider {
+                let canonical = provider_budget::canonical_quota_key(provider);
                 let already_recorded_by_quota =
-                    quota_provider_recorded.as_deref() == Some(provider.as_str());
+                    quota_provider_recorded.as_deref() == Some(canonical);
                 match record.exit_class {
                     ExitClass::ModelError | ExitClass::RateLimit =>
                     {
                         #[allow(clippy::collapsible_match)]
                         if !already_recorded_by_quota {
-                            self.provider_health.record_failure(provider);
+                            self.provider_health.record_failure(canonical);
                         }
                     }
                     ExitClass::Success | ExitClass::EmptySuccess => {
-                        self.provider_health.record_success(provider);
+                        self.provider_health.record_success(canonical);
                     }
                     _ => {} // Other exit classes don't affect provider health
                 }
@@ -6300,13 +6347,13 @@ impl AgentOrchestrator {
                     error_signatures::ErrorKind::Throttle => {
                         warn!(
                             agent = %name,
-                            provider = %provider,
+                            provider = %canonical,
                             model = ?record.model_used,
                             "stderr classified as throttle; tripping breaker + exhausting budget"
                         );
-                        self.provider_health.record_failure(provider);
+                        self.provider_health.record_failure(canonical);
                         if let Some(tracker) = self.provider_budget_tracker.as_ref() {
-                            tracker.force_exhaust(provider);
+                            tracker.force_exhaust(canonical);
                         }
                     }
                     error_signatures::ErrorKind::Flake => {
@@ -7044,6 +7091,46 @@ Remove the pause flag once the underlying failure is resolved:\n\n\
                             );
                         }
                     }
+                }
+            }
+
+            // Send to Quickwit for cost-aware routing analytics
+            if let Some(ref sink) = self.quickwit_sink {
+                let doc = quickwit::LogDocument {
+                    timestamp: event.completed_at.to_rfc3339(),
+                    project_id: self
+                        .config
+                        .projects
+                        .first()
+                        .map(|p| p.id.clone())
+                        .unwrap_or_else(|| crate::dispatcher::LEGACY_PROJECT_ID.to_string()),
+                    level: if event.success {
+                        "INFO".to_string()
+                    } else {
+                        "WARN".to_string()
+                    },
+                    agent_name: agent_name.clone(),
+                    layer: "Core".to_string(),
+                    source: "telemetry".to_string(),
+                    message: event
+                        .error
+                        .clone()
+                        .unwrap_or_else(|| "completion recorded".to_string()),
+                    model: Some(event.model.clone()),
+                    cost_usd: Some(event.cost_usd),
+                    latency_ms: Some(event.latency_ms),
+                    tokens_input: Some(event.tokens.input),
+                    tokens_output: Some(event.tokens.output),
+                    exit_class: if event.success {
+                        Some("success".to_string())
+                    } else {
+                        Some("error".to_string())
+                    },
+                    is_free: event.cost_usd == 0.0,
+                    ..Default::default()
+                };
+                if let Err(e) = sink.send(doc).await {
+                    warn!(error = %e, "failed to send telemetry to Quickwit");
                 }
             }
         }

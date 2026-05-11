@@ -91,6 +91,7 @@ fn register_providers(orchestrator: &mut AgentOrchestrator) {
 enum Cli {
     Run { config: PathBuf },
     Check { config: PathBuf },
+    Version,
     Help,
 }
 
@@ -109,6 +110,7 @@ fn parse_args() -> Result<Cli, String> {
                 check = Some(PathBuf::from(path));
             }
             "-h" | "--help" => return Ok(Cli::Help),
+            "-V" | "--version" => return Ok(Cli::Version),
             other if other.starts_with("--") => {
                 return Err(format!("unknown flag: {other}"));
             }
@@ -137,6 +139,7 @@ fn print_help() {
     println!("    adf [CONFIG]           Run the orchestrator");
     println!("    adf --check CONFIG     Validate config + print agent routing table");
     println!("    adf --help             Show this message");
+    println!("    adf --version          Show version");
 }
 
 /// Run the dry-run validator: load, validate, and print the routing table.
@@ -260,6 +263,10 @@ async fn main() -> ExitCode {
     match cli {
         Cli::Help => {
             print_help();
+            ExitCode::SUCCESS
+        }
+        Cli::Version => {
+            println!("adf {}", env!("CARGO_PKG_VERSION"));
             ExitCode::SUCCESS
         }
         Cli::Check { config } => run_check(config),

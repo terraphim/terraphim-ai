@@ -595,6 +595,8 @@ fn test_orchestrator_with_routing_config() {
         probe_results_dir: None,
         probe_on_startup: false,
         use_routing_engine: true,
+        route_selection_strategy:
+            terraphim_orchestrator::control_plane::RouteSelectionStrategy::Fastest,
     });
     let orch = AgentOrchestrator::new(config);
     assert!(
