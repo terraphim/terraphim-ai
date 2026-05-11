@@ -737,6 +737,11 @@ enum Command {
         #[arg(long, default_value_t = false)]
         pinned: bool,
     },
+    /// Manage knowledge graph entries
+    Kg {
+        #[command(subcommand)]
+        sub: KgSub,
+    },
     /// Chat with the AI using a specific role
     #[cfg(feature = "llm")]
     Chat {
@@ -1218,6 +1223,20 @@ enum ConfigSub {
     Validate,
     /// Reload roles from JSON file specified in settings.toml role_config
     Reload,
+}
+
+#[derive(Subcommand, Debug)]
+enum KgSub {
+    /// List knowledge graph entries
+    List {
+        #[arg(long)]
+        role: Option<String>,
+        #[arg(long, default_value_t = 50)]
+        top_k: usize,
+        /// Show only pinned entries
+        #[arg(long, default_value_t = false)]
+        pinned: bool,
+    },
 }
 
 /// Get the session cache file path
@@ -2286,6 +2305,28 @@ async fn run_offline_command(
             }
             Ok(())
         }
+        Command::Kg { sub } => match sub {
+            KgSub::List {
+                role,
+                top_k,
+                pinned,
+            } => {
+                let role_name = service.resolve_role(role.as_deref()).await?;
+
+                if pinned {
+                    let pinned_concepts = service.get_role_graph_pinned(&role_name).await?;
+                    for concept in pinned_concepts {
+                        println!("{}", concept);
+                    }
+                } else {
+                    let concepts = service.get_role_graph_top_k(&role_name, top_k).await?;
+                    for concept in concepts {
+                        println!("{}", concept);
+                    }
+                }
+                Ok(())
+            }
+        },
         #[cfg(feature = "llm")]
         Command::Chat {
             role,
@@ -4335,6 +4376,39 @@ async fn run_server_command(
             }
             Ok(())
         }
+        Command::Kg { sub } => match sub {
+            KgSub::List {
+                role,
+                top_k,
+                pinned,
+            } => {
+                let role_name = if let Some(role) = role {
+                    role
+                } else {
+                    let config_res = api.get_config().await?;
+                    config_res.config.selected_role.to_string()
+                };
+
+                let graph_res = api.rolegraph(Some(&role_name)).await?;
+                if pinned {
+                    let pinned_ids: std::collections::HashSet<u64> =
+                        graph_res.pinned_node_ids.iter().copied().collect();
+                    for node in graph_res.nodes {
+                        if pinned_ids.contains(&node.id) {
+                            println!("{}", node.label);
+                        }
+                    }
+                } else {
+                    let mut nodes_sorted = graph_res.nodes;
+                    #[allow(clippy::unnecessary_sort_by)]
+                    nodes_sorted.sort_by(|a, b| b.rank.cmp(&a.rank));
+                    for node in nodes_sorted.into_iter().take(top_k) {
+                        println!("{}", node.label);
+                    }
+                }
+                Ok(())
+            }
+        },
         #[cfg(feature = "llm")]
         Command::Chat {
             role,

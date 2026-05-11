@@ -41,7 +41,7 @@ pub const JMAP_MISSING_TOKEN_PENALTY: i64 = 1;
 /// no document indexing). Returns 0 when the thesaurus is empty or no concept
 /// matches.
 fn score_distinct_concepts(rg: &RoleGraph, query: &str) -> usize {
-    let ids = rg.find_matching_node_ids(query);
+    let ids = rg.find_matching_node_ids_with_fallback(query, false);
     let unique: AHashSet<u64> = ids.into_iter().collect();
     unique.len()
 }
