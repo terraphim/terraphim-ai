@@ -1,11 +1,11 @@
 //! Polling helpers for ROC v1 Step F — turn open PRs + reviewer comments into
-//! [`DispatchTask::AutoMerge`] tasks.
+//! [`crate::dispatcher::DispatchTask::AutoMerge`] tasks.
 //!
-//! The orchestrator invokes [`AgentOrchestrator::poll_pending_reviews`] once
+//! The orchestrator invokes [`crate::AgentOrchestrator::poll_pending_reviews`] once
 //! per `reconcile_tick`. That method walks every project with a Gitea config,
 //! lists open PRs, looks for the latest structural-pr-review comment, calls
 //! [`crate::pr_review::parse_verdict`] + [`crate::pr_review::evaluate`], and
-//! enqueues an [`DispatchTask::AutoMerge`] when — and only when — every gate
+//! enqueues a [`crate::dispatcher::DispatchTask::AutoMerge`] when — and only when — every gate
 //! in [`crate::pr_review::AutoMergeCriteria::default`] is satisfied.
 //!
 //! The module is split into:
@@ -195,7 +195,7 @@ impl AutoMergeExecutor for GiteaPrTracker {
 /// Outcome of applying the auto-merge policy to a single PR.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EvaluationOutcome {
-    /// Every gate cleared; the caller should enqueue [`DispatchTask::AutoMerge`].
+    /// Every gate cleared; the caller should enqueue [`crate::dispatcher::DispatchTask::AutoMerge`].
     Merge { head_sha: String },
     /// At least one gate failed. The reason is a short human-readable string
     /// suitable for logging or posting back to the PR.
