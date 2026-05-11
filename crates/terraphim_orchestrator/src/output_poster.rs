@@ -401,64 +401,69 @@ fn build_project_trackers(config: &GiteaOutputConfig) -> ProjectTrackers {
 
     let (agent_trackers, agent_tokens): (HashMap<String, GiteaTracker>, HashMap<String, String>) =
         match &config.agent_tokens_path {
-            Some(path) => match std::fs::read_to_string(path) {
-                Ok(contents) => match serde_json::from_str::<HashMap<String, String>>(&contents) {
-                    Ok(tokens) => {
-                        tracing::info!(
-                            count = tokens.len(),
-                            path = %path.display(),
-                            owner = %config.owner,
-                            repo = %config.repo,
-                            "loaded per-agent Gitea tokens"
-                        );
-                        let mut trackers = HashMap::with_capacity(tokens.len());
-                        let mut raw = HashMap::with_capacity(tokens.len());
-                        for (agent_name, token) in tokens {
-                            let agent_config = GiteaConfig {
-                                base_url: config.base_url.clone(),
-                                token: token.clone(),
-                                owner: config.owner.clone(),
-                                repo: config.repo.clone(),
-                                active_states: vec!["open".to_string()],
-                                terminal_states: vec!["closed".to_string()],
-                                use_robot_api: false,
-                                robot_path: PathBuf::from(ROBOT_PATH),
-                                claim_strategy: ClaimStrategy::PreferRobot,
-                            };
-                            match GiteaTracker::new(agent_config) {
-                                Ok(tracker) => {
-                                    trackers.insert(agent_name.clone(), tracker);
-                                    raw.insert(agent_name, token);
+            Some(path) => {
+                crate::config::warn_if_world_readable(path);
+                match std::fs::read_to_string(path) {
+                    Ok(contents) => {
+                        match serde_json::from_str::<HashMap<String, String>>(&contents) {
+                            Ok(tokens) => {
+                                tracing::info!(
+                                    count = tokens.len(),
+                                    path = %path.display(),
+                                    owner = %config.owner,
+                                    repo = %config.repo,
+                                    "loaded per-agent Gitea tokens"
+                                );
+                                let mut trackers = HashMap::with_capacity(tokens.len());
+                                let mut raw = HashMap::with_capacity(tokens.len());
+                                for (agent_name, token) in tokens {
+                                    let agent_config = GiteaConfig {
+                                        base_url: config.base_url.clone(),
+                                        token: token.clone(),
+                                        owner: config.owner.clone(),
+                                        repo: config.repo.clone(),
+                                        active_states: vec!["open".to_string()],
+                                        terminal_states: vec!["closed".to_string()],
+                                        use_robot_api: false,
+                                        robot_path: PathBuf::from(ROBOT_PATH),
+                                        claim_strategy: ClaimStrategy::PreferRobot,
+                                    };
+                                    match GiteaTracker::new(agent_config) {
+                                        Ok(tracker) => {
+                                            trackers.insert(agent_name.clone(), tracker);
+                                            raw.insert(agent_name, token);
+                                        }
+                                        Err(e) => {
+                                            tracing::warn!(
+                                                agent = %agent_name,
+                                                error = %e,
+                                                "failed to create agent tracker, will use project default"
+                                            );
+                                        }
+                                    }
                                 }
-                                Err(e) => {
-                                    tracing::warn!(
-                                        agent = %agent_name,
-                                        error = %e,
-                                        "failed to create agent tracker, will use project default"
-                                    );
-                                }
+                                (trackers, raw)
+                            }
+                            Err(e) => {
+                                tracing::warn!(
+                                    path = %path.display(),
+                                    error = %e,
+                                    "failed to parse agent tokens JSON, all agents will use project default token"
+                                );
+                                (HashMap::new(), HashMap::new())
                             }
                         }
-                        (trackers, raw)
                     }
                     Err(e) => {
                         tracing::warn!(
                             path = %path.display(),
                             error = %e,
-                            "failed to parse agent tokens JSON, all agents will use project default token"
+                            "failed to read agent tokens file, all agents will use project default token"
                         );
                         (HashMap::new(), HashMap::new())
                     }
-                },
-                Err(e) => {
-                    tracing::warn!(
-                        path = %path.display(),
-                        error = %e,
-                        "failed to read agent tokens file, all agents will use project default token"
-                    );
-                    (HashMap::new(), HashMap::new())
                 }
-            },
+            }
             None => (HashMap::new(), HashMap::new()),
         };
 

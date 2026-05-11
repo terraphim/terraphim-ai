@@ -1083,6 +1083,47 @@ pub(crate) fn validate_model_provider(
     })
 }
 
+/// Emit a tracing error if `path` is world-readable (Unix mode & 0o004 != 0).
+///
+/// Sensitive configuration files (orchestrator config, agent tokens) must not
+/// be world-readable. Any other system user could read API tokens or webhook
+/// secrets. The correct permissions are 0600 (owner read/write only).
+///
+/// This is advisory: the orchestrator continues loading even if the check fails,
+/// so operators can still recover from misconfigured deployments by fixing
+/// permissions while the service is running.
+pub fn warn_if_world_readable(path: &std::path::Path) {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        match std::fs::metadata(path) {
+            Ok(meta) => {
+                let mode = meta.permissions().mode();
+                if mode & 0o004 != 0 {
+                    tracing::error!(
+                        path = %path.display(),
+                        mode = format!("{:04o}", mode & 0o777),
+                        "SECURITY: sensitive file is world-readable. \
+                         Fix immediately: chmod 600 {}",
+                        path.display()
+                    );
+                } else if mode & 0o040 != 0 {
+                    tracing::warn!(
+                        path = %path.display(),
+                        mode = format!("{:04o}", mode & 0o777),
+                        "SECURITY: sensitive file is group-readable. \
+                         Consider: chmod 600 {}",
+                        path.display()
+                    );
+                }
+            }
+            Err(e) => {
+                tracing::debug!(path = %path.display(), error = %e, "could not stat file for permission check");
+            }
+        }
+    }
+}
+
 impl OrchestratorConfig {
     /// Find a project definition by id.
     pub fn project_by_id(&self, id: &str) -> Option<&Project> {
@@ -1144,6 +1185,7 @@ impl OrchestratorConfig {
         path: impl AsRef<std::path::Path>,
     ) -> Result<Self, crate::error::OrchestratorError> {
         let path = path.as_ref();
+        warn_if_world_readable(path);
         let content = std::fs::read_to_string(path)?;
         let mut config = Self::from_toml(&content)?;
 
@@ -2754,5 +2796,44 @@ task = "build"
             config.agents[0].event_only,
             "event_only must survive TOML round-trip when set to true"
         );
+    }
+
+    #[cfg(unix)]
+    mod permission_tests {
+        use std::os::unix::fs::PermissionsExt;
+
+        /// Creates a temp file with the given octal mode and returns its path.
+        fn temp_file_with_mode(content: &str, mode: u32) -> tempfile::TempDir {
+            let dir = tempfile::tempdir().unwrap();
+            let path = dir.path().join("test_config.toml");
+            std::fs::write(&path, content).unwrap();
+            let mut perms = std::fs::metadata(&path).unwrap().permissions();
+            perms.set_mode(mode);
+            std::fs::set_permissions(&path, perms).unwrap();
+            dir
+        }
+
+        #[test]
+        fn warn_if_world_readable_does_not_panic_on_secure_file() {
+            let dir = temp_file_with_mode("content", 0o600);
+            let path = dir.path().join("test_config.toml");
+            // Should complete without panic; warnings are advisory only.
+            super::super::warn_if_world_readable(&path);
+        }
+
+        #[test]
+        fn warn_if_world_readable_does_not_panic_on_world_readable_file() {
+            let dir = temp_file_with_mode("content", 0o644);
+            let path = dir.path().join("test_config.toml");
+            // Logs an error but must not panic or return an error.
+            super::super::warn_if_world_readable(&path);
+        }
+
+        #[test]
+        fn warn_if_world_readable_does_not_panic_on_missing_file() {
+            let path = std::path::Path::new("/nonexistent/path/config.toml");
+            // Should silently log debug and return without panic.
+            super::super::warn_if_world_readable(path);
+        }
     }
 }
