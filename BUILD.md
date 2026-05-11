@@ -18,11 +18,32 @@ Push Event → build-runner-llm → detect CI config → extract commands → tr
 
 The build-runner detects CI configuration in this priority order:
 
-1. **GitHub Actions** (`.github/workflows/ci-pr.yml`) - Extracts `run` steps
-2. **Cargo workspace** (`Cargo.toml`) - Standard Rust commands
-3. **Makefile** - Runs `make`
-4. **Earthfile** - Extracts `RUN` lines containing cargo/build/test
-5. **package.json** - Node.js projects (bun install/build/test)
+1. **GitHub Actions** (`.github/workflows/*.yml`) - Extracts `run` steps from all workflows that trigger on push/pull_request
+2. **BUILD.md** - Project-specific build documentation with bash code blocks
+3. **Cargo workspace** (`Cargo.toml`) - Standard Rust commands
+4. **Makefile** - Runs `make`
+5. **Earthfile** - Extracts `RUN` lines containing cargo/build/test
+6. **package.json** - Node.js projects (bun install/build/test)
+
+### GitHub Actions Integration
+
+The build-runner automatically discovers and executes commands from all GitHub Actions workflows that trigger on `push` or `pull_request` events. This means your existing CI configuration is leveraged directly:
+
+- No need to duplicate build commands
+- Uses the same commands as GitHub Actions
+- Extracts `run` steps from all jobs
+
+Example: If `.github/workflows/ci-pr.yml` contains:
+```yaml
+jobs:
+  build:
+    steps:
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --workspace -- -D warnings
+      - run: cargo test --workspace
+```
+
+The build-runner will execute these exact commands locally.
 
 ### Default Rust Build Sequence
 
