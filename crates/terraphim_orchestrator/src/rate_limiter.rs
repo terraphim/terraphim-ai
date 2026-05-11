@@ -18,7 +18,7 @@ use tracing::{debug, info};
 pub fn is_rate_limit_backoff_enabled() -> bool {
     std::env::var("RATE_LIMIT_BACKOFF_ENABLED")
         .map(|v| v == "true" || v == "1")
-        .unwrap_or(false)
+        .unwrap_or(true)
 }
 
 /// Rate limit state for a single provider.
@@ -202,10 +202,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_rate_limiter_disabled_by_default() {
+    fn test_rate_limiter_enabled_by_default() {
         std::env::remove_var("RATE_LIMIT_BACKOFF_ENABLED");
         let limiter = RateLimiter::new();
-        assert!(!limiter.is_enabled());
+        assert!(limiter.is_enabled());
         assert!(!limiter.is_rate_limited("test-provider"));
     }
 
