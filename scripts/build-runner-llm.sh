@@ -9,11 +9,21 @@
 # 4. Transforms commands via terraphim-agent replace (KG lookup)
 # 5. Executes with rch remote compilation support
 # 6. Posts status to Gitea
+# 7. Tracks costs and alerts on threshold breaches
 
 set -e
 
 export GITEA_URL=https://git.terraphim.cloud
 export PATH="$HOME/.cargo/bin:$HOME/.local/bin:$HOME/bin:$HOME/.bun/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+
+# Cost tracking configuration
+COST_THRESHOLD_WARN=0.01    # $0.01 - warning threshold
+COST_THRESHOLD_FAIL=0.05    # $0.05 - fail threshold
+COST_PER_KG_LOOKUP=0.0001   # $0.0001 per KG lookup (Aho-Corasick)
+COST_PER_LLM_CALL=0.005     # $0.005 per LLM extraction call
+TOTAL_COST=0
+LLM_CALLS=0
+KG_LOOKUPS=0
 
 # Status helper
 POST_STATUS() {
@@ -30,10 +40,69 @@ POST_STATUS() {
 }
 
 # Logging helpers
-log_info() { echo "[INFO] $1"; }
-log_success() { echo "[SUCCESS] $1"; }
-log_warning() { echo "[WARNING] $1"; }
-log_error() { echo "[ERROR] $1"; }
+log_info() { echo "[INFO] $1" >&2; }
+log_success() { echo "[SUCCESS] $1" >&2; }
+log_warning() { echo "[WARNING] $1" >&2; }
+log_error() { echo "[ERROR] $1" >&2; }
+
+# Cost tracking helpers
+track_kg_lookup() {
+  KG_LOOKUPS=$((KG_LOOKUPS + 1))
+  TOTAL_COST=$(echo "$TOTAL_COST + $COST_PER_KG_LOOKUP" | bc -l 2>/dev/null || echo "$TOTAL_COST")
+}
+
+track_llm_call() {
+  LLM_CALLS=$((LLM_CALLS + 1))
+  TOTAL_COST=$(echo "$TOTAL_COST + $COST_PER_LLM_CALL" | bc -l 2>/dev/null || echo "$TOTAL_COST")
+}
+
+check_cost_thresholds() {
+  # Warn if over warning threshold
+  if (( $(echo "$TOTAL_COST > $COST_THRESHOLD_WARN" | bc -l 2>/dev/null || echo 0) )); then
+    log_warning "Build cost \$$TOTAL_COST exceeds warning threshold (\$$COST_THRESHOLD_WARN)"
+    if (( $(echo "$TOTAL_COST > $COST_THRESHOLD_FAIL" | bc -l 2>/dev/null || echo 0) )); then
+      log_error "Build cost \$$TOTAL_COST exceeds fail threshold (\$$COST_THRESHOLD_FAIL)"
+      POST_STATUS failure "build failed: cost \$$TOTAL_COST exceeds threshold \$$COST_THRESHOLD_FAIL"
+      send_cost_metrics "cost_exceeded"
+      exit 1
+    fi
+  fi
+}
+
+# Send cost metrics to Quickwit
+send_cost_metrics() {
+  local status="${1:-success}"
+  local timestamp
+  timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+  local metrics_payload
+  metrics_payload=$(cat <<EOF
+{
+  "timestamp": "$timestamp",
+  "agent": "build-runner-llm",
+  "project": "${GITEA_REPO:-unknown}",
+  "sha": "${ADF_PUSH_SHA:-unknown}",
+  "model": "haiku",
+  "cost_cents": $TOTAL_COST,
+  "kg_lookups": $KG_LOOKUPS,
+  "llm_calls": $LLM_CALLS,
+  "status": "$status"
+}
+EOF
+)
+
+  # Send to Quickwit if configured
+  if [ -n "$QUICKWIT_ENDPOINT" ] && [ -n "$QUICKWIT_INDEX" ]; then
+    curl -fsS -X POST \
+      -H "Content-Type: application/json" \
+      -d "$metrics_payload" \
+      "$QUICKWIT_ENDPOINT/api/v1/$QUICKWIT_INDEX/ingest" \
+      >/dev/null 2>&1 || true
+  fi
+
+  # Also log to stdout
+  log_info "Cost report: \$$TOTAL_COST total (KG: $KG_LOOKUPS lookups, LLM: $LLM_CALLS calls)"
+}
 
 # Command whitelist validation
 validate_command() {
@@ -85,6 +154,9 @@ execute_command() {
     log_info "  Transformed: $cmd → $transformed"
   fi
 
+  # Track KG lookup cost
+  track_kg_lookup
+
   # Execute
   if eval "$transformed"; then
     log_success "  Step $step complete"
@@ -116,7 +188,8 @@ detect_and_extract() {
   # Priority 2: Earthfile
   if [ -f "Earthfile" ]; then
     log_info "Detected: Earthfile"
-    grep -E '^\s+(RUN|BUILD|COPY|ARG)\s+' Earthfile | sed 's/^\s*RUN\s*//' | sed 's/^\s*BUILD\s*//' | grep -v '^$'
+    # Only extract RUN lines (actual shell commands), not ARG/COPY/BUILD
+    grep -E '^\s+RUN\s+' Earthfile | sed 's/^\s*RUN\s*//' | grep -v '^$'
     return 0
   fi
 
@@ -196,12 +269,17 @@ main() {
     step=$((step + 1))
   done <<< "$commands"
 
+  # Check cost thresholds
+  check_cost_thresholds
+
   if [ "$failed" -eq 0 ]; then
     POST_STATUS success "all build steps passed"
     log_success "Build completed successfully"
+    send_cost_metrics "success"
     exit 0
   else
     # Status already posted by execute_command
+    send_cost_metrics "failure"
     exit 1
   fi
 }
