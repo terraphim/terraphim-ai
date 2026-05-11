@@ -231,16 +231,28 @@ mod tests {
         // First rate limit: 60s backoff
         limiter.record_rate_limit(provider);
         let dur1 = limiter.backoff_duration(provider).unwrap();
-        assert!(dur1.as_secs() >= 50 && dur1.as_secs() <= 65, "first backoff: {}s", dur1.as_secs());
+        assert!(
+            dur1.as_secs() >= 50 && dur1.as_secs() <= 65,
+            "first backoff: {}s",
+            dur1.as_secs()
+        );
 
         // Second rate limit: 120s backoff
         limiter.record_rate_limit(provider);
         let dur2 = limiter.backoff_duration(provider).unwrap();
-        assert!(dur2.as_secs() >= 110 && dur2.as_secs() <= 125, "second backoff: {}s", dur2.as_secs());
+        assert!(
+            dur2.as_secs() >= 110 && dur2.as_secs() <= 125,
+            "second backoff: {}s",
+            dur2.as_secs()
+        );
 
         // Third rate limit: 240s backoff
         limiter.record_rate_limit(provider);
         let dur3 = limiter.backoff_duration(provider).unwrap();
-        assert!(dur3.as_secs() >= 230 && dur3.as_secs() <= 245, "third backoff: {}s", dur3.as_secs());
+        assert!(
+            dur3.as_secs() >= 230 && dur3.as_secs() <= 245,
+            "third backoff: {}s",
+            dur3.as_secs()
+        );
     }
 }

@@ -60,15 +60,15 @@ pub mod pr_review;
 pub mod project_control;
 pub mod provider_budget;
 pub mod provider_probe;
-pub mod rate_limiter;
 #[cfg(feature = "quickwit")]
 pub mod quickwit;
 #[cfg(feature = "quickwit")]
 pub mod quickwit_bulk;
+pub mod rate_limiter;
 pub mod scheduler;
-pub mod worktree_guard;
 pub mod scope;
 pub mod webhook;
+pub mod worktree_guard;
 
 pub use agent_run_record::{
     AgentRunRecord, ExitClass, ExitClassification, ExitClassifier, RunTrigger,
@@ -106,12 +106,12 @@ pub use nightwatch::{
 };
 pub use output_poster::OutputPoster;
 pub use persona::{MetapromptRenderError, MetapromptRenderer, PersonaRegistry};
-pub use scheduler::{ScheduleEvent, TimeScheduler};
-pub use rate_limiter::{is_rate_limit_backoff_enabled, RateLimiter};
-pub use worktree_guard::{with_worktree_guard, with_worktree_guard_async, WorktreeGuard};
 #[cfg(feature = "quickwit")]
 pub use quickwit_bulk::QuickwitEsBulkSink;
+pub use rate_limiter::{is_rate_limit_backoff_enabled, RateLimiter};
+pub use scheduler::{ScheduleEvent, TimeScheduler};
 use terraphim_types::{FindingSeverity, ReviewFinding};
+pub use worktree_guard::{with_worktree_guard, with_worktree_guard_async, WorktreeGuard};
 
 use chrono::Timelike;
 use std::collections::HashMap;
@@ -1049,9 +1049,7 @@ impl AgentOrchestrator {
         {
             if let Some(ref kg_router) = self.kg_router {
                 info!("running startup provider probe via KG action:: templates");
-                self.provider_health
-                    .probe_all(kg_router)
-                    .await;
+                self.provider_health.probe_all(kg_router).await;
 
                 // Save probe results if directory configured
                 if let Some(ref dir) = self
@@ -5546,9 +5544,7 @@ impl AgentOrchestrator {
         // 13. D-2: Re-probe providers if cached results are stale
         if self.provider_health.is_stale() {
             if let Some(ref kg_router) = self.kg_router {
-                self.provider_health
-                    .probe_all(kg_router)
-                    .await;
+                self.provider_health.probe_all(kg_router).await;
                 if let Some(ref dir) = self
                     .config
                     .routing

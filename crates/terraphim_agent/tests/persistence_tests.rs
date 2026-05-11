@@ -189,8 +189,10 @@ async fn test_config_persistence_across_runs() -> Result<()> {
     let roles = list_available_roles()?;
 
     let test_role = pick_existing_role(&roles, &["Rust Engineer", "Terraphim Engineer", "Default"]);
-    let (stdout1, stderr1, code1) =
-        run_tui_command(&["config", "set", "selected_role", &test_role], Some(test_root.clone()))?;
+    let (stdout1, stderr1, code1) = run_tui_command(
+        &["config", "set", "selected_role", &test_role],
+        Some(test_root.clone()),
+    )?;
 
     assert_eq!(
         code1, 0,
@@ -237,8 +239,10 @@ async fn test_role_switching_persistence() -> Result<()> {
     for (i, role) in roles_to_test.iter().enumerate() {
         println!("Testing role switch #{}: '{}'", i + 1, role);
 
-        let (set_stdout, set_stderr, set_code) =
-            run_tui_command(&["config", "set", "selected_role", role], Some(test_root.clone()))?;
+        let (set_stdout, set_stderr, set_code) = run_tui_command(
+            &["config", "set", "selected_role", role],
+            Some(test_root.clone()),
+        )?;
 
         assert_eq!(
             set_code, 0,
@@ -252,7 +256,8 @@ async fn test_role_switching_persistence() -> Result<()> {
             role
         );
 
-        let (show_stdout, show_stderr, show_code) = run_tui_command(&["config", "show"], Some(test_root.clone()))?;
+        let (show_stdout, show_stderr, show_code) =
+            run_tui_command(&["config", "show"], Some(test_root.clone()))?;
         assert_eq!(
             show_code, 0,
             "Config show should work, stderr: {}",
@@ -270,7 +275,8 @@ async fn test_role_switching_persistence() -> Result<()> {
         thread::sleep(Duration::from_millis(200));
     }
 
-    let (final_stdout, final_stderr, final_code) = run_tui_command(&["config", "show"], Some(test_root))?;
+    let (final_stdout, final_stderr, final_code) =
+        run_tui_command(&["config", "show"], Some(test_root))?;
     assert_eq!(
         final_code, 0,
         "Final config show should work, stderr: {}",
@@ -320,10 +326,7 @@ async fn test_persistence_backend_functionality() -> Result<()> {
         let _config = parse_config_from_output(&show_stdout)?;
     }
 
-    assert!(
-        dashmap_dir.exists(),
-        "Dashmap directory should exist"
-    );
+    assert!(dashmap_dir.exists(), "Dashmap directory should exist");
 
     Ok(())
 }
@@ -343,7 +346,8 @@ async fn test_concurrent_persistence_operations() -> Result<()> {
             let role = roles[i].clone();
             let root = root_clone.clone();
             tokio::spawn(async move {
-                let result = run_tui_command(&["config", "set", "selected_role", &role], Some(root));
+                let result =
+                    run_tui_command(&["config", "set", "selected_role", &role], Some(root));
                 (i, role, result)
             })
         })
@@ -441,14 +445,8 @@ async fn test_persistence_recovery_after_corruption() -> Result<()> {
         config["id"], config["selected_role"]
     );
 
-    assert!(
-        sqlite_dir.exists(),
-        "SQLite dir should be recreated"
-    );
-    assert!(
-        dashmap_dir.exists(),
-        "Dashmap dir should be recreated"
-    );
+    assert!(sqlite_dir.exists(), "SQLite dir should be recreated");
+    assert!(dashmap_dir.exists(), "Dashmap dir should be recreated");
 
     let (_, stderr2, code2) = run_tui_command(
         &["config", "set", "selected_role", &recovery_role],
@@ -486,8 +484,10 @@ async fn test_persistence_with_special_characters() -> Result<()> {
     for role in special_roles {
         println!("Testing persistence with special role: '{}'", role);
 
-        let (_set_stdout, set_stderr, set_code) =
-            run_tui_command(&["config", "set", "selected_role", &role], Some(test_root.clone()))?;
+        let (_set_stdout, set_stderr, set_code) = run_tui_command(
+            &["config", "set", "selected_role", &role],
+            Some(test_root.clone()),
+        )?;
 
         assert_eq!(
             set_code, 0,
@@ -530,7 +530,11 @@ async fn test_persistence_directory_permissions() -> Result<()> {
         assert!(dir.exists(), "Directory should exist: {}", dir.display());
 
         let metadata = fs::metadata(dir)?;
-        assert!(metadata.is_dir(), "Should be a directory: {}", dir.display());
+        assert!(
+            metadata.is_dir(),
+            "Should be a directory: {}",
+            dir.display()
+        );
 
         let test_file = dir.join("permission_test.tmp");
         fs::write(&test_file, "test")?;
@@ -556,8 +560,10 @@ async fn test_persistence_backend_selection() -> Result<()> {
     let selected_role =
         pick_existing_role(&roles, &["Default", "Terraphim Engineer", "Rust Engineer"]);
 
-    let (_stdout, stderr, code) =
-        run_tui_command(&["config", "set", "selected_role", &selected_role], Some(test_root.clone()))?;
+    let (_stdout, stderr, code) = run_tui_command(
+        &["config", "set", "selected_role", &selected_role],
+        Some(test_root.clone()),
+    )?;
     assert_eq!(code, 0, "Config set should succeed, stderr: {}", stderr);
 
     let log_output = stderr;

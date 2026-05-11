@@ -276,7 +276,7 @@ max_memory_bytes = 1073741824
 "#,
         base = base
     );
-    let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+    let config = OrchestratorConfig::from_toml(&toml_str).unwrap();
     let orch = AgentOrchestrator::new(config);
     assert!(orch.is_ok());
 

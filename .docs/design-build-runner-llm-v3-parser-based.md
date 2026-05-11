@@ -440,6 +440,121 @@ pub fn resolve_build_action(
 }
 ```
 
+## terraphim-agent Replace Integration
+
+### Structured Build Output
+
+The `terraphim-agent replace` command transforms raw text into structured, linked output using the knowledge graph:
+
+```bash
+# Raw build output
+$ cargo test --workspace
+    Running unittests src/lib.rs
+    test test_format ... ok
+    test test_lint ... FAILED
+
+# Transform to linked output
+$ terraphim-agent replace "test test_lint ... FAILED" --role "DevOps Engineer" --format markdown
+> test [test_lint](https://git.terraphim.cloud/terraphim/terraphim-ai/src/main.rs#L42) ... [FAILED](https://git.terraphim.cloud/terraphim/terraphim-ai/issues?q=test_lint)
+```
+
+### Use Cases for Build-Runner
+
+1. **Auto-linking build steps to documentation**
+   ```bash
+   # Build output
+   $ cargo build --workspace
+   Compiling terraphim_automata v1.15.0
+   Compiling terraphim_orchestrator v1.8.0
+
+   # Replace with linked output
+   $ terraphim-agent replace "$BUILD_OUTPUT" --format wiki
+   > Compiling [[terraphim_automata]] v1.15.0
+   > Compiling [[terraphim_orchestrator]] v1.8.0
+   ```
+
+2. **Linking failures to known issues**
+   ```bash
+   # Test failure
+   test provider_probe::test_rate_limiter ... FAILED
+
+   # Replace links failures to existing issues
+   $ terraphim-agent replace "test_rate_limiter" --format markdown
+   > [test_rate_limiter](https://git.terraphim.cloud/terraphim/terraphim-ai/issues/1415)
+   ```
+
+3. **Creating structured build reports**
+   ```bash
+   # Generate build report
+   $ echo "Build completed: fmt, clippy, build, test" \
+     | terraphim-agent replace --role "DevOps Engineer" --format markdown
+
+   > Build completed:
+   > - [[cargo fmt|format]]
+   > - [[cargo clippy|lint]]
+   > - [[cargo build|compile]]
+   > - [[cargo test|test]]
+   ```
+
+4. **Wiki-style build documentation**
+   ```markdown
+   # Build Report - 2026-05-11
+
+   ## Steps Executed
+   - [[format]] - Code formatting (2s)
+   - [[lint]] - Static analysis (45s)
+   - [[compile]] - Build workspace (120s)
+   - [[test]] - Run test suite (300s)
+
+   ## Failures
+   - [[test_rate_limiter]] - See [[issue-1415]]
+   ```
+
+### Integration with Build Output
+
+```rust
+use terraphim_automata::replace::TermReplacer;
+
+pub fn format_build_output(
+    raw_output: &str,
+    project: &str,
+) -> String {
+    // Replace known terms with links
+    let replacer = TermReplacer::new()
+        .with_role("DevOps Engineer")
+        .with_format(Format::Markdown);
+
+    let linked_output = replacer.replace(raw_output);
+
+    // Add build metadata
+    format!(
+        "# Build Report - {}\n\n{}",
+        chrono::Utc::now().format("%Y-%m-%d %H:%M"),
+        linked_output
+    )
+}
+```
+
+### Build Report Generation
+
+```bash
+#!/bin/bash
+# build-report.sh
+
+BUILD_OUTPUT=$(cargo test --workspace 2>&1)
+
+# Transform output with terraphim-agent replace
+FORMATTED_OUTPUT=$(echo "$BUILD_OUTPUT" | \
+  ~/.cargo/bin/terraphim-agent replace --role "DevOps Engineer" --format markdown)
+
+# Post to Gitea as PR comment
+curl -X POST \
+  -H "Authorization: token $GITEA_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{\"body\": \"$FORMATTED_OUTPUT\"}" \
+  "$GITEA_URL/api/v1/repos/$OWNER/$REPO/issues/$PR_NUMBER/comments"
+```
+
 ## Implementation Plan (Revised)
 
 ### Phase 1: Parser Infrastructure (4h)
