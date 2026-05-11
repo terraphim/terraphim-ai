@@ -581,18 +581,30 @@ impl SymphonyOrchestrator {
             None => return,
         };
 
+        let max_retries = self.config.max_retry_attempts();
+
         // Fetch current candidates
         let candidates = match self.tracker.fetch_candidate_issues().await {
             Ok(c) => c,
             Err(e) => {
                 warn!(issue_id, "retry poll failed: {e}");
-                self.schedule_retry(
-                    issue_id,
-                    &retry_entry.identifier,
-                    retry_entry.attempt + 1,
-                    Some(format!("retry poll failed: {e}")),
-                    false,
-                );
+                let next_attempt = retry_entry.attempt + 1;
+                if next_attempt > max_retries {
+                    warn!(
+                        issue_id,
+                        attempt = retry_entry.attempt,
+                        "max retries exhausted after poll failure, releasing claim"
+                    );
+                    self.state.claimed.remove(issue_id);
+                } else {
+                    self.schedule_retry(
+                        issue_id,
+                        &retry_entry.identifier,
+                        next_attempt,
+                        Some(format!("retry poll failed: {e}")),
+                        false,
+                    );
+                }
                 return;
             }
         };
@@ -608,13 +620,23 @@ impl SymphonyOrchestrator {
             }
             Some(issue) => {
                 if self.state.available_slots() == 0 {
-                    self.schedule_retry(
-                        issue_id,
-                        &issue.identifier,
-                        retry_entry.attempt + 1,
-                        Some("no available orchestrator slots".into()),
-                        false,
-                    );
+                    let next_attempt = retry_entry.attempt + 1;
+                    if next_attempt > max_retries {
+                        warn!(
+                            issue_id,
+                            attempt = retry_entry.attempt,
+                            "max retries exhausted waiting for a slot, releasing claim"
+                        );
+                        self.state.claimed.remove(issue_id);
+                    } else {
+                        self.schedule_retry(
+                            issue_id,
+                            &issue.identifier,
+                            next_attempt,
+                            Some("no available orchestrator slots".into()),
+                            false,
+                        );
+                    }
                 } else {
                     self.dispatch_issue(issue, Some(retry_entry.attempt)).await;
                 }
@@ -794,5 +816,213 @@ impl SymphonyOrchestrator {
         }
 
         self.state.claimed.clear();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::workflow::WorkflowDefinition;
+    use crate::tracker::{Issue, IssueTracker};
+    use async_trait::async_trait;
+    use tempfile::TempDir;
+
+    // A real in-memory tracker used for testing -- not a mock.
+    struct FakeTracker {
+        issues: Vec<Issue>,
+        fail_on_fetch: bool,
+    }
+
+    impl FakeTracker {
+        fn with_issues(issues: Vec<Issue>) -> Self {
+            Self {
+                issues,
+                fail_on_fetch: false,
+            }
+        }
+
+        fn always_failing() -> Self {
+            Self {
+                issues: vec![],
+                fail_on_fetch: true,
+            }
+        }
+    }
+
+    #[async_trait]
+    impl IssueTracker for FakeTracker {
+        async fn fetch_candidate_issues(&self) -> crate::Result<Vec<Issue>> {
+            if self.fail_on_fetch {
+                Err(crate::SymphonyError::Tracker {
+                    kind: "fake".into(),
+                    message: "simulated tracker failure".into(),
+                })
+            } else {
+                Ok(self.issues.clone())
+            }
+        }
+
+        async fn fetch_issue_states_by_ids(&self, ids: &[String]) -> crate::Result<Vec<Issue>> {
+            Ok(self
+                .issues
+                .iter()
+                .filter(|i| ids.contains(&i.id))
+                .cloned()
+                .collect())
+        }
+
+        async fn fetch_issues_by_states(&self, _states: &[String]) -> crate::Result<Vec<Issue>> {
+            Ok(vec![])
+        }
+    }
+
+    fn make_issue(id: &str) -> Issue {
+        Issue {
+            id: id.into(),
+            identifier: format!("TEST-{id}"),
+            title: "Test issue".into(),
+            description: None,
+            priority: Some(1),
+            state: "Todo".into(),
+            branch_name: None,
+            url: None,
+            labels: vec![],
+            blocked_by: vec![],
+            pagerank_score: None,
+            created_at: None,
+            updated_at: None,
+        }
+    }
+
+    fn config_for_test(
+        tmp: &TempDir,
+        max_retry_attempts: u32,
+        max_concurrent: usize,
+    ) -> ServiceConfig {
+        let root = tmp.path().display();
+        let yaml = format!(
+            "tracker:\n  kind: gitea\nworkspace:\n  root: {root}\nagent:\n  max_retry_attempts: {max_retry_attempts}\n  max_concurrent_agents: {max_concurrent}",
+        );
+        let content = format!("---\n{yaml}\n---\nTest prompt.");
+        let workflow = WorkflowDefinition::parse(&content).unwrap();
+        ServiceConfig::from_workflow(workflow)
+    }
+
+    fn make_test_orchestrator(
+        tracker: Box<dyn IssueTracker>,
+        config: &ServiceConfig,
+    ) -> SymphonyOrchestrator {
+        let ws_mgr = crate::workspace::WorkspaceManager::new(config).unwrap();
+        SymphonyOrchestrator::new(config.clone(), tracker, ws_mgr)
+    }
+
+    fn seed_retry_entry(
+        orch: &mut SymphonyOrchestrator,
+        issue_id: &str,
+        identifier: &str,
+        attempt: u32,
+    ) {
+        let tx = orch.retry_fire_tx.clone();
+        // Noop timer: tests drive on_retry_timer directly without waiting for timer fires.
+        let timer_handle = tokio::spawn(async move {
+            drop(tx);
+        });
+        let entry = state::RetryEntry {
+            issue_id: issue_id.to_string(),
+            identifier: identifier.to_string(),
+            attempt,
+            due_at: tokio::time::Instant::now(),
+            timer_handle,
+            error: None,
+        };
+        orch.state
+            .retry_attempts
+            .insert(issue_id.to_string(), entry);
+        orch.state.claimed.insert(issue_id.to_string());
+    }
+
+    // Regression for commit 3128b6653: slot exhaustion at the retry bound must release the
+    // claim rather than growing the attempt counter without limit (RetryBound TLA+ invariant).
+    #[tokio::test]
+    async fn slot_exhaustion_at_retry_bound_releases_claim() {
+        let tmp = tempfile::tempdir().unwrap();
+        // max_retry_attempts=1, max_concurrent_agents=0 (no dispatch slots).
+        let config = config_for_test(&tmp, 1, 0);
+        let issue = make_issue("42");
+        let tracker = Box::new(FakeTracker::with_issues(vec![issue]));
+        let mut orch = make_test_orchestrator(tracker, &config);
+
+        // Seed with attempt == max_retry_attempts (1). Next attempt would be 2 > 1.
+        seed_retry_entry(&mut orch, "42", "TEST-42", 1);
+        assert!(
+            orch.state.claimed.contains("42"),
+            "pre-condition: claim must be held"
+        );
+
+        orch.on_retry_timer("42").await;
+
+        assert!(
+            !orch.state.claimed.contains("42"),
+            "claim must be released when slot exhaustion hits the retry bound"
+        );
+        assert!(
+            !orch.state.retry_attempts.contains_key("42"),
+            "no retry must remain after the bound is exhausted"
+        );
+    }
+
+    // Regression for commit 3128b6653: tracker poll failure at the retry bound must release
+    // the claim (second enforcement path in on_retry_timer).
+    #[tokio::test]
+    async fn poll_failure_at_retry_bound_releases_claim() {
+        let tmp = tempfile::tempdir().unwrap();
+        // Slots are plentiful; the tracker itself always fails.
+        let config = config_for_test(&tmp, 1, 10);
+        let tracker = Box::new(FakeTracker::always_failing());
+        let mut orch = make_test_orchestrator(tracker, &config);
+
+        seed_retry_entry(&mut orch, "99", "TEST-99", 1);
+        assert!(
+            orch.state.claimed.contains("99"),
+            "pre-condition: claim must be held"
+        );
+
+        orch.on_retry_timer("99").await;
+
+        assert!(
+            !orch.state.claimed.contains("99"),
+            "claim must be released when poll fails and retry bound is exhausted"
+        );
+        assert!(
+            !orch.state.retry_attempts.contains_key("99"),
+            "no retry must remain after bound is exhausted via poll failure"
+        );
+    }
+
+    // Sanity: within the bound the claim is preserved and the retry is rescheduled.
+    // Removing the RetryBound guard causes this test to keep rescheduling indefinitely
+    // and the above two tests to fail to release the claim.
+    #[tokio::test]
+    async fn within_retry_bound_claim_is_preserved_and_retry_rescheduled() {
+        let tmp = tempfile::tempdir().unwrap();
+        // max_retry_attempts=5; slots=0 to force re-queue without dispatch.
+        let config = config_for_test(&tmp, 5, 0);
+        let issue = make_issue("77");
+        let tracker = Box::new(FakeTracker::with_issues(vec![issue]));
+        let mut orch = make_test_orchestrator(tracker, &config);
+
+        // attempt=2, next would be 3 which is <= 5: well within bound.
+        seed_retry_entry(&mut orch, "77", "TEST-77", 2);
+
+        orch.on_retry_timer("77").await;
+
+        assert!(
+            orch.state.claimed.contains("77"),
+            "claim must be preserved while within the retry bound"
+        );
+        assert!(
+            orch.state.retry_attempts.contains_key("77"),
+            "retry must be rescheduled while within the retry bound"
+        );
     }
 }
