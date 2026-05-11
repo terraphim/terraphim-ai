@@ -15,6 +15,10 @@ WorkingDirectory=/opt/ai-dark-factory
 # are all on PATH -- needed by child agents (opencode, gtr, cargo, etc.).
 ExecStart=/bin/bash -lc 'exec /usr/local/bin/adf orchestrator.toml'
 
+# Enable rate-limit backoff to prevent burning API budget on
+# throttled providers (issue #1412).
+Environment="RATE_LIMIT_BACKOFF_ENABLED=true"
+
 # ADF manages its own child processes; give them time to finish on stop.
 # SIGTERM lets ADF drain gracefully, SIGKILL after 90s if stuck.
 TimeoutStopSec=90
