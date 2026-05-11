@@ -19,7 +19,12 @@ use terraphim_persistence::Persistable;
 async fn create_terraphim_engineer_config() -> Result<String> {
     // Use memory-only persistence to avoid RocksDB filesystem issues in CI
     set_env_var("TERRAPHIM_PROFILE_MEMORY_TYPE", "memory");
-    set_env_var("TERRAPHIM_LOG_DIR", "/tmp/terraphim-logs");
+    let log_dir = tempfile::Builder::new()
+        .prefix("terraphim-logs")
+        .tempdir()?
+        .into_path();
+    std::fs::create_dir_all(&log_dir)?;
+    set_env_var("TERRAPHIM_LOG_DIR", log_dir.to_string_lossy().to_string());
     let _ = DeviceStorage::init_memory_only().await;
     let current_dir = std::env::current_dir()?;
     let project_root = current_dir.parent().unwrap().parent().unwrap();

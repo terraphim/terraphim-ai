@@ -1050,7 +1050,7 @@ impl AgentOrchestrator {
             if let Some(ref kg_router) = self.kg_router {
                 info!("running startup provider probe via KG action:: templates");
                 self.provider_health
-                    .probe_all(kg_router, &|p| self.provider_rate_limits.is_blocked(p))
+                    .probe_all(kg_router)
                     .await;
 
                 // Save probe results if directory configured
@@ -5547,7 +5547,7 @@ impl AgentOrchestrator {
         if self.provider_health.is_stale() {
             if let Some(ref kg_router) = self.kg_router {
                 self.provider_health
-                    .probe_all(kg_router, &|p| self.provider_rate_limits.is_blocked(p))
+                    .probe_all(kg_router)
                     .await;
                 if let Some(ref dir) = self
                     .config

@@ -2,19 +2,22 @@
 //! OutputPoster per-project routing, legacy-mode fallback, and concurrency /
 //! dispatcher fairness seen through public APIs.
 
+use std::path::Path;
+
 use terraphim_orchestrator::config::OrchestratorConfig;
 use terraphim_orchestrator::dispatcher::{DispatchTask, Dispatcher, LEGACY_PROJECT_ID};
 use terraphim_orchestrator::output_poster::OutputPoster;
 
-fn two_project_config() -> OrchestratorConfig {
-    let toml_str = r#"
-working_dir = "/tmp/adf"
+fn two_project_config(base: &Path) -> OrchestratorConfig {
+    let toml_str = format!(
+        r#"
+working_dir = "{base}/adf"
 
 [nightwatch]
 
 [compound_review]
 schedule = "0 2 * * *"
-repo_path = "/tmp/repo"
+repo_path = "{base}/repo"
 
 [gitea]
 base_url = "https://git.example.test"
@@ -24,7 +27,7 @@ repo = "legacy-repo"
 
 [[projects]]
 id = "alpha"
-working_dir = "/tmp/alpha"
+working_dir = "{base}/alpha"
 
 [projects.gitea]
 base_url = "https://git.example.test"
@@ -34,7 +37,7 @@ repo = "alpha-repo"
 
 [[projects]]
 id = "beta"
-working_dir = "/tmp/beta"
+working_dir = "{base}/beta"
 
 [projects.gitea]
 base_url = "https://git.example.test"
@@ -55,13 +58,16 @@ layer = "Safety"
 cli_tool = "claude"
 task = "t"
 project = "beta"
-"#;
-    OrchestratorConfig::from_toml(toml_str).unwrap()
+"#,
+        base = base.display()
+    );
+    OrchestratorConfig::from_toml(&toml_str).unwrap()
 }
 
 #[test]
 fn output_poster_routes_per_project_and_to_legacy_fallback() {
-    let config = two_project_config();
+    let _tmp = tempfile::tempdir().unwrap();
+    let config = two_project_config(_tmp.path());
     let poster =
         OutputPoster::from_orchestrator_config(&config).expect("expected poster to be constructed");
 
@@ -94,14 +100,17 @@ fn output_poster_routes_per_project_and_to_legacy_fallback() {
 #[test]
 fn output_poster_legacy_single_project_still_addressable() {
     // Legacy single-project config: only top-level gitea, no [[projects]].
-    let toml_str = r#"
-working_dir = "/tmp/adf"
+    let _tmp = tempfile::tempdir().unwrap();
+    let base = _tmp.path().display();
+    let toml_str = format!(
+        r#"
+working_dir = "{base}/adf"
 
 [nightwatch]
 
 [compound_review]
 schedule = "0 2 * * *"
-repo_path = "/tmp/repo"
+repo_path = "{base}/repo"
 
 [gitea]
 base_url = "https://git.example.test"
@@ -114,7 +123,9 @@ name = "legacy"
 layer = "Safety"
 cli_tool = "claude"
 task = "t"
-"#;
+"#,
+        base = base
+    );
     let config = OrchestratorConfig::from_toml(toml_str).unwrap();
     let poster = OutputPoster::from_orchestrator_config(&config).expect("legacy poster constructs");
 
@@ -134,18 +145,21 @@ task = "t"
 
 #[test]
 fn output_poster_without_gitea_returns_none() {
-    let toml_str = r#"
-working_dir = "/tmp/adf"
+    let _tmp = tempfile::tempdir().unwrap();
+    let base = _tmp.path().display();
+    let toml_str = format!(
+        r#"
+working_dir = "{base}/adf"
 
 [nightwatch]
 
 [compound_review]
 schedule = "0 2 * * *"
-repo_path = "/tmp/repo"
+repo_path = "{base}/repo"
 
 [[projects]]
 id = "alpha"
-working_dir = "/tmp/alpha"
+working_dir = "{base}/alpha"
 
 [[agents]]
 name = "alpha-worker"
@@ -153,7 +167,9 @@ layer = "Safety"
 cli_tool = "claude"
 task = "t"
 project = "alpha"
-"#;
+"#,
+        base = base
+    );
     let config = OrchestratorConfig::from_toml(toml_str).unwrap();
     assert!(OutputPoster::from_orchestrator_config(&config).is_none());
 }

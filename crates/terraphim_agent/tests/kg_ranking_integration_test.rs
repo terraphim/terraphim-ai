@@ -109,9 +109,7 @@ async fn start_test_server() -> Result<(Child, String)> {
     let config_path_absolute = config_path_buf.to_string_lossy().to_string();
 
     // Clear any existing saved config to prevent it from overriding our test config
-    let test_data_path = std::path::Path::new("/tmp/terraphim_test_").join(port.to_string());
-    let _ = std::fs::remove_dir_all(&test_data_path);
-    std::fs::create_dir_all(&test_data_path)?;
+    let test_data_path = tempfile::tempdir()?.into_path();
 
     println!(
         "[TEST] Spawning server process with config: {}",
@@ -215,14 +213,15 @@ async fn get_shared_server_url() -> &'static String {
 /// Clean up test resources (directories and files).  Does **not** kill the
 /// shared server so subsequent tests can reuse it.
 fn cleanup_test_resources() -> Result<()> {
+    let tmp = std::env::temp_dir();
     let test_dirs = vec![
-        "/tmp/terraphim_sqlite",
-        "/tmp/dashmaptest",
-        "/tmp/opendal",
-        "/tmp/terraphim_test_kg",
+        tmp.join("terraphim_sqlite"),
+        tmp.join("dashmaptest"),
+        tmp.join("opendal"),
+        tmp.join("terraphim_test_kg"),
     ];
-    for dir in test_dirs {
-        if Path::new(dir).exists() {
+    for dir in &test_dirs {
+        if dir.exists() {
             let _ = fs::remove_dir_all(dir);
         }
     }
