@@ -332,3 +332,55 @@ fallback_agent = "build-runner"
 # Current build-runner: $0.00, 3min, 0% adaptability
 # build-runner-llm v2: $0.005 total, 3min+0.1s, 100% cached
 ```
+
+## External Validation: GitHub Next Agentic Workflows
+
+This design aligns with GitHub Next's "Agentic Workflows" research prototype (August 2025):
+
+### Key Validation Points
+
+1. **Natural Language CI/CD** - GitHub Next uses markdown with YAML frontmatter for workflow definitions. Our `BUILD.md` with `build::` directives follows the same pattern.
+
+2. **Compiles to Standard Actions** - They compile markdown to GitHub Actions YAML. We compile `build::` directives to standard shell commands via rch.
+
+3. **Safe Outputs** - Their "safe outputs" concept maps to our command whitelist validation. Both prevent uncontrolled write access.
+
+4. **Explicit Tools** - They declare tools in frontmatter. Our `toolchain::` metadata serves the same purpose.
+
+5. **Repo-centric** - Both designs are repo-centric with team-visible, auditable logs.
+
+### What We Can Adopt
+
+```markdown
+---
+# BUILD.md with YAML frontmatter (inspired by GitHub Next)
+project: terraphim-ai
+toolchain: cargo
+features:
+  - quickwit
+  - llm-router
+---
+
+# Build Sequence
+
+## Format
+build:: format
+action:: cargo fmt --all -- --check
+cost:: low
+category:: quality-gate
+```
+
+### Differences (Why Our Design is Better)
+
+| Aspect | GitHub Next | Our Design |
+|--------|-------------|------------|
+| LLM calls | Every workflow run | Only on cold start |
+| Caching | None | terraphim KG with fingerprinting |
+| Cost | $0.01+ per run | $0.0001 avg over 100 runs |
+| Learning | None | terraphim-agent captures success/failure |
+| Determinism | Non-deterministic (LLM) | Deterministic hot path |
+
+### Reference
+- GitHub Next Project: https://githubnext.com/projects/agentic-workflows/
+- Documentation: https://githubnext.github.io/gh-aw
+- Related: GitHub Blog "Automate repository tasks with GitHub Agentic Workflows" (Feb 2026)
