@@ -4,7 +4,7 @@
 //! ClickUp, Discourse, JMAP …) and the service layer. It owns:
 //!
 //! - **Indexer abstraction** -- [`IndexMiddleware`](indexer::IndexMiddleware) trait
-//!   and [`search_haystacks`](indexer::search_haystacks) for parallel haystack queries
+//!   and [`search_haystacks`] for parallel haystack queries
 //! - **Thesaurus builders** -- converting source documents into automata-compatible JSON
 //! - **Command execution** -- sandboxed invocation of external tools
 //!

@@ -10,7 +10,7 @@ use fff_search::types::FileItem;
 /// Scores files by counting knowledge-graph concept matches in their path.
 ///
 /// Implements [`ExternalScorer`] so it can be plugged directly into a
-/// `fff-search` [`ScoringContext`].  The scorer reads the file's
+/// `fff-search` `ScoringContext`.  The scorer reads the file's
 /// `relative_path`, runs it through the Aho-Corasick automata built from
 /// the thesaurus, and returns `min(unique_matches * weight_per_term,
 /// max_boost)`.
