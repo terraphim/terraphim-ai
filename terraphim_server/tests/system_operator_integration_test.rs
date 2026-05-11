@@ -23,7 +23,11 @@ async fn test_system_operator_remote_kg_integration() {
     );
 
     // Check if system operator data exists
-    let system_operator_path = PathBuf::from("/tmp/system_operator/pages");
+    let system_operator_path = tempfile::Builder::new()
+        .prefix("system_operator_pages")
+        .tempdir()
+        .expect("failed to create tempdir")
+        .into_path();
     if !system_operator_path.exists() {
         log::warn!(
             "System operator data not found at {:?}. Run setup_system_operator.sh first.",

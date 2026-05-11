@@ -44,9 +44,10 @@ fn project_agent(name: &str, project: Option<&str>) -> AgentDefinition {
     }
 }
 
-fn test_config_with_pause(pause_dir: PathBuf, threshold: u32) -> OrchestratorConfig {
+fn test_config_with_pause(pause_dir: PathBuf, threshold: u32, working_dir: PathBuf) -> OrchestratorConfig {
+    let worktree_root = working_dir.join(".worktrees");
     OrchestratorConfig {
-        working_dir: PathBuf::from("/tmp/test-orchestrator-breaker"),
+        working_dir,
         nightwatch: NightwatchConfig::default(),
         compound_review: CompoundReviewConfig {
             cli_tool: None,
@@ -56,7 +57,7 @@ fn test_config_with_pause(pause_dir: PathBuf, threshold: u32) -> OrchestratorCon
             max_duration_secs: 60,
             repo_path: PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../.."),
             create_prs: false,
-            worktree_root: PathBuf::from("/tmp/test-orchestrator-breaker/.worktrees"),
+            worktree_root,
             base_branch: "main".to_string(),
             max_concurrent_agents: 3,
             ..Default::default()
@@ -103,7 +104,8 @@ fn test_config_with_pause(pause_dir: PathBuf, threshold: u32) -> OrchestratorCon
 #[tokio::test]
 async fn pause_flag_blocks_dispatch_for_matching_project() {
     let tmp = TempDir::new().unwrap();
-    let config = test_config_with_pause(tmp.path().to_path_buf(), 3);
+    let _workdir = TempDir::new().unwrap();
+    let config = test_config_with_pause(tmp.path().to_path_buf(), 3, _workdir.path().to_path_buf());
     let mut orch = AgentOrchestrator::new(config).unwrap();
 
     // Pre-create the pause flag for "odilo".
@@ -124,7 +126,8 @@ async fn pause_flag_blocks_dispatch_for_matching_project() {
 #[tokio::test]
 async fn absent_pause_flag_does_not_block_dispatch() {
     let tmp = TempDir::new().unwrap();
-    let config = test_config_with_pause(tmp.path().to_path_buf(), 3);
+    let _workdir = TempDir::new().unwrap();
+    let config = test_config_with_pause(tmp.path().to_path_buf(), 3, _workdir.path().to_path_buf());
     let orch = AgentOrchestrator::new(config).unwrap();
 
     // No pause flag: the spawn path runs to completion. The underlying
@@ -145,7 +148,8 @@ async fn absent_pause_flag_does_not_block_dispatch() {
 #[tokio::test]
 async fn pause_flag_is_project_scoped() {
     let tmp = TempDir::new().unwrap();
-    let config = test_config_with_pause(tmp.path().to_path_buf(), 3);
+    let _workdir = TempDir::new().unwrap();
+    let config = test_config_with_pause(tmp.path().to_path_buf(), 3, _workdir.path().to_path_buf());
     let mut orch = AgentOrchestrator::new(config).unwrap();
 
     project_control::touch_pause_flag(tmp.path(), "odilo").unwrap();
@@ -168,7 +172,8 @@ async fn pause_flag_is_project_scoped() {
 #[tokio::test]
 async fn pause_flag_does_not_affect_legacy_global_agents() {
     let tmp = TempDir::new().unwrap();
-    let config = test_config_with_pause(tmp.path().to_path_buf(), 3);
+    let _workdir = TempDir::new().unwrap();
+    let config = test_config_with_pause(tmp.path().to_path_buf(), 3, _workdir.path().to_path_buf());
     let _orch = AgentOrchestrator::new(config).unwrap();
 
     // Even with an exotic "__global__" pause flag, legacy (project=None)
@@ -180,7 +185,8 @@ async fn pause_flag_does_not_affect_legacy_global_agents() {
 #[tokio::test]
 async fn circuit_breaker_trips_at_threshold_and_touches_pause_flag() {
     let tmp = TempDir::new().unwrap();
-    let config = test_config_with_pause(tmp.path().to_path_buf(), 3);
+    let _workdir = TempDir::new().unwrap();
+    let config = test_config_with_pause(tmp.path().to_path_buf(), 3, _workdir.path().to_path_buf());
     let mut orch = AgentOrchestrator::new(config).unwrap();
 
     // Two failures under threshold: no pause flag yet.
@@ -207,7 +213,8 @@ async fn circuit_breaker_trips_at_threshold_and_touches_pause_flag() {
 #[tokio::test]
 async fn circuit_breaker_resets_on_success() {
     let tmp = TempDir::new().unwrap();
-    let config = test_config_with_pause(tmp.path().to_path_buf(), 3);
+    let _workdir = TempDir::new().unwrap();
+    let config = test_config_with_pause(tmp.path().to_path_buf(), 3, _workdir.path().to_path_buf());
     let mut orch = AgentOrchestrator::new(config).unwrap();
 
     orch.simulate_project_meta_failures_for_test("odilo", 2)
@@ -232,7 +239,8 @@ async fn circuit_breaker_resets_on_success() {
 #[tokio::test]
 async fn circuit_breaker_is_per_project() {
     let tmp = TempDir::new().unwrap();
-    let config = test_config_with_pause(tmp.path().to_path_buf(), 2);
+    let _workdir = TempDir::new().unwrap();
+    let config = test_config_with_pause(tmp.path().to_path_buf(), 2, _workdir.path().to_path_buf());
     let mut orch = AgentOrchestrator::new(config).unwrap();
 
     // Trip odilo.
@@ -255,7 +263,8 @@ async fn circuit_breaker_is_per_project() {
 #[tokio::test]
 async fn pause_flag_removal_restores_dispatch() {
     let tmp = TempDir::new().unwrap();
-    let config = test_config_with_pause(tmp.path().to_path_buf(), 3);
+    let _workdir = TempDir::new().unwrap();
+    let config = test_config_with_pause(tmp.path().to_path_buf(), 3, _workdir.path().to_path_buf());
     let orch = AgentOrchestrator::new(config).unwrap();
 
     // Create the flag, observe paused, remove, observe not-paused.

@@ -35,9 +35,10 @@ const PROJECT: &str = "alpha";
 /// No agents, no trackers, no projects — the poller drives itself off the
 /// in-memory `InMemoryPrTracker` passed directly into
 /// `poll_pending_reviews_for_project`.
-fn minimal_config() -> OrchestratorConfig {
+fn minimal_config(working_dir: PathBuf) -> OrchestratorConfig {
+    let worktree_root = working_dir.join(".worktrees");
     OrchestratorConfig {
-        working_dir: PathBuf::from("/tmp/terraphim-auto-merge-tests"),
+        working_dir,
         nightwatch: NightwatchConfig::default(),
         compound_review: CompoundReviewConfig {
             cli_tool: None,
@@ -47,7 +48,7 @@ fn minimal_config() -> OrchestratorConfig {
             max_duration_secs: 60,
             repo_path: PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../.."),
             create_prs: false,
-            worktree_root: PathBuf::from("/tmp/terraphim-auto-merge-tests/.worktrees"),
+            worktree_root,
             base_branch: "main".to_string(),
             max_concurrent_agents: 1,
             ..Default::default()
@@ -158,7 +159,7 @@ fn auto_merge_depth(orch: &AgentOrchestrator) -> u64 {
 
 #[tokio::test]
 async fn auto_merge_requires_all_gates() {
-    let mut orch = AgentOrchestrator::new(minimal_config()).unwrap();
+    let mut orch = AgentOrchestrator::new(minimal_config(tempfile::tempdir().unwrap().into_path())).unwrap();
 
     let tracker = InMemoryPrTracker::new().with_pr(
         pr_summary(101, "claude-code", "2ef451d8", 42),
@@ -193,7 +194,7 @@ async fn auto_merge_requires_all_gates() {
 
 #[tokio::test]
 async fn auto_merge_blocked_on_p1_present() {
-    let mut orch = AgentOrchestrator::new(minimal_config()).unwrap();
+    let mut orch = AgentOrchestrator::new(minimal_config(tempfile::tempdir().unwrap().into_path())).unwrap();
 
     let tracker = InMemoryPrTracker::new().with_pr(
         pr_summary(202, "claude-code", "62672e38", 42),
@@ -214,7 +215,7 @@ async fn auto_merge_blocked_on_p1_present() {
 
 #[tokio::test]
 async fn auto_merge_blocked_on_non_agent_author() {
-    let mut orch = AgentOrchestrator::new(minimal_config()).unwrap();
+    let mut orch = AgentOrchestrator::new(minimal_config(tempfile::tempdir().unwrap().into_path())).unwrap();
 
     // Reuse the clean fixture but swap the author login to a human.
     let tracker = InMemoryPrTracker::new().with_pr(
@@ -236,7 +237,7 @@ async fn auto_merge_blocked_on_non_agent_author() {
 
 #[tokio::test]
 async fn auto_merge_blocked_on_large_diff() {
-    let mut orch = AgentOrchestrator::new(minimal_config()).unwrap();
+    let mut orch = AgentOrchestrator::new(minimal_config(tempfile::tempdir().unwrap().into_path())).unwrap();
 
     // 5/5 clean review, agent author, but diff_loc exceeds the 500 LoC cap.
     let tracker = InMemoryPrTracker::new().with_pr(
@@ -258,7 +259,7 @@ async fn auto_merge_blocked_on_large_diff() {
 
 #[tokio::test]
 async fn auto_merge_idempotent_across_ticks() {
-    let mut orch = AgentOrchestrator::new(minimal_config()).unwrap();
+    let mut orch = AgentOrchestrator::new(minimal_config(tempfile::tempdir().unwrap().into_path())).unwrap();
 
     let tracker = InMemoryPrTracker::new().with_pr(
         pr_summary(505, "claude-code", "2ef451d8", 42),
@@ -289,7 +290,7 @@ async fn auto_merge_idempotent_across_ticks() {
 
 #[tokio::test]
 async fn poll_skips_prs_without_reviewer_comment() {
-    let mut orch = AgentOrchestrator::new(minimal_config()).unwrap();
+    let mut orch = AgentOrchestrator::new(minimal_config(tempfile::tempdir().unwrap().into_path())).unwrap();
 
     // One PR with a non-reviewer comment (human noise) and no reviewer
     // verdict yet. The poller should treat this as "no verdict, skip".
@@ -316,7 +317,7 @@ async fn poll_skips_prs_without_reviewer_comment() {
 
 #[tokio::test]
 async fn poll_handles_verdict_parse_error_gracefully() {
-    let mut orch = AgentOrchestrator::new(minimal_config()).unwrap();
+    let mut orch = AgentOrchestrator::new(minimal_config(tempfile::tempdir().unwrap().into_path())).unwrap();
 
     let tracker = InMemoryPrTracker::new().with_pr(
         pr_summary(707, "claude-code", "6becb2f7", 42),

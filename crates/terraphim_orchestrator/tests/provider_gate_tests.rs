@@ -313,9 +313,11 @@ fn budget_aware_config(
     providers: Vec<ProviderBudgetConfig>,
     state_file: Option<PathBuf>,
     agents: Vec<AgentDefinition>,
+    working_dir: PathBuf,
 ) -> OrchestratorConfig {
+    let worktree_root = working_dir.join(".worktrees");
     OrchestratorConfig {
-        working_dir: PathBuf::from("/tmp/terraphim-provider-budget-test"),
+        working_dir: working_dir.clone(),
         nightwatch: NightwatchConfig::default(),
         compound_review: CompoundReviewConfig {
             cli_tool: None,
@@ -325,7 +327,7 @@ fn budget_aware_config(
             max_duration_secs: 60,
             repo_path: PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../.."),
             create_prs: false,
-            worktree_root: PathBuf::from("/tmp/terraphim-provider-budget-test/.worktrees"),
+            worktree_root,
             base_branch: "main".to_string(),
             max_concurrent_agents: 3,
             ..Default::default()
@@ -383,6 +385,7 @@ async fn record_telemetry_feeds_provider_budget_tracker() {
     // Regression for the P1 "Layer 3 is read-only at runtime": feed
     // telemetry events through the orchestrator's `record_telemetry`
     // and confirm the provider budget tracker observes the spend.
+    let _tmp = tempfile::tempdir().unwrap();
     let providers = vec![ProviderBudgetConfig {
         id: "opencode-go".to_string(),
         max_hour_cents: Some(50),
@@ -393,6 +396,7 @@ async fn record_telemetry_feeds_provider_budget_tracker() {
         providers,
         None,
         vec![agent_with_model("worker", "opencode-go/minimax-m2.5")],
+        _tmp.path().to_path_buf(),
     );
 
     let orch = AgentOrchestrator::new(config).expect("build orchestrator");
@@ -445,6 +449,7 @@ async fn record_telemetry_feeds_provider_budget_tracker() {
 async fn record_telemetry_ignores_zero_cost_and_unknown_model() {
     // zero-cost events must be a no-op; unknown bare models silently
     // feed their own synthetic key (rather than panicking or mis-routing).
+    let _tmp = tempfile::tempdir().unwrap();
     let providers = vec![ProviderBudgetConfig {
         id: "kimi-for-coding".to_string(),
         max_hour_cents: Some(100),
@@ -455,6 +460,7 @@ async fn record_telemetry_ignores_zero_cost_and_unknown_model() {
         providers,
         None,
         vec![agent_with_model("worker", "kimi-for-coding/k2p5")],
+        _tmp.path().to_path_buf(),
     );
     let orch = AgentOrchestrator::new(config).expect("build orchestrator");
     let tracker = orch
@@ -504,6 +510,7 @@ async fn provider_budget_persistence_round_trip_via_orchestrator() {
     // Drive the tracker through the orchestrator, persist, then build
     // a new orchestrator from the same config + state file and verify
     // the counters carry across the "restart".
+    let _tmp = tempfile::tempdir().unwrap();
     let tmp = tempfile::NamedTempFile::new().unwrap();
     let state_path = tmp.path().to_path_buf();
     drop(tmp);
@@ -521,6 +528,7 @@ async fn provider_budget_persistence_round_trip_via_orchestrator() {
             providers.clone(),
             Some(state_path.clone()),
             vec![agent_with_model("worker", "opencode-go/minimax-m2.5")],
+            _tmp.path().to_path_buf(),
         );
         let orch = AgentOrchestrator::new(config).expect("build orchestrator");
         orch.record_telemetry_for_test(vec![(
@@ -540,6 +548,7 @@ async fn provider_budget_persistence_round_trip_via_orchestrator() {
         providers,
         Some(state_path.clone()),
         vec![agent_with_model("worker", "opencode-go/minimax-m2.5")],
+        _tmp.path().to_path_buf(),
     );
     let orch2 = AgentOrchestrator::new(config2).expect("rebuild orchestrator");
     let snap = orch2

@@ -240,15 +240,16 @@ fn parse_config_from_output(output: &str) -> Result<serde_json::Value> {
 
 /// Clean up test files
 fn cleanup_test_files() -> Result<()> {
+    let tmp = std::env::temp_dir();
     let test_dirs = vec![
-        "/tmp/terraphim_sqlite",
-        "/tmp/dashmaptest",
-        "/tmp/terraphim_rocksdb",
-        "/tmp/opendal",
+        tmp.join("terraphim_sqlite"),
+        tmp.join("dashmaptest"),
+        tmp.join("terraphim_rocksdb"),
+        tmp.join("opendal"),
     ];
 
-    for dir in test_dirs {
-        if Path::new(dir).exists() {
+    for dir in &test_dirs {
+        if dir.exists() {
             let _ = fs::remove_dir_all(dir);
         }
     }

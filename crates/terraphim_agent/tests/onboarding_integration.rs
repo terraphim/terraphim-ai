@@ -102,11 +102,15 @@ fn test_local_notes_requires_path() {
 fn test_local_notes_with_path() {
     use terraphim_agent::onboarding::apply_template;
 
-    let role = apply_template("local-notes", Some("/tmp/test-notes"))
+    let temp_dir = tempfile::tempdir().expect("failed to create tempdir");
+    let test_path = temp_dir.path().join("test-notes");
+    let test_path_str = test_path.to_str().expect("path should be valid utf-8");
+
+    let role = apply_template("local-notes", Some(test_path_str))
         .expect("Should apply template with path");
 
     assert_eq!(role.name.to_string(), "Local Notes");
-    assert_eq!(role.haystacks[0].location, "/tmp/test-notes");
+    assert_eq!(role.haystacks[0].location, test_path_str);
     assert_eq!(role.haystacks[0].service, ServiceType::Ripgrep);
 }
 

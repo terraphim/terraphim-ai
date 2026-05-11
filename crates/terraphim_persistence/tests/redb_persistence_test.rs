@@ -114,7 +114,12 @@ async fn test_redb_error_handling() -> Result<(), Box<dyn std::error::Error>> {
         server_hostname: "localhost:8000".to_string(),
         api_endpoint: "http://localhost:8000/api".to_string(),
         initialized: false,
-        default_data_path: "/tmp/test_invalid".to_string(),
+        default_data_path: tempfile::Builder::new()
+            .prefix("test_invalid")
+            .tempdir()?
+            .into_path()
+            .to_string_lossy()
+            .to_string(),
         profiles,
         role_config: None,
         default_role: None,

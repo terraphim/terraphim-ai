@@ -98,13 +98,15 @@ mod tests {
 
     #[test]
     fn workspace_config_default_timeout() {
-        let config = WorkspaceConfig::new(PathBuf::from("/tmp/work"));
+        let dir = tempfile::tempdir().unwrap();
+        let config = WorkspaceConfig::new(dir.path().to_path_buf());
         assert_eq!(config.hook_timeout_ms, 60000);
     }
 
     #[test]
     fn workspace_config_builder() {
-        let config = WorkspaceConfig::new(PathBuf::from("/tmp/work"))
+        let dir = tempfile::tempdir().unwrap();
+        let config = WorkspaceConfig::new(dir.path().to_path_buf())
             .with_hook_timeout_ms(30000)
             .with_hooks(
                 HooksConfig::new()

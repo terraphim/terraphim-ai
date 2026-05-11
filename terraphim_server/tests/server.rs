@@ -24,6 +24,11 @@ mod tests {
     fn sample_config() -> Config {
         let automata_path = AutomataPath::from_local("fixtures/term_to_id.json");
         let haystack = "fixtures/haystack".to_string();
+        let system_operator_pages = tempfile::Builder::new()
+            .prefix("system_operator_pages")
+            .tempdir()
+            .expect("failed to create tempdir")
+            .into_path();
 
         ConfigBuilder::new()
             .global_shortcut("Ctrl+X")
@@ -58,7 +63,7 @@ mod tests {
                         automata_path: Some(automata_path.clone()),
                         knowledge_graph_local: Some(KnowledgeGraphLocal {
                             input_type: KnowledgeGraphInputType::Markdown,
-                            path: PathBuf::from("/tmp/system_operator/pages/"),
+                            path: system_operator_pages.clone(),
                         }),
                         public: true,
                         publish: true,
@@ -86,7 +91,7 @@ mod tests {
                         automata_path: Some(automata_path),
                         knowledge_graph_local: Some(KnowledgeGraphLocal {
                             input_type: KnowledgeGraphInputType::Markdown,
-                            path: PathBuf::from("/tmp/system_operator/pages/"),
+                            path: system_operator_pages,
                         }),
                         public: true,
                         publish: true,

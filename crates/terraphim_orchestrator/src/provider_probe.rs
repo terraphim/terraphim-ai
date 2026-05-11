@@ -4,13 +4,14 @@
 //! health state (Closed/Open/HalfOpen). The probe executes `action::` templates
 //! from KG routing rules via CLI tools to test the full stack.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
 
 use terraphim_spawner::health::{CircuitBreaker, CircuitBreakerConfig, CircuitState, HealthStatus};
 use tracing::{debug, info, warn};
 
 use crate::kg_router::KgRouter;
+use crate::rate_limiter::RateLimiter;
 
 /// Result of probing a single provider+model combination.
 #[derive(Debug, Clone, serde::Serialize)]
@@ -31,20 +32,18 @@ pub enum ProbeStatus {
     Success,
     Error,
     Timeout,
+    RateLimited,
 }
 
 /// Cached provider availability map with TTL-based refresh.
 pub struct ProviderHealthMap {
-    /// Per-provider circuit breakers.
     breakers: HashMap<String, CircuitBreaker>,
-    /// Latest probe results.
     results: Vec<ProbeResult>,
-    /// When the last probe ran.
     probed_at: Option<Instant>,
-    /// How long probe results are valid.
     ttl: Duration,
-    /// Circuit breaker configuration.
     cb_config: CircuitBreakerConfig,
+    rate_limited: HashSet<String>,
+    rate_limiter: Option<RateLimiter>,
 }
 
 impl std::fmt::Debug for ProviderHealthMap {
@@ -70,7 +69,18 @@ impl ProviderHealthMap {
                 cooldown: Duration::from_secs(300),
                 success_threshold: 1,
             },
+            rate_limited: HashSet::new(),
+            rate_limiter: None,
         }
+    }
+
+    pub fn with_rate_limiter(mut self, rate_limiter: RateLimiter) -> Self {
+        self.rate_limiter = Some(rate_limiter);
+        self
+    }
+
+    pub fn is_rate_limited(&self, provider: &str) -> bool {
+        self.rate_limited.contains(provider)
     }
 
     /// Check if cached probe results have expired.
@@ -106,6 +116,17 @@ impl ProviderHealthMap {
                         provider = %rule.provider,
                         model = %rule.model,
                         "probe skipped: circuit breaker open"
+                    );
+                    continue;
+                }
+            }
+
+            if let Some(ref rate_limiter) = self.rate_limiter {
+                if rate_limiter.is_rate_limited(&rule.provider) {
+                    debug!(
+                        provider = %rule.provider,
+                        model = %rule.model,
+                        "probe skipped: rate-limited"
                     );
                     continue;
                 }
@@ -157,6 +178,12 @@ impl ProviderHealthMap {
                     }
                 }
                 ProbeStatus::Timeout => breaker.record_failure(),
+                ProbeStatus::RateLimited => {
+                    if let Some(ref rate_limiter) = self.rate_limiter {
+                        rate_limiter.record_rate_limit(&result.provider);
+                    }
+                    self.rate_limited.insert(result.provider.clone());
+                }
             }
         }
 
@@ -190,6 +217,7 @@ impl ProviderHealthMap {
                 ProbeStatus::Success => HealthStatus::Healthy,
                 ProbeStatus::Error => HealthStatus::Unhealthy,
                 ProbeStatus::Timeout => HealthStatus::Unhealthy,
+                ProbeStatus::RateLimited => HealthStatus::Unhealthy,
             };
         }
 
@@ -623,6 +651,45 @@ async fn probe_single(provider: &str, model: &str, action_template: Option<&str>
                 timestamp,
             }
         }
+    }
+}
+
+impl ProviderHealthMap {
+    pub async fn send_to_quickwit(
+        &self,
+        sink: &crate::quickwit::QuickwitFleetSink,
+        project_id: &str,
+    ) {
+        for result in &self.results {
+            let doc = crate::quickwit::LogDocument {
+                timestamp: result.timestamp.clone(),
+                project_id: project_id.to_string(),
+                level: match result.status {
+                    ProbeStatus::Success => "INFO".to_string(),
+                    _ => "WARN".to_string(),
+                },
+                agent_name: "probe".to_string(),
+                layer: "Core".to_string(),
+                source: "probe".to_string(),
+                message: result
+                    .error
+                    .clone()
+                    .unwrap_or_else(|| format!("probe {:?}", result.status)),
+                model: Some(result.model.clone()),
+                cost_usd: Some(0.0),
+                latency_ms: result.latency_ms,
+                exit_class: Some(format!("{:?}", result.status).to_lowercase()),
+                is_free: true,
+                ..Default::default()
+            };
+            if let Err(e) = sink.send(doc).await {
+                warn!(error = %e, "failed to send probe result to Quickwit");
+            }
+        }
+        info!(
+            results = self.results.len(),
+            "probe results sent to Quickwit"
+        );
     }
 }
 
