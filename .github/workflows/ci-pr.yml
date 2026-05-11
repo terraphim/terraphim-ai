@@ -360,7 +360,7 @@ jobs:
       - name: Run unit tests
         run: |
           # Run unit tests (rocksdb feature disabled in CI, zlob enabled for fff-search)
-          /home/alex/.local/bin/rch exec -- cargo test --workspace --lib --bins --features zlob -- --test-threads=2
+          /home/alex/.local/bin/rch exec -- cargo test --workspace --no-fail-fast --lib --bins --features zlob -- --test-threads=2
 
       - name: sccache stats
         if: always()
