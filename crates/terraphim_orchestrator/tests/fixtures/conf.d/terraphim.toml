@@ -2301,3 +2301,33 @@ echo "pr-test-guardian: posted adf/test status state=$STATE"
 '''
 
 
+
+[[agents]]
+name = "build-runner-llm"
+layer = "Growth"
+cli_tool = "/bin/bash"
+model = "haiku"
+fallback_model = "zai-coding-plan/glm-5-turbo"
+max_cpu_seconds = 1800
+grace_period_secs = 30
+event_only = true
+project = "terraphim-ai"
+capabilities = ["build", "test", "adaptive-ci"]
+task = """source ~/.profile
+
+## build-runner-llm: Fast/cheap LLM build runner
+## Part of Epic #1423: fast/cheap LLM build-runner
+##
+## Architecture: KG-first (DevOpsRunner role)
+## - Phase 1: Query terraphim-agent learnings
+## - Phase 2: Extract commands from CI config (GitHub Actions, Earthfile, Makefile)
+## - Phase 3: Transform via terraphim-agent replace (cargo -> rch, npm -> bun)
+## - Phase 4: Validate against whitelist
+## - Phase 5: Execute and post status
+
+export GITEA_URL=https://git.terraphim.cloud
+export PATH="$HOME/.cargo/bin:$HOME/.local/bin:$HOME/bin:$HOME/.bun/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+
+# Execute build-runner-llm.sh
+bash /home/alex/terraphim-ai/scripts/build-runner-llm.sh
+"""

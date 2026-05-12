@@ -234,7 +234,8 @@ fn auto_merge_depth(orch: &AgentOrchestrator) -> u64 {
 
 #[tokio::test]
 async fn auto_merge_success_enqueues_post_merge_gate() {
-    let mut orch = AgentOrchestrator::new(minimal_config(tempfile::tempdir().unwrap().into_path())).unwrap();
+    let mut orch =
+        AgentOrchestrator::new(minimal_config(tempfile::tempdir().unwrap().into_path())).unwrap();
 
     let executor = RecordingExecutor::new(
         vec![pr(101, "2ef451d8", 42)],
@@ -287,7 +288,8 @@ async fn auto_merge_success_enqueues_post_merge_gate() {
 
 #[tokio::test]
 async fn auto_merge_skipped_when_head_sha_changed() {
-    let mut orch = AgentOrchestrator::new(minimal_config(tempfile::tempdir().unwrap().into_path())).unwrap();
+    let mut orch =
+        AgentOrchestrator::new(minimal_config(tempfile::tempdir().unwrap().into_path())).unwrap();
 
     // Live PR has a DIFFERENT head sha from the dispatch payload.
     let executor = RecordingExecutor::new(
@@ -329,7 +331,8 @@ async fn auto_merge_skipped_when_head_sha_changed() {
 
 #[tokio::test]
 async fn auto_merge_failure_opens_adf_issue() {
-    let mut orch = AgentOrchestrator::new(minimal_config(tempfile::tempdir().unwrap().into_path())).unwrap();
+    let mut orch =
+        AgentOrchestrator::new(minimal_config(tempfile::tempdir().unwrap().into_path())).unwrap();
 
     let executor = RecordingExecutor::new(
         vec![pr(303, "2ef451d8", 42)],
@@ -390,7 +393,8 @@ async fn auto_merge_failure_opens_adf_issue() {
 
 #[tokio::test]
 async fn auto_merge_marks_dedupe_set_on_success() {
-    let mut orch = AgentOrchestrator::new(minimal_config(tempfile::tempdir().unwrap().into_path())).unwrap();
+    let mut orch =
+        AgentOrchestrator::new(minimal_config(tempfile::tempdir().unwrap().into_path())).unwrap();
 
     let executor = RecordingExecutor::new(
         vec![pr(404, "2ef451d8", 42)],
@@ -425,7 +429,8 @@ async fn auto_merge_marks_dedupe_set_on_success() {
 
 #[tokio::test]
 async fn auto_merge_skipped_when_pr_already_closed() {
-    let mut orch = AgentOrchestrator::new(minimal_config(tempfile::tempdir().unwrap().into_path())).unwrap();
+    let mut orch =
+        AgentOrchestrator::new(minimal_config(tempfile::tempdir().unwrap().into_path())).unwrap();
 
     // The open-PR list does NOT contain PR 505 — someone already merged or
     // closed it between the verdict and this tick.

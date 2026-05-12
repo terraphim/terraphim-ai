@@ -44,7 +44,11 @@ fn project_agent(name: &str, project: Option<&str>) -> AgentDefinition {
     }
 }
 
-fn test_config_with_pause(pause_dir: PathBuf, threshold: u32, working_dir: PathBuf) -> OrchestratorConfig {
+fn test_config_with_pause(
+    pause_dir: PathBuf,
+    threshold: u32,
+    working_dir: PathBuf,
+) -> OrchestratorConfig {
     let worktree_root = working_dir.join(".worktrees");
     OrchestratorConfig {
         working_dir,

@@ -103,10 +103,7 @@ impl QuickwitEsBulkSink {
     /// Send a batch of documents using ES bulk API.
     ///
     /// Returns the number of successfully indexed documents.
-    pub async fn send_batch(
-        &self,
-        documents: Vec<LogDocument>,
-    ) -> Result<usize, QuickwitError> {
+    pub async fn send_batch(&self, documents: Vec<LogDocument>) -> Result<usize, QuickwitError> {
         if documents.is_empty() {
             return Ok(0);
         }
@@ -157,13 +154,12 @@ impl QuickwitEsBulkSink {
         }
 
         // Parse response to count successes
-        let bulk_response: BulkResponse =
-            serde_json::from_str(&response_body).map_err(|e| {
-                QuickwitError::SerializationError(format!(
-                    "failed to parse bulk response: {} (body: {})",
-                    e, response_body
-                ))
-            })?;
+        let bulk_response: BulkResponse = serde_json::from_str(&response_body).map_err(|e| {
+            QuickwitError::SerializationError(format!(
+                "failed to parse bulk response: {} (body: {})",
+                e, response_body
+            ))
+        })?;
 
         let success_count = bulk_response
             .items
@@ -217,8 +213,7 @@ impl QuickwitEsBulkSink {
     }
 
     /// Build the NDJSON bulk body.
-    fn build_bulk_body(&self, documents: &[LogDocument]
-    ) -> Result<String, serde_json::Error> {
+    fn build_bulk_body(&self, documents: &[LogDocument]) -> Result<String, serde_json::Error> {
         let mut body = String::new();
 
         for doc in documents {
@@ -254,18 +249,16 @@ mod tests {
             "test-index".to_string(),
         );
 
-        let docs = vec![
-            LogDocument {
-                timestamp: "2026-05-11T10:00:00Z".to_string(),
-                project_id: "test".to_string(),
-                level: "INFO".to_string(),
-                agent_name: "test-agent".to_string(),
-                layer: "Core".to_string(),
-                source: "orchestrator".to_string(),
-                message: "test message".to_string(),
-                ..Default::default()
-            },
-        ];
+        let docs = vec![LogDocument {
+            timestamp: "2026-05-11T10:00:00Z".to_string(),
+            project_id: "test".to_string(),
+            level: "INFO".to_string(),
+            agent_name: "test-agent".to_string(),
+            layer: "Core".to_string(),
+            source: "orchestrator".to_string(),
+            message: "test message".to_string(),
+            ..Default::default()
+        }];
 
         let body = sink.build_bulk_body(&docs).unwrap();
         assert!(body.contains("\"index\""));
@@ -275,10 +268,8 @@ mod tests {
 
     #[test]
     fn test_bulk_url() {
-        let sink = QuickwitEsBulkSink::new(
-            "http://localhost:7280".to_string(),
-            "adf-logs".to_string(),
-        );
+        let sink =
+            QuickwitEsBulkSink::new("http://localhost:7280".to_string(), "adf-logs".to_string());
         assert_eq!(
             sink.bulk_url(),
             "http://localhost:7280/api/v1/_elastic/adf-logs/_bulk?refresh=true"

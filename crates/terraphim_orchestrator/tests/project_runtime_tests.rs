@@ -126,7 +126,7 @@ task = "t"
 "#,
         base = base
     );
-    let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+    let config = OrchestratorConfig::from_toml(&toml_str).unwrap();
     let poster = OutputPoster::from_orchestrator_config(&config).expect("legacy poster constructs");
 
     // Legacy project id resolves the top-level tracker.
@@ -170,7 +170,7 @@ project = "alpha"
 "#,
         base = base
     );
-    let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+    let config = OrchestratorConfig::from_toml(&toml_str).unwrap();
     assert!(OutputPoster::from_orchestrator_config(&config).is_none());
 }
 
