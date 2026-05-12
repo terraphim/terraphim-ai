@@ -87,4 +87,16 @@ pub enum OrchestratorError {
 
     #[error("include glob '{pattern}' is invalid: {reason}")]
     InvalidIncludeGlob { pattern: String, reason: String },
+
+    #[error("agent '{agent}' {field} value {value}s is outside allowed range [{min}s, {max}s]")]
+    AgentFieldOutOfRange {
+        agent: String,
+        field: String,
+        value: u64,
+        min: u64,
+        max: u64,
+    },
+
+    #[error("nightwatch probe_ttl_secs {value}s is below minimum {min}s (rate-limit protection)")]
+    ProbeTtlTooShort { value: u64, min: u64 },
 }

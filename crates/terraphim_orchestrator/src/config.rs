@@ -29,6 +29,12 @@ fn default_pre_check_timeout() -> u64 {
     60
 }
 
+const GRACE_PERIOD_MIN_SECS: u64 = 5;
+const GRACE_PERIOD_MAX_SECS: u64 = 300;
+const MAX_CPU_MIN_SECS: u64 = 60;
+const MAX_CPU_MAX_SECS: u64 = 7200;
+const PROBE_TTL_MIN_SECS: u64 = 60;
+
 /// Definition of a single project within a multi-project fleet.
 ///
 /// Each project carries its own working directory, Gitea target, mention
@@ -1373,6 +1379,46 @@ impl OrchestratorConfig {
             }
             if let Some(model) = &agent.fallback_model {
                 validate_model_provider(&agent.name, "fallback_model", model)?;
+            }
+        }
+
+        // D2: grace_period_secs range validation (5s - 300s)
+        for agent in &self.agents {
+            if let Some(grace) = agent.grace_period_secs {
+                if !(GRACE_PERIOD_MIN_SECS..=GRACE_PERIOD_MAX_SECS).contains(&grace) {
+                    return Err(crate::error::OrchestratorError::AgentFieldOutOfRange {
+                        agent: agent.name.clone(),
+                        field: "grace_period_secs".into(),
+                        value: grace,
+                        min: GRACE_PERIOD_MIN_SECS,
+                        max: GRACE_PERIOD_MAX_SECS,
+                    });
+                }
+            }
+        }
+
+        // D3: max_cpu_seconds range validation (60s - 7200s)
+        for agent in &self.agents {
+            if let Some(cpu) = agent.max_cpu_seconds {
+                if !(MAX_CPU_MIN_SECS..=MAX_CPU_MAX_SECS).contains(&cpu) {
+                    return Err(crate::error::OrchestratorError::AgentFieldOutOfRange {
+                        agent: agent.name.clone(),
+                        field: "max_cpu_seconds".into(),
+                        value: cpu,
+                        min: MAX_CPU_MIN_SECS,
+                        max: MAX_CPU_MAX_SECS,
+                    });
+                }
+            }
+        }
+
+        // D4: RoutingConfig probe_ttl_secs minimum validation (60s) if routing is enabled
+        if let Some(ref routing) = self.routing {
+            if routing.probe_ttl_secs < PROBE_TTL_MIN_SECS {
+                return Err(crate::error::OrchestratorError::ProbeTtlTooShort {
+                    value: routing.probe_ttl_secs,
+                    min: PROBE_TTL_MIN_SECS,
+                });
             }
         }
 
@@ -2835,5 +2881,217 @@ task = "build"
             // Should silently log debug and return without panic.
             super::super::warn_if_world_readable(path);
         }
+    }
+
+    // === D2: grace_period_secs validation tests ===
+
+    #[test]
+    fn test_validate_grace_period_too_low() {
+        let toml_str = r#"
+working_dir = "/tmp"
+[nightwatch]
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+[[agents]]
+name = "test-agent"
+layer = "Safety"
+cli_tool = "echo"
+task = "test"
+grace_period_secs = 2
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        let err = config.validate().unwrap_err();
+        assert!(matches!(
+            err,
+            crate::error::OrchestratorError::AgentFieldOutOfRange {
+                ref field,
+                ..
+            } if field == "grace_period_secs"
+        ));
+    }
+
+    #[test]
+    fn test_validate_grace_period_too_high() {
+        let toml_str = r#"
+working_dir = "/tmp"
+[nightwatch]
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+[[agents]]
+name = "test-agent"
+layer = "Safety"
+cli_tool = "echo"
+task = "test"
+grace_period_secs = 500
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        let err = config.validate().unwrap_err();
+        assert!(matches!(
+            err,
+            crate::error::OrchestratorError::AgentFieldOutOfRange {
+                ref field,
+                ..
+            } if field == "grace_period_secs"
+        ));
+    }
+
+    #[test]
+    fn test_validate_grace_period_in_range() {
+        let toml_str = r#"
+working_dir = "/tmp"
+[nightwatch]
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+[[agents]]
+name = "test-agent"
+layer = "Safety"
+cli_tool = "echo"
+task = "test"
+grace_period_secs = 30
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        assert!(config.validate().is_ok());
+    }
+
+    // === D3: max_cpu_seconds validation tests ===
+
+    #[test]
+    fn test_validate_max_cpu_too_low() {
+        let toml_str = r#"
+working_dir = "/tmp"
+[nightwatch]
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+[[agents]]
+name = "test-agent"
+layer = "Safety"
+cli_tool = "echo"
+task = "test"
+max_cpu_seconds = 30
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        let err = config.validate().unwrap_err();
+        assert!(matches!(
+            err,
+            crate::error::OrchestratorError::AgentFieldOutOfRange {
+                ref field,
+                ..
+            } if field == "max_cpu_seconds"
+        ));
+    }
+
+    #[test]
+    fn test_validate_max_cpu_too_high() {
+        let toml_str = r#"
+working_dir = "/tmp"
+[nightwatch]
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+[[agents]]
+name = "test-agent"
+layer = "Safety"
+cli_tool = "echo"
+task = "test"
+max_cpu_seconds = 10000
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        let err = config.validate().unwrap_err();
+        assert!(matches!(
+            err,
+            crate::error::OrchestratorError::AgentFieldOutOfRange {
+                ref field,
+                ..
+            } if field == "max_cpu_seconds"
+        ));
+    }
+
+    #[test]
+    fn test_validate_max_cpu_in_range() {
+        let toml_str = r#"
+working_dir = "/tmp"
+[nightwatch]
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+[[agents]]
+name = "test-agent"
+layer = "Safety"
+cli_tool = "echo"
+task = "test"
+max_cpu_seconds = 3600
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        assert!(config.validate().is_ok());
+    }
+
+    // === D4: RoutingConfig probe_ttl_secs validation tests ===
+
+    #[test]
+    fn test_validate_probe_ttl_too_short() {
+        let toml_str = r#"
+working_dir = "/tmp"
+[nightwatch]
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+[routing]
+taxonomy_path = "/tmp/taxonomy"
+probe_ttl_secs = 30
+[[agents]]
+name = "test-agent"
+layer = "Safety"
+cli_tool = "echo"
+task = "test"
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        let err = config.validate().unwrap_err();
+        assert!(matches!(
+            err,
+            crate::error::OrchestratorError::ProbeTtlTooShort { .. }
+        ));
+    }
+
+    #[test]
+    fn test_validate_probe_ttl_in_range() {
+        let toml_str = r#"
+working_dir = "/tmp"
+[nightwatch]
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+[routing]
+taxonomy_path = "/tmp/taxonomy"
+probe_ttl_secs = 120
+[[agents]]
+name = "test-agent"
+layer = "Safety"
+cli_tool = "echo"
+task = "test"
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn test_validate_no_routing_no_probe_validation() {
+        let toml_str = r#"
+working_dir = "/tmp"
+[nightwatch]
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+[[agents]]
+name = "test-agent"
+layer = "Safety"
+cli_tool = "echo"
+task = "test"
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        assert!(config.validate().is_ok());
     }
 }
