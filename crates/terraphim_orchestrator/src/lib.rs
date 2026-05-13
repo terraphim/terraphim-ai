@@ -1107,11 +1107,22 @@ impl AgentOrchestrator {
 
             let agent_names: Vec<String> =
                 self.config.agents.iter().map(|a| a.name.clone()).collect();
+            let project_by_repo: std::collections::HashMap<String, String> = self
+                .config
+                .projects
+                .iter()
+                .filter_map(|p| {
+                    p.gitea
+                        .as_ref()
+                        .map(|g| (format!("{}/{}", g.owner, g.repo), p.id.clone()))
+                })
+                .collect();
             let state = webhook::WebhookState {
                 agent_names,
                 persona_registry: Arc::new(self.persona_registry.clone()),
                 dispatch_tx,
                 secret: webhook_cfg.secret.clone(),
+                project_by_repo,
             };
 
             let router = webhook::webhook_router(state);
@@ -1218,23 +1229,7 @@ impl AgentOrchestrator {
                 Ok(LoopEvent::Webhook(dispatch)) => {
                     let comment_id = dispatch.comment_id();
                     self.handle_webhook_dispatch(dispatch).await;
-                    let project_ids: Vec<String> = if self.config.projects.is_empty() {
-                        vec![dispatcher::LEGACY_PROJECT_ID.to_string()]
-                    } else {
-                        self.config.projects.iter().map(|p| p.id.clone()).collect()
-                    };
-                    for pid in &project_ids {
-                        let cursor = self
-                            .mention_cursors
-                            .entry(pid.clone())
-                            .or_insert_with(mention::MentionCursor::now);
-                        cursor.mark_processed(comment_id);
-                    }
-                    for pid in &project_ids {
-                        if let Some(cursor) = self.mention_cursors.get(pid) {
-                            cursor.save(pid).await;
-                        }
-                    }
+                    self.mark_webhook_comment_processed(comment_id).await;
                     let _ = loop_tx.lock().unwrap().send(LoopEvent::Tick);
                 }
                 Ok(LoopEvent::Schedule(event)) => {
@@ -1244,6 +1239,27 @@ impl AgentOrchestrator {
                     self.handle_drift_alert(alert).await;
                 }
                 Ok(LoopEvent::Tick) => {
+                    loop {
+                        match loop_rx.try_recv() {
+                            Ok(LoopEvent::Webhook(dispatch)) => {
+                                let comment_id = dispatch.comment_id();
+                                self.handle_webhook_dispatch(dispatch).await;
+                                self.mark_webhook_comment_processed(comment_id).await;
+                            }
+                            Ok(LoopEvent::Schedule(event)) => {
+                                self.handle_schedule_event(event).await;
+                            }
+                            Ok(LoopEvent::DriftAlert(alert)) => {
+                                self.handle_drift_alert(alert).await;
+                            }
+                            Ok(LoopEvent::Tick) => {
+                                // Coalesce stale ticks so long reconciliation runs do not
+                                // starve webhook and schedule events queued behind them.
+                            }
+                            Err(std::sync::mpsc::TryRecvError::Empty) => break,
+                            Err(std::sync::mpsc::TryRecvError::Disconnected) => break,
+                        }
+                    }
                     match tokio::time::timeout(reconcile_timeout, self.reconcile_tick()).await {
                         Ok(()) => {}
                         Err(_) => {
@@ -1279,6 +1295,26 @@ impl AgentOrchestrator {
     pub fn shutdown(&mut self) {
         info!("shutdown requested");
         self.shutdown_requested = true;
+    }
+
+    async fn mark_webhook_comment_processed(&mut self, comment_id: u64) {
+        let project_ids: Vec<String> = if self.config.projects.is_empty() {
+            vec![dispatcher::LEGACY_PROJECT_ID.to_string()]
+        } else {
+            self.config.projects.iter().map(|p| p.id.clone()).collect()
+        };
+        for pid in &project_ids {
+            let cursor = self
+                .mention_cursors
+                .entry(pid.clone())
+                .or_insert_with(mention::MentionCursor::now);
+            cursor.mark_processed(comment_id);
+        }
+        for pid in &project_ids {
+            if let Some(cursor) = self.mention_cursors.get(pid) {
+                cursor.save(pid).await;
+            }
+        }
     }
 
     /// Get current status of all agents.
@@ -1969,8 +2005,18 @@ impl AgentOrchestrator {
         // Create isolated git worktree for implementation-tier agents that modify code.
         // Review-tier agents (haiku) are read-only and don't need isolation.
         let needs_isolation = model.as_ref().map(|m| !m.contains("haiku")).unwrap_or(true);
+
+        // Resolve the git repo directory for worktree operations. Project-bound
+        // agents need a worktree from their own repo, not the orchestrator's.
+        let repo_dir: &Path = def
+            .project
+            .as_deref()
+            .and_then(|pid| self.config.project_by_id(pid))
+            .map(|p| p.working_dir.as_path())
+            .unwrap_or(&self.config.working_dir);
+
         let (worktree_path, worktree_guard) = if needs_isolation {
-            if let Some(path) = self.create_agent_worktree(&def.name).await {
+            if let Some(path) = self.create_agent_worktree(&def.name, repo_dir).await {
                 let guard = crate::worktree_guard::WorktreeGuard::new(&path);
                 (Some(path), Some(guard))
             } else {
@@ -1979,10 +2025,7 @@ impl AgentOrchestrator {
         } else {
             (None, None)
         };
-        let agent_working_dir = worktree_path
-            .as_ref()
-            .unwrap_or(&self.config.working_dir)
-            .clone();
+        let agent_working_dir = worktree_path.as_deref().unwrap_or(repo_dir).to_path_buf();
 
         // Build primary Provider from the agent definition for the spawner.
         let primary_provider = terraphim_types::capability::Provider {
@@ -5273,9 +5316,13 @@ impl AgentOrchestrator {
 
     /// Create a git worktree for an agent to work in isolation.
     ///
+    /// `repo_dir` is the git repository root where `git worktree add` runs.
+    /// For project-bound agents this is the project's working_dir; otherwise
+    /// it is the orchestrator's top-level working_dir.
+    ///
     /// Returns the worktree path if successful, None if worktree creation fails
     /// (fail-open: agent uses shared working_dir instead).
-    async fn create_agent_worktree(&self, agent_name: &str) -> Option<PathBuf> {
+    async fn create_agent_worktree(&self, agent_name: &str, repo_dir: &Path) -> Option<PathBuf> {
         let worktree_root = PathBuf::from("/tmp/adf-worktrees");
         if let Err(e) = tokio::fs::create_dir_all(&worktree_root).await {
             warn!(agent = %agent_name, error = %e, "failed to create worktree root");
@@ -5293,7 +5340,7 @@ impl AgentOrchestrator {
                 &worktree_path.to_string_lossy(),
                 "HEAD",
             ])
-            .current_dir(&self.config.working_dir)
+            .current_dir(repo_dir)
             .output()
             .await;
 
@@ -5302,6 +5349,7 @@ impl AgentOrchestrator {
                 info!(
                     agent = %agent_name,
                     path = %worktree_path.display(),
+                    repo = %repo_dir.display(),
                     "created isolated git worktree"
                 );
                 Some(worktree_path)
@@ -5323,7 +5371,7 @@ impl AgentOrchestrator {
     }
 
     /// Remove a git worktree after an agent finishes.
-    async fn remove_agent_worktree(&self, agent_name: &str, worktree_path: &Path) {
+    async fn remove_agent_worktree(&self, agent_name: &str, worktree_path: &Path, repo_dir: &Path) {
         // Force-remove even if there are uncommitted changes (they were already
         // committed by try_commit_agent_work or are intentionally discarded).
         let output = tokio::process::Command::new("git")
@@ -5333,7 +5381,7 @@ impl AgentOrchestrator {
                 "--force",
                 &worktree_path.to_string_lossy(),
             ])
-            .current_dir(&self.config.working_dir)
+            .current_dir(repo_dir)
             .output()
             .await;
 
@@ -6665,14 +6713,20 @@ impl AgentOrchestrator {
             self.record_project_meta_exit(&def, status).await;
 
             // Auto-commit in the agent's working directory (worktree or shared)
-            let commit_dir = worktree_path.as_deref().unwrap_or(&self.config.working_dir);
+            let project_repo: &Path = def
+                .project
+                .as_deref()
+                .and_then(|pid| self.config.project_by_id(pid))
+                .map(|p| p.working_dir.as_path())
+                .unwrap_or(&self.config.working_dir);
+            let commit_dir = worktree_path.as_deref().unwrap_or(project_repo);
             if status.success() {
                 self.try_commit_agent_work(&name, commit_dir).await;
             }
 
             // Clean up the worktree after committing
             if let Some(ref wt) = worktree_path {
-                self.remove_agent_worktree(&name, wt).await;
+                self.remove_agent_worktree(&name, wt, project_repo).await;
             }
         }
     }
