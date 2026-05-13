@@ -6633,7 +6633,31 @@ impl AgentOrchestrator {
                 };
 
                 if !respawned {
-                    self.handle_agent_exit(&name, &def, status);
+                    // KG routing failed or no healthy route - try configured fallback before giving up
+                    if def.fallback_provider.is_some() {
+                        info!(
+                            agent = %name,
+                            fallback_provider = ?def.fallback_provider,
+                            fallback_model = ?def.fallback_model,
+                            "KG routing failed, respawning with configured fallback provider"
+                        );
+                        let mut fallback_def = def.clone();
+                        if let Some(ref fb_provider) = def.fallback_provider {
+                            fallback_def.cli_tool = fb_provider.clone();
+                        }
+                        if let Some(ref fb_model) = def.fallback_model {
+                            fallback_def.model = Some(fb_model.clone());
+                        }
+                        fallback_def.provider = None;
+                        fallback_def.fallback_provider = None;
+                        fallback_def.fallback_model = None;
+                        if let Err(e) = self.spawn_agent(&fallback_def).await {
+                            error!(agent = %name, error = %e, "failed to respawn with fallback");
+                            self.handle_agent_exit(&name, &def, status);
+                        }
+                    } else {
+                        self.handle_agent_exit(&name, &def, status);
+                    }
                 }
             } else {
                 self.handle_agent_exit(&name, &def, status);
