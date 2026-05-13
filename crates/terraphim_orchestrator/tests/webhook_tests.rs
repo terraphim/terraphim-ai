@@ -13,6 +13,7 @@ fn make_state(
         persona_registry: Arc::new(PersonaRegistry::new()),
         dispatch_tx: tx,
         secret: secret.map(|s| s.to_string()),
+        project_by_repo: std::collections::HashMap::new(),
     };
     (state, rx)
 }

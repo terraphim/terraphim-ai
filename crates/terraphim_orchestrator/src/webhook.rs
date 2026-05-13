@@ -194,6 +194,7 @@ pub struct WebhookState {
     pub persona_registry: std::sync::Arc<PersonaRegistry>,
     pub dispatch_tx: tokio::sync::mpsc::Sender<WebhookDispatch>,
     pub secret: Option<String>,
+    pub project_by_repo: std::collections::HashMap<String, String>,
 }
 
 /// Create the webhook router.
@@ -286,10 +287,15 @@ async fn handle_gitea_webhook(
     // mentions (`@adf:project/name`) before the Aho-Corasick parser strips them.
     let mention_tokens = crate::mention::parse_mention_tokens(&payload.comment.body);
     // Map agent_name -> detected project for unqualified mentions resolved by parser.
+    // Derive the project from the webhook's repository full name (e.g. zestic-ai/odilo -> odilo).
+    let repo_derived_project: Option<String> = state
+        .project_by_repo
+        .get(&payload.repository.full_name)
+        .cloned();
     let unqualified_project_map: std::collections::HashMap<String, Option<String>> = mention_tokens
         .iter()
         .filter(|t| t.project.is_none())
-        .map(|t| (t.agent.clone(), None))
+        .map(|t| (t.agent.clone(), repo_derived_project.clone()))
         .collect();
 
     let commands = parser.parse_commands(
