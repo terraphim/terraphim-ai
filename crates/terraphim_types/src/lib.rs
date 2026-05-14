@@ -465,6 +465,7 @@ impl Display for Concept {
     }
 }
 
+/// Classifies a document by its role in the knowledge graph.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DocumentType {
@@ -474,6 +475,7 @@ pub enum DocumentType {
     ConfigDocument,
 }
 
+/// Routing directive specifying which LLM provider and model to use.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RouteDirective {
     pub provider: String,
@@ -486,6 +488,7 @@ pub struct RouteDirective {
     pub is_free: bool,
 }
 
+/// Parsed directives extracted from the YAML front matter of a markdown KG entry.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MarkdownDirectives {
     #[serde(default)]
@@ -624,6 +627,7 @@ impl Document {
     }
 }
 
+/// A directed relationship between two nodes in the knowledge graph.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Edge {
     /// ID of the edge (u64)
@@ -1583,6 +1587,7 @@ pub struct KGIndexInfo {
     pub version: Option<String>,
 }
 
+/// A single message in a conversation, including metadata for cost tracking.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
@@ -1887,6 +1892,7 @@ pub enum ContextUsageType {
 )]
 #[cfg_attr(feature = "typescript", derive(Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+/// A clamped priority value in the range 0–100 (higher = more urgent).
 pub struct Priority(pub u8);
 
 impl Priority {
