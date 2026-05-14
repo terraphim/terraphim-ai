@@ -41,6 +41,7 @@ pub mod dual_mode;
 pub mod error;
 pub mod error_signatures;
 pub mod flow;
+pub mod gitea_skill_loader;
 pub mod handoff;
 pub mod kg_router;
 pub mod learning;
@@ -308,6 +309,11 @@ pub struct AgentOrchestrator {
     /// Directory for per-agent output log files. Each completed agent run
     /// writes its stdout+stderr to `<agent_log_dir>/<name>-<timestamp>.log`.
     agent_log_dir: PathBuf,
+    /// Cache directory populated from Gitea at startup (issue #1434).
+    /// `None` when `gitea_skill_repo` is not configured. When `Some`, this
+    /// directory is prepended to the skill search path so remote skills
+    /// shadow local ones while local directories remain as fallback.
+    gitea_skill_cache_dir: Option<PathBuf>,
 }
 
 /// Build the composite restart-state key for an agent definition.
@@ -848,6 +854,7 @@ impl AgentOrchestrator {
                     config.working_dir.join("logs").join("agents")
                 }
             },
+            gitea_skill_cache_dir: None,
         })
     }
 
@@ -1080,6 +1087,15 @@ impl AgentOrchestrator {
 
         // Restore persisted telemetry from previous runs
         self.restore_telemetry().await;
+
+        // Populate Gitea skill cache if configured (issue #1434).
+        // On success, the cache dir becomes the first skill root.
+        // On any error, populate_skill_cache logs a warning and returns the
+        // cache dir path anyway; local skill roots are used as fallback.
+        if let Some(ref skill_repo) = self.config.gitea_skill_repo.clone() {
+            let cache_dir = gitea_skill_loader::populate_skill_cache(skill_repo, false).await;
+            self.gitea_skill_cache_dir = Some(cache_dir);
+        }
 
         // One-shot migration of the legacy top-level `adf/mention_cursor`
         // key into per-project keys. No-op after the first successful
@@ -1518,8 +1534,11 @@ impl AgentOrchestrator {
         }
 
         let home_dir = std::env::var("HOME").ok().map(std::path::PathBuf::from);
-        let skill_roots =
-            Self::skill_roots(self.config.skill_data_dir.as_deref(), home_dir.as_deref());
+        let skill_roots = Self::skill_roots(
+            self.config.skill_data_dir.as_deref(),
+            home_dir.as_deref(),
+            self.gitea_skill_cache_dir.as_deref(),
+        );
 
         if skill_roots.is_empty() {
             return String::new();
@@ -1653,14 +1672,30 @@ impl AgentOrchestrator {
         (section, ids)
     }
 
+    /// Build the ordered list of directories to search for SKILL.md files.
+    ///
+    /// Priority (highest first):
+    /// 1. Gitea skill cache dir (populated at startup from remote, if configured)
+    /// 2. Configured `skill_data_dir` from TOML
+    /// 3. `~/.opencode/skills`
+    /// 4. `~/.claude/skills`
     fn skill_roots(
         configured: Option<&std::path::Path>,
         home_dir: Option<&std::path::Path>,
+        gitea_cache: Option<&std::path::Path>,
     ) -> Vec<std::path::PathBuf> {
         let mut roots = Vec::new();
 
-        if let Some(dir) = configured {
+        // Remote skills take priority — operators push updates to Gitea
+        // without modifying local files.
+        if let Some(dir) = gitea_cache {
             roots.push(dir.to_path_buf());
+        }
+
+        if let Some(dir) = configured {
+            if !roots.iter().any(|r| r == dir) {
+                roots.push(dir.to_path_buf());
+            }
         }
 
         if let Some(home) = home_dir {
@@ -7833,6 +7868,7 @@ mod tests {
             handoff_buffer_ttl_secs: None,
             persona_data_dir: None,
             skill_data_dir: None,
+            gitea_skill_repo: None,
             flows: vec![],
             flow_state_dir: None,
             gitea: None,
@@ -8008,6 +8044,7 @@ task = "test"
         let roots = AgentOrchestrator::skill_roots(
             Some(configured_skill_root.path()),
             Some(home_dir.path()),
+            None,
         );
 
         assert_eq!(roots[0], configured_skill_root.path());
@@ -8069,6 +8106,7 @@ task = "test"
             handoff_buffer_ttl_secs: None,
             persona_data_dir: None,
             skill_data_dir: None,
+            gitea_skill_repo: None,
             flows: vec![],
             flow_state_dir: None,
             gitea: None,
@@ -9015,6 +9053,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             include: vec![],
             providers: vec![],
             provider_budget_state_file: None,
+            gitea_skill_repo: None,
             pause_dir: None,
             project_circuit_breaker_threshold: 3,
             fleet_escalation_owner: None,
