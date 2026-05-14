@@ -218,15 +218,33 @@ tea comment IDX "progress update" --repo terraphim/terraphim-ai
 tea issues close IDX --repo terraphim/terraphim-ai
 ```
 
+### Session Checkpoint (Mandatory Before Picking Work)
+
+Each agent session starts with zero memory of prior work. To prevent re-work loops, every implementation agent MUST run this checkpoint BEFORE picking any issue:
+
+```bash
+git fetch origin 2>/dev/null
+echo "=== Existing task branches ===" && git branch -r | grep "task/" || true
+echo "=== Open PRs ===" && gtr list-pulls --owner terraphim --repo terraphim-ai --state open 2>/dev/null | head -30
+```
+
+Rules:
+1. SKIP any issue where a remote branch or open PR already exists
+2. Pick the NEXT unblocked issue from `gtr ready` instead
+3. NEVER re-create a PR that already exists (409 Conflict = skip). Comment on the existing PR instead.
+
+This checkpoint is configured in all ADF developer agent task blocks (`conf.d/*.toml`) and MUST NOT be removed.
+
 ### Agent Workflow (Mandatory for All Agents)
 
 1. **Start**: `source ~/.profile` (load Gitea env vars)
-2. **Pick work**: `gitea-robot ready --owner terraphim --repo terraphim-ai` -- choose highest PageRank unblocked issue
-3. **Branch**: `git checkout -b task/IDX-short-title`
-4. **Implement**: TDD, commit with `Refs #IDX`
-5. **Update Gitea**: `tea comment IDX "Implementation complete. Summary." --repo terraphim/terraphim-ai`
-6. **PR**: Push branch, create PR on GitHub referencing `Refs terraphim/terraphim-ai#IDX (Gitea)`
-7. **Close**: `tea issues close IDX --repo terraphim/terraphim-ai` after merge
+2. **Checkpoint**: Run the session checkpoint above to skip already-in-progress issues
+3. **Pick work**: `gitea-robot ready --owner terraphim --repo terraphim-ai` -- choose highest PageRank unblocked issue
+4. **Branch**: `git checkout -b task/IDX-short-title`
+5. **Implement**: TDD, commit with `Refs #IDX`
+6. **Update Gitea**: `tea comment IDX "Implementation complete. Summary." --repo terraphim/terraphim-ai`
+7. **PR**: Push branch, create PR on GitHub referencing `Refs terraphim/terraphim-ai#IDX (Gitea)`
+8. **Close**: `tea issues close IDX --repo terraphim/terraphim-ai` after merge
 
 ### Commit Message Convention
 

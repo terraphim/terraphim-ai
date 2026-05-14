@@ -1,7 +1,7 @@
 //! Execution environment abstraction for RLM.
 //!
 //! This module defines the `ExecutionEnvironment` trait and related types that
-//! provide a unified interface for different execution backends (Firecracker, Docker, E2B).
+//! provide a unified interface for different execution backends (Firecracker, Docker, E2B, Local).
 //!
 //! ## Architecture
 //!
@@ -9,7 +9,8 @@
 //! ExecutionEnvironment trait
 //!     ├── FirecrackerExecutor (full VM isolation, requires KVM)
 //!     ├── DockerExecutor (container isolation, gVisor/runc)
-//!     └── E2bExecutor (cloud-hosted Firecracker)
+//!     ├── E2bExecutor (cloud-hosted Firecracker)
+//!     └── LocalExecutor (local process execution, no isolation)
 //! ```
 //!
 //! ## Backend Selection
@@ -21,11 +22,13 @@
 
 mod context;
 mod firecracker;
+mod local;
 mod ssh;
 mod r#trait;
 
 pub use context::{Capability, ExecutionContext, ExecutionResult, SnapshotId, ValidationResult};
 pub use firecracker::FirecrackerExecutor;
+pub use local::LocalExecutor;
 pub use ssh::SshExecutor;
 pub use r#trait::ExecutionEnvironment;
 
@@ -80,6 +83,7 @@ pub async fn select_executor(
             BackendType::Firecracker,
             BackendType::E2b,
             BackendType::Docker,
+            BackendType::Local,
         ]
     } else {
         config.backend_preference.clone()
@@ -92,7 +96,6 @@ pub async fn select_executor(
             BackendType::Firecracker if is_kvm_available() => {
                 log::info!("Selected Firecracker backend (KVM available)");
                 let executor = FirecrackerExecutor::new(config.clone())?;
-                // Initialize the executor to set up VmManager and SnapshotManager
                 if let Err(e) = executor.initialize().await {
                     log::warn!(
                         "Failed to initialize FirecrackerExecutor: {}. Trying next backend.",
@@ -110,7 +113,6 @@ pub async fn select_executor(
 
             BackendType::E2b if config.e2b_api_key.is_some() => {
                 log::info!("Selected E2B backend");
-                // E2B executor will be implemented in later phase
                 tried.push("e2b (not yet implemented)".to_string());
             }
             BackendType::E2b => {
@@ -123,12 +125,16 @@ pub async fn select_executor(
                     "Selected Docker backend (gVisor: {})",
                     is_gvisor_available()
                 );
-                // Docker executor will be implemented in later phase
                 tried.push("docker (not yet implemented)".to_string());
             }
             BackendType::Docker => {
                 log::debug!("Docker unavailable: daemon not running");
                 tried.push("docker (not available)".to_string());
+            }
+
+            BackendType::Local => {
+                log::info!("Selected Local backend (no isolation)");
+                return Ok(Box::new(LocalExecutor::new()));
             }
         }
     }

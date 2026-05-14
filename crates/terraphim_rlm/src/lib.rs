@@ -92,8 +92,8 @@ pub use budget::BudgetTracker;
 pub use config::{BackendType, KgStrictness, RlmConfig, SessionModel};
 pub use error::RlmError;
 pub use executor::{
-    Capability, ExecutionContext, ExecutionEnvironment, ExecutionResult, SnapshotId, SshExecutor,
-    ValidationResult,
+    Capability, ExecutionContext, ExecutionEnvironment, ExecutionResult, LocalExecutor, SnapshotId,
+    SshExecutor, ValidationResult,
 };
 pub use llm_bridge::{LlmBridge, LlmBridgeConfig, QueryRequest, QueryResponse};
 pub use logger::{TrajectoryEvent, TrajectoryLogger, TrajectoryLoggerConfig, read_trajectory_file};

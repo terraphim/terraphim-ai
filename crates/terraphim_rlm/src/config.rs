@@ -196,6 +196,7 @@ impl Default for RlmConfig {
                 BackendType::Firecracker,
                 BackendType::E2b,
                 BackendType::Docker,
+                BackendType::Local,
             ],
             e2b_api_key: None,
             e2b_template: None,
@@ -210,6 +211,10 @@ impl Default for RlmConfig {
                 },
                 BackendSessionConfig {
                     backend: BackendType::Docker,
+                    session_model: SessionModel::Affinity,
+                },
+                BackendSessionConfig {
+                    backend: BackendType::Local,
                     session_model: SessionModel::Affinity,
                 },
             ],
@@ -317,6 +322,8 @@ pub enum BackendType {
     E2b,
     /// Docker containers (gVisor or runc).
     Docker,
+    /// Local process execution (no isolation, direct command execution).
+    Local,
 }
 
 impl std::fmt::Display for BackendType {
@@ -325,6 +332,7 @@ impl std::fmt::Display for BackendType {
             BackendType::Firecracker => write!(f, "firecracker"),
             BackendType::E2b => write!(f, "e2b"),
             BackendType::Docker => write!(f, "docker"),
+            BackendType::Local => write!(f, "local"),
         }
     }
 }
