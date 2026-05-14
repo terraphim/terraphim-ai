@@ -96,6 +96,9 @@ enum Commands {
         /// Include pinned KG entries in results even if they don't match the query
         #[arg(long)]
         include_pinned: bool,
+        /// Minimum composite quality score (0.0-1.0). Excludes documents below this threshold.
+        #[arg(long)]
+        min_quality: Option<f64>,
     },
 
     /// Show configuration
@@ -376,7 +379,8 @@ async fn main() -> Result<()> {
             role,
             limit,
             include_pinned,
-        }) => handle_search(&service, query, role, limit, include_pinned).await,
+            min_quality,
+        }) => handle_search(&service, query, role, limit, include_pinned, min_quality).await,
         Some(Commands::Config) => handle_config(&service).await,
         Some(Commands::Roles { sub }) => match sub {
             RolesSub::List => handle_roles_list(&service).await,
@@ -477,6 +481,7 @@ async fn handle_search(
     role: Option<String>,
     limit: Option<usize>,
     include_pinned: bool,
+    min_quality: Option<f64>,
 ) -> Result<serde_json::Value> {
     let role_name = if let Some(role) = role {
         terraphim_types::RoleName::new(&role)
@@ -484,9 +489,18 @@ async fn handle_search(
         service.get_selected_role().await
     };
 
-    let documents = service
+    let mut documents = service
         .search_with_options(&query, &role_name, limit, include_pinned)
         .await?;
+
+    if let Some(threshold) = min_quality {
+        documents.retain(|doc| {
+            doc.quality_score
+                .as_ref()
+                .map(|qs| qs.composite() >= threshold)
+                .unwrap_or(false)
+        });
+    }
 
     // Apply limit client-side since the service may return more results
     let documents = if let Some(max) = limit {

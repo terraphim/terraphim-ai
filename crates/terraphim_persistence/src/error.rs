@@ -1,5 +1,6 @@
 use terraphim_settings;
 
+/// Errors arising from persistence layer operations.
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("Error with profile: {0}")]
@@ -33,4 +34,5 @@ impl From<opendal::Error> for Error {
     }
 }
 
+/// Convenience alias for `Result<T, Error>` used throughout this crate.
 pub type Result<T> = std::result::Result<T, Error>;

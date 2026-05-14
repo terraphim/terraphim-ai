@@ -47,6 +47,7 @@ pub fn session_to_document(session: &Session) -> Document {
         synonyms: None,
         route: None,
         priority: None,
+        quality_score: None,
     }
 }
 

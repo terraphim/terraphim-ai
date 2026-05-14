@@ -220,6 +220,7 @@ impl IndexMiddleware for QueryRsHaystackIndexer {
                                 synonyms: None,
                                 route: None,
                                 priority: None,
+                                quality_score: None,
                             };
                             if let Err(e) = cache_doc.save().await {
                                 log::warn!(
@@ -450,6 +451,7 @@ impl QueryRsHaystackIndexer {
             synonyms: None,
             route: None,
             priority: None,
+            quality_score: None,
         };
         let normalized = dummy_doc.normalize_key(original_id);
 
@@ -1093,6 +1095,7 @@ impl QueryRsHaystackIndexer {
                         synonyms: None,
                         route: None,
                         priority: None,
+                        quality_score: None,
                     });
                 }
             }
@@ -1147,6 +1150,7 @@ impl QueryRsHaystackIndexer {
                                         synonyms: None,
                                         route: None,
                                         priority: None,
+                                        quality_score: None,
                                     });
                                 }
                             }
@@ -1237,6 +1241,7 @@ impl QueryRsHaystackIndexer {
                             synonyms: None,
                             route: None,
                             priority: None,
+                            quality_score: None,
                         });
                     }
                 }
@@ -1283,6 +1288,7 @@ impl QueryRsHaystackIndexer {
                                 synonyms: None,
                                 route: None,
                                 priority: None,
+                                quality_score: None,
                             });
                         }
                     }

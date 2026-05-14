@@ -1601,6 +1601,7 @@ mod tests {
             synonyms: None,
             route: None,
             priority: None,
+            quality_score: None,
         };
         rolegraph.insert_document(&document_id, document);
         println!("query with terraphim-graph and service");
@@ -1642,6 +1643,7 @@ mod tests {
             synonyms: None,
             route: None,
             priority: None,
+            quality_score: None,
         };
         rolegraph.insert_document(&document_id2, document2);
         log::debug!("Query graph");
@@ -1698,6 +1700,7 @@ mod tests {
             synonyms: None,
             route: None,
             priority: None,
+            quality_score: None,
         };
         rolegraph.insert_document(&document_id4, document);
         log::debug!("Query graph");
@@ -1804,6 +1807,7 @@ mod tests {
             synonyms: None,
             route: None,
             priority: None,
+            quality_score: None,
         };
 
         // Insert document into rolegraph (this should create nodes and edges)
@@ -1908,6 +1912,7 @@ mod tests {
             synonyms: None,
             route: None,
             priority: None,
+        quality_score: None,
         };
 
         // Insert document into rolegraph
@@ -1996,6 +2001,7 @@ mod tests {
             synonyms: None,
             route: None,
             priority: None,
+            quality_score: None,
         };
 
         rolegraph.insert_document(&document_id, test_document);
@@ -2055,6 +2061,7 @@ mod tests {
             synonyms: None,
             route: None,
             priority: None,
+            quality_score: None,
         };
 
         rolegraph.insert_document(&document_id, test_document);
@@ -2123,6 +2130,7 @@ mod tests {
             synonyms: None,
             route: None,
             priority: None,
+            quality_score: None,
         };
 
         single_rolegraph.insert_document(&document_id, simple_document);

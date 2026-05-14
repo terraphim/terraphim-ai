@@ -691,6 +691,7 @@ mod tests {
             synonyms: None,
             route: None,
             priority: None,
+            quality_score: None,
         };
 
         // Save document to each operator to verify they work

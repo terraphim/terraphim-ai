@@ -540,6 +540,7 @@ impl ReplHandler {
                     role: role_name,
                     layer: Layer::default(),
                     include_pinned: false,
+                    min_quality: None,
                 };
 
                 match api_client.search(&search_query).await {
@@ -891,6 +892,7 @@ impl ReplHandler {
                     synonyms: None,
                     route: None,
                     priority: None,
+                    quality_score: None,
                 };
 
                 match api_client

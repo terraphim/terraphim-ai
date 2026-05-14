@@ -1129,6 +1129,7 @@ impl TerraphimService {
             role: None,
             layer: Layer::default(),
             include_pinned: false,
+            min_quality: None,
         };
 
         let documents = self.search(&search_query).await?;
@@ -1505,9 +1506,27 @@ impl TerraphimService {
                 limit: None,
                 layer: Layer::default(),
                 include_pinned: false,
+                min_quality: None,
             })
             .await?;
         Ok(documents)
+    }
+
+    /// Filter documents by minimum composite quality score.
+    ///
+    /// Documents without a quality score are excluded when `min_quality` is set.
+    fn apply_min_quality_filter(docs: Vec<Document>, min_quality: Option<f64>) -> Vec<Document> {
+        let Some(threshold) = min_quality else {
+            return docs;
+        };
+        docs.into_iter()
+            .filter(|doc| {
+                doc.quality_score
+                    .as_ref()
+                    .map(|qs| qs.composite() >= threshold)
+                    .unwrap_or(false)
+            })
+            .collect()
     }
 
     /// Search for documents in the haystacks
@@ -1521,7 +1540,9 @@ impl TerraphimService {
             terraphim_middleware::search_haystacks(self.config_state.clone(), search_query.clone())
                 .await?;
 
-        match role.relevance_function {
+        let min_quality = search_query.min_quality;
+
+        let docs_result: Result<Vec<Document>> = match role.relevance_function {
             RelevanceFunction::TitleScorer => {
                 log::debug!("Searching haystack with title scorer");
 
@@ -2206,6 +2227,7 @@ impl TerraphimService {
                                                 synonyms: None,
                                                 route: None,
                                                 priority: None,
+                                                quality_score: None,
                                             };
 
                                             // Save to persistence for future use
@@ -2494,7 +2516,9 @@ impl TerraphimService {
                     Ok(documents)
                 }
             }
-        }
+        };
+        let docs = docs_result?;
+        Ok(Self::apply_min_quality_filter(docs, min_quality))
     }
 
     /// Check if a document ID appears to be hash-based (16 hex characters)
@@ -3212,6 +3236,7 @@ mod tests {
             role: Some(role_name),
             layer: Layer::default(),
             include_pinned: false,
+            min_quality: None,
         };
 
         // Test that Atomic Data URLs are skipped during persistence lookup
@@ -3284,6 +3309,7 @@ mod tests {
             synonyms: None,
             route: None,
             priority: None,
+            quality_score: None,
         };
 
         // Test 1: Save Atomic Data document to persistence
@@ -3327,6 +3353,7 @@ mod tests {
             role: Some(role_name),
             layer: Layer::default(),
             include_pinned: false,
+            min_quality: None,
         };
 
         let result = service.search(&search_query).await;
@@ -3408,6 +3435,7 @@ mod tests {
             synonyms: None,
             route: None,
             priority: None,
+            quality_score: None,
         };
 
         // Save the Atomic Data document to persistence
@@ -3533,6 +3561,7 @@ mod tests {
                 synonyms: None,
                 route: None,
                 priority: None,
+                quality_score: None,
             },
             Document {
                 id: "test-doc-2".to_string(),
@@ -3549,6 +3578,7 @@ mod tests {
                 synonyms: None,
                 route: None,
                 priority: None,
+                quality_score: None,
             },
             Document {
                 id: "test-doc-3".to_string(),
@@ -3565,6 +3595,7 @@ mod tests {
                 synonyms: None,
                 route: None,
                 priority: None,
+                quality_score: None,
             },
         ];
 

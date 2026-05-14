@@ -17,6 +17,9 @@ use tokio::process::Command;
 
 use crate::Result;
 
+/// A single JSON object emitted by ripgrep's `--json` output mode.
+///
+/// See <https://docs.rs/grep-printer/0.2.1/grep_printer/struct.JSON.html>.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash)]
 #[serde(tag = "type", content = "data")]
 #[serde(rename_all = "snake_case")]
@@ -149,6 +152,8 @@ pub fn json_decode(jsonlines: &str) -> Result<Vec<Message>> {
         .collect::<std::result::Result<Vec<Message>, serde_json::Error>>()?)
 }
 
+/// Wraps the `rg` binary, running it with `--json` output and returning
+/// parsed [`Message`] values.
 pub struct RipgrepCommand {
     command: String,
     default_args: Vec<String>,

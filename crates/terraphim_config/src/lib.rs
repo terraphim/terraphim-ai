@@ -46,12 +46,14 @@ use crate::llm_router::LlmRouterConfig;
 // LLM Router configuration
 pub mod llm_router;
 
+/// Convenience alias for `Result<T, TerraphimConfigError>` used throughout this crate.
 pub type Result<T> = std::result::Result<T, TerraphimConfigError>;
 
 use opendal::Result as OpendalResult;
 
 type PersistenceResult<T> = std::result::Result<T, terraphim_persistence::Error>;
 
+/// Errors arising from loading, validating, or persisting Terraphim configuration.
 #[derive(Error, Debug)]
 pub enum TerraphimConfigError {
     #[error("Unable to load config")]
@@ -459,13 +461,14 @@ pub struct KnowledgeGraph {
     pub public: bool,
     pub publish: bool,
 }
-/// check KG set correctly
 impl KnowledgeGraph {
+    /// Return `true` if either an automata path or a local KG directory is configured.
     pub fn is_set(&self) -> bool {
         self.automata_path.is_some() || self.knowledge_graph_local.is_some()
     }
 }
 
+/// Local knowledge-graph source: an input type paired with a filesystem path.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema)]
 #[cfg_attr(feature = "typescript", derive(Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
@@ -508,6 +511,11 @@ impl ConfigBuilder {
             settings_path: PathBuf::new(),
         }
     }
+    /// Create a new builder seeded with the given [`ConfigId`].
+    ///
+    /// Chooses the appropriate [`DeviceSettings`] variant for the id:
+    /// `ConfigId::Embedded` uses embedded defaults; all others call
+    /// [`DeviceSettings::new`].
     pub fn new_with_id(id: ConfigId) -> Self {
         let device_settings = match id {
             ConfigId::Embedded => DeviceSettings::default_embedded(),
@@ -523,6 +531,7 @@ impl ConfigBuilder {
             settings_path: PathBuf::new(),
         }
     }
+    /// Populate the builder with a minimal embedded (WASM/library) configuration.
     pub fn build_default_embedded(mut self) -> Self {
         self.config.id = ConfigId::Embedded;
 
@@ -612,9 +621,12 @@ impl ConfigBuilder {
         self
     }
 
+    /// Resolve the configured `default_data_path`, expanding `~` and `${VAR}` tokens.
     pub fn get_default_data_path(&self) -> PathBuf {
         expand_path(&self.device_settings.default_data_path)
     }
+
+    /// Populate the builder with a server configuration sourced from the current working directory.
     pub fn build_default_server(mut self) -> Self {
         self.config.id = ConfigId::Server;
         // mind where cargo run is triggered from
@@ -709,6 +721,7 @@ impl ConfigBuilder {
             .unwrap()
     }
 
+    /// Populate the builder with desktop defaults, using the resolved data path for haystacks.
     pub fn build_default_desktop(mut self) -> Self {
         let default_data_path = self.get_default_data_path();
         // Remove the automata_path - let it be built from local KG files during startup
@@ -838,6 +851,8 @@ impl Default for ConfigBuilder {
     }
 }
 
+/// Distinguishes how the configuration is deployed: as a background server,
+/// a desktop application, or compiled-in (WASM/library) mode.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema)]
 #[cfg_attr(feature = "typescript", derive(Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]

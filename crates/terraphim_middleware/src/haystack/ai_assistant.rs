@@ -283,6 +283,7 @@ fn message_to_document(
         synonyms: None,
         route: None,
         priority: None,
+        quality_score: None,
     }
 }
 

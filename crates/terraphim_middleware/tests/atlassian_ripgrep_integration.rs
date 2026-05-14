@@ -50,6 +50,7 @@ async fn atlassian_ripgrep_haystack_smoke() {
         search_terms: None,
         layer: Default::default(),
         include_pinned: false,
+        min_quality: None,
     };
     let result = search_haystacks(config_state, query).await;
     assert!(

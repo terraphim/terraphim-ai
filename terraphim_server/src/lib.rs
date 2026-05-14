@@ -292,6 +292,7 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
                                                     synonyms: None,
                                                     route: None,
                                                     priority: None,
+                                                    quality_score: None,
                                                 };
 
                                                 // Save document to persistence layer first
@@ -414,6 +415,7 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
                                                         synonyms: None,
                                                         route: None,
                                                         priority: None,
+                                                        quality_score: None,
                                                     };
 
                                                     // Save document to persistence layer

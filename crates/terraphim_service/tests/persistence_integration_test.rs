@@ -60,6 +60,7 @@ async fn test_service_document_persistence_integration() {
         synonyms: None,
         route: None,
         priority: None,
+    quality_score: None,
     };
 
     let created_doc = service
@@ -158,6 +159,7 @@ async fn test_service_document_persistence_integration() {
         synonyms: None,
         route: None,
         priority: None,
+        quality_score: None,
     };
 
     let _created_special_doc = new_service
@@ -486,6 +488,7 @@ async fn test_unicode_persistence_in_service() {
         synonyms: None,
         route: None,
         priority: None,
+    quality_score: None,
     };
 
     // Create document through service
@@ -582,6 +585,7 @@ async fn test_large_content_persistence_in_service() {
         synonyms: None,
         route: None,
         priority: None,
+        quality_score: None,
     };
 
     println!(

@@ -32,6 +32,7 @@ mod logical_operators_fix_validation_tests {
                 synonyms: None,
                 route: None,
                 priority: None,
+                quality_score: None,
             },
             Document {
                 id: "2".to_string(),
@@ -48,6 +49,7 @@ mod logical_operators_fix_validation_tests {
                 synonyms: None,
                 route: None,
                 priority: None,
+                quality_score: None,
             },
             Document {
                 id: "3".to_string(),
@@ -64,6 +66,7 @@ mod logical_operators_fix_validation_tests {
                 synonyms: None,
                 route: None,
                 priority: None,
+                quality_score: None,
             },
             Document {
                 id: "4".to_string(),
@@ -80,6 +83,7 @@ mod logical_operators_fix_validation_tests {
                 synonyms: None,
                 route: None,
                 priority: None,
+                quality_score: None,
             },
         ]
     }
@@ -102,6 +106,7 @@ mod logical_operators_fix_validation_tests {
             role: Some(RoleName::from("Default")),
             layer: Layer::default(),
             include_pinned: false,
+            min_quality: None,
         };
 
         // Test get_all_terms to ensure no duplication
@@ -162,6 +167,7 @@ mod logical_operators_fix_validation_tests {
             role: Some(RoleName::from("Default")),
             layer: Layer::default(),
             include_pinned: false,
+            min_quality: None,
         };
 
         // Test get_all_terms to ensure no duplication
@@ -228,6 +234,7 @@ mod logical_operators_fix_validation_tests {
             role: Some(RoleName::from("Default")),
             layer: Layer::default(),
             include_pinned: false,
+            min_quality: None,
         };
 
         // Test get_all_terms for single term
@@ -278,6 +285,7 @@ mod logical_operators_fix_validation_tests {
                 synonyms: None,
                 route: None,
                 priority: None,
+                quality_score: None,
             },
             Document {
                 id: "2".to_string(),
@@ -294,6 +302,7 @@ mod logical_operators_fix_validation_tests {
                 synonyms: None,
                 route: None,
                 priority: None,
+                quality_score: None,
             },
         ];
 
@@ -307,6 +316,7 @@ mod logical_operators_fix_validation_tests {
             role: Some(RoleName::from("Default")),
             layer: Layer::default(),
             include_pinned: false,
+            min_quality: None,
         };
 
         let result = service
@@ -346,6 +356,7 @@ mod logical_operators_fix_validation_tests {
             role: Some(RoleName::from("Default")),
             layer: Layer::default(),
             include_pinned: false,
+            min_quality: None,
         };
 
         // Test get_all_terms
@@ -389,6 +400,7 @@ mod logical_operators_fix_validation_tests {
             role: Some(RoleName::from("Default")),
             layer: Layer::default(),
             include_pinned: false,
+            min_quality: None,
         };
 
         // Test get_all_terms

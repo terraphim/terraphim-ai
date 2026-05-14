@@ -655,6 +655,7 @@ mod tests {
             synonyms: None,
             route: None,
             priority: None,
+        quality_score: None,
         }
     }
 

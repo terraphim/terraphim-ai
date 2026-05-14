@@ -15,6 +15,7 @@ use cached::proc_macro::cached;
 use serde::Deserialize;
 use terraphim_types::{Concept, NormalizedTerm, NormalizedTermValue, Thesaurus};
 
+/// Errors that can occur while building a thesaurus or running ripgrep.
 #[derive(Error, Debug)]
 pub enum BuilderError {
     #[error("IO error")]
@@ -25,6 +26,7 @@ pub enum BuilderError {
     Indexation(String),
 }
 
+/// Convenience alias for `Result<T, BuilderError>`.
 pub type Result<T> = std::result::Result<T, BuilderError>;
 
 /// Compute a SHA-256 hash of all markdown files in a directory tree.

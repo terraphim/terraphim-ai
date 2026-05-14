@@ -68,6 +68,7 @@ async fn clickup_live_search_returns_documents() {
         search_terms: None,
         layer: Default::default(),
         include_pinned: false,
+        min_quality: None,
     };
     let _results = search_haystacks(config_state, query).await.unwrap();
     // Results should be empty or non-empty (both are valid for this test)
@@ -121,6 +122,7 @@ async fn clickup_live_search_work_term() {
         search_terms: None,
         layer: Default::default(),
         include_pinned: false,
+        min_quality: None,
     };
     let results = search_haystacks(config_state, query).await.unwrap();
     assert!(

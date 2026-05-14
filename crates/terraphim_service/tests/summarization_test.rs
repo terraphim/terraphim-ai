@@ -36,6 +36,7 @@ fn create_test_document(id: &str, body: &str) -> Document {
         synonyms: None,
         route: None,
         priority: None,
+        quality_score: None,
     }
 }
 
@@ -86,6 +87,7 @@ fn create_comprehensive_test_document() -> Document {
         synonyms: None,
         route: None,
         priority: None,
+        quality_score: None,
     }
 }
 
