@@ -228,26 +228,26 @@ This document tracks implementation tasks for the Session Search and Robot Mode 
 
 #### Subtasks
 
-- [ ] **1.6.1** Unit tests for forgiving parser
+- [x] **1.6.1** Unit tests for forgiving parser
   - Exact match tests
   - Typo correction tests
   - Alias expansion tests
   - Edge cases
 
-- [ ] **1.6.2** Unit tests for robot output
+- [x] **1.6.2** Unit tests for robot output
   - JSON formatting tests
   - Exit code tests
   - Schema validation tests
 
-- [ ] **1.6.3** Integration tests
+- [x] **1.6.3** Integration tests
   - End-to-end command tests
   - Robot mode integration
   - Error handling tests
 
 #### Acceptance Criteria
 
-- [ ] All tests pass
-- [ ] Coverage > 80% for new code
+- [x] All tests pass
+- [x] Coverage > 80% for new code
 
 ---
 
@@ -626,7 +626,7 @@ Phase 3:
 | 1.3 | ✅ Complete | - | Self-documentation API |
 | 1.4 | ✅ Complete | - | REPL robot mode, forgiving parser, /robot command |
 | 1.5 | ✅ Complete | - | Token budget, field filtering, truncation, pagination |
-| 1.6 | Not Started | - | Tests |
+| 1.6 | ✅ Complete | - | Tests — 51 forgiving + 66 robot unit tests; 3 integration test files |
 
 ### Phase 2 Status
 
