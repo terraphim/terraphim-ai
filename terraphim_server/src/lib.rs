@@ -1,3 +1,8 @@
+//! HTTP server for the Terraphim AI backend.
+//!
+//! Exposes search, configuration, knowledge-graph, conversation-context,
+//! and workflow management APIs via Axum.  Optionally serves embedded
+//! frontend assets when built with the `embedded-assets` feature.
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -136,6 +141,7 @@ fn create_document_description(content: &str) -> Option<String> {
 mod api;
 mod error;
 
+/// HTTP handlers for multi-agent, optimisation, orchestration, parallel, prompt-chain, routing, VM-execution, and WebSocket workflows.
 pub mod workflows;
 
 pub use api::{
@@ -174,14 +180,18 @@ mod assets {
 #[cfg(not(feature = "embedded-assets"))]
 use assets::Asset as Assets;
 
-// Extended application state that includes workflow management
+/// Shared application state threaded through all Axum route handlers.
 #[derive(Clone)]
 pub struct AppState {
+    /// Configuration and per-role knowledge-graph state.
     pub config_state: ConfigState,
+    /// Live map of workflow runs keyed by workflow ID.
     pub workflow_sessions: Arc<workflows::WorkflowSessions>,
+    /// Sender half of the WebSocket broadcast channel.
     pub websocket_broadcaster: workflows::WebSocketBroadcaster,
 }
 
+/// Starts the Axum HTTP server, builds all routes, and serves until shutdown.
 pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigState) -> Result<()> {
     log::info!("Starting axum server");
 
@@ -649,6 +659,7 @@ async fn not_found() -> Response {
     (StatusCode::NOT_FOUND, "404").into_response()
 }
 
+/// Constructs a minimal Axum router suitable for integration tests.
 pub async fn build_router_for_tests() -> Router {
     use terraphim_config::ConfigBuilder;
 

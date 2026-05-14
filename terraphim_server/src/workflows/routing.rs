@@ -21,6 +21,7 @@ struct RouteOption {
     speed: String,
 }
 
+/// Axum handler for the `POST /workflows/route` endpoint.
 pub async fn execute_routing(
     State(state): State<AppState>,
     Json(request): Json<WorkflowRequest>,

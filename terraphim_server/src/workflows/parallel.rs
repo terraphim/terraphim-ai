@@ -75,6 +75,7 @@ struct ExecutionSummary {
     diversity_score: f64,
 }
 
+/// Axum handler for the `POST /workflows/parallel` endpoint.
 pub async fn execute_parallel(
     State(state): State<AppState>,
     Json(request): Json<WorkflowRequest>,

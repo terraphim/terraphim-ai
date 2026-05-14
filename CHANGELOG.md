@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Rustdoc on `terraphim_server`** added `//!` crate-level doc, struct/enum/field docs and function doc-comments across `src/lib.rs`, `src/error.rs`, `src/api.rs`, and all `src/workflows/` sub-modules -- `RUSTDOCFLAGS="-W missing-docs" cargo doc --no-deps` now produces zero warnings
 - **Rustdoc on core public types** added doc comments to `ServiceError`, `TerraphimService`, middleware `Error`, rolegraph `Error`, `split_paragraphs`, `DocumentType`, `RouteDirective`, `MarkdownDirectives`, `Edge`, `ChatMessage`, and `Priority` across four crates (Refs #547)
 - **Orchestrator webhook fix** resolves project from repo for unqualified `@adf:` mentions
 - **Provider probe timeout** increased from 60s to 120s for reliability
