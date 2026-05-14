@@ -1515,10 +1515,12 @@ impl TerraphimService {
     /// Filter documents by minimum composite quality score.
     ///
     /// Documents without a quality score are excluded when `min_quality` is set.
+    /// Out-of-range thresholds are clamped to `[0.0, 1.0]` before comparison.
     fn apply_min_quality_filter(docs: Vec<Document>, min_quality: Option<f64>) -> Vec<Document> {
         let Some(threshold) = min_quality else {
             return docs;
         };
+        let threshold = threshold.clamp(0.0, 1.0);
         docs.into_iter()
             .filter(|doc| {
                 doc.quality_score
@@ -3773,5 +3775,17 @@ mod tests {
         assert_eq!(result[0].id, "a");
         assert_eq!(result[1].id, "b");
         assert_eq!(result[2].id, "c");
+    }
+
+    #[test]
+    fn test_min_quality_negative_threshold_clamped_to_zero() {
+        // A negative threshold is clamped to 0.0: documents with any score pass,
+        // documents without a score are still excluded.
+        let with_score = doc_with_quality("scored", 0.1, 0.1, 0.1);
+        let no_score = doc_without_quality("unscored");
+        let result =
+            TerraphimService::apply_min_quality_filter(vec![with_score, no_score], Some(-0.1));
+        assert_eq!(result.len(), 1, "only scored document should pass");
+        assert_eq!(result[0].id, "scored");
     }
 }
