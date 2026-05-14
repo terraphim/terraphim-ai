@@ -716,6 +716,9 @@ enum Command {
         /// Include pinned KG entries in results
         #[arg(long, default_value_t = false)]
         include_pinned: bool,
+        /// Minimum composite quality score (0.0-1.0). Excludes documents below this threshold.
+        #[arg(long)]
+        min_quality: Option<f64>,
     },
     /// Manage roles (list, select)
     Roles {
@@ -2048,6 +2051,7 @@ async fn run_offline_command(
             limit,
             fail_on_empty,
             include_pinned,
+            min_quality,
         } => {
             let (role_name, auto) = service
                 .resolve_or_auto_route(role.as_deref(), &query)
@@ -2091,14 +2095,24 @@ async fn run_offline_command(
                     include_pinned,
                     role: Some(role_name.clone()),
                     layer: Layer::default(),
+                    min_quality,
                 };
 
                 service.search_with_query(&search_query).await?
             } else {
-                // Single term query (backward compatibility)
-                service
-                    .search_with_role(&query, &role_name, Some(limit))
-                    .await?
+                // Single term query
+                let search_query = SearchQuery {
+                    search_term: NormalizedTermValue::from(query.as_str()),
+                    search_terms: None,
+                    operator: None,
+                    skip: Some(0),
+                    limit: Some(limit),
+                    include_pinned,
+                    role: Some(role_name.clone()),
+                    layer: Layer::default(),
+                    min_quality,
+                };
+                service.search_with_query(&search_query).await?
             };
 
             let results_count = results.len();
@@ -4095,6 +4109,7 @@ async fn run_server_command(
             limit,
             fail_on_empty: _,
             include_pinned,
+            min_quality,
         } => {
             // Get selected role from server if not specified
             let role_name = if let Some(role) = role {
@@ -4121,6 +4136,7 @@ async fn run_server_command(
                     role: Some(role_name),
                     layer: Layer::default(),
                     include_pinned,
+                    min_quality,
                 }
             } else {
                 // Single term query (backward compatibility)
@@ -4133,6 +4149,7 @@ async fn run_server_command(
                     role: Some(role_name),
                     layer: Layer::default(),
                     include_pinned,
+                    min_quality,
                 }
             };
 
@@ -5124,6 +5141,7 @@ fn ui_loop(
                                         role: Some(RoleName::new(&role)),
                                         layer: Layer::default(),
                                         include_pinned: false,
+                                        min_quality: None,
                                     };
                                     backend.search(&q).await
                                 }) {

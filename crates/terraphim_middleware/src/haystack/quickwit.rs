@@ -416,6 +416,7 @@ impl QuickwitHaystackIndexer {
             synonyms: None,
             route: None,
             priority: None,
+            quality_score: None,
         })
     }
 
@@ -440,6 +441,7 @@ impl QuickwitHaystackIndexer {
             synonyms: None,
             route: None,
             priority: None,
+            quality_score: None,
         };
 
         dummy_doc.normalize_key(&original_id)

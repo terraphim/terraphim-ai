@@ -421,6 +421,7 @@ pub fn email_to_document(email: &Email) -> Document {
         synonyms: None,
         route: None,
         priority: None,
+        quality_score: None,
     }
 }
 

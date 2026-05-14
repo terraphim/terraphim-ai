@@ -62,6 +62,7 @@ fn dummy_document(id: String, body: String) -> Document {
         synonyms: None,
         route: None,
         priority: None,
+        quality_score: None,
     }
 }
 

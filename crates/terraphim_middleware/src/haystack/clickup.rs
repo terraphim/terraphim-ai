@@ -6,6 +6,7 @@ use terraphim_config::Haystack;
 use terraphim_persistence::Persistable;
 use terraphim_types::{Document, DocumentType, Index};
 
+/// Haystack indexer that fetches tasks and lists from the ClickUp API.
 #[derive(Debug, Clone)]
 pub struct ClickUpHaystackIndexer {
     client: Client,
@@ -38,6 +39,7 @@ impl ClickUpHaystackIndexer {
             synonyms: None,
             route: None,
             priority: None,
+            quality_score: None,
         };
         dummy_doc.normalize_key(original_id)
     }
@@ -68,6 +70,7 @@ impl ClickUpHaystackIndexer {
             synonyms: None,
             route: None,
             priority: None,
+            quality_score: None,
         })
     }
 }

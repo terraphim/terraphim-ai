@@ -32,6 +32,7 @@
 //!     role: Some(RoleName::new("engineer")),
 //!     layer: Layer::default(),
 //!     include_pinned: false,
+//!     min_quality: None,
 //! };
 //!
 //! // Multi-term AND query
@@ -63,6 +64,7 @@
 //!     synonyms: None,
 //!     route: None,
 //!     priority: None,
+//!     quality_score: None,
 //! };
 //! ```
 //!
@@ -465,6 +467,7 @@ impl Display for Concept {
     }
 }
 
+/// Classifies a document by its role in the knowledge graph.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DocumentType {
@@ -474,6 +477,7 @@ pub enum DocumentType {
     ConfigDocument,
 }
 
+/// Routing directive specifying which LLM provider and model to use.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RouteDirective {
     pub provider: String,
@@ -486,6 +490,7 @@ pub struct RouteDirective {
     pub is_free: bool,
 }
 
+/// Parsed directives extracted from the YAML front matter of a markdown KG entry.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MarkdownDirectives {
     #[serde(default)]
@@ -549,6 +554,7 @@ pub struct MarkdownDirectives {
 ///     synonyms: None,
 ///     route: None,
 ///     priority: None,
+///     quality_score: None,
 /// };
 /// ```
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -588,6 +594,9 @@ pub struct Document {
     /// Optional priority directive (0-100)
     #[serde(default)]
     pub priority: Option<u8>,
+    /// Quality scores for K/L/S dimensions, populated by judge system or manual review
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub quality_score: Option<QualityScore>,
 }
 
 impl fmt::Display for Document {
@@ -624,6 +633,7 @@ impl Document {
     }
 }
 
+/// A directed relationship between two nodes in the knowledge graph.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Edge {
     /// ID of the edge (u64)
@@ -815,6 +825,7 @@ impl Index {
                 // rank only available for terraphim graph
                 // use scorer to populate the rank for all cases
                 document.rank = Some(doc.rank);
+                document.quality_score = doc.quality_score.clone();
                 documents.push(document.clone());
             } else {
                 log::warn!("Document not found in cache. Cannot convert.");
@@ -837,6 +848,7 @@ impl Index {
             // Rank only available for terraphim graph
             // use scorer to populate the rank for all cases
             document.rank = Some(doc.rank);
+            document.quality_score = doc.quality_score.clone();
             Some(document)
         } else {
             None
@@ -871,18 +883,20 @@ impl IntoIterator for Index {
 ///
 /// These scores represent the quality of a document across three dimensions:
 /// - Knowledge: Depth and accuracy of domain knowledge
-/// - Learning: Educational value and clarity
-/// - Synthesis: Integration of concepts and insight
+/// - Logic: Reasoning quality and clarity
+/// - Structure: Organisation of concepts and insight
 ///
 /// All scores are optional and range from 0.0 to 1.0 when present.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct QualityScore {
     /// Knowledge quality score (0.0-1.0)
     pub knowledge: Option<f64>,
-    /// Learning quality score (0.0-1.0)
-    pub learning: Option<f64>,
-    /// Synthesis quality score (0.0-1.0)
-    pub synthesis: Option<f64>,
+    /// Logic quality score (0.0-1.0)
+    pub logic: Option<f64>,
+    /// Structure quality score (0.0-1.0)
+    pub structure: Option<f64>,
+    /// Timestamp when the quality was last evaluated
+    pub last_evaluated: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 impl QualityScore {
@@ -897,8 +911,9 @@ impl QualityScore {
     ///
     /// let score = QualityScore {
     ///     knowledge: Some(0.8),
-    ///     learning: Some(0.6),
-    ///     synthesis: None,
+    ///     logic: Some(0.6),
+    ///     structure: None,
+    ///     last_evaluated: None,
     /// };
     /// assert_eq!(score.composite(), 0.7); // (0.8 + 0.6) / 2
     ///
@@ -913,11 +928,11 @@ impl QualityScore {
             sum += k;
             count += 1;
         }
-        if let Some(l) = self.learning {
+        if let Some(l) = self.logic {
             sum += l;
             count += 1;
         }
-        if let Some(s) = self.synthesis {
+        if let Some(s) = self.structure {
             sum += s;
             count += 1;
         }
@@ -1078,6 +1093,7 @@ pub fn extract_first_paragraph(body: &str) -> String {
 ///     role: Some(RoleName::new("data_scientist")),
 ///     layer: Layer::default(),
 ///     include_pinned: false,
+///     min_quality: None,
 /// };
 /// ```
 ///
@@ -1118,6 +1134,10 @@ pub struct SearchQuery {
     /// Include pinned KG entries in results even if they don't match the query
     #[serde(default)]
     pub include_pinned: bool,
+    /// Minimum composite quality score threshold (0.0–1.0). Documents with a composite
+    /// score below this value are excluded from results.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min_quality: Option<f64>,
 }
 
 impl SearchQuery {
@@ -1172,6 +1192,7 @@ impl SearchQuery {
             role,
             layer: Layer::default(),
             include_pinned: false,
+            min_quality: None,
         }
     }
 }
@@ -1583,6 +1604,7 @@ pub struct KGIndexInfo {
     pub version: Option<String>,
 }
 
+/// A single message in a conversation, including metadata for cost tracking.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
@@ -1887,6 +1909,7 @@ pub enum ContextUsageType {
 )]
 #[cfg_attr(feature = "typescript", derive(Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+/// A clamped priority value in the range 0–100 (higher = more urgent).
 pub struct Priority(pub u8);
 
 impl Priority {
@@ -2638,6 +2661,7 @@ mod tests {
             role: Some(RoleName::new("test")),
             layer: Layer::default(),
             include_pinned: false,
+            min_quality: None,
         };
 
         assert!(!single_query.is_multi_term_query());
@@ -2703,6 +2727,7 @@ mod tests {
             role: Some(RoleName::new("test_role")),
             layer: Layer::default(),
             include_pinned: false,
+            min_quality: None,
         };
 
         let json = serde_json::to_string(&query).unwrap();
@@ -3117,6 +3142,7 @@ mod tests {
             role: None,
             layer: Layer::Two,
             include_pinned: false,
+            min_quality: None,
         };
 
         let json = serde_json::to_string(&query).unwrap();
@@ -3132,24 +3158,27 @@ mod tests {
         // Test with all three scores
         let full_score = QualityScore {
             knowledge: Some(0.8),
-            learning: Some(0.6),
-            synthesis: Some(0.7),
+            logic: Some(0.6),
+            structure: Some(0.7),
+            last_evaluated: None,
         };
         assert!((full_score.composite() - 0.7).abs() < f64::EPSILON); // (0.8 + 0.6 + 0.7) / 3
 
         // Test with two scores
         let partial_score = QualityScore {
             knowledge: Some(0.9),
-            learning: None,
-            synthesis: Some(0.5),
+            logic: None,
+            structure: Some(0.5),
+            last_evaluated: None,
         };
         assert!((partial_score.composite() - 0.7).abs() < f64::EPSILON); // (0.9 + 0.5) / 2
 
         // Test with one score
         let single_score = QualityScore {
             knowledge: Some(0.8),
-            learning: None,
-            synthesis: None,
+            logic: None,
+            structure: None,
+            last_evaluated: None,
         };
         assert!((single_score.composite() - 0.8).abs() < f64::EPSILON);
 
@@ -3162,8 +3191,9 @@ mod tests {
     fn test_quality_score_serialization() {
         let score = QualityScore {
             knowledge: Some(0.8),
-            learning: Some(0.6),
-            synthesis: Some(0.7),
+            logic: Some(0.6),
+            structure: Some(0.7),
+            last_evaluated: None,
         };
 
         let json = serde_json::to_string(&score).unwrap();
@@ -3173,8 +3203,8 @@ mod tests {
 
         let deserialized: QualityScore = serde_json::from_str(&json).unwrap();
         assert_eq!(deserialized.knowledge, Some(0.8));
-        assert_eq!(deserialized.learning, Some(0.6));
-        assert_eq!(deserialized.synthesis, Some(0.7));
+        assert_eq!(deserialized.logic, Some(0.6));
+        assert_eq!(deserialized.structure, Some(0.7));
     }
 
     #[test]
@@ -3184,8 +3214,9 @@ mod tests {
         let json = serde_json::to_string(&score).unwrap();
         let deserialized: QualityScore = serde_json::from_str(&json).unwrap();
         assert!(deserialized.knowledge.is_none());
-        assert!(deserialized.learning.is_none());
-        assert!(deserialized.synthesis.is_none());
+        assert!(deserialized.logic.is_none());
+        assert!(deserialized.structure.is_none());
+        assert!(deserialized.last_evaluated.is_none());
     }
 
     #[test]
@@ -3198,8 +3229,9 @@ mod tests {
             nodes: vec![1, 2],
             quality_score: Some(QualityScore {
                 knowledge: Some(0.8),
-                learning: Some(0.6),
-                synthesis: Some(0.7),
+                logic: Some(0.6),
+                structure: Some(0.7),
+                last_evaluated: None,
             }),
         };
 
@@ -3224,6 +3256,7 @@ mod tests {
             synonyms: None,
             route: None,
             priority: None,
+            quality_score: None,
         };
 
         let indexed = IndexedDocument::from_document(doc);

@@ -32,6 +32,7 @@ struct WebSocketResponse {
     error: Option<String>,
 }
 
+/// Tracks metadata for a single connected WebSocket client.
 #[derive(Debug, Clone)]
 pub struct WebSocketSession {
     session_id: String,
@@ -47,6 +48,7 @@ struct ClientInfo {
     connection_type: String,
 }
 
+/// Axum handler that upgrades an HTTP connection to a WebSocket session.
 pub async fn websocket_handler(ws: WebSocketUpgrade, State(state): State<AppState>) -> Response {
     ws.on_upgrade(|socket| websocket_connection(socket, state))
 }
@@ -477,6 +479,7 @@ fn generate_session_id() -> String {
 
 // Additional utility functions for WebSocket management
 
+/// Broadcasts a generic workflow event to all connected WebSocket clients.
 pub async fn broadcast_workflow_event(
     broadcaster: &broadcast::Sender<WebSocketMessage>,
     event_type: &str,
@@ -494,6 +497,7 @@ pub async fn broadcast_workflow_event(
     let _ = broadcaster.send(message);
 }
 
+/// Broadcasts a `workflow_progress` event with the current step and completion percentage.
 pub async fn notify_workflow_progress(
     broadcaster: &broadcast::Sender<WebSocketMessage>,
     workflow_id: String,
@@ -511,6 +515,7 @@ pub async fn notify_workflow_progress(
     broadcast_workflow_event(broadcaster, "workflow_progress", Some(workflow_id), data).await;
 }
 
+/// Broadcasts a `workflow_completed` or `workflow_failed` event depending on `success`.
 pub async fn notify_workflow_completion(
     broadcaster: &broadcast::Sender<WebSocketMessage>,
     workflow_id: String,
@@ -534,6 +539,7 @@ pub async fn notify_workflow_completion(
     broadcast_workflow_event(broadcaster, event_type, Some(workflow_id), data).await;
 }
 
+/// Broadcasts a `workflow_started` event when a new workflow run is created.
 pub async fn notify_workflow_started(
     broadcaster: &broadcast::Sender<WebSocketMessage>,
     workflow_id: String,
@@ -550,6 +556,7 @@ pub async fn notify_workflow_started(
 
 // Health check and monitoring functions
 
+/// Returns a health-check JSON payload describing the WebSocket server's capabilities.
 pub async fn websocket_health_check() -> serde_json::Value {
     serde_json::json!({
         "websocket_server": "operational",
@@ -573,6 +580,7 @@ pub async fn websocket_health_check() -> serde_json::Value {
     })
 }
 
+/// Returns aggregate statistics (session count, subscription totals) for all active WebSocket sessions.
 pub fn get_websocket_stats(sessions: &HashMap<String, WebSocketSession>) -> serde_json::Value {
     let total_sessions = sessions.len();
     let total_subscriptions: usize = sessions

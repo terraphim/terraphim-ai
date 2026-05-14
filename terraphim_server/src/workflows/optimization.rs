@@ -160,6 +160,7 @@ struct PlateauAnalysis {
     break_strategy: String,
 }
 
+/// Axum handler for the `POST /workflows/optimize` endpoint.
 pub async fn execute_optimization(
     State(state): State<AppState>,
     Json(request): Json<WorkflowRequest>,

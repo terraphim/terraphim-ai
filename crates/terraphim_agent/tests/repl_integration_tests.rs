@@ -298,6 +298,7 @@ fn test_tui_render_detail_view() {
         synonyms: None,
         route: None,
         priority: None,
+        quality_score: None,
     };
 
     terminal

@@ -39,6 +39,7 @@ pub struct ConversationIndex {
 }
 
 impl ConversationIndex {
+    /// Create a new, empty index at schema version `1.0.0`.
     pub fn new() -> Self {
         Self {
             version: "1.0.0".to_string(),
@@ -47,21 +48,25 @@ impl ConversationIndex {
         }
     }
 
+    /// Insert or replace the summary for a conversation, updating `updated_at`.
     pub fn add(&mut self, summary: ConversationSummary) {
         self.conversations
             .insert(summary.id.as_str().to_string(), summary);
         self.updated_at = chrono::Utc::now();
     }
 
+    /// Remove the conversation with `id` from the index, updating `updated_at`.
     pub fn remove(&mut self, id: &ConversationId) {
         self.conversations.remove(id.as_str());
         self.updated_at = chrono::Utc::now();
     }
 
+    /// Return the summary for `id`, or `None` if not present.
     pub fn get(&self, id: &ConversationId) -> Option<&ConversationSummary> {
         self.conversations.get(id.as_str())
     }
 
+    /// Return all conversation summaries as an unordered `Vec`.
     pub fn list(&self) -> Vec<ConversationSummary> {
         self.conversations.values().cloned().collect()
     }
@@ -80,6 +85,7 @@ pub struct OpenDALConversationPersistence {
 }
 
 impl OpenDALConversationPersistence {
+    /// Create a new instance with an empty in-memory index cache.
     pub fn new() -> Self {
         Self {
             index_cache: tokio::sync::RwLock::new(None),

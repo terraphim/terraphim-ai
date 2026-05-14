@@ -198,6 +198,7 @@ impl McpService {
             skip: skip.map(|s| s as usize),
             layer: Layer::default(),
             include_pinned: false,
+            min_quality: None,
         };
 
         match service.search(&search_query).await {
@@ -518,6 +519,7 @@ impl McpService {
                     skip: Some(0),
                     layer: Layer::default(),
                     include_pinned: false,
+                    min_quality: None,
                 };
                 let snippet = match service.search(&sq).await {
                     Ok(documents) if !documents.is_empty() => {
@@ -2518,6 +2520,7 @@ impl ServerHandler for McpService {
                 role: None,
                 layer: terraphim_types::Layer::default(),
                 include_pinned: false,
+                min_quality: None,
             };
 
             match service.search(&search_query).await {
@@ -2544,6 +2547,7 @@ impl ServerHandler for McpService {
                 role: None,
                 layer: terraphim_types::Layer::default(),
                 include_pinned: false,
+                min_quality: None,
             };
 
             let documents = service

@@ -204,6 +204,7 @@ pub fn blocks_to_documents(source_id: &str, normalized: &NormalizedMarkdown) -> 
                 synonyms: None,
                 route: None,
                 priority: None,
+                quality_score: None,
             }
         })
         .collect()

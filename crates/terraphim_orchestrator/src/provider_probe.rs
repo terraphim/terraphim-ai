@@ -539,7 +539,7 @@ async fn probe_single(provider: &str, model: &str, action_template: Option<&str>
     }
 
     let start = Instant::now();
-    let timeout = Duration::from_secs(60);
+    let timeout = Duration::from_secs(120);
 
     debug!(provider, model, action = %action, "running probe command");
 

@@ -104,6 +104,7 @@ async fn load_documents_from_dir(docs_dir: &Path) -> std::io::Result<HashMap<Str
             synonyms: None,
             route: None,
             priority: None,
+            quality_score: None,
         };
 
         docs.insert(stem, doc);

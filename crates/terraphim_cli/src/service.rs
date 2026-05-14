@@ -268,6 +268,7 @@ impl CliService {
             role: Some(role.clone()),
             layer: Layer::default(),
             include_pinned,
+            min_quality: None,
         };
 
         let mut service = self.service.lock().await;

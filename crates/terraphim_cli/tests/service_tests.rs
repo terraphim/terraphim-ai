@@ -207,6 +207,7 @@ mod search_query_tests {
             role: Some(RoleName::new("Default")),
             layer: Default::default(),
             include_pinned: false,
+            min_quality: None,
         };
 
         assert_eq!(query.search_term.to_string(), "rust async");
@@ -225,6 +226,7 @@ mod search_query_tests {
             role: None,
             layer: Default::default(),
             include_pinned: false,
+            min_quality: None,
         };
 
         assert!(query.role.is_none());

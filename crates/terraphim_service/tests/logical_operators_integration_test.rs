@@ -29,6 +29,7 @@ mod logical_operators_integration_tests {
             role: Some(RoleName::from("Default")),
             layer: Layer::default(),
             include_pinned: false,
+            min_quality: None,
         };
 
         // Test that the search executes without error
@@ -64,6 +65,7 @@ mod logical_operators_integration_tests {
             role: Some(RoleName::from("Default")),
             layer: Layer::default(),
             include_pinned: false,
+            min_quality: None,
         };
 
         let result = service.search(&query).await;
@@ -93,6 +95,7 @@ mod logical_operators_integration_tests {
             role: Some(RoleName::from("Default")),
             layer: Layer::default(),
             include_pinned: false,
+            min_quality: None,
         };
 
         let result = service.search(&query).await;
@@ -122,6 +125,7 @@ mod logical_operators_integration_tests {
             role: Some(RoleName::from("Default")),
             layer: Layer::default(),
             include_pinned: false,
+            min_quality: None,
         };
 
         let result = service.search(&query).await;
@@ -150,6 +154,7 @@ mod logical_operators_integration_tests {
             role: Some(RoleName::from("Default")),
             layer: Layer::default(),
             include_pinned: false,
+            min_quality: None,
         };
 
         let result = service.search(&query).await;
@@ -181,6 +186,7 @@ mod logical_operators_integration_tests {
             role: Some(RoleName::from("Default")),
             layer: Layer::default(),
             include_pinned: false,
+            min_quality: None,
         };
 
         let result = service.search(&query).await;
@@ -211,6 +217,7 @@ mod logical_operators_integration_tests {
             role: Some(RoleName::from("Default")),
             layer: Layer::default(),
             include_pinned: false,
+            min_quality: None,
         };
 
         let result1 = service.search(&query1).await;
@@ -230,6 +237,7 @@ mod logical_operators_integration_tests {
             role: Some(RoleName::from("Default")),
             layer: Layer::default(),
             include_pinned: false,
+            min_quality: None,
         };
 
         let result2 = service.search(&query2).await;
@@ -266,6 +274,7 @@ mod logical_operators_integration_tests {
                 role: Some(RoleName::from(role_name)),
                 layer: Layer::default(),
                 include_pinned: false,
+                min_quality: None,
             };
 
             let result = service.search(&query).await;

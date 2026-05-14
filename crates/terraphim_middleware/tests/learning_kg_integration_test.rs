@@ -89,6 +89,7 @@ fn create_query(term: &str) -> SearchQuery {
         role: Some(RoleName::new("test")),
         layer: Layer::default(),
         include_pinned: false,
+        min_quality: None,
     }
 }
 
@@ -181,6 +182,7 @@ fn test_query_with_learnings_preserves_regular_documents() {
         synonyms: None,
         route: None,
         priority: None,
+        quality_score: None,
     };
     let regular_id = regular.id.clone();
     graph.insert_document(&regular_id, regular);
@@ -220,6 +222,7 @@ fn test_feedback_loop_only_touches_learning_documents_and_updates_rank() {
         synonyms: None,
         route: None,
         priority: None,
+        quality_score: None,
     };
     let regular_id = regular.id.clone();
     graph.insert_document(&regular_id, regular);

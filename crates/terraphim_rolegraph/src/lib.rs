@@ -45,6 +45,7 @@ pub mod symbolic_embeddings;
 use aho_corasick::{AhoCorasick, MatchKind};
 use unicode_segmentation::UnicodeSegmentation;
 
+/// Errors produced by the role-graph knowledge graph operations.
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("The given node ID was not found")]
@@ -1391,6 +1392,10 @@ impl From<RoleGraph> for RoleGraphSync {
 static RE: std::sync::LazyLock<Regex> =
     std::sync::LazyLock::new(|| Regex::new(r"[?!|]\s+").unwrap());
 
+/// Splits a block of text into individual sentences and clause fragments.
+///
+/// Uses Unicode sentence segmentation followed by splitting on `?`, `!`, and `|`.
+/// Empty fragments and leading/trailing whitespace are discarded.
 pub fn split_paragraphs(paragraphs: &str) -> Vec<&str> {
     let sentences = UnicodeSegmentation::split_sentence_bounds(paragraphs);
     let parts =
@@ -1596,6 +1601,7 @@ mod tests {
             synonyms: None,
             route: None,
             priority: None,
+            quality_score: None,
         };
         rolegraph.insert_document(&document_id, document);
         println!("query with terraphim-graph and service");
@@ -1637,6 +1643,7 @@ mod tests {
             synonyms: None,
             route: None,
             priority: None,
+            quality_score: None,
         };
         rolegraph.insert_document(&document_id2, document2);
         log::debug!("Query graph");
@@ -1693,6 +1700,7 @@ mod tests {
             synonyms: None,
             route: None,
             priority: None,
+            quality_score: None,
         };
         rolegraph.insert_document(&document_id4, document);
         log::debug!("Query graph");
@@ -1799,6 +1807,7 @@ mod tests {
             synonyms: None,
             route: None,
             priority: None,
+            quality_score: None,
         };
 
         // Insert document into rolegraph (this should create nodes and edges)
@@ -1903,6 +1912,7 @@ mod tests {
             synonyms: None,
             route: None,
             priority: None,
+        quality_score: None,
         };
 
         // Insert document into rolegraph
@@ -1991,6 +2001,7 @@ mod tests {
             synonyms: None,
             route: None,
             priority: None,
+            quality_score: None,
         };
 
         rolegraph.insert_document(&document_id, test_document);
@@ -2050,6 +2061,7 @@ mod tests {
             synonyms: None,
             route: None,
             priority: None,
+            quality_score: None,
         };
 
         rolegraph.insert_document(&document_id, test_document);
@@ -2118,6 +2130,7 @@ mod tests {
             synonyms: None,
             route: None,
             priority: None,
+            quality_score: None,
         };
 
         single_rolegraph.insert_document(&document_id, simple_document);

@@ -166,6 +166,7 @@ struct ExecutionEvent {
     metadata: serde_json::Value,
 }
 
+/// Axum handler for the `POST /workflows/orchestrate` endpoint.
 pub async fn execute_orchestration(
     State(state): State<AppState>,
     Json(request): Json<WorkflowRequest>,

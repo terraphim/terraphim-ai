@@ -50,6 +50,7 @@ async fn test_terraphim_graph_search_comprehensive() -> Result<(), Box<dyn std::
         synonyms: None,
         route: None,
         priority: None,
+        quality_score: None,
         },
         Document {
             id: "service_doc".to_string(),
@@ -66,6 +67,7 @@ async fn test_terraphim_graph_search_comprehensive() -> Result<(), Box<dyn std::
         synonyms: None,
         route: None,
         priority: None,
+        quality_score: None,
         },
         Document {
             id: "terraphim_graph_doc".to_string(),
@@ -85,6 +87,7 @@ async fn test_terraphim_graph_search_comprehensive() -> Result<(), Box<dyn std::
         synonyms: None,
         route: None,
         priority: None,
+        quality_score: None,
         },
     ];
 
@@ -226,6 +229,7 @@ async fn test_terraphim_graph_search_comprehensive() -> Result<(), Box<dyn std::
             limit: Some(10),
             layer: Layer::default(),
             include_pinned: false,
+            min_quality: None,
         };
 
         let results = terraphim_service.search(&search_query).await?;
@@ -312,6 +316,7 @@ async fn test_persistence_fallback_behavior() -> Result<(), Box<dyn std::error::
         synonyms: None,
         route: None,
         priority: None,
+        quality_score: None,
     };
 
     // Save to all profiles
@@ -382,6 +387,7 @@ async fn test_empty_rolegraph_search() -> Result<(), Box<dyn std::error::Error>>
         limit: Some(10),
         layer: Layer::default(),
         include_pinned: false,
+        min_quality: None,
     };
 
     let results = terraphim_service.search(&search_query).await?;

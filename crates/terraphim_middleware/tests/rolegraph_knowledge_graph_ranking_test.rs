@@ -110,6 +110,7 @@ async fn test_rolegraph_knowledge_graph_ranking() {
         synonyms: None,
         route: None,
         priority: None,
+        quality_score: None,
     };
 
     rolegraph.insert_document(&document.id, document.clone());
