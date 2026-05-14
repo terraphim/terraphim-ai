@@ -41,6 +41,7 @@ pub mod dual_mode;
 pub mod error;
 pub mod error_signatures;
 pub mod flow;
+pub mod gitea_skill_loader;
 pub mod handoff;
 pub mod kg_router;
 pub mod learning;
@@ -60,15 +61,15 @@ pub mod pr_review;
 pub mod project_control;
 pub mod provider_budget;
 pub mod provider_probe;
-pub mod rate_limiter;
 #[cfg(feature = "quickwit")]
 pub mod quickwit;
 #[cfg(feature = "quickwit")]
 pub mod quickwit_bulk;
+pub mod rate_limiter;
 pub mod scheduler;
-pub mod worktree_guard;
 pub mod scope;
 pub mod webhook;
+pub mod worktree_guard;
 
 pub use agent_run_record::{
     AgentRunRecord, ExitClass, ExitClassification, ExitClassifier, RunTrigger,
@@ -106,12 +107,12 @@ pub use nightwatch::{
 };
 pub use output_poster::OutputPoster;
 pub use persona::{MetapromptRenderError, MetapromptRenderer, PersonaRegistry};
-pub use scheduler::{ScheduleEvent, TimeScheduler};
-pub use rate_limiter::{is_rate_limit_backoff_enabled, RateLimiter};
-pub use worktree_guard::{with_worktree_guard, with_worktree_guard_async, WorktreeGuard};
 #[cfg(feature = "quickwit")]
 pub use quickwit_bulk::QuickwitEsBulkSink;
+pub use rate_limiter::{is_rate_limit_backoff_enabled, RateLimiter};
+pub use scheduler::{ScheduleEvent, TimeScheduler};
 use terraphim_types::{FindingSeverity, ReviewFinding};
+pub use worktree_guard::{with_worktree_guard, with_worktree_guard_async, WorktreeGuard};
 
 use chrono::Timelike;
 use std::collections::HashMap;
@@ -308,6 +309,11 @@ pub struct AgentOrchestrator {
     /// Directory for per-agent output log files. Each completed agent run
     /// writes its stdout+stderr to `<agent_log_dir>/<name>-<timestamp>.log`.
     agent_log_dir: PathBuf,
+    /// Cache directory populated from Gitea at startup (issue #1434).
+    /// `None` when `gitea_skill_repo` is not configured. When `Some`, this
+    /// directory is prepended to the skill search path so remote skills
+    /// shadow local ones while local directories remain as fallback.
+    gitea_skill_cache_dir: Option<PathBuf>,
 }
 
 /// Build the composite restart-state key for an agent definition.
@@ -848,6 +854,7 @@ impl AgentOrchestrator {
                     config.working_dir.join("logs").join("agents")
                 }
             },
+            gitea_skill_cache_dir: None,
         })
     }
 
@@ -1049,9 +1056,7 @@ impl AgentOrchestrator {
         {
             if let Some(ref kg_router) = self.kg_router {
                 info!("running startup provider probe via KG action:: templates");
-                self.provider_health
-                    .probe_all(kg_router)
-                    .await;
+                self.provider_health.probe_all(kg_router).await;
 
                 // Save probe results if directory configured
                 if let Some(ref dir) = self
@@ -1083,6 +1088,15 @@ impl AgentOrchestrator {
         // Restore persisted telemetry from previous runs
         self.restore_telemetry().await;
 
+        // Populate Gitea skill cache if configured (issue #1434).
+        // On success, the cache dir becomes the first skill root.
+        // On any error, populate_skill_cache logs a warning and returns the
+        // cache dir path anyway; local skill roots are used as fallback.
+        if let Some(ref skill_repo) = self.config.gitea_skill_repo.clone() {
+            let cache_dir = gitea_skill_loader::populate_skill_cache(skill_repo, false).await;
+            self.gitea_skill_cache_dir = Some(cache_dir);
+        }
+
         // One-shot migration of the legacy top-level `adf/mention_cursor`
         // key into per-project keys. No-op after the first successful
         // startup.
@@ -1109,11 +1123,22 @@ impl AgentOrchestrator {
 
             let agent_names: Vec<String> =
                 self.config.agents.iter().map(|a| a.name.clone()).collect();
+            let project_by_repo: std::collections::HashMap<String, String> = self
+                .config
+                .projects
+                .iter()
+                .filter_map(|p| {
+                    p.gitea
+                        .as_ref()
+                        .map(|g| (format!("{}/{}", g.owner, g.repo), p.id.clone()))
+                })
+                .collect();
             let state = webhook::WebhookState {
                 agent_names,
                 persona_registry: Arc::new(self.persona_registry.clone()),
                 dispatch_tx,
                 secret: webhook_cfg.secret.clone(),
+                project_by_repo,
             };
 
             let router = webhook::webhook_router(state);
@@ -1220,23 +1245,7 @@ impl AgentOrchestrator {
                 Ok(LoopEvent::Webhook(dispatch)) => {
                     let comment_id = dispatch.comment_id();
                     self.handle_webhook_dispatch(dispatch).await;
-                    let project_ids: Vec<String> = if self.config.projects.is_empty() {
-                        vec![dispatcher::LEGACY_PROJECT_ID.to_string()]
-                    } else {
-                        self.config.projects.iter().map(|p| p.id.clone()).collect()
-                    };
-                    for pid in &project_ids {
-                        let cursor = self
-                            .mention_cursors
-                            .entry(pid.clone())
-                            .or_insert_with(mention::MentionCursor::now);
-                        cursor.mark_processed(comment_id);
-                    }
-                    for pid in &project_ids {
-                        if let Some(cursor) = self.mention_cursors.get(pid) {
-                            cursor.save(pid).await;
-                        }
-                    }
+                    self.mark_webhook_comment_processed(comment_id).await;
                     let _ = loop_tx.lock().unwrap().send(LoopEvent::Tick);
                 }
                 Ok(LoopEvent::Schedule(event)) => {
@@ -1246,6 +1255,27 @@ impl AgentOrchestrator {
                     self.handle_drift_alert(alert).await;
                 }
                 Ok(LoopEvent::Tick) => {
+                    loop {
+                        match loop_rx.try_recv() {
+                            Ok(LoopEvent::Webhook(dispatch)) => {
+                                let comment_id = dispatch.comment_id();
+                                self.handle_webhook_dispatch(dispatch).await;
+                                self.mark_webhook_comment_processed(comment_id).await;
+                            }
+                            Ok(LoopEvent::Schedule(event)) => {
+                                self.handle_schedule_event(event).await;
+                            }
+                            Ok(LoopEvent::DriftAlert(alert)) => {
+                                self.handle_drift_alert(alert).await;
+                            }
+                            Ok(LoopEvent::Tick) => {
+                                // Coalesce stale ticks so long reconciliation runs do not
+                                // starve webhook and schedule events queued behind them.
+                            }
+                            Err(std::sync::mpsc::TryRecvError::Empty) => break,
+                            Err(std::sync::mpsc::TryRecvError::Disconnected) => break,
+                        }
+                    }
                     match tokio::time::timeout(reconcile_timeout, self.reconcile_tick()).await {
                         Ok(()) => {}
                         Err(_) => {
@@ -1281,6 +1311,26 @@ impl AgentOrchestrator {
     pub fn shutdown(&mut self) {
         info!("shutdown requested");
         self.shutdown_requested = true;
+    }
+
+    async fn mark_webhook_comment_processed(&mut self, comment_id: u64) {
+        let project_ids: Vec<String> = if self.config.projects.is_empty() {
+            vec![dispatcher::LEGACY_PROJECT_ID.to_string()]
+        } else {
+            self.config.projects.iter().map(|p| p.id.clone()).collect()
+        };
+        for pid in &project_ids {
+            let cursor = self
+                .mention_cursors
+                .entry(pid.clone())
+                .or_insert_with(mention::MentionCursor::now);
+            cursor.mark_processed(comment_id);
+        }
+        for pid in &project_ids {
+            if let Some(cursor) = self.mention_cursors.get(pid) {
+                cursor.save(pid).await;
+            }
+        }
     }
 
     /// Get current status of all agents.
@@ -1484,8 +1534,11 @@ impl AgentOrchestrator {
         }
 
         let home_dir = std::env::var("HOME").ok().map(std::path::PathBuf::from);
-        let skill_roots =
-            Self::skill_roots(self.config.skill_data_dir.as_deref(), home_dir.as_deref());
+        let skill_roots = Self::skill_roots(
+            self.config.skill_data_dir.as_deref(),
+            home_dir.as_deref(),
+            self.gitea_skill_cache_dir.as_deref(),
+        );
 
         if skill_roots.is_empty() {
             return String::new();
@@ -1619,14 +1672,30 @@ impl AgentOrchestrator {
         (section, ids)
     }
 
+    /// Build the ordered list of directories to search for SKILL.md files.
+    ///
+    /// Priority (highest first):
+    /// 1. Gitea skill cache dir (populated at startup from remote, if configured)
+    /// 2. Configured `skill_data_dir` from TOML
+    /// 3. `~/.opencode/skills`
+    /// 4. `~/.claude/skills`
     fn skill_roots(
         configured: Option<&std::path::Path>,
         home_dir: Option<&std::path::Path>,
+        gitea_cache: Option<&std::path::Path>,
     ) -> Vec<std::path::PathBuf> {
         let mut roots = Vec::new();
 
-        if let Some(dir) = configured {
+        // Remote skills take priority — operators push updates to Gitea
+        // without modifying local files.
+        if let Some(dir) = gitea_cache {
             roots.push(dir.to_path_buf());
+        }
+
+        if let Some(dir) = configured {
+            if !roots.iter().any(|r| r == dir) {
+                roots.push(dir.to_path_buf());
+            }
         }
 
         if let Some(home) = home_dir {
@@ -1971,8 +2040,18 @@ impl AgentOrchestrator {
         // Create isolated git worktree for implementation-tier agents that modify code.
         // Review-tier agents (haiku) are read-only and don't need isolation.
         let needs_isolation = model.as_ref().map(|m| !m.contains("haiku")).unwrap_or(true);
+
+        // Resolve the git repo directory for worktree operations. Project-bound
+        // agents need a worktree from their own repo, not the orchestrator's.
+        let repo_dir: &Path = def
+            .project
+            .as_deref()
+            .and_then(|pid| self.config.project_by_id(pid))
+            .map(|p| p.working_dir.as_path())
+            .unwrap_or(&self.config.working_dir);
+
         let (worktree_path, worktree_guard) = if needs_isolation {
-            if let Some(path) = self.create_agent_worktree(&def.name).await {
+            if let Some(path) = self.create_agent_worktree(&def.name, repo_dir).await {
                 let guard = crate::worktree_guard::WorktreeGuard::new(&path);
                 (Some(path), Some(guard))
             } else {
@@ -1981,10 +2060,7 @@ impl AgentOrchestrator {
         } else {
             (None, None)
         };
-        let agent_working_dir = worktree_path
-            .as_ref()
-            .unwrap_or(&self.config.working_dir)
-            .clone();
+        let agent_working_dir = worktree_path.as_deref().unwrap_or(repo_dir).to_path_buf();
 
         // Build primary Provider from the agent definition for the spawner.
         let primary_provider = terraphim_types::capability::Provider {
@@ -5275,9 +5351,13 @@ impl AgentOrchestrator {
 
     /// Create a git worktree for an agent to work in isolation.
     ///
+    /// `repo_dir` is the git repository root where `git worktree add` runs.
+    /// For project-bound agents this is the project's working_dir; otherwise
+    /// it is the orchestrator's top-level working_dir.
+    ///
     /// Returns the worktree path if successful, None if worktree creation fails
     /// (fail-open: agent uses shared working_dir instead).
-    async fn create_agent_worktree(&self, agent_name: &str) -> Option<PathBuf> {
+    async fn create_agent_worktree(&self, agent_name: &str, repo_dir: &Path) -> Option<PathBuf> {
         let worktree_root = PathBuf::from("/tmp/adf-worktrees");
         if let Err(e) = tokio::fs::create_dir_all(&worktree_root).await {
             warn!(agent = %agent_name, error = %e, "failed to create worktree root");
@@ -5295,7 +5375,7 @@ impl AgentOrchestrator {
                 &worktree_path.to_string_lossy(),
                 "HEAD",
             ])
-            .current_dir(&self.config.working_dir)
+            .current_dir(repo_dir)
             .output()
             .await;
 
@@ -5304,6 +5384,7 @@ impl AgentOrchestrator {
                 info!(
                     agent = %agent_name,
                     path = %worktree_path.display(),
+                    repo = %repo_dir.display(),
                     "created isolated git worktree"
                 );
                 Some(worktree_path)
@@ -5325,7 +5406,7 @@ impl AgentOrchestrator {
     }
 
     /// Remove a git worktree after an agent finishes.
-    async fn remove_agent_worktree(&self, agent_name: &str, worktree_path: &Path) {
+    async fn remove_agent_worktree(&self, agent_name: &str, worktree_path: &Path, repo_dir: &Path) {
         // Force-remove even if there are uncommitted changes (they were already
         // committed by try_commit_agent_work or are intentionally discarded).
         let output = tokio::process::Command::new("git")
@@ -5335,7 +5416,7 @@ impl AgentOrchestrator {
                 "--force",
                 &worktree_path.to_string_lossy(),
             ])
-            .current_dir(&self.config.working_dir)
+            .current_dir(repo_dir)
             .output()
             .await;
 
@@ -5546,9 +5627,7 @@ impl AgentOrchestrator {
         // 13. D-2: Re-probe providers if cached results are stale
         if self.provider_health.is_stale() {
             if let Some(ref kg_router) = self.kg_router {
-                self.provider_health
-                    .probe_all(kg_router)
-                    .await;
+                self.provider_health.probe_all(kg_router).await;
                 if let Some(ref dir) = self
                     .config
                     .routing
@@ -6637,7 +6716,31 @@ impl AgentOrchestrator {
                 };
 
                 if !respawned {
-                    self.handle_agent_exit(&name, &def, status);
+                    // KG routing failed or no healthy route - try configured fallback before giving up
+                    if def.fallback_provider.is_some() {
+                        info!(
+                            agent = %name,
+                            fallback_provider = ?def.fallback_provider,
+                            fallback_model = ?def.fallback_model,
+                            "KG routing failed, respawning with configured fallback provider"
+                        );
+                        let mut fallback_def = def.clone();
+                        if let Some(ref fb_provider) = def.fallback_provider {
+                            fallback_def.cli_tool = fb_provider.clone();
+                        }
+                        if let Some(ref fb_model) = def.fallback_model {
+                            fallback_def.model = Some(fb_model.clone());
+                        }
+                        fallback_def.provider = None;
+                        fallback_def.fallback_provider = None;
+                        fallback_def.fallback_model = None;
+                        if let Err(e) = self.spawn_agent(&fallback_def).await {
+                            error!(agent = %name, error = %e, "failed to respawn with fallback");
+                            self.handle_agent_exit(&name, &def, status);
+                        }
+                    } else {
+                        self.handle_agent_exit(&name, &def, status);
+                    }
                 }
             } else {
                 self.handle_agent_exit(&name, &def, status);
@@ -6645,14 +6748,20 @@ impl AgentOrchestrator {
             self.record_project_meta_exit(&def, status).await;
 
             // Auto-commit in the agent's working directory (worktree or shared)
-            let commit_dir = worktree_path.as_deref().unwrap_or(&self.config.working_dir);
+            let project_repo: &Path = def
+                .project
+                .as_deref()
+                .and_then(|pid| self.config.project_by_id(pid))
+                .map(|p| p.working_dir.as_path())
+                .unwrap_or(&self.config.working_dir);
+            let commit_dir = worktree_path.as_deref().unwrap_or(project_repo);
             if status.success() {
                 self.try_commit_agent_work(&name, commit_dir).await;
             }
 
             // Clean up the worktree after committing
             if let Some(ref wt) = worktree_path {
-                self.remove_agent_worktree(&name, wt).await;
+                self.remove_agent_worktree(&name, wt, project_repo).await;
             }
         }
     }
@@ -7759,6 +7868,7 @@ mod tests {
             handoff_buffer_ttl_secs: None,
             persona_data_dir: None,
             skill_data_dir: None,
+            gitea_skill_repo: None,
             flows: vec![],
             flow_state_dir: None,
             gitea: None,
@@ -7934,6 +8044,7 @@ task = "test"
         let roots = AgentOrchestrator::skill_roots(
             Some(configured_skill_root.path()),
             Some(home_dir.path()),
+            None,
         );
 
         assert_eq!(roots[0], configured_skill_root.path());
@@ -7995,6 +8106,7 @@ task = "test"
             handoff_buffer_ttl_secs: None,
             persona_data_dir: None,
             skill_data_dir: None,
+            gitea_skill_repo: None,
             flows: vec![],
             flow_state_dir: None,
             gitea: None,
@@ -8941,6 +9053,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             include: vec![],
             providers: vec![],
             provider_budget_state_file: None,
+            gitea_skill_repo: None,
             pause_dir: None,
             project_circuit_breaker_threshold: 3,
             fleet_escalation_owner: None,

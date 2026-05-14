@@ -177,7 +177,9 @@ mod tests {
         let skill_dir = tmp.path().join("my-skill");
         tokio::fs::create_dir_all(&skill_dir).await.unwrap();
         let skill_file = skill_dir.join("SKILL.md");
-        tokio::fs::write(&skill_file, b"cached content").await.unwrap();
+        tokio::fs::write(&skill_file, b"cached content")
+            .await
+            .unwrap();
 
         let config = make_config(tmp.path().to_path_buf(), vec!["my-skill"]);
         // force=false should skip existing file without hitting network
