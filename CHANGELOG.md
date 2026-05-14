@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **ADF implementation-swarm split** into two parallel agents (`implementation-swarm-A` using `openai/gpt-5.3-codex`, `implementation-swarm-B` using `kimi-for-coding/k2p5`); both agents use the five-phase disciplined engineering process; `offset` field staggers issue selection to avoid conflicts; broken `quality-check`, `pr-spec-validator`, and `pr-security-sentinel` steps disabled to reduce rate-limit waste
 - **`QualityScore` type** added to `IndexedDocument` and `Document` in `terraphim_types`, carrying `logic_score`, `structure_score`, and `composite` (NaN-guarded) fields for downstream ranking (Refs #547)
 - **Rustdoc on `terraphim_server`** added `//!` crate-level doc, struct/enum/field docs and function doc-comments across `src/lib.rs`, `src/error.rs`, `src/api.rs`, and all `src/workflows/` sub-modules -- `RUSTDOCFLAGS="-W missing-docs" cargo doc --no-deps` now produces zero warnings
 - **Rustdoc on core public types** added doc comments to `ServiceError`, `TerraphimService`, middleware `Error`, rolegraph `Error`, `split_paragraphs`, `DocumentType`, `RouteDirective`, `MarkdownDirectives`, `Edge`, `ChatMessage`, and `Priority` across four crates (Refs #547)
