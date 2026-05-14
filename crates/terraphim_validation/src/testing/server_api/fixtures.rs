@@ -28,6 +28,7 @@ impl TestFixtures {
             synonyms: None,
             route: None,
             priority: None,
+            quality_score: None,
         }
     }
 
@@ -56,6 +57,7 @@ impl TestFixtures {
             synonyms: None,
             route: None,
             priority: None,
+            quality_score: None,
         }
     }
 
@@ -70,6 +72,7 @@ impl TestFixtures {
             limit: Some(10),
             layer: Layer::default(),
             include_pinned: false,
+            min_quality: None,
         }
     }
 
@@ -121,6 +124,7 @@ impl TestFixtures {
                 synonyms: None,
                 route: None,
                 priority: None,
+                quality_score: None,
             })
             .collect()
     }
@@ -143,6 +147,7 @@ impl TestFixtures {
             synonyms: None,
             route: None,
             priority: None,
+            quality_score: None,
         }
     }
 
@@ -163,6 +168,7 @@ impl TestFixtures {
             synonyms: None,
             route: None,
             priority: None,
+            quality_score: None,
         }
     }
 }

@@ -62,6 +62,7 @@ async fn test_kg_lookup_functionality_basic() {
         synonyms: None,
         route: None,
         priority: None,
+        quality_score: None,
     };
 
     // Test persistence layer

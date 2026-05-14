@@ -112,6 +112,7 @@ fn create_test_documents() -> Vec<Document> {
             synonyms: None,
             route: None,
             priority: None,
+            quality_score: None,
         },
         Document {
             id: "doc-2".to_string(),
@@ -129,6 +130,7 @@ fn create_test_documents() -> Vec<Document> {
             synonyms: None,
             route: None,
             priority: None,
+            quality_score: None,
         },
         Document {
             id: "doc-3".to_string(),
@@ -145,6 +147,7 @@ fn create_test_documents() -> Vec<Document> {
             synonyms: None,
             route: None,
             priority: None,
+            quality_score: None,
         },
     ]
 }

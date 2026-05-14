@@ -190,6 +190,7 @@ fn test_summarize_request_serialization() {
         synonyms: None,
         route: None,
         priority: None,
+        quality_score: None,
     };
 
     let summarize_request = SummarizeRequest {
@@ -451,6 +452,7 @@ fn test_batch_summarize_request_serialization() {
             synonyms: None,
             route: None,
             priority: None,
+            quality_score: None,
         },
         Document {
             id: "doc2".to_string(),
@@ -467,6 +469,7 @@ fn test_batch_summarize_request_serialization() {
             synonyms: None,
             route: None,
             priority: None,
+            quality_score: None,
         },
     ];
 
@@ -566,6 +569,7 @@ fn test_boundary_values() {
         synonyms: None,
         route: None,
         priority: None,
+        quality_score: None,
     };
 
     let doc_json = serde_json::to_string(&complete_doc);
@@ -587,6 +591,7 @@ fn test_boundary_values() {
         synonyms: None,
         route: None,
         priority: None,
+        quality_score: None,
     };
 
     let minimal_doc_json = serde_json::to_string(&minimal_doc);

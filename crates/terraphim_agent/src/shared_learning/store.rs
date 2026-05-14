@@ -1368,6 +1368,7 @@ mod tests {
                 synonyms: None,
                 route: None,
                 priority: None,
+                quality_score: None,
             };
             let learning_id = "learning-graph-test";
             graph.insert_document(learning_id, doc);

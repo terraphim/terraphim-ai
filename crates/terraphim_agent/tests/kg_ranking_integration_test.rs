@@ -316,6 +316,7 @@ async fn search_via_server(
         role: Some(RoleName::new(role)),
         layer: Layer::default(),
         include_pinned: false,
+        min_quality: None,
     };
 
     let response = client.search(&search_query).await?;
@@ -412,6 +413,7 @@ fn search_via_cli(server_url: &str, query: &str, role: &str) -> Result<(Vec<Docu
                             synonyms: None,
                             route: None,
                             priority: None,
+                            quality_score: None,
                         })
                     })
                     .collect()

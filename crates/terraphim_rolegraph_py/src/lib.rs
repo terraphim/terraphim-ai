@@ -202,6 +202,7 @@ impl From<PyDocument> for ::terraphim_types::Document {
             synonyms: None,
             route: None,
             priority: None,
+        quality_score: None,
         }
     }
 }

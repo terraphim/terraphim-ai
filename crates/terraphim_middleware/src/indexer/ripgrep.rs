@@ -129,6 +129,7 @@ impl RipgrepIndexer {
             synonyms: None,
             route: None,
             priority: None,
+            quality_score: None,
         };
         // Create a meaningful ID from the file path
         let original_id = format!("ripgrep_{}", file_path);

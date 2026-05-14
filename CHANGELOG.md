@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Rustdoc on core public types** added doc comments to `ServiceError`, `TerraphimService`, middleware `Error`, rolegraph `Error`, `split_paragraphs`, `DocumentType`, `RouteDirective`, `MarkdownDirectives`, `Edge`, `ChatMessage`, and `Priority` across four crates (Refs #547)
+- **Orchestrator webhook fix** resolves project from repo for unqualified `@adf:` mentions
+- **Provider probe timeout** increased from 60s to 120s for reliability
+- **Orchestrator fallback** triggers fallback provider on `rate_limit` exit when KG routing fails
+- **ADF config validation** added for `grace_period`, `max_cpu`, and `probe_ttl`
+- **Build-runner-llm** agent with Graph-first System, cost tracking, and BUILD.md build sequences
+- **Rate-limit backoff** enabled by default in orchestrator; `RATE_LIMIT_BACKOFF_ENABLED` env var wired to systemd service
 - **Intra-doc link fixes** resolved broken rustdoc links and unclosed HTML tag warnings across `terraphim_orchestrator`, `terraphim_types`, `terraphim_tracker` — cargo doc now produces zero warnings on all core crates
 - **Unique tempdir** in `test_tool_index_save_and_load` to eliminate cross-run state pollution (Refs #1340)
 - **Module-level rustdoc** added to `terraphim_dsm` and `terraphim_github_runner_server` — the final two binary crates lacking a crate-level `//!` comment
