@@ -1515,10 +1515,12 @@ impl TerraphimService {
     /// Filter documents by minimum composite quality score.
     ///
     /// Documents without a quality score are excluded when `min_quality` is set.
+    /// Out-of-range thresholds are clamped to `[0.0, 1.0]` before comparison.
     fn apply_min_quality_filter(docs: Vec<Document>, min_quality: Option<f64>) -> Vec<Document> {
         let Some(threshold) = min_quality else {
             return docs;
         };
+        let threshold = threshold.clamp(0.0, 1.0);
         docs.into_iter()
             .filter(|doc| {
                 doc.quality_score
@@ -3666,5 +3668,124 @@ mod tests {
 
         log::info!("✅ KG term search rank assignment test completed successfully!");
         Ok(())
+    }
+
+    // Helper to build a Document with a given composite quality score.
+    fn doc_with_quality(id: &str, knowledge: f64, logic: f64, structure: f64) -> Document {
+        Document {
+            id: id.to_string(),
+            url: format!("https://example.com/{id}"),
+            title: id.to_string(),
+            body: String::new(),
+            quality_score: Some(terraphim_types::QualityScore {
+                knowledge: Some(knowledge),
+                logic: Some(logic),
+                structure: Some(structure),
+                last_evaluated: None,
+            }),
+            ..Default::default()
+        }
+    }
+
+    fn doc_without_quality(id: &str) -> Document {
+        Document {
+            id: id.to_string(),
+            url: format!("https://example.com/{id}"),
+            title: id.to_string(),
+            body: String::new(),
+            quality_score: None,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn test_min_quality_none_returns_all_documents() {
+        // When min_quality is None, all documents are returned unchanged.
+        let docs = vec![
+            doc_with_quality("a", 0.9, 0.9, 0.9),
+            doc_with_quality("b", 0.1, 0.1, 0.1),
+            doc_without_quality("c"),
+        ];
+        let result = TerraphimService::apply_min_quality_filter(docs, None);
+        assert_eq!(result.len(), 3);
+    }
+
+    #[test]
+    fn test_min_quality_keeps_documents_at_or_above_threshold() {
+        // composite = (0.8 + 0.6 + 0.7) / 3 = 0.7
+        let high = doc_with_quality("high", 0.8, 0.6, 0.7);
+        // composite = (0.3 + 0.2 + 0.1) / 3 ≈ 0.2
+        let low = doc_with_quality("low", 0.3, 0.2, 0.1);
+        let docs = vec![high, low];
+
+        let result = TerraphimService::apply_min_quality_filter(docs, Some(0.5));
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].id, "high");
+    }
+
+    #[test]
+    fn test_min_quality_excludes_documents_below_threshold() {
+        // composite = 0.4
+        let doc = doc_with_quality("below", 0.4, 0.4, 0.4);
+        let result = TerraphimService::apply_min_quality_filter(vec![doc], Some(0.5));
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_min_quality_excludes_documents_without_quality_score() {
+        // Documents with no quality_score must be excluded when a threshold is set.
+        let no_score = doc_without_quality("no-score");
+        let result = TerraphimService::apply_min_quality_filter(vec![no_score], Some(0.0));
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_min_quality_exact_threshold_is_included() {
+        // composite = 0.5 exactly — must satisfy >= threshold
+        let doc = doc_with_quality("exact", 0.5, 0.5, 0.5);
+        let result = TerraphimService::apply_min_quality_filter(vec![doc], Some(0.5));
+        assert_eq!(result.len(), 1);
+    }
+
+    #[test]
+    fn test_min_quality_threshold_zero_excludes_no_score_docs() {
+        // Threshold 0.0 passes any document that has a score, but not scoreless ones.
+        let with_score = doc_with_quality("scored", 0.0, 0.0, 0.0);
+        let no_score = doc_without_quality("unscored");
+        let result =
+            TerraphimService::apply_min_quality_filter(vec![with_score, no_score], Some(0.0));
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].id, "scored");
+    }
+
+    #[test]
+    fn test_min_quality_empty_input_returns_empty() {
+        let result = TerraphimService::apply_min_quality_filter(vec![], Some(0.5));
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_min_quality_preserves_document_order() {
+        // Verify that documents passing the filter are returned in original order.
+        let a = doc_with_quality("a", 0.9, 0.9, 0.9);
+        let b = doc_with_quality("b", 0.8, 0.8, 0.8);
+        let c = doc_with_quality("c", 0.7, 0.7, 0.7);
+        let result = TerraphimService::apply_min_quality_filter(vec![a, b, c], Some(0.5));
+        assert_eq!(result.len(), 3);
+        assert_eq!(result[0].id, "a");
+        assert_eq!(result[1].id, "b");
+        assert_eq!(result[2].id, "c");
+    }
+
+    #[test]
+    fn test_min_quality_negative_threshold_clamped_to_zero() {
+        // A negative threshold is clamped to 0.0: documents with any score pass,
+        // documents without a score are still excluded.
+        let with_score = doc_with_quality("scored", 0.1, 0.1, 0.1);
+        let no_score = doc_without_quality("unscored");
+        let result =
+            TerraphimService::apply_min_quality_filter(vec![with_score, no_score], Some(-0.1));
+        assert_eq!(result.len(), 1, "only scored document should pass");
+        assert_eq!(result[0].id, "scored");
     }
 }
