@@ -59,6 +59,7 @@ pub fn learning_to_indexed_document(
         synonyms: None,
         route: None,
         priority: None,
+        quality_score: None,
     };
 
     IndexedDocument {

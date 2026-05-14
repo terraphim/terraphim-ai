@@ -8,6 +8,7 @@ use super::{
 };
 use crate::AppState;
 
+/// Axum handler for the `POST /workflows/vm-execution-demo` endpoint.
 pub async fn execute_vm_execution_demo(
     State(state): State<AppState>,
     Json(request): Json<WorkflowRequest>,

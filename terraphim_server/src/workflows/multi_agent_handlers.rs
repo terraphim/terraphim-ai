@@ -1248,6 +1248,7 @@ impl MultiAgentWorkflowExecutor {
         Ok(role.clone())
     }
 
+    /// Executes a VM-isolated workflow demonstration for the given prompt and role.
     #[allow(clippy::too_many_arguments)]
     pub async fn execute_vm_execution_demo(
         &self,

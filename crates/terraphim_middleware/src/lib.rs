@@ -35,6 +35,7 @@ pub use indexer::{search_haystacks, RipgrepIndexer};
 // #[cfg(test)]
 // mod tests; // Removed - no tests module
 
+/// Errors produced by the middleware layer during indexing and search orchestration.
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("Serde deserialization error: {0}")]

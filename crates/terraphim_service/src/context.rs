@@ -441,6 +441,7 @@ mod tests {
             synonyms: None,
             route: None,
             priority: None,
+            quality_score: None,
         };
 
         let context = context_manager.create_document_context(&document);
@@ -472,6 +473,7 @@ mod tests {
                 synonyms: None,
                 route: None,
                 priority: None,
+                quality_score: None,
             },
             Document {
                 id: "doc2".to_string(),
@@ -488,6 +490,7 @@ mod tests {
                 synonyms: None,
                 route: None,
                 priority: None,
+                quality_score: None,
             },
         ];
 
@@ -732,6 +735,7 @@ mod tests {
             synonyms: None,
             route: None,
             priority: None,
+            quality_score: None,
         };
 
         let context_item = context_manager.create_document_context(&document);

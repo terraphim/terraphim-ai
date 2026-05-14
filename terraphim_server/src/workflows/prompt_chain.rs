@@ -18,6 +18,7 @@ struct ChainStep {
     duration_ms: u64,
 }
 
+/// Axum handler for the `POST /workflows/prompt-chain` endpoint.
 pub async fn execute_prompt_chain(
     State(state): State<AppState>,
     Json(request): Json<WorkflowRequest>,

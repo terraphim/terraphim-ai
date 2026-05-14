@@ -72,6 +72,7 @@ async fn test_kg_preprocessing_basic_functionality() {
         synonyms: None,
         route: None,
         priority: None,
+    quality_score: None,
     };
 
     // Basic test: just verify the service can be created and document is preserved
@@ -165,6 +166,7 @@ async fn test_kg_preprocessing_respects_terraphim_it_flag() {
         synonyms: None,
         route: None,
         priority: None,
+        quality_score: None,
     };
 
     // Basic test: just verify we can create services with different terraphim_it settings
@@ -240,6 +242,7 @@ async fn test_kg_preprocessing_prevents_double_processing() {
         synonyms: None,
         route: None,
         priority: None,
+        quality_score: None,
     };
 
     let original_body = pre_processed_document.body.clone();

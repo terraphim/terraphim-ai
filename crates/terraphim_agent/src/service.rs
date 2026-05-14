@@ -324,6 +324,7 @@ impl TuiService {
             role: Some(role.clone()),
             layer: Layer::default(),
             include_pinned: false,
+            min_quality: None,
         };
 
         let mut service = self.service.lock().await;
@@ -331,6 +332,8 @@ impl TuiService {
     }
 
     /// Search documents using a complete SearchQuery (supports logical operators)
+    ///
+    /// Quality filtering via `query.min_quality` is applied by the underlying service.
     pub async fn search_with_query(&self, query: &SearchQuery) -> Result<Vec<Document>> {
         let mut service = self.service.lock().await;
         Ok(service.search(query).await?)

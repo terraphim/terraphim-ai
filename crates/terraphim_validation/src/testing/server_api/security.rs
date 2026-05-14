@@ -223,6 +223,7 @@ pub mod path_traversal_tests {
                 synonyms: None,
                 route: None,
                 priority: None,
+                quality_score: None,
             };
 
             let response = server.post("/documents", &malicious_document).await;
@@ -347,6 +348,7 @@ pub mod input_validation_tests {
             synonyms: None,
             route: None,
             priority: None,
+            quality_score: None,
         };
 
         let response = server.post("/documents", &large_document).await;
@@ -391,6 +393,7 @@ pub mod input_validation_tests {
             synonyms: None,
             route: None,
             priority: None,
+            quality_score: None,
         };
 
         let response = server.post("/documents", &malicious_document).await;
@@ -475,6 +478,7 @@ pub mod command_injection_tests {
                 synonyms: None,
                 route: None,
                 priority: None,
+                quality_score: None,
             };
 
             let response = server.post("/documents", &malicious_document).await;

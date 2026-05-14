@@ -94,6 +94,7 @@ async fn test_malformed_server_response() {
         role: Some(RoleName::new("Default")),
         layer: Layer::default(),
         include_pinned: false,
+        min_quality: None,
     };
 
     let result = client.search(&extreme_query).await;
@@ -141,6 +142,7 @@ async fn test_invalid_role_handling() {
         role: Some(RoleName::new("CompleteLyInvalidRoleName12345")),
         layer: Layer::default(),
         include_pinned: false,
+        min_quality: None,
     };
 
     let result = client.search(&invalid_query).await;
@@ -206,6 +208,7 @@ async fn test_empty_and_special_character_queries() {
             role: Some(RoleName::new("Default")),
             layer: Layer::default(),
             include_pinned: false,
+            min_quality: None,
         };
 
         let result = client.search(&search_query).await;
@@ -261,6 +264,7 @@ async fn test_concurrent_request_handling() {
                 role: Some(RoleName::new("Default")),
                 layer: Layer::default(),
                 include_pinned: false,
+                min_quality: None,
             };
             client_clone.search(&query).await
         });
@@ -371,6 +375,7 @@ async fn test_summarization_error_handling() {
         synonyms: None,
         route: None,
         priority: None,
+        quality_score: None,
     };
 
     let result = client
@@ -527,6 +532,7 @@ async fn test_graceful_degradation() {
                     role: Some(RoleName::new("Default")),
                     layer: Layer::default(),
                     include_pinned: false,
+                    min_quality: None,
                 };
                 client
                     .search(&query)

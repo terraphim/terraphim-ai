@@ -38,6 +38,7 @@ async fn test_weighted_haystack_ranking() {
         synonyms: None,
         route: None,
         priority: None,
+        quality_score: None,
     };
     let low_weight_doc = Document {
         id: "low_weight_doc".to_string(),
@@ -55,6 +56,7 @@ async fn test_weighted_haystack_ranking() {
         synonyms: None,
         route: None,
         priority: None,
+        quality_score: None,
     };
     // Create test haystacks with different weights
     let high_weight_haystack = Haystack {
@@ -122,6 +124,7 @@ async fn test_weighted_haystack_ranking() {
         role: Some(RoleName::from("Test Role")),
         layer: Layer::default(),
         include_pinned: false,
+        min_quality: None,
     };
     // Perform search which should apply haystack weights
     let search_result = service.search(&search_query).await.expect("Search failed");
@@ -179,6 +182,7 @@ async fn test_default_weight_handling() {
         synonyms: None,
         route: None,
         priority: None,
+        quality_score: None,
     };
 
     // Create test config with a default haystack
@@ -234,6 +238,7 @@ async fn test_default_weight_handling() {
         role: Some(RoleName::from("Test Role")),
         layer: Layer::default(),
         include_pinned: false,
+        min_quality: None,
     };
 
     let search_result = service.search(&search_query).await.expect("Search failed");

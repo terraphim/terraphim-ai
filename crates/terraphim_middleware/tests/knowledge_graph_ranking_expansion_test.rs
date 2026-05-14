@@ -127,6 +127,7 @@ async fn test_knowledge_graph_ranking_expansion() {
                 synonyms: None,
                 route: None,
                 priority: None,
+                quality_score: None,
             };
 
             initial_rolegraph.insert_document(&document.id, document.clone());
@@ -249,6 +250,7 @@ The Graph Analysis component works closely with existing graph processing system
                 synonyms: None,
                 route: None,
                 priority: None,
+                quality_score: None,
             };
 
             expanded_rolegraph.insert_document(&document.id, document.clone());

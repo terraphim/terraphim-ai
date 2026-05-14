@@ -327,6 +327,7 @@ mod tests {
                 synonyms: None,
                 route: None,
                 priority: None,
+            quality_score: None,
             },
             Document {
                 id: "2".to_string(),
@@ -343,6 +344,7 @@ mod tests {
                 synonyms: None,
                 route: None,
                 priority: None,
+            quality_score: None,
             },
         ];
 
@@ -382,6 +384,7 @@ mod tests {
                 synonyms: None,
                 route: None,
                 priority: None,
+            quality_score: None,
             },
             Document {
                 id: "2".to_string(),
@@ -398,6 +401,7 @@ mod tests {
                 synonyms: None,
                 route: None,
                 priority: None,
+            quality_score: None,
             },
         ];
 
@@ -437,6 +441,7 @@ mod tests {
                 synonyms: None,
                 route: None,
                 priority: None,
+            quality_score: None,
             },
             Document {
                 id: "2".to_string(),
@@ -453,6 +458,7 @@ mod tests {
                 synonyms: None,
                 route: None,
                 priority: None,
+            quality_score: None,
             },
         ];
 
@@ -492,6 +498,7 @@ mod tests {
                 synonyms: None,
                 route: None,
                 priority: None,
+            quality_score: None,
             },
             Document {
                 id: "2".to_string(),
@@ -508,6 +515,7 @@ mod tests {
                 synonyms: None,
                 route: None,
                 priority: None,
+            quality_score: None,
             },
         ];
 

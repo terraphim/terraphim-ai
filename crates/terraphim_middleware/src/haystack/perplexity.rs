@@ -282,6 +282,7 @@ impl PerplexityHaystackIndexer {
                 synonyms: None,
                 route: None,
                 priority: None,
+                quality_score: None,
             };
 
             documents.push(document);
@@ -314,6 +315,7 @@ impl PerplexityHaystackIndexer {
                         synonyms: None,
                         route: None,
                         priority: None,
+                        quality_score: None,
                     };
                     documents.push(source_doc);
                 }
@@ -438,6 +440,7 @@ impl PerplexityHaystackIndexer {
                     synonyms: None,
                     route: None,
                     priority: None,
+                    quality_score: None,
                 };
 
                 if let Err(e) = cache_doc.save().await {
