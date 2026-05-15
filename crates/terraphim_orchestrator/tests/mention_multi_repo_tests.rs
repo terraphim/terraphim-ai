@@ -40,6 +40,7 @@ fn agent(name: &str, project: Option<&str>) -> AgentDefinition {
         pre_check: None,
         gitea_issue: None,
         event_only: false,
+        evolution_enabled: false,
         project: project.map(|s| s.to_string()),
     }
 }

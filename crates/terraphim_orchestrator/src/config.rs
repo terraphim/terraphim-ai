@@ -198,6 +198,9 @@ pub struct OrchestratorConfig {
     /// Shared learning system configuration.
     #[serde(default)]
     pub learning: LearningConfig,
+    /// Agent evolution system configuration (requires `evolution` feature).
+    #[serde(default)]
+    pub evolution: EvolutionConfig,
     /// PR-fan-out dispatch configuration (ADF Phase 2, plan §5).
     ///
     /// Lists the agents that should be dispatched on a Gitea
@@ -346,6 +349,41 @@ impl Default for LearningConfig {
             max_entries: default_learning_max_entries(),
             archive_days: default_learning_archive_days(),
             consolidation_ticks: default_learning_consolidation_ticks(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EvolutionConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default = "default_evolution_max_memory_tokens")]
+    pub max_memory_tokens: usize,
+    #[serde(default = "default_evolution_max_snapshots")]
+    pub max_snapshots_per_agent: usize,
+    #[serde(default = "default_evolution_consolidation_ticks")]
+    pub consolidation_interval_ticks: u64,
+}
+
+fn default_evolution_max_memory_tokens() -> usize {
+    1500
+}
+
+fn default_evolution_max_snapshots() -> usize {
+    100
+}
+
+fn default_evolution_consolidation_ticks() -> u64 {
+    200
+}
+
+impl Default for EvolutionConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            max_memory_tokens: default_evolution_max_memory_tokens(),
+            max_snapshots_per_agent: default_evolution_max_snapshots(),
+            consolidation_interval_ticks: default_evolution_consolidation_ticks(),
         }
     }
 }
@@ -664,6 +702,10 @@ pub struct AgentDefinition {
     /// rejected at load time.
     #[serde(default)]
     pub project: Option<String>,
+    /// Enable evolution tracking for this agent (requires `evolution` feature
+    /// and top-level `evolution.enabled = true`). Default: false.
+    #[serde(default)]
+    pub evolution_enabled: bool,
 }
 
 /// Agent layer in the dark factory hierarchy.

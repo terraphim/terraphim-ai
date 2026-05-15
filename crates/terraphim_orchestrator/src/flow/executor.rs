@@ -240,6 +240,7 @@ impl FlowExecutor {
             gitea_issue: None,
             event_only: false,
             project: None,
+            evolution_enabled: false,
         };
 
         // Build provider for spawner

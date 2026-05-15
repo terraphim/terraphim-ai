@@ -435,7 +435,7 @@ action:: opencode -m {{ model }} -p "{{ prompt }}"
             "priority:: 60\nsynonyms:: verify, validate, check results, drift detection\n\
              route:: anthropic, haiku\naction:: claude --model {{ model }} -p \"{{ prompt }}\" --max-turns 30\n\
              route:: kimi, kimi-for-coding/k2p5\naction:: opencode run -m {{ model }} --format json \"{{ prompt }}\"\n\
-             route:: zai, zai-coding-plan/glm-5-turbo\naction:: opencode run -m {{ model }} --format json \"{{ prompt }}\"\n\
+             route:: zai, zai-coding-plan/glm-5.1\naction:: opencode run -m {{ model }} --format json \"{{ prompt }}\"\n\
              route:: openai, openai/gpt-5.4-mini\naction:: opencode run -m {{ model }} --format json \"{{ prompt }}\"\n",
         );
 
@@ -460,7 +460,7 @@ action:: opencode -m {{ model }} -p "{{ prompt }}"
             .first_healthy_route(&["anthropic".to_string(), "kimi".to_string()])
             .unwrap();
         assert_eq!(healthy2.provider, "zai");
-        assert_eq!(healthy2.model, "zai-coding-plan/glm-5-turbo");
+        assert_eq!(healthy2.model, "zai-coding-plan/glm-5.1");
 
         // Four routes: anthropic + kimi + zai + openai
         assert_eq!(decision.fallback_routes.len(), 4);

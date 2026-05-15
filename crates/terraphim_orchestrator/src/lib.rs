@@ -40,6 +40,7 @@ pub mod dispatcher;
 pub mod dual_mode;
 pub mod error;
 pub mod error_signatures;
+pub mod evolution;
 pub mod flow;
 pub mod gitea_skill_loader;
 pub mod handoff;
@@ -314,6 +315,9 @@ pub struct AgentOrchestrator {
     /// directory is prepended to the skill search path so remote skills
     /// shadow local ones while local directories remain as fallback.
     gitea_skill_cache_dir: Option<PathBuf>,
+    /// Agent evolution manager. No-op when evolution feature is disabled
+    /// or `evolution.enabled = false` in config.
+    evolution_manager: evolution::EvolutionManager,
 }
 
 /// Build the composite restart-state key for an agent definition.
@@ -855,6 +859,7 @@ impl AgentOrchestrator {
                 }
             },
             gitea_skill_cache_dir: None,
+            evolution_manager: evolution::EvolutionManager::new(config.evolution.clone()),
         })
     }
 
@@ -7829,6 +7834,7 @@ mod tests {
 
                     gitea_issue: None,
                     event_only: false,
+                    evolution_enabled: false,
 
                     project: None,
                 },
@@ -7855,6 +7861,7 @@ mod tests {
 
                     gitea_issue: None,
                     event_only: false,
+                    evolution_enabled: false,
 
                     project: None,
                 },
@@ -7888,6 +7895,7 @@ mod tests {
             fleet_escalation_repo: None,
             post_merge_gate: None,
             learning: config::LearningConfig::default(),
+            evolution: config::EvolutionConfig::default(),
             pr_dispatch: None,
             pr_dispatch_per_project: Default::default(),
         }
@@ -8094,6 +8102,7 @@ task = "test"
 
                 gitea_issue: None,
                 event_only: false,
+                evolution_enabled: false,
 
                 project: None,
             }],
@@ -8126,6 +8135,7 @@ task = "test"
             fleet_escalation_repo: None,
             post_merge_gate: None,
             learning: config::LearningConfig::default(),
+            evolution: config::EvolutionConfig::default(),
             pr_dispatch: None,
             pr_dispatch_per_project: Default::default(),
         }
@@ -8210,6 +8220,7 @@ task = "test"
 
             gitea_issue: None,
             event_only: false,
+            evolution_enabled: false,
 
             project: None,
         }];
@@ -8415,6 +8426,7 @@ task = "test"
 
             gitea_issue: None,
             event_only: false,
+            evolution_enabled: false,
 
             project: None,
         }];
@@ -8503,6 +8515,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
 
             gitea_issue: None,
             event_only: false,
+            evolution_enabled: false,
 
             project: None,
         }];
@@ -8757,6 +8770,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             pre_check: None,
             gitea_issue: None,
             event_only: false,
+            evolution_enabled: false,
             project: None,
         }];
         let mut orch = AgentOrchestrator::new(config).unwrap();
@@ -8924,6 +8938,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             pre_check: None,
             gitea_issue: None,
             event_only: false,
+            evolution_enabled: false,
             project: None,
         }];
 
@@ -9018,6 +9033,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
                 pre_check: None,
                 gitea_issue: None,
                 event_only: false,
+                evolution_enabled: false,
                 project: Some("alpha".to_string()),
             }],
             restart_cooldown_secs: 0,
@@ -9060,6 +9076,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             fleet_escalation_repo: None,
             post_merge_gate: None,
             learning: config::LearningConfig::default(),
+            evolution: config::EvolutionConfig::default(),
             pr_dispatch: None,
             pr_dispatch_per_project: Default::default(),
         };
@@ -9311,6 +9328,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             pre_check: None,
             gitea_issue: None,
             event_only: false,
+            evolution_enabled: false,
             project: Some("alpha".to_string()),
         });
         config.pr_dispatch_per_project.insert(
@@ -9710,6 +9728,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             pre_check: None,
             gitea_issue: None,
             event_only: false,
+            evolution_enabled: false,
             project: Some("alpha".to_string()),
         });
         // The per-project block takes precedence over the top-level block,
@@ -10051,6 +10070,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             pre_check: None,
             gitea_issue: None,
             event_only: false,
+            evolution_enabled: false,
             project: Some("alpha".to_string()),
         });
         // The per-project block takes precedence over the top-level block,
@@ -10344,6 +10364,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             pre_check: None,
             gitea_issue: None,
             event_only: false,
+            evolution_enabled: false,
             project: Some("alpha".to_string()),
         });
         config.pr_dispatch = Some(crate::config::PrDispatchConfig {
@@ -10624,6 +10645,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             pre_check: None,
             gitea_issue: None,
             event_only: false,
+            evolution_enabled: false,
             project: Some("alpha".to_string()),
         });
         // The per-project block takes precedence over the top-level block,
@@ -10916,6 +10938,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             pre_check: None,
             gitea_issue: None,
             event_only: true,
+            evolution_enabled: false,
             project: None,
         }];
         // mentions config required so handle_webhook_dispatch does not bail at the top.
@@ -10969,6 +10992,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             pre_check: None,
             gitea_issue: None,
             event_only: true,
+            evolution_enabled: false,
             project: None,
         }];
         config.mentions = Some(crate::config::MentionConfig::default());
@@ -11024,6 +11048,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             pre_check: None,
             gitea_issue: Some(9999),
             event_only: true,
+            evolution_enabled: false,
             project: None,
         };
 

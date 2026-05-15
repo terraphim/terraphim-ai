@@ -56,13 +56,13 @@ fn register_providers(orchestrator: &mut AgentOrchestrator) {
         ],
     });
 
-    // Deep thinking, architecture, security: zai-coding-plan/glm-5-turbo
+    // Deep thinking, architecture, security: zai-coding-plan/glm-5.1
     // Subscription: ZAI subscription via zai-coding-plan prefix.
     router.add_provider(Provider {
-        id: "zai-coding-plan/glm-5-turbo".into(),
-        name: "GLM-5-Turbo (ZAI subscription)".into(),
+        id: "zai-coding-plan/glm-5.1".into(),
+        name: "GLM-5.1 (ZAI subscription)".into(),
         provider_type: ProviderType::Llm {
-            model_id: "glm-5-turbo".into(),
+            model_id: "glm-5.1".into(),
             api_endpoint: "https://open.bigmodel.cn".into(),
         },
         capabilities: vec![

@@ -305,6 +305,7 @@ fn agent_with_model(name: &str, model: &str) -> AgentDefinition {
         pre_check: None,
         gitea_issue: None,
         event_only: false,
+        evolution_enabled: false,
         project: None,
     }
 }
