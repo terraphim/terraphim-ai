@@ -218,6 +218,43 @@ pub struct OrchestratorConfig {
     /// 3. [`PrDispatchConfig::legacy_default`].
     #[serde(default, skip_deserializing)]
     pub pr_dispatch_per_project: std::collections::HashMap<String, PrDispatchConfig>,
+    /// Gitea skill repository configuration for loading skills from a remote repo.
+    #[serde(default)]
+    pub gitea_skill_repo: Option<GiteaSkillRepoConfig>,
+}
+
+/// Configuration for loading skills from a Gitea repository.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GiteaSkillRepoConfig {
+    /// Repository URL.
+    pub url: String,
+    /// Repository owner.
+    pub owner: String,
+    /// Repository name.
+    pub repo: String,
+    /// Git reference (branch, tag, or commit).
+    #[serde(default = "default_git_ref")]
+    pub git_ref: String,
+    /// Local cache directory.
+    #[serde(default)]
+    pub cache_dir: PathBuf,
+    /// Optional authentication token.
+    #[serde(default)]
+    pub token: Option<String>,
+    /// Fetch timeout in seconds.
+    #[serde(default = "default_fetch_timeout")]
+    pub fetch_timeout_secs: u64,
+    /// List of skills to load.
+    #[serde(default)]
+    pub skills: Vec<String>,
+}
+
+fn default_git_ref() -> String {
+    "main".to_string()
+}
+
+fn default_fetch_timeout() -> u64 {
+    30
 }
 
 /// PR-fan-out routing table for the `pull_request.opened` event (ADF Phase 2,
