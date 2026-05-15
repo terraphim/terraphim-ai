@@ -48,6 +48,10 @@ pub struct DockerExecutor {
     /// is `None` until the container is created and published.
     session_to_container: DashMap<SessionId, Arc<Mutex<Option<String>>>>,
     image: String,
+    /// HostConfig applied to every session container. Defaults to
+    /// `default_host_config()` (permissive profile); override per executor
+    /// via `with_host_config`.
+    host_config: HostConfig,
     capabilities: Vec<Capability>,
 }
 
@@ -99,6 +103,7 @@ impl DockerExecutor {
             docker,
             session_to_container: DashMap::new(),
             image: DEFAULT_IMAGE.to_string(),
+            host_config: default_host_config(),
             capabilities,
         })
     }
@@ -107,6 +112,14 @@ impl DockerExecutor {
         let mut executor = Self::new(config)?;
         executor.image = image.to_string();
         Ok(executor)
+    }
+
+    /// Override the per-container `HostConfig` (resource limits, network
+    /// mode, capability drops, rootfs read-only flag). Replaces the entire
+    /// default profile.
+    pub fn with_host_config(mut self, host_config: HostConfig) -> Self {
+        self.host_config = host_config;
+        self
     }
 
     async fn ensure_container(&self, session_id: &SessionId) -> RlmResult<String> {
@@ -152,7 +165,7 @@ impl DockerExecutor {
         let config = ContainerCreateBody {
             image: Some(self.image.clone()),
             cmd: Some(vec!["sleep".to_string(), "infinity".to_string()]),
-            host_config: Some(default_host_config()),
+            host_config: Some(self.host_config.clone()),
             ..Default::default()
         };
 
@@ -480,6 +493,54 @@ mod tests {
             .unwrap_or(false)
     }
 
+    /// Container-running tests need the default image cached locally.
+    /// We skip rather than auto-pull to keep test latency bounded and
+    /// network access optional.
+    fn is_default_image_present() -> bool {
+        std::process::Command::new("docker")
+            .args(["image", "inspect", DEFAULT_IMAGE])
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false)
+    }
+
+    fn skip_unless_image_ready(test_name: &str) -> bool {
+        if !is_docker_available() {
+            eprintln!("Skipping {}: Docker not available", test_name);
+            return false;
+        }
+        if !is_default_image_present() {
+            eprintln!(
+                "Skipping {}: image {} not present locally (run `docker pull {}` to enable)",
+                test_name, DEFAULT_IMAGE, DEFAULT_IMAGE
+            );
+            return false;
+        }
+        true
+    }
+
+    #[test]
+    fn test_with_host_config_overrides_default() {
+        if !is_docker_available() {
+            eprintln!("Skipping test: Docker not available");
+            return;
+        }
+        let strict = HostConfig {
+            memory: Some(64 * 1024 * 1024),
+            pids_limit: Some(32),
+            cap_drop: Some(vec!["ALL".to_string()]),
+            network_mode: Some("none".to_string()),
+            readonly_rootfs: Some(true),
+            ..Default::default()
+        };
+        let exec = DockerExecutor::new(RlmConfig::minimal())
+            .unwrap()
+            .with_host_config(strict.clone());
+        assert_eq!(exec.host_config.memory, strict.memory);
+        assert_eq!(exec.host_config.network_mode, strict.network_mode);
+        assert_eq!(exec.host_config.readonly_rootfs, strict.readonly_rootfs);
+    }
+
     #[test]
     fn test_default_host_config_permissive_profile() {
         // Verify the design-decision values are wired into HostConfig.
@@ -567,15 +628,16 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore] // requires docker daemon access
     async fn test_docker_release_session_container_removes() {
-        if !is_docker_available() {
+        if !skip_unless_image_ready("test_docker_release_session_container_removes") {
             return;
         }
         let exec = DockerExecutor::new(RlmConfig::minimal()).unwrap();
-        let mut ctx = ExecutionContext::default();
-        ctx.session_id = SessionId::new();
-        ctx.timeout_ms = 30_000;
+        let ctx = ExecutionContext {
+            session_id: SessionId::new(),
+            timeout_ms: 30_000,
+            ..Default::default()
+        };
 
         let result = exec.execute_command("echo hi", &ctx).await.unwrap();
         assert!(result.is_success(), "echo should succeed: {:?}", result);
@@ -591,9 +653,8 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore] // requires docker daemon access
     async fn test_docker_concurrent_ensure_no_leak() {
-        if !is_docker_available() {
+        if !skip_unless_image_ready("test_docker_concurrent_ensure_no_leak") {
             return;
         }
         let exec = std::sync::Arc::new(DockerExecutor::new(RlmConfig::minimal()).unwrap());

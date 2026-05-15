@@ -40,18 +40,34 @@ log_debug() {
     fi
 }
 
-# Portable timeout wrapper. Reads stdin, runs the command with a hard kill
-# after $1 seconds, propagates stdout/stderr. Uses pure POSIX shell so it
-# works on macOS without GNU coreutils (`gtimeout`).
+# Portable timeout wrapper. Reads stdin, runs the command in its own process
+# group with a hard kill after $1 seconds, propagates stdout/stderr. Uses
+# pure POSIX shell so it works on macOS without GNU coreutils (`gtimeout`).
+#
+# Process-group semantics: the child runs under `setsid` (or, on macOS where
+# setsid lacks the `--` form, an inline pgid trick). Both the watchdog
+# escalation kill and the watchdog teardown kill use negative pids, so a
+# recycled pid cannot be hit even if the wait() race fires.
 run_with_timeout() {
     local timeout_secs="$1"; shift
-    "$@" &
+
+    # Start command in a new process group so kill -- -PGID hits exactly the
+    # descendant tree. `setsid` is POSIX on Linux; macOS bash ships it via
+    # /usr/bin/setsid (since 10.15). Fall back to plain & on systems lacking
+    # setsid (rare).
+    if command -v setsid >/dev/null 2>&1; then
+        setsid -- "$@" &
+    else
+        "$@" &
+    fi
     local pid=$!
+
     (
         sleep "$timeout_secs"
-        kill -TERM "$pid" 2>/dev/null
+        # Negative pid = process group; harmless if pid already exited.
+        kill -TERM -- "-$pid" 2>/dev/null || kill -TERM "$pid" 2>/dev/null
         sleep 1
-        kill -KILL "$pid" 2>/dev/null
+        kill -KILL -- "-$pid" 2>/dev/null || kill -KILL "$pid" 2>/dev/null
     ) &
     local watcher=$!
     local rc=0
@@ -60,6 +76,8 @@ run_with_timeout() {
     else
         rc=$?
     fi
+    # Tear down the watchdog. It targets its own pid (this shell's child),
+    # not the recycled pid space.
     kill -KILL "$watcher" 2>/dev/null
     wait "$watcher" 2>/dev/null
     return $rc
@@ -169,8 +187,19 @@ main() {
         local rlm_args
         local result
 
-        rlm_cmd=$(echo "$command" | awk '{print $1}' | tr '[:upper:]' '[:lower:]')
-        rlm_args=$(echo "$command" | awk '{$1=""; print $0}' | sed 's/^[[:space:]]*//')
+        # Bash parameter expansion preserves internal whitespace and any
+        # literal quotes in the prompt, unlike `awk '{$1=""; print $0}'`
+        # which collapses runs of whitespace.
+        rlm_cmd="${command%% *}"
+        rlm_cmd="$(printf '%s' "$rlm_cmd" | tr '[:upper:]' '[:lower:]')"
+        # Strip the first word (and exactly one separating space) to get
+        # everything else verbatim. If the command has no trailing args,
+        # the result is empty.
+        if [[ "$command" == *" "* ]]; then
+            rlm_args="${command#* }"
+        else
+            rlm_args=""
+        fi
 
         log_debug "RLM command: $rlm_cmd"
         log_debug "RLM args: $rlm_args"

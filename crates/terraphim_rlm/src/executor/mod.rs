@@ -192,8 +192,10 @@ mod tests {
         // backend_preference=[Local] forces selection of LocalExecutor
         // regardless of which other backends are available, exercising the
         // warn-log path on the Local arm.
-        let mut config = RlmConfig::default();
-        config.backend_preference = vec![BackendType::Local];
+        let config = RlmConfig {
+            backend_preference: vec![BackendType::Local],
+            ..Default::default()
+        };
 
         let executor = select_executor(&config).await.expect("should select Local");
         assert_eq!(executor.backend_type(), BackendType::Local);
@@ -203,9 +205,11 @@ mod tests {
     async fn test_select_executor_e2b_unimplemented_falls_through_to_local() {
         // With an E2B api key set but no Firecracker/Docker available,
         // selector should not stall on the E2B arm and should reach Local.
-        let mut config = RlmConfig::default();
-        config.backend_preference = vec![BackendType::E2b, BackendType::Local];
-        config.e2b_api_key = Some("dummy".to_string());
+        let config = RlmConfig {
+            backend_preference: vec![BackendType::E2b, BackendType::Local],
+            e2b_api_key: Some("dummy".to_string()),
+            ..Default::default()
+        };
 
         let executor = select_executor(&config)
             .await

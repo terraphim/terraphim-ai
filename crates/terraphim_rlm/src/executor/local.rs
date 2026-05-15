@@ -258,8 +258,10 @@ mod tests {
     #[tokio::test]
     async fn test_local_honours_ctx_timeout() {
         let executor = LocalExecutor::new();
-        let mut ctx = ExecutionContext::default();
-        ctx.timeout_ms = 200;
+        let ctx = ExecutionContext {
+            timeout_ms: 200,
+            ..Default::default()
+        };
 
         let start = Instant::now();
         let result = executor.execute_command("sleep 5", &ctx).await.unwrap();
@@ -280,32 +282,49 @@ mod tests {
         // The presence of `kill_on_drop(true)` in build_command means the spawned
         // child is reaped when the future running it is dropped on timeout.
         // We assert this by giving the snippet a unique marker, timing out, and
-        // checking pgrep finds nothing matching the marker afterwards.
+        // polling pgrep with bounded backoff so the test stays deterministic
+        // on loaded CI (kernel reaping is fast but not instantaneous).
         let executor = LocalExecutor::new();
-        let mut ctx = ExecutionContext::default();
-        ctx.timeout_ms = 100;
-        let marker = format!("terraphim-rlm-marker-{}", std::process::id());
+        let ctx = ExecutionContext {
+            timeout_ms: 100,
+            ..Default::default()
+        };
+        let marker = format!(
+            "terraphim-rlm-marker-{}-{}",
+            std::process::id(),
+            ulid::Ulid::new()
+        );
 
         let _ = executor
             .execute_command(&format!("sleep 30 && echo {}", marker), &ctx)
             .await
             .unwrap();
 
-        // Give the kernel a moment to reap.
-        tokio::time::sleep(Duration::from_millis(200)).await;
-
-        let pgrep = std::process::Command::new("pgrep")
-            .args(["-f", &marker])
-            .output();
-
-        if let Ok(output) = pgrep {
-            // pgrep returns 1 when no processes match. If it finds a match (rc 0),
-            // a sleep child outlived its timeout - the bug we're guarding against.
-            assert!(
-                !output.status.success(),
-                "child process leaked after timeout: pgrep found '{}'",
-                String::from_utf8_lossy(&output.stdout)
-            );
+        // Poll up to 2s for the marker process to disappear (50 ms steps).
+        let deadline = Instant::now() + Duration::from_secs(2);
+        loop {
+            let pgrep = std::process::Command::new("pgrep")
+                .args(["-f", &marker])
+                .output();
+            let still_alive = match pgrep {
+                Ok(o) => o.status.success(),
+                Err(_) => break, // pgrep absent: cannot verify, accept.
+            };
+            if !still_alive {
+                return;
+            }
+            if Instant::now() >= deadline {
+                let leftover = std::process::Command::new("pgrep")
+                    .args(["-f", &marker])
+                    .output()
+                    .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
+                    .unwrap_or_default();
+                panic!(
+                    "child process leaked after timeout: pgrep still finds '{}'",
+                    leftover
+                );
+            }
+            tokio::time::sleep(Duration::from_millis(50)).await;
         }
     }
 

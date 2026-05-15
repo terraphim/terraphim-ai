@@ -186,6 +186,18 @@ impl TerraphimRlm {
             let _ = sender.send(()).await;
         }
 
+        // Release executor-side per-session resources (Docker container,
+        // Firecracker VM via the trait's default Ok(()) on backends without
+        // per-session state). Errors are logged but not propagated: session
+        // teardown must succeed even if the backend is unreachable.
+        if let Err(e) = self.executor.end_session(session_id).await {
+            log::warn!(
+                "executor.end_session({}) failed during destroy_session: {}",
+                session_id,
+                e
+            );
+        }
+
         // Destroy the session
         self.session_manager.destroy_session(session_id)?;
         log::info!("Destroyed session: {}", session_id);
@@ -821,13 +833,19 @@ mod tests {
     /// Mock executor for testing
     struct MockExecutor {
         capabilities: Vec<Capability>,
+        end_session_calls: std::sync::Arc<std::sync::atomic::AtomicUsize>,
     }
 
     impl MockExecutor {
         fn new() -> Self {
             Self {
                 capabilities: vec![Capability::PythonExecution, Capability::BashExecution],
+                end_session_calls: std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0)),
             }
+        }
+
+        fn end_session_counter(&self) -> std::sync::Arc<std::sync::atomic::AtomicUsize> {
+            self.end_session_calls.clone()
         }
     }
 
@@ -900,6 +918,12 @@ mod tests {
         async fn cleanup(&self) -> Result<(), Self::Error> {
             Ok(())
         }
+
+        async fn end_session(&self, _session_id: &SessionId) -> Result<(), Self::Error> {
+            self.end_session_calls
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            Ok(())
+        }
     }
 
     #[test]
@@ -932,6 +956,27 @@ mod tests {
         // Destroy session
         rlm.destroy_session(&session.id).await.unwrap();
         assert!(rlm.get_session(&session.id).is_err());
+    }
+
+    #[tokio::test]
+    async fn test_destroy_session_calls_executor_end_session() {
+        // Regression guard: destroy_session must release executor-side
+        // per-session resources via the ExecutionEnvironment::end_session
+        // trait method.
+        let config = RlmConfig::minimal();
+        let executor = MockExecutor::new();
+        let counter = executor.end_session_counter();
+        let rlm = TerraphimRlm::with_executor(config, executor).unwrap();
+
+        let session = rlm.create_session().await.unwrap();
+        assert_eq!(counter.load(std::sync::atomic::Ordering::SeqCst), 0);
+
+        rlm.destroy_session(&session.id).await.unwrap();
+        assert_eq!(
+            counter.load(std::sync::atomic::Ordering::SeqCst),
+            1,
+            "destroy_session must invoke executor.end_session exactly once"
+        );
     }
 
     #[tokio::test]
