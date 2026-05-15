@@ -1,5 +1,5 @@
 use aho_corasick::{AhoCorasick, MatchKind};
-use terraphim_types::{NormalizedTerm, NormalizedTermValue, Thesaurus};
+use terraphim_types::{NormalizedTerm, NormalizedTermValue, RoleName, Thesaurus};
 
 use crate::url_protector::UrlProtector;
 
@@ -77,6 +77,72 @@ pub fn find_matches(
         });
     }
     Ok(matches)
+}
+
+/// Compute the list of thesaurus concepts matched by `query`.
+///
+/// Wraps [`find_matches`] with the small ergonomic shim used by callers
+/// that already hold a [`Thesaurus`] and only care about the matched terms,
+/// not the full [`Matched`] records or positions. Returns the term values
+/// of every matched entry.
+///
+/// On any matching error this returns an empty `Vec` and logs at `debug!`,
+/// because all current callers (robot-mode search envelope) treat
+/// "concepts_matched" as a best-effort enrichment field that must never
+/// fail the surrounding response.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use terraphim_automata::compute_concepts_matched;
+/// use terraphim_types::Thesaurus;
+///
+/// let thesaurus = Thesaurus::new("role-eng".into());
+/// // ... populate thesaurus ...
+/// let concepts = compute_concepts_matched("learning rust async", &thesaurus);
+/// ```
+pub fn compute_concepts_matched(query: &str, thesaurus: &Thesaurus) -> Vec<String> {
+    match find_matches(query, thesaurus.clone(), false) {
+        Ok(matches) => matches.into_iter().map(|m| m.term).collect(),
+        Err(e) => {
+            log::debug!("compute_concepts_matched: find_matches failed: {}", e);
+            Vec::new()
+        }
+    }
+}
+
+/// Build a minimal [`Thesaurus`] from a slice of plain term strings, assigning
+/// each an auto-generated unique id via [`NormalizedTerm::with_auto_id`].
+///
+/// Intended for callers that receive lossy thesaurus data over the wire
+/// (e.g. an HTTP API that returns only `HashMap<String, String>` values)
+/// and need a `Thesaurus` for [`find_matches`] / [`compute_concepts_matched`]
+/// without committing to a fake id (`1u64` for every term).
+///
+/// The first argument is used to label the thesaurus for diagnostics; pass
+/// the role name or any meaningful tag.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use terraphim_automata::thesaurus_from_terms;
+/// use terraphim_types::RoleName;
+///
+/// let role = RoleName::new("Engineer");
+/// let values = vec!["rust".to_string(), "async".to_string()];
+/// let thesaurus = thesaurus_from_terms(&role, values.iter().map(String::as_str));
+/// ```
+pub fn thesaurus_from_terms<'a, I>(role: &RoleName, values: I) -> Thesaurus
+where
+    I: IntoIterator<Item = &'a str>,
+{
+    let mut thesaurus = Thesaurus::new(format!("role-{}", role));
+    for value in values {
+        let nv = NormalizedTermValue::from(value);
+        let term = NormalizedTerm::with_auto_id(nv.clone());
+        thesaurus.insert(nv, term);
+    }
+    thesaurus
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -232,6 +298,74 @@ fn find_paragraph_end(text: &str, from_index: usize) -> usize {
     match end_rel {
         Some(i) => from_index + i,
         None => text.len(),
+    }
+}
+
+#[cfg(test)]
+mod compute_concepts_matched_tests {
+    use super::*;
+    use terraphim_types::RoleName;
+
+    #[test]
+    fn empty_thesaurus_returns_empty() {
+        let thesaurus = Thesaurus::new("empty".to_string());
+        assert!(compute_concepts_matched("rust async tokio", &thesaurus).is_empty());
+    }
+
+    #[test]
+    fn single_term_match() {
+        let role = RoleName::new("Engineer");
+        let thesaurus = thesaurus_from_terms(&role, ["rust"]);
+        let matches = compute_concepts_matched("learning rust today", &thesaurus);
+        assert_eq!(matches, vec!["rust".to_string()]);
+    }
+
+    #[test]
+    fn case_insensitive() {
+        let role = RoleName::new("Engineer");
+        let thesaurus = thesaurus_from_terms(&role, ["rust"]);
+        let matches = compute_concepts_matched("RUST is great", &thesaurus);
+        // The matched term carries the case from the input text.
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].to_lowercase(), "rust");
+    }
+
+    #[test]
+    fn parity_full_vs_string_built_thesaurus() {
+        // Regression test: a Thesaurus built from full NormalizedTerm records
+        // (offline robot-search path) and one built via thesaurus_from_terms
+        // (server robot-search path, lossy HTTP API) must produce identical
+        // compute_concepts_matched output for the same query.
+        let role = RoleName::new("Engineer");
+        let terms = ["rust", "tokio", "async"];
+
+        // Offline shape: ids carried through from the in-memory thesaurus.
+        let mut offline = Thesaurus::new("offline".to_string());
+        for (i, t) in terms.iter().enumerate() {
+            let nv = NormalizedTermValue::from(*t);
+            offline.insert(nv.clone(), NormalizedTerm::new(i as u64 + 100, nv));
+        }
+
+        // Server shape: only string values available; ids assigned by helper.
+        let server = thesaurus_from_terms(&role, terms.iter().copied());
+
+        let query = "Today I am learning rust async with tokio";
+        let mut a = compute_concepts_matched(query, &offline);
+        let mut b = compute_concepts_matched(query, &server);
+        a.sort();
+        b.sort();
+        assert_eq!(a, b, "offline/server thesaurus shapes must agree");
+    }
+
+    #[test]
+    fn multiple_terms_unique_ids() {
+        let role = RoleName::new("Engineer");
+        let thesaurus = thesaurus_from_terms(&role, ["rust", "tokio", "async"]);
+        // with_auto_id must give distinct ids; verify by collecting the
+        // underlying NormalizedTerm.id values from the thesaurus.
+        let ids: std::collections::HashSet<u64> =
+            thesaurus.into_iter().map(|(_, term)| term.id).collect();
+        assert_eq!(ids.len(), 3, "with_auto_id should produce unique ids");
     }
 }
 

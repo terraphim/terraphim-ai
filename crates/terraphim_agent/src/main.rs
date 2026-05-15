@@ -2175,10 +2175,17 @@ async fn run_offline_command(
                     .collect();
 
                 let concepts_matched = match service.get_thesaurus(&role_name).await {
-                    Ok(thesaurus) => terraphim_automata::find_matches(&query, thesaurus, false)
-                        .map(|matches| matches.into_iter().map(|m| m.term).collect())
-                        .unwrap_or_default(),
-                    Err(_) => vec![],
+                    Ok(thesaurus) => {
+                        terraphim_automata::compute_concepts_matched(&query, &thesaurus)
+                    }
+                    Err(e) => {
+                        log::debug!(
+                            "get_thesaurus failed for {}: {}; concepts_matched empty",
+                            role_name,
+                            e
+                        );
+                        Vec::new()
+                    }
                 };
 
                 let data = SearchResultsData {
@@ -4238,26 +4245,24 @@ async fn run_server_command(
                     .collect();
 
                 let concepts_matched = match api.get_thesaurus(role_name.as_str()).await {
-                    Ok(thesaurus_res) => {
-                        let mut thesaurus =
-                            terraphim_types::Thesaurus::new(format!("role-{}", role_name));
-                        if let Some(entries) = &thesaurus_res.thesaurus {
-                            for value in entries.values() {
-                                let normalized_term = terraphim_types::NormalizedTerm::new(
-                                    1u64,
-                                    terraphim_types::NormalizedTermValue::from(value.clone()),
-                                );
-                                thesaurus.insert(
-                                    terraphim_types::NormalizedTermValue::from(value.clone()),
-                                    normalized_term,
-                                );
-                            }
+                    Ok(thesaurus_res) => match thesaurus_res.thesaurus {
+                        Some(entries) => {
+                            let thesaurus = terraphim_automata::thesaurus_from_terms(
+                                &role_name,
+                                entries.values().map(String::as_str),
+                            );
+                            terraphim_automata::compute_concepts_matched(&query, &thesaurus)
                         }
-                        terraphim_automata::find_matches(&query, thesaurus, false)
-                            .map(|matches| matches.into_iter().map(|m| m.term).collect())
-                            .unwrap_or_default()
+                        None => Vec::new(),
+                    },
+                    Err(e) => {
+                        log::debug!(
+                            "get_thesaurus failed for {}: {}; concepts_matched empty",
+                            role_name,
+                            e
+                        );
+                        Vec::new()
                     }
-                    Err(_) => vec![],
                 };
 
                 let data = SearchResultsData {
