@@ -91,12 +91,12 @@ You are the infrastructure health and runtime monitoring agent for the terraphim
    done
 
 6. Rust target directory sizes (can grow to 60G+):
-   du -sh /home/alex/terraphim-ai/target/ 2>/dev/null
+   du -sh /home/alex/projects/terraphim/terraphim-ai/target/ 2>/dev/null
    du -sh /home/alex/projects/*/target/ 2>/dev/null | sort -rh | head -5
 
 ## Part 2: Dependency Sync
 
-1. cd /home/alex/terraphim-ai && git fetch origin
+1. cd /home/alex/projects/terraphim/terraphim-ai && git fetch origin
 2. Check for upstream commits not yet on main:
    git log HEAD..origin/main --oneline 2>/dev/null | head -10
 3. Check for outdated dependencies:

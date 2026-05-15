@@ -62,7 +62,7 @@ echo "=== Themis Product Owner Cycle: $(date -u +%Y-%m-%dT%H:%M:%SZ) ==="
 
 ## Step 0: Read current WIGs from progress.md
 
-WIGS=$(cat /home/alex/terraphim-ai/progress.md 2>/dev/null \
+WIGS=$(cat /home/alex/projects/terraphim/terraphim-ai/progress.md 2>/dev/null \
   | grep -A 20 "WIG\|Wildly Important\|Q2 2026\|Current Quarter" \
   | head -25 || echo "(progress.md not found -- WIG check skipped)")
 echo "--- Current WIGs ---"

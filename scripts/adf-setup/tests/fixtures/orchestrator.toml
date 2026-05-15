@@ -1,10 +1,10 @@
 # Synthetic terraphim project fixture (no real tokens or private data)
-working_dir = "/home/alex/terraphim-ai"
+working_dir = "/home/alex/projects/terraphim/terraphim-ai"
 restart_cooldown_secs = 300
 max_restart_count = 3
 disk_usage_threshold = 90
 tick_interval_secs = 30
-persona_data_dir = "/home/alex/terraphim-ai/data/personas"
+persona_data_dir = "/home/alex/projects/terraphim/terraphim-ai/data/personas"
 skill_data_dir = "/opt/ai-dark-factory/skills"
 flow_state_dir = "/opt/ai-dark-factory/flow-states"
 role_config_path = "/opt/ai-dark-factory/persona_roles_config.json"
@@ -34,13 +34,13 @@ critical_threshold = 0.70
 [compound_review]
 schedule = "0 0-10 * * *"
 max_duration_secs = 1800
-repo_path = "/home/alex/terraphim-ai"
+repo_path = "/home/alex/projects/terraphim/terraphim-ai"
 create_prs = false
-worktree_root = "/home/alex/terraphim-ai/.worktrees"
+worktree_root = "/home/alex/projects/terraphim/terraphim-ai/.worktrees"
 
 [workflow]
 enabled = true
-workflow_file = "/home/alex/terraphim-ai/WORKFLOW.md"
+workflow_file = "/home/alex/projects/terraphim/terraphim-ai/WORKFLOW.md"
 
 [workflow.tracker]
 kind = "gitea"
@@ -88,7 +88,7 @@ task = "Coordinate quality review chain."
 [[flows]]
 name = "security-audit-flow"
 project = "terraphim"
-repo_path = "/home/alex/terraphim-ai"
+repo_path = "/home/alex/projects/terraphim/terraphim-ai"
 base_branch = "main"
 timeout_secs = 3600
 schedule = "0 */6 * * *"

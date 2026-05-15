@@ -1,6 +1,6 @@
 [[projects]]
 id = "terraphim"
-working_dir = "/home/alex/terraphim-ai"
+working_dir = "/home/alex/projects/terraphim/terraphim-ai"
 
 [projects.gitea]
 base_url = "https://git.example.test"
@@ -17,7 +17,7 @@ flush_interval_secs = 5
 
 [projects.workflow]
 enabled = true
-workflow_file = "/home/alex/terraphim-ai/WORKFLOW.md"
+workflow_file = "/home/alex/projects/terraphim/terraphim-ai/WORKFLOW.md"
 
 [projects.workflow.tracker]
 kind = "gitea"
@@ -74,7 +74,7 @@ project = "terraphim"
 [[flows]]
 name = "security-audit-flow"
 project = "terraphim"
-repo_path = "/home/alex/terraphim-ai"
+repo_path = "/home/alex/projects/terraphim/terraphim-ai"
 base_branch = "main"
 timeout_secs = 3600
 schedule = "0 */6 * * *"

@@ -4,7 +4,7 @@ restart_cooldown_secs = 300
 max_restart_count = 3
 disk_usage_threshold = 90
 tick_interval_secs = 60
-persona_data_dir = "/home/alex/terraphim-ai/data/personas"
+persona_data_dir = "/home/alex/projects/terraphim/terraphim-ai/data/personas"
 
 [quickwit]
 enabled = true

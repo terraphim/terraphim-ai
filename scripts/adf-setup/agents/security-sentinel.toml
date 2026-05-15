@@ -53,7 +53,7 @@ Before doing ANY work, check for learnings from previous agent runs:
 
 ## Security Scan
 
-cd /home/alex/terraphim-ai
+cd /home/alex/projects/terraphim/terraphim-ai
 
 ### 1. CVE and dependency audit
 cargo audit 2>&1 | tee /tmp/security-sentinel-cargo-audit.txt

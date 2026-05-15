@@ -1,12 +1,12 @@
 disk_usage_threshold = 90
 flow_state_dir = "/opt/ai-dark-factory/flow-states"
 max_restart_count = 3
-persona_data_dir = "/home/alex/terraphim-ai/data/personas"
+persona_data_dir = "/home/alex/projects/terraphim/terraphim-ai/data/personas"
 restart_cooldown_secs = 300
 role_config_path = "/opt/ai-dark-factory/persona_roles_config.json"
 skill_data_dir = "/opt/ai-dark-factory/skills"
 tick_interval_secs = 30
-working_dir = "/home/alex/terraphim-ai"
+working_dir = "/home/alex/projects/terraphim/terraphim-ai"
 include = [
     "conf.d/*.toml",
 ]
@@ -14,9 +14,9 @@ include = [
 [compound_review]
 schedule = "0 0-10 * * *"
 max_duration_secs = 1800
-repo_path = "/home/alex/terraphim-ai"
+repo_path = "/home/alex/projects/terraphim/terraphim-ai"
 create_prs = false
-worktree_root = "/home/alex/terraphim-ai/.worktrees"
+worktree_root = "/home/alex/projects/terraphim/terraphim-ai/.worktrees"
 
 [nightwatch]
 eval_interval_secs = 300

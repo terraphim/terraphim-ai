@@ -986,7 +986,7 @@ git fetch --prune origin $ADF_PUSH_REF 2>/dev/null || true
 git checkout -f $ADF_PUSH_SHA
 
 # Execute new build-runner-llm script
-bash /home/alex/terraphim-ai/scripts/build-runner-llm.sh
+bash /home/alex/projects/terraphim/terraphim-ai/scripts/build-runner-llm.sh
 '''
 
 # ----- pr-reviewer -----
