@@ -21,12 +21,14 @@
 //! 3. Fallback to next available backend if preferred is unavailable
 
 mod context;
+mod docker;
 mod firecracker;
 mod local;
 mod ssh;
 mod r#trait;
 
 pub use context::{Capability, ExecutionContext, ExecutionResult, SnapshotId, ValidationResult};
+pub use docker::DockerExecutor;
 pub use firecracker::FirecrackerExecutor;
 pub use local::LocalExecutor;
 pub use ssh::SshExecutor;
@@ -121,11 +123,9 @@ pub async fn select_executor(
             }
 
             BackendType::Docker if is_docker_available() => {
-                log::info!(
-                    "Selected Docker backend (gVisor: {})",
-                    is_gvisor_available()
-                );
-                tried.push("docker (not yet implemented)".to_string());
+                log::info!("Selected Docker backend (container isolation)");
+                let executor = DockerExecutor::new(config.clone())?;
+                return Ok(Box::new(executor));
             }
             BackendType::Docker => {
                 log::debug!("Docker unavailable: daemon not running");

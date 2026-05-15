@@ -2174,10 +2174,17 @@ async fn run_offline_command(
                     })
                     .collect();
 
+                let concepts_matched = match service.get_thesaurus(&role_name).await {
+                    Ok(thesaurus) => terraphim_automata::find_matches(&query, thesaurus, false)
+                        .map(|matches| matches.into_iter().map(|m| m.term).collect())
+                        .unwrap_or_default(),
+                    Err(_) => vec![],
+                };
+
                 let data = SearchResultsData {
                     results: items,
                     total_matches: total,
-                    concepts_matched: vec![],
+                    concepts_matched,
                     wildcard_fallback: false,
                 };
 
@@ -4230,10 +4237,33 @@ async fn run_server_command(
                     })
                     .collect();
 
+                let concepts_matched = match api.get_thesaurus(&role_name).await {
+                    Ok(thesaurus_res) => {
+                        let mut thesaurus =
+                            terraphim_types::Thesaurus::new(format!("role-{}", role_name));
+                        if let Some(entries) = &thesaurus_res.thesaurus {
+                            for value in entries.values() {
+                                let normalized_term = terraphim_types::NormalizedTerm::new(
+                                    1u64,
+                                    terraphim_types::NormalizedTermValue::from(value.clone()),
+                                );
+                                thesaurus.insert(
+                                    terraphim_types::NormalizedTermValue::from(value.clone()),
+                                    normalized_term,
+                                );
+                            }
+                        }
+                        terraphim_automata::find_matches(&query, thesaurus, false)
+                            .map(|matches| matches.into_iter().map(|m| m.term).collect())
+                            .unwrap_or_default()
+                    }
+                    Err(_) => vec![],
+                };
+
                 let data = SearchResultsData {
                     results: items,
                     total_matches: total,
-                    concepts_matched: vec![],
+                    concepts_matched,
                     wildcard_fallback: false,
                 };
 
