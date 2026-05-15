@@ -102,7 +102,13 @@ mod tests {
     }
 
     #[test]
+    #[serial_test::serial]
     fn test_merged_config_from_role() {
+        // Defensive: another test in this module sets LLM_PROXY_URL.
+        // Tests in the same binary share process-wide env, so remove first.
+        unsafe {
+            env::remove_var("LLM_PROXY_URL");
+        }
         let role_config = LlmRouterConfig {
             enabled: true,
             mode: RouterMode::Service,
@@ -123,6 +129,7 @@ mod tests {
     }
 
     #[test]
+    #[serial_test::serial]
     fn test_env_overrides() {
         unsafe {
             env::set_var("LLM_PROXY_URL", "http://env-proxy:9999");

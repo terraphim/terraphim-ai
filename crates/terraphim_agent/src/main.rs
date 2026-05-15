@@ -4140,7 +4140,7 @@ async fn run_server_command(
                     operator: operator.map(|op| op.into()),
                     skip: Some(0),
                     limit: Some(limit),
-                    role: Some(role_name),
+                    role: Some(role_name.clone()),
                     layer: Layer::default(),
                     include_pinned,
                     min_quality,
@@ -4153,7 +4153,7 @@ async fn run_server_command(
                     operator: None,
                     skip: Some(0),
                     limit: Some(limit),
-                    role: Some(role_name),
+                    role: Some(role_name.clone()),
                     layer: Layer::default(),
                     include_pinned,
                     min_quality,
@@ -4237,7 +4237,7 @@ async fn run_server_command(
                     })
                     .collect();
 
-                let concepts_matched = match api.get_thesaurus(&role_name).await {
+                let concepts_matched = match api.get_thesaurus(role_name.as_str()).await {
                     Ok(thesaurus_res) => {
                         let mut thesaurus =
                             terraphim_types::Thesaurus::new(format!("role-{}", role_name));

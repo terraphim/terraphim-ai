@@ -167,6 +167,7 @@ fn test_config(working_dir: PathBuf) -> OrchestratorConfig {
         learning: terraphim_orchestrator::LearningConfig::default(),
         pr_dispatch: None,
         pr_dispatch_per_project: Default::default(),
+        gitea_skill_repo: None,
         gate_reconcile_interval_ticks: 20,
     }
 }
