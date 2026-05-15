@@ -224,7 +224,10 @@ pub struct OrchestratorConfig {
 }
 
 /// Configuration for loading skills from a Gitea repository.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+///
+/// `Debug` is implemented manually so the `token` field is redacted in any
+/// log/panic output. Do not derive `Debug` on this struct.
+#[derive(Clone, Serialize, Deserialize)]
 pub struct GiteaSkillRepoConfig {
     /// Repository URL.
     pub url: String,
@@ -235,10 +238,12 @@ pub struct GiteaSkillRepoConfig {
     /// Git reference (branch, tag, or commit).
     #[serde(default = "default_git_ref")]
     pub git_ref: String,
-    /// Local cache directory.
-    #[serde(default)]
+    /// Local cache directory. Defaults to `$XDG_CACHE_HOME/terraphim/skills`
+    /// (or `$HOME/.cache/terraphim/skills`, or `$TMPDIR/terraphim/skills` as
+    /// further fallbacks).
+    #[serde(default = "default_cache_dir")]
     pub cache_dir: PathBuf,
-    /// Optional authentication token.
+    /// Optional authentication token. Redacted in `Debug` output.
     #[serde(default)]
     pub token: Option<String>,
     /// Fetch timeout in seconds.
@@ -249,12 +254,47 @@ pub struct GiteaSkillRepoConfig {
     pub skills: Vec<String>,
 }
 
+impl std::fmt::Debug for GiteaSkillRepoConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("GiteaSkillRepoConfig")
+            .field("url", &self.url)
+            .field("owner", &self.owner)
+            .field("repo", &self.repo)
+            .field("git_ref", &self.git_ref)
+            .field("cache_dir", &self.cache_dir)
+            .field("token", &self.token.as_ref().map(|_| "***REDACTED***"))
+            .field("fetch_timeout_secs", &self.fetch_timeout_secs)
+            .field("skills", &self.skills)
+            .finish()
+    }
+}
+
 fn default_git_ref() -> String {
     "main".to_string()
 }
 
 fn default_fetch_timeout() -> u64 {
     30
+}
+
+/// Compute the default cache directory for `GiteaSkillRepoConfig::cache_dir`.
+///
+/// Order of preference:
+/// 1. `$XDG_CACHE_HOME/terraphim/skills`
+/// 2. `$HOME/.cache/terraphim/skills`
+/// 3. `$TMPDIR/terraphim/skills` (last resort - file-system-writable)
+fn default_cache_dir() -> PathBuf {
+    if let Ok(xdg) = std::env::var("XDG_CACHE_HOME") {
+        if !xdg.is_empty() {
+            return PathBuf::from(xdg).join("terraphim/skills");
+        }
+    }
+    if let Ok(home) = std::env::var("HOME") {
+        if !home.is_empty() {
+            return PathBuf::from(home).join(".cache/terraphim/skills");
+        }
+    }
+    std::env::temp_dir().join("terraphim/skills")
 }
 
 /// PR-fan-out routing table for the `pull_request.opened` event (ADF Phase 2,
@@ -1485,6 +1525,36 @@ fn substitute_env(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn gitea_skill_repo_token_redacted_in_debug() {
+        let cfg = GiteaSkillRepoConfig {
+            url: "https://git.example".to_string(),
+            owner: "acme".to_string(),
+            repo: "skills".to_string(),
+            git_ref: "main".to_string(),
+            cache_dir: PathBuf::from("/tmp/skills"),
+            token: Some("super-secret-do-not-leak".to_string()),
+            fetch_timeout_secs: 30,
+            skills: vec![],
+        };
+        let dbg = format!("{:?}", cfg);
+        assert!(
+            !dbg.contains("super-secret-do-not-leak"),
+            "token must be redacted in Debug output"
+        );
+        assert!(
+            dbg.contains("***REDACTED***"),
+            "Debug output should mark token as redacted"
+        );
+    }
+
+    #[test]
+    fn gitea_skill_repo_default_cache_dir_non_empty() {
+        let dir = default_cache_dir();
+        assert!(!dir.as_os_str().is_empty());
+        assert!(dir.ends_with("terraphim/skills"));
+    }
 
     #[test]
     fn test_config_parse_minimal() {
