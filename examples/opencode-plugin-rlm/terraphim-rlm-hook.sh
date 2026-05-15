@@ -23,11 +23,16 @@
 #       }]
 #     }
 #   }
+#
+# Requirements:
+#   - bash (>= 4)
+#   - jq (POSIX-portable JSON encoding)
+#   - terraphim_mcp_server on PATH or set $TERRAPHIM_MCP
 
 TERRAPHIM_AGENT="${TERRAPHIM_AGENT:-$HOME/.cargo/bin/terraphim-agent}"
 TERRAPHIM_MCP="${TERRAPHIM_MCP:-terraphim_mcp_server}"
 
-RLM_TIMEOUT_MS=30000
+RLM_TIMEOUT_SECS=30
 
 log_debug() {
     if [[ "${TERRAPHIM_DEBUG:-0}" == "1" ]]; then
@@ -35,55 +40,94 @@ log_debug() {
     fi
 }
 
+# Portable timeout wrapper. Reads stdin, runs the command with a hard kill
+# after $1 seconds, propagates stdout/stderr. Uses pure POSIX shell so it
+# works on macOS without GNU coreutils (`gtimeout`).
+run_with_timeout() {
+    local timeout_secs="$1"; shift
+    "$@" &
+    local pid=$!
+    (
+        sleep "$timeout_secs"
+        kill -TERM "$pid" 2>/dev/null
+        sleep 1
+        kill -KILL "$pid" 2>/dev/null
+    ) &
+    local watcher=$!
+    local rc=0
+    if wait "$pid" 2>/dev/null; then
+        rc=0
+    else
+        rc=$?
+    fi
+    kill -KILL "$watcher" 2>/dev/null
+    wait "$watcher" 2>/dev/null
+    return $rc
+}
+
+# Build a JSON-RPC `tools/call` request body using jq so all string values
+# are correctly escaped, then send it on stdin to the MCP server. Stderr is
+# propagated (not silenced) so operators can debug failed invocations.
 call_mcp_tool() {
     local tool="$1"
-    local args="$2"
+    local args_json="$2"   # caller passes a pre-built JSON object string
 
-    echo "{\"jsonrpc\":\"2.0\",\"id\":$$,\"method\":\"tools/call\",\"params\":{\"name\":\"$tool\",\"arguments\":$args}}" | \
-        timeout 30 "$TERRAPHIM_MCP" 2>/dev/null
+    local request
+    request=$(jq -nc --arg tool "$tool" --argjson args "$args_json" \
+        '{jsonrpc: "2.0", id: 1, method: "tools/call",
+          params: {name: $tool, arguments: $args}}')
+
+    printf '%s\n' "$request" | run_with_timeout "$RLM_TIMEOUT_SECS" "$TERRAPHIM_MCP"
 }
 
 rlm_query() {
     local prompt="$1"
     local session_id="${2:-}"
-
+    local args_json
     if [[ -n "$session_id" ]]; then
-        call_mcp_tool "rlm_query" "{\"prompt\":\"$prompt\",\"session_id\":\"$session_id\"}"
+        args_json=$(jq -nc --arg p "$prompt" --arg s "$session_id" \
+            '{prompt: $p, session_id: $s}')
     else
-        call_mcp_tool "rlm_query" "{\"prompt\":\"$prompt\"}"
+        args_json=$(jq -nc --arg p "$prompt" '{prompt: $p}')
     fi
+    call_mcp_tool "rlm_query" "$args_json"
 }
 
 rlm_code() {
     local code="$1"
     local session_id="${2:-}"
-
+    local args_json
     if [[ -n "$session_id" ]]; then
-        call_mcp_tool "rlm_code" "{\"code\":\"$code\",\"session_id\":\"$session_id\"}"
+        args_json=$(jq -nc --arg c "$code" --arg s "$session_id" \
+            '{code: $c, session_id: $s}')
     else
-        call_mcp_tool "rlm_code" "{\"code\":\"$code\"}"
+        args_json=$(jq -nc --arg c "$code" '{code: $c}')
     fi
+    call_mcp_tool "rlm_code" "$args_json"
 }
 
 rlm_bash() {
     local command="$1"
     local session_id="${2:-}"
-
+    local args_json
     if [[ -n "$session_id" ]]; then
-        call_mcp_tool "rlm_bash" "{\"command\":\"$command\",\"session_id\":\"$session_id\"}"
+        args_json=$(jq -nc --arg c "$command" --arg s "$session_id" \
+            '{command: $c, session_id: $s}')
     else
-        call_mcp_tool "rlm_bash" "{\"command\":\"$command\"}"
+        args_json=$(jq -nc --arg c "$command" '{command: $c}')
     fi
+    call_mcp_tool "rlm_bash" "$args_json"
 }
 
 rlm_status() {
     local session_id="${1:-}"
-
+    local args_json
     if [[ -n "$session_id" ]]; then
-        call_mcp_tool "rlm_status" "{\"session_id\":\"$session_id\"}"
+        args_json=$(jq -nc --arg s "$session_id" '{session_id: $s}')
     else
-        call_mcp_tool "rlm_status" "{}"
+        args_json='{}'
     fi
+    call_mcp_tool "rlm_status" "$args_json"
 }
 
 main() {

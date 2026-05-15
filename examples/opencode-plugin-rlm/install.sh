@@ -14,6 +14,17 @@ OPENCODE_PLUGIN_DIR="${HOME}/.config/opencode/plugin"
 OPENCODE_PLUGINS_DIR="${HOME}/.config/opencode/plugins"
 CLAUDE_HOOKS_DIR="${HOME}/.claude/hooks"
 
+# Required runtime dependencies for the Claude Code hook (terraphim-rlm-hook.sh).
+# Warn but do not block if missing - operator may install them out of band.
+if ! command -v jq >/dev/null 2>&1; then
+    echo "WARNING: 'jq' is not installed but is required by terraphim-rlm-hook.sh."
+    echo "         Install it via your platform package manager:"
+    echo "           macOS:   brew install jq"
+    echo "           Ubuntu:  apt-get install jq"
+    echo "           Fedora:  dnf install jq"
+    echo
+fi
+
 usage() {
     echo "Usage: $0 [OPTIONS]"
     echo ""

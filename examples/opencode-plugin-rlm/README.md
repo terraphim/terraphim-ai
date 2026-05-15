@@ -13,8 +13,13 @@ OpenCode plugin for terraphim_rlm - Recursive Language Model orchestration with 
 ## Requirements
 
 - OpenCode CLI installed
-- terraphim_mcp_server with RLM tools, OR
-- terraphim_rlm crate built from source
+- terraphim_mcp_server with RLM tools, OR terraphim_rlm crate built from source
+- For the Claude Code hook (`terraphim-rlm-hook.sh`): `bash` (>= 4) and `jq`
+  (the hook builds JSON-RPC requests via `jq -n --arg` for safe escaping)
+
+The hook is portable: it does NOT depend on GNU `timeout`/`gtimeout`, so it
+works on macOS without `brew install coreutils`. A pure-POSIX subshell
+wrapper enforces request timeouts.
 
 ## Installation
 
@@ -96,6 +101,25 @@ By default, RLM tries backends in this order:
 2. **E2B** - Cloud-hosted Firecracker (requires API key)
 3. **Docker** - Container isolation (requires Docker daemon)
 4. **Local** - Direct execution on host (no isolation)
+
+## Known Issues
+
+The OpenCode plugin (`terraphim-rlm.js`) currently spawns a fresh
+`terraphim_mcp_server` process per tool invocation rather than reusing a
+long-lived stdio connection. This is correct but inefficient. A rewrite to
+share the `ensureMcpServer` process across calls is tracked as a follow-up.
+
+## Tests
+
+A bash smoke-test suite exercises the hook's input parsing, JSON
+construction, and portable timeout wrapper:
+
+```bash
+bash tests/test_hook.sh
+```
+
+Tests do not require a running MCP server; they stub `$TERRAPHIM_MCP`
+with a script that captures its stdin so we can inspect the request body.
 
 ## License
 
