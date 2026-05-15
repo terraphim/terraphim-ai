@@ -23,7 +23,7 @@ use bollard::models::ContainerCreateBody;
 use bollard::query_parameters::{CreateContainerOptionsBuilder, RemoveContainerOptionsBuilder};
 use futures::StreamExt;
 use std::collections::HashMap;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use super::{Capability, ExecutionContext, ExecutionResult, SnapshotId, ValidationResult};
 use crate::config::{BackendType, RlmConfig};
@@ -100,20 +100,42 @@ impl DockerExecutor {
             .name(&container_name)
             .build();
 
-        self.docker
+        let create_response = self
+            .docker
             .create_container(Some(options), config)
             .await
             .map_err(|e| RlmError::BackendInitFailed {
                 backend: "docker".to_string(),
                 message: format!("Failed to create container: {}", e),
-            })
-            .map(|c| c.id)
+            })?;
+
+        if let Err(e) = self.docker.start_container(&create_response.id, None).await {
+            let remove_opts = RemoveContainerOptionsBuilder::new().force(true).build();
+            if let Err(remove_err) = self
+                .docker
+                .remove_container(&create_response.id, Some(remove_opts))
+                .await
+            {
+                log::warn!(
+                    "Failed to remove container {} after start failure: {}",
+                    create_response.id,
+                    remove_err
+                );
+            }
+            return Err(RlmError::BackendInitFailed {
+                backend: "docker".to_string(),
+                message: format!("Failed to start container: {}", e),
+            });
+        }
+
+        Ok(create_response.id)
     }
 
     async fn exec_in_container(
         &self,
         container_id: &str,
         cmd: Vec<&str>,
+        ctx: &ExecutionContext,
     ) -> RlmResult<ExecutionResult> {
         let exec_config = CreateExecOptions {
             attach_stdout: Some(true),
@@ -141,28 +163,47 @@ impl DockerExecutor {
 
         let output = self.docker.start_exec(&exec.id, Some(start_options)).await;
 
-        let execution_time_ms = start.elapsed().as_millis() as u64;
-
         match output {
             Ok(StartExecResults::Attached { mut output, .. }) => {
                 let mut stdout = String::new();
                 let mut stderr = String::new();
-                let exit_code = 0;
+                let timeout_duration = Duration::from_millis(ctx.timeout_ms);
 
-                while let Some(Ok(msg)) = output.next().await {
-                    match msg {
-                        LogOutput::StdOut { message } => {
-                            stdout.push_str(&String::from_utf8_lossy(&message));
+                let stream_future = async {
+                    while let Some(Ok(msg)) = output.next().await {
+                        match msg {
+                            LogOutput::StdOut { message } => {
+                                stdout.push_str(&String::from_utf8_lossy(&message));
+                            }
+                            LogOutput::StdErr { message } => {
+                                stderr.push_str(&String::from_utf8_lossy(&message));
+                            }
+                            LogOutput::Console { message } => {
+                                stdout.push_str(&String::from_utf8_lossy(&message));
+                            }
+                            LogOutput::StdIn { .. } => {}
                         }
-                        LogOutput::StdErr { message } => {
-                            stderr.push_str(&String::from_utf8_lossy(&message));
-                        }
-                        LogOutput::Console { message } => {
-                            stdout.push_str(&String::from_utf8_lossy(&message));
-                        }
-                        LogOutput::StdIn { .. } => {}
                     }
+                };
+
+                let timed_out = tokio::time::timeout(timeout_duration, stream_future)
+                    .await
+                    .is_err();
+
+                let execution_time_ms = start.elapsed().as_millis() as u64;
+
+                if timed_out {
+                    return Ok(ExecutionResult::timeout(stdout, stderr)
+                        .with_execution_time(execution_time_ms));
                 }
+
+                let exit_code = self
+                    .docker
+                    .inspect_exec(&exec.id)
+                    .await
+                    .ok()
+                    .and_then(|inspect| inspect.exit_code)
+                    .unwrap_or(-1) as i32;
 
                 Ok(ExecutionResult {
                     stdout,
@@ -175,16 +216,19 @@ impl DockerExecutor {
                     metadata: HashMap::new(),
                 })
             }
-            Ok(StartExecResults::Detached) => Ok(ExecutionResult {
-                stdout: String::new(),
-                stderr: "Exec detached (not captured)".to_string(),
-                exit_code: -1,
-                execution_time_ms,
-                output_truncated: false,
-                output_file_path: None,
-                timed_out: false,
-                metadata: HashMap::new(),
-            }),
+            Ok(StartExecResults::Detached) => {
+                let execution_time_ms = start.elapsed().as_millis() as u64;
+                Ok(ExecutionResult {
+                    stdout: String::new(),
+                    stderr: "Exec detached (not captured)".to_string(),
+                    exit_code: -1,
+                    execution_time_ms,
+                    output_truncated: false,
+                    output_file_path: None,
+                    timed_out: false,
+                    metadata: HashMap::new(),
+                })
+            }
             Err(e) => Err(RlmError::ExecutionFailed {
                 message: format!("Exec failed: {}", e),
                 exit_code: None,
@@ -217,7 +261,7 @@ impl super::ExecutionEnvironment for DockerExecutor {
     ) -> Result<ExecutionResult, Self::Error> {
         let container_id = self.ensure_container(&ctx.session_id).await?;
         let cmd = vec!["python3", "-c", code];
-        self.exec_in_container(&container_id, cmd).await
+        self.exec_in_container(&container_id, cmd, ctx).await
     }
 
     async fn execute_command(
@@ -227,7 +271,7 @@ impl super::ExecutionEnvironment for DockerExecutor {
     ) -> Result<ExecutionResult, Self::Error> {
         let container_id = self.ensure_container(&ctx.session_id).await?;
         let bash_cmd = vec!["bash", "-c", cmd];
-        self.exec_in_container(&container_id, bash_cmd).await
+        self.exec_in_container(&container_id, bash_cmd, ctx).await
     }
 
     async fn validate(&self, _input: &str) -> Result<ValidationResult, Self::Error> {
@@ -284,9 +328,15 @@ impl super::ExecutionEnvironment for DockerExecutor {
             .map(|(_, id)| id)
             .collect();
 
-        for container_id in containers {
-            if let Err(e) = self.delete_container(&container_id).await {
-                log::warn!("Failed to cleanup container {}: {}", container_id, e);
+        let futures: Vec<_> = containers
+            .iter()
+            .map(|id| self.delete_container(id))
+            .collect();
+
+        let results = futures::future::join_all(futures).await;
+        for (i, result) in results.into_iter().enumerate() {
+            if let Err(e) = result {
+                log::warn!("Failed to cleanup container {}: {}", containers[i], e);
             }
         }
 
@@ -296,25 +346,40 @@ impl super::ExecutionEnvironment for DockerExecutor {
 
 impl Drop for DockerExecutor {
     fn drop(&mut self) {
-        let containers: Vec<_> = self
+        let containers: Vec<String> = self
             .session_to_container
             .write()
             .drain()
             .map(|(_, id)| id)
             .collect();
 
-        for container_id in containers {
-            let docker = self.docker.clone();
-            let container_id = container_id.clone();
-            std::thread::spawn(move || {
-                let rt = tokio::runtime::Runtime::new();
-                if let Ok(rt) = rt {
-                    rt.block_on(async {
-                        let options = RemoveContainerOptionsBuilder::new().force(true).build();
-                        let _ = docker.remove_container(&container_id, Some(options)).await;
-                    });
-                }
-            });
+        if containers.is_empty() {
+            return;
+        }
+
+        let docker = self.docker.clone();
+        match tokio::runtime::Handle::try_current() {
+            Ok(_handle) => {
+                tokio::spawn(async move {
+                    let remove_opts = RemoveContainerOptionsBuilder::new().force(true).build();
+                    let futures: Vec<_> = containers
+                        .iter()
+                        .map(|id| docker.remove_container(id, Some(remove_opts.clone())))
+                        .collect();
+                    let results = futures::future::join_all(futures).await;
+                    for (i, result) in results.into_iter().enumerate() {
+                        if let Err(e) = result {
+                            log::warn!("Drop: failed to remove container {}: {}", containers[i], e);
+                        }
+                    }
+                });
+            }
+            Err(_) => {
+                log::warn!(
+                    "DockerExecutor::drop called outside tokio runtime; {} container(s) not cleaned up",
+                    containers.len()
+                );
+            }
         }
     }
 }
