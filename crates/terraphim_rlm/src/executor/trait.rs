@@ -153,4 +153,14 @@ pub trait ExecutionEnvironment: Send + Sync {
     ///
     /// Called when shutting down or when a session ends.
     async fn cleanup(&self) -> Result<(), Self::Error>;
+
+    /// Release per-session resources for the given session.
+    ///
+    /// Called by the supervisor when a session ends, before the executor
+    /// itself is dropped. Backends with per-session affinity (containers,
+    /// VMs, sandboxes) should release the bound resource here. The default
+    /// implementation is a no-op for backends without per-session state.
+    async fn end_session(&self, _session_id: &SessionId) -> Result<(), Self::Error> {
+        Ok(())
+    }
 }
