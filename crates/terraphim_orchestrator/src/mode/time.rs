@@ -190,6 +190,7 @@ mod tests {
 
             gitea_issue: None,
             event_only: false,
+            evolution_enabled: false,
 
             project: None,
         }

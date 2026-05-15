@@ -10,6 +10,7 @@ repository = "https://github.com/terraphim/terraphim-ai"
 [features]
 default = ["quickwit"]
 quickwit = ["dep:reqwest", "dep:reqwest-middleware", "dep:reqwest-retry"]
+evolution = ["dep:terraphim_agent_evolution"]
 
 [dependencies]
 # Terraphim internal crates
@@ -65,6 +66,9 @@ anyhow = { workspace = true }
 # Persistence layer for shared learnings
 opendal = { version = "0.54", default-features = false }
 terraphim_persistence = { path = "../terraphim_persistence", version = "1.4.10", features = ["sqlite"] }
+
+# Agent evolution system (optional)
+terraphim_agent_evolution = { path = "../terraphim_agent_evolution", version = "1.0.0", optional = true }
 
 # Quickwit integration (optional)
 reqwest = { workspace = true, optional = true }

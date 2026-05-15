@@ -9142,6 +9142,7 @@ dependencies = [
  "serial_test",
  "sha2 0.10.9",
  "tempfile",
+ "terraphim_agent_evolution",
  "terraphim_automata",
  "terraphim_persistence",
  "terraphim_router",

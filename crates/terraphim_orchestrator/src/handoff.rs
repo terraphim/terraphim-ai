@@ -29,6 +29,9 @@ pub struct HandoffContext {
     /// Time-to-live in seconds (None = use buffer default).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ttl_secs: Option<u64>,
+    /// Evolution snapshot key for inter-agent memory transfer.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub evolution_snapshot_key: Option<String>,
 }
 
 impl HandoffContext {
@@ -48,6 +51,7 @@ impl HandoffContext {
             files_touched: Vec::new(),
             timestamp: chrono::Utc::now(),
             ttl_secs: None,
+            evolution_snapshot_key: None,
         }
     }
 
@@ -327,6 +331,7 @@ mod tests {
             ],
             timestamp: Utc::now(),
             ttl_secs: Some(3600),
+            evolution_snapshot_key: None,
         }
     }
 
@@ -373,6 +378,7 @@ mod tests {
             files_touched: vec![PathBuf::from("test.rs")],
             timestamp: Utc::now(),
             ttl_secs: Some(7200),
+            evolution_snapshot_key: None,
         };
 
         let json = original.to_json().unwrap();
@@ -515,6 +521,7 @@ mod tests {
             files_touched: vec![],
             timestamp: Utc::now(),
             ttl_secs: None,
+            evolution_snapshot_key: None,
         };
 
         let json = ctx_without_ttl.to_json().unwrap();
@@ -523,6 +530,7 @@ mod tests {
         // Test that ttl_secs is included when Some
         let ctx_with_ttl = HandoffContext {
             ttl_secs: Some(3600),
+            evolution_snapshot_key: None,
             ..ctx_without_ttl
         };
 
