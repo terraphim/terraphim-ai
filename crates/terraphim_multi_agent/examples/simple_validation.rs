@@ -3,9 +3,8 @@
 //! This is a simplified example that demonstrates core functionality
 //! without complex storage operations to avoid memory issues.
 
-use std::sync::Arc;
 use terraphim_multi_agent::{
-    test_utils::create_test_role, CommandInput, CommandType, TerraphimAgent,
+    CommandInput, CommandType, TerraphimAgent, test_utils::create_test_role,
 };
 use terraphim_persistence::DeviceStorage;
 
@@ -16,18 +15,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Initialize storage using the test utility approach
     println!("1️⃣ Initializing storage...");
-    DeviceStorage::init_memory_only()
+    let persistence = DeviceStorage::arc_memory_only()
         .await
         .map_err(|e| format!("Storage init failed: {}", e))?;
-
-    let storage_ref = DeviceStorage::instance()
-        .await
-        .map_err(|e| format!("Storage access failed: {}", e))?;
-
-    // Create new owned storage to avoid lifetime issues
-    use std::ptr;
-    let storage_copy = unsafe { ptr::read(storage_ref) };
-    let persistence = Arc::new(storage_copy);
     println!("✅ Storage initialized successfully");
 
     // Create test role

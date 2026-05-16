@@ -5,10 +5,9 @@
 //! web examples in @examples/agent-workflows/
 
 use ahash::AHashMap;
-use std::sync::Arc;
 use terraphim_config::Role;
 use terraphim_multi_agent::{
-    test_utils::create_test_role, CommandInput, CommandType, MultiAgentResult, TerraphimAgent,
+    CommandInput, CommandType, MultiAgentResult, TerraphimAgent, test_utils::create_test_role,
 };
 use terraphim_persistence::DeviceStorage;
 use terraphim_types::RelevanceFunction;
@@ -20,16 +19,9 @@ async fn demonstrate_prompt_chaining() -> MultiAgentResult<()> {
     println!("=====================================");
 
     // Initialize storage
-    DeviceStorage::init_memory_only()
+    let persistence = DeviceStorage::arc_memory_only()
         .await
         .map_err(|e| terraphim_multi_agent::MultiAgentError::PersistenceError(e.to_string()))?;
-    let storage_ref = DeviceStorage::instance()
-        .await
-        .map_err(|e| terraphim_multi_agent::MultiAgentError::PersistenceError(e.to_string()))?;
-
-    use std::ptr;
-    let storage_copy = unsafe { ptr::read(storage_ref) };
-    let persistence = Arc::new(storage_copy);
 
     // Create development agent
     let dev_agent = TerraphimAgent::new(create_test_role(), persistence, None).await?;
@@ -87,16 +79,9 @@ async fn demonstrate_routing() -> MultiAgentResult<()> {
     println!("==============================");
 
     // Initialize storage
-    DeviceStorage::init_memory_only()
+    let persistence = DeviceStorage::arc_memory_only()
         .await
         .map_err(|e| terraphim_multi_agent::MultiAgentError::PersistenceError(e.to_string()))?;
-    let storage_ref = DeviceStorage::instance()
-        .await
-        .map_err(|e| terraphim_multi_agent::MultiAgentError::PersistenceError(e.to_string()))?;
-
-    use std::ptr;
-    let storage_copy = unsafe { ptr::read(storage_ref) };
-    let persistence = Arc::new(storage_copy);
 
     // Create different agents for different complexity levels
     let simple_agent = TerraphimAgent::new(create_simple_role(), persistence.clone(), None).await?;
@@ -150,16 +135,9 @@ async fn demonstrate_parallelization() -> MultiAgentResult<()> {
     println!("=====================================");
 
     // Initialize storage
-    DeviceStorage::init_memory_only()
+    let persistence = DeviceStorage::arc_memory_only()
         .await
         .map_err(|e| terraphim_multi_agent::MultiAgentError::PersistenceError(e.to_string()))?;
-    let storage_ref = DeviceStorage::instance()
-        .await
-        .map_err(|e| terraphim_multi_agent::MultiAgentError::PersistenceError(e.to_string()))?;
-
-    use std::ptr;
-    let storage_copy = unsafe { ptr::read(storage_ref) };
-    let persistence = Arc::new(storage_copy);
 
     // Create multiple perspective agents
     let perspectives = vec![
@@ -209,16 +187,9 @@ async fn demonstrate_orchestrator_workers() -> MultiAgentResult<()> {
     println!("===========================================");
 
     // Initialize storage
-    DeviceStorage::init_memory_only()
+    let persistence = DeviceStorage::arc_memory_only()
         .await
         .map_err(|e| terraphim_multi_agent::MultiAgentError::PersistenceError(e.to_string()))?;
-    let storage_ref = DeviceStorage::instance()
-        .await
-        .map_err(|e| terraphim_multi_agent::MultiAgentError::PersistenceError(e.to_string()))?;
-
-    use std::ptr;
-    let storage_copy = unsafe { ptr::read(storage_ref) };
-    let persistence = Arc::new(storage_copy);
 
     // Create orchestrator
     let orchestrator =
@@ -294,16 +265,9 @@ async fn demonstrate_evaluator_optimizer() -> MultiAgentResult<()> {
     println!("==========================================");
 
     // Initialize storage
-    DeviceStorage::init_memory_only()
+    let persistence = DeviceStorage::arc_memory_only()
         .await
         .map_err(|e| terraphim_multi_agent::MultiAgentError::PersistenceError(e.to_string()))?;
-    let storage_ref = DeviceStorage::instance()
-        .await
-        .map_err(|e| terraphim_multi_agent::MultiAgentError::PersistenceError(e.to_string()))?;
-
-    use std::ptr;
-    let storage_copy = unsafe { ptr::read(storage_ref) };
-    let persistence = Arc::new(storage_copy);
 
     // Create generator and evaluator
     let generator = TerraphimAgent::new(create_generator_role(), persistence.clone(), None).await?;

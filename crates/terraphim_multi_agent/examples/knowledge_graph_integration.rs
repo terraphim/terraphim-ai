@@ -6,10 +6,9 @@
 //! - Query-specific context injection
 //! - Multi-layered context assembly
 
-use std::sync::Arc;
 use terraphim_config::Role;
 use terraphim_multi_agent::{
-    test_utils::create_test_role, CommandInput, CommandType, MultiAgentResult, TerraphimAgent,
+    CommandInput, CommandType, MultiAgentResult, TerraphimAgent, test_utils::create_test_role,
 };
 use terraphim_persistence::DeviceStorage;
 
@@ -48,16 +47,9 @@ async fn example_context_enrichment() -> MultiAgentResult<()> {
     println!("===============================================");
 
     // Initialize storage
-    DeviceStorage::init_memory_only()
+    let persistence = DeviceStorage::arc_memory_only()
         .await
         .map_err(|e| terraphim_multi_agent::MultiAgentError::PersistenceError(e.to_string()))?;
-    let storage = DeviceStorage::instance()
-        .await
-        .map_err(|e| terraphim_multi_agent::MultiAgentError::PersistenceError(e.to_string()))?;
-
-    use std::ptr;
-    let storage_copy = unsafe { ptr::read(storage) };
-    let persistence = Arc::new(storage_copy);
 
     // Create knowledge graph enabled agent
     let role = create_knowledge_graph_role();
@@ -101,16 +93,9 @@ async fn example_semantic_relationships() -> MultiAgentResult<()> {
     println!("===============================================");
 
     // Initialize storage and agent
-    DeviceStorage::init_memory_only()
+    let persistence = DeviceStorage::arc_memory_only()
         .await
         .map_err(|e| terraphim_multi_agent::MultiAgentError::PersistenceError(e.to_string()))?;
-    let storage = DeviceStorage::instance()
-        .await
-        .map_err(|e| terraphim_multi_agent::MultiAgentError::PersistenceError(e.to_string()))?;
-
-    use std::ptr;
-    let storage_copy = unsafe { ptr::read(storage) };
-    let persistence = Arc::new(storage_copy);
 
     let role = create_knowledge_graph_role();
     let agent = TerraphimAgent::new(role, persistence, None).await?;
@@ -154,16 +139,9 @@ async fn example_multilayer_context() -> MultiAgentResult<()> {
     println!("==============================================");
 
     // Initialize storage and agent
-    DeviceStorage::init_memory_only()
+    let persistence = DeviceStorage::arc_memory_only()
         .await
         .map_err(|e| terraphim_multi_agent::MultiAgentError::PersistenceError(e.to_string()))?;
-    let storage = DeviceStorage::instance()
-        .await
-        .map_err(|e| terraphim_multi_agent::MultiAgentError::PersistenceError(e.to_string()))?;
-
-    use std::ptr;
-    let storage_copy = unsafe { ptr::read(storage) };
-    let persistence = Arc::new(storage_copy);
 
     let mut role = create_knowledge_graph_role();
 
@@ -235,16 +213,9 @@ async fn example_context_aware_commands() -> MultiAgentResult<()> {
     println!("===============================================");
 
     // Initialize storage and agent
-    DeviceStorage::init_memory_only()
+    let persistence = DeviceStorage::arc_memory_only()
         .await
         .map_err(|e| terraphim_multi_agent::MultiAgentError::PersistenceError(e.to_string()))?;
-    let storage = DeviceStorage::instance()
-        .await
-        .map_err(|e| terraphim_multi_agent::MultiAgentError::PersistenceError(e.to_string()))?;
-
-    use std::ptr;
-    let storage_copy = unsafe { ptr::read(storage) };
-    let persistence = Arc::new(storage_copy);
 
     let role = create_knowledge_graph_role();
     let agent = TerraphimAgent::new(role, persistence, None).await?;
@@ -296,16 +267,9 @@ async fn example_performance_analysis() -> MultiAgentResult<()> {
     println!("=================================================");
 
     // Initialize storage and agent
-    DeviceStorage::init_memory_only()
+    let persistence = DeviceStorage::arc_memory_only()
         .await
         .map_err(|e| terraphim_multi_agent::MultiAgentError::PersistenceError(e.to_string()))?;
-    let storage = DeviceStorage::instance()
-        .await
-        .map_err(|e| terraphim_multi_agent::MultiAgentError::PersistenceError(e.to_string()))?;
-
-    use std::ptr;
-    let storage_copy = unsafe { ptr::read(storage) };
-    let persistence = Arc::new(storage_copy);
 
     let role = create_knowledge_graph_role();
     let agent = TerraphimAgent::new(role, persistence, None).await?;

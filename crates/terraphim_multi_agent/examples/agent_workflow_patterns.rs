@@ -29,16 +29,9 @@ async fn demonstrate_prompt_chaining() -> MultiAgentResult<()> {
     println!("Sequential software development workflow with 6 steps");
 
     // Initialize storage
-    DeviceStorage::init_memory_only()
+    let persistence = DeviceStorage::arc_memory_only()
         .await
         .map_err(|e| MultiAgentError::PersistenceError(e.to_string()))?;
-    let storage_ref = DeviceStorage::instance()
-        .await
-        .map_err(|e| MultiAgentError::PersistenceError(e.to_string()))?;
-
-    use std::ptr;
-    let storage_copy = unsafe { ptr::read(storage_ref) };
-    let persistence = Arc::new(storage_copy);
 
     // Create a software development role
     let dev_role = create_software_development_role();
@@ -125,16 +118,9 @@ async fn demonstrate_routing() -> MultiAgentResult<()> {
     println!("Smart task distribution with model selection");
 
     // Initialize storage
-    DeviceStorage::init_memory_only()
+    let persistence = DeviceStorage::arc_memory_only()
         .await
         .map_err(|e| MultiAgentError::PersistenceError(e.to_string()))?;
-    let storage_ref = DeviceStorage::instance()
-        .await
-        .map_err(|e| MultiAgentError::PersistenceError(e.to_string()))?;
-
-    use std::ptr;
-    let storage_copy = unsafe { ptr::read(storage_ref) };
-    let persistence = Arc::new(storage_copy);
 
     // Create different agent roles for different complexity levels
     // Simple tasks agent (fast, low cost)
@@ -213,16 +199,9 @@ async fn demonstrate_parallelization() -> MultiAgentResult<()> {
     println!("Multi-perspective analysis with parallel execution");
 
     // Initialize storage
-    DeviceStorage::init_memory_only()
+    let persistence = DeviceStorage::arc_memory_only()
         .await
         .map_err(|e| MultiAgentError::PersistenceError(e.to_string()))?;
-    let storage_ref = DeviceStorage::instance()
-        .await
-        .map_err(|e| MultiAgentError::PersistenceError(e.to_string()))?;
-
-    use std::ptr;
-    let storage_copy = unsafe { ptr::read(storage_ref) };
-    let persistence = Arc::new(storage_copy);
 
     // Create 6 different perspective agents
     let perspectives = vec![
@@ -342,16 +321,9 @@ async fn demonstrate_orchestrator_workers() -> MultiAgentResult<()> {
     println!("Hierarchical data science pipeline with specialized workers");
 
     // Initialize storage
-    DeviceStorage::init_memory_only()
+    let persistence = DeviceStorage::arc_memory_only()
         .await
         .map_err(|e| MultiAgentError::PersistenceError(e.to_string()))?;
-    let storage_ref = DeviceStorage::instance()
-        .await
-        .map_err(|e| MultiAgentError::PersistenceError(e.to_string()))?;
-
-    use std::ptr;
-    let storage_copy = unsafe { ptr::read(storage_ref) };
-    let persistence = Arc::new(storage_copy);
 
     // Create orchestrator agent
     let orchestrator_role = create_orchestrator_role();
@@ -542,16 +514,9 @@ async fn demonstrate_evaluator_optimizer() -> MultiAgentResult<()> {
     println!("Iterative content improvement with quality evaluation");
 
     // Initialize storage
-    DeviceStorage::init_memory_only()
+    let persistence = DeviceStorage::arc_memory_only()
         .await
         .map_err(|e| MultiAgentError::PersistenceError(e.to_string()))?;
-    let storage_ref = DeviceStorage::instance()
-        .await
-        .map_err(|e| MultiAgentError::PersistenceError(e.to_string()))?;
-
-    use std::ptr;
-    let storage_copy = unsafe { ptr::read(storage_ref) };
-    let persistence = Arc::new(storage_copy);
 
     // Create content generator agent
     let generator_role = create_content_generator_role();

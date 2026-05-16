@@ -10,7 +10,7 @@ use ahash::AHashMap;
 use std::sync::Arc;
 use terraphim_config::Role;
 use terraphim_multi_agent::{
-    test_utils::create_test_role, CommandInput, CommandType, MultiAgentResult, TerraphimAgent,
+    CommandInput, CommandType, MultiAgentResult, TerraphimAgent, test_utils::create_test_role,
 };
 use terraphim_persistence::DeviceStorage;
 use terraphim_types::RelevanceFunction;
@@ -156,16 +156,9 @@ async fn example_agent_registry() -> MultiAgentResult<()> {
     println!("==========================================");
 
     // Initialize storage
-    DeviceStorage::init_memory_only()
+    let persistence = DeviceStorage::arc_memory_only()
         .await
         .map_err(|e| terraphim_multi_agent::MultiAgentError::PersistenceError(e.to_string()))?;
-    let storage = DeviceStorage::instance()
-        .await
-        .map_err(|e| terraphim_multi_agent::MultiAgentError::PersistenceError(e.to_string()))?;
-
-    use std::ptr;
-    let storage_copy = unsafe { ptr::read(storage) };
-    let persistence = Arc::new(storage_copy);
 
     // Create registry
     // TODO: Migrate to KnowledgeGraphAgentRegistry
@@ -201,16 +194,9 @@ async fn example_coordinated_execution() -> MultiAgentResult<()> {
     println!("=====================================================");
 
     // Initialize storage
-    DeviceStorage::init_memory_only()
+    let persistence = DeviceStorage::arc_memory_only()
         .await
         .map_err(|e| terraphim_multi_agent::MultiAgentError::PersistenceError(e.to_string()))?;
-    let storage = DeviceStorage::instance()
-        .await
-        .map_err(|e| terraphim_multi_agent::MultiAgentError::PersistenceError(e.to_string()))?;
-
-    use std::ptr;
-    let storage_copy = unsafe { ptr::read(storage) };
-    let persistence = Arc::new(storage_copy);
 
     // Create specialized agents (registry temporarily disabled during migration)
     let roles = create_specialized_roles();
@@ -288,16 +274,9 @@ async fn example_parallel_processing() -> MultiAgentResult<()> {
     println!("=======================================");
 
     // Initialize storage
-    DeviceStorage::init_memory_only()
+    let persistence = DeviceStorage::arc_memory_only()
         .await
         .map_err(|e| terraphim_multi_agent::MultiAgentError::PersistenceError(e.to_string()))?;
-    let storage = DeviceStorage::instance()
-        .await
-        .map_err(|e| terraphim_multi_agent::MultiAgentError::PersistenceError(e.to_string()))?;
-
-    use std::ptr;
-    let storage_copy = unsafe { ptr::read(storage) };
-    let persistence = Arc::new(storage_copy);
 
     // Create multiple instances of the same agent for parallel processing
     let mut agents = Vec::new();
@@ -360,16 +339,9 @@ async fn example_performance_comparison() -> MultiAgentResult<()> {
     println!("==========================================");
 
     // Initialize storage
-    DeviceStorage::init_memory_only()
+    let persistence = DeviceStorage::arc_memory_only()
         .await
         .map_err(|e| terraphim_multi_agent::MultiAgentError::PersistenceError(e.to_string()))?;
-    let storage = DeviceStorage::instance()
-        .await
-        .map_err(|e| terraphim_multi_agent::MultiAgentError::PersistenceError(e.to_string()))?;
-
-    use std::ptr;
-    let storage_copy = unsafe { ptr::read(storage) };
-    let persistence = Arc::new(storage_copy);
 
     // Create agents with different configurations
     let roles = create_specialized_roles();

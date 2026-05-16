@@ -5,7 +5,6 @@
 //! configurations to intelligent autonomous agents.
 
 use ahash::AHashMap;
-use std::sync::Arc;
 use terraphim_config::{ConfigBuilder, Haystack, Role, ServiceType};
 use terraphim_multi_agent::{
     CommandInput, CommandType, MultiAgentError, MultiAgentResult, TerraphimAgent,
@@ -32,12 +31,14 @@ fn create_atomic_server_agent_role() -> Role {
         llm_context_window: Some(16000),
         llm_router_enabled: false,
         llm_router_config: None,
-        haystacks: vec![Haystack::new(
-            "http://localhost:9883".to_string(), // Atomic server URL
-            ServiceType::Atomic,
-            true, // read-only
-        )
-        .with_atomic_secret(Some("your-base64-secret-here".to_string()))],
+        haystacks: vec![
+            Haystack::new(
+                "http://localhost:9883".to_string(), // Atomic server URL
+                ServiceType::Atomic,
+                true, // read-only
+            )
+            .with_atomic_secret(Some("your-base64-secret-here".to_string())),
+        ],
         extra: {
             let mut extra = AHashMap::new();
             // Multi-agent specific configuration
@@ -98,17 +99,9 @@ async fn demonstrate_config_evolution() -> MultiAgentResult<()> {
     println!("\n2️⃣ Step 2: Multi-Agent System Evolution");
 
     // Initialize storage
-    DeviceStorage::init_memory_only()
+    let persistence = DeviceStorage::arc_memory_only()
         .await
         .map_err(|e| MultiAgentError::PersistenceError(e.to_string()))?;
-
-    let storage_ref = DeviceStorage::instance()
-        .await
-        .map_err(|e| MultiAgentError::PersistenceError(e.to_string()))?;
-
-    use std::ptr;
-    let storage_copy = unsafe { ptr::read(storage_ref) };
-    let persistence = Arc::new(storage_copy);
 
     // Transform role into intelligent agent
     let role = create_atomic_server_agent_role();
@@ -130,17 +123,9 @@ async fn demonstrate_intelligent_queries() -> MultiAgentResult<()> {
     println!("==================================");
 
     // Initialize agent
-    DeviceStorage::init_memory_only()
+    let persistence = DeviceStorage::arc_memory_only()
         .await
         .map_err(|e| MultiAgentError::PersistenceError(e.to_string()))?;
-
-    let storage_ref = DeviceStorage::instance()
-        .await
-        .map_err(|e| MultiAgentError::PersistenceError(e.to_string()))?;
-
-    use std::ptr;
-    let storage_copy = unsafe { ptr::read(storage_ref) };
-    let persistence = Arc::new(storage_copy);
 
     let role = create_atomic_server_agent_role();
     let agent = TerraphimAgent::new(role, persistence, None).await?;
@@ -195,17 +180,9 @@ async fn demonstrate_context_integration() -> MultiAgentResult<()> {
     println!("===================================");
 
     // Initialize agent
-    DeviceStorage::init_memory_only()
+    let persistence = DeviceStorage::arc_memory_only()
         .await
         .map_err(|e| MultiAgentError::PersistenceError(e.to_string()))?;
-
-    let storage_ref = DeviceStorage::instance()
-        .await
-        .map_err(|e| MultiAgentError::PersistenceError(e.to_string()))?;
-
-    use std::ptr;
-    let storage_copy = unsafe { ptr::read(storage_ref) };
-    let persistence = Arc::new(storage_copy);
 
     let role = create_atomic_server_agent_role();
     let agent = TerraphimAgent::new(role, persistence, None).await?;
@@ -263,17 +240,9 @@ async fn demonstrate_evolution_comparison() -> MultiAgentResult<()> {
     println!("   • Cost and performance tracking");
 
     // Initialize intelligent agent
-    DeviceStorage::init_memory_only()
+    let persistence = DeviceStorage::arc_memory_only()
         .await
         .map_err(|e| MultiAgentError::PersistenceError(e.to_string()))?;
-
-    let storage_ref = DeviceStorage::instance()
-        .await
-        .map_err(|e| MultiAgentError::PersistenceError(e.to_string()))?;
-
-    use std::ptr;
-    let storage_copy = unsafe { ptr::read(storage_ref) };
-    let persistence = Arc::new(storage_copy);
 
     let role = create_atomic_server_agent_role();
     let agent = TerraphimAgent::new(role, persistence, None).await?;
