@@ -181,7 +181,7 @@ fn test_config(working_dir: PathBuf) -> OrchestratorConfig {
 /// Design reference: test_orchestrator_spawns_safety_agents (partial -- creation + state)
 #[test]
 fn test_orchestrator_creates_and_initial_state() {
-    let config = test_config(tempfile::tempdir().unwrap().into_path());
+    let config = test_config(tempfile::tempdir().unwrap().keep());
     let orch = AgentOrchestrator::new(config).unwrap();
 
     // No agents running before run() is called
@@ -196,7 +196,7 @@ fn test_orchestrator_creates_and_initial_state() {
 /// Design reference: test_orchestrator_shutdown_cleans_up
 #[tokio::test]
 async fn test_orchestrator_shutdown_cleans_up() {
-    let config = test_config(tempfile::tempdir().unwrap().into_path());
+    let config = test_config(tempfile::tempdir().unwrap().keep());
     let mut orch = AgentOrchestrator::new(config).unwrap();
 
     // Request shutdown before running -- the run() loop should exit immediately
@@ -296,7 +296,7 @@ max_memory_bytes = 1073741824
 /// Design reference: test_orchestrator_handles_drift_alert
 #[test]
 fn test_orchestrator_handles_drift_alert() {
-    let config = test_config(tempfile::tempdir().unwrap().into_path());
+    let config = test_config(tempfile::tempdir().unwrap().keep());
     let mut orch = AgentOrchestrator::new(config).unwrap();
 
     // Verify rate limiter is accessible and functional through orchestrator
@@ -395,7 +395,7 @@ fn test_error_variants_display() {
 
 #[tokio::test]
 async fn test_shell_pre_check_skips_on_empty_output() {
-    let mut config = test_config(tempfile::tempdir().unwrap().into_path());
+    let mut config = test_config(tempfile::tempdir().unwrap().keep());
     config.agents[0].pre_check = Some(terraphim_orchestrator::PreCheckStrategy::Shell {
         script: "true".to_string(), // exit 0, empty stdout
         timeout_secs: 5,
@@ -409,7 +409,7 @@ async fn test_shell_pre_check_skips_on_empty_output() {
 
 #[tokio::test]
 async fn test_shell_pre_check_returns_findings() {
-    let mut config = test_config(tempfile::tempdir().unwrap().into_path());
+    let mut config = test_config(tempfile::tempdir().unwrap().keep());
     config.agents[0].pre_check = Some(terraphim_orchestrator::PreCheckStrategy::Shell {
         script: "echo 'found issues'".to_string(),
         timeout_secs: 5,
@@ -422,7 +422,7 @@ async fn test_shell_pre_check_returns_findings() {
 
 #[tokio::test]
 async fn test_shell_pre_check_fail_open_on_error() {
-    let mut config = test_config(tempfile::tempdir().unwrap().into_path());
+    let mut config = test_config(tempfile::tempdir().unwrap().keep());
     config.agents[0].pre_check = Some(terraphim_orchestrator::PreCheckStrategy::Shell {
         script: "exit 1".to_string(),
         timeout_secs: 5,
@@ -435,7 +435,7 @@ async fn test_shell_pre_check_fail_open_on_error() {
 
 #[tokio::test]
 async fn test_shell_pre_check_timeout_fail_open() {
-    let mut config = test_config(tempfile::tempdir().unwrap().into_path());
+    let mut config = test_config(tempfile::tempdir().unwrap().keep());
     config.agents[0].pre_check = Some(terraphim_orchestrator::PreCheckStrategy::Shell {
         script: "sleep 10".to_string(),
         timeout_secs: 1,
@@ -448,7 +448,7 @@ async fn test_shell_pre_check_timeout_fail_open() {
 
 #[tokio::test]
 async fn test_no_pre_check_spawns_normally() {
-    let config = test_config(tempfile::tempdir().unwrap().into_path()); // pre_check is None
+    let config = test_config(tempfile::tempdir().unwrap().keep()); // pre_check is None
     let mut orch = AgentOrchestrator::new(config).unwrap();
     let result = orch.spawn_agent_for_test("sentinel").await;
     assert!(result.is_ok());
@@ -458,7 +458,7 @@ async fn test_no_pre_check_spawns_normally() {
 /// Integration test: gitea-issue pre-check fails open when no workflow config.
 #[tokio::test]
 async fn test_gitea_issue_no_workflow_config_fail_open() {
-    let mut config = test_config(tempfile::tempdir().unwrap().into_path());
+    let mut config = test_config(tempfile::tempdir().unwrap().keep());
     config.workflow = None; // no workflow config
     config.agents[0].pre_check =
         Some(terraphim_orchestrator::PreCheckStrategy::GiteaIssue { issue_number: 42 });
@@ -471,7 +471,7 @@ async fn test_gitea_issue_no_workflow_config_fail_open() {
 /// Git-diff: first run (no last_run_commits) always spawns.
 #[tokio::test]
 async fn test_git_diff_first_run_always_spawns() {
-    let mut config = test_config(tempfile::tempdir().unwrap().into_path());
+    let mut config = test_config(tempfile::tempdir().unwrap().keep());
     config.agents[0].pre_check = Some(terraphim_orchestrator::PreCheckStrategy::GitDiff {
         watch_paths: vec!["crates/".to_string()],
     });
@@ -485,7 +485,7 @@ async fn test_git_diff_first_run_always_spawns() {
 /// Git-diff: HEAD unchanged since last run -> skip (NoFindings).
 #[tokio::test]
 async fn test_git_diff_no_changes_skips() {
-    let mut config = test_config(tempfile::tempdir().unwrap().into_path());
+    let mut config = test_config(tempfile::tempdir().unwrap().keep());
     // Set working_dir to the actual repo so git commands work
     config.working_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     config.agents[0].pre_check = Some(terraphim_orchestrator::PreCheckStrategy::GitDiff {
@@ -510,7 +510,7 @@ async fn test_git_diff_no_changes_skips() {
 /// Git-diff: changes in watched paths -> spawn (Findings).
 #[tokio::test]
 async fn test_git_diff_matching_changes_spawns() {
-    let mut config = test_config(tempfile::tempdir().unwrap().into_path());
+    let mut config = test_config(tempfile::tempdir().unwrap().keep());
     config.working_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     config.agents[0].pre_check = Some(terraphim_orchestrator::PreCheckStrategy::GitDiff {
         watch_paths: vec!["crates/".to_string()],
@@ -529,7 +529,7 @@ async fn test_git_diff_matching_changes_spawns() {
 /// Git-diff: changes exist but NOT in watched paths -> skip (NoFindings).
 #[tokio::test]
 async fn test_git_diff_non_matching_changes_skips() {
-    let mut config = test_config(tempfile::tempdir().unwrap().into_path());
+    let mut config = test_config(tempfile::tempdir().unwrap().keep());
     config.working_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     config.agents[0].pre_check = Some(terraphim_orchestrator::PreCheckStrategy::GitDiff {
         watch_paths: vec!["nonexistent-directory-that-will-never-match/".to_string()],
@@ -627,7 +627,7 @@ fn test_orchestrator_with_routing_config() {
 /// that a config WITH workflow but unreachable endpoint also fails open.
 #[tokio::test]
 async fn test_gitea_issue_unreachable_endpoint_fail_open() {
-    let mut config = test_config(tempfile::tempdir().unwrap().into_path());
+    let mut config = test_config(tempfile::tempdir().unwrap().keep());
     config.workflow = Some(WorkflowConfig {
         enabled: true,
         poll_interval_secs: 30,
@@ -659,7 +659,7 @@ async fn test_gitea_issue_unreachable_endpoint_fail_open() {
 /// Uses real git repo (CARGO_MANIFEST_DIR) with HEAD as last-run commit.
 #[tokio::test]
 async fn test_spawn_agent_skipped_by_git_diff_no_matching() {
-    let mut config = test_config(tempfile::tempdir().unwrap().into_path());
+    let mut config = test_config(tempfile::tempdir().unwrap().keep());
     config.working_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     config.agents[0].pre_check = Some(terraphim_orchestrator::PreCheckStrategy::GitDiff {
         watch_paths: vec!["nonexistent-path-that-never-matches/".to_string()],
@@ -679,7 +679,7 @@ async fn test_spawn_agent_skipped_by_git_diff_no_matching() {
 /// Uses real git repo with empty tree as baseline.
 #[tokio::test]
 async fn test_spawn_agent_proceeds_with_git_diff_findings() {
-    let mut config = test_config(tempfile::tempdir().unwrap().into_path());
+    let mut config = test_config(tempfile::tempdir().unwrap().keep());
     config.working_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     config.agents[0].pre_check = Some(terraphim_orchestrator::PreCheckStrategy::GitDiff {
         watch_paths: vec!["crates/".to_string()],

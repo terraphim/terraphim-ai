@@ -22,7 +22,7 @@ async fn create_terraphim_engineer_config() -> Result<String> {
     let log_dir = tempfile::Builder::new()
         .prefix("terraphim-logs")
         .tempdir()?
-        .into_path();
+        .keep();
     std::fs::create_dir_all(&log_dir)?;
     set_env_var("TERRAPHIM_LOG_DIR", log_dir.to_string_lossy().to_string());
     let _ = DeviceStorage::init_memory_only().await;

@@ -9,7 +9,7 @@ mod tests {
     use terraphim_automata::AutomataPath;
     use terraphim_server::{CreateDocumentResponse, SearchResponse, Status, axum_server};
 
-    use std::{net::SocketAddr, path::PathBuf, time::Duration};
+    use std::{net::SocketAddr, time::Duration};
     use terraphim_config::{
         Config, ConfigBuilder, ConfigState, Haystack, KnowledgeGraph, KnowledgeGraphLocal, Role,
         ServiceType,
@@ -28,7 +28,7 @@ mod tests {
             .prefix("system_operator_pages")
             .tempdir()
             .expect("failed to create tempdir")
-            .into_path();
+            .keep();
 
         ConfigBuilder::new()
             .global_shortcut("Ctrl+X")

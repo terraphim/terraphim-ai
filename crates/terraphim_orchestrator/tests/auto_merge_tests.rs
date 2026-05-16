@@ -162,7 +162,7 @@ fn auto_merge_depth(orch: &AgentOrchestrator) -> u64 {
 #[tokio::test]
 async fn auto_merge_requires_all_gates() {
     let mut orch =
-        AgentOrchestrator::new(minimal_config(tempfile::tempdir().unwrap().into_path())).unwrap();
+        AgentOrchestrator::new(minimal_config(tempfile::tempdir().unwrap().keep())).unwrap();
 
     let tracker = InMemoryPrTracker::new().with_pr(
         pr_summary(101, "claude-code", "2ef451d8", 42),
@@ -198,7 +198,7 @@ async fn auto_merge_requires_all_gates() {
 #[tokio::test]
 async fn auto_merge_blocked_on_p1_present() {
     let mut orch =
-        AgentOrchestrator::new(minimal_config(tempfile::tempdir().unwrap().into_path())).unwrap();
+        AgentOrchestrator::new(minimal_config(tempfile::tempdir().unwrap().keep())).unwrap();
 
     let tracker = InMemoryPrTracker::new().with_pr(
         pr_summary(202, "claude-code", "62672e38", 42),
@@ -220,7 +220,7 @@ async fn auto_merge_blocked_on_p1_present() {
 #[tokio::test]
 async fn auto_merge_blocked_on_non_agent_author() {
     let mut orch =
-        AgentOrchestrator::new(minimal_config(tempfile::tempdir().unwrap().into_path())).unwrap();
+        AgentOrchestrator::new(minimal_config(tempfile::tempdir().unwrap().keep())).unwrap();
 
     // Reuse the clean fixture but swap the author login to a human.
     let tracker = InMemoryPrTracker::new().with_pr(
@@ -243,7 +243,7 @@ async fn auto_merge_blocked_on_non_agent_author() {
 #[tokio::test]
 async fn auto_merge_blocked_on_large_diff() {
     let mut orch =
-        AgentOrchestrator::new(minimal_config(tempfile::tempdir().unwrap().into_path())).unwrap();
+        AgentOrchestrator::new(minimal_config(tempfile::tempdir().unwrap().keep())).unwrap();
 
     // 5/5 clean review, agent author, but diff_loc exceeds the 500 LoC cap.
     let tracker = InMemoryPrTracker::new().with_pr(
@@ -266,7 +266,7 @@ async fn auto_merge_blocked_on_large_diff() {
 #[tokio::test]
 async fn auto_merge_idempotent_across_ticks() {
     let mut orch =
-        AgentOrchestrator::new(minimal_config(tempfile::tempdir().unwrap().into_path())).unwrap();
+        AgentOrchestrator::new(minimal_config(tempfile::tempdir().unwrap().keep())).unwrap();
 
     let tracker = InMemoryPrTracker::new().with_pr(
         pr_summary(505, "claude-code", "2ef451d8", 42),
@@ -298,7 +298,7 @@ async fn auto_merge_idempotent_across_ticks() {
 #[tokio::test]
 async fn poll_skips_prs_without_reviewer_comment() {
     let mut orch =
-        AgentOrchestrator::new(minimal_config(tempfile::tempdir().unwrap().into_path())).unwrap();
+        AgentOrchestrator::new(minimal_config(tempfile::tempdir().unwrap().keep())).unwrap();
 
     // One PR with a non-reviewer comment (human noise) and no reviewer
     // verdict yet. The poller should treat this as "no verdict, skip".
@@ -326,7 +326,7 @@ async fn poll_skips_prs_without_reviewer_comment() {
 #[tokio::test]
 async fn poll_handles_verdict_parse_error_gracefully() {
     let mut orch =
-        AgentOrchestrator::new(minimal_config(tempfile::tempdir().unwrap().into_path())).unwrap();
+        AgentOrchestrator::new(minimal_config(tempfile::tempdir().unwrap().keep())).unwrap();
 
     let tracker = InMemoryPrTracker::new().with_pr(
         pr_summary(707, "claude-code", "6becb2f7", 42),

@@ -117,7 +117,7 @@ async fn test_redb_error_handling() -> Result<(), Box<dyn std::error::Error>> {
         default_data_path: tempfile::Builder::new()
             .prefix("test_invalid")
             .tempdir()?
-            .into_path()
+            .keep()
             .to_string_lossy()
             .to_string(),
         profiles,

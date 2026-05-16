@@ -109,7 +109,7 @@ async fn start_test_server() -> Result<(Child, String)> {
     let config_path_absolute = config_path_buf.to_string_lossy().to_string();
 
     // Clear any existing saved config to prevent it from overriding our test config
-    let test_data_path = tempfile::tempdir()?.into_path();
+    let test_data_path = tempfile::tempdir()?.keep();
 
     println!(
         "[TEST] Spawning server process with config: {}",
