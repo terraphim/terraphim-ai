@@ -2065,12 +2065,22 @@ impl AgentOrchestrator {
 
         // Resolve the git repo directory for worktree operations. Project-bound
         // agents need a worktree from their own repo, not the orchestrator's.
-        let repo_dir: &Path = def
-            .project
-            .as_deref()
-            .and_then(|pid| self.config.project_by_id(pid))
-            .map(|p| p.working_dir.as_path())
-            .unwrap_or(&self.config.working_dir);
+        let repo_dir: &Path = if let Some(pid) = def.project.as_deref() {
+            match self.config.project_by_id(pid) {
+                Some(p) => p.working_dir.as_path(),
+                None => {
+                    warn!(
+                        agent = %def.name,
+                        project_id = %pid,
+                        fallback = %self.config.working_dir.display(),
+                        "project_by_id returned None, falling back to orchestrator working_dir"
+                    );
+                    &self.config.working_dir
+                }
+            }
+        } else {
+            &self.config.working_dir
+        };
 
         let (worktree_path, worktree_guard) = if needs_isolation {
             if let Some(path) = self.create_agent_worktree(&def.name, repo_dir).await {
