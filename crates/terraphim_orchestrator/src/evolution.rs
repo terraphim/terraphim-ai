@@ -12,6 +12,7 @@ use terraphim_agent_evolution::{
 pub struct EvolutionManager {
     #[cfg(feature = "evolution")]
     systems: HashMap<AgentId, AgentEvolutionSystem>,
+    #[cfg_attr(not(feature = "evolution"), allow(dead_code))]
     config: EvolutionConfig,
     enabled: bool,
 }

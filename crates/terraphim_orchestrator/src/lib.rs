@@ -6789,8 +6789,8 @@ impl AgentOrchestrator {
 
             // Evolution: record lesson and snapshot on agent exit.
             if def.evolution_enabled && self.evolution_manager.is_enabled() {
-                let exit_desc = format!("Agent {} exited with status: {}", name, status);
-                let exit_code = status.code().unwrap_or(-1);
+                let _exit_desc = format!("Agent {} exited with status: {}", name, status);
+                let _exit_code = status.code().unwrap_or(-1);
                 #[cfg(feature = "evolution")]
                 {
                     let category = if status.success() {

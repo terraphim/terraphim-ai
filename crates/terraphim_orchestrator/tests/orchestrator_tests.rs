@@ -172,6 +172,7 @@ fn test_config(working_dir: PathBuf) -> OrchestratorConfig {
         pr_dispatch_per_project: Default::default(),
         gitea_skill_repo: None,
         gate_reconcile_interval_ticks: 20,
+        evolution: Default::default(),
     }
 }
 
@@ -336,6 +337,7 @@ async fn test_handoff_context_file_roundtrip() {
         ],
         timestamp: chrono::Utc::now(),
         ttl_secs: Some(3600),
+        evolution_snapshot_key: None,
     };
 
     original.write_to_file(&handoff_path).unwrap();

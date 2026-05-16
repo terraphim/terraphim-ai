@@ -366,6 +366,7 @@ fn budget_aware_config(
         pr_dispatch_per_project: Default::default(),
         gitea_skill_repo: None,
         gate_reconcile_interval_ticks: 20,
+        evolution: Default::default(),
     }
 }
 
