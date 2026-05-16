@@ -283,9 +283,9 @@ detect_and_extract() {
   if [ -f "Cargo.toml" ]; then
     log_info "Detected: Cargo workspace"
     echo "cargo fmt --all -- --check"
-    echo "cargo clippy --workspace -- -D warnings"
+    echo "cargo clippy --workspace --all-targets -- -D warnings"
     echo "cargo build --workspace"
-    echo "cargo test --workspace"
+    echo "cargo test --workspace --no-fail-fast"
     return 0
   fi
 

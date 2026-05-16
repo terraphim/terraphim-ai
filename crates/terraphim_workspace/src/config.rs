@@ -94,7 +94,6 @@ impl HooksConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
 
     #[test]
     fn workspace_config_default_timeout() {
