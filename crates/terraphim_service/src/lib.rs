@@ -61,6 +61,20 @@ pub mod context;
 #[cfg(test)]
 mod context_tests;
 
+/// Returns a substring of `s` from `start` to `end` (byte offsets), adjusted
+/// inward to the nearest char boundaries. Prevents panics when arithmetic
+/// offsets land inside multi-byte sequences such as `→` (U+2192).
+fn safe_byte_slice(s: &str, start: usize, end: usize) -> &str {
+    let start = (0..=start.min(s.len()))
+        .rev()
+        .find(|&i| s.is_char_boundary(i))
+        .unwrap_or(0);
+    let end = (end.min(s.len())..=s.len())
+        .find(|&i| s.is_char_boundary(i))
+        .unwrap_or(s.len());
+    &s[start..end]
+}
+
 /// Normalize a filename to be used as a document ID
 ///
 /// This ensures consistent ID generation between server startup and edit API
@@ -951,11 +965,11 @@ impl TerraphimService {
 
                                 // Show a snippet of the processed content with context
                                 if let Some(first_link_pos) = processed_content.find("](kg:") {
-                                    let start = first_link_pos.saturating_sub(50);
-                                    let end = (first_link_pos + 100).min(processed_content.len());
+                                    let raw_start = first_link_pos.saturating_sub(50);
+                                    let raw_end = first_link_pos + 100;
                                     log::info!(
                                         "📄 Content snippet with KG link: ...{}...",
-                                        &processed_content[start..end]
+                                        safe_byte_slice(&processed_content, raw_start, raw_end)
                                     );
                                 }
                             } else {
@@ -3787,5 +3801,59 @@ mod tests {
             TerraphimService::apply_min_quality_filter(vec![with_score, no_score], Some(-0.1));
         assert_eq!(result.len(), 1, "only scored document should pass");
         assert_eq!(result[0].id, "scored");
+    }
+
+    // safe_byte_slice regression tests — guards against the char-boundary panic
+    // that occurred when arithmetic offsets landed inside multi-byte sequences.
+
+    #[test]
+    fn safe_byte_slice_ascii_unchanged() {
+        let s = "hello world";
+        assert_eq!(safe_byte_slice(s, 0, s.len()), s);
+        assert_eq!(safe_byte_slice(s, 2, 7), "llo w");
+    }
+
+    #[test]
+    fn safe_byte_slice_multibyte_end_adjusted() {
+        // "→" is U+2192, encoded as 3 bytes: 0xE2 0x86 0x92.
+        // byte 3 is the start of "→"; bytes 4 and 5 are continuation bytes.
+        let s = "abc→def"; // bytes: a(0) b(1) c(2) →(3,4,5) d(6) e(7) f(8)
+        // end=5 lands inside "→"; safe_byte_slice must ceil to 6.
+        let result = safe_byte_slice(s, 0, 5);
+        assert!(
+            s.is_char_boundary(result.len()),
+            "end must be a char boundary"
+        );
+        assert!(
+            !result.contains('\u{FFFD}'),
+            "must not produce replacement char"
+        );
+    }
+
+    #[test]
+    fn safe_byte_slice_multibyte_start_adjusted() {
+        let s = "abc→def"; // "→" starts at byte 3
+        // start=4 lands inside "→"; safe_byte_slice must floor to 3.
+        let result = safe_byte_slice(s, 4, s.len());
+        assert!(
+            s[..s.len() - result.len()].is_char_boundary(s.len() - result.len())
+                || result.starts_with('→')
+                || result.starts_with('d'),
+            "slice must start at a valid char boundary"
+        );
+    }
+
+    #[test]
+    fn safe_byte_slice_does_not_panic_on_arrow_content() {
+        // Regression: the KG preprocessing log snippet panicked when content
+        // contained "→" and arithmetic offsets fell inside the 3-byte sequence.
+        let content = "# npm run build\n\nBuild JavaScript/TypeScript project...synonyms:: npm run build, →, build script\n";
+        // Simulate find("](kg:") returning an offset that places raw_end inside "→"
+        for start in 0..content.len() {
+            for end in start..=content.len() + 10 {
+                // Must not panic for any byte offsets
+                let _ = safe_byte_slice(content, start, end);
+            }
+        }
     }
 }
