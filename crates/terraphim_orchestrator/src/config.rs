@@ -512,9 +512,10 @@ fn default_true_routing() -> bool {
 }
 
 /// Configuration for posting agent output to Gitea issues.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct GiteaOutputConfig {
     pub base_url: String,
+    /// Gitea API token. Redacted in `Debug` output.
     pub token: String,
     pub owner: String,
     pub repo: String,
@@ -522,6 +523,18 @@ pub struct GiteaOutputConfig {
     /// When present, agents post comments under their own Gitea user.
     #[serde(default)]
     pub agent_tokens_path: Option<PathBuf>,
+}
+
+impl std::fmt::Debug for GiteaOutputConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("GiteaOutputConfig")
+            .field("base_url", &self.base_url)
+            .field("token", &"***REDACTED***")
+            .field("owner", &self.owner)
+            .field("repo", &self.repo)
+            .field("agent_tokens_path", &self.agent_tokens_path)
+            .finish()
+    }
 }
 
 /// Configuration for mention-driven dispatch.
@@ -571,16 +584,25 @@ impl Default for MentionConfig {
 }
 
 /// Configuration for the webhook server.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct WebhookConfig {
     /// Bind address for the webhook server (default "127.0.0.1:9090").
     /// Use 127.0.0.1 (localhost) to avoid exposing the webhook endpoint to all network interfaces.
     /// Set to "0.0.0.0:9090" explicitly if external access is required.
     #[serde(default = "default_webhook_bind")]
     pub bind: String,
-    /// Shared secret for HMAC signature verification.
+    /// Shared HMAC secret for webhook signature verification. Redacted in `Debug` output.
     /// Must match the secret configured in Gitea webhook settings.
     pub secret: Option<String>,
+}
+
+impl std::fmt::Debug for WebhookConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("WebhookConfig")
+            .field("bind", &self.bind)
+            .field("secret", &self.secret.as_ref().map(|_| "***REDACTED***"))
+            .finish()
+    }
 }
 
 fn default_webhook_bind() -> String {
@@ -3242,5 +3264,55 @@ task = "test"
 "#;
         let config = OrchestratorConfig::from_toml(toml_str).unwrap();
         assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn gitea_output_config_token_redacted_in_debug() {
+        let cfg = GiteaOutputConfig {
+            base_url: "https://git.example".to_string(),
+            token: "super-secret-gitea-token".to_string(),
+            owner: "acme".to_string(),
+            repo: "platform".to_string(),
+            agent_tokens_path: None,
+        };
+        let dbg = format!("{:?}", cfg);
+        assert!(
+            !dbg.contains("super-secret-gitea-token"),
+            "Gitea token must be redacted in Debug output, got: {dbg}"
+        );
+        assert!(
+            dbg.contains("***REDACTED***"),
+            "Debug output should mark token as redacted, got: {dbg}"
+        );
+    }
+
+    #[test]
+    fn webhook_config_secret_redacted_in_debug() {
+        let cfg = WebhookConfig {
+            bind: "127.0.0.1:9090".to_string(),
+            secret: Some("hmac-webhook-secret".to_string()),
+        };
+        let dbg = format!("{:?}", cfg);
+        assert!(
+            !dbg.contains("hmac-webhook-secret"),
+            "Webhook secret must be redacted in Debug output, got: {dbg}"
+        );
+        assert!(
+            dbg.contains("***REDACTED***"),
+            "Debug output should mark secret as redacted, got: {dbg}"
+        );
+    }
+
+    #[test]
+    fn webhook_config_none_secret_debug_shows_none() {
+        let cfg = WebhookConfig {
+            bind: "127.0.0.1:9090".to_string(),
+            secret: None,
+        };
+        let dbg = format!("{:?}", cfg);
+        assert!(
+            dbg.contains("None"),
+            "None secret should show as None in Debug output, got: {dbg}"
+        );
     }
 }
