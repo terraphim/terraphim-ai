@@ -356,3 +356,38 @@ If remotes diverge:
 - NEVER stop before pushing - that leaves work stranded locally
 - NEVER say "ready to push when you are" - YOU must push
 - If push fails, resolve and retry until it succeeds
+
+## Agent Evolution System
+
+The orchestrator can track agent evolution (versioned memory, task history, lessons) across runs. This is supplementary to SharedLearningStore.
+
+### Configuration
+
+```toml
+# orchestrator.toml
+[evolution]
+enabled = true
+max_memory_tokens = 1500        # Max chars of evolution context in prompts
+max_snapshots_per_agent = 100   # Max snapshots before pruning
+consolidation_interval_ticks = 200  # Reconcile ticks between memory consolidation
+
+[[agents]]
+name = "security-sentinel"
+evolution_enabled = true  # Opt-in per agent
+```
+
+### Build
+
+Requires `evolution` Cargo feature:
+```bash
+cargo build -p terraphim_orchestrator --features evolution
+cargo test -p terraphim_orchestrator --features evolution
+```
+
+### Key Integration Points
+
+- `crates/terraphim_orchestrator/src/evolution.rs` - EvolutionManager wrapper
+- `HandoffContext.evolution_snapshot_key` - Inter-agent snapshot transfer
+- `AgentDefinition.evolution_enabled` - Per-agent opt-in
+- Project-level skill: `.skills/terraphim-evolution/SKILL.md`
+- Project-level agent: `.claude/agents/evolution-manager.md`

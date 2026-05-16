@@ -40,6 +40,7 @@ pub mod dispatcher;
 pub mod dual_mode;
 pub mod error;
 pub mod error_signatures;
+pub mod evolution;
 pub mod flow;
 pub mod gitea_skill_loader;
 pub mod handoff;
@@ -317,6 +318,9 @@ pub struct AgentOrchestrator {
     /// directory is prepended to the skill search path so remote skills
     /// shadow local ones while local directories remain as fallback.
     gitea_skill_cache_dir: Option<PathBuf>,
+    /// Agent evolution manager. No-op when evolution feature is disabled
+    /// or `evolution.enabled = false` in config.
+    evolution_manager: evolution::EvolutionManager,
 }
 
 /// Build the composite restart-state key for an agent definition.
@@ -859,6 +863,7 @@ impl AgentOrchestrator {
                 }
             },
             gitea_skill_cache_dir: None,
+            evolution_manager: evolution::EvolutionManager::new(config.evolution.clone()),
         })
     }
 
@@ -2020,7 +2025,7 @@ impl AgentOrchestrator {
 
         // Inject prior lessons from shared learning store
         let (lessons_section, lesson_ids) = self.render_lessons_section(&def.name);
-        let composed_task = if lessons_section.is_empty() {
+        let mut composed_task = if lessons_section.is_empty() {
             composed_task
         } else {
             info!(
@@ -2032,6 +2037,19 @@ impl AgentOrchestrator {
                 .insert(def.name.clone(), lesson_ids);
             format!("{}\n\n{}", composed_task, lessons_section)
         };
+
+        // Inject evolution memory context if enabled for this agent.
+        if def.evolution_enabled && self.evolution_manager.is_enabled() {
+            self.evolution_manager.ensure_agent(&def.name);
+            let _ = self
+                .evolution_manager
+                .record_task_start(&def.name, &def.task);
+            let evo_ctx = self.evolution_manager.render_context(&def.name);
+            if !evo_ctx.is_empty() {
+                info!(agent = %def.name, "injecting evolution memory context");
+                composed_task = format!("{}\n\n{}", composed_task, evo_ctx);
+            }
+        }
 
         // Use stdin only when persona was actually resolved (prompt is enriched)
         // or when the task exceeds ARG_MAX safety threshold.
@@ -5691,6 +5709,14 @@ impl AgentOrchestrator {
                     Ok(_) => {}
                 }
             }
+
+            // Evolution memory consolidation (promotes high-importance short-term to long-term).
+            if self.evolution_manager.is_enabled() {
+                let consolidated = self.evolution_manager.consolidate_all();
+                if consolidated > 0 {
+                    info!(consolidated, "evolution memory consolidation complete");
+                }
+            }
         }
 
         // 17. Drain the unified dispatch queue. Handlers for ReviewPr,
@@ -6751,6 +6777,32 @@ impl AgentOrchestrator {
             }
             self.record_project_meta_exit(&def, status).await;
 
+            // Evolution: record lesson and snapshot on agent exit.
+            if def.evolution_enabled && self.evolution_manager.is_enabled() {
+                let exit_desc = format!("Agent {} exited with status: {}", name, status);
+                let exit_code = status.code().unwrap_or(-1);
+                #[cfg(feature = "evolution")]
+                {
+                    let category = if status.success() {
+                        terraphim_agent_evolution::LessonCategory::SuccessPattern
+                    } else {
+                        terraphim_agent_evolution::LessonCategory::Failure
+                    };
+                    let _ = self.evolution_manager.record_lesson(
+                        &name,
+                        &format!("{} run completed", name),
+                        &exit_desc,
+                        &format!("Exit code: {}", exit_code),
+                        category,
+                    );
+                }
+                #[cfg(not(feature = "evolution"))]
+                let _: () = ();
+                if let Some(snapshot_key) = self.evolution_manager.snapshot_on_exit(&name) {
+                    info!(agent = %name, key = %snapshot_key, "evolution snapshot created");
+                }
+            }
+
             // Auto-commit in the agent's working directory (worktree or shared)
             let project_repo: &Path = def
                 .project
@@ -7124,6 +7176,30 @@ Remove the pause flag once the underlying failure is resolved:\n\n\
 
         for (name, event) in &events {
             self.nightwatch.observe(name, event);
+
+            // Feed output to evolution system if enabled.
+            if self.evolution_manager.is_enabled() {
+                let is_evo = self
+                    .active_agents
+                    .get(name)
+                    .map(|m| m.definition.evolution_enabled)
+                    .unwrap_or(false);
+                if is_evo {
+                    let (line_content, event_type) = match event {
+                        crate::OutputEvent::Stdout { line, .. } => (line.clone(), "stdout"),
+                        crate::OutputEvent::Stderr { line, .. } => (line.clone(), "stderr"),
+                        _ => continue,
+                    };
+                    let _ = self
+                        .evolution_manager
+                        .record_output(evolution::EvolutionOutput {
+                            agent_id: name.clone(),
+                            content: line_content,
+                            event_type: event_type.to_string(),
+                            importance: "medium".to_string(),
+                        });
+                }
+            }
 
             match event {
                 OutputEvent::Stdout { line, .. } => {
@@ -7858,6 +7934,7 @@ mod tests {
 
                     gitea_issue: None,
                     event_only: false,
+                    evolution_enabled: false,
 
                     project: None,
                 },
@@ -7884,6 +7961,7 @@ mod tests {
 
                     gitea_issue: None,
                     event_only: false,
+                    evolution_enabled: false,
 
                     project: None,
                 },
@@ -7917,6 +7995,7 @@ mod tests {
             fleet_escalation_repo: None,
             post_merge_gate: None,
             learning: config::LearningConfig::default(),
+            evolution: config::EvolutionConfig::default(),
             pr_dispatch: None,
             pr_dispatch_per_project: Default::default(),
         }
@@ -8123,6 +8202,7 @@ task = "test"
 
                 gitea_issue: None,
                 event_only: false,
+                evolution_enabled: false,
 
                 project: None,
             }],
@@ -8155,6 +8235,7 @@ task = "test"
             fleet_escalation_repo: None,
             post_merge_gate: None,
             learning: config::LearningConfig::default(),
+            evolution: config::EvolutionConfig::default(),
             pr_dispatch: None,
             pr_dispatch_per_project: Default::default(),
         }
@@ -8239,6 +8320,7 @@ task = "test"
 
             gitea_issue: None,
             event_only: false,
+            evolution_enabled: false,
 
             project: None,
         }];
@@ -8444,6 +8526,7 @@ task = "test"
 
             gitea_issue: None,
             event_only: false,
+            evolution_enabled: false,
 
             project: None,
         }];
@@ -8532,6 +8615,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
 
             gitea_issue: None,
             event_only: false,
+            evolution_enabled: false,
 
             project: None,
         }];
@@ -8786,6 +8870,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             pre_check: None,
             gitea_issue: None,
             event_only: false,
+            evolution_enabled: false,
             project: None,
         }];
         let mut orch = AgentOrchestrator::new(config).unwrap();
@@ -8953,6 +9038,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             pre_check: None,
             gitea_issue: None,
             event_only: false,
+            evolution_enabled: false,
             project: None,
         }];
 
@@ -9047,6 +9133,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
                 pre_check: None,
                 gitea_issue: None,
                 event_only: false,
+                evolution_enabled: false,
                 project: Some("alpha".to_string()),
             }],
             restart_cooldown_secs: 0,
@@ -9089,6 +9176,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             fleet_escalation_repo: None,
             post_merge_gate: None,
             learning: config::LearningConfig::default(),
+            evolution: config::EvolutionConfig::default(),
             pr_dispatch: None,
             pr_dispatch_per_project: Default::default(),
         };
@@ -9340,6 +9428,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             pre_check: None,
             gitea_issue: None,
             event_only: false,
+            evolution_enabled: false,
             project: Some("alpha".to_string()),
         });
         config.pr_dispatch_per_project.insert(
@@ -9739,6 +9828,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             pre_check: None,
             gitea_issue: None,
             event_only: false,
+            evolution_enabled: false,
             project: Some("alpha".to_string()),
         });
         // The per-project block takes precedence over the top-level block,
@@ -10080,6 +10170,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             pre_check: None,
             gitea_issue: None,
             event_only: false,
+            evolution_enabled: false,
             project: Some("alpha".to_string()),
         });
         // The per-project block takes precedence over the top-level block,
@@ -10373,6 +10464,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             pre_check: None,
             gitea_issue: None,
             event_only: false,
+            evolution_enabled: false,
             project: Some("alpha".to_string()),
         });
         config.pr_dispatch = Some(crate::config::PrDispatchConfig {
@@ -10653,6 +10745,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             pre_check: None,
             gitea_issue: None,
             event_only: false,
+            evolution_enabled: false,
             project: Some("alpha".to_string()),
         });
         // The per-project block takes precedence over the top-level block,
@@ -10945,6 +11038,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             pre_check: None,
             gitea_issue: None,
             event_only: true,
+            evolution_enabled: false,
             project: None,
         }];
         // mentions config required so handle_webhook_dispatch does not bail at the top.
@@ -10998,6 +11092,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             pre_check: None,
             gitea_issue: None,
             event_only: true,
+            evolution_enabled: false,
             project: None,
         }];
         config.mentions = Some(crate::config::MentionConfig::default());
@@ -11053,6 +11148,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             pre_check: None,
             gitea_issue: Some(9999),
             event_only: true,
+            evolution_enabled: false,
             project: None,
         };
 

@@ -82,6 +82,7 @@ fn test_config(working_dir: PathBuf) -> OrchestratorConfig {
 
                 gitea_issue: None,
                 event_only: false,
+                evolution_enabled: false,
 
                 project: None,
             },
@@ -108,6 +109,7 @@ fn test_config(working_dir: PathBuf) -> OrchestratorConfig {
 
                 gitea_issue: None,
                 event_only: false,
+                evolution_enabled: false,
 
                 project: None,
             },
@@ -134,6 +136,7 @@ fn test_config(working_dir: PathBuf) -> OrchestratorConfig {
 
                 gitea_issue: None,
                 event_only: false,
+                evolution_enabled: false,
 
                 project: None,
             },

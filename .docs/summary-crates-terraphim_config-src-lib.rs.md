@@ -1,15 +1,54 @@
 # Summary: terraphim_config/src/lib.rs
 
-**Purpose:** Configuration management and role-based knowledge graph setup.
+**Purpose:** Configuration management for Terraphim AI with role-based settings and knowledge graph orchestration.
 
-**Key Details:**
-- Core type: `ConfigState` - manages role configurations and their associated graphs
-- Uses `terraphim_automata` for thesaurus loading and building
-- Uses `terraphim_rolegraph` for `RoleGraph` and `RoleGraphSync`
-- Uses `terraphim_persistence::Persistable` for saving/loading config
-- Uses `terraphim_settings::DeviceSettings` for device-specific settings
-- Error type: `TerraphimConfigError` with variants for NotFound, NoRoles, Persistence, Json, etc.
-- LLM router configuration in `llm_router` module
-- Shell-like variable expansion in paths (`expand_tilde`)
-- Async trait implementations for config loading
-- TypeScript definitions available with `typescript` feature (tsify)
+**Loading Priority:**
+1. Explicit path via `TERRAPHIM_CONFIG` environment variable
+2. Saved config retrieved from persistence layer
+3. Hard-coded defaults in `terraphim_server/default/`
+
+**Key Types:**
+- **`Config`**: Top-level configuration holding all roles, global shortcut, default/selected role
+- **`Role`**: User profile with haystacks, relevance function, theme, LLM settings
+- **`Haystack`**: Data source descriptor (path, service type, extra parameters)
+- **`ServiceType`**: Enum of supported haystack backends
+- **`KnowledgeGraph`**: Automata path and/or local KG files for indexing
+
+**Supported Service Types:**
+- `Ripgrep`: Local filesystem search
+- `Atomic`: Atomic Server integration
+- `QueryRs`: query.rs API
+- `ClickUp`: ClickUp API
+- `Mcp`: Model Context Protocol client
+- `Perplexity`: AI-powered web search
+- `GrepApp`: GitHub code search
+- `AiAssistant`: AI coding assistant session logs
+- `Quickwit`: Log/observability search
+- `Jmap`: Email search (RFC 8620/8621)
+
+**LLM Configuration:**
+- `llm_enabled`: Enable AI-powered article summaries
+- `llm_api_key`, `llm_model`: Provider credentials
+- `llm_auto_summarize`: Automatic summarization of search results
+- `llm_chat_enabled`: Chat interface backed by LLM
+- `llm_router_enabled`: Intelligent LLM routing with 6-phase architecture
+
+**ConfigState:**
+- Wraps Config with Arc<Mutex<Config>> for thread-safe access
+- Maintains AHashMap<RoleName, RoleGraphSync> for per-role knowledge graphs
+- Provides async methods: `new()`, `get_default_role()`, `get_role()`, `search_indexed_documents()`
+
+**Path Expansion:**
+- Supports `${HOME}`, `$HOME`, `${VAR:-default}` syntax
+- Expands `~` at start of paths
+- Uses dirs crate with fallback strategies
+
+**RoleGraph Integration:**
+- Extracts triggers and pinned directives from KG markdown files
+- Builds RoleGraph from automata path or local KG files
+- Fallback chain: automata_path -> local KG -> empty thesaurus
+
+**Persistence:**
+- Implements `Persistable` trait for async save/load
+- Saves to all profiles via fire-and-forget tokio::spawn
+- Schema evolution detection with cache invalidation
