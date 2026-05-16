@@ -968,13 +968,16 @@ pub struct WorkflowConfig {
 }
 
 /// Tracker configuration for issue-driven mode.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+///
+/// `Debug` is implemented manually so the `api_key` field is redacted in any
+/// log/panic output. Do not derive `Debug` on this struct.
+#[derive(Clone, Serialize, Deserialize)]
 pub struct TrackerConfig {
     /// Tracker kind: "gitea" or "linear".
     pub kind: String,
     /// API endpoint URL.
     pub endpoint: String,
-    /// API key (supports env var substitution like "${GITEA_TOKEN}").
+    /// API key (supports env var substitution like "${GITEA_TOKEN}"). Redacted in `Debug` output.
     pub api_key: String,
     /// Repository owner (for Gitea).
     pub owner: String,
@@ -989,6 +992,21 @@ pub struct TrackerConfig {
     /// State configuration.
     #[serde(default)]
     pub states: TrackerStates,
+}
+
+impl std::fmt::Debug for TrackerConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TrackerConfig")
+            .field("kind", &self.kind)
+            .field("endpoint", &self.endpoint)
+            .field("api_key", &"***REDACTED***")
+            .field("owner", &self.owner)
+            .field("repo", &self.repo)
+            .field("project_slug", &self.project_slug)
+            .field("use_robot_api", &self.use_robot_api)
+            .field("states", &self.states)
+            .finish()
+    }
 }
 
 /// Tracker state configuration.
@@ -3313,6 +3331,29 @@ task = "test"
         assert!(
             dbg.contains("None"),
             "None secret should show as None in Debug output, got: {dbg}"
+        );
+    }
+
+    #[test]
+    fn tracker_config_api_key_redacted_in_debug() {
+        let cfg = TrackerConfig {
+            kind: "gitea".to_string(),
+            endpoint: "https://git.example/api/v1".to_string(),
+            api_key: "live-gitea-api-token".to_string(),
+            owner: "acme".to_string(),
+            repo: "platform".to_string(),
+            project_slug: None,
+            use_robot_api: false,
+            states: TrackerStates::default(),
+        };
+        let dbg = format!("{:?}", cfg);
+        assert!(
+            !dbg.contains("live-gitea-api-token"),
+            "Tracker api_key must be redacted in Debug output, got: {dbg}"
+        );
+        assert!(
+            dbg.contains("***REDACTED***"),
+            "Debug output should mark api_key as redacted, got: {dbg}"
         );
     }
 }
