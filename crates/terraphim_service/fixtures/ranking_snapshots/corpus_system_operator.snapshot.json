@@ -1,0 +1,65 @@
+{
+  "corpus": "corpus_system_operator",
+  "snapshots": [
+    {
+      "query": "log monitoring",
+      "scorer": "BM25Plus",
+      "top_n": 5,
+      "expected_ids": [
+        "sysop_002",
+        "sysop_017",
+        "sysop_001",
+        "sysop_003",
+        "sysop_004"
+      ]
+    },
+    {
+      "query": "network security",
+      "scorer": "BM25Plus",
+      "top_n": 5,
+      "expected_ids": [
+        "sysop_003",
+        "sysop_016",
+        "sysop_001",
+        "sysop_018",
+        "sysop_007"
+      ]
+    },
+    {
+      "query": "backup recovery",
+      "scorer": "BM25Plus",
+      "top_n": 5,
+      "expected_ids": [
+        "sysop_004",
+        "sysop_001",
+        "sysop_002",
+        "sysop_003",
+        "sysop_005"
+      ]
+    },
+    {
+      "query": "kubernetes container",
+      "scorer": "BM25Plus",
+      "top_n": 5,
+      "expected_ids": [
+        "sysop_005",
+        "sysop_001",
+        "sysop_002",
+        "sysop_003",
+        "sysop_004"
+      ]
+    },
+    {
+      "query": "incident response",
+      "scorer": "BM25Plus",
+      "top_n": 5,
+      "expected_ids": [
+        "sysop_011",
+        "sysop_001",
+        "sysop_002",
+        "sysop_003",
+        "sysop_004"
+      ]
+    }
+  ]
+}

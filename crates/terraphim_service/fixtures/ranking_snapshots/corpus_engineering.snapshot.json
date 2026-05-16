@@ -1,0 +1,65 @@
+{
+  "corpus": "corpus_engineering",
+  "snapshots": [
+    {
+      "query": "rust testing",
+      "scorer": "BM25F",
+      "top_n": 5,
+      "expected_ids": [
+        "eng_005",
+        "eng_006",
+        "eng_014",
+        "eng_017",
+        "eng_004"
+      ]
+    },
+    {
+      "query": "CI CD pipeline",
+      "scorer": "BM25F",
+      "top_n": 5,
+      "expected_ids": [
+        "eng_002",
+        "eng_001",
+        "eng_003",
+        "eng_004",
+        "eng_005"
+      ]
+    },
+    {
+      "query": "async runtime",
+      "scorer": "BM25F",
+      "top_n": 5,
+      "expected_ids": [
+        "eng_007",
+        "eng_010",
+        "eng_018",
+        "eng_019",
+        "eng_001"
+      ]
+    },
+    {
+      "query": "performance profiling",
+      "scorer": "BM25F",
+      "top_n": 5,
+      "expected_ids": [
+        "eng_009",
+        "eng_001",
+        "eng_002",
+        "eng_003",
+        "eng_004"
+      ]
+    },
+    {
+      "query": "observability monitoring",
+      "scorer": "BM25F",
+      "top_n": 5,
+      "expected_ids": [
+        "eng_020",
+        "eng_001",
+        "eng_002",
+        "eng_003",
+        "eng_004"
+      ]
+    }
+  ]
+}

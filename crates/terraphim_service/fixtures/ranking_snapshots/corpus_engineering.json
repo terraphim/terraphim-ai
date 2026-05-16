@@ -1,0 +1,127 @@
+{
+  "role": "Engineering",
+  "scorer": "BM25F",
+  "description": "20-document corpus for engineering role BM25F regression gate",
+  "documents": [
+    {
+      "id": "eng_001",
+      "title": "Cargo Workspace Management",
+      "body": "Cargo workspaces allow multiple Rust crates to share a single Cargo.lock and build output directory. Use workspace resolver v2 for feature unification.",
+      "description": "Managing multi-crate Rust projects with Cargo workspaces"
+    },
+    {
+      "id": "eng_002",
+      "title": "CI/CD Pipeline Design",
+      "body": "Continuous integration pipelines automate build test and deployment workflows. GitHub Actions and GitLab CI are popular choices for Rust projects.",
+      "description": "Automated build and deployment pipeline patterns"
+    },
+    {
+      "id": "eng_003",
+      "title": "API Design with OpenAPI",
+      "body": "OpenAPI specifications define RESTful API contracts. Code generation from OpenAPI schemas accelerates client and server development.",
+      "description": "Designing APIs with OpenAPI and REST conventions"
+    },
+    {
+      "id": "eng_004",
+      "title": "Rust Trait System",
+      "body": "Traits define shared behaviour in Rust. Generic trait bounds enable zero-cost abstractions. Object safety constraints govern dynamic dispatch.",
+      "description": "Advanced use of Rust traits and generics"
+    },
+    {
+      "id": "eng_005",
+      "title": "Testing Strategies for Rust",
+      "body": "Unit tests live alongside source code in Rust. Integration tests reside in a tests directory. Property-based testing with proptest generates random inputs.",
+      "description": "Comprehensive testing approaches for Rust projects"
+    },
+    {
+      "id": "eng_006",
+      "title": "WebAssembly with Rust",
+      "body": "Rust compiles to WebAssembly via wasm-pack. WASM modules run in browsers Node.js and edge runtimes. wasm-bindgen bridges Rust and JavaScript types.",
+      "description": "Building WebAssembly modules with Rust and wasm-pack"
+    },
+    {
+      "id": "eng_007",
+      "title": "Async Runtime Internals",
+      "body": "Tokio implements a multi-threaded work-stealing scheduler. Tasks are lightweight green threads. IO is handled via epoll on Linux and kqueue on macOS.",
+      "description": "Deep dive into asynchronous runtime implementation"
+    },
+    {
+      "id": "eng_008",
+      "title": "Code Review Best Practices",
+      "body": "Effective code review focuses on correctness security and maintainability. Pull requests should be small and focused. Use conventional commits for clarity.",
+      "description": "Guidelines for effective engineering code reviews"
+    },
+    {
+      "id": "eng_009",
+      "title": "Performance Profiling in Rust",
+      "body": "Flame graphs identify CPU hotspots. Criterion benchmarks measure function performance. perf and cargo flamegraph are standard profiling tools.",
+      "description": "Tools and techniques for profiling Rust application performance"
+    },
+    {
+      "id": "eng_010",
+      "title": "Database Schema Evolution",
+      "body": "Schema migrations must be backward compatible during rolling deployments. SQLx compile-time query verification prevents runtime SQL errors.",
+      "description": "Safe database schema migration strategies"
+    },
+    {
+      "id": "eng_011",
+      "title": "Distributed Tracing with OpenTelemetry",
+      "body": "OpenTelemetry provides vendor-neutral tracing metrics and logging. Rust supports OTEL via the opentelemetry-rust crate. Jaeger stores and queries traces.",
+      "description": "Implementing distributed tracing for microservices"
+    },
+    {
+      "id": "eng_012",
+      "title": "Container Security Hardening",
+      "body": "Minimal container images reduce attack surface. Distroless images contain only the application binary. Non-root execution prevents privilege escalation.",
+      "description": "Security best practices for containerised applications"
+    },
+    {
+      "id": "eng_013",
+      "title": "Feature Flag Systems",
+      "body": "Feature flags decouple deployment from release. LaunchDarkly and Unleash provide flag management. Rust conditional compilation uses cfg attributes.",
+      "description": "Implementing and managing feature flags in production"
+    },
+    {
+      "id": "eng_014",
+      "title": "Static Analysis Tools for Rust",
+      "body": "Clippy provides idiomatic Rust linting. cargo-deny checks licence compatibility and security advisories. cargo-audit scans for known vulnerabilities.",
+      "description": "Static analysis and security scanning for Rust codebases"
+    },
+    {
+      "id": "eng_015",
+      "title": "Event-Driven Architecture",
+      "body": "Event streaming systems like Kafka Fluvio and NATS decouple producers from consumers. Consumer groups enable parallel processing of event streams.",
+      "description": "Patterns for event-driven and message-driven architectures"
+    },
+    {
+      "id": "eng_016",
+      "title": "Infrastructure as Code",
+      "body": "Terraform and Pulumi provision cloud infrastructure declaratively. GitOps workflows store infrastructure state in version control repositories.",
+      "description": "Managing infrastructure with code and version control"
+    },
+    {
+      "id": "eng_017",
+      "title": "Rust Lifetime Annotations",
+      "body": "Lifetime annotations prevent use-after-free and dangling references. The borrow checker enforces lifetime constraints at compile time.",
+      "description": "Understanding and applying Rust lifetime annotations"
+    },
+    {
+      "id": "eng_018",
+      "title": "Microservice Communication Patterns",
+      "body": "gRPC provides efficient binary protocol communication between services. REST over HTTPS suits public APIs. Message queues enable async service decoupling.",
+      "description": "Inter-service communication strategies for microservices"
+    },
+    {
+      "id": "eng_019",
+      "title": "Test-Driven Development",
+      "body": "TDD cycles through red green refactor steps. Writing tests first clarifies requirements. Rust test macros and tokio-test support async TDD workflows.",
+      "description": "Applying test-driven development in Rust projects"
+    },
+    {
+      "id": "eng_020",
+      "title": "Observability and Monitoring",
+      "body": "The three pillars of observability are metrics traces and logs. Prometheus scrapes metrics endpoints. Grafana visualises time-series metric data.",
+      "description": "Building observable systems with monitoring and alerting"
+    }
+  ]
+}
