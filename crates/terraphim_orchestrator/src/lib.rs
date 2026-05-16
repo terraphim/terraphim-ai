@@ -6789,10 +6789,10 @@ impl AgentOrchestrator {
 
             // Evolution: record lesson and snapshot on agent exit.
             if def.evolution_enabled && self.evolution_manager.is_enabled() {
-                let _exit_desc = format!("Agent {} exited with status: {}", name, status);
-                let _exit_code = status.code().unwrap_or(-1);
                 #[cfg(feature = "evolution")]
                 {
+                    let exit_desc = format!("Agent {} exited with status: {}", name, status);
+                    let exit_code = status.code().unwrap_or(-1);
                     let category = if status.success() {
                         terraphim_agent_evolution::LessonCategory::SuccessPattern
                     } else {
@@ -6806,8 +6806,6 @@ impl AgentOrchestrator {
                         category,
                     );
                 }
-                #[cfg(not(feature = "evolution"))]
-                let _: () = ();
                 if let Some(snapshot_key) = self.evolution_manager.snapshot_on_exit(&name) {
                     info!(agent = %name, key = %snapshot_key, "evolution snapshot created");
                 }
