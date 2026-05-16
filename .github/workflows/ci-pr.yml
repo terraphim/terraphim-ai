@@ -293,8 +293,8 @@ jobs:
     name: Rust Unit Tests
     runs-on: [self-hosted, bigbox]
     timeout-minutes: 8
-    needs: [changes, rust-compile]
-    if: needs.changes.outputs.rust-changed == 'true' && needs.rust-compile.result == 'success'
+    needs: [changes, rust-format]
+    if: needs.changes.outputs.rust-changed == 'true' && needs.rust-format.result == 'success'
     env:
       RUSTC_WRAPPER: /home/alex/.local/bin/sccache
       SCCACHE_BUCKET: rust-cache
@@ -357,10 +357,18 @@ jobs:
             ${{ runner.os }}-cargo-pr-
             ${{ runner.os }}-cargo-
 
+      - name: Install cargo-nextest
+        run: |
+          if ! command -v cargo-nextest >/dev/null 2>&1; then
+            cargo install cargo-nextest --locked
+          fi
+          cargo nextest --version
+
       - name: Run unit tests
         run: |
-          # Run unit tests (rocksdb feature disabled in CI, zlob enabled for fff-search)
-          /home/alex/.local/bin/rch exec -- cargo test --workspace --no-fail-fast --lib --bins --features zlob -- --test-threads=2
+          # Run unit tests via nextest (rocksdb feature disabled in CI, zlob enabled for fff-search)
+          # slow-timeout and fail-fast are configured in .config/nextest.toml [profile.ci]
+          /home/alex/.local/bin/rch exec -- cargo nextest run --workspace --profile ci --lib --bins --features zlob
 
       - name: sccache stats
         if: always()
