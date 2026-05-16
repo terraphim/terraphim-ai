@@ -236,6 +236,9 @@ pub struct AgentOrchestrator {
     /// Per-agent last-run commit hash for GitDiff strategy.
     /// Key: agent name. Value: commit SHA.
     last_run_commits: HashMap<String, String>,
+    /// Per-agent last cron fire timestamp to prevent re-triggering within same schedule window.
+    /// Key: agent name. Value: timestamp of last fire.
+    last_cron_fire: HashMap<String, chrono::DateTime<chrono::Utc>>,
     /// Lazy-initialised Gitea tracker for gitea-issue pre-check.
     pre_check_tracker: Option<terraphim_tracker::GiteaTracker>,
     /// Active flow executions keyed by flow name.
@@ -820,6 +823,7 @@ impl AgentOrchestrator {
             output_poster,
             circuit_breakers: Arc::new(Mutex::new(HashMap::new())),
             last_run_commits: HashMap::new(),
+            last_cron_fire: HashMap::new(),
             pre_check_tracker: None,
             active_flows: HashMap::new(),
             mention_cursors: HashMap::new(),
@@ -7089,25 +7093,33 @@ Remove the pause flag once the underlying failure is resolved:\n\n\
         let scheduled = self.scheduler.scheduled_agents();
 
         // Collect agents that should fire
-        let to_spawn: Vec<AgentDefinition> = scheduled
+        let to_spawn: Vec<(AgentDefinition, chrono::DateTime<chrono::Utc>)> = scheduled
             .into_iter()
             .filter(|(def, _schedule)| {
                 // Skip if already active
                 !self.active_agents.contains_key(&def.name)
             })
-            .filter(|(_def, schedule)| {
-                // Check if a fire time exists between last_tick and now
-                schedule
-                    .after(&self.last_tick_time)
-                    .take_while(|t| *t <= now)
-                    .next()
-                    .is_some()
+            .filter_map(|(def, schedule)| {
+                // Get the next fire time after last_tick_time
+                let next_fire = schedule.after(&self.last_tick_time).next()?;
+                // Check if fire time is within window
+                if next_fire > now {
+                    return None;
+                }
+                // Skip if agent already fired at this schedule occurrence
+                if let Some(last_fire) = self.last_cron_fire.get(&def.name) {
+                    if next_fire <= *last_fire {
+                        return None;
+                    }
+                }
+                Some((def.clone(), next_fire))
             })
-            .map(|(def, _)| def.clone())
             .collect();
 
-        for def in to_spawn {
-            info!(agent = %def.name, "cron schedule fired");
+        for (def, fire_time) in to_spawn {
+            info!(agent = %def.name, fire_time = %fire_time, "cron schedule fired");
+            // Record fire time before spawning to prevent rapid re-trigger
+            self.last_cron_fire.insert(def.name.clone(), fire_time);
             if let Err(e) = self.spawn_agent(&def).await {
                 error!(agent = %def.name, error = %e, "cron spawn failed");
             }
@@ -7674,6 +7686,23 @@ Remove the pause flag once the underlying failure is resolved:\n\n\
     pub fn set_last_run_commit(&mut self, agent_name: &str, commit: &str) {
         self.last_run_commits
             .insert(agent_name.to_string(), commit.to_string());
+    }
+
+    /// Test helper: set last_cron_fire for a given agent.
+    #[doc(hidden)]
+    pub fn set_last_cron_fire(
+        &mut self,
+        agent_name: &str,
+        fire_time: chrono::DateTime<chrono::Utc>,
+    ) {
+        self.last_cron_fire
+            .insert(agent_name.to_string(), fire_time);
+    }
+
+    /// Test helper: set last_tick_time for synthetic time testing.
+    #[doc(hidden)]
+    pub fn set_last_tick_time(&mut self, time: chrono::DateTime<chrono::Utc>) {
+        self.last_tick_time = time;
     }
 
     /// Test helper: access the telemetry store for assertions.

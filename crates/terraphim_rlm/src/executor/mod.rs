@@ -91,6 +91,9 @@ pub async fn select_executor(
         config.backend_preference.clone()
     };
 
+    // Cache the docker availability probe across loop iterations to avoid
+    // repeating the (~50-100 ms) shell-out to `docker --version`.
+    let docker_available = is_docker_available();
     let mut tried = Vec::new();
 
     for backend in backends {
@@ -114,26 +117,46 @@ pub async fn select_executor(
             }
 
             BackendType::E2b if config.e2b_api_key.is_some() => {
-                log::info!("Selected E2B backend");
-                tried.push("e2b (not yet implemented)".to_string());
+                // E2B backend is declared in BackendType but not yet wired up.
+                // Previously this arm logged "Selected E2B backend" then fell
+                // through, misleading operators. Now we explicitly skip and
+                // try the next backend.
+                log::debug!("E2B backend not yet implemented; trying next backend");
+                tried.push("e2b (not implemented)".to_string());
             }
             BackendType::E2b => {
                 log::debug!("E2B unavailable: no API key configured");
                 tried.push("e2b (no API key)".to_string());
             }
 
-            BackendType::Docker if is_docker_available() => {
-                log::info!("Selected Docker backend (container isolation)");
-                let executor = DockerExecutor::new(config.clone())?;
-                return Ok(Box::new(executor));
-            }
+            BackendType::Docker if docker_available => match DockerExecutor::new(config.clone()) {
+                Ok(executor) => {
+                    log::info!("Selected Docker backend (container isolation)");
+                    return Ok(Box::new(executor));
+                }
+                Err(e) => {
+                    // Previously this propagated via `?` and aborted backend
+                    // selection. Now we fall through to the next backend (e.g.
+                    // Local) so the executor stays selectable when the Docker
+                    // daemon is up but bollard's connect fails for any reason.
+                    log::warn!("DockerExecutor init failed: {}. Trying next backend.", e);
+                    tried.push(format!("docker (init failed: {})", e));
+                }
+            },
             BackendType::Docker => {
-                log::debug!("Docker unavailable: daemon not running");
+                log::debug!("Docker unavailable: CLI not present");
                 tried.push("docker (not available)".to_string());
             }
 
             BackendType::Local => {
-                log::info!("Selected Local backend (no isolation)");
+                // Local has no isolation - this is a security-posture
+                // downgrade from any of the sandboxed backends. Previously
+                // logged at `info`; now `warn` so production logs surface
+                // the fall-back.
+                log::warn!(
+                    "Falling back to LocalExecutor (NO ISOLATION). Tried: {:?}",
+                    tried
+                );
                 return Ok(Box::new(LocalExecutor::new()));
             }
         }
@@ -162,5 +185,35 @@ mod tests {
     fn test_gvisor_check() {
         // This test just verifies the function doesn't panic
         let _ = is_gvisor_available();
+    }
+
+    #[tokio::test]
+    async fn test_select_executor_local_preference_returns_local() {
+        // backend_preference=[Local] forces selection of LocalExecutor
+        // regardless of which other backends are available, exercising the
+        // warn-log path on the Local arm.
+        let config = RlmConfig {
+            backend_preference: vec![BackendType::Local],
+            ..Default::default()
+        };
+
+        let executor = select_executor(&config).await.expect("should select Local");
+        assert_eq!(executor.backend_type(), BackendType::Local);
+    }
+
+    #[tokio::test]
+    async fn test_select_executor_e2b_unimplemented_falls_through_to_local() {
+        // With an E2B api key set but no Firecracker/Docker available,
+        // selector should not stall on the E2B arm and should reach Local.
+        let config = RlmConfig {
+            backend_preference: vec![BackendType::E2b, BackendType::Local],
+            e2b_api_key: Some("dummy".to_string()),
+            ..Default::default()
+        };
+
+        let executor = select_executor(&config)
+            .await
+            .expect("should fall through to Local");
+        assert_eq!(executor.backend_type(), BackendType::Local);
     }
 }

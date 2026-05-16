@@ -12,7 +12,6 @@
 //! - Quick prototyping without VM overhead
 
 use std::collections::HashMap;
-use std::path::PathBuf;
 use std::process::Stdio;
 use std::time::{Duration, Instant};
 
@@ -28,26 +27,21 @@ use crate::executor::context::{
 };
 use crate::types::SessionId;
 
+const BACKEND_NAME: &str = "local";
+
 pub struct LocalExecutor {
     python_path: String,
-    output_dir: PathBuf,
 }
 
 impl LocalExecutor {
     pub fn new() -> Self {
         Self {
             python_path: "python3".to_string(),
-            output_dir: std::env::temp_dir().join("terraphim_rlm_local"),
         }
     }
 
     pub fn with_python(mut self, path: impl Into<String>) -> Self {
         self.python_path = path.into();
-        self
-    }
-
-    pub fn with_output_dir(mut self, path: PathBuf) -> Self {
-        self.output_dir = path;
         self
     }
 
@@ -58,7 +52,8 @@ impl LocalExecutor {
             .arg(cmd)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
-            .envs(&ctx.env_vars);
+            .envs(&ctx.env_vars)
+            .kill_on_drop(true);
 
         if let Some(cwd) = &ctx.working_dir {
             command.current_dir(cwd);
@@ -74,7 +69,8 @@ impl LocalExecutor {
             .arg(code)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
-            .envs(&ctx.env_vars);
+            .envs(&ctx.env_vars)
+            .kill_on_drop(true);
 
         if let Some(cwd) = &ctx.working_dir {
             command.current_dir(cwd);
@@ -83,10 +79,14 @@ impl LocalExecutor {
         command
     }
 
-    async fn run_command(&self, mut cmd: Command) -> RlmResult<ExecutionResult> {
+    async fn run_command(
+        &self,
+        mut cmd: Command,
+        ctx: &ExecutionContext,
+    ) -> RlmResult<ExecutionResult> {
         let start = Instant::now();
-
-        let output = timeout(Duration::from_millis(30000), cmd.output()).await;
+        let timeout_duration = Duration::from_millis(ctx.timeout_ms);
+        let output = timeout(timeout_duration, cmd.output()).await;
 
         let execution_time_ms = start.elapsed().as_millis() as u64;
 
@@ -109,7 +109,7 @@ impl LocalExecutor {
             }),
             Err(_) => Ok(ExecutionResult {
                 stdout: String::new(),
-                stderr: "Execution timed out after 30 seconds".to_string(),
+                stderr: format!("Execution timed out after {}ms", ctx.timeout_ms),
                 exit_code: -1,
                 execution_time_ms,
                 output_truncated: false,
@@ -127,6 +127,13 @@ impl Default for LocalExecutor {
     }
 }
 
+fn unsupported(op: &'static str) -> RlmError {
+    RlmError::NotSupported {
+        backend: BACKEND_NAME.to_string(),
+        op: op.to_string(),
+    }
+}
+
 #[async_trait]
 impl ExecutionEnvironment for LocalExecutor {
     type Error = RlmError;
@@ -137,7 +144,7 @@ impl ExecutionEnvironment for LocalExecutor {
         ctx: &ExecutionContext,
     ) -> Result<ExecutionResult, Self::Error> {
         let cmd = self.build_python_command(code, ctx);
-        self.run_command(cmd).await
+        self.run_command(cmd, ctx).await
     }
 
     async fn execute_command(
@@ -146,7 +153,7 @@ impl ExecutionEnvironment for LocalExecutor {
         ctx: &ExecutionContext,
     ) -> Result<ExecutionResult, Self::Error> {
         let command = self.build_command(cmd, ctx);
-        self.run_command(command).await
+        self.run_command(command, ctx).await
     }
 
     async fn validate(&self, _input: &str) -> Result<ValidationResult, Self::Error> {
@@ -158,26 +165,26 @@ impl ExecutionEnvironment for LocalExecutor {
         _session_id: &SessionId,
         _name: &str,
     ) -> Result<SnapshotId, Self::Error> {
-        Ok(SnapshotId::new(_name, _session_id.clone()))
+        Err(unsupported("create_snapshot"))
     }
 
     async fn restore_snapshot(&self, _id: &SnapshotId) -> Result<(), Self::Error> {
-        Ok(())
+        Err(unsupported("restore_snapshot"))
     }
 
     async fn list_snapshots(
         &self,
         _session_id: &SessionId,
     ) -> Result<Vec<SnapshotId>, Self::Error> {
-        Ok(vec![])
+        Err(unsupported("list_snapshots"))
     }
 
     async fn delete_snapshot(&self, _id: &SnapshotId) -> Result<(), Self::Error> {
-        Ok(())
+        Err(unsupported("delete_snapshot"))
     }
 
     async fn delete_session_snapshots(&self, _session_id: &SessionId) -> Result<(), Self::Error> {
-        Ok(())
+        Err(unsupported("delete_session_snapshots"))
     }
 
     fn capabilities(&self) -> &[Capability] {
@@ -246,5 +253,102 @@ mod tests {
         let result = executor.execute_command("exit 1", &ctx).await.unwrap();
         assert!(!result.is_success());
         assert_eq!(result.exit_code, 1);
+    }
+
+    #[tokio::test]
+    async fn test_local_honours_ctx_timeout() {
+        let executor = LocalExecutor::new();
+        let ctx = ExecutionContext {
+            timeout_ms: 200,
+            ..Default::default()
+        };
+
+        let start = Instant::now();
+        let result = executor.execute_command("sleep 5", &ctx).await.unwrap();
+        let elapsed = start.elapsed();
+
+        assert!(result.timed_out, "expected timed_out=true");
+        assert_eq!(result.exit_code, -1);
+        assert!(
+            elapsed < Duration::from_millis(1500),
+            "execution should respect ctx.timeout_ms (200ms), took {:?}",
+            elapsed
+        );
+        assert!(result.stderr.contains("200ms"));
+    }
+
+    #[tokio::test]
+    async fn test_local_kills_on_timeout() {
+        // The presence of `kill_on_drop(true)` in build_command means the spawned
+        // child is reaped when the future running it is dropped on timeout.
+        // We assert this by giving the snippet a unique marker, timing out, and
+        // polling pgrep with bounded backoff so the test stays deterministic
+        // on loaded CI (kernel reaping is fast but not instantaneous).
+        let executor = LocalExecutor::new();
+        let ctx = ExecutionContext {
+            timeout_ms: 100,
+            ..Default::default()
+        };
+        let marker = format!(
+            "terraphim-rlm-marker-{}-{}",
+            std::process::id(),
+            ulid::Ulid::new()
+        );
+
+        let _ = executor
+            .execute_command(&format!("sleep 30 && echo {}", marker), &ctx)
+            .await
+            .unwrap();
+
+        // Poll up to 2s for the marker process to disappear (50 ms steps).
+        let deadline = Instant::now() + Duration::from_secs(2);
+        loop {
+            let pgrep = std::process::Command::new("pgrep")
+                .args(["-f", &marker])
+                .output();
+            let still_alive = match pgrep {
+                Ok(o) => o.status.success(),
+                Err(_) => break, // pgrep absent: cannot verify, accept.
+            };
+            if !still_alive {
+                return;
+            }
+            if Instant::now() >= deadline {
+                let leftover = std::process::Command::new("pgrep")
+                    .args(["-f", &marker])
+                    .output()
+                    .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
+                    .unwrap_or_default();
+                panic!(
+                    "child process leaked after timeout: pgrep still finds '{}'",
+                    leftover
+                );
+            }
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+    }
+
+    #[tokio::test]
+    async fn test_local_snapshot_returns_not_supported() {
+        let executor = LocalExecutor::new();
+        let session = SessionId::new();
+
+        let create = executor.create_snapshot(&session, "x").await;
+        assert!(matches!(create, Err(RlmError::NotSupported { .. })));
+
+        let list = executor.list_snapshots(&session).await;
+        assert!(matches!(list, Err(RlmError::NotSupported { .. })));
+
+        let delete_session = executor.delete_session_snapshots(&session).await;
+        assert!(matches!(delete_session, Err(RlmError::NotSupported { .. })));
+    }
+
+    #[tokio::test]
+    async fn test_local_end_session_default_is_ok() {
+        // LocalExecutor has no per-session resources; default trait impl of
+        // end_session should return Ok.
+        let executor = LocalExecutor::new();
+        let session = SessionId::new();
+        assert!(executor.end_session(&session).await.is_ok());
     }
 }

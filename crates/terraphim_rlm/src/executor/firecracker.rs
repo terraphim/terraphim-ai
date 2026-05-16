@@ -779,6 +779,16 @@ impl super::ExecutionEnvironment for FirecrackerExecutor {
 
         Ok(())
     }
+
+    async fn end_session(&self, session_id: &SessionId) -> Result<(), Self::Error> {
+        // Bridge the trait method to the existing inherent
+        // `release_session_vm` so `TerraphimRlm::destroy_session` releases
+        // the VM allocation when callers tear down a session.
+        if let Some(vm_id) = self.release_session_vm(session_id) {
+            log::debug!("end_session({}) released vm {}", session_id, vm_id);
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]

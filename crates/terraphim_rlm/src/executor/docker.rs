@@ -19,11 +19,14 @@ use async_trait::async_trait;
 use bollard::Docker;
 use bollard::container::LogOutput;
 use bollard::exec::{CreateExecOptions, StartExecOptions, StartExecResults};
-use bollard::models::ContainerCreateBody;
+use bollard::models::{ContainerCreateBody, HostConfig};
 use bollard::query_parameters::{CreateContainerOptionsBuilder, RemoveContainerOptionsBuilder};
+use dashmap::DashMap;
 use futures::StreamExt;
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
+use tokio::sync::Mutex;
 
 use super::{Capability, ExecutionContext, ExecutionResult, SnapshotId, ValidationResult};
 use crate::config::{BackendType, RlmConfig};
@@ -31,21 +34,58 @@ use crate::error::{RlmError, RlmResult};
 use crate::types::SessionId;
 
 const DEFAULT_IMAGE: &str = "python:3.11-slim";
+const BACKEND_NAME: &str = "docker";
 
-#[allow(dead_code)]
+/// Default container memory limit in bytes (512 MiB).
+const DEFAULT_MEMORY_BYTES: i64 = 512 * 1024 * 1024;
+/// Default container PIDs limit.
+const DEFAULT_PIDS_LIMIT: i64 = 256;
+
 pub struct DockerExecutor {
-    config: RlmConfig,
     docker: Docker,
-    session_to_container: parking_lot::RwLock<HashMap<SessionId, String>>,
+    /// Per-session container map. Each entry holds a `Mutex<Option<String>>`:
+    /// the lock serialises creation for that session, and the inner `Option`
+    /// is `None` until the container is created and published.
+    session_to_container: DashMap<SessionId, Arc<Mutex<Option<String>>>>,
     image: String,
+    /// HostConfig applied to every session container. Defaults to
+    /// `default_host_config()` (permissive profile); override per executor
+    /// via `with_host_config`.
+    host_config: HostConfig,
     capabilities: Vec<Capability>,
 }
 
+/// Build the default `HostConfig` applied to every session container.
+///
+/// Permissive profile per design decision (2026-05-15):
+/// - Memory cap: 512 MiB
+/// - PIDs cap: 256
+/// - All Linux capabilities dropped
+/// - Network: `bridge` (outbound allowed for LLM bridge & pip use)
+/// - Read-only rootfs: false (Python needs to write to /tmp)
+fn default_host_config() -> HostConfig {
+    HostConfig {
+        memory: Some(DEFAULT_MEMORY_BYTES),
+        pids_limit: Some(DEFAULT_PIDS_LIMIT),
+        cap_drop: Some(vec!["ALL".to_string()]),
+        network_mode: Some("bridge".to_string()),
+        readonly_rootfs: Some(false),
+        ..Default::default()
+    }
+}
+
+fn unsupported(op: &'static str) -> RlmError {
+    RlmError::NotSupported {
+        backend: BACKEND_NAME.to_string(),
+        op: op.to_string(),
+    }
+}
+
 impl DockerExecutor {
-    pub fn new(config: RlmConfig) -> Result<Self, RlmError> {
+    pub fn new(_config: RlmConfig) -> Result<Self, RlmError> {
         let docker =
             Docker::connect_with_local_defaults().map_err(|e| RlmError::BackendInitFailed {
-                backend: "docker".to_string(),
+                backend: BACKEND_NAME.to_string(),
                 message: format!(
                     "Failed to connect to Docker daemon: {}. Is Docker running?",
                     e
@@ -60,10 +100,10 @@ impl DockerExecutor {
         ];
 
         Ok(Self {
-            config,
             docker,
-            session_to_container: parking_lot::RwLock::new(HashMap::new()),
+            session_to_container: DashMap::new(),
             image: DEFAULT_IMAGE.to_string(),
+            host_config: default_host_config(),
             capabilities,
         })
     }
@@ -74,17 +114,49 @@ impl DockerExecutor {
         Ok(executor)
     }
 
+    /// Override the per-container `HostConfig` (resource limits, network
+    /// mode, capability drops, rootfs read-only flag). Replaces the entire
+    /// default profile.
+    pub fn with_host_config(mut self, host_config: HostConfig) -> Self {
+        self.host_config = host_config;
+        self
+    }
+
     async fn ensure_container(&self, session_id: &SessionId) -> RlmResult<String> {
-        if let Some(container_id) = self.session_to_container.read().get(session_id) {
-            return Ok(container_id.clone());
+        let entry = self
+            .session_to_container
+            .entry(*session_id)
+            .or_insert_with(|| Arc::new(Mutex::new(None)))
+            .clone();
+
+        let mut guard = entry.lock().await;
+        if let Some(id) = guard.as_ref() {
+            return Ok(id.clone());
         }
+        let new_id = self.create_container(session_id).await?;
+        *guard = Some(new_id.clone());
+        Ok(new_id)
+    }
 
-        let container_id = self.create_container(session_id).await?;
-        self.session_to_container
-            .write()
-            .insert(*session_id, container_id.clone());
-
-        Ok(container_id)
+    /// Release the container associated with `session_id`, removing it from
+    /// Docker and from the internal session map. Returns the container id if
+    /// one was bound to this session, or `None` if no container existed.
+    ///
+    /// Mirrors `FirecrackerExecutor::release_session_vm`. Errors from
+    /// `docker.remove_container` are logged but not propagated, so the
+    /// session map is always cleaned up even if the daemon is unreachable.
+    pub async fn release_session_container(&self, session_id: &SessionId) -> Option<String> {
+        let removed = self.session_to_container.remove(session_id)?;
+        let id = removed.1.lock().await.take()?;
+        if let Err(e) = self.delete_container(&id).await {
+            log::warn!(
+                "release_session_container({}): failed to remove {}: {}",
+                session_id,
+                id,
+                e
+            );
+        }
+        Some(id)
     }
 
     async fn create_container(&self, session_id: &SessionId) -> RlmResult<String> {
@@ -92,7 +164,8 @@ impl DockerExecutor {
 
         let config = ContainerCreateBody {
             image: Some(self.image.clone()),
-            cmd: Some(vec!["sleep".to_string(), "3600".to_string()]),
+            cmd: Some(vec!["sleep".to_string(), "infinity".to_string()]),
+            host_config: Some(self.host_config.clone()),
             ..Default::default()
         };
 
@@ -105,7 +178,7 @@ impl DockerExecutor {
             .create_container(Some(options), config)
             .await
             .map_err(|e| RlmError::BackendInitFailed {
-                backend: "docker".to_string(),
+                backend: BACKEND_NAME.to_string(),
                 message: format!("Failed to create container: {}", e),
             })?;
 
@@ -123,7 +196,7 @@ impl DockerExecutor {
                 );
             }
             return Err(RlmError::BackendInitFailed {
-                backend: "docker".to_string(),
+                backend: BACKEND_NAME.to_string(),
                 message: format!("Failed to start container: {}", e),
             });
         }
@@ -203,7 +276,8 @@ impl DockerExecutor {
                     .await
                     .ok()
                     .and_then(|inspect| inspect.exit_code)
-                    .unwrap_or(-1) as i32;
+                    .map(|c| i32::try_from(c).unwrap_or(-1))
+                    .unwrap_or(-1);
 
                 Ok(ExecutionResult {
                     stdout,
@@ -248,6 +322,26 @@ impl DockerExecutor {
                 message: format!("Failed to remove container {}: {}", container_id, e),
             })
     }
+
+    /// Drain all session entries and return their (resolved) container ids.
+    /// Used by `cleanup` and `Drop`.
+    async fn drain_container_ids(&self) -> Vec<String> {
+        let entries: Vec<_> = self
+            .session_to_container
+            .iter()
+            .map(|kv| kv.value().clone())
+            .collect();
+        // Now empty the map.
+        self.session_to_container.clear();
+
+        let mut ids = Vec::with_capacity(entries.len());
+        for entry in entries {
+            if let Some(id) = entry.lock().await.take() {
+                ids.push(id);
+            }
+        }
+        ids
+    }
 }
 
 #[async_trait]
@@ -280,29 +374,29 @@ impl super::ExecutionEnvironment for DockerExecutor {
 
     async fn create_snapshot(
         &self,
-        session_id: &SessionId,
-        name: &str,
+        _session_id: &SessionId,
+        _name: &str,
     ) -> Result<SnapshotId, Self::Error> {
-        Ok(SnapshotId::new(name, *session_id))
+        Err(unsupported("create_snapshot"))
     }
 
     async fn restore_snapshot(&self, _id: &SnapshotId) -> Result<(), Self::Error> {
-        Ok(())
+        Err(unsupported("restore_snapshot"))
     }
 
     async fn list_snapshots(
         &self,
         _session_id: &SessionId,
     ) -> Result<Vec<SnapshotId>, Self::Error> {
-        Ok(vec![])
+        Err(unsupported("list_snapshots"))
     }
 
     async fn delete_snapshot(&self, _id: &SnapshotId) -> Result<(), Self::Error> {
-        Ok(())
+        Err(unsupported("delete_snapshot"))
     }
 
     async fn delete_session_snapshots(&self, _session_id: &SessionId) -> Result<(), Self::Error> {
-        Ok(())
+        Err(unsupported("delete_session_snapshots"))
     }
 
     fn capabilities(&self) -> &[Capability] {
@@ -321,39 +415,35 @@ impl super::ExecutionEnvironment for DockerExecutor {
     }
 
     async fn cleanup(&self) -> Result<(), Self::Error> {
-        let containers: Vec<_> = self
-            .session_to_container
-            .write()
-            .drain()
-            .map(|(_, id)| id)
-            .collect();
-
-        let futures: Vec<_> = containers
-            .iter()
-            .map(|id| self.delete_container(id))
-            .collect();
-
+        let ids = self.drain_container_ids().await;
+        let futures: Vec<_> = ids.iter().map(|id| self.delete_container(id)).collect();
         let results = futures::future::join_all(futures).await;
         for (i, result) in results.into_iter().enumerate() {
             if let Err(e) = result {
-                log::warn!("Failed to cleanup container {}: {}", containers[i], e);
+                log::warn!("Failed to cleanup container {}: {}", ids[i], e);
             }
         }
+        Ok(())
+    }
 
+    async fn end_session(&self, session_id: &SessionId) -> Result<(), Self::Error> {
+        let _ = self.release_session_container(session_id).await;
         Ok(())
     }
 }
 
 impl Drop for DockerExecutor {
     fn drop(&mut self) {
-        let containers: Vec<String> = self
+        // Snapshot the entry pointers so we can drain in the spawned task
+        // without holding the DashMap reference here.
+        let entries: Vec<_> = self
             .session_to_container
-            .write()
-            .drain()
-            .map(|(_, id)| id)
+            .iter()
+            .map(|kv| kv.value().clone())
             .collect();
+        self.session_to_container.clear();
 
-        if containers.is_empty() {
+        if entries.is_empty() {
             return;
         }
 
@@ -361,23 +451,29 @@ impl Drop for DockerExecutor {
         match tokio::runtime::Handle::try_current() {
             Ok(_handle) => {
                 tokio::spawn(async move {
+                    let mut ids = Vec::with_capacity(entries.len());
+                    for entry in entries {
+                        if let Some(id) = entry.lock().await.take() {
+                            ids.push(id);
+                        }
+                    }
                     let remove_opts = RemoveContainerOptionsBuilder::new().force(true).build();
-                    let futures: Vec<_> = containers
+                    let futures: Vec<_> = ids
                         .iter()
                         .map(|id| docker.remove_container(id, Some(remove_opts.clone())))
                         .collect();
                     let results = futures::future::join_all(futures).await;
                     for (i, result) in results.into_iter().enumerate() {
                         if let Err(e) = result {
-                            log::warn!("Drop: failed to remove container {}: {}", containers[i], e);
+                            log::warn!("Drop: failed to remove container {}: {}", ids[i], e);
                         }
                     }
                 });
             }
             Err(_) => {
                 log::warn!(
-                    "DockerExecutor::drop called outside tokio runtime; {} container(s) not cleaned up",
-                    containers.len()
+                    "DockerExecutor::drop called outside tokio runtime; {} session entries not cleaned up",
+                    entries.len()
                 );
             }
         }
@@ -395,6 +491,65 @@ mod tests {
             .output()
             .map(|o| o.status.success())
             .unwrap_or(false)
+    }
+
+    /// Container-running tests need the default image cached locally.
+    /// We skip rather than auto-pull to keep test latency bounded and
+    /// network access optional.
+    fn is_default_image_present() -> bool {
+        std::process::Command::new("docker")
+            .args(["image", "inspect", DEFAULT_IMAGE])
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false)
+    }
+
+    fn skip_unless_image_ready(test_name: &str) -> bool {
+        if !is_docker_available() {
+            eprintln!("Skipping {}: Docker not available", test_name);
+            return false;
+        }
+        if !is_default_image_present() {
+            eprintln!(
+                "Skipping {}: image {} not present locally (run `docker pull {}` to enable)",
+                test_name, DEFAULT_IMAGE, DEFAULT_IMAGE
+            );
+            return false;
+        }
+        true
+    }
+
+    #[test]
+    fn test_with_host_config_overrides_default() {
+        if !is_docker_available() {
+            eprintln!("Skipping test: Docker not available");
+            return;
+        }
+        let strict = HostConfig {
+            memory: Some(64 * 1024 * 1024),
+            pids_limit: Some(32),
+            cap_drop: Some(vec!["ALL".to_string()]),
+            network_mode: Some("none".to_string()),
+            readonly_rootfs: Some(true),
+            ..Default::default()
+        };
+        let exec = DockerExecutor::new(RlmConfig::minimal())
+            .unwrap()
+            .with_host_config(strict.clone());
+        assert_eq!(exec.host_config.memory, strict.memory);
+        assert_eq!(exec.host_config.network_mode, strict.network_mode);
+        assert_eq!(exec.host_config.readonly_rootfs, strict.readonly_rootfs);
+    }
+
+    #[test]
+    fn test_default_host_config_permissive_profile() {
+        // Verify the design-decision values are wired into HostConfig.
+        let hc = default_host_config();
+        assert_eq!(hc.memory, Some(DEFAULT_MEMORY_BYTES));
+        assert_eq!(hc.pids_limit, Some(DEFAULT_PIDS_LIMIT));
+        assert_eq!(hc.cap_drop.as_deref(), Some(&["ALL".to_string()][..]));
+        assert_eq!(hc.network_mode.as_deref(), Some("bridge"));
+        assert_eq!(hc.readonly_rootfs, Some(false));
     }
 
     #[test]
@@ -436,5 +591,92 @@ mod tests {
         let executor = DockerExecutor::new(config).unwrap();
         let result = executor.health_check().await.unwrap();
         assert!(result);
+    }
+
+    #[tokio::test]
+    async fn test_docker_snapshot_returns_not_supported() {
+        // Snapshot ops do not require a running Docker daemon - they're pure
+        // returns.
+        let cfg = RlmConfig::minimal();
+        // We cannot construct a DockerExecutor without a daemon, so gate.
+        if !is_docker_available() {
+            eprintln!("Skipping test: Docker not available");
+            return;
+        }
+        let exec = DockerExecutor::new(cfg).unwrap();
+        let session = SessionId::new();
+
+        assert!(matches!(
+            exec.create_snapshot(&session, "x").await,
+            Err(RlmError::NotSupported { .. })
+        ));
+        assert!(matches!(
+            exec.list_snapshots(&session).await,
+            Err(RlmError::NotSupported { .. })
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_docker_release_session_container_unknown_returns_none() {
+        if !is_docker_available() {
+            eprintln!("Skipping test: Docker not available");
+            return;
+        }
+        let exec = DockerExecutor::new(RlmConfig::minimal()).unwrap();
+        let unknown = SessionId::new();
+        assert!(exec.release_session_container(&unknown).await.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_docker_release_session_container_removes() {
+        if !skip_unless_image_ready("test_docker_release_session_container_removes") {
+            return;
+        }
+        let exec = DockerExecutor::new(RlmConfig::minimal()).unwrap();
+        let ctx = ExecutionContext {
+            session_id: SessionId::new(),
+            timeout_ms: 30_000,
+            ..Default::default()
+        };
+
+        let result = exec.execute_command("echo hi", &ctx).await.unwrap();
+        assert!(result.is_success(), "echo should succeed: {:?}", result);
+
+        let released = exec.release_session_container(&ctx.session_id).await;
+        assert!(released.is_some(), "expected a container to release");
+
+        // Subsequent op should create a fresh container, not error.
+        let result2 = exec.execute_command("echo again", &ctx).await.unwrap();
+        assert!(result2.is_success());
+
+        let _ = exec.release_session_container(&ctx.session_id).await;
+    }
+
+    #[tokio::test]
+    async fn test_docker_concurrent_ensure_no_leak() {
+        if !skip_unless_image_ready("test_docker_concurrent_ensure_no_leak") {
+            return;
+        }
+        let exec = std::sync::Arc::new(DockerExecutor::new(RlmConfig::minimal()).unwrap());
+        let session_id = SessionId::new();
+
+        // Fire 8 concurrent calls with the same session id.
+        let mut handles = Vec::new();
+        for _ in 0..8 {
+            let exec = exec.clone();
+            let sid = session_id;
+            handles.push(tokio::spawn(
+                async move { exec.ensure_container(&sid).await },
+            ));
+        }
+        let results: Vec<_> = futures::future::join_all(handles).await;
+        let ids: Vec<String> = results.into_iter().map(|r| r.unwrap().unwrap()).collect();
+
+        // All callers must see the same container id.
+        let first = ids[0].clone();
+        assert!(ids.iter().all(|id| id == &first));
+
+        // Cleanup.
+        let _ = exec.release_session_container(&session_id).await;
     }
 }

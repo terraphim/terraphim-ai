@@ -167,6 +167,10 @@ pub enum RlmError {
     #[error("Configuration error: {message}")]
     ConfigError { message: String },
 
+    /// Operation is not supported by the selected backend.
+    #[error("Backend '{backend}' does not support operation '{op}'")]
+    NotSupported { backend: String, op: String },
+
     /// Internal error.
     #[error("Internal error: {message}")]
     Internal { message: String },
@@ -245,6 +249,7 @@ impl RlmError {
             RlmError::SnapshotNotFound { .. } => -32040,
             RlmError::NoBackendAvailable { .. } => -32050,
             RlmError::DnsBlocked { .. } => -32060,
+            RlmError::NotSupported { .. } => -32070,
             RlmError::Cancelled => -32099,
             _ => -32000, // Generic server error
         }
@@ -323,6 +328,20 @@ mod tests {
 
         let not_budget = RlmError::Cancelled;
         assert!(!not_budget.is_budget_exhausted());
+    }
+
+    #[test]
+    fn test_not_supported_not_retryable_and_has_code() {
+        let err = RlmError::NotSupported {
+            backend: "local".to_string(),
+            op: "create_snapshot".to_string(),
+        };
+        assert!(!err.is_retryable());
+        assert!(!err.is_budget_exhausted());
+        assert_eq!(err.to_mcp_error().code, -32070);
+        let display = err.to_string();
+        assert!(display.contains("local"));
+        assert!(display.contains("create_snapshot"));
     }
 
     #[test]

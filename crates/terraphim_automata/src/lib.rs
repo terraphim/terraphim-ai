@@ -141,7 +141,8 @@ pub use markdown_directives::{
     MarkdownDirectiveWarning, MarkdownDirectivesParseResult, parse_markdown_directives_dir,
 };
 pub use matcher::{
-    LinkType, Matched, extract_paragraphs_from_automata, find_matches, replace_matches,
+    LinkType, Matched, compute_concepts_matched, extract_paragraphs_from_automata, find_matches,
+    replace_matches, thesaurus_from_terms,
 };
 
 // Medical entity extraction re-exports
