@@ -1,0 +1,68 @@
+warning: patch `tokio-tungstenite v0.28.0 (https://github.com/snapview/tokio-tungstenite.git?tag=v0.28.0#35d110c2)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+    Blocking waiting for file lock on build directory
+    Checking terraphim_orchestrator v1.8.0 (/data/projects/terraphim/terraphim-ai/crates/terraphim_orchestrator)
+   Compiling terraphim_agent v1.17.1 (/data/projects/terraphim/terraphim-ai/crates/terraphim_agent)
+    Checking terraphim_ai_nodejs v1.0.0 (/data/projects/terraphim/terraphim-ai/terraphim_ai_nodejs)
+    Checking terraphim_rlm v1.17.1 (/data/projects/terraphim/terraphim-ai/crates/terraphim_rlm)
+    Checking terraphim_kg_orchestration v1.0.0 (/data/projects/terraphim/terraphim-ai/crates/terraphim_kg_orchestration)
+    Checking terraphim_kg_agents v1.0.0 (/data/projects/terraphim/terraphim-ai/crates/terraphim_kg_agents)
+    Checking terraphim-cli v1.17.1 (/data/projects/terraphim/terraphim-ai/crates/terraphim_cli)
+    Checking terraphim_router v1.8.0 (/data/projects/terraphim/terraphim-ai/crates/terraphim_router)
+    Checking terraphim_persistence v1.15.0 (/data/projects/terraphim/terraphim-ai/crates/terraphim_persistence)
+    Checking terraphim_atomic_client v1.0.0 (/data/projects/terraphim/terraphim-ai/crates/terraphim_atomic_client)
+    Checking terraphim_mcp_server v1.0.0 (/data/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server)
+    Checking terraphim-firecracker v0.1.0 (/data/projects/terraphim/terraphim-ai/terraphim_firecracker)
+    Checking terraphim_middleware v1.17.1 (/data/projects/terraphim/terraphim-ai/crates/terraphim_middleware)
+    Checking terraphim_goal_alignment v1.0.0 (/data/projects/terraphim/terraphim-ai/crates/terraphim_goal_alignment)
+    Checking terraphim_agent_registry v1.0.0 (/data/projects/terraphim/terraphim-ai/crates/terraphim_agent_registry)
+    Checking terraphim_usage v1.17.1 (/data/projects/terraphim/terraphim-ai/crates/terraphim_usage)
+    Checking terraphim_ccusage v1.17.1 (/data/projects/terraphim/terraphim-ai/crates/terraphim_ccusage)
+error: unused variable: `exit_desc`
+    --> crates/terraphim_orchestrator/src/lib.rs:6782:21
+     |
+6782 |                 let exit_desc = format!("Agent {} exited with status: {}", name, status);
+     |                     ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_exit_desc`
+     |
+     = note: `-D unused-variables` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(unused_variables)]`
+
+error: unused variable: `exit_code`
+    --> crates/terraphim_orchestrator/src/lib.rs:6783:21
+     |
+6783 |                 let exit_code = status.code().unwrap_or(-1);
+     |                     ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_exit_code`
+
+    Checking terraphim_agent_messaging v1.0.0 (/data/projects/terraphim/terraphim-ai/crates/terraphim_agent_messaging)
+    Checking terraphim_agent_supervisor v1.0.0 (/data/projects/terraphim/terraphim-ai/crates/terraphim_agent_supervisor)
+    Checking terraphim_agent_evolution v1.0.0 (/data/projects/terraphim/terraphim-ai/crates/terraphim_agent_evolution)
+error: field `config` is never read
+  --> crates/terraphim_orchestrator/src/evolution.rs:15:5
+   |
+12 | pub struct EvolutionManager {
+   |            ---------------- field in this struct
+...
+15 |     config: EvolutionConfig,
+   |     ^^^^^^
+   |
+   = note: `EvolutionManager` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+   = note: `-D dead-code` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[expect(dead_code)]` or `#[allow(dead_code)]`
+
+    Checking terraphim_workspace v1.13.0 (/data/projects/terraphim/terraphim-ai/crates/terraphim_workspace)
+error: unused import: `std::path::PathBuf`
+  --> crates/terraphim_workspace/src/config.rs:97:9
+   |
+97 |     use std::path::PathBuf;
+   |         ^^^^^^^^^^^^^^^^^^
+   |
+   = note: `-D unused-imports` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(unused_imports)]`
+
+error: could not compile `terraphim_workspace` (lib test) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `terraphim_orchestrator` (lib) due to 3 previous errors
+error: could not compile `terraphim_orchestrator` (lib test) due to 3 previous errors
