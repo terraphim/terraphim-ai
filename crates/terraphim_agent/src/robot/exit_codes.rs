@@ -116,4 +116,45 @@ mod tests {
         assert_eq!(ExitCode::from_code(2), ExitCode::ErrorUsage);
         assert_eq!(ExitCode::from_code(99), ExitCode::ErrorGeneral); // Unknown maps to general
     }
+
+    #[test]
+    fn test_exit_code_from_code_round_trip() {
+        let all_variants = [
+            ExitCode::Success,
+            ExitCode::ErrorGeneral,
+            ExitCode::ErrorUsage,
+            ExitCode::ErrorIndexMissing,
+            ExitCode::ErrorNotFound,
+            ExitCode::ErrorAuth,
+            ExitCode::ErrorNetwork,
+            ExitCode::ErrorTimeout,
+        ];
+        for variant in all_variants {
+            assert_eq!(
+                ExitCode::from_code(variant.code()),
+                variant,
+                "from_code({}) should return {:?}",
+                variant.code(),
+                variant
+            );
+        }
+    }
+
+    #[test]
+    fn test_exit_code_display() {
+        assert!(ExitCode::Success.to_string().contains("SUCCESS"));
+        assert!(ExitCode::ErrorGeneral.to_string().contains('1'));
+    }
+
+    #[test]
+    fn test_exit_code_description() {
+        assert!(!ExitCode::Success.description().is_empty());
+        assert!(!ExitCode::ErrorTimeout.description().is_empty());
+    }
+
+    #[test]
+    fn test_exit_code_name() {
+        assert_eq!(ExitCode::Success.name(), "SUCCESS");
+        assert_eq!(ExitCode::ErrorNotFound.name(), "ERROR_NOT_FOUND");
+    }
 }

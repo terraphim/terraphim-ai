@@ -80,6 +80,77 @@ fn test_format_flag_minimal() {
 }
 
 #[test]
+fn test_format_flag_table() {
+    let config = RobotConfig::new().with_format(OutputFormat::Table);
+    let formatter = RobotFormatter::new(config);
+    let data = serde_json::json!({"status": "ok"});
+    let output = formatter.format(&data).unwrap();
+    assert!(output.contains("status"));
+}
+
+#[test]
+fn test_robot_response_serialized_in_all_formats() {
+    let formats = [
+        OutputFormat::Json,
+        OutputFormat::Jsonl,
+        OutputFormat::Minimal,
+        OutputFormat::Table,
+    ];
+    for format in formats {
+        let meta = ResponseMeta::new("search");
+        let response = RobotResponse::success(serde_json::json!({"results": []}), meta);
+        let config = RobotConfig::new().with_format(format);
+        let formatter = RobotFormatter::new(config);
+        let output = formatter.format(&response).unwrap();
+        let json: serde_json::Value =
+            serde_json::from_str(&output).expect("robot response must be valid JSON");
+        assert_eq!(
+            json.get("success").and_then(|v| v.as_bool()),
+            Some(true),
+            "format {:?}: response.success should be true",
+            format
+        );
+        assert!(
+            json.get("meta").is_some(),
+            "format {:?}: response.meta must be present",
+            format
+        );
+    }
+}
+
+#[test]
+fn test_robot_response_error_serialized_in_all_formats() {
+    let formats = [
+        OutputFormat::Json,
+        OutputFormat::Jsonl,
+        OutputFormat::Minimal,
+        OutputFormat::Table,
+    ];
+    for format in formats {
+        use terraphim_agent::robot::RobotError;
+        let meta = ResponseMeta::new("search");
+        let errors = vec![RobotError::no_results("nothing found")];
+        let response = RobotResponse::<()>::error(errors, meta);
+        let config = RobotConfig::new().with_format(format);
+        let formatter = RobotFormatter::new(config);
+        let output = formatter.format(&response).unwrap();
+        let json: serde_json::Value =
+            serde_json::from_str(&output).expect("error response must be valid JSON");
+        assert_eq!(
+            json.get("success").and_then(|v| v.as_bool()),
+            Some(false),
+            "format {:?}: error response.success should be false",
+            format
+        );
+        assert!(
+            json.get("errors").is_some(),
+            "format {:?}: error response.errors must be present",
+            format
+        );
+    }
+}
+
+#[test]
 fn test_field_modes_with_formatter() {
     let config = RobotConfig::new()
         .with_fields(FieldMode::Minimal)
