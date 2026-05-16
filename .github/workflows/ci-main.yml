@@ -89,6 +89,59 @@ jobs:
           fi
           echo "targets=$TARGETS" >> $GITHUB_OUTPUT
 
+  # Rust formatting and linting gate (runs before build, mirrors ci-pr.yml rust-format job)
+  # Ensures every push to main/develop is fmt-clean and clippy-clean.
+  rust-format:
+    name: Rust Format and Lint
+    runs-on: [self-hosted, bigbox]
+    timeout-minutes: 5
+    needs: setup
+    env:
+      RUSTC_WRAPPER: /home/alex/.local/bin/sccache
+      SCCACHE_BUCKET: rust-cache
+      SCCACHE_SERVER_PORT: "4231"
+      SCCACHE_ENDPOINT: http://172.26.0.1:8333
+      SCCACHE_S3_USE_SSL: "false"
+      SCCACHE_REGION: us-east-1
+      SCCACHE_S3_KEY_PREFIX: terraphim-ai
+      AWS_ACCESS_KEY_ID: any
+      AWS_SECRET_ACCESS_KEY: any
+
+    steps:
+      - name: Fix target directory permissions
+        run: |
+          if [ -d "target" ]; then
+            sudo chown -R $(id -u):$(id -g) target 2>/dev/null || true
+            sudo chmod -R u+rw target 2>/dev/null || chmod -R u+rw target 2>/dev/null || true
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: sccache start and zero stats
+        run: |
+          /home/alex/.local/bin/sccache --start-server || true
+          /home/alex/.local/bin/sccache --zero-stats
+
+      - name: Rustfmt Check
+        run: /home/alex/.local/bin/rch exec -- cargo fmt --all -- --check
+
+      - name: Clippy Check
+        run: /home/alex/.local/bin/rch exec -- cargo clippy --workspace --all-targets --features zlob -- -D warnings
+        env:
+          RUST_BACKTRACE: 1
+
+      - name: sccache stats
+        if: always()
+        run: /home/alex/.local/bin/sccache --show-stats
+
   # Rust build with comprehensive caching
   # Optimal stack: bigbox runner + sccache backed by SeaweedFS S3 on fcbr0 +
   # rch dispatch for queue/slot accounting shared with ADF agents. See
@@ -97,7 +150,7 @@ jobs:
     name: Rust Build (${{ matrix.target }})
     runs-on: [self-hosted, bigbox]
     timeout-minutes: 30
-    needs: [setup, frontend-build]
+    needs: [setup, frontend-build, rust-format]
     strategy:
       fail-fast: false
       matrix:
@@ -558,7 +611,7 @@ jobs:
     name: Build Summary
     runs-on: [self-hosted, bigbox]
     timeout-minutes: 2
-    needs: [setup, rust-build, frontend-build, wasm-build, docker-build, integration-tests]
+    needs: [setup, rust-format, rust-build, frontend-build, wasm-build, docker-build, integration-tests]
     if: always()
 
     steps:
