@@ -791,14 +791,47 @@ pub struct AgentDefinition {
 }
 
 /// Agent layer in the dark factory hierarchy.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum AgentLayer {
     /// Always running, auto-restart on failure.
     Safety,
     /// Cron-scheduled or event-triggered.
     Core,
     /// On-demand, spawned when needed.
+    #[default]
     Growth,
+}
+
+impl Default for AgentDefinition {
+    fn default() -> Self {
+        Self {
+            name: String::new(),
+            layer: AgentLayer::Growth,
+            cli_tool: String::new(),
+            task: String::new(),
+            schedule: None,
+            model: None,
+            capabilities: vec![],
+            max_memory_bytes: None,
+            budget_monthly_cents: None,
+            provider: None,
+            persona: None,
+            terraphim_role: None,
+            skill_chain: vec![],
+            sfia_skills: vec![],
+            fallback_provider: None,
+            fallback_model: None,
+            grace_period_secs: None,
+            max_cpu_seconds: None,
+            pre_check: None,
+            gitea_issue: None,
+            event_only: false,
+            evolution_enabled: false,
+            context_rot_wall_secs: None,
+            context_rot_token_budget: None,
+            project: None,
+        }
+    }
 }
 
 /// Nightwatch drift detection thresholds.

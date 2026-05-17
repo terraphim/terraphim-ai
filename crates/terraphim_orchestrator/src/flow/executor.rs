@@ -223,26 +223,9 @@ impl FlowExecutor {
             cli_tool: cli_tool.clone(),
             task: task.clone(),
             model: step.model.clone(),
-            schedule: None,
-            capabilities: vec![],
-            max_memory_bytes: None,
-            budget_monthly_cents: None,
             provider: step.provider.clone(),
             persona: step.persona.clone(),
-            terraphim_role: None,
-            skill_chain: vec![],
-            sfia_skills: vec![],
-            fallback_provider: None,
-            fallback_model: None,
-            grace_period_secs: None,
-            max_cpu_seconds: None,
-            pre_check: None,
-            gitea_issue: None,
-            event_only: false,
-            project: None,
-            evolution_enabled: false,
-            context_rot_wall_secs: None,
-            context_rot_token_budget: None,
+            ..Default::default()
         };
 
         // Build provider for spawner

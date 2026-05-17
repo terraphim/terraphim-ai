@@ -7,7 +7,7 @@
 //! - `MentionCursor` per-project key isolation at the API level.
 //! - One-shot `migrate_legacy_mention_cursor` idempotency.
 
-use terraphim_orchestrator::config::{AgentDefinition, AgentLayer, Project};
+use terraphim_orchestrator::config::{AgentDefinition, Project};
 use terraphim_orchestrator::mention::{
     migrate_legacy_mention_cursor, parse_mention_tokens, parse_mentions, resolve_mention,
     MentionCursor,
@@ -20,30 +20,10 @@ const LEGACY: &str = "__global__";
 fn agent(name: &str, project: Option<&str>) -> AgentDefinition {
     AgentDefinition {
         name: name.to_string(),
-        layer: AgentLayer::Growth,
         cli_tool: "echo".to_string(),
         task: "t".to_string(),
-        schedule: None,
-        model: None,
-        capabilities: vec![],
-        max_memory_bytes: None,
-        budget_monthly_cents: None,
-        provider: None,
-        persona: None,
-        terraphim_role: None,
-        skill_chain: vec![],
-        sfia_skills: vec![],
-        fallback_provider: None,
-        fallback_model: None,
-        grace_period_secs: None,
-        max_cpu_seconds: None,
-        pre_check: None,
-        gitea_issue: None,
-        event_only: false,
-        evolution_enabled: false,
-        context_rot_wall_secs: None,
-        context_rot_token_budget: None,
         project: project.map(|s| s.to_string()),
+        ..Default::default()
     }
 }
 

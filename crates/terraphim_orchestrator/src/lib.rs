@@ -8465,29 +8465,7 @@ task = "test"
                 layer: AgentLayer::Safety,
                 cli_tool: "echo".to_string(),
                 task: "safety watch".to_string(),
-                model: None,
-                schedule: None,
-                capabilities: vec![],
-                max_memory_bytes: None,
-                budget_monthly_cents: None,
-                provider: None,
-                persona: None,
-                terraphim_role: None,
-                skill_chain: vec![],
-                sfia_skills: vec![],
-                fallback_provider: None,
-                fallback_model: None,
-                grace_period_secs: None,
-                max_cpu_seconds: None,
-                pre_check: None,
-
-                gitea_issue: None,
-                event_only: false,
-                evolution_enabled: false,
-                context_rot_wall_secs: None,
-                context_rot_token_budget: None,
-
-                project: None,
+                ..Default::default()
             }],
             restart_cooldown_secs: 0, // instant restart for testing
             max_restart_count: 3,
@@ -8585,29 +8563,8 @@ task = "test"
             layer: AgentLayer::Core,
             cli_tool: "echo".to_string(),
             task: "core task".to_string(),
-            model: None,
             schedule: Some("0 3 * * *".to_string()),
-            capabilities: vec![],
-            max_memory_bytes: None,
-            budget_monthly_cents: None,
-            provider: None,
-            persona: None,
-            terraphim_role: None,
-            skill_chain: vec![],
-            sfia_skills: vec![],
-            fallback_provider: None,
-            fallback_model: None,
-            grace_period_secs: None,
-            max_cpu_seconds: None,
-            pre_check: None,
-
-            gitea_issue: None,
-            event_only: false,
-            evolution_enabled: false,
-            context_rot_wall_secs: None,
-            context_rot_token_budget: None,
-
-            project: None,
+            ..Default::default()
         }];
         let mut orch = AgentOrchestrator::new(config).unwrap();
 
@@ -8793,29 +8750,9 @@ task = "test"
             layer: AgentLayer::Safety,
             cli_tool: "cat".to_string(),
             task: "test task".to_string(),
-            model: None,
-            schedule: None,
-            capabilities: vec![],
-            max_memory_bytes: None,
-            budget_monthly_cents: None,
-            provider: None,
-            persona: Some("TestAgent".to_string()), // Persona that exists in default test_persona
-            terraphim_role: None,
-            skill_chain: vec![],
-            sfia_skills: vec![],
-            fallback_provider: None,
-            fallback_model: None,
-            grace_period_secs: None,
-            max_cpu_seconds: None,
-            pre_check: None,
-
-            gitea_issue: None,
-            event_only: false,
-            evolution_enabled: false,
-            context_rot_wall_secs: None,
-            context_rot_token_budget: None,
-
-            project: None,
+            // Persona that exists in default test_persona
+            persona: Some("TestAgent".to_string()),
+            ..Default::default()
         }];
 
         // Set up persona data dir with a test persona
@@ -8884,29 +8821,9 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             layer: AgentLayer::Safety,
             cli_tool: "echo".to_string(),
             task: "test task".to_string(),
-            model: None,
-            schedule: None,
-            capabilities: vec![],
-            max_memory_bytes: None,
-            budget_monthly_cents: None,
-            provider: None,
-            persona: Some("NonExistentPersona".to_string()), // This persona doesn't exist
-            terraphim_role: None,
-            skill_chain: vec![],
-            sfia_skills: vec![],
-            fallback_provider: None,
-            fallback_model: None,
-            grace_period_secs: None,
-            max_cpu_seconds: None,
-            pre_check: None,
-
-            gitea_issue: None,
-            event_only: false,
-            evolution_enabled: false,
-            context_rot_wall_secs: None,
-            context_rot_token_budget: None,
-
-            project: None,
+            // This persona doesn't exist
+            persona: Some("NonExistentPersona".to_string()),
+            ..Default::default()
         }];
 
         // No persona_data_dir, so registry will be empty
@@ -9142,27 +9059,9 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             layer: AgentLayer::Core,
             cli_tool: "sleep".to_string(),
             task: "60".to_string(),
-            model: None,
-            schedule: None,
-            capabilities: vec![],
-            max_memory_bytes: None,
-            budget_monthly_cents: None,
-            provider: None,
-            persona: None,
-            terraphim_role: None,
-            skill_chain: vec![],
-            sfia_skills: vec![],
-            fallback_provider: None,
-            fallback_model: None,
             grace_period_secs: Some(2),
             max_cpu_seconds: Some(1), // 1 second timeout
-            pre_check: None,
-            gitea_issue: None,
-            event_only: false,
-            evolution_enabled: false,
-            context_rot_wall_secs: None,
-            context_rot_token_budget: None,
-            project: None,
+            ..Default::default()
         }];
         let mut orch = AgentOrchestrator::new(config).unwrap();
         let def = orch.config.agents[0].clone();
@@ -9190,27 +9089,11 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             layer: AgentLayer::Core,
             cli_tool: "sleep".to_string(),
             task: "original task for rot test".to_string(),
-            model: None,
-            schedule: None,
-            capabilities: vec![],
-            max_memory_bytes: None,
-            budget_monthly_cents: None,
-            provider: None,
-            persona: None,
-            terraphim_role: None,
-            skill_chain: vec![],
-            sfia_skills: vec![],
             fallback_provider: Some("/bin/true".to_string()), // fallback set but must NOT be spawned
-            fallback_model: None,
             grace_period_secs: Some(2),
             max_cpu_seconds: Some(10),      // hard limit
             context_rot_wall_secs: Some(1), // rot threshold fires first
-            context_rot_token_budget: None,
-            pre_check: None,
-            gitea_issue: None,
-            event_only: false,
-            evolution_enabled: false,
-            project: None,
+            ..Default::default()
         }];
         let mut orch = AgentOrchestrator::new(config).unwrap();
         let def = orch.config.agents[0].clone();
@@ -9243,27 +9126,10 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             layer: AgentLayer::Core,
             cli_tool: "sleep".to_string(),
             task: "60".to_string(),
-            model: None,
-            schedule: None,
-            capabilities: vec![],
-            max_memory_bytes: None,
-            budget_monthly_cents: None,
-            provider: None,
-            persona: None,
-            terraphim_role: None,
-            skill_chain: vec![],
-            sfia_skills: vec![],
-            fallback_provider: None,
-            fallback_model: None,
             grace_period_secs: Some(2),
             max_cpu_seconds: Some(1),
-            context_rot_wall_secs: None, // rot detection disabled
-            context_rot_token_budget: None,
-            pre_check: None,
-            gitea_issue: None,
-            event_only: false,
-            evolution_enabled: false,
-            project: None,
+            // context_rot_wall_secs is None (default) — rot detection disabled
+            ..Default::default()
         }];
         let mut orch = AgentOrchestrator::new(config).unwrap();
         let def = orch.config.agents[0].clone();
@@ -9444,28 +9310,9 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             layer: AgentLayer::Safety,
             cli_tool: "echo".to_string(),
             task: "should not run".to_string(),
-            model: None,
-            schedule: None,
-            capabilities: vec![],
-            max_memory_bytes: None,
             // $1 monthly budget.
             budget_monthly_cents: Some(100),
-            provider: None,
-            persona: None,
-            terraphim_role: None,
-            skill_chain: vec![],
-            sfia_skills: vec![],
-            fallback_provider: None,
-            fallback_model: None,
-            grace_period_secs: None,
-            max_cpu_seconds: None,
-            pre_check: None,
-            gitea_issue: None,
-            event_only: false,
-            evolution_enabled: false,
-            context_rot_wall_secs: None,
-            context_rot_token_budget: None,
-            project: None,
+            ..Default::default()
         }];
 
         let mut orch = AgentOrchestrator::new(config).unwrap();
@@ -9542,27 +9389,9 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
                 layer: AgentLayer::Safety,
                 cli_tool: cli_tool.to_string(),
                 task: "review".to_string(),
-                model: None,
-                schedule: None,
                 capabilities: vec!["review".to_string()],
-                max_memory_bytes: None,
-                budget_monthly_cents: None,
-                provider: None,
-                persona: None,
-                terraphim_role: None,
-                skill_chain: vec![],
-                sfia_skills: vec![],
-                fallback_provider: None,
-                fallback_model: None,
-                grace_period_secs: None,
-                max_cpu_seconds: None,
-                pre_check: None,
-                gitea_issue: None,
-                event_only: false,
-                evolution_enabled: false,
-                context_rot_wall_secs: None,
-                context_rot_token_budget: None,
                 project: Some("alpha".to_string()),
+                ..Default::default()
             }],
             restart_cooldown_secs: 0,
             max_restart_count: 3,
@@ -9836,30 +9665,11 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
         let (mut config, tmp) = review_pr_config(cli_tool);
         config.agents.push(AgentDefinition {
             name: "build-runner".to_string(),
-            layer: AgentLayer::Growth,
             cli_tool: cli_tool.to_string(),
             task: "build".to_string(),
-            model: None,
-            schedule: None,
             capabilities: vec!["build".to_string()],
-            max_memory_bytes: None,
-            budget_monthly_cents: None,
-            provider: None,
-            persona: None,
-            terraphim_role: None,
-            skill_chain: vec![],
-            sfia_skills: vec![],
-            fallback_provider: None,
-            fallback_model: None,
-            grace_period_secs: None,
-            max_cpu_seconds: None,
-            pre_check: None,
-            gitea_issue: None,
-            event_only: false,
-            evolution_enabled: false,
-            context_rot_wall_secs: None,
-            context_rot_token_budget: None,
             project: Some("alpha".to_string()),
+            ..Default::default()
         });
         config.pr_dispatch_per_project.insert(
             "alpha".to_string(),
@@ -10241,27 +10051,10 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             layer: AgentLayer::Safety,
             cli_tool: cli_tool.to_string(),
             task: "spec".to_string(),
-            model: None,
-            schedule: None,
             capabilities: vec!["review".to_string()],
-            max_memory_bytes: None,
-            budget_monthly_cents: None,
-            provider: None,
-            persona: None,
-            terraphim_role: None,
             skill_chain: vec!["requirements-traceability".to_string()],
-            sfia_skills: vec![],
-            fallback_provider: None,
-            fallback_model: None,
-            grace_period_secs: None,
-            max_cpu_seconds: None,
-            pre_check: None,
-            gitea_issue: None,
-            event_only: false,
-            evolution_enabled: false,
-            context_rot_wall_secs: None,
-            context_rot_token_budget: None,
             project: Some("alpha".to_string()),
+            ..Default::default()
         });
         // The per-project block takes precedence over the top-level block,
         // so we must update both to keep them in sync.
@@ -10582,30 +10375,12 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
         let (mut config, tmp) = review_pr_config_with_fanout(cli_tool);
         config.agents.push(AgentDefinition {
             name: "pr-test-guardian".to_string(),
-            layer: AgentLayer::Growth,
             cli_tool: cli_tool.to_string(),
             task: "test".to_string(),
-            model: None,
-            schedule: None,
             capabilities: vec!["review".to_string(), "test".to_string()],
-            max_memory_bytes: None,
-            budget_monthly_cents: None,
-            provider: None,
-            persona: None,
-            terraphim_role: None,
             skill_chain: vec!["testing".to_string()],
-            sfia_skills: vec![],
-            fallback_provider: None,
-            fallback_model: None,
-            grace_period_secs: None,
-            max_cpu_seconds: None,
-            pre_check: None,
-            gitea_issue: None,
-            event_only: false,
-            evolution_enabled: false,
-            context_rot_wall_secs: None,
-            context_rot_token_budget: None,
             project: Some("alpha".to_string()),
+            ..Default::default()
         });
         // The per-project block takes precedence over the top-level block,
         // so we must update both to keep them in sync.
@@ -10878,30 +10653,12 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
         let (mut config, tmp) = review_pr_config(cli_tool);
         config.agents.push(AgentDefinition {
             name: "pr-compliance-watchdog".to_string(),
-            layer: AgentLayer::Growth,
             cli_tool: cli_tool.to_string(),
             task: "compliance".to_string(),
-            model: None,
-            schedule: None,
             capabilities: vec!["compliance".to_string()],
-            max_memory_bytes: None,
-            budget_monthly_cents: None,
-            provider: None,
-            persona: None,
-            terraphim_role: None,
             skill_chain: vec!["responsible-ai".to_string()],
-            sfia_skills: vec![],
-            fallback_provider: None,
-            fallback_model: None,
-            grace_period_secs: None,
-            max_cpu_seconds: None,
-            pre_check: None,
-            gitea_issue: None,
-            event_only: false,
-            evolution_enabled: false,
-            context_rot_wall_secs: None,
-            context_rot_token_budget: None,
             project: Some("alpha".to_string()),
+            ..Default::default()
         });
         config.pr_dispatch = Some(crate::config::PrDispatchConfig {
             agents_on_pr_open: vec![
@@ -11164,27 +10921,10 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             layer: AgentLayer::Safety,
             cli_tool: cli_tool.to_string(),
             task: "security".to_string(),
-            model: None,
-            schedule: None,
             capabilities: vec!["review".to_string(), "security".to_string()],
-            max_memory_bytes: None,
-            budget_monthly_cents: None,
-            provider: None,
-            persona: None,
-            terraphim_role: None,
             skill_chain: vec!["security-audit".to_string()],
-            sfia_skills: vec![],
-            fallback_provider: None,
-            fallback_model: None,
-            grace_period_secs: None,
-            max_cpu_seconds: None,
-            pre_check: None,
-            gitea_issue: None,
-            event_only: false,
-            evolution_enabled: false,
-            context_rot_wall_secs: None,
-            context_rot_token_budget: None,
             project: Some("alpha".to_string()),
+            ..Default::default()
         });
         // The per-project block takes precedence over the top-level block,
         // so we must update both to keep them in sync.
@@ -11456,30 +11196,11 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
         // Replace the test fixture agents with a single event_only agent.
         config.agents = vec![AgentDefinition {
             name: "build-runner".to_string(),
-            layer: AgentLayer::Growth,
             cli_tool: "/bin/bash".to_string(),
             task: "echo would-build".to_string(),
-            schedule: None,
-            model: None,
             capabilities: vec!["build".to_string()],
-            max_memory_bytes: None,
-            budget_monthly_cents: None,
-            provider: None,
-            persona: None,
-            terraphim_role: None,
-            skill_chain: vec![],
-            sfia_skills: vec![],
-            fallback_provider: None,
-            fallback_model: None,
-            grace_period_secs: None,
-            max_cpu_seconds: None,
-            pre_check: None,
-            gitea_issue: None,
             event_only: true,
-            evolution_enabled: false,
-            context_rot_wall_secs: None,
-            context_rot_token_budget: None,
-            project: None,
+            ..Default::default()
         }];
         // mentions config required so handle_webhook_dispatch does not bail at the top.
         config.mentions = Some(crate::config::MentionConfig::default());
@@ -11512,30 +11233,11 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
         let mut config = test_config();
         config.agents = vec![AgentDefinition {
             name: "build-runner".to_string(),
-            layer: AgentLayer::Growth,
             cli_tool: "/bin/bash".to_string(),
             task: "echo would-build".to_string(),
-            schedule: None,
-            model: None,
             capabilities: vec!["build".to_string()],
-            max_memory_bytes: None,
-            budget_monthly_cents: None,
-            provider: None,
-            persona: None,
-            terraphim_role: None,
-            skill_chain: vec![],
-            sfia_skills: vec![],
-            fallback_provider: None,
-            fallback_model: None,
-            grace_period_secs: None,
-            max_cpu_seconds: None,
-            pre_check: None,
-            gitea_issue: None,
             event_only: true,
-            evolution_enabled: false,
-            context_rot_wall_secs: None,
-            context_rot_token_budget: None,
-            project: None,
+            ..Default::default()
         }];
         config.mentions = Some(crate::config::MentionConfig::default());
 
@@ -11570,30 +11272,12 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
     fn test_post_exit_guard_invariant_event_only_with_gitea_issue() {
         let def = AgentDefinition {
             name: "build-runner".to_string(),
-            layer: AgentLayer::Growth,
             cli_tool: "/bin/bash".to_string(),
             task: "echo would-build".to_string(),
-            schedule: None,
-            model: None,
             capabilities: vec!["build".to_string()],
-            max_memory_bytes: None,
-            budget_monthly_cents: None,
-            provider: None,
-            persona: None,
-            terraphim_role: None,
-            skill_chain: vec![],
-            sfia_skills: vec![],
-            fallback_provider: None,
-            fallback_model: None,
-            grace_period_secs: None,
-            max_cpu_seconds: None,
-            pre_check: None,
             gitea_issue: Some(9999),
             event_only: true,
-            evolution_enabled: false,
-            context_rot_wall_secs: None,
-            context_rot_token_budget: None,
-            project: None,
+            ..Default::default()
         };
 
         // The defensive guard reads exactly these two fields. Its branch fires

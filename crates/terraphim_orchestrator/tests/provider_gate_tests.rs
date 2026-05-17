@@ -289,26 +289,8 @@ fn agent_with_model(name: &str, model: &str) -> AgentDefinition {
         cli_tool: "echo".to_string(),
         task: "task".to_string(),
         model: Some(model.to_string()),
-        schedule: None,
-        capabilities: vec![],
-        max_memory_bytes: None,
         budget_monthly_cents: Some(10_000),
-        provider: None,
-        persona: None,
-        terraphim_role: None,
-        skill_chain: vec![],
-        sfia_skills: vec![],
-        fallback_provider: None,
-        fallback_model: None,
-        grace_period_secs: None,
-        max_cpu_seconds: None,
-        pre_check: None,
-        gitea_issue: None,
-        event_only: false,
-        evolution_enabled: false,
-        context_rot_wall_secs: None,
-        context_rot_token_budget: None,
-        project: None,
+        ..Default::default()
     }
 }
 

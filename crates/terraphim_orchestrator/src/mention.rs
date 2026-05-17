@@ -572,36 +572,13 @@ impl MentionTracker {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::AgentLayer;
     use terraphim_types::persona::PersonaDefinition;
 
     fn test_agent_default() -> AgentDefinition {
         AgentDefinition {
-            name: String::new(),
-            layer: AgentLayer::Growth,
             cli_tool: "echo".to_string(),
             task: "test task".to_string(),
-            schedule: None,
-            model: None,
-            capabilities: vec![],
-            max_memory_bytes: None,
-            budget_monthly_cents: None,
-            provider: None,
-            persona: None,
-            terraphim_role: None,
-            skill_chain: vec![],
-            sfia_skills: vec![],
-            fallback_provider: None,
-            fallback_model: None,
-            grace_period_secs: None,
-            max_cpu_seconds: None,
-            pre_check: None,
-            gitea_issue: None,
-            event_only: false,
-            evolution_enabled: false,
-            context_rot_wall_secs: None,
-            context_rot_token_budget: None,
-            project: None,
+            ..Default::default()
         }
     }
 
