@@ -7260,8 +7260,9 @@ Remove the pause flag once the underlying failure is resolved:\n\n\
                 match managed.output_rx.try_recv() {
                     Ok(event) => {
                         if let OutputEvent::Stdout { ref line, .. } = event {
-                            managed.output_bytes_consumed =
-                                managed.output_bytes_consumed.saturating_add(line.len() as u64);
+                            managed.output_bytes_consumed = managed
+                                .output_bytes_consumed
+                                .saturating_add(line.len() as u64);
                         }
                         events.push((name.clone(), event));
                     }
@@ -11386,13 +11387,23 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             layer: AgentLayer::Core,
             cli_tool: "sleep".to_string(),
             task: "60".to_string(),
-            model: None, schedule: None, capabilities: vec![],
-            max_memory_bytes: None, budget_monthly_cents: None,
-            provider: None, persona: None, terraphim_role: None,
-            skill_chain: vec![], sfia_skills: vec![],
-            fallback_provider: None, fallback_model: None,
-            grace_period_secs: Some(1), max_cpu_seconds: None,
-            pre_check: None, gitea_issue: None, event_only: false,
+            model: None,
+            schedule: None,
+            capabilities: vec![],
+            max_memory_bytes: None,
+            budget_monthly_cents: None,
+            provider: None,
+            persona: None,
+            terraphim_role: None,
+            skill_chain: vec![],
+            sfia_skills: vec![],
+            fallback_provider: None,
+            fallback_model: None,
+            grace_period_secs: Some(1),
+            max_cpu_seconds: None,
+            pre_check: None,
+            gitea_issue: None,
+            event_only: false,
             evolution_enabled: false,
             context_rot_token_budget: Some(100),
             project: None,
@@ -11419,13 +11430,23 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             layer: AgentLayer::Core,
             cli_tool: "sleep".to_string(),
             task: "60".to_string(),
-            model: None, schedule: None, capabilities: vec![],
-            max_memory_bytes: None, budget_monthly_cents: None,
-            provider: None, persona: None, terraphim_role: None,
-            skill_chain: vec![], sfia_skills: vec![],
-            fallback_provider: None, fallback_model: None,
-            grace_period_secs: Some(1), max_cpu_seconds: None,
-            pre_check: None, gitea_issue: None, event_only: false,
+            model: None,
+            schedule: None,
+            capabilities: vec![],
+            max_memory_bytes: None,
+            budget_monthly_cents: None,
+            provider: None,
+            persona: None,
+            terraphim_role: None,
+            skill_chain: vec![],
+            sfia_skills: vec![],
+            fallback_provider: None,
+            fallback_model: None,
+            grace_period_secs: Some(1),
+            max_cpu_seconds: None,
+            pre_check: None,
+            gitea_issue: None,
+            event_only: false,
             evolution_enabled: false,
             context_rot_token_budget: Some(100),
             project: None,
