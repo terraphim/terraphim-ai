@@ -6,14 +6,28 @@ use serde::{Deserialize, Serialize};
 /// Used with `{{matrix.<key>}}` template substitution.
 pub type MatrixParams = HashMap<String, String>;
 
+/// Maximum number of parameter rows permitted in a single `MatrixConfig`.
+/// Prevents runaway sequential execution and unbounded allocation from
+/// erroneous or adversarial configs.
+pub const MAX_MATRIX_PARAMS: usize = 256;
+
 /// Configuration for matrix (fan-out) expansion of a flow step.
 ///
 /// When present, the step is expanded into N sub-executions, one per entry in
 /// `params`. Each sub-execution receives its own `{{matrix.*}}` template
 /// variables resolved from the corresponding row.
+///
+/// # Security
+///
+/// Matrix param values are substituted verbatim into command strings that are
+/// executed via `bash -lc`. **Only use trusted, admin-authored values.**
+/// The executor rejects values containing shell metacharacters (`;`, `|`,
+/// `&`, `` ` ``, `$`, `>`, `<`, `!`, newlines) to prevent injection.
+/// The number of rows is capped at [`MAX_MATRIX_PARAMS`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MatrixConfig {
     /// Ordered list of parameter maps. Each entry produces one sub-execution.
+    /// Must not exceed [`MAX_MATRIX_PARAMS`] rows.
     pub params: Vec<MatrixParams>,
     /// Maximum number of sub-executions that may run concurrently.
     /// Defaults to 1 (fully sequential).

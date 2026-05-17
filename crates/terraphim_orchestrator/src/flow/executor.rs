@@ -5,13 +5,43 @@ use chrono::Utc;
 use tokio::process::Command;
 use tokio::time::{timeout, Duration};
 
-use super::config::{FailStrategy, FlowDefinition, FlowStepDef, MatrixParams, StepKind};
+use super::config::{
+    FailStrategy, FlowDefinition, FlowStepDef, MatrixParams, StepKind, MAX_MATRIX_PARAMS,
+};
 use super::envelope::{MatrixResult, StepEnvelope};
 use super::state::{FlowRunState, FlowRunStatus};
 use crate::config::{AgentDefinition, AgentLayer};
 use crate::error::OrchestratorError;
 use terraphim_spawner::{AgentSpawner, OutputEvent, SpawnContext, SpawnRequest};
 use terraphim_types::capability::Provider;
+
+/// Shell metacharacters that must not appear in matrix param values.
+/// Param values are substituted verbatim into `bash -lc` command strings;
+/// any of these characters can introduce injection when the command is executed.
+const SHELL_METACHARACTERS: &[char] = &[';', '|', '&', '`', '$', '>', '<', '!', '\n', '(', ')'];
+
+/// Validate a single matrix param value against shell injection.
+/// Returns `Err` if the value contains any shell metacharacter.
+fn validate_matrix_param(
+    flow_name: &str,
+    step_name: &str,
+    key: &str,
+    value: &str,
+) -> Result<(), OrchestratorError> {
+    for &ch in SHELL_METACHARACTERS {
+        if value.contains(ch) {
+            return Err(OrchestratorError::FlowFailed {
+                flow_name: flow_name.to_string(),
+                reason: format!(
+                    "matrix step '{}': param '{}' contains shell metacharacter '{}'; \
+                     only trusted, shell-safe values are permitted",
+                    step_name, key, ch
+                ),
+            });
+        }
+    }
+    Ok(())
+}
 
 /// Replace `{{matrix.<key>}}` placeholders in `template` with values from `row`.
 /// Unresolved placeholders are left as-is (will be cleared by resolve_templates later).
@@ -695,6 +725,27 @@ impl FlowExecutor {
 
         if matrix.params.is_empty() {
             return Ok(vec![]);
+        }
+
+        // Guard: cap params count to prevent unbounded sequential execution.
+        if matrix.params.len() > MAX_MATRIX_PARAMS {
+            return Err(OrchestratorError::FlowFailed {
+                flow_name: flow.name.clone(),
+                reason: format!(
+                    "matrix step '{}': params count {} exceeds maximum {}",
+                    step.name,
+                    matrix.params.len(),
+                    MAX_MATRIX_PARAMS
+                ),
+            });
+        }
+
+        // Guard: validate all param values for shell metacharacters before any
+        // sub-step is executed, so we fail fast rather than mid-run.
+        for row in &matrix.params {
+            for (key, value) in row {
+                validate_matrix_param(&flow.name, &step.name, key, value)?;
+            }
         }
 
         let fail_strategy = matrix.fail_strategy;
@@ -1810,5 +1861,134 @@ mod tests {
         let result =
         executor.resolve_templates("passed: {{steps.run-model.success_count}} failed: {{steps.run-model.failure_count}} codes: {{steps.run-model.all_exit_codes}}", &flow, &state);
         assert_eq!(result, "passed: 1 failed: 1 codes: 0,1");
+    }
+
+    #[test]
+    fn test_validate_matrix_param_rejects_shell_metacharacters() {
+        // Semicolons enable command chaining.
+        assert!(validate_matrix_param("flow", "step", "k", "hello; rm -rf /").is_err());
+        // Backtick subshell.
+        assert!(validate_matrix_param("flow", "step", "k", "`id`").is_err());
+        // Dollar-paren subshell.
+        assert!(validate_matrix_param("flow", "step", "k", "$(id)").is_err());
+        // Pipe.
+        assert!(validate_matrix_param("flow", "step", "k", "foo | bar").is_err());
+        // Ampersand background.
+        assert!(validate_matrix_param("flow", "step", "k", "cmd &").is_err());
+        // Newline injection.
+        assert!(validate_matrix_param("flow", "step", "k", "first\nsecond").is_err());
+        // Redirect.
+        assert!(validate_matrix_param("flow", "step", "k", "a > /etc/passwd").is_err());
+    }
+
+    #[test]
+    fn test_validate_matrix_param_allows_safe_values() {
+        // Model names, file paths, and plain strings are safe.
+        assert!(validate_matrix_param("flow", "step", "model", "kimi-for-coding/k2p5").is_ok());
+        assert!(validate_matrix_param("flow", "step", "prompt", "caution-first").is_ok());
+        assert!(validate_matrix_param("flow", "step", "msg", "hello world").is_ok());
+        assert!(validate_matrix_param("flow", "step", "path", "/tmp/results.json").is_ok());
+        assert!(validate_matrix_param("flow", "step", "num", "42").is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_matrix_step_rejects_oversized_params() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let executor =
+            FlowExecutor::new(temp_dir.path().to_path_buf(), temp_dir.path().to_path_buf());
+
+        let params: Vec<_> = (0..=MAX_MATRIX_PARAMS)
+            .map(|i| {
+                let mut row = std::collections::HashMap::new();
+                row.insert("n".to_string(), i.to_string());
+                row
+            })
+            .collect();
+
+        let flow = FlowDefinition {
+            name: "oversize-test".to_string(),
+            project: "test".to_string(),
+            schedule: None,
+            repo_path: "/tmp/repo".to_string(),
+            base_branch: "main".to_string(),
+            timeout_secs: 3600,
+            steps: vec![FlowStepDef {
+                name: "step".to_string(),
+                kind: StepKind::Action,
+                command: Some("echo {{matrix.n}}".to_string()),
+                cli_tool: None,
+                model: None,
+                task: None,
+                task_file: None,
+                condition: None,
+                timeout_secs: 10,
+                on_fail: FailStrategy::Abort,
+                provider: None,
+                persona: None,
+                matrix: Some(MatrixConfig {
+                    params,
+                    max_parallel: 1,
+                    fail_strategy: FailStrategy::Continue,
+                }),
+            }],
+        };
+        let state = FlowRunState::new("oversize-test");
+        let result = executor
+            .execute_matrix_step(&flow.steps[0], &flow, &state)
+            .await;
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(
+            msg.contains("exceeds maximum"),
+            "expected 'exceeds maximum' in: {msg}"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_matrix_step_rejects_metacharacter_in_param() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let executor =
+            FlowExecutor::new(temp_dir.path().to_path_buf(), temp_dir.path().to_path_buf());
+
+        let mut row = std::collections::HashMap::new();
+        row.insert("msg".to_string(), "hello; rm -rf /".to_string());
+
+        let flow = FlowDefinition {
+            name: "injection-test".to_string(),
+            project: "test".to_string(),
+            schedule: None,
+            repo_path: "/tmp/repo".to_string(),
+            base_branch: "main".to_string(),
+            timeout_secs: 3600,
+            steps: vec![FlowStepDef {
+                name: "step".to_string(),
+                kind: StepKind::Action,
+                command: Some("echo {{matrix.msg}}".to_string()),
+                cli_tool: None,
+                model: None,
+                task: None,
+                task_file: None,
+                condition: None,
+                timeout_secs: 10,
+                on_fail: FailStrategy::Abort,
+                provider: None,
+                persona: None,
+                matrix: Some(MatrixConfig {
+                    params: vec![row],
+                    max_parallel: 1,
+                    fail_strategy: FailStrategy::Continue,
+                }),
+            }],
+        };
+        let state = FlowRunState::new("injection-test");
+        let result = executor
+            .execute_matrix_step(&flow.steps[0], &flow, &state)
+            .await;
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(
+            msg.contains("shell metacharacter"),
+            "expected 'shell metacharacter' in: {msg}"
+        );
     }
 }
