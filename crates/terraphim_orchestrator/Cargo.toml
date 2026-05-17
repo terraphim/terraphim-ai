@@ -101,6 +101,15 @@ name = "compound_cancellation_test"
 path = "tests/compound_cancellation_test.rs"
 required-features = ["test-helpers"]
 
+# Layer 2 startup sweep integration test (epic #1567 / issue #1570).
+# Same test-helpers gate as Layer 1 -- the test re-uses the shared
+# `scope::test_support::setup_git_repo` fixture so the sweep never
+# runs against the live repository.
+[[test]]
+name = "sweep_on_startup_test"
+path = "tests/sweep_on_startup_test.rs"
+required-features = ["test-helpers"]
+
 
 [[bin]]
 name = "adf"
