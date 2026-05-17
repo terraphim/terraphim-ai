@@ -42,7 +42,7 @@ jobs:
         run: |
           set +e
           cargo deny check advisories bans licenses 2>&1 | tee /tmp/cargo-deny-output.txt
-          DENY_EXIT=$?
+          DENY_EXIT=${PIPESTATUS[0]}
           echo "exit_code=${DENY_EXIT}" >> "$GITHUB_OUTPUT"
           exit 0
 
