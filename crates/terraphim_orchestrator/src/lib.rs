@@ -693,6 +693,45 @@ impl AgentOrchestrator {
         let scheduler = TimeScheduler::new(&config.agents, Some(&config.compound_review.schedule))?;
         let compound_workflow =
             CompoundReviewWorkflow::from_compound_config(config.compound_review.clone());
+
+        // Layer 2 startup sweep (epic #1567, issue #1570).
+        //
+        // Reconcile any worktree residue left by a previous instance
+        // before we accept ticks. Synchronous: must finish before the
+        // tick thread is spawned in `run()` so a fresh review cycle
+        // never races against half-killed `review-*` directories.
+        //
+        // `extra_roots` mirrors the per-agent worktree convention
+        // from `lib.rs:5393`. If you change that literal there, change
+        // it here too.
+        //
+        // `cfg(not(test))` gate: the in-lib `test_config()` (see
+        // `lib.rs:7926`) points `repo_path` at the live terraphim-ai
+        // checkout. Without this gate, the sweep's
+        // `git worktree prune --verbose` races against
+        // `test_orchestrator_compound_review_manual`'s concurrent
+        // `git worktree add` on that shared real repo's
+        // `.git/worktrees/` admin registry. The production wiring is
+        // exercised end-to-end by `tests/sweep_on_startup_test.rs`,
+        // which builds an isolated `TempDir` repo and asserts the
+        // sweep DOES run from `AgentOrchestrator::new`. Do not remove
+        // this gate without first migrating the in-lib `test_config()`
+        // to a TempDir-based `repo_path`.
+        #[cfg(not(test))]
+        {
+            let sweep_report = compound_workflow
+                .worktree_manager()
+                .sweep_stale(&[PathBuf::from("/tmp/adf-worktrees")]);
+            if sweep_report.swept_count + sweep_report.root_owned_skipped > 10 {
+                warn!(
+                    swept_count = sweep_report.swept_count,
+                    root_owned_skipped = sweep_report.root_owned_skipped,
+                    failed_count = sweep_report.failed_count,
+                    "large worktree backlog at startup -- prior crash storm likely"
+                );
+            }
+        }
+
         let handoff_buffer = HandoffBuffer::new(config.handoff_buffer_ttl_secs.unwrap_or(86400));
         let handoff_ledger = HandoffLedger::new(config.working_dir.join("handoff-ledger.jsonl"));
 

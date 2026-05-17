@@ -250,6 +250,18 @@ impl CompoundReviewWorkflow {
         Self::new(swarm_config)
     }
 
+    /// Borrow the inner [`WorktreeManager`].
+    ///
+    /// Layer 2 (epic #1567, issue #1570) calls
+    /// `worktree_manager().sweep_stale(...)` from
+    /// `AgentOrchestrator::new` to reconcile stale `review-*` residue
+    /// left behind by SIGKILL / OOM before any tick thread runs.
+    /// Production code outside the startup sweep should prefer the
+    /// higher-level workflow methods.
+    pub fn worktree_manager(&self) -> &WorktreeManager {
+        &self.worktree_manager
+    }
+
     /// Run a full compound review cycle.
     ///
     /// 1. Get changed files between git_ref and base_ref
