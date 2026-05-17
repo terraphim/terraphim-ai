@@ -949,13 +949,11 @@ impl TerraphimService {
                                     kg_links.join("], [")
                                 );
 
-                                // Show a snippet of the processed content with context
-                                if let Some(first_link_pos) = processed_content.find("](kg:") {
-                                    let start = first_link_pos.saturating_sub(50);
-                                    let end = (first_link_pos + 100).min(processed_content.len());
+                                let snippet = snippet_around(&processed_content, "](kg:", 50, 100);
+                                if !snippet.is_empty() {
                                     log::info!(
                                         "📄 Content snippet with KG link: ...{}...",
-                                        &processed_content[start..end]
+                                        snippet
                                     );
                                 }
                             } else {
@@ -3023,6 +3021,26 @@ impl TerraphimService {
     }
 }
 
+pub(crate) fn snippet_around(s: &str, marker: &str, before: usize, after: usize) -> String {
+    let Some(marker_byte) = s.find(marker) else {
+        return String::new();
+    };
+    let marker_char_index = s[..marker_byte].chars().count();
+    let total_chars = s.chars().count();
+
+    let start_char_index = marker_char_index.saturating_sub(before);
+    let end_char_index = (marker_char_index + marker.len() + after).min(total_chars);
+
+    if start_char_index >= end_char_index {
+        return String::new();
+    }
+
+    s.chars()
+        .skip(start_char_index)
+        .take(end_char_index - start_char_index)
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -3787,5 +3805,72 @@ mod tests {
             TerraphimService::apply_min_quality_filter(vec![with_score, no_score], Some(-0.1));
         assert_eq!(result.len(), 1, "only scored document should pass");
         assert_eq!(result[0].id, "scored");
+    }
+
+    #[test]
+    fn test_snippet_around_ascii_simple() {
+        let s = "Hello World foo](kg:bar Baz";
+        let result = snippet_around(s, "](kg:", 10, 10);
+        assert_eq!(result, " World foo](kg:bar Baz");
+    }
+
+    #[test]
+    fn test_snippet_around_ascii_truncation_left() {
+        let s = "xyz Hello World foo](kg:bar";
+        let result = snippet_around(s, "](kg:", 10, 10);
+        assert_eq!(result, " World foo](kg:bar");
+    }
+
+    #[test]
+    fn test_snippet_around_ascii_truncation_right() {
+        let s = "Hello World foo](kg:bar xyz";
+        let result = snippet_around(s, "](kg:", 10, 10);
+        assert_eq!(result, " World foo](kg:bar xyz");
+    }
+
+    #[test]
+    fn test_snippet_around_multibyte_cjk() {
+        let s = "日本語 Hello](kg:bar 日本語";
+        let result = snippet_around(s, "](kg:", 5, 5);
+        assert!(!result.is_empty());
+        assert!(result.contains("Hello"));
+        assert!(result.contains("](kg:"));
+    }
+
+    #[test]
+    fn test_snippet_around_multibyte_emoji() {
+        let s = "Hello 😂 World](kg:bar";
+        let result = snippet_around(s, "](kg:", 10, 10);
+        assert!(!result.is_empty());
+        assert!(result.contains("😂"));
+        assert!(result.contains("](kg:"));
+    }
+
+    #[test]
+    fn test_snippet_around_marker_not_found() {
+        let s = "Hello World";
+        let result = snippet_around(s, "](kg:", 10, 10);
+        assert_eq!(result, "");
+    }
+
+    #[test]
+    fn test_snippet_around_empty_string() {
+        let s = "";
+        let result = snippet_around(s, "](kg:", 10, 10);
+        assert_eq!(result, "");
+    }
+
+    #[test]
+    fn test_snippet_around_marker_at_start() {
+        let s = "](kg:bar Hello";
+        let result = snippet_around(s, "](kg:", 10, 10);
+        assert_eq!(result, "](kg:bar Hello");
+    }
+
+    #[test]
+    fn test_snippet_around_marker_at_end() {
+        let s = "Hello ](kg:bar";
+        let result = snippet_around(s, "](kg:", 10, 10);
+        assert_eq!(result, "Hello ](kg:bar");
     }
 }
