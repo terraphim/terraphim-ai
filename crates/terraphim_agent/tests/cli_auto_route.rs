@@ -124,5 +124,21 @@ fn t9_robot_mode_stdout_is_pure_json_stderr_has_auto_route() -> Result<()> {
         parsed.get("data").is_some(),
         "JSON envelope missing 'data' field"
     );
+    assert!(
+        parsed.get("meta").and_then(|m| m.get("query")).is_some(),
+        "JSON envelope missing 'meta.query' field"
+    );
+    assert_eq!(
+        parsed
+            .get("meta")
+            .and_then(|m| m.get("query"))
+            .and_then(|q| q.as_str()),
+        Some("terraphim"),
+        "meta.query must equal the searched term"
+    );
+    assert!(
+        parsed.get("meta").and_then(|m| m.get("role")).is_some(),
+        "JSON envelope missing 'meta.role' field"
+    );
     Ok(())
 }
