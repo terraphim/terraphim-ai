@@ -214,7 +214,11 @@ impl ShardedUmlsExtractor {
         let shards: Vec<DoubleArrayAhoCorasick<u32>> = shard_bytes
             .iter()
             .map(|bytes| {
-                // SAFETY: bytes were produced by DoubleArrayAhoCorasick::serialize()
+                // SAFETY: bytes were produced by `DoubleArrayAhoCorasick::serialize()` on
+                // this machine and have passed SHA-256 checksum verification inside
+                // `load_umls_artifact()` before reaching this point.  The checksum gate
+                // guarantees the bytes are bit-for-bit identical to what `serialize()`
+                // wrote; no tampered or externally-sourced bytes can reach this call.
                 let (automaton, _remaining) =
                     unsafe { DoubleArrayAhoCorasick::<u32>::deserialize_unchecked(bytes) };
                 automaton
