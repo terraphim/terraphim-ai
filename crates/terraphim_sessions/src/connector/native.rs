@@ -153,13 +153,29 @@ impl NativeClaudeConnector {
         let (tx, rx) = mpsc::channel(32);
         let path = Arc::new(base_path);
 
-        tokio::task::spawn_blocking(move || -> Result<()> {
-            let (watcher_tx, watcher_rx) = std::sync::mpsc::channel();
-            let mut watcher = recommended_watcher(move |res| {
-                let _ = watcher_tx.send(res);
-            })?;
+        // Oneshot to propagate watcher initialisation errors back to the async caller before the
+        // blocking loop starts. Without this the JoinHandle is dropped and init errors are lost.
+        let (ready_tx, ready_rx) = tokio::sync::oneshot::channel::<Result<()>>();
 
-            watcher.watch(&path, RecursiveMode::Recursive)?;
+        tokio::task::spawn_blocking(move || {
+            let (watcher_tx, watcher_rx) = std::sync::mpsc::channel();
+            let mut watcher = match recommended_watcher(move |res| {
+                let _ = watcher_tx.send(res);
+            }) {
+                Ok(w) => w,
+                Err(e) => {
+                    let _ = ready_tx.send(Err(anyhow::anyhow!(e)));
+                    return;
+                }
+            };
+
+            if let Err(e) = watcher.watch(&path, RecursiveMode::Recursive) {
+                let _ = ready_tx.send(Err(anyhow::anyhow!(e)));
+                return;
+            }
+
+            // Signal successful initialisation before entering the event loop.
+            let _ = ready_tx.send(Ok(()));
 
             tracing::info!(
                 "Started watching for Claude sessions in: {}",
@@ -230,9 +246,11 @@ impl NativeClaudeConnector {
                     }
                 }
             }
-
-            Ok(())
         });
+
+        // Await watcher initialisation. Propagate any error to the caller so that watch_all()
+        // can log and skip this connector rather than returning a silently-dead receiver.
+        ready_rx.await??;
 
         Ok(rx)
     }
@@ -704,6 +722,25 @@ mod tests {
             s3b.messages.len(),
             s3.messages.len(),
             "dedup: no-op when unchanged"
+        );
+    }
+
+    /// Regression test for #814: watch_at must return Err when the path cannot be watched.
+    ///
+    /// The path is valid when created but removed before watch_at calls watcher.watch().
+    /// Without the oneshot fix the error is swallowed and the receiver hangs forever.
+    #[tokio::test]
+    async fn test_watch_at_nonexistent_path_returns_err() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().to_path_buf();
+        // Remove the directory so the notify watcher cannot set up recursive watching.
+        std::fs::remove_dir_all(&path).unwrap();
+
+        let connector = NativeClaudeConnector;
+        let result = connector.watch_at(path).await;
+        assert!(
+            result.is_err(),
+            "watch_at should return Err for a non-existent path"
         );
     }
 
