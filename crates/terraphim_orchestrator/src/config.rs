@@ -768,6 +768,15 @@ pub struct AgentDefinition {
     /// and top-level `evolution.enabled = true`). Default: false.
     #[serde(default)]
     pub evolution_enabled: bool,
+    /// Maximum output tokens before context-rot is declared for this agent.
+    ///
+    /// Token count is estimated from accumulated stdout bytes: `bytes / 4`.
+    /// When the accumulated estimate exceeds this value `poll_wall_timeouts`
+    /// fires the same kill-and-respawn path as the wall-clock rot signal.
+    ///
+    /// Must be `> 0` when set. `None` disables token-budget rot (default).
+    #[serde(default)]
+    pub context_rot_token_budget: Option<u64>,
 }
 
 /// Agent layer in the dark factory hierarchy.
@@ -1568,6 +1577,16 @@ impl OrchestratorConfig {
                         max: MAX_CPU_MAX_SECS,
                     });
                 }
+            }
+        }
+
+        // D3b: context_rot_token_budget must be > 0 when set
+        for agent in &self.agents {
+            if let Some(0) = agent.context_rot_token_budget {
+                return Err(crate::error::OrchestratorError::Config(format!(
+                    "agent '{{}}': context_rot_token_budget must be > 0 when set",
+                    agent.name
+                )));
             }
         }
 
@@ -3355,5 +3374,67 @@ task = "test"
             dbg.contains("***REDACTED***"),
             "Debug output should mark api_key as redacted, got: {dbg}"
         );
+    }
+
+    #[test]
+    fn test_token_budget_zero_is_rejected() {
+        let toml_str = r#"
+working_dir = "/tmp"
+[nightwatch]
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+[[agents]]
+name = "test-agent"
+layer = "Safety"
+cli_tool = "echo"
+task = "test"
+context_rot_token_budget = 0
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        let err = config.validate().unwrap_err();
+        assert!(
+            matches!(err, crate::error::OrchestratorError::Config(ref msg) if msg.contains("context_rot_token_budget") && msg.contains("> 0")),
+            "expected context_rot_token_budget validation error, got: {err}"
+        );
+    }
+
+    #[test]
+    fn test_token_budget_positive_is_accepted() {
+        let toml_str = r#"
+working_dir = "/tmp"
+[nightwatch]
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+[[agents]]
+name = "test-agent"
+layer = "Safety"
+cli_tool = "echo"
+task = "test"
+context_rot_token_budget = 50000
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        assert!(config.validate().is_ok());
+        assert_eq!(config.agents[0].context_rot_token_budget, Some(50000));
+    }
+
+    #[test]
+    fn test_token_budget_absent_is_accepted() {
+        let toml_str = r#"
+working_dir = "/tmp"
+[nightwatch]
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+[[agents]]
+name = "test-agent"
+layer = "Safety"
+cli_tool = "echo"
+task = "test"
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        assert!(config.validate().is_ok());
+        assert!(config.agents[0].context_rot_token_budget.is_none());
     }
 }

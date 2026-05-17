@@ -282,6 +282,7 @@ impl FlowExecutor {
             event_only: false,
             project: None,
             evolution_enabled: false,
+            context_rot_token_budget: None,
         };
 
         // Build provider for spawner

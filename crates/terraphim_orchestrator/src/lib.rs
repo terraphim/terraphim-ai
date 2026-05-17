@@ -180,6 +180,8 @@ struct ManagedAgent {
     /// Worktree guard for automatic cleanup on agent crash.
     #[allow(dead_code)]
     worktree_guard: Option<crate::worktree_guard::WorktreeGuard>,
+    /// Accumulated stdout bytes received from this agent since spawn.
+    output_bytes_consumed: u64,
 }
 
 #[cfg(not(test))]
@@ -2259,6 +2261,7 @@ impl AgentOrchestrator {
                 concurrency_permit: permit,
                 commit_status_post: None,
                 output_tmp_path,
+                output_bytes_consumed: 0,
             },
         );
 
@@ -2588,6 +2591,7 @@ impl AgentOrchestrator {
                 spawned_by_mention: false,
                 worktree_path: None,
                 worktree_guard: None,
+                output_bytes_consumed: 0,
                 routed_model: if routed_model.is_empty() {
                     None
                 } else {
@@ -2791,6 +2795,7 @@ impl AgentOrchestrator {
                 spawned_by_mention: false,
                 worktree_path: None,
                 worktree_guard: None,
+                output_bytes_consumed: 0,
                 routed_model: None,
                 session_id: format!("{}-{}", def.name, ulid::Ulid::new()),
                 mention_chain_id: None,
@@ -3105,6 +3110,7 @@ impl AgentOrchestrator {
                 spawned_by_mention: false,
                 worktree_path: None,
                 worktree_guard: None,
+                output_bytes_consumed: 0,
                 routed_model: None,
                 session_id: format!("{}-{}", def.name, ulid::Ulid::new()),
                 mention_chain_id: None,
@@ -6198,6 +6204,22 @@ impl AgentOrchestrator {
                         "agent exceeded wall-clock timeout, killing for fallback respawn"
                     );
                     timed_out.push(name.clone());
+                    continue;
+                }
+            }
+            // Token-budget rot: estimated output-token count exceeds configured budget.
+            // Estimate: accumulated stdout bytes / 4 (1 token ≈ 4 bytes for LLM output).
+            if let Some(budget) = managed.definition.context_rot_token_budget {
+                let estimated_tokens = managed.output_bytes_consumed / 4;
+                if estimated_tokens >= budget {
+                    warn!(
+                        agent = %name,
+                        estimated_tokens,
+                        budget,
+                        output_bytes = managed.output_bytes_consumed,
+                        "agent exceeded context-rot token budget, killing for fallback respawn"
+                    );
+                    timed_out.push(name.clone());
                 }
             }
         }
@@ -7236,7 +7258,13 @@ Remove the pause flag once the underlying failure is resolved:\n\n\
         for (name, managed) in &mut self.active_agents {
             loop {
                 match managed.output_rx.try_recv() {
-                    Ok(event) => events.push((name.clone(), event)),
+                    Ok(event) => {
+                        if let OutputEvent::Stdout { ref line, .. } = event {
+                            managed.output_bytes_consumed =
+                                managed.output_bytes_consumed.saturating_add(line.len() as u64);
+                        }
+                        events.push((name.clone(), event));
+                    }
                     Err(broadcast::error::TryRecvError::Empty) => break,
                     Err(broadcast::error::TryRecvError::Lagged(n)) => {
                         warn!(agent = %name, skipped = n, "output events lagged");
@@ -8024,6 +8052,7 @@ mod tests {
                     gitea_issue: None,
                     event_only: false,
                     evolution_enabled: false,
+                    context_rot_token_budget: None,
 
                     project: None,
                 },
@@ -8051,6 +8080,7 @@ mod tests {
                     gitea_issue: None,
                     event_only: false,
                     evolution_enabled: false,
+                    context_rot_token_budget: None,
 
                     project: None,
                 },
@@ -8371,6 +8401,7 @@ task = "test"
                 gitea_issue: None,
                 event_only: false,
                 evolution_enabled: false,
+                context_rot_token_budget: None,
 
                 project: None,
             }],
@@ -8489,6 +8520,7 @@ task = "test"
             gitea_issue: None,
             event_only: false,
             evolution_enabled: false,
+            context_rot_token_budget: None,
 
             project: None,
         }];
@@ -8695,6 +8727,7 @@ task = "test"
             gitea_issue: None,
             event_only: false,
             evolution_enabled: false,
+            context_rot_token_budget: None,
 
             project: None,
         }];
@@ -8784,6 +8817,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             gitea_issue: None,
             event_only: false,
             evolution_enabled: false,
+            context_rot_token_budget: None,
 
             project: None,
         }];
@@ -9039,6 +9073,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             gitea_issue: None,
             event_only: false,
             evolution_enabled: false,
+            context_rot_token_budget: None,
             project: None,
         }];
         let mut orch = AgentOrchestrator::new(config).unwrap();
@@ -9208,6 +9243,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             gitea_issue: None,
             event_only: false,
             evolution_enabled: false,
+            context_rot_token_budget: None,
             project: None,
         }];
 
@@ -9303,6 +9339,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
                 gitea_issue: None,
                 event_only: false,
                 evolution_enabled: false,
+                context_rot_token_budget: None,
                 project: Some("alpha".to_string()),
             }],
             restart_cooldown_secs: 0,
@@ -9598,6 +9635,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             gitea_issue: None,
             event_only: false,
             evolution_enabled: false,
+            context_rot_token_budget: None,
             project: Some("alpha".to_string()),
         });
         config.pr_dispatch_per_project.insert(
@@ -9998,6 +10036,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             gitea_issue: None,
             event_only: false,
             evolution_enabled: false,
+            context_rot_token_budget: None,
             project: Some("alpha".to_string()),
         });
         // The per-project block takes precedence over the top-level block,
@@ -10340,6 +10379,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             gitea_issue: None,
             event_only: false,
             evolution_enabled: false,
+            context_rot_token_budget: None,
             project: Some("alpha".to_string()),
         });
         // The per-project block takes precedence over the top-level block,
@@ -10634,6 +10674,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             gitea_issue: None,
             event_only: false,
             evolution_enabled: false,
+            context_rot_token_budget: None,
             project: Some("alpha".to_string()),
         });
         config.pr_dispatch = Some(crate::config::PrDispatchConfig {
@@ -10915,6 +10956,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             gitea_issue: None,
             event_only: false,
             evolution_enabled: false,
+            context_rot_token_budget: None,
             project: Some("alpha".to_string()),
         });
         // The per-project block takes precedence over the top-level block,
@@ -11208,6 +11250,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             gitea_issue: None,
             event_only: true,
             evolution_enabled: false,
+            context_rot_token_budget: None,
             project: None,
         }];
         // mentions config required so handle_webhook_dispatch does not bail at the top.
@@ -11262,6 +11305,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             gitea_issue: None,
             event_only: true,
             evolution_enabled: false,
+            context_rot_token_budget: None,
             project: None,
         }];
         config.mentions = Some(crate::config::MentionConfig::default());
@@ -11318,6 +11362,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             gitea_issue: Some(9999),
             event_only: true,
             evolution_enabled: false,
+            context_rot_token_budget: None,
             project: None,
         };
 
@@ -11331,5 +11376,74 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             def.gitea_issue.is_some(),
             "gitea_issue must be Some(_) for the post-exit code to enter the outer if-let"
         );
+    }
+
+    #[tokio::test]
+    async fn test_token_budget_exceeded_kills_agent() {
+        let mut config = test_config_fast_lifecycle();
+        config.agents = vec![AgentDefinition {
+            name: "budget-exceeded".to_string(),
+            layer: AgentLayer::Core,
+            cli_tool: "sleep".to_string(),
+            task: "60".to_string(),
+            model: None, schedule: None, capabilities: vec![],
+            max_memory_bytes: None, budget_monthly_cents: None,
+            provider: None, persona: None, terraphim_role: None,
+            skill_chain: vec![], sfia_skills: vec![],
+            fallback_provider: None, fallback_model: None,
+            grace_period_secs: Some(1), max_cpu_seconds: None,
+            pre_check: None, gitea_issue: None, event_only: false,
+            evolution_enabled: false,
+            context_rot_token_budget: Some(100),
+            project: None,
+        }];
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+        let def = orch.config.agents[0].clone();
+        orch.spawn_agent(&def).await.unwrap();
+        assert!(orch.active_agents.contains_key("budget-exceeded"));
+        if let Some(m) = orch.active_agents.get_mut("budget-exceeded") {
+            m.output_bytes_consumed = 401; // 401/4=100 tokens >= budget 100
+        }
+        orch.poll_wall_timeouts().await;
+        assert!(
+            !orch.active_agents.contains_key("budget-exceeded"),
+            "agent must be killed when token budget is exceeded"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_token_budget_not_exceeded_keeps_agent() {
+        let mut config = test_config_fast_lifecycle();
+        config.agents = vec![AgentDefinition {
+            name: "budget-ok".to_string(),
+            layer: AgentLayer::Core,
+            cli_tool: "sleep".to_string(),
+            task: "60".to_string(),
+            model: None, schedule: None, capabilities: vec![],
+            max_memory_bytes: None, budget_monthly_cents: None,
+            provider: None, persona: None, terraphim_role: None,
+            skill_chain: vec![], sfia_skills: vec![],
+            fallback_provider: None, fallback_model: None,
+            grace_period_secs: Some(1), max_cpu_seconds: None,
+            pre_check: None, gitea_issue: None, event_only: false,
+            evolution_enabled: false,
+            context_rot_token_budget: Some(100),
+            project: None,
+        }];
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+        let def = orch.config.agents[0].clone();
+        orch.spawn_agent(&def).await.unwrap();
+        assert!(orch.active_agents.contains_key("budget-ok"));
+        if let Some(m) = orch.active_agents.get_mut("budget-ok") {
+            m.output_bytes_consumed = 100; // 100/4=25 tokens < budget 100
+        }
+        orch.poll_wall_timeouts().await;
+        assert!(
+            orch.active_agents.contains_key("budget-ok"),
+            "agent must NOT be killed when token budget is not exceeded"
+        );
+        if let Some(m) = orch.active_agents.remove("budget-ok") {
+            let _ = m.handle.kill().await;
+        }
     }
 }
