@@ -7,7 +7,9 @@ pub struct FlowDefinition {
     /// Must match a `Project.id` when projects are defined.
     pub project: String,
     #[serde(default)]
-    pub schedule: Option<String>, // cron expression
+    /// Optional cron expression for scheduled flow runs (e.g. `"0 2 * * *"`).
+    pub schedule: Option<String>,
+    /// Filesystem path of the repository this flow operates on.
     pub repo_path: String,
     #[serde(default = "default_base_branch")]
     pub base_branch: String,
@@ -15,6 +17,7 @@ pub struct FlowDefinition {
     #[serde(default = "default_flow_timeout")]
     pub timeout_secs: u64,
     #[serde(default)]
+    /// Ordered list of steps to execute in this flow.
     pub steps: Vec<FlowStepDef>,
 }
 
