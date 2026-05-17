@@ -11,6 +11,11 @@ repository = "https://github.com/terraphim/terraphim-ai"
 default = ["quickwit"]
 quickwit = ["dep:reqwest", "dep:reqwest-middleware", "dep:reqwest-retry"]
 evolution = ["dep:terraphim_agent_evolution"]
+# Expose `scope::test_support` to integration tests under `tests/`.
+# The dependency on `tempfile` is also pulled in by `[dev-dependencies]`,
+# so this feature is effectively a no-op for non-test consumers, but
+# the cfg gate keeps the helper out of the production tree.
+test-helpers = ["dep:tempfile"]
 
 [dependencies]
 # Terraphim internal crates
@@ -75,6 +80,10 @@ reqwest = { workspace = true, optional = true }
 reqwest-middleware = { workspace = true, optional = true }
 reqwest-retry = { workspace = true, optional = true }
 ulid = "1.2.1"
+
+# Optional: enabled by the `test-helpers` feature so that the
+# `scope::test_support` module can be shared with integration tests.
+tempfile = { workspace = true, optional = true }
 
 [dev-dependencies]
 tokio-test = "0.4"

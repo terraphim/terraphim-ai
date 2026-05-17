@@ -4,6 +4,20 @@ use std::time::Instant;
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
+use crate::worktree_guard::WorktreeGuard;
+
+/// Directory-name prefix for compound-review worktrees.
+///
+/// Single source of truth referenced by:
+/// - `compound.rs::run` when constructing `review-<uuid>` names.
+/// - Layer 2 (`scope::WorktreeManager::sweep_stale`) when matching
+///   stale entries on startup.
+/// - Layer 3 (`scripts/adf-setup/adf-cleanup.sh`) for the operator
+///   cleanup helper.
+///
+/// Changes here must be mirrored in the shell script.
+pub const WORKTREE_REVIEW_PREFIX: &str = "review-";
+
 /// Check if `prefix` is a proper path prefix of `path`.
 /// Ensures "src/" matches "src/main.rs" but not "src-backup/".
 pub(crate) fn is_path_prefix(prefix: &str, path: &str) -> bool {
@@ -256,12 +270,16 @@ impl WorktreeManager {
     /// * `name` - Name of the worktree (used as directory name)
     /// * `git_ref` - Git reference (branch, tag, commit) to check out
     ///
-    /// Returns the path to the created worktree.
+    /// Returns a `WorktreeGuard` that owns cleanup of the worktree.
+    /// When the guard is dropped without `.keep()` being called, it
+    /// invokes `git worktree remove --force` against the repository
+    /// (reconciling the `<repo>/.git/worktrees/<name>` admin entry)
+    /// and falls back to filesystem removal on failure.
     pub async fn create_worktree(
         &self,
         name: &str,
         git_ref: &str,
-    ) -> Result<PathBuf, std::io::Error> {
+    ) -> Result<WorktreeGuard, std::io::Error> {
         let worktree_path = self.worktree_base.join(name);
 
         // Create parent directory if needed
@@ -297,7 +315,7 @@ impl WorktreeManager {
         }
 
         info!(name = %name, path = %worktree_path.display(), "worktree created");
-        Ok(worktree_path)
+        Ok(WorktreeGuard::for_managed(&self.repo_path, worktree_path))
     }
 
     /// Remove a worktree.
@@ -670,17 +688,20 @@ mod tests {
         let (_temp_dir, repo_path) = setup_git_repo();
         let manager = WorktreeManager::new(&repo_path);
 
-        let worktree_path = manager.create_worktree("feature-branch", "HEAD").await;
+        let guard_result = manager.create_worktree("feature-branch", "HEAD").await;
         assert!(
-            worktree_path.is_ok(),
+            guard_result.is_ok(),
             "create_worktree failed: {:?}",
-            worktree_path.err()
+            guard_result.err()
         );
 
-        let path = worktree_path.unwrap();
+        let guard = guard_result.unwrap();
+        let path = guard.path().to_path_buf();
         assert!(path.exists());
         assert!(path.join(".git").exists());
         assert!(path.join("README.md").exists());
+        // Disarm so guard's Drop doesn't fight the temp_dir teardown.
+        guard.keep();
     }
 
     #[tokio::test]
@@ -688,10 +709,12 @@ mod tests {
         let (_temp_dir, repo_path) = setup_git_repo();
         let manager = WorktreeManager::new(&repo_path);
 
-        // Create worktree
-        manager.create_worktree("to-remove", "HEAD").await.unwrap();
+        // Create worktree; keep the guard so the manual remove path
+        // below is what removes it (not the guard's Drop).
+        let guard = manager.create_worktree("to-remove", "HEAD").await.unwrap();
         let path = manager.worktree_base().join("to-remove");
         assert!(path.exists());
+        guard.keep();
 
         // Remove worktree
         let result = manager.remove_worktree("to-remove").await;
@@ -714,10 +737,12 @@ mod tests {
         let (_temp_dir, repo_path) = setup_git_repo();
         let manager = WorktreeManager::new(&repo_path);
 
-        // Create multiple worktrees
-        manager.create_worktree("wt1", "HEAD").await.unwrap();
-        manager.create_worktree("wt2", "HEAD").await.unwrap();
-        manager.create_worktree("wt3", "HEAD").await.unwrap();
+        // Create multiple worktrees; disarm each guard so cleanup_all
+        // is what removes them (this test asserts the manager's
+        // own bulk path, not the guard's Drop).
+        manager.create_worktree("wt1", "HEAD").await.unwrap().keep();
+        manager.create_worktree("wt2", "HEAD").await.unwrap().keep();
+        manager.create_worktree("wt3", "HEAD").await.unwrap().keep();
 
         let worktrees = manager.list_worktrees().unwrap();
         assert_eq!(worktrees.len(), 3);
@@ -739,9 +764,13 @@ mod tests {
         let worktrees = manager.list_worktrees().unwrap();
         assert!(worktrees.is_empty());
 
-        // Create worktrees
-        manager.create_worktree("wt-a", "HEAD").await.unwrap();
-        manager.create_worktree("wt-b", "HEAD").await.unwrap();
+        // Create worktrees; keep the guards so the worktrees survive
+        // long enough for list_worktrees to enumerate them.
+        let _g_a = manager.create_worktree("wt-a", "HEAD").await.unwrap();
+        let _g_b = manager.create_worktree("wt-b", "HEAD").await.unwrap();
+        // Disarm so guard Drop doesn't race the TempDir teardown.
+        _g_a.keep();
+        _g_b.keep();
 
         let worktrees = manager.list_worktrees().unwrap();
         assert_eq!(worktrees.len(), 2);
@@ -756,8 +785,9 @@ mod tests {
 
         assert!(!manager.worktree_exists("test-wt"));
 
-        manager.create_worktree("test-wt", "HEAD").await.unwrap();
+        let guard = manager.create_worktree("test-wt", "HEAD").await.unwrap();
         assert!(manager.worktree_exists("test-wt"));
+        guard.keep();
 
         manager.remove_worktree("test-wt").await.unwrap();
         assert!(!manager.worktree_exists("test-wt"));
@@ -777,10 +807,86 @@ mod tests {
         let (_temp_dir, repo_path) = setup_git_repo();
         let manager = WorktreeManager::new(&repo_path);
 
-        manager.create_worktree("duplicate", "HEAD").await.unwrap();
+        let guard = manager.create_worktree("duplicate", "HEAD").await.unwrap();
 
         // Creating duplicate should fail
         let result = manager.create_worktree("duplicate", "HEAD").await;
         assert!(result.is_err());
+        guard.keep();
+    }
+}
+
+/// Test helpers exposed at module scope (under the `test-helpers`
+/// feature, or when compiling the lib's own test target) so
+/// integration tests under `tests/` can re-use the git repo fixture.
+/// These helpers have no production callers; they exist to share
+/// setup code across `scope.rs::tests` and the cancellation property
+/// test.
+#[doc(hidden)]
+#[cfg(any(test, feature = "test-helpers"))]
+pub mod test_support {
+    use std::path::PathBuf;
+    use std::process::Command;
+    use tempfile::TempDir;
+
+    /// Initialise a real git repository in a fresh `TempDir` with one
+    /// commit. Returns the `TempDir` (caller owns the lifetime) and
+    /// the repo path.
+    pub fn setup_git_repo() -> (TempDir, PathBuf) {
+        std::env::remove_var("GIT_INDEX_FILE");
+
+        let temp_dir = TempDir::new().expect("failed to create temp dir");
+        let repo_path = temp_dir.path().to_path_buf();
+
+        let output = Command::new("git")
+            .arg("init")
+            .arg(&repo_path)
+            .env_remove("GIT_INDEX_FILE")
+            .output()
+            .expect("failed to run git init");
+        assert!(output.status.success(), "git init failed");
+
+        Command::new("git")
+            .arg("-C")
+            .arg(&repo_path)
+            .arg("config")
+            .arg("user.email")
+            .arg("test@test.com")
+            .env_remove("GIT_INDEX_FILE")
+            .output()
+            .expect("failed to config git email");
+
+        Command::new("git")
+            .arg("-C")
+            .arg(&repo_path)
+            .arg("config")
+            .arg("user.name")
+            .arg("Test User")
+            .env_remove("GIT_INDEX_FILE")
+            .output()
+            .expect("failed to config git name");
+
+        std::fs::write(repo_path.join("README.md"), "# Test Repo").expect("failed to write file");
+
+        Command::new("git")
+            .arg("-C")
+            .arg(&repo_path)
+            .arg("add")
+            .arg(".")
+            .env_remove("GIT_INDEX_FILE")
+            .output()
+            .expect("failed to git add");
+
+        Command::new("git")
+            .arg("-C")
+            .arg(&repo_path)
+            .arg("commit")
+            .arg("-m")
+            .arg("Initial commit")
+            .env_remove("GIT_INDEX_FILE")
+            .output()
+            .expect("failed to git commit");
+
+        (temp_dir, repo_path)
     }
 }
