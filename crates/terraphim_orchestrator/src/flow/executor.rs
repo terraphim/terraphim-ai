@@ -409,6 +409,39 @@ impl FlowExecutor {
                 return Ok(state);
             }
 
+            // Handle matrix expansion before dispatching to step executors.
+            if step.matrix.is_some() {
+                match self.execute_matrix_step(step, flow, &state).await {
+                    Ok(envelopes) => {
+                        let result = MatrixResult::from_envelopes(&envelopes);
+                        let had_failures = result.failure_count > 0;
+                        state.matrix_envelopes.insert(step.name.clone(), envelopes);
+                        state.next_step_index = i + 1;
+                        let _ = state.save_to_file(&self.flow_state_dir);
+                        if had_failures {
+                            tracing::warn!(
+                                step = %step.name,
+                                failures = result.failure_count,
+                                "matrix step completed with failures"
+                            );
+                        }
+                    }
+                    Err(e) => match step.on_fail {
+                        FailStrategy::Abort => {
+                            state.status = FlowRunStatus::Failed;
+                            state.finished_at = Some(Utc::now());
+                            state.error = Some(e.to_string());
+                            let _ = state.save_to_file(&self.flow_state_dir);
+                            return Err(e);
+                        }
+                        FailStrategy::SkipFailed | FailStrategy::Continue => {
+                            tracing::warn!(step = %step.name, error = %e, "matrix step failed, continuing");
+                        }
+                    },
+                }
+                continue;
+            }
+
             let result = match step.kind {
                 StepKind::Action => self.execute_action(step, flow, &state).await,
                 StepKind::Agent => self.execute_agent(step, flow, &state).await,
@@ -565,11 +598,149 @@ impl FlowExecutor {
             }
         }
 
+        // Resolve matrix aggregate references: {{steps.<name>.success_count}}, {{steps.<name>.all_exit_codes}}
+        for (step_name, envelopes) in &state.matrix_envelopes {
+            let prefix = format!("{{{{steps.{}", step_name);
+            if result.contains(&prefix) {
+                let agg = MatrixResult::from_envelopes(envelopes);
+                result = result.replace(
+                    &format!("{{{{steps.{}.success_count}}}}", step_name),
+                    &agg.success_count.to_string(),
+                );
+                result = result.replace(
+                    &format!("{{{{steps.{}.failure_count}}}}", step_name),
+                    &agg.failure_count.to_string(),
+                );
+                result = result.replace(
+                    &format!("{{{{steps.{}.all_exit_codes}}}}", step_name),
+                    &agg.all_exit_codes,
+                );
+            }
+        }
+
         // Remove any unresolved {{...}} references (resolve to empty string)
         let re = regex::Regex::new(r"\{\{[^}]+\}\}").unwrap();
         result = re.replace_all(&result, "").to_string();
 
         result
+    }
+
+    /// Execute a single sub-step of a matrix expansion. Resolves `{{matrix.*}}`
+    /// variables from `matrix_row` before dispatching to the underlying executor.
+    async fn execute_matrix_sub_step(
+        &self,
+        step: &FlowStepDef,
+        flow: &FlowDefinition,
+        state: &FlowRunState,
+        matrix_row: &MatrixParams,
+        sub_index: usize,
+    ) -> Result<StepEnvelope, OrchestratorError> {
+        let sub_name = format!("{}-matrix-{}", step.name, sub_index);
+        let mut sub_step = step.clone();
+        sub_step.name = sub_name;
+        sub_step.matrix = None; // prevent recursion
+
+        // Resolve {{matrix.*}} in mutable fields.
+        if let Some(ref task) = sub_step.task {
+            sub_step.task = Some(resolve_matrix_vars(task, matrix_row));
+        }
+        if let Some(ref task_file) = sub_step.task_file {
+            sub_step.task_file = Some(resolve_matrix_vars(task_file, matrix_row));
+        }
+        if let Some(ref command) = sub_step.command {
+            sub_step.command = Some(resolve_matrix_vars(command, matrix_row));
+        }
+        if let Some(ref model) = sub_step.model {
+            sub_step.model = Some(resolve_matrix_vars(model, matrix_row));
+        }
+        if let Some(ref provider) = sub_step.provider {
+            sub_step.provider = Some(resolve_matrix_vars(provider, matrix_row));
+        }
+
+        match sub_step.kind {
+            StepKind::Action => self.execute_action(&sub_step, flow, state).await,
+            StepKind::Agent => self.execute_agent(&sub_step, flow, state).await,
+            _ => Err(OrchestratorError::FlowFailed {
+                flow_name: flow.name.clone(),
+                reason: format!(
+                    "matrix step '{}': only 'action' and 'agent' kinds support matrix expansion",
+                    step.name
+                ),
+            }),
+        }
+    }
+
+    /// Execute a matrix-expanded step: fan out into N sub-executions (one per
+    /// params row), run sequentially (respecting `max_parallel` as advisory),
+    /// and collect all results.
+    ///
+    /// Returns the ordered envelopes. If `fail_strategy` is `Abort` and any
+    /// sub-step fails, returns an error after all sub-steps are recorded.
+    pub async fn execute_matrix_step(
+        &self,
+        step: &FlowStepDef,
+        flow: &FlowDefinition,
+        state: &FlowRunState,
+    ) -> Result<Vec<StepEnvelope>, OrchestratorError> {
+        let matrix = step
+            .matrix
+            .as_ref()
+            .ok_or_else(|| OrchestratorError::FlowFailed {
+                flow_name: flow.name.clone(),
+                reason: format!(
+                    "execute_matrix_step called on step '{}' with no matrix config",
+                    step.name
+                ),
+            })?;
+
+        if matrix.params.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let fail_strategy = matrix.fail_strategy;
+        let mut envelopes = Vec::with_capacity(matrix.params.len());
+        let mut any_failed = false;
+
+        // Run sub-executions sequentially. The max_parallel field is preserved
+        // for future concurrency support without a breaking API change.
+        for (idx, row) in matrix.params.iter().enumerate() {
+            match self.execute_matrix_sub_step(step, flow, state, row, idx).await {
+                Ok(env) => {
+                    if env.exit_code != 0 {
+                        any_failed = true;
+                    }
+                    envelopes.push(env);
+                }
+                Err(e) => {
+                    any_failed = true;
+                    envelopes.push(StepEnvelope {
+                        step_name: format!("{}-matrix-{}-error", step.name, idx),
+                        started_at: Utc::now(),
+                        finished_at: Utc::now(),
+                        exit_code: -1,
+                        stdout: String::new(),
+                        stderr: e.to_string(),
+                        cost_usd: None,
+                        session_id: None,
+                        input_tokens: None,
+                        output_tokens: None,
+                        stdout_file: None,
+                    });
+                }
+            }
+        }
+
+        if any_failed && fail_strategy == FailStrategy::Abort {
+            return Err(OrchestratorError::FlowFailed {
+                flow_name: flow.name.clone(),
+                reason: format!(
+                    "matrix step '{}': one or more sub-executions failed",
+                    step.name
+                ),
+            });
+        }
+
+        Ok(envelopes)
     }
 }
 
@@ -1485,5 +1656,154 @@ mod tests {
         );
 
         let _ = std::fs::remove_dir_all(&state_dir);
+    
+    #[tokio::test]
+    async fn test_matrix_action_step_all_succeed() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let executor =
+            FlowExecutor::new(temp_dir.path().to_path_buf(), temp_dir.path().to_path_buf());
+
+        use super::config::MatrixConfig;
+        use std::collections::HashMap;
+
+        let mut row0 = HashMap::new();
+        row0.insert("msg".to_string(), "hello".to_string());
+        let mut row1 = HashMap::new();
+        row1.insert("msg".to_string(), "world".to_string());
+
+        let flow = FlowDefinition {
+            name: "matrix-test".to_string(),
+            project: "test".to_string(),
+            schedule: None,
+            repo_path: "/tmp/repo".to_string(),
+            base_branch: "main".to_string(),
+            timeout_secs: 3600,
+            steps: vec![FlowStepDef {
+                name: "echo-matrix".to_string(),
+                kind: StepKind::Action,
+                command: Some("echo {{matrix.msg}}".to_string()),
+                cli_tool: None,
+                model: None,
+                task: None,
+                task_file: None,
+                condition: None,
+                timeout_secs: 10,
+                on_fail: FailStrategy::Abort,
+                provider: None,
+                persona: None,
+                matrix: Some(MatrixConfig {
+                    params: vec![row0, row1],
+                    max_parallel: 1,
+                    fail_strategy: FailStrategy::Continue,
+                }),
+            }],
+        };
+
+        let state = executor.run(&flow, None).await.unwrap();
+
+        assert_eq!(state.status, FlowRunStatus::Completed);
+        // Regular step_envelopes should be empty (matrix results go to matrix_envelopes)
+        assert!(state.step_envelopes.is_empty());
+        // Matrix envelopes should have 2 entries
+        let envelopes = state.matrix_envelopes.get("echo-matrix").unwrap();
+        assert_eq!(envelopes.len(), 2);
+        assert_eq!(envelopes[0].exit_code, 0);
+        assert_eq!(envelopes[1].exit_code, 0);
+        assert!(envelopes[0].stdout.contains("hello"));
+        assert!(envelopes[1].stdout.contains("world"));
     }
+
+    #[tokio::test]
+    async fn test_matrix_step_abort_on_failure() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let executor =
+            FlowExecutor::new(temp_dir.path().to_path_buf(), temp_dir.path().to_path_buf());
+
+        use super::config::MatrixConfig;
+        use std::collections::HashMap;
+
+        let mut row0 = HashMap::new();
+        row0.insert("code".to_string(), "0".to_string());
+        let mut row1 = HashMap::new();
+        row1.insert("code".to_string(), "1".to_string());
+
+        let flow = FlowDefinition {
+            name: "matrix-abort-test".to_string(),
+            project: "test".to_string(),
+            schedule: None,
+            repo_path: "/tmp/repo".to_string(),
+            base_branch: "main".to_string(),
+            timeout_secs: 3600,
+            steps: vec![FlowStepDef {
+                name: "exit-matrix".to_string(),
+                kind: StepKind::Action,
+                command: Some("exit {{matrix.code}}".to_string()),
+                cli_tool: None,
+                model: None,
+                task: None,
+                task_file: None,
+                condition: None,
+                timeout_secs: 10,
+                on_fail: FailStrategy::Abort,
+                provider: None,
+                persona: None,
+                matrix: Some(MatrixConfig {
+                    params: vec![row0, row1],
+                    max_parallel: 1,
+                    fail_strategy: FailStrategy::Abort,
+                }),
+            }],
+        };
+
+        // When matrix.fail_strategy=abort and a sub-step fails, execute_matrix_step returns Err.
+        // The run loop honours the step-level on_fail=Abort and marks the flow Failed.
+        let result = executor.run(&flow, None).await;
+        // Flow should fail because matrix step aborted on non-zero exit code
+        assert!(result.is_err() || result.as_ref().unwrap().status == FlowRunStatus::Failed);
+    }
+
+    #[test]
+    fn test_resolve_templates_matrix_aggregate() {
+        let executor = FlowExecutor::new(PathBuf::from("/tmp"), PathBuf::from("/tmp/state"));
+        let flow = create_test_flow();
+
+        let mut state = FlowRunState::new("test-flow");
+        state.matrix_envelopes.insert(
+            "run-model".to_string(),
+            vec![
+                StepEnvelope {
+                    step_name: "run-model-matrix-0".to_string(),
+                    started_at: Utc::now(),
+                    finished_at: Utc::now(),
+                    exit_code: 0,
+                    stdout: "ok".to_string(),
+                    stderr: String::new(),
+                    cost_usd: None,
+                    session_id: None,
+                    input_tokens: None,
+                    output_tokens: None,
+                    stdout_file: None,
+                },
+                StepEnvelope {
+                    step_name: "run-model-matrix-1".to_string(),
+                    started_at: Utc::now(),
+                    finished_at: Utc::now(),
+                    exit_code: 1,
+                    stdout: "failed".to_string(),
+                    stderr: String::new(),
+                    cost_usd: None,
+                    session_id: None,
+                    input_tokens: None,
+                    output_tokens: None,
+                    stdout_file: None,
+                },
+            ],
+        );
+
+        let result =
+            executor.resolve_templates("passed: {{steps.run-model.success_count}} failed: {{steps.run-model.failure_count}} codes: {{steps.run-model.all_exit_codes}}", &flow, &state);
+        assert_eq!(result, "passed: 1 failed: 1 codes: 0,1");
+    }
+
+}
 }
