@@ -3360,30 +3360,24 @@ task = "test"
     #[test]
     fn expand_env_vars_substitutes_set_variable() {
         std::env::set_var("_TEST_EXPAND_VAR_1546", "my_secret_value");
-        let toml = "[webhook]\nbind = \"127.0.0.1:9091\"\nsecret = \"${_TEST_EXPAND_VAR_1546}\"";
-        let cfg = OrchestratorConfig::from_toml(toml).unwrap();
-        let wh = cfg.webhook.unwrap();
-        assert_eq!(wh.secret.as_deref(), Some("my_secret_value"));
+        let result = expand_env_vars("secret = \"${_TEST_EXPAND_VAR_1546}\"");
+        assert_eq!(result, "secret = \"my_secret_value\"");
         std::env::remove_var("_TEST_EXPAND_VAR_1546");
     }
 
     #[test]
     fn expand_env_vars_empty_string_for_unset_variable() {
         std::env::remove_var("_TEST_UNSET_VAR_1546");
-        let toml = "[webhook]\nbind = \"127.0.0.1:9091\"\nsecret = \"${_TEST_UNSET_VAR_1546}\"";
-        let cfg = OrchestratorConfig::from_toml(toml).unwrap();
-        let wh = cfg.webhook.unwrap();
-        // Unset variable expands to empty string, which deserialises as Some("")
-        assert_eq!(wh.secret.as_deref(), Some(""));
+        let result = expand_env_vars("secret = \"${_TEST_UNSET_VAR_1546}\"");
+        // Unset variable expands to empty string
+        assert_eq!(result, "secret = \"\"");
     }
 
     #[test]
     fn expand_env_vars_dollar_brace_syntax_only() {
         // $VAR (without braces) must NOT be expanded — avoids breaking TOML values
-        let toml = "[webhook]\nbind = \"127.0.0.1:9091\"\nsecret = \"$PLAIN_VAR\"";
-        let cfg = OrchestratorConfig::from_toml(toml).unwrap();
-        let wh = cfg.webhook.unwrap();
-        assert_eq!(wh.secret.as_deref(), Some("$PLAIN_VAR"));
+        let result = expand_env_vars("secret = \"$PLAIN_VAR\"");
+        assert_eq!(result, "secret = \"$PLAIN_VAR\"");
     }
 
     #[test]
