@@ -5,7 +5,7 @@ use chrono::Utc;
 use tokio::process::Command;
 use tokio::time::{timeout, Duration};
 
-use super::config::{FailStrategy, FlowDefinition, FlowStepDef, MatrixParams, StepKind};
+use super::config::{FailStrategy, FlowDefinition, FlowStepDef, MatrixConfig, MatrixParams, StepKind};
 use super::envelope::{MatrixResult, StepEnvelope};
 use super::state::{FlowRunState, FlowRunStatus};
 use crate::config::{AgentDefinition, AgentLayer};
@@ -994,6 +994,7 @@ mod tests {
             on_fail: FailStrategy::Abort,
             provider: None,
             persona: None,
+            matrix: None,
         };
 
         let envelope = executor.execute_action(&step, &flow, &state).await.unwrap();
@@ -1034,6 +1035,7 @@ mod tests {
             on_fail: FailStrategy::Abort,
             provider: None,
             persona: None,
+            matrix: None,
         };
 
         let result = executor.execute_action(&step, &flow, &state).await;
@@ -1085,6 +1087,7 @@ mod tests {
             on_fail: FailStrategy::Abort,
             provider: None,
             persona: None,
+            matrix: None,
         };
 
         let result = executor.evaluate_gate(&step, &flow, &state).unwrap();
@@ -1134,6 +1137,7 @@ mod tests {
             on_fail: FailStrategy::Abort,
             provider: None,
             persona: None,
+            matrix: None,
         };
 
         let result = executor.evaluate_gate(&step, &flow, &state).unwrap();
@@ -1663,7 +1667,6 @@ mod tests {
         let executor =
             FlowExecutor::new(temp_dir.path().to_path_buf(), temp_dir.path().to_path_buf());
 
-        use super::config::MatrixConfig;
         use std::collections::HashMap;
 
         let mut row0 = HashMap::new();
@@ -1719,7 +1722,6 @@ mod tests {
         let executor =
             FlowExecutor::new(temp_dir.path().to_path_buf(), temp_dir.path().to_path_buf());
 
-        use super::config::MatrixConfig;
         use std::collections::HashMap;
 
         let mut row0 = HashMap::new();
