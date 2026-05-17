@@ -113,6 +113,7 @@ impl TerraphimError for CommonError {
 
 /// Helper functions for creating common error types
 impl CommonError {
+    /// Creates a network error without an underlying source.
     pub fn network(message: impl Into<String>) -> Self {
         CommonError::Network {
             message: message.into(),
@@ -120,6 +121,7 @@ impl CommonError {
         }
     }
 
+    /// Creates a network error wrapping an underlying error source.
     pub fn network_with_source(
         message: impl Into<String>,
         source: impl std::error::Error + Send + Sync + 'static,
@@ -130,6 +132,7 @@ impl CommonError {
         }
     }
 
+    /// Creates a configuration error without a specific field reference.
     pub fn config(message: impl Into<String>) -> Self {
         CommonError::Configuration {
             message: message.into(),
@@ -137,6 +140,7 @@ impl CommonError {
         }
     }
 
+    /// Creates a configuration error identifying the offending field.
     pub fn config_field(message: impl Into<String>, field: impl Into<String>) -> Self {
         CommonError::Configuration {
             message: message.into(),
@@ -144,6 +148,7 @@ impl CommonError {
         }
     }
 
+    /// Creates a validation error without a specific field reference.
     pub fn validation(message: impl Into<String>) -> Self {
         CommonError::Validation {
             message: message.into(),
@@ -151,6 +156,7 @@ impl CommonError {
         }
     }
 
+    /// Creates a validation error identifying the offending field.
     pub fn validation_field(message: impl Into<String>, field: impl Into<String>) -> Self {
         CommonError::Validation {
             message: message.into(),
@@ -158,12 +164,14 @@ impl CommonError {
         }
     }
 
+    /// Creates an authentication error.
     pub fn auth(message: impl Into<String>) -> Self {
         CommonError::Auth {
             message: message.into(),
         }
     }
 
+    /// Creates a storage error without an underlying source.
     pub fn storage(message: impl Into<String>) -> Self {
         CommonError::Storage {
             message: message.into(),
@@ -171,6 +179,7 @@ impl CommonError {
         }
     }
 
+    /// Creates a storage error wrapping an underlying error source.
     pub fn storage_with_source(
         message: impl Into<String>,
         source: impl std::error::Error + Send + Sync + 'static,
@@ -181,6 +190,7 @@ impl CommonError {
         }
     }
 
+    /// Creates an integration error for a named external service.
     pub fn integration(service: impl Into<String>, message: impl Into<String>) -> Self {
         CommonError::Integration {
             service: service.into(),

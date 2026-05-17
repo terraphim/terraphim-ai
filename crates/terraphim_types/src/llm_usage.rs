@@ -2,6 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
+/// Token usage and cost metrics for a single LLM request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LlmUsage {
     pub input_tokens: u64,
@@ -13,16 +14,19 @@ pub struct LlmUsage {
 }
 
 impl LlmUsage {
+    /// Returns the sum of input and output tokens for this request.
     pub fn total_tokens(&self) -> u64 {
         self.input_tokens + self.output_tokens
     }
 
+    /// Attaches a USD cost to the usage record, consuming and returning `self`.
     pub fn with_cost(mut self, cost_usd: f64) -> Self {
         self.cost_usd = Some(cost_usd);
         self
     }
 }
 
+/// Content produced by an LLM call, together with optional token usage.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LlmResult {
     pub content: String,

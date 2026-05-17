@@ -121,6 +121,7 @@ pub struct GiteaPrTracker {
 }
 
 impl GiteaPrTracker {
+    /// Wraps a [`terraphim_tracker::GiteaTracker`] as a [`PrTracker`].
     pub fn new(inner: terraphim_tracker::GiteaTracker) -> Self {
         Self { inner }
     }
@@ -316,6 +317,7 @@ pub struct PrPollRateLimiter {
 }
 
 impl PrPollRateLimiter {
+    /// Creates a rate limiter with the given minimum inter-poll interval.
     pub fn new(min_interval: Duration) -> Self {
         Self {
             last_poll: HashMap::new(),
@@ -346,6 +348,7 @@ pub struct AutoMergeDedupeSet {
 }
 
 impl AutoMergeDedupeSet {
+    /// Creates an empty deduplications set.
     pub fn new() -> Self {
         Self::default()
     }

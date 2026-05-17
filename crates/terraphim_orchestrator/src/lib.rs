@@ -1533,11 +1533,13 @@ impl AgentOrchestrator {
         &mut self.cost_tracker
     }
 
+    /// Attaches a Quickwit fleet sink for structured log shipping.
     #[cfg(feature = "quickwit")]
     pub fn set_quickwit_sink(&mut self, sink: quickwit::QuickwitFleetSink) {
         self.quickwit_sink = Some(sink);
     }
 
+    /// Returns the top-level Quickwit configuration if present.
     #[cfg(feature = "quickwit")]
     pub fn quickwit_config(&self) -> Option<&QuickwitConfig> {
         self.config.quickwit.as_ref()
@@ -6287,6 +6289,18 @@ impl AgentOrchestrator {
         }
     }
 
+    /// Truncate `s` to at most `max_bytes` bytes, finding the last char boundary.
+    fn truncate_to_char_boundary(s: &str, max_bytes: usize) -> &str {
+        if s.len() <= max_bytes {
+            return s;
+        }
+        let mut end = max_bytes;
+        while !s.is_char_boundary(end) {
+            end -= 1;
+        }
+        &s[..end]
+    }
+
     /// Post a context-rot signal comment to the agent's Gitea issue.
     ///
     /// The comment surfaces the original task prompt so a human or planner agent
@@ -6304,7 +6318,7 @@ impl AgentOrchestrator {
 
         let elapsed_mins = elapsed_secs / 60;
         let task_excerpt = if original_task.len() > 500 {
-            format!("{}…", &original_task[..500])
+            format!("{}…", Self::truncate_to_char_boundary(original_task, 500))
         } else {
             original_task.to_string()
         };
@@ -9263,6 +9277,37 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             !orch.active_agents.contains_key("normal-timeout"),
             "normal timeout must still remove the agent"
         );
+    }
+
+    // Context rot comment truncation — char-boundary safety (regression #1515 class)
+    #[test]
+    fn test_truncate_to_char_boundary_ascii() {
+        let s = "a".repeat(600);
+        let truncated = AgentOrchestrator::truncate_to_char_boundary(&s, 500);
+        assert_eq!(truncated.len(), 500);
+        assert!(s.is_char_boundary(500));
+    }
+
+    #[test]
+    fn test_truncate_to_char_boundary_multibyte_at_boundary() {
+        // 3-byte UTF-8 sequences (e.g., '€' is U+20AC, encoded as 3 bytes)
+        // Build a string where byte 500 falls inside a multibyte char.
+        let repeated = "€".repeat(200); // 600 bytes total (200 × 3)
+        assert_eq!(repeated.len(), 600);
+        // Byte 500 falls in the middle of the 167th '€' (500 % 3 == 2).
+        assert!(!repeated.is_char_boundary(500));
+        let truncated = AgentOrchestrator::truncate_to_char_boundary(&repeated, 500);
+        // Must be a valid str and must not exceed 500 bytes.
+        assert!(truncated.len() <= 500);
+        let last_boundary = truncated.len();
+        assert!(repeated.is_char_boundary(last_boundary));
+    }
+
+    #[test]
+    fn test_truncate_to_char_boundary_short_string() {
+        let s = "hello";
+        let truncated = AgentOrchestrator::truncate_to_char_boundary(s, 500);
+        assert_eq!(truncated, s);
     }
 
     // =========================================================================

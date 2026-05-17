@@ -542,6 +542,7 @@ pub struct MentionTracker {
 }
 
 impl MentionTracker {
+    /// Creates a new tracker enforcing the given per-issue dispatch cap.
     pub fn new(max_dispatches_per_issue: u32) -> Self {
         Self {
             max_dispatches_per_issue,

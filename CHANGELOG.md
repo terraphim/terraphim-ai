@@ -48,6 +48,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Frontend developer role setup** experiment documentation and clarification
 - **Compiled thesaurus cache invalidation** via SHA-256 source hash tracking on KG markdown edits (Refs #945)
 - **`terraphim-agent cache flush`** CLI subcommand for manual cache eviction by role (Refs #945)
+- **Context rot detection** wall-clock threshold monitor in orchestrator; tasks idle beyond the threshold are flagged as stale for re-dispatch (Refs #1443)
+- **`terraphim_agent_evolution`** wired into ADF orchestrator for adaptive agent learning; evolution hooks called on agent run completion (#1487)
+- **`DockerExecutor`** in `terraphim_rlm` for container-based isolated code execution with configurable image and volume mounts (#1485)
+- **`LocalExecutor`** backend added to `terraphim_rlm` for direct local code execution without VM or container overhead
+- **`opencode-plugin-rlm` example** demonstrating OpenCode plugin integration with Claude Code hook for remote execution workflows
+- **cargo-nextest** per-test slow-timeout CI gate added to `ci-pr.yml` and `ci-main.yml` to surface hanging tests (Refs #1475)
+- **`safe_byte_slice()`** helper function for char-boundary-safe string slicing, eliminating KG snippet log panics on multi-byte UTF-8 input (Refs #1515)
+- **Criterion CI step** added to `ci-pr.yml`; benchmark output captured to snapshot file and wired into update-benchmark-snapshot.sh (Refs #574)
 
 ### Fixed
 
@@ -97,6 +105,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Terraphim DSM** refactored to knowledge graph semantic grouping tool
 - **Build-runner dispatch** deduplicated to prevent concurrent target directory writes
 - **Version** bumped to 1.17.1
+- **Documentation gap report** generated for 2026-05-17 -- 156 undocumented public items across 4 key crates (orchestrator: 78, types: 42, service: 36, config: 0); orchestrator and types are primary targets
 
 ### Fixed
 
@@ -105,6 +114,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`--server` flag** on listen subcommand now routes through custom error handler
 - **Dead `tick_num` counter** removed and redundant `u64` cast eliminated in orchestrator (Ref #1239)
 - **Gitea labels** resolved as integer IDs instead of string names (#1139)
+- **`TrackerConfig`, `GiteaOutputConfig`, `WebhookConfig`** token/secret/api_key fields redacted in `Debug` output to prevent secret leakage in logs (Refs #1300)
+- **rust-format gate** added to `ci-main.yml` with pre-existing clippy errors resolved (Refs #1390)
+- **Deprecated `tempfile::into_path()`** replaced with `keep()` across workspace to resolve clippy warnings
+- **Build-runner compilation** fixed; `--all-targets` removed from BUILD.md, pre-existing clippy warnings resolved
+- **Orchestrator `WARN` log** added when `project_by_id` returns `None` during worktree creation for easier debugging
+- **RLM executor surface** hardened; agent search envelope validation tightened and OpenCode hook made more robust (#870)
+- **ADF setup paths** corrected from stale `/home/alex/terraphim-ai` to canonical `/data/projects/terraphim/terraphim-ai`
+- **`concepts_matched`** field populated in robot-mode search envelope for correct output contract (#1486)
+- **`gitea_skill_loader`** uses API endpoint for raw content to support SHA refs, fixing skill loading from non-default branches (Refs #1434)
+- **Config-set exit code assertion** widened to tolerate clap version differences in CI (Refs #1473)
+
+### Changed
+
+- **ADF `implementation-swarm`** split into two focused agents for parallel implementation; broken safety agents disabled to prevent false gate failures
 
 ## [1.17.0] - 2026-04-27
 

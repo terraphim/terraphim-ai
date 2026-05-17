@@ -77,6 +77,7 @@ impl TimeScheduler {
         })
     }
 
+    /// Takes ownership of the event receiver, replacing it with a fresh one-shot channel.
     pub fn take_event_rx(&mut self) -> Option<mpsc::Receiver<ScheduleEvent>> {
         let (_, rx) = mpsc::channel(1);
         Some(std::mem::replace(&mut self.event_rx, rx))

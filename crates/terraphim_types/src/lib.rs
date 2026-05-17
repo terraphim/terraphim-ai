@@ -261,11 +261,13 @@ impl<'de> Deserialize<'de> for RoleName {
 pub struct NormalizedTermValue(String);
 
 impl NormalizedTermValue {
+    /// Creates a new normalised term value by trimming whitespace and lowercasing.
     pub fn new(term: String) -> Self {
         let value = term.trim().to_lowercase();
         Self(value)
     }
-    // convert to &str
+
+    /// Returns the normalised term as a string slice.
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -649,6 +651,7 @@ pub struct Edge {
 }
 
 impl Edge {
+    /// Creates a new edge with the given identifier and an initial document association.
     pub fn new(id: u64, document_id: String) -> Self {
         let mut doc_hash = AHashMap::new();
         doc_hash.insert(document_id, 1);
@@ -771,6 +774,7 @@ impl Thesaurus {
         self.data.get(key)
     }
 
+    /// Returns an iterator over the normalised term keys in the thesaurus.
     pub fn keys(
         &self,
     ) -> std::collections::hash_map::Keys<'_, NormalizedTermValue, NormalizedTerm> {
@@ -961,9 +965,12 @@ pub struct IndexedDocument {
 }
 
 impl IndexedDocument {
+    /// Serialises the indexed document to a JSON string.
     pub fn to_json_string(&self) -> Result<String, serde_json::Error> {
         serde_json::to_string(&self)
     }
+
+    /// Constructs an `IndexedDocument` from a `Document`, initialising rank to 0 and edges/nodes empty.
     pub fn from_document(document: Document) -> Self {
         IndexedDocument {
             id: document.id,
@@ -1250,14 +1257,17 @@ pub enum KnowledgeGraphInputType {
 pub struct ConversationId(pub String);
 
 impl ConversationId {
+    /// Generates a new random conversation identifier (UUID v4).
     pub fn new() -> Self {
         Self(uuid::Uuid::new_v4().to_string())
     }
 
+    /// Wraps an existing string as a conversation identifier.
     pub fn from_string(id: String) -> Self {
         Self(id)
     }
 
+    /// Returns the identifier as a string slice.
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -1303,14 +1313,17 @@ pub enum ContextType {
 pub struct MessageId(pub String);
 
 impl MessageId {
+    /// Generates a new random message identifier (UUID v4).
     pub fn new() -> Self {
         Self(uuid::Uuid::new_v4().to_string())
     }
 
+    /// Wraps an existing string as a message identifier.
     pub fn from_string(id: String) -> Self {
         Self(id)
     }
 
+    /// Returns the identifier as a string slice.
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -1818,6 +1831,7 @@ pub struct ContextHistory {
 }
 
 impl ContextHistory {
+    /// Creates a new context history with the given maximum entry capacity.
     pub fn new(max_entries: usize) -> Self {
         Self {
             used_contexts: Vec::new(),
@@ -2299,6 +2313,7 @@ pub struct MultiAgentContext {
 }
 
 impl MultiAgentContext {
+    /// Creates a new multi-agent context with a fresh session identifier and current timestamps.
     pub fn new() -> Self {
         let now = chrono::Utc::now();
         Self {
