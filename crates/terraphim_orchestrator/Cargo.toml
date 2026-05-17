@@ -90,6 +90,17 @@ tokio-test = "0.4"
 tempfile = { workspace = true }
 serial_test = "3"
 
+# Layer 1 cancellation property test (epic #1567 / issue #1569).
+# Requires the `test-helpers` feature to access
+# `scope::test_support::setup_git_repo`. Declared explicitly so
+# `cargo test --all-features` picks it up; the source file is also
+# `#![cfg(all(unix, feature = "test-helpers"))]` for defensive
+# double-gating.
+[[test]]
+name = "compound_cancellation_test"
+path = "tests/compound_cancellation_test.rs"
+required-features = ["test-helpers"]
+
 
 [[bin]]
 name = "adf"
