@@ -8,14 +8,24 @@
 //! or matching fails, an empty result is returned without blocking execution.
 
 use serde::{Deserialize, Serialize};
-use std::sync::OnceLock;
+use std::path::PathBuf;
+use std::sync::RwLock;
+use terraphim_automata::builder::compute_kg_source_hash;
 use terraphim_types::Thesaurus;
 
-use crate::learnings::{build_kg_thesaurus_from_dir, find_kg_dir};
+use crate::learnings::{build_kg_thesaurus_with_hash, find_kg_dir};
+
+/// Cached thesaurus with metadata for auto-invalidation.
+struct CachedThesaurus {
+    thesaurus: Thesaurus,
+    source_hash: String,
+    kg_path: PathBuf,
+}
 
 /// Global cache for the KG thesaurus used by command validation.
 /// Built once from `docs/src/kg/*.md` files and reused across invocations.
-static VALIDATION_KG_THESAURUS: OnceLock<Option<Thesaurus>> = OnceLock::new();
+/// Automatically rebuilds when source hash changes.
+static KG_CACHE: RwLock<Option<CachedThesaurus>> = RwLock::new(None);
 
 /// A single validation finding from KG pattern matching.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -56,18 +66,57 @@ impl KgValidationResult {
 ///
 /// This function is fail-open: any errors during thesaurus loading or matching
 /// result in an empty `KgValidationResult` rather than an error.
+///
+/// The cache is automatically invalidated when KG source files change.
 pub fn validate_command_against_kg(command: &str) -> KgValidationResult {
-    let thesaurus_opt = VALIDATION_KG_THESAURUS.get_or_init(|| {
-        let kg_dir = find_kg_dir()?;
-        build_kg_thesaurus_from_dir(&kg_dir)
-    });
-
-    let thesaurus = match thesaurus_opt {
-        Some(t) => t.clone(),
+    let thesaurus = match get_thesaurus_with_auto_rebuild() {
+        Some(t) => t,
         None => return KgValidationResult::empty(),
     };
 
     validate_command_with_thesaurus(command, thesaurus)
+}
+
+/// Get the thesaurus with automatic rebuild on source change.
+///
+/// Returns a cloned copy of the cached thesaurus, rebuilding it if the
+/// underlying KG files have changed since last build.
+fn get_thesaurus_with_auto_rebuild() -> Option<Thesaurus> {
+    // Fast path: check if cache is populated and still valid (read lock)
+    {
+        let guard = KG_CACHE.read().ok()?;
+        if let Some(cached) = guard.as_ref() {
+            if let Ok(Some(current_hash)) = compute_kg_source_hash(&cached.kg_path) {
+                if current_hash == cached.source_hash {
+                    return Some(cached.thesaurus.clone());
+                }
+            }
+        }
+    }
+
+    // Slow path: need to rebuild (write lock)
+    let mut guard = KG_CACHE.write().ok()?;
+
+    // Re-check after acquiring write lock (another thread may have updated)
+    if let Some(cached) = guard.as_ref() {
+        if let Ok(Some(current_hash)) = compute_kg_source_hash(&cached.kg_path) {
+            if current_hash == cached.source_hash {
+                return Some(cached.thesaurus.clone());
+            }
+        }
+    }
+
+    // Build new cache
+    let kg_dir = find_kg_dir()?;
+    let (thesaurus, source_hash) = build_kg_thesaurus_with_hash(&kg_dir)?;
+    let result = thesaurus.clone();
+    let cached = CachedThesaurus {
+        thesaurus,
+        source_hash,
+        kg_path: kg_dir,
+    };
+    *guard = Some(cached);
+    Some(result)
 }
 
 /// Validate a command against a provided thesaurus (useful for testing).
@@ -234,5 +283,45 @@ mod tests {
             .find(|f| f.matched_term == "pnpm install")
             .expect("Should find pnpm install match");
         assert_eq!(finding.suggested_replacement, "bun install");
+    }
+
+    #[test]
+    fn test_build_kg_thesaurus_with_hash_returns_thesaurus_and_hash() {
+        use std::io::Write;
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let kg_dir = temp_dir.path();
+
+        let concept_file = kg_dir.join("test-concept.md");
+        let mut file = std::fs::File::create(&concept_file).unwrap();
+        writeln!(file, "synonyms:: test-alias").unwrap();
+
+        let result = crate::learnings::build_kg_thesaurus_with_hash(kg_dir);
+        assert!(result.is_some());
+
+        let (_thesaurus, hash) = result.unwrap();
+        assert!(!hash.is_empty());
+        assert!(hash != "unknown");
+    }
+
+    #[test]
+    fn test_build_kg_thesaurus_with_hash_empty_dir() {
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let kg_dir = temp_dir.path();
+
+        // Empty directory returns None (build_kg_thesaurus_from_dir returns None for empty)
+        let result = crate::learnings::build_kg_thesaurus_with_hash(kg_dir);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_build_kg_thesaurus_with_hash_nonexistent_dir() {
+        let result = crate::learnings::build_kg_thesaurus_with_hash(std::path::Path::new(
+            "/nonexistent/path/xyz",
+        ));
+        assert!(result.is_none());
     }
 }

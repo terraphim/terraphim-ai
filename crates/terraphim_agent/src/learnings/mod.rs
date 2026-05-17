@@ -48,7 +48,7 @@ pub use capture::{
     annotate_with_thesaurus, query_all_entries,
 };
 // Re-export KG thesaurus building utilities for use by hook validation pipeline
-pub(crate) use capture::{build_kg_thesaurus_from_dir, find_kg_dir};
+pub(crate) use capture::{build_kg_thesaurus_with_hash, find_kg_dir};
 
 // Re-export compile functions for building thesauruses from corrections
 #[allow(unused_imports)]

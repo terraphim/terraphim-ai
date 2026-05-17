@@ -12,7 +12,7 @@ include = [
 ]
 
 [compound_review]
-schedule = "0 0-10 * * *"
+schedule = "0 6 * * *"
 max_duration_secs = 1800
 repo_path = "/home/alex/projects/terraphim/terraphim-ai"
 create_prs = false
