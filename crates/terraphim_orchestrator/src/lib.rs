@@ -9105,6 +9105,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
                 on_fail: crate::flow::config::FailStrategy::Abort,
                 provider: None,
                 persona: None,
+                matrix: None,
             }],
         }];
 
