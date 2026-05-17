@@ -895,7 +895,11 @@ impl terraphim_types::shared_learning::LearningStore for SharedLearningStore {
         Ok(filtered)
     }
 
-    fn record_applied(&self, id: &str) -> Result<(), terraphim_types::shared_learning::StoreError> {
+    fn record_applied(
+        &self,
+        id: &str,
+        _applied_by: &str,
+    ) -> Result<(), terraphim_types::shared_learning::StoreError> {
         block_on(self.persistence.record_applied(id))
             .map_err(|e| terraphim_types::shared_learning::StoreError::Persistence(e.to_string()))
     }
@@ -903,6 +907,7 @@ impl terraphim_types::shared_learning::LearningStore for SharedLearningStore {
     fn record_effective(
         &self,
         id: &str,
+        _applied_by: &str,
     ) -> Result<(), terraphim_types::shared_learning::StoreError> {
         block_on(self.persistence.record_effective(id))
             .map_err(|e| terraphim_types::shared_learning::StoreError::Persistence(e.to_string()))
@@ -1128,7 +1133,7 @@ mod tests {
         let retrieved = dyn_store.get(&id).unwrap();
         assert_eq!(retrieved.title, "Trait impl test");
 
-        dyn_store.record_effective(&id).unwrap();
+        dyn_store.record_effective(&id, "test-agent").unwrap();
         let after = dyn_store.get(&id).unwrap();
         assert_eq!(after.quality.effective_count, 1);
 
