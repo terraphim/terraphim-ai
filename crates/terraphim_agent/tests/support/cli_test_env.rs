@@ -74,6 +74,9 @@ pub fn apply_hermetic_env(cmd: &mut Command) -> Result<()> {
     //   - Windows: %APPDATA%/aks/terraphim/config
     // Write to all three under the hermetic HOME so whichever runs first
     // finds our settings.
+    let workspace = workspace_root()?;
+    let role_config = workspace.join("terraphim_server/default/terraphim_engineer_config.json");
+
     let sqlite_db = sqlite_dir.join("terraphim.db");
     let settings_toml = format!(
         r#"
@@ -81,6 +84,7 @@ server_hostname = "127.0.0.1:8000"
 api_endpoint = "http://localhost:8000/api"
 initialized = "false"
 default_data_path = "{data}"
+role_config = "{role_config}"
 
 [profiles.dashmap]
 type = "dashmap"
@@ -93,6 +97,7 @@ connection_string = "{db}"
 table = "terraphim_kv"
 "#,
         data = data_dir.display(),
+        role_config = role_config.display(),
         dashmap = dashmap_dir.display(),
         sqlite = sqlite_dir.display(),
         db = sqlite_db.display(),
@@ -103,14 +108,14 @@ table = "terraphim_kv"
             .join("Library")
             .join("Application Support")
             .join("com.aks.terraphim"),
+        // Also write to XDG_CONFIG_HOME so that on Linux, directories::ProjectDirs
+        // finds the hermetic settings.toml before falling back to the real user config.
+        xdg_config_home.join("terraphim"),
     ];
     for dir in &settings_dirs {
         fs::create_dir_all(dir)?;
         fs::write(dir.join("settings.toml"), &settings_toml)?;
     }
-
-    let workspace = workspace_root()?;
-    let role_config = workspace.join("terraphim_server/default/terraphim_engineer_config.json");
 
     cmd.current_dir(&workspace)
         .env("HOME", &home_dir)
