@@ -1289,6 +1289,23 @@ pub fn warn_if_world_readable(path: &std::path::Path) {
     }
 }
 
+/// Expand `${VAR_NAME}` placeholders in a TOML string using environment variables.
+///
+/// Variables that are not set in the environment are replaced with an empty string,
+/// making secrets optional at parse time (the application can validate afterwards).
+/// Only `${UPPER_CASE}` syntax is supported; `$VAR` and `$(cmd)` are left as-is.
+fn expand_env_vars(s: &str) -> String {
+    use std::sync::OnceLock;
+    static RE: OnceLock<regex::Regex> = OnceLock::new();
+    let re = RE.get_or_init(|| {
+        regex::Regex::new(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}").expect("valid env-var expansion regex")
+    });
+    re.replace_all(s, |caps: &regex::Captures| {
+        std::env::var(&caps[1]).unwrap_or_default()
+    })
+    .into_owned()
+}
+
 impl OrchestratorConfig {
     /// Find a project definition by id.
     pub fn project_by_id(&self, id: &str) -> Option<&Project> {
@@ -1335,8 +1352,14 @@ impl OrchestratorConfig {
 
     /// Parse an OrchestratorConfig from a TOML string. Does not expand
     /// `include` globs; use `from_file` when include expansion is needed.
+    ///
+    /// `${VAR_NAME}` placeholders are expanded from the environment before
+    /// parsing, allowing secrets (e.g. `[webhook] secret = "${ADF_WEBHOOK_SECRET}"`)
+    /// to be injected at runtime rather than stored in git-tracked files.
     pub fn from_toml(toml_str: &str) -> Result<Self, crate::error::OrchestratorError> {
-        toml::from_str(toml_str).map_err(|e| crate::error::OrchestratorError::Config(e.to_string()))
+        let expanded = expand_env_vars(toml_str);
+        toml::from_str(&expanded)
+            .map_err(|e| crate::error::OrchestratorError::Config(e.to_string()))
     }
 
     /// Load an OrchestratorConfig from a TOML file, expanding any
@@ -3332,6 +3355,35 @@ task = "test"
             dbg.contains("None"),
             "None secret should show as None in Debug output, got: {dbg}"
         );
+    }
+
+    #[test]
+    fn expand_env_vars_substitutes_set_variable() {
+        std::env::set_var("_TEST_EXPAND_VAR_1546", "my_secret_value");
+        let toml = "[webhook]\nbind = \"127.0.0.1:9091\"\nsecret = \"${_TEST_EXPAND_VAR_1546}\"";
+        let cfg = OrchestratorConfig::from_toml(toml).unwrap();
+        let wh = cfg.webhook.unwrap();
+        assert_eq!(wh.secret.as_deref(), Some("my_secret_value"));
+        std::env::remove_var("_TEST_EXPAND_VAR_1546");
+    }
+
+    #[test]
+    fn expand_env_vars_empty_string_for_unset_variable() {
+        std::env::remove_var("_TEST_UNSET_VAR_1546");
+        let toml = "[webhook]\nbind = \"127.0.0.1:9091\"\nsecret = \"${_TEST_UNSET_VAR_1546}\"";
+        let cfg = OrchestratorConfig::from_toml(toml).unwrap();
+        let wh = cfg.webhook.unwrap();
+        // Unset variable expands to empty string, which deserialises as Some("")
+        assert_eq!(wh.secret.as_deref(), Some(""));
+    }
+
+    #[test]
+    fn expand_env_vars_dollar_brace_syntax_only() {
+        // $VAR (without braces) must NOT be expanded — avoids breaking TOML values
+        let toml = "[webhook]\nbind = \"127.0.0.1:9091\"\nsecret = \"$PLAIN_VAR\"";
+        let cfg = OrchestratorConfig::from_toml(toml).unwrap();
+        let wh = cfg.webhook.unwrap();
+        assert_eq!(wh.secret.as_deref(), Some("$PLAIN_VAR"));
     }
 
     #[test]
