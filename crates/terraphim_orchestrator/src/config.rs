@@ -1584,7 +1584,7 @@ impl OrchestratorConfig {
         for agent in &self.agents {
             if let Some(0) = agent.context_rot_token_budget {
                 return Err(crate::error::OrchestratorError::Config(format!(
-                    "agent '{{}}': context_rot_token_budget must be > 0 when set",
+                    "agent '{}': context_rot_token_budget must be > 0 when set",
                     agent.name
                 )));
             }
