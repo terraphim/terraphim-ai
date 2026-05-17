@@ -364,7 +364,7 @@ impl Default for FeatureFlags {
             file_operations: cfg!(feature = "repl-file"),
             web_operations: cfg!(feature = "repl-web"),
             vm_execution: true,
-            session_search: false, // Will be true when sessions feature is added
+            session_search: cfg!(feature = "repl-sessions"),
             knowledge_graph: true,
         }
     }

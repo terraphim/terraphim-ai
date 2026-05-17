@@ -12,7 +12,7 @@ license = "Apache-2.0"
 readme = "../../README.md"
 
 [features]
-default = ["repl-interactive", "llm"]
+default = ["repl-interactive", "llm", "repl-sessions"]
 server = ["dep:reqwest", "dep:urlencoding"]
 llm = ["terraphim_service/ollama", "terraphim_service/llm_router"]
 repl = ["dep:rustyline", "dep:colored", "dep:comfy-table"]
