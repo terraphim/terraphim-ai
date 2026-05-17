@@ -1,4 +1,37 @@
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
+
+/// One row of a matrix expansion: a map of variable name to string value.
+/// Used with `{{matrix.<key>}}` template substitution.
+pub type MatrixParams = HashMap<String, String>;
+
+/// Configuration for matrix (fan-out) expansion of a flow step.
+///
+/// When present, the step is expanded into N sub-executions, one per entry in
+/// `params`. Each sub-execution receives its own `{{matrix.*}}` template
+/// variables resolved from the corresponding row.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MatrixConfig {
+    /// Ordered list of parameter maps. Each entry produces one sub-execution.
+    pub params: Vec<MatrixParams>,
+    /// Maximum number of sub-executions that may run concurrently.
+    /// Defaults to 1 (fully sequential).
+    #[serde(default = "default_max_parallel")]
+    pub max_parallel: usize,
+    /// What to do when one sub-execution fails.
+    /// Defaults to `continue` (collect all results before deciding).
+    #[serde(default = "default_matrix_fail_strategy")]
+    pub fail_strategy: FailStrategy,
+}
+
+fn default_max_parallel() -> usize {
+    1
+}
+
+fn default_matrix_fail_strategy() -> FailStrategy {
+    FailStrategy::Continue
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FlowDefinition {
@@ -60,6 +93,10 @@ pub struct FlowStepDef {
     /// Persona name (for agent steps).
     #[serde(default)]
     pub persona: Option<String>,
+    /// Matrix configuration. When set, this step is expanded into N sub-executions,
+    /// one per entry in `matrix.params`.
+    #[serde(default)]
+    pub matrix: Option<MatrixConfig>,
 }
 
 fn default_timeout() -> u64 {
@@ -89,6 +126,86 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_matrix_config_parse() {
+        let toml_str = r#"
+name = "experiment"
+project = "default"
+repo_path = "/tmp/repo"
+
+[[steps]]
+name = "run-model"
+kind = "agent"
+cli_tool = "claude"
+task = "run task with {{matrix.model}} using prompt {{matrix.prompt}}"
+
+[steps.matrix]
+max_parallel = 2
+fail_strategy = "continue"
+
+[[steps.matrix.params]]
+model = "sonnet"
+prompt = "caution-first"
+
+[[steps.matrix.params]]
+model = "haiku"
+prompt = "fast"
+"#;
+
+        let flow: FlowDefinition = toml::from_str(toml_str).unwrap();
+        assert_eq!(flow.steps.len(), 1);
+
+        let step = &flow.steps[0];
+        let matrix = step.matrix.as_ref().expect("matrix should be present");
+        assert_eq!(matrix.params.len(), 2);
+        assert_eq!(matrix.max_parallel, 2);
+        assert_eq!(matrix.fail_strategy, FailStrategy::Continue);
+
+        assert_eq!(matrix.params[0]["model"], "sonnet");
+        assert_eq!(matrix.params[0]["prompt"], "caution-first");
+        assert_eq!(matrix.params[1]["model"], "haiku");
+        assert_eq!(matrix.params[1]["prompt"], "fast");
+    }
+
+    #[test]
+    fn test_matrix_config_defaults() {
+        let toml_str = r#"
+name = "test"
+project = "default"
+repo_path = "/tmp"
+
+[[steps]]
+name = "step"
+kind = "action"
+command = "echo {{matrix.val}}"
+
+[[steps.matrix.params]]
+val = "hello"
+"#;
+
+        let flow: FlowDefinition = toml::from_str(toml_str).unwrap();
+        let matrix = flow.steps[0].matrix.as_ref().unwrap();
+        assert_eq!(matrix.max_parallel, 1); // default
+        assert_eq!(matrix.fail_strategy, FailStrategy::Continue); // default
+    }
+
+    #[test]
+    fn test_step_without_matrix_is_none() {
+        let toml_str = r#"
+name = "test"
+project = "default"
+repo_path = "/tmp"
+
+[[steps]]
+name = "plain"
+kind = "action"
+command = "echo hello"
+"#;
+
+        let flow: FlowDefinition = toml::from_str(toml_str).unwrap();
+        assert!(flow.steps[0].matrix.is_none());
+    }
+
+    #[test]
     fn test_flow_config_parse_minimal() {
         let toml_str = r#"
 name = "test-flow"
@@ -115,6 +232,7 @@ command = "cargo build"
         assert_eq!(step.command, Some("cargo build".to_string()));
         assert_eq!(step.timeout_secs, 600); // default
         assert_eq!(step.on_fail, FailStrategy::Abort); // default
+        assert!(step.matrix.is_none());
     }
 
     #[test]
