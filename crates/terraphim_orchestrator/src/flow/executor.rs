@@ -5,13 +5,24 @@ use chrono::Utc;
 use tokio::process::Command;
 use tokio::time::{timeout, Duration};
 
-use super::config::{FailStrategy, FlowDefinition, FlowStepDef, StepKind};
-use super::envelope::StepEnvelope;
+use super::config::{FailStrategy, FlowDefinition, FlowStepDef, MatrixParams, StepKind};
+use super::envelope::{MatrixResult, StepEnvelope};
 use super::state::{FlowRunState, FlowRunStatus};
 use crate::config::{AgentDefinition, AgentLayer};
 use crate::error::OrchestratorError;
 use terraphim_spawner::{AgentSpawner, OutputEvent, SpawnContext, SpawnRequest};
 use terraphim_types::capability::Provider;
+
+/// Replace `{{matrix.<key>}}` placeholders in `template` with values from `row`.
+/// Unresolved placeholders are left as-is (will be cleared by resolve_templates later).
+fn resolve_matrix_vars(template: &str, row: &MatrixParams) -> String {
+    let mut result = template.to_string();
+    for (key, value) in row {
+        let placeholder = format!("{{{{matrix.{}}}}}", key);
+        result = result.replace(&placeholder, value);
+    }
+    result
+}
 
 /// Per-project runtime metadata used to build a [`SpawnContext`] for flow
 /// steps. Populated from `OrchestratorConfig.projects` when FlowExecutor is
@@ -986,6 +997,7 @@ mod tests {
                     on_fail: FailStrategy::Abort,
                     provider: None,
                     persona: None,
+                    matrix: None,
                 },
                 FlowStepDef {
                     name: "step2".to_string(),
@@ -1000,6 +1012,7 @@ mod tests {
                     on_fail: FailStrategy::Abort,
                     provider: None,
                     persona: None,
+                    matrix: None,
                 },
             ],
         };
@@ -1045,6 +1058,7 @@ mod tests {
                     on_fail: FailStrategy::Abort,
                     provider: None,
                     persona: None,
+                    matrix: None,
                 },
                 FlowStepDef {
                     name: "gate1".to_string(),
@@ -1059,6 +1073,7 @@ mod tests {
                     on_fail: FailStrategy::Abort,
                     provider: None,
                     persona: None,
+                    matrix: None,
                 },
                 FlowStepDef {
                     name: "action2".to_string(),
@@ -1073,6 +1088,7 @@ mod tests {
                     on_fail: FailStrategy::Abort,
                     provider: None,
                     persona: None,
+                    matrix: None,
                 },
             ],
         };
@@ -1110,6 +1126,7 @@ mod tests {
                     on_fail: FailStrategy::Abort,
                     provider: None,
                     persona: None,
+                    matrix: None,
                 },
                 FlowStepDef {
                     name: "gate1".to_string(),
@@ -1124,6 +1141,7 @@ mod tests {
                     on_fail: FailStrategy::Abort,
                     provider: None,
                     persona: None,
+                    matrix: None,
                 },
                 FlowStepDef {
                     name: "action2".to_string(),
@@ -1138,6 +1156,7 @@ mod tests {
                     on_fail: FailStrategy::Abort,
                     provider: None,
                     persona: None,
+                    matrix: None,
                 },
             ],
         };
@@ -1178,6 +1197,7 @@ mod tests {
                     on_fail: FailStrategy::Abort,
                     provider: None,
                     persona: None,
+                    matrix: None,
                 },
                 FlowStepDef {
                     name: "step2".to_string(),
@@ -1192,6 +1212,7 @@ mod tests {
                     on_fail: FailStrategy::Abort,
                     provider: None,
                     persona: None,
+                    matrix: None,
                 },
                 FlowStepDef {
                     name: "step3".to_string(),
@@ -1206,6 +1227,7 @@ mod tests {
                     on_fail: FailStrategy::Abort,
                     provider: None,
                     persona: None,
+                    matrix: None,
                 },
             ],
         };
@@ -1258,6 +1280,7 @@ mod tests {
                     on_fail: FailStrategy::Abort,
                     provider: None,
                     persona: None,
+                    matrix: None,
                 },
                 FlowStepDef {
                     name: "step2".to_string(),
@@ -1272,6 +1295,7 @@ mod tests {
                     on_fail: FailStrategy::Abort,
                     provider: None,
                     persona: None,
+                    matrix: None,
                 },
                 FlowStepDef {
                     name: "step3".to_string(),
@@ -1286,6 +1310,7 @@ mod tests {
                     on_fail: FailStrategy::Abort,
                     provider: None,
                     persona: None,
+                    matrix: None,
                 },
             ],
         };
@@ -1346,6 +1371,7 @@ mod tests {
                     on_fail: FailStrategy::Abort,
                     provider: None,
                     persona: None,
+                    matrix: None,
                 },
                 FlowStepDef {
                     name: "checkpoint1".to_string(),
@@ -1360,6 +1386,7 @@ mod tests {
                     on_fail: FailStrategy::Abort,
                     provider: None,
                     persona: None,
+                    matrix: None,
                 },
                 FlowStepDef {
                     name: "step2".to_string(),
@@ -1374,6 +1401,7 @@ mod tests {
                     on_fail: FailStrategy::Abort,
                     provider: None,
                     persona: None,
+                    matrix: None,
                 },
             ],
         };
@@ -1427,6 +1455,7 @@ mod tests {
                     on_fail: FailStrategy::Abort,
                     provider: None,
                     persona: None,
+                    matrix: None,
                 },
                 FlowStepDef {
                     name: "never-runs".to_string(),
@@ -1441,6 +1470,7 @@ mod tests {
                     on_fail: FailStrategy::Abort,
                     provider: None,
                     persona: None,
+                    matrix: None,
                 },
             ],
         };
