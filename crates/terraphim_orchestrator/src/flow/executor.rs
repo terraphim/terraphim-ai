@@ -5,9 +5,7 @@ use chrono::Utc;
 use tokio::process::Command;
 use tokio::time::{timeout, Duration};
 
-use super::config::{
-    FailStrategy, FlowDefinition, FlowStepDef, MatrixConfig, MatrixParams, StepKind,
-};
+use super::config::{FailStrategy, FlowDefinition, FlowStepDef, MatrixParams, StepKind};
 use super::envelope::{MatrixResult, StepEnvelope};
 use super::state::{FlowRunState, FlowRunStatus};
 use crate::config::{AgentDefinition, AgentLayer};
@@ -752,6 +750,7 @@ impl FlowExecutor {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::flow::config::MatrixConfig;
     use crate::flow::envelope::StepEnvelope;
     use chrono::Utc;
 
@@ -1665,151 +1664,151 @@ mod tests {
         );
 
         let _ = std::fs::remove_dir_all(&state_dir);
+    }
 
-        #[tokio::test]
-        async fn test_matrix_action_step_all_succeed() {
-            let temp_dir = tempfile::tempdir().unwrap();
-            let executor =
-                FlowExecutor::new(temp_dir.path().to_path_buf(), temp_dir.path().to_path_buf());
+    #[tokio::test]
+    async fn test_matrix_action_step_all_succeed() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let executor =
+            FlowExecutor::new(temp_dir.path().to_path_buf(), temp_dir.path().to_path_buf());
 
-            use std::collections::HashMap;
+        use std::collections::HashMap;
 
-            let mut row0 = HashMap::new();
-            row0.insert("msg".to_string(), "hello".to_string());
-            let mut row1 = HashMap::new();
-            row1.insert("msg".to_string(), "world".to_string());
+        let mut row0 = HashMap::new();
+        row0.insert("msg".to_string(), "hello".to_string());
+        let mut row1 = HashMap::new();
+        row1.insert("msg".to_string(), "world".to_string());
 
-            let flow = FlowDefinition {
-                name: "matrix-test".to_string(),
-                project: "test".to_string(),
-                schedule: None,
-                repo_path: "/tmp/repo".to_string(),
-                base_branch: "main".to_string(),
-                timeout_secs: 3600,
-                steps: vec![FlowStepDef {
-                    name: "echo-matrix".to_string(),
-                    kind: StepKind::Action,
-                    command: Some("echo {{matrix.msg}}".to_string()),
-                    cli_tool: None,
-                    model: None,
-                    task: None,
-                    task_file: None,
-                    condition: None,
-                    timeout_secs: 10,
-                    on_fail: FailStrategy::Abort,
-                    provider: None,
-                    persona: None,
-                    matrix: Some(MatrixConfig {
-                        params: vec![row0, row1],
-                        max_parallel: 1,
-                        fail_strategy: FailStrategy::Continue,
-                    }),
-                }],
-            };
+        let flow = FlowDefinition {
+            name: "matrix-test".to_string(),
+            project: "test".to_string(),
+            schedule: None,
+            repo_path: "/tmp/repo".to_string(),
+            base_branch: "main".to_string(),
+            timeout_secs: 3600,
+            steps: vec![FlowStepDef {
+                name: "echo-matrix".to_string(),
+                kind: StepKind::Action,
+                command: Some("echo {{matrix.msg}}".to_string()),
+                cli_tool: None,
+                model: None,
+                task: None,
+                task_file: None,
+                condition: None,
+                timeout_secs: 10,
+                on_fail: FailStrategy::Abort,
+                provider: None,
+                persona: None,
+                matrix: Some(MatrixConfig {
+                    params: vec![row0, row1],
+                    max_parallel: 1,
+                    fail_strategy: FailStrategy::Continue,
+                }),
+            }],
+        };
 
-            let state = executor.run(&flow, None).await.unwrap();
+        let state = executor.run(&flow, None).await.unwrap();
 
-            assert_eq!(state.status, FlowRunStatus::Completed);
-            // Regular step_envelopes should be empty (matrix results go to matrix_envelopes)
-            assert!(state.step_envelopes.is_empty());
-            // Matrix envelopes should have 2 entries
-            let envelopes = state.matrix_envelopes.get("echo-matrix").unwrap();
-            assert_eq!(envelopes.len(), 2);
-            assert_eq!(envelopes[0].exit_code, 0);
-            assert_eq!(envelopes[1].exit_code, 0);
-            assert!(envelopes[0].stdout.contains("hello"));
-            assert!(envelopes[1].stdout.contains("world"));
-        }
+        assert_eq!(state.status, FlowRunStatus::Completed);
+        // Regular step_envelopes should be empty (matrix results go to matrix_envelopes)
+        assert!(state.step_envelopes.is_empty());
+        // Matrix envelopes should have 2 entries
+        let envelopes = state.matrix_envelopes.get("echo-matrix").unwrap();
+        assert_eq!(envelopes.len(), 2);
+        assert_eq!(envelopes[0].exit_code, 0);
+        assert_eq!(envelopes[1].exit_code, 0);
+        assert!(envelopes[0].stdout.contains("hello"));
+        assert!(envelopes[1].stdout.contains("world"));
+    }
 
-        #[tokio::test]
-        async fn test_matrix_step_abort_on_failure() {
-            let temp_dir = tempfile::tempdir().unwrap();
-            let executor =
-                FlowExecutor::new(temp_dir.path().to_path_buf(), temp_dir.path().to_path_buf());
+    #[tokio::test]
+    async fn test_matrix_step_abort_on_failure() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let executor =
+            FlowExecutor::new(temp_dir.path().to_path_buf(), temp_dir.path().to_path_buf());
 
-            use std::collections::HashMap;
+        use std::collections::HashMap;
 
-            let mut row0 = HashMap::new();
-            row0.insert("code".to_string(), "0".to_string());
-            let mut row1 = HashMap::new();
-            row1.insert("code".to_string(), "1".to_string());
+        let mut row0 = HashMap::new();
+        row0.insert("code".to_string(), "0".to_string());
+        let mut row1 = HashMap::new();
+        row1.insert("code".to_string(), "1".to_string());
 
-            let flow = FlowDefinition {
-                name: "matrix-abort-test".to_string(),
-                project: "test".to_string(),
-                schedule: None,
-                repo_path: "/tmp/repo".to_string(),
-                base_branch: "main".to_string(),
-                timeout_secs: 3600,
-                steps: vec![FlowStepDef {
-                    name: "exit-matrix".to_string(),
-                    kind: StepKind::Action,
-                    command: Some("exit {{matrix.code}}".to_string()),
-                    cli_tool: None,
-                    model: None,
-                    task: None,
-                    task_file: None,
-                    condition: None,
-                    timeout_secs: 10,
-                    on_fail: FailStrategy::Abort,
-                    provider: None,
-                    persona: None,
-                    matrix: Some(MatrixConfig {
-                        params: vec![row0, row1],
-                        max_parallel: 1,
-                        fail_strategy: FailStrategy::Abort,
-                    }),
-                }],
-            };
+        let flow = FlowDefinition {
+            name: "matrix-abort-test".to_string(),
+            project: "test".to_string(),
+            schedule: None,
+            repo_path: "/tmp/repo".to_string(),
+            base_branch: "main".to_string(),
+            timeout_secs: 3600,
+            steps: vec![FlowStepDef {
+                name: "exit-matrix".to_string(),
+                kind: StepKind::Action,
+                command: Some("exit {{matrix.code}}".to_string()),
+                cli_tool: None,
+                model: None,
+                task: None,
+                task_file: None,
+                condition: None,
+                timeout_secs: 10,
+                on_fail: FailStrategy::Abort,
+                provider: None,
+                persona: None,
+                matrix: Some(MatrixConfig {
+                    params: vec![row0, row1],
+                    max_parallel: 1,
+                    fail_strategy: FailStrategy::Abort,
+                }),
+            }],
+        };
 
-            // When matrix.fail_strategy=abort and a sub-step fails, execute_matrix_step returns Err.
-            // The run loop honours the step-level on_fail=Abort and marks the flow Failed.
-            let result = executor.run(&flow, None).await;
-            // Flow should fail because matrix step aborted on non-zero exit code
-            assert!(result.is_err() || result.as_ref().unwrap().status == FlowRunStatus::Failed);
-        }
+        // When matrix.fail_strategy=abort and a sub-step fails, execute_matrix_step returns Err.
+        // The run loop honours the step-level on_fail=Abort and marks the flow Failed.
+        let result = executor.run(&flow, None).await;
+        // Flow should fail because matrix step aborted on non-zero exit code
+        assert!(result.is_err() || result.as_ref().unwrap().status == FlowRunStatus::Failed);
+    }
 
-        #[test]
-        fn test_resolve_templates_matrix_aggregate() {
-            let executor = FlowExecutor::new(PathBuf::from("/tmp"), PathBuf::from("/tmp/state"));
-            let flow = create_test_flow();
+    #[test]
+    fn test_resolve_templates_matrix_aggregate() {
+        let executor = FlowExecutor::new(PathBuf::from("/tmp"), PathBuf::from("/tmp/state"));
+        let flow = create_test_flow();
 
-            let mut state = FlowRunState::new("test-flow");
-            state.matrix_envelopes.insert(
-                "run-model".to_string(),
-                vec![
-                    StepEnvelope {
-                        step_name: "run-model-matrix-0".to_string(),
-                        started_at: Utc::now(),
-                        finished_at: Utc::now(),
-                        exit_code: 0,
-                        stdout: "ok".to_string(),
-                        stderr: String::new(),
-                        cost_usd: None,
-                        session_id: None,
-                        input_tokens: None,
-                        output_tokens: None,
-                        stdout_file: None,
-                    },
-                    StepEnvelope {
-                        step_name: "run-model-matrix-1".to_string(),
-                        started_at: Utc::now(),
-                        finished_at: Utc::now(),
-                        exit_code: 1,
-                        stdout: "failed".to_string(),
-                        stderr: String::new(),
-                        cost_usd: None,
-                        session_id: None,
-                        input_tokens: None,
-                        output_tokens: None,
-                        stdout_file: None,
-                    },
-                ],
-            );
+        let mut state = FlowRunState::new("test-flow");
+        state.matrix_envelopes.insert(
+            "run-model".to_string(),
+            vec![
+                StepEnvelope {
+                    step_name: "run-model-matrix-0".to_string(),
+                    started_at: Utc::now(),
+                    finished_at: Utc::now(),
+                    exit_code: 0,
+                    stdout: "ok".to_string(),
+                    stderr: String::new(),
+                    cost_usd: None,
+                    session_id: None,
+                    input_tokens: None,
+                    output_tokens: None,
+                    stdout_file: None,
+                },
+                StepEnvelope {
+                    step_name: "run-model-matrix-1".to_string(),
+                    started_at: Utc::now(),
+                    finished_at: Utc::now(),
+                    exit_code: 1,
+                    stdout: "failed".to_string(),
+                    stderr: String::new(),
+                    cost_usd: None,
+                    session_id: None,
+                    input_tokens: None,
+                    output_tokens: None,
+                    stdout_file: None,
+                },
+            ],
+        );
 
-            let result =
-            executor.resolve_templates("passed: {{steps.run-model.success_count}} failed: {{steps.run-model.failure_count}} codes: {{steps.run-model.all_exit_codes}}", &flow, &state);
-            assert_eq!(result, "passed: 1 failed: 1 codes: 0,1");
-        }
+        let result =
+        executor.resolve_templates("passed: {{steps.run-model.success_count}} failed: {{steps.run-model.failure_count}} codes: {{steps.run-model.all_exit_codes}}", &flow, &state);
+        assert_eq!(result, "passed: 1 failed: 1 codes: 0,1");
     }
 }
