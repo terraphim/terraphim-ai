@@ -768,6 +768,26 @@ pub struct AgentDefinition {
     /// and top-level `evolution.enabled = true`). Default: false.
     #[serde(default)]
     pub evolution_enabled: bool,
+
+    /// Wall-clock seconds beyond which the agent is considered stuck in context rot.
+    ///
+    /// When the agent has been running longer than this threshold, the orchestrator
+    /// kills it and emits a rot signal (structured log + Gitea comment on
+    /// `gitea_issue` if set) instead of attempting a fallback respawn. The original
+    /// task prompt is surfaced in the comment to aid re-decomposition.
+    ///
+    /// `None` disables rot detection for this agent. Recommended value: 1800 (30
+    /// minutes). Must be <= `max_cpu_seconds` when both are set.
+    #[serde(default)]
+    pub context_rot_wall_secs: Option<u64>,
+
+    /// Output-token budget beyond which the agent is considered in context rot.
+    ///
+    /// Reserved for future use. Token counting from spawned agent processes is not
+    /// yet implemented. When set, the field is validated but has no runtime effect.
+    /// Planned default when enabled: 50000.
+    #[serde(default)]
+    pub context_rot_token_budget: Option<u64>,
 }
 
 /// Agent layer in the dark factory hierarchy.
@@ -1571,7 +1591,30 @@ impl OrchestratorConfig {
             }
         }
 
-        // D4: RoutingConfig probe_ttl_secs minimum validation (60s) if routing is enabled
+        // D4: context_rot_wall_secs validation (min 60s, must be <= max_cpu_seconds if both set)
+        for agent in &self.agents {
+            if let Some(rot_secs) = agent.context_rot_wall_secs {
+                if rot_secs < MAX_CPU_MIN_SECS {
+                    return Err(crate::error::OrchestratorError::AgentFieldOutOfRange {
+                        agent: agent.name.clone(),
+                        field: "context_rot_wall_secs".into(),
+                        value: rot_secs,
+                        min: MAX_CPU_MIN_SECS,
+                        max: MAX_CPU_MAX_SECS,
+                    });
+                }
+                if let Some(max_cpu) = agent.max_cpu_seconds {
+                    if rot_secs > max_cpu {
+                        return Err(crate::error::OrchestratorError::Config(format!(
+                            "agent '{}': context_rot_wall_secs ({}) must be <= max_cpu_seconds ({})",
+                            agent.name, rot_secs, max_cpu
+                        )));
+                    }
+                }
+            }
+        }
+
+        // D5: RoutingConfig probe_ttl_secs minimum validation (60s) if routing is enabled
         if let Some(ref routing) = self.routing {
             if routing.probe_ttl_secs < PROBE_TTL_MIN_SECS {
                 return Err(crate::error::OrchestratorError::ProbeTtlTooShort {
@@ -3218,7 +3261,80 @@ max_cpu_seconds = 3600
         assert!(config.validate().is_ok());
     }
 
-    // === D4: RoutingConfig probe_ttl_secs validation tests ===
+    // === D4: context_rot_wall_secs validation tests ===
+
+    #[test]
+    fn test_validate_context_rot_wall_secs_too_low() {
+        let toml_str = r#"
+working_dir = "/tmp"
+[nightwatch]
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+[[agents]]
+name = "test-agent"
+layer = "Safety"
+cli_tool = "echo"
+task = "test"
+context_rot_wall_secs = 30
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        let err = config.validate().unwrap_err();
+        assert!(matches!(
+            err,
+            crate::error::OrchestratorError::AgentFieldOutOfRange {
+                ref field,
+                ..
+            } if field == "context_rot_wall_secs"
+        ));
+    }
+
+    #[test]
+    fn test_validate_context_rot_exceeds_max_cpu() {
+        let toml_str = r#"
+working_dir = "/tmp"
+[nightwatch]
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+[[agents]]
+name = "test-agent"
+layer = "Safety"
+cli_tool = "echo"
+task = "test"
+max_cpu_seconds = 600
+context_rot_wall_secs = 1200
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        let err = config.validate().unwrap_err();
+        assert!(
+            matches!(err, crate::error::OrchestratorError::Config(_)),
+            "expected Config error when rot threshold > max_cpu_seconds, got: {:?}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_validate_context_rot_valid() {
+        let toml_str = r#"
+working_dir = "/tmp"
+[nightwatch]
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+[[agents]]
+name = "test-agent"
+layer = "Safety"
+cli_tool = "echo"
+task = "test"
+max_cpu_seconds = 3600
+context_rot_wall_secs = 1800
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        assert!(config.validate().is_ok());
+    }
+
+    // === D5: RoutingConfig probe_ttl_secs validation tests ===
 
     #[test]
     fn test_validate_probe_ttl_too_short() {

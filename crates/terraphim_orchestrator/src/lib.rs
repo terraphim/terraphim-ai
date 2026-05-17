@@ -6186,10 +6186,29 @@ impl AgentOrchestrator {
 
     /// Kill agents that have exceeded their wall-clock timeout and respawn with fallback.
     async fn poll_wall_timeouts(&mut self) {
+        // Separate rot-detected agents (no retry) from normal timeouts (may retry).
+        // Rot detection takes priority: if context_rot_wall_secs is set and elapsed,
+        // the agent is treated as decomposition failure regardless of max_cpu_seconds.
+        let mut rot_detected: Vec<String> = Vec::new();
         let mut timed_out: Vec<String> = Vec::new();
+
         for (name, managed) in &self.active_agents {
+            let elapsed = managed.started_at.elapsed();
+
+            if let Some(rot_secs) = managed.definition.context_rot_wall_secs {
+                if elapsed > Duration::from_secs(rot_secs) {
+                    warn!(
+                        agent = %name,
+                        elapsed_secs = elapsed.as_secs(),
+                        rot_threshold_secs = rot_secs,
+                        "context rot detected: agent exceeded decomposition threshold"
+                    );
+                    rot_detected.push(name.clone());
+                    continue;
+                }
+            }
+
             if let Some(max_secs) = managed.definition.max_cpu_seconds {
-                let elapsed = managed.started_at.elapsed();
                 if elapsed > Duration::from_secs(max_secs) {
                     warn!(
                         agent = %name,
@@ -6202,6 +6221,32 @@ impl AgentOrchestrator {
             }
         }
 
+        // Handle context-rot agents: kill, emit rot signal, NO fallback retry.
+        for name in rot_detected {
+            if let Some(managed) = self.active_agents.remove(&name) {
+                let def = managed.definition.clone();
+                let elapsed_secs = managed.started_at.elapsed().as_secs();
+
+                warn!(
+                    agent = %name,
+                    elapsed_secs,
+                    rot_threshold_secs = def.context_rot_wall_secs.unwrap_or(0),
+                    "context rot signal: killing agent without retry — re-decompose the task"
+                );
+
+                if let Err(e) = managed.handle.kill().await {
+                    error!(agent = %name, error = %e, "failed to kill rot-detected agent");
+                }
+
+                // Post Gitea rot-signal comment on the agent's issue if configured.
+                if let Some(issue_num) = def.gitea_issue {
+                    self.post_context_rot_comment(&name, issue_num, &def.task, elapsed_secs)
+                        .await;
+                }
+            }
+        }
+
+        // Handle normal timeouts: kill, then optionally respawn with fallback.
         for name in timed_out {
             if let Some(managed) = self.active_agents.remove(&name) {
                 let def = managed.definition.clone();
@@ -6239,6 +6284,56 @@ impl AgentOrchestrator {
                     info!(agent = %name, "no fallback configured, agent timed out permanently");
                 }
             }
+        }
+    }
+
+    /// Post a context-rot signal comment to the agent's Gitea issue.
+    ///
+    /// The comment surfaces the original task prompt so a human or planner agent
+    /// can re-decompose the work into smaller sub-tasks before re-launching.
+    async fn post_context_rot_comment(
+        &self,
+        agent_name: &str,
+        issue_num: u64,
+        original_task: &str,
+        elapsed_secs: u64,
+    ) {
+        let Some(ref poster) = self.output_poster else {
+            return;
+        };
+
+        let elapsed_mins = elapsed_secs / 60;
+        let task_excerpt = if original_task.len() > 500 {
+            format!("{}…", &original_task[..500])
+        } else {
+            original_task.to_string()
+        };
+
+        let body = format!(
+            "## Context Rot Signal\n\n\
+             **Agent**: `{agent_name}`  \n\
+             **Elapsed**: {elapsed_secs}s ({elapsed_mins} min)  \n\
+             **Action**: Killed without retry — this is a decomposition failure, not a transient error.\n\n\
+             ### Original task prompt\n\n\
+             ```\n{task_excerpt}\n```\n\n\
+             ### Next steps\n\n\
+             This task ran too long, indicating the scope was too large for a single agent session.\n\
+             Please re-decompose into smaller sub-tasks before re-launching.\n\n\
+             Metric: `context-rot-signal` logged at `{elapsed_secs}s`."
+        );
+
+        match poster.tracker().post_comment(issue_num, &body).await {
+            Ok(_) => info!(
+                agent = %agent_name,
+                issue_num,
+                "posted context rot signal comment"
+            ),
+            Err(e) => warn!(
+                agent = %agent_name,
+                issue_num,
+                error = %e,
+                "failed to post context rot signal comment"
+            ),
         }
     }
 
@@ -8024,6 +8119,8 @@ mod tests {
                     gitea_issue: None,
                     event_only: false,
                     evolution_enabled: false,
+                    context_rot_wall_secs: None,
+                    context_rot_token_budget: None,
 
                     project: None,
                 },
@@ -8051,6 +8148,8 @@ mod tests {
                     gitea_issue: None,
                     event_only: false,
                     evolution_enabled: false,
+                    context_rot_wall_secs: None,
+                    context_rot_token_budget: None,
 
                     project: None,
                 },
@@ -8371,6 +8470,8 @@ task = "test"
                 gitea_issue: None,
                 event_only: false,
                 evolution_enabled: false,
+                context_rot_wall_secs: None,
+                context_rot_token_budget: None,
 
                 project: None,
             }],
@@ -8489,6 +8590,8 @@ task = "test"
             gitea_issue: None,
             event_only: false,
             evolution_enabled: false,
+            context_rot_wall_secs: None,
+            context_rot_token_budget: None,
 
             project: None,
         }];
@@ -8695,6 +8798,8 @@ task = "test"
             gitea_issue: None,
             event_only: false,
             evolution_enabled: false,
+            context_rot_wall_secs: None,
+            context_rot_token_budget: None,
 
             project: None,
         }];
@@ -8784,6 +8889,8 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             gitea_issue: None,
             event_only: false,
             evolution_enabled: false,
+            context_rot_wall_secs: None,
+            context_rot_token_budget: None,
 
             project: None,
         }];
@@ -9039,6 +9146,8 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             gitea_issue: None,
             event_only: false,
             evolution_enabled: false,
+            context_rot_wall_secs: None,
+            context_rot_token_budget: None,
             project: None,
         }];
         let mut orch = AgentOrchestrator::new(config).unwrap();
@@ -9052,6 +9161,108 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
         // Poll should detect timeout and kill
         orch.poll_agent_exits().await;
         assert!(!orch.active_agents.contains_key("timeout-test"));
+    }
+
+    // =========================================================================
+    // Context Rot Detection Tests (Gitea #1443)
+    // =========================================================================
+
+    #[tokio::test]
+    async fn test_context_rot_kills_agent_without_retry() {
+        let mut config = test_config_fast_lifecycle();
+        // Use sleep agent with context_rot_wall_secs smaller than max_cpu_seconds
+        config.agents = vec![AgentDefinition {
+            name: "rot-test".to_string(),
+            layer: AgentLayer::Core,
+            cli_tool: "sleep".to_string(),
+            task: "original task for rot test".to_string(),
+            model: None,
+            schedule: None,
+            capabilities: vec![],
+            max_memory_bytes: None,
+            budget_monthly_cents: None,
+            provider: None,
+            persona: None,
+            terraphim_role: None,
+            skill_chain: vec![],
+            sfia_skills: vec![],
+            fallback_provider: Some("/bin/true".to_string()), // fallback set but must NOT be spawned
+            fallback_model: None,
+            grace_period_secs: Some(2),
+            max_cpu_seconds: Some(10),      // hard limit
+            context_rot_wall_secs: Some(1), // rot threshold fires first
+            context_rot_token_budget: None,
+            pre_check: None,
+            gitea_issue: None,
+            event_only: false,
+            evolution_enabled: false,
+            project: None,
+        }];
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+        let def = orch.config.agents[0].clone();
+        orch.spawn_agent(&def).await.unwrap();
+        assert!(orch.active_agents.contains_key("rot-test"));
+
+        // Wait for the rot threshold to elapse
+        tokio::time::sleep(Duration::from_secs(2)).await;
+
+        // poll_wall_timeouts should detect rot and kill WITHOUT spawning fallback
+        orch.poll_wall_timeouts().await;
+
+        assert!(
+            !orch.active_agents.contains_key("rot-test"),
+            "rot-detected agent must be removed"
+        );
+        // The fallback would be named "rot-test-fallback" or similar — ensure none were spawned
+        assert!(
+            orch.active_agents.is_empty(),
+            "no fallback agent should be spawned on context rot"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_context_rot_wall_secs_none_uses_normal_timeout() {
+        let mut config = test_config_fast_lifecycle();
+        // Agent with no context_rot_wall_secs — should use normal timeout path
+        config.agents = vec![AgentDefinition {
+            name: "normal-timeout".to_string(),
+            layer: AgentLayer::Core,
+            cli_tool: "sleep".to_string(),
+            task: "60".to_string(),
+            model: None,
+            schedule: None,
+            capabilities: vec![],
+            max_memory_bytes: None,
+            budget_monthly_cents: None,
+            provider: None,
+            persona: None,
+            terraphim_role: None,
+            skill_chain: vec![],
+            sfia_skills: vec![],
+            fallback_provider: None,
+            fallback_model: None,
+            grace_period_secs: Some(2),
+            max_cpu_seconds: Some(1),
+            context_rot_wall_secs: None, // rot detection disabled
+            context_rot_token_budget: None,
+            pre_check: None,
+            gitea_issue: None,
+            event_only: false,
+            evolution_enabled: false,
+            project: None,
+        }];
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+        let def = orch.config.agents[0].clone();
+        orch.spawn_agent(&def).await.unwrap();
+        assert!(orch.active_agents.contains_key("normal-timeout"));
+
+        tokio::time::sleep(Duration::from_secs(2)).await;
+        orch.poll_wall_timeouts().await;
+
+        assert!(
+            !orch.active_agents.contains_key("normal-timeout"),
+            "normal timeout must still remove the agent"
+        );
     }
 
     // =========================================================================
@@ -9207,6 +9418,8 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             gitea_issue: None,
             event_only: false,
             evolution_enabled: false,
+            context_rot_wall_secs: None,
+            context_rot_token_budget: None,
             project: None,
         }];
 
@@ -9302,6 +9515,8 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
                 gitea_issue: None,
                 event_only: false,
                 evolution_enabled: false,
+                context_rot_wall_secs: None,
+                context_rot_token_budget: None,
                 project: Some("alpha".to_string()),
             }],
             restart_cooldown_secs: 0,
@@ -9597,6 +9812,8 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             gitea_issue: None,
             event_only: false,
             evolution_enabled: false,
+            context_rot_wall_secs: None,
+            context_rot_token_budget: None,
             project: Some("alpha".to_string()),
         });
         config.pr_dispatch_per_project.insert(
@@ -9997,6 +10214,8 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             gitea_issue: None,
             event_only: false,
             evolution_enabled: false,
+            context_rot_wall_secs: None,
+            context_rot_token_budget: None,
             project: Some("alpha".to_string()),
         });
         // The per-project block takes precedence over the top-level block,
@@ -10339,6 +10558,8 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             gitea_issue: None,
             event_only: false,
             evolution_enabled: false,
+            context_rot_wall_secs: None,
+            context_rot_token_budget: None,
             project: Some("alpha".to_string()),
         });
         // The per-project block takes precedence over the top-level block,
@@ -10633,6 +10854,8 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             gitea_issue: None,
             event_only: false,
             evolution_enabled: false,
+            context_rot_wall_secs: None,
+            context_rot_token_budget: None,
             project: Some("alpha".to_string()),
         });
         config.pr_dispatch = Some(crate::config::PrDispatchConfig {
@@ -10914,6 +11137,8 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             gitea_issue: None,
             event_only: false,
             evolution_enabled: false,
+            context_rot_wall_secs: None,
+            context_rot_token_budget: None,
             project: Some("alpha".to_string()),
         });
         // The per-project block takes precedence over the top-level block,
@@ -11207,6 +11432,8 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             gitea_issue: None,
             event_only: true,
             evolution_enabled: false,
+            context_rot_wall_secs: None,
+            context_rot_token_budget: None,
             project: None,
         }];
         // mentions config required so handle_webhook_dispatch does not bail at the top.
@@ -11261,6 +11488,8 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             gitea_issue: None,
             event_only: true,
             evolution_enabled: false,
+            context_rot_wall_secs: None,
+            context_rot_token_budget: None,
             project: None,
         }];
         config.mentions = Some(crate::config::MentionConfig::default());
@@ -11317,6 +11546,8 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             gitea_issue: Some(9999),
             event_only: true,
             evolution_enabled: false,
+            context_rot_wall_secs: None,
+            context_rot_token_budget: None,
             project: None,
         };
 

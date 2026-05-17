@@ -598,6 +598,8 @@ mod tests {
             gitea_issue: None,
             event_only: false,
             evolution_enabled: false,
+            context_rot_wall_secs: None,
+            context_rot_token_budget: None,
             project: None,
         }
     }
