@@ -12,7 +12,7 @@ include = [
 ]
 
 [compound_review]
-schedule = "0 0-10 * * *"
+schedule = "0 6 * * *"
 max_duration_secs = 1800
 repo_path = "/home/alex/projects/terraphim/terraphim-ai"
 create_prs = false
@@ -39,4 +39,4 @@ probe_on_startup = true
 
 [webhook]
 bind = "172.18.0.1:9091"
-secret = "85af336ebec99fe512871106650bce179f9a2b218f40576f76d5ff0a55e7af9a"
+secret = "${ADF_WEBHOOK_SECRET}"

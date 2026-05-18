@@ -679,15 +679,20 @@ impl terraphim_types::shared_learning::LearningStore for SharedLearningStore {
         Ok(candidates)
     }
 
-    fn record_applied(&self, id: &str) -> Result<(), terraphim_types::shared_learning::StoreError> {
-        block_on(self.record_application(id, "learning-store", false))
+    fn record_applied(
+        &self,
+        id: &str,
+        applied_by: &str,
+    ) -> Result<(), terraphim_types::shared_learning::StoreError> {
+        block_on(self.record_application(id, applied_by, false))
     }
 
     fn record_effective(
         &self,
         id: &str,
+        applied_by: &str,
     ) -> Result<(), terraphim_types::shared_learning::StoreError> {
-        block_on(self.record_application(id, "learning-store", true))
+        block_on(self.record_application(id, applied_by, true))
     }
 
     fn list_by_trust(
@@ -1185,11 +1190,11 @@ mod tests {
             );
             let id = dyn_store.insert(learning).unwrap();
 
-            dyn_store.record_applied(&id).unwrap();
+            dyn_store.record_applied(&id, "agent-a").unwrap();
             let l = dyn_store.get(&id).unwrap();
             assert_eq!(l.quality.applied_count, 1);
 
-            dyn_store.record_effective(&id).unwrap();
+            dyn_store.record_effective(&id, "agent-b").unwrap();
             let l = dyn_store.get(&id).unwrap();
             assert_eq!(l.quality.applied_count, 2);
             assert_eq!(l.quality.effective_count, 1);
@@ -1210,10 +1215,10 @@ mod tests {
 
             assert_eq!(dyn_store.get(&id).unwrap().trust_level, Tl::L1);
 
-            dyn_store.record_effective(&id).unwrap();
-            dyn_store.record_effective(&id).unwrap();
-            dyn_store.record_effective(&id).unwrap();
-            dyn_store.record_effective(&id).unwrap();
+            dyn_store.record_effective(&id, "agent-a").unwrap();
+            dyn_store.record_effective(&id, "agent-b").unwrap();
+            dyn_store.record_effective(&id, "agent-a").unwrap();
+            dyn_store.record_effective(&id, "agent-b").unwrap();
 
             let l = dyn_store.get(&id).unwrap();
             assert_eq!(l.quality.effective_count, 4);

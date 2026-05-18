@@ -193,6 +193,15 @@ pub enum SessionsSubcommand {
     ByFile { file_path: String, json: bool },
     /// Build search index and show index statistics
     Index { verbose: bool },
+    /// Cluster sessions by concept similarity (Spec F5.2)
+    Cluster {
+        /// Maximum number of clusters (auto-detect if None)
+        k: Option<usize>,
+        /// Minimum sessions per cluster
+        min_sessions: Option<usize>,
+        /// Output format: "json" for machine-readable output
+        format: Option<String>,
+    },
 }
 
 #[cfg(feature = "firecracker")]
@@ -1317,8 +1326,50 @@ impl FromStr for ReplCommand {
                             subcommand: SessionsSubcommand::Index { verbose },
                         })
                     }
+                    "cluster" => {
+                        let mut k = None;
+                        let mut min_sessions = None;
+                        let mut format = None;
+                        let mut i = 2;
+                        while i < parts.len() {
+                            match parts[i] {
+                                "--k" | "-k" => {
+                                    if i + 1 < parts.len() {
+                                        k = parts[i + 1].parse::<usize>().ok();
+                                        i += 2;
+                                    } else {
+                                        i += 1;
+                                    }
+                                }
+                                "--min-sessions" => {
+                                    if i + 1 < parts.len() {
+                                        min_sessions = parts[i + 1].parse::<usize>().ok();
+                                        i += 2;
+                                    } else {
+                                        i += 1;
+                                    }
+                                }
+                                "--format" => {
+                                    if i + 1 < parts.len() {
+                                        format = Some(parts[i + 1].to_string());
+                                        i += 2;
+                                    } else {
+                                        i += 1;
+                                    }
+                                }
+                                _ => i += 1,
+                            }
+                        }
+                        Ok(ReplCommand::Sessions {
+                            subcommand: SessionsSubcommand::Cluster {
+                                k,
+                                min_sessions,
+                                format,
+                            },
+                        })
+                    }
                     _ => Err(anyhow!(
-                        "Unknown sessions subcommand: {}. Use: sources, list, search, stats, show, concepts, related, timeline, export, enrich, files, by-file, index",
+                        "Unknown sessions subcommand: {}. Use: sources, list, search, stats, show, concepts, related, cluster, timeline, export, enrich, files, by-file, index",
                         parts[1]
                     )),
                 }

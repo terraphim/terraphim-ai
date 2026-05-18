@@ -43,9 +43,11 @@ use rmcp::{
         stdio,
     },
 };
+use terraphim_automata::builder::{Logseq, ThesaurusBuilder};
 use terraphim_config::{ConfigBuilder, ConfigState};
+use terraphim_file_search::kg_scorer::KgPathScorer;
 use terraphim_mcp_server::McpService;
-use tracing::{Level, info};
+use tracing::{Level, info, warn};
 
 #[derive(Parser, Debug)]
 #[command(name = "terraphim_mcp_server")]
@@ -139,7 +141,45 @@ async fn main() -> Result<()> {
         .expect("Failed to create config state from config");
 
     // Create the MCP service
-    let service = McpService::new(Arc::new(config_state));
+    let config_state = Arc::new(config_state);
+
+    // Wire KgPathScorer from the selected role's KG path
+    let (selected_role, kg_path) = {
+        let cfg = config_state.config.lock().await;
+        let selected = cfg.selected_role.clone();
+        let path = cfg
+            .roles
+            .get(&selected)
+            .and_then(|r| r.kg.as_ref())
+            .and_then(|kg| kg.knowledge_graph_local.as_ref())
+            .map(|kgl| kgl.path.clone());
+        (selected, path)
+    };
+
+    let mut service = McpService::new(Arc::clone(&config_state));
+
+    if let Some(kg_path) = kg_path {
+        info!("Building KgPathScorer from KG path: {:?}", kg_path);
+        let builder = Logseq::default();
+        let role_name = selected_role.as_lowercase().to_string();
+        match builder.build(role_name, kg_path).await {
+            Ok(thesaurus) => {
+                let term_count = thesaurus.len();
+                let scorer = Arc::new(KgPathScorer::new(thesaurus));
+                service = service.with_kg_scorer(scorer);
+                info!(
+                    "KgPathScorer wired with {} terms for role '{}'",
+                    term_count, selected_role
+                );
+            }
+            Err(e) => {
+                warn!(
+                    "Failed to build thesaurus for KgPathScorer (role '{}'): {}",
+                    selected_role, e
+                );
+            }
+        }
+    }
 
     if args.sse {
         info!("Starting SSE server on {}", args.bind);

@@ -26,6 +26,7 @@ fn make_agent(name: &str, layer: AgentLayer, schedule: Option<&str>) -> AgentDef
         gitea_issue: None,
         event_only: false,
         evolution_enabled: false,
+        rlm_enabled: None,
 
         project: None,
     }

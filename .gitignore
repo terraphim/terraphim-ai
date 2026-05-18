@@ -53,6 +53,11 @@ crates/**/crates/
 # Signing keys (NEVER commit private keys)
 keys/
 
+# ADF deployment configs may contain real secrets injected at deploy time.
+# Use orchestrator.toml.example as the tracked template; keep the live file local.
+# See: https://git.terraphim.cloud/terraphim/terraphim-ai/issues/1546
+scripts/adf-setup/**/*.toml.local
+
 # CodeBuff compiled JavaScript files
 .codebuff/agents/.agents/*.js
 

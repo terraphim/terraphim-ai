@@ -104,6 +104,27 @@ pub fn save_umls_artifact(
 
 /// Load a UMLS artifact: returns (header, shard_bytes_list)
 pub fn load_umls_artifact(path: &Path) -> anyhow::Result<(ArtifactHeader, Vec<Vec<u8>>)> {
+    // Advisory permission check: a world-writable artifact file allows an
+    // attacker to forge both bytes and stored checksums together, bypassing
+    // the integrity gate.  Log a warning but do not abort — this is P2
+    // advisory (see Gitea #1587).  Binding this to Unix keeps Windows builds clean.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if let Ok(meta) = std::fs::metadata(path) {
+            let mode = meta.permissions().mode();
+            if mode & 0o002 != 0 {
+                log::warn!(
+                    "Artifact {:?} is world-writable (mode {:04o}). \
+                     An attacker with filesystem write access could forge a \
+                     valid artifact and bypass checksum verification.",
+                    path,
+                    mode
+                );
+            }
+        }
+    }
+
     let compressed = std::fs::read(path)?;
     let raw = zstd::decode_all(&compressed[..])?;
 
@@ -267,6 +288,40 @@ mod tests {
         assert!(result.is_err(), "tampered artifact must be rejected");
         let msg = result.err().unwrap().to_string();
         assert!(msg.contains("checksum mismatch"), "error: {}", msg);
+    }
+
+    /// Verify that a world-writable artifact still loads successfully.
+    ///
+    /// The permission check is advisory (P2, Gitea #1587): it emits a log
+    /// warning but does not abort loading.  The checksum gate still protects
+    /// against _tampered_ bytes; the warning alerts operators to tighten
+    /// filesystem permissions.
+    #[test]
+    #[cfg(unix)]
+    fn test_world_writable_artifact_loads_ok() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("world_writable.bin.zst");
+
+        let shard_bytes = vec![vec![1u8; 10], vec![2u8; 8]];
+        let header = make_test_header(&shard_bytes);
+        save_umls_artifact(&header, &shard_bytes, &path).unwrap();
+
+        // Make world-writable (0o666)
+        let mut perms = std::fs::metadata(&path).unwrap().permissions();
+        perms.set_mode(0o666);
+        std::fs::set_permissions(&path, perms).unwrap();
+
+        // Loading must succeed — the warning is advisory, not fatal
+        let result = load_umls_artifact(&path);
+        assert!(
+            result.is_ok(),
+            "World-writable artifact must still load (advisory warning only); got: {:?}",
+            result.err()
+        );
+        let (loaded_header, loaded_shards) = result.unwrap();
+        assert_eq!(loaded_header.total_patterns, 3);
+        assert_eq!(loaded_shards.len(), 2);
     }
 
     #[test]

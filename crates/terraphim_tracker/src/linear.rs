@@ -9,7 +9,7 @@ use reqwest::Client;
 use tracing::debug;
 
 /// Configuration for Linear tracker.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct LinearConfig {
     /// GraphQL endpoint URL (typically `https://api.linear.app/graphql`).
     pub endpoint: String,
@@ -21,6 +21,18 @@ pub struct LinearConfig {
     pub active_states: Vec<String>,
     /// Terminal states that trigger workspace cleanup.
     pub terminal_states: Vec<String>,
+}
+
+impl std::fmt::Debug for LinearConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LinearConfig")
+            .field("endpoint", &self.endpoint)
+            .field("api_key", &"***REDACTED***")
+            .field("project_slug", &self.project_slug)
+            .field("active_states", &self.active_states)
+            .field("terminal_states", &self.terminal_states)
+            .finish()
+    }
 }
 
 /// Linear GraphQL client.
@@ -492,5 +504,19 @@ mod tests {
         let states = vec!["Todo".to_string(), "In Progress".to_string()];
         let filter = tracker.state_filter(&states);
         assert_eq!(filter, "[\"Todo\", \"In Progress\"]");
+    }
+
+    #[test]
+    fn linear_config_api_key_redacted_in_debug() {
+        let cfg = test_config();
+        let dbg = format!("{:?}", cfg);
+        assert!(
+            !dbg.contains("test-key"),
+            "LinearConfig api_key must be redacted in Debug output, got: {dbg}"
+        );
+        assert!(
+            dbg.contains("***REDACTED***"),
+            "Debug output should mark api_key as redacted, got: {dbg}"
+        );
     }
 }

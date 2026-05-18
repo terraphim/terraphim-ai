@@ -8,7 +8,7 @@ license = "Apache-2.0"
 repository = "https://github.com/terraphim/terraphim-ai"
 
 [features]
-default = ["quickwit"]
+default = ["quickwit", "evolution"]
 quickwit = ["dep:reqwest", "dep:reqwest-middleware", "dep:reqwest-retry"]
 evolution = ["dep:terraphim_agent_evolution"]
 # Expose `scope::test_support` to integration tests under `tests/`.

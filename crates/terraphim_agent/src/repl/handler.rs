@@ -2711,6 +2711,120 @@ impl ReplHandler {
                 }
             }
 
+            SessionsSubcommand::Cluster {
+                k,
+                min_sessions,
+                format,
+            } => {
+                #[cfg(feature = "enrichment")]
+                {
+                    use terraphim_sessions::SessionCluster;
+
+                    println!(
+                        "\n{} Clustering sessions by concept similarity...",
+                        "[cluster]".bold().cyan()
+                    );
+
+                    let clusters: Vec<SessionCluster> =
+                        svc.cluster_by_concepts(k, min_sessions).await;
+
+                    if clusters.is_empty() {
+                        println!(
+                            "{} No sessions found. Use '/sessions enrich' to add concept data first.",
+                            "[info]".blue()
+                        );
+                        return Ok(());
+                    }
+
+                    let json_format = format.as_deref() == Some("json");
+
+                    if json_format {
+                        let output: Vec<serde_json::Value> = clusters
+                            .iter()
+                            .map(|c| {
+                                serde_json::json!({
+                                    "cluster_id": c.id,
+                                    "session_count": c.sessions.len(),
+                                    "dominant_concepts": c.dominant_concepts,
+                                    "sessions": c.sessions.iter().map(|s| {
+                                        let id_short = &s.id[..s.id.len().min(8)];
+                                        serde_json::json!({
+                                            "id": id_short,
+                                            "source": s.source,
+                                            "title": s.title,
+                                        })
+                                    }).collect::<Vec<_>>(),
+                                })
+                            })
+                            .collect();
+                        println!(
+                            "{}",
+                            serde_json::to_string_pretty(&output)
+                                .unwrap_or_else(|_| "[]".to_string())
+                        );
+                    } else {
+                        let mut table = Table::new();
+                        table
+                            .load_preset(UTF8_FULL)
+                            .apply_modifier(UTF8_ROUND_CORNERS)
+                            .set_header(vec![
+                                Cell::new("Cluster").fg(Color::Cyan),
+                                Cell::new("Sessions").fg(Color::Yellow),
+                                Cell::new("Concepts").fg(Color::Green),
+                                Cell::new("Sample title").fg(Color::White),
+                            ]);
+
+                        for cluster in &clusters {
+                            let concepts = cluster.dominant_concepts.join(", ");
+                            let concepts_display = if concepts.len() > 40 {
+                                format!("{}...", &concepts[..40])
+                            } else {
+                                concepts
+                            };
+                            let sample = cluster
+                                .sessions
+                                .first()
+                                .and_then(|s| s.title.as_ref())
+                                .map(|t| {
+                                    if t.len() > 35 {
+                                        format!("{}...", &t[..35])
+                                    } else {
+                                        t.clone()
+                                    }
+                                })
+                                .unwrap_or_else(|| "-".to_string());
+
+                            table.add_row(vec![
+                                Cell::new(format!("#{}", cluster.id)),
+                                Cell::new(cluster.sessions.len().to_string()),
+                                Cell::new(concepts_display),
+                                Cell::new(sample),
+                            ]);
+                        }
+
+                        println!("{}", table);
+                        let total: usize = clusters.iter().map(|c| c.sessions.len()).sum();
+                        println!(
+                            "\n{} {} clusters, {} sessions total",
+                            "[info]".blue(),
+                            clusters.len(),
+                            total
+                        );
+                    }
+                }
+                #[cfg(not(feature = "enrichment"))]
+                {
+                    let _ = (k, min_sessions, format);
+                    println!(
+                        "\n{} Clustering requires the enrichment feature.",
+                        "[info]".blue()
+                    );
+                    println!("Rebuild with: cargo build --features repl-full,enrichment");
+                    let sessions = svc.list_sessions().await;
+                    println!("Sessions available: {}", sessions.len());
+                }
+            }
+
             SessionsSubcommand::Index { verbose } => {
                 let sessions = svc.list_sessions().await;
                 let count = sessions.len();

@@ -66,12 +66,30 @@ pub struct WebOperationRequest {
 }
 
 /// Proxy configuration for web operations
-#[derive(Debug, Clone, Serialize, Deserialize)]
+///
+/// Note: `password` is redacted in `Debug` output. The field is still
+/// serialised by `Serialize` -- callers must not log or expose the
+/// serialised form.
+#[derive(Clone, Serialize, Deserialize)]
 pub struct ProxyConfig {
     pub host: String,
     pub port: u16,
     pub username: Option<String>,
     pub password: Option<String>,
+}
+
+impl std::fmt::Debug for ProxyConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ProxyConfig")
+            .field("host", &self.host)
+            .field("port", &self.port)
+            .field("username", &self.username)
+            .field(
+                "password",
+                &self.password.as_ref().map(|_| "***REDACTED***"),
+            )
+            .finish()
+    }
 }
 
 /// Web operation execution result
@@ -570,5 +588,29 @@ impl OperationComplexity {
             OperationComplexity::Medium => 3,
             OperationComplexity::High => 5,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn proxy_config_password_redacted_in_debug() {
+        let cfg = ProxyConfig {
+            host: "proxy.example.com".to_string(),
+            port: 8080,
+            username: Some("user".to_string()),
+            password: Some("secret-password".to_string()),
+        };
+        let dbg = format!("{:?}", cfg);
+        assert!(
+            !dbg.contains("secret-password"),
+            "ProxyConfig password must be redacted in Debug output, got: {dbg}"
+        );
+        assert!(
+            dbg.contains("***REDACTED***"),
+            "Debug output should mark password as redacted, got: {dbg}"
+        );
     }
 }

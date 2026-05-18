@@ -312,12 +312,8 @@ mod tests {
         ];
 
         for (key, normalized, id) in concepts {
-            let term = NormalizedTerm {
-                id,
-                value: NormalizedTermValue::from(normalized),
-                display_value: None,
-                url: Some(format!("https://example.com/{}", key)),
-            };
+            let mut term = NormalizedTerm::new(id, NormalizedTermValue::from(normalized));
+            term.url = Some(format!("https://example.com/{}", key));
             thesaurus.insert(NormalizedTermValue::from(key), term);
         }
 

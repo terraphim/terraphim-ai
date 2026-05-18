@@ -24,7 +24,7 @@ pub enum WikiSyncError {
 }
 
 /// Configuration for Gitea wiki client
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct GiteaWikiConfig {
     /// Gitea instance URL
     pub gitea_url: String,
@@ -38,6 +38,19 @@ pub struct GiteaWikiConfig {
     pub robot_path: String,
     /// Request timeout
     pub timeout: Duration,
+}
+
+impl std::fmt::Debug for GiteaWikiConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("GiteaWikiConfig")
+            .field("gitea_url", &self.gitea_url)
+            .field("token", &"***REDACTED***")
+            .field("owner", &self.owner)
+            .field("repo", &self.repo)
+            .field("robot_path", &self.robot_path)
+            .field("timeout", &self.timeout)
+            .finish()
+    }
 }
 
 impl Default for GiteaWikiConfig {
@@ -516,5 +529,20 @@ mod tests {
         // L2 learning should attempt sync (will fail due to /bin/false)
         let result = client.sync_learning(&learning).await;
         assert!(result.is_err() || matches!(result, Ok(SyncResult::Skipped(_))));
+    }
+
+    #[test]
+    fn gitea_wiki_config_token_redacted_in_debug() {
+        let mut cfg = GiteaWikiConfig::default();
+        cfg.token = "secret-gitea-token".to_string();
+        let dbg = format!("{:?}", cfg);
+        assert!(
+            !dbg.contains("secret-gitea-token"),
+            "GiteaWikiConfig token must be redacted in Debug output, got: {dbg}"
+        );
+        assert!(
+            dbg.contains("***REDACTED***"),
+            "Debug output should mark token as redacted, got: {dbg}"
+        );
     }
 }

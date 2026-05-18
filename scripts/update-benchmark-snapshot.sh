@@ -54,6 +54,7 @@ fmt_ns_to() {
 find_build_bench() {
     local size="$1"
     for candidate in \
+        "$CRITERION_DIR/build_index_throughput/build_autocomplete_index/${size}/new/estimates.json" \
         "$CRITERION_DIR/build_index_throughput/${size}/new/estimates.json" \
         "$CRITERION_DIR/build_index_throughput/${size}_terms/new/estimates.json" \
         "$CRITERION_DIR/build_index_throughput/terms_${size}/new/estimates.json"

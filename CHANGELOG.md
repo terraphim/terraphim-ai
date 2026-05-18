@@ -9,6 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Session search capability** enabled in `terraphim_agent` binary (2026-05-17)
+- **Evolution integration** `terraphim_agent_evolution` wired into ADF orchestrator (Refs #1487, 2026-05-15)
+- **Ranking regression gate** Kendall-tau snapshot tests added to prevent ranking regressions (Refs #1454, 2026-05-16)
+- **Phase 1 robot mode tests** complete test suite for robot CLI output format (Refs #1473, 2026-05-16)
+- **cargo-nextest** per-test slow-timeout support added to CI pipeline (Refs #1475, 2026-05-16)
+- **Rustdoc gaps resolved** doc comments added to public items in `terraphim_automata`, `terraphim_rolegraph`, `terraphim_middleware`, and `terraphim_sessions` (2026-05-18)
+
+### Fixed
+
+- **`ProxyConfig` and `LlmConfig` api_key** redacted from `Debug` output (Refs #1667, 2026-05-18)
+- **`llm_api_key` and `atomic_server_secret`** redacted from `Debug` output (Refs #1661, 2026-05-18)
+- **Credential fields** in `Debug` output hardened across config structs (Refs #1667, 2026-05-18)
+- **`watch()` init errors** now propagated via oneshot channel instead of being swallowed (Refs #814, 2026-05-17)
+- **UTF-8 char-boundary panic** in KG snippet extraction replaced with char-safe helper (Refs #1557, 2026-05-17)
+- **`TrackerConfig` api_key** redacted from `Debug` output (Refs #1300, 2026-05-16)
+- **`GiteaOutputConfig` token and secret** redacted from `Debug` output (Refs #1300, 2026-05-16)
+- **`unsafe ptr::read`** replaced with `arc_memory_only()` in multi_agent examples (Refs #1497, 2026-05-16)
+- **Deprecated `tempfile::into_path()`** replaced with `keep()` across workspace (2026-05-16)
+- **RLM executor surface** hardened; agent search envelope and OpenCode hook fixed (Refs #870, 2026-05-16)
+
+### CI
+
+- **`rust-format` gate** added to `ci-main.yml` with pre-existing clippy error fixes (Refs #1390, 2026-05-16)
+
 - **`QualityScore` type** added to `IndexedDocument` and `Document` in `terraphim_types`, carrying `logic_score`, `structure_score`, and `composite` (NaN-guarded) fields for downstream ranking (Refs #547)
 - **Rustdoc on `terraphim_server`** added `//!` crate-level doc, struct/enum/field docs and function doc-comments across `src/lib.rs`, `src/error.rs`, `src/api.rs`, and all `src/workflows/` sub-modules -- `RUSTDOCFLAGS="-W missing-docs" cargo doc --no-deps` now produces zero warnings
 - **Rustdoc on core public types** added doc comments to `ServiceError`, `TerraphimService`, middleware `Error`, rolegraph `Error`, `split_paragraphs`, `DocumentType`, `RouteDirective`, `MarkdownDirectives`, `Edge`, `ChatMessage`, and `Priority` across four crates (Refs #547)

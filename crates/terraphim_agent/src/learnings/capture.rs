@@ -808,6 +808,26 @@ pub(crate) fn build_kg_thesaurus_from_dir(
     Some(thesaurus)
 }
 
+/// Build a thesaurus synchronously from KG markdown files and compute its source hash.
+///
+/// Returns `(thesaurus, source_hash)` tuple, or `None` if building fails.
+///
+/// This function combines thesaurus building with hash computation to avoid
+/// reading the KG directory twice.
+pub(crate) fn build_kg_thesaurus_with_hash(
+    kg_dir: &std::path::Path,
+) -> Option<(terraphim_types::Thesaurus, String)> {
+    use terraphim_automata::builder::compute_kg_source_hash;
+
+    let thesaurus = build_kg_thesaurus_from_dir(kg_dir)?;
+    let source_hash = compute_kg_source_hash(kg_dir)
+        .ok()
+        .flatten()
+        .unwrap_or_else(|| "unknown".to_string());
+
+    Some((thesaurus, source_hash))
+}
+
 /// Determine the KG directory path.
 ///
 /// Tries the current working directory first, then walks up parent directories

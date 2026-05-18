@@ -165,6 +165,15 @@ jobs:
           rm server.pid
         fi
 
+    - name: Run Criterion headline benchmarks
+      continue-on-error: true
+      run: |
+        cargo bench -p terraphim_automata --bench autocomplete_bench \
+          -- build_index_throughput \
+          --sample-size 20 \
+          --measurement-time 5 \
+          --quiet
+
     - name: Upload benchmark results
       uses: actions/upload-artifact@v4
       if: always()
@@ -172,6 +181,14 @@ jobs:
         name: benchmark-results-${{ github.run_id }}
         path: benchmark-results/
         retention-days: 30
+
+    - name: Upload Criterion data
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: criterion-data-${{ github.run_id }}
+        path: target/criterion/
+        retention-days: 14
 
     - name: Generate performance report
       if: always()
@@ -295,6 +312,21 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         name: benchmark-results-${{ github.run_id }}
+
+    - name: Download Criterion data
+      uses: actions/download-artifact@v4
+      continue-on-error: true
+      with:
+        name: criterion-data-${{ github.run_id }}
+        path: target/criterion/
+
+    - name: Warn if Criterion data absent
+      run: |
+        if [ ! -d target/criterion ] || [ -z "$(ls -A target/criterion 2>/dev/null)" ]; then
+          echo "::warning::Criterion artifact not found for run ${{ github.run_id }}. Snapshot will use static fallback values."
+          echo "### Criterion data absent" >> "$GITHUB_STEP_SUMMARY"
+          echo "Benchmark snapshot falls back to static values because the Criterion artifact was not uploaded (bench step may have failed)." >> "$GITHUB_STEP_SUMMARY"
+        fi
 
     - name: Update baseline
       run: |

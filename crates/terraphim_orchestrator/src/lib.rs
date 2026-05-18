@@ -80,9 +80,9 @@ pub use concurrency::{ConcurrencyController, FairnessPolicy, ModeQuotas};
 #[cfg(feature = "quickwit")]
 pub use config::QuickwitConfig;
 pub use config::{
-    AgentDefinition, AgentLayer, CompoundReviewConfig, ConcurrencyConfig, GiteaOutputConfig,
-    LearningConfig, MentionConfig, NightwatchConfig, OrchestratorConfig, PreCheckStrategy,
-    TrackerConfig, TrackerStates, WebhookConfig, WorkflowConfig,
+    AgentDefinition, AgentLayer, CompoundReviewConfig, ConcurrencyConfig, EvolutionConfig,
+    GiteaOutputConfig, LearningConfig, MentionConfig, NightwatchConfig, OrchestratorConfig,
+    PreCheckStrategy, TrackerConfig, TrackerStates, WebhookConfig, WorkflowConfig,
 };
 pub use cost_tracker::{AgentMetrics, BudgetVerdict, CostSnapshot, CostTracker, ExecutionMetrics};
 pub use dispatcher::{DispatchTask, Dispatcher, DispatcherStats};
@@ -2097,6 +2097,19 @@ impl AgentOrchestrator {
                 info!(agent = %def.name, "injecting evolution memory context");
                 composed_task = format!("{}\n\n{}", composed_task, evo_ctx);
             }
+        }
+
+        // Inject RLM session info if enabled for this agent.
+        if def.rlm_enabled.unwrap_or(false) {
+            info!(agent = %def.name, "injecting RLM sandboxed execution context");
+            composed_task = format!(
+                "{}\n\n## RLM Sandboxed Code Execution\n\
+                 You have access to sandboxed code execution via terraphim_rlm. \
+                 Use the terraphim-rlm MCP tools to execute code in an isolated environment \
+                 when you need to run, test, or validate code changes. \
+                 Sessions are resource-limited and automatically cleaned up.",
+                composed_task
+            );
         }
 
         // Use stdin only when persona was actually resolved (prompt is enriched)
@@ -6436,7 +6449,7 @@ impl AgentOrchestrator {
                             ExitClass::Success | ExitClass::EmptySuccess => {
                                 tokio::task::block_in_place(|| {
                                     tokio::runtime::Handle::current()
-                                        .block_on(store.record_effective(id))
+                                        .block_on(store.record_effective(id, name))
                                 })
                             }
                             ExitClass::Timeout
@@ -6447,7 +6460,8 @@ impl AgentOrchestrator {
                             | ExitClass::NetworkError
                             | ExitClass::ResourceExhaustion
                             | ExitClass::Crash => tokio::task::block_in_place(|| {
-                                tokio::runtime::Handle::current().block_on(store.record_applied(id))
+                                tokio::runtime::Handle::current()
+                                    .block_on(store.record_applied(id, name))
                             }),
                             _ => continue,
                         };
@@ -8024,6 +8038,7 @@ mod tests {
                     gitea_issue: None,
                     event_only: false,
                     evolution_enabled: false,
+                    rlm_enabled: None,
 
                     project: None,
                 },
@@ -8051,6 +8066,7 @@ mod tests {
                     gitea_issue: None,
                     event_only: false,
                     evolution_enabled: false,
+                    rlm_enabled: None,
 
                     project: None,
                 },
@@ -8371,6 +8387,7 @@ task = "test"
                 gitea_issue: None,
                 event_only: false,
                 evolution_enabled: false,
+                rlm_enabled: None,
 
                 project: None,
             }],
@@ -8489,6 +8506,7 @@ task = "test"
             gitea_issue: None,
             event_only: false,
             evolution_enabled: false,
+            rlm_enabled: None,
 
             project: None,
         }];
@@ -8695,6 +8713,7 @@ task = "test"
             gitea_issue: None,
             event_only: false,
             evolution_enabled: false,
+            rlm_enabled: None,
 
             project: None,
         }];
@@ -8784,6 +8803,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             gitea_issue: None,
             event_only: false,
             evolution_enabled: false,
+            rlm_enabled: None,
 
             project: None,
         }];
@@ -9039,6 +9059,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             gitea_issue: None,
             event_only: false,
             evolution_enabled: false,
+            rlm_enabled: None,
             project: None,
         }];
         let mut orch = AgentOrchestrator::new(config).unwrap();
@@ -9105,6 +9126,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
                 on_fail: crate::flow::config::FailStrategy::Abort,
                 provider: None,
                 persona: None,
+                matrix: None,
             }],
         }];
 
@@ -9207,6 +9229,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             gitea_issue: None,
             event_only: false,
             evolution_enabled: false,
+            rlm_enabled: None,
             project: None,
         }];
 
@@ -9302,6 +9325,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
                 gitea_issue: None,
                 event_only: false,
                 evolution_enabled: false,
+                rlm_enabled: None,
                 project: Some("alpha".to_string()),
             }],
             restart_cooldown_secs: 0,
@@ -9597,6 +9621,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             gitea_issue: None,
             event_only: false,
             evolution_enabled: false,
+            rlm_enabled: None,
             project: Some("alpha".to_string()),
         });
         config.pr_dispatch_per_project.insert(
@@ -9997,6 +10022,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             gitea_issue: None,
             event_only: false,
             evolution_enabled: false,
+            rlm_enabled: None,
             project: Some("alpha".to_string()),
         });
         // The per-project block takes precedence over the top-level block,
@@ -10339,6 +10365,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             gitea_issue: None,
             event_only: false,
             evolution_enabled: false,
+            rlm_enabled: None,
             project: Some("alpha".to_string()),
         });
         // The per-project block takes precedence over the top-level block,
@@ -10633,6 +10660,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             gitea_issue: None,
             event_only: false,
             evolution_enabled: false,
+            rlm_enabled: None,
             project: Some("alpha".to_string()),
         });
         config.pr_dispatch = Some(crate::config::PrDispatchConfig {
@@ -10914,6 +10942,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             gitea_issue: None,
             event_only: false,
             evolution_enabled: false,
+            rlm_enabled: None,
             project: Some("alpha".to_string()),
         });
         // The per-project block takes precedence over the top-level block,
@@ -11207,6 +11236,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             gitea_issue: None,
             event_only: true,
             evolution_enabled: false,
+            rlm_enabled: None,
             project: None,
         }];
         // mentions config required so handle_webhook_dispatch does not bail at the top.
@@ -11261,6 +11291,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             gitea_issue: None,
             event_only: true,
             evolution_enabled: false,
+            rlm_enabled: None,
             project: None,
         }];
         config.mentions = Some(crate::config::MentionConfig::default());
@@ -11317,6 +11348,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             gitea_issue: Some(9999),
             event_only: true,
             evolution_enabled: false,
+            rlm_enabled: None,
             project: None,
         };
 

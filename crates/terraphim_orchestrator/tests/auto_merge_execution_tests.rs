@@ -80,11 +80,11 @@ fn minimal_config(working_dir: PathBuf) -> OrchestratorConfig {
         fleet_escalation_repo: None,
         post_merge_gate: None,
         learning: terraphim_orchestrator::LearningConfig::default(),
+        evolution: terraphim_orchestrator::EvolutionConfig::default(),
         pr_dispatch: None,
         pr_dispatch_per_project: Default::default(),
         gitea_skill_repo: None,
         gate_reconcile_interval_ticks: 20,
-        evolution: Default::default(),
     }
 }
 
