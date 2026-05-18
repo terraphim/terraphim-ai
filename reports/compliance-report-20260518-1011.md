@@ -1,6 +1,6 @@
 # Compliance Report — terraphim-ai
-**Date**: 2026-05-18 10:11 CEST  
-**Auditor**: Vigil (security-sentinel)  
+**Date**: 2026-05-18 10:11 CEST
+**Auditor**: Vigil (security-sentinel)
 **Verdict**: CONDITIONAL PASS
 
 ---
@@ -90,7 +90,7 @@ Manual `fmt::Debug` implementations confirmed **present and correct** for:
 
 ### 5.3 NEW FINDING — P2 Gap: `RlmConfig` unredacted Debug
 
-**Severity: P2 (Medium)**  
+**Severity: P2 (Medium)**
 **Location**: `crates/terraphim_rlm/src/config.rs`, line 9
 
 `RlmConfig` uses `#[derive(Debug)]` and contains two credential-bearing fields:

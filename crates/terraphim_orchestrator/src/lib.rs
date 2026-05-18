@@ -8387,7 +8387,7 @@ task = "test"
                 gitea_issue: None,
                 event_only: false,
                 evolution_enabled: false,
-                    rlm_enabled: None,
+                rlm_enabled: None,
 
                 project: None,
             }],
@@ -8506,7 +8506,7 @@ task = "test"
             gitea_issue: None,
             event_only: false,
             evolution_enabled: false,
-                    rlm_enabled: None,
+            rlm_enabled: None,
 
             project: None,
         }];
@@ -8713,7 +8713,7 @@ task = "test"
             gitea_issue: None,
             event_only: false,
             evolution_enabled: false,
-                    rlm_enabled: None,
+            rlm_enabled: None,
 
             project: None,
         }];
@@ -8803,7 +8803,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             gitea_issue: None,
             event_only: false,
             evolution_enabled: false,
-                    rlm_enabled: None,
+            rlm_enabled: None,
 
             project: None,
         }];
@@ -9059,7 +9059,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             gitea_issue: None,
             event_only: false,
             evolution_enabled: false,
-                    rlm_enabled: None,
+            rlm_enabled: None,
             project: None,
         }];
         let mut orch = AgentOrchestrator::new(config).unwrap();
@@ -9229,7 +9229,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             gitea_issue: None,
             event_only: false,
             evolution_enabled: false,
-                    rlm_enabled: None,
+            rlm_enabled: None,
             project: None,
         }];
 
@@ -9325,7 +9325,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
                 gitea_issue: None,
                 event_only: false,
                 evolution_enabled: false,
-                    rlm_enabled: None,
+                rlm_enabled: None,
                 project: Some("alpha".to_string()),
             }],
             restart_cooldown_secs: 0,
@@ -9621,7 +9621,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             gitea_issue: None,
             event_only: false,
             evolution_enabled: false,
-                    rlm_enabled: None,
+            rlm_enabled: None,
             project: Some("alpha".to_string()),
         });
         config.pr_dispatch_per_project.insert(
@@ -10022,7 +10022,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             gitea_issue: None,
             event_only: false,
             evolution_enabled: false,
-                    rlm_enabled: None,
+            rlm_enabled: None,
             project: Some("alpha".to_string()),
         });
         // The per-project block takes precedence over the top-level block,
@@ -10365,7 +10365,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             gitea_issue: None,
             event_only: false,
             evolution_enabled: false,
-                    rlm_enabled: None,
+            rlm_enabled: None,
             project: Some("alpha".to_string()),
         });
         // The per-project block takes precedence over the top-level block,
@@ -10660,7 +10660,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             gitea_issue: None,
             event_only: false,
             evolution_enabled: false,
-                    rlm_enabled: None,
+            rlm_enabled: None,
             project: Some("alpha".to_string()),
         });
         config.pr_dispatch = Some(crate::config::PrDispatchConfig {
@@ -10942,7 +10942,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             gitea_issue: None,
             event_only: false,
             evolution_enabled: false,
-                    rlm_enabled: None,
+            rlm_enabled: None,
             project: Some("alpha".to_string()),
         });
         // The per-project block takes precedence over the top-level block,
@@ -11236,7 +11236,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             gitea_issue: None,
             event_only: true,
             evolution_enabled: false,
-                    rlm_enabled: None,
+            rlm_enabled: None,
             project: None,
         }];
         // mentions config required so handle_webhook_dispatch does not bail at the top.
@@ -11291,7 +11291,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             gitea_issue: None,
             event_only: true,
             evolution_enabled: false,
-                    rlm_enabled: None,
+            rlm_enabled: None,
             project: None,
         }];
         config.mentions = Some(crate::config::MentionConfig::default());
@@ -11348,7 +11348,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             gitea_issue: Some(9999),
             event_only: true,
             evolution_enabled: false,
-                    rlm_enabled: None,
+            rlm_enabled: None,
             project: None,
         };
 

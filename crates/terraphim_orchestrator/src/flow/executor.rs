@@ -282,7 +282,7 @@ impl FlowExecutor {
             event_only: false,
             project: None,
             evolution_enabled: false,
-                    rlm_enabled: None,
+            rlm_enabled: None,
         };
 
         // Build provider for spawner
