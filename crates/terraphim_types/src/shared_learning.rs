@@ -136,8 +136,8 @@ pub trait LearningStore: Send + Sync {
         min_trust: TrustLevel,
         limit: usize,
     ) -> Result<Vec<SharedLearning>, StoreError>;
-    fn record_applied(&self, id: &str) -> Result<(), StoreError>;
-    fn record_effective(&self, id: &str) -> Result<(), StoreError>;
+    fn record_applied(&self, id: &str, applied_by: &str) -> Result<(), StoreError>;
+    fn record_effective(&self, id: &str, applied_by: &str) -> Result<(), StoreError>;
     fn list_by_trust(&self, min_trust: TrustLevel) -> Result<Vec<SharedLearning>, StoreError>;
     fn archive_stale(&self, max_age_days: u32) -> Result<usize, StoreError>;
 }
@@ -220,7 +220,7 @@ impl LearningStore for InMemoryLearningStore {
         Ok(results)
     }
 
-    fn record_applied(&self, id: &str) -> Result<(), StoreError> {
+    fn record_applied(&self, id: &str, applied_by: &str) -> Result<(), StoreError> {
         let mut map = self
             .learnings
             .lock()
@@ -228,14 +228,12 @@ impl LearningStore for InMemoryLearningStore {
         let learning = map
             .get_mut(id)
             .ok_or_else(|| StoreError::NotFound(id.to_string()))?;
-        learning
-            .quality
-            .record_application(&learning.source_agent, false);
+        learning.quality.record_application(applied_by, false);
         learning.updated_at = Utc::now();
         Ok(())
     }
 
-    fn record_effective(&self, id: &str) -> Result<(), StoreError> {
+    fn record_effective(&self, id: &str, applied_by: &str) -> Result<(), StoreError> {
         let mut map = self
             .learnings
             .lock()
@@ -243,9 +241,7 @@ impl LearningStore for InMemoryLearningStore {
         let learning = map
             .get_mut(id)
             .ok_or_else(|| StoreError::NotFound(id.to_string()))?;
-        learning
-            .quality
-            .record_application(&learning.source_agent, true);
+        learning.quality.record_application(applied_by, true);
         learning.updated_at = Utc::now();
         if learning.quality.meets_l2_criteria() && learning.trust_level == TrustLevel::L1 {
             learning.promote_to_l2();
@@ -977,15 +973,19 @@ mod tests {
         );
         let id = store.insert(learning).unwrap();
 
-        store.record_applied(&id).unwrap();
+        store.record_applied(&id, "agent-a").unwrap();
         let l = store.get(&id).unwrap();
         assert_eq!(l.quality.applied_count, 1);
         assert_eq!(l.quality.effective_count, 0);
 
-        store.record_effective(&id).unwrap();
+        store.record_effective(&id, "agent-b").unwrap();
         let l = store.get(&id).unwrap();
         assert_eq!(l.quality.applied_count, 2);
         assert_eq!(l.quality.effective_count, 1);
+        assert_eq!(
+            l.quality.agent_count, 2,
+            "two distinct agents should be counted"
+        );
     }
 
     #[test]
@@ -999,10 +999,15 @@ mod tests {
         );
         let id = store.insert(learning).unwrap();
 
-        store.record_effective(&id).unwrap();
+        // Three applications across two agents satisfies meets_l2_criteria (applied>=3, agent_count>=2)
+        for agent in &["agent", "other", "agent"] {
+            store.record_effective(&id, agent).unwrap();
+        }
         let l = store.get(&id).unwrap();
-        assert_eq!(l.quality.effective_count, 1);
-        assert_eq!(l.trust_level, TrustLevel::L1);
+        assert_eq!(l.quality.effective_count, 3);
+        assert_eq!(l.quality.agent_count, 2);
+        assert!(l.quality.meets_l2_criteria());
+        assert_eq!(l.trust_level, TrustLevel::L2);
     }
 
     #[test]

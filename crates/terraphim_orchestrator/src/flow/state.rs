@@ -1,9 +1,10 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
-use super::envelope::StepEnvelope;
+use super::envelope::{MatrixResult, StepEnvelope};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FlowRunState {
@@ -14,6 +15,10 @@ pub struct FlowRunState {
     pub finished_at: Option<DateTime<Utc>>,
     pub next_step_index: usize,
     pub step_envelopes: Vec<StepEnvelope>,
+    /// Results from matrix-expanded steps. Key is step name; value is the
+    /// ordered list of sub-execution envelopes (one per matrix params row).
+    #[serde(default)]
+    pub matrix_envelopes: HashMap<String, Vec<StepEnvelope>>,
     #[serde(default)]
     pub error: Option<String>,
 }
@@ -38,6 +43,7 @@ impl FlowRunState {
             finished_at: None,
             next_step_index: 0,
             step_envelopes: Vec::new(),
+            matrix_envelopes: HashMap::new(),
             error: None,
         }
     }
@@ -54,6 +60,14 @@ impl FlowRunState {
         self.step_envelopes
             .iter()
             .find(|e| e.step_name == step_name)
+    }
+
+    /// Return aggregated results for a matrix step, or `None` if no matrix
+    /// envelopes exist for that step name.
+    pub fn matrix_result(&self, step_name: &str) -> Option<MatrixResult> {
+        self.matrix_envelopes
+            .get(step_name)
+            .map(|envelopes| MatrixResult::from_envelopes(envelopes))
     }
 
     pub fn save_to_file(&self, dir: &Path) -> std::io::Result<PathBuf> {
@@ -103,6 +117,7 @@ mod tests {
         assert_eq!(state.status, FlowRunStatus::Running);
         assert_eq!(state.next_step_index, 0);
         assert!(state.step_envelopes.is_empty());
+        assert!(state.matrix_envelopes.is_empty());
         assert!(state.error.is_none());
         assert!(state.finished_at.is_none());
 
@@ -145,10 +160,33 @@ mod tests {
     }
 
     #[test]
+    fn test_matrix_result_lookup() {
+        let mut state = FlowRunState::new("test-flow");
+
+        // Populate matrix envelopes for a step
+        state.matrix_envelopes.insert(
+            "run-model".to_string(),
+            vec![
+                create_test_envelope("run-model-matrix-0", 0),
+                create_test_envelope("run-model-matrix-1", 1),
+                create_test_envelope("run-model-matrix-2", 0),
+            ],
+        );
+
+        let result = state.matrix_result("run-model").unwrap();
+        assert_eq!(result.success_count, 2);
+        assert_eq!(result.failure_count, 1);
+        assert_eq!(result.all_exit_codes, "0,1,0");
+
+        // Non-existent matrix step
+        assert!(state.matrix_result("nonexistent").is_none());
+    }
+
+    #[test]
     fn test_state_save_load_roundtrip() {
         let temp_dir = tempfile::tempdir().unwrap();
 
-        // Create a state with some data
+        // Create a state with some data including matrix envelopes
         let mut original = FlowRunState::new("test-flow");
         original.next_step_index = 2;
         original
@@ -157,6 +195,13 @@ mod tests {
         original
             .step_envelopes
             .push(create_test_envelope("analyze", 0));
+        original.matrix_envelopes.insert(
+            "run-model".to_string(),
+            vec![
+                create_test_envelope("run-model-matrix-0", 0),
+                create_test_envelope("run-model-matrix-1", 0),
+            ],
+        );
 
         // Save to file
         let path = original.save_to_file(temp_dir.path()).unwrap();
@@ -175,6 +220,7 @@ mod tests {
         assert_eq!(loaded.next_step_index, original.next_step_index);
         assert_eq!(loaded.step_envelopes.len(), original.step_envelopes.len());
         assert_eq!(loaded.error, original.error);
+        assert_eq!(loaded.matrix_envelopes.len(), 1);
 
         // Verify envelope data
         assert_eq!(loaded.step_envelopes[0].step_name, "gather-changes");

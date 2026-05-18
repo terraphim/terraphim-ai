@@ -6449,7 +6449,7 @@ impl AgentOrchestrator {
                             ExitClass::Success | ExitClass::EmptySuccess => {
                                 tokio::task::block_in_place(|| {
                                     tokio::runtime::Handle::current()
-                                        .block_on(store.record_effective(id))
+                                        .block_on(store.record_effective(id, name))
                                 })
                             }
                             ExitClass::Timeout
@@ -6460,7 +6460,8 @@ impl AgentOrchestrator {
                             | ExitClass::NetworkError
                             | ExitClass::ResourceExhaustion
                             | ExitClass::Crash => tokio::task::block_in_place(|| {
-                                tokio::runtime::Handle::current().block_on(store.record_applied(id))
+                                tokio::runtime::Handle::current()
+                                    .block_on(store.record_applied(id, name))
                             }),
                             _ => continue,
                         };
@@ -9125,6 +9126,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
                 on_fail: crate::flow::config::FailStrategy::Abort,
                 provider: None,
                 persona: None,
+                matrix: None,
             }],
         }];
 

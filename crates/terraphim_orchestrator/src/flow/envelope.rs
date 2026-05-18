@@ -3,6 +3,36 @@ use serde::{Deserialize, Serialize};
 
 const MAX_OUTPUT_BYTES: usize = 512 * 1024; // 512 KB
 
+/// Aggregated view of matrix sub-execution results.
+/// Referenced by `{{steps.<name>.success_count}}` and
+/// `{{steps.<name>.all_exit_codes}}` template variables.
+#[derive(Debug, Clone)]
+pub struct MatrixResult {
+    /// Number of sub-executions that exited with code 0.
+    pub success_count: usize,
+    /// Number of sub-executions that exited with a non-zero code.
+    pub failure_count: usize,
+    /// Comma-separated list of exit codes, in order of completion.
+    pub all_exit_codes: String,
+}
+
+impl MatrixResult {
+    pub fn from_envelopes(envelopes: &[StepEnvelope]) -> Self {
+        let success_count = envelopes.iter().filter(|e| e.exit_code == 0).count();
+        let failure_count = envelopes.len() - success_count;
+        let all_exit_codes = envelopes
+            .iter()
+            .map(|e| e.exit_code.to_string())
+            .collect::<Vec<_>>()
+            .join(",");
+        Self {
+            success_count,
+            failure_count,
+            all_exit_codes,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StepEnvelope {
     pub step_name: String,
@@ -51,6 +81,68 @@ impl StepEnvelope {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn make_envelope(step_name: &str, exit_code: i32) -> StepEnvelope {
+        StepEnvelope {
+            step_name: step_name.to_string(),
+            started_at: Utc::now(),
+            finished_at: Utc::now(),
+            exit_code,
+            stdout: String::new(),
+            stderr: String::new(),
+            cost_usd: None,
+            session_id: None,
+            input_tokens: None,
+            output_tokens: None,
+            stdout_file: None,
+        }
+    }
+
+    #[test]
+    fn test_matrix_result_all_success() {
+        let envelopes = vec![
+            make_envelope("run-model-0", 0),
+            make_envelope("run-model-1", 0),
+            make_envelope("run-model-2", 0),
+        ];
+        let result = MatrixResult::from_envelopes(&envelopes);
+        assert_eq!(result.success_count, 3);
+        assert_eq!(result.failure_count, 0);
+        assert_eq!(result.all_exit_codes, "0,0,0");
+    }
+
+    #[test]
+    fn test_matrix_result_mixed() {
+        let envelopes = vec![
+            make_envelope("run-model-0", 0),
+            make_envelope("run-model-1", 1),
+            make_envelope("run-model-2", 0),
+        ];
+        let result = MatrixResult::from_envelopes(&envelopes);
+        assert_eq!(result.success_count, 2);
+        assert_eq!(result.failure_count, 1);
+        assert_eq!(result.all_exit_codes, "0,1,0");
+    }
+
+    #[test]
+    fn test_matrix_result_all_failed() {
+        let envelopes = vec![
+            make_envelope("run-model-0", 1),
+            make_envelope("run-model-1", 2),
+        ];
+        let result = MatrixResult::from_envelopes(&envelopes);
+        assert_eq!(result.success_count, 0);
+        assert_eq!(result.failure_count, 2);
+        assert_eq!(result.all_exit_codes, "1,2");
+    }
+
+    #[test]
+    fn test_matrix_result_empty() {
+        let result = MatrixResult::from_envelopes(&[]);
+        assert_eq!(result.success_count, 0);
+        assert_eq!(result.failure_count, 0);
+        assert_eq!(result.all_exit_codes, "");
+    }
 
     fn create_test_envelope() -> StepEnvelope {
         StepEnvelope {

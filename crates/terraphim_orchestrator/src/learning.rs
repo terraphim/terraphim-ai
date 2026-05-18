@@ -157,6 +157,9 @@ pub struct Learning {
     pub verify_pattern: Option<String>,
     pub applied_count: u32,
     pub effective_count: u32,
+    /// Distinct agent names that have applied or confirmed this learning.
+    #[serde(default)]
+    pub agent_names: Vec<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub archived_at: Option<DateTime<Utc>>,
@@ -199,11 +202,11 @@ pub trait LearningPersistence: Send + Sync {
         min_trust: TrustLevel,
     ) -> Result<Vec<Learning>, LearningError>;
 
-    /// Increment applied_count.
-    async fn record_applied(&self, id: &str) -> Result<(), LearningError>;
+    /// Increment applied_count and record the applying agent.
+    async fn record_applied(&self, id: &str, applied_by: &str) -> Result<(), LearningError>;
 
-    /// Increment effective_count and auto-promote trust level.
-    async fn record_effective(&self, id: &str) -> Result<(), LearningError>;
+    /// Increment effective_count, record the applying agent, and auto-promote trust level.
+    async fn record_effective(&self, id: &str, applied_by: &str) -> Result<(), LearningError>;
 
     /// Archive stale learnings older than `max_age_days` that are still L0.
     async fn archive_stale(&self, max_age_days: u32) -> Result<usize, LearningError>;
@@ -254,6 +257,7 @@ impl LearningPersistence for InMemoryLearningPersistence {
             verify_pattern: input.verify_pattern,
             applied_count: 0,
             effective_count: 0,
+            agent_names: vec![],
             created_at: now,
             updated_at: now,
             archived_at: None,
@@ -307,13 +311,16 @@ impl LearningPersistence for InMemoryLearningPersistence {
         Ok(results)
     }
 
-    async fn record_applied(&self, id: &str) -> Result<(), LearningError> {
+    async fn record_applied(&self, id: &str, applied_by: &str) -> Result<(), LearningError> {
         let mut data = self
             .data
             .write()
             .map_err(|e| LearningError::Storage(format!("lock poisoned: {e}")))?;
         if let Some(l) = data.get_mut(id) {
             l.applied_count += 1;
+            if !l.agent_names.contains(&applied_by.to_string()) {
+                l.agent_names.push(applied_by.to_string());
+            }
             l.updated_at = Utc::now();
             Ok(())
         } else {
@@ -321,20 +328,24 @@ impl LearningPersistence for InMemoryLearningPersistence {
         }
     }
 
-    async fn record_effective(&self, id: &str) -> Result<(), LearningError> {
+    async fn record_effective(&self, id: &str, applied_by: &str) -> Result<(), LearningError> {
         let mut data = self
             .data
             .write()
             .map_err(|e| LearningError::Storage(format!("lock poisoned: {e}")))?;
         if let Some(l) = data.get_mut(id) {
             l.effective_count += 1;
+            if !l.agent_names.contains(&applied_by.to_string()) {
+                l.agent_names.push(applied_by.to_string());
+            }
             l.updated_at = Utc::now();
-            // Auto-promote
-            l.trust_level = match (l.trust_level, l.effective_count) {
-                (TrustLevel::L0, n) if n >= 1 => TrustLevel::L1,
-                (TrustLevel::L1, n) if n >= 3 => TrustLevel::L2,
-                (TrustLevel::L2, n) if n >= 5 => TrustLevel::L3,
-                (current, _) => current,
+            // Auto-promote; L1→L2 requires at least 2 distinct agents for diversity
+            let agent_count = l.agent_names.len() as u32;
+            l.trust_level = match (l.trust_level, l.effective_count, agent_count) {
+                (TrustLevel::L0, n, _) if n >= 1 => TrustLevel::L1,
+                (TrustLevel::L1, n, a) if n >= 3 && a >= 2 => TrustLevel::L2,
+                (TrustLevel::L2, n, _) if n >= 5 => TrustLevel::L3,
+                (current, _, _) => current,
             };
             Ok(())
         } else {
@@ -505,6 +516,7 @@ impl LearningPersistence for DeviceStorageLearningPersistence {
             verify_pattern: input.verify_pattern,
             applied_count: 0,
             effective_count: 0,
+            agent_names: vec![],
             created_at: now,
             updated_at: now,
             archived_at: None,
@@ -554,12 +566,15 @@ impl LearningPersistence for DeviceStorageLearningPersistence {
         Ok(results)
     }
 
-    async fn record_applied(&self, id: &str) -> Result<(), LearningError> {
+    async fn record_applied(&self, id: &str, applied_by: &str) -> Result<(), LearningError> {
         let mut cache = self.cache.write().await;
         let learning = cache
             .get_mut(id)
             .ok_or_else(|| LearningError::NotFound(id.to_string()))?;
         learning.applied_count += 1;
+        if !learning.agent_names.contains(&applied_by.to_string()) {
+            learning.agent_names.push(applied_by.to_string());
+        }
         learning.updated_at = Utc::now();
         let snapshot = learning.clone();
         drop(cache);
@@ -567,19 +582,23 @@ impl LearningPersistence for DeviceStorageLearningPersistence {
         self.persist_learning(&snapshot).await
     }
 
-    async fn record_effective(&self, id: &str) -> Result<(), LearningError> {
+    async fn record_effective(&self, id: &str, applied_by: &str) -> Result<(), LearningError> {
         let mut cache = self.cache.write().await;
         let learning = cache
             .get_mut(id)
             .ok_or_else(|| LearningError::NotFound(id.to_string()))?;
         learning.effective_count += 1;
+        if !learning.agent_names.contains(&applied_by.to_string()) {
+            learning.agent_names.push(applied_by.to_string());
+        }
         learning.updated_at = Utc::now();
-        // Auto-promote
-        learning.trust_level = match (learning.trust_level, learning.effective_count) {
-            (TrustLevel::L0, n) if n >= 1 => TrustLevel::L1,
-            (TrustLevel::L1, n) if n >= 3 => TrustLevel::L2,
-            (TrustLevel::L2, n) if n >= 5 => TrustLevel::L3,
-            (current, _) => current,
+        // Auto-promote; L1→L2 requires at least 2 distinct agents for diversity
+        let agent_count = learning.agent_names.len() as u32;
+        learning.trust_level = match (learning.trust_level, learning.effective_count, agent_count) {
+            (TrustLevel::L0, n, _) if n >= 1 => TrustLevel::L1,
+            (TrustLevel::L1, n, a) if n >= 3 && a >= 2 => TrustLevel::L2,
+            (TrustLevel::L2, n, _) if n >= 5 => TrustLevel::L3,
+            (current, _, _) => current,
         };
         let snapshot = learning.clone();
         drop(cache);
@@ -682,12 +701,12 @@ impl SharedLearningStore {
             .await
     }
 
-    pub async fn record_applied(&self, id: &str) -> Result<(), LearningError> {
-        self.persistence.record_applied(id).await
+    pub async fn record_applied(&self, id: &str, applied_by: &str) -> Result<(), LearningError> {
+        self.persistence.record_applied(id, applied_by).await
     }
 
-    pub async fn record_effective(&self, id: &str) -> Result<(), LearningError> {
-        self.persistence.record_effective(id).await
+    pub async fn record_effective(&self, id: &str, applied_by: &str) -> Result<(), LearningError> {
+        self.persistence.record_effective(id, applied_by).await
     }
 
     pub async fn archive_stale(&self, max_age_days: u32) -> Result<usize, LearningError> {
@@ -827,6 +846,8 @@ fn to_shared_learning(l: &Learning) -> terraphim_types::shared_learning::SharedL
     sl.verify_pattern = l.verify_pattern.clone();
     sl.quality.applied_count = l.applied_count;
     sl.quality.effective_count = l.effective_count;
+    sl.quality.agent_count = l.agent_names.len() as u32;
+    sl.quality.agent_names = l.agent_names.clone();
     sl.created_at = l.created_at;
     sl.updated_at = l.updated_at;
     sl
@@ -895,16 +916,21 @@ impl terraphim_types::shared_learning::LearningStore for SharedLearningStore {
         Ok(filtered)
     }
 
-    fn record_applied(&self, id: &str) -> Result<(), terraphim_types::shared_learning::StoreError> {
-        block_on(self.persistence.record_applied(id))
+    fn record_applied(
+        &self,
+        id: &str,
+        applied_by: &str,
+    ) -> Result<(), terraphim_types::shared_learning::StoreError> {
+        block_on(self.persistence.record_applied(id, applied_by))
             .map_err(|e| terraphim_types::shared_learning::StoreError::Persistence(e.to_string()))
     }
 
     fn record_effective(
         &self,
         id: &str,
+        applied_by: &str,
     ) -> Result<(), terraphim_types::shared_learning::StoreError> {
-        block_on(self.persistence.record_effective(id))
+        block_on(self.persistence.record_effective(id, applied_by))
             .map_err(|e| terraphim_types::shared_learning::StoreError::Persistence(e.to_string()))
     }
 
@@ -1006,7 +1032,7 @@ mod tests {
             .unwrap();
 
         // L0 → record_effective → L1
-        store.record_effective(&id).await.unwrap();
+        store.record_effective(&id, "agent-a").await.unwrap();
         let l = store.get(&id).await.unwrap().unwrap();
         assert_eq!(l.trust_level, TrustLevel::L1);
 
@@ -1032,7 +1058,7 @@ mod tests {
             .unwrap();
 
         // Promote to L1
-        store.record_effective(&id).await.unwrap();
+        store.record_effective(&id, "sec-sentinel").await.unwrap();
 
         let for_sentinel = store.query_relevant("sec-sentinel").await.unwrap();
         assert_eq!(for_sentinel.len(), 1);
@@ -1057,11 +1083,82 @@ mod tests {
             .await
             .unwrap();
 
-        store.record_effective(&id).await.unwrap();
+        store.record_effective(&id, "test-agent").await.unwrap();
 
         let ctx = store.generate_context("test-agent").await.unwrap();
         assert!(ctx.contains("Known Issues"));
         assert!(ctx.contains("k2p5"));
+    }
+
+    #[tokio::test]
+    async fn test_record_applied_tracks_agent_names() {
+        let store = SharedLearningStore::in_memory();
+
+        let id = store
+            .insert(NewLearning {
+                source_agent: "a".into(),
+                category: LearningCategory::Tip,
+                summary: "test".into(),
+                details: None,
+                applicable_agents: vec![],
+                verify_pattern: None,
+            })
+            .await
+            .unwrap();
+
+        store.record_applied(&id, "agent-a").await.unwrap();
+        store.record_applied(&id, "agent-b").await.unwrap();
+        // Same agent again: should not increase agent count
+        store.record_applied(&id, "agent-a").await.unwrap();
+
+        let l = store.get(&id).await.unwrap().unwrap();
+        assert_eq!(l.applied_count, 3);
+        assert_eq!(
+            l.agent_names.len(),
+            2,
+            "distinct agents: agent-a and agent-b"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_l2_promotion_requires_two_agents() {
+        let store = SharedLearningStore::in_memory();
+
+        let id = store
+            .insert(NewLearning {
+                source_agent: "a".into(),
+                category: LearningCategory::Tip,
+                summary: "diverse test".into(),
+                details: None,
+                applicable_agents: vec![],
+                verify_pattern: None,
+            })
+            .await
+            .unwrap();
+
+        // L0 → L1 (one effective from one agent)
+        store.record_effective(&id, "agent-a").await.unwrap();
+        let l = store.get(&id).await.unwrap().unwrap();
+        assert_eq!(l.trust_level, TrustLevel::L1);
+
+        // Three effectives from ONE agent: should NOT reach L2 (agent_count < 2)
+        store.record_effective(&id, "agent-a").await.unwrap();
+        store.record_effective(&id, "agent-a").await.unwrap();
+        let l = store.get(&id).await.unwrap().unwrap();
+        assert_eq!(
+            l.trust_level,
+            TrustLevel::L1,
+            "single-agent triple should stay L1"
+        );
+
+        // One more from a SECOND agent: now agent_count >= 2 → L2
+        store.record_effective(&id, "agent-b").await.unwrap();
+        let l = store.get(&id).await.unwrap().unwrap();
+        assert_eq!(
+            l.trust_level,
+            TrustLevel::L2,
+            "second distinct agent triggers L2"
+        );
     }
 
     #[tokio::test]
@@ -1084,6 +1181,7 @@ mod tests {
                     verify_pattern: None,
                     applied_count: 0,
                     effective_count: 0,
+                    agent_names: vec![],
                     created_at: Utc::now() - chrono::Duration::days(60),
                     updated_at: Utc::now() - chrono::Duration::days(60),
                     archived_at: None,
@@ -1128,7 +1226,7 @@ mod tests {
         let retrieved = dyn_store.get(&id).unwrap();
         assert_eq!(retrieved.title, "Trait impl test");
 
-        dyn_store.record_effective(&id).unwrap();
+        dyn_store.record_effective(&id, "test-agent").unwrap();
         let after = dyn_store.get(&id).unwrap();
         assert_eq!(after.quality.effective_count, 1);
 
