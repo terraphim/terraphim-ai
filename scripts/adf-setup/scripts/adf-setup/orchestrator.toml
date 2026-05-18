@@ -39,4 +39,4 @@ probe_on_startup = true
 
 [webhook]
 bind = "172.18.0.1:9091"
-secret = "85af336ebec99fe512871106650bce179f9a2b218f40576f76d5ff0a55e7af9a"
+secret = "${ADF_WEBHOOK_SECRET}"
