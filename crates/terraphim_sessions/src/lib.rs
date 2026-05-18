@@ -50,8 +50,6 @@ pub use model::{
 };
 #[cfg(feature = "enrichment")]
 pub use service::SessionCluster;
-#[cfg(feature = "enrichment")]
-pub use service::SessionCluster;
 pub use service::SessionService;
 
 #[cfg(feature = "enrichment")]

@@ -46,6 +46,29 @@ pub mod resource_mapper;
 
 use crate::resource_mapper::TerraphimResourceMapper;
 
+/// Find the terraphim_rlm binary in common locations.
+fn find_terraphim_rlm_binary() -> std::path::PathBuf {
+    // Check ~/.cargo/bin first (typical cargo install location)
+    if let Ok(home) = std::env::var("HOME") {
+        let path = std::path::PathBuf::from(home).join(".cargo/bin/terraphim_rlm");
+        if path.exists() {
+            return path;
+        }
+    }
+    // Try PATH
+    if let Ok(path) = std::process::Command::new("which")
+        .arg("terraphim_rlm")
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+    {
+        if !path.is_empty() {
+            return std::path::PathBuf::from(path);
+        }
+    }
+    // Fallback to bare name and hope it's in PATH
+    std::path::PathBuf::from("terraphim_rlm")
+}
+
 /// Unified error type for the Terraphim MCP server.
 ///
 /// Variants cover the four failure domains: service-layer errors from
@@ -1548,6 +1571,127 @@ impl McpService {
 
         Ok(CallToolResult::success(contents))
     }
+
+    /// Spawn the terraphim_rlm CLI and return the result.
+    async fn spawn_rlm_cli(
+        &self,
+        command: &str,
+        arguments: Option<serde_json::Map<String, serde_json::Value>>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let args = arguments.unwrap_or_default();
+
+        // Extract session_id or use "auto"
+        let session_id = args
+            .get("session_id")
+            .and_then(|v| v.as_str())
+            .unwrap_or("auto")
+            .to_string();
+
+        // Build the JSON args for stdin (excluding session_id)
+        let mut stdin_args = args.clone();
+        stdin_args.remove("session_id");
+        let stdin_json = serde_json::to_string(&stdin_args).map_err(|e| {
+            ErrorData::internal_error(format!("Failed to serialize args: {}", e), None)
+        })?;
+
+        // Find the terraphim_rlm binary
+        let binary_path = find_terraphim_rlm_binary();
+
+        tracing::info!(
+            "Spawning terraphim_rlm {} --session-id {}",
+            command,
+            session_id
+        );
+
+        let mut child = tokio::process::Command::new(&binary_path)
+            .arg(command)
+            .arg("--session-id")
+            .arg(&session_id)
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .map_err(|e| {
+                ErrorData::internal_error(format!("Failed to spawn terraphim_rlm: {}", e), None)
+            })?;
+
+        // Write JSON args to stdin
+        if let Some(mut stdin) = child.stdin.take() {
+            use tokio::io::AsyncWriteExt;
+            stdin.write_all(stdin_json.as_bytes()).await.map_err(|e| {
+                ErrorData::internal_error(
+                    format!("Failed to write to terraphim_rlm stdin: {}", e),
+                    None,
+                )
+            })?;
+            stdin.shutdown().await.map_err(|e| {
+                ErrorData::internal_error(
+                    format!("Failed to close terraphim_rlm stdin: {}", e),
+                    None,
+                )
+            })?;
+        }
+
+        let output = child.wait_with_output().await.map_err(|e| {
+            ErrorData::internal_error(format!("terraphim_rlm process failed: {}", e), None)
+        })?;
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+
+        if !output.status.success() {
+            tracing::error!(
+                "terraphim_rlm exited with code {:?}: stderr={}",
+                output.status.code(),
+                stderr
+            );
+            return Ok(CallToolResult::error(vec![Content::text(format!(
+                "RLM execution failed (exit code {:?}):\nstdout: {}\nstderr: {}",
+                output.status.code(),
+                stdout,
+                stderr
+            ))]));
+        }
+
+        // Parse the JSON response
+        match serde_json::from_str::<serde_json::Value>(&stdout) {
+            Ok(response) => {
+                if response
+                    .get("success")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false)
+                {
+                    let data = response
+                        .get("data")
+                        .cloned()
+                        .unwrap_or(serde_json::Value::Null);
+                    Ok(CallToolResult::success(vec![Content::text(
+                        serde_json::to_string_pretty(&data).unwrap_or_else(|_| data.to_string()),
+                    )]))
+                } else {
+                    let error = response
+                        .get("error")
+                        .and_then(|e| e.get("message"))
+                        .and_then(|m| m.as_str())
+                        .unwrap_or("Unknown RLM error");
+                    Ok(CallToolResult::error(vec![Content::text(
+                        error.to_string(),
+                    )]))
+                }
+            }
+            Err(e) => {
+                tracing::error!(
+                    "Failed to parse terraphim_rlm output: {}. stdout: {}",
+                    e,
+                    stdout
+                );
+                Ok(CallToolResult::error(vec![Content::text(format!(
+                    "Failed to parse RLM output: {}\nRaw output: {}",
+                    e, stdout
+                ))]))
+            }
+        }
+    }
 }
 
 impl ServerHandler for McpService {
@@ -2035,6 +2179,167 @@ impl ServerHandler for McpService {
                 annotations: None,
                 icons: None,
                 meta: None,
+            },
+            // RLM tools
+            Tool {
+                name: "rlm_code".into(),
+                title: Some("Execute Python Code".into()),
+                description: Some("Execute Python code in an isolated execution environment. Returns stdout, stderr, and exit status.".into()),
+                input_schema: Arc::new(serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "code": {
+                            "type": "string",
+                            "description": "Python code to execute"
+                        },
+                        "session_id": {
+                            "type": "string",
+                            "description": "Optional session ID (auto-created if not provided)"
+                        },
+                        "timeout_ms": {
+                            "type": "integer",
+                            "description": "Optional execution timeout in milliseconds"
+                        }
+                    },
+                    "required": ["code"]
+                }).as_object().unwrap().clone()),
+                output_schema: None,
+                annotations: None,
+                icons: None,
+                meta: None,
+            },
+            Tool {
+                name: "rlm_bash".into(),
+                title: Some("Execute Bash Command".into()),
+                description: Some("Execute a bash command in an isolated execution environment.".into()),
+                input_schema: Arc::new(serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "command": {
+                            "type": "string",
+                            "description": "Bash command to execute"
+                        },
+                        "session_id": {
+                            "type": "string",
+                            "description": "Optional session ID (auto-created if not provided)"
+                        },
+                        "timeout_ms": {
+                            "type": "integer",
+                            "description": "Optional execution timeout in milliseconds"
+                        }
+                    },
+                    "required": ["command"]
+                }).as_object().unwrap().clone()),
+                output_schema: None,
+                annotations: None,
+                icons: None,
+                meta: None,
+            },
+            Tool {
+                name: "rlm_query".into(),
+                title: Some("Query LLM".into()),
+                description: Some("Query the LLM from within an RLM session.".into()),
+                input_schema: Arc::new(serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "prompt": {
+                            "type": "string",
+                            "description": "The prompt/query to send to the LLM"
+                        },
+                        "session_id": {
+                            "type": "string",
+                            "description": "Optional session ID (auto-created if not provided)"
+                        }
+                    },
+                    "required": ["prompt"]
+                }).as_object().unwrap().clone()),
+                output_schema: None,
+                annotations: None,
+                icons: None,
+                meta: None,
+            },
+            Tool {
+                name: "rlm_context".into(),
+                title: Some("Manage Context Variables".into()),
+                description: Some("Manage context variables within an RLM session.".into()),
+                input_schema: Arc::new(serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "action": {
+                            "type": "string",
+                            "enum": ["get", "set", "list", "delete"],
+                            "description": "The action to perform"
+                        },
+                        "session_id": {
+                            "type": "string",
+                            "description": "Optional session ID (auto-created if not provided)"
+                        },
+                        "key": {
+                            "type": "string",
+                            "description": "Variable key"
+                        },
+                        "value": {
+                            "type": "string",
+                            "description": "Variable value (for set)"
+                        }
+                    },
+                    "required": ["action"]
+                }).as_object().unwrap().clone()),
+                output_schema: None,
+                annotations: None,
+                icons: None,
+                meta: None,
+            },
+            Tool {
+                name: "rlm_snapshot".into(),
+                title: Some("Manage VM Snapshots".into()),
+                description: Some("Manage execution environment snapshots for rollback support.".into()),
+                input_schema: Arc::new(serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "action": {
+                            "type": "string",
+                            "enum": ["create", "restore", "list", "delete"],
+                            "description": "The snapshot action"
+                        },
+                        "session_id": {
+                            "type": "string",
+                            "description": "Optional session ID (auto-created if not provided)"
+                        },
+                        "snapshot_name": {
+                            "type": "string",
+                            "description": "Name for the snapshot"
+                        }
+                    },
+                    "required": ["action"]
+                }).as_object().unwrap().clone()),
+                output_schema: None,
+                annotations: None,
+                icons: None,
+                meta: None,
+            },
+            Tool {
+                name: "rlm_status".into(),
+                title: Some("Get Session Status".into()),
+                description: Some("Get the status of an RLM session.".into()),
+                input_schema: Arc::new(serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "session_id": {
+                            "type": "string",
+                            "description": "Optional session ID (auto-created if not provided)"
+                        },
+                        "include_history": {
+                            "type": "boolean",
+                            "description": "Whether to include command history"
+                        }
+                    },
+                    "required": []
+                }).as_object().unwrap().clone()),
+                output_schema: None,
+                annotations: None,
+                icons: None,
+                meta: None,
             }
         ];
 
@@ -2488,6 +2793,13 @@ impl ServerHandler for McpService {
                 self.multi_grep_files(patterns, path, constraints, limit, cursor, output_mode)
                     .await
             }
+            // RLM tools - spawn terraphim_rlm CLI
+            "rlm_code" => self.spawn_rlm_cli("code", request.arguments).await,
+            "rlm_bash" => self.spawn_rlm_cli("bash", request.arguments).await,
+            "rlm_query" => self.spawn_rlm_cli("query", request.arguments).await,
+            "rlm_context" => self.spawn_rlm_cli("context", request.arguments).await,
+            "rlm_snapshot" => self.spawn_rlm_cli("snapshot", request.arguments).await,
+            "rlm_status" => self.spawn_rlm_cli("status", request.arguments).await,
             _ => Err(ErrorData::method_not_found::<
                 rmcp::model::CallToolRequestMethod,
             >()),
