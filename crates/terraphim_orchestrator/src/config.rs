@@ -768,6 +768,13 @@ pub struct AgentDefinition {
     /// and top-level `evolution.enabled = true`). Default: false.
     #[serde(default)]
     pub evolution_enabled: bool,
+    /// Enable RLM sandboxed code execution for this agent.
+    /// When Some(true), the orchestrator injects RLM session info
+    /// into the agent prompt, enabling the agent to request
+    /// isolated code execution via terraphim_rlm.
+    /// Default: None (disabled).
+    #[serde(default)]
+    pub rlm_enabled: Option<bool>,
 }
 
 /// Agent layer in the dark factory hierarchy.

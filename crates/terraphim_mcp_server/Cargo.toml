@@ -17,7 +17,7 @@ rmcp = { version = "0.9.0", features = ["server", "transport-sse-server", "trans
 serde_json = { workspace = true }
 
 fff-search = { git = "https://github.com/AlexMikhalev/fff.nvim.git", branch = "feat/external-scorer" }
-terraphim_automata = { path = "../terraphim_automata" }
+terraphim_automata = { path = "../terraphim_automata", features = ["tokio-runtime"] }
 terraphim_config = { path = "../terraphim_config" }
 terraphim_file_search = { path = "../terraphim_file_search" }
 terraphim_hooks = { path = "../terraphim_hooks" }

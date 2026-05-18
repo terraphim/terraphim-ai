@@ -83,6 +83,7 @@ fn test_config(working_dir: PathBuf) -> OrchestratorConfig {
                 gitea_issue: None,
                 event_only: false,
                 evolution_enabled: false,
+                    rlm_enabled: None,
 
                 project: None,
             },
@@ -110,6 +111,7 @@ fn test_config(working_dir: PathBuf) -> OrchestratorConfig {
                 gitea_issue: None,
                 event_only: false,
                 evolution_enabled: false,
+                    rlm_enabled: None,
 
                 project: None,
             },
@@ -137,6 +139,7 @@ fn test_config(working_dir: PathBuf) -> OrchestratorConfig {
                 gitea_issue: None,
                 event_only: false,
                 evolution_enabled: false,
+                    rlm_enabled: None,
 
                 project: None,
             },
@@ -168,11 +171,11 @@ fn test_config(working_dir: PathBuf) -> OrchestratorConfig {
         fleet_escalation_repo: None,
         post_merge_gate: None,
         learning: terraphim_orchestrator::LearningConfig::default(),
+        evolution: terraphim_orchestrator::EvolutionConfig::default(),
         pr_dispatch: None,
         pr_dispatch_per_project: Default::default(),
         gitea_skill_repo: None,
         gate_reconcile_interval_ticks: 20,
-        evolution: Default::default(),
     }
 }
 
@@ -693,4 +696,42 @@ async fn test_spawn_agent_proceeds_with_git_diff_findings() {
     let result = orch.spawn_agent_for_test("sentinel").await;
     assert!(result.is_ok());
     assert!(orch.is_agent_active("sentinel")); // changes match crates/ watch_path
+}
+
+#[test]
+fn test_rlm_enabled_field_defaults_none() {
+    let toml_str = r#"
+        name = "test-agent"
+        layer = "Core"
+        cli_tool = "claude"
+        task = "do something"
+    "#;
+    let def: terraphim_orchestrator::AgentDefinition = toml::from_str(toml_str).unwrap();
+    assert_eq!(def.rlm_enabled, None);
+}
+
+#[test]
+fn test_rlm_enabled_field_parses_true() {
+    let toml_str = r#"
+        name = "test-agent"
+        layer = "Core"
+        cli_tool = "claude"
+        task = "do something"
+        rlm_enabled = true
+    "#;
+    let def: terraphim_orchestrator::AgentDefinition = toml::from_str(toml_str).unwrap();
+    assert_eq!(def.rlm_enabled, Some(true));
+}
+
+#[test]
+fn test_rlm_enabled_field_parses_false() {
+    let toml_str = r#"
+        name = "test-agent"
+        layer = "Core"
+        cli_tool = "claude"
+        task = "do something"
+        rlm_enabled = false
+    "#;
+    let def: terraphim_orchestrator::AgentDefinition = toml::from_str(toml_str).unwrap();
+    assert_eq!(def.rlm_enabled, Some(false));
 }

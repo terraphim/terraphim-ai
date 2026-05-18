@@ -41,6 +41,7 @@ fn project_agent(name: &str, project: Option<&str>) -> AgentDefinition {
         gitea_issue: None,
         event_only: false,
         evolution_enabled: false,
+                    rlm_enabled: None,
         project: project.map(|s| s.to_string()),
     }
 }
@@ -100,11 +101,11 @@ fn test_config_with_pause(
         fleet_escalation_repo: None,
         post_merge_gate: None,
         learning: terraphim_orchestrator::LearningConfig::default(),
+        evolution: terraphim_orchestrator::EvolutionConfig::default(),
         pr_dispatch: None,
         pr_dispatch_per_project: Default::default(),
         gitea_skill_repo: None,
         gate_reconcile_interval_ticks: 20,
-        evolution: Default::default(),
     }
 }
 

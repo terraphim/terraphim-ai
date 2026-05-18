@@ -306,6 +306,7 @@ fn agent_with_model(name: &str, model: &str) -> AgentDefinition {
         gitea_issue: None,
         event_only: false,
         evolution_enabled: false,
+                    rlm_enabled: None,
         project: None,
     }
 }
@@ -362,11 +363,11 @@ fn budget_aware_config(
         fleet_escalation_repo: None,
         post_merge_gate: None,
         learning: terraphim_orchestrator::LearningConfig::default(),
+        evolution: terraphim_orchestrator::EvolutionConfig::default(),
         pr_dispatch: None,
         pr_dispatch_per_project: Default::default(),
         gitea_skill_repo: None,
         gate_reconcile_interval_ticks: 20,
-        evolution: Default::default(),
     }
 }
 

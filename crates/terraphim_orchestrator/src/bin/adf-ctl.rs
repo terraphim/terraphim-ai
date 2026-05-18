@@ -4,9 +4,10 @@
 //! to the orchestrator webhook endpoint. Requires SSH access to bigbox.
 
 use anyhow::{bail, Context, Result};
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use hmac::{Hmac, Mac};
 use jiff::Timestamp;
+use serde::Serialize;
 use sha2::Sha256;
 use std::io::Write;
 use std::process::{Command, Stdio};
@@ -23,6 +24,17 @@ const DEFAULT_WAIT_TIMEOUT_SECS: u64 = 1200;
 struct Cli {
     #[command(subcommand)]
     command: AdfSub,
+}
+
+/// Output format for subcommands that support both human-readable text and
+/// machine-parseable JSON. Default is `Human` for back-compatibility; the
+/// `adf-orchestrate` skill and other automation should pass `--format json`.
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, ValueEnum)]
+#[clap(rename_all = "lowercase")]
+enum OutputFormat {
+    #[default]
+    Human,
+    Json,
 }
 
 #[derive(Subcommand, Debug)]
@@ -58,6 +70,9 @@ enum AdfSub {
         /// journalctl --since value (e.g. 1h, 30m)
         #[arg(long, default_value = "1h")]
         since: String,
+        /// Output format: human (default) or json for automation
+        #[arg(long, value_enum, default_value_t)]
+        format: OutputFormat,
     },
     /// Kill a running agent by name [best-effort via SSH pgrep]
     Cancel {
@@ -72,6 +87,9 @@ enum AdfSub {
         /// SSH host alias
         #[arg(long, default_value = DEFAULT_HOST)]
         host: String,
+        /// Output format: human (default) or json for automation
+        #[arg(long, value_enum, default_value_t)]
+        format: OutputFormat,
     },
 }
 
@@ -99,9 +117,13 @@ fn run(sub: AdfSub) -> Result<()> {
             wait,
             timeout,
         ),
-        AdfSub::Status { host, since } => cmd_status(&host, &since),
+        AdfSub::Status {
+            host,
+            since,
+            format,
+        } => cmd_status(&host, &since, format),
         AdfSub::Cancel { name, host } => cmd_cancel(&name, &host),
-        AdfSub::Agents { host } => cmd_agents(&host),
+        AdfSub::Agents { host, format } => cmd_agents(&host, format),
     }
 }
 
@@ -306,34 +328,113 @@ fn wait_for_agent_exit(name: &str, host: &str, timeout_secs: u64) -> Result<()> 
     }
 }
 
-fn cmd_status(host: &str, since: &str) -> Result<()> {
-    println!("[best-effort via SSH process scan; not authoritative without admin socket]");
-    println!();
-
-    println!("=== Recent agent activity (last {}) ===", since);
+fn cmd_status(host: &str, since: &str, format: OutputFormat) -> Result<()> {
     let journal_cmd = format!(
         "journalctl -u adf-orchestrator --since '{} ago' --no-pager 2>/dev/null \
          | grep -E 'exit classified|spawning agent|Agent spawned' | tail -30",
         since
     );
-    let (stdout, stderr, _) = ssh_run(host, &journal_cmd)?;
-    if !stderr.is_empty() {
-        eprintln!("ssh stderr: {}", stderr);
-    }
-    if stdout.trim().is_empty() {
-        println!("(no recent activity found)");
-    } else {
-        print!("{}", stdout);
-    }
+    let (journal_stdout, journal_stderr, _) = ssh_run(host, &journal_cmd)?;
 
-    println!();
-    println!("=== Running claude processes ===");
     let pgrep_cmd = "ps -o pid,etimes,cputime,comm -p $(pgrep -d, claude 2>/dev/null) 2>/dev/null \
                      || echo '(no claude processes running)'";
-    let (stdout, _, _) = ssh_run(host, pgrep_cmd)?;
-    print!("{}", stdout);
+    let (pgrep_stdout, _, _) = ssh_run(host, pgrep_cmd)?;
+
+    let activity = parse_journal_activity(&journal_stdout);
+    let processes = parse_running_processes(&pgrep_stdout);
+
+    match format {
+        OutputFormat::Human => {
+            println!("[best-effort via SSH process scan; not authoritative without admin socket]");
+            println!();
+            println!("=== Recent agent activity (last {}) ===", since);
+            if !journal_stderr.is_empty() {
+                eprintln!("ssh stderr: {}", journal_stderr);
+            }
+            if journal_stdout.trim().is_empty() {
+                println!("(no recent activity found)");
+            } else {
+                print!("{}", journal_stdout);
+            }
+            println!();
+            println!("=== Running claude processes ===");
+            print!("{}", pgrep_stdout);
+        }
+        OutputFormat::Json => {
+            let report = StatusReport {
+                host,
+                since,
+                recent_activity: activity,
+                running_processes: processes,
+                best_effort: true,
+                note: "best-effort via SSH process scan; not authoritative without admin socket",
+            };
+            println!("{}", serde_json::to_string_pretty(&report)?);
+        }
+    }
 
     Ok(())
+}
+
+#[derive(Debug, Serialize)]
+struct StatusReport<'a> {
+    host: &'a str,
+    since: &'a str,
+    recent_activity: Vec<JournalEvent>,
+    running_processes: Vec<ProcessInfo>,
+    best_effort: bool,
+    note: &'a str,
+}
+
+#[derive(Debug, Serialize, PartialEq, Eq)]
+struct JournalEvent {
+    line: String,
+}
+
+#[derive(Debug, Serialize, PartialEq, Eq)]
+struct ProcessInfo {
+    pid: String,
+    etimes: String,
+    cputime: String,
+    comm: String,
+}
+
+/// Parse `journalctl` output filtered for orchestrator events into structured
+/// records. Empty input or a single placeholder line yields an empty Vec so
+/// JSON consumers see a stable `[]` rather than a noisy string.
+fn parse_journal_activity(stdout: &str) -> Vec<JournalEvent> {
+    stdout
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty())
+        .map(|l| JournalEvent {
+            line: l.to_string(),
+        })
+        .collect()
+}
+
+/// Parse `ps -o pid,etimes,cputime,comm` output. The header row is dropped, as
+/// is the `(no claude processes running)` fallback emitted by the shell when
+/// `pgrep` matches nothing.
+fn parse_running_processes(stdout: &str) -> Vec<ProcessInfo> {
+    stdout
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty() && !l.starts_with("PID") && !l.starts_with("(no claude"))
+        .filter_map(|l| {
+            let mut parts = l.split_whitespace();
+            let pid = parts.next()?.to_string();
+            let etimes = parts.next()?.to_string();
+            let cputime = parts.next()?.to_string();
+            let comm = parts.next()?.to_string();
+            Some(ProcessInfo {
+                pid,
+                etimes,
+                cputime,
+                comm,
+            })
+        })
+        .collect()
 }
 
 fn cmd_cancel(name: &str, host: &str) -> Result<()> {
@@ -375,7 +476,7 @@ fn cmd_cancel(name: &str, host: &str) -> Result<()> {
     Ok(())
 }
 
-fn cmd_agents(host: &str) -> Result<()> {
+fn cmd_agents(host: &str, format: OutputFormat) -> Result<()> {
     let cmd = "grep '^name = ' /opt/ai-dark-factory/conf.d/*.toml \
                /opt/ai-dark-factory/orchestrator.toml 2>/dev/null \
                | awk -F'\"' '{print $2}' | sort -u";
@@ -384,14 +485,38 @@ fn cmd_agents(host: &str) -> Result<()> {
         eprintln!("ssh stderr: {}", stderr);
         bail!("Failed to list agents from {}", host);
     }
-    println!("Configured agents on {}:", host);
-    for agent in stdout.lines() {
-        let a = agent.trim();
-        if !a.is_empty() {
-            println!("  {}", a);
+    let agents = parse_agents_list(&stdout);
+
+    match format {
+        OutputFormat::Human => {
+            println!("Configured agents on {}:", host);
+            for a in &agents {
+                println!("  {}", a);
+            }
+        }
+        OutputFormat::Json => {
+            let report = AgentsReport { host, agents };
+            println!("{}", serde_json::to_string_pretty(&report)?);
         }
     }
     Ok(())
+}
+
+#[derive(Debug, Serialize)]
+struct AgentsReport<'a> {
+    host: &'a str,
+    agents: Vec<String>,
+}
+
+/// Parse the deduplicated agent-name list emitted by the remote grep+awk
+/// pipeline. Empty lines are dropped so JSON consumers see only real names.
+fn parse_agents_list(stdout: &str) -> Vec<String> {
+    stdout
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty())
+        .map(str::to_string)
+        .collect()
 }
 
 #[cfg(test)]
@@ -446,6 +571,101 @@ mod tests {
         assert!(!sig.is_empty());
         assert!(sig.chars().all(|c| c.is_ascii_hexdigit()));
         assert_eq!(sig.len(), 64);
+    }
+
+    #[test]
+    fn test_parse_agents_list_basic() {
+        let stdout = "meta-learning\nsecurity-sentinel\nbuild-runner\n";
+        let parsed = parse_agents_list(stdout);
+        assert_eq!(
+            parsed,
+            vec![
+                "meta-learning".to_string(),
+                "security-sentinel".to_string(),
+                "build-runner".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_parse_agents_list_drops_blank_lines() {
+        let stdout = "\n\nmeta-learning\n\n  \nsecurity-sentinel\n";
+        let parsed = parse_agents_list(stdout);
+        assert_eq!(
+            parsed,
+            vec!["meta-learning".to_string(), "security-sentinel".to_string()]
+        );
+    }
+
+    #[test]
+    fn test_parse_agents_list_empty_returns_empty() {
+        assert!(parse_agents_list("").is_empty());
+        assert!(parse_agents_list("\n\n\n").is_empty());
+    }
+
+    #[test]
+    fn test_agents_report_json_shape() {
+        let report = AgentsReport {
+            host: "bigbox",
+            agents: vec!["meta-learning".to_string(), "build-runner".to_string()],
+        };
+        let json = serde_json::to_value(&report).unwrap();
+        assert_eq!(json["host"], "bigbox");
+        assert_eq!(json["agents"][0], "meta-learning");
+        assert_eq!(json["agents"][1], "build-runner");
+        assert_eq!(json["agents"].as_array().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn test_parse_journal_activity_filters_blanks() {
+        let stdout = "May 16 12:00 exit classified agent=meta-learning exit_class=success\n\n\
+                      May 16 12:05 spawning agent=build-runner\n";
+        let parsed = parse_journal_activity(stdout);
+        assert_eq!(parsed.len(), 2);
+        assert!(parsed[0].line.contains("meta-learning"));
+        assert!(parsed[1].line.contains("build-runner"));
+    }
+
+    #[test]
+    fn test_parse_running_processes_strips_header_and_placeholder() {
+        let stdout = "  PID  ELAPSED     TIME COMMAND\n\
+                      12345     3600 00:05:23 claude\n\
+                      12346      120 00:00:11 claude\n";
+        let parsed = parse_running_processes(stdout);
+        assert_eq!(parsed.len(), 2);
+        assert_eq!(parsed[0].pid, "12345");
+        assert_eq!(parsed[0].etimes, "3600");
+        assert_eq!(parsed[0].cputime, "00:05:23");
+        assert_eq!(parsed[0].comm, "claude");
+    }
+
+    #[test]
+    fn test_parse_running_processes_no_claude_placeholder() {
+        let parsed = parse_running_processes("(no claude processes running)\n");
+        assert!(parsed.is_empty());
+    }
+
+    #[test]
+    fn test_status_report_json_includes_best_effort_flag() {
+        let report = StatusReport {
+            host: "bigbox",
+            since: "1h",
+            recent_activity: vec![],
+            running_processes: vec![],
+            best_effort: true,
+            note: "test",
+        };
+        let json = serde_json::to_value(&report).unwrap();
+        assert_eq!(json["host"], "bigbox");
+        assert_eq!(json["since"], "1h");
+        assert_eq!(json["best_effort"], true);
+        assert!(json["recent_activity"].is_array());
+        assert!(json["running_processes"].is_array());
+    }
+
+    #[test]
+    fn test_output_format_default_is_human() {
+        assert_eq!(OutputFormat::default(), OutputFormat::Human);
     }
 
     #[test]

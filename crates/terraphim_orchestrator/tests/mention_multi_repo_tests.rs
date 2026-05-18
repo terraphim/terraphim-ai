@@ -41,6 +41,7 @@ fn agent(name: &str, project: Option<&str>) -> AgentDefinition {
         gitea_issue: None,
         event_only: false,
         evolution_enabled: false,
+                    rlm_enabled: None,
         project: project.map(|s| s.to_string()),
     }
 }

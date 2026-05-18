@@ -255,7 +255,7 @@ feat(module): short description Refs #IDX
 ### Model Rules for Bigbox Agents
 
 Use ONLY subscription-based models:
-- `kimi-for-coding/k2p5` -- Moonshot subscription (implementation)
+- `kimi-for-coding/k2p6` -- Moonshot subscription (implementation)
 - `opencode-go/minimax-m2.5` -- MiniMax subscription
 - `/home/alex/.local/bin/claude --model sonnet` -- Anthropic subscription (verification)
 - `codex` -- ChatGPT OAuth
