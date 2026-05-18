@@ -438,6 +438,219 @@ pub struct SessionStatistics {
     pub sessions_by_source: HashMap<String, usize>,
 }
 
+
+/// A cluster of sessions grouped by concept similarity
+#[cfg(feature = "enrichment")]
+#[derive(Debug, Clone)]
+pub struct SessionCluster {
+    /// Cluster ID (1-indexed)
+    pub id: usize,
+    /// Sessions belonging to this cluster
+    pub sessions: Vec<Session>,
+    /// Top concepts shared across sessions in this cluster
+    pub dominant_concepts: Vec<String>,
+}
+
+/// Jaccard similarity between two concept sets
+#[cfg(feature = "enrichment")]
+fn jaccard_similarity(
+    a: &std::collections::HashSet<String>,
+    b: &std::collections::HashSet<String>,
+) -> f64 {
+    let intersection = a.iter().filter(|k| b.contains(*k)).count();
+    let union = a.len() + b.len() - intersection;
+    if union == 0 {
+        0.0
+    } else {
+        intersection as f64 / union as f64
+    }
+}
+
+/// Average Jaccard similarity between all pairs across two clusters
+#[cfg(feature = "enrichment")]
+fn average_cluster_similarity(
+    ca: &[usize],
+    cb: &[usize],
+    concept_sets: &[std::collections::HashSet<String>],
+) -> f64 {
+    let mut total = 0.0_f64;
+    let mut count = 0_usize;
+    for &i in ca {
+        for &j in cb {
+            total += jaccard_similarity(&concept_sets[i], &concept_sets[j]);
+            count += 1;
+        }
+    }
+    if count == 0 {
+        0.0
+    } else {
+        total / count as f64
+    }
+}
+
+impl SessionService {
+    /// Cluster sessions by concept similarity using Jaccard coefficient.
+    ///
+    /// Sessions are partitioned into groups where any two members share at least
+    /// 10% of their concept vocabulary. Sessions without enrichment data are
+    /// collected in a final "uncategorised" cluster.
+    ///
+    /// Set `k` to cap the number of concept-based clusters (smallest clusters
+    /// are merged iteratively). Set `min_sessions` to suppress clusters smaller
+    /// than a given size.
+    #[cfg(feature = "enrichment")]
+    pub async fn cluster_by_concepts(
+        &self,
+        k: Option<usize>,
+        min_sessions: Option<usize>,
+    ) -> Vec<SessionCluster> {
+        use std::collections::{HashMap, HashSet};
+
+        if let Err(e) = self.maybe_auto_import().await {
+            tracing::warn!("Auto-import check failed: {}", e);
+        }
+
+        let cache = self.cache.read().await;
+        let sessions: Vec<Session> = cache.values().cloned().collect();
+        drop(cache);
+
+        if sessions.is_empty() {
+            return Vec::new();
+        }
+
+        let min_size = min_sessions.unwrap_or(1);
+        const THRESHOLD: f64 = 0.1;
+
+        // Partition into enriched (with concepts) and unenriched
+        let mut enriched_sessions: Vec<Session> = Vec::new();
+        let mut enriched_concepts: Vec<HashSet<String>> = Vec::new();
+        let mut unenriched: Vec<Session> = Vec::new();
+
+        for session in sessions {
+            if let Some(ref sc) = session.metadata.enrichment {
+                if !sc.concepts.is_empty() {
+                    let concept_set: HashSet<String> = sc.concepts.keys().cloned().collect();
+                    enriched_sessions.push(session);
+                    enriched_concepts.push(concept_set);
+                    continue;
+                }
+            }
+            unenriched.push(session);
+        }
+
+        // Greedy single-pass clustering with average-linkage threshold
+        let n = enriched_sessions.len();
+        let mut cluster_ids: Vec<Option<usize>> = vec![None; n];
+        let mut next_id = 0_usize;
+
+        for i in 0..n {
+            if cluster_ids[i].is_some() {
+                continue;
+            }
+            let cid = next_id;
+            next_id += 1;
+            cluster_ids[i] = Some(cid);
+
+            for j in (i + 1)..n {
+                if cluster_ids[j].is_some() {
+                    continue;
+                }
+                let members: Vec<usize> = (0..=i)
+                    .filter(|&x| cluster_ids[x] == Some(cid))
+                    .collect();
+                let avg_sim: f64 = members
+                    .iter()
+                    .map(|&m| jaccard_similarity(&enriched_concepts[m], &enriched_concepts[j]))
+                    .sum::<f64>()
+                    / members.len() as f64;
+                if avg_sim >= THRESHOLD {
+                    cluster_ids[j] = Some(cid);
+                }
+            }
+        }
+
+        // Build cluster index lists
+        let mut cluster_map: HashMap<usize, Vec<usize>> = HashMap::new();
+        for (i, cid) in cluster_ids.iter().enumerate() {
+            if let Some(c) = cid {
+                cluster_map.entry(*c).or_default().push(i);
+            }
+        }
+        let mut cluster_vec: Vec<Vec<usize>> = cluster_map.into_values().collect();
+        cluster_vec.sort_by(|a, b| b.len().cmp(&a.len()));
+
+        // Merge down to k clusters if requested
+        if let Some(max_k) = k {
+            while cluster_vec.len() > max_k && cluster_vec.len() >= 2 {
+                let nc = cluster_vec.len();
+                let mut best_sim = -1.0_f64;
+                let mut best = (0usize, 1usize);
+                for i in 0..nc {
+                    for j in (i + 1)..nc {
+                        let sim = average_cluster_similarity(
+                            &cluster_vec[i],
+                            &cluster_vec[j],
+                            &enriched_concepts,
+                        );
+                        if sim > best_sim {
+                            best_sim = sim;
+                            best = (i, j);
+                        }
+                    }
+                }
+                let (a, b) = best;
+                let to_merge = cluster_vec.remove(b);
+                cluster_vec[a].extend(to_merge);
+            }
+        }
+
+        // Convert index lists to SessionCluster
+        let mut result: Vec<SessionCluster> = cluster_vec
+            .into_iter()
+            .filter(|indices| indices.len() >= min_size)
+            .enumerate()
+            .map(|(cluster_idx, indices)| {
+                let cluster_sessions: Vec<Session> =
+                    indices.iter().map(|&i| enriched_sessions[i].clone()).collect();
+
+                // Count concepts across cluster members
+                let mut concept_counts: HashMap<String, usize> = HashMap::new();
+                for &i in &indices {
+                    for concept in &enriched_concepts[i] {
+                        *concept_counts.entry(concept.clone()).or_default() += 1;
+                    }
+                }
+                let mut sorted: Vec<(String, usize)> = concept_counts.into_iter().collect();
+                sorted.sort_by(|a, b| b.1.cmp(&a.1));
+                let dominant: Vec<String> =
+                    sorted.into_iter().take(5).map(|(c, _)| c).collect();
+
+                SessionCluster {
+                    id: cluster_idx + 1,
+                    sessions: cluster_sessions,
+                    dominant_concepts: dominant,
+                }
+            })
+            .collect();
+
+        // Append unenriched sessions as a separate cluster
+        if !unenriched.is_empty() && unenriched.len() >= min_size {
+            result.push(SessionCluster {
+                id: result.len() + 1,
+                sessions: unenriched,
+                dominant_concepts: vec!["(no enrichment data)".to_string()],
+            });
+        }
+
+        // Re-number after min_size filter
+        for (i, c) in result.iter_mut().enumerate() {
+            c.id = i + 1;
+        }
+
+        result
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -777,5 +990,157 @@ mod tests {
         // No match
         let matching = service.sessions_by_file("nonexistent").await;
         assert!(matching.is_empty());
+    }
+}
+
+#[cfg(all(test, feature = "enrichment"))]
+mod cluster_tests {
+    use super::*;
+    use crate::enrichment::{ConceptMatch, ConceptOccurrence, SessionConcepts};
+    use crate::model::SessionMetadata;
+
+    fn make_enriched_session(id: &str, concepts: &[&str]) -> Session {
+        let mut meta = SessionMetadata::default();
+        let mut sc = SessionConcepts::new(id.to_string());
+        for (idx, &term) in concepts.iter().enumerate() {
+            let mut cm = ConceptMatch::new(
+                term.to_string(),
+                term.to_string(),
+                idx as u64,
+                None,
+            );
+            cm.add_occurrence(ConceptOccurrence {
+                message_idx: 0,
+                start_pos: 0,
+                end_pos: term.len(),
+                context: None,
+            });
+            sc.insert_or_update(cm);
+        }
+        meta.enrichment = Some(sc);
+        Session {
+            id: id.to_string(),
+            source: "test".to_string(),
+            external_id: id.to_string(),
+            title: Some(format!("Session {}", id)),
+            source_path: std::path::PathBuf::from("."),
+            started_at: None,
+            ended_at: None,
+            messages: vec![],
+            metadata: meta,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_cluster_empty_service() {
+        let mut svc = SessionService::new();
+        svc.disable_auto_import();
+        let clusters = svc.cluster_by_concepts(None, None).await;
+        assert!(clusters.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_cluster_similar_sessions_grouped() {
+        let svc = SessionService::new();
+        let s1 = make_enriched_session("s1", &["rust", "async", "tokio"]);
+        let s2 = make_enriched_session("s2", &["rust", "async", "streams"]);
+        let s3 = make_enriched_session("s3", &["python", "django", "flask"]);
+        svc.load_sessions(vec![s1, s2, s3]).await;
+
+        let clusters = svc.cluster_by_concepts(None, None).await;
+        assert!(clusters.len() >= 2, "expected >= 2 clusters, got {}", clusters.len());
+
+        let s1_cluster = clusters
+            .iter()
+            .find(|c| c.sessions.iter().any(|s| s.id == "s1"))
+            .expect("s1 not found in any cluster");
+        assert!(
+            s1_cluster.sessions.iter().any(|s| s.id == "s2"),
+            "s2 should be in the same cluster as s1"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_cluster_with_k_cap() {
+        let svc = SessionService::new();
+        let s1 = make_enriched_session("s1", &["rust", "async"]);
+        let s2 = make_enriched_session("s2", &["python", "web"]);
+        let s3 = make_enriched_session("s3", &["java", "spring"]);
+        svc.load_sessions(vec![s1, s2, s3]).await;
+
+        let clusters = svc.cluster_by_concepts(Some(2), None).await;
+        assert!(clusters.len() <= 2, "expected <=2 clusters, got {}", clusters.len());
+    }
+
+    #[tokio::test]
+    async fn test_cluster_unenriched_sessions_separate() {
+        let svc = SessionService::new();
+        let s1 = make_enriched_session("s1", &["rust"]);
+        let s2 = Session {
+            id: "s2".to_string(),
+            source: "test".to_string(),
+            external_id: "s2".to_string(),
+            title: Some("No concepts".to_string()),
+            source_path: std::path::PathBuf::from("."),
+            started_at: None,
+            ended_at: None,
+            messages: vec![],
+            metadata: SessionMetadata::default(),
+        };
+        svc.load_sessions(vec![s1, s2]).await;
+
+        let clusters = svc.cluster_by_concepts(None, None).await;
+        assert_eq!(clusters.len(), 2, "expected 2 clusters (enriched + unenriched)");
+        let unenriched = clusters
+            .iter()
+            .find(|c| c.dominant_concepts.iter().any(|d| d.contains("no enrichment")));
+        assert!(unenriched.is_some(), "expected an unenriched cluster");
+    }
+
+    #[tokio::test]
+    async fn test_cluster_dominant_concepts() {
+        let svc = SessionService::new();
+        let s1 = make_enriched_session("s1", &["rust", "async"]);
+        let s2 = make_enriched_session("s2", &["rust", "tokio"]);
+        svc.load_sessions(vec![s1, s2]).await;
+
+        let clusters = svc.cluster_by_concepts(None, None).await;
+        let rust_cluster = clusters
+            .iter()
+            .find(|c| c.sessions.iter().any(|s| s.id == "s1"))
+            .expect("cluster for s1 not found");
+        assert!(
+            rust_cluster.dominant_concepts.contains(&"rust".to_string()),
+            "rust should be dominant; got {:?}",
+            rust_cluster.dominant_concepts
+        );
+    }
+
+    #[tokio::test]
+    async fn test_cluster_min_sessions_filter() {
+        let svc = SessionService::new();
+        let s1 = make_enriched_session("s1", &["rust"]);
+        let s2 = make_enriched_session("s2", &["python"]);
+        svc.load_sessions(vec![s1, s2]).await;
+
+        let clusters = svc.cluster_by_concepts(None, Some(2)).await;
+        assert!(
+            clusters.is_empty(),
+            "expected 0 clusters with min_sessions=2, got {}",
+            clusters.len()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_cluster_ids_sequential() {
+        let svc = SessionService::new();
+        let s1 = make_enriched_session("s1", &["rust"]);
+        let s2 = make_enriched_session("s2", &["python"]);
+        svc.load_sessions(vec![s1, s2]).await;
+
+        let clusters = svc.cluster_by_concepts(None, None).await;
+        for (i, c) in clusters.iter().enumerate() {
+            assert_eq!(c.id, i + 1, "cluster IDs should be sequential starting from 1");
+        }
     }
 }
