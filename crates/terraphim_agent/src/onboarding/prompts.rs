@@ -465,12 +465,23 @@ pub fn prompt_llm_config() -> Result<PromptResult<LlmConfig>, OnboardingError> {
 }
 
 /// LLM configuration from wizard
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct LlmConfig {
     pub provider: Option<String>,
     pub model: Option<String>,
     pub api_key: Option<String>,
     pub base_url: Option<String>,
+}
+
+impl std::fmt::Debug for LlmConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LlmConfig")
+            .field("provider", &self.provider)
+            .field("model", &self.model)
+            .field("api_key", &self.api_key.as_ref().map(|_| "***REDACTED***"))
+            .field("base_url", &self.base_url)
+            .finish()
+    }
 }
 
 /// Prompt for knowledge graph configuration
@@ -583,5 +594,24 @@ mod tests {
             base_url: None,
         };
         assert!(config.provider.is_none());
+    }
+
+    #[test]
+    fn llm_config_api_key_redacted_in_debug() {
+        let cfg = LlmConfig {
+            provider: Some("openai".to_string()),
+            model: Some("gpt-4".to_string()),
+            api_key: Some("sk-secret-key".to_string()),
+            base_url: None,
+        };
+        let dbg = format!("{:?}", cfg);
+        assert!(
+            !dbg.contains("sk-secret-key"),
+            "LlmConfig api_key must be redacted in Debug output, got: {dbg}"
+        );
+        assert!(
+            dbg.contains("***REDACTED***"),
+            "Debug output should mark api_key as redacted, got: {dbg}"
+        );
     }
 }
