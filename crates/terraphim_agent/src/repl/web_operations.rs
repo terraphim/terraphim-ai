@@ -84,7 +84,10 @@ impl std::fmt::Debug for ProxyConfig {
             .field("host", &self.host)
             .field("port", &self.port)
             .field("username", &self.username)
-            .field("password", &self.password.as_ref().map(|_| "***REDACTED***"))
+            .field(
+                "password",
+                &self.password.as_ref().map(|_| "***REDACTED***"),
+            )
             .finish()
     }
 }
