@@ -49,6 +49,8 @@ pub use model::{
     ContentBlock, FileAccess, FileOperation, Message, MessageRole, Session, SessionMetadata,
 };
 pub use service::SessionService;
+#[cfg(feature = "enrichment")]
+pub use service::SessionCluster;
 
 #[cfg(feature = "enrichment")]
 pub use enrichment::{
