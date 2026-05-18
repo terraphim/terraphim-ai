@@ -95,6 +95,35 @@ impl FieldMode {
     }
 }
 
+impl std::str::FromStr for FieldMode {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.starts_with("custom:") {
+            let fields: Vec<String> = s
+                .strip_prefix("custom:")
+                .unwrap_or("")
+                .split(',')
+                .map(|f| f.trim().to_string())
+                .filter(|f| !f.is_empty())
+                .collect();
+            if fields.is_empty() {
+                return Err("custom: mode requires at least one field name".to_string());
+            }
+            return Ok(FieldMode::Custom(fields));
+        }
+        match s.to_lowercase().as_str() {
+            "full" => Ok(FieldMode::Full),
+            "summary" => Ok(FieldMode::Summary),
+            "minimal" => Ok(FieldMode::Minimal),
+            _ => Err(format!(
+                "unknown field mode '{}'. Valid values: full, summary, minimal, custom:<f1>,<f2>",
+                s
+            )),
+        }
+    }
+}
+
 /// Robot mode configuration
 #[derive(Debug, Clone)]
 pub struct RobotConfig {
@@ -288,6 +317,48 @@ mod tests {
                 "score".to_string()
             ])
         );
+    }
+
+    #[test]
+    fn test_field_mode_from_str_standard_variants() {
+        use std::str::FromStr;
+        assert_eq!(FieldMode::from_str("full").unwrap(), FieldMode::Full);
+        assert_eq!(FieldMode::from_str("Full").unwrap(), FieldMode::Full);
+        assert_eq!(FieldMode::from_str("summary").unwrap(), FieldMode::Summary);
+        assert_eq!(FieldMode::from_str("minimal").unwrap(), FieldMode::Minimal);
+    }
+
+    #[test]
+    fn test_field_mode_from_str_custom() {
+        use std::str::FromStr;
+        let mode = FieldMode::from_str("custom:title,score").unwrap();
+        assert_eq!(
+            mode,
+            FieldMode::Custom(vec!["title".to_string(), "score".to_string()])
+        );
+    }
+
+    #[test]
+    fn test_field_mode_from_str_custom_empty_fields_error() {
+        use std::str::FromStr;
+        assert!(FieldMode::from_str("custom:").is_err());
+    }
+
+    #[test]
+    fn test_field_mode_from_str_unknown_returns_error() {
+        use std::str::FromStr;
+        assert!(FieldMode::from_str("bogus").is_err());
+    }
+
+    #[test]
+    fn test_robot_config_builder_all_flags() {
+        let config = RobotConfig::new()
+            .with_max_tokens(1000)
+            .with_max_content_length(500)
+            .with_fields(FieldMode::Summary);
+        assert_eq!(config.max_tokens, Some(1000));
+        assert_eq!(config.max_content_length, Some(500));
+        assert_eq!(config.fields, FieldMode::Summary);
     }
 
     #[test]

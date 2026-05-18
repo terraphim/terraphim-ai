@@ -719,6 +719,15 @@ enum Command {
         /// Minimum composite quality score (0.0-1.0). Excludes documents below this threshold.
         #[arg(long)]
         min_quality: Option<f64>,
+        /// Maximum estimated tokens in robot-mode output (4 chars ≈ 1 token)
+        #[arg(long)]
+        max_tokens: Option<usize>,
+        /// Maximum characters per content/preview field before truncation
+        #[arg(long)]
+        max_content_length: Option<usize>,
+        /// Output field set: full, summary, minimal, or custom:<f1>,<f2>
+        #[arg(long)]
+        fields: Option<robot::output::FieldMode>,
     },
     /// Manage roles (list, select)
     Roles {
@@ -2052,6 +2061,9 @@ async fn run_offline_command(
             fail_on_empty,
             include_pinned,
             min_quality,
+            max_tokens,
+            max_content_length,
+            fields,
         } => {
             let (role_name, auto) = service
                 .resolve_or_auto_route(role.as_deref(), &query)
@@ -2129,10 +2141,18 @@ async fn run_offline_command(
                 let mut robot_config = RobotConfig::new()
                     .with_format(robot_format)
                     .with_max_results(limit);
-                if output.robot {
-                    robot_config = robot_config
-                        .with_max_content_length(2000)
-                        .with_max_tokens(8000);
+                if let Some(mt) = max_tokens {
+                    robot_config = robot_config.with_max_tokens(mt);
+                } else if output.robot {
+                    robot_config = robot_config.with_max_tokens(8000);
+                }
+                if let Some(mcl) = max_content_length {
+                    robot_config = robot_config.with_max_content_length(mcl);
+                } else if output.robot {
+                    robot_config = robot_config.with_max_content_length(2000);
+                }
+                if let Some(fm) = fields {
+                    robot_config = robot_config.with_fields(fm);
                 }
 
                 let formatter = RobotFormatter::new(robot_config.clone());
@@ -4125,6 +4145,9 @@ async fn run_server_command(
             fail_on_empty: _,
             include_pinned,
             min_quality,
+            max_tokens,
+            max_content_length,
+            fields,
         } => {
             // Get selected role from server if not specified
             let role_name = if let Some(role) = role {
@@ -4200,10 +4223,18 @@ async fn run_server_command(
                 let mut robot_config = RobotConfig::new()
                     .with_format(robot_format)
                     .with_max_results(limit);
-                if output.robot {
-                    robot_config = robot_config
-                        .with_max_content_length(2000)
-                        .with_max_tokens(8000);
+                if let Some(mt) = max_tokens {
+                    robot_config = robot_config.with_max_tokens(mt);
+                } else if output.robot {
+                    robot_config = robot_config.with_max_tokens(8000);
+                }
+                if let Some(mcl) = max_content_length {
+                    robot_config = robot_config.with_max_content_length(mcl);
+                } else if output.robot {
+                    robot_config = robot_config.with_max_content_length(2000);
+                }
+                if let Some(fm) = fields {
+                    robot_config = robot_config.with_fields(fm);
                 }
 
                 let formatter = RobotFormatter::new(robot_config.clone());
