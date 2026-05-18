@@ -2188,11 +2188,12 @@ async fn run_offline_command(
                     }
                 };
 
+                let wildcard_fallback = concepts_matched.is_empty();
                 let data = SearchResultsData {
                     results: items,
                     total_matches: total,
                     concepts_matched,
-                    wildcard_fallback: false,
+                    wildcard_fallback,
                 };
 
                 let meta = ResponseMeta::new("search")
@@ -4265,11 +4266,12 @@ async fn run_server_command(
                     }
                 };
 
+                let wildcard_fallback = concepts_matched.is_empty();
                 let data = SearchResultsData {
                     results: items,
                     total_matches: total,
                     concepts_matched,
-                    wildcard_fallback: false,
+                    wildcard_fallback,
                 };
 
                 let meta = ResponseMeta::new("search")

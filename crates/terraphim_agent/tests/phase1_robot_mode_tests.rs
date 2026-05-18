@@ -1,4 +1,5 @@
 use terraphim_agent::forgiving::{AliasRegistry, ForgivingParser};
+use terraphim_agent::robot::schema::{SearchResultItem, SearchResultsData};
 use terraphim_agent::robot::{
     ExitCode, FieldMode, OutputFormat, ResponseMeta, RobotConfig, RobotFormatter, RobotResponse,
 };
@@ -216,4 +217,87 @@ fn test_truncation_with_budget() {
     let (truncated, was_truncated) = formatter.truncate_content(&long_content);
     assert!(was_truncated);
     assert!(truncated.len() <= 53);
+}
+
+/// AC-a: when concepts_matched is non-empty the field is populated in the JSON envelope.
+#[test]
+fn test_concepts_matched_populated_in_search_results_data() {
+    let data = SearchResultsData {
+        results: vec![],
+        total_matches: 0,
+        concepts_matched: vec!["knowledge graph".to_string()],
+        wildcard_fallback: false,
+    };
+    let meta = ResponseMeta::new("search");
+    let response = RobotResponse::success(data, meta);
+    let config = RobotConfig::new().with_format(OutputFormat::Json);
+    let formatter = RobotFormatter::new(config);
+    let output = formatter.format(&response).unwrap();
+    let json: serde_json::Value = serde_json::from_str(&output).unwrap();
+    let concepts = json
+        .pointer("/data/concepts_matched")
+        .and_then(|v| v.as_array())
+        .expect("concepts_matched must be present and an array");
+    assert!(
+        concepts
+            .iter()
+            .any(|c| c.as_str() == Some("knowledge graph")),
+        "concepts_matched must contain the matched concept; got {:?}",
+        concepts
+    );
+    assert_eq!(
+        json.pointer("/data/wildcard_fallback")
+            .and_then(|v| v.as_bool()),
+        Some(false),
+        "wildcard_fallback must be false when concepts matched"
+    );
+}
+
+/// AC-b: when concepts_matched is empty the wildcard_fallback flag must be true.
+#[test]
+fn test_wildcard_fallback_true_when_no_concepts_matched() {
+    // Simulate the logic applied at both search emission sites:
+    // wildcard_fallback = concepts_matched.is_empty()
+    let concepts_matched: Vec<String> = vec![];
+    let wildcard_fallback = concepts_matched.is_empty();
+
+    let data = SearchResultsData {
+        results: vec![SearchResultItem {
+            rank: 1,
+            id: "doc-1".to_string(),
+            title: "Raw text match".to_string(),
+            url: None,
+            score: 0.5,
+            preview: None,
+            source: None,
+            date: None,
+            preview_truncated: false,
+        }],
+        total_matches: 1,
+        concepts_matched,
+        wildcard_fallback,
+    };
+
+    assert!(
+        data.wildcard_fallback,
+        "wildcard_fallback must be true when concepts_matched is empty"
+    );
+
+    let meta = ResponseMeta::new("search");
+    let response = RobotResponse::success(data, meta);
+    let config = RobotConfig::new().with_format(OutputFormat::Json);
+    let formatter = RobotFormatter::new(config);
+    let output = formatter.format(&response).unwrap();
+    let json: serde_json::Value = serde_json::from_str(&output).unwrap();
+    assert_eq!(
+        json.pointer("/data/wildcard_fallback")
+            .and_then(|v| v.as_bool()),
+        Some(true),
+        "wildcard_fallback must be true in serialised output"
+    );
+    // concepts_matched omitted from JSON due to skip_serializing_if = "Vec::is_empty"
+    assert!(
+        json.pointer("/data/concepts_matched").is_none(),
+        "concepts_matched must be absent from JSON when empty (serde skip_serializing_if)"
+    );
 }
