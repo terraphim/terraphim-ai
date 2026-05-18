@@ -106,7 +106,7 @@ impl TerraphimRlm {
         // Create session manager
         let session_manager = Arc::new(SessionManager::new(config.clone()));
 
-        // Create LLM bridge
+        // Create LLM bridge (bare — caller wires a client via set_llm_client()).
         let llm_bridge_config = LlmBridgeConfig::default();
         let llm_bridge = Arc::new(LlmBridge::new(llm_bridge_config, session_manager.clone()));
 
@@ -793,6 +793,25 @@ impl TerraphimRlm {
             include_history,
             // Command history would be added here if tracking is enabled
         })
+    }
+
+    /// Inject an LLM client from the orchestrator's routing pipeline.
+    ///
+    /// The orchestrator owns provider health, budget tracking, and
+    /// fallback routing.  Call this after construction to wire RLM
+    /// into the existing cost-optimisation stack instead of building
+    /// a standalone client.
+    ///
+    /// Requires the `llm` feature.
+    #[cfg(feature = "llm")]
+    pub fn set_llm_client(&mut self, client: Arc<dyn terraphim_service::llm::LlmClient>) {
+        log::info!("RLM LLM bridge configured with provider: {}", client.name());
+        let bridge_config = LlmBridgeConfig::default();
+        self.llm_bridge = Arc::new(LlmBridge::with_llm_client(
+            bridge_config,
+            self.session_manager.clone(),
+            client,
+        ));
     }
 }
 
