@@ -4,7 +4,7 @@
 //! without complex storage operations to avoid memory issues.
 
 use terraphim_multi_agent::{
-    CommandInput, CommandType, TerraphimAgent, test_utils::create_test_role,
+    test_utils::create_test_role, CommandInput, CommandType, TerraphimAgent,
 };
 use terraphim_persistence::DeviceStorage;
 
