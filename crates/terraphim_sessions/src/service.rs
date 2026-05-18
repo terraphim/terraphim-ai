@@ -577,7 +577,7 @@ impl SessionService {
             }
         }
         let mut cluster_vec: Vec<Vec<usize>> = cluster_map.into_values().collect();
-        cluster_vec.sort_by(|a, b| b.len().cmp(&a.len()));
+        cluster_vec.sort_by_key(|c| std::cmp::Reverse(c.len()));
 
         // Merge down to k clusters if requested
         if let Some(max_k) = k {
@@ -621,7 +621,7 @@ impl SessionService {
                     }
                 }
                 let mut sorted: Vec<(String, usize)> = concept_counts.into_iter().collect();
-                sorted.sort_by(|a, b| b.1.cmp(&a.1));
+                sorted.sort_by_key(|item| std::cmp::Reverse(item.1));
                 let dominant: Vec<String> =
                     sorted.into_iter().take(5).map(|(c, _)| c).collect();
 
