@@ -438,7 +438,6 @@ pub struct SessionStatistics {
     pub sessions_by_source: HashMap<String, usize>,
 }
 
-
 /// A cluster of sessions grouped by concept similarity
 #[cfg(feature = "enrichment")]
 #[derive(Debug, Clone)]
@@ -555,9 +554,8 @@ impl SessionService {
                 if cluster_ids[j].is_some() {
                     continue;
                 }
-                let members: Vec<usize> = (0..=i)
-                    .filter(|&x| cluster_ids[x] == Some(cid))
-                    .collect();
+                let members: Vec<usize> =
+                    (0..=i).filter(|&x| cluster_ids[x] == Some(cid)).collect();
                 let avg_sim: f64 = members
                     .iter()
                     .map(|&m| jaccard_similarity(&enriched_concepts[m], &enriched_concepts[j]))
@@ -610,8 +608,10 @@ impl SessionService {
             .filter(|indices| indices.len() >= min_size)
             .enumerate()
             .map(|(cluster_idx, indices)| {
-                let cluster_sessions: Vec<Session> =
-                    indices.iter().map(|&i| enriched_sessions[i].clone()).collect();
+                let cluster_sessions: Vec<Session> = indices
+                    .iter()
+                    .map(|&i| enriched_sessions[i].clone())
+                    .collect();
 
                 // Count concepts across cluster members
                 let mut concept_counts: HashMap<String, usize> = HashMap::new();
@@ -622,8 +622,7 @@ impl SessionService {
                 }
                 let mut sorted: Vec<(String, usize)> = concept_counts.into_iter().collect();
                 sorted.sort_by_key(|item| std::cmp::Reverse(item.1));
-                let dominant: Vec<String> =
-                    sorted.into_iter().take(5).map(|(c, _)| c).collect();
+                let dominant: Vec<String> = sorted.into_iter().take(5).map(|(c, _)| c).collect();
 
                 SessionCluster {
                     id: cluster_idx + 1,
@@ -1003,12 +1002,7 @@ mod cluster_tests {
         let mut meta = SessionMetadata::default();
         let mut sc = SessionConcepts::new(id.to_string());
         for (idx, &term) in concepts.iter().enumerate() {
-            let mut cm = ConceptMatch::new(
-                term.to_string(),
-                term.to_string(),
-                idx as u64,
-                None,
-            );
+            let mut cm = ConceptMatch::new(term.to_string(), term.to_string(), idx as u64, None);
             cm.add_occurrence(ConceptOccurrence {
                 message_idx: 0,
                 start_pos: 0,
@@ -1048,7 +1042,11 @@ mod cluster_tests {
         svc.load_sessions(vec![s1, s2, s3]).await;
 
         let clusters = svc.cluster_by_concepts(None, None).await;
-        assert!(clusters.len() >= 2, "expected >= 2 clusters, got {}", clusters.len());
+        assert!(
+            clusters.len() >= 2,
+            "expected >= 2 clusters, got {}",
+            clusters.len()
+        );
 
         let s1_cluster = clusters
             .iter()
@@ -1069,7 +1067,11 @@ mod cluster_tests {
         svc.load_sessions(vec![s1, s2, s3]).await;
 
         let clusters = svc.cluster_by_concepts(Some(2), None).await;
-        assert!(clusters.len() <= 2, "expected <=2 clusters, got {}", clusters.len());
+        assert!(
+            clusters.len() <= 2,
+            "expected <=2 clusters, got {}",
+            clusters.len()
+        );
     }
 
     #[tokio::test]
@@ -1090,10 +1092,16 @@ mod cluster_tests {
         svc.load_sessions(vec![s1, s2]).await;
 
         let clusters = svc.cluster_by_concepts(None, None).await;
-        assert_eq!(clusters.len(), 2, "expected 2 clusters (enriched + unenriched)");
-        let unenriched = clusters
-            .iter()
-            .find(|c| c.dominant_concepts.iter().any(|d| d.contains("no enrichment")));
+        assert_eq!(
+            clusters.len(),
+            2,
+            "expected 2 clusters (enriched + unenriched)"
+        );
+        let unenriched = clusters.iter().find(|c| {
+            c.dominant_concepts
+                .iter()
+                .any(|d| d.contains("no enrichment"))
+        });
         assert!(unenriched.is_some(), "expected an unenriched cluster");
     }
 
@@ -1140,7 +1148,11 @@ mod cluster_tests {
 
         let clusters = svc.cluster_by_concepts(None, None).await;
         for (i, c) in clusters.iter().enumerate() {
-            assert_eq!(c.id, i + 1, "cluster IDs should be sequential starting from 1");
+            assert_eq!(
+                c.id,
+                i + 1,
+                "cluster IDs should be sequential starting from 1"
+            );
         }
     }
 }
