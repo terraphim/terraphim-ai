@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **terraphim_rlm CLI binary** with 6 commands (code, bash, query, context, snapshot, status) for stateless RLM execution (Refs #RLM-CLI, 2026-05-18)
+- **MCP server RLM integration** via process spawning — 6 new tools exposed without linking terraphim_rlm (avoids static init hang) (Refs #RLM-CLI, 2026-05-18)
 - **Session search capability** enabled in `terraphim_agent` binary (2026-05-17)
 - **Evolution integration** `terraphim_agent_evolution` wired into ADF orchestrator (Refs #1487, 2026-05-15)
 - **Ranking regression gate** Kendall-tau snapshot tests added to prevent ranking regressions (Refs #1454, 2026-05-16)
