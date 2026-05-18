@@ -51,14 +51,18 @@ rmcp = { version = "0.9.0", features = ["server"], optional = true }
 parking_lot = "0.12"
 dashmap = "6.1"
 
-[dev-dependencies]
-tokio-test = "0.4"
-tempfile = "3.0"
-test-log = "0.2"
+# CLI
+clap = { version = "4.5", features = ["derive"], optional = true }
+env_logger = { version = "0.11", optional = true }
+
+[[bin]]
+name = "terraphim_rlm"
+path = "src/main.rs"
+required-features = ["cli"]
 
 [features]
 default = ["full"]
-full = ["llm", "kg-validation", "supervision", "llm-bridge", "docker-backend", "e2b-backend", "mcp"]
+full = ["llm", "kg-validation", "supervision", "llm-bridge", "docker-backend", "e2b-backend", "mcp", "cli"]
 llm = ["dep:terraphim_service"]
 kg-validation = ["dep:terraphim_automata", "dep:terraphim_types", "dep:terraphim_rolegraph"]
 supervision = ["dep:terraphim_agent_supervisor"]
@@ -66,3 +70,9 @@ llm-bridge = ["dep:hyper", "dep:hyper-util"]
 docker-backend = ["dep:bollard"]
 e2b-backend = ["dep:reqwest"]
 mcp = ["dep:rmcp"]
+cli = ["dep:clap", "dep:env_logger"]
+
+[dev-dependencies]
+tokio-test = "0.4"
+tempfile = "3.0"
+test-log = "0.2"

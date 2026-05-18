@@ -48,9 +48,9 @@ pub use connector::{ConnectorRegistry, ConnectorStatus, ImportOptions, SessionCo
 pub use model::{
     ContentBlock, FileAccess, FileOperation, Message, MessageRole, Session, SessionMetadata,
 };
-pub use service::SessionService;
 #[cfg(feature = "enrichment")]
 pub use service::SessionCluster;
+pub use service::SessionService;
 
 #[cfg(feature = "enrichment")]
 pub use enrichment::{
