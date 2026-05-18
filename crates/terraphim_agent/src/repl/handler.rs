@@ -2777,7 +2777,13 @@ impl ReplHandler {
                         for cluster in &clusters {
                             let concepts = cluster.dominant_concepts.join(", ");
                             let concepts_display = if concepts.len() > 40 {
-                                format!("{}...", &concepts[..40])
+                                let end = concepts
+                                    .char_indices()
+                                    .take(40)
+                                    .last()
+                                    .map(|(i, _)| i)
+                                    .unwrap_or(concepts.len());
+                                format!("{}...", &concepts[..end])
                             } else {
                                 concepts
                             };
@@ -2787,7 +2793,13 @@ impl ReplHandler {
                                 .and_then(|s| s.title.as_ref())
                                 .map(|t| {
                                     if t.len() > 35 {
-                                        format!("{}...", &t[..35])
+                                        let end = t
+                                            .char_indices()
+                                            .take(35)
+                                            .last()
+                                            .map(|(i, _)| i)
+                                            .unwrap_or(t.len());
+                                        format!("{}...", &t[..end])
                                     } else {
                                         t.clone()
                                     }
