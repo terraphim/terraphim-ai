@@ -239,6 +239,14 @@ pub struct AgentOrchestrator {
     /// Per-agent last cron fire timestamp to prevent re-triggering within same schedule window.
     /// Key: agent name. Value: timestamp of last fire.
     last_cron_fire: HashMap<String, chrono::DateTime<chrono::Utc>>,
+    /// Last compound-review fire time, used to gate the compound schedule
+    /// independently of `last_tick_time`. Mirrors the `last_cron_fire`
+    /// pattern for per-agent crons. Without this cursor, if the
+    /// `reconcile_tick` future is cancelled mid-await by its 90 s
+    /// `tokio::time::timeout` safety wrapper, `last_tick_time` is never
+    /// advanced and the same compound-review occurrence re-fires on the
+    /// very next tick, producing a worktree storm (#1562).
+    last_compound_review_fired_at: Option<chrono::DateTime<chrono::Utc>>,
     /// Lazy-initialised Gitea tracker for gitea-issue pre-check.
     pre_check_tracker: Option<terraphim_tracker::GiteaTracker>,
     /// Active flow executions keyed by flow name.
@@ -685,6 +693,45 @@ impl AgentOrchestrator {
         let scheduler = TimeScheduler::new(&config.agents, Some(&config.compound_review.schedule))?;
         let compound_workflow =
             CompoundReviewWorkflow::from_compound_config(config.compound_review.clone());
+
+        // Layer 2 startup sweep (epic #1567, issue #1570).
+        //
+        // Reconcile any worktree residue left by a previous instance
+        // before we accept ticks. Synchronous: must finish before the
+        // tick thread is spawned in `run()` so a fresh review cycle
+        // never races against half-killed `review-*` directories.
+        //
+        // `extra_roots` mirrors the per-agent worktree convention
+        // from `lib.rs:5393`. If you change that literal there, change
+        // it here too.
+        //
+        // `cfg(not(test))` gate: the in-lib `test_config()` (see
+        // `lib.rs:7926`) points `repo_path` at the live terraphim-ai
+        // checkout. Without this gate, the sweep's
+        // `git worktree prune --verbose` races against
+        // `test_orchestrator_compound_review_manual`'s concurrent
+        // `git worktree add` on that shared real repo's
+        // `.git/worktrees/` admin registry. The production wiring is
+        // exercised end-to-end by `tests/sweep_on_startup_test.rs`,
+        // which builds an isolated `TempDir` repo and asserts the
+        // sweep DOES run from `AgentOrchestrator::new`. Do not remove
+        // this gate without first migrating the in-lib `test_config()`
+        // to a TempDir-based `repo_path`.
+        #[cfg(not(test))]
+        {
+            let sweep_report = compound_workflow
+                .worktree_manager()
+                .sweep_stale(&[PathBuf::from("/tmp/adf-worktrees")]);
+            if sweep_report.swept_count + sweep_report.root_owned_skipped > 10 {
+                warn!(
+                    swept_count = sweep_report.swept_count,
+                    root_owned_skipped = sweep_report.root_owned_skipped,
+                    failed_count = sweep_report.failed_count,
+                    "large worktree backlog at startup -- prior crash storm likely"
+                );
+            }
+        }
+
         let handoff_buffer = HandoffBuffer::new(config.handoff_buffer_ttl_secs.unwrap_or(86400));
         let handoff_ledger = HandoffLedger::new(config.working_dir.join("handoff-ledger.jsonl"));
 
@@ -824,6 +871,7 @@ impl AgentOrchestrator {
             circuit_breakers: Arc::new(Mutex::new(HashMap::new())),
             last_run_commits: HashMap::new(),
             last_cron_fire: HashMap::new(),
+            last_compound_review_fired_at: None,
             pre_check_tracker: None,
             active_flows: HashMap::new(),
             mention_cursors: HashMap::new(),
@@ -7137,26 +7185,46 @@ Remove the pause flag once the underlying failure is resolved:\n\n\
         if let Some(compound_sched) = self.scheduler.compound_review_schedule() {
             debug!(
                 last_tick = %self.last_tick_time,
+                last_fired = ?self.last_compound_review_fired_at,
                 now = %now,
                 "checking compound review schedule"
             );
 
-            // Get next fire times for debugging
-            let upcoming: Vec<_> = compound_sched.after(&self.last_tick_time).take(3).collect();
-            debug!(upcoming = ?upcoming, "compound schedule upcoming times");
-
-            let should_fire = compound_sched
+            // Compute the earliest occurrence strictly after
+            // `last_tick_time` that is also <= now. This is the same
+            // occurrence the buggy code would have refired forever when
+            // the reconcile-tick future was cancelled mid-await by the
+            // 90 s `tokio::time::timeout` safety wrapper (#1562).
+            let next_fire = compound_sched
                 .after(&self.last_tick_time)
                 .take_while(|t| *t <= now)
-                .next()
-                .is_some();
+                .next();
+            debug!(next_fire = ?next_fire, "compound schedule next fire");
 
-            debug!(should_fire = should_fire, "compound review fire check");
+            if let Some(fire_time) = next_fire {
+                // Gate against re-firing the same occurrence. The
+                // cursor `last_compound_review_fired_at` is the per-
+                // occurrence dedup key, mirroring `last_cron_fire` for
+                // per-agent crons. It is updated *before* the `.await`
+                // below so a cancelled future cannot lose the update.
+                let already_fired = self
+                    .last_compound_review_fired_at
+                    .map(|prev| fire_time <= prev)
+                    .unwrap_or(false);
 
-            if should_fire {
-                info!("compound review schedule fired, starting review");
-                self.handle_schedule_event(ScheduleEvent::CompoundReview)
-                    .await;
+                if !already_fired {
+                    // Record fire time BEFORE awaiting
+                    // `handle_schedule_event` so that future
+                    // cancellation cannot lose the update and
+                    // re-trigger the same occurrence on the next tick.
+                    self.last_compound_review_fired_at = Some(fire_time);
+                    info!(
+                        fire_time = %fire_time,
+                        "compound review schedule fired, starting review"
+                    );
+                    self.handle_schedule_event(ScheduleEvent::CompoundReview)
+                        .await;
+                }
             }
         }
     }
@@ -7713,6 +7781,19 @@ Remove the pause flag once the underlying failure is resolved:\n\n\
         self.last_tick_time = time;
     }
 
+    /// Test helper: read the compound-review fire cursor.
+    #[doc(hidden)]
+    pub fn last_compound_review_fired_at(&self) -> Option<chrono::DateTime<chrono::Utc>> {
+        self.last_compound_review_fired_at
+    }
+
+    /// Test helper: clear the compound-review fire cursor for synthetic
+    /// testing of the cancellation property.
+    #[doc(hidden)]
+    pub fn clear_last_compound_review_fired_at(&mut self) {
+        self.last_compound_review_fired_at = None;
+    }
+
     /// Test helper: access the telemetry store for assertions.
     #[doc(hidden)]
     pub fn telemetry_store(&self) -> &control_plane::TelemetryStore {
@@ -8092,6 +8173,85 @@ mod tests {
         );
         assert_eq!(result.agents_run, 0, "no agents with empty groups");
         assert_eq!(result.agents_failed, 0);
+    }
+
+    /// Regression test for #1562.
+    ///
+    /// Property: when `check_cron_schedules` fires the compound review,
+    /// `last_compound_review_fired_at` advances **before** the `await`
+    /// on `handle_schedule_event`. Calling `check_cron_schedules` a
+    /// second time without advancing wall-clock time must NOT re-fire
+    /// the same occurrence; the cursor stays put.
+    ///
+    /// This is the property that breaks if the cursor is dropped: the
+    /// 90 s `tokio::time::timeout` wrapping `reconcile_tick` cancels
+    /// the future mid-await, `last_tick_time` is never updated, and
+    /// the next tick re-evaluates the same cron occurrence as "should
+    /// fire", spawning a new worktree every tick (the bigbox storm).
+    #[tokio::test]
+    async fn test_compound_review_cursor_advances_on_cancellation() {
+        // Build a test config and override compound_review so that the
+        // workflow has no review groups -- it still creates a worktree
+        // on the workspace git repo, but no agent subprocesses are
+        // launched. This mirrors `test_orchestrator_compound_review_manual`.
+        let mut config = test_config();
+        let tmp_worktree = TempDir::new().expect("tempdir");
+        config.compound_review.worktree_root = tmp_worktree.path().to_path_buf();
+        // Schedule fires hourly so we can use a recent `last_tick_time`.
+        // 5-field cron: minute 0 of every hour.
+        config.compound_review.schedule = "0 * * * *".to_string();
+
+        let mut orch = AgentOrchestrator::new(config).expect("orchestrator");
+
+        // Replace the compound workflow with one that uses an empty
+        // group list so the cron-fire path is a no-op apart from the
+        // worktree creation/removal. The orchestrator's
+        // `repo_path`/`base_branch` are inherited from the test config.
+        let repo_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let swarm_config = crate::compound::SwarmConfig {
+            groups: vec![],
+            timeout: Duration::from_secs(60),
+            worktree_root: tmp_worktree.path().to_path_buf(),
+            repo_path,
+            base_branch: "main".to_string(),
+            max_concurrent_agents: 1,
+            create_prs: false,
+        };
+        orch.compound_workflow = crate::compound::CompoundReviewWorkflow::new(swarm_config);
+
+        // Plant `last_tick_time` 2 hours ago so at least one occurrence
+        // of `0 * * * *` lies in [last_tick_time, now]. Clear the new
+        // cursor so the first call has nothing to compare against.
+        let two_hours_ago = chrono::Utc::now() - chrono::Duration::hours(2);
+        orch.set_last_tick_time(two_hours_ago);
+        orch.clear_last_compound_review_fired_at();
+        assert!(
+            orch.last_compound_review_fired_at().is_none(),
+            "cursor should start empty",
+        );
+
+        // First call: should advance the cursor to a past fire time.
+        orch.check_cron_schedules().await;
+        let cursor_after_first = orch
+            .last_compound_review_fired_at()
+            .expect("cursor should be Some after first fire");
+        assert!(
+            cursor_after_first <= chrono::Utc::now(),
+            "cursor should be in the past, got {}",
+            cursor_after_first
+        );
+
+        // Second call without advancing wall-clock or `last_tick_time`:
+        // the cursor must NOT advance (the same occurrence is gated).
+        orch.check_cron_schedules().await;
+        let cursor_after_second = orch
+            .last_compound_review_fired_at()
+            .expect("cursor should still be Some");
+        assert_eq!(
+            cursor_after_first, cursor_after_second,
+            "cursor must not re-advance on a re-check without new occurrences \
+             (#1562 storm regression)",
+        );
     }
 
     #[test]
