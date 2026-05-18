@@ -215,7 +215,7 @@ fn default_context_window() -> Option<u64> {
 ///
 /// It contains a user's knowledge graph, a list of haystacks, as
 /// well as preferences for the relevance function and theme
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema, Default)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema, Default)]
 #[cfg_attr(feature = "typescript", derive(Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct Role {
@@ -261,6 +261,33 @@ pub struct Role {
     /// Configuration for intelligent routing behavior
     #[serde(default)]
     pub llm_router_config: Option<LlmRouterConfig>,
+}
+
+impl std::fmt::Debug for Role {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Role")
+            .field("shortname", &self.shortname)
+            .field("name", &self.name)
+            .field("relevance_function", &self.relevance_function)
+            .field("terraphim_it", &self.terraphim_it)
+            .field("theme", &self.theme)
+            .field("kg", &self.kg)
+            .field("haystacks", &self.haystacks)
+            .field("llm_enabled", &self.llm_enabled)
+            .field(
+                "llm_api_key",
+                &self.llm_api_key.as_ref().map(|_| "***REDACTED***"),
+            )
+            .field("llm_model", &self.llm_model)
+            .field("llm_auto_summarize", &self.llm_auto_summarize)
+            .field("llm_chat_enabled", &self.llm_chat_enabled)
+            .field("llm_chat_system_prompt", &self.llm_chat_system_prompt)
+            .field("llm_chat_model", &self.llm_chat_model)
+            .field("llm_context_window", &self.llm_context_window)
+            .field("llm_router_enabled", &self.llm_router_enabled)
+            .field("llm_router_config", &self.llm_router_config)
+            .finish_non_exhaustive()
+    }
 }
 
 impl Role {
@@ -334,7 +361,7 @@ pub enum ServiceType {
 ///
 /// One user can have multiple haystacks
 /// Each haystack is indexed using a specific service
-#[derive(Debug, Deserialize, Clone, PartialEq, Eq, JsonSchema)]
+#[derive(Deserialize, Clone, PartialEq, Eq, JsonSchema)]
 #[cfg_attr(feature = "typescript", derive(Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct Haystack {
@@ -401,6 +428,22 @@ impl Serialize for Haystack {
         }
 
         state.end()
+    }
+}
+
+impl std::fmt::Debug for Haystack {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Haystack")
+            .field("location", &self.location)
+            .field("service", &self.service)
+            .field("read_only", &self.read_only)
+            .field("fetch_content", &self.fetch_content)
+            .field(
+                "atomic_server_secret",
+                &self.atomic_server_secret.as_ref().map(|_| "***REDACTED***"),
+            )
+            .field("extra_parameters", &self.extra_parameters)
+            .finish()
     }
 }
 
@@ -1674,6 +1717,61 @@ mod tests {
         assert!(
             result.is_err(),
             "Should return error for empty/invalid JSON"
+        );
+    }
+
+    #[test]
+    async fn role_llm_api_key_redacted_in_debug() {
+        let mut role = Role::default();
+        role.llm_api_key = Some("super-secret-api-key-do-not-leak".to_string());
+        let dbg = format!("{:?}", role);
+        assert!(
+            !dbg.contains("super-secret-api-key-do-not-leak"),
+            "llm_api_key must be redacted in Debug output, got: {dbg}"
+        );
+        assert!(
+            dbg.contains("***REDACTED***"),
+            "Debug output should mark llm_api_key as redacted, got: {dbg}"
+        );
+    }
+
+    #[test]
+    async fn role_none_llm_api_key_debug_shows_none() {
+        let role = Role::default();
+        let dbg = format!("{:?}", role);
+        assert!(
+            dbg.contains("llm_api_key: None"),
+            "None llm_api_key should show as None in Debug, got: {dbg}"
+        );
+    }
+
+    #[test]
+    async fn haystack_atomic_server_secret_redacted_in_debug() {
+        let mut haystack =
+            Haystack::new("http://example.com".to_string(), ServiceType::Atomic, false);
+        haystack.atomic_server_secret = Some("atomic-secret-do-not-leak".to_string());
+        let dbg = format!("{:?}", haystack);
+        assert!(
+            !dbg.contains("atomic-secret-do-not-leak"),
+            "atomic_server_secret must be redacted in Debug output, got: {dbg}"
+        );
+        assert!(
+            dbg.contains("***REDACTED***"),
+            "Debug output should mark atomic_server_secret as redacted, got: {dbg}"
+        );
+    }
+
+    #[test]
+    async fn haystack_none_atomic_server_secret_debug_shows_none() {
+        let haystack = Haystack::new(
+            "http://example.com".to_string(),
+            ServiceType::Ripgrep,
+            false,
+        );
+        let dbg = format!("{:?}", haystack);
+        assert!(
+            dbg.contains("atomic_server_secret: None"),
+            "None atomic_server_secret should show as None in Debug, got: {dbg}"
         );
     }
 }
