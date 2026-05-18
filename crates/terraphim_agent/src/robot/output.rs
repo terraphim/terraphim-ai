@@ -210,17 +210,56 @@ impl RobotFormatter {
         Self { config }
     }
 
-    /// Format a value as output string
+    /// Format a value as output string, applying field-mode filtering
+    /// when the value is a search response with results.
     pub fn format<T: Serialize>(&self, value: &T) -> Result<String, serde_json::Error> {
-        match self.config.format {
-            OutputFormat::Json => serde_json::to_string_pretty(value),
-            OutputFormat::Jsonl | OutputFormat::Minimal => serde_json::to_string(value),
-            OutputFormat::Table => {
-                // For table format, we still return JSON but it's not used
-                // The caller should handle table formatting separately
-                serde_json::to_string_pretty(value)
+        let filtered = self.apply_fields(value);
+        let output = match self.config.format {
+            OutputFormat::Json => serde_json::to_string_pretty(&filtered),
+            OutputFormat::Jsonl | OutputFormat::Minimal => serde_json::to_string(&filtered),
+            OutputFormat::Table => serde_json::to_string_pretty(&filtered),
+        };
+        output
+    }
+
+    /// Apply field-mode filtering. For non-`Full` modes, drops fields
+    /// from each item in `data.results` that are not in the allowed set.
+    /// Returns the original value unchanged when the value is not a
+    /// search response or serialization fails.
+    fn apply_fields<T: Serialize>(&self, value: &T) -> serde_json::Value {
+        if matches!(self.config.fields, FieldMode::Full) {
+            return serde_json::to_value(value).unwrap_or(serde_json::Value::Null);
+        }
+        let mut v = match serde_json::to_value(value) {
+            Ok(v) => v,
+            Err(_) => return serde_json::Value::Null,
+        };
+        if let Some(results) = v.get_mut("data").and_then(|d| d.get_mut("results")) {
+            if let Some(arr) = results.as_array_mut() {
+                let keep: Vec<&str> = match &self.config.fields {
+                    FieldMode::Full => unreachable!(),
+                    FieldMode::Summary => vec![
+                        "rank",
+                        "id",
+                        "title",
+                        "url",
+                        "score",
+                        "preview",
+                        "source",
+                        "date",
+                        "preview_truncated",
+                    ],
+                    FieldMode::Minimal => vec!["rank", "id", "title", "url", "score"],
+                    FieldMode::Custom(fields) => fields.iter().map(|s| s.as_str()).collect(),
+                };
+                for item in arr {
+                    if let Some(obj) = item.as_object_mut() {
+                        obj.retain(|k, _| keep.contains(&k.as_str()));
+                    }
+                }
             }
         }
+        v
     }
 
     /// Format multiple values as JSONL
@@ -500,6 +539,85 @@ mod tests {
         let (truncated, was_truncated) = formatter.truncate_content("abcdefgh");
         assert!(was_truncated);
         assert!(truncated.starts_with("abcde"));
+    }
+
+    #[test]
+    fn test_fields_full_includes_all() {
+        let config = RobotConfig::new().with_fields(FieldMode::Full);
+        let formatter = RobotFormatter::new(config);
+        let data = serde_json::json!({
+            "data": {
+                "results": [
+                    {"rank": 1, "id": "a", "title": "T", "url": "u", "score": 0.9, "preview": "p"}
+                ]
+            }
+        });
+        let output = formatter.format(&data).unwrap();
+        assert!(output.contains("\"preview\""));
+        assert!(output.contains("\"rank\""));
+    }
+
+    #[test]
+    fn test_fields_minimal_excludes_preview() {
+        let config = RobotConfig::new().with_fields(FieldMode::Minimal);
+        let formatter = RobotFormatter::new(config);
+        let data = serde_json::json!({
+            "data": {
+                "results": [
+                    {"rank": 1, "id": "a", "title": "T", "url": "u", "score": 0.9, "preview": "p"}
+                ]
+            }
+        });
+        let output = formatter.format(&data).unwrap();
+        assert!(!output.contains("\"preview\""));
+        assert!(output.contains("\"rank\""));
+        assert!(output.contains("\"id\""));
+    }
+
+    #[test]
+    fn test_fields_summary_includes_preview_excludes_body() {
+        let config = RobotConfig::new().with_fields(FieldMode::Summary);
+        let formatter = RobotFormatter::new(config);
+        let data = serde_json::json!({
+            "data": {
+                "results": [
+                    {"rank": 1, "id": "a", "title": "T", "preview": "p", "body": "full text"}
+                ]
+            }
+        });
+        let output = formatter.format(&data).unwrap();
+        assert!(output.contains("\"preview\""));
+        assert!(!output.contains("\"body\""));
+    }
+
+    #[test]
+    fn test_fields_custom_only_keeps_named() {
+        let config =
+            RobotConfig::new().with_fields(FieldMode::Custom(vec!["rank".into(), "id".into()]));
+        let formatter = RobotFormatter::new(config);
+        let data = serde_json::json!({
+            "data": {
+                "results": [
+                    {"rank": 1, "id": "a", "title": "T", "url": "u", "score": 0.9}
+                ]
+            }
+        });
+        let output = formatter.format(&data).unwrap();
+        assert!(output.contains("\"rank\""));
+        assert!(output.contains("\"id\""));
+        assert!(!output.contains("\"title\""));
+        assert!(!output.contains("\"url\""));
+        assert!(!output.contains("\"score\""));
+    }
+
+    #[test]
+    fn test_fields_full_noop_on_non_search_response() {
+        let config = RobotConfig::new().with_fields(FieldMode::Minimal);
+        let formatter = RobotFormatter::new(config);
+        let data = serde_json::json!({"status": "ok", "msg": "hello"});
+        let output = formatter.format(&data).unwrap();
+        assert!(output.contains("\"msg\""));
+        assert!(output.contains("\"status\""));
     }
 }
 

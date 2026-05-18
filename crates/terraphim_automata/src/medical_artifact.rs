@@ -104,22 +104,31 @@ pub fn save_umls_artifact(
 
 /// Load a UMLS artifact: returns (header, shard_bytes_list)
 pub fn load_umls_artifact(path: &Path) -> anyhow::Result<(ArtifactHeader, Vec<Vec<u8>>)> {
-    // Advisory permission check: a world-writable artifact file allows an
-    // attacker to forge both bytes and stored checksums together, bypassing
-    // the integrity gate.  Log a warning but do not abort — this is P2
-    // advisory (see Gitea #1587).  Binding this to Unix keeps Windows builds clean.
+    // Permission enforcement: any write bit beyond the owner is a hard
+    // error.  An attacker who can write the artifact can forge both bytes
+    // and stored checksums together, bypassing the integrity gate.  The
+    // checksum guard is only effective when the file is owner-writable
+    // exclusively.  Binding this to Unix keeps Windows builds clean;
+    // Windows callers should apply ACLs externally.
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
         if let Ok(meta) = std::fs::metadata(path) {
             let mode = meta.permissions().mode();
+            let mut reasons = Vec::new();
             if mode & 0o002 != 0 {
-                log::warn!(
-                    "Artifact {:?} is world-writable (mode {:04o}). \
-                     An attacker with filesystem write access could forge a \
-                     valid artifact and bypass checksum verification.",
+                reasons.push("world-writable".to_string());
+            }
+            if mode & 0o020 != 0 {
+                reasons.push("group-writable".to_string());
+            }
+            if !reasons.is_empty() {
+                anyhow::bail!(
+                    "Artifact {:?} has insecure permissions (mode {:04o}): {}. \
+                     Restrict to owner-only write (e.g. chmod 600) and re-save.",
                     path,
-                    mode
+                    mode,
+                    reasons.join(", ")
                 );
             }
         }
@@ -290,15 +299,13 @@ mod tests {
         assert!(msg.contains("checksum mismatch"), "error: {}", msg);
     }
 
-    /// Verify that a world-writable artifact still loads successfully.
+    /// Verify that a world-writable artifact is rejected as a hard error.
     ///
-    /// The permission check is advisory (P2, Gitea #1587): it emits a log
-    /// warning but does not abort loading.  The checksum gate still protects
-    /// against _tampered_ bytes; the warning alerts operators to tighten
-    /// filesystem permissions.
+    /// An attacker who can write the file can forge both bytes and
+    /// checksums.  The permission gate rejects before any data is read.
     #[test]
     #[cfg(unix)]
-    fn test_world_writable_artifact_loads_ok() {
+    fn test_world_writable_artifact_rejected() {
         use std::os::unix::fs::PermissionsExt;
         let dir = tempdir().unwrap();
         let path = dir.path().join("world_writable.bin.zst");
@@ -312,11 +319,63 @@ mod tests {
         perms.set_mode(0o666);
         std::fs::set_permissions(&path, perms).unwrap();
 
-        // Loading must succeed — the warning is advisory, not fatal
+        let result = load_umls_artifact(&path);
+        assert!(result.is_err(), "World-writable artifact must be rejected");
+        let msg = result.err().unwrap().to_string();
+        assert!(
+            msg.contains("world-writable"),
+            "error must mention world-writable, got: {msg}"
+        );
+    }
+
+    /// Verify that a group-writable artifact is rejected.
+    #[test]
+    #[cfg(unix)]
+    fn test_group_writable_artifact_rejected() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("group_writable.bin.zst");
+
+        let shard_bytes = vec![vec![1u8; 10], vec![2u8; 8]];
+        let header = make_test_header(&shard_bytes);
+        save_umls_artifact(&header, &shard_bytes, &path).unwrap();
+
+        // Make group-writable (0o620)
+        let mut perms = std::fs::metadata(&path).unwrap().permissions();
+        perms.set_mode(0o620);
+        std::fs::set_permissions(&path, perms).unwrap();
+
+        let result = load_umls_artifact(&path);
+        assert!(result.is_err(), "Group-writable artifact must be rejected");
+        let msg = result.err().unwrap().to_string();
+        assert!(
+            msg.contains("group-writable"),
+            "error must mention group-writable, got: {msg}"
+        );
+    }
+
+    /// Verify that an artifact with secure owner-only permissions (0o600)
+    /// loads successfully.
+    #[test]
+    #[cfg(unix)]
+    fn test_secure_permissions_artifact_loads_ok() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("secure.bin.zst");
+
+        let shard_bytes = vec![vec![1u8; 10], vec![2u8; 8]];
+        let header = make_test_header(&shard_bytes);
+        save_umls_artifact(&header, &shard_bytes, &path).unwrap();
+
+        // Secure: owner read+write only
+        let mut perms = std::fs::metadata(&path).unwrap().permissions();
+        perms.set_mode(0o600);
+        std::fs::set_permissions(&path, perms).unwrap();
+
         let result = load_umls_artifact(&path);
         assert!(
             result.is_ok(),
-            "World-writable artifact must still load (advisory warning only); got: {:?}",
+            "Owner-writable-only artifact must load; got: {:?}",
             result.err()
         );
         let (loaded_header, loaded_shards) = result.unwrap();
