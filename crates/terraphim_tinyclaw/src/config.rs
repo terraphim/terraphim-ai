@@ -105,7 +105,7 @@ fn default_max_session_messages() -> usize {
 }
 
 /// Hybrid LLM configuration.
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[derive(Clone, Default, Deserialize, Serialize)]
 pub struct LlmConfig {
     /// Proxy configuration for tool-calling and quality responses.
     pub proxy: ProxyConfig,
@@ -121,8 +121,17 @@ impl LlmConfig {
     }
 }
 
+impl std::fmt::Debug for LlmConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LlmConfig")
+            .field("proxy", &self.proxy)
+            .field("direct", &self.direct)
+            .finish()
+    }
+}
+
 /// Proxy client configuration.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 pub struct ProxyConfig {
     /// Base URL for the terraphim-llm-proxy.
     pub base_url: String,
@@ -164,6 +173,18 @@ impl ProxyConfig {
             log::warn!("proxy.api_key is empty - requests may fail");
         }
         Ok(())
+    }
+}
+
+impl std::fmt::Debug for ProxyConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ProxyConfig")
+            .field("base_url", &self.base_url)
+            .field("api_key", &"***REDACTED***")
+            .field("timeout_ms", &self.timeout_ms)
+            .field("model", &self.model)
+            .field("retry_after_secs", &self.retry_after_secs)
+            .finish()
     }
 }
 
@@ -647,6 +668,45 @@ model = "llama3.2"
         assert!(
             !cfg.is_allowed("u12345"),
             "Lowercase variant should be rejected"
+        );
+    }
+
+    #[test]
+    fn test_proxy_config_debug_redacts_api_key() {
+        let cfg = ProxyConfig {
+            api_key: "super-secret-proxy-key".to_string(),
+            base_url: "http://localhost:3456".to_string(),
+            ..Default::default()
+        };
+        let output = format!("{:?}", cfg);
+        assert!(
+            !output.contains("super-secret-proxy-key"),
+            "api_key must not appear in ProxyConfig Debug output"
+        );
+        assert!(
+            output.contains("***REDACTED***"),
+            "Redaction marker must appear in ProxyConfig Debug output"
+        );
+    }
+
+    #[test]
+    fn test_llm_config_debug_does_not_leak_api_key() {
+        let cfg = LlmConfig {
+            proxy: ProxyConfig {
+                api_key: "secret-llm-api-key".to_string(),
+                base_url: "http://localhost:3456".to_string(),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let output = format!("{:?}", cfg);
+        assert!(
+            !output.contains("secret-llm-api-key"),
+            "api_key must not appear in LlmConfig Debug output"
+        );
+        assert!(
+            output.contains("***REDACTED***"),
+            "Redaction marker must appear in LlmConfig Debug output"
         );
     }
 }

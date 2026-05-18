@@ -4,6 +4,20 @@ use std::time::Instant;
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
+use crate::worktree_guard::WorktreeGuard;
+
+/// Directory-name prefix for compound-review worktrees.
+///
+/// Single source of truth referenced by:
+/// - `compound.rs::run` when constructing `review-<uuid>` names.
+/// - Layer 2 (`scope::WorktreeManager::sweep_stale`) when matching
+///   stale entries on startup.
+/// - Layer 3 (`scripts/adf-setup/adf-cleanup.sh`) for the operator
+///   cleanup helper.
+///
+/// Changes here must be mirrored in the shell script.
+pub const WORKTREE_REVIEW_PREFIX: &str = "review-";
+
 /// Check if `prefix` is a proper path prefix of `path`.
 /// Ensures "src/" matches "src/main.rs" but not "src-backup/".
 pub(crate) fn is_path_prefix(prefix: &str, path: &str) -> bool {
@@ -256,12 +270,16 @@ impl WorktreeManager {
     /// * `name` - Name of the worktree (used as directory name)
     /// * `git_ref` - Git reference (branch, tag, commit) to check out
     ///
-    /// Returns the path to the created worktree.
+    /// Returns a `WorktreeGuard` that owns cleanup of the worktree.
+    /// When the guard is dropped without `.keep()` being called, it
+    /// invokes `git worktree remove --force` against the repository
+    /// (reconciling the `<repo>/.git/worktrees/<name>` admin entry)
+    /// and falls back to filesystem removal on failure.
     pub async fn create_worktree(
         &self,
         name: &str,
         git_ref: &str,
-    ) -> Result<PathBuf, std::io::Error> {
+    ) -> Result<WorktreeGuard, std::io::Error> {
         let worktree_path = self.worktree_base.join(name);
 
         // Create parent directory if needed
@@ -297,7 +315,7 @@ impl WorktreeManager {
         }
 
         info!(name = %name, path = %worktree_path.display(), "worktree created");
-        Ok(worktree_path)
+        Ok(WorktreeGuard::for_managed(&self.repo_path, worktree_path))
     }
 
     /// Remove a worktree.
@@ -405,6 +423,211 @@ impl WorktreeManager {
     pub fn worktree_exists(&self, name: &str) -> bool {
         self.worktree_base.join(name).join(".git").exists()
     }
+
+    /// Sweep stale worktree residue left by a previous orchestrator
+    /// instance (SIGKILL, OOM, panic-across-runtime, host reboot
+    /// mid-review).
+    ///
+    /// Synchronous on purpose: `AgentOrchestrator::new` is a sync
+    /// constructor and the sweep must complete before any tick thread
+    /// is spawned. This is Layer 2 of the worktree lifecycle defence
+    /// in depth (epic #1567):
+    ///
+    /// - Layer 1 (`WorktreeGuard::Drop`) handles the happy / cancelled
+    ///   path while the process is still alive.
+    /// - Layer 2 (this method) reconciles whatever survived the
+    ///   previous process death.
+    /// - Layer 3 (`scripts/adf-setup/adf-cleanup.sh` via
+    ///   `ExecStartPre`) catches root-owned residue that the
+    ///   orchestrator user cannot remove.
+    ///
+    /// Behaviour:
+    /// 1. Walk `self.worktree_base` direct children whose name starts
+    ///    with [`WORKTREE_REVIEW_PREFIX`] and attempt removal.
+    /// 2. Walk every direct child of each `extra_roots` entry (no
+    ///    prefix filter -- the per-agent `/tmp/adf-worktrees` root
+    ///    convention has no prefix).
+    /// 3. Removal tries `git worktree remove --force` first so the
+    ///    `<repo>/.git/worktrees/<name>` admin entry is reconciled,
+    ///    then falls back to `std::fs::remove_dir_all` on non-zero
+    ///    exit.
+    /// 4. `io::ErrorKind::PermissionDenied` (EACCES/EPERM on Linux)
+    ///    increments `root_owned_skipped` rather than `failed_count`.
+    ///    Layer 3 will catch those on the next service restart.
+    /// 5. After walking, runs `git worktree prune --verbose` to drop
+    ///    dead admin entries whose paths no longer exist on disk.
+    ///
+    /// Emits a single structured `info!` line with all
+    /// [`SweepReport`] fields plus a synthetic
+    /// `backlog_count = swept_count + root_owned_skipped`, so Quickwit
+    /// dashboards can alert on residue backlog without parsing
+    /// individual `warn!` lines.
+    pub fn sweep_stale(&self, extra_roots: &[PathBuf]) -> SweepReport {
+        let start = std::time::Instant::now();
+        let mut report = SweepReport::default();
+
+        // 1. Primary base: only review-prefixed entries.
+        if self.worktree_base.is_dir() {
+            match std::fs::read_dir(&self.worktree_base) {
+                Ok(entries) => {
+                    for entry in entries.flatten() {
+                        let name = match entry.file_name().into_string() {
+                            Ok(n) => n,
+                            Err(_) => continue,
+                        };
+                        if !name.starts_with(WORKTREE_REVIEW_PREFIX) {
+                            continue;
+                        }
+                        self.sweep_one(&entry.path(), &mut report);
+                    }
+                }
+                Err(e) => {
+                    warn!(
+                        path = %self.worktree_base.display(),
+                        error = %e,
+                        "sweep_stale could not enumerate worktree base"
+                    );
+                }
+            }
+        }
+
+        // 2. Extra roots (typically `/tmp/adf-worktrees`): every
+        //    direct child, regardless of prefix.
+        for root in extra_roots {
+            if !root.is_dir() {
+                continue;
+            }
+            match std::fs::read_dir(root) {
+                Ok(entries) => {
+                    for entry in entries.flatten() {
+                        self.sweep_one(&entry.path(), &mut report);
+                    }
+                }
+                Err(e) => {
+                    warn!(
+                        path = %root.display(),
+                        error = %e,
+                        "sweep_stale could not enumerate extra root"
+                    );
+                }
+            }
+        }
+
+        // 3. Reconcile git's admin registry so half-killed worktree
+        //    metadata under `<repo>/.git/worktrees/` is dropped.
+        let prune = std::process::Command::new("git")
+            .arg("-C")
+            .arg(&self.repo_path)
+            .arg("worktree")
+            .arg("prune")
+            .arg("--verbose")
+            .env_remove("GIT_INDEX_FILE")
+            .output();
+        report.prune_succeeded = matches!(&prune, Ok(o) if o.status.success());
+        if let Ok(out) = prune {
+            if !out.status.success() {
+                let stderr = String::from_utf8_lossy(&out.stderr);
+                warn!(stderr = %stderr, "git worktree prune failed during sweep");
+            }
+        } else if let Err(e) = prune {
+            warn!(error = %e, "git worktree prune could not be invoked during sweep");
+        }
+
+        report.duration_ms = start.elapsed().as_millis() as u64;
+        info!(
+            swept_count = report.swept_count,
+            failed_count = report.failed_count,
+            root_owned_skipped = report.root_owned_skipped,
+            prune_succeeded = report.prune_succeeded,
+            duration_ms = report.duration_ms,
+            backlog_count = report.swept_count + report.root_owned_skipped,
+            "worktree sweep_stale complete"
+        );
+        report
+    }
+
+    /// Remove one worktree path, updating `report` in place.
+    ///
+    /// Tries `git worktree remove --force` first so the git admin
+    /// registry stays in sync; falls back to `remove_dir_all` on
+    /// non-zero exit. Permission-denied during the fallback path is
+    /// counted as `root_owned_skipped` (Layer 3 territory) rather
+    /// than a hard failure.
+    fn sweep_one(&self, path: &Path, report: &mut SweepReport) {
+        let status = std::process::Command::new("git")
+            .arg("-C")
+            .arg(&self.repo_path)
+            .arg("worktree")
+            .arg("remove")
+            .arg("--force")
+            .arg(path)
+            .env_remove("GIT_INDEX_FILE")
+            .status();
+
+        if matches!(&status, Ok(s) if s.success()) {
+            // Git removed both the worktree directory and the admin
+            // entry. Some git versions leave an empty directory if the
+            // worktree was already corrupt; tidy that up best-effort.
+            if path.exists() {
+                let _ = std::fs::remove_dir_all(path);
+            }
+            report.swept_count += 1;
+            return;
+        }
+
+        // Git refused (or the path was never a registered worktree to
+        // begin with -- common for residue under `/tmp/adf-worktrees`).
+        // Fall back to a plain directory removal.
+        match std::fs::remove_dir_all(path) {
+            Ok(_) => report.swept_count += 1,
+            Err(e) if matches!(e.kind(), std::io::ErrorKind::PermissionDenied) => {
+                warn!(
+                    path = %path.display(),
+                    "sweep_stale skipping root-owned worktree -- Layer 3 will clean"
+                );
+                report.root_owned_skipped += 1;
+            }
+            Err(e) if matches!(e.kind(), std::io::ErrorKind::NotFound) => {
+                // The path vanished between read_dir() and remove. Not
+                // an error worth counting -- something else (Layer 3,
+                // a sibling sweep) already handled it.
+            }
+            Err(e) => {
+                warn!(
+                    path = %path.display(),
+                    error = %e,
+                    "sweep_stale failed to remove worktree residue"
+                );
+                report.failed_count += 1;
+            }
+        }
+    }
+}
+
+/// Summary of a [`WorktreeManager::sweep_stale`] invocation.
+///
+/// Emitted via structured `tracing::info!` so Quickwit can compute
+/// backlog gauges (`swept_count + root_owned_skipped`) and alert on
+/// large residue indicative of a prior crash storm.
+#[derive(Debug, Clone, Default)]
+pub struct SweepReport {
+    /// Number of worktree directories successfully removed (either
+    /// via `git worktree remove --force` or filesystem fallback).
+    pub swept_count: usize,
+    /// Number of removal attempts that returned a non-PermissionDenied
+    /// error. Indicates filesystem-level problems worth investigating.
+    pub failed_count: usize,
+    /// Number of entries skipped because the orchestrator user lacked
+    /// permission. These belong to Layer 3 (`adf-cleanup.sh` run as
+    /// root via `ExecStartPre`).
+    pub root_owned_skipped: usize,
+    /// Whether `git worktree prune --verbose` exited zero. False
+    /// implies the git admin registry under `<repo>/.git/worktrees`
+    /// may still hold dangling entries; the next sweep will retry.
+    pub prune_succeeded: bool,
+    /// Wall-clock duration of the sweep in milliseconds, for
+    /// observability and startup-time budgeting.
+    pub duration_ms: u64,
 }
 
 #[cfg(test)]
@@ -670,17 +893,20 @@ mod tests {
         let (_temp_dir, repo_path) = setup_git_repo();
         let manager = WorktreeManager::new(&repo_path);
 
-        let worktree_path = manager.create_worktree("feature-branch", "HEAD").await;
+        let guard_result = manager.create_worktree("feature-branch", "HEAD").await;
         assert!(
-            worktree_path.is_ok(),
+            guard_result.is_ok(),
             "create_worktree failed: {:?}",
-            worktree_path.err()
+            guard_result.err()
         );
 
-        let path = worktree_path.unwrap();
+        let guard = guard_result.unwrap();
+        let path = guard.path().to_path_buf();
         assert!(path.exists());
         assert!(path.join(".git").exists());
         assert!(path.join("README.md").exists());
+        // Disarm so guard's Drop doesn't fight the temp_dir teardown.
+        guard.keep();
     }
 
     #[tokio::test]
@@ -688,10 +914,12 @@ mod tests {
         let (_temp_dir, repo_path) = setup_git_repo();
         let manager = WorktreeManager::new(&repo_path);
 
-        // Create worktree
-        manager.create_worktree("to-remove", "HEAD").await.unwrap();
+        // Create worktree; keep the guard so the manual remove path
+        // below is what removes it (not the guard's Drop).
+        let guard = manager.create_worktree("to-remove", "HEAD").await.unwrap();
         let path = manager.worktree_base().join("to-remove");
         assert!(path.exists());
+        guard.keep();
 
         // Remove worktree
         let result = manager.remove_worktree("to-remove").await;
@@ -714,10 +942,12 @@ mod tests {
         let (_temp_dir, repo_path) = setup_git_repo();
         let manager = WorktreeManager::new(&repo_path);
 
-        // Create multiple worktrees
-        manager.create_worktree("wt1", "HEAD").await.unwrap();
-        manager.create_worktree("wt2", "HEAD").await.unwrap();
-        manager.create_worktree("wt3", "HEAD").await.unwrap();
+        // Create multiple worktrees; disarm each guard so cleanup_all
+        // is what removes them (this test asserts the manager's
+        // own bulk path, not the guard's Drop).
+        manager.create_worktree("wt1", "HEAD").await.unwrap().keep();
+        manager.create_worktree("wt2", "HEAD").await.unwrap().keep();
+        manager.create_worktree("wt3", "HEAD").await.unwrap().keep();
 
         let worktrees = manager.list_worktrees().unwrap();
         assert_eq!(worktrees.len(), 3);
@@ -739,9 +969,13 @@ mod tests {
         let worktrees = manager.list_worktrees().unwrap();
         assert!(worktrees.is_empty());
 
-        // Create worktrees
-        manager.create_worktree("wt-a", "HEAD").await.unwrap();
-        manager.create_worktree("wt-b", "HEAD").await.unwrap();
+        // Create worktrees; keep the guards so the worktrees survive
+        // long enough for list_worktrees to enumerate them.
+        let _g_a = manager.create_worktree("wt-a", "HEAD").await.unwrap();
+        let _g_b = manager.create_worktree("wt-b", "HEAD").await.unwrap();
+        // Disarm so guard Drop doesn't race the TempDir teardown.
+        _g_a.keep();
+        _g_b.keep();
 
         let worktrees = manager.list_worktrees().unwrap();
         assert_eq!(worktrees.len(), 2);
@@ -756,8 +990,9 @@ mod tests {
 
         assert!(!manager.worktree_exists("test-wt"));
 
-        manager.create_worktree("test-wt", "HEAD").await.unwrap();
+        let guard = manager.create_worktree("test-wt", "HEAD").await.unwrap();
         assert!(manager.worktree_exists("test-wt"));
+        guard.keep();
 
         manager.remove_worktree("test-wt").await.unwrap();
         assert!(!manager.worktree_exists("test-wt"));
@@ -777,10 +1012,286 @@ mod tests {
         let (_temp_dir, repo_path) = setup_git_repo();
         let manager = WorktreeManager::new(&repo_path);
 
-        manager.create_worktree("duplicate", "HEAD").await.unwrap();
+        let guard = manager.create_worktree("duplicate", "HEAD").await.unwrap();
 
         // Creating duplicate should fail
         let result = manager.create_worktree("duplicate", "HEAD").await;
         assert!(result.is_err());
+        guard.keep();
+    }
+
+    // ==================== sweep_stale Tests (Layer 2 / #1570) ====================
+
+    #[test]
+    fn test_sweep_stale_empty_dir() {
+        // Base dir exists but is empty. Report should be all zeros and
+        // prune should still succeed against a clean repo.
+        let (_temp_dir, repo_path) = setup_git_repo();
+        let base = repo_path.join(".worktrees");
+        std::fs::create_dir_all(&base).expect("create empty base");
+        let manager = WorktreeManager::with_base(&repo_path, &base);
+
+        let report = manager.sweep_stale(&[]);
+        assert_eq!(report.swept_count, 0);
+        assert_eq!(report.failed_count, 0);
+        assert_eq!(report.root_owned_skipped, 0);
+        assert!(report.prune_succeeded, "prune should succeed on clean repo");
+    }
+
+    #[test]
+    fn test_sweep_stale_no_base() {
+        // Base dir does not exist; method must return successfully.
+        let (_temp_dir, repo_path) = setup_git_repo();
+        let manager =
+            WorktreeManager::with_base(&repo_path, repo_path.join("does-not-exist-anywhere"));
+
+        let report = manager.sweep_stale(&[]);
+        assert_eq!(report.swept_count, 0);
+        assert_eq!(report.failed_count, 0);
+        assert_eq!(report.root_owned_skipped, 0);
+        assert!(report.prune_succeeded);
+    }
+
+    #[test]
+    fn test_sweep_stale_removes_review_prefix() {
+        // Seed three `review-*` directories as plain dirs (not real
+        // worktrees -- sweep_one falls back to remove_dir_all when git
+        // refuses an unregistered path, which is exactly the
+        // residue-after-SIGKILL shape).
+        let (_temp_dir, repo_path) = setup_git_repo();
+        let base = repo_path.join(".worktrees");
+        std::fs::create_dir_all(&base).unwrap();
+
+        for i in 0..3 {
+            let dir = base.join(format!("{}{}", WORKTREE_REVIEW_PREFIX, i));
+            std::fs::create_dir_all(&dir).unwrap();
+            std::fs::write(dir.join("dummy.txt"), "residue").unwrap();
+        }
+
+        let manager = WorktreeManager::with_base(&repo_path, &base);
+        let report = manager.sweep_stale(&[]);
+
+        assert_eq!(report.swept_count, 3, "all three review dirs swept");
+        assert_eq!(report.failed_count, 0);
+        assert_eq!(report.root_owned_skipped, 0);
+        assert!(report.prune_succeeded);
+
+        for i in 0..3 {
+            let dir = base.join(format!("{}{}", WORKTREE_REVIEW_PREFIX, i));
+            assert!(!dir.exists(), "review-{} should be removed", i);
+        }
+    }
+
+    #[test]
+    fn test_sweep_stale_preserves_non_review_prefix() {
+        // Only `review-` prefixed entries are swept from worktree_base.
+        // Sibling directories under the same base must be preserved.
+        let (_temp_dir, repo_path) = setup_git_repo();
+        let base = repo_path.join(".worktrees");
+        std::fs::create_dir_all(&base).unwrap();
+
+        let review_dir = base.join(format!("{}victim", WORKTREE_REVIEW_PREFIX));
+        let keep_dir = base.join("keep-me");
+        std::fs::create_dir_all(&review_dir).unwrap();
+        std::fs::create_dir_all(&keep_dir).unwrap();
+        std::fs::write(keep_dir.join("important.txt"), "data").unwrap();
+
+        let manager = WorktreeManager::with_base(&repo_path, &base);
+        let report = manager.sweep_stale(&[]);
+
+        assert_eq!(report.swept_count, 1);
+        assert!(!review_dir.exists(), "review-victim should be swept");
+        assert!(keep_dir.exists(), "keep-me must be preserved");
+        assert!(
+            keep_dir.join("important.txt").exists(),
+            "keep-me contents must survive"
+        );
+    }
+
+    #[test]
+    fn test_sweep_stale_runs_prune() {
+        // `prune_succeeded` must be true after a clean sweep against a
+        // healthy repo. This guards against silently regressing the
+        // git registry reconciliation step.
+        let (_temp_dir, repo_path) = setup_git_repo();
+        let base = repo_path.join(".worktrees");
+        std::fs::create_dir_all(&base).unwrap();
+        let manager = WorktreeManager::with_base(&repo_path, &base);
+
+        let report = manager.sweep_stale(&[]);
+        assert!(
+            report.prune_succeeded,
+            "prune step must run and succeed after sweep"
+        );
+    }
+
+    #[test]
+    fn test_sweep_stale_extra_roots_no_prefix_filter() {
+        // Entries under extra_roots are swept regardless of prefix --
+        // the per-agent root convention has no naming convention.
+        let (_temp_dir, repo_path) = setup_git_repo();
+        let base = repo_path.join(".worktrees");
+        std::fs::create_dir_all(&base).unwrap();
+
+        // Unique temp dir to mimic `/tmp/adf-worktrees` without
+        // colliding with a parallel real orchestrator on this host.
+        let extra = std::env::temp_dir().join(format!("adf-worktrees-test-{}", Uuid::new_v4()));
+        std::fs::create_dir_all(&extra).unwrap();
+        let agent_dir = extra.join("agent-alpha");
+        std::fs::create_dir_all(&agent_dir).unwrap();
+        std::fs::write(agent_dir.join("scratch.txt"), "tmp").unwrap();
+
+        let manager = WorktreeManager::with_base(&repo_path, &base);
+        let report = manager.sweep_stale(std::slice::from_ref(&extra));
+
+        assert_eq!(report.swept_count, 1, "agent-alpha should be swept");
+        assert!(!agent_dir.exists(), "extra-root child should be removed");
+
+        // Tidy up the now-empty extra root.
+        let _ = std::fs::remove_dir_all(&extra);
+    }
+
+    /// Root-owned residue belongs to Layer 3 (`adf-cleanup.sh` via
+    /// `ExecStartPre`); Layer 2 must skip it gracefully without
+    /// counting it as a hard failure.
+    ///
+    /// This test is Linux-only and only meaningful when the test
+    /// process runs as root. In every other environment it is a no-op
+    /// that nonetheless documents the contract (the assertion would
+    /// be vacuously skipped).
+    #[test]
+    #[cfg_attr(not(target_os = "linux"), ignore)]
+    fn test_sweep_stale_skips_root_owned() {
+        // Runtime gate: skip when not root. Without elevated privilege
+        // we cannot create a file the test user cannot delete, so the
+        // PermissionDenied path is unreachable.
+        let is_root = std::env::var("USER")
+            .map(|u| u == "root")
+            .unwrap_or(false)
+            // SAFETY: getuid() is async-signal-safe and side-effect free.
+            || unsafe { libc_getuid() } == 0;
+        if !is_root {
+            eprintln!("skipping test_sweep_stale_skips_root_owned: not root");
+            return;
+        }
+
+        let (_temp_dir, repo_path) = setup_git_repo();
+        let base = repo_path.join(".worktrees");
+        std::fs::create_dir_all(&base).unwrap();
+
+        let review_dir = base.join(format!("{}root-owned", WORKTREE_REVIEW_PREFIX));
+        std::fs::create_dir_all(&review_dir).unwrap();
+
+        // Make the parent dir read+exec but not writable for non-owner
+        // so remove_dir_all from a dropped-privilege process would
+        // EACCES. Real root-owned residue scenario: the file's owner
+        // is root and the orchestrator runs as a service user.
+        //
+        // We cannot truly fake this from inside a root test process
+        // (root bypasses DAC), so this test asserts only that the
+        // method completes without panicking when handed a path it
+        // cannot remove. The actual EACCES branch is exercised by
+        // Layer 3 integration testing on the bigbox.
+        let report = WorktreeManager::with_base(&repo_path, &base).sweep_stale(&[]);
+
+        // Whether the dir was swept or marked root_owned_skipped
+        // depends on the host's filesystem; both are acceptable. The
+        // contract is just "no panic, no failed_count".
+        assert_eq!(
+            report.failed_count, 0,
+            "root-owned residue must never count as a hard failure"
+        );
+    }
+
+    // Direct FFI to `getuid(2)` so we do not pull `nix` or `libc`
+    // crates just for one test. Linux only.
+    #[cfg(target_os = "linux")]
+    extern "C" {
+        #[link_name = "getuid"]
+        fn libc_getuid() -> u32;
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    #[allow(dead_code)]
+    unsafe fn libc_getuid() -> u32 {
+        // Non-Linux fallback that never claims root, so the runtime
+        // gate above always skips. The `#[cfg_attr(ignore)]` on the
+        // test means we will not reach this branch in practice.
+        1
+    }
+}
+
+/// Test helpers exposed at module scope (under the `test-helpers`
+/// feature, or when compiling the lib's own test target) so
+/// integration tests under `tests/` can re-use the git repo fixture.
+/// These helpers have no production callers; they exist to share
+/// setup code across `scope.rs::tests` and the cancellation property
+/// test.
+#[doc(hidden)]
+#[cfg(any(test, feature = "test-helpers"))]
+pub mod test_support {
+    use std::path::PathBuf;
+    use std::process::Command;
+    use tempfile::TempDir;
+
+    /// Initialise a real git repository in a fresh `TempDir` with one
+    /// commit. Returns the `TempDir` (caller owns the lifetime) and
+    /// the repo path.
+    pub fn setup_git_repo() -> (TempDir, PathBuf) {
+        std::env::remove_var("GIT_INDEX_FILE");
+
+        let temp_dir = TempDir::new().expect("failed to create temp dir");
+        let repo_path = temp_dir.path().to_path_buf();
+
+        let output = Command::new("git")
+            .arg("init")
+            .arg(&repo_path)
+            .env_remove("GIT_INDEX_FILE")
+            .output()
+            .expect("failed to run git init");
+        assert!(output.status.success(), "git init failed");
+
+        Command::new("git")
+            .arg("-C")
+            .arg(&repo_path)
+            .arg("config")
+            .arg("user.email")
+            .arg("test@test.com")
+            .env_remove("GIT_INDEX_FILE")
+            .output()
+            .expect("failed to config git email");
+
+        Command::new("git")
+            .arg("-C")
+            .arg(&repo_path)
+            .arg("config")
+            .arg("user.name")
+            .arg("Test User")
+            .env_remove("GIT_INDEX_FILE")
+            .output()
+            .expect("failed to config git name");
+
+        std::fs::write(repo_path.join("README.md"), "# Test Repo").expect("failed to write file");
+
+        Command::new("git")
+            .arg("-C")
+            .arg(&repo_path)
+            .arg("add")
+            .arg(".")
+            .env_remove("GIT_INDEX_FILE")
+            .output()
+            .expect("failed to git add");
+
+        Command::new("git")
+            .arg("-C")
+            .arg(&repo_path)
+            .arg("commit")
+            .arg("-m")
+            .arg("Initial commit")
+            .env_remove("GIT_INDEX_FILE")
+            .output()
+            .expect("failed to git commit");
+
+        (temp_dir, repo_path)
     }
 }

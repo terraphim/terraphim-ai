@@ -49,6 +49,7 @@ pub struct SnomedConcept {
 }
 
 impl SnomedConcept {
+    /// Creates a new `SnomedConcept` with the given identifier, primary term, and semantic type.
     pub fn new(id: u64, term: String, semantic_type: SemanticType) -> Self {
         Self {
             id,

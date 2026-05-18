@@ -15,6 +15,7 @@ pub struct Matched {
 /// Minimum pattern length for find_matches to prevent spurious matches.
 const MIN_FIND_PATTERN_LENGTH: usize = 2;
 
+/// Finds thesaurus matches within `text`, optionally recording byte positions.
 pub fn find_matches(
     text: &str,
     thesaurus: Thesaurus,

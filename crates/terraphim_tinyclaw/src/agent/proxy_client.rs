@@ -8,7 +8,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 /// Configuration for the proxy client.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct ProxyClientConfig {
     /// Base URL for the proxy (e.g., "http://127.0.0.1:3456")
     pub base_url: String,
@@ -20,6 +20,18 @@ pub struct ProxyClientConfig {
     pub model: Option<String>,
     /// Retry backoff after failure in seconds
     pub retry_after_secs: u64,
+}
+
+impl std::fmt::Debug for ProxyClientConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ProxyClientConfig")
+            .field("base_url", &self.base_url)
+            .field("api_key", &"***REDACTED***")
+            .field("timeout_ms", &self.timeout_ms)
+            .field("model", &self.model)
+            .field("retry_after_secs", &self.retry_after_secs)
+            .finish()
+    }
 }
 
 impl Default for ProxyClientConfig {
@@ -372,5 +384,25 @@ mod tests {
         let response: AnthropicResponse = serde_json::from_value(json).unwrap();
         assert_eq!(response.usage.input_tokens, 200);
         assert_eq!(response.usage.output_tokens, 75);
+    }
+
+    #[test]
+    fn proxy_client_config_api_key_redacted_in_debug() {
+        let cfg = ProxyClientConfig {
+            base_url: "http://127.0.0.1:3456".to_string(),
+            api_key: "proxy-secret-key".to_string(),
+            timeout_ms: 60_000,
+            model: None,
+            retry_after_secs: 60,
+        };
+        let dbg = format!("{:?}", cfg);
+        assert!(
+            !dbg.contains("proxy-secret-key"),
+            "ProxyClientConfig api_key must be redacted in Debug output, got: {dbg}"
+        );
+        assert!(
+            dbg.contains("***REDACTED***"),
+            "Debug output should mark api_key as redacted, got: {dbg}"
+        );
     }
 }

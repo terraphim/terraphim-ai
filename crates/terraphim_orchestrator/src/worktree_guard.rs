@@ -26,19 +26,51 @@ use tracing::{debug, info, warn};
 pub struct WorktreeGuard {
     path: PathBuf,
     should_cleanup: bool,
+    /// When `Some`, `Drop` runs `git -C <repo_path> worktree remove
+    /// --force <path>` first and falls back to a filesystem-only
+    /// removal on non-zero exit or when the git CLI is not
+    /// invokable. When `None`, only the filesystem path runs (the
+    /// existing per-agent caller in `lib.rs`, unchanged).
+    repo_path: Option<PathBuf>,
 }
 
 impl WorktreeGuard {
     /// Create a new worktree guard for the given path.
     ///
     /// The path will be removed when the guard is dropped unless
-    /// `keep()` is called.
+    /// `keep()` is called. This constructor performs filesystem-only
+    /// cleanup; use `for_managed` for git-aware cleanup of worktrees
+    /// created via `WorktreeManager::create_worktree`.
     pub fn new<P: AsRef<Path>>(path: P) -> Self {
         let path = path.as_ref().to_path_buf();
         debug!(path = %path.display(), "worktree guard created");
         Self {
             path,
             should_cleanup: true,
+            repo_path: None,
+        }
+    }
+
+    /// Create a managed guard whose `Drop` invokes `git worktree
+    /// remove --force` against `repo_path` before falling back to
+    /// filesystem removal.
+    ///
+    /// Use this when the worktree was created via
+    /// `WorktreeManager::create_worktree` so the git admin registry
+    /// at `<repo>/.git/worktrees/<name>` is reconciled along with the
+    /// directory itself.
+    pub fn for_managed<R: AsRef<Path>, P: AsRef<Path>>(repo_path: R, worktree_path: P) -> Self {
+        let path = worktree_path.as_ref().to_path_buf();
+        let repo = repo_path.as_ref().to_path_buf();
+        debug!(
+            repo_path = %repo.display(),
+            worktree_path = %path.display(),
+            "managed worktree guard created"
+        );
+        Self {
+            path,
+            should_cleanup: true,
+            repo_path: Some(repo),
         }
     }
 
@@ -66,6 +98,49 @@ impl WorktreeGuard {
             return;
         }
 
+        // Managed path: try `git worktree remove --force` first so the
+        // git admin entry at `<repo>/.git/worktrees/<name>` is
+        // reconciled. The synchronous std Command is intentional --
+        // Drop cannot be async, and git worktree remove is sub-second.
+        if let Some(ref repo) = self.repo_path {
+            let start = std::time::Instant::now();
+            let status = std::process::Command::new("git")
+                .arg("-C")
+                .arg(repo)
+                .arg("worktree")
+                .arg("remove")
+                .arg("--force")
+                .arg(&self.path)
+                .env_remove("GIT_INDEX_FILE")
+                .status();
+
+            match status {
+                Ok(s) if s.success() => {
+                    info!(
+                        path = %self.path.display(),
+                        duration_ms = start.elapsed().as_millis() as u64,
+                        "worktree cleaned up via git"
+                    );
+                    return;
+                }
+                Ok(s) => {
+                    warn!(
+                        path = %self.path.display(),
+                        exit_code = ?s.code(),
+                        "git worktree remove failed, falling back to fs"
+                    );
+                }
+                Err(e) => {
+                    warn!(
+                        path = %self.path.display(),
+                        error = %e,
+                        "git CLI not invokable, falling back to fs"
+                    );
+                }
+            }
+        }
+
+        // Fallback / unmanaged path: filesystem-only removal.
         match std::fs::remove_dir_all(&self.path) {
             Ok(_) => {
                 info!(path = %self.path.display(), "worktree cleaned up");
@@ -179,5 +254,111 @@ mod tests {
 
         assert_eq!(result, 42);
         assert!(!worktree.exists());
+    }
+
+    /// Minimal real git repo bootstrap for guard tests. Mirrors the
+    /// helper in `scope::tests::setup_git_repo` but kept inline here
+    /// so the unit tests are self-contained.
+    fn init_git_repo() -> TempDir {
+        std::env::remove_var("GIT_INDEX_FILE");
+        let temp_dir = TempDir::new().expect("temp dir");
+        let repo = temp_dir.path();
+        let run = |args: &[&str]| {
+            let status = std::process::Command::new("git")
+                .arg("-C")
+                .arg(repo)
+                .args(args)
+                .env_remove("GIT_INDEX_FILE")
+                .status()
+                .expect("git invocation");
+            assert!(status.success(), "git {:?} failed", args);
+        };
+        std::process::Command::new("git")
+            .arg("init")
+            .arg(repo)
+            .env_remove("GIT_INDEX_FILE")
+            .status()
+            .expect("git init");
+        run(&["config", "user.email", "test@test.com"]);
+        run(&["config", "user.name", "Test User"]);
+        std::fs::write(repo.join("README.md"), "# Test").unwrap();
+        run(&["add", "."]);
+        run(&["commit", "-m", "init"]);
+        temp_dir
+    }
+
+    #[test]
+    fn test_managed_guard_invokes_git_remove() {
+        let repo = init_git_repo();
+        let worktree = repo.path().join(".worktrees/managed-remove");
+
+        // Use real git worktree add so the admin entry exists.
+        let status = std::process::Command::new("git")
+            .arg("-C")
+            .arg(repo.path())
+            .arg("worktree")
+            .arg("add")
+            .arg(&worktree)
+            .arg("HEAD")
+            .env_remove("GIT_INDEX_FILE")
+            .status()
+            .expect("git worktree add");
+        assert!(status.success(), "git worktree add failed");
+        assert!(worktree.exists());
+        // git admin registry entry exists
+        let admin = repo.path().join(".git/worktrees/managed-remove");
+        assert!(admin.exists(), "git admin entry should exist");
+
+        {
+            let _guard = WorktreeGuard::for_managed(repo.path(), &worktree);
+        }
+
+        assert!(
+            !worktree.exists(),
+            "managed guard should remove worktree dir"
+        );
+        assert!(
+            !admin.exists(),
+            "managed guard should reconcile git admin entry"
+        );
+    }
+
+    #[test]
+    fn test_managed_guard_fallback_on_git_failure() {
+        // Point repo_path at a non-git directory so `git worktree
+        // remove` exits non-zero, exercising the fs fallback.
+        let temp_dir = TempDir::new().unwrap();
+        let not_a_repo = temp_dir.path().join("not-a-repo");
+        std::fs::create_dir(&not_a_repo).unwrap();
+
+        let worktree = temp_dir.path().join("orphan-worktree");
+        std::fs::create_dir(&worktree).unwrap();
+        File::create(worktree.join("payload.txt")).unwrap();
+
+        {
+            let _guard = WorktreeGuard::for_managed(&not_a_repo, &worktree);
+        }
+
+        assert!(
+            !worktree.exists(),
+            "fallback fs removal should remove worktree dir"
+        );
+    }
+
+    #[test]
+    fn test_managed_guard_keep_disarms() {
+        let temp_dir = TempDir::new().unwrap();
+        let fake_repo = temp_dir.path().join("repo");
+        std::fs::create_dir(&fake_repo).unwrap();
+        let worktree = temp_dir.path().join("kept-worktree");
+        std::fs::create_dir(&worktree).unwrap();
+
+        let guard = WorktreeGuard::for_managed(&fake_repo, &worktree);
+        guard.keep();
+
+        assert!(
+            worktree.exists(),
+            "managed guard with keep() must not remove"
+        );
     }
 }

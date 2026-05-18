@@ -84,6 +84,7 @@ pub struct ModelInfo {
 }
 
 impl ClineConnector {
+    /// Creates a new `ClineConnector` using the default Cline global storage path.
     pub fn new() -> Self {
         Self {
             default_path: cline_global_storage_path(),

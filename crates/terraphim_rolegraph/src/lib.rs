@@ -261,6 +261,7 @@ impl TriggerIndex {
         )
     }
 
+    /// Returns `true` if this node has no outgoing trigger terms.
     pub fn is_empty(&self) -> bool {
         self.triggers.is_empty()
     }
@@ -1127,6 +1128,7 @@ impl RoleGraph {
         self.documents.contains_key(document_id)
     }
 
+    /// Inserts or updates the document entry for `document_id` using graph coordinates `(x, y)`.
     pub fn add_or_update_document(&mut self, document_id: &str, x: u64, y: u64) {
         let edge_id = magic_pair(x, y);
         let edge = self.init_or_update_edge(edge_id, document_id);
