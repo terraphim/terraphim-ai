@@ -18,6 +18,7 @@ pub struct MarkdownDirectivesParseResult {
     pub warnings: Vec<MarkdownDirectiveWarning>,
 }
 
+/// Parses all markdown directive files in `root`, collecting synonyms and warnings.
 pub fn parse_markdown_directives_dir(root: &Path) -> crate::Result<MarkdownDirectivesParseResult> {
     let mut directives = HashMap::new();
     let mut warnings = Vec::new();

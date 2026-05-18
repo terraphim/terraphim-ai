@@ -385,6 +385,7 @@ struct Duration {
     human: String,
 }
 
+/// Decodes a newline-delimited JSON string into a vector of `Message` values.
 pub fn json_decode(jsonlines: &str) -> Result<Vec<Message>> {
     Ok(serde_json::Deserializer::from_str(jsonlines)
         .into_iter()
