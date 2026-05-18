@@ -123,15 +123,37 @@ pub struct LlmBridge {
     session_manager: Arc<SessionManager>,
     /// Budget trackers per session.
     budget_trackers: dashmap::DashMap<SessionId, Arc<BudgetTracker>>,
+    /// Optional real LLM client.  When `None`, `query()` returns
+    /// `LlmNotConfigured` instead of a silent stub.
+    #[cfg(feature = "llm")]
+    llm_client: Option<Arc<dyn terraphim_service::llm::LlmClient>>,
 }
 
 impl LlmBridge {
-    /// Create a new LLM bridge.
+    /// Create a new LLM bridge without a real LLM client.
+    /// Queries will return `LlmNotConfigured`.
     pub fn new(config: LlmBridgeConfig, session_manager: Arc<SessionManager>) -> Self {
         Self {
             config,
             session_manager,
             budget_trackers: dashmap::DashMap::new(),
+            #[cfg(feature = "llm")]
+            llm_client: None,
+        }
+    }
+
+    /// Create a new LLM bridge with a configured LLM client.
+    #[cfg(feature = "llm")]
+    pub fn with_llm_client(
+        config: LlmBridgeConfig,
+        session_manager: Arc<SessionManager>,
+        client: Arc<dyn terraphim_service::llm::LlmClient>,
+    ) -> Self {
+        Self {
+            config,
+            session_manager,
+            budget_trackers: dashmap::DashMap::new(),
+            llm_client: Some(client),
         }
     }
 
@@ -189,16 +211,34 @@ impl LlmBridge {
 
         let start = std::time::Instant::now();
 
-        // TODO: Actually call the LLM service
-        // For now, return a stub response
-        let response_text = format!(
-            "[LLM Bridge stub] Query: {}...",
-            if request.prompt.len() > 50 {
-                &request.prompt[..50]
-            } else {
-                &request.prompt
+        #[cfg(feature = "llm")]
+        let response_text = match &self.llm_client {
+            Some(client) => {
+                let chat_opts = terraphim_service::llm::ChatOptions {
+                    max_tokens: request.max_tokens.map(|t| t as u32),
+                    temperature: request.temperature,
+                };
+                let messages = vec![serde_json::json!({
+                    "role": "user",
+                    "content": request.prompt
+                })];
+                client
+                    .chat_completion(messages, chat_opts)
+                    .await
+                    .map_err(|e| RlmError::LlmCallFailed {
+                        message: e.to_string(),
+                    })?
             }
-        );
+            None => {
+                return Err(RlmError::LlmNotConfigured);
+            }
+        };
+
+        #[cfg(not(feature = "llm"))]
+        {
+            let _request = request;
+            return Err(RlmError::LlmNotConfigured);
+        }
 
         // Estimate tokens (1 token ~= 4 chars for English text)
         let estimated_tokens = (request.prompt.len() / 4 + response_text.len() / 4) as u64;

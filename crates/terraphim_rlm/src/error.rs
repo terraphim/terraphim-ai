@@ -132,6 +132,13 @@ pub enum RlmError {
     #[error("LLM call failed: {message}")]
     LlmCallFailed { message: String },
 
+    /// No LLM client configured. Enable the `llm` feature and set an API key
+    /// or run a local Ollama instance.
+    #[error(
+        "No LLM client configured. Enable the `llm` feature (--features llm) and set OPENROUTER_API_KEY or run Ollama on localhost:11434."
+    )]
+    LlmNotConfigured,
+
     /// LLM bridge authentication failed.
     #[error("LLM bridge authentication failed: invalid session token")]
     LlmBridgeAuthFailed,
