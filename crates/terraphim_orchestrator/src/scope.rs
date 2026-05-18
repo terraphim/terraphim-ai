@@ -6,6 +6,102 @@ use uuid::Uuid;
 
 use crate::worktree_guard::WorktreeGuard;
 
+/// Filename of the ownership manifest written at the root of every ADF
+/// worktree.  Presence of this file with valid contents is the gate for
+/// cleanup: sweep only deletes entries carrying this sentinel.
+pub const WORKTREE_MANIFEST_FILENAME: &str = ".adf-worktree-manifest.json";
+
+/// Ownership manifest stored at the root of each ADF worktree.
+///
+/// Existence of this file with matching repo and path fields is the
+/// single gate for sweep/cleanup.  Directories without a valid manifest
+/// are preserved regardless of name prefix or location.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct WorktreeManifest {
+    /// Schema version for forward compatibility.
+    pub version: u32,
+    /// Git repository this worktree belongs to.
+    pub repo_path: String,
+    /// Absolute path of this worktree (self-referential).
+    pub worktree_path: String,
+    /// Name of the agent or component that created this worktree.
+    pub creator: String,
+    /// Session or correlation ID linking this worktree to its task.
+    pub session_id: String,
+    /// Process ID that performed the `git worktree add`.
+    pub pid: u32,
+    /// ISO-8601 timestamp of creation.
+    pub created_at: String,
+}
+
+impl WorktreeManifest {
+    /// Current schema version. Increment when the struct changes
+    /// incompatibly.
+    pub const CURRENT_VERSION: u32 = 1;
+
+    /// Write a manifest to `dir / WORKTREE_MANIFEST_FILENAME`.
+    pub fn write_to_dir(&self, dir: &Path) -> Result<(), std::io::Error> {
+        let path = dir.join(WORKTREE_MANIFEST_FILENAME);
+        let json = serde_json::to_string_pretty(self)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+        std::fs::write(&path, json)?;
+        debug!(path = %path.display(), "worktree manifest written");
+        Ok(())
+    }
+
+    /// Read and validate a manifest from a directory.
+    ///
+    /// Returns `None` if the file is absent, unreadable, unparseable,
+    /// or fails validation (wrong repo, wrong path, or future version).
+    pub fn read_from_dir(dir: &Path) -> Option<Self> {
+        let path = dir.join(WORKTREE_MANIFEST_FILENAME);
+        let bytes = std::fs::read(&path).ok()?;
+        let m: WorktreeManifest = serde_json::from_slice(&bytes).ok()?;
+        if m.version > Self::CURRENT_VERSION {
+            warn!(
+                path = %path.display(),
+                manifest_version = m.version,
+                current_version = Self::CURRENT_VERSION,
+                "worktree manifest version too new, skipping"
+            );
+            return None;
+        }
+        Some(m)
+    }
+
+    /// Check that the manifest's embedded paths match the expected
+    /// repository and the actual directory on disk.
+    pub fn validate(&self, expected_repo: &Path, dir_on_disk: &Path) -> bool {
+        if self.repo_path != expected_repo.to_string_lossy() {
+            warn!(
+                manifest_repo = %self.repo_path,
+                expected_repo = %expected_repo.display(),
+                "worktree manifest repo mismatch"
+            );
+            return false;
+        }
+        if self.worktree_path != dir_on_disk.to_string_lossy() {
+            warn!(
+                manifest_path = %self.worktree_path,
+                dir_on_disk = %dir_on_disk.display(),
+                "worktree manifest path mismatch"
+            );
+            return false;
+        }
+        true
+    }
+
+    /// Convenience: read from `dir` and validate against `expected_repo`.
+    pub fn read_valid(dir: &Path, expected_repo: &Path) -> Option<Self> {
+        let m = Self::read_from_dir(dir)?;
+        if m.validate(expected_repo, dir) {
+            Some(m)
+        } else {
+            None
+        }
+    }
+}
+
 /// Directory-name prefix for compound-review worktrees.
 ///
 /// Single source of truth referenced by:
@@ -315,6 +411,27 @@ impl WorktreeManager {
         }
 
         info!(name = %name, path = %worktree_path.display(), "worktree created");
+
+        // Write ownership manifest so sweep can safely identify this
+        // worktree as ADF-managed.  Best-effort; a missing or invalid
+        // manifest inhibits cleanup rather than breaking the worktree.
+        let manifest = WorktreeManifest {
+            version: WorktreeManifest::CURRENT_VERSION,
+            repo_path: self.repo_path.to_string_lossy().to_string(),
+            worktree_path: worktree_path.to_string_lossy().to_string(),
+            creator: "orchestrator".to_string(),
+            session_id: name.to_string(),
+            pid: std::process::id(),
+            created_at: chrono::Utc::now().to_rfc3339(),
+        };
+        if let Err(e) = manifest.write_to_dir(&worktree_path) {
+            warn!(
+                path = %worktree_path.display(),
+                error = %e,
+                "failed to write worktree manifest; cleanup will skip this entry"
+            );
+        }
+
         Ok(WorktreeGuard::for_managed(&self.repo_path, worktree_path))
     }
 
@@ -538,6 +655,7 @@ impl WorktreeManager {
             swept_count = report.swept_count,
             failed_count = report.failed_count,
             root_owned_skipped = report.root_owned_skipped,
+            no_manifest_skipped = report.no_manifest_skipped,
             prune_succeeded = report.prune_succeeded,
             duration_ms = report.duration_ms,
             backlog_count = report.swept_count + report.root_owned_skipped,
@@ -548,12 +666,36 @@ impl WorktreeManager {
 
     /// Remove one worktree path, updating `report` in place.
     ///
+    /// Before deletion, checks for a valid [`WorktreeManifest`]. If the
+    /// manifest is absent, invalid, or mismatched, the directory is
+    /// preserved regardless of naming convention.  This prevents
+    /// accidental deletion of non-ADF directories that happen to share
+    /// the `review-` prefix or live under `/tmp/adf-worktrees`.
+    ///
     /// Tries `git worktree remove --force` first so the git admin
     /// registry stays in sync; falls back to `remove_dir_all` on
     /// non-zero exit. Permission-denied during the fallback path is
     /// counted as `root_owned_skipped` (Layer 3 territory) rather
     /// than a hard failure.
     fn sweep_one(&self, path: &Path, report: &mut SweepReport) {
+        // Reject entries that do not carry a valid manifest.
+        let manifest = match WorktreeManifest::read_valid(path, &self.repo_path) {
+            Some(m) => m,
+            None => {
+                warn!(
+                    path = %path.display(),
+                    "sweep_stale skipping directory without valid ADF manifest"
+                );
+                report.no_manifest_skipped += 1;
+                return;
+            }
+        };
+        debug!(
+            path = %path.display(),
+            creator = %manifest.creator,
+            session_id = %manifest.session_id,
+            "sweep_stale found valid manifest, proceeding with removal"
+        );
         let status = std::process::Command::new("git")
             .arg("-C")
             .arg(&self.repo_path)
@@ -621,6 +763,10 @@ pub struct SweepReport {
     /// permission. These belong to Layer 3 (`adf-cleanup.sh` run as
     /// root via `ExecStartPre`).
     pub root_owned_skipped: usize,
+    /// Number of entries skipped because no valid ADF worktree
+    /// manifest was found in the directory.  Protects non-ADF data
+    /// from accidental deletion.
+    pub no_manifest_skipped: usize,
     /// Whether `git worktree prune --verbose` exited zero. False
     /// implies the git admin registry under `<repo>/.git/worktrees`
     /// may still hold dangling entries; the next sweep will retry.
@@ -888,6 +1034,22 @@ mod tests {
         (temp_dir, repo_path)
     }
 
+    /// Write a valid ADF worktree manifest into `dir` for testing.
+    /// Used by sweep tests to ensure test directories are recognised
+    /// as ADF-managed worktrees.
+    fn write_test_manifest(dir: &Path, repo_path: &Path) {
+        let manifest = WorktreeManifest {
+            version: WorktreeManifest::CURRENT_VERSION,
+            repo_path: repo_path.to_string_lossy().to_string(),
+            worktree_path: dir.to_string_lossy().to_string(),
+            creator: "test".to_string(),
+            session_id: "test-session".to_string(),
+            pid: std::process::id(),
+            created_at: chrono::Utc::now().to_rfc3339(),
+        };
+        manifest.write_to_dir(dir).expect("write test manifest");
+    }
+
     #[tokio::test]
     async fn test_create_worktree() {
         let (_temp_dir, repo_path) = setup_git_repo();
@@ -1057,7 +1219,8 @@ mod tests {
         // Seed three `review-*` directories as plain dirs (not real
         // worktrees -- sweep_one falls back to remove_dir_all when git
         // refuses an unregistered path, which is exactly the
-        // residue-after-SIGKILL shape).
+        // residue-after-SIGKILL shape).  Each must carry a valid
+        // manifest or the sweep will preserve it.
         let (_temp_dir, repo_path) = setup_git_repo();
         let base = repo_path.join(".worktrees");
         std::fs::create_dir_all(&base).unwrap();
@@ -1066,6 +1229,7 @@ mod tests {
             let dir = base.join(format!("{}{}", WORKTREE_REVIEW_PREFIX, i));
             std::fs::create_dir_all(&dir).unwrap();
             std::fs::write(dir.join("dummy.txt"), "residue").unwrap();
+            write_test_manifest(&dir, &repo_path);
         }
 
         let manager = WorktreeManager::with_base(&repo_path, &base);
@@ -1074,7 +1238,7 @@ mod tests {
         assert_eq!(report.swept_count, 3, "all three review dirs swept");
         assert_eq!(report.failed_count, 0);
         assert_eq!(report.root_owned_skipped, 0);
-        assert!(report.prune_succeeded);
+        assert_eq!(report.no_manifest_skipped, 0);
 
         for i in 0..3 {
             let dir = base.join(format!("{}{}", WORKTREE_REVIEW_PREFIX, i));
@@ -1084,8 +1248,9 @@ mod tests {
 
     #[test]
     fn test_sweep_stale_preserves_non_review_prefix() {
-        // Only `review-` prefixed entries are swept from worktree_base.
-        // Sibling directories under the same base must be preserved.
+        // Only `review-` prefixed entries with valid manifests are
+        // swept from worktree_base.  `keep-me` lacks BOTH a review
+        // prefix AND a manifest, so it must survive.
         let (_temp_dir, repo_path) = setup_git_repo();
         let base = repo_path.join(".worktrees");
         std::fs::create_dir_all(&base).unwrap();
@@ -1095,6 +1260,7 @@ mod tests {
         std::fs::create_dir_all(&review_dir).unwrap();
         std::fs::create_dir_all(&keep_dir).unwrap();
         std::fs::write(keep_dir.join("important.txt"), "data").unwrap();
+        write_test_manifest(&review_dir, &repo_path);
 
         let manager = WorktreeManager::with_base(&repo_path, &base);
         let report = manager.sweep_stale(&[]);
@@ -1129,6 +1295,7 @@ mod tests {
     fn test_sweep_stale_extra_roots_no_prefix_filter() {
         // Entries under extra_roots are swept regardless of prefix --
         // the per-agent root convention has no naming convention.
+        // Each must carry a valid manifest.
         let (_temp_dir, repo_path) = setup_git_repo();
         let base = repo_path.join(".worktrees");
         std::fs::create_dir_all(&base).unwrap();
@@ -1140,6 +1307,7 @@ mod tests {
         let agent_dir = extra.join("agent-alpha");
         std::fs::create_dir_all(&agent_dir).unwrap();
         std::fs::write(agent_dir.join("scratch.txt"), "tmp").unwrap();
+        write_test_manifest(&agent_dir, &repo_path);
 
         let manager = WorktreeManager::with_base(&repo_path, &base);
         let report = manager.sweep_stale(std::slice::from_ref(&extra));
