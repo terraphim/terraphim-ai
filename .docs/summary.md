@@ -97,6 +97,14 @@ User Query
 - `Role`: User profile with haystacks, relevance function, theme, LLM settings
 - `Haystack`: Data source descriptor with service type
 - `KnowledgeGraph`: Automata path and/or local KG files
+- `ProjectConfig`: Project-level overrides in `.terraphim/config.json`
+
+**Project-Level Config Discovery:**
+- Searches parent directories for `.terraphim/` directory starting from CWD
+- Enables project-specific roles, global shortcuts, and configuration overrides
+- Merged with global config via `Config::with_project()` and `Config::merge_with()`
+- Roles merged by `RoleName`: project role fully replaces global role
+- Optional `global_shortcut` field allows project configs to omit it
 
 **Service Types Supported:**
 - Ripgrep, Atomic Server, QueryRs, ClickUp, MCP, Perplexity, GrepApp, AiAssistant, Quickwit, JMAP
