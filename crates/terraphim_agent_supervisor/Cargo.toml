@@ -1,6 +1,6 @@
 [package]
 name = "terraphim_agent_supervisor"
-version = "1.0.0"
+version = "1.19.0"
 edition.workspace = true
 authors = ["Terraphim Contributors"]
 description = "OTP-inspired supervision trees for fault-tolerant AI agent management"
