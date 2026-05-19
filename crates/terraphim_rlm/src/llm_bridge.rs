@@ -373,6 +373,60 @@ mod tests {
         let session_manager = Arc::new(SessionManager::new(config));
         let session = session_manager.create_session().unwrap();
 
+        #[cfg(feature = "llm")]
+        let bridge = {
+            use ahash::AHashMap;
+            use serde_json::Value;
+            use terraphim_config::Role;
+            use terraphim_types::RelevanceFunction;
+
+            if let Ok(api_key) = std::env::var("OPENROUTER_API_KEY") {
+                let mut extra = AHashMap::new();
+                extra.insert(
+                    "llm_provider".to_string(),
+                    Value::String("genai".to_string()),
+                );
+                extra.insert(
+                    "llm_model".to_string(),
+                    Value::String("mistralai/mistral-7b-instruct:free".to_string()),
+                );
+
+                let role = Role {
+                    shortname: None,
+                    name: "test".into(),
+                    relevance_function: RelevanceFunction::TitleScorer,
+                    terraphim_it: false,
+                    theme: "default".to_string(),
+                    kg: None,
+                    haystacks: vec![],
+                    llm_enabled: true,
+                    llm_api_key: Some(api_key),
+                    llm_model: Some("mistralai/mistral-7b-instruct:free".to_string()),
+                    llm_auto_summarize: false,
+                    llm_chat_enabled: false,
+                    llm_chat_system_prompt: None,
+                    llm_chat_model: None,
+                    llm_context_window: None,
+                    extra,
+                    llm_router_enabled: false,
+                    llm_router_config: None,
+                };
+
+                if let Some(client) = terraphim_service::llm::build_llm_from_role(&role) {
+                    LlmBridge::with_llm_client(
+                        LlmBridgeConfig::default(),
+                        session_manager,
+                        client,
+                    )
+                } else {
+                    LlmBridge::new(LlmBridgeConfig::default(), session_manager)
+                }
+            } else {
+                LlmBridge::new(LlmBridgeConfig::default(), session_manager)
+            }
+        };
+
+        #[cfg(not(feature = "llm"))]
         let bridge = LlmBridge::new(LlmBridgeConfig::default(), session_manager);
 
         (bridge, session.id)
@@ -393,8 +447,12 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore = "requires live LLM client; run with --ignored when LLM is configured"]
     async fn test_single_query() {
+        if std::env::var("OPENROUTER_API_KEY").is_err() {
+            eprintln!("Skipping test_single_query: OPENROUTER_API_KEY not set");
+            return;
+        }
+
         let (bridge, session_id) = create_test_bridge();
 
         let request = QueryRequest {
@@ -405,7 +463,7 @@ mod tests {
         };
 
         let result = bridge.query(&session_id, request).await;
-        assert!(result.is_ok());
+        assert!(result.is_ok(), "query failed: {:?}", result.err());
 
         let response = result.unwrap();
         assert!(!response.response.is_empty());
@@ -413,8 +471,12 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore = "requires live LLM client; run with --ignored when LLM is configured"]
     async fn test_batched_query() {
+        if std::env::var("OPENROUTER_API_KEY").is_err() {
+            eprintln!("Skipping test_batched_query: OPENROUTER_API_KEY not set");
+            return;
+        }
+
         let (bridge, session_id) = create_test_bridge();
 
         let request = BatchedQueryRequest {
@@ -435,7 +497,7 @@ mod tests {
         };
 
         let result = bridge.query_batched(&session_id, request).await;
-        assert!(result.is_ok());
+        assert!(result.is_ok(), "batched query failed: {:?}", result.err());
 
         let response = result.unwrap();
         assert_eq!(response.responses.len(), 2);

@@ -74,7 +74,8 @@ mod tests {
         let temp = TempDir::new().unwrap();
         let base = temp_dir_with_structure(&temp, &["work/", "work/.terraphim/", "work/src/"]);
         let result = discover(Some(&base.join("work/src"))).unwrap();
-        assert_eq!(result, Some(base.join("work/.terraphim")));
+        let expected = std::fs::canonicalize(base.join("work/.terraphim")).unwrap();
+        assert_eq!(result, Some(expected));
     }
 
     #[test]
@@ -87,11 +88,14 @@ mod tests {
 
     #[test]
     fn test_discover_from_current_dir() {
+        let original_dir = std::env::current_dir().unwrap();
         let temp = TempDir::new().unwrap();
         let base = temp_dir_with_structure(&temp, &[".terraphim/"]);
         std::env::set_current_dir(&base).unwrap();
         let result = discover(None).unwrap();
-        assert_eq!(result, Some(base.join(".terraphim")));
+        let expected = std::fs::canonicalize(base.join(".terraphim")).unwrap();
+        assert_eq!(result, Some(expected));
+        std::env::set_current_dir(original_dir).unwrap();
     }
 
     #[test]
@@ -102,7 +106,8 @@ mod tests {
             &["project/", "project/.terraphim/", "project/src/main.rs"],
         );
         let result = discover(Some(&base.join("project/src"))).unwrap();
-        assert_eq!(result, Some(base.join("project/.terraphim")));
+        let expected = std::fs::canonicalize(base.join("project/.terraphim")).unwrap();
+        assert_eq!(result, Some(expected));
     }
 
     #[test]
@@ -119,7 +124,8 @@ mod tests {
             ],
         );
         let result = discover(Some(&base.join("a/b/c/src"))).unwrap();
-        assert_eq!(result, Some(base.join("a/b/c/.terraphim")));
+        let expected = std::fs::canonicalize(base.join("a/b/c/.terraphim")).unwrap();
+        assert_eq!(result, Some(expected));
     }
 
     #[test]
@@ -155,7 +161,8 @@ mod tests {
         let temp = TempDir::new().unwrap();
         let base = temp_dir_with_structure(&temp, &[".terraphim/"]);
         let result = discover(Some(&base)).unwrap();
-        assert_eq!(result, Some(base.join(".terraphim")));
+        let expected = std::fs::canonicalize(base.join(".terraphim")).unwrap();
+        assert_eq!(result, Some(expected));
     }
 
     #[test]
