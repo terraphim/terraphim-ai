@@ -122,11 +122,11 @@ validate_command() {
 # Transform command using terraphim-agent
 transform_command() {
   local cmd="$1"
-  # Try DevOpsRunner role for build command transformations
+  # Try AI Engineer role for build command transformations
   if [ -f "$HOME/.cargo/bin/terraphim-agent" ]; then
     local transformed
     transformed=$(echo "$cmd" | "$HOME/.cargo/bin/terraphim-agent" replace \
-      --role "DevOpsRunner" 2>/dev/null || echo "")
+      --role "AI Engineer" 2>/dev/null || echo "")
     if [ -n "$transformed" ] && [ "$transformed" != "$cmd" ]; then
       echo "$transformed"
       return 0

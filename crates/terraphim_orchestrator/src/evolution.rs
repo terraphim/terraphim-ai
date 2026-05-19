@@ -426,8 +426,10 @@ mod tests {
     #[cfg(feature = "evolution")]
     #[tokio::test(flavor = "multi_thread")]
     async fn test_lesson_with_feature() {
-        let mut config = EvolutionConfig::default();
-        config.enabled = true;
+        let config = EvolutionConfig {
+            enabled: true,
+            ..Default::default()
+        };
         let mut mgr = EvolutionManager::new(config);
         mgr.ensure_agent("test-agent");
         let result = mgr.record_lesson(
@@ -443,8 +445,10 @@ mod tests {
     #[cfg(feature = "evolution")]
     #[tokio::test(flavor = "multi_thread")]
     async fn test_record_output_with_feature() {
-        let mut config = EvolutionConfig::default();
-        config.enabled = true;
+        let config = EvolutionConfig {
+            enabled: true,
+            ..Default::default()
+        };
         let mut mgr = EvolutionManager::new(config);
         mgr.ensure_agent("test-agent");
         let output = EvolutionOutput {
@@ -459,8 +463,10 @@ mod tests {
     #[cfg(feature = "evolution")]
     #[tokio::test(flavor = "multi_thread")]
     async fn test_render_context_with_data() {
-        let mut config = EvolutionConfig::default();
-        config.enabled = true;
+        let config = EvolutionConfig {
+            enabled: true,
+            ..Default::default()
+        };
         let mut mgr = EvolutionManager::new(config);
         mgr.ensure_agent("test-agent");
         let output = EvolutionOutput {
@@ -478,8 +484,10 @@ mod tests {
     #[cfg(feature = "evolution")]
     #[tokio::test(flavor = "multi_thread")]
     async fn test_snapshot_creates_key() {
-        let mut config = EvolutionConfig::default();
-        config.enabled = true;
+        let config = EvolutionConfig {
+            enabled: true,
+            ..Default::default()
+        };
         let mut mgr = EvolutionManager::new(config);
         mgr.ensure_agent("test-agent");
         let key = mgr.snapshot_on_exit("test-agent");
@@ -492,8 +500,10 @@ mod tests {
     #[cfg(feature = "evolution")]
     #[tokio::test(flavor = "multi_thread")]
     async fn test_task_lifecycle_with_feature() {
-        let mut config = EvolutionConfig::default();
-        config.enabled = true;
+        let config = EvolutionConfig {
+            enabled: true,
+            ..Default::default()
+        };
         let mut mgr = EvolutionManager::new(config);
         mgr.ensure_agent("test-agent");
         let task_id = mgr.record_task_start("test-agent", "implement feature X");
