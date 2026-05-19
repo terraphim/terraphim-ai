@@ -54,7 +54,7 @@ mod kg_protocol_resolution_test {
 
         let config = Config {
             id: ConfigId::Server,
-            global_shortcut: "Cmd+Space".to_string(),
+            global_shortcut: Some("Cmd+Space".to_string()),
             roles,
             default_role: role_name.clone(),
             selected_role: role_name.clone(),
@@ -195,7 +195,7 @@ mod kg_protocol_resolution_test {
 
         let config = Config {
             id: ConfigId::Server,
-            global_shortcut: "Cmd+Space".to_string(),
+            global_shortcut: Some("Cmd+Space".to_string()),
             roles,
             default_role: role_name.clone(),
             selected_role: role_name.clone(),

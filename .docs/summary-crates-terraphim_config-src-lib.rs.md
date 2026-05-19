@@ -7,6 +7,13 @@
 2. Saved config retrieved from persistence layer
 3. Hard-coded defaults in `terraphim_server/default/`
 
+**Project-Level Config Discovery:**
+- Searches parent directories for `.terraphim/` directory starting from current working directory
+- Enables project-specific roles, global shortcuts, and configuration overrides
+- Merged with global config via `Config::with_project()` and `Config::merge_with()`
+- Roles merged by `RoleName`: project role fully replaces global role (no deep merge)
+- `global_shortcut` field is optional in project configs
+
 **Key Types:**
 - **`Config`**: Top-level configuration holding all roles, global shortcut, default/selected role
 - **`Role`**: User profile with haystacks, relevance function, theme, LLM settings

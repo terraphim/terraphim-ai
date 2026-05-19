@@ -215,7 +215,7 @@ impl LlmBridge {
         let response_text = match &self.llm_client {
             Some(client) => {
                 let chat_opts = terraphim_service::llm::ChatOptions {
-                    max_tokens: request.max_tokens.map(|t| t as u32),
+                    max_tokens: request.max_tokens,
                     temperature: request.temperature,
                 };
                 let messages = vec![serde_json::json!({
@@ -393,6 +393,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "requires live LLM client; run with --ignored when LLM is configured"]
     async fn test_single_query() {
         let (bridge, session_id) = create_test_bridge();
 
@@ -412,6 +413,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "requires live LLM client; run with --ignored when LLM is configured"]
     async fn test_batched_query() {
         let (bridge, session_id) = create_test_bridge();
 

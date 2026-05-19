@@ -79,7 +79,7 @@ pub fn sanitize_system_prompt(prompt: &str) -> SanitizedPrompt {
     }
 
     let content = if prompt.len() > MAX_PROMPT_LENGTH {
-        prompt[..MAX_PROMPT_LENGTH].to_string()
+        prompt.chars().take(MAX_PROMPT_LENGTH).collect::<String>()
     } else {
         prompt.to_string()
     };
@@ -204,7 +204,18 @@ mod tests {
         let prompt = "a".repeat(MAX_PROMPT_LENGTH + 1000);
         let result = sanitize_system_prompt(&prompt);
         assert!(result.was_modified);
-        assert_eq!(result.content.len(), MAX_PROMPT_LENGTH);
+        assert_eq!(result.content.chars().count(), MAX_PROMPT_LENGTH);
+    }
+
+    #[test]
+    fn test_sanitize_multibyte_boundary() {
+        // MAX_PROMPT_LENGTH+1 chars: 9999 ASCII + 2 CJK (3 bytes each)
+        // After char-safe truncation: 9999 ASCII + 1 CJK = 10000 chars, 10002 bytes
+        let prompt: String = "a".repeat(MAX_PROMPT_LENGTH - 1) + "中中";
+        let result = sanitize_system_prompt(&prompt);
+        assert!(result.was_modified);
+        assert_eq!(result.content.chars().count(), MAX_PROMPT_LENGTH);
+        assert!(result.content.len() > MAX_PROMPT_LENGTH);
     }
 
     #[test]

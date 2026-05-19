@@ -48,7 +48,7 @@ async fn fixture() -> Arc<ConfigState> {
 
     let config = Config {
         id: ConfigId::Embedded,
-        global_shortcut: "Ctrl+X".to_string(),
+        global_shortcut: Some("Ctrl+X".to_string()),
         roles: roles_map,
         default_role: role_name.clone(),
         selected_role: role_name.clone(),
