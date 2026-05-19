@@ -62,7 +62,7 @@ required-features = ["cli"]
 
 [features]
 default = ["full"]
-full = ["llm", "kg-validation", "supervision", "llm-bridge", "docker-backend", "e2b-backend", "mcp", "cli", "firecracker"]
+full = ["llm", "kg-validation", "supervision", "llm-bridge", "docker-backend", "e2b-backend", "mcp", "cli"]
 llm = ["dep:terraphim_service"]
 kg-validation = ["dep:terraphim_automata", "dep:terraphim_types", "dep:terraphim_rolegraph"]
 supervision = ["dep:terraphim_agent_supervisor"]
