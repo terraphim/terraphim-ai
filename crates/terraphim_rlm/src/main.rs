@@ -328,11 +328,3 @@ fn read_stdin_json<T: serde::de::DeserializeOwned>() -> Result<T, Box<dyn std::e
     }
     Ok(serde_json::from_str(&buffer)?)
 }
-
-impl Default for StatusRequest {
-    fn default() -> Self {
-        Self {
-            include_history: false,
-        }
-    }
-}

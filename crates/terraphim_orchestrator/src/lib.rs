@@ -4794,11 +4794,10 @@ impl AgentOrchestrator {
                          Refs: ROC v1 Step G handler, adf-fleet#35."
                     );
                     let labels = ["adf", "auto-merge-failed", "status/needs-triage"];
+                    self.auto_merge_failure_dedupe
+                        .record(&project, pr_number, &head_sha);
                     match tracker.open_failure_issue(&title, &body, &labels).await {
-                        Ok(_issue_number) => {
-                            self.auto_merge_failure_dedupe
-                                .record(&project, pr_number, &head_sha);
-                        }
+                        Ok(_issue_number) => {}
                         Err(issue_err) => {
                             warn!(
                                 pr_number,
