@@ -1722,8 +1722,7 @@ mod tests {
 
     #[test]
     async fn role_llm_api_key_redacted_in_debug() {
-        let mut role = Role::default();
-        role.llm_api_key = Some("super-secret-api-key-do-not-leak".to_string());
+        let role = Role { llm_api_key: Some("super-secret-api-key-do-not-leak".to_string()), ..Default::default() };
         let dbg = format!("{:?}", role);
         assert!(
             !dbg.contains("super-secret-api-key-do-not-leak"),
