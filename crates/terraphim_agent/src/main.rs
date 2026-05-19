@@ -2049,7 +2049,7 @@ async fn run_offline_command(
         return run_learn_command(sub).await;
     }
 
-    let service = TuiService::new(config_path).await?;
+    let service = TuiService::new(config_path, false).await?;
 
     match command {
         Command::Search {
@@ -5087,7 +5087,7 @@ fn ui_loop(
 
     #[cfg(not(feature = "server"))]
     let backend = {
-        let service = rt.block_on(async { TuiService::new(None).await })?;
+        let service = rt.block_on(async { TuiService::new(None, false).await })?;
         crate::tui_backend::TuiBackend::Local(service)
     };
 

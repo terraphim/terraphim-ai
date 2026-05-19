@@ -47,7 +47,7 @@ uuid = { workspace = true, features = ["v4", "serde"] }
 cron = "0.13"
 
 # Command parsing via terraphim-automata
-terraphim_automata = { path = "../terraphim_automata", version = "1.4.10" }
+terraphim_automata = { path = "../terraphim_automata", version = "1.19.2" }
 
 # Config parsing
 toml = "0.8"
@@ -73,7 +73,7 @@ opendal = { version = "0.54", default-features = false }
 terraphim_persistence = { path = "../terraphim_persistence", version = "1.4.10", features = ["sqlite"] }
 
 # Agent evolution system (optional)
-terraphim_agent_evolution = { path = "../terraphim_agent_evolution", version = "1.0.0", optional = true }
+terraphim_agent_evolution = { path = "../terraphim_agent_evolution", version = "1.19.2", optional = true }
 
 # Quickwit integration (optional)
 reqwest = { workspace = true, optional = true }

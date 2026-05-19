@@ -94,7 +94,7 @@ async fn test_weighted_haystack_ranking() {
     // Create test config
     let mut config = Config {
         id: terraphim_config::ConfigId::Server,
-        global_shortcut: "Ctrl+X".to_string(),
+        global_shortcut: Some("Ctrl+X".to_string()),
         roles,
         default_role: RoleName::from("Test Role"),
         selected_role: RoleName::from("Test Role"),
@@ -211,7 +211,7 @@ async fn test_default_weight_handling() {
 
     let mut config = Config {
         id: terraphim_config::ConfigId::Server,
-        global_shortcut: "Ctrl+X".to_string(),
+        global_shortcut: Some("Ctrl+X".to_string()),
         roles,
         default_role: RoleName::from("Test Role"),
         selected_role: RoleName::from("Test Role"),

@@ -121,7 +121,10 @@ fn test_config_response_deserialization() {
     let config_response = response.unwrap();
     assert_eq!(config_response.status, "success");
     assert_eq!(config_response.config.selected_role.to_string(), "Default");
-    assert_eq!(config_response.config.global_shortcut, "Ctrl+Space");
+    assert_eq!(
+        config_response.config.global_shortcut,
+        Some("Ctrl+Space".to_string())
+    );
     assert!(
         config_response
             .config

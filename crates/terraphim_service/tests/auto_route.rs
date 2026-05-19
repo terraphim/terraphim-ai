@@ -70,7 +70,7 @@ fn assemble(roles: Vec<(Role, RoleGraphSync)>, default: &str, selected: &str) ->
     }
     let config = Config {
         id: ConfigId::Embedded,
-        global_shortcut: "Ctrl+X".to_string(),
+        global_shortcut: Some("Ctrl+X".to_string()),
         roles: role_map,
         default_role: RoleName::new(default),
         selected_role: RoleName::new(selected),
