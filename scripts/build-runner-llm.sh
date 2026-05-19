@@ -122,11 +122,11 @@ validate_command() {
 # Transform command using terraphim-agent
 transform_command() {
   local cmd="$1"
-  # Try DevOps Engineer role for build command transformations
+  # Try AI Engineer role for build command transformations
   if [ -f "$HOME/.cargo/bin/terraphim-agent" ]; then
     local transformed
     transformed=$(echo "$cmd" | "$HOME/.cargo/bin/terraphim-agent" replace \
-      --role "DevOps Engineer" 2>/dev/null || echo "")
+      --role "AI Engineer" 2>/dev/null || echo "")
     if [ -n "$transformed" ] && [ "$transformed" != "$cmd" ]; then
       echo "$transformed"
       return 0
@@ -321,7 +321,7 @@ detect_and_extract() {
 main() {
   log_info "Starting build-runner-llm (Epic #1423)"
   log_info "Working directory: $ADF_WORKING_DIR"
-  log_info "Role: DevOps Engineer (KG-first, LLM disabled)"
+  log_info "Role: AI Engineer (KG-first, LLM disabled)"
 
   POST_STATUS pending "build started"
 
