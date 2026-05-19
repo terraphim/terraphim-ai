@@ -158,17 +158,20 @@ execute_command() {
   track_kg_lookup
 
   # Execute — tee full output to BUILD_LOG for post-mortem (ADF truncates stderr)
-  if eval "$transformed" 2>&1 | tee -a "${BUILD_LOG:-/tmp/build-runner-output.log}" >&2; then
+  local build_rc
+  set -o pipefail
+  eval "$transformed" 2>&1 | tee -a "${BUILD_LOG:-/tmp/build-runner-output.log}" >&2
+  build_rc=$?
+  set +o pipefail
+  if [ "$build_rc" -eq 0 ]; then
     log_success "  Step $step complete"
     return 0
   else
-    local exit_code=${PIPESTATUS[0]}
-    log_error "  Step $step failed with exit code $exit_code"
-    POST_STATUS failure "build failed at step $step (exit $exit_code)"
-    # Capture learning
+    log_error "  Step $step failed with exit code $build_rc"
+    POST_STATUS failure "build failed at step $step (exit $build_rc)"
     if [ -f "$HOME/.cargo/bin/terraphim-agent" ]; then
       "$HOME/.cargo/bin/terraphim-agent" learn capture "$transformed" \
-        --error "exit code $exit_code" --exit-code "$exit_code" 2>/dev/null || true
+        --error "exit code $build_rc" --exit-code "$build_rc" 2>/dev/null || true
     fi
     return 1
   fi

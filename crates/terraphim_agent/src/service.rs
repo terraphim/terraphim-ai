@@ -1,4 +1,5 @@
 use anyhow::Result;
+use std::path::PathBuf;
 use std::sync::Arc;
 use terraphim_config::{Config, ConfigBuilder, ConfigId, ConfigState};
 use terraphim_persistence::Persistable;
@@ -24,7 +25,10 @@ impl TuiService {
     ///    JSON and saves to persistence; subsequent runs use persistence so CLI changes stick)
     /// 3. Persistence layer (SQLite)
     /// 4. Embedded defaults (hardcoded roles)
-    pub async fn new(config_path: Option<String>) -> Result<Self> {
+    ///
+    /// If `no_project_config` is false, project-level `.terraphim/config.json` is discovered
+    /// and merged on top of the loaded configuration.
+    pub async fn new(config_path: Option<String>, no_project_config: bool) -> Result<Self> {
         // Initialize logging
         terraphim_service::logging::init_logging(
             terraphim_service::logging::detect_logging_config(),
@@ -36,7 +40,10 @@ impl TuiService {
         if let Some(ref path) = config_path {
             log::info!("Loading config from --config flag: '{}'", path);
             match Config::load_from_json_file(path) {
-                Ok(config) => {
+                Ok(mut config) => {
+                    if !no_project_config {
+                        Self::merge_project_config(&mut config);
+                    }
                     return Self::from_config(config).await;
                 }
                 Err(e) => {
@@ -71,7 +78,12 @@ impl TuiService {
         // Priority 2: role_config in settings.toml (bootstrap-then-persistence)
         if let Some(ref role_config_path) = device_settings.role_config {
             log::info!("Found role_config in settings.toml: '{}'", role_config_path);
-            return Self::load_with_role_config(role_config_path, &device_settings).await;
+            return Self::load_with_role_config(
+                role_config_path,
+                &device_settings,
+                no_project_config,
+            )
+            .await;
         }
 
         // Priority 3 & 4: Persistence -> embedded defaults (existing behavior)
@@ -84,15 +96,19 @@ impl TuiService {
                 }
                 Err(_) => {
                     log::debug!("No saved config found, using default embedded");
-                    return Self::new_with_embedded_defaults().await;
+                    return Self::new_with_embedded_defaults(no_project_config).await;
                 }
             },
             Err(e) => {
                 log::warn!("Failed to build config: {:?}, using default", e);
-                return Self::new_with_embedded_defaults().await;
+                return Self::new_with_embedded_defaults(no_project_config).await;
             }
         };
 
+        let mut config = config;
+        if !no_project_config {
+            Self::merge_project_config(&mut config);
+        }
         Self::from_config(config).await
     }
 
@@ -104,6 +120,7 @@ impl TuiService {
     async fn load_with_role_config(
         role_config_path: &str,
         device_settings: &DeviceSettings,
+        no_project_config: bool,
     ) -> Result<Self> {
         // Try persistence first (preserves runtime changes like `config set`)
         if let Ok(mut empty_config) = ConfigBuilder::new_with_id(ConfigId::Embedded).build() {
@@ -113,7 +130,11 @@ impl TuiService {
                         "Loaded {} role(s) from persistence (role_config bootstrap already done)",
                         persisted.roles.len()
                     );
-                    return Self::from_config(persisted).await;
+                    let mut config = persisted;
+                    if !no_project_config {
+                        Self::merge_project_config(&mut config);
+                    }
+                    return Self::from_config(config).await;
                 }
             }
         }
@@ -153,6 +174,9 @@ impl TuiService {
                     log::warn!("Failed to save bootstrapped config to persistence: {:?}", e);
                 }
 
+                if !no_project_config {
+                    Self::merge_project_config(&mut config);
+                }
                 Self::from_config(config).await
             }
             Err(e) => {
@@ -161,7 +185,7 @@ impl TuiService {
                     role_config_path,
                     e
                 );
-                Self::new_with_embedded_defaults().await
+                Self::new_with_embedded_defaults(no_project_config).await
             }
         }
     }
@@ -169,10 +193,13 @@ impl TuiService {
     /// Initialize service strictly from the embedded default configuration.
     ///
     /// This constructor avoids touching host-specific config/state and is used by tests.
-    pub async fn new_with_embedded_defaults() -> Result<Self> {
-        let config = ConfigBuilder::new_with_id(ConfigId::Embedded)
+    pub async fn new_with_embedded_defaults(no_project_config: bool) -> Result<Self> {
+        let mut config = ConfigBuilder::new_with_id(ConfigId::Embedded)
             .build_default_embedded()
             .build()?;
+        if !no_project_config {
+            Self::merge_project_config(&mut config);
+        }
         Self::from_config(config).await
     }
 
@@ -184,6 +211,28 @@ impl TuiService {
             config_state,
             service: Arc::new(Mutex::new(service)),
         })
+    }
+
+    fn merge_project_config(config: &mut Config) {
+        if let Ok(Some(path)) = terraphim_config::project::discover(None) {
+            let config_path = path.join("config.json");
+            if config_path.is_file() {
+                if let Ok(project_config) =
+                    terraphim_config::project::ProjectConfig::from_file(&config_path)
+                {
+                    log::info!("Merging project config from '{}'", config_path.display());
+                    let builder = ConfigBuilder::from_config(
+                        config.clone(),
+                        DeviceSettings::new(),
+                        PathBuf::new(),
+                    );
+                    *config = builder
+                        .merge_with(&project_config)
+                        .build()
+                        .unwrap_or_else(|_| config.clone());
+                }
+            }
+        }
     }
 
     /// Get the current configuration
