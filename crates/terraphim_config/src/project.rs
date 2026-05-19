@@ -163,10 +163,10 @@ mod tests {
         let temp = TempDir::new().unwrap();
         let real = temp.path().join("real");
         let linked = temp.path().join("linked");
-        fs::create_dir_all(&real.join(".terraphim")).unwrap();
-        fs::create_dir_all(&real.join("src")).unwrap();
+        fs::create_dir_all(real.join(".terraphim")).unwrap();
+        fs::create_dir_all(real.join("src")).unwrap();
         std::os::unix::fs::symlink(&real, &linked).unwrap();
-        let canonical = std::fs::canonicalize(&real.join(".terraphim")).unwrap();
+        let canonical = std::fs::canonicalize(real.join(".terraphim")).unwrap();
         let result = discover(Some(&linked.join("src"))).unwrap();
         assert_eq!(result, Some(canonical));
     }
