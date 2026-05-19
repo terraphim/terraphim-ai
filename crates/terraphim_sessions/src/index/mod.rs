@@ -45,6 +45,7 @@ pub struct SessionIndex {
     index: Index,
     reader: IndexReader,
     fields: IndexFields,
+    #[allow(dead_code)]
     schema: Schema,
 }
 
@@ -206,7 +207,7 @@ fn session_to_doc(s: &Session, f: &IndexFields) -> TantivyDocument {
     doc.add_text(f.session_id, &s.id);
     doc.add_text(f.source, &s.source);
     doc.add_text(f.title, s.title.as_deref().unwrap_or(&s.source));
-    doc.add_text(f.body_text, &build_body(s));
+    doc.add_text(f.body_text, build_body(s));
     let code = extract_code(s);
     if !code.is_empty() {
         doc.add_text(f.code_text, &code);

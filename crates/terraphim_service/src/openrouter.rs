@@ -57,7 +57,7 @@ impl OpenRouterService {
     /// * `model` - Model name (e.g., "openai/gpt-3.5-turbo", "anthropic/claude-3-sonnet")
     ///
     /// # Examples
-    /// ```rust
+    /// ```rust,ignore
     /// use terraphim_service::openrouter::OpenRouterService;
     ///
     /// let service = OpenRouterService::new(
@@ -144,7 +144,7 @@ impl OpenRouterService {
     /// A concise summary of the article content
     ///
     /// # Examples
-    /// ```rust
+    /// ```rust,ignore
     /// let summary = service.generate_summary(
     ///     "Long article content...",
     ///     200

@@ -38,7 +38,7 @@ pub fn query_with_learnings(
 
     let mut results: Vec<_> = merged.into_values().collect();
     // Sort by rank descending
-    results.sort_by(|a, b| b.rank.cmp(&a.rank));
+    results.sort_by_key(|b| std::cmp::Reverse(b.rank));
 
     results
 }

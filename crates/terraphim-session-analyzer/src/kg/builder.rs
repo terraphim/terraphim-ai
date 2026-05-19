@@ -86,12 +86,9 @@ impl KnowledgeGraphBuilder {
         for (idx, pattern) in patterns.iter().enumerate() {
             #[allow(clippy::cast_possible_truncation)]
             let id = (self.thesaurus.len() + idx) as u64;
-            let normalized_term = NormalizedTerm {
-                id,
-                value: NormalizedTermValue::from(concept_name.as_str()),
-                display_value: None,
-                url: Some(format!("concept://{concept_name}")),
-            };
+            let normalized_term =
+                NormalizedTerm::new(id, NormalizedTermValue::from(concept_name.as_str()))
+                    .with_url(format!("concept://{concept_name}"));
 
             self.thesaurus
                 .insert(NormalizedTermValue::from(pattern.as_str()), normalized_term);

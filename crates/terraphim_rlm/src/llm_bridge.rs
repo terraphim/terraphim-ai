@@ -215,7 +215,7 @@ impl LlmBridge {
         let response_text = match &self.llm_client {
             Some(client) => {
                 let chat_opts = terraphim_service::llm::ChatOptions {
-                    max_tokens: request.max_tokens.map(|t| t as u32),
+                    max_tokens: request.max_tokens,
                     temperature: request.temperature,
                 };
                 let messages = vec![serde_json::json!({
