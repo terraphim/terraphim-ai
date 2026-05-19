@@ -83,37 +83,25 @@ pub enum SessionAction {
 // =============================================================================
 
 /// Request for code execution.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Default, Deserialize)]
 pub struct CodeRequest {
     pub code: String,
-    #[serde(default)]
-    pub timeout_ms: Option<u64>,
 }
 
 /// Request for bash execution.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Default, Deserialize)]
 pub struct BashRequest {
     pub command: String,
-    #[serde(default)]
-    pub timeout_ms: Option<u64>,
-    #[serde(default)]
-    pub working_dir: Option<String>,
 }
 
 /// Request for LLM query.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Default, Deserialize)]
 pub struct QueryRequest {
     pub prompt: String,
-    #[serde(default)]
-    pub model: Option<String>,
-    #[serde(default)]
-    pub temperature: Option<f64>,
-    #[serde(default)]
-    pub max_tokens: Option<u64>,
 }
 
 /// Request for context variable operations.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Default, Deserialize)]
 pub struct ContextRequest {
     pub action: String,
     #[serde(default)]
@@ -123,7 +111,7 @@ pub struct ContextRequest {
 }
 
 /// Request for snapshot operations.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Default, Deserialize)]
 pub struct SnapshotRequest {
     pub action: String,
     #[serde(default)]
@@ -131,7 +119,7 @@ pub struct SnapshotRequest {
 }
 
 /// Request for status.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Default, Deserialize)]
 pub struct StatusRequest {
     #[serde(default)]
     pub include_history: bool,
@@ -192,9 +180,9 @@ pub struct ExecutionResponse {
 /// Query result response.
 #[derive(Debug, Serialize)]
 pub struct QueryResponse {
+    pub model: String,
     pub response: String,
     pub tokens_used: u64,
-    pub model: String,
 }
 
 /// Context result response.

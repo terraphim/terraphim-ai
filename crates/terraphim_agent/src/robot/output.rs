@@ -214,12 +214,11 @@ impl RobotFormatter {
     /// when the value is a search response with results.
     pub fn format<T: Serialize>(&self, value: &T) -> Result<String, serde_json::Error> {
         let filtered = self.apply_fields(value);
-        let output = match self.config.format {
+        match self.config.format {
             OutputFormat::Json => serde_json::to_string_pretty(&filtered),
             OutputFormat::Jsonl | OutputFormat::Minimal => serde_json::to_string(&filtered),
             OutputFormat::Table => serde_json::to_string_pretty(&filtered),
-        };
-        output
+        }
     }
 
     /// Apply field-mode filtering. For non-`Full` modes, drops fields
