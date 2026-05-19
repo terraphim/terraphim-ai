@@ -72,7 +72,7 @@ terraphim_types = { path = "../terraphim_types", version = "1.0.0" }
 terraphim_settings = { path = "../terraphim_settings", version = "1.0.0" }
 terraphim_persistence = { path = "../terraphim_persistence", version = "1.0.0" }
 terraphim_config = { path = "../terraphim_config", version = "1.0.0" }
-terraphim_automata = { path = "../terraphim_automata", version = "1.19.1" }
+terraphim_automata = { path = "../terraphim_automata", version = "1.19.2" }
 terraphim_service = { path = "../terraphim_service", version = "1.0.0", default-features = false }
 terraphim_middleware = { path = "../terraphim_middleware", version = "1.0.0" }
 terraphim_rolegraph = { path = "../terraphim_rolegraph", version = "1.0.0" }

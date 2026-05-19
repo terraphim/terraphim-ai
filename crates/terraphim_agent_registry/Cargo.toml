@@ -1,6 +1,6 @@
 [package]
 name = "terraphim_agent_registry"
-version = "1.19.1"
+version = "1.19.2"
 edition.workspace = true
 authors = ["Terraphim Contributors"]
 description = "Knowledge graph-based agent registry for intelligent agent discovery and capability matching"
@@ -14,10 +14,10 @@ readme = "../../README.md"
 [dependencies]
 # Core Terraphim dependencies
 terraphim_types = { path = "../terraphim_types", version = "1.0.0" }
-terraphim_automata = { path = "../terraphim_automata", version = "1.19.1" }
+terraphim_automata = { path = "../terraphim_automata", version = "1.19.2" }
 terraphim_rolegraph = { path = "../terraphim_rolegraph", version = "1.0.0" }
-terraphim_agent_supervisor = { path = "../terraphim_agent_supervisor", version = "1.19.1" }
-terraphim_agent_messaging = { path = "../terraphim_agent_messaging", version = "1.19.1" }
+terraphim_agent_supervisor = { path = "../terraphim_agent_supervisor", version = "1.19.2" }
+terraphim_agent_messaging = { path = "../terraphim_agent_messaging", version = "1.19.2" }
 
 # Core async runtime and utilities
 tokio = { workspace = true }

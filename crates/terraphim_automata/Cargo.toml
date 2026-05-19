@@ -1,6 +1,6 @@
 [package]
 name = "terraphim_automata"
-version = "1.19.1"
+version = "1.19.2"
 edition.workspace = true
 authors = ["Terraphim Contributors"]
 description = "Automata for searching and processing knowledge graphs"
@@ -14,7 +14,7 @@ readme = "README.md"
 
 [dependencies]
 terraphim_types = { path = "../terraphim_types", version = "1.0.0" }
-terraphim-markdown-parser = { path = "../terraphim-markdown-parser", version = "1.19.1" }
+terraphim-markdown-parser = { path = "../terraphim-markdown-parser", version = "1.19.2" }
 
 ahash = { version = "0.8.6", features = ["serde"] }
 aho-corasick = "1.0.2"
