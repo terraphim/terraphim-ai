@@ -1704,7 +1704,9 @@ impl AgentOrchestrator {
         let truncated: Vec<_> = learnings.into_iter().take(max_entries).collect();
         let ids: Vec<String> = truncated.iter().map(|l| l.id.clone()).collect();
 
-        let mut section = String::from("## Prior Lessons\n\nLessons learned from previous agent runs. Apply relevant insights:\n\n");
+        let mut section = String::from(
+            "## Prior Lessons\n\nLessons learned from previous agent runs. Apply relevant insights:\n\n",
+        );
         for l in &truncated {
             section.push_str(&format!(
                 "- [{}] {} (trust: {}, verified {}x)\n",
@@ -3725,16 +3727,19 @@ impl AgentOrchestrator {
                     after_sha = %after_sha,
                     pusher = %pusher_login,
                     files = files_changed.len(),
-                    "webhook: enqueuing Push dispatch task"
+                    "webhook: dispatching Push directly"
                 );
-                self.dispatcher.enqueue(dispatcher::DispatchTask::Push {
+                let task = dispatcher::DispatchTask::Push {
                     project,
                     ref_name,
                     before_sha,
                     after_sha,
                     pusher_login,
                     files_changed,
-                });
+                };
+                if let Err(e) = self.handle_push(task).await {
+                    warn!(error = %e, "handle_push failed in webhook handler");
+                }
             }
         }
     }
@@ -5617,6 +5622,18 @@ impl AgentOrchestrator {
     /// Periodic reconciliation: detect exits, check cron, evaluate drift, drain output.
     async fn reconcile_tick(&mut self) {
         let tick_start = Instant::now();
+
+        // 0. Reap orphaned opencode probe processes every 12 ticks (~1 min
+        // at 5 s interval). Processes that survive kill -9 -<pgid> in
+        // probe_single may become PPID=1 orphans; periodic cleanup
+        // prevents accumulation.
+        if self.tick_count % 12 == 0 {
+            let _ = std::process::Command::new("pkill")
+                .arg("-9")
+                .arg("-f")
+                .arg(".opencode run")
+                .spawn();
+        }
 
         self.provider_rate_limits.clean_expired();
         self.retry_counts

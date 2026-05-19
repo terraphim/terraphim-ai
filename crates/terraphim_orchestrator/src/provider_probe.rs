@@ -96,6 +96,12 @@ impl ProviderHealthMap {
     /// rules, executes each action template with a test prompt via
     /// `tokio::process::Command`, and records results.
     pub async fn probe_all(&mut self, kg_router: &KgRouter) {
+        // Set probed_at immediately so is_stale() returns false even if
+        // this call is later cancelled by reconcile_tick timeout. This
+        // breaks the deadlock where probes never complete, circuit
+        // breakers never open, and probes re-run on every tick.
+        self.probed_at = Some(Instant::now());
+
         let mut seen = HashMap::new();
         let mut tasks = Vec::new();
 
@@ -144,46 +150,20 @@ impl ProviderHealthMap {
         let mut results = Vec::new();
         for task in tasks {
             match task.await {
-                Ok(result) => results.push(result),
+                Ok(result) => {
+                    // Update the circuit breaker for this result immediately,
+                    // before collecting it. If probe_all is cancelled partway
+                    // through, completed probes' breakers are already updated.
+                    Self::update_breaker_for_result(
+                        &mut self.breakers,
+                        &mut self.rate_limited,
+                        &self.cb_config,
+                        self.rate_limiter.as_ref(),
+                        &result,
+                    );
+                    results.push(result)
+                }
                 Err(e) => warn!(error = %e, "probe task panicked"),
-            }
-        }
-
-        // Update circuit breakers from probe results (keyed by provider:model).
-        // Skip updating the breaker when the probe failed because the CLI tool
-        // is missing from PATH — that is an environment/configuration issue,
-        // not a provider health issue, and should not open the circuit.
-        for result in &results {
-            let key = format!("{}:{}", result.provider, result.model);
-            let breaker = self
-                .breakers
-                .entry(key)
-                .or_insert_with(|| CircuitBreaker::new(self.cb_config.clone()));
-
-            match result.status {
-                ProbeStatus::Success => breaker.record_success(),
-                ProbeStatus::Error => {
-                    // Do not count environment/configuration errors as provider
-                    // failures — they do not indicate that the API is down.
-                    let err = result.error.as_deref().unwrap_or("");
-                    if is_environment_error(err) {
-                        debug!(
-                            provider = %result.provider,
-                            model = %result.model,
-                            error = %err,
-                            "skipping circuit-breaker update: environment/config error"
-                        );
-                    } else {
-                        breaker.record_failure();
-                    }
-                }
-                ProbeStatus::Timeout => breaker.record_failure(),
-                ProbeStatus::RateLimited => {
-                    if let Some(ref rate_limiter) = self.rate_limiter {
-                        rate_limiter.record_rate_limit(&result.provider);
-                    }
-                    self.rate_limited.insert(result.provider.clone());
-                }
             }
         }
 
@@ -197,7 +177,49 @@ impl ProviderHealthMap {
         );
 
         self.results = results;
-        self.probed_at = Some(Instant::now());
+    }
+
+    /// Update a single circuit breaker from a probe result.
+    /// Extracted so it can be called inline during probe_all (before
+    /// all results are collected) and also from tests.
+    fn update_breaker_for_result(
+        breakers: &mut HashMap<String, CircuitBreaker>,
+        rate_limited: &mut HashSet<String>,
+        cb_config: &CircuitBreakerConfig,
+        rate_limiter: Option<&RateLimiter>,
+        result: &ProbeResult,
+    ) {
+        // Skip updating the breaker when the probe failed because the
+        // CLI tool is missing from PATH — that is an environment/
+        // configuration issue, not a provider health issue.
+        let key = format!("{}:{}", result.provider, result.model);
+        let breaker = breakers
+            .entry(key)
+            .or_insert_with(|| CircuitBreaker::new(cb_config.clone()));
+
+        match result.status {
+            ProbeStatus::Success => breaker.record_success(),
+            ProbeStatus::Error => {
+                let err = result.error.as_deref().unwrap_or("");
+                if crate::provider_probe::is_environment_error(err) {
+                    debug!(
+                        provider = %result.provider,
+                        model = %result.model,
+                        error = %err,
+                        "skipping circuit-breaker update: environment/config error"
+                    );
+                } else {
+                    breaker.record_failure();
+                }
+            }
+            ProbeStatus::Timeout => breaker.record_failure(),
+            ProbeStatus::RateLimited => {
+                if let Some(rate_limiter) = rate_limiter {
+                    rate_limiter.record_rate_limit(&result.provider);
+                }
+                rate_limited.insert(result.provider.clone());
+            }
+        }
     }
 
     /// Get health status for a specific provider+model combination.
@@ -632,12 +654,15 @@ async fn probe_single(provider: &str, model: &str, action_template: Option<&str>
             }
         }
         Err(_) => {
-            // Timeout: the bash/opencode process is still running.  Explicitly
-            // SIGKILL it to prevent process leaks.
+            // Timeout: the bash/opencode process is still running.
+            // Kill the entire process group (negative PID) so that
+            // opencode children spawned by bash are killed too.
+            // bash -c spawns the child in the same process group,
+            // so bash's PID equals the process group ID.
             if let Some(pid) = pid {
                 let _ = std::process::Command::new("kill")
                     .arg("-9")
-                    .arg(pid.to_string())
+                    .arg(format!("-{}", pid))
                     .spawn();
             }
             warn!(provider, model, "probe timed out after 60s");
