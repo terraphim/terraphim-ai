@@ -46,6 +46,9 @@ use crate::llm_router::LlmRouterConfig;
 // LLM Router configuration
 pub mod llm_router;
 
+// Project-level configuration discovery
+pub mod project;
+
 /// Convenience alias for `Result<T, TerraphimConfigError>` used throughout this crate.
 pub type Result<T> = std::result::Result<T, TerraphimConfigError>;
 
@@ -846,7 +849,37 @@ impl ConfigBuilder {
 
     /// Set the global shortcut for the config
     pub fn global_shortcut(mut self, global_shortcut: &str) -> Self {
-        self.config.global_shortcut = global_shortcut.to_string();
+        self.config.global_shortcut = Some(global_shortcut.to_string());
+        self
+    }
+
+    /// Merge with a project config.
+    ///
+    /// Project roles fully replace global roles (by RoleName), not deep-merge.
+    /// Project global_shortcut, if present, overrides the global one.
+    pub fn merge_with(mut self, project_config: &crate::project::ProjectConfig) -> Self {
+        if let Some(ref shortcut) = project_config.global_shortcut {
+            self.config.global_shortcut = Some(shortcut.clone());
+        }
+        for (name, role) in &project_config.roles {
+            let role_name = RoleName::new(name);
+            self.config.roles.insert(role_name, role.clone());
+        }
+        self
+    }
+
+    /// Apply project config discovery and merge if found.
+    ///
+    /// Returns self unchanged if no project config is found.
+    pub fn with_project(self) -> Self {
+        if let Ok(Some(path)) = crate::project::discover(None) {
+            let config_path = path.join("config.json");
+            if config_path.is_file() {
+                if let Ok(project_config) = crate::project::ProjectConfig::from_file(&config_path) {
+                    return self.merge_with(&project_config);
+                }
+            }
+        }
         self
     }
 
@@ -915,7 +948,8 @@ pub struct Config {
     /// Identifier for the config
     pub id: ConfigId,
     /// Global shortcut for activating terraphim desktop
-    pub global_shortcut: String,
+    #[schemars(default)]
+    pub global_shortcut: Option<String>,
     /// User roles with their respective settings
     #[schemars(skip)]
     pub roles: AHashMap<RoleName, Role>,
@@ -928,7 +962,7 @@ impl Config {
     fn empty() -> Self {
         Self {
             id: ConfigId::Server, // Default to Server
-            global_shortcut: "Ctrl+X".to_string(),
+            global_shortcut: None,
             roles: AHashMap::new(),
             default_role: RoleName::new("Default"),
             selected_role: RoleName::new("Default"),
@@ -1516,7 +1550,7 @@ mod tests {
             .add_role("dummy", dummy_role())
             .build()
             .unwrap();
-        assert_eq!(config.global_shortcut, "Ctrl+X");
+        assert_eq!(config.global_shortcut, None);
         let device_settings = DeviceSettings::new();
         let settings_path = PathBuf::from(".");
         let new_config = ConfigBuilder::from_config(config, device_settings, settings_path)
@@ -1524,7 +1558,7 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(new_config.global_shortcut, "Ctrl+/");
+        assert_eq!(new_config.global_shortcut, Some("Ctrl+/".to_string()));
     }
 
     fn dummy_role() -> Role {
@@ -1722,8 +1756,10 @@ mod tests {
 
     #[test]
     async fn role_llm_api_key_redacted_in_debug() {
-        let mut role = Role::default();
-        role.llm_api_key = Some("super-secret-api-key-do-not-leak".to_string());
+        let role = Role {
+            llm_api_key: Some("super-secret-api-key-do-not-leak".to_string()),
+            ..Default::default()
+        };
         let dbg = format!("{:?}", role);
         assert!(
             !dbg.contains("super-secret-api-key-do-not-leak"),

@@ -74,7 +74,7 @@ notify = "8.2"
 regex = { version = "1.10", optional = true }
 
 # Feature-gated: Terraphim Session Analyzer
-terraphim-session-analyzer = { version = "1.6.0", path = "../terraphim-session-analyzer", optional = true }
+terraphim-session-analyzer = { version = "1.19.2", path = "../terraphim-session-analyzer", optional = true }
 
 # Feature-gated: Markdown parsing for Aider/Cline connectors
 terraphim-markdown-parser = { path = "../terraphim-markdown-parser", optional = true }

@@ -393,6 +393,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "requires live LLM client; run with --ignored when LLM is configured"]
     async fn test_single_query() {
         let (bridge, session_id) = create_test_bridge();
 
@@ -412,6 +413,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "requires live LLM client; run with --ignored when LLM is configured"]
     async fn test_batched_query() {
         let (bridge, session_id) = create_test_bridge();
 

@@ -2882,7 +2882,7 @@ impl ReplHandler {
 
 /// Run REPL in offline mode
 pub async fn run_repl_offline_mode() -> Result<()> {
-    let service = TuiService::new(None).await?;
+    let service = TuiService::new(None, false).await?;
     let mut handler = ReplHandler::new_offline(service);
     handler.run().await
 }
