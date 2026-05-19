@@ -12,7 +12,7 @@ use terraphim_types::RoleName;
 /// Test that TuiService can be created and basic methods work
 #[tokio::test]
 async fn test_tui_service_creation() -> Result<()> {
-    let service = TuiService::new_with_embedded_defaults().await?;
+    let service = TuiService::new_with_embedded_defaults(true).await?;
 
     // Get the current config
     let config = service.get_config().await;
@@ -63,7 +63,7 @@ async fn test_tui_service_new_uses_host_settings_path() -> Result<()> {
 /// Test the search method with default role
 #[tokio::test]
 async fn test_tui_service_search() -> Result<()> {
-    let service = TuiService::new_with_embedded_defaults().await?;
+    let service = TuiService::new_with_embedded_defaults(true).await?;
 
     // Search with the selected role
     let selected_role = service.get_selected_role().await;
@@ -88,7 +88,7 @@ async fn test_tui_service_search() -> Result<()> {
 /// Test autocomplete method
 #[tokio::test]
 async fn test_tui_service_autocomplete() -> Result<()> {
-    let service = TuiService::new_with_embedded_defaults().await?;
+    let service = TuiService::new_with_embedded_defaults(true).await?;
     let role_name = service.get_selected_role().await;
 
     // Autocomplete may fail if no thesaurus is loaded, which is expected
@@ -113,7 +113,7 @@ async fn test_tui_service_autocomplete() -> Result<()> {
 /// Test replace_matches method
 #[tokio::test]
 async fn test_tui_service_replace_matches() -> Result<()> {
-    let service = TuiService::new_with_embedded_defaults().await?;
+    let service = TuiService::new_with_embedded_defaults(true).await?;
     let role_name = service.get_selected_role().await;
 
     let text = "This is a test with some terms to replace.";
@@ -141,7 +141,7 @@ async fn test_tui_service_replace_matches() -> Result<()> {
 /// Test summarize method
 #[tokio::test]
 async fn test_tui_service_summarize() -> Result<()> {
-    let service = TuiService::new_with_embedded_defaults().await?;
+    let service = TuiService::new_with_embedded_defaults(true).await?;
     let role_name = service.get_selected_role().await;
 
     let content = "This is a test paragraph that needs to be summarized. It contains multiple sentences with various topics and information that should be condensed.";
@@ -171,7 +171,7 @@ async fn test_tui_service_summarize() -> Result<()> {
 /// Test list roles with info
 #[tokio::test]
 async fn test_tui_service_list_roles_with_info() -> Result<()> {
-    let service = TuiService::new_with_embedded_defaults().await?;
+    let service = TuiService::new_with_embedded_defaults(true).await?;
 
     let roles = service.list_roles_with_info().await;
 
@@ -186,7 +186,7 @@ async fn test_tui_service_list_roles_with_info() -> Result<()> {
 /// Test find_matches method
 #[tokio::test]
 async fn test_tui_service_find_matches() -> Result<()> {
-    let service = TuiService::new_with_embedded_defaults().await?;
+    let service = TuiService::new_with_embedded_defaults(true).await?;
     let role_name = service.get_selected_role().await;
 
     let text = "This is a test paragraph with some terms to match.";
@@ -212,7 +212,7 @@ async fn test_tui_service_find_matches() -> Result<()> {
 /// Test that role discovery works with shortnames and case-insensitive lookups
 #[tokio::test]
 async fn test_tui_service_find_role_by_shortname() -> Result<()> {
-    let service = TuiService::new_with_embedded_defaults().await?;
+    let service = TuiService::new_with_embedded_defaults(true).await?;
     let roles = service.list_roles_with_info().await;
 
     let (role_name, shortname) = roles
@@ -241,7 +241,7 @@ async fn test_tui_service_find_role_by_shortname() -> Result<()> {
 /// Test that updating the selected role persists across service queries
 #[tokio::test]
 async fn test_tui_service_update_selected_role() -> Result<()> {
-    let service = TuiService::new_with_embedded_defaults().await?;
+    let service = TuiService::new_with_embedded_defaults(true).await?;
     let current_role = service.get_selected_role().await;
 
     let new_role = service

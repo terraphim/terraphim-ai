@@ -308,11 +308,14 @@ mod tests {
         let orig_config: ConfigResponse = response.json().await.unwrap();
         assert!(matches!(orig_config.status, Status::Success));
         assert_eq!(orig_config.config.default_role, "Default".into());
-        assert_eq!(orig_config.config.global_shortcut, "Ctrl+X");
+        assert_eq!(
+            orig_config.config.global_shortcut,
+            Some("Ctrl+X".to_string())
+        );
 
         let mut new_config = orig_config.config.clone();
         new_config.default_role = "Engineer".to_string().into();
-        new_config.global_shortcut = "Ctrl+P".to_string();
+        new_config.global_shortcut = Some("Ctrl+P".to_string());
         let client = terraphim_service::http_client::create_default_client()
             .expect("Failed to create HTTP client");
         let response = client
@@ -328,7 +331,10 @@ mod tests {
         let new_config: ConfigResponse = response.json().await.unwrap();
         assert!(matches!(orig_config.status, Status::Success));
         assert_eq!(new_config.config.default_role, "Engineer".into());
-        assert_eq!(new_config.config.global_shortcut, "Ctrl+P");
+        assert_eq!(
+            new_config.config.global_shortcut,
+            Some("Ctrl+P".to_string())
+        );
     }
 
     #[tokio::test]
