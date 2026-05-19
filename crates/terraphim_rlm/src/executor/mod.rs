@@ -21,14 +21,18 @@
 //! 3. Fallback to next available backend if preferred is unavailable
 
 mod context;
+#[cfg(feature = "docker-backend")]
 mod docker;
+#[cfg(feature = "firecracker")]
 mod firecracker;
 mod local;
 mod ssh;
 mod r#trait;
 
 pub use context::{Capability, ExecutionContext, ExecutionResult, SnapshotId, ValidationResult};
+#[cfg(feature = "docker-backend")]
 pub use docker::DockerExecutor;
+#[cfg(feature = "firecracker")]
 pub use firecracker::FirecrackerExecutor;
 pub use local::LocalExecutor;
 pub use ssh::SshExecutor;
@@ -93,11 +97,13 @@ pub async fn select_executor(
 
     // Cache the docker availability probe across loop iterations to avoid
     // repeating the (~50-100 ms) shell-out to `docker --version`.
+    #[cfg(feature = "docker-backend")]
     let docker_available = is_docker_available();
     let mut tried = Vec::new();
 
     for backend in backends {
         match backend {
+            #[cfg(feature = "firecracker")]
             BackendType::Firecracker if is_kvm_available() => {
                 log::info!("Selected Firecracker backend (KVM available)");
                 let executor = FirecrackerExecutor::new(config.clone())?;
@@ -111,9 +117,15 @@ pub async fn select_executor(
                 }
                 return Ok(Box::new(executor));
             }
+            #[cfg(feature = "firecracker")]
             BackendType::Firecracker => {
                 log::debug!("Firecracker unavailable: KVM not present");
                 tried.push("firecracker (no KVM)".to_string());
+            }
+            #[cfg(not(feature = "firecracker"))]
+            BackendType::Firecracker => {
+                log::debug!("Firecracker backend disabled at compile time");
+                tried.push("firecracker (compile-time disabled)".to_string());
             }
 
             BackendType::E2b if config.e2b_api_key.is_some() => {
@@ -129,6 +141,7 @@ pub async fn select_executor(
                 tried.push("e2b (no API key)".to_string());
             }
 
+            #[cfg(feature = "docker-backend")]
             BackendType::Docker if docker_available => match DockerExecutor::new(config.clone()) {
                 Ok(executor) => {
                     log::info!("Selected Docker backend (container isolation)");
@@ -143,9 +156,15 @@ pub async fn select_executor(
                     tried.push(format!("docker (init failed: {})", e));
                 }
             },
+            #[cfg(feature = "docker-backend")]
             BackendType::Docker => {
                 log::debug!("Docker unavailable: CLI not present");
                 tried.push("docker (not available)".to_string());
+            }
+            #[cfg(not(feature = "docker-backend"))]
+            BackendType::Docker => {
+                log::debug!("Docker backend disabled at compile time");
+                tried.push("docker (compile-time disabled)".to_string());
             }
 
             BackendType::Local => {
