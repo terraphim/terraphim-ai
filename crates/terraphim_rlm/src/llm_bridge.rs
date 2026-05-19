@@ -413,11 +413,7 @@ mod tests {
                 };
 
                 if let Some(client) = terraphim_service::llm::build_llm_from_role(&role) {
-                    LlmBridge::with_llm_client(
-                        LlmBridgeConfig::default(),
-                        session_manager,
-                        client,
-                    )
+                    LlmBridge::with_llm_client(LlmBridgeConfig::default(), session_manager, client)
                 } else {
                     LlmBridge::new(LlmBridgeConfig::default(), session_manager)
                 }
