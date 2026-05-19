@@ -157,12 +157,12 @@ execute_command() {
   # Track KG lookup cost
   track_kg_lookup
 
-  # Execute
-  if eval "$transformed"; then
+  # Execute — tee full output to BUILD_LOG for post-mortem (ADF truncates stderr)
+  if eval "$transformed" 2>&1 | tee -a "${BUILD_LOG:-/tmp/build-runner-output.log}" >&2; then
     log_success "  Step $step complete"
     return 0
   else
-    local exit_code=$?
+    local exit_code=${PIPESTATUS[0]}
     log_error "  Step $step failed with exit code $exit_code"
     POST_STATUS failure "build failed at step $step (exit $exit_code)"
     # Capture learning
@@ -182,40 +182,22 @@ parse_build_md() {
 
   log_info "Parsing BUILD.md for build sequence"
 
-  # Extract commands from code blocks under "Default Rust Build Sequence" or similar sections
-  # Look for bash code blocks that contain build commands
   local in_block=0
-  local block_content=""
-
   while IFS= read -r line; do
-    # Start of bash code block
     if [[ "$line" =~ ^'```bash'$ ]]; then
       in_block=1
-      block_content=""
       continue
     fi
-
-    # End of code block
     if [[ "$line" =~ ^'```'$ ]] && [ "$in_block" -eq 1 ]; then
       in_block=0
-      # Check if block contains build commands
-      if echo "$block_content" | grep -qE '^(cargo|make|npm|yarn|pnpm|bun|docker|pytest|python|go|rustc)'; then
-        echo "$block_content" | grep -v '^$'
-        return 0
-      fi
       continue
     fi
-
-    # Collect block content
     if [ "$in_block" -eq 1 ]; then
-      block_content="$block_content$line"
-      # Check for multi-line content
-      if [ ${#block_content} -gt 0 ]; then
-        block_content="$block_content"
+      if echo "$line" | grep -qE '^(cargo|make|npm|yarn|pnpm|bun|docker|pytest|python|go|rustc)'; then
+        echo "$line"
       fi
-      echo "$line"
     fi
-  done < BUILD.md | grep -v '^$' | grep -E '^(cargo|make|npm|yarn|pnpm|bun|docker|pytest|python|go|rustc)' | head -20
+  done < BUILD.md | head -20
 
   return 0
 }
@@ -323,9 +305,12 @@ main() {
   log_info "Working directory: $ADF_WORKING_DIR"
   log_info "Role: AI Engineer (KG-first, LLM disabled)"
 
+  BUILD_LOG="${ADF_WORKING_DIR}/build-output.log"
+  echo "=== build-runner-llm $(date -u +%Y-%m-%dT%H:%M:%SZ) SHA=${ADF_PUSH_SHA:-unknown} ===" > "$BUILD_LOG"
+  log_info "Full build log: $BUILD_LOG"
+
   POST_STATUS pending "build started"
 
-  # Check prerequisites
   if [ -z "$ADF_WORKING_DIR" ]; then
     log_error "ADF_WORKING_DIR not set"
     exit 1
