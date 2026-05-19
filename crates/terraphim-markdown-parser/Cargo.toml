@@ -1,6 +1,6 @@
 [package]
 name = "terraphim-markdown-parser"
-version = "1.0.0"
+version = "1.19.1"
 edition.workspace = true
 authors = ["Terraphim Contributors"]
 description = "Terraphim Markdown Parser"

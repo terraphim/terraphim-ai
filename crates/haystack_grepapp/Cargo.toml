@@ -8,7 +8,7 @@ license = "MIT"
 repository = "https://github.com/terraphim/terraphim-ai"
 
 [dependencies]
-haystack_core = { path = "../haystack_core", version = "1.0.0" }
+haystack_core = { path = "../haystack_core", version = "1.19.1" }
 terraphim_types = { path = "../terraphim_types", version = "1.0.0" }
 reqwest = { workspace = true, features = ["json", "rustls-tls"] }
 
