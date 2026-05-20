@@ -482,4 +482,120 @@ task = "task"
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("invalid layer"));
     }
+
+    #[test]
+    fn discover_and_load_returns_err_on_malformed_toml() {
+        let tmp = TempDir::new().unwrap();
+        let project_dir = tmp.path().join("proj");
+        fs::create_dir_all(project_dir.join(".terraphim")).unwrap();
+        fs::write(
+            project_dir.join(".terraphim/adf.toml"),
+            "not valid toml {{{{",
+        )
+        .unwrap();
+
+        let result = ProjectAdfConfig::discover_and_load(&project_dir).unwrap_err();
+        assert!(result.to_string().contains("failed to parse"));
+    }
+
+    #[test]
+    fn discover_and_load_returns_err_when_project_id_missing() {
+        let tmp = TempDir::new().unwrap();
+        let project_dir = tmp.path().join("proj");
+        fs::create_dir_all(project_dir.join(".terraphim")).unwrap();
+        fs::write(
+            project_dir.join(".terraphim/adf.toml"),
+            r#"
+name = "Missing Project Id"
+[[agents]]
+name = "agent"
+layer = "Safety"
+cli_tool = "echo"
+task = "task"
+"#,
+        )
+        .unwrap();
+
+        let result = ProjectAdfConfig::discover_and_load(&project_dir).unwrap_err();
+        assert!(result.to_string().contains("missing field `project_id`"));
+    }
+
+    #[test]
+    fn full_config_passes_validation() {
+        let tmp = TempDir::new().unwrap();
+        let project_dir = temp_project_with_adf(
+            &tmp,
+            r#"
+project_id = "validation-test"
+name = "Validation Test"
+
+[[agents]]
+name = "safety-echo"
+layer = "Safety"
+cli_tool = "echo"
+task = "Say hello"
+
+[[pr_dispatch]]
+name = "safety-echo"
+context = "adf/build"
+"#,
+        );
+
+        let adf = ProjectAdfConfig::discover_and_load(&project_dir)
+            .unwrap()
+            .unwrap();
+        let (project, agents) = (&adf).try_into().expect("conversion must succeed");
+
+        let nightwatch = crate::config::NightwatchConfig::default();
+        let compound_review = crate::config::CompoundReviewConfig {
+            schedule: "0 2 * * *".to_string(),
+            repo_path: adf.discovered_path.parent().unwrap().to_path_buf(),
+            ..Default::default()
+        };
+
+        let mut config = crate::config::OrchestratorConfig {
+            working_dir: adf.discovered_path.parent().unwrap().to_path_buf(),
+            nightwatch,
+            compound_review,
+            workflow: None,
+            agents,
+            restart_cooldown_secs: 60,
+            max_restart_count: 10,
+            restart_budget_window_secs: 43_200,
+            disk_usage_threshold: 90,
+            tick_interval_secs: 30,
+            gate_reconcile_interval_ticks: 20,
+            handoff_buffer_ttl_secs: Some(86400),
+            persona_data_dir: None,
+            skill_data_dir: None,
+            flows: vec![],
+            flow_state_dir: None,
+            gitea: None,
+            mentions: None,
+            webhook: None,
+            role_config_path: None,
+            routing: None,
+            #[cfg(feature = "quickwit")]
+            quickwit: None,
+            projects: vec![project],
+            include: vec![],
+            providers: vec![],
+            provider_budget_state_file: None,
+            pause_dir: None,
+            project_circuit_breaker_threshold: 5,
+            fleet_escalation_owner: None,
+            fleet_escalation_repo: None,
+            post_merge_gate: None,
+            learning: crate::config::LearningConfig::default(),
+            evolution: crate::config::EvolutionConfig::default(),
+            pr_dispatch: adf.pr_dispatch,
+            pr_dispatch_per_project: std::collections::HashMap::new(),
+            gitea_skill_repo: None,
+        };
+
+        config.substitute_env_vars();
+        config
+            .validate()
+            .expect("full OrchestratorConfig must validate");
+    }
 }
