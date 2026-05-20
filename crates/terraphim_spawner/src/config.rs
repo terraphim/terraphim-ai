@@ -21,7 +21,7 @@ pub struct ResourceLimits {
 }
 
 /// Configuration for an agent
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct AgentConfig {
     /// Agent identifier
     pub agent_id: String,
@@ -42,6 +42,43 @@ pub struct AgentConfig {
     /// Whether the CLI tool supports reading the task from stdin.
     /// When false, the task is always passed as a positional argument.
     pub supports_stdin: bool,
+}
+
+/// Returns `true` if an env-var key name indicates a sensitive credential.
+fn is_sensitive_key(key: &str) -> bool {
+    let upper = key.to_uppercase();
+    upper.contains("TOKEN")
+        || upper.contains("KEY")
+        || upper.contains("SECRET")
+        || upper.contains("PASSWORD")
+}
+
+impl std::fmt::Debug for AgentConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let redacted: std::collections::HashMap<&str, &str> = self
+            .env_vars
+            .iter()
+            .map(|(k, v)| {
+                let val: &str = if is_sensitive_key(k) {
+                    "***REDACTED***"
+                } else {
+                    v.as_str()
+                };
+                (k.as_str(), val)
+            })
+            .collect();
+        f.debug_struct("AgentConfig")
+            .field("agent_id", &self.agent_id)
+            .field("cli_command", &self.cli_command)
+            .field("args", &self.args)
+            .field("working_dir", &self.working_dir)
+            .field("env_vars", &redacted)
+            .field("required_api_keys", &self.required_api_keys)
+            .field("resource_limits", &self.resource_limits)
+            .field("use_stdin", &self.use_stdin)
+            .field("supports_stdin", &self.supports_stdin)
+            .finish()
+    }
 }
 
 impl AgentConfig {
@@ -563,6 +600,78 @@ mod tests {
     }
 
     #[test]
+    fn test_is_sensitive_key_detects_known_patterns() {
+        assert!(is_sensitive_key("ANTHROPIC_API_KEY"));
+        assert!(is_sensitive_key("OPENAI_API_KEY"));
+        assert!(is_sensitive_key("GITHUB_TOKEN"));
+        assert!(is_sensitive_key("DB_PASSWORD"));
+        assert!(is_sensitive_key("APP_SECRET"));
+        assert!(is_sensitive_key("api_key"));
+        assert!(is_sensitive_key("auth_token"));
+    }
+
+    #[test]
+    fn test_is_sensitive_key_allows_safe_keys() {
+        assert!(!is_sensitive_key("HOME"));
+        assert!(!is_sensitive_key("PATH"));
+        assert!(!is_sensitive_key("LOG_LEVEL"));
+        assert!(!is_sensitive_key("RUST_LOG"));
+        assert!(!is_sensitive_key("AGENT_ID"));
+    }
+
+    #[test]
+    fn test_debug_redacts_sensitive_env_vars() {
+        let mut env_vars = HashMap::new();
+        env_vars.insert(
+            "ANTHROPIC_API_KEY".to_string(),
+            "sk-ant-real-secret".to_string(),
+        );
+        env_vars.insert("GITHUB_TOKEN".to_string(), "ghp_real_token".to_string());
+        env_vars.insert("LOG_LEVEL".to_string(), "debug".to_string());
+        env_vars.insert("HOME".to_string(), "/home/agent".to_string());
+
+        let config = AgentConfig {
+            agent_id: "test-agent".to_string(),
+            cli_command: "claude".to_string(),
+            args: vec![],
+            working_dir: None,
+            env_vars,
+            required_api_keys: vec![],
+            resource_limits: ResourceLimits::default(),
+            use_stdin: false,
+            supports_stdin: true,
+        };
+
+        let debug_output = format!("{:?}", config);
+
+        // Sensitive values must not appear
+        assert!(
+            !debug_output.contains("sk-ant-real-secret"),
+            "API key value must be redacted"
+        );
+        assert!(
+            !debug_output.contains("ghp_real_token"),
+            "Token value must be redacted"
+        );
+
+        // Redaction marker must appear
+        assert!(
+            debug_output.contains("***REDACTED***"),
+            "Redaction marker must appear for sensitive keys"
+        );
+
+        // Non-sensitive values must be visible
+        assert!(
+            debug_output.contains("debug"),
+            "Non-sensitive env var value must be visible"
+        );
+        assert!(
+            debug_output.contains("/home/agent"),
+            "Non-sensitive env var value must be visible"
+        );
+    }
+
+    #[test]
     fn test_model_args_pi_rust_bare() {
         let args = AgentConfig::model_args("pi-rust", "glm-5.1");
         assert_eq!(args, vec!["--model", "glm-5.1"]);
@@ -593,5 +702,23 @@ mod tests {
 
         let keys = AgentConfig::infer_api_keys("/home/alex/.local/bin/pi-rust");
         assert!(keys.is_empty());
+    }
+
+    #[test]
+    fn test_debug_empty_env_vars_shows_nothing_redacted() {
+        let config = AgentConfig {
+            agent_id: "test".to_string(),
+            cli_command: "claude".to_string(),
+            args: vec![],
+            working_dir: None,
+            env_vars: HashMap::new(),
+            required_api_keys: vec![],
+            resource_limits: ResourceLimits::default(),
+            use_stdin: false,
+            supports_stdin: true,
+        };
+        let debug_output = format!("{:?}", config);
+        assert!(!debug_output.contains("***REDACTED***"));
+        assert!(debug_output.contains("AgentConfig"));
     }
 }
