@@ -91,6 +91,7 @@ fn register_providers(orchestrator: &mut AgentOrchestrator) {
 enum Cli {
     Run { config: PathBuf },
     Check { config: PathBuf },
+    LocalCheck,
     Version,
     Help,
 }
@@ -98,6 +99,7 @@ enum Cli {
 fn parse_args() -> Result<Cli, String> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let mut check: Option<PathBuf> = None;
+    let mut local_check = false;
     let mut positional: Option<PathBuf> = None;
 
     let mut iter = args.into_iter();
@@ -108,6 +110,16 @@ fn parse_args() -> Result<Cli, String> {
                     .next()
                     .ok_or_else(|| "--check requires a config path".to_string())?;
                 check = Some(PathBuf::from(path));
+            }
+            "--local" => {
+                if iter.next().as_deref() == Some("--check") {
+                    local_check = true;
+                } else {
+                    return Err(
+                        "--local must be followed by --check (use: adf --local --check)"
+                            .to_string(),
+                    );
+                }
             }
             "-h" | "--help" => return Ok(Cli::Help),
             "-V" | "--version" => return Ok(Cli::Version),
@@ -123,7 +135,9 @@ fn parse_args() -> Result<Cli, String> {
         }
     }
 
-    if let Some(config) = check {
+    if local_check {
+        Ok(Cli::LocalCheck)
+    } else if let Some(config) = check {
         Ok(Cli::Check { config })
     } else {
         let config =
@@ -136,10 +150,11 @@ fn print_help() {
     println!("adf -- AI Dark Factory orchestrator");
     println!();
     println!("USAGE:");
-    println!("    adf [CONFIG]           Run the orchestrator");
-    println!("    adf --check CONFIG     Validate config + print agent routing table");
-    println!("    adf --help             Show this message");
-    println!("    adf --version          Show version");
+    println!("    adf [CONFIG]                Run the orchestrator");
+    println!("    adf --check CONFIG          Validate config + print agent routing table");
+    println!("    adf --local --check         Discover .terraphim/adf.toml and validate");
+    println!("    adf --help                  Show this message");
+    println!("    adf --version               Show version");
 }
 
 /// Run the dry-run validator: load, validate, and print the routing table.
@@ -155,6 +170,101 @@ fn run_check(path: PathBuf) -> ExitCode {
 
     if let Err(e) = config.validate() {
         eprintln!("adf --check FAILED validation for {}: {e}", path.display());
+        return ExitCode::from(1);
+    }
+
+    print_routing_table(&config);
+    ExitCode::SUCCESS
+}
+
+fn run_local_check(cwd: PathBuf) -> ExitCode {
+    let adf_config = match terraphim_orchestrator::ProjectAdfConfig::discover_and_load(&cwd) {
+        Ok(Some(cfg)) => cfg,
+        Ok(None) => {
+            eprintln!(
+                "adf --local --check: no .terraphim/adf.toml found at or above {}",
+                cwd.display()
+            );
+            return ExitCode::from(1);
+        }
+        Err(e) => {
+            eprintln!("adf --local --check FAILED: {e}");
+            return ExitCode::from(1);
+        }
+    };
+
+    println!(
+        "Discovered {}: {} agents from {}",
+        adf_config.project_id,
+        adf_config.agents.len(),
+        adf_config.discovered_path.display()
+    );
+
+    let (project, agents) = match (&adf_config).try_into() {
+        Ok(tuple) => tuple,
+        Err(e) => {
+            eprintln!("adf --local --check FAILED conversion: {e}");
+            return ExitCode::from(1);
+        }
+    };
+
+    let working_dir = adf_config
+        .discovered_path
+        .parent()
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| cwd.clone());
+
+    let nightwatch = terraphim_orchestrator::config::NightwatchConfig::default();
+    let compound_review = terraphim_orchestrator::config::CompoundReviewConfig {
+        schedule: "0 2 * * *".to_string(),
+        repo_path: working_dir.clone(),
+        ..Default::default()
+    };
+
+    let mut config = OrchestratorConfig {
+        working_dir,
+        nightwatch,
+        compound_review,
+        workflow: None,
+        agents,
+        restart_cooldown_secs: 60,
+        max_restart_count: 10,
+        restart_budget_window_secs: 43_200,
+        disk_usage_threshold: 90,
+        tick_interval_secs: 30,
+        gate_reconcile_interval_ticks: 20,
+        handoff_buffer_ttl_secs: Some(86400),
+        persona_data_dir: None,
+        skill_data_dir: None,
+        flows: vec![],
+        flow_state_dir: None,
+        gitea: None,
+        mentions: None,
+        webhook: None,
+        role_config_path: None,
+        routing: None,
+        #[cfg(feature = "quickwit")]
+        quickwit: None,
+        projects: vec![project],
+        include: vec![],
+        providers: vec![],
+        provider_budget_state_file: None,
+        pause_dir: None,
+        project_circuit_breaker_threshold: 5,
+        fleet_escalation_owner: None,
+        fleet_escalation_repo: None,
+        post_merge_gate: None,
+        learning: terraphim_orchestrator::config::LearningConfig::default(),
+        evolution: terraphim_orchestrator::config::EvolutionConfig::default(),
+        pr_dispatch: adf_config.pr_dispatch,
+        pr_dispatch_per_project: std::collections::HashMap::new(),
+        gitea_skill_repo: None,
+    };
+
+    config.substitute_env_vars();
+
+    if let Err(e) = config.validate() {
+        eprintln!("adf --local --check FAILED validation: {e}");
         return ExitCode::from(1);
     }
 
@@ -269,6 +379,7 @@ async fn main() -> ExitCode {
             println!("adf {}", env!("CARGO_PKG_VERSION"));
             ExitCode::SUCCESS
         }
+        Cli::LocalCheck => run_local_check(std::env::current_dir().unwrap_or_default()),
         Cli::Check { config } => run_check(config),
         Cli::Run { config } => {
             tracing::info!(config = %config.display(), "loading orchestrator config");

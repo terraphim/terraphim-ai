@@ -109,3 +109,122 @@ fn adf_check_table_is_sorted_by_project_then_agent() {
     // within beta, alphabetical: reviewer before watcher.
     assert!(beta_rev_idx < beta_watch_idx);
 }
+
+#[test]
+fn adf_local_check_succeeds_on_valid_adf_toml() {
+    let tmp = tempfile::tempdir_in("/tmp").unwrap();
+    let project_dir = tmp.path().join("local-test-project");
+    std::fs::create_dir_all(project_dir.join(".terraphim")).unwrap();
+    std::fs::write(
+        project_dir.join(".terraphim/adf.toml"),
+        r#"
+project_id = "local-valid"
+name = "Local Valid"
+
+[[agents]]
+name = "local-safety"
+layer = "Safety"
+cli_tool = "echo"
+task = "Hello"
+"#,
+    )
+    .unwrap();
+
+    let out = Command::new(adf_bin())
+        .args(["--local", "--check"])
+        .current_dir(&project_dir)
+        .output()
+        .expect("run adf --local --check");
+
+    assert!(out.status.success(), "expected success, got {:?}", out);
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stdout.contains("Discovered local-valid"),
+        "stdout: {stdout}"
+    );
+    assert!(stdout.contains("local-safety"), "stdout: {stdout}");
+    assert!(stdout.contains("Safety"), "stdout: {stdout}");
+}
+
+#[test]
+fn adf_local_check_fails_when_no_adf_toml() {
+    let tmp = tempfile::tempdir_in("/tmp").unwrap();
+    let project_dir = tmp.path().join("no-adf");
+    std::fs::create_dir_all(project_dir.join("src")).unwrap();
+
+    let out = Command::new(adf_bin())
+        .args(["--local", "--check"])
+        .current_dir(&project_dir)
+        .output()
+        .expect("run adf --local --check");
+
+    assert!(!out.status.success());
+    assert_eq!(out.status.code(), Some(1));
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("no .terraphim/adf.toml found"),
+        "stderr: {stderr}"
+    );
+}
+
+#[test]
+fn adf_local_check_fails_on_invalid_layer() {
+    let tmp = tempfile::tempdir_in("/tmp").unwrap();
+    let project_dir = tmp.path().join("bad-layer");
+    std::fs::create_dir_all(project_dir.join(".terraphim")).unwrap();
+    std::fs::write(
+        project_dir.join(".terraphim/adf.toml"),
+        r#"
+project_id = "bad-layer"
+name = "Bad Layer"
+
+[[agents]]
+name = "bad-agent"
+layer = "Review"
+cli_tool = "echo"
+task = "task"
+"#,
+    )
+    .unwrap();
+
+    let out = Command::new(adf_bin())
+        .args(["--local", "--check"])
+        .current_dir(&project_dir)
+        .output()
+        .expect("run adf --local --check");
+
+    assert!(!out.status.success());
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("invalid layer") || stderr.contains("FAILED"),
+        "stderr: {stderr}"
+    );
+}
+
+#[test]
+fn adf_local_check_requires_both_flags() {
+    let tmp = tempfile::tempdir_in("/tmp").unwrap();
+    let project_dir = tmp.path().join("local-test");
+    std::fs::create_dir_all(project_dir.join(".terraphim")).unwrap();
+    std::fs::write(
+        project_dir.join(".terraphim/adf.toml"),
+        r#"
+project_id = "t"
+name = "t"
+"#,
+    )
+    .unwrap();
+
+    let out = Command::new(adf_bin())
+        .arg("--local")
+        .current_dir(&project_dir)
+        .output()
+        .expect("run adf --local only");
+
+    assert!(!out.status.success());
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("--local must be followed by --check"),
+        "stderr: {stderr}"
+    );
+}
