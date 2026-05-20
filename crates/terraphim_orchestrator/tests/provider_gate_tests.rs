@@ -355,6 +355,7 @@ fn budget_aware_config(
         quickwit: None,
         projects: vec![],
         include: vec![],
+        project_sources: vec![],
         providers,
         provider_budget_state_file: state_file,
         pause_dir: None,

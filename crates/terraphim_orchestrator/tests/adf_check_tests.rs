@@ -61,6 +61,63 @@ fn adf_check_expands_include_and_prints_merged_agents() {
 }
 
 #[test]
+fn adf_check_loads_project_source_and_prints_agent() {
+    let tmp = tempfile::tempdir_in("/tmp").unwrap();
+    let project_dir = tmp.path().join("source-project");
+    std::fs::create_dir_all(project_dir.join(".terraphim")).unwrap();
+    std::fs::write(
+        project_dir.join(".terraphim/adf.toml"),
+        r#"
+project_id = "source-project"
+name = "Source Project"
+
+[[agents]]
+name = "source-agent"
+layer = "Core"
+cli_tool = "codex"
+task = "Check source loader"
+model = "kimi-for-coding/k2p6"
+"#,
+    )
+    .unwrap();
+
+    let config_path = tmp.path().join("orchestrator.toml");
+    std::fs::write(
+        &config_path,
+        format!(
+            r#"
+working_dir = "{root}/work"
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 2 * * *"
+repo_path = "{root}/repo"
+
+[[project_sources]]
+id = "source-project"
+root = "source-project"
+config = ".terraphim/adf.toml"
+"#,
+            root = tmp.path().display()
+        ),
+    )
+    .unwrap();
+
+    let out = Command::new(adf_bin())
+        .arg("--check")
+        .arg(&config_path)
+        .output()
+        .expect("run adf --check");
+
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(out.status.success(), "expected success, got {out:?}");
+    assert!(stdout.contains("source-project"), "stdout: {stdout}");
+    assert!(stdout.contains("source-agent"), "stdout: {stdout}");
+    assert!(stdout.contains("kimi-for-coding/k2p6"), "stdout: {stdout}");
+}
+
+#[test]
 fn adf_check_fails_on_banned_provider_with_nonzero_exit() {
     let out = Command::new(adf_bin())
         .arg("--check")

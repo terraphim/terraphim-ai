@@ -73,6 +73,24 @@ pub struct Project {
     pub max_concurrent_mention_agents: Option<usize>,
 }
 
+/// Global registry entry for loading a repo-local `.terraphim/adf.toml`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectSourceConfig {
+    /// Project id expected inside the project-local config.
+    pub id: String,
+    /// Repository/project root.
+    pub root: PathBuf,
+    /// Config path relative to `root`, or absolute for operator-managed paths.
+    pub config: PathBuf,
+    /// Disabled sources are retained in the loaded config but not merged.
+    #[serde(default = "default_project_source_enabled")]
+    pub enabled: bool,
+}
+
+fn default_project_source_enabled() -> bool {
+    true
+}
+
 /// Top-level orchestrator configuration (parsed from TOML).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OrchestratorConfig {
@@ -152,6 +170,9 @@ pub struct OrchestratorConfig {
     /// to the base config file's parent directory.
     #[serde(default)]
     pub include: Vec<String>,
+    /// Repo-local ADF configs to merge after legacy includes.
+    #[serde(default)]
+    pub project_sources: Vec<ProjectSourceConfig>,
     /// Per-provider spend caps for hour / day tumbling UTC windows.
     /// Empty means no provider-level budget gating.
     #[serde(default)]
@@ -1384,10 +1405,6 @@ impl OrchestratorConfig {
         let content = std::fs::read_to_string(path)?;
         let mut config = Self::from_toml(&content)?;
 
-        if config.include.is_empty() {
-            return Ok(config);
-        }
-
         let base_dir = path.parent().unwrap_or_else(|| std::path::Path::new("."));
         let patterns = std::mem::take(&mut config.include);
 
@@ -1448,7 +1465,66 @@ impl OrchestratorConfig {
         // show what was merged.
         config.include = patterns;
 
+        config.merge_project_sources(base_dir)?;
+
         Ok(config)
+    }
+
+    fn merge_project_sources(
+        &mut self,
+        base_dir: &std::path::Path,
+    ) -> Result<(), crate::error::OrchestratorError> {
+        let mut seen_source_ids = std::collections::HashSet::new();
+        for source in &self.project_sources {
+            if !seen_source_ids.insert(source.id.as_str()) {
+                return Err(crate::error::OrchestratorError::Config(format!(
+                    "duplicate project_sources id '{}'",
+                    source.id
+                )));
+            }
+        }
+
+        for source in self.project_sources.iter().filter(|source| source.enabled) {
+            let root = if source.root.is_absolute() {
+                source.root.clone()
+            } else {
+                base_dir.join(&source.root)
+            };
+            let config_path = if source.config.is_absolute() {
+                source.config.clone()
+            } else {
+                root.join(&source.config)
+            };
+
+            let adf =
+                crate::ProjectAdfConfig::load_from_path(&config_path, &root).map_err(|e| {
+                    crate::error::OrchestratorError::Config(format!(
+                        "failed to load project source '{}' from {}: {}",
+                        source.id,
+                        config_path.display(),
+                        e
+                    ))
+                })?;
+
+            if adf.project_id != source.id {
+                return Err(crate::error::OrchestratorError::Config(format!(
+                    "project source '{}' loaded {} with project_id '{}'",
+                    source.id,
+                    config_path.display(),
+                    adf.project_id
+                )));
+            }
+
+            let (project, agents) = (&adf).try_into()?;
+            if let Some(dispatch) = adf.pr_dispatch {
+                self.pr_dispatch_per_project
+                    .insert(source.id.clone(), dispatch);
+            }
+            self.projects.push(project);
+            self.agents.extend(agents);
+        }
+
+        Ok(())
     }
 
     /// Load from a TOML file, expand include globs, and validate.
@@ -1521,7 +1597,18 @@ impl OrchestratorConfig {
         // Every agent.project (if Some) must reference a known project id.
         // In multi-project mode, every agent must set project; in legacy
         // mode agent.project must be None.
+        let mut seen_agents: std::collections::HashSet<(Option<&str>, &str)> =
+            std::collections::HashSet::new();
         for agent in &self.agents {
+            let key = (agent.project.as_deref(), agent.name.as_str());
+            if !seen_agents.insert(key) {
+                let scope = agent.project.as_deref().unwrap_or("<legacy>");
+                return Err(crate::error::OrchestratorError::Config(format!(
+                    "duplicate agent '{}' in project '{}'",
+                    agent.name, scope
+                )));
+            }
+
             match (&agent.project, multi_project) {
                 (Some(pid), _) => {
                     if !seen_ids.contains(pid.as_str()) {

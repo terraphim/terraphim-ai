@@ -101,6 +101,7 @@ fn isolated_config(
         quickwit: None,
         projects: vec![],
         include: vec![],
+        project_sources: vec![],
         providers: vec![],
         provider_budget_state_file: None,
         pause_dir: None,

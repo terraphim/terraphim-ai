@@ -93,6 +93,7 @@ fn test_config_with_pause(
         quickwit: None,
         projects: vec![],
         include: vec![],
+        project_sources: vec![],
         providers: vec![],
         provider_budget_state_file: None,
         pause_dir: Some(pause_dir),

@@ -85,6 +85,7 @@ pub struct ProjectAdfConfig {
     pub agents: Vec<TomlAdfAgent>,
     pub pr_dispatch: Option<PrDispatchConfig>,
     pub discovered_path: PathBuf,
+    root: PathBuf,
 }
 
 impl TomlProjectAdfConfig {
@@ -139,6 +140,7 @@ impl TomlProjectAdfConfig {
     fn into_adf_config(
         self,
         discovered_path: PathBuf,
+        root: PathBuf,
     ) -> Result<ProjectAdfConfig, OrchestratorError> {
         let pr_dispatch = self.pr_dispatch.map(|entries| PrDispatchConfig {
             agents_on_pr_open: entries
@@ -156,16 +158,28 @@ impl TomlProjectAdfConfig {
             agents: self.agents,
             pr_dispatch,
             discovered_path,
+            root,
         })
     }
 }
 
 impl ProjectAdfConfig {
     pub fn project_root(&self) -> &Path {
-        self.discovered_path
-            .parent()
-            .and_then(Path::parent)
-            .unwrap_or(&self.discovered_path)
+        &self.root
+    }
+
+    pub fn load_from_path(adf_path: &Path, project_root: &Path) -> Result<Self, OrchestratorError> {
+        let content = std::fs::read_to_string(adf_path).map_err(|e| {
+            OrchestratorError::Config(format!("failed to read {}: {}", adf_path.display(), e))
+        })?;
+
+        let expanded = crate::config::expand_env_vars(&content);
+        let mut toml_config: TomlProjectAdfConfig = toml::from_str(&expanded).map_err(|e| {
+            OrchestratorError::Config(format!("failed to parse {}: {}", adf_path.display(), e))
+        })?;
+
+        toml_config.try_expand_env_vars();
+        toml_config.into_adf_config(adf_path.to_path_buf(), project_root.to_path_buf())
     }
 
     fn discover_terraphim_dir(start_dir: &Path) -> Option<PathBuf> {
@@ -195,17 +209,8 @@ impl ProjectAdfConfig {
             return Ok(None);
         }
 
-        let content = std::fs::read_to_string(&adf_path).map_err(|e| {
-            OrchestratorError::Config(format!("failed to read {}: {}", adf_path.display(), e))
-        })?;
-
-        let expanded = crate::config::expand_env_vars(&content);
-        let mut toml_config: TomlProjectAdfConfig = toml::from_str(&expanded).map_err(|e| {
-            OrchestratorError::Config(format!("failed to parse {}: {}", adf_path.display(), e))
-        })?;
-
-        toml_config.try_expand_env_vars();
-        toml_config.into_adf_config(adf_path).map(Some)
+        let project_root = terraphim_dir.parent().unwrap_or(&terraphim_dir);
+        Self::load_from_path(&adf_path, project_root).map(Some)
     }
 }
 
@@ -583,6 +588,7 @@ context = "adf/build"
             quickwit: None,
             projects: vec![project],
             include: vec![],
+            project_sources: vec![],
             providers: vec![],
             provider_budget_state_file: None,
             pause_dir: None,
