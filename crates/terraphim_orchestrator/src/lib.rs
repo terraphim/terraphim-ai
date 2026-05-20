@@ -2550,7 +2550,12 @@ impl AgentOrchestrator {
         // to the spawner -- not the runtime informational summary.
         // The summary is layered as ADF_TASK_SUMMARY env so future TOML
         // scripts can reference it without a code change.
-        let mut request = SpawnRequest::new(primary_provider, &def.task);
+        // Bug #2450 fix: pr-reviewer agent was receiving `def.task` ("review")
+        // instead of `task_string` (the full PR review description), causing
+        // the agent to exit with empty_success in 2s. The TOML `task` field
+        // is a label/placeholder for pr-reviewer; the actual work is built
+        // by build_review_task(req) into task_string.
+        let mut request = SpawnRequest::new(primary_provider, &task_string);
         if !routed_model.is_empty() {
             request = request.with_primary_model(&routed_model);
         }
