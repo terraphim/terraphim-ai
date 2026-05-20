@@ -664,7 +664,18 @@ impl AgentSpawner {
         let mut cmd = Command::new(&config.cli_command);
         cmd.current_dir(working_dir).args(&config.args);
 
-        if use_stdin {
+        // Respect per-CLI stdin capability. opencode hangs on stdin for large
+        // tasks, so it always receives the task as a positional argument even
+        // when the orchestrator requests stdin delivery.
+        let effective_stdin = use_stdin && config.supports_stdin;
+        if use_stdin && !config.supports_stdin {
+            tracing::info!(
+                agent = %config.agent_id,
+                cli = %config.cli_command,
+                "stdin requested but not supported by CLI tool; falling back to positional arg"
+            );
+        }
+        if effective_stdin {
             cmd.stdin(Stdio::piped());
         } else {
             cmd.arg(task);
@@ -753,7 +764,7 @@ impl AgentSpawner {
         }
 
         // Write task to stdin if using stdin delivery
-        if use_stdin {
+        if effective_stdin {
             if let Some(mut stdin) = child.stdin.take() {
                 use tokio::io::AsyncWriteExt;
                 stdin.write_all(task.as_bytes()).await.map_err(|e| {

@@ -1,13 +1,13 @@
 # Document Quality Evaluation Report
 
 ## Metadata
-- **Document**: `.docs/research-fix-test-compilation.md`
+- **Document**: `.docs/research-opencode-delivery.md`
 - **Type**: Phase 1 Research
-- **Evaluated**: 2026-02-02
+- **Evaluated**: 2026-05-20
 
 ## Decision: GO
 
-**Average Score**: 4.1 / 5.0
+**Average Score**: 4.3 / 5.0
 **Blocking Dimensions**: None
 
 ## Dimension Scores
@@ -15,8 +15,8 @@
 | Dimension | Score | Status |
 |-----------|-------|--------|
 | Syntactic | 4/5 | Pass |
-| Semantic | 4/5 | Pass |
-| Pragmatic | 4/5 | Pass |
+| Semantic | 5/5 | Pass |
+| Pragmatic | 5/5 | Pass |
 | Social | 4/5 | Pass |
 | Physical | 4/5 | Pass |
 | Empirical | 4/5 | Pass |
@@ -26,114 +26,77 @@
 ### Syntactic Quality (4/5)
 
 **Strengths:**
-- Clear term definitions in Section 1 (Problem Restatement)
-- Consistent structure across all 7 sections
-- Tables used effectively in Section 3 for system elements
-- No contradictions between sections
+- All sections follow the expected Phase 1 template structure
+- Terminology is consistent throughout ("stdin delivery", "positional arguments")
+- System elements table is well-structured with clear columns
 
 **Weaknesses:**
-- "SearchResultDoc" term is mentioned but not explicitly defined in research context (though this is the problem being researched)
+- Section 5 is labelled "Investigation Results" instead of "Risks, Unknowns, and Assumptions" (deviates from template)
 
 **Suggested Revisions:**
-- [ ] Add brief definition of SearchResultDoc in Section 1 to clarify it's the undefined type causing issues
+- [ ] Rename Section 5 to match template, or add the expected section as Section 5 and make investigation results Section 8
 
-### Semantic Quality (4/5)
+### Semantic Quality (5/5)
 
 **Strengths:**
-- Accurately identifies the compilation error problem
-- Correctly scopes IN/OUT boundaries
-- Domain concepts (tests, compilation, types) used correctly
-- Technical claims about dead code paths supported by evidence
+- Domain-accurate: correctly identifies `opencode run [message..]` positional syntax
+- Testing is rigorous: compared stdin vs positional with 97KB task (actual swarm size)
+- Root cause correctly identified: stdin delivery hangs for large tasks, positional args work
+- ARG_MAX verified empirically: 2MB on bigbox, tasks are ~63KB
 
 **Weaknesses:**
-- Could more explicitly state that CLI mode is intentionally disabled (vs. accidentally commented out)
+- None identified
 
-**Suggested Revisions:**
-- [ ] Clarify in Section 3 that CLI mode is intentionally disabled per code comments
-
-### Pragmatic Quality (4/5)
+### Pragmatic Quality (5/5)
 
 **Strengths:**
-- Clear next steps implied (fix compilation errors)
-- Questions for reviewer are specific and actionable
-- Simplification strategies in Section 6 are practical
-- Constraints have clear implications explained
+- Immediately actionable: clear finding that positional args should be used
+- Provides concrete test results with timings (stdin: hung 25s+, positional: exited 7s)
+- Risk table with specific mitigations
+- Enables Phase 2 design work
 
 **Weaknesses:**
-- Could be more explicit about the recommended approach in Questions section
-
-**Suggested Revisions:**
-- [ ] Add explicit recommendation option in Question 1 (comment out vs. define type)
+- None identified
 
 ### Social Quality (4/5)
 
 **Strengths:**
-- Assumptions are clearly marked
-- Language is clear and unambiguous
-- Different stakeholders would interpret consistently
-- Jargon ("KG ranking", "CLI mode") is used appropriately for technical audience
+- Test results are unambiguous and reproducible
+- Clear distinction between what works and what doesn't
+- Risks are explicit with mitigations
 
 **Weaknesses:**
-- Minor: "KG" abbreviation used without expansion on first use (though implied from context)
-
-**Suggested Revisions:**
-- [ ] Expand "KG" to "Knowledge Graph" on first use in Section 1
+- Could benefit from explicit statement of which CLI tools are affected (only opencode, or others?)
 
 ### Physical Quality (4/5)
 
 **Strengths:**
-- Well-structured with clear section headers
-- Table in Section 3 enhances readability
-- Consistent markdown formatting
-- Easy to navigate to specific sections
+- Well-structured with numbered sections
+- Tables used effectively for system elements and risks
+- Test results clearly separated and labelled
 
 **Weaknesses:**
-- Could benefit from a brief summary at the top
-- No diagram (though not necessary for this simple issue)
-
-**Suggested Revisions:**
-- [ ] Optional: Add 2-3 line executive summary at top
+- No diagrams (not critical for this document type)
+- Could use a summary table at the top for quick reference
 
 ### Empirical Quality (4/5)
 
 **Strengths:**
-- Easy to read without re-reading
-- Complex technical issues broken into digestible sections
 - Clear, concise writing
-- Manageable sentence structure
-- Information chunked effectively (7 sections, tables, lists)
+- Test results are easy to understand
+- Information chunked logically
 
 **Weaknesses:**
-- Section 5 (Risks) has dense information that could be better formatted
-
-**Suggested Revisions:**
-- [ ] Consider bullet formatting in Section 5 for better readability
+- Section 5 (Investigation Results) is long; could be broken into subsections for each test
 
 ## Revision Checklist
 
 Priority order based on impact:
 
-- [ ] **Low**: Add brief SearchResultDoc definition in Section 1
-- [ ] **Low**: Clarify CLI mode is intentionally disabled in Section 3
-- [ ] **Low**: Add explicit recommendation in Question 1
-- [ ] **Low**: Expand "KG" abbreviation on first use
-- [ ] **Low**: Optional executive summary at top
-- [ ] **Low**: Improve formatting in Section 5
-
-## Weighted Calculation
-
-Raw scores: 4, 4, 4, 4, 4, 4 = Average 4.0
-Phase 1 weights (Semantic 1.5x, Pragmatic 1.2x):
-- Syntactic: 4 * 1.0 = 4.0
-- Semantic: 4 * 1.5 = 6.0
-- Pragmatic: 4 * 1.2 = 4.8
-- Social: 4 * 1.0 = 4.0
-- Physical: 4 * 1.0 = 4.0
-- Empirical: 4 * 1.0 = 4.0
-- Weighted Total: 26.8 / 6.7 = 4.0
-
-**Verdict**: Document meets quality thresholds. Approved for Phase 2.
+- [ ] Medium: Add explicit statement that only opencode is affected, claude/codex unchanged
+- [ ] Low: Rename Section 5 to match Phase 1 template structure
+- [ ] Low: Break Test 1-4 into subsections for easier scanning
 
 ## Next Steps
 
-Document approved for Phase 2 (disciplined-design). Proceed with design phase to create implementation plan for fixing the SearchResultDoc compilation errors.
+Document approved for Phase 2. Proceed with `disciplined-design` skill.

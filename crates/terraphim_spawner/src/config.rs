@@ -39,6 +39,9 @@ pub struct AgentConfig {
     pub resource_limits: ResourceLimits,
     /// Whether to deliver the task prompt via stdin instead of CLI arg
     pub use_stdin: bool,
+    /// Whether the CLI tool supports reading the task from stdin.
+    /// When false, the task is always passed as a positional argument.
+    pub supports_stdin: bool,
 }
 
 impl AgentConfig {
@@ -58,6 +61,7 @@ impl AgentConfig {
                 required_api_keys: Self::infer_api_keys(cli_command),
                 resource_limits: ResourceLimits::default(),
                 use_stdin: false,
+                supports_stdin: Self::infer_supports_stdin(cli_command),
             }),
             ProviderType::Llm { .. } => Err(ValidationError::NotAnAgent(provider.id.clone())),
         }
@@ -88,6 +92,17 @@ impl AgentConfig {
             .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or(cli_command)
+    }
+
+    /// Whether the CLI tool supports stdin delivery.
+    ///
+    /// opencode hangs on stdin for large tasks (>~50KB), so it must
+    /// always receive the task as a positional argument.
+    fn infer_supports_stdin(cli_command: &str) -> bool {
+        match Self::cli_name(cli_command) {
+            "opencode" => false,
+            _ => true,
+        }
     }
 
     /// Infer CLI-specific arguments for non-interactive execution.
@@ -360,6 +375,65 @@ mod tests {
         );
         assert_eq!(AgentConfig::cli_name("claude"), "claude");
         assert_eq!(AgentConfig::cli_name("/usr/bin/codex"), "codex");
+    }
+
+    #[test]
+    fn test_infer_supports_stdin() {
+        // opencode does NOT support stdin (hangs on large tasks)
+        assert!(!AgentConfig::infer_supports_stdin("opencode"));
+        assert!(!AgentConfig::infer_supports_stdin(
+            "/home/alex/.bun/bin/opencode"
+        ));
+
+        // claude and codex DO support stdin
+        assert!(AgentConfig::infer_supports_stdin("claude"));
+        assert!(AgentConfig::infer_supports_stdin("claude-code"));
+        assert!(AgentConfig::infer_supports_stdin("/usr/local/bin/claude"));
+        assert!(AgentConfig::infer_supports_stdin("codex"));
+
+        // Unknown tools default to true (stdin is the safe assumption)
+        assert!(AgentConfig::infer_supports_stdin("unknown-tool"));
+    }
+
+    #[test]
+    fn test_from_provider_sets_supports_stdin() {
+        let provider = terraphim_types::capability::Provider {
+            id: "test-opencode".into(),
+            name: "test-opencode".into(),
+            provider_type: terraphim_types::capability::ProviderType::Agent {
+                agent_id: "test".into(),
+                cli_command: "opencode".into(),
+                working_dir: std::env::current_dir().unwrap(),
+            },
+            capabilities: vec![],
+            cost_level: terraphim_types::capability::CostLevel::Cheap,
+            latency: terraphim_types::capability::Latency::Medium,
+            keywords: vec![],
+        };
+        let config = AgentConfig::from_provider(&provider).unwrap();
+        assert!(
+            !config.supports_stdin,
+            "opencode config should have supports_stdin=false"
+        );
+
+        let provider_claude = terraphim_types::capability::Provider {
+            id: "test-claude".into(),
+            name: "test-claude".into(),
+            provider_type: terraphim_types::capability::ProviderType::Agent {
+                agent_id: "test".into(),
+                cli_command: "claude".into(),
+                working_dir: std::env::current_dir().unwrap(),
+            },
+            capabilities: vec![],
+            cost_level: terraphim_types::capability::CostLevel::Cheap,
+            latency: terraphim_types::capability::Latency::Medium,
+            keywords: vec![],
+        };
+        let config_claude = AgentConfig::from_provider(&provider_claude).unwrap();
+        assert!(
+            config_claude.supports_stdin,
+            "claude config should have supports_stdin=true"
+        );
     }
 
     #[test]
