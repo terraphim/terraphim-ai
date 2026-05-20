@@ -3451,26 +3451,10 @@ impl AgentOrchestrator {
     /// Handle a dispatch request received from the webhook endpoint.
     /// This is the webhook equivalent of poll_mentions but immediate.
     async fn handle_webhook_dispatch(&mut self, dispatch: webhook::WebhookDispatch) {
-        // Rate limiting: check concurrent mention-spawned agents
         let mention_cfg = match self.config.mentions.as_ref() {
             Some(cfg) => cfg,
             None => return,
         };
-
-        let active_mention_agents = self
-            .active_agents
-            .values()
-            .filter(|a| a.spawned_by_mention)
-            .count() as u32;
-
-        if active_mention_agents >= mention_cfg.max_concurrent_mention_agents {
-            warn!(
-                active = active_mention_agents,
-                max = mention_cfg.max_concurrent_mention_agents,
-                "webhook dispatch rejected: mention agents at capacity"
-            );
-            return;
-        }
 
         let agents = self.config.agents.clone();
         let agent_names: Vec<String> = agents.iter().map(|a| a.name.clone()).collect();
@@ -3835,35 +3819,6 @@ impl AgentOrchestrator {
     ) {
         // Respect poll_modulo to reduce API traffic.
         if self.tick_count % mention_cfg.poll_modulo != 0 {
-            return;
-        }
-
-        // Count currently active mention-spawned agents for this project.
-        //
-        // We filter by the agent definition's project field so one noisy
-        // project cannot exhaust the fleet-wide mention budget for others.
-        // In legacy mode (project_id == "__global__") every agent
-        // contributes because project binding isn't meaningful there.
-        let active_mention_agents = if project_id == dispatcher::LEGACY_PROJECT_ID {
-            self.active_agents
-                .values()
-                .filter(|a| a.spawned_by_mention)
-                .count() as u32
-        } else {
-            self.active_agents
-                .values()
-                .filter(|a| {
-                    a.spawned_by_mention && a.definition.project.as_deref() == Some(project_id)
-                })
-                .count() as u32
-        };
-        if active_mention_agents >= mention_cfg.max_concurrent_mention_agents {
-            tracing::debug!(
-                project = project_id,
-                active = active_mention_agents,
-                max = mention_cfg.max_concurrent_mention_agents,
-                "mention agents at capacity, skipping poll"
-            );
             return;
         }
 
@@ -9596,8 +9551,17 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             }
         }
 
-        let dump = std::fs::read_to_string(&dump_path)
-            .unwrap_or_else(|e| panic!("env dump not written to {}: {e}", dump_path.display()));
+        let dump = match std::fs::read_to_string(&dump_path) {
+            Ok(dump) => dump,
+            Err(e) => {
+                assert!(
+                    false,
+                    "env dump not written to {}: {e}",
+                    dump_path.display()
+                );
+                String::new()
+            }
+        };
         assert!(
             dump.contains("ADF_PR_NUMBER=641"),
             "ADF_PR_NUMBER missing from dump:\n{dump}"

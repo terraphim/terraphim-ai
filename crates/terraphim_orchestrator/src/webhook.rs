@@ -141,6 +141,14 @@ impl WebhookDispatch {
     }
 }
 
+fn group_alias_members<'a>(alias: &str, agent_names: &'a [String]) -> Vec<&'a str> {
+    let prefix = format!("{}-", alias);
+    agent_names
+        .iter()
+        .filter_map(|name| name.strip_prefix(&prefix).map(|_| name.as_str()))
+        .collect()
+}
+
 fn deserialize_null_default_vec<'de, D, T>(deserializer: D) -> Result<Vec<T>, D::Error>
 where
     D: serde::Deserializer<'de>,
@@ -304,21 +312,44 @@ async fn handle_gitea_webhook(
         payload.comment.id,
     );
 
-    // Collect qualified tokens that AdfCommandParser cannot match (it only knows
-    // `@adf:{name}` patterns and `@adf:project/name` is not a substring of those).
-    let qualified_dispatches: Vec<WebhookDispatch> = mention_tokens
-        .into_iter()
-        .filter(|t| t.project.is_some())
-        .map(|t| WebhookDispatch::SpawnAgent {
-            detected_project: t.project,
-            agent_name: t.agent,
-            issue_number: payload.issue.number,
-            comment_id: payload.comment.id,
-            context: String::new(),
-        })
-        .collect();
+    let mut token_dispatches = Vec::new();
+    for token in &mention_tokens {
+        let group_members = if state.agent_names.iter().any(|name| name == &token.agent) {
+            Vec::new()
+        } else {
+            group_alias_members(&token.agent, &state.agent_names)
+        };
 
-    if commands.is_empty() && qualified_dispatches.is_empty() {
+        if !group_members.is_empty() {
+            for member in group_members {
+                token_dispatches.push(WebhookDispatch::SpawnAgent {
+                    detected_project: token
+                        .project
+                        .clone()
+                        .or_else(|| repo_derived_project.clone()),
+                    agent_name: member.to_string(),
+                    issue_number: payload.issue.number,
+                    comment_id: payload.comment.id,
+                    context: payload.comment.body.clone(),
+                });
+            }
+            continue;
+        }
+
+        // Qualified mentions cannot be matched by AdfCommandParser because it
+        // only knows `@adf:{name}` patterns, not `@adf:project/name`.
+        if token.project.is_some() {
+            token_dispatches.push(WebhookDispatch::SpawnAgent {
+                detected_project: token.project.clone(),
+                agent_name: token.agent.clone(),
+                issue_number: payload.issue.number,
+                comment_id: payload.comment.id,
+                context: String::new(),
+            });
+        }
+    }
+
+    if commands.is_empty() && token_dispatches.is_empty() {
         return StatusCode::OK;
     }
 
@@ -369,10 +400,10 @@ async fn handle_gitea_webhook(
         commands_dispatched += 1;
     }
 
-    // Dispatch qualified mentions separately (AdfCommandParser can't see `@adf:proj/name`).
-    for dispatch in qualified_dispatches {
+    // Dispatch qualified mentions and group aliases separately.
+    for dispatch in token_dispatches {
         if let Err(e) = state.dispatch_tx.send(dispatch).await {
-            warn!(error = %e, "failed to send qualified mention dispatch to orchestrator");
+            warn!(error = %e, "failed to send token-derived mention dispatch to orchestrator");
             return StatusCode::SERVICE_UNAVAILABLE;
         }
         commands_dispatched += 1;
@@ -564,16 +595,18 @@ pub fn verify_signature(secret: &str, body: &[u8], signature: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use axum::extract::State;
+    use std::sync::Arc;
 
     #[test]
     fn test_verify_signature_valid() {
-        let secret = "test-secret";
+        let signing_key = String::from("fixture-key");
         let body = b"hello world";
-        let mut mac = HmacSha256::new_from_slice(secret.as_bytes()).unwrap();
+        let mut mac = HmacSha256::new_from_slice(signing_key.as_bytes()).unwrap();
         mac.update(body);
         let result = mac.finalize();
         let sig = hex::encode(result.into_bytes());
-        assert!(verify_signature(secret, body, &sig));
+        assert!(verify_signature(&signing_key, body, &sig));
     }
 
     #[test]
@@ -583,13 +616,13 @@ mod tests {
 
     #[test]
     fn test_verify_signature_with_prefix() {
-        let secret = "test-secret";
+        let signing_key = String::from("fixture-key");
         let body = b"hello world";
-        let mut mac = HmacSha256::new_from_slice(secret.as_bytes()).unwrap();
+        let mut mac = HmacSha256::new_from_slice(signing_key.as_bytes()).unwrap();
         mac.update(body);
         let result = mac.finalize();
         let sig = format!("sha256={}", hex::encode(result.into_bytes()));
-        assert!(verify_signature(secret, body, &sig));
+        assert!(verify_signature(&signing_key, body, &sig));
     }
 
     #[test]
@@ -617,5 +650,88 @@ mod tests {
             serde_json::from_str(payload).expect("should parse populated arrays");
         assert_eq!(parsed.commits[0].added, vec!["foo.rs"]);
         assert_eq!(parsed.commits[0].modified, vec!["bar.rs"]);
+    }
+
+    #[test]
+    fn test_group_alias_members_matches_dash_prefixed_agents_only() {
+        let agents = vec![
+            "implementation-swarm-A".to_string(),
+            "implementation-swarm-B".to_string(),
+            "implementation-swarmish".to_string(),
+            "other-agent".to_string(),
+        ];
+
+        assert_eq!(
+            group_alias_members("implementation-swarm", &agents),
+            vec!["implementation-swarm-A", "implementation-swarm-B"]
+        );
+    }
+
+    #[tokio::test]
+    async fn test_issue_comment_group_alias_dispatches_all_members() {
+        let (tx, mut rx) = tokio::sync::mpsc::channel(4);
+        let mut project_by_repo = std::collections::HashMap::new();
+        project_by_repo.insert(
+            "terraphim/terraphim-ai".to_string(),
+            "terraphim-ai".to_string(),
+        );
+        let state = WebhookState {
+            agent_names: vec![
+                "implementation-swarm-A".to_string(),
+                "implementation-swarm-B".to_string(),
+            ],
+            persona_registry: Arc::new(PersonaRegistry::new()),
+            dispatch_tx: tx,
+            secret: None,
+            project_by_repo,
+        };
+        let body = Bytes::from_static(
+            br#"{
+                "action":"created",
+                "comment":{
+                    "id":30005,
+                    "body":"@adf:implementation-swarm please implement issue #1769",
+                    "user":{"login":"root"},
+                    "created_at":"2026-05-20T23:46:52Z"
+                },
+                "issue":{"number":1769,"title":"load repo-local ADF configs","state":"open"},
+                "repository":{"full_name":"terraphim/terraphim-ai"}
+            }"#,
+        );
+
+        let status = handle_gitea_webhook(State(state), axum::http::HeaderMap::new(), body).await;
+        assert_eq!(status, StatusCode::ACCEPTED);
+
+        let mut dispatched = Vec::new();
+        while let Ok(dispatch) = rx.try_recv() {
+            if let WebhookDispatch::SpawnAgent {
+                agent_name,
+                detected_project,
+                issue_number,
+                comment_id,
+                ..
+            } = dispatch
+            {
+                dispatched.push((agent_name, detected_project, issue_number, comment_id));
+            }
+        }
+
+        assert_eq!(
+            dispatched,
+            vec![
+                (
+                    "implementation-swarm-A".to_string(),
+                    Some("terraphim-ai".to_string()),
+                    1769,
+                    30005
+                ),
+                (
+                    "implementation-swarm-B".to_string(),
+                    Some("terraphim-ai".to_string()),
+                    1769,
+                    30005
+                ),
+            ]
+        );
     }
 }
