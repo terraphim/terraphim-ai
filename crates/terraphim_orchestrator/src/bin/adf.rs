@@ -226,11 +226,7 @@ fn run_local_check(cwd: PathBuf) -> ExitCode {
         }
     };
 
-    let working_dir = adf_config
-        .discovered_path
-        .parent()
-        .map(|p| p.to_path_buf())
-        .unwrap_or_else(|| cwd.clone());
+    let working_dir = adf_config.project_root().to_path_buf();
 
     let nightwatch = terraphim_orchestrator::config::NightwatchConfig::default();
     let compound_review = terraphim_orchestrator::config::CompoundReviewConfig {
@@ -345,11 +341,7 @@ async fn run_local_agent(agent_name: &str, cwd: PathBuf) -> ExitCode {
         }
     };
 
-    let working_dir = adf_config
-        .discovered_path
-        .parent()
-        .map(|p| p.to_path_buf())
-        .unwrap_or_else(|| cwd);
+    let working_dir = adf_config.project_root().to_path_buf();
 
     let nightwatch = terraphim_orchestrator::config::NightwatchConfig::default();
     let compound_review = terraphim_orchestrator::config::CompoundReviewConfig {

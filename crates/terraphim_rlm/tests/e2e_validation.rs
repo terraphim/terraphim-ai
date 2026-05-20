@@ -10,6 +10,8 @@
 //! - Ollama running with at least one model
 //! - gh CLI authenticated for private repo access
 
+#![cfg(feature = "firecracker")]
+
 use terraphim_rlm::{
     config::{BackendType, RlmConfig},
     executor::{Capability, ExecutionEnvironment},

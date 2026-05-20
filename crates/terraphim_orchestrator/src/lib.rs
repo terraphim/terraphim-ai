@@ -1581,14 +1581,28 @@ impl AgentOrchestrator {
         out
     }
 
-    /// Load skill chain content from skill definition files for the given agent definition.
+    /// Load skill chain content from skill definition files for legacy/global agents.
     ///
     /// Reads each skill named in `def.skill_chain` from `{skill_data_dir}/{name}/SKILL.md`.
     /// If that path is missing, it falls back to `skill.md` and well-known HOME skill roots
     /// (`~/.opencode/skills`, then `~/.claude/skills`). Returns a formatted string with all
     /// skill contents, or empty string if no skills can be loaded.
+    ///
+    /// Project-scoped agents keep `skill_chain` as orchestration metadata only. Their
+    /// CLI tools load project skills natively from the working directory, avoiding
+    /// duplicate prompt injection and oversized task payloads.
     fn load_skill_chain_content(&self, def: &AgentDefinition) -> String {
         if def.skill_chain.is_empty() {
+            return String::new();
+        }
+
+        if def.project.is_some() {
+            info!(
+                agent = %def.name,
+                project = ?def.project,
+                skills = def.skill_chain.len(),
+                "skipping skill_chain prompt injection for project-scoped agent"
+            );
             return String::new();
         }
 
@@ -8332,6 +8346,25 @@ task = "test"
         let loaded = orch.load_skill_chain_content(&def);
         assert!(loaded.contains("### Skill: business-scenario-design"));
         assert!(loaded.contains("Lowercase skill content"));
+    }
+
+    #[test]
+    fn test_load_skill_chain_content_skips_project_scoped_agents() {
+        let skill_root = TempDir::new().unwrap();
+        let skill_dir = skill_root.path().join("disciplined-implementation");
+        std::fs::create_dir_all(&skill_dir).unwrap();
+        std::fs::write(skill_dir.join("SKILL.md"), "Project skill content").unwrap();
+
+        let mut config = test_config();
+        config.skill_data_dir = Some(skill_root.path().to_path_buf());
+        let orch = AgentOrchestrator::new(config).unwrap();
+
+        let mut def = orch.config.agents[0].clone();
+        def.project = Some("terraphim-ai".to_string());
+        def.skill_chain = vec!["disciplined-implementation".to_string()];
+
+        let loaded = orch.load_skill_chain_content(&def);
+        assert!(loaded.is_empty());
     }
 
     #[test]

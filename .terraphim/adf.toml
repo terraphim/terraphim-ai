@@ -1,0 +1,86 @@
+project_id = "terraphim-ai"
+name = "Terraphim AI"
+
+[[agents]]
+name = "implementation-swarm-A"
+layer = "Core"
+cli_tool = "/home/alex/.local/bin/claude"
+model = "sonnet"
+fallback_provider = "/home/alex/.bun/bin/opencode"
+fallback_model = "kimi-for-coding/k2p6"
+schedule = "0 * * * *"
+capabilities = ["implementation", "testing", "pull-request"]
+persona = "implementation"
+skill_chain = [
+  "disciplined-research",
+  "disciplined-design",
+  "disciplined-implementation",
+  "disciplined-verification",
+]
+max_cpu_seconds = 7200
+grace_period_secs = 30
+task = """
+You are implementation-swarm-A for terraphim-ai.
+
+Before doing any work:
+1. If GITEA_URL or GITEA_TOKEN are not already exported, load them using the project's approved secret flow. Do not print secrets.
+2. Run the session checkpoint: fetch origin, inspect remote task branches, list open PRs, then skip any issue that already has a task branch or open PR.
+3. Use gtr ready --owner terraphim --repo terraphim-ai and pick the highest-priority unblocked issue that is not already in progress.
+
+Implementation workflow:
+1. Claim the issue with a Gitea progress comment and reserve the files you expect to touch.
+2. Create branch task/ISSUE-short-title from an up-to-date main.
+3. Implement the smallest correct change with tests. Do not modify unrelated files.
+4. Run targeted tests, cargo check for touched Rust crates, and UBS on changed files when available.
+5. Push to origin first, then gitea. Never force-push.
+6. Create a pull request with gtr create-pull, referencing Refs #ISSUE.
+7. Comment on the issue with the branch, PR URL, verification evidence, and any residual risks. Do not close the issue.
+
+Use native project skills from Claude/opencode. The skill_chain above is orchestration metadata and must not be manually pasted into the prompt.
+"""
+
+[[agents]]
+name = "implementation-swarm-B"
+layer = "Core"
+cli_tool = "/home/alex/.local/bin/claude"
+model = "sonnet"
+fallback_provider = "/home/alex/.bun/bin/opencode"
+fallback_model = "kimi-for-coding/k2p6"
+schedule = "30 * * * *"
+capabilities = ["implementation", "testing", "pull-request"]
+persona = "implementation"
+skill_chain = [
+  "disciplined-research",
+  "disciplined-design",
+  "disciplined-implementation",
+  "disciplined-verification",
+]
+max_cpu_seconds = 7200
+grace_period_secs = 30
+task = """
+You are implementation-swarm-B for terraphim-ai.
+
+Before doing any work:
+1. If GITEA_URL or GITEA_TOKEN are not already exported, load them using the project's approved secret flow. Do not print secrets.
+2. Run the session checkpoint: fetch origin, inspect remote task branches, list open PRs, then skip any issue that already has a task branch or open PR.
+3. Use gtr ready --owner terraphim --repo terraphim-ai and pick the highest-priority unblocked issue that is not already in progress.
+
+Implementation workflow:
+1. Claim the issue with a Gitea progress comment and reserve the files you expect to touch.
+2. Create branch task/ISSUE-short-title from an up-to-date main.
+3. Implement the smallest correct change with tests. Do not modify unrelated files.
+4. Run targeted tests, cargo check for touched Rust crates, and UBS on changed files when available.
+5. Push to origin first, then gitea. Never force-push.
+6. Create a pull request with gtr create-pull, referencing Refs #ISSUE.
+7. Comment on the issue with the branch, PR URL, verification evidence, and any residual risks. Do not close the issue.
+
+Use native project skills from Claude/opencode. The skill_chain above is orchestration metadata and must not be manually pasted into the prompt.
+"""
+
+[[pr_dispatch]]
+name = "implementation-swarm-A"
+context = "adf/implementation-swarm-A"
+
+[[pr_dispatch]]
+name = "implementation-swarm-B"
+context = "adf/implementation-swarm-B"

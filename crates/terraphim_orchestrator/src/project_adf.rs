@@ -161,6 +161,13 @@ impl TomlProjectAdfConfig {
 }
 
 impl ProjectAdfConfig {
+    pub fn project_root(&self) -> &Path {
+        self.discovered_path
+            .parent()
+            .and_then(Path::parent)
+            .unwrap_or(&self.discovered_path)
+    }
+
     fn discover_terraphim_dir(start_dir: &Path) -> Option<PathBuf> {
         let mut current = Some(start_dir.to_path_buf());
 
@@ -208,11 +215,7 @@ impl TryFrom<&ProjectAdfConfig> for (Project, Vec<AgentDefinition>) {
     fn try_from(cfg: &ProjectAdfConfig) -> Result<Self, Self::Error> {
         let project = Project {
             id: cfg.project_id.clone(),
-            working_dir: cfg
-                .discovered_path
-                .parent()
-                .unwrap_or(&cfg.discovered_path)
-                .to_path_buf(),
+            working_dir: cfg.project_root().to_path_buf(),
             schedule_offset_minutes: 0,
             gitea: None,
             mentions: None,
@@ -397,6 +400,7 @@ model = "kimi-for-coding/k2p6"
 
         let (project, agents) = (&adf).try_into().expect("conversion must succeed");
         assert_eq!(project.id, "conv-test");
+        assert_eq!(project.working_dir, project_dir);
         assert_eq!(agents.len(), 1);
         assert_eq!(agents[0].name, "core-agent");
         assert_eq!(agents[0].layer, AgentLayer::Core);
