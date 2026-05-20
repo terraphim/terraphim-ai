@@ -55,6 +55,7 @@ CRATES=(
   "terraphim_hooks"
   "terraphim-session-analyzer"
   "haystack_core"
+  "haystack_jmap"
   "grepapp_haystack"
   "terraphim_middleware"
   "terraphim_update"
