@@ -803,7 +803,9 @@ impl AgentSpawner {
             .write(true)
             .open(&path)
             .map_err(|e| std::io::Error::other(format!("open {}: {}", path, e)))?;
-        write!(f, "{}", score).map_err(|e| std::io::Error::other(format!("write {}: {}", path, e)))
+        let buf = format!("{}\n", score);
+        f.write_all(buf.as_bytes())
+            .map_err(|e| std::io::Error::other(format!("write {}: {}", path, e)))
     }
 }
 
