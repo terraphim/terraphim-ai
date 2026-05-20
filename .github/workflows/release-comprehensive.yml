@@ -905,7 +905,7 @@ jobs:
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
         run: |
-          TOKEN=$(op read "op://Terraphim/TerraphimCrates.ioToken/password")
+          TOKEN=$(op read "op://TerraphimPlatform/crates.io.token/token")
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
 
       - name: Publish crates in dependency order
