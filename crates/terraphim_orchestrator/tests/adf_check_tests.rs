@@ -228,3 +228,122 @@ name = "t"
         "stderr: {stderr}"
     );
 }
+
+#[test]
+fn adf_local_agent_spawns_echo_agent() {
+    let tmp = tempfile::tempdir_in("/tmp").unwrap();
+    let project_dir = tmp.path().join("agent-test");
+    std::fs::create_dir_all(project_dir.join(".terraphim")).unwrap();
+    std::fs::write(
+        project_dir.join(".terraphim/adf.toml"),
+        r#"
+project_id = "agent-test"
+name = "Agent Test"
+
+[[agents]]
+name = "echo-agent"
+layer = "Safety"
+cli_tool = "echo"
+task = "hello world"
+"#,
+    )
+    .unwrap();
+
+    let out = Command::new(adf_bin())
+        .args(["--local", "--agent", "echo-agent"])
+        .current_dir(&project_dir)
+        .output()
+        .expect("run adf --local --agent echo-agent");
+
+    assert!(out.status.success(), "expected success, got {:?}", out);
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stdout.contains("hello world"),
+        "stdout should contain task output, got: {stdout}"
+    );
+}
+
+#[test]
+fn adf_local_agent_not_found() {
+    let tmp = tempfile::tempdir_in("/tmp").unwrap();
+    let project_dir = tmp.path().join("agent-not-found");
+    std::fs::create_dir_all(project_dir.join(".terraphim")).unwrap();
+    std::fs::write(
+        project_dir.join(".terraphim/adf.toml"),
+        r#"
+project_id = "agent-not-found"
+name = "Agent Not Found"
+
+[[agents]]
+name = "actual-agent"
+layer = "Safety"
+cli_tool = "echo"
+task = "hello"
+"#,
+    )
+    .unwrap();
+
+    let out = Command::new(adf_bin())
+        .args(["--local", "--agent", "nonexistent-agent"])
+        .current_dir(&project_dir)
+        .output()
+        .expect("run adf --local --agent nonexistent-agent");
+
+    assert!(!out.status.success());
+    assert_eq!(out.status.code(), Some(1));
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("agent not found") && stderr.contains("nonexistent-agent"),
+        "stderr should mention agent not found, got: {stderr}"
+    );
+}
+
+#[test]
+fn adf_local_agent_no_terraphim_dir() {
+    let tmp = tempfile::tempdir_in("/tmp").unwrap();
+    let project_dir = tmp.path().join("no-terraphim");
+    std::fs::create_dir_all(project_dir.join("src")).unwrap();
+
+    let out = Command::new(adf_bin())
+        .args(["--local", "--agent", "some-agent"])
+        .current_dir(&project_dir)
+        .output()
+        .expect("run adf --local --agent");
+
+    assert!(!out.status.success());
+    assert_eq!(out.status.code(), Some(1));
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("no .terraphim/adf.toml found"),
+        "stderr: {stderr}"
+    );
+}
+
+#[test]
+fn adf_local_agent_requires_agent_name() {
+    let tmp = tempfile::tempdir_in("/tmp").unwrap();
+    let project_dir = tmp.path().join("local-test");
+    std::fs::create_dir_all(project_dir.join(".terraphim")).unwrap();
+    std::fs::write(
+        project_dir.join(".terraphim/adf.toml"),
+        r#"
+project_id = "t"
+name = "t"
+"#,
+    )
+    .unwrap();
+
+    let out = Command::new(adf_bin())
+        .args(["--local", "--agent"])
+        .current_dir(&project_dir)
+        .output()
+        .expect("run adf --local --agent without name");
+
+    assert!(!out.status.success());
+    assert_eq!(out.status.code(), Some(2));
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("--local --agent requires an agent name"),
+        "stderr: {stderr}"
+    );
+}
