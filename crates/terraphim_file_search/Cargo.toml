@@ -4,6 +4,7 @@ version.workspace = true
 edition.workspace = true
 authors = ["Terraphim Contributors"]
 description = "Knowledge-graph scored file search integration for Terraphim AI"
+publish = false
 documentation = "https://terraphim.ai"
 homepage = "https://terraphim.ai"
 repository = "https://github.com/terraphim/terraphim-ai"

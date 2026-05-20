@@ -4,6 +4,7 @@ version = "1.0.0"
 edition = "2021"
 description = "Multi-agent system for Terraphim built on roles with rust-genai integration"
 license = "MIT"
+publish = false
 
 [features]
 default = ["test-utils"]

@@ -59,10 +59,8 @@ CRATES=(
   "grepapp_haystack"
   "terraphim_middleware"
   "terraphim_update"
-  "terraphim_service"
   "terraphim_tracker"
   "terraphim_orchestrator"
-  "terraphim_agent"
 )
 
 # Map package names to directory names (for crates where they differ)
