@@ -1301,7 +1301,7 @@ pub fn warn_if_world_readable(path: &std::path::Path) {
 /// Variables that are not set in the environment are replaced with an empty string,
 /// making secrets optional at parse time (the application can validate afterwards).
 /// Only `${UPPER_CASE}` syntax is supported; `$VAR` and `$(cmd)` are left as-is.
-fn expand_env_vars(s: &str) -> String {
+pub(crate) fn expand_env_vars(s: &str) -> String {
     use std::sync::OnceLock;
     static RE: OnceLock<regex::Regex> = OnceLock::new();
     let re = RE.get_or_init(|| {

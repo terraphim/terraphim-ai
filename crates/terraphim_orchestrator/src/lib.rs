@@ -59,6 +59,7 @@ pub mod pr_dispatch;
 pub mod pr_gate;
 pub mod pr_poller;
 pub mod pr_review;
+pub mod project_adf;
 pub mod project_control;
 pub mod provider_budget;
 pub mod provider_probe;
@@ -108,6 +109,7 @@ pub use nightwatch::{
 };
 pub use output_poster::OutputPoster;
 pub use persona::{MetapromptRenderError, MetapromptRenderer, PersonaRegistry};
+pub use project_adf::ProjectAdfConfig;
 #[cfg(feature = "quickwit")]
 pub use quickwit_bulk::QuickwitEsBulkSink;
 pub use rate_limiter::{is_rate_limit_backoff_enabled, RateLimiter};
