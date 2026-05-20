@@ -717,6 +717,41 @@ impl AgentSpawner {
 
         let mut child = cmd.spawn()?;
 
+        #[cfg(unix)]
+        {
+            if let Some(pid) = child.id() {
+                let oom_score = std::fs::read_to_string(format!("/proc/{}/oom_score", pid))
+                    .unwrap_or_else(|_| "unknown".to_string());
+                let oom_adj = std::fs::read_to_string(format!("/proc/{}/oom_score_adj", pid))
+                    .unwrap_or_else(|_| "unknown".to_string());
+                tracing::info!(
+                    pid,
+                    oom_score = oom_score.trim(),
+                    oom_score_adj = oom_adj.trim(),
+                    "spawned process oom diagnostics (before adjustment)"
+                );
+
+                if let Err(e) = Self::set_oom_score_adj(pid, -1000) {
+                    tracing::warn!(
+                        pid,
+                        error = %e,
+                        "failed to set oom_score_adj=-1000 for agent process"
+                    );
+                } else {
+                    let new_adj = std::fs::read_to_string(format!("/proc/{}/oom_score_adj", pid))
+                        .unwrap_or_else(|_| "unknown".to_string());
+                    let new_score = std::fs::read_to_string(format!("/proc/{}/oom_score", pid))
+                        .unwrap_or_else(|_| "unknown".to_string());
+                    tracing::info!(
+                        pid,
+                        oom_score = new_score.trim(),
+                        oom_score_adj = new_adj.trim(),
+                        "spawned process oom diagnostics (after adjustment)"
+                    );
+                }
+            }
+        }
+
         // Write task to stdin if using stdin delivery
         if use_stdin {
             if let Some(mut stdin) = child.stdin.take() {
@@ -757,6 +792,18 @@ impl AgentSpawner {
         }
 
         Ok(())
+    }
+
+    /// Set oom_score_adj for a given PID.
+    #[cfg(unix)]
+    fn set_oom_score_adj(pid: u32, score: i32) -> Result<(), std::io::Error> {
+        use std::io::Write;
+        let path = format!("/proc/{}/oom_score_adj", pid);
+        let mut f = std::fs::OpenOptions::new()
+            .write(true)
+            .open(&path)
+            .map_err(|e| std::io::Error::other(format!("open {}: {}", path, e)))?;
+        write!(f, "{}", score).map_err(|e| std::io::Error::other(format!("write {}: {}", path, e)))
     }
 }
 
