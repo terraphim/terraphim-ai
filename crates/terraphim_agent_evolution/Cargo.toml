@@ -2,6 +2,7 @@
 name = "terraphim_agent_evolution"
 version = "1.19.2"
 edition.workspace = true
+description = "Agent evolution system for Terraphim AI"
 license = "MIT"
 
 [dependencies]
