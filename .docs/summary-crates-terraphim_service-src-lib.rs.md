@@ -1,52 +1,65 @@
 # Summary: terraphim_service/src/lib.rs
 
-**Purpose:** Main service layer integrating knowledge graph, thesaurus, and relevance-scoring pipeline for document search, indexing, and AI-assisted summarisation.
+## Purpose
 
-**Key Components:**
-- **`TerraphimService`**: Main service facade coordinating config, graphs, and storage
-- **`auto_route`**: Automatic role selection and context routing
-- **`llm`**: Generic LLM layer for multiple providers (OpenRouter, Ollama)
-- **`summarization_*`**: Async document summarisation queue system
-- **`proxy_client`**: LLM proxy service for unified provider management
-- **`http_client`**: Centralized HTTP client creation and configuration
+Main service layer for Terraphim AI providing document search, indexing, and AI-assisted summarisation across multiple haystack backends. Integrates knowledge graph, thesaurus, and relevance-scoring pipeline.
 
-**Core Methods:**
+## Core Methods
+
+### TerraphimService
+- `new(config_state)`: Create service with ConfigState
 - `ensure_thesaurus_loaded()`: Load/build thesaurus with cache invalidation
-- `preprocess_document_content()`: KG term linking with `terraphim_it` mode
-- `preprocess_document_content_with_search()`: KG linking + search term highlighting
-- `create_document()`: Persist and index new documents
+- `preprocess_document_content()`: KG term linking (terraphim_it mode)
+- `create_document()`: Persist, index, and update haystack files
 - `get_document_by_id()`: Retrieve with normalized ID fallback
 
-**KG Preprocessing (`terraphim_it`):**
-- Replaces KG terms in document body with `[term](kg:concept)` links
-- Filters terms: excludes generic technical terms, prioritises important KG concepts
-- Max 8 KG terms per document to avoid over-linking
-- Supports Markdown link format intercepted by frontend
+## Document Pipeline
 
-**Document Processing Pipeline:**
-1. Load/persist document via fastest operator
+1. Persist document via fastest operator
 2. Index into all role graphs
-3. Write back to on-disk Markdown files for writable ripgrep haystacks
+3. Write back to Markdown files (ripgrep haystacks)
 4. Apply KG preprocessing if enabled
 
-**LLM Integration:**
-- OpenRouter support (feature-gated)
-- Ollama support for local inference
-- Async summarisation with queue system
-- Chat completion with context management
+## KG Preprocessing (terraphim_it)
 
-**Auto-Route Context:**
-- `AutoRouteContext`: Role selection based on conversation context
-- `JMAP_MISSING_TOKEN_PENALTY`: Penalty score for missing JMAP credentials
-- `auto_select_role()`: Intelligent role selection algorithm
+- Replaces KG terms with `[term](kg:concept)` links
+- Filters generic technical terms (40+ excluded terms)
+- Prioritizes important KG terms (graph, haystack, service, terraphim, etc.)
+- Max 8 terms per document
+- Supports Markdown link format for frontend interception
 
-**Error Handling:**
-- `ServiceError` enum with category classification
-- `is_recoverable()`: Distinguishes retryable vs fatal errors
-- Integrates middleware, OpenDAL, persistence, config errors
+## Key Modules
 
-**Haystack Indexing:**
-- RipgrepIndexer for local filesystem
-- Supports recursive directory traversal
-- Atomic Server integration for structured data
-- MCP client for Model Context Protocol servers
+- **auto_route**: `AutoRouteContext`, `auto_select_role`, `AutoRouteReason`, `AutoRouteResult`
+- **llm**: Generic LLM layer for multiple providers
+- **llm_proxy**: Unified provider management
+- **http_client**: Centralized HTTP client creation
+- **logging**: Standardized logging utilities
+- **conversation_service**: Chat conversation management
+- **summarization_queue/manager/worker**: Async summarisation pipeline
+- **rate_limiter**: Service rate limiting
+- **context**: LLM conversation context management
+- **error**: Centralized error handling with `ServiceError` enum
+
+## Error Handling
+
+```rust
+pub enum ServiceError {
+    Middleware(terraphim_middleware::Error),
+    OpenDal(Box<opendal::Error>),
+    Persistence(terraphim_persistence::Error),
+    Config(String),
+    #[cfg(feature = "openrouter")]
+    OpenRouter(crate::openrouter::OpenRouterError),
+    Common(crate::error::CommonError),
+}
+```
+
+Implements `TerraphimError` trait with `category()` and `is_recoverable()`.
+
+## Cache Invalidation
+
+Thesaurus cache stale detection via `compute_kg_source_hash()`:
+- Compares cached source hash vs current KG source
+- Automatically rebuilds when hash changes
+- Handles optional files gracefully (DEBUG level for file-not-found)

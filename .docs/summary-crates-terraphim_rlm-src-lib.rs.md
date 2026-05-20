@@ -1,8 +1,11 @@
 # Summary: terraphim_rlm/src/lib.rs
 
-**Purpose:** Recursive Language Model (RLM) orchestration with isolated Firecracker VM execution, sub-500ms allocation, and knowledge graph validation.
+## Purpose
 
-**Architecture:**
+Recursive Language Model (RLM) orchestration crate providing isolated code execution in Firecracker VMs with sub-500ms allocation, recursive LLM invocation from within VMs via HTTP bridge, and knowledge graph validation of commands.
+
+## Architecture
+
 ```
 TerraphimRlm (public API)
     ├── SessionManager (VM affinity, context, snapshots, extensions)
@@ -16,34 +19,28 @@ ExecutionEnvironment trait
     └── E2bExecutor (cloud option)
 ```
 
-**Core Modules:**
-- `config`: BackendType, KgStrictness, RlmConfig, SessionModel
-- `executor`: Execution environment abstraction
-- `budget`: BudgetTracker for token/time limits
-- `session`: Session management with VM affinity
-- `llm_bridge`: LLM invocation from within VMs
-- `parser`: Command parsing
-- `query_loop`: Query execution loop
-- `rlm`: Main RLM orchestration
-- `logger`: Trajectory logging
+## Key Modules
 
-**Key Types:**
-- `RlmConfig`: Configuration with timeout, model, strictness settings
-- `RlmError`: Error types
-- `ExecutionResult`: Command/code execution result
-- `SnapshotId`: VM snapshot identifier
-- `ValidationResult`: KG validation result
-- `QueryRequest`, `QueryResponse`: LLM bridge types
-- `TrajectoryEvent`: Logging event
+- **config**: `RlmConfig`, `BackendType`, `KgStrictness`, `SessionModel`
+- **executor**: `ExecutionEnvironment` trait, `LocalExecutor`, `FirecrackerExecutor`, `DockerExecutor`, `SshExecutor`
+- **session**: `SessionManager`, `SessionStats`
+- **budget**: `BudgetTracker` - dual budget system (tokens + time)
+- **llm_bridge**: `LlmBridge`, `LlmBridgeConfig`, `QueryRequest`, `QueryResponse`
+- **parser**: `CommandParser` - command parsing for query loop
+- **query_loop**: `QueryLoop`, `QueryLoopConfig`, `QueryLoopResult`, `TerminationReason`
+- **rlm**: `TerraphimRlm`, `SessionStatus`, `LlmQueryResult`
+- **validator**: `KnowledgeGraphValidator` (kg-validation feature)
+- **mcp_tools**: MCP tools integration (mcp feature)
 
-**Features:**
-- Firecracker microVM isolation with sub-500ms boot
-- Dual budget system (tokens + time)
-- VM snapshots and resume
-- SSH executor for remote execution
-- Knowledge graph command validation
-- Trajectory logging for audit
+## Constants
 
-**Cargo Features:**
-- `kg-validation`: Enable KG validation
-- `mcp`: MCP tools support
+- `DEFAULT_TOKEN_BUDGET`: 100K tokens
+- `DEFAULT_TIME_BUDGET_MS`: 5 minutes
+- `DEFAULT_MAX_RECURSION_DEPTH`: 10
+- `VM_ALLOCATION_TIMEOUT_MS`: 500ms
+- `TARGET_BOOT_TIME_MS`: 2 seconds
+- `DEFAULT_DNS_ALLOWLIST`: pypi.org, github.com, raw.githubusercontent.com
+
+## Version
+
+1.19.2 (workspace version)

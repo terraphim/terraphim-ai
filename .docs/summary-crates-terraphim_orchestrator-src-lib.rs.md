@@ -1,9 +1,12 @@
 # Summary: terraphim_orchestrator/src/lib.rs
 
-**Purpose:** Multi-agent orchestration with scheduling, budgeting, and compound review for the "dark factory" pattern.
+## Purpose
 
-**Core Components:**
-- **AgentOrchestrator**: Main orchestrator running dark factory pattern
+Multi-agent orchestration with scheduling, budgeting, and compound review. Implements the "dark factory" pattern for managing fleets of AI agents with resource scheduling, cost tracking, and coordinated review workflows.
+
+## Core Components
+
+- **AgentOrchestrator**: Main orchestrator running the dark factory pattern
 - **DualModeOrchestrator**: Real-time and batch processing with fairness scheduling
 - **CompoundReviewWorkflow**: Multi-agent review swarm with persona-based specialization
 - **Scheduler**: Time-based and event-driven task scheduling
@@ -12,38 +15,57 @@
 - **NightwatchMonitor**: Drift detection and rate limiting
 - **MetaCoordinator**: Cross-project issue-driven agent dispatch with PageRank prioritisation
 
-**Key Modules:**
-- `adf_commands`: ADF-specific command handling
-- `compound`: Compound review workflow with swarm config
-- `control_plane`: Routing and fleet management
-- `cost_tracker`: Metrics, verdicts, budget tracking
-- `dispatcher`: Task dispatch with stats
-- `evolution`: Agent evolution with memory snapshots
-- `handoff`: Inter-agent state transfer
-- `kg_router`: Knowledge graph-based routing
-- `pr_dispatch`, `pr_gate`, `pr_review`: PR lifecycle management
-- `provider_probe`: LLM provider health monitoring
+## Key Features
 
-**Key Exports:**
-- `AgentRunRecord`, `ExitClass`, `ExitClassification`
-- `CompoundReviewResult`, `SwarmConfig`
-- `DualModeOrchestrator`
-- `CostTracker`, `AgentMetrics`, `BudgetVerdict`
-- `Dispatcher`, `DispatchTask`
-- `HandoffBuffer`, `HandoffContext`
-- `MentionTracker`, `MentionChainTracker`
-- `OrchestratorConfig`, `AgentDefinition`, `AgentLayer`
+### Agent Management
+- Safety-layer agents spawned immediately on startup
+- Layer-based agent classification (Safety, Meta, Review, Implementation)
+- Worktree management with automatic cleanup on agent crash
+- Concurrency control with per-project agent limits
+- Agent restart tracking with budget windowing
 
-**Configuration:**
-- OrchestratorConfig for main settings
-- AgentDefinition with evolution, model, capabilities
-- CompoundReviewConfig for review workflows
-- NightwatchConfig for rate limiting
-- WebhookConfig for output posting
+### Knowledge Graph Integration
+- KG router loaded from taxonomy markdown files
+- KG-boosted exit classification for structured error categorisation
+- Provider health tracking with circuit breakers
+- Stderr error signature classification per provider
 
-**Features:**
-- PageRank-based issue prioritisation
-- Token budget tracking with time limits
-- Agent learning capture and evolution
-- Multi-provider LLM routing (kimi, opencode-go, minimax, claude, etc.)
-- Quickwit integration for log search
+### Routing & Budgeting
+- Provider budget tracking (hour/day spend)
+- Model routing via KG action templates
+- Rate limiter with backoff support
+- Telemetry store for model performance tracking
+
+### Dark Factory Pattern
+- Unified priority queue for all dispatch sources (time, issue, mention, review-pr, auto-merge, post-merge-gate)
+- Per-PR rate limiting for verdict polling
+- Auto-merge deduplication
+- TTL-based failure dedupe cache
+
+### Learning & Evolution
+- Shared learning store integration
+- Evolution manager for agent snapshots
+- Session handoff with context transfer
+
+## Key Modules
+
+- `dispatcher`: Unified `Dispatcher` for multi-source task dispatch
+- `scheduler`: `TimeScheduler` for cron-based agent firing
+- `nightwatch`: `NightwatchMonitor` for drift detection
+- `cost_tracker`: `CostTracker` for budget enforcement
+- `compound`: `CompoundReviewWorkflow` for multi-agent review
+- `handoff`: `HandoffBuffer`, `HandoffLedger` for inter-agent communication
+- `kg_router`: KG-driven model router
+- `evolution`: Agent evolution manager
+- `learning`: Shared learning store
+- `pr_gate`, `pr_poller`, `pr_dispatch`: PR workflow automation
+- `worktree_guard`: Automatic worktree cleanup
+- `provider_probe`: Provider health monitoring
+
+## Configuration
+
+Uses TOML config with agents defined as `[[agents]]` with:
+- `name`, `layer`, `model`, `budget_monthly_cents`
+- `schedule` (cron expression)
+- `run_policy`, `restart_threshold`
+- Project-scoped agents with `project` field
