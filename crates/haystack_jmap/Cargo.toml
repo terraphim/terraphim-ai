@@ -2,6 +2,7 @@
 name = "haystack_jmap"
 version = "1.19.2"
 edition.workspace = true
+description = "JMAP haystack provider for Terraphim AI"
 license = "MIT"
 
 [dependencies]
