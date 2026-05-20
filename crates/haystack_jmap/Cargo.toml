@@ -5,8 +5,8 @@ edition.workspace = true
 license = "MIT"
 
 [dependencies]
-haystack_core = { path = "../haystack_core" }
-terraphim_types = { path = "../terraphim_types" }
+haystack_core = { path = "../haystack_core", version.workspace = true }
+terraphim_types = { path = "../terraphim_types", version = "1.0.0" }
 reqwest = { workspace = true, features = ["json", "rustls-tls"] }
 
 tokio = { workspace = true, features = ["full"] }
