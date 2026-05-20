@@ -1,58 +1,62 @@
 # Summary: terraphim_types/src/lib.rs
 
-**Purpose:** Core type definitions shared across all Terraphim crates.
+## Purpose
 
-**Key Types:**
+Core type definitions for the Terraphim AI system. Provides fundamental data structures for knowledge graphs, documents, search, conversations, LLM routing, multi-agent coordination, and dynamic ontology.
 
-| Type | Purpose |
-|------|---------|
-| `Thesaurus` | Mapping from NormalizedTermValue to NormalizedTerm |
-| `NormalizedTerm` | Term with ID, value, display_value, URL, rank |
-| `NormalizedTermValue` | Canonical term value (display text) |
-| `Document` | Indexed document with body, title, tags, description |
-| `IndexedDocument` | Search result with matched edges and ranking |
-| `Node` | Graph node with connected edges and rank |
-| `Edge` | Graph edge with document references |
-| `RoleName` | Role identifier wrapper |
-| `SearchQuery` | Search request with terms, operators, pagination |
-| `RelevanceFunction` | Ranking algorithm enum |
-| `LogicalOperator` | AND/OR operators for multi-term queries |
-| `Layer` | Search result layer/category |
-| `DocumentType` | Document classification (KgEntry, etc.) |
+## Key Types
 
-**Thesaurus:**
-- Implements `IntoIterator` for iteration over terms
-- Stores terms as HashMap<NormalizedTermValue, NormalizedTerm>
-- Supports JSON serialization via serde
+### Knowledge Graph
+- `Thesaurus`: Dictionary with synonyms mapping to concepts
+- `Concept`: Higher-level normalized term with ID
+- `Node`: Concept with connections (connected_with HashSet)
+- `Edge`: Directed relationship with doc_hash
+- `NormalizedTerm`: ID + value + display_value + url + action + priority + trigger + pinned
+- `NormalizedTermValue`: Case-insensitive string wrapper
 
-**SearchQuery:**
-- `search_term`: Primary search term
-- `search_terms`: Alternative multi-term format
-- `operator`: LogicalOperator (AND/OR)
-- `limit`/`skip`: Pagination
-- `include_pinned`: Include pinned entries
-- `layer`: Result filtering layer
+### Document Management
+- `Document`: id, url, title, body, description, summarization, tags, rank, doc_type, route, priority, quality_score
+- `IndexedDocument`: id, matched_edges, rank, tags, nodes, quality_score
+- `Index`: HashMap<String, Document> wrapper
+- `DocumentType`: KgEntry, Document, ConfigDocument
 
-**RelevanceFunction:**
-- `TitleScorer`: Simple title matching
-- `TerraphimGraph`: Knowledge graph-based scoring
+### Search Operations
+- `SearchQuery`: search_term, search_terms, operator, skip, limit, role, layer, include_pinned, min_quality
+- `LogicalOperator`: And, Or
+- `Layer`: One (title+tags), Two (+summary), Three (full content)
+- `RelevanceFunction`: TerraphimGraph, TitleScorer, BM25, BM25F, BM25Plus
 
-**Document Structure:**
-```rust
-pub struct Document {
-    pub id: String,
-    pub url: String,
-    pub title: String,
-    pub body: String,
-    pub description: Option<String>,
-    pub summarization: Option<String>,
-    pub stub: Option<bool>,
-    pub tags: Option<Vec<String>>,
-    pub rank: Option<u64>,
-    pub source_haystack: Option<String>,
-    pub doc_type: DocumentType,
-    pub synonyms: Option<String>,
-    pub route: Option<String>,
-    pub priority: Option<i32>,
-}
-```
+### Conversation Context
+- `ConversationId`, `MessageId`: Unique identifiers
+- `ContextType`: System, UserInput, Document, SearchResult, External, KGTermDefinition, KGIndex
+- `ContextItem`: id, context_type, title, summary, content, metadata, created_at, relevance_score
+
+### LLM & Routing
+- `RouteDirective`: provider, model, action template, is_free
+- `MarkdownDirectives`: doc_type, synonyms, route, routes, priority, trigger, pinned, heading
+- `RoutingDecision`, `Priority`
+
+### Multi-Agent
+- `MultiAgentContext`, `AgentInfo`
+
+### Quality & Review
+- `QualityScore`: knowledge, logic, structure, last_evaluated
+- `ReviewFinding`: FindingCategory, FindingSeverity
+
+### Personas
+- `PersonaDefinition`, `CharacteristicDef`, `SfiaSkillDef`
+
+### LLM Usage
+- `LlmUsage`, `LlmResult`, `ModelPricing`
+
+### Other
+- `RoleName`: Case-insensitive role identification
+- `KnowledgeGraphInputType`: Markdown, Json
+- `QualityScore`: K/L/S composite scoring
+
+## Feature Flags
+
+- `typescript`: TypeScript type generation via tsify
+- `medical`: SNOMED CT/UMLS extraction
+- `hgnc`: HGNC gene normalization
+- `kg-integration`: Shared learning types

@@ -1,61 +1,52 @@
 # Summary: terraphim_config/src/lib.rs
 
-**Purpose:** Configuration management for Terraphim AI with role-based settings and knowledge graph orchestration.
+## Purpose
 
-**Loading Priority:**
-1. Explicit path via `TERRAPHIM_CONFIG` environment variable
-2. Saved config retrieved from persistence layer
-3. Hard-coded defaults in `terraphim_server/default/`
+Role-based configuration management with knowledge graph orchestration. Provides `Config`, `Role`, `Haystack`, and `KnowledgeGraph` types with support for multiple service backends and LLM integration.
 
-**Project-Level Config Discovery:**
-- Searches parent directories for `.terraphim/` directory starting from current working directory
-- Enables project-specific roles, global shortcuts, and configuration overrides
-- Merged with global config via `Config::with_project()` and `Config::merge_with()`
-- Roles merged by `RoleName`: project role fully replaces global role (no deep merge)
-- `global_shortcut` field is optional in project configs
+## Key Types
 
-**Key Types:**
-- **`Config`**: Top-level configuration holding all roles, global shortcut, default/selected role
-- **`Role`**: User profile with haystacks, relevance function, theme, LLM settings
-- **`Haystack`**: Data source descriptor (path, service type, extra parameters)
-- **`ServiceType`**: Enum of supported haystack backends
-- **`KnowledgeGraph`**: Automata path and/or local KG files for indexing
+### Config
+- `ConfigId`: Server, Desktop, or Embedded deployment mode
+- `Config`: Top-level config with roles, global shortcut, default/selected role
+- `Role`: User profile with haystacks, relevance function, theme, LLM settings
+- `Haystack`: Data source descriptor with service type
+- `KnowledgeGraph`: Automata path and/or local KG files
 
-**Supported Service Types:**
-- `Ripgrep`: Local filesystem search
-- `Atomic`: Atomic Server integration
-- `QueryRs`: query.rs API
-- `ClickUp`: ClickUp API
-- `Mcp`: Model Context Protocol client
-- `Perplexity`: AI-powered web search
-- `GrepApp`: GitHub code search
-- `AiAssistant`: AI coding assistant session logs
-- `Quickwit`: Log/observability search
-- `Jmap`: Email search (RFC 8620/8621)
+### Role Configuration
+- `shortname`, `name`, `relevance_function`, `theme`
+- `kg`: Optional knowledge graph (automata_path + knowledge_graph_local)
+- `haystacks`: Vec of data sources
+- LLM settings: `llm_enabled`, `llm_api_key`, `llm_model`, `llm_auto_summarize`, `llm_chat_enabled`
+- `llm_router_enabled`: Intelligent LLM routing
 
-**LLM Configuration:**
-- `llm_enabled`: Enable AI-powered article summaries
-- `llm_api_key`, `llm_model`: Provider credentials
-- `llm_auto_summarize`: Automatic summarization of search results
-- `llm_chat_enabled`: Chat interface backed by LLM
-- `llm_router_enabled`: Intelligent LLM routing with 6-phase architecture
+### ServiceType (enum)
+- Ripgrep, Atomic, QueryRs, ClickUp, Mcp, Perplexity, GrepApp, AiAssistant, Quickwit, Jmap
 
-**ConfigState:**
-- Wraps Config with Arc<Mutex<Config>> for thread-safe access
-- Maintains AHashMap<RoleName, RoleGraphSync> for per-role knowledge graphs
-- Provides async methods: `new()`, `get_default_role()`, `get_role()`, `search_indexed_documents()`
+### Path Expansion
+- `expand_path()`: Supports `~`, `$HOME`, `${VAR:-default}` syntax
+- Project-level config discovery in `.terraphim/config.json`
 
-**Path Expansion:**
-- Supports `${HOME}`, `$HOME`, `${VAR:-default}` syntax
-- Expands `~` at start of paths
-- Uses dirs crate with fallback strategies
+### ConfigState
+- Holds Terraphim Config and RoleGraphs
+- Creates RoleGraph for each role using TerraphimGraph relevance function
+- Extracts triggers/pinned directives from KG markdown files
 
-**RoleGraph Integration:**
-- Extracts triggers and pinned directives from KG markdown files
-- Builds RoleGraph from automata path or local KG files
-- Fallback chain: automata_path -> local KG -> empty thesaurus
+### ConfigBuilder
+- `build_default_embedded()`: WASM/library mode with Default, Terraphim Engineer, Rust Engineer roles
+- `build_default_server()`: Server mode with Default, Engineer, System Operator roles
+- `build_default_desktop()`: Desktop mode with Default, Terraphim Engineer, Rust Engineer roles
+- `add_role()`, `default_role()`, `merge_with()` for configuration composition
 
-**Persistence:**
+### Persistence
 - Implements `Persistable` trait for async save/load
-- Saves to all profiles via fire-and-forget tokio::spawn
-- Schema evolution detection with cache invalidation
+- Uses fastest operator for storage
+- Schema evolution detection
+
+## Key Features
+
+1. **Role-based search**: Different relevance functions per role
+2. **Multi-haystack**: Multiple data sources per role
+3. **LLM integration**: Chat, summarization, intelligent routing
+4. **KG preprocessing**: Trigger extraction, pinned entries, source hashing
+5. **Project overrides**: Per-project config in `.terraphim/config.json`
