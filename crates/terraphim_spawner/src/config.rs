@@ -99,10 +99,7 @@ impl AgentConfig {
     /// opencode hangs on stdin for large tasks (>~50KB), so it must
     /// always receive the task as a positional argument.
     fn infer_supports_stdin(cli_command: &str) -> bool {
-        match Self::cli_name(cli_command) {
-            "opencode" => false,
-            _ => true,
-        }
+        !matches!(Self::cli_name(cli_command), "opencode")
     }
 
     /// Infer CLI-specific arguments for non-interactive execution.
