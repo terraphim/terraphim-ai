@@ -9779,17 +9779,12 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             }
         }
 
-        let dump = match std::fs::read_to_string(&dump_path) {
-            Ok(dump) => dump,
-            Err(e) => {
-                assert!(
-                    false,
-                    "env dump not written to {}: {e}",
-                    dump_path.display()
-                );
-                String::new()
-            }
-        };
+        assert!(
+            dump_path.exists(),
+            "env dump not written to {}",
+            dump_path.display()
+        );
+        let dump = std::fs::read_to_string(&dump_path).expect("env dump should be readable");
         assert!(
             dump.contains("ADF_PR_NUMBER=641"),
             "ADF_PR_NUMBER missing from dump:\n{dump}"
