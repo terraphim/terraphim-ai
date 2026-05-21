@@ -2171,7 +2171,7 @@ impl AgentOrchestrator {
 
         let (worktree_path, worktree_guard) = if needs_isolation {
             let path = self.create_agent_worktree(&def.name, repo_dir).await?;
-            let guard = crate::worktree_guard::WorktreeGuard::new(&path);
+            let guard = crate::worktree_guard::WorktreeGuard::for_managed(repo_dir, &path);
             (Some(path), Some(guard))
         } else {
             (None, None)
@@ -6205,12 +6205,59 @@ impl AgentOrchestrator {
         }
 
         for name in timed_out {
-            if let Some(managed) = self.active_agents.remove(&name) {
+            if let Some(mut managed) = self.active_agents.remove(&name) {
                 let def = managed.definition.clone();
+                let elapsed_secs = managed.started_at.elapsed().as_secs();
+                let max_wall_secs = def.max_cpu_seconds.unwrap_or_default();
+                let mut output_lines: Vec<String> = managed
+                    .handle
+                    .captured_output_events()
+                    .into_iter()
+                    .filter_map(|event| match event {
+                        OutputEvent::Stdout { line, .. } => Some(line),
+                        OutputEvent::Stderr { line, .. } => Some(format!("[stderr] {line}")),
+                        _ => None,
+                    })
+                    .collect();
+                output_lines.push(format!(
+                    "[timeout] agent exceeded wall-clock timeout after {elapsed_secs}s (limit {max_wall_secs}s)"
+                ));
 
-                // Kill the process
-                if let Err(e) = managed.handle.kill().await {
-                    error!(agent = %name, error = %e, "failed to kill timed-out agent");
+                let grace = Duration::from_secs(managed.definition.grace_period_secs.unwrap_or(5));
+                if let Err(e) = managed.handle.shutdown(grace).await {
+                    error!(agent = %name, error = %e, "failed to terminate timed-out agent");
+                }
+
+                if let (Some(poster), Some(issue)) = (&self.output_poster, def.gitea_issue) {
+                    let project = def
+                        .project
+                        .clone()
+                        .unwrap_or_else(|| crate::dispatcher::LEGACY_PROJECT_ID.to_string());
+                    if let Err(e) = poster
+                        .post_agent_output_for_project(&project, &name, issue, &output_lines, None)
+                        .await
+                    {
+                        warn!(
+                            agent = %name,
+                            project = %project,
+                            issue = issue,
+                            error = %e,
+                            "failed to post timed-out agent output to Gitea"
+                        );
+                    }
+                }
+
+                let project_repo: &Path = def
+                    .project
+                    .as_deref()
+                    .and_then(|pid| self.config.project_by_id(pid))
+                    .map(|p| p.working_dir.as_path())
+                    .unwrap_or(&self.config.working_dir);
+                if let Some(guard) = managed.worktree_guard.take() {
+                    guard.keep();
+                }
+                if let Some(ref wt) = managed.worktree_path {
+                    self.remove_agent_worktree(&name, wt, project_repo).await;
                 }
 
                 // Try respawn with fallback if configured
