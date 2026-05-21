@@ -132,6 +132,29 @@ use terraphim_spawner::{AgentHandle, AgentSpawner, ResourceLimits, SpawnContext,
 use tokio::sync::broadcast;
 use tracing::{debug, error, info, warn};
 
+fn format_runtime_duration(seconds: u64) -> String {
+    let hours = seconds / 3600;
+    let minutes = (seconds % 3600) / 60;
+    let secs = seconds % 60;
+
+    match (hours, minutes, secs) {
+        (0, 0, secs) => format!("{secs}s"),
+        (0, minutes, 0) => format!("{minutes}m"),
+        (0, minutes, secs) => format!("{minutes}m {secs}s"),
+        (hours, 0, 0) => format!("{hours}h"),
+        (hours, minutes, 0) => format!("{hours}h {minutes}m"),
+        (hours, minutes, secs) => format!("{hours}h {minutes}m {secs}s"),
+    }
+}
+
+fn timeout_summary(elapsed_secs: u64, limit_secs: u64) -> String {
+    format!(
+        "[timeout] agent exceeded configured runtime limit after {} (limit {}; elapsed {elapsed_secs}s, limit {limit_secs}s). The `max_cpu_seconds` setting is also enforced by ADF as a wall-clock runtime limit.",
+        format_runtime_duration(elapsed_secs),
+        format_runtime_duration(limit_secs)
+    )
+}
+
 /// Result of evaluating a pre-check strategy before spawning an agent.
 #[derive(Debug, Clone)]
 pub enum PreCheckResult {
@@ -6193,11 +6216,14 @@ impl AgentOrchestrator {
             if let Some(max_secs) = managed.definition.max_cpu_seconds {
                 let elapsed = managed.started_at.elapsed();
                 if elapsed > Duration::from_secs(max_secs) {
+                    let elapsed_secs = elapsed.as_secs();
                     warn!(
                         agent = %name,
-                        elapsed_secs = elapsed.as_secs(),
-                        max_wall_secs = max_secs,
-                        "agent exceeded wall-clock timeout, killing for fallback respawn"
+                        elapsed_secs = elapsed_secs,
+                        runtime_limit_secs = max_secs,
+                        elapsed = %format_runtime_duration(elapsed_secs),
+                        runtime_limit = %format_runtime_duration(max_secs),
+                        "agent exceeded configured runtime limit, terminating for fallback respawn"
                     );
                     timed_out.push(name.clone());
                 }
@@ -6208,7 +6234,7 @@ impl AgentOrchestrator {
             if let Some(mut managed) = self.active_agents.remove(&name) {
                 let def = managed.definition.clone();
                 let elapsed_secs = managed.started_at.elapsed().as_secs();
-                let max_wall_secs = def.max_cpu_seconds.unwrap_or_default();
+                let runtime_limit_secs = def.max_cpu_seconds.unwrap_or_default();
                 let mut output_lines: Vec<String> = managed
                     .handle
                     .captured_output_events()
@@ -6219,9 +6245,7 @@ impl AgentOrchestrator {
                         _ => None,
                     })
                     .collect();
-                output_lines.push(format!(
-                    "[timeout] agent exceeded wall-clock timeout after {elapsed_secs}s (limit {max_wall_secs}s)"
-                ));
+                output_lines.push(timeout_summary(elapsed_secs, runtime_limit_secs));
 
                 let grace = Duration::from_secs(managed.definition.grace_period_secs.unwrap_or(5));
                 if let Err(e) = managed.handle.shutdown(grace).await {
@@ -6308,11 +6332,14 @@ impl AgentOrchestrator {
                     if let Some(max_secs) = managed.definition.max_cpu_seconds {
                         let elapsed = managed.started_at.elapsed();
                         if elapsed > Duration::from_secs(max_secs) {
+                            let elapsed_secs = elapsed.as_secs();
                             warn!(
                                 agent = %name,
-                                elapsed_secs = elapsed.as_secs(),
-                                max_secs = max_secs,
-                                "agent exceeded wall-clock timeout, killing"
+                                elapsed_secs = elapsed_secs,
+                                runtime_limit_secs = max_secs,
+                                elapsed = %format_runtime_duration(elapsed_secs),
+                                runtime_limit = %format_runtime_duration(max_secs),
+                                "agent exceeded configured runtime limit, terminating"
                             );
                             timed_out.push(name.clone());
                         }
@@ -8053,6 +8080,25 @@ mod tests {
             crate::dispatcher::LEGACY_PROJECT_ID.to_string(),
             name.to_string(),
         )
+    }
+
+    #[test]
+    fn formats_runtime_duration_for_timeout_messages() {
+        assert_eq!(format_runtime_duration(59), "59s");
+        assert_eq!(format_runtime_duration(60), "1m");
+        assert_eq!(format_runtime_duration(1889), "31m 29s");
+        assert_eq!(format_runtime_duration(7200), "2h");
+        assert_eq!(format_runtime_duration(7384), "2h 3m 4s");
+    }
+
+    #[test]
+    fn timeout_summary_explains_elapsed_and_limit() {
+        let summary = timeout_summary(1889, 1800);
+
+        assert!(summary.contains("31m 29s"));
+        assert!(summary.contains("30m"));
+        assert!(summary.contains("elapsed 1889s, limit 1800s"));
+        assert!(summary.contains("wall-clock runtime limit"));
     }
 
     fn test_config() -> OrchestratorConfig {
