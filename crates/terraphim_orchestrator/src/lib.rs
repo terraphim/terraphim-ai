@@ -1325,7 +1325,8 @@ impl AgentOrchestrator {
             });
         }
 
-        let reconcile_timeout = Duration::from_secs(self.config.tick_interval_secs.max(30) * 3);
+        let event_recv_timeout = Duration::from_secs(self.config.tick_interval_secs.max(30) * 3);
+        let reconcile_timeout = Duration::from_secs(250);
 
         loop {
             if self.shutdown_requested {
@@ -1333,7 +1334,7 @@ impl AgentOrchestrator {
                 break;
             }
 
-            match loop_rx.recv_timeout(reconcile_timeout) {
+            match loop_rx.recv_timeout(event_recv_timeout) {
                 Ok(LoopEvent::Webhook(dispatch)) => {
                     let comment_id = dispatch.comment_id();
                     self.handle_webhook_dispatch(dispatch).await;

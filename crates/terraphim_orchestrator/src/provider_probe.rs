@@ -146,7 +146,7 @@ impl ProviderHealthMap {
         }
 
         let mut results = Vec::new();
-        for (provider, model, task) in tasks {
+        for (_, _, task) in tasks {
             match task.await {
                 Ok(result) => results.push(result),
                 Err(e) => warn!(error = %e, "probe task panicked"),
@@ -664,7 +664,7 @@ impl ProviderHealthMap {
         sink: &crate::quickwit::QuickwitFleetSink,
         project_id: &str,
     ) {
-        for (i, result) in self.results.iter().enumerate() {
+        for result in &self.results {
             let doc = crate::quickwit::LogDocument {
                 timestamp: result.timestamp.clone(),
                 project_id: project_id.to_string(),
