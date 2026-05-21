@@ -57,4 +57,13 @@ ignore = [
     # - semver-incompatible with 0.103.x fix; blocked on serenity 0.13+
     # - Resolution: Remove once serenity 0.13+ releases with rustls 0.23+ support
     "RUSTSEC-2026-0104",
+    # RUSTSEC-2026-0002: lru 0.12.5 IterMut violates Stacked Borrows
+    # - Package: lru 0.12.5 via tantivy 0.22.1
+    # - Dependency chain: tantivy 0.22.1 -> terraphim_sessions (feature: tantivy-index, optional)
+    # - tantivy 0.22.x pins lru ^0.12 internally; cannot override without a major tantivy upgrade
+    # - terraphim uses tantivy for read-only full-text session search; the unsound IterMut
+    #   path is never exercised by our search-only usage (no mutation during iteration)
+    # - The tantivy-index feature is optional and not enabled in the default build
+    # - Resolution: Remove once tantivy updates to lru >= 0.12.6 or we upgrade to tantivy 0.23+
+    "RUSTSEC-2026-0002",
 ]

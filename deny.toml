@@ -44,6 +44,11 @@ ignore = [
     # rand unsound with custom logger + thread_rng - currently transitive via proptest/dev tooling.
     # TODO: remove once the rand 0.9.3+ upgrade lands across the dependency graph.
     "RUSTSEC-2026-0097",
+    # lru 0.12.5 IterMut violates Stacked Borrows - transitive via tantivy 0.22.1 (optional feature
+    # tantivy-index in terraphim_sessions). tantivy 0.22.x pins lru 0.12.5 internally; the unsound
+    # IterMut path is never invoked by terraphim's read-only session search usage.
+    # TODO: Remove once tantivy updates to lru >= 0.12.6 or we upgrade to tantivy 0.23+.
+    "RUSTSEC-2026-0002",
 ]
 
 [licenses]
