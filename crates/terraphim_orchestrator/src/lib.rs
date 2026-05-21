@@ -5630,140 +5630,198 @@ impl AgentOrchestrator {
     /// Periodic reconciliation: detect exits, check cron, evaluate drift, drain output.
     async fn reconcile_tick(&mut self) {
         let tick_start = Instant::now();
+        eprintln!(
+            "[ADF-TIMING] reconcile_tick starting at {}",
+            chrono::Utc::now()
+        );
+        info!("reconcile_tick starting");
 
-        self.provider_rate_limits.clean_expired();
-        self.retry_counts
-            .retain(|_, (_, ts)| ts.elapsed() < Duration::from_secs(3600));
+        macro_rules! timed_step {
+            ($name:expr, $body:expr) => {{
+                eprintln!("[ADF-TIMING] step={} start", $name);
+                info!(step = $name, "reconcile step start");
+                let step_start = Instant::now();
+                let result = $body;
+                let elapsed = step_start.elapsed();
+                eprintln!(
+                    "[ADF-TIMING] step={} elapsed_ms={}",
+                    $name,
+                    elapsed.as_millis()
+                );
+                if elapsed > std::time::Duration::from_secs(5) {
+                    warn!(
+                        step = $name,
+                        elapsed_ms = elapsed.as_millis() as u64,
+                        "slow reconcile step"
+                    );
+                } else {
+                    info!(
+                        step = $name,
+                        elapsed_ms = elapsed.as_millis() as u64,
+                        "reconcile step complete"
+                    );
+                }
+                result
+            }};
+        }
+
+        timed_step!("clean_expired", {
+            self.provider_rate_limits.clean_expired();
+            self.retry_counts
+                .retain(|_, (_, ts)| ts.elapsed() < Duration::from_secs(3600));
+        });
 
         // Check wall-clock timeouts and respawn with fallback
-        self.poll_wall_timeouts().await;
+        timed_step!("poll_wall_timeouts", self.poll_wall_timeouts().await);
 
         // 1. Poll all active agents for exit and handle exits per layer
-        self.poll_agent_exits().await;
+        timed_step!("poll_agent_exits", self.poll_agent_exits().await);
 
         // 2. Restart pending Safety agents (cooldown-aware)
-        self.restart_pending_safety_agents().await;
+        timed_step!(
+            "restart_pending_safety",
+            self.restart_pending_safety_agents().await
+        );
 
         // 3. Check cron schedules for Core agents
-        self.check_cron_schedules().await;
+        timed_step!("check_cron_schedules", self.check_cron_schedules().await);
 
         // 4. Drain output events to nightwatch and collect telemetry
-        let telemetry_events = self.drain_output_events();
+        let telemetry_events = timed_step!("drain_output_events", self.drain_output_events());
         if !telemetry_events.is_empty() {
-            self.record_telemetry(telemetry_events).await;
+            timed_step!(
+                "record_telemetry",
+                self.record_telemetry(telemetry_events).await
+            );
         }
 
         // 5. Evaluate nightwatch drift (only during active hours)
-        let nw_cfg = &self.config.nightwatch;
-        let current_hour = chrono::Local::now().hour() as u8;
-        let in_window = if nw_cfg.active_start_hour <= nw_cfg.active_end_hour {
-            current_hour >= nw_cfg.active_start_hour && current_hour < nw_cfg.active_end_hour
-        } else {
-            // Wraps past midnight, e.g. start=22 end=6
-            current_hour >= nw_cfg.active_start_hour || current_hour < nw_cfg.active_end_hour
-        };
-        if in_window {
-            self.nightwatch.evaluate();
-        }
+        timed_step!("nightwatch_evaluate", {
+            let nw_cfg = &self.config.nightwatch;
+            let current_hour = chrono::Local::now().hour() as u8;
+            let in_window = if nw_cfg.active_start_hour <= nw_cfg.active_end_hour {
+                current_hour >= nw_cfg.active_start_hour && current_hour < nw_cfg.active_end_hour
+            } else {
+                // Wraps past midnight, e.g. start=22 end=6
+                current_hour >= nw_cfg.active_start_hour || current_hour < nw_cfg.active_end_hour
+            };
+            if in_window {
+                self.nightwatch.evaluate();
+            }
+        });
 
         // 6. Sweep expired handoff buffer entries
-        let swept = self.handoff_buffer.sweep_expired();
-        if swept > 0 {
-            info!(swept_count = swept, "swept expired handoff buffer entries");
-        }
+        timed_step!("sweep_handoff", {
+            let swept = self.handoff_buffer.sweep_expired();
+            if swept > 0 {
+                info!(swept_count = swept, "swept expired handoff buffer entries");
+            }
+        });
 
         // 7. Check monthly budget reset
-        self.cost_tracker.monthly_reset_if_due();
+        timed_step!("budget_reset", self.cost_tracker.monthly_reset_if_due());
 
         // 8. Enforce budget limits (pause exhausted agents)
-        self.enforce_budgets().await;
+        timed_step!("enforce_budgets", self.enforce_budgets().await);
 
         // 9. Poll active flows (non-blocking)
-        let completed_flows: Vec<String> = self
-            .active_flows
-            .iter()
-            .filter(|(_, handle)| handle.is_finished())
-            .map(|(name, _)| name.clone())
-            .collect();
+        timed_step!("poll_flows", {
+            let completed_flows: Vec<String> = self
+                .active_flows
+                .iter()
+                .filter(|(_, handle)| handle.is_finished())
+                .map(|(name, _)| name.clone())
+                .collect();
 
-        for name in completed_flows {
-            if let Some(handle) = self.active_flows.remove(&name) {
-                match handle.await {
-                    Ok(state) => {
-                        tracing::info!(flow = %name, status = ?state.status, "flow completed");
-                        if let Some(ref dir) = self.config.flow_state_dir {
-                            let _ = state.save_to_file(dir);
-                        }
-                        // Feed cost data from step envelopes into nightwatch for drift detection
-                        for envelope in &state.step_envelopes {
-                            if let (Some(cost), Some(input), Some(output)) = (
-                                envelope.cost_usd,
-                                envelope.input_tokens,
-                                envelope.output_tokens,
-                            ) {
-                                self.nightwatch.observe_cost(
-                                    &format!("flow-{}", name),
-                                    cost,
-                                    input,
-                                    output,
-                                    None, // Flows don't have individual budgets yet
-                                );
+            for name in completed_flows {
+                if let Some(handle) = self.active_flows.remove(&name) {
+                    match handle.await {
+                        Ok(state) => {
+                            tracing::info!(flow = %name, status = ?state.status, "flow completed");
+                            if let Some(ref dir) = self.config.flow_state_dir {
+                                let _ = state.save_to_file(dir);
+                            }
+                            // Feed cost data from step envelopes into nightwatch for drift detection
+                            for envelope in &state.step_envelopes {
+                                if let (Some(cost), Some(input), Some(output)) = (
+                                    envelope.cost_usd,
+                                    envelope.input_tokens,
+                                    envelope.output_tokens,
+                                ) {
+                                    self.nightwatch.observe_cost(
+                                        &format!("flow-{}", name),
+                                        cost,
+                                        input,
+                                        output,
+                                        None, // Flows don't have individual budgets yet
+                                    );
+                                }
                             }
                         }
-                    }
-                    Err(e) => {
-                        tracing::error!(flow = %name, error = %e, "flow task panicked");
+                        Err(e) => {
+                            tracing::error!(flow = %name, error = %e, "flow task panicked");
+                        }
                     }
                 }
             }
-        }
+        });
 
         // 10. Check flow schedules
-        self.check_flow_schedules().await;
+        timed_step!("check_flow_schedules", self.check_flow_schedules().await);
 
         // 11. Poll for @adf: mentions in watched issues
-        self.poll_mentions().await;
+        timed_step!("poll_mentions", self.poll_mentions().await);
 
         // 12. D-4: Hot-reload KG routing rules if markdown files changed
-        if let Some(ref mut router) = self.kg_router {
-            router.reload_if_changed();
-        }
+        timed_step!("kg_reload", {
+            if let Some(ref mut router) = self.kg_router {
+                router.reload_if_changed();
+            }
+        });
 
         // 13. D-2: Re-probe providers if cached results are stale
         if self.provider_health.is_stale() {
-            if let Some(ref kg_router) = self.kg_router {
-                self.provider_health.probe_all(kg_router).await;
-                if let Some(ref dir) = self
-                    .config
-                    .routing
-                    .as_ref()
-                    .and_then(|r| r.probe_results_dir.clone())
-                {
-                    let _ = self.provider_health.save_results(dir.as_path()).await;
-                }
-
-                // Send probe results to Quickwit for cost-aware routing
-                if let Some(ref sink) = self.quickwit_sink {
-                    let project_id = self
+            timed_step!("probe_providers", {
+                if let Some(ref kg_router) = self.kg_router {
+                    self.provider_health.probe_all(kg_router).await;
+                    if let Some(ref dir) = self
                         .config
-                        .projects
-                        .first()
-                        .map(|p| p.id.clone())
-                        .unwrap_or_else(|| crate::dispatcher::LEGACY_PROJECT_ID.to_string());
-                    self.provider_health
-                        .send_to_quickwit(sink, &project_id)
-                        .await;
+                        .routing
+                        .as_ref()
+                        .and_then(|r| r.probe_results_dir.clone())
+                    {
+                        let _ = self.provider_health.save_results(dir.as_path()).await;
+                    }
+
+                    // Send probe results to Quickwit for cost-aware routing
+                    if let Some(ref sink) = self.quickwit_sink {
+                        let project_id = self
+                            .config
+                            .projects
+                            .first()
+                            .map(|p| p.id.clone())
+                            .unwrap_or_else(|| crate::dispatcher::LEGACY_PROJECT_ID.to_string());
+                        self.provider_health
+                            .send_to_quickwit(sink, &project_id)
+                            .await;
+                    }
                 }
-            }
+            });
         }
 
         // 14. Update last_tick_time and increment tick counter
         self.last_tick_time = chrono::Utc::now();
         self.tick_count = self.tick_count.wrapping_add(1);
 
+        // 14. Update last_tick_time and increment tick counter
+        timed_step!("tick_counter_update", {
+            self.last_tick_time = chrono::Utc::now();
+            self.tick_count = self.tick_count.wrapping_add(1);
+        });
+
         // 15. Periodic telemetry persistence (every 60 ticks = ~5 min at 5s interval)
         if self.tick_count % 60 == 0 {
-            self.persist_telemetry();
+            timed_step!("persist_telemetry", self.persist_telemetry());
         }
 
         // 16. Flush provider-budget snapshot. The tracker accumulates in
@@ -5771,107 +5829,117 @@ impl AgentOrchestrator {
         // carry across restarts (cf. with_persistence at construction).
         // Skip when no tracker was configured.
         if let Some(tracker) = self.provider_budget_tracker.as_ref() {
-            if let Err(e) = tracker.persist() {
-                warn!(error = %e, "failed to persist provider budget snapshot");
-            }
+            timed_step!("budget_persist", {
+                if let Err(e) = tracker.persist() {
+                    warn!(error = %e, "failed to persist provider budget snapshot");
+                }
+            });
         }
 
         // Archive stale learnings periodically
         if self.tick_count % self.learning_config.consolidation_ticks == 0 {
-            if let Some(ref store) = self.learning_store {
-                match tokio::task::block_in_place(|| {
-                    tokio::runtime::Handle::current()
-                        .block_on(store.archive_stale(self.learning_config.archive_days))
-                }) {
-                    Ok(archived) if archived > 0 => {
-                        info!(archived, "archived stale learnings");
+            timed_step!("archive_learnings", {
+                if let Some(ref store) = self.learning_store {
+                    match tokio::task::block_in_place(|| {
+                        tokio::runtime::Handle::current()
+                            .block_on(store.archive_stale(self.learning_config.archive_days))
+                    }) {
+                        Ok(archived) if archived > 0 => {
+                            info!(archived, "archived stale learnings");
+                        }
+                        Err(e) => {
+                            warn!(error = %e, "failed to archive stale learnings");
+                        }
+                        Ok(_) => {}
                     }
-                    Err(e) => {
-                        warn!(error = %e, "failed to archive stale learnings");
-                    }
-                    Ok(_) => {}
                 }
-            }
 
-            // Evolution memory consolidation (promotes high-importance short-term to long-term).
-            if self.evolution_manager.is_enabled() {
-                let consolidated = self.evolution_manager.consolidate_all();
-                if consolidated > 0 {
-                    info!(consolidated, "evolution memory consolidation complete");
+                // Evolution memory consolidation (promotes high-importance short-term to long-term).
+                if self.evolution_manager.is_enabled() {
+                    let consolidated = self.evolution_manager.consolidate_all();
+                    if consolidated > 0 {
+                        info!(consolidated, "evolution memory consolidation complete");
+                    }
                 }
-            }
+            });
         }
 
         // 17. Drain the unified dispatch queue. Handlers for ReviewPr,
         // AutoMerge, and PostMergeTestGate are stubs; wiring happens in
         // Steps D, G, and H respectively.
-        while let Some(task) = self.dispatcher.dequeue() {
-            match task {
-                DispatchTask::TimeDriven { name, project, .. } => {
-                    tracing::debug!(name, project, "TimeDriven task drained from dispatcher");
-                }
-                DispatchTask::IssueDriven {
-                    identifier,
-                    project,
-                    ..
-                } => {
-                    tracing::debug!(
+        timed_step!("drain_dispatch", {
+            while let Some(task) = self.dispatcher.dequeue() {
+                match task {
+                    DispatchTask::TimeDriven { name, project, .. } => {
+                        tracing::debug!(name, project, "TimeDriven task drained from dispatcher");
+                    }
+                    DispatchTask::IssueDriven {
                         identifier,
                         project,
-                        "IssueDriven task drained from dispatcher"
-                    );
-                }
-                DispatchTask::MentionDriven {
-                    agent_name,
-                    project,
-                    ..
-                } => {
-                    tracing::debug!(
+                        ..
+                    } => {
+                        tracing::debug!(
+                            identifier,
+                            project,
+                            "IssueDriven task drained from dispatcher"
+                        );
+                    }
+                    DispatchTask::MentionDriven {
                         agent_name,
                         project,
-                        "MentionDriven task drained from dispatcher"
-                    );
-                }
-                task @ DispatchTask::ReviewPr { .. } => {
-                    if let Err(e) = self.handle_review_pr(task).await {
-                        warn!(error = %e, "handle_review_pr failed");
+                        ..
+                    } => {
+                        tracing::debug!(
+                            agent_name,
+                            project,
+                            "MentionDriven task drained from dispatcher"
+                        );
                     }
-                }
-                task @ DispatchTask::AutoMerge { .. } => {
-                    if let Err(e) = self.handle_auto_merge(task).await {
-                        warn!(error = %e, "handle_auto_merge failed");
+                    task @ DispatchTask::ReviewPr { .. } => {
+                        if let Err(e) = self.handle_review_pr(task).await {
+                            warn!(error = %e, "handle_review_pr failed");
+                        }
                     }
-                }
-                task @ DispatchTask::PostMergeTestGate { .. } => {
-                    if let Err(e) = self.handle_post_merge_test_gate(task).await {
-                        tracing::error!(error = ?e, "handle_post_merge_test_gate failed");
+                    task @ DispatchTask::AutoMerge { .. } => {
+                        if let Err(e) = self.handle_auto_merge(task).await {
+                            warn!(error = %e, "handle_auto_merge failed");
+                        }
                     }
-                }
-                task @ DispatchTask::Push { .. } => {
-                    if let Err(e) = self.handle_push(task).await {
-                        warn!(error = %e, "handle_push failed");
+                    task @ DispatchTask::PostMergeTestGate { .. } => {
+                        if let Err(e) = self.handle_post_merge_test_gate(task).await {
+                            tracing::error!(error = ?e, "handle_post_merge_test_gate failed");
+                        }
+                    }
+                    task @ DispatchTask::Push { .. } => {
+                        if let Err(e) = self.handle_push(task).await {
+                            warn!(error = %e, "handle_push failed");
+                        }
                     }
                 }
             }
-        }
+        });
 
         // 17.5. PR gate reconciliation: read actual commit statuses and
         // branch protection, classify each open PR head, and take action
         // (enqueue missing agents, open remediation issues, or clear for
         // auto-merge). Runs every N ticks to avoid excessive API load.
         if self.tick_count % self.config.gate_reconcile_interval_ticks as u64 == 0 {
-            if let Err(e) = self.reconcile_pr_gates().await {
-                warn!(error = %e, "reconcile_pr_gates failed");
-            }
+            timed_step!("reconcile_pr_gates", {
+                if let Err(e) = self.reconcile_pr_gates().await {
+                    warn!(error = %e, "reconcile_pr_gates failed");
+                }
+            });
         }
 
         // 18. ROC v1 Step F: poll open PRs for reviewer verdicts and enqueue
         // AutoMerge for any PR that clears every gate. Runs AFTER the
         // dispatch drain so the newly enqueued AutoMerge tasks are serviced
         // on the NEXT tick (deterministic ordering).
-        if let Err(e) = self.poll_pending_reviews().await {
-            warn!(error = %e, "poll_pending_reviews failed");
-        }
+        timed_step!("poll_pending_reviews", {
+            if let Err(e) = self.poll_pending_reviews().await {
+                warn!(error = %e, "poll_pending_reviews failed");
+            }
+        });
 
         info!(
             tick = self.tick_count,
