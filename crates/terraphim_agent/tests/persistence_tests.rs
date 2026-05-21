@@ -50,8 +50,8 @@ fn parse_config_from_output(output: &str) -> Result<serde_json::Value> {
 }
 
 /// Parse role names from `terraphim-agent roles list` output.
-fn list_available_roles() -> Result<Vec<String>> {
-    let (stdout, stderr, code) = run_tui_command(&["roles", "list"], None)?;
+fn list_available_roles(test_root: Option<PathBuf>) -> Result<Vec<String>> {
+    let (stdout, stderr, code) = run_tui_command(&["roles", "list"], test_root)?;
     anyhow::ensure!(code == 0, "roles list should succeed, stderr: {}", stderr);
 
     let roles = extract_clean_output(&stdout)
@@ -186,7 +186,7 @@ async fn test_persistence_setup_and_cleanup() -> Result<()> {
 async fn test_config_persistence_across_runs() -> Result<()> {
     let (temp_dir, _, _) = create_test_env()?;
     let test_root = temp_dir.path().to_path_buf();
-    let roles = list_available_roles()?;
+    let roles = list_available_roles(Some(test_root.clone()))?;
 
     let test_role = pick_existing_role(&roles, &["Rust Engineer", "Terraphim Engineer", "Default"]);
     let (stdout1, stderr1, code1) = run_tui_command(
@@ -230,7 +230,7 @@ async fn test_config_persistence_across_runs() -> Result<()> {
 async fn test_role_switching_persistence() -> Result<()> {
     let (temp_dir, _, _) = create_test_env()?;
     let test_root = temp_dir.path().to_path_buf();
-    let available_roles = list_available_roles()?;
+    let available_roles = list_available_roles(Some(test_root.clone()))?;
 
     // Test switching between different roles and verifying persistence
     // selected_role must be an existing role name
@@ -301,7 +301,7 @@ async fn test_role_switching_persistence() -> Result<()> {
 async fn test_persistence_backend_functionality() -> Result<()> {
     let (temp_dir, _, dashmap_dir) = create_test_env()?;
     let test_root = temp_dir.path().to_path_buf();
-    let roles = list_available_roles()?;
+    let roles = list_available_roles(Some(test_root.clone()))?;
 
     let config_changes = sample_roles(&roles, 3)
         .into_iter()
@@ -336,7 +336,7 @@ async fn test_persistence_backend_functionality() -> Result<()> {
 async fn test_concurrent_persistence_operations() -> Result<()> {
     let (temp_dir, _, _) = create_test_env()?;
     let test_root = temp_dir.path().to_path_buf();
-    let available_roles = list_available_roles()?;
+    let available_roles = list_available_roles(Some(test_root.clone()))?;
 
     let roles = sample_roles(&available_roles, 5);
 
@@ -410,7 +410,7 @@ async fn test_concurrent_persistence_operations() -> Result<()> {
 async fn test_persistence_recovery_after_corruption() -> Result<()> {
     let (temp_dir, sqlite_dir, dashmap_dir) = create_test_env()?;
     let test_root = temp_dir.path().to_path_buf();
-    let roles = list_available_roles()?;
+    let roles = list_available_roles(Some(test_root.clone()))?;
     let initial_role =
         pick_existing_role(&roles, &["Default", "Terraphim Engineer", "Rust Engineer"]);
     let recovery_role =
@@ -468,7 +468,7 @@ async fn test_persistence_recovery_after_corruption() -> Result<()> {
 async fn test_persistence_with_special_characters() -> Result<()> {
     let (temp_dir, _, _) = create_test_env()?;
     let test_root = temp_dir.path().to_path_buf();
-    let roles = list_available_roles()?;
+    let roles = list_available_roles(Some(test_root.clone()))?;
 
     let special_roles = roles
         .iter()
@@ -556,7 +556,7 @@ async fn test_persistence_directory_permissions() -> Result<()> {
 async fn test_persistence_backend_selection() -> Result<()> {
     let (temp_dir, _, _) = create_test_env()?;
     let test_root = temp_dir.path().to_path_buf();
-    let roles = list_available_roles()?;
+    let roles = list_available_roles(Some(test_root.clone()))?;
     let selected_role =
         pick_existing_role(&roles, &["Default", "Terraphim Engineer", "Rust Engineer"]);
 
