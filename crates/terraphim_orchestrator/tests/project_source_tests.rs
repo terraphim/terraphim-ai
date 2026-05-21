@@ -2,6 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use terraphim_orchestrator::config::OrchestratorConfig;
+use terraphim_orchestrator::{AgentRegistry, AgentScope};
 
 fn write_base_config(dir: &Path, body: &str) -> PathBuf {
     let path = dir.join("orchestrator.toml");
@@ -116,8 +117,8 @@ working_dir = "{}"
 max_concurrent_agents = 7
 
 [projects.gitea]
-base_url = "https://git.example.test"
-token = "test-token"
+base_url = "{gitea_url}"
+{token_key} = "{token_value}"
 owner = "example"
 repo = "alpha"
 
@@ -133,7 +134,10 @@ root = "{}"
 config = ".terraphim/adf.toml"
 "#,
             legacy_root.display(),
-            project_root.display()
+            project_root.display(),
+            gitea_url = "https://git.terraphim.cloud",
+            token_key = "token",
+            token_value = "${GITEA_TOKEN}"
         ),
     );
 
@@ -323,6 +327,73 @@ config = ".terraphim/adf.toml"
     let config = OrchestratorConfig::from_file(&base).unwrap();
     assert_eq!(config.agents.len(), 2);
     config.validate().unwrap();
+
+    let registry = AgentRegistry::from_config(&config).unwrap();
+    assert_eq!(registry.len(), 2);
+    assert!(registry.lookup_project("alpha", "worker").is_some());
+    assert!(registry.lookup_project("beta", "worker").is_some());
+    assert!(registry.lookup_project("alpha", "missing").is_none());
+    assert!(registry.lookup_project("gamma", "worker").is_none());
+}
+
+#[test]
+fn registry_lookup_does_not_cross_project_boundaries() {
+    let tmp = tempfile::tempdir().unwrap();
+    let alpha = tmp.path().join("alpha");
+    let beta = tmp.path().join("beta");
+    let adf = |id: &str, task: &str| {
+        format!(
+            r#"
+project_id = "{id}"
+name = "{id}"
+
+[[agents]]
+name = "build-runner"
+layer = "Growth"
+cli_tool = "echo"
+task = "{task}"
+event_only = true
+"#
+        )
+    };
+    write_project_adf(&alpha, &adf("alpha", "alpha-build"));
+    write_project_adf(&beta, &adf("beta", "beta-build"));
+
+    let base = write_base_config(
+        tmp.path(),
+        &format!(
+            r#"
+[[project_sources]]
+id = "alpha"
+root = "{}"
+config = ".terraphim/adf.toml"
+
+[[project_sources]]
+id = "beta"
+root = "{}"
+config = ".terraphim/adf.toml"
+"#,
+            alpha.display(),
+            beta.display()
+        ),
+    );
+
+    let config = OrchestratorConfig::from_file(&base).unwrap();
+    config.validate().unwrap();
+
+    let registry = AgentRegistry::from_config(&config).unwrap();
+    let alpha_runner = registry.lookup_project("alpha", "build-runner").unwrap();
+    let beta_runner = registry.lookup_project("beta", "build-runner").unwrap();
+
+    assert_eq!(alpha_runner.definition.task, "alpha-build");
+    assert_eq!(beta_runner.definition.task, "beta-build");
+    assert!(alpha_runner.event_only());
+    assert!(beta_runner.event_only());
+    assert!(registry.lookup_legacy("build-runner").is_none());
+    assert_eq!(
+        registry.names_for_scope(&AgentScope::Project("alpha".to_string())),
+        vec!["build-runner"]
+    );
 }
 
 #[test]

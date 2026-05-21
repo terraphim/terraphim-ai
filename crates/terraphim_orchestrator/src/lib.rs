@@ -30,6 +30,7 @@
 //! ```
 
 pub mod adf_commands;
+pub mod agent_registry;
 pub mod agent_run_record;
 pub mod compound;
 pub mod concurrency;
@@ -73,6 +74,7 @@ pub mod scope;
 pub mod webhook;
 pub mod worktree_guard;
 
+pub use agent_registry::{AgentKey, AgentRegistry, AgentScope, AgentSource, RegisteredAgent};
 pub use agent_run_record::{
     AgentRunRecord, ExitClass, ExitClassification, ExitClassifier, RunTrigger,
 };
@@ -232,6 +234,7 @@ pub struct AgentOrchestrator {
     nightwatch: NightwatchMonitor,
     scheduler: TimeScheduler,
     compound_workflow: CompoundReviewWorkflow,
+    agent_registry: AgentRegistry,
     active_agents: HashMap<String, ManagedAgent>,
     rate_limiter: RateLimitTracker,
     shutdown_requested: bool,
@@ -728,6 +731,7 @@ impl AgentOrchestrator {
         let scheduler = TimeScheduler::new(&config.agents, Some(&config.compound_review.schedule))?;
         let compound_workflow =
             CompoundReviewWorkflow::from_compound_config(config.compound_review.clone());
+        let agent_registry = AgentRegistry::from_config(&config)?;
 
         // Layer 2 startup sweep (epic #1567, issue #1570).
         //
@@ -872,6 +876,7 @@ impl AgentOrchestrator {
             nightwatch,
             scheduler,
             compound_workflow,
+            agent_registry,
             active_agents: HashMap::new(),
             rate_limiter: RateLimitTracker::default(),
             shutdown_requested: false,
@@ -2713,20 +2718,20 @@ impl AgentOrchestrator {
 
         // Look up the build-runner agent for this project. Missing must
         // skip silently — no `pending` posted by the caller.
-        let def =
-            match self.config.agents.iter().find(|a| {
-                a.name == "build-runner" && a.project.as_deref() == Some(project.as_str())
-            }) {
-                Some(d) => d.clone(),
-                None => {
-                    warn!(
-                        pr_number,
-                        project = %project,
-                        "ReviewPr skipped: no build-runner agent configured for project"
-                    );
-                    return Ok(false);
-                }
-            };
+        let def = match self
+            .agent_registry
+            .lookup_project(project.as_str(), "build-runner")
+        {
+            Some(agent) => agent.definition.clone(),
+            None => {
+                warn!(
+                    pr_number,
+                    project = %project,
+                    "ReviewPr skipped: no build-runner agent configured for project"
+                );
+                return Ok(false);
+            }
+        };
 
         // === STATIC ALLOW-LIST GATE ===
         // build-runner is bash-only (no LLM), so def.model is normally None
@@ -3019,20 +3024,20 @@ impl AgentOrchestrator {
 
         // Look up the build-runner agent for this project. Repos without
         // build-runner shouldn't break the orchestrator -- log and skip.
-        let def =
-            match self.config.agents.iter().find(|a| {
-                a.name == "build-runner" && a.project.as_deref() == Some(project.as_str())
-            }) {
-                Some(d) => d.clone(),
-                None => {
-                    warn!(
-                        project = %project,
-                        after_sha = %after_sha,
-                        "Push skipped: no build-runner agent configured for project"
-                    );
-                    return Ok(());
-                }
-            };
+        let def = match self
+            .agent_registry
+            .lookup_project(project.as_str(), "build-runner")
+        {
+            Some(agent) => agent.definition.clone(),
+            None => {
+                warn!(
+                    project = %project,
+                    after_sha = %after_sha,
+                    "Push skipped: no build-runner agent configured for project"
+                );
+                return Ok(());
+            }
+        };
 
         if self.active_agents.contains_key("build-runner") {
             info!(
