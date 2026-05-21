@@ -258,6 +258,8 @@ const EXIT_CLASS_PATTERNS: &[PatternDef] = &[
             "throttled",
             "hit your limit",
             "you've hit your limit",
+            "you've hit your session limit",
+            "session limit",
             "plan limit",
             "tier limit",
             "usage cap",
@@ -954,6 +956,18 @@ mod tests {
             Some(1),
             &[],
             &["You've hit your limit - resets 2am Europe/Berlin".to_string()],
+        );
+        assert_eq!(result.exit_class, ExitClass::RateLimit);
+        assert!(result.confidence > 0.0);
+    }
+
+    #[test]
+    fn classify_claude_session_limit() {
+        let c = classifier();
+        let result = c.classify(
+            Some(1),
+            &["You've hit your session limit · resets 2am (Europe/Berlin)".to_string()],
+            &[],
         );
         assert_eq!(result.exit_class, ExitClass::RateLimit);
         assert!(result.confidence > 0.0);
