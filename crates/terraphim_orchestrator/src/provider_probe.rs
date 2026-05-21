@@ -136,18 +136,28 @@ impl ProviderHealthMap {
             let model = rule.model.clone();
             let action = rule.action.clone();
 
-            tasks.push(tokio::spawn(async move {
-                probe_single(&provider, &model, action.as_deref()).await
-            }));
+            tasks.push((
+                provider.clone(),
+                model.clone(),
+                tokio::spawn(
+                    async move { probe_single(&provider, &model, action.as_deref()).await },
+                ),
+            ));
         }
 
         let mut results = Vec::new();
         eprintln!("[ADF-TIMING] probe_all: awaiting {} tasks", tasks.len());
-        for (i, task) in tasks.into_iter().enumerate() {
-            eprintln!("[ADF-TIMING] probe_all: awaiting task {}", i);
+        for (i, (provider, model, task)) in tasks.into_iter().enumerate() {
+            eprintln!(
+                "[ADF-TIMING] probe_all: awaiting task {} ({} / {})",
+                i, provider, model
+            );
             match task.await {
                 Ok(result) => {
-                    eprintln!("[ADF-TIMING] probe_all: task {} completed", i);
+                    eprintln!(
+                        "[ADF-TIMING] probe_all: task {} ({} / {}) completed with {:?}",
+                        i, provider, model, result.status
+                    );
                     results.push(result);
                 }
                 Err(e) => warn!(error = %e, "probe task panicked"),
@@ -550,7 +560,7 @@ async fn probe_single(provider: &str, model: &str, action_template: Option<&str>
     }
 
     let start = Instant::now();
-    let timeout = Duration::from_secs(120);
+    let timeout = Duration::from_secs(15);
 
     debug!(provider, model, action = %action, "running probe command");
 
@@ -651,14 +661,14 @@ async fn probe_single(provider: &str, model: &str, action_template: Option<&str>
                     .arg(pid.to_string())
                     .spawn();
             }
-            warn!(provider, model, "probe timed out after 60s");
+            warn!(provider, model, "probe timed out after 15s");
             ProbeResult {
                 provider: provider.to_string(),
                 model: model.to_string(),
                 cli_tool,
                 status: ProbeStatus::Timeout,
                 latency_ms: Some(latency_ms),
-                error: Some("timeout after 60s".to_string()),
+                error: Some("timeout after 15s".to_string()),
                 timestamp,
             }
         }
