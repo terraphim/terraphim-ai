@@ -315,7 +315,7 @@ fn build_local_spawn_context(
 }
 
 /// Run a single named agent from .terraphim/adf.toml in the foreground.
-/// Streams output to stdout and returns the agent's exit code.
+/// Prints captured output and returns the agent's exit code.
 async fn run_local_agent(agent_name: &str, cwd: PathBuf) -> ExitCode {
     let adf_config = match terraphim_orchestrator::ProjectAdfConfig::discover_and_load(&cwd) {
         Ok(Some(cfg)) => cfg,
@@ -526,33 +526,26 @@ async fn run_local_agent(agent_name: &str, cwd: PathBuf) -> ExitCode {
         }
     };
 
-    let output_rx = handle.subscribe_output();
-
-    let output_task = tokio::spawn(async move {
-        let mut rx = output_rx;
-        while let Ok(event) = rx.recv().await {
-            match event {
-                terraphim_spawner::OutputEvent::Stdout { line, .. } => {
-                    println!("{}", line);
-                }
-                terraphim_spawner::OutputEvent::Stderr { line, .. } => {
-                    eprintln!("[stderr] {}", line);
-                }
-                terraphim_spawner::OutputEvent::Mention {
-                    target, message, ..
-                } => {
-                    eprintln!("[@mention {}] {}", target, message);
-                }
-                terraphim_spawner::OutputEvent::Completed { .. } => {}
-            }
-        }
-    });
-
     let exit_code = match handle.wait().await {
         Ok(status) => {
             tracing::info!(agent = %agent_name, status = %status, "agent exited");
             tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-            output_task.abort();
+            for event in handle.captured_output_events() {
+                match event {
+                    terraphim_spawner::OutputEvent::Stdout { line, .. } => {
+                        println!("{}", line);
+                    }
+                    terraphim_spawner::OutputEvent::Stderr { line, .. } => {
+                        eprintln!("[stderr] {}", line);
+                    }
+                    terraphim_spawner::OutputEvent::Mention {
+                        target, message, ..
+                    } => {
+                        eprintln!("[@mention {}] {}", target, message);
+                    }
+                    terraphim_spawner::OutputEvent::Completed { .. } => {}
+                }
+            }
             std::io::stdout().flush().ok();
             match status.code() {
                 Some(0) => ExitCode::SUCCESS,
@@ -562,7 +555,6 @@ async fn run_local_agent(agent_name: &str, cwd: PathBuf) -> ExitCode {
         }
         Err(e) => {
             tracing::error!(agent = %agent_name, error = %e, "failed to wait on agent");
-            output_task.abort();
             ExitCode::from(1)
         }
     };

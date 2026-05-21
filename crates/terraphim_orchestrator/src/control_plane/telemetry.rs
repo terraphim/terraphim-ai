@@ -500,8 +500,13 @@ impl TelemetryStore {
                 }
             }
 
-            if let Some(event_time) = perf.last_event_at {
-                if event_time >= cutoff && perf.successful_completions > 0 {
+            let event_time = perf
+                .last_event_at
+                .filter(|event_time| *event_time >= cutoff)
+                .or_else(|| (summary.exported_at >= cutoff).then_some(summary.exported_at));
+
+            if let Some(event_time) = event_time {
+                if perf.successful_completions > 0 {
                     let synthetic_count = perf.successful_completions.min(10);
                     let events = inner.events.entry(perf.model.clone()).or_default();
                     for i in 0..synthetic_count {
@@ -521,20 +526,18 @@ impl TelemetryStore {
                     }
                 }
 
-                if event_time >= cutoff {
-                    for _ in 0..perf.failed_completions.min(3) {
-                        let events = inner.events.entry(perf.model.clone()).or_default();
-                        events.push(CompletionEvent {
-                            model: perf.model.clone(),
-                            session_id: String::new(),
-                            completed_at: event_time,
-                            latency_ms: 0,
-                            success: false,
-                            tokens: TokenBreakdown::default(),
-                            cost_usd: 0.0,
-                            error: Some("recovered failure".to_string()),
-                        });
-                    }
+                for _ in 0..perf.failed_completions.min(3) {
+                    let events = inner.events.entry(perf.model.clone()).or_default();
+                    events.push(CompletionEvent {
+                        model: perf.model.clone(),
+                        session_id: String::new(),
+                        completed_at: event_time,
+                        latency_ms: 0,
+                        success: false,
+                        tokens: TokenBreakdown::default(),
+                        cost_usd: 0.0,
+                        error: Some("recovered failure".to_string()),
+                    });
                 }
             }
         }

@@ -1,11 +1,14 @@
 //! Output capture with @mention detection
 
 use regex::Regex;
+use std::sync::{Arc, Mutex};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::{ChildStderr, ChildStdout};
 use tokio::sync::{broadcast, mpsc};
 
 use terraphim_types::capability::ProcessId;
+
+const MAX_CAPTURED_EVENTS: usize = 4096;
 
 /// Events that can be captured from agent output
 #[derive(Debug, Clone)]
@@ -35,6 +38,7 @@ pub struct OutputCapture {
     event_sender: mpsc::Sender<OutputEvent>,
     /// Broadcast sender for live output streaming (e.g., WebSocket subscribers)
     broadcast_sender: broadcast::Sender<OutputEvent>,
+    captured_events: Arc<Mutex<Vec<OutputEvent>>>,
 }
 
 impl OutputCapture {
@@ -52,6 +56,7 @@ impl OutputCapture {
             mention_regex: Regex::new(r"@(\w+)").unwrap(),
             event_sender,
             broadcast_sender,
+            captured_events: Arc::new(Mutex::new(Vec::new())),
         };
 
         // Start capturing stdout and stderr
@@ -74,12 +79,29 @@ impl OutputCapture {
         &self.broadcast_sender
     }
 
+    /// Return a snapshot of captured output events for foreground callers.
+    pub fn captured_events(&self) -> Vec<OutputEvent> {
+        self.captured_events
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone()
+    }
+
+    fn record_event(captured_events: &Arc<Mutex<Vec<OutputEvent>>>, event: OutputEvent) {
+        let mut events = captured_events.lock().unwrap_or_else(|e| e.into_inner());
+        if events.len() >= MAX_CAPTURED_EVENTS {
+            events.remove(0);
+        }
+        events.push(event);
+    }
+
     /// Start capturing stdout
     fn capture_stdout(&self, mut stdout: BufReader<ChildStdout>) {
         let process_id = self.process_id;
         let mention_regex = self.mention_regex.clone();
         let event_sender = self.event_sender.clone();
         let broadcast_sender = self.broadcast_sender.clone();
+        let captured_events = self.captured_events.clone();
 
         tokio::spawn(async move {
             let mut line = String::new();
@@ -105,6 +127,7 @@ impl OutputCapture {
                                     target,
                                     message,
                                 };
+                                Self::record_event(&captured_events, mention_event.clone());
                                 let _ = event_sender.send(mention_event.clone()).await;
                                 let _ = broadcast_sender.send(mention_event);
                             }
@@ -112,6 +135,7 @@ impl OutputCapture {
 
                         // Send stdout event
                         let stdout_event = OutputEvent::Stdout { process_id, line };
+                        Self::record_event(&captured_events, stdout_event.clone());
                         let _ = event_sender.send(stdout_event.clone()).await;
                         let _ = broadcast_sender.send(stdout_event);
                     }
@@ -129,6 +153,7 @@ impl OutputCapture {
         let process_id = self.process_id;
         let event_sender = self.event_sender.clone();
         let broadcast_sender = self.broadcast_sender.clone();
+        let captured_events = self.captured_events.clone();
 
         tokio::spawn(async move {
             let mut line = String::new();
@@ -144,6 +169,7 @@ impl OutputCapture {
                         }
 
                         let stderr_event = OutputEvent::Stderr { process_id, line };
+                        Self::record_event(&captured_events, stderr_event.clone());
                         let _ = event_sender.send(stderr_event.clone()).await;
                         let _ = broadcast_sender.send(stderr_event);
                     }

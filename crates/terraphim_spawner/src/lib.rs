@@ -189,6 +189,11 @@ impl AgentHandle {
         &self.output_capture
     }
 
+    /// Snapshot of output events captured so far.
+    pub fn captured_output_events(&self) -> Vec<OutputEvent> {
+        self.output_capture.captured_events()
+    }
+
     /// Subscribe to live output events via broadcast channel.
     ///
     /// Returns a receiver that gets a clone of every output event,

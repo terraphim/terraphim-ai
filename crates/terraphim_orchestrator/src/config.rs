@@ -1520,7 +1520,13 @@ impl OrchestratorConfig {
                 self.pr_dispatch_per_project
                     .insert(source.id.clone(), dispatch);
             }
-            self.projects.push(project);
+            if !self
+                .projects
+                .iter()
+                .any(|existing| existing.id == project.id)
+            {
+                self.projects.push(project);
+            }
             self.agents.extend(agents);
         }
 

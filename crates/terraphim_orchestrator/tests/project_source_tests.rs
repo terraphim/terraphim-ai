@@ -83,6 +83,77 @@ config = ".terraphim/adf.toml"
 }
 
 #[test]
+fn enabled_project_source_merges_into_existing_project_metadata() {
+    let tmp = tempfile::tempdir().unwrap();
+    let project_root = tmp.path().join("alpha");
+    let legacy_root = tmp.path().join("legacy-alpha");
+    write_project_adf(
+        &project_root,
+        r#"
+project_id = "alpha"
+name = "Alpha"
+
+[[agents]]
+name = "repo-worker"
+layer = "Core"
+cli_tool = "codex"
+task = "Implement alpha"
+model = "kimi-for-coding/k2p6"
+
+[[pr_dispatch]]
+name = "repo-worker"
+context = "adf/build"
+"#,
+    );
+
+    let base = write_base_config(
+        tmp.path(),
+        &format!(
+            r#"
+[[projects]]
+id = "alpha"
+working_dir = "{}"
+max_concurrent_agents = 7
+
+[projects.gitea]
+base_url = "https://git.example.test"
+token = "test-token"
+owner = "example"
+repo = "alpha"
+
+[projects.mentions]
+poll_modulo = 3
+max_dispatches_per_tick = 4
+max_concurrent_mention_agents = 5
+max_mention_depth = 2
+
+[[project_sources]]
+id = "alpha"
+root = "{}"
+config = ".terraphim/adf.toml"
+"#,
+            legacy_root.display(),
+            project_root.display()
+        ),
+    );
+
+    let config = OrchestratorConfig::from_file(&base).unwrap();
+    assert_eq!(config.projects.len(), 1);
+    assert_eq!(config.projects[0].id, "alpha");
+    assert_eq!(config.projects[0].working_dir, legacy_root);
+    assert_eq!(config.projects[0].max_concurrent_agents, Some(7));
+    assert_eq!(config.projects[0].gitea.as_ref().unwrap().repo, "alpha");
+    assert_eq!(config.projects[0].mentions.as_ref().unwrap().poll_modulo, 3);
+    assert_eq!(config.agents.len(), 1);
+    assert_eq!(config.agents[0].project.as_deref(), Some("alpha"));
+    assert_eq!(
+        config.agents_on_pr_open_for_project("alpha")[0].name,
+        "repo-worker"
+    );
+    config.validate().unwrap();
+}
+
+#[test]
 fn disabled_project_source_is_not_merged() {
     let tmp = tempfile::tempdir().unwrap();
     let project_root = tmp.path().join("disabled");
