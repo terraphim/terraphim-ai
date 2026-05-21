@@ -473,16 +473,21 @@ fn build_provider_budget_tracker(
 /// Build the global concurrency controller from orchestrator config.
 ///
 /// Uses `workflow.concurrency` when workflow mode is configured; otherwise
-/// falls back to sensible defaults (global_max = 10, time_max = 10,
-/// issue_max = 5, round-robin fairness).
+/// falls back to no global cap, issue_max = 5, round-robin fairness.
 fn build_concurrency_controller(config: &OrchestratorConfig) -> concurrency::ConcurrencyController {
     let (global_max, time_max, issue_max, fairness) = config
         .workflow
         .as_ref()
         .map(|w| {
+            let global_max = w.concurrency.global_max;
+            let effective_global_max = if global_max == 0 {
+                concurrency::UNBOUNDED_GLOBAL_PERMITS
+            } else {
+                global_max
+            };
             (
-                w.concurrency.global_max,
-                w.concurrency.global_max, // time-driven shares global pool
+                global_max,
+                effective_global_max, // time-driven shares global pool
                 w.concurrency.issue_max,
                 w.concurrency
                     .fairness
@@ -490,7 +495,12 @@ fn build_concurrency_controller(config: &OrchestratorConfig) -> concurrency::Con
                     .unwrap_or(concurrency::FairnessPolicy::RoundRobin),
             )
         })
-        .unwrap_or((10, 10, 5, concurrency::FairnessPolicy::RoundRobin));
+        .unwrap_or((
+            0,
+            concurrency::UNBOUNDED_GLOBAL_PERMITS,
+            5,
+            concurrency::FairnessPolicy::RoundRobin,
+        ));
 
     let quotas = concurrency::ModeQuotas {
         time_max,

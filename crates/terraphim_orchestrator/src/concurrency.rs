@@ -7,6 +7,9 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{Mutex, Semaphore};
 
+/// Practical upper bound used when the global concurrency cap is disabled.
+pub const UNBOUNDED_GLOBAL_PERMITS: usize = 1_000_000;
+
 /// Concurrency controller with fairness policies.
 #[derive(Clone)]
 pub struct ConcurrencyController {
@@ -138,6 +141,11 @@ impl ConcurrencyController {
         fairness: FairnessPolicy,
         project_caps: HashMap<String, ProjectCaps>,
     ) -> Self {
+        let global_max = if global_max == 0 {
+            UNBOUNDED_GLOBAL_PERMITS
+        } else {
+            global_max
+        };
         Self {
             global: Arc::new(Semaphore::new(global_max)),
             quotas,
@@ -397,6 +405,27 @@ mod tests {
 
         let permit4 = controller.acquire_time_driven(TEST_PROJECT).await;
         assert!(permit4.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_zero_global_max_disables_global_cap() {
+        let controller = ConcurrencyController::new(
+            0,
+            ModeQuotas {
+                time_max: 3,
+                issue_max: 3,
+            },
+            FairnessPolicy::RoundRobin,
+        );
+
+        let permit1 = controller.acquire_time_driven(TEST_PROJECT).await;
+        let permit2 = controller.acquire_time_driven(TEST_PROJECT).await;
+        let permit3 = controller.acquire_time_driven(TEST_PROJECT).await;
+
+        assert!(permit1.is_some());
+        assert!(permit2.is_some());
+        assert!(permit3.is_some());
+        assert!(controller.available_slots() > 0);
     }
 
     #[tokio::test]

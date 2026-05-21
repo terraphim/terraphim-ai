@@ -140,13 +140,16 @@ impl DualModeOrchestrator {
 
         // Create concurrency controller
         let concurrency = if let Some(ref workflow) = config.workflow {
+            let global_max = workflow.concurrency.global_max;
+            let effective_global_max = if global_max == 0 {
+                crate::concurrency::UNBOUNDED_GLOBAL_PERMITS
+            } else {
+                global_max
+            };
             ConcurrencyController::with_project_caps(
-                workflow.concurrency.global_max,
+                global_max,
                 ModeQuotas {
-                    time_max: workflow
-                        .concurrency
-                        .global_max
-                        .saturating_sub(workflow.concurrency.issue_max),
+                    time_max: effective_global_max.saturating_sub(workflow.concurrency.issue_max),
                     issue_max: workflow.concurrency.issue_max,
                 },
                 workflow

@@ -1061,6 +1061,7 @@ impl Default for TrackerStates {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConcurrencyConfig {
     /// Global maximum concurrent agents (both modes combined).
+    /// Zero disables the global cap; per-project caps still apply.
     #[serde(default = "default_global_max")]
     pub global_max: usize,
     /// Maximum issue-driven agents.
@@ -1094,7 +1095,7 @@ fn default_terminal_states() -> Vec<String> {
 }
 
 fn default_global_max() -> usize {
-    5
+    0
 }
 
 fn default_issue_max() -> usize {
@@ -2079,7 +2080,7 @@ task = "t"
         // Check defaults
         assert_eq!(workflow.poll_interval_secs, 120);
         assert!(!workflow.tracker.use_robot_api);
-        assert_eq!(workflow.concurrency.global_max, 5);
+        assert_eq!(workflow.concurrency.global_max, 0);
         assert_eq!(workflow.concurrency.issue_max, 3);
         assert_eq!(workflow.concurrency.fairness, "round_robin");
     }
