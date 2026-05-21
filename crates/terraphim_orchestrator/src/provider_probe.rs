@@ -146,27 +146,12 @@ impl ProviderHealthMap {
         }
 
         let mut results = Vec::new();
-        eprintln!("[ADF-TIMING] probe_all: awaiting {} tasks", tasks.len());
-        for (i, (provider, model, task)) in tasks.into_iter().enumerate() {
-            eprintln!(
-                "[ADF-TIMING] probe_all: awaiting task {} ({} / {})",
-                i, provider, model
-            );
+        for (provider, model, task) in tasks {
             match task.await {
-                Ok(result) => {
-                    eprintln!(
-                        "[ADF-TIMING] probe_all: task {} ({} / {}) completed with {:?}",
-                        i, provider, model, result.status
-                    );
-                    results.push(result);
-                }
+                Ok(result) => results.push(result),
                 Err(e) => warn!(error = %e, "probe task panicked"),
             }
         }
-        eprintln!(
-            "[ADF-TIMING] probe_all: all tasks awaited, {} results",
-            results.len()
-        );
 
         // Update circuit breakers from probe results (keyed by provider:model).
         // Skip updating the breaker when the probe failed because the CLI tool
@@ -421,7 +406,6 @@ impl ProviderHealthMap {
 
     /// Save probe results to a JSON file (pi-benchmark compatible format).
     pub async fn save_results(&self, dir: &std::path::Path) -> std::io::Result<()> {
-        eprintln!("[ADF-TIMING] save_results start");
         tokio::fs::create_dir_all(dir).await?;
 
         let json = serde_json::to_string_pretty(&self.results).map_err(std::io::Error::other)?;
@@ -433,7 +417,6 @@ impl ProviderHealthMap {
         tokio::fs::write(&timestamped, &json).await?;
         tokio::fs::write(&latest, &json).await?;
 
-        eprintln!("[ADF-TIMING] save_results complete");
         info!(
             path = %timestamped.display(),
             results = self.results.len(),
@@ -681,10 +664,6 @@ impl ProviderHealthMap {
         sink: &crate::quickwit::QuickwitFleetSink,
         project_id: &str,
     ) {
-        eprintln!(
-            "[ADF-TIMING] send_to_quickwit start, {} results",
-            self.results.len()
-        );
         for (i, result) in self.results.iter().enumerate() {
             let doc = crate::quickwit::LogDocument {
                 timestamp: result.timestamp.clone(),
@@ -707,21 +686,10 @@ impl ProviderHealthMap {
                 is_free: true,
                 ..Default::default()
             };
-            eprintln!(
-                "[ADF-TIMING] send_to_quickwit: sending doc {}/{}",
-                i + 1,
-                self.results.len()
-            );
             if let Err(e) = sink.send(doc).await {
                 warn!(error = %e, "failed to send probe result to Quickwit");
             }
-            eprintln!(
-                "[ADF-TIMING] send_to_quickwit: sent doc {}/{}",
-                i + 1,
-                self.results.len()
-            );
         }
-        eprintln!("[ADF-TIMING] send_to_quickwit complete");
         info!(
             results = self.results.len(),
             "probe results sent to Quickwit"

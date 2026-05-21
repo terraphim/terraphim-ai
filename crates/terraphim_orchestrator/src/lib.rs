@@ -5630,35 +5630,17 @@ impl AgentOrchestrator {
     /// Periodic reconciliation: detect exits, check cron, evaluate drift, drain output.
     async fn reconcile_tick(&mut self) {
         let tick_start = Instant::now();
-        eprintln!(
-            "[ADF-TIMING] reconcile_tick starting at {}",
-            chrono::Utc::now()
-        );
-        info!("reconcile_tick starting");
 
         macro_rules! timed_step {
             ($name:expr, $body:expr) => {{
-                eprintln!("[ADF-TIMING] step={} start", $name);
-                info!(step = $name, "reconcile step start");
                 let step_start = Instant::now();
                 let result = $body;
                 let elapsed = step_start.elapsed();
-                eprintln!(
-                    "[ADF-TIMING] step={} elapsed_ms={}",
-                    $name,
-                    elapsed.as_millis()
-                );
                 if elapsed > std::time::Duration::from_secs(5) {
                     warn!(
                         step = $name,
                         elapsed_ms = elapsed.as_millis() as u64,
                         "slow reconcile step"
-                    );
-                } else {
-                    info!(
-                        step = $name,
-                        elapsed_ms = elapsed.as_millis() as u64,
-                        "reconcile step complete"
                     );
                 }
                 result
