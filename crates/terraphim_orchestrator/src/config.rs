@@ -775,6 +775,17 @@ pub struct AgentDefinition {
     /// Default: None (disabled).
     #[serde(default)]
     pub rlm_enabled: Option<bool>,
+
+    /// If true, `spawn_agent` honours the explicit `cli_tool` and `model` on
+    /// this definition and skips the KG tier-routing override block. Set by
+    /// the quota-exit and wall-clock-timeout fallback respawns so the
+    /// operator-chosen fallback provider is not overridden by the same
+    /// tier-routing rule that selected the now-blocked primary.
+    ///
+    /// Default `false` preserves existing behaviour for normal (non-fallback)
+    /// spawns -- KG tier routing continues to dominate static config.
+    #[serde(default)]
+    pub bypass_kg_routing: bool,
 }
 
 /// Agent layer in the dark factory hierarchy.

@@ -1974,6 +1974,17 @@ impl AgentOrchestrator {
                 }
                 Some(decision.candidate.model)
             }
+        } else if supports_model_flag && def.bypass_kg_routing {
+            // Fallback respawn (quota exit, wall-clock timeout, or KG-fallback
+            // route already selected): the caller has explicitly chosen
+            // `cli_tool` and `model`, and re-running KG tier routing here
+            // would override their decision and route the spawn back to the
+            // just-blocked primary. Honour the static config verbatim.
+            info!(
+                agent = %def.name,
+                "bypassing KG tier routing per agent definition (fallback respawn)"
+            );
+            def.model.clone()
         } else if supports_model_flag {
             // KG routing first (phase-aware tier selection from markdown rules).
             // Takes priority over static model config so tier routing controls selection.
@@ -6303,6 +6314,10 @@ impl AgentOrchestrator {
                     // Clear fallback to prevent infinite loops
                     fallback_def.fallback_provider = None;
                     fallback_def.fallback_model = None;
+                    // Honour the chosen cli_tool/model verbatim: skip KG re-routing
+                    // which would otherwise re-pick the primary provider that just
+                    // timed out.
+                    fallback_def.bypass_kg_routing = true;
 
                     if let Err(e) = self.spawn_agent(&fallback_def).await {
                         error!(agent = %name, error = %e, "failed to respawn with fallback");
@@ -6871,6 +6886,11 @@ impl AgentOrchestrator {
                                 }
                                 fallback_def.fallback_provider = None;
                                 fallback_def.fallback_model = None;
+                                // KG router already filtered for healthy routes;
+                                // re-running KG selection inside spawn_agent could
+                                // drift if breaker state has changed (e.g. a probe
+                                // succeeded). Lock the chosen route in.
+                                fallback_def.bypass_kg_routing = true;
                                 info!(
                                     agent = %name,
                                     retry_name = %fallback_def.name,
@@ -6917,6 +6937,12 @@ impl AgentOrchestrator {
                         fallback_def.provider = None;
                         fallback_def.fallback_provider = None;
                         fallback_def.fallback_model = None;
+                        // The whole point of this branch is to escape KG routing
+                        // (it just told us "no healthy route"). Honour the
+                        // operator-chosen cli_tool/model verbatim instead of
+                        // letting spawn_agent re-evaluate KG and re-pick the
+                        // primary that drove us here.
+                        fallback_def.bypass_kg_routing = true;
                         if let Err(e) = self.spawn_agent(&fallback_def).await {
                             error!(agent = %name, error = %e, "failed to respawn with fallback");
                             self.handle_agent_exit(&name, &def, status);
@@ -8120,6 +8146,7 @@ mod tests {
                     event_only: false,
                     evolution_enabled: false,
                     rlm_enabled: None,
+                    bypass_kg_routing: false,
 
                     project: None,
                 },
@@ -8148,6 +8175,7 @@ mod tests {
                     event_only: false,
                     evolution_enabled: false,
                     rlm_enabled: None,
+                    bypass_kg_routing: false,
 
                     project: None,
                 },
@@ -8469,6 +8497,7 @@ task = "test"
                 event_only: false,
                 evolution_enabled: false,
                 rlm_enabled: None,
+                bypass_kg_routing: false,
 
                 project: None,
             }],
@@ -8588,6 +8617,7 @@ task = "test"
             event_only: false,
             evolution_enabled: false,
             rlm_enabled: None,
+            bypass_kg_routing: false,
 
             project: None,
         }];
@@ -8795,6 +8825,7 @@ task = "test"
             event_only: false,
             evolution_enabled: false,
             rlm_enabled: None,
+            bypass_kg_routing: false,
 
             project: None,
         }];
@@ -8885,6 +8916,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             event_only: false,
             evolution_enabled: false,
             rlm_enabled: None,
+            bypass_kg_routing: false,
 
             project: None,
         }];
@@ -9112,6 +9144,32 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
     }
 
     #[test]
+    fn agent_def_bypass_kg_routing_defaults_false() {
+        // TOML without the field deserialises to `false` via #[serde(default)].
+        let toml_src = r#"
+name = "test-agent"
+layer = "Core"
+cli_tool = "/bin/echo"
+task = "ping"
+"#;
+        let def: AgentDefinition = toml::from_str(toml_src).expect("parse default");
+        assert!(!def.bypass_kg_routing);
+    }
+
+    #[test]
+    fn agent_def_bypass_kg_routing_explicit_true() {
+        let toml_src = r#"
+name = "test-agent"
+layer = "Core"
+cli_tool = "/bin/echo"
+task = "ping"
+bypass_kg_routing = true
+"#;
+        let def: AgentDefinition = toml::from_str(toml_src).expect("parse explicit");
+        assert!(def.bypass_kg_routing);
+    }
+
+    #[test]
     fn rate_limit_window_block_and_check() {
         let mut window = ProviderRateLimitWindow::new();
         assert!(!window.is_blocked("claude-code"));
@@ -9196,6 +9254,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             event_only: false,
             evolution_enabled: false,
             rlm_enabled: None,
+            bypass_kg_routing: false,
             project: None,
         }];
         let mut orch = AgentOrchestrator::new(config).unwrap();
@@ -9366,6 +9425,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             event_only: false,
             evolution_enabled: false,
             rlm_enabled: None,
+            bypass_kg_routing: false,
             project: None,
         }];
 
@@ -9462,6 +9522,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
                 event_only: false,
                 evolution_enabled: false,
                 rlm_enabled: None,
+                bypass_kg_routing: false,
                 project: Some("alpha".to_string()),
             }],
             restart_cooldown_secs: 0,
@@ -9758,6 +9819,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             event_only: false,
             evolution_enabled: false,
             rlm_enabled: None,
+            bypass_kg_routing: false,
             project: Some("alpha".to_string()),
         });
         config.pr_dispatch_per_project.insert(
@@ -10159,6 +10221,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             event_only: false,
             evolution_enabled: false,
             rlm_enabled: None,
+            bypass_kg_routing: false,
             project: Some("alpha".to_string()),
         });
         // The per-project block takes precedence over the top-level block,
@@ -10502,6 +10565,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             event_only: false,
             evolution_enabled: false,
             rlm_enabled: None,
+            bypass_kg_routing: false,
             project: Some("alpha".to_string()),
         });
         // The per-project block takes precedence over the top-level block,
@@ -10797,6 +10861,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             event_only: false,
             evolution_enabled: false,
             rlm_enabled: None,
+            bypass_kg_routing: false,
             project: Some("alpha".to_string()),
         });
         config.pr_dispatch = Some(crate::config::PrDispatchConfig {
@@ -11079,6 +11144,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             event_only: false,
             evolution_enabled: false,
             rlm_enabled: None,
+            bypass_kg_routing: false,
             project: Some("alpha".to_string()),
         });
         // The per-project block takes precedence over the top-level block,
@@ -11373,6 +11439,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             event_only: true,
             evolution_enabled: false,
             rlm_enabled: None,
+            bypass_kg_routing: false,
             project: None,
         }];
         // mentions config required so handle_webhook_dispatch does not bail at the top.
@@ -11428,6 +11495,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             event_only: true,
             evolution_enabled: false,
             rlm_enabled: None,
+            bypass_kg_routing: false,
             project: None,
         }];
         config.mentions = Some(crate::config::MentionConfig::default());
@@ -11485,6 +11553,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             event_only: true,
             evolution_enabled: false,
             rlm_enabled: None,
+            bypass_kg_routing: false,
             project: None,
         };
 
