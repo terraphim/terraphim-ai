@@ -9,6 +9,11 @@
 //! - KVM access (/dev/kvm) OR Docker daemon
 //! - Ollama running with at least one model
 //! - gh CLI authenticated for private repo access
+//!
+//! Gated behind the `firecracker` feature; `FirecrackerExecutor` is only
+//! compiled when that feature is enabled, so this whole file is skipped
+//! in default workspace builds.
+#![cfg(feature = "firecracker")]
 
 use terraphim_rlm::{
     config::{BackendType, RlmConfig},

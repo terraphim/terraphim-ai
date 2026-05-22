@@ -155,6 +155,7 @@ mod tests {
             event_only: false,
             evolution_enabled: false,
             rlm_enabled: None,
+            bypass_kg_routing: false,
             project: Some("odilo".to_string()),
         }
     }

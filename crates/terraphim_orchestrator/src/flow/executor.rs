@@ -283,6 +283,7 @@ impl FlowExecutor {
             project: None,
             evolution_enabled: false,
             rlm_enabled: None,
+            bypass_kg_routing: false,
         };
 
         // Build provider for spawner
