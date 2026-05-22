@@ -11,6 +11,14 @@ use crate::config::CompoundReviewConfig;
 use crate::error::OrchestratorError;
 use crate::scope::{WorktreeManager, WORKTREE_REVIEW_PREFIX};
 
+const INHERITED_GIT_ENV: [&str; 4] = ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_PREFIX"];
+
+fn clear_git_env(command: &mut tokio::process::Command) {
+    for var in INHERITED_GIT_ENV {
+        command.env_remove(var);
+    }
+}
+
 // Embed prompt templates at compile time to avoid CWD-dependent file loading.
 // The ADF binary may run from /opt/ai-dark-factory/ but templates live in the
 // source tree. Embedding eliminates the path resolution issue entirely.
@@ -467,7 +475,9 @@ impl CompoundReviewWorkflow {
         git_ref: &str,
         base_ref: &str,
     ) -> Result<Vec<String>, OrchestratorError> {
-        let output = tokio::process::Command::new("git")
+        let mut command = tokio::process::Command::new("git");
+        clear_git_env(&mut command);
+        let output = command
             .args([
                 "-C",
                 self.config.repo_path.to_str().unwrap_or("."),
@@ -476,7 +486,6 @@ impl CompoundReviewWorkflow {
                 base_ref,
                 git_ref,
             ])
-            .env_remove("GIT_INDEX_FILE")
             .output()
             .await
             .map_err(|e| {

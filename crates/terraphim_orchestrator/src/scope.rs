@@ -6,6 +6,20 @@ use uuid::Uuid;
 
 use crate::worktree_guard::WorktreeGuard;
 
+const INHERITED_GIT_ENV: [&str; 4] = ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_PREFIX"];
+
+fn clear_git_env(command: &mut tokio::process::Command) {
+    for var in INHERITED_GIT_ENV {
+        command.env_remove(var);
+    }
+}
+
+fn clear_std_git_env(command: &mut std::process::Command) {
+    for var in INHERITED_GIT_ENV {
+        command.env_remove(var);
+    }
+}
+
 /// Filename of the ownership manifest written at the root of every ADF
 /// worktree.  Presence of this file with valid contents is the gate for
 /// cleanup: sweep only deletes entries carrying this sentinel.
@@ -390,14 +404,15 @@ impl WorktreeManager {
             "creating git worktree"
         );
 
-        let output = tokio::process::Command::new("git")
+        let mut command = tokio::process::Command::new("git");
+        clear_git_env(&mut command);
+        let output = command
             .arg("-C")
             .arg(&self.repo_path)
             .arg("worktree")
             .arg("add")
             .arg(&worktree_path)
             .arg(git_ref)
-            .env_remove("GIT_INDEX_FILE")
             .output()
             .await?;
 
@@ -448,26 +463,28 @@ impl WorktreeManager {
 
         info!(name = %name, "removing git worktree");
 
-        let output = tokio::process::Command::new("git")
+        let mut command = tokio::process::Command::new("git");
+        clear_git_env(&mut command);
+        let output = command
             .arg("-C")
             .arg(&self.repo_path)
             .arg("worktree")
             .arg("remove")
             .arg(&worktree_path)
-            .env_remove("GIT_INDEX_FILE")
             .output()
             .await?;
 
         if !output.status.success() {
             // Try force removal if normal removal fails
-            let output = tokio::process::Command::new("git")
+            let mut command = tokio::process::Command::new("git");
+            clear_git_env(&mut command);
+            let output = command
                 .arg("-C")
                 .arg(&self.repo_path)
                 .arg("worktree")
                 .arg("remove")
                 .arg("--force")
                 .arg(&worktree_path)
-                .env_remove("GIT_INDEX_FILE")
                 .output()
                 .await?;
 
@@ -632,13 +649,14 @@ impl WorktreeManager {
 
         // 3. Reconcile git's admin registry so half-killed worktree
         //    metadata under `<repo>/.git/worktrees/` is dropped.
-        let prune = std::process::Command::new("git")
+        let mut command = std::process::Command::new("git");
+        clear_std_git_env(&mut command);
+        let prune = command
             .arg("-C")
             .arg(&self.repo_path)
             .arg("worktree")
             .arg("prune")
             .arg("--verbose")
-            .env_remove("GIT_INDEX_FILE")
             .output();
         report.prune_succeeded = matches!(&prune, Ok(o) if o.status.success());
         if let Ok(out) = prune {
@@ -696,14 +714,15 @@ impl WorktreeManager {
             session_id = %manifest.session_id,
             "sweep_stale found valid manifest, proceeding with removal"
         );
-        let status = std::process::Command::new("git")
+        let mut command = std::process::Command::new("git");
+        clear_std_git_env(&mut command);
+        let status = command
             .arg("-C")
             .arg(&self.repo_path)
             .arg("worktree")
             .arg("remove")
             .arg("--force")
             .arg(path)
-            .env_remove("GIT_INDEX_FILE")
             .status();
 
         if matches!(&status, Ok(s) if s.success()) {
@@ -975,17 +994,20 @@ mod tests {
 
     // ==================== WorktreeManager Tests ====================
 
-    fn setup_git_repo() -> (TempDir, PathBuf) {
-        // Clear GIT_INDEX_FILE so git commands use their own index.
-        // During pre-commit hooks, git sets this to a lock file which
-        // causes git operations in test temp repos to fail.
-        std::env::remove_var("GIT_INDEX_FILE");
+    fn isolated_git() -> Command {
+        let mut command = Command::new("git");
+        for var in INHERITED_GIT_ENV {
+            command.env_remove(var);
+        }
+        command
+    }
 
+    fn setup_git_repo() -> (TempDir, PathBuf) {
         let temp_dir = TempDir::new().expect("failed to create temp dir");
         let repo_path = temp_dir.path().to_path_buf();
 
         // Initialize git repo
-        let output = Command::new("git")
+        let output = isolated_git()
             .arg("init")
             .arg(&repo_path)
             .output()
@@ -993,7 +1015,7 @@ mod tests {
         assert!(output.status.success(), "git init failed");
 
         // Configure git user for commits
-        Command::new("git")
+        isolated_git()
             .arg("-C")
             .arg(&repo_path)
             .arg("config")
@@ -1002,7 +1024,7 @@ mod tests {
             .output()
             .expect("failed to config git email");
 
-        Command::new("git")
+        isolated_git()
             .arg("-C")
             .arg(&repo_path)
             .arg("config")
@@ -1014,7 +1036,7 @@ mod tests {
         // Create initial commit
         std::fs::write(repo_path.join("README.md"), "# Test Repo").expect("failed to write file");
 
-        Command::new("git")
+        isolated_git()
             .arg("-C")
             .arg(&repo_path)
             .arg("add")
@@ -1022,7 +1044,7 @@ mod tests {
             .output()
             .expect("failed to git add");
 
-        Command::new("git")
+        isolated_git()
             .arg("-C")
             .arg(&repo_path)
             .arg("commit")
@@ -1402,61 +1424,62 @@ pub mod test_support {
     use std::process::Command;
     use tempfile::TempDir;
 
+    fn isolated_git() -> Command {
+        let mut command = Command::new("git");
+        for var in super::INHERITED_GIT_ENV {
+            command.env_remove(var);
+        }
+        command
+    }
+
     /// Initialise a real git repository in a fresh `TempDir` with one
     /// commit. Returns the `TempDir` (caller owns the lifetime) and
     /// the repo path.
     pub fn setup_git_repo() -> (TempDir, PathBuf) {
-        std::env::remove_var("GIT_INDEX_FILE");
-
         let temp_dir = TempDir::new().expect("failed to create temp dir");
         let repo_path = temp_dir.path().to_path_buf();
 
-        let output = Command::new("git")
+        let output = isolated_git()
             .arg("init")
             .arg(&repo_path)
-            .env_remove("GIT_INDEX_FILE")
             .output()
             .expect("failed to run git init");
         assert!(output.status.success(), "git init failed");
 
-        Command::new("git")
+        isolated_git()
             .arg("-C")
             .arg(&repo_path)
             .arg("config")
             .arg("user.email")
             .arg("test@test.com")
-            .env_remove("GIT_INDEX_FILE")
             .output()
             .expect("failed to config git email");
 
-        Command::new("git")
+        isolated_git()
             .arg("-C")
             .arg(&repo_path)
             .arg("config")
             .arg("user.name")
             .arg("Test User")
-            .env_remove("GIT_INDEX_FILE")
             .output()
             .expect("failed to config git name");
 
         std::fs::write(repo_path.join("README.md"), "# Test Repo").expect("failed to write file");
 
-        Command::new("git")
+        isolated_git()
             .arg("-C")
             .arg(&repo_path)
             .arg("add")
             .arg(".")
-            .env_remove("GIT_INDEX_FILE")
             .output()
             .expect("failed to git add");
 
-        Command::new("git")
+        isolated_git()
             .arg("-C")
             .arg(&repo_path)
             .arg("commit")
             .arg("-m")
             .arg("Initial commit")
-            .env_remove("GIT_INDEX_FILE")
             .output()
             .expect("failed to git commit");
 

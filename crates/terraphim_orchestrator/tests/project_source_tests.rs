@@ -84,6 +84,76 @@ config = ".terraphim/adf.toml"
 }
 
 #[test]
+fn project_source_pr_dispatch_keeps_required_top_level_contexts() {
+    let tmp = tempfile::tempdir().unwrap();
+    let project_root = tmp.path().join("alpha");
+    write_project_adf(
+        &project_root,
+        r#"
+project_id = "alpha"
+name = "Alpha"
+
+[[agents]]
+name = "implementation-swarm"
+layer = "Core"
+cli_tool = "codex"
+task = "Implement alpha"
+model = "kimi-for-coding/k2p6"
+
+[[pr_dispatch]]
+name = "implementation-swarm"
+context = "adf/implementation-swarm"
+"#,
+    );
+
+    let base = write_base_config(
+        tmp.path(),
+        &format!(
+            r#"
+[[agents]]
+name = "build-runner"
+layer = "Growth"
+cli_tool = "echo"
+task = "build"
+project = "alpha"
+
+[[agents]]
+name = "pr-reviewer"
+layer = "Growth"
+cli_tool = "echo"
+task = "review"
+project = "alpha"
+
+[pr_dispatch]
+agents_on_pr_open = [
+    {{ name = "build-runner", context = "adf/build" }},
+    {{ name = "pr-reviewer", context = "adf/pr-reviewer" }},
+]
+
+[[project_sources]]
+id = "alpha"
+root = "{}"
+config = ".terraphim/adf.toml"
+"#,
+            project_root.display()
+        ),
+    );
+
+    let config = OrchestratorConfig::from_file(&base).unwrap();
+    let contexts: Vec<_> = config
+        .agents_on_pr_open_for_project("alpha")
+        .into_iter()
+        .map(|entry| entry.context)
+        .collect();
+
+    assert_eq!(
+        contexts,
+        vec!["adf/implementation-swarm", "adf/build", "adf/pr-reviewer",]
+    );
+    config.validate().unwrap();
+}
+
+#[test]
 fn enabled_project_source_merges_into_existing_project_metadata() {
     let tmp = tempfile::tempdir().unwrap();
     let project_root = tmp.path().join("alpha");

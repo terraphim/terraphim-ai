@@ -1517,7 +1517,10 @@ impl OrchestratorConfig {
             }
 
             let (project, agents) = (&adf).try_into()?;
-            if let Some(dispatch) = adf.pr_dispatch {
+            if let Some(mut dispatch) = adf.pr_dispatch {
+                if let Some(default_dispatch) = self.pr_dispatch.as_ref() {
+                    append_missing_dispatch_contexts(&mut dispatch, default_dispatch);
+                }
                 self.pr_dispatch_per_project
                     .insert(source.id.clone(), dispatch);
             }
@@ -1706,6 +1709,18 @@ impl OrchestratorConfig {
         }
 
         Ok(())
+    }
+}
+
+fn append_missing_dispatch_contexts(target: &mut PrDispatchConfig, defaults: &PrDispatchConfig) {
+    for entry in &defaults.agents_on_pr_open {
+        if !target
+            .agents_on_pr_open
+            .iter()
+            .any(|existing| existing.context == entry.context)
+        {
+            target.agents_on_pr_open.push(entry.clone());
+        }
     }
 }
 

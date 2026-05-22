@@ -18,6 +18,14 @@ use std::path::{Path, PathBuf};
 
 use tracing::{debug, info, warn};
 
+const INHERITED_GIT_ENV: [&str; 4] = ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_PREFIX"];
+
+fn clear_git_env(command: &mut std::process::Command) {
+    for var in INHERITED_GIT_ENV {
+        command.env_remove(var);
+    }
+}
+
 /// RAII guard that removes a worktree directory when dropped.
 ///
 /// Call `keep()` to prevent cleanup (e.g., when the agent succeeds and
@@ -104,14 +112,15 @@ impl WorktreeGuard {
         // Drop cannot be async, and git worktree remove is sub-second.
         if let Some(ref repo) = self.repo_path {
             let start = std::time::Instant::now();
-            let status = std::process::Command::new("git")
+            let mut command = std::process::Command::new("git");
+            clear_git_env(&mut command);
+            let status = command
                 .arg("-C")
                 .arg(repo)
                 .arg("worktree")
                 .arg("remove")
                 .arg("--force")
                 .arg(&self.path)
-                .env_remove("GIT_INDEX_FILE")
                 .status();
 
             match status {
@@ -260,25 +269,22 @@ mod tests {
     /// helper in `scope::tests::setup_git_repo` but kept inline here
     /// so the unit tests are self-contained.
     fn init_git_repo() -> TempDir {
-        std::env::remove_var("GIT_INDEX_FILE");
         let temp_dir = TempDir::new().expect("temp dir");
         let repo = temp_dir.path();
         let run = |args: &[&str]| {
-            let status = std::process::Command::new("git")
+            let mut command = std::process::Command::new("git");
+            clear_git_env(&mut command);
+            let status = command
                 .arg("-C")
                 .arg(repo)
                 .args(args)
-                .env_remove("GIT_INDEX_FILE")
                 .status()
                 .expect("git invocation");
             assert!(status.success(), "git {:?} failed", args);
         };
-        std::process::Command::new("git")
-            .arg("init")
-            .arg(repo)
-            .env_remove("GIT_INDEX_FILE")
-            .status()
-            .expect("git init");
+        let mut command = std::process::Command::new("git");
+        clear_git_env(&mut command);
+        command.arg("init").arg(repo).status().expect("git init");
         run(&["config", "user.email", "test@test.com"]);
         run(&["config", "user.name", "Test User"]);
         std::fs::write(repo.join("README.md"), "# Test").unwrap();
@@ -293,14 +299,15 @@ mod tests {
         let worktree = repo.path().join(".worktrees/managed-remove");
 
         // Use real git worktree add so the admin entry exists.
-        let status = std::process::Command::new("git")
+        let mut command = std::process::Command::new("git");
+        clear_git_env(&mut command);
+        let status = command
             .arg("-C")
             .arg(repo.path())
             .arg("worktree")
             .arg("add")
             .arg(&worktree)
             .arg("HEAD")
-            .env_remove("GIT_INDEX_FILE")
             .status()
             .expect("git worktree add");
         assert!(status.success(), "git worktree add failed");

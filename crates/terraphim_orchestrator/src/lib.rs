@@ -134,6 +134,21 @@ use terraphim_spawner::{AgentHandle, AgentSpawner, ResourceLimits, SpawnContext,
 use tokio::sync::broadcast;
 use tracing::{debug, error, info, warn};
 
+const INHERITED_GIT_ENV: [&str; 4] = ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_PREFIX"];
+
+fn clear_git_env(command: &mut tokio::process::Command) {
+    for var in INHERITED_GIT_ENV {
+        command.env_remove(var);
+    }
+}
+
+#[cfg(test)]
+fn clear_std_git_env(command: &mut std::process::Command) {
+    for var in INHERITED_GIT_ENV {
+        command.env_remove(var);
+    }
+}
+
 fn format_runtime_duration(seconds: u64) -> String {
     let hours = seconds / 3600;
     let minutes = (seconds % 3600) / 60;
@@ -3249,9 +3264,11 @@ impl AgentOrchestrator {
 
         // Get changed files
         let diff_range = format!("{}..{}", last_commit, head);
+        let mut command = tokio::process::Command::new("git");
+        clear_git_env(&mut command);
         let output = match tokio::time::timeout(
             Duration::from_secs(30),
-            tokio::process::Command::new("git")
+            command
                 .args(["diff", "--name-only", &diff_range])
                 .current_dir(&self.config.working_dir)
                 .output(),
@@ -3407,9 +3424,11 @@ impl AgentOrchestrator {
             let comment_time = &latest.created_at;
 
             // Use git log to check for commits after the comment time
+            let mut command = tokio::process::Command::new("git");
+            clear_git_env(&mut command);
             let output = match tokio::time::timeout(
                 Duration::from_secs(30),
-                tokio::process::Command::new("git")
+                command
                     .args(["log", "--oneline", &format!("--since={}", comment_time)])
                     .current_dir(&self.config.working_dir)
                     .output(),
@@ -3457,9 +3476,11 @@ impl AgentOrchestrator {
 
     /// Get current HEAD commit hash.
     async fn get_current_head(&self) -> Result<String, OrchestratorError> {
+        let mut command = tokio::process::Command::new("git");
+        clear_git_env(&mut command);
         let output = tokio::time::timeout(
             Duration::from_secs(5),
-            tokio::process::Command::new("git")
+            command
                 .args(["rev-parse", "HEAD"])
                 .current_dir(&self.config.working_dir)
                 .output(),
@@ -5478,7 +5499,9 @@ impl AgentOrchestrator {
         let id = uuid::Uuid::new_v4().to_string()[..8].to_string();
         let worktree_path = worktree_root.join(format!("{agent_name}-{id}"));
 
-        let output = tokio::process::Command::new("git")
+        let mut command = tokio::process::Command::new("git");
+        clear_git_env(&mut command);
+        let output = command
             .args([
                 "worktree",
                 "add",
@@ -5520,7 +5543,9 @@ impl AgentOrchestrator {
     async fn remove_agent_worktree(&self, agent_name: &str, worktree_path: &Path, repo_dir: &Path) {
         // Force-remove even if there are uncommitted changes (they were already
         // committed by try_commit_agent_work or are intentionally discarded).
-        let output = tokio::process::Command::new("git")
+        let mut command = tokio::process::Command::new("git");
+        clear_git_env(&mut command);
+        let output = command
             .args([
                 "worktree",
                 "remove",
@@ -5561,7 +5586,9 @@ impl AgentOrchestrator {
     /// but not propagated — agent work is best-effort.
     async fn try_commit_agent_work(&self, agent_name: &str, working_dir: &Path) {
         // Stage all changes
-        let add = tokio::process::Command::new("git")
+        let mut command = tokio::process::Command::new("git");
+        clear_git_env(&mut command);
+        let add = command
             .args(["add", "-A"])
             .current_dir(working_dir)
             .output()
@@ -5573,7 +5600,9 @@ impl AgentOrchestrator {
         }
 
         // Check if there are staged changes
-        let diff_check = tokio::process::Command::new("git")
+        let mut command = tokio::process::Command::new("git");
+        clear_git_env(&mut command);
+        let diff_check = command
             .args(["diff", "--cached", "--quiet"])
             .current_dir(working_dir)
             .status()
@@ -5592,7 +5621,9 @@ impl AgentOrchestrator {
         }
 
         // Get current branch for commit message
-        let branch = tokio::process::Command::new("git")
+        let mut command = tokio::process::Command::new("git");
+        clear_git_env(&mut command);
+        let branch = command
             .args(["branch", "--show-current"])
             .current_dir(working_dir)
             .output()
@@ -5605,7 +5636,9 @@ impl AgentOrchestrator {
 
         let msg = format!("feat({agent_name}): agent work [auto-commit]");
 
-        let commit = tokio::process::Command::new("git")
+        let mut command = tokio::process::Command::new("git");
+        clear_git_env(&mut command);
+        let commit = command
             .args(["commit", "-m", &msg])
             .current_dir(working_dir)
             .output()
@@ -8304,7 +8337,9 @@ mod tests {
         // In shallow clones (e.g. CI with fetch-depth: 1) HEAD~1 does not exist.
         // Fall back to diffing against the empty tree so the test works everywhere.
         let base_ref = {
-            let check = std::process::Command::new("git")
+            let mut command = std::process::Command::new("git");
+            clear_std_git_env(&mut command);
+            let check = command
                 .args([
                     "-C",
                     repo_path.to_str().unwrap(),
@@ -8317,7 +8352,9 @@ mod tests {
                 Ok(o) if o.status.success() => "HEAD~1".to_string(),
                 _ => {
                     // 4b825dc: the well-known empty tree hash in git
-                    let empty = std::process::Command::new("git")
+                    let mut command = std::process::Command::new("git");
+                    clear_std_git_env(&mut command);
+                    let empty = command
                         .args([
                             "-C",
                             repo_path.to_str().unwrap(),
