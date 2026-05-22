@@ -381,22 +381,82 @@ impl ProviderRateLimitWindow {
     }
 }
 
+/// Conservative fallback block applied at the quota-detect site when no
+/// "resets" line is present in stderr at all (i.e. `parse_reset_time` cannot
+/// even be invoked with useful input). Long enough to skip the next cron
+/// firing (~30 min active-window cadence); short enough that a misclassified
+/// non-quota error does not disable the provider for the day.
+pub(crate) const DEFAULT_RATE_LIMIT_BLOCK: Duration = Duration::from_secs(900);
+
 fn parse_reset_time(quota_line: &str) -> Option<Instant> {
     let line = quota_line.to_lowercase();
 
     if let Some(idx) = line.find("resets in ") {
         let rest = &line[idx + "resets in ".len()..];
-        if let Ok(n) = rest
-            .chars()
-            .take_while(|c| c.is_ascii_digit())
-            .collect::<String>()
-            .parse::<u64>()
-        {
+        let digits: String = rest.chars().take_while(|c| c.is_ascii_digit()).collect();
+        if let Ok(n) = digits.parse::<u64>() {
             if rest.contains("hour") {
                 return Some(Instant::now() + Duration::from_secs(n * 3600));
             }
             if rest.contains("minute") {
                 return Some(Instant::now() + Duration::from_secs(n * 60));
+            }
+            // Short abbreviations used by Claude Code: "resets in 4h", "resets in 30m".
+            // The character immediately after the digits disambiguates the unit.
+            let unit = rest.chars().nth(digits.len());
+            match unit {
+                Some('h') => return Some(Instant::now() + Duration::from_secs(n * 3600)),
+                Some('m') => {
+                    // Guard against "min..." which is already handled above; the
+                    // "minute" branch returned first, so any remaining 'm' here
+                    // is the short form.
+                    return Some(Instant::now() + Duration::from_secs(n * 60));
+                }
+                _ => {}
+            }
+        }
+    }
+
+    // "resets 11pm" / "resets 7am" -- wall-clock hour with am/pm suffix, no "in"/"at".
+    // Treat the hour as UTC (bigbox locale); compute next future occurrence.
+    if let Some(idx) = line.find("resets ") {
+        let rest = line[idx + "resets ".len()..].trim_start();
+        let digits: String = rest.chars().take_while(|c| c.is_ascii_digit()).collect();
+        if !digits.is_empty() {
+            let after_digits = &rest[digits.len()..];
+            let is_pm = after_digits.starts_with("pm");
+            let is_am = after_digits.starts_with("am");
+            if is_pm || is_am {
+                if let Ok(h) = digits.parse::<u32>() {
+                    if h <= 12 {
+                        let hour_24 = match (h, is_pm) {
+                            (12, true) => 12,
+                            (12, false) => 0,
+                            (h, true) => h + 12,
+                            (h, false) => h,
+                        };
+                        if let Some(time) = chrono::NaiveTime::from_hms_opt(hour_24, 0, 0) {
+                            let now = chrono::Utc::now();
+                            let mut target_date = now.date_naive();
+                            let mut target_utc =
+                                chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(
+                                    target_date.and_time(time),
+                                    chrono::Utc,
+                                );
+                            if target_utc <= now {
+                                target_date += chrono::Duration::days(1);
+                                target_utc =
+                                    chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(
+                                        target_date.and_time(time),
+                                        chrono::Utc,
+                                    );
+                            }
+                            if let Ok(delta) = (target_utc - now).to_std() {
+                                return Some(Instant::now() + delta);
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -6515,6 +6575,28 @@ impl AgentOrchestrator {
                         );
                         self.provider_rate_limits
                             .block_until(provider_key, reset_time);
+                    } else {
+                        // Safety floor: classifier says RateLimit but no parseable
+                        // reset window in stderr. Apply a conservative block so the
+                        // next cron firing skips this provider while we iterate on
+                        // the parser. The warn-log carries a representative stderr
+                        // tail so future format drift is discoverable.
+                        let stderr_sample: String = stderr_lines
+                            .iter()
+                            .rev()
+                            .take(3)
+                            .rev()
+                            .cloned()
+                            .collect::<Vec<_>>()
+                            .join(" | ");
+                        warn!(
+                            provider = %provider_key,
+                            block_secs = DEFAULT_RATE_LIMIT_BLOCK.as_secs(),
+                            stderr_tail = %stderr_sample,
+                            "rate-limit detected but reset window unparseable; applying conservative safety-floor block"
+                        );
+                        self.provider_rate_limits
+                            .block_until(provider_key, Instant::now() + DEFAULT_RATE_LIMIT_BLOCK);
                     }
                     quota_provider_recorded = Some(provider_key.to_string());
                 }
@@ -8972,6 +9054,61 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
     fn parse_reset_time_no_match() {
         let result = parse_reset_time("something unrelated");
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn parse_reset_time_short_hours_abbreviation() {
+        // "resets in 4h" -- Claude Code's compact format
+        let before = std::time::Instant::now();
+        let result = parse_reset_time("5-hour limit reached, resets in 4h").unwrap();
+        let delta = result.duration_since(before);
+        // 4 hours, allowing a small wall-clock slack between `before` and `Instant::now()`
+        // inside the parser.
+        assert!(delta >= std::time::Duration::from_secs(4 * 3600 - 1));
+        assert!(delta <= std::time::Duration::from_secs(4 * 3600 + 5));
+    }
+
+    #[test]
+    fn parse_reset_time_short_minutes_abbreviation() {
+        // "resets in 30m"
+        let before = std::time::Instant::now();
+        let result = parse_reset_time("resets in 30m").unwrap();
+        let delta = result.duration_since(before);
+        assert!(delta >= std::time::Duration::from_secs(30 * 60 - 1));
+        assert!(delta <= std::time::Duration::from_secs(30 * 60 + 5));
+    }
+
+    #[test]
+    fn parse_reset_time_pm_suffix() {
+        // "resets 11pm" -- amount depends on wall-clock; just assert non-zero & bounded
+        let result = parse_reset_time("you've hit your session limit, resets 11pm");
+        assert!(result.is_some(), "11pm must parse to a future instant");
+        // The pm path computes a delta < 24h.
+        let delta = result.unwrap().duration_since(std::time::Instant::now());
+        assert!(delta <= std::time::Duration::from_secs(24 * 3600));
+    }
+
+    #[test]
+    fn parse_reset_time_am_suffix() {
+        let result = parse_reset_time("session limit reached, resets 7am");
+        assert!(result.is_some());
+        let delta = result.unwrap().duration_since(std::time::Instant::now());
+        assert!(delta <= std::time::Duration::from_secs(24 * 3600));
+    }
+
+    #[test]
+    fn parse_reset_time_unknown_without_resets_returns_none() {
+        // No "resets" token at all -> caller applies safety floor.
+        assert!(parse_reset_time("you've hit your session limit").is_none());
+        assert!(parse_reset_time("rate limit exceeded, try later").is_none());
+    }
+
+    #[test]
+    fn default_rate_limit_block_is_fifteen_minutes() {
+        assert_eq!(
+            DEFAULT_RATE_LIMIT_BLOCK,
+            std::time::Duration::from_secs(900)
+        );
     }
 
     #[test]
