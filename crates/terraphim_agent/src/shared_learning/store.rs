@@ -328,6 +328,20 @@ impl SharedLearningStore {
             .collect())
     }
 
+    pub async fn promote_to_l1(&self, id: &str) -> Result<(), StoreError> {
+        let mut index = self.index.write().await;
+        let learning = index
+            .get_mut(id)
+            .ok_or_else(|| StoreError::NotFound(id.to_string()))?;
+        learning.promote_to_l1();
+        let updated = learning.clone();
+        drop(index);
+
+        self.persist(&updated).await?;
+        info!("Promoted learning {} to L1", id);
+        Ok(())
+    }
+
     pub async fn promote_to_l2(&self, id: &str) -> Result<(), StoreError> {
         let mut index = self.index.write().await;
         let learning = index
@@ -786,7 +800,7 @@ mod tests {
         let retrieved = store.get(&id).await.unwrap();
         assert_eq!(retrieved.id, id);
         assert_eq!(retrieved.title, "Test Learning");
-        assert_eq!(retrieved.trust_level, TrustLevel::L1);
+        assert_eq!(retrieved.trust_level, TrustLevel::L0);
     }
 
     #[tokio::test]
@@ -799,6 +813,7 @@ mod tests {
             LearningSource::Manual,
             "agent".to_string(),
         );
+        learning.promote_to_l1();
         learning.promote_to_l2();
 
         store.insert(learning).await.unwrap();
@@ -846,6 +861,7 @@ mod tests {
         let id = learning.id.clone();
         store.insert(learning).await.unwrap();
 
+        store.promote_to_l1(&id).await.unwrap();
         store.promote_to_l2(&id).await.unwrap();
 
         let retrieved = store.get(&id).await.unwrap();
@@ -865,6 +881,8 @@ mod tests {
         )
         .with_keywords(vec!["git".to_string(), "push".to_string()]);
 
+        let mut learning = learning;
+        learning.promote_to_l1();
         store.insert(learning).await.unwrap();
 
         let suggestions = store
@@ -913,6 +931,7 @@ mod tests {
         let id = learning.id.clone();
         store.insert(learning).await.unwrap();
 
+        store.promote_to_l1(&id).await.unwrap();
         store.record_application(&id, "agent1", true).await.unwrap();
         store.record_application(&id, "agent1", true).await.unwrap();
         store.record_application(&id, "agent2", true).await.unwrap();
@@ -1029,6 +1048,7 @@ mod tests {
         store.insert(learning).await.unwrap();
 
         // Promote to L2
+        store.promote_to_l1(&id).await.unwrap();
         store.promote_to_l2(&id).await.unwrap();
 
         // Record applications
@@ -1090,7 +1110,7 @@ mod tests {
             retrieved.rejection_reason.as_deref(),
             Some("not applicable")
         );
-        assert_eq!(retrieved.trust_level, TrustLevel::L1);
+        assert_eq!(retrieved.trust_level, TrustLevel::L0);
     }
 
     #[tokio::test]
@@ -1213,7 +1233,7 @@ mod tests {
             );
             let id = dyn_store.insert(learning).unwrap();
 
-            assert_eq!(dyn_store.get(&id).unwrap().trust_level, Tl::L1);
+            assert_eq!(dyn_store.get(&id).unwrap().trust_level, Tl::L0);
 
             dyn_store.record_effective(&id, "agent-a").unwrap();
             dyn_store.record_effective(&id, "agent-b").unwrap();
@@ -1229,18 +1249,20 @@ mod tests {
             let store = create_trait_test_store().await;
             let dyn_store: &dyn LearningStore = &store;
 
-            let l1 = SharedLearning::new(
+            let mut l1 = SharedLearning::new(
                 "L1".to_string(),
                 "c".to_string(),
                 LearningSource::Manual,
                 "a".to_string(),
             );
+            l1.promote_to_l1();
             let mut l2 = SharedLearning::new(
                 "L2".to_string(),
                 "c".to_string(),
                 LearningSource::Manual,
                 "a".to_string(),
             );
+            l2.promote_to_l1();
             l2.promote_to_l2();
             dyn_store.insert(l1).unwrap();
             dyn_store.insert(l2).unwrap();
@@ -1278,13 +1300,14 @@ mod tests {
             let store = create_trait_test_store().await;
             let dyn_store: &dyn LearningStore = &store;
 
-            let learning = SharedLearning::new(
+            let mut learning = SharedLearning::new(
                 "Agent Specific".to_string(),
                 "Only for security".to_string(),
                 LearningSource::Manual,
                 "sec".to_string(),
             )
             .with_applicable_agents(vec!["security-audit".to_string()]);
+            learning.promote_to_l1();
             dyn_store.insert(learning).unwrap();
 
             let for_sec = dyn_store
@@ -1404,13 +1427,14 @@ mod tests {
             let store = create_trait_test_store().await;
             let dyn_store: &dyn LearningStore = &store;
 
-            let learning = SharedLearning::new(
+            let mut learning = SharedLearning::new(
                 "Rust Error".to_string(),
                 "Use cargo clippy for rust errors".to_string(),
                 LearningSource::Manual,
                 "agent".to_string(),
             )
             .with_keywords(vec!["rust".to_string(), "clippy".to_string()]);
+            learning.promote_to_l1();
             dyn_store.insert(learning).unwrap();
 
             let results = dyn_store
