@@ -782,6 +782,71 @@ model = "llama3.2"
     }
 
     #[test]
+    fn test_telegram_config_debug_redacts_token() {
+        let cfg = TelegramConfig {
+            token: "secret-telegram-bot-token".to_string(),
+            allow_from: vec!["user1".to_string()],
+        };
+        let output = format!("{:?}", cfg);
+        assert!(
+            !output.contains("secret-telegram-bot-token"),
+            "token must not appear in TelegramConfig Debug output"
+        );
+        assert!(output.contains("***REDACTED***"));
+    }
+
+    #[test]
+    fn test_discord_config_debug_redacts_token() {
+        let cfg = DiscordConfig {
+            token: "secret-discord-bot-token".to_string(),
+            allow_from: vec!["user1".to_string()],
+        };
+        let output = format!("{:?}", cfg);
+        assert!(
+            !output.contains("secret-discord-bot-token"),
+            "token must not appear in DiscordConfig Debug output"
+        );
+        assert!(output.contains("***REDACTED***"));
+    }
+
+    #[test]
+    fn test_slack_config_debug_redacts_tokens() {
+        let cfg = SlackConfig {
+            bot_token: "xoxb-secret-bot-token".to_string(),
+            app_token: "xapp-secret-app-token".to_string(),
+            allow_from: vec!["U01234567".to_string()],
+        };
+        let output = format!("{:?}", cfg);
+        assert!(
+            !output.contains("xoxb-secret-bot-token"),
+            "bot_token must not appear in SlackConfig Debug output"
+        );
+        assert!(
+            !output.contains("xapp-secret-app-token"),
+            "app_token must not appear in SlackConfig Debug output"
+        );
+        assert!(output.contains("***REDACTED***"));
+    }
+
+    #[test]
+    fn test_matrix_config_debug_redacts_password() {
+        let cfg = MatrixConfig {
+            homeserver_url: "https://matrix.example.com".to_string(),
+            username: "bot_user".to_string(),
+            password: "super-secret-matrix-password".to_string(),
+            allow_from: vec!["@user:example.com".to_string()],
+        };
+        let output = format!("{:?}", cfg);
+        assert!(
+            !output.contains("super-secret-matrix-password"),
+            "password must not appear in MatrixConfig Debug output"
+        );
+        assert!(output.contains("***REDACTED***"));
+        assert!(output.contains("matrix.example.com"));
+        assert!(output.contains("bot_user"));
+    }
+
+    #[test]
     fn test_llm_config_debug_does_not_leak_api_key() {
         let cfg = LlmConfig {
             proxy: ProxyConfig {

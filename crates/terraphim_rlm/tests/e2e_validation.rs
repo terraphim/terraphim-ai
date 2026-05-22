@@ -15,6 +15,8 @@
 //! in default workspace builds.
 #![cfg(feature = "firecracker")]
 
+#![cfg(feature = "firecracker")]
+
 use terraphim_rlm::{
     config::{BackendType, RlmConfig},
     executor::{Capability, ExecutionEnvironment},

@@ -118,4 +118,5 @@ mod tests {
         assert!(out.contains("None"));
         assert!(!out.contains("github-token"));
     }
+    }
 }

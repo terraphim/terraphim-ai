@@ -1576,6 +1576,23 @@ mod tests {
     }
 
     #[test]
+    fn gitea_config_debug_redacts_token() {
+        let config = GiteaConfig::new(
+            "https://git.example.com".to_string(),
+            "secret-gitea-api-token".to_string(),
+            "owner".to_string(),
+            "repo".to_string(),
+        );
+        let output = format!("{:?}", config);
+        assert!(
+            !output.contains("secret-gitea-api-token"),
+            "token must not appear in GiteaConfig Debug output"
+        );
+        assert!(output.contains("***REDACTED***"));
+        assert!(output.contains("git.example.com"));
+    }
+
+    #[test]
     fn normalise_issue_converts_fields() {
         let config = test_config();
         let tracker = GiteaTracker::new(config).unwrap();
