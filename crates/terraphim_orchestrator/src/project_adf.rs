@@ -259,6 +259,7 @@ impl TryFrom<&ProjectAdfConfig> for (Project, Vec<AgentDefinition>) {
                     project: Some(cfg.project_id.clone()),
                     evolution_enabled: ta.evolution_enabled,
                     rlm_enabled: ta.rlm_enabled,
+                    bypass_kg_routing: false,
                 })
             })
             .collect::<Result<Vec<AgentDefinition>, OrchestratorError>>()?;
