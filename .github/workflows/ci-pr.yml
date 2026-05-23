@@ -654,7 +654,6 @@ jobs:
           if [[ "${{ needs.rust-format.result }}" == "failure" ]] || \
              [[ "${{ needs.compile-check.result }}" == "failure" ]] || \
              [[ "${{ needs.rust-tests.result }}" == "failure" ]] || \
-             [[ "${{ needs.rust-tests.result }}" == "failure" ]] || \
              [[ "${{ needs.ranking-regression-gate.result }}" == "failure" ]]; then
             echo "❌ **PR Validation Failed** - Please fix the failing checks before merging." >> $GITHUB_STEP_SUMMARY
             exit 1
