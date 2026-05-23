@@ -6515,7 +6515,8 @@ impl AgentOrchestrator {
 
             // Config-error circuit-breaker: quarantine after 3 consecutive failures.
             let record = if record.exit_class == ExitClass::ConfigError {
-                let count = self.config_error_counters
+                let count = self
+                    .config_error_counters
                     .entry(name.clone())
                     .and_modify(|c| *c += 1)
                     .or_insert(1);
@@ -6532,7 +6533,10 @@ impl AgentOrchestrator {
                         // TODO: persist enabled=false to conf.d TOML (issue #1817).
                     }
                 }
-                AgentRunRecord { consecutive_config_errors: new_count, ..record }
+                AgentRunRecord {
+                    consecutive_config_errors: new_count,
+                    ..record
+                }
             } else {
                 self.config_error_counters.remove(name.as_str());
                 record
