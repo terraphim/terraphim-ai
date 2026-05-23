@@ -85,6 +85,7 @@ fn test_config(working_dir: PathBuf) -> OrchestratorConfig {
                 evolution_enabled: false,
                 rlm_enabled: None,
                 bypass_kg_routing: false,
+                enabled: true,
 
                 project: None,
             },
@@ -114,6 +115,7 @@ fn test_config(working_dir: PathBuf) -> OrchestratorConfig {
                 evolution_enabled: false,
                 rlm_enabled: None,
                 bypass_kg_routing: false,
+                enabled: true,
 
                 project: None,
             },
@@ -143,6 +145,7 @@ fn test_config(working_dir: PathBuf) -> OrchestratorConfig {
                 evolution_enabled: false,
                 rlm_enabled: None,
                 bypass_kg_routing: false,
+                enabled: true,
 
                 project: None,
             },

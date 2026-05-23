@@ -260,6 +260,7 @@ impl TryFrom<&ProjectAdfConfig> for (Project, Vec<AgentDefinition>) {
                     evolution_enabled: ta.evolution_enabled,
                     rlm_enabled: ta.rlm_enabled,
                     bypass_kg_routing: false,
+                    enabled: true,
                 })
             })
             .collect::<Result<Vec<AgentDefinition>, OrchestratorError>>()?;
