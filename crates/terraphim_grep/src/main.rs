@@ -164,9 +164,13 @@ async fn main() -> Result<()> {
 
     tracing::debug!("Loaded thesaurus with {} entries", thesaurus.len());
 
+    // Determine search path
+    let search_path = args.paths.first().cloned().unwrap_or_else(|| PathBuf::from("."));
+
     // Create hybrid searcher
-    let hybrid_searcher = HybridSearcher::new(role_name.clone(), thesaurus)
-        .with_context(|| "Failed to create hybrid searcher")?;
+    let mut hybrid_searcher = HybridSearcher::new(role_name.clone(), thesaurus)
+        .map_err(|e| anyhow::anyhow!("Failed to create hybrid searcher: {}", e))?;
+    hybrid_searcher = hybrid_searcher.with_search_path(search_path);
     let hybrid_searcher = Arc::new(hybrid_searcher);
 
     // Create sufficiency judge

@@ -24,6 +24,8 @@ terraphim_service = { path = "../terraphim_service", optional = true }
 haystack_core = { path = "../haystack_core", optional = true }
 terraphim_file_search = { path = "../terraphim_file_search", optional = true }
 
+fff-search = { git = "https://github.com/AlexMikhalev/fff.nvim.git", branch = "feat/external-scorer", optional = true }
+
 async-trait.workspace = true
 parking_lot = "0.12"
 tracing = { workspace = true }
@@ -34,7 +36,7 @@ clap = { version = "4", features = ["derive"] }
 [features]
 default = ["llm"]
 llm = ["dep:terraphim_service"]
-code-search = ["dep:terraphim_file_search"]
+code-search = ["dep:terraphim_file_search", "dep:fff-search"]
 doc-search = ["dep:haystack_core"]
 
 [dev-dependencies]

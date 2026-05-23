@@ -8,7 +8,7 @@ pub mod sufficiency_judge;
 use std::sync::Arc;
 
 pub use error::{Result, TerraphimGrepError};
-pub use hybrid_searcher::{GrepOptions, Haystack, HybridResults, HybridSearcher, RetrievedChunk};
+pub use hybrid_searcher::{GrepOptions, Haystack, HybridResults, HybridSearcher, KgConcept, RetrievedChunk};
 pub use kg_curation::KgCurationRlm;
 pub use rlm_context::RlmContext;
 pub use signatures::{AnswerWithCitations, Citation, Match, NewConcept, RlmSignature};
@@ -18,7 +18,7 @@ pub use sufficiency_judge::{HeuristicThresholds, Sufficiency, SufficiencyJudge};
 pub struct GrepResult {
     pub chunks: Vec<RetrievedChunk>,
     pub answer: Option<AnswerWithCitations>,
-    pub concepts: Vec<hybrid_searcher::KgConcept>,
+    pub concepts: Vec<KgConcept>,
     pub sufficiency: SufficiencyState,
     pub stats: GrepStats,
 }

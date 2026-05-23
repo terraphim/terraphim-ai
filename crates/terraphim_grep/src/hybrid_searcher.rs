@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
@@ -83,45 +84,19 @@ impl HybridResults {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.code_results.is_empty() && self.doc_results.is_empty() && self.kg_concepts.is_empty()
+        self.code_results.is_empty()
+            && self.doc_results.is_empty()
+            && self.kg_concepts.is_empty()
     }
 }
 
-/// Hybrid searcher that combines KG, code, and doc search.
 pub struct HybridSearcher {
     role_graph: Arc<tokio::sync::RwLock<terraphim_rolegraph::RoleGraph>>,
-    #[cfg(feature = "code-search")]
-    code_searcher: Option<CodeSearcher>,
-    #[cfg(not(feature = "code-search"))]
-    _code_searcher: (),
-    #[cfg(feature = "doc-search")]
-    doc_searcher: Option<DocSearcher>,
-    #[cfg(not(feature = "doc-search"))]
-    _doc_searcher: (),
+    search_path: PathBuf,
 }
-
-#[cfg(feature = "code-search")]
-pub struct CodeSearcher {
-    // Future: will use fff-search or ripgrep for code search
-}
-
-#[cfg(not(feature = "code-search"))]
-pub struct CodeSearcher(pub ());
-
-#[cfg(feature = "doc-search")]
-pub struct DocSearcher {
-    // Future: will use haystack_core HaystackProvider for doc search
-}
-
-#[cfg(not(feature = "doc-search"))]
-pub struct DocSearcher(pub ());
 
 impl HybridSearcher {
-    /// Create a new HybridSearcher with the given role name and thesaurus.
-    pub fn new(
-        role_name: String,
-        thesaurus: terraphim_types::Thesaurus,
-    ) -> Result<Self, terraphim_rolegraph::Error> {
+    pub fn new(role_name: String, thesaurus: terraphim_types::Thesaurus) -> Result<Self, terraphim_rolegraph::Error> {
         let rolegraph = terraphim_rolegraph::RoleGraph::new_sync(
             terraphim_types::RoleName::new(&role_name),
             thesaurus,
@@ -129,51 +104,12 @@ impl HybridSearcher {
 
         Ok(Self {
             role_graph: Arc::new(tokio::sync::RwLock::new(rolegraph)),
-            #[cfg(feature = "code-search")]
-            code_searcher: None,
-            #[cfg(not(feature = "code-search"))]
-            _code_searcher: (),
-            #[cfg(feature = "doc-search")]
-            doc_searcher: None,
-            #[cfg(not(feature = "doc-search"))]
-            _doc_searcher: (),
+            search_path: PathBuf::from("."),
         })
     }
 
-    /// Create a HybridSearcher with an existing RoleGraph.
-    pub fn with_role_graph(role_graph: terraphim_rolegraph::RoleGraph) -> Self {
-        Self {
-            role_graph: Arc::new(tokio::sync::RwLock::new(role_graph)),
-            #[cfg(feature = "code-search")]
-            code_searcher: None,
-            #[cfg(not(feature = "code-search"))]
-            _code_searcher: (),
-            #[cfg(feature = "doc-search")]
-            doc_searcher: None,
-            #[cfg(not(feature = "doc-search"))]
-            _doc_searcher: (),
-        }
-    }
-
-    #[cfg(feature = "code-search")]
-    pub fn with_code_searcher(mut self, searcher: CodeSearcher) -> Self {
-        self.code_searcher = Some(searcher);
-        self
-    }
-
-    #[cfg(not(feature = "code-search"))]
-    pub fn with_code_searcher(self, _searcher: CodeSearcher) -> Self {
-        self
-    }
-
-    #[cfg(feature = "doc-search")]
-    pub fn with_doc_searcher(mut self, searcher: DocSearcher) -> Self {
-        self.doc_searcher = Some(searcher);
-        self
-    }
-
-    #[cfg(not(feature = "doc-search"))]
-    pub fn with_doc_searcher(self, _searcher: DocSearcher) -> Self {
+    pub fn with_search_path(mut self, path: PathBuf) -> Self {
+        self.search_path = path;
         self
     }
 
@@ -183,29 +119,22 @@ impl HybridSearcher {
         options: &GrepOptions,
     ) -> Result<HybridResults, String> {
         let max_results = options.max_results;
-
-        // Run searches in parallel based on haystack configuration
-        // We need to clone data before spawning tasks to avoid lifetime issues
+        let search_path = self.search_path.clone();
         let role_graph = self.role_graph.clone();
         let query_owned = query.to_string();
-        let max_results_owned = max_results;
 
-        let (kg_concepts, code_results, doc_results) = match options.haystack {
-            Haystack::All => {
+        let (kg_concepts, code_results) = match options.haystack {
+            Haystack::All | Haystack::Code => {
                 let kg_handle = tokio::spawn({
                     let query = query_owned.clone();
                     let graph = role_graph.clone();
-                    async move { Self::search_kg_static(&query, max_results_owned, graph).await }
+                    async move { Self::search_kg(&query, max_results, graph).await }
                 });
 
                 let code_handle = tokio::spawn({
                     let query = query_owned.clone();
-                    async move { Self::search_code_static(&query, max_results_owned).await }
-                });
-
-                let doc_handle = tokio::spawn({
-                    let query = query_owned.clone();
-                    async move { Self::search_docs_static(&query, max_results_owned).await }
+                    let path = search_path.clone();
+                    async move { Self::search_code(&query, max_results, path).await }
                 });
 
                 let kg_concepts = kg_handle
@@ -214,37 +143,23 @@ impl HybridSearcher {
                 let code_results = code_handle
                     .await
                     .map_err(|e| format!("Code search join error: {}", e))??;
-                let doc_results = doc_handle
-                    .await
-                    .map_err(|e| format!("Doc search join error: {}", e))??;
-
-                (kg_concepts, code_results, doc_results)
-            }
-            Haystack::Code => {
-                let kg_concepts =
-                    Self::search_kg_static(&query_owned, max_results_owned, role_graph.clone())
-                        .await?;
-                let code_results =
-                    Self::search_code_static(&query_owned, max_results_owned).await?;
-                (kg_concepts, code_results, vec![])
+                (kg_concepts, code_results)
             }
             Haystack::Docs => {
                 let kg_concepts =
-                    Self::search_kg_static(&query_owned, max_results_owned, role_graph.clone())
-                        .await?;
-                let doc_results = Self::search_docs_static(&query_owned, max_results_owned).await?;
-                (kg_concepts, vec![], doc_results)
+                    Self::search_kg(&query_owned, max_results, role_graph.clone()).await?;
+                (kg_concepts, vec![])
             }
         };
 
         Ok(HybridResults {
             code_results,
-            doc_results,
+            doc_results: vec![],
             kg_concepts,
         })
     }
 
-    async fn search_kg_static(
+    async fn search_kg(
         query: &str,
         limit: usize,
         graph: Arc<tokio::sync::RwLock<terraphim_rolegraph::RoleGraph>>,
@@ -268,20 +183,78 @@ impl HybridSearcher {
         Ok(concepts)
     }
 
-    async fn search_code_static(
-        _query: &str,
-        _limit: usize,
+    async fn search_code(
+        query: &str,
+        limit: usize,
+        search_path: PathBuf,
     ) -> Result<Vec<RetrievedChunk>, String> {
-        // Code search placeholder - would use fff-search or ripgrep
-        Ok(vec![])
-    }
+        #[cfg(feature = "code-search")]
+        {
+            use fff_search::{
+                ContentCacheBudget, FilePicker, FilePickerOptions, FFFMode, GrepMode,
+                GrepSearchOptions, grep_search, parse_grep_query,
+            };
 
-    async fn search_docs_static(
-        _query: &str,
-        _limit: usize,
-    ) -> Result<Vec<RetrievedChunk>, String> {
-        // Doc search placeholder - would use haystack_core HaystackProvider
-        Ok(vec![])
+            let mut picker = FilePicker::new(FilePickerOptions {
+                base_path: search_path.to_string_lossy().to_string(),
+                mode: FFFMode::Ai,
+                watch: false,
+                warmup_mmap_cache: false,
+                cache_budget: None,
+            })
+            .map_err(|e| format!("FilePicker init failed: {}", e))?;
+
+            picker
+                .collect_files()
+                .map_err(|e| format!("File scan failed: {}", e))?;
+
+            let files = picker.get_files().to_vec();
+            if files.is_empty() {
+                return Ok(vec![]);
+            }
+
+            let fff_query = parse_grep_query(query);
+            let budget = ContentCacheBudget::default();
+            let options = GrepSearchOptions {
+                max_file_size: 10 * 1024 * 1024,
+                max_matches_per_file: 200,
+                smart_case: true,
+                file_offset: 0,
+                page_limit: limit,
+                mode: GrepMode::PlainText,
+                time_budget_ms: 0,
+                before_context: 0,
+                after_context: 0,
+                classify_definitions: false,
+            };
+
+            let result = grep_search(&files, &fff_query, &options, &budget, None, None, None);
+
+            let chunks = result
+                .matches
+                .into_iter()
+                .take(limit)
+                .filter_map(|m| {
+                    let file = result.files.get(m.file_index)?;
+                    Some(RetrievedChunk {
+                        content: m.line_content,
+                        source: file.relative_path.clone(),
+                        line_start: Some(m.line_number as usize),
+                        line_end: Some(m.line_number as usize),
+                        relevance_score: 1.0,
+                        haystack: "code",
+                    })
+                })
+                .collect();
+
+            Ok(chunks)
+        }
+
+        #[cfg(not(feature = "code-search"))]
+        {
+            let _ = (query, limit, search_path);
+            Ok(vec![])
+        }
     }
 
     pub fn fuse_and_rank(&self, mut results: Vec<RetrievedChunk>) -> Vec<RetrievedChunk> {
