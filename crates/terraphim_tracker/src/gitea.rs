@@ -79,7 +79,7 @@ pub struct GiteaMergeResult {
 }
 
 /// Configuration for Gitea tracker.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct GiteaConfig {
     pub base_url: String,
     pub token: String,
@@ -92,6 +92,22 @@ pub struct GiteaConfig {
     pub robot_path: PathBuf,
     /// Default claim strategy (default: PreferRobot).
     pub claim_strategy: ClaimStrategy,
+}
+
+impl std::fmt::Debug for GiteaConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("GiteaConfig")
+            .field("base_url", &self.base_url)
+            .field("token", &"***REDACTED***")
+            .field("owner", &self.owner)
+            .field("repo", &self.repo)
+            .field("active_states", &self.active_states)
+            .field("terminal_states", &self.terminal_states)
+            .field("use_robot_api", &self.use_robot_api)
+            .field("robot_path", &self.robot_path)
+            .field("claim_strategy", &self.claim_strategy)
+            .finish()
+    }
 }
 
 impl GiteaConfig {
@@ -1513,6 +1529,22 @@ mod tests {
     use super::*;
     use wiremock::matchers::{method, path, query_param};
     use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    #[test]
+    fn gitea_config_debug_redacts_token() {
+        let cfg = GiteaConfig::new(
+            "https://git.terraphim.cloud".to_string(),
+            "gitea-secret-token-abcdef".to_string(),
+            "terraphim".to_string(),
+            "terraphim-ai".to_string(),
+        );
+        let out = format!("{:?}", cfg);
+        assert!(!out.contains("gitea-secret-token-abcdef"));
+        assert!(out.contains("***REDACTED***"));
+        // Non-secret fields render normally
+        assert!(out.contains("git.terraphim.cloud"));
+        assert!(out.contains("terraphim-ai"));
+    }
 
     fn make_tracker(base_url: &str) -> GiteaTracker {
         let config = GiteaConfig {

@@ -263,7 +263,7 @@ impl ChannelsConfig {
 }
 
 /// Telegram channel configuration.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 pub struct TelegramConfig {
     /// Bot token from @BotFather.
     pub token: String,
@@ -271,6 +271,15 @@ pub struct TelegramConfig {
     /// List of allowed sender IDs (usernames or user IDs).
     /// Must be non-empty for security.
     pub allow_from: Vec<String>,
+}
+
+impl std::fmt::Debug for TelegramConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TelegramConfig")
+            .field("token", &"***REDACTED***")
+            .field("allow_from", &self.allow_from)
+            .finish()
+    }
 }
 
 impl TelegramConfig {
@@ -295,7 +304,7 @@ impl TelegramConfig {
 }
 
 /// Discord channel configuration.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 pub struct DiscordConfig {
     /// Bot token from Discord Developer Portal.
     pub token: String,
@@ -303,6 +312,15 @@ pub struct DiscordConfig {
     /// List of allowed sender IDs (usernames or user IDs).
     /// Must be non-empty for security.
     pub allow_from: Vec<String>,
+}
+
+impl std::fmt::Debug for DiscordConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DiscordConfig")
+            .field("token", &"***REDACTED***")
+            .field("allow_from", &self.allow_from)
+            .finish()
+    }
 }
 
 impl DiscordConfig {
@@ -327,7 +345,7 @@ impl DiscordConfig {
 }
 
 /// Slack channel configuration.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 pub struct SlackConfig {
     /// Bot token (xoxb-...) from Slack App settings.
     pub bot_token: String,
@@ -338,6 +356,16 @@ pub struct SlackConfig {
     /// List of allowed sender IDs (Slack user IDs like "U01234567").
     /// Must be non-empty for security.
     pub allow_from: Vec<String>,
+}
+
+impl std::fmt::Debug for SlackConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SlackConfig")
+            .field("bot_token", &"***REDACTED***")
+            .field("app_token", &"***REDACTED***")
+            .field("allow_from", &self.allow_from)
+            .finish()
+    }
 }
 
 impl SlackConfig {
@@ -366,7 +394,7 @@ impl SlackConfig {
 }
 
 /// Matrix channel configuration for WhatsApp bridge.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 pub struct MatrixConfig {
     /// Matrix homeserver URL (e.g., `https://matrix.example.com`)
     pub homeserver_url: String,
@@ -377,6 +405,17 @@ pub struct MatrixConfig {
     /// List of allowed sender IDs (Matrix MXIDs like "@user:example.com")
     /// Must be non-empty for security.
     pub allow_from: Vec<String>,
+}
+
+impl std::fmt::Debug for MatrixConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MatrixConfig")
+            .field("homeserver_url", &self.homeserver_url)
+            .field("username", &self.username)
+            .field("password", &"***REDACTED***")
+            .field("allow_from", &self.allow_from)
+            .finish()
+    }
 }
 
 impl MatrixConfig {
@@ -476,6 +515,59 @@ fn expand_env_vars(input: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn telegram_config_debug_redacts_token() {
+        let cfg = TelegramConfig {
+            token: "telegram-secret-12345".into(),
+            allow_from: vec!["@alice".into()],
+        };
+        let out = format!("{:?}", cfg);
+        assert!(!out.contains("telegram-secret-12345"));
+        assert!(out.contains("***REDACTED***"));
+        assert!(out.contains("@alice")); // non-secret field still rendered
+    }
+
+    #[test]
+    fn discord_config_debug_redacts_token() {
+        let cfg = DiscordConfig {
+            token: "discord-secret-67890".into(),
+            allow_from: vec!["bob".into()],
+        };
+        let out = format!("{:?}", cfg);
+        assert!(!out.contains("discord-secret-67890"));
+        assert!(out.contains("***REDACTED***"));
+    }
+
+    #[test]
+    fn slack_config_debug_redacts_both_tokens() {
+        let cfg = SlackConfig {
+            bot_token: "xoxb-bot-secret".into(),
+            app_token: "xapp-app-secret".into(),
+            allow_from: vec!["U01234567".into()],
+        };
+        let out = format!("{:?}", cfg);
+        assert!(!out.contains("xoxb-bot-secret"));
+        assert!(!out.contains("xapp-app-secret"));
+        // The redacted marker appears at least once per redacted field
+        assert!(out.matches("***REDACTED***").count() >= 2);
+    }
+
+    #[test]
+    fn matrix_config_debug_redacts_password_only() {
+        let cfg = MatrixConfig {
+            homeserver_url: "https://matrix.example.com".into(),
+            username: "@user:example.com".into(),
+            password: "matrix-secret-pw".into(),
+            allow_from: vec!["@friend:example.com".into()],
+        };
+        let out = format!("{:?}", cfg);
+        assert!(!out.contains("matrix-secret-pw"));
+        assert!(out.contains("***REDACTED***"));
+        // username + homeserver_url are not secrets; verify they render
+        assert!(out.contains("@user:example.com"));
+        assert!(out.contains("matrix.example.com"));
+    }
 
     #[test]
     fn test_config_from_toml() {
