@@ -108,4 +108,14 @@ pub enum MergeCoordinatorError {
 
     #[error(transparent)]
     Io(#[from] std::io::Error),
+
+    #[error("Gitea API failure: {0}")]
+    Api(String),
+}
+
+impl MergeCoordinatorError {
+    /// Convenience constructor for API failures.
+    pub fn api(s: impl Into<String>) -> Self {
+        Self::Api(s.into())
+    }
 }
