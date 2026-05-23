@@ -7,6 +7,7 @@ pub mod types;
 pub mod pid_lock;
 pub mod gitea;
 pub mod evaluator;
+pub mod jsonlog;
 
 /// Extract `Fixes #N` references from a PR body. Case-insensitive.
 /// Does NOT match `Refs #N` (which should not trigger auto-close).
