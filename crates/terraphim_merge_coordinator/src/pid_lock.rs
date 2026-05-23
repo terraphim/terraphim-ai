@@ -111,7 +111,11 @@ mod tests {
         let _guard = acquire_pid_lock(&lock_path, 30).expect("acquire");
         let contents = std::fs::read_to_string(&lock_path).unwrap();
         let payload = parse_lock_payload(&contents);
-        assert!(payload.pid > 0, "pid should be written; got {}", payload.pid);
+        assert!(
+            payload.pid > 0,
+            "pid should be written; got {}",
+            payload.pid
+        );
         assert!(payload.acquired_at > 0);
     }
 

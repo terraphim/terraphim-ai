@@ -3,11 +3,11 @@
 //! Full spec at .docs/spec-merge-coordinator.md will be implemented in
 //! follow-up commits. This skeleton proves the crate scaffolds correctly.
 
-pub mod types;
-pub mod pid_lock;
-pub mod gitea;
 pub mod evaluator;
+pub mod gitea;
 pub mod jsonlog;
+pub mod pid_lock;
+pub mod types;
 
 /// Extract `Fixes #N` references from a PR body. Case-insensitive.
 /// Does NOT match `Refs #N` (which should not trigger auto-close).

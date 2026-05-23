@@ -71,7 +71,10 @@ pub async fn merge_and_close(
             return Ok(MergeOutcome::Skipped(reason.clone()));
         }
         EvalVerdict::Conflicting => {
-            warn!(pr = eval.pr_index, "conflicting subagent verdicts; not merging");
+            warn!(
+                pr = eval.pr_index,
+                "conflicting subagent verdicts; not merging"
+            );
             return Ok(MergeOutcome::Skipped("conflicting verdicts".into()));
         }
         EvalVerdict::Merge => {}

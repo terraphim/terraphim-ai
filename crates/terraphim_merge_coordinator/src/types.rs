@@ -74,7 +74,10 @@ mod tests {
     #[test]
     fn exit_code_display() {
         assert_eq!(ExitCode::Success.to_string(), "success");
-        assert_eq!(ExitCode::EvaluationFailures.to_string(), "evaluation_failures");
+        assert_eq!(
+            ExitCode::EvaluationFailures.to_string(),
+            "evaluation_failures"
+        );
         assert_eq!(ExitCode::Critical.to_string(), "critical");
     }
 

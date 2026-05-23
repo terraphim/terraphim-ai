@@ -117,7 +117,10 @@ async fn run() -> ExitCode {
             }
             Ok(MergeOutcome::Skipped(reason)) => emit(
                 "pr.skipped",
-                &[("pr_index", json!(eval.pr_index)), ("reason", json!(reason))],
+                &[
+                    ("pr_index", json!(eval.pr_index)),
+                    ("reason", json!(reason)),
+                ],
             ),
             Err(e) => {
                 emit(

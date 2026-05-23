@@ -64,7 +64,10 @@ mod tests {
         // Caller responsibility: we test that the function does not
         // synthesise a "token" key on its own.
         let v = build_event("pr.merged", &[("pr_index", json!(7))]);
-        assert!(v.get("token").is_none(), "emit must not synthesise token field");
+        assert!(
+            v.get("token").is_none(),
+            "emit must not synthesise token field"
+        );
     }
 
     #[test]
