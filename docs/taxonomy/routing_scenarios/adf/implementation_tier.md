@@ -30,6 +30,12 @@ action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ promp
 route:: openai, openai/gpt-5.3-codex
 action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"
 
+route:: minimax, minimax-coding-plan/MiniMax-M2.7-highspeed
+action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"
+
+route:: pi-rust-minimax, MiniMax-M2.7-highspeed
+action:: /home/alex/.local/bin/pi-rust --provider minimax-coding-plan --model {{ model }} -p "{{ prompt }}"
+
 route:: zai, zai-coding-plan/glm-5.1
 is_free:: true
 action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"

@@ -25,6 +25,12 @@ action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ promp
 route:: openai, openai/gpt-5.4
 action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"
 
+route:: openai, opencode/gpt-5.5
+action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"
+
+route:: pi-rust-openai-codex, gpt-5.5
+action:: /home/alex/.local/bin/pi-rust --provider openai-codex --model {{ model }} -p "{{ prompt }}"
+
 route:: zai, zai-coding-plan/glm-5.1
 is_free:: true
 action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"
