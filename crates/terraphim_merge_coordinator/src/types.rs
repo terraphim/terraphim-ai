@@ -99,3 +99,13 @@ mod tests {
         }
     }
 }
+
+/// Error type for the merge-coordinator surface.
+#[derive(Debug, thiserror::Error)]
+pub enum MergeCoordinatorError {
+    #[error("PID lock held by another instance (pid={pid}, age_secs={age_secs})")]
+    LockHeld { pid: i32, age_secs: u64 },
+
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+}

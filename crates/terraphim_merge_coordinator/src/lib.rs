@@ -4,6 +4,7 @@
 //! follow-up commits. This skeleton proves the crate scaffolds correctly.
 
 pub mod types;
+pub mod pid_lock;
 
 /// Extract `Fixes #N` references from a PR body. Case-insensitive.
 /// Does NOT match `Refs #N` (which should not trigger auto-close).
