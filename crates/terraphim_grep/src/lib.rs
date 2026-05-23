@@ -14,7 +14,7 @@ pub use rlm_context::RlmContext;
 pub use signatures::{AnswerWithCitations, Citation, Match, NewConcept, RlmSignature};
 pub use sufficiency_judge::{HeuristicThresholds, Sufficiency, SufficiencyJudge};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct GrepResult {
     pub chunks: Vec<RetrievedChunk>,
     pub answer: Option<AnswerWithCitations>,
@@ -23,14 +23,14 @@ pub struct GrepResult {
     pub stats: GrepStats,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub enum SufficiencyState {
     SearchOnly,
     RlmSynthesis,
     RlmInsufficient,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct GrepStats {
     pub search_latency_ms: u64,
     pub rlm_latency_ms: Option<u64>,
@@ -42,7 +42,7 @@ pub struct TerraphimGrep {
     hybrid_searcher: Arc<HybridSearcher>,
     sufficiency_judge: Arc<SufficiencyJudge>,
     #[cfg(feature = "llm")]
-    kg_curation: Arc<KgCurationRlm>,
+    kg_curation: Option<Arc<KgCurationRlm>>,
     #[cfg(feature = "llm")]
     llm_client: Option<Arc<dyn terraphim_service::llm::LlmClient>>,
 }
@@ -52,12 +52,11 @@ impl TerraphimGrep {
     pub fn new(
         hybrid_searcher: Arc<HybridSearcher>,
         sufficiency_judge: Arc<SufficiencyJudge>,
-        kg_curation: Arc<KgCurationRlm>,
     ) -> Self {
         Self {
             hybrid_searcher,
             sufficiency_judge,
-            kg_curation,
+            kg_curation: None,
             llm_client: None,
         }
     }
@@ -71,6 +70,12 @@ impl TerraphimGrep {
             hybrid_searcher,
             sufficiency_judge,
         }
+    }
+
+    #[cfg(feature = "llm")]
+    pub fn with_kg_curation(mut self, kg_curation: Arc<KgCurationRlm>) -> Self {
+        self.kg_curation = Some(kg_curation);
+        self
     }
 
     #[cfg(feature = "llm")]
@@ -222,10 +227,9 @@ impl TerraphimGrep {
             kg_hits: hybrid_results.kg_concepts.len(),
         };
 
-        let _ = self
-            .kg_curation
-            .extract_and_index(query, &llm_response)
-            .await;
+        if let Some(ref kg_curation) = self.kg_curation {
+            let _ = kg_curation.extract_and_index(query, &llm_response).await;
+        }
 
         Ok(GrepResult {
             chunks,

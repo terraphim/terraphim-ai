@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use parking_lot::RwLock;
+use serde::{Deserialize, Serialize};
 use terraphim_types::Document;
 
 #[derive(Debug, Clone)]
@@ -24,14 +24,15 @@ impl Default for GrepOptions {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Haystack {
+    #[default]
     Code,
     Docs,
     All,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RetrievedChunk {
     pub content: String,
     pub source: String,
@@ -54,7 +55,7 @@ impl From<Document> for RetrievedChunk {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KgConcept {
     pub id: u64,
     pub name: String,
@@ -86,34 +87,172 @@ impl HybridResults {
     }
 }
 
+/// Hybrid searcher that combines KG, code, and doc search.
 pub struct HybridSearcher {
-    kg_query: Arc<RwLock<terraphim_rolegraph::RoleGraph>>,
+    role_graph: Arc<tokio::sync::RwLock<terraphim_rolegraph::RoleGraph>>,
+    #[cfg(feature = "code-search")]
+    code_searcher: Option<CodeSearcher>,
+    #[cfg(not(feature = "code-search"))]
+    _code_searcher: (),
+    #[cfg(feature = "doc-search")]
+    doc_searcher: Option<DocSearcher>,
+    #[cfg(not(feature = "doc-search"))]
+    _doc_searcher: (),
 }
 
+#[cfg(feature = "code-search")]
+pub struct CodeSearcher {
+    // Future: will use fff-search or ripgrep for code search
+}
+
+#[cfg(not(feature = "code-search"))]
+pub struct CodeSearcher(pub ());
+
+#[cfg(feature = "doc-search")]
+pub struct DocSearcher {
+    // Future: will use haystack_core HaystackProvider for doc search
+}
+
+#[cfg(not(feature = "doc-search"))]
+pub struct DocSearcher(pub ());
+
 impl HybridSearcher {
-    pub fn new(kg_query: Arc<RwLock<terraphim_rolegraph::RoleGraph>>) -> Self {
-        Self { kg_query }
+    /// Create a new HybridSearcher with the given role name and thesaurus.
+    pub fn new(
+        role_name: String,
+        thesaurus: terraphim_types::Thesaurus,
+    ) -> Result<Self, terraphim_rolegraph::Error> {
+        let rolegraph = terraphim_rolegraph::RoleGraph::new_sync(
+            terraphim_types::RoleName::new(&role_name),
+            thesaurus,
+        )?;
+
+        Ok(Self {
+            role_graph: Arc::new(tokio::sync::RwLock::new(rolegraph)),
+            #[cfg(feature = "code-search")]
+            code_searcher: None,
+            #[cfg(not(feature = "code-search"))]
+            _code_searcher: (),
+            #[cfg(feature = "doc-search")]
+            doc_searcher: None,
+            #[cfg(not(feature = "doc-search"))]
+            _doc_searcher: (),
+        })
+    }
+
+    /// Create a HybridSearcher with an existing RoleGraph.
+    pub fn with_role_graph(role_graph: terraphim_rolegraph::RoleGraph) -> Self {
+        Self {
+            role_graph: Arc::new(tokio::sync::RwLock::new(role_graph)),
+            #[cfg(feature = "code-search")]
+            code_searcher: None,
+            #[cfg(not(feature = "code-search"))]
+            _code_searcher: (),
+            #[cfg(feature = "doc-search")]
+            doc_searcher: None,
+            #[cfg(not(feature = "doc-search"))]
+            _doc_searcher: (),
+        }
+    }
+
+    #[cfg(feature = "code-search")]
+    pub fn with_code_searcher(mut self, searcher: CodeSearcher) -> Self {
+        self.code_searcher = Some(searcher);
+        self
+    }
+
+    #[cfg(not(feature = "code-search"))]
+    pub fn with_code_searcher(self, _searcher: CodeSearcher) -> Self {
+        self
+    }
+
+    #[cfg(feature = "doc-search")]
+    pub fn with_doc_searcher(mut self, searcher: DocSearcher) -> Self {
+        self.doc_searcher = Some(searcher);
+        self
+    }
+
+    #[cfg(not(feature = "doc-search"))]
+    pub fn with_doc_searcher(self, _searcher: DocSearcher) -> Self {
+        self
     }
 
     pub async fn search(
         &self,
         query: &str,
-        _options: &GrepOptions,
+        options: &GrepOptions,
     ) -> Result<HybridResults, String> {
-        let kg_concepts = self.search_kg(query).await?;
+        let max_results = options.max_results;
+
+        // Run searches in parallel based on haystack configuration
+        // We need to clone data before spawning tasks to avoid lifetime issues
+        let role_graph = self.role_graph.clone();
+        let query_owned = query.to_string();
+        let max_results_owned = max_results;
+
+        let (kg_concepts, code_results, doc_results) = match options.haystack {
+            Haystack::All => {
+                let kg_handle = tokio::spawn({
+                    let query = query_owned.clone();
+                    let graph = role_graph.clone();
+                    async move { Self::search_kg_static(&query, max_results_owned, graph).await }
+                });
+
+                let code_handle = tokio::spawn({
+                    let query = query_owned.clone();
+                    async move { Self::search_code_static(&query, max_results_owned).await }
+                });
+
+                let doc_handle = tokio::spawn({
+                    let query = query_owned.clone();
+                    async move { Self::search_docs_static(&query, max_results_owned).await }
+                });
+
+                let kg_concepts = kg_handle
+                    .await
+                    .map_err(|e| format!("KG search join error: {}", e))??;
+                let code_results = code_handle
+                    .await
+                    .map_err(|e| format!("Code search join error: {}", e))??;
+                let doc_results = doc_handle
+                    .await
+                    .map_err(|e| format!("Doc search join error: {}", e))??;
+
+                (kg_concepts, code_results, doc_results)
+            }
+            Haystack::Code => {
+                let kg_concepts =
+                    Self::search_kg_static(&query_owned, max_results_owned, role_graph.clone())
+                        .await?;
+                let code_results =
+                    Self::search_code_static(&query_owned, max_results_owned).await?;
+                (kg_concepts, code_results, vec![])
+            }
+            Haystack::Docs => {
+                let kg_concepts =
+                    Self::search_kg_static(&query_owned, max_results_owned, role_graph.clone())
+                        .await?;
+                let doc_results = Self::search_docs_static(&query_owned, max_results_owned).await?;
+                (kg_concepts, vec![], doc_results)
+            }
+        };
 
         Ok(HybridResults {
-            code_results: vec![],
-            doc_results: vec![],
+            code_results,
+            doc_results,
             kg_concepts,
         })
     }
 
-    async fn search_kg(&self, query: &str) -> Result<Vec<KgConcept>, String> {
-        let graph = self.kg_query.read();
+    async fn search_kg_static(
+        query: &str,
+        limit: usize,
+        graph: Arc<tokio::sync::RwLock<terraphim_rolegraph::RoleGraph>>,
+    ) -> Result<Vec<KgConcept>, String> {
+        let graph_guard = graph.read().await;
 
-        let matches = graph
-            .query_graph_with_trigger_fallback(query, None, Some(10), false)
+        let matches = graph_guard
+            .query_graph_with_trigger_fallback(query, None, Some(limit), false)
             .map_err(|e| e.to_string())?;
 
         let concepts = matches
@@ -127,6 +266,22 @@ impl HybridSearcher {
             .collect();
 
         Ok(concepts)
+    }
+
+    async fn search_code_static(
+        _query: &str,
+        _limit: usize,
+    ) -> Result<Vec<RetrievedChunk>, String> {
+        // Code search placeholder - would use fff-search or ripgrep
+        Ok(vec![])
+    }
+
+    async fn search_docs_static(
+        _query: &str,
+        _limit: usize,
+    ) -> Result<Vec<RetrievedChunk>, String> {
+        // Doc search placeholder - would use haystack_core HaystackProvider
+        Ok(vec![])
     }
 
     pub fn fuse_and_rank(&self, mut results: Vec<RetrievedChunk>) -> Vec<RetrievedChunk> {

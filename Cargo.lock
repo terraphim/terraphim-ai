@@ -8984,6 +8984,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
+ "terraphim_automata",
  "terraphim_file_search",
  "terraphim_rolegraph",
  "terraphim_service",

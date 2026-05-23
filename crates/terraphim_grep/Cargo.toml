@@ -19,20 +19,23 @@ log.workspace = true
 
 terraphim_types = { path = "../terraphim_types" }
 terraphim_rolegraph = { path = "../terraphim_rolegraph" }
+terraphim_automata = { path = "../terraphim_automata" }
 terraphim_service = { path = "../terraphim_service", optional = true }
-haystack_core = { path = "../haystack_core" }
-terraphim_file_search = { path = "../terraphim_file_search" }
+haystack_core = { path = "../haystack_core", optional = true }
+terraphim_file_search = { path = "../terraphim_file_search", optional = true }
 
 async-trait.workspace = true
 parking_lot = "0.12"
 tracing = { workspace = true }
-tracing-subscriber = "0.3"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 clap = { version = "4", features = ["derive"] }
 
 [features]
 default = ["llm"]
 llm = ["dep:terraphim_service"]
+code-search = ["dep:terraphim_file_search"]
+doc-search = ["dep:haystack_core"]
 
 [dev-dependencies]
 tokio-test = "0.4"
