@@ -8972,6 +8972,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "terraphim_grep"
+version = "1.19.3"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "haystack_core",
+ "log",
+ "parking_lot 0.12.5",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "terraphim_file_search",
+ "terraphim_rolegraph",
+ "terraphim_service",
+ "terraphim_types",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-test",
+ "tracing",
+]
+
+[[package]]
 name = "terraphim_hooks"
 version = "1.4.10"
 dependencies = [

@@ -1,0 +1,36 @@
+[package]
+name = "terraphim_grep"
+version.workspace = true
+edition.workspace = true
+authors = ["Terraphim AI Team"]
+description = "Intelligent hybrid grep with RLM fallback and KG curation"
+license = "MIT"
+repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["grep", "search", "knowledge-graph", "rlm"]
+categories = ["development-tools"]
+
+[dependencies]
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+log.workspace = true
+
+terraphim_types = { path = "../terraphim_types" }
+terraphim_rolegraph = { path = "../terraphim_rolegraph" }
+terraphim_service = { path = "../terraphim_service", optional = true }
+haystack_core = { path = "../haystack_core" }
+terraphim_file_search = { path = "../terraphim_file_search" }
+
+async-trait.workspace = true
+parking_lot = "0.12"
+tracing = { workspace = true }
+
+[features]
+default = ["llm"]
+llm = ["dep:terraphim_service"]
+
+[dev-dependencies]
+tokio-test = "0.4"
+tempfile.workspace = true
