@@ -786,6 +786,15 @@ pub struct AgentDefinition {
     /// spawns -- KG tier routing continues to dominate static config.
     #[serde(default)]
     pub bypass_kg_routing: bool,
+
+    /// Whether this agent is enabled. Set to false by the config-error
+    /// circuit-breaker after 3 consecutive ConfigError exits. Defaults to true.
+    #[serde(default = "default_agent_enabled")]
+    pub enabled: bool,
+}
+
+fn default_agent_enabled() -> bool {
+    true
 }
 
 /// Agent layer in the dark factory hierarchy.

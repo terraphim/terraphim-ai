@@ -308,6 +308,7 @@ fn agent_with_model(name: &str, model: &str) -> AgentDefinition {
         evolution_enabled: false,
         rlm_enabled: None,
         bypass_kg_routing: false,
+        enabled: true,
         project: None,
     }
 }

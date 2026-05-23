@@ -28,6 +28,7 @@ fn make_agent(name: &str, layer: AgentLayer, schedule: Option<&str>) -> AgentDef
         evolution_enabled: false,
         rlm_enabled: None,
         bypass_kg_routing: false,
+        enabled: true,
 
         project: None,
     }

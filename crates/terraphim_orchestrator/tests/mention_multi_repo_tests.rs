@@ -43,6 +43,7 @@ fn agent(name: &str, project: Option<&str>) -> AgentDefinition {
         evolution_enabled: false,
         rlm_enabled: None,
         bypass_kg_routing: false,
+        enabled: true,
         project: project.map(|s| s.to_string()),
     }
 }
