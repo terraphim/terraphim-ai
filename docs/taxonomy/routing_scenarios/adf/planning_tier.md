@@ -28,12 +28,12 @@ action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ promp
 route:: openai, opencode/gpt-5.5
 action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"
 
-route:: pi-rust-openai-codex, gpt-5.5
+route:: openai-codex, gpt-5.5
 action:: /home/alex/.local/bin/pi-rust --provider openai-codex --model {{ model }} -p "{{ prompt }}"
 
 # Z.AI Coding Plan healthy via pi-rust; broken via opencode 1.14.48
 # (opencode emits only step_start, no text). Investigation: 2026-05-23.
 # Route through pi-rust until opencode integration is fixed upstream.
-route:: pi-rust-zai, glm-5.1
+route:: zai-coding-plan, glm-5.1
 is_free:: true
 action:: /home/alex/.local/bin/pi-rust --provider zai-coding-plan --model {{ model }} -p "{{ prompt }}"

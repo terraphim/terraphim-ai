@@ -656,7 +656,7 @@ action:: opencode -m {{ model }} -p "{{ prompt }}"
                 "merge-coordinator",
                 "review merge verdict and evaluate GO NO-GO for PR approval",
                 "decision_tier",
-                "pi-rust-openai-codex",
+                "openai-codex",
             ),
             // IMPLEMENTATION TIER (sonnet)
             (
@@ -700,7 +700,7 @@ action:: opencode -m {{ model }} -p "{{ prompt }}"
                 "nightwatch-retrospective",
                 "nightwatch retrospective and quality evaluation across fleet health",
                 "decision_tier",
-                "pi-rust-openai-codex",
+                "openai-codex",
             ),
         ];
 
