@@ -3,6 +3,8 @@
 //! Full spec at .docs/spec-merge-coordinator.md will be implemented in
 //! follow-up commits. This skeleton proves the crate scaffolds correctly.
 
+pub mod types;
+
 /// Extract `Fixes #N` references from a PR body. Case-insensitive.
 /// Does NOT match `Refs #N` (which should not trigger auto-close).
 pub fn extract_fixes(body: &str) -> Vec<u64> {
