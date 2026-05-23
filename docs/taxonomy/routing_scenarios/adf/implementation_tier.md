@@ -36,8 +36,9 @@ action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ promp
 route:: pi-rust-minimax, MiniMax-M2.7-highspeed
 action:: /home/alex/.local/bin/pi-rust --provider minimax-coding-plan --model {{ model }} -p "{{ prompt }}"
 
-# zai-coding-plan/* is upstream-broken on opencode 1.14.48 (only emits
-# step_start, no text). Investigation: 2026-05-23. Re-add when fixed.
-# route:: zai, zai-coding-plan/glm-5.1
-# is_free:: true
-# action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"
+# Z.AI Coding Plan healthy via pi-rust; broken via opencode 1.14.48
+# (opencode emits only step_start, no text). Investigation: 2026-05-23.
+# Route through pi-rust until opencode integration is fixed upstream.
+route:: pi-rust-zai, glm-5.1
+is_free:: true
+action:: /home/alex/.local/bin/pi-rust --provider zai-coding-plan --model {{ model }} -p "{{ prompt }}"
