@@ -8977,6 +8977,7 @@ version = "1.19.3"
 dependencies = [
  "anyhow",
  "async-trait",
+ "clap",
  "haystack_core",
  "log",
  "parking_lot 0.12.5",
@@ -8991,6 +8992,7 @@ dependencies = [
  "tokio",
  "tokio-test",
  "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
