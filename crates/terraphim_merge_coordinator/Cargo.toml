@@ -1,0 +1,7 @@
+[package]
+name = "terraphim_merge_coordinator"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+thiserror.workspace = true
