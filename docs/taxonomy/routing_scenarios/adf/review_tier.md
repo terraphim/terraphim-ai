@@ -23,9 +23,11 @@ action:: /home/alex/.local/bin/claude --model {{ model }} -p "{{ prompt }}" --ma
 route:: kimi, kimi-for-coding/k2p5
 action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"
 
-route:: zai, zai-coding-plan/glm-5.1
-is_free:: true
-action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"
+# zai-coding-plan/* is upstream-broken on opencode 1.14.48 (only emits
+# step_start, no text). Investigation: 2026-05-23. Re-add when fixed.
+# route:: zai, zai-coding-plan/glm-5.1
+# is_free:: true
+# action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"
 
 route:: openai, openai/gpt-5.4-mini
 action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"

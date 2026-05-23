@@ -7,6 +7,26 @@
 **Estimated Effort**: 14 hours (revised down from 20h after bigbox inspection -- see "v2 corrections")
 **Refs**: epic #1807, #1804 (P0 credentials), #1805 (P1 merge-coordinator), #1797 (fleet CRITICAL), **#1783** (replace opencode runtime with pi-rust), **#1785** (terraphim_pi_agent bridge crate)
 
+## v3 correction: Z.AI is upstream-broken (2026-05-23 evening)
+
+Direct invocation on bigbox revealed:
+
+```
+opencode run -m zai-coding-plan/glm-5.1 --format json "say ping"
+-> {"type":"step_start",...}
+-> (silence; exits with no text/step_finish)
+```
+
+Same behaviour across all four `zai-coding-plan/*` models (glm-5.1, glm-5-turbo, glm-4.7, glm-4.5-air). Auth is present in opencode `auth.json`. Other coding-plan providers (kimi-for-coding, minimax-coding-plan) work normally in the same harness. Conclusion: **opencode's Z.AI Coding Plan integration (or the Z.AI subscription itself) is broken upstream**, not a probe-tuning issue. The provider_probe's 60s TIMEOUT classification is **correct**.
+
+**Step 1 revision:**
+- Drop "tighten probe to 30s + stderr classification" -- probe is correct
+- Instead: **quarantine Z.AI routes in taxonomy** so KG router never selects them as a fallback while Z.AI is upstream-broken. Either remove the `route::` lines, or annotate with `is_unhealthy:: true` if KG router supports it (TBC)
+- File a **separate** new issue: "Investigate Z.AI Coding Plan stream truncation (opencode 1.14.48)" -- this is opencode/Z.AI vendor work, not orchestrator work
+- pi-rust against Z.AI is separately blocked on `ZHIPU_API_KEY` env not being exported from opencode's `auth.json` to systemd unit -- low priority while Z.AI itself is broken
+
+**Net effect**: Step 1 simplifies further (from "probe fix" to "quarantine routes + file vendor issue") -- estimate drops from 2h to 30 min.
+
 ## v2 corrections after bigbox inspection (2026-05-23)
 
 Three factual corrections that simplify the design:

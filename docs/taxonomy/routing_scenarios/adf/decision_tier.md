@@ -27,6 +27,8 @@ action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ promp
 route:: kimi, kimi-for-coding/k2p6
 action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"
 
-route:: zai, zai-coding-plan/glm-5.1
-is_free:: true
-action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"
+# zai-coding-plan/* is upstream-broken on opencode 1.14.48 (only emits
+# step_start, no text). Investigation: 2026-05-23. Re-add when fixed.
+# route:: zai, zai-coding-plan/glm-5.1
+# is_free:: true
+# action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"
