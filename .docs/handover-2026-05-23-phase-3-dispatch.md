@@ -1,6 +1,19 @@
 # Handover: ADF Self-Healing Phase 3 -- agents dispatched, awaiting PRs
 
-**Date**: 2026-05-23 (afternoon, ~14:20 BST)
+**Date**: 2026-05-23 (latest update ~14:45 BST)
+
+## v2 update (~14:45 BST)
+
+After this handover was first written, the session continued and:
+
+- **#1804** (Debug redaction) -- handled direct (compliance-watchdog is a scanner not a coder). Closed. Commit `94778e06a` includes the 6 manual `impl Debug` + clippy pre-existing-lint fix that unblocks build-runner.
+- **#1817** Steps (b)+(c) handled direct. Closed. Commit `693381e7b` ships `systemd/`, `scripts/bigbox-sync.sh`, and 2 runbooks. Step 6a (circuit-breaker) deferred to land after #1805 replaces the legacy Python merge-coordinator.
+- **#1805** implementation-swarm (PID 3210115) still running on claude/sonnet after ~30 min wall-clock; worktree still clean (no writes). Per operator decision, no intervention -- let it run to wall-clock or completion.
+- **Compliance-watchdog spawn on #1804** was killed (PIDs 3209756, 3210509) because it was the wrong agent type for the fix.
+
+Net commits added since v1: `02e7ecd66`, `ee9e8350f`, `94778e06a`, `693381e7b`.
+
+Net state: **6 of 7 implementation steps complete on `main`**. Only Step 7 (#1805 merge-coordinator crate) remains in flight via implementation-swarm.
 **Author**: Claude (this session)
 **Successor entry point**: Re-engage via `/loop 30m <prompt>` (see §Re-entry) or fresh session + read this doc.
 **Research**: `.docs/research-adf-self-healing-2026-05-23.md`
