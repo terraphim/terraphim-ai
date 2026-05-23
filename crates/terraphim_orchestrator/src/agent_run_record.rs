@@ -69,6 +69,8 @@ pub enum ExitClass {
     PermissionDenied,
     /// SIGSEGV, SIGKILL, panic, stack overflow
     Crash,
+    /// Config validation failure (bad working dir, missing config file, etc.)
+    ConfigError,
     /// No patterns matched and non-zero exit
     Unknown,
 }
@@ -87,6 +89,7 @@ impl fmt::Display for ExitClass {
             ExitClass::ResourceExhaustion => write!(f, "resource_exhaustion"),
             ExitClass::PermissionDenied => write!(f, "permission_denied"),
             ExitClass::Crash => write!(f, "crash"),
+            ExitClass::ConfigError => write!(f, "config_error"),
             ExitClass::Unknown => write!(f, "unknown"),
         }
     }
@@ -105,6 +108,7 @@ impl ExitClass {
             "resourceexhaustion" => Some(ExitClass::ResourceExhaustion),
             "permissiondenied" => Some(ExitClass::PermissionDenied),
             "crash" => Some(ExitClass::Crash),
+            "configerror" => Some(ExitClass::ConfigError),
             _ => None,
         }
     }
@@ -183,9 +187,17 @@ pub struct AgentRunRecord {
     pub mention_depth: Option<u32>,
     /// Name of the parent agent that triggered this mention (empty for human).
     pub mention_parent_agent: Option<String>,
+    /// Consecutive ConfigError exits for quarantine circuit-breaker (not persisted across restarts).
+    #[serde(default)]
+    pub consecutive_config_errors: u32,
 }
 
 impl AgentRunRecord {
+    /// Returns true when the agent has hit the quarantine threshold (3 consecutive ConfigErrors).
+    pub fn should_quarantine(&self) -> bool {
+        self.consecutive_config_errors >= 3
+    }
+
     /// Truncate text to at most max_len bytes, respecting UTF-8 character boundaries.
     ///
     /// Avoids panicking when `max_len` falls inside a multi-byte character.
@@ -351,6 +363,16 @@ const EXIT_CLASS_PATTERNS: &[PatternDef] = &[
             "segmentation fault",
             "bus error",
             "SIGBUS",
+        ],
+    },
+    PatternDef {
+        concept_name: "configerror",
+        patterns: &[
+            "Config validation error",
+            "Working directory does not exist",
+            "configuration error",
+            "invalid configuration",
+            "config validation failed",
         ],
     },
 ];
@@ -854,6 +876,7 @@ mod tests {
             mention_chain_id: None,
             mention_depth: None,
             mention_parent_agent: None,
+            consecutive_config_errors: 0,
         };
         let json = serde_json::to_string(&record).unwrap();
         let deserialized: AgentRunRecord = serde_json::from_str(&json).unwrap();
@@ -1020,6 +1043,7 @@ mod tests {
             mention_chain_id: None,
             mention_depth: None,
             mention_parent_agent: None,
+            consecutive_config_errors: 0,
         };
 
         store.insert(&record).await.unwrap();
