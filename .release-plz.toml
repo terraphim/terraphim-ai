@@ -41,6 +41,11 @@ name = "terraphim_agent"
 changelog_path = "./crates/terraphim_tui/CHANGELOG.md"
 changelog_update = true
 
+[[package]]
+name = "terraphim_grep"
+changelog_path = "./crates/terraphim_grep/CHANGELOG.md"
+changelog_update = true
+
 # Don't release internal crates automatically
 [[package]]
 name = "terraphim_automata"
@@ -64,7 +69,13 @@ release = false
 
 [[package]]
 name = "terraphim_service"
-release = false
+# Released as part of the workspace publish chain. Was previously `release = false`,
+# which let the crates.io version drift from `terraphim_types` (1.16.34 vs 1.19.3) and
+# left consumers like `terraphim_grep` unable to `cargo install` because the published
+# service didn't initialise `min_quality`/`quality_score` fields added in newer types.
+# Releasing service alongside types keeps the chain coherent for downstream consumers.
+changelog_path = "./crates/terraphim_service/CHANGELOG.md"
+changelog_update = true
 
 [[package]]
 name = "terraphim_settings"

@@ -7,6 +7,7 @@ on:
       - 'terraphim_server-v*'
       - 'terraphim-ai-desktop-v*'
       - 'terraphim_agent-v*'
+      - 'terraphim_grep-v*'
   workflow_dispatch:
     inputs:
       test_run:
@@ -71,7 +72,7 @@ jobs:
           echo "Workspace version (from terraphim_server): $WORKSPACE_VERSION"
 
           # Check key binaries
-          BINARIES=("terraphim_server" "terraphim_agent" "terraphim-cli")
+          BINARIES=("terraphim_server" "terraphim_agent" "terraphim-cli" "terraphim_grep")
           FAILED=0
 
           for pkg in "${BINARIES[@]}"; do
@@ -102,17 +103,19 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Linux builds
-          - os: ubuntu-22.04
+          # Linux builds -- run on bigbox self-hosted runner for faster Docker
+          # access (cross uses Docker for musl targets) and to keep paid runner
+          # minutes for the macOS notarise + Windows builds that bigbox can't host.
+          - os: [self-hosted, bigbox]
             target: x86_64-unknown-linux-gnu
             use_cross: false
-          - os: ubuntu-22.04
+          - os: [self-hosted, bigbox]
             target: x86_64-unknown-linux-musl
             use_cross: true
-          - os: ubuntu-22.04
+          - os: [self-hosted, bigbox]
             target: aarch64-unknown-linux-musl
             use_cross: true
-          - os: ubuntu-22.04
+          - os: [self-hosted, bigbox]
             target: armv7-unknown-linux-musleabihf
             use_cross: true
           # macOS builds
@@ -229,6 +232,13 @@ jobs:
           ${{ matrix.use_cross && 'cross' || 'cargo' }} build --release \
             --target ${{ matrix.target }} -p terraphim-cli --bin terraphim-cli
 
+      - name: Build Grep binary
+        shell: bash
+        run: |
+          ${{ matrix.use_cross && 'cross' || 'cargo' }} build --release \
+            --target ${{ matrix.target }} -p terraphim_grep --bin terraphim-grep \
+            --features "code-search openrouter"
+
       - name: Verify binary versions (native builds only)
         if: matrix.target == 'x86_64-unknown-linux-gnu'
         shell: bash
@@ -261,6 +271,14 @@ jobs:
             exit 1
           fi
 
+          # Verify terraphim-grep
+          GREP_VERSION=$(./target/${{ matrix.target }}/release/terraphim-grep --version 2>&1 | head -1)
+          echo "terraphim-grep: $GREP_VERSION"
+          if [[ "$GREP_VERSION" != *"$EXPECTED_VERSION"* ]]; then
+            echo "::error::terraphim-grep version mismatch: expected $EXPECTED_VERSION in '$GREP_VERSION'"
+            exit 1
+          fi
+
           echo "All binary versions verified successfully!"
 
       - name: Prepare artifacts (Unix)
@@ -279,12 +297,15 @@ jobs:
             -C "target/${{ matrix.target }}/release" terraphim-agent
           tar -czf "artifacts/terraphim-cli-${VERSION}-${{ matrix.target }}.tar.gz" \
             -C "target/${{ matrix.target }}/release" terraphim-cli
+          tar -czf "artifacts/terraphim-grep-${VERSION}-${{ matrix.target }}.tar.gz" \
+            -C "target/${{ matrix.target }}/release" terraphim-grep
           # Also copy raw binaries for backward compatibility
           if [ -f "target/${{ matrix.target }}/release/terraphim_server" ]; then
             cp target/${{ matrix.target }}/release/terraphim_server artifacts/terraphim_server-${{ matrix.target }}
           fi
           cp target/${{ matrix.target }}/release/terraphim-agent artifacts/terraphim-agent-${{ matrix.target }}
           cp target/${{ matrix.target }}/release/terraphim-cli artifacts/terraphim-cli-${{ matrix.target }}
+          cp target/${{ matrix.target }}/release/terraphim-grep artifacts/terraphim-grep-${{ matrix.target }}
           chmod +x artifacts/*
 
       - name: Prepare artifacts (Windows)
@@ -302,11 +323,13 @@ jobs:
           fi
           7z a -tzip "../../../artifacts/terraphim-agent-${VERSION}-${{ matrix.target }}.zip" terraphim-agent.exe
           7z a -tzip "../../../artifacts/terraphim-cli-${VERSION}-${{ matrix.target }}.zip" terraphim-cli.exe
+          7z a -tzip "../../../artifacts/terraphim-grep-${VERSION}-${{ matrix.target }}.zip" terraphim-grep.exe
           cd -
           # Also copy raw binaries for backward compatibility
           cp target/${{ matrix.target }}/release/terraphim_server.exe artifacts/terraphim_server-${{ matrix.target }}.exe || true
           cp target/${{ matrix.target }}/release/terraphim-agent.exe artifacts/terraphim-agent-${{ matrix.target }}.exe || true
           cp target/${{ matrix.target }}/release/terraphim-cli.exe artifacts/terraphim-cli-${{ matrix.target }}.exe || true
+          cp target/${{ matrix.target }}/release/terraphim-grep.exe artifacts/terraphim-grep-${{ matrix.target }}.exe || true
 
       - name: Upload binary artifacts
         uses: actions/upload-artifact@v5
@@ -349,15 +372,23 @@ jobs:
             aarch64/terraphim-agent-aarch64-apple-darwin \
             -output universal/terraphim-agent-universal-apple-darwin
 
+          # Create universal binary for terraphim-grep
+          lipo -create \
+            x86_64/terraphim-grep-x86_64-apple-darwin \
+            aarch64/terraphim-grep-aarch64-apple-darwin \
+            -output universal/terraphim-grep-universal-apple-darwin
+
           chmod +x universal/*
 
           # Verify universal binaries
           echo "Verifying universal binaries:"
           file universal/terraphim_server-universal-apple-darwin
           file universal/terraphim-agent-universal-apple-darwin
+          file universal/terraphim-grep-universal-apple-darwin
 
           lipo -info universal/terraphim_server-universal-apple-darwin
           lipo -info universal/terraphim-agent-universal-apple-darwin
+          lipo -info universal/terraphim-grep-universal-apple-darwin
 
       - name: Upload universal binaries
         uses: actions/upload-artifact@v5
@@ -424,6 +455,18 @@ jobs:
             "$CERT_BASE64" \
             "$CERT_PASSWORD"
 
+      - name: Sign and notarize terraphim-grep
+        env:
+          RUNNER_TEMP: ${{ runner.temp }}
+        run: |
+          ./scripts/sign-macos-binary.sh \
+            "universal/terraphim-grep-universal-apple-darwin" \
+            "$APPLE_ID" \
+            "$APPLE_TEAM_ID" \
+            "$APPLE_APP_PASSWORD" \
+            "$CERT_BASE64" \
+            "$CERT_PASSWORD"
+
       - name: Verify signed binaries
         run: |
           echo "==> Verifying terraphim_server"
@@ -434,6 +477,10 @@ jobs:
           codesign --verify --deep --strict --verbose=2 universal/terraphim-agent-universal-apple-darwin
           file universal/terraphim-agent-universal-apple-darwin
 
+          echo "==> Verifying terraphim-grep"
+          codesign --verify --deep --strict --verbose=2 universal/terraphim-grep-universal-apple-darwin
+          file universal/terraphim-grep-universal-apple-darwin
+
       - name: Upload signed binaries
         uses: actions/upload-artifact@v5
         with:
@@ -442,7 +489,7 @@ jobs:
 
   build-debian-packages:
     name: Build Debian packages
-    runs-on: ubuntu-22.04
+    runs-on: [self-hosted, bigbox]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -491,6 +538,13 @@ jobs:
 
           # Build agent package
           cargo deb -p terraphim_agent --output target/debian/
+
+          # Build grep package (requires code-search + openrouter features for the
+          # hybrid pipeline; cargo-deb reads [package.metadata.deb] from the crate's
+          # Cargo.toml). The compile step uses the same features the release binary
+          # build uses so behaviour parity with the tarball artefacts is preserved.
+          cargo deb -p terraphim_grep --output target/debian/ \
+            -- --features "code-search openrouter"
 
       - name: Upload Debian packages
         uses: actions/upload-artifact@v5
@@ -667,12 +721,19 @@ jobs:
             **Signed and Notarized** - No Gatekeeper warnings
             - `terraphim_server-universal-apple-darwin`: Server binary for all Macs
             - `terraphim-agent-universal-apple-darwin`: TUI binary for all Macs
+            - `terraphim-grep-universal-apple-darwin`: Hybrid grep CLI for all Macs
 
             ### Server Binaries
             - `terraphim_server-*`: Server binaries for various platforms
 
             ### TUI Binaries
             - `terraphim-agent-*`: Terminal UI binaries for various platforms
+
+            ### Grep Binaries
+            - `terraphim-grep-*`: Hybrid grep CLI (knowledge-graph boost + LLM fallback)
+              for various platforms. See
+              [crates/terraphim_grep/RELEASE_NOTES_v1.20.0.md](https://github.com/terraphim/terraphim-ai/blob/main/crates/terraphim_grep/RELEASE_NOTES_v1.20.0.md)
+              for crate-focused details.
 
             ### Desktop Applications
             Desktop applications are now built and released separately in the [terraphim-ai-desktop](https://github.com/terraphim/terraphim-ai-desktop) repository.
@@ -731,10 +792,12 @@ jobs:
           # macOS universal binaries
           SERVER_SHA=$(grep "terraphim_server-universal-apple-darwin" checksums.txt | awk '{print $1}')
           AGENT_SHA=$(grep "terraphim-agent-universal-apple-darwin" checksums.txt | awk '{print $1}')
+          GREP_SHA=$(grep "terraphim-grep-universal-apple-darwin" checksums.txt | awk '{print $1}')
 
           # Linux GNU binaries (for Homebrew)
           SERVER_LINUX_GNU_SHA=$(grep "terraphim_server-x86_64-unknown-linux-gnu" checksums.txt | grep -v tar.gz | awk '{print $1}')
           AGENT_LINUX_GNU_SHA=$(grep "terraphim-agent-x86_64-unknown-linux-gnu" checksums.txt | grep -v tar.gz | awk '{print $1}')
+          GREP_LINUX_GNU_SHA=$(grep "terraphim-grep-x86_64-unknown-linux-gnu" checksums.txt | grep -v tar.gz | awk '{print $1}')
 
           # Fallback to MUSL if GNU not available
           if [ -z "$SERVER_LINUX_GNU_SHA" ]; then
@@ -745,16 +808,24 @@ jobs:
             AGENT_LINUX_GNU_SHA=$(grep "terraphim-agent-x86_64-unknown-linux-musl" checksums.txt | grep -v tar.gz | awk '{print $1}')
             echo "⚠️  Using MUSL fallback for agent"
           fi
+          if [ -z "$GREP_LINUX_GNU_SHA" ]; then
+            GREP_LINUX_GNU_SHA=$(grep "terraphim-grep-x86_64-unknown-linux-musl" checksums.txt | grep -v tar.gz | awk '{print $1}')
+            echo "⚠️  Using MUSL fallback for grep"
+          fi
 
           echo "server_sha=$SERVER_SHA" >> $GITHUB_OUTPUT
           echo "agent_sha=$AGENT_SHA" >> $GITHUB_OUTPUT
+          echo "grep_sha=$GREP_SHA" >> $GITHUB_OUTPUT
           echo "server_linux_gnu_sha=$SERVER_LINUX_GNU_SHA" >> $GITHUB_OUTPUT
           echo "agent_linux_gnu_sha=$AGENT_LINUX_GNU_SHA" >> $GITHUB_OUTPUT
+          echo "grep_linux_gnu_sha=$GREP_LINUX_GNU_SHA" >> $GITHUB_OUTPUT
 
           echo "Server universal binary SHA256: $SERVER_SHA"
           echo "Agent universal binary SHA256: $AGENT_SHA"
+          echo "Grep universal binary SHA256: $GREP_SHA"
           echo "Server Linux GNU SHA256: $SERVER_LINUX_GNU_SHA"
           echo "Agent Linux GNU SHA256: $AGENT_LINUX_GNU_SHA"
+          echo "Grep Linux GNU SHA256: $GREP_LINUX_GNU_SHA"
 
       - name: Clone Homebrew tap
         run: |
@@ -768,8 +839,10 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
           SERVER_SHA: ${{ steps.checksums.outputs.server_sha }}
           AGENT_SHA: ${{ steps.checksums.outputs.agent_sha }}
+          GREP_SHA: ${{ steps.checksums.outputs.grep_sha }}
           SERVER_LINUX_GNU_SHA: ${{ steps.checksums.outputs.server_linux_gnu_sha }}
           AGENT_LINUX_GNU_SHA: ${{ steps.checksums.outputs.agent_linux_gnu_sha }}
+          GREP_LINUX_GNU_SHA: ${{ steps.checksums.outputs.grep_linux_gnu_sha }}
         run: |
           cd homebrew-terraphim
 
@@ -844,11 +917,44 @@ jobs:
           end
           EOF
 
+          # Update terraphim-grep.rb -- hybrid grep CLI with KG boost and LLM fallback
+          cat > Formula/terraphim-grep.rb << EOF
+          class TerraphimGrep < Formula
+            desc "Intelligent hybrid grep with knowledge-graph boosting and LLM fallback"
+            homepage "https://github.com/terraphim/terraphim-ai"
+            version "${VERSION}"
+            license "MIT"
+
+            on_macos do
+              url "https://github.com/terraphim/terraphim-ai/releases/download/v${VERSION}/terraphim-grep-universal-apple-darwin"
+              sha256 "${GREP_SHA}"
+            end
+
+            on_linux do
+              url "https://github.com/terraphim/terraphim-ai/releases/download/v${VERSION}/terraphim-grep-x86_64-unknown-linux-gnu"
+              sha256 "${GREP_LINUX_GNU_SHA}"
+            end
+
+            def install
+              if OS.mac?
+                bin.install "terraphim-grep-universal-apple-darwin" => "terraphim-grep"
+              else
+                bin.install "terraphim-grep-x86_64-unknown-linux-gnu" => "terraphim-grep"
+              end
+            end
+
+            test do
+              assert_match "terraphim", shell_output("#{bin}/terraphim-grep --version 2>&1", 0)
+            end
+          end
+          EOF
+
           git add Formula/
           git commit -m "feat: update formulas to v${VERSION} with universal binaries
 
           - terraphim-server v${VERSION}
           - terraphim-agent v${VERSION}
+          - terraphim-grep v${VERSION}
 
           🤖 Automated update from release workflow"
 

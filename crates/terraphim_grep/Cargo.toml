@@ -1,0 +1,82 @@
+[package]
+name = "terraphim_grep"
+version.workspace = true
+edition.workspace = true
+authors = ["Terraphim AI Team"]
+description = "Intelligent hybrid grep with RLM fallback and KG curation"
+license = "MIT"
+repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["grep", "search", "knowledge-graph", "rlm"]
+categories = ["development-tools"]
+
+[dependencies]
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+log.workspace = true
+
+# Path deps include `version` so `cargo publish` accepts the manifest. The script
+# `scripts/publish-crates.sh` rewrites these versions at publish time to align with
+# the release version; the field's *presence* is what the publisher requires. The
+# value here must match each crate's currently-declared local version so path
+# resolution succeeds for local builds.
+terraphim_types = { path = "../terraphim_types", version = "1.15.0" }
+terraphim_rolegraph = { path = "../terraphim_rolegraph", version = "1.15.0" }
+terraphim_automata = { path = "../terraphim_automata", version = "1.19.2" }
+terraphim_service = { path = "../terraphim_service", version = "1.16.15", optional = true }
+terraphim_config = { path = "../terraphim_config", version = "1.15.0", optional = true }
+
+fff-search = { version = "0.8.2", optional = true }
+
+async-trait.workspace = true
+parking_lot = "0.12"
+tracing = { workspace = true }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+clap = { version = "4", features = ["derive"] }
+
+[features]
+default = ["llm"]
+llm = ["dep:terraphim_service", "dep:terraphim_config"]
+code-search = ["dep:fff-search"]
+# Enable OpenRouter provider support (required for live OpenRouter tests against free models)
+openrouter = ["llm", "terraphim_service/openrouter"]
+
+[dev-dependencies]
+tokio-test = "0.4"
+tempfile.workspace = true
+criterion = { version = "0.8", features = ["async_tokio"] }
+terraphim_router = { path = "../terraphim_router", version = "1.8.0" }
+
+[[bin]]
+name = "terraphim-grep"
+path = "src/main.rs"
+
+[[bench]]
+name = "hybrid_search"
+harness = false
+required-features = ["code-search"]
+
+# Debian package metadata; consumed by `cargo deb -p terraphim_grep`. Mirrors the
+# pattern in `crates/terraphim_agent/Cargo.toml` for consistency across binaries.
+[package.metadata.deb]
+maintainer = "Terraphim Contributors <team@terraphim.ai>"
+copyright = "2026, Terraphim Contributors"
+license-file = ["../../LICENSE-MIT", "4"]
+extended-description = """
+Terraphim Grep -- intelligent hybrid grep with knowledge-graph boosting and
+LLM fallback. Runs fff-search code retrieval and a knowledge-graph concept
+lookup in parallel, applies KG-aware boosting so chunks matching your thesaurus
+rank above generic matches, and falls back to an LLM only when local sufficiency
+is below threshold. Configured via role JSON; works in search-only mode without
+any API key."""
+depends = "$auto"
+section = "utility"
+priority = "optional"
+assets = [
+    ["target/release/terraphim-grep", "usr/bin/", "755"],
+    ["../../README.md", "usr/share/doc/terraphim-grep/README", "644"],
+    ["RELEASE_NOTES_v1.20.0.md", "usr/share/doc/terraphim-grep/RELEASE_NOTES.md", "644"],
+]

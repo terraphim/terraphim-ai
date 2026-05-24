@@ -2423,12 +2423,42 @@ dependencies = [
 ]
 
 [[package]]
+name = "fff-grep"
+version = "0.8.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b6ca06be38274d97cdae21d01417c833e4fefd232122533f5aff646e392a76da"
+dependencies = [
+ "bstr",
+ "memchr",
+]
+
+[[package]]
+name = "fff-notify-debouncer-full"
+version = "0.9.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "29a4ebea7b8a2840cd59358bbf396f6f04313ce8eae84ac79703ce80298b8731"
+dependencies = [
+ "file-id",
+ "log",
+ "notify 9.0.0-rc.4",
+ "notify-types",
+ "rustc-hash 2.1.2",
+ "walkdir",
+]
+
+[[package]]
 name = "fff-query-parser"
 version = "0.5.1"
 source = "git+https://github.com/AlexMikhalev/fff.nvim.git?branch=feat%2Fexternal-scorer#efd15524383babd4d2d18a191240d3dcf494eb31"
 dependencies = [
  "zlob",
 ]
+
+[[package]]
+name = "fff-query-parser"
+version = "0.8.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "633a674c4bc5b1540a812b7d04286b4998d536e3d6e1e2802ef8934e1bcd44d1"
 
 [[package]]
 name = "fff-search"
@@ -2442,8 +2472,8 @@ dependencies = [
  "chrono",
  "dirs 5.0.1",
  "dunce",
- "fff-grep",
- "fff-query-parser",
+ "fff-grep 0.5.1",
+ "fff-query-parser 0.5.1",
  "git2",
  "glidesort",
  "globset",
@@ -2451,7 +2481,7 @@ dependencies = [
  "ignore",
  "memchr",
  "memmap2",
- "neo_frizbee",
+ "neo_frizbee 0.8.5",
  "notify 8.2.0",
  "notify-debouncer-full 0.7.0",
  "once_cell",
@@ -2469,6 +2499,43 @@ dependencies = [
  "tracing-appender",
  "tracing-subscriber",
  "zlob",
+]
+
+[[package]]
+name = "fff-search"
+version = "0.8.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bcd88a6f9a27e8ce7a16120a4507c6a0ee6ed0119eccf79e9606129412135169"
+dependencies = [
+ "ahash",
+ "aho-corasick",
+ "blake3",
+ "dirs 5.0.1",
+ "dunce",
+ "fff-grep 0.8.2",
+ "fff-notify-debouncer-full",
+ "fff-query-parser 0.8.2",
+ "git2",
+ "glidesort",
+ "globset",
+ "heed",
+ "ignore",
+ "libc",
+ "memchr",
+ "memmap2",
+ "neo_frizbee 0.10.2",
+ "notify 9.0.0-rc.4",
+ "parking_lot 0.12.5",
+ "pathdiff",
+ "rayon",
+ "regex",
+ "regex-syntax",
+ "serde",
+ "smallvec",
+ "thiserror 2.0.18",
+ "tracing",
+ "tracing-appender",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -2933,7 +3000,7 @@ dependencies = [
 
 [[package]]
 name = "grepapp_haystack"
-version = "1.19.3"
+version = "1.20.0"
 dependencies = [
  "anyhow",
  "haystack_core",
@@ -3057,7 +3124,7 @@ dependencies = [
 
 [[package]]
 name = "haystack_core"
-version = "1.19.3"
+version = "1.20.0"
 dependencies = [
  "terraphim_types",
  "tokio",
@@ -4486,6 +4553,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "neo_frizbee"
+version = "0.10.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "728e0731ad3a0083b9f72a82df72c298641ba970d4e308e0897ec4c89212c31d"
+dependencies = [
+ "itertools 0.14.0",
+ "raw-cpuid",
+]
+
+[[package]]
 name = "new_debug_unreachable"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4617,6 +4694,26 @@ dependencies = [
  "notify-types",
  "walkdir",
  "windows-sys 0.60.2",
+]
+
+[[package]]
+name = "notify"
+version = "9.0.0-rc.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b44b771d4dd781ef14c84078693e67495da6b47f609f72e8a4da8420a861240e"
+dependencies = [
+ "bitflags 2.11.1",
+ "inotify 0.11.1",
+ "kqueue",
+ "libc",
+ "log",
+ "mio 1.2.0",
+ "notify-types",
+ "objc2-core-foundation",
+ "objc2-core-services",
+ "walkdir",
+ "windows-sys 0.61.2",
+ "xxhash-rust",
 ]
 
 [[package]]
@@ -4891,6 +4988,16 @@ checksum = "ca347214e24bc973fc025fd0d36ebb179ff30536ed1f80252706db19ee452009"
 dependencies = [
  "objc2",
  "objc2-foundation",
+]
+
+[[package]]
+name = "objc2-core-services"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "583300ad934cba24ff5292aee751ecc070f7ca6b39a574cc21b7b5e588e06a0b"
+dependencies = [
+ "libc",
+ "objc2-core-foundation",
 ]
 
 [[package]]
@@ -8521,7 +8628,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim-cli"
-version = "1.19.3"
+version = "1.20.0"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -8585,7 +8692,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim-session-analyzer"
-version = "1.19.3"
+version = "1.20.0"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -8624,7 +8731,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_agent"
-version = "1.19.3"
+version = "1.20.0"
 dependencies = [
  "ahash",
  "anyhow",
@@ -8855,7 +8962,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_ccusage"
-version = "1.19.3"
+version = "1.20.0"
 dependencies = [
  "chrono",
  "serde",
@@ -8868,7 +8975,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_codebase_eval"
-version = "1.19.3"
+version = "1.20.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -8914,7 +9021,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_dsm"
-version = "1.19.3"
+version = "1.20.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -8930,11 +9037,11 @@ dependencies = [
 
 [[package]]
 name = "terraphim_file_search"
-version = "1.19.3"
+version = "1.20.0"
 dependencies = [
  "ahash",
  "criterion 0.5.1",
- "fff-search",
+ "fff-search 0.5.1",
  "notify 8.2.0",
  "notify-debouncer-full 0.6.0",
  "parking_lot 0.12.5",
@@ -8969,6 +9076,33 @@ dependencies = [
  "tokio",
  "tokio-test",
  "uuid",
+]
+
+[[package]]
+name = "terraphim_grep"
+version = "1.20.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "clap",
+ "criterion 0.8.2",
+ "fff-search 0.8.2",
+ "log",
+ "parking_lot 0.12.5",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "terraphim_automata",
+ "terraphim_config",
+ "terraphim_rolegraph",
+ "terraphim_router",
+ "terraphim_service",
+ "terraphim_types",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-test",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -9062,7 +9196,7 @@ dependencies = [
  "base64 0.21.7",
  "clap",
  "env_logger",
- "fff-search",
+ "fff-search 0.5.1",
  "regex",
  "rmcp",
  "serde_json",
@@ -9087,7 +9221,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_merge_coordinator"
-version = "1.19.3"
+version = "1.20.0"
 dependencies = [
  "chrono",
  "fs2",
@@ -9102,7 +9236,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_middleware"
-version = "1.19.3"
+version = "1.20.0"
 dependencies = [
  "ahash",
  "async-trait",
@@ -9273,7 +9407,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_rlm"
-version = "1.19.3"
+version = "1.20.0"
 dependencies = [
  "ahash",
  "anyhow",
@@ -9361,7 +9495,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_server"
-version = "1.19.3"
+version = "1.20.0"
 dependencies = [
  "ahash",
  "anyhow",
@@ -9439,7 +9573,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_sessions"
-version = "1.19.3"
+version = "1.20.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -9523,14 +9657,14 @@ dependencies = [
 
 [[package]]
 name = "terraphim_test_utils"
-version = "1.19.3"
+version = "1.20.0"
 dependencies = [
  "rustc_version",
 ]
 
 [[package]]
 name = "terraphim_tinyclaw"
-version = "1.19.3"
+version = "1.20.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -9633,7 +9767,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_usage"
-version = "1.19.3"
+version = "1.20.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -11634,6 +11768,12 @@ dependencies = [
  "mac",
  "markup5ever 0.12.1",
 ]
+
+[[package]]
+name = "xxhash-rust"
+version = "0.8.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fdd20c5420375476fbd4394763288da7eb0cc0b8c11deed431a91562af7335d3"
 
 [[package]]
 name = "yaml-rust2"

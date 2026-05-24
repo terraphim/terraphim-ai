@@ -58,10 +58,12 @@ CRATES=(
   "haystack_jmap"
   "grepapp_haystack"
   "terraphim_middleware"
+  "terraphim_service"
   "terraphim_update"
   "terraphim_tracker"
   "terraphim_agent_evolution"
   "terraphim_orchestrator"
+  "terraphim_grep"
 )
 
 # Map package names to directory names (for crates where they differ)
