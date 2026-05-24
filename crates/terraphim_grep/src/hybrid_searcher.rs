@@ -299,17 +299,25 @@ impl HybridSearcher {
     ) -> Result<Vec<RetrievedChunk>, String> {
         #[cfg(feature = "code-search")]
         {
+            // fff-search 0.8.2 API changes vs 0.5.1:
+            //   - `grep_search` is now crate-private; use `FilePicker::grep` instead
+            //   - `FilePickerOptions` dropped `warmup_mmap_cache`, gained other fields;
+            //     use `..Default::default()` to stay forward-compatible
+            //   - `GrepSearchOptions` requires `abort_signal` and `trim_whitespace`;
+            //     same: prefer `..Default::default()`
+            //   - `FileItem.relative_path` is now a method requiring an arena reference;
+            //     `&FilePicker` implements `FFFStringStorage` so we pass `&picker`
             use fff_search::{
-                ContentCacheBudget, FFFMode, FilePicker, FilePickerOptions, GrepMode,
-                GrepSearchOptions, grep_search, parse_grep_query,
+                FFFMode, FilePicker, FilePickerOptions, GrepMode, GrepSearchOptions,
+                parse_grep_query,
             };
 
             let mut picker = FilePicker::new(FilePickerOptions {
                 base_path: search_path.to_string_lossy().to_string(),
                 mode: FFFMode::Ai,
                 watch: false,
-                warmup_mmap_cache: false,
                 cache_budget: None,
+                ..FilePickerOptions::default()
             })
             .map_err(|e| format!("FilePicker init failed: {}", e))?;
 
@@ -317,13 +325,11 @@ impl HybridSearcher {
                 .collect_files()
                 .map_err(|e| format!("File scan failed: {}", e))?;
 
-            let files = picker.get_files().to_vec();
-            if files.is_empty() {
+            if picker.get_files().is_empty() {
                 return Ok(vec![]);
             }
 
             let fff_query = parse_grep_query(query);
-            let budget = ContentCacheBudget::default();
             let options = GrepSearchOptions {
                 max_file_size: 10 * 1024 * 1024,
                 max_matches_per_file: 200,
@@ -331,23 +337,20 @@ impl HybridSearcher {
                 file_offset: 0,
                 page_limit: limit,
                 mode: GrepMode::PlainText,
-                time_budget_ms: 0,
-                before_context: 0,
-                after_context: 0,
-                classify_definitions: false,
+                ..GrepSearchOptions::default()
             };
 
-            let result = grep_search(&files, &fff_query, &options, &budget, None, None, None);
+            let result = picker.grep(&fff_query, &options);
 
             let chunks = result
                 .matches
-                .into_iter()
+                .iter()
                 .take(limit)
                 .filter_map(|m| {
                     let file = result.files.get(m.file_index)?;
                     Some(RetrievedChunk {
-                        content: m.line_content,
-                        source: file.relative_path.clone(),
+                        content: m.line_content.clone(),
+                        source: file.relative_path(&picker),
                         line_start: Some(m.line_number as usize),
                         line_end: Some(m.line_number as usize),
                         relevance_score: 1.0,
