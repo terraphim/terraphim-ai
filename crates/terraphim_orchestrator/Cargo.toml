@@ -46,6 +46,9 @@ uuid = { workspace = true, features = ["v4", "serde"] }
 # Scheduling
 cron = "0.13"
 
+# CLI tool resolution
+which = "5"
+
 # Command parsing via terraphim-automata
 terraphim_automata = { path = "../terraphim_automata", version = "1.19.2" }
 

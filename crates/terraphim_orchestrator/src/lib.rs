@@ -30,7 +30,9 @@
 //! ```
 
 pub mod adf_commands;
+pub mod agent_run_command;
 pub mod agent_run_record;
+pub mod agent_runner;
 pub mod compound;
 pub mod concurrency;
 pub mod config;
@@ -75,6 +77,15 @@ pub mod worktree_guard;
 
 pub use agent_run_record::{
     AgentRunRecord, ExitClass, ExitClassification, ExitClassifier, RunTrigger,
+};
+pub use agent_run_command::{
+    parse_agent_args, run_synthetic, run_validate, run_validate_all, AgentSubcommand,
+    AgentValidateAllReport, OutputFormat,
+};
+pub use agent_runner::{
+    probe_cli_tool, probe_model_available, run_agent_synthetic, validate_agent_runtime,
+    AgentRunRequest, AgentRuntimeValidationReport, GiteaTargetReport, ModeResult,
+    SyntheticEvent, TriggerMode,
 };
 pub use compound::{CompoundReviewResult, CompoundReviewWorkflow, ReviewGroupDef, SwarmConfig};
 pub use concurrency::{ConcurrencyController, FairnessPolicy, ModeQuotas};

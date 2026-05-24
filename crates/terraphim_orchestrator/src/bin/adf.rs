@@ -4,6 +4,9 @@ use std::process::ExitCode;
 
 use terraphim_orchestrator::config::OrchestratorConfig;
 use terraphim_orchestrator::AgentOrchestrator;
+use terraphim_orchestrator::{
+    parse_agent_args, run_synthetic, run_validate, run_validate_all, AgentSubcommand,
+};
 use terraphim_spawner::{AgentSpawner, ResourceLimits, SpawnContext};
 use terraphim_types::capability::{Capability, CostLevel, Latency, Provider, ProviderType};
 use tracing_subscriber::EnvFilter;
@@ -95,6 +98,7 @@ enum Cli {
     Check { config: PathBuf },
     LocalCheck,
     LocalAgent { agent_name: String },
+    Agent { sub_args: Vec<String> },
     Version,
     Help,
 }
@@ -136,6 +140,10 @@ fn parse_args() -> Result<Cli, String> {
             }
             "-h" | "--help" => return Ok(Cli::Help),
             "-V" | "--version" => return Ok(Cli::Version),
+            "agent" => {
+                let sub_args: Vec<String> = iter.collect();
+                return Ok(Cli::Agent { sub_args });
+            }
             other if other.starts_with("--") => {
                 return Err(format!("unknown flag: {other}"));
             }
@@ -171,8 +179,220 @@ fn print_help() {
     println!("    adf --check CONFIG          Validate config + print agent routing table");
     println!("    adf --local --check         Discover .terraphim/adf.toml and validate");
     println!("    adf --local --agent NAME    Run named agent from .terraphim/adf.toml locally");
+    println!("    adf agent validate [NAME]    Validate agent runtime (or all agents)");
+    println!("    adf agent validate-all       Validate all agents across trigger modes");
+    println!("    adf agent run NAME           Run agent with synthetic event injection");
     println!("    adf --help                  Show this message");
     println!("    adf --version               Show version");
+    println!();
+    println!("AGENT SUB_COMMANDS:");
+    println!("    adf agent validate [NAME] [--project ID] [--format json|human]");
+    println!("    adf agent validate-all --config CONFIG [--format json|human]");
+    println!("    adf agent run NAME --synthetic-event <pr|push> [--pr N] [--project ID]");
+}
+
+/// Run the agent subcommand (validate, validate-all, run).
+fn run_agent(sub_args: Vec<String>) -> ExitCode {
+    let subcommand = match parse_agent_args(&sub_args) {
+        Ok(cmd) => cmd,
+        Err(e) => {
+            eprintln!("error: {e}");
+            return ExitCode::from(2);
+        }
+    };
+
+    match subcommand {
+        AgentSubcommand::Validate {
+            agent_name,
+            project: _,
+            format,
+            skip_model_probe,
+        } => {
+            let adf_config = match terraphim_orchestrator::ProjectAdfConfig::discover_and_load(
+                &std::env::current_dir().unwrap_or_default(),
+            ) {
+                Ok(Some(cfg)) => cfg,
+                Ok(None) => {
+                    eprintln!(
+                        "adf agent validate: no .terraphim/adf.toml found at or above current directory"
+                    );
+                    return ExitCode::from(1);
+                }
+                Err(e) => {
+                    eprintln!("adf agent validate: failed to load config: {e}");
+                    return ExitCode::from(1);
+                }
+            };
+
+            let project_id = &adf_config.project_id;
+            let (project_def, agents) = match (&adf_config).try_into() {
+                Ok(tuple) => tuple,
+                Err(e) => {
+                    eprintln!("adf agent validate: config error: {e}");
+                    return ExitCode::from(1);
+                }
+            };
+
+            let working_dir = adf_config
+                .discovered_path
+                .parent()
+                .map(|p| p.to_path_buf())
+                .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
+
+            let nightwatch = terraphim_orchestrator::config::NightwatchConfig::default();
+            let compound_review = terraphim_orchestrator::config::CompoundReviewConfig {
+                schedule: "0 2 * * *".to_string(),
+                repo_path: working_dir.clone(),
+                ..Default::default()
+            };
+
+            let mut config = OrchestratorConfig {
+                working_dir,
+                nightwatch,
+                compound_review,
+                workflow: None,
+                agents,
+                restart_cooldown_secs: 60,
+                max_restart_count: 10,
+                restart_budget_window_secs: 43_200,
+                disk_usage_threshold: 90,
+                tick_interval_secs: 30,
+                gate_reconcile_interval_ticks: 20,
+                handoff_buffer_ttl_secs: Some(86400),
+                persona_data_dir: None,
+                skill_data_dir: None,
+                flows: vec![],
+                flow_state_dir: None,
+                gitea: None,
+                mentions: None,
+                webhook: None,
+                role_config_path: None,
+                routing: None,
+                #[cfg(feature = "quickwit")]
+                quickwit: None,
+                projects: vec![project_def.clone()],
+                include: vec![],
+                providers: vec![],
+                provider_budget_state_file: None,
+                pause_dir: None,
+                project_circuit_breaker_threshold: 5,
+                fleet_escalation_owner: None,
+                fleet_escalation_repo: None,
+                post_merge_gate: None,
+                learning: terraphim_orchestrator::config::LearningConfig::default(),
+                evolution: terraphim_orchestrator::config::EvolutionConfig::default(),
+                pr_dispatch: adf_config.pr_dispatch,
+                pr_dispatch_per_project: std::collections::HashMap::new(),
+                gitea_skill_repo: None,
+            };
+
+            config.substitute_env_vars();
+
+            if let Err(e) = config.validate() {
+                eprintln!("adf agent validate: config validation failed: {e}");
+                return ExitCode::from(1);
+            }
+
+            run_validate(&config, agent_name, Some(project_id.clone()), format, skip_model_probe)
+        }
+        AgentSubcommand::ValidateAll {
+            config,
+            format,
+            skip_model_probe,
+        } => run_validate_all(config, format, skip_model_probe),
+        AgentSubcommand::RunSynthetic {
+            agent_name,
+            project: _,
+            event,
+            format,
+        } => {
+            let adf_config =
+                match terraphim_orchestrator::ProjectAdfConfig::discover_and_load(&std::env::current_dir().unwrap_or_default())
+                {
+                    Ok(Some(cfg)) => cfg,
+                    Ok(None) => {
+                        eprintln!(
+                            "adf agent run: no .terraphim/adf.toml found at or above current directory"
+                        );
+                        return ExitCode::from(1);
+                    }
+                    Err(e) => {
+                        eprintln!("adf agent run: failed to load config: {e}");
+                        return ExitCode::from(1);
+                    }
+                };
+
+            let (project_def, agents) = match (&adf_config).try_into() {
+                Ok(tuple) => tuple,
+                Err(e) => {
+                    eprintln!("adf agent run: config error: {e}");
+                    return ExitCode::from(1);
+                }
+            };
+
+            let working_dir = adf_config
+                .discovered_path
+                .parent()
+                .map(|p| p.to_path_buf())
+                .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
+
+            let nightwatch = terraphim_orchestrator::config::NightwatchConfig::default();
+            let compound_review = terraphim_orchestrator::config::CompoundReviewConfig {
+                schedule: "0 2 * * *".to_string(),
+                repo_path: working_dir.clone(),
+                ..Default::default()
+            };
+
+            let mut config = OrchestratorConfig {
+                working_dir,
+                nightwatch,
+                compound_review,
+                workflow: None,
+                agents,
+                restart_cooldown_secs: 60,
+                max_restart_count: 10,
+                restart_budget_window_secs: 43_200,
+                disk_usage_threshold: 90,
+                tick_interval_secs: 30,
+                gate_reconcile_interval_ticks: 20,
+                handoff_buffer_ttl_secs: Some(86400),
+                persona_data_dir: None,
+                skill_data_dir: None,
+                flows: vec![],
+                flow_state_dir: None,
+                gitea: None,
+                mentions: None,
+                webhook: None,
+                role_config_path: None,
+                routing: None,
+                #[cfg(feature = "quickwit")]
+                quickwit: None,
+                projects: vec![project_def.clone()],
+                include: vec![],
+                providers: vec![],
+                provider_budget_state_file: None,
+                pause_dir: None,
+                project_circuit_breaker_threshold: 5,
+                fleet_escalation_owner: None,
+                fleet_escalation_repo: None,
+                post_merge_gate: None,
+                learning: terraphim_orchestrator::config::LearningConfig::default(),
+                evolution: terraphim_orchestrator::config::EvolutionConfig::default(),
+                pr_dispatch: adf_config.pr_dispatch,
+                pr_dispatch_per_project: std::collections::HashMap::new(),
+                gitea_skill_repo: None,
+            };
+
+            config.substitute_env_vars();
+
+            if let Err(e) = config.validate() {
+                eprintln!("adf agent run: config validation failed: {e}");
+                return ExitCode::from(1);
+            }
+
+            run_synthetic(&config, &agent_name, Some(project_def.id.clone()), event, format)
+        }
+    }
 }
 
 /// Run the dry-run validator: load, validate, and print the routing table.
@@ -226,18 +446,18 @@ fn run_local_check(cwd: PathBuf) -> ExitCode {
         }
     };
 
-    let working_dir = adf_config
-        .discovered_path
-        .parent()
-        .map(|p| p.to_path_buf())
-        .unwrap_or_else(|| cwd.clone());
+            let working_dir = adf_config
+                .discovered_path
+                .parent()
+                .map(|p| p.to_path_buf())
+                .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
 
-    let nightwatch = terraphim_orchestrator::config::NightwatchConfig::default();
-    let compound_review = terraphim_orchestrator::config::CompoundReviewConfig {
-        schedule: "0 2 * * *".to_string(),
-        repo_path: working_dir.clone(),
-        ..Default::default()
-    };
+            let nightwatch = terraphim_orchestrator::config::NightwatchConfig::default();
+            let compound_review = terraphim_orchestrator::config::CompoundReviewConfig {
+                schedule: "0 2 * * *".to_string(),
+                repo_path: working_dir.clone(),
+                ..Default::default()
+            };
 
     let mut config = OrchestratorConfig {
         working_dir,
@@ -687,6 +907,7 @@ async fn main() -> ExitCode {
         Cli::LocalAgent { agent_name } => {
             run_local_agent(&agent_name, std::env::current_dir().unwrap_or_default()).await
         }
+        Cli::Agent { sub_args } => run_agent(sub_args),
         Cli::Check { config } => run_check(config),
         Cli::Run { config } => {
             tracing::info!(config = %config.display(), "loading orchestrator config");
