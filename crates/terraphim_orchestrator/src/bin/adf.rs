@@ -2,6 +2,9 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
+use terraphim_orchestrator::agent_runner::{
+    validate_agent_runtime, AgentRunRequest, AgentRuntimeValidationReport,
+};
 use terraphim_orchestrator::config::OrchestratorConfig;
 use terraphim_orchestrator::AgentOrchestrator;
 use terraphim_spawner::{AgentSpawner, ResourceLimits, SpawnContext};
@@ -91,16 +94,93 @@ fn register_providers(orchestrator: &mut AgentOrchestrator) {
 }
 
 enum Cli {
-    Run { config: PathBuf },
-    Check { config: PathBuf },
+    Run {
+        config: PathBuf,
+    },
+    Check {
+        config: PathBuf,
+    },
+    AgentValidate {
+        config: PathBuf,
+        agent_name: String,
+        project: Option<String>,
+        format: OutputFormat,
+    },
     LocalCheck,
-    LocalAgent { agent_name: String },
+    LocalAgent {
+        agent_name: String,
+    },
     Version,
     Help,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum OutputFormat {
+    Human,
+    Json,
+}
+
+fn parse_agent_validate_args(args: Vec<String>) -> Result<Cli, String> {
+    let mut config: Option<PathBuf> = None;
+    let mut project: Option<String> = None;
+    let mut format = OutputFormat::Human;
+    let mut agent_name: Option<String> = None;
+
+    let mut iter = args.into_iter();
+    while let Some(arg) = iter.next() {
+        match arg.as_str() {
+            "--config" => {
+                let path = iter
+                    .next()
+                    .ok_or_else(|| "agent validate --config requires a path".to_string())?;
+                config = Some(PathBuf::from(path));
+            }
+            "--project" => {
+                project = Some(
+                    iter.next()
+                        .ok_or_else(|| "agent validate --project requires a value".to_string())?,
+                );
+            }
+            "--format" => {
+                let value = iter
+                    .next()
+                    .ok_or_else(|| "agent validate --format requires human or json".to_string())?;
+                format = match value.as_str() {
+                    "human" => OutputFormat::Human,
+                    "json" => OutputFormat::Json,
+                    _ => return Err(format!("unknown format: {value}")),
+                };
+            }
+            other if other.starts_with("--") => {
+                return Err(format!("unknown agent validate flag: {other}"));
+            }
+            other => {
+                if agent_name.is_some() {
+                    return Err(format!("unexpected agent validate argument: {other}"));
+                }
+                agent_name = Some(other.to_string());
+            }
+        }
+    }
+
+    Ok(Cli::AgentValidate {
+        config: config.ok_or_else(|| "agent validate requires --config CONFIG".to_string())?,
+        agent_name: agent_name.ok_or_else(|| "agent validate requires AGENT".to_string())?,
+        project,
+        format,
+    })
+}
+
 fn parse_args() -> Result<Cli, String> {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.first().map(|arg| arg.as_str()) == Some("agent") {
+        return match args.get(1).map(|arg| arg.as_str()) {
+            Some("validate") => parse_agent_validate_args(args.into_iter().skip(2).collect()),
+            Some(other) => Err(format!("unknown agent command: {other}")),
+            None => Err("agent requires a subcommand".to_string()),
+        };
+    }
+
     let mut check: Option<PathBuf> = None;
     let mut local_mode: Option<String> = None;
     let mut positional: Option<PathBuf> = None;
@@ -169,10 +249,96 @@ fn print_help() {
     println!("USAGE:");
     println!("    adf [CONFIG]                Run the orchestrator");
     println!("    adf --check CONFIG          Validate config + print agent routing table");
+    println!(
+        "    adf agent validate --config CONFIG AGENT [--project PROJECT] [--format human|json]"
+    );
     println!("    adf --local --check         Discover .terraphim/adf.toml and validate");
     println!("    adf --local --agent NAME    Run named agent from .terraphim/adf.toml locally");
     println!("    adf --help                  Show this message");
     println!("    adf --version               Show version");
+}
+
+fn print_agent_validation_human(report: &AgentRuntimeValidationReport) {
+    println!("agent: {}", report.agent_name);
+    println!("project: {}", report.project);
+    println!("layer: {}", report.layer);
+    println!("cli_tool: {}", report.cli_tool);
+    println!("model: {}", report.model.as_deref().unwrap_or("<unset>"));
+    println!("working_dir: {}", report.working_dir);
+    println!("repo_ok: {}", report.repo_ok);
+    println!("runnable: {}", report.runnable);
+    println!("evolution_requested: {}", report.evolution_requested);
+    println!("evolution_available: {}", report.evolution_available);
+    if let Some(target) = &report.gitea_target {
+        println!(
+            "gitea: {}/{}/{} issue={}",
+            target.base_url,
+            target.owner,
+            target.repo,
+            target
+                .issue
+                .map(|issue| issue.to_string())
+                .unwrap_or_else(|| "<unset>".to_string())
+        );
+    }
+    for warning in &report.warnings {
+        println!("warning: {warning}");
+    }
+}
+
+fn run_agent_validate(
+    config_path: PathBuf,
+    agent_name: String,
+    project: Option<String>,
+    format: OutputFormat,
+) -> ExitCode {
+    let config = match OrchestratorConfig::from_file(&config_path) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!(
+                "adf agent validate FAILED to load {}: {e}",
+                config_path.display()
+            );
+            return ExitCode::from(1);
+        }
+    };
+
+    if let Err(e) = config.validate() {
+        eprintln!(
+            "adf agent validate FAILED validation for {}: {e}",
+            config_path.display()
+        );
+        return ExitCode::from(1);
+    }
+
+    let request = AgentRunRequest {
+        agent_name,
+        project,
+    };
+    let report = match validate_agent_runtime(&config, &request) {
+        Ok(report) => report,
+        Err(e) => {
+            eprintln!("adf agent validate FAILED: {e}");
+            return ExitCode::from(1);
+        }
+    };
+
+    match format {
+        OutputFormat::Human => print_agent_validation_human(&report),
+        OutputFormat::Json => match serde_json::to_string_pretty(&report) {
+            Ok(json) => println!("{json}"),
+            Err(e) => {
+                eprintln!("adf agent validate FAILED to encode JSON: {e}");
+                return ExitCode::from(1);
+            }
+        },
+    }
+
+    if report.runnable {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::from(1)
+    }
 }
 
 /// Run the dry-run validator: load, validate, and print the routing table.
@@ -663,6 +829,7 @@ async fn main() -> ExitCode {
         .with_env_filter(
             EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
         )
+        .with_writer(std::io::stderr)
         .init();
 
     let cli = match parse_args() {
@@ -687,6 +854,12 @@ async fn main() -> ExitCode {
         Cli::LocalAgent { agent_name } => {
             run_local_agent(&agent_name, std::env::current_dir().unwrap_or_default()).await
         }
+        Cli::AgentValidate {
+            config,
+            agent_name,
+            project,
+            format,
+        } => run_agent_validate(config, agent_name, project, format),
         Cli::Check { config } => run_check(config),
         Cli::Run { config } => {
             tracing::info!(config = %config.display(), "loading orchestrator config");

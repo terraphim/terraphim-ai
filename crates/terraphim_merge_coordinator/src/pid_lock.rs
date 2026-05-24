@@ -100,16 +100,14 @@ fn now_secs() -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::thread;
-    use std::time::Duration;
     use tempfile::tempdir;
 
     #[test]
-    fn acquire_creates_lock_file_and_writes_pid() {
-        let dir = tempdir().unwrap();
+    fn acquire_creates_lock_file_and_writes_pid() -> Result<(), Box<dyn std::error::Error>> {
+        let dir = tempdir()?;
         let lock_path = dir.path().join("merge-coordinator.lock");
-        let _guard = acquire_pid_lock(&lock_path, 30).expect("acquire");
-        let contents = std::fs::read_to_string(&lock_path).unwrap();
+        let _guard = acquire_pid_lock(&lock_path, 30)?;
+        let contents = std::fs::read_to_string(&lock_path)?;
         let payload = parse_lock_payload(&contents);
         assert!(
             payload.pid > 0,
@@ -117,40 +115,42 @@ mod tests {
             payload.pid
         );
         assert!(payload.acquired_at > 0);
+        Ok(())
     }
 
     #[test]
-    fn second_acquire_within_stale_window_returns_lock_held() {
-        let dir = tempdir().unwrap();
+    fn second_acquire_within_stale_window_returns_lock_held()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let dir = tempdir()?;
         let lock_path = dir.path().join("merge-coordinator.lock");
-        let _guard1 = acquire_pid_lock(&lock_path, 30).expect("first acquire");
+        let _guard1 = acquire_pid_lock(&lock_path, 30)?;
 
-        match acquire_pid_lock(&lock_path, 30) {
-            Err(MergeCoordinatorError::LockHeld { pid, .. }) => {
-                assert!(pid > 0, "lock holder pid should be reported");
-            }
-            other => panic!("expected LockHeld, got {other:?}"),
-        }
+        let Err(MergeCoordinatorError::LockHeld { pid, .. }) = acquire_pid_lock(&lock_path, 30)
+        else {
+            return Err("expected LockHeld".into());
+        };
+        assert!(pid > 0, "lock holder pid should be reported");
+        Ok(())
     }
 
     #[test]
-    fn second_acquire_after_stale_threshold_steals_lock() {
-        let dir = tempdir().unwrap();
+    fn second_acquire_after_stale_threshold_steals_lock() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let dir = tempdir()?;
         let lock_path = dir.path().join("merge-coordinator.lock");
         // Write a stale lock payload (PID 999999 acquired 100s ago).
         let stale_ts = now_secs().saturating_sub(100);
-        std::fs::write(&lock_path, format!("999999 {stale_ts}\n")).unwrap();
+        std::fs::write(&lock_path, format!("999999 {stale_ts}\n"))?;
 
         // 30s stale threshold; 100s elapsed -> steal succeeds.
-        let _guard = acquire_pid_lock(&lock_path, 30).expect("should steal stale lock");
-        let contents = std::fs::read_to_string(&lock_path).unwrap();
+        let _guard = acquire_pid_lock(&lock_path, 30)?;
+        let contents = std::fs::read_to_string(&lock_path)?;
         let payload = parse_lock_payload(&contents);
         assert_ne!(payload.pid, 999999, "stale pid should be replaced");
         assert!(
             payload.acquired_at > stale_ts,
             "new acquired_at should be more recent than stale one"
         );
-        // Defensive: keep the guard alive over a brief sleep.
-        thread::sleep(Duration::from_millis(10));
+        Ok(())
     }
 }

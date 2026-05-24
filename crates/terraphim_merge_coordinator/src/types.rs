@@ -92,14 +92,15 @@ mod tests {
     }
 
     #[test]
-    fn merge_outcome_merged_carries_closed_issues() {
+    fn merge_outcome_merged_carries_closed_issues() -> Result<(), &'static str> {
         let m = MergeOutcome::Merged {
             closed_issues: vec![1804, 1817],
         };
-        match m {
-            MergeOutcome::Merged { closed_issues } => assert_eq!(closed_issues, vec![1804, 1817]),
-            _ => panic!("expected Merged"),
-        }
+        let MergeOutcome::Merged { closed_issues } = m else {
+            return Err("constructed value must be Merged");
+        };
+        assert_eq!(closed_issues, vec![1804, 1817]);
+        Ok(())
     }
 }
 

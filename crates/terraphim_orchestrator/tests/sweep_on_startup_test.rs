@@ -80,6 +80,9 @@ fn isolated_config(
             gitea_issue: None,
             event_only: false,
             evolution_enabled: false,
+            rlm_enabled: None,
+            bypass_kg_routing: false,
+            enabled: true,
             project: None,
         }],
         restart_cooldown_secs: 60,
@@ -125,18 +128,18 @@ fn isolated_config(
 /// directory survives but `<repo>/.git/worktrees/<name>` may or may
 /// not. The sweep's fallback path handles both.
 #[test]
-fn sweep_removes_review_prefixed_residue_on_startup() {
-    let working_dir = TempDir::new().expect("working dir");
+fn sweep_removes_review_prefixed_residue_on_startup() -> Result<(), Box<dyn std::error::Error>> {
+    let working_dir = TempDir::new()?;
     let (_repo_tmp, repo_path) = setup_git_repo();
     let worktree_root = working_dir.path().join("worktrees");
-    std::fs::create_dir_all(&worktree_root).unwrap();
+    std::fs::create_dir_all(&worktree_root)?;
 
     // Seed three review-prefixed dirs to look like residue.
     let mut review_dirs = Vec::new();
     for _ in 0..3 {
         let dir = worktree_root.join(format!("{}{}", WORKTREE_REVIEW_PREFIX, Uuid::new_v4()));
-        std::fs::create_dir_all(&dir).unwrap();
-        std::fs::write(dir.join("residue.txt"), "left by SIGKILL").unwrap();
+        std::fs::create_dir_all(&dir)?;
+        std::fs::write(dir.join("residue.txt"), "left by SIGKILL")?;
         review_dirs.push(dir);
     }
 
@@ -150,7 +153,7 @@ fn sweep_removes_review_prefixed_residue_on_startup() {
         repo_path,
         worktree_root.clone(),
     );
-    let _orch = AgentOrchestrator::new(config).expect("AgentOrchestrator::new must succeed");
+    let _orch = AgentOrchestrator::new(config)?;
 
     // After new() returns, all review residue must be gone.
     for d in &review_dirs {
@@ -160,29 +163,30 @@ fn sweep_removes_review_prefixed_residue_on_startup() {
             d.display()
         );
     }
+    Ok(())
 }
 
 /// Non-review-prefixed siblings under the same `worktree_root` must
 /// be preserved by the startup sweep.
 #[test]
-fn sweep_preserves_non_review_siblings_on_startup() {
-    let working_dir = TempDir::new().expect("working dir");
+fn sweep_preserves_non_review_siblings_on_startup() -> Result<(), Box<dyn std::error::Error>> {
+    let working_dir = TempDir::new()?;
     let (_repo_tmp, repo_path) = setup_git_repo();
     let worktree_root = working_dir.path().join("worktrees");
-    std::fs::create_dir_all(&worktree_root).unwrap();
+    std::fs::create_dir_all(&worktree_root)?;
 
     let review_dir = worktree_root.join(format!("{}victim", WORKTREE_REVIEW_PREFIX));
     let keep_dir = worktree_root.join("keep-me");
-    std::fs::create_dir_all(&review_dir).unwrap();
-    std::fs::create_dir_all(&keep_dir).unwrap();
-    std::fs::write(keep_dir.join("important.txt"), "do not delete").unwrap();
+    std::fs::create_dir_all(&review_dir)?;
+    std::fs::create_dir_all(&keep_dir)?;
+    std::fs::write(keep_dir.join("important.txt"), "do not delete")?;
 
     let config = isolated_config(
         working_dir.path().to_path_buf(),
         repo_path,
         worktree_root.clone(),
     );
-    let _orch = AgentOrchestrator::new(config).expect("AgentOrchestrator::new must succeed");
+    let _orch = AgentOrchestrator::new(config)?;
 
     assert!(!review_dir.exists(), "review-victim should be swept");
     assert!(keep_dir.exists(), "keep-me must survive the sweep");
@@ -190,6 +194,7 @@ fn sweep_preserves_non_review_siblings_on_startup() {
         keep_dir.join("important.txt").exists(),
         "keep-me contents must survive the sweep"
     );
+    Ok(())
 }
 
 /// Direct children of any extra root passed via the sweep are removed
@@ -202,22 +207,23 @@ fn sweep_preserves_non_review_siblings_on_startup() {
 /// against an isolated temp root and assert the same outcome the
 /// startup wiring would produce.
 #[test]
-fn sweep_removes_extra_root_children_regardless_of_prefix() {
+fn sweep_removes_extra_root_children_regardless_of_prefix() -> Result<(), Box<dyn std::error::Error>>
+{
     use terraphim_orchestrator::scope::WorktreeManager;
 
     let (_repo_tmp, repo_path) = setup_git_repo();
     let worktree_root = _repo_tmp.path().join(".worktrees");
-    std::fs::create_dir_all(&worktree_root).unwrap();
+    std::fs::create_dir_all(&worktree_root)?;
     let manager = WorktreeManager::with_base(&repo_path, &worktree_root);
 
     // Per-host-unique extra root; avoids racing the real
     // /tmp/adf-worktrees if another agent is running locally.
     let extra_root = std::env::temp_dir().join(format!("adf-worktrees-test-{}", Uuid::new_v4()));
-    std::fs::create_dir_all(&extra_root).unwrap();
+    std::fs::create_dir_all(&extra_root)?;
 
     let agent_child = extra_root.join("agent-task-7");
-    std::fs::create_dir_all(&agent_child).unwrap();
-    std::fs::write(agent_child.join("scratch.txt"), "residue").unwrap();
+    std::fs::create_dir_all(&agent_child)?;
+    std::fs::write(agent_child.join("scratch.txt"), "residue")?;
 
     let report = manager.sweep_stale(std::slice::from_ref(&extra_root));
 
@@ -234,4 +240,5 @@ fn sweep_removes_extra_root_children_regardless_of_prefix() {
 
     // Tidy up the now-empty extra root.
     let _ = std::fs::remove_dir_all(&extra_root);
+    Ok(())
 }

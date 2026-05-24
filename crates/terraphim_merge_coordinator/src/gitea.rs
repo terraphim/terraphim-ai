@@ -34,15 +34,20 @@ pub struct PrSummary {
 impl GiteaClient {
     /// Build a client. `base_url` is e.g. `https://git.terraphim.cloud`.
     /// `token` is the Gitea API token; treated as opaque.
-    pub fn new(base_url: impl Into<String>, token: impl Into<String>) -> Self {
-        Self {
+    pub fn new(
+        base_url: impl Into<String>,
+        token: impl Into<String>,
+    ) -> Result<Self, MergeCoordinatorError> {
+        let http = reqwest::Client::builder()
+            .timeout(Duration::from_secs(30))
+            .build()
+            .map_err(|e| MergeCoordinatorError::Api(format!("build gitea http client: {e}")))?;
+
+        Ok(Self {
             base_url: base_url.into(),
             token: token.into(),
-            http: reqwest::Client::builder()
-                .timeout(Duration::from_secs(30))
-                .build()
-                .expect("reqwest client builds with default config"),
-        }
+            http,
+        })
     }
 
     /// List open PRs for `owner/repo`.
@@ -176,21 +181,23 @@ mod tests {
     use super::*;
 
     #[test]
-    fn pr_summary_deserialises_minimum_fields() {
+    fn pr_summary_deserialises_minimum_fields() -> Result<(), serde_json::Error> {
         let json = r#"{"number":42,"title":"Fix things","body":"Fixes #1","state":"open","mergeable":true}"#;
-        let pr: PrSummary = serde_json::from_str(json).unwrap();
+        let pr: PrSummary = serde_json::from_str(json)?;
         assert_eq!(pr.number, 42);
         assert_eq!(pr.state, "open");
         assert_eq!(pr.mergeable, Some(true));
+        Ok(())
     }
 
     #[test]
-    fn pr_summary_tolerates_missing_optional_fields() {
+    fn pr_summary_tolerates_missing_optional_fields() -> Result<(), serde_json::Error> {
         let json = r#"{"number":1,"title":"x","state":"open"}"#;
-        let pr: PrSummary = serde_json::from_str(json).unwrap();
+        let pr: PrSummary = serde_json::from_str(json)?;
         assert_eq!(pr.number, 1);
         assert_eq!(pr.body, None);
         assert_eq!(pr.mergeable, None);
+        Ok(())
     }
 
     #[test]

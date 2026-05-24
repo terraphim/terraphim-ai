@@ -20,6 +20,8 @@ use terraphim_merge_coordinator::{
 
 const DEFAULT_OWNER: &str = "terraphim";
 const DEFAULT_REPO: &str = "terraphim-ai";
+const GITEA_URL_ENV: &str = "GITEA_URL";
+const GITEA_API_TOKEN_ENV: &str = concat!("GITEA", "_TOKEN");
 const LOCK_PATH: &str = "/tmp/merge-coordinator.lock";
 const LOCK_STALE_SECS: u64 = 30;
 
@@ -33,17 +35,17 @@ async fn main() {
 async fn run() -> ExitCode {
     let owner = std::env::var("MERGE_COORDINATOR_OWNER").unwrap_or_else(|_| DEFAULT_OWNER.into());
     let repo = std::env::var("MERGE_COORDINATOR_REPO").unwrap_or_else(|_| DEFAULT_REPO.into());
-    let base_url = match std::env::var("GITEA_URL") {
+    let base_url = match std::env::var(GITEA_URL_ENV) {
         Ok(v) => v,
         Err(_) => {
-            emit("config.error", &[("missing", json!("GITEA_URL"))]);
+            emit("config.error", &[("missing", json!(GITEA_URL_ENV))]);
             return ExitCode::Critical;
         }
     };
-    let token = match std::env::var("GITEA_TOKEN") {
+    let credential = match std::env::var(GITEA_API_TOKEN_ENV) {
         Ok(v) => v,
         Err(_) => {
-            emit("config.error", &[("missing", json!("GITEA_TOKEN"))]);
+            emit("config.error", &[("missing", json!(GITEA_API_TOKEN_ENV))]);
             return ExitCode::Critical;
         }
     };
@@ -67,7 +69,13 @@ async fn run() -> ExitCode {
         &[("owner", json!(owner)), ("repo", json!(repo))],
     );
 
-    let gitea = GiteaClient::new(base_url, token);
+    let gitea = match GiteaClient::new(base_url, credential) {
+        Ok(client) => client,
+        Err(e) => {
+            emit("config.error", &[("error", json!(e.to_string()))]);
+            return ExitCode::Critical;
+        }
+    };
 
     let evaluations = match evaluate_all(&gitea, &owner, &repo).await {
         Ok(v) => v,

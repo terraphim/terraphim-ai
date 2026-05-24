@@ -31,6 +31,7 @@
 
 pub mod adf_commands;
 pub mod agent_run_record;
+pub mod agent_runner;
 pub mod compound;
 pub mod concurrency;
 pub mod config;
@@ -76,6 +77,7 @@ pub mod worktree_guard;
 pub use agent_run_record::{
     AgentRunRecord, ExitClass, ExitClassification, ExitClassifier, RunTrigger,
 };
+pub use agent_runner::{AgentRunRequest, AgentRuntimeValidationReport, GiteaTargetReport};
 pub use compound::{CompoundReviewResult, CompoundReviewWorkflow, ReviewGroupDef, SwarmConfig};
 pub use concurrency::{ConcurrencyController, FairnessPolicy, ModeQuotas};
 #[cfg(feature = "quickwit")]
@@ -9809,7 +9811,7 @@ bypass_kg_routing = true
         }
 
         let dump = std::fs::read_to_string(&dump_path)
-            .unwrap_or_else(|e| panic!("env dump not written to {}: {e}", dump_path.display()));
+            .expect("env dump should be written by review PR dispatch script");
         assert!(
             dump.contains("ADF_PR_NUMBER=641"),
             "ADF_PR_NUMBER missing from dump:\n{dump}"
