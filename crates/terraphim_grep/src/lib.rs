@@ -8,7 +8,9 @@ pub mod sufficiency_judge;
 use std::sync::Arc;
 
 pub use error::{Result, TerraphimGrepError};
-pub use hybrid_searcher::{GrepOptions, Haystack, HybridResults, HybridSearcher, KgConcept, RetrievedChunk};
+pub use hybrid_searcher::{
+    GrepOptions, Haystack, HybridResults, HybridSearcher, KgConcept, RetrievedChunk,
+};
 pub use kg_curation::KgCurationRlm;
 pub use rlm_context::RlmContext;
 pub use signatures::{AnswerWithCitations, Citation, Match, NewConcept, RlmSignature};
@@ -191,9 +193,23 @@ impl TerraphimGrep {
                 .await
                 .map_err(|e| TerraphimGrepError::RlmFailed(e.to_string()))?
         } else {
-            return Err(TerraphimGrepError::LlmNotConfigured(
-                "LLM client not configured".to_string(),
-            ));
+            // No LLM configured -- degrade gracefully to search-only rather than failing.
+            // The chunks we already retrieved are still useful even without synthesis.
+            // Callers that explicitly need synthesis can pass `force_rlm = true`; that path
+            // still fails fast in `search_with_rlm`.
+            let stats = GrepStats {
+                search_latency_ms: start.elapsed().as_millis() as u64,
+                rlm_latency_ms: None,
+                chunks_returned: chunks.len(),
+                kg_hits: hybrid_results.kg_concepts.len(),
+            };
+            return Ok(GrepResult {
+                chunks,
+                answer: None,
+                concepts: hybrid_results.kg_concepts,
+                sufficiency: SufficiencyState::SearchOnly,
+                stats,
+            });
         };
 
         let rlm_latency_ms = rlm_start.elapsed().as_millis() as u64;
@@ -289,6 +305,8 @@ impl TerraphimGrep {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(feature = "code-search")]
+    use terraphim_types::Thesaurus;
 
     #[test]
     fn test_grep_options_default() {
@@ -298,5 +316,55 @@ mod tests {
         assert_eq!(options.max_results, 50);
         assert!(!options.force_rlm);
         assert!(!options.include_answer);
+    }
+
+    /// When `code-search` is enabled and the sufficiency judge requests synthesis but no
+    /// `LlmClient` is wired, the searcher must degrade to `SearchOnly` rather than failing
+    /// with `LlmNotConfigured`. This guards D005 (graceful fallback) -- the previous
+    /// behaviour broke the CLI for any query that returned partial results.
+    #[cfg(feature = "code-search")]
+    #[tokio::test]
+    async fn search_without_llm_degrades_to_search_only() {
+        let tmp = tempfile::TempDir::new().expect("tempdir");
+        for i in 0..5 {
+            let path = tmp.path().join(format!("file_{i}.rs"));
+            std::fs::write(&path, format!("fn target_{i}() {{ /* target */ }}\n")).unwrap();
+        }
+
+        let hybrid = HybridSearcher::new("test-role".to_string(), Thesaurus::new("t".to_string()))
+            .expect("build hybrid searcher")
+            .with_search_path(tmp.path().to_path_buf());
+        let grep = TerraphimGrep::new(Arc::new(hybrid), Arc::new(SufficiencyJudge::default()));
+
+        let result = grep
+            .search(
+                "target",
+                GrepOptions {
+                    haystack: Haystack::Code,
+                    max_results: 50,
+                    ..GrepOptions::default()
+                },
+            )
+            .await
+            .expect("search should succeed without LLM");
+
+        // The fff backend should have found at least one match -- if not the corpus is wrong.
+        assert!(
+            !result.chunks.is_empty(),
+            "expected fff-search to return chunks from {:?}",
+            tmp.path()
+        );
+
+        // Whether the judge picked `Sufficient` or `NeedsSynthesis` depends on coverage
+        // heuristics, but the user-visible state must be one of the no-LLM-required ones.
+        assert!(
+            matches!(
+                result.sufficiency,
+                SufficiencyState::SearchOnly | SufficiencyState::RlmInsufficient
+            ),
+            "expected SearchOnly/RlmInsufficient, got {:?}",
+            result.sufficiency
+        );
+        assert!(result.answer.is_none(), "no LLM -> no synthesised answer");
     }
 }

@@ -61,6 +61,12 @@ struct Args {
 
     #[arg(long, help = "Thesaurus path")]
     thesaurus: Option<PathBuf>,
+
+    #[arg(
+        long,
+        help = "Path to a JSON file containing a terraphim_config::Role with LLM/router settings"
+    )]
+    role_config: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, ValueEnum)]
@@ -105,6 +111,102 @@ fn init_tracing() {
         .with(fmt::layer())
         .with(filter)
         .init();
+}
+
+/// Build an `LlmClient` for the requested role.
+///
+/// Resolution order:
+///   1. If `--role-config <path>` is provided, deserialize a `terraphim_config::Role` from
+///      that JSON file and feed it to `terraphim_service::llm::build_llm_from_role`.
+///   2. Otherwise construct a minimal in-memory `Role` populated from environment variables
+///      (`OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, `OLLAMA_BASE_URL`, `OLLAMA_MODEL`).
+///   3. Return `None` if neither source yields a usable LLM client. The grep stays usable in
+///      search-only mode -- the LLM is only required when sufficiency falls below threshold.
+///
+/// `terraphim_service::llm::build_llm_from_role` is the public entry point: it owns the
+/// precedence rules and decides internally whether to return a direct provider (Ollama /
+/// OpenRouter / GenAi) or a `RouterBridgeLlmClient` based on `role.llm_router_enabled`.
+/// Wiring this function rather than the bridge directly keeps grep aligned with how the
+/// server, TUI, and RLM consume LLM clients.
+#[cfg(feature = "llm")]
+fn build_llm_for_role(
+    role_name: &str,
+    role_config_path: Option<&std::path::Path>,
+) -> Option<Arc<dyn terraphim_service::llm::LlmClient>> {
+    let role = match role_config_path {
+        Some(path) => match std::fs::read_to_string(path) {
+            Ok(contents) => match serde_json::from_str::<terraphim_config::Role>(&contents) {
+                Ok(r) => r,
+                Err(e) => {
+                    tracing::warn!("Failed to parse role config at {:?}: {}", path, e);
+                    return None;
+                }
+            },
+            Err(e) => {
+                tracing::warn!("Failed to read role config at {:?}: {}", path, e);
+                return None;
+            }
+        },
+        None => role_from_env(role_name)?,
+    };
+
+    terraphim_service::llm::build_llm_from_role(&role)
+}
+
+#[cfg(not(feature = "llm"))]
+#[allow(dead_code)]
+fn build_llm_for_role(
+    _role_name: &str,
+    _role_config_path: Option<&std::path::Path>,
+) -> Option<std::sync::Arc<()>> {
+    None
+}
+
+/// Construct a minimal `Role` from environment variables. Returns `None` when no LLM
+/// credentials are visible -- the CLI then runs in search-only mode.
+#[cfg(feature = "llm")]
+fn role_from_env(role_name: &str) -> Option<terraphim_config::Role> {
+    use serde_json::Value;
+
+    let openrouter_key = std::env::var("OPENROUTER_API_KEY")
+        .ok()
+        .filter(|s| !s.is_empty());
+    let ollama_url = std::env::var("OLLAMA_BASE_URL")
+        .ok()
+        .filter(|s| !s.is_empty());
+
+    if openrouter_key.is_none() && ollama_url.is_none() {
+        return None;
+    }
+
+    let mut role = terraphim_config::Role::new(role_name);
+    role.llm_enabled = true;
+
+    if let Some(key) = openrouter_key {
+        let model = std::env::var("OPENROUTER_MODEL")
+            .unwrap_or_else(|_| "qwen/qwen3-coder:free".to_string());
+        role.llm_api_key = Some(key);
+        role.llm_model = Some(model.clone());
+        role.extra.insert(
+            "llm_provider".to_string(),
+            Value::String("openrouter".to_string()),
+        );
+        role.extra
+            .insert("llm_model".to_string(), Value::String(model));
+    } else if let Some(url) = ollama_url {
+        let model = std::env::var("OLLAMA_MODEL").unwrap_or_else(|_| "llama3.2:3b".to_string());
+        role.llm_model = Some(model.clone());
+        role.extra.insert(
+            "llm_provider".to_string(),
+            Value::String("ollama".to_string()),
+        );
+        role.extra
+            .insert("ollama_base_url".to_string(), Value::String(url));
+        role.extra
+            .insert("ollama_model".to_string(), Value::String(model));
+    }
+
+    Some(role)
 }
 
 fn find_default_thesaurus() -> Option<PathBuf> {
@@ -165,7 +267,11 @@ async fn main() -> Result<()> {
     tracing::debug!("Loaded thesaurus with {} entries", thesaurus.len());
 
     // Determine search path
-    let search_path = args.paths.first().cloned().unwrap_or_else(|| PathBuf::from("."));
+    let search_path = args
+        .paths
+        .first()
+        .cloned()
+        .unwrap_or_else(|| PathBuf::from("."));
 
     // Create hybrid searcher
     let mut hybrid_searcher = HybridSearcher::new(role_name.clone(), thesaurus)
@@ -177,8 +283,22 @@ async fn main() -> Result<()> {
     let sufficiency_judge = SufficiencyJudge::default();
     let sufficiency_judge = Arc::new(sufficiency_judge);
 
-    // Create TerraphimGrep
+    // Create TerraphimGrep and optionally attach an LLM client
     let terraphim_grep = TerraphimGrep::new(hybrid_searcher, sufficiency_judge);
+    #[cfg(feature = "llm")]
+    let terraphim_grep = match build_llm_for_role(&role_name, args.role_config.as_deref()) {
+        Some(client) => {
+            tracing::info!("LLM client wired: {}", client.name());
+            terraphim_grep.with_llm_client(client)
+        }
+        None => {
+            tracing::debug!(
+                "No LLM client available -- running in search-only mode (set OPENROUTER_API_KEY \
+                 or --role-config to enable RLM synthesis)"
+            );
+            terraphim_grep
+        }
+    };
 
     // Perform search
     let result = terraphim_grep

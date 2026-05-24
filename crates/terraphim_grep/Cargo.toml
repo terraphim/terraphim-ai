@@ -21,6 +21,7 @@ terraphim_types = { path = "../terraphim_types" }
 terraphim_rolegraph = { path = "../terraphim_rolegraph" }
 terraphim_automata = { path = "../terraphim_automata" }
 terraphim_service = { path = "../terraphim_service", optional = true }
+terraphim_config = { path = "../terraphim_config", optional = true }
 haystack_core = { path = "../haystack_core", optional = true }
 terraphim_file_search = { path = "../terraphim_file_search", optional = true }
 
@@ -35,14 +36,23 @@ clap = { version = "4", features = ["derive"] }
 
 [features]
 default = ["llm"]
-llm = ["dep:terraphim_service"]
+llm = ["dep:terraphim_service", "dep:terraphim_config"]
 code-search = ["dep:terraphim_file_search", "dep:fff-search"]
 doc-search = ["dep:haystack_core"]
+# Enable OpenRouter provider support (required for live OpenRouter tests against free models)
+openrouter = ["llm", "terraphim_service/openrouter"]
 
 [dev-dependencies]
 tokio-test = "0.4"
 tempfile.workspace = true
+criterion = { version = "0.8", features = ["async_tokio"] }
+terraphim_router = { path = "../terraphim_router" }
 
 [[bin]]
 name = "terraphim-grep"
 path = "src/main.rs"
+
+[[bench]]
+name = "hybrid_search"
+harness = false
+required-features = ["code-search"]

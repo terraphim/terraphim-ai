@@ -84,9 +84,7 @@ impl HybridResults {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.code_results.is_empty()
-            && self.doc_results.is_empty()
-            && self.kg_concepts.is_empty()
+        self.code_results.is_empty() && self.doc_results.is_empty() && self.kg_concepts.is_empty()
     }
 }
 
@@ -96,7 +94,10 @@ pub struct HybridSearcher {
 }
 
 impl HybridSearcher {
-    pub fn new(role_name: String, thesaurus: terraphim_types::Thesaurus) -> Result<Self, terraphim_rolegraph::Error> {
+    pub fn new(
+        role_name: String,
+        thesaurus: terraphim_types::Thesaurus,
+    ) -> Result<Self, terraphim_rolegraph::Error> {
         let rolegraph = terraphim_rolegraph::RoleGraph::new_sync(
             terraphim_types::RoleName::new(&role_name),
             thesaurus,
@@ -191,7 +192,7 @@ impl HybridSearcher {
         #[cfg(feature = "code-search")]
         {
             use fff_search::{
-                ContentCacheBudget, FilePicker, FilePickerOptions, FFFMode, GrepMode,
+                ContentCacheBudget, FFFMode, FilePicker, FilePickerOptions, GrepMode,
                 GrepSearchOptions, grep_search, parse_grep_query,
             };
 
