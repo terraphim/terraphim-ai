@@ -1,15 +1,165 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::process::ExitCode;
+use std::str::FromStr;
 
+use cron::Schedule;
 use serde::Serialize;
-use crate::config::OrchestratorConfig;
+use crate::config::{AgentDefinition, OrchestratorConfig};
 use crate::{
     validate_agent_runtime, AgentRunRequest, AgentRuntimeValidationReport,
-    SyntheticEvent,
+    ModeResult, OrchestratorError, SyntheticEvent, TriggerMode,
 };
 
 const LEGACY_PROJECT: &str = "<legacy>";
+
+fn parse_cron(expr: &str) -> Result<Schedule, OrchestratorError> {
+    let parts: Vec<&str> = expr.split_whitespace().collect();
+    let full_expr = match parts.len() {
+        5 => format!("0 {} *", expr),
+        6 => format!("{} *", expr),
+        7 => expr.to_string(),
+        _ => {
+            return Err(OrchestratorError::Config(format!(
+                "invalid cron '{}': expected 5, 6, or 7 fields, got {}",
+                expr,
+                parts.len()
+            )));
+        }
+    };
+    Schedule::from_str(&full_expr)
+        .map_err(|e| OrchestratorError::Config(format!("invalid cron '{}': {}", expr, e)))
+}
+
+pub fn applicable_modes(agent: &AgentDefinition) -> Vec<TriggerMode> {
+    let mut modes = vec![TriggerMode::Local];
+    if agent.schedule.is_some() {
+        modes.push(TriggerMode::Cron);
+    }
+    if agent.event_only {
+        modes.push(TriggerMode::PullRequest);
+        modes.push(TriggerMode::Push);
+    }
+    modes
+}
+
+pub fn schedule_for_agent(config: &OrchestratorConfig, agent_name: &str) -> Option<String> {
+    config.agents.iter()
+        .find(|a| a.name == agent_name)
+        .and_then(|a| a.schedule.clone())
+}
+
+pub fn is_cron_schedule_valid(expr: &str) -> bool {
+    parse_cron(expr).is_ok()
+}
+
+fn validate_agent_mode(
+    _config: &OrchestratorConfig,
+    agent: &AgentDefinition,
+    mode: TriggerMode,
+) -> ModeResult {
+    let mut warnings = Vec::new();
+    let runnable = match mode {
+        TriggerMode::Cron => {
+            if let Some(ref expr) = agent.schedule {
+                if is_cron_schedule_valid(expr) {
+                    true
+                } else {
+                    warnings.push(format!("invalid cron expression: {}", expr));
+                    false
+                }
+            } else {
+                warnings.push("agent has no cron schedule".to_string());
+                false
+            }
+        }
+        TriggerMode::PullRequest | TriggerMode::Push => {
+            if agent.event_only {
+                true
+            } else {
+                warnings.push("agent is not event-only".to_string());
+                false
+            }
+        }
+        TriggerMode::Mention => {
+            if agent.event_only {
+                warnings.push("event-only agent cannot be mention-dispatched".to_string());
+                false
+            } else {
+                true
+            }
+        }
+        TriggerMode::Local => {
+            !agent.cli_tool.trim().is_empty()
+        }
+        TriggerMode::Webhook => {
+            true
+        }
+    };
+
+    let cli_tool_probe = if !agent.cli_tool.trim().is_empty() {
+        Some(crate::probe_cli_tool(&agent.cli_tool).unwrap_or(false))
+    } else {
+        None
+    };
+
+    let model_probe = agent.model.as_ref().map(|m| {
+        crate::probe_model_available(m, agent.provider.as_deref()).unwrap_or(false)
+    });
+
+    ModeResult {
+        trigger_mode: mode,
+        runnable,
+        cli_tool_probe,
+        model_probe,
+        synthetic_event_ok: None,
+        warnings,
+    }
+}
+
+pub fn validate_agent_all_modes(
+    config: &OrchestratorConfig,
+    agent: &AgentDefinition,
+) -> (AgentRuntimeValidationReport, HashMap<TriggerMode, ModeResult>) {
+    let request = match &agent.project {
+        Some(p) => AgentRunRequest::new(&agent.name).with_project(p),
+        None => AgentRunRequest::new(&agent.name),
+    };
+
+    let runtime_report = validate_agent_runtime(config, &request)
+        .unwrap_or_else(|_| AgentRuntimeValidationReport {
+            agent_name: agent.name.clone(),
+            project: agent.project.clone().unwrap_or_else(|| LEGACY_PROJECT.to_string()),
+            layer: format!("{:?}", agent.layer),
+            schedule: agent.schedule.clone(),
+            cli_tool: agent.cli_tool.clone(),
+            model: agent.model.clone(),
+            working_dir: config.working_dir_for_agent(agent).display().to_string(),
+            repo_ok: config.working_dir_for_agent(agent).is_dir(),
+            gitea_target: None,
+            evolution_requested: agent.evolution_enabled,
+            evolution_available: config.evolution.enabled && agent.evolution_enabled,
+            runnable: false,
+            cli_tool_probe: None,
+            model_probe: None,
+            warnings: vec!["validation failed".to_string()],
+        });
+
+    let modes = applicable_modes(agent);
+    let mode_results: HashMap<TriggerMode, ModeResult> = modes
+        .into_iter()
+        .map(|m| (m, validate_agent_mode(config, agent, m)))
+        .collect();
+
+    let all_runnable = mode_results.values().all(|r| r.runnable);
+
+    let report = AgentRuntimeValidationReport {
+        runnable: runtime_report.runnable && all_runnable,
+        ..runtime_report
+    };
+
+    (report, mode_results)
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AgentSubcommand {
@@ -53,9 +203,11 @@ impl std::str::FromStr for OutputFormat {
 #[derive(Debug, Clone, Serialize)]
 pub struct AgentValidateAllReport {
     pub agents: HashMap<String, AgentRuntimeValidationReport>,
+    pub mode_results: HashMap<String, HashMap<TriggerMode, ModeResult>>,
     pub total: usize,
     pub runnable: usize,
     pub failed: usize,
+    pub all_modes_runnable: bool,
 }
 
 pub fn parse_agent_args(args: &[String]) -> Result<AgentSubcommand, String> {
@@ -71,8 +223,8 @@ pub fn parse_agent_args(args: &[String]) -> Result<AgentSubcommand, String> {
     while let Some(arg) = iter.next() {
         match arg.as_str() {
             "validate" | "validate-all" | "run" => {
-                if subcommand.is_some() {
-                    return Err(format!("multiple subcommands: {} and {}", subcommand.unwrap(), arg));
+                if let Some(prev) = &subcommand {
+                    return Err(format!("multiple subcommands: {} and {}", prev, arg));
                 }
                 subcommand = Some(arg.clone());
             }
@@ -192,38 +344,31 @@ pub fn run_validate(
             }
         }
     } else {
+        let mut reports: HashMap<String, AgentRuntimeValidationReport> = HashMap::new();
+        let mut mode_results: HashMap<String, HashMap<TriggerMode, ModeResult>> = HashMap::new();
         let mut runnable = 0;
         let mut failed = 0;
-        let mut reports: HashMap<String, AgentRuntimeValidationReport> = HashMap::new();
         for agent in &config.agents {
-            let proj = agent.project.clone();
-            let request = match &proj {
-                Some(p) => AgentRunRequest::new(&agent.name).with_project(p),
-                None => AgentRunRequest::new(&agent.name),
-            };
-            match validate_agent_runtime(config, &request) {
-                Ok(report) => {
-                    if report.runnable {
-                        runnable += 1;
-                    } else {
-                        failed += 1;
-                    }
-                    reports.insert(agent.name.clone(), report);
-                }
-                Err(e) => {
-                    eprintln!("validate failed for {}: {e}", agent.name);
-                    failed += 1;
-                }
+            let (report, modes) = validate_agent_all_modes(config, agent);
+            if report.runnable {
+                runnable += 1;
+            } else {
+                failed += 1;
             }
+            reports.insert(agent.name.clone(), report);
+            mode_results.insert(agent.name.clone(), modes);
         }
+        let all_modes_runnable = failed == 0;
         let all_report = AgentValidateAllReport {
             agents: reports,
+            mode_results,
             total: runnable + failed,
             runnable,
             failed,
+            all_modes_runnable,
         };
         print_validate_all_report(&all_report, format);
-        if failed > 0 {
+        if !all_modes_runnable {
             ExitCode::from(1)
         } else {
             ExitCode::SUCCESS
@@ -240,37 +385,30 @@ pub fn run_validate_all(config: PathBuf, format: OutputFormat, _skip_model_probe
         }
     };
     let mut reports: HashMap<String, AgentRuntimeValidationReport> = HashMap::new();
+    let mut mode_results: HashMap<String, HashMap<TriggerMode, ModeResult>> = HashMap::new();
     let mut runnable = 0;
     let mut failed = 0;
     for agent in &config.agents {
-        let proj = agent.project.clone();
-        let request = match &proj {
-            Some(p) => AgentRunRequest::new(&agent.name).with_project(p),
-            None => AgentRunRequest::new(&agent.name),
-        };
-        match validate_agent_runtime(&config, &request) {
-            Ok(report) => {
-                if report.runnable {
-                    runnable += 1;
-                } else {
-                    failed += 1;
-                }
-                reports.insert(agent.name.clone(), report);
-            }
-            Err(e) => {
-                eprintln!("validate failed for {}: {e}", agent.name);
-                failed += 1;
-            }
+        let (report, modes) = validate_agent_all_modes(&config, agent);
+        if report.runnable {
+            runnable += 1;
+        } else {
+            failed += 1;
         }
+        reports.insert(agent.name.clone(), report);
+        mode_results.insert(agent.name.clone(), modes);
     }
+    let all_modes_runnable = failed == 0;
     let all_report = AgentValidateAllReport {
         agents: reports,
+        mode_results,
         total: runnable + failed,
         runnable,
         failed,
+        all_modes_runnable,
     };
     print_validate_all_report(&all_report, format);
-    if failed > 0 {
+    if !all_modes_runnable {
         ExitCode::from(1)
     } else {
         ExitCode::SUCCESS
@@ -343,6 +481,7 @@ fn print_validate_all_report(report: &AgentValidateAllReport, format: OutputForm
             println!("  Total: {}", report.total);
             println!("  Runnable: {}", report.runnable);
             println!("  Failed: {}", report.failed);
+            println!("  All Modes Runnable: {}", report.all_modes_runnable);
             println!();
             for (name, r) in &report.agents {
                 println!(
@@ -351,6 +490,17 @@ fn print_validate_all_report(report: &AgentValidateAllReport, format: OutputForm
                     name,
                     r.project
                 );
+                if let Some(modes) = report.mode_results.get(name) {
+                    for (mode, result) in modes {
+                        println!(
+                            "    {:?}: runnable={}, cli_probe={:?}, model_probe={:?}",
+                            mode,
+                            result.runnable,
+                            result.cli_tool_probe,
+                            result.model_probe
+                        );
+                    }
+                }
             }
         }
     }
@@ -464,5 +614,152 @@ mod tests {
         assert!(matches!("human".parse::<OutputFormat>(), Ok(OutputFormat::Human)));
         assert!(matches!("json".parse::<OutputFormat>(), Ok(OutputFormat::Json)));
         assert!("yaml".parse::<OutputFormat>().is_err());
+    }
+
+    fn make_agent(name: &str, schedule: Option<&str>, event_only: bool) -> AgentDefinition {
+        AgentDefinition {
+            name: name.to_string(),
+            layer: AgentLayer::Core,
+            cli_tool: "echo".to_string(),
+            task: "test".to_string(),
+            schedule: schedule.map(String::from),
+            model: Some("minimax-coding-plan/MiniMax-M2.5".to_string()),
+            capabilities: vec![],
+            max_memory_bytes: None,
+            budget_monthly_cents: None,
+            provider: None,
+            persona: None,
+            terraphim_role: None,
+            skill_chain: vec![],
+            sfia_skills: vec![],
+            fallback_provider: None,
+            fallback_model: None,
+            grace_period_secs: None,
+            max_cpu_seconds: None,
+            pre_check: None,
+            gitea_issue: None,
+            event_only,
+            project: None,
+            evolution_enabled: false,
+            rlm_enabled: None,
+            bypass_kg_routing: false,
+            enabled: true,
+        }
+    }
+
+    #[test]
+    fn applicable_modes_cron_agent() {
+        let agent = make_agent("security-sentinel", Some("0 */6 * * *"), false);
+        let modes = applicable_modes(&agent);
+        assert!(modes.contains(&TriggerMode::Cron));
+        assert!(modes.contains(&TriggerMode::Local));
+        assert!(!modes.contains(&TriggerMode::PullRequest));
+        assert!(!modes.contains(&TriggerMode::Push));
+    }
+
+    #[test]
+    fn applicable_modes_event_only_agent() {
+        let agent = make_agent("pr-reviewer", None, true);
+        let modes = applicable_modes(&agent);
+        assert!(modes.contains(&TriggerMode::PullRequest));
+        assert!(modes.contains(&TriggerMode::Push));
+        assert!(modes.contains(&TriggerMode::Local));
+        assert!(!modes.contains(&TriggerMode::Cron));
+    }
+
+    #[test]
+    fn is_cron_schedule_valid_valid() {
+        assert!(is_cron_schedule_valid("0 */6 * * *"));
+        assert!(is_cron_schedule_valid("15 0-10 * * *"));
+        assert!(is_cron_schedule_valid("*/30 * * * *"));
+    }
+
+    #[test]
+    fn is_cron_schedule_valid_invalid() {
+        assert!(!is_cron_schedule_valid("not a cron"));
+        assert!(!is_cron_schedule_valid(""));
+        assert!(!is_cron_schedule_valid("60 0 * * *"));
+    }
+
+    use crate::config::{AgentDefinition, AgentLayer};
+    use crate::OrchestratorConfig;
+    use tempfile::TempDir;
+
+    fn test_config(agents: Vec<AgentDefinition>) -> OrchestratorConfig {
+        let tmp = TempDir::new().unwrap();
+        OrchestratorConfig {
+            working_dir: tmp.path().to_path_buf(),
+            nightwatch: Default::default(),
+            compound_review: Default::default(),
+            workflow: None,
+            agents,
+            restart_cooldown_secs: 60,
+            max_restart_count: 10,
+            restart_budget_window_secs: 43_200,
+            disk_usage_threshold: 90,
+            tick_interval_secs: 30,
+            gate_reconcile_interval_ticks: 20,
+            handoff_buffer_ttl_secs: None,
+            persona_data_dir: None,
+            skill_data_dir: None,
+            flows: vec![],
+            flow_state_dir: None,
+            gitea: None,
+            mentions: None,
+            webhook: None,
+            role_config_path: None,
+            routing: None,
+            #[cfg(feature = "quickwit")]
+            quickwit: None,
+            projects: vec![],
+            include: vec![],
+            providers: vec![],
+            provider_budget_state_file: None,
+            pause_dir: None,
+            project_circuit_breaker_threshold: 3,
+            fleet_escalation_owner: None,
+            fleet_escalation_repo: None,
+            post_merge_gate: None,
+            learning: Default::default(),
+            evolution: Default::default(),
+            pr_dispatch: None,
+            pr_dispatch_per_project: std::collections::HashMap::new(),
+            gitea_skill_repo: None,
+        }
+    }
+
+    #[test]
+    fn schedule_for_agent_finds_schedule() {
+        let agent = make_agent("security-sentinel", Some("0 */6 * * *"), false);
+        let config = test_config(vec![agent]);
+        assert_eq!(schedule_for_agent(&config, "security-sentinel"), Some("0 */6 * * *".to_string()));
+    }
+
+    #[test]
+    fn schedule_for_agent_not_found() {
+        let agent = make_agent("security-sentinel", Some("0 */6 * * *"), false);
+        let config = test_config(vec![agent]);
+        assert_eq!(schedule_for_agent(&config, "nonexistent"), None);
+    }
+
+    #[test]
+    fn validate_agent_all_modes_cron_agent() {
+        let agent = make_agent("security-sentinel", Some("0 */6 * * *"), false);
+        let config = test_config(vec![agent.clone()]);
+        let (report, mode_results) = validate_agent_all_modes(&config, &agent);
+        assert_eq!(report.agent_name, "security-sentinel");
+        assert!(mode_results.contains_key(&TriggerMode::Cron));
+        assert!(mode_results.contains_key(&TriggerMode::Local));
+        assert_eq!(mode_results.get(&TriggerMode::Cron).unwrap().runnable, true);
+    }
+
+    #[test]
+    fn validate_agent_all_modes_event_only_agent() {
+        let agent = make_agent("pr-reviewer", None, true);
+        let config = test_config(vec![agent.clone()]);
+        let (_report, mode_results) = validate_agent_all_modes(&config, &agent);
+        assert!(mode_results.contains_key(&TriggerMode::PullRequest));
+        assert!(mode_results.contains_key(&TriggerMode::Push));
+        assert!(mode_results.contains_key(&TriggerMode::Local));
     }
 }
