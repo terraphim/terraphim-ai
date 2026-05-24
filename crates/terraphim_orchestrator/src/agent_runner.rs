@@ -212,9 +212,10 @@ pub fn validate_agent_runtime(
         None
     };
 
-    let model_probe = agent.model.as_ref().map(|m| {
-        probe_model_available(m, agent.provider.as_deref()).unwrap_or(false)
-    });
+    let model_probe = agent
+        .model
+        .as_ref()
+        .map(|m| probe_model_available(m, agent.provider.as_deref()).unwrap_or(false));
 
     let runnable = repo_ok
         && agent.enabled
@@ -547,11 +548,23 @@ mod tests {
             diff_loc: 500,
         };
         let vars = event.env_vars();
-        assert_eq!(vars.get("ADF_EVENT_TYPE").map(String::as_str), Some("pull_request"));
+        assert_eq!(
+            vars.get("ADF_EVENT_TYPE").map(String::as_str),
+            Some("pull_request")
+        );
         assert_eq!(vars.get("ADF_PR_NUMBER").map(String::as_str), Some("42"));
-        assert_eq!(vars.get("ADF_PR_HEAD_SHA").map(String::as_str), Some("abc123"));
-        assert_eq!(vars.get("ADF_PR_AUTHOR").map(String::as_str), Some("testuser"));
-        assert_eq!(vars.get("ADF_PR_TITLE").map(String::as_str), Some("Test PR"));
+        assert_eq!(
+            vars.get("ADF_PR_HEAD_SHA").map(String::as_str),
+            Some("abc123")
+        );
+        assert_eq!(
+            vars.get("ADF_PR_AUTHOR").map(String::as_str),
+            Some("testuser")
+        );
+        assert_eq!(
+            vars.get("ADF_PR_TITLE").map(String::as_str),
+            Some("Test PR")
+        );
         assert_eq!(vars.get("ADF_PR_DIFF_LOC").map(String::as_str), Some("500"));
     }
 
@@ -566,8 +579,14 @@ mod tests {
         let vars = event.env_vars();
         assert_eq!(vars.get("ADF_EVENT_TYPE").map(String::as_str), Some("push"));
         assert_eq!(vars.get("ADF_PUSH_SHA").map(String::as_str), Some("def456"));
-        assert_eq!(vars.get("ADF_PUSH_REF").map(String::as_str), Some("refs/heads/main"));
-        assert_eq!(vars.get("ADF_PUSH_PUSHER").map(String::as_str), Some("devuser"));
+        assert_eq!(
+            vars.get("ADF_PUSH_REF").map(String::as_str),
+            Some("refs/heads/main")
+        );
+        assert_eq!(
+            vars.get("ADF_PUSH_PUSHER").map(String::as_str),
+            Some("devuser")
+        );
         assert_eq!(
             vars.get("ADF_PUSH_FILES").map(String::as_str),
             Some("src/lib.rs,Cargo.toml")

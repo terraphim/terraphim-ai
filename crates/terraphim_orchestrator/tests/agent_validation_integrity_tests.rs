@@ -5,7 +5,9 @@
 
 use tempfile::TempDir;
 use terraphim_orchestrator::config::{AgentDefinition, AgentLayer, OrchestratorConfig};
-use terraphim_orchestrator::{applicable_modes, schedule_for_agent, validate_agent_all_modes, TriggerMode};
+use terraphim_orchestrator::{
+    applicable_modes, schedule_for_agent, validate_agent_all_modes, TriggerMode,
+};
 
 fn fixture_config(agents: Vec<AgentDefinition>) -> OrchestratorConfig {
     let tmp = TempDir::new().unwrap();
@@ -89,7 +91,12 @@ fn make_agent(
 #[test]
 fn test_cron_agents_have_schedule() {
     let agents = vec![
-        make_agent("scheduled-agent", AgentLayer::Core, Some("0 */6 * * *"), false),
+        make_agent(
+            "scheduled-agent",
+            AgentLayer::Core,
+            Some("0 */6 * * *"),
+            false,
+        ),
         make_agent("event-agent", AgentLayer::Growth, None, true),
     ];
     let config = fixture_config(agents);
@@ -115,7 +122,12 @@ fn test_cron_agents_have_schedule() {
 #[test]
 fn test_event_only_agents_no_schedule() {
     let agents = vec![
-        make_agent("scheduled-agent", AgentLayer::Core, Some("0 */6 * * *"), false),
+        make_agent(
+            "scheduled-agent",
+            AgentLayer::Core,
+            Some("0 */6 * * *"),
+            false,
+        ),
         make_agent("event-agent", AgentLayer::Growth, None, true),
     ];
     let config = fixture_config(agents);
@@ -146,7 +158,12 @@ fn test_event_only_agents_no_schedule() {
 #[test]
 fn test_non_event_only_agents_have_mention_mode() {
     let agents = vec![
-        make_agent("scheduled-agent", AgentLayer::Core, Some("0 */6 * * *"), false),
+        make_agent(
+            "scheduled-agent",
+            AgentLayer::Core,
+            Some("0 */6 * * *"),
+            false,
+        ),
         make_agent("safety-agent", AgentLayer::Safety, None, false),
     ];
     let config = fixture_config(agents);
@@ -166,7 +183,12 @@ fn test_non_event_only_agents_have_mention_mode() {
 #[test]
 fn test_all_agents_have_local_mode() {
     let agents = vec![
-        make_agent("scheduled-agent", AgentLayer::Core, Some("0 */6 * * *"), false),
+        make_agent(
+            "scheduled-agent",
+            AgentLayer::Core,
+            Some("0 */6 * * *"),
+            false,
+        ),
         make_agent("event-agent", AgentLayer::Growth, None, true),
         make_agent("safety-agent", AgentLayer::Safety, None, false),
     ];
@@ -185,7 +207,12 @@ fn test_all_agents_have_local_mode() {
 #[test]
 fn test_all_agents_have_webhook_mode() {
     let agents = vec![
-        make_agent("scheduled-agent", AgentLayer::Core, Some("0 */6 * * *"), false),
+        make_agent(
+            "scheduled-agent",
+            AgentLayer::Core,
+            Some("0 */6 * * *"),
+            false,
+        ),
         make_agent("event-agent", AgentLayer::Growth, None, true),
     ];
     let config = fixture_config(agents);
@@ -202,7 +229,12 @@ fn test_all_agents_have_webhook_mode() {
 
 #[test]
 fn test_validate_all_modes_completes_for_cron_agent() {
-    let agent = make_agent("scheduled-agent", AgentLayer::Core, Some("0 */6 * * *"), false);
+    let agent = make_agent(
+        "scheduled-agent",
+        AgentLayer::Core,
+        Some("0 */6 * * *"),
+        false,
+    );
     let config = fixture_config(vec![agent.clone()]);
 
     let (report, mode_results) = validate_agent_all_modes(&config, &agent);
@@ -240,8 +272,14 @@ fn test_schedule_for_agent_returns_correct_expression() {
     ];
     let config = fixture_config(agents);
 
-    assert_eq!(schedule_for_agent(&config, "agent-a"), Some("0 3 * * *".to_string()));
-    assert_eq!(schedule_for_agent(&config, "agent-b"), Some("15 */6 * * *".to_string()));
+    assert_eq!(
+        schedule_for_agent(&config, "agent-a"),
+        Some("0 3 * * *".to_string())
+    );
+    assert_eq!(
+        schedule_for_agent(&config, "agent-b"),
+        Some("15 */6 * * *".to_string())
+    );
     assert_eq!(schedule_for_agent(&config, "agent-c"), None);
     assert_eq!(schedule_for_agent(&config, "nonexistent"), None);
 }

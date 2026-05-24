@@ -75,18 +75,18 @@ pub mod scope;
 pub mod webhook;
 pub mod worktree_guard;
 
+pub use agent_run_command::{
+    applicable_modes, is_cron_schedule_valid, parse_agent_args, run_synthetic, run_validate,
+    run_validate_all, schedule_for_agent, validate_agent_all_modes, AgentSubcommand,
+    AgentValidateAllReport, OutputFormat,
+};
 pub use agent_run_record::{
     AgentRunRecord, ExitClass, ExitClassification, ExitClassifier, RunTrigger,
 };
-pub use agent_run_command::{
-    applicable_modes, is_cron_schedule_valid, parse_agent_args, run_synthetic,
-    run_validate, run_validate_all, schedule_for_agent, validate_agent_all_modes,
-    AgentSubcommand, AgentValidateAllReport, OutputFormat,
-};
 pub use agent_runner::{
     probe_cli_tool, probe_model_available, run_agent_synthetic, validate_agent_runtime,
-    AgentRunRequest, AgentRuntimeValidationReport, GiteaTargetReport, ModeResult,
-    SyntheticEvent, TriggerMode,
+    AgentRunRequest, AgentRuntimeValidationReport, GiteaTargetReport, ModeResult, SyntheticEvent,
+    TriggerMode,
 };
 pub use compound::{CompoundReviewResult, CompoundReviewWorkflow, ReviewGroupDef, SwarmConfig};
 pub use concurrency::{ConcurrencyController, FairnessPolicy, ModeQuotas};
