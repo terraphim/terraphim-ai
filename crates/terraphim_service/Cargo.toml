@@ -4,7 +4,6 @@ version = "1.16.15"
 edition.workspace = true
 authors = ["Terraphim Contributors"]
 description = "Terraphim service for handling user requests and responses."
-publish = false
 documentation = "https://terraphim.ai"
 homepage = "https://terraphim.ai"
 repository = "https://github.com/terraphim/terraphim-ai"

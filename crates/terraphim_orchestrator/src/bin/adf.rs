@@ -293,7 +293,13 @@ fn run_agent(sub_args: Vec<String>) -> ExitCode {
                 return ExitCode::from(1);
             }
 
-            run_validate(&config, agent_name, Some(project_id.clone()), format, skip_model_probe)
+            run_validate(
+                &config,
+                agent_name,
+                Some(project_id.clone()),
+                format,
+                skip_model_probe,
+            )
         }
         AgentSubcommand::ValidateAll {
             config,
@@ -306,21 +312,21 @@ fn run_agent(sub_args: Vec<String>) -> ExitCode {
             event,
             format,
         } => {
-            let adf_config =
-                match terraphim_orchestrator::ProjectAdfConfig::discover_and_load(&std::env::current_dir().unwrap_or_default())
-                {
-                    Ok(Some(cfg)) => cfg,
-                    Ok(None) => {
-                        eprintln!(
-                            "adf agent run: no .terraphim/adf.toml found at or above current directory"
-                        );
-                        return ExitCode::from(1);
-                    }
-                    Err(e) => {
-                        eprintln!("adf agent run: failed to load config: {e}");
-                        return ExitCode::from(1);
-                    }
-                };
+            let adf_config = match terraphim_orchestrator::ProjectAdfConfig::discover_and_load(
+                &std::env::current_dir().unwrap_or_default(),
+            ) {
+                Ok(Some(cfg)) => cfg,
+                Ok(None) => {
+                    eprintln!(
+                        "adf agent run: no .terraphim/adf.toml found at or above current directory"
+                    );
+                    return ExitCode::from(1);
+                }
+                Err(e) => {
+                    eprintln!("adf agent run: failed to load config: {e}");
+                    return ExitCode::from(1);
+                }
+            };
 
             let (project_def, agents) = match (&adf_config).try_into() {
                 Ok(tuple) => tuple,
@@ -390,7 +396,13 @@ fn run_agent(sub_args: Vec<String>) -> ExitCode {
                 return ExitCode::from(1);
             }
 
-            run_synthetic(&config, &agent_name, Some(project_def.id.clone()), event, format)
+            run_synthetic(
+                &config,
+                &agent_name,
+                Some(project_def.id.clone()),
+                event,
+                format,
+            )
         }
     }
 }
@@ -446,18 +458,18 @@ fn run_local_check(cwd: PathBuf) -> ExitCode {
         }
     };
 
-            let working_dir = adf_config
-                .discovered_path
-                .parent()
-                .map(|p| p.to_path_buf())
-                .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
+    let working_dir = adf_config
+        .discovered_path
+        .parent()
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
 
-            let nightwatch = terraphim_orchestrator::config::NightwatchConfig::default();
-            let compound_review = terraphim_orchestrator::config::CompoundReviewConfig {
-                schedule: "0 2 * * *".to_string(),
-                repo_path: working_dir.clone(),
-                ..Default::default()
-            };
+    let nightwatch = terraphim_orchestrator::config::NightwatchConfig::default();
+    let compound_review = terraphim_orchestrator::config::CompoundReviewConfig {
+        schedule: "0 2 * * *".to_string(),
+        repo_path: working_dir.clone(),
+        ..Default::default()
+    };
 
     let mut config = OrchestratorConfig {
         working_dir,
