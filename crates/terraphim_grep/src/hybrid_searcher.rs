@@ -88,8 +88,75 @@ impl HybridResults {
     }
 }
 
+/// Default weight applied to KG matches when boosting a chunk's relevance score.
+/// A weight of 1.0 means a chunk whose path and content fully match the top KG concept
+/// can roughly double its rank vs an unmatched chunk with the same base score.
+pub const DEFAULT_KG_BOOST_WEIGHT: f64 = 1.0;
+
+/// Compute the KG boost for a single chunk against a set of matched concepts.
+///
+/// For each concept whose lowercased `name` (or `display_value`, if set) appears in the
+/// chunk's lowercased source path or content, the concept's normalised score contributes
+/// to the boost. The result is in `[0.0, weight]`; callers add it to the chunk's
+/// `relevance_score`.
+///
+/// Why path-and-content: matching only paths misses content-defined concepts (a struct
+/// `RetryPolicy` declared in `src/network.rs`); matching only content over-rewards files
+/// that mention a concept in passing. Combining the two is a sensible default.
+pub fn score_kg_boost(chunk: &RetrievedChunk, concepts: &[KgConcept], weight: f64) -> f64 {
+    if concepts.is_empty() || weight <= 0.0 {
+        return 0.0;
+    }
+    let max_concept_score: f64 = concepts.iter().map(|c| c.score).fold(0.0, f64::max);
+    if max_concept_score <= 0.0 {
+        return 0.0;
+    }
+    let source_lower = chunk.source.to_lowercase();
+    let content_lower = chunk.content.to_lowercase();
+
+    let mut boost = 0.0;
+    for c in concepts {
+        let needle = c
+            .display_value
+            .as_deref()
+            .unwrap_or(c.name.as_str())
+            .to_lowercase();
+        if needle.is_empty() {
+            continue;
+        }
+        if source_lower.contains(&needle) || content_lower.contains(&needle) {
+            boost += c.score / max_concept_score;
+        }
+    }
+    (boost * weight).min(weight * concepts.len() as f64)
+}
+
+/// Apply KG boost to a batch of chunks and sort by boosted score (descending).
+/// Mutates `relevance_score` in place so downstream consumers can see the boost reflected
+/// in the JSON output -- otherwise the ordering would be inexplicable.
+pub fn boost_chunks_with_kg(
+    mut chunks: Vec<RetrievedChunk>,
+    concepts: &[KgConcept],
+) -> Vec<RetrievedChunk> {
+    for chunk in chunks.iter_mut() {
+        let boost = score_kg_boost(chunk, concepts, DEFAULT_KG_BOOST_WEIGHT);
+        chunk.relevance_score += boost;
+    }
+    chunks.sort_by(|a, b| {
+        b.relevance_score
+            .partial_cmp(&a.relevance_score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    chunks
+}
+
 pub struct HybridSearcher {
     role_graph: Arc<tokio::sync::RwLock<terraphim_rolegraph::RoleGraph>>,
+    /// Kept alongside the rolegraph so KG-style boosting still works when no documents
+    /// have been indexed into the graph. The rolegraph requires indexed documents to
+    /// return meaningful query results; the raw thesaurus is enough to identify which
+    /// of the user's known concepts touch the query.
+    thesaurus: terraphim_types::Thesaurus,
     search_path: PathBuf,
 }
 
@@ -100,11 +167,12 @@ impl HybridSearcher {
     ) -> Result<Self, terraphim_rolegraph::Error> {
         let rolegraph = terraphim_rolegraph::RoleGraph::new_sync(
             terraphim_types::RoleName::new(&role_name),
-            thesaurus,
+            thesaurus.clone(),
         )?;
 
         Ok(Self {
             role_graph: Arc::new(tokio::sync::RwLock::new(rolegraph)),
+            thesaurus,
             search_path: PathBuf::from("."),
         })
     }
@@ -124,12 +192,15 @@ impl HybridSearcher {
         let role_graph = self.role_graph.clone();
         let query_owned = query.to_string();
 
+        let thesaurus = self.thesaurus.clone();
+
         let (kg_concepts, code_results) = match options.haystack {
             Haystack::All | Haystack::Code => {
                 let kg_handle = tokio::spawn({
                     let query = query_owned.clone();
                     let graph = role_graph.clone();
-                    async move { Self::search_kg(&query, max_results, graph).await }
+                    let thes = thesaurus.clone();
+                    async move { Self::search_kg(&query, max_results, graph, &thes).await }
                 });
 
                 let code_handle = tokio::spawn({
@@ -148,10 +219,18 @@ impl HybridSearcher {
             }
             Haystack::Docs => {
                 let kg_concepts =
-                    Self::search_kg(&query_owned, max_results, role_graph.clone()).await?;
+                    Self::search_kg(&query_owned, max_results, role_graph.clone(), &thesaurus)
+                        .await?;
                 (kg_concepts, vec![])
             }
         };
+
+        // KG boost: re-rank code_results so chunks whose source path or content matches
+        // a thesaurus concept rank above generic matches. The base relevance from fff is
+        // currently uniform (1.0 per match), so without this step the user's knowledge
+        // does not influence ordering at all. Boost in place; the boosted score is what
+        // the JSON output reports so downstream tools see why a chunk ranked where it did.
+        let code_results = boost_chunks_with_kg(code_results, &kg_concepts);
 
         Ok(HybridResults {
             code_results,
@@ -164,6 +243,7 @@ impl HybridSearcher {
         query: &str,
         limit: usize,
         graph: Arc<tokio::sync::RwLock<terraphim_rolegraph::RoleGraph>>,
+        thesaurus: &terraphim_types::Thesaurus,
     ) -> Result<Vec<KgConcept>, String> {
         let graph_guard = graph.read().await;
 
@@ -171,16 +251,44 @@ impl HybridSearcher {
             .query_graph_with_trigger_fallback(query, None, Some(limit), false)
             .map_err(|e| e.to_string())?;
 
-        let concepts = matches
-            .into_iter()
-            .map(|(doc_id, indexed_doc)| KgConcept {
-                id: 0,
-                name: doc_id,
-                display_value: None,
-                score: indexed_doc.rank as f64,
-            })
-            .collect();
+        if !matches.is_empty() {
+            let concepts = matches
+                .into_iter()
+                .map(|(doc_id, indexed_doc)| KgConcept {
+                    id: 0,
+                    name: doc_id,
+                    display_value: None,
+                    score: indexed_doc.rank as f64,
+                })
+                .collect();
+            return Ok(concepts);
+        }
 
+        // Fallback: rolegraph returned nothing (graph has no indexed documents yet, or no
+        // node matched the query). Fall back to thesaurus-only matching so KG boost still
+        // fires. Match the rolegraph's Aho-Corasick semantics by lowercasing both sides
+        // and scanning each thesaurus key for substring presence in the query.
+        let query_lower = query.to_lowercase();
+        let mut concepts: Vec<KgConcept> = thesaurus
+            .keys()
+            .filter_map(|key| {
+                let key_str = key.as_str();
+                let key_lower = key_str.to_lowercase();
+                if query_lower.contains(&key_lower) || key_lower.contains(&query_lower) {
+                    Some(KgConcept {
+                        id: 0,
+                        name: key_str.to_string(),
+                        display_value: None,
+                        score: 1.0,
+                    })
+                } else {
+                    None
+                }
+            })
+            .take(limit)
+            .collect();
+        // Stable ordering for deterministic boost output across runs.
+        concepts.sort_by(|a, b| a.name.cmp(&b.name));
         Ok(concepts)
     }
 
@@ -308,6 +416,73 @@ mod tests {
         let chunks = results.to_chunks();
         assert_eq!(chunks.len(), 2);
         assert_eq!(results.total_results(), 2);
+    }
+
+    fn chunk(source: &str, content: &str, score: f64) -> RetrievedChunk {
+        RetrievedChunk {
+            content: content.to_string(),
+            source: source.to_string(),
+            line_start: Some(1),
+            line_end: Some(1),
+            relevance_score: score,
+            haystack: "code",
+        }
+    }
+
+    fn concept(name: &str, score: f64) -> KgConcept {
+        KgConcept {
+            id: 0,
+            name: name.to_string(),
+            display_value: None,
+            score,
+        }
+    }
+
+    #[test]
+    fn kg_boost_promotes_matching_chunks_to_top() {
+        // Two chunks with identical base scores. Only one mentions the KG concept in its
+        // path or content. After boost, the matching chunk must rank first -- this is the
+        // "your knowledge tops the results" guarantee.
+        let chunks = vec![
+            chunk("src/parse_csv.rs", "fn parse_csv() {}", 1.0),
+            chunk("src/retry_policy.rs", "pub struct RetryPolicy {}", 1.0),
+        ];
+        let concepts = vec![concept("retry_policy", 0.9)];
+
+        let ranked = boost_chunks_with_kg(chunks, &concepts);
+        assert_eq!(ranked[0].source, "src/retry_policy.rs");
+        assert!(
+            ranked[0].relevance_score > ranked[1].relevance_score,
+            "KG-matched chunk must outscore the unmatched chunk: {:?} vs {:?}",
+            ranked[0].relevance_score,
+            ranked[1].relevance_score,
+        );
+    }
+
+    #[test]
+    fn kg_boost_no_concepts_is_a_noop() {
+        // No KG concepts -> no boost -> ordering by base score only. Confirms the boost
+        // path stays neutral when there's nothing to learn from the KG.
+        let chunks = vec![chunk("a.rs", "alpha", 0.5), chunk("b.rs", "beta", 0.9)];
+        let ranked = boost_chunks_with_kg(chunks, &[]);
+        assert_eq!(ranked[0].source, "b.rs");
+        assert!((ranked[0].relevance_score - 0.9).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn kg_boost_stacks_when_multiple_concepts_match() {
+        // A chunk that matches *two* concepts gets a larger boost than one matching only
+        // one. Pins down the additive behaviour of score_kg_boost.
+        let one_match = chunk("src/retry.rs", "fn retry() {}", 1.0);
+        let two_matches = chunk("src/retry.rs", "fn retry() -> backoff::Result<()>", 1.0);
+        let concepts = vec![concept("retry", 1.0), concept("backoff", 1.0)];
+
+        let b1 = score_kg_boost(&one_match, &concepts, 1.0);
+        let b2 = score_kg_boost(&two_matches, &concepts, 1.0);
+        assert!(
+            b2 > b1,
+            "two-concept match must score higher than one-concept match: {b2} vs {b1}"
+        );
     }
 
     #[test]

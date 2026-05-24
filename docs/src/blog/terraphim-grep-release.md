@@ -24,9 +24,10 @@ The LLM wiring goes through `terraphim_service::llm::build_llm_from_role` -- the
 
 ## What is new in this release
 
-- End-to-end hybrid pipeline: fff-search code chunks + KG concepts + sufficiency judging + LLM synthesis with citations.
+- **Your knowledge tops the results.** `fff-search` returns uniform `relevance_score = 1.0` per match, so on its own it cannot order them. The new `boost_chunks_with_kg` re-ranks chunks: files whose source path or content matches your thesaurus concepts move to the top. The boost is reflected in the chunk's score in the JSON output, so you can see *why* something ranked where it did.
+- End-to-end hybrid pipeline: fff-search code chunks + KG concepts + KG boost + sufficiency judging + LLM synthesis with citations.
 - Graceful degradation: no LLM configured? You still get chunks. `force_rlm = true` still fails fast.
 - Four-layer test pyramid, zero mocks: inline unit tests, router capability assertions, live OpenRouter free-model smoke (`#[ignore]`), and a manual quality gate.
-- Criterion benchmarks for `code_only`, `hybrid_with_kg`, and `fuse_and_rank`. First numbers: hybrid latency flat at ~3.2 ms across thesaurus sizes 10..10,000.
+- Criterion benchmarks for `code_only`, `hybrid_with_kg`, `fuse_and_rank`, and `kg_boost_overhead`. First numbers: hybrid latency flat at ~3.2 ms across thesaurus sizes 10..10,000; KG boost adds under 25 us at typical scale.
 
 Full design rationale and benchmark walkthrough in the [long-form post](https://github.com/terraphim/terraphim-ai/blob/main/docs/blog/terraphim-grep-hybrid-search-with-llm-fallback.md).

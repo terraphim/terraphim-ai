@@ -9,7 +9,8 @@ use std::sync::Arc;
 
 pub use error::{Result, TerraphimGrepError};
 pub use hybrid_searcher::{
-    GrepOptions, Haystack, HybridResults, HybridSearcher, KgConcept, RetrievedChunk,
+    DEFAULT_KG_BOOST_WEIGHT, GrepOptions, Haystack, HybridResults, HybridSearcher, KgConcept,
+    RetrievedChunk, boost_chunks_with_kg, score_kg_boost,
 };
 pub use kg_curation::KgCurationRlm;
 pub use rlm_context::RlmContext;

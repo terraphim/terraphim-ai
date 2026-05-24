@@ -170,6 +170,60 @@ fuse_and_rank/chunks/10000   849 us    11.8 Melem/s
 Throughput drops at scale because the sort fights cache locality, but absolute latency
 stays well below the network round-trip budget.
 
+## Your Knowledge Tops the Results
+
+`fff-search` returns a uniform `relevance_score = 1.0` per match. Sorting by that score
+is meaningless; without an ordering signal you would be back to "thirty hits, read them
+all." We added a **KG-aware boost** so the chunks whose source path or content matches
+your thesaurus concepts move to the top.
+
+The shape:
+
+```rust
+pub fn score_kg_boost(chunk: &RetrievedChunk, concepts: &[KgConcept], weight: f64) -> f64;
+pub fn boost_chunks_with_kg(chunks: Vec<RetrievedChunk>, concepts: &[KgConcept]) -> Vec<RetrievedChunk>;
+```
+
+For each chunk we lowercase the source path and content once, then for each matched
+concept we check whether its `name` (or `display_value`) appears in either. Matching
+concepts contribute their normalised score; unmatched ones do not. The boost is added
+to the chunk's existing `relevance_score` and the JSON output shows the boosted number,
+so downstream tools can see *why* a chunk ranked where it did.
+
+Default weight is `1.0`: a fully-KG-matched chunk roughly doubles its score versus an
+unmatched chunk. The unit tests pin this contract down:
+
+```rust
+#[test]
+fn kg_boost_promotes_matching_chunks_to_top() {
+    let chunks = vec![
+        chunk("src/parse_csv.rs", "fn parse_csv() {}", 1.0),
+        chunk("src/retry_policy.rs", "pub struct RetryPolicy {}", 1.0),
+    ];
+    let concepts = vec![concept("retry_policy", 0.9)];
+    let ranked = boost_chunks_with_kg(chunks, &concepts);
+    assert_eq!(ranked[0].source, "src/retry_policy.rs");
+}
+```
+
+And the `kg_boost_overhead` benchmark group quantifies the cost. First numbers, 1000
+chunks against varying concept counts:
+
+```
+kg_boost_overhead/concepts/0       49.7 us    sort only, no concepts
+kg_boost_overhead/concepts/10      478 us
+kg_boost_overhead/concepts/100     3.85 ms
+kg_boost_overhead/concepts/1000    36.0 ms
+```
+
+The cost grows linearly with `chunks * concepts` (one substring search per pair). At
+typical grep scale -- say 50 chunks and a handful of KG concepts matched per query --
+the boost adds under 25 microseconds to a 3.2 ms hybrid search. Less than 1% overhead.
+
+The 1000-concept case (36 ms) is pathological -- it would require every term in the
+thesaurus to have matched the query, which does not happen in practice. The bench
+exists so future regressions on the algorithm get caught.
+
 ## What Did Not Change
 
 - The fff-search integration itself. It was already correct -- proven by `fff_search::file_picker`
@@ -177,9 +231,7 @@ stays well below the network round-trip budget.
 - The sufficiency judge thresholds. The defaults (min_coverage 0.7, min_kg_confidence 0.5,
   min_diversity 2, min_results 3) still steer most queries into NeedsSynthesis. Tuning
   those is a separate conversation -- the bench gives us the latency data to do it on.
-- The knowledge graph's role in ranking. KG concepts ride alongside chunks in the result;
-  they do not currently boost chunk scores. That is a real next step -- the benchmark is
-  the regression guard.
+- The fff-search integration itself.
 
 ## What This Unlocks
 

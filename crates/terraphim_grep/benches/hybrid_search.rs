@@ -1,9 +1,10 @@
 //! Benchmarks for `terraphim_grep::HybridSearcher`.
 //!
-//! Three groups:
+//! Four groups:
 //!   - `code_only`           -- code haystack only (fff-search), no KG
-//!   - `hybrid_with_kg`      -- code + KG concept extraction in parallel
+//!   - `hybrid_with_kg`      -- code + KG concept extraction in parallel (boost included)
 //!   - `fuse_and_rank`       -- isolated sort/rank cost across chunk batches
+//!   - `kg_boost_overhead`   -- isolated cost of the KG-aware boost as the concept set grows
 //!
 //! Run all:
 //!   cargo bench -p terraphim_grep --features code-search --bench hybrid_search
@@ -22,7 +23,9 @@ use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_m
 use tempfile::TempDir;
 use tokio::runtime::Runtime;
 
-use terraphim_grep::{GrepOptions, Haystack, HybridSearcher, RetrievedChunk};
+use terraphim_grep::{
+    GrepOptions, Haystack, HybridSearcher, KgConcept, RetrievedChunk, boost_chunks_with_kg,
+};
 use terraphim_types::{NormalizedTerm, NormalizedTermValue, Thesaurus};
 
 /// Create a temp directory populated with `file_count` Rust source files, each containing
@@ -174,10 +177,80 @@ fn bench_fuse_and_rank(c: &mut Criterion) {
     group.finish();
 }
 
+/// Measures the standalone cost of `boost_chunks_with_kg` -- the KG ranking boost --
+/// at fixed chunk count and growing concept count. Proves the boost stays cheap enough
+/// to keep on by default; if this group ever runs hot we know to revisit the algorithm.
+fn bench_kg_boost_overhead(c: &mut Criterion) {
+    let mut group = c.benchmark_group("kg_boost_overhead");
+
+    // 1000 chunks, half of which contain a concept name in their source/content. This
+    // mirrors a realistic mix: most of the corpus is irrelevant to the user's domain,
+    // a minority of files match the thesaurus.
+    let chunks: Vec<RetrievedChunk> = (0..1000)
+        .map(|i| {
+            let (source, content) = if i % 2 == 0 {
+                (
+                    format!("src/retry_handler_{i}.rs"),
+                    format!("pub struct RetryHandler{i} {{ backoff: Backoff }}"),
+                )
+            } else {
+                (
+                    format!("src/unrelated_{i}.rs"),
+                    format!("fn helper_{i}() {{}}"),
+                )
+            };
+            RetrievedChunk {
+                content,
+                source,
+                line_start: Some(1),
+                line_end: Some(1),
+                relevance_score: 1.0,
+                haystack: "code",
+            }
+        })
+        .collect();
+
+    for &concept_count in &[0usize, 10, 100, 1_000] {
+        let concepts: Vec<KgConcept> = (0..concept_count)
+            .map(|i| {
+                // Half the concepts intentionally match the matching-half of chunks; the
+                // rest are domain noise. Realistic shape: not every concept lands a hit.
+                let name = if i % 2 == 0 {
+                    "retry".to_string()
+                } else {
+                    format!("unrelated_concept_{i}")
+                };
+                KgConcept {
+                    id: i as u64,
+                    name,
+                    display_value: None,
+                    score: 0.5 + (i % 5) as f64 / 10.0,
+                }
+            })
+            .collect();
+
+        group.throughput(Throughput::Elements(chunks.len() as u64));
+        group.bench_with_input(
+            BenchmarkId::new("concepts", concept_count),
+            &concept_count,
+            |b, _| {
+                b.iter(|| {
+                    let fresh = chunks.clone();
+                    let ranked = boost_chunks_with_kg(fresh, &concepts);
+                    std::hint::black_box(ranked);
+                });
+            },
+        );
+    }
+
+    group.finish();
+}
+
 criterion_group!(
     benches,
     bench_code_only,
     bench_hybrid_with_kg,
-    bench_fuse_and_rank
+    bench_fuse_and_rank,
+    bench_kg_boost_overhead
 );
 criterion_main!(benches);

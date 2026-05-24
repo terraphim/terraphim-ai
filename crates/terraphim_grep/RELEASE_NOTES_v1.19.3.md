@@ -4,8 +4,14 @@ Tracks Gitea issue #1743, PR #1825 (branch `task/1743-terraphim-grep`).
 
 ## Highlights
 
+- **KG-aware boost: your knowledge tops the results.** New `boost_chunks_with_kg`
+  re-ranks chunks so files whose source path or content matches your thesaurus
+  concepts move above generic matches. Default weight of `1.0` lets a fully-matched
+  chunk roughly double its score; the boost is reflected in the JSON output so
+  downstream tools can see why a chunk ranked where it did.
 - End-to-end hybrid pipeline: `fff-search` code retrieval + parallel knowledge-graph
-  concept extraction + sufficiency judging + LLM synthesis with citations.
+  concept extraction + KG-aware ranking boost + sufficiency judging + LLM synthesis
+  with citations.
 - CLI wires `terraphim_service::llm::build_llm_from_role` -- aligns grep with how the
   server, TUI, and RLM consume providers; whether routing through capability extraction
   kicks in is a role-config decision (`llm_router_enabled = true`).
@@ -13,7 +19,8 @@ Tracks Gitea issue #1743, PR #1825 (branch `task/1743-terraphim-grep`).
   still fails fast.
 - Four-layer test pyramid, zero mocks (L1 inline, L2 router-capability,
   L3 e2e against free OpenRouter, L4 manual quality gate).
-- Criterion benchmarks for `code_only`, `hybrid_with_kg`, and `fuse_and_rank`.
+- Criterion benchmarks for `code_only`, `hybrid_with_kg`, `fuse_and_rank`, and the new
+  `kg_boost_overhead` -- under 25 us added per search at typical scale.
 
 ## Defects fixed
 
@@ -46,7 +53,7 @@ target/release/terraphim-grep-v1.19.3-task1743-darwin-arm64.tar.gz
 target/release/terraphim-grep.sha256
 ```
 
-SHA-256 of tarball (darwin-arm64): `356aeafbaf3b2f0c2541e21a07317869c7686ac83e4879d73276f1c5edd7ed4f`
+SHA-256 of tarball (darwin-arm64): `f4cd95f5a30a263145f82fca9895062cf95b1cc580358fa8b99397649d9b0118`
 
 ## Crates.io publishability
 
