@@ -39,7 +39,10 @@ pub fn applicable_modes(agent: &AgentDefinition) -> Vec<TriggerMode> {
     if agent.event_only {
         modes.push(TriggerMode::PullRequest);
         modes.push(TriggerMode::Push);
+    } else {
+        modes.push(TriggerMode::Mention);
     }
+    modes.push(TriggerMode::Webhook);
     modes
 }
 

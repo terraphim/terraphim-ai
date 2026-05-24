@@ -79,8 +79,9 @@ pub use agent_run_record::{
     AgentRunRecord, ExitClass, ExitClassification, ExitClassifier, RunTrigger,
 };
 pub use agent_run_command::{
-    parse_agent_args, run_synthetic, run_validate, run_validate_all, AgentSubcommand,
-    AgentValidateAllReport, OutputFormat,
+    applicable_modes, is_cron_schedule_valid, parse_agent_args, run_synthetic,
+    run_validate, run_validate_all, schedule_for_agent, validate_agent_all_modes,
+    AgentSubcommand, AgentValidateAllReport, OutputFormat,
 };
 pub use agent_runner::{
     probe_cli_tool, probe_model_available, run_agent_synthetic, validate_agent_runtime,
