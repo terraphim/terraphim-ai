@@ -1316,6 +1316,36 @@ pub fn warn_if_world_readable(path: &std::path::Path) {
     }
 }
 
+/// Validate that a webhook secret is not a hardcoded hex string.
+///
+/// Hardcoded secrets in config files are a P1 security risk: they end up in
+/// backups, logs, and git history. This function rejects strings that look
+/// like generated HMAC keys (hexadecimal, 32+ characters) unless they use
+/// the `${VAR_NAME}` env-var reference syntax.
+///
+/// Passphrases and short test keys are still allowed.
+pub fn validate_webhook_secret(secret: &str) -> Result<(), crate::error::OrchestratorError> {
+    // Env-var references are the approved pattern.
+    if secret.starts_with("${") && secret.ends_with("}") {
+        return Ok(());
+    }
+    // Reject hex strings that look like hardcoded cryptographic keys.
+    // A 256-bit HMAC key is 64 hex chars; we draw the line at 32 chars
+    // (128 bits) to catch most generated secrets without blocking
+    // legitimate short test values.
+    if secret.len() >= 32 && secret.chars().all(|c| c.is_ascii_hexdigit()) {
+        return Err(crate::error::OrchestratorError::Config(
+            format!(
+                "webhook.secret appears to be a hardcoded hex string ({} chars). \
+                 Use an environment variable reference like \"${{ADF_WEBHOOK_SECRET}}\" \
+                 to avoid storing secrets in config files.",
+                secret.len()
+            )
+        ));
+    }
+    Ok(())
+}
+
 /// Expand `${VAR_NAME}` placeholders in a TOML string using environment variables.
 ///
 /// Variables that are not set in the environment are replaced with an empty string,
@@ -1628,6 +1658,13 @@ impl OrchestratorConfig {
                     value: routing.probe_ttl_secs,
                     min: PROBE_TTL_MIN_SECS,
                 });
+            }
+        }
+
+        // P1: Reject hardcoded webhook secrets to prevent secrets in config files
+        if let Some(ref webhook) = self.webhook {
+            if let Some(ref secret) = webhook.secret {
+                validate_webhook_secret(secret)?;
             }
         }
 
@@ -3405,6 +3442,116 @@ task = "test"
         // $VAR (without braces) must NOT be expanded — avoids breaking TOML values
         let result = expand_env_vars("secret = \"$PLAIN_VAR\"");
         assert_eq!(result, "secret = \"$PLAIN_VAR\"");
+    }
+
+    // === P1: Hardcoded webhook secret validation ===
+
+    #[test]
+    fn webhook_secret_hardcoded_hex_rejected() {
+        let hex64 = "85af336ebec99fe512871106650bce179f9a2b218f40576f76d5ff0a55e7af9a";
+        let result = validate_webhook_secret(hex64);
+        assert!(
+            result.is_err(),
+            "64-char hex secret must be rejected as hardcoded"
+        );
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("hardcoded hex string"),
+            "error should explain the hardcoded secret risk: {err}"
+        );
+    }
+
+    #[test]
+    fn webhook_secret_env_var_allowed() {
+        assert!(
+            validate_webhook_secret("${ADF_WEBHOOK_SECRET}").is_ok(),
+            "env-var reference must be allowed"
+        );
+        assert!(
+            validate_webhook_secret("${MY_SECRET}").is_ok(),
+            "any env-var reference must be allowed"
+        );
+    }
+
+    #[test]
+    fn webhook_secret_passphrase_allowed() {
+        assert!(
+            validate_webhook_secret("my-passphrase-123").is_ok(),
+            "passphrase secret must be allowed"
+        );
+    }
+
+    #[test]
+    fn webhook_secret_short_hex_allowed() {
+        assert!(
+            validate_webhook_secret("deadbeef12345678").is_ok(),
+            "16-char hex is below the 32-char threshold and must be allowed"
+        );
+    }
+
+    #[test]
+    fn webhook_secret_31_char_hex_allowed() {
+        let hex31 = "abcd1234abcd1234abcd1234abcd123";
+        assert_eq!(hex31.len(), 31);
+        assert!(
+            validate_webhook_secret(hex31).is_ok(),
+            "31-char hex is below the 32-char threshold and must be allowed"
+        );
+    }
+
+    #[test]
+    fn webhook_secret_32_char_hex_rejected() {
+        let hex32 = "abcd1234abcd1234abcd1234abcd1234";
+        assert_eq!(hex32.len(), 32);
+        assert!(
+            validate_webhook_secret(hex32).is_err(),
+            "32-char hex must be rejected as hardcoded"
+        );
+    }
+
+    #[test]
+    fn test_validate_webhook_secret_in_config() {
+        let toml_str = r#"
+working_dir = "/tmp"
+[nightwatch]
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+[webhook]
+bind = "127.0.0.1:9090"
+secret = "85af336ebec99fe512871106650bce179f9a2b218f40576f76d5ff0a55e7af9a"
+[[agents]]
+name = "a"
+layer = "Safety"
+cli_tool = "echo"
+task = "t"
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        let result = config.validate();
+        assert!(result.is_err(), "config with hardcoded webhook secret must fail validation");
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("hardcoded hex string"), "error should mention hardcoded secret: {err}");
+    }
+
+    #[test]
+    fn test_validate_webhook_env_var_in_config_passes() {
+        let toml_str = r#"
+working_dir = "/tmp"
+[nightwatch]
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+[webhook]
+bind = "127.0.0.1:9090"
+secret = "${ADF_WEBHOOK_SECRET}"
+[[agents]]
+name = "a"
+layer = "Safety"
+cli_tool = "echo"
+task = "t"
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        assert!(config.validate().is_ok(), "config with env-var webhook secret must pass validation");
     }
 
     #[test]

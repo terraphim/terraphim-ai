@@ -188,6 +188,25 @@ fn resolve_secret(explicit: Option<&str>, host: &str) -> Result<String> {
             DEFAULT_ORCHESTRATOR_TOML
         );
     }
+    // If the remote config uses an env-var reference (e.g. "${ADF_WEBHOOK_SECRET}"),
+    // resolve the actual value from the remote shell environment.
+    if secret.starts_with("${") && secret.ends_with("}") {
+        let var_name = &secret[2..secret.len() - 1];
+        let env_cmd = format!("bash -lc 'echo ${}'", var_name);
+        let (env_stdout, _, env_code) = ssh_run(host, &env_cmd)?;
+        let env_secret = env_stdout.trim().to_string();
+        if env_code != 0 || env_secret.is_empty() || env_secret == secret {
+            bail!(
+                "Webhook secret in {} is an env-var reference ({}), \
+                 but the variable is not set on {}. \
+                 Set ADF_WEBHOOK_SECRET env var locally or pass --secret",
+                DEFAULT_ORCHESTRATOR_TOML,
+                secret,
+                host
+            );
+        }
+        return Ok(env_secret);
+    }
     Ok(secret)
 }
 
