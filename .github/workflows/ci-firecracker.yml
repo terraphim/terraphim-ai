@@ -158,11 +158,18 @@ jobs:
       - name: cargo build --workspace
         run: /home/alex/.local/bin/rch exec -- cargo build --workspace
 
-      - name: cargo test --workspace
+      - name: Install cargo-nextest
+        run: |
+          if ! command -v cargo-nextest >/dev/null 2>&1; then
+            cargo install cargo-nextest --locked
+          fi
+          cargo nextest --version
+
+      - name: cargo nextest run --workspace
         # Only test_chat_command is skipped: it requires LLM API credentials
         # not present in CI. All other failures must be fixed at the source,
-        # not skipped.
-        run: /home/alex/.local/bin/rch exec -- cargo test --workspace -- --skip test_chat_command
+        # not skipped. nextest uses filter expressions instead of --skip.
+        run: /home/alex/.local/bin/rch exec -- cargo nextest run --workspace --profile ci -E 'not test(test_chat_command)'
 
       - name: sccache stats
         if: always()

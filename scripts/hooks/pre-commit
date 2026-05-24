@@ -118,11 +118,11 @@ if command_exists cargo; then
         fi
         print_status "SUCCESS" "Cargo build passed"
 
-        # Run tests (with timeout to avoid hanging)
-        print_status "INFO" "Running Rust tests..."
-        if ! cargo test --workspace --lib >/dev/null 2>&1; then
+        # Run tests via nextest (per-test timeouts prevent hangs, e.g. #1305)
+        print_status "INFO" "Running Rust tests via cargo-nextest..."
+        if ! cargo nextest run --workspace --lib >/dev/null 2>&1; then
             print_status "FAIL" "Some tests are failing"
-            print_status "INFO" "Run 'cargo test --workspace --lib' to see details"
+            print_status "INFO" "Run 'cargo nextest run --workspace --lib' to see details"
             exit 1
         fi
         print_status "SUCCESS" "All Rust tests passed"
