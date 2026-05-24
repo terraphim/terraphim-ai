@@ -3,13 +3,13 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 use std::str::FromStr;
 
-use cron::Schedule;
-use serde::Serialize;
 use crate::config::{AgentDefinition, OrchestratorConfig};
 use crate::{
-    validate_agent_runtime, AgentRunRequest, AgentRuntimeValidationReport,
-    ModeResult, OrchestratorError, SyntheticEvent, TriggerMode,
+    validate_agent_runtime, AgentRunRequest, AgentRuntimeValidationReport, ModeResult,
+    OrchestratorError, SyntheticEvent, TriggerMode,
 };
+use cron::Schedule;
+use serde::Serialize;
 
 const LEGACY_PROJECT: &str = "<legacy>";
 
@@ -47,7 +47,9 @@ pub fn applicable_modes(agent: &AgentDefinition) -> Vec<TriggerMode> {
 }
 
 pub fn schedule_for_agent(config: &OrchestratorConfig, agent_name: &str) -> Option<String> {
-    config.agents.iter()
+    config
+        .agents
+        .iter()
         .find(|a| a.name == agent_name)
         .and_then(|a| a.schedule.clone())
 }
@@ -92,12 +94,8 @@ fn validate_agent_mode(
                 true
             }
         }
-        TriggerMode::Local => {
-            !agent.cli_tool.trim().is_empty()
-        }
-        TriggerMode::Webhook => {
-            true
-        }
+        TriggerMode::Local => !agent.cli_tool.trim().is_empty(),
+        TriggerMode::Webhook => true,
     };
 
     let cli_tool_probe = if !agent.cli_tool.trim().is_empty() {
@@ -106,9 +104,10 @@ fn validate_agent_mode(
         None
     };
 
-    let model_probe = agent.model.as_ref().map(|m| {
-        crate::probe_model_available(m, agent.provider.as_deref()).unwrap_or(false)
-    });
+    let model_probe = agent
+        .model
+        .as_ref()
+        .map(|m| crate::probe_model_available(m, agent.provider.as_deref()).unwrap_or(false));
 
     ModeResult {
         trigger_mode: mode,
@@ -123,16 +122,22 @@ fn validate_agent_mode(
 pub fn validate_agent_all_modes(
     config: &OrchestratorConfig,
     agent: &AgentDefinition,
-) -> (AgentRuntimeValidationReport, HashMap<TriggerMode, ModeResult>) {
+) -> (
+    AgentRuntimeValidationReport,
+    HashMap<TriggerMode, ModeResult>,
+) {
     let request = match &agent.project {
         Some(p) => AgentRunRequest::new(&agent.name).with_project(p),
         None => AgentRunRequest::new(&agent.name),
     };
 
-    let runtime_report = validate_agent_runtime(config, &request)
-        .unwrap_or_else(|_| AgentRuntimeValidationReport {
+    let runtime_report =
+        validate_agent_runtime(config, &request).unwrap_or_else(|_| AgentRuntimeValidationReport {
             agent_name: agent.name.clone(),
-            project: agent.project.clone().unwrap_or_else(|| LEGACY_PROJECT.to_string()),
+            project: agent
+                .project
+                .clone()
+                .unwrap_or_else(|| LEGACY_PROJECT.to_string()),
             layer: format!("{:?}", agent.layer),
             schedule: agent.schedule.clone(),
             cli_tool: agent.cli_tool.clone(),
@@ -242,10 +247,14 @@ pub fn parse_agent_args(args: &[String]) -> Result<AgentSubcommand, String> {
                 skip_model_probe = true;
             }
             "--config" | "-c" => {
-                config = Some(PathBuf::from(iter.next().ok_or("--config requires a value")?));
+                config = Some(PathBuf::from(
+                    iter.next().ok_or("--config requires a value")?,
+                ));
             }
             "--synthetic-event" => {
-                let ev = iter.next().ok_or("--synthetic-event requires an event type")?;
+                let ev = iter
+                    .next()
+                    .ok_or("--synthetic-event requires an event type")?;
                 event = match ev.as_str() {
                     "pr" | "pull_request" => Some(SyntheticEvent::PullRequest {
                         number: 1,
@@ -379,7 +388,11 @@ pub fn run_validate(
     }
 }
 
-pub fn run_validate_all(config: PathBuf, format: OutputFormat, _skip_model_probe: bool) -> ExitCode {
+pub fn run_validate_all(
+    config: PathBuf,
+    format: OutputFormat,
+    _skip_model_probe: bool,
+) -> ExitCode {
     let config = match OrchestratorConfig::from_file(&config) {
         Ok(c) => c,
         Err(e) => {
@@ -425,7 +438,10 @@ pub fn run_synthetic(
     _event: SyntheticEvent,
     format: OutputFormat,
 ) -> ExitCode {
-    eprintln!("synthetic run not yet implemented for agent: {}", agent_name);
+    eprintln!(
+        "synthetic run not yet implemented for agent: {}",
+        agent_name
+    );
     let report = AgentRuntimeValidationReport {
         agent_name: agent_name.to_string(),
         project: project.unwrap_or_else(|| LEGACY_PROJECT.to_string()),
@@ -497,10 +513,7 @@ fn print_validate_all_report(report: &AgentValidateAllReport, format: OutputForm
                     for (mode, result) in modes {
                         println!(
                             "    {:?}: runnable={}, cli_probe={:?}, model_probe={:?}",
-                            mode,
-                            result.runnable,
-                            result.cli_tool_probe,
-                            result.model_probe
+                            mode, result.runnable, result.cli_tool_probe, result.model_probe
                         );
                     }
                 }
@@ -517,7 +530,13 @@ mod tests {
     fn parse_validate_no_args() {
         let args = vec!["validate".to_string()];
         let cmd = parse_agent_args(&args).unwrap();
-        assert!(matches!(cmd, AgentSubcommand::Validate { agent_name: None, .. }));
+        assert!(matches!(
+            cmd,
+            AgentSubcommand::Validate {
+                agent_name: None,
+                ..
+            }
+        ));
     }
 
     #[test]
@@ -573,11 +592,17 @@ mod tests {
             "42".to_string(),
         ];
         let cmd = parse_agent_args(&args).unwrap();
-        let AgentSubcommand::RunSynthetic { agent_name, event, .. } = cmd else {
+        let AgentSubcommand::RunSynthetic {
+            agent_name, event, ..
+        } = cmd
+        else {
             panic!("expected RunSynthetic")
         };
         assert_eq!(agent_name, "security-sentinel");
-        assert!(matches!(event, SyntheticEvent::PullRequest { number: 42, .. }));
+        assert!(matches!(
+            event,
+            SyntheticEvent::PullRequest { number: 42, .. }
+        ));
     }
 
     #[test]
@@ -589,7 +614,10 @@ mod tests {
             "push".to_string(),
         ];
         let cmd = parse_agent_args(&args).unwrap();
-        let AgentSubcommand::RunSynthetic { agent_name, event, .. } = cmd else {
+        let AgentSubcommand::RunSynthetic {
+            agent_name, event, ..
+        } = cmd
+        else {
             panic!("expected RunSynthetic")
         };
         assert_eq!(agent_name, "pr-reviewer");
@@ -605,7 +633,12 @@ mod tests {
             "terraphim".to_string(),
         ];
         let cmd = parse_agent_args(&args).unwrap();
-        let AgentSubcommand::Validate { agent_name, project, .. } = cmd else {
+        let AgentSubcommand::Validate {
+            agent_name,
+            project,
+            ..
+        } = cmd
+        else {
             panic!("expected Validate")
         };
         assert_eq!(agent_name, Some("security-sentinel".to_string()));
@@ -614,8 +647,14 @@ mod tests {
 
     #[test]
     fn output_format_parsing() {
-        assert!(matches!("human".parse::<OutputFormat>(), Ok(OutputFormat::Human)));
-        assert!(matches!("json".parse::<OutputFormat>(), Ok(OutputFormat::Json)));
+        assert!(matches!(
+            "human".parse::<OutputFormat>(),
+            Ok(OutputFormat::Human)
+        ));
+        assert!(matches!(
+            "json".parse::<OutputFormat>(),
+            Ok(OutputFormat::Json)
+        ));
         assert!("yaml".parse::<OutputFormat>().is_err());
     }
 
@@ -735,7 +774,10 @@ mod tests {
     fn schedule_for_agent_finds_schedule() {
         let agent = make_agent("security-sentinel", Some("0 */6 * * *"), false);
         let config = test_config(vec![agent]);
-        assert_eq!(schedule_for_agent(&config, "security-sentinel"), Some("0 */6 * * *".to_string()));
+        assert_eq!(
+            schedule_for_agent(&config, "security-sentinel"),
+            Some("0 */6 * * *".to_string())
+        );
     }
 
     #[test]
