@@ -92,7 +92,10 @@ pub struct Email {
 }
 
 /// Represents an email address.
-#[derive(Debug, Serialize, Deserialize, Clone)]
+///
+/// GDPR note: `email` and `name` are personal data (Article 4(1)).
+/// Custom `Debug` impl redacts these fields to prevent PII leakage in logs.
+#[derive(Serialize, Deserialize, Clone)]
 pub struct EmailAddress {
     /// The name associated with the email address.
     pub name: Option<String>,
@@ -101,8 +104,20 @@ pub struct EmailAddress {
     pub email: String,
 }
 
+impl std::fmt::Debug for EmailAddress {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("EmailAddress")
+            .field("email", &"***REDACTED***")
+            .field("name", &"***REDACTED***")
+            .finish()
+    }
+}
+
 /// Represents the value of an email body part.
-#[derive(Debug, Serialize, Deserialize, Clone)]
+///
+/// PII note: `value` may contain full email body content.
+/// Custom `Debug` impl truncates the value to prevent body leakage in logs.
+#[derive(Serialize, Deserialize, Clone)]
 pub struct BodyValue {
     /// The content of the body part.
     pub value: String,
@@ -110,6 +125,17 @@ pub struct BodyValue {
     /// Whether the content is truncated.
     #[serde(rename = "isTruncated")]
     pub is_truncated: Option<bool>,
+}
+
+impl std::fmt::Debug for BodyValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let truncated: String = self.value.chars().take(20).collect();
+        let ellipsis = if self.value.len() > 20 { "..." } else { "" };
+        f.debug_struct("BodyValue")
+            .field("value", &format!("{}{}", truncated, ellipsis))
+            .field("is_truncated", &self.is_truncated)
+            .finish()
+    }
 }
 
 /// Represents an email body part.
@@ -125,7 +151,8 @@ pub struct BodyPart {
 }
 
 /// A client for interacting with a JMAP server.
-#[derive(Debug)]
+///
+/// Custom `Debug` impl redacts `access_token` to prevent credential leakage in logs.
 pub struct JMAPClient {
     /// The JMAP session associated with the client.
     session: Session,
@@ -135,6 +162,14 @@ pub struct JMAPClient {
 
     /// The access token used for authentication.
     access_token: String,
+}
+
+impl std::fmt::Debug for JMAPClient {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("JMAPClient")
+            .field("access_token", &"***REDACTED***")
+            .finish_non_exhaustive()
+    }
 }
 
 /// Represents a JMAP response.
@@ -727,5 +762,68 @@ mod tests {
 
         let emails = client.search_emails("nothing", 10).await.unwrap();
         assert!(emails.is_empty());
+    }
+
+    #[test]
+    fn test_email_address_debug_redacts_pii() {
+        let addr = EmailAddress {
+            name: Some("Alice".to_string()),
+            email: "alice@example.com".to_string(),
+        };
+        let dbg = format!("{:?}", addr);
+        assert!(
+            !dbg.contains("alice@example.com"),
+            "EmailAddress Debug must not contain email PII, got: {}",
+            dbg
+        );
+        assert!(
+            !dbg.contains("Alice"),
+            "EmailAddress Debug must not contain name PII, got: {}",
+            dbg
+        );
+        assert!(
+            dbg.contains("REDACTED"),
+            "EmailAddress Debug should show REDACTED, got: {}",
+            dbg
+        );
+    }
+
+    #[test]
+    fn test_body_value_debug_truncates_content() {
+        let bv = BodyValue {
+            value: "This is a long email body that should be truncated in debug output."
+                .to_string(),
+            is_truncated: Some(false),
+        };
+        let dbg = format!("{:?}", bv);
+        assert!(
+            !dbg.contains("long email body"),
+            "BodyValue Debug must not expose full body content, got: {}",
+            dbg
+        );
+        assert!(
+            dbg.contains("..."),
+            "BodyValue Debug should show truncation marker, got: {}",
+            dbg
+        );
+    }
+
+    #[test]
+    fn test_body_value_debug_short_content_no_ellipsis() {
+        let bv = BodyValue {
+            value: "Short".to_string(),
+            is_truncated: None,
+        };
+        let dbg = format!("{:?}", bv);
+        assert!(
+            dbg.contains("Short"),
+            "Short BodyValue should show content, got: {}",
+            dbg
+        );
+        assert!(
+            !dbg.contains("..."),
+            "Short BodyValue should not show ellipsis, got: {}",
+            dbg
+        );
     }
 }
