@@ -1934,7 +1934,7 @@ impl AgentOrchestrator {
             .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or(&def.cli_tool);
-        let supports_model_flag = matches!(cli_name, "claude" | "claude-code" | "opencode");
+        let supports_model_flag = matches!(cli_name, "claude" | "claude-code" | "opencode" | "pi-rust" | "pi");
 
         // Track KG decision for CLI override (set inside the routing block below)
         let mut kg_cli_override: Option<String> = None;
@@ -7668,11 +7668,20 @@ Remove the pause flag once the underlying failure is resolved:\n\n\
         session_id: &str,
         model: &str,
     ) -> Option<control_plane::telemetry::CompletionEvent> {
-        let parsed = match cli_tool {
+        let cli_basename = std::path::Path::new(cli_tool)
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or(cli_tool);
+        let parsed = match cli_basename {
             "opencode" => {
                 control_plane::output_parser::parse_opencode_line(line, session_id, model, None)
             }
-            "claude" => control_plane::output_parser::parse_claude_line(line, session_id, model),
+            "claude" | "claude-code" => {
+                control_plane::output_parser::parse_claude_line(line, session_id, model)
+            }
+            "pi-rust" | "pi" => {
+                control_plane::output_parser::parse_pi_rust_line(line, session_id, model)
+            }
             _ => control_plane::output_parser::ParsedOutput::Ignored,
         };
         match parsed {

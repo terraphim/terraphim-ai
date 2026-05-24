@@ -121,6 +121,11 @@ impl AgentConfig {
                 "--format".to_string(),
                 "json".to_string(),
             ],
+            "pi-rust" | "pi" => vec![
+                "-p".to_string(),
+                "--mode".to_string(),
+                "json".to_string(),
+            ],
             // Shell interpreters: pass the task as an inline script. Enables
             // shell-script agents like fleet-meta to run `cli_tool = "/bin/bash"`
             // with the task body as the script source.
@@ -156,6 +161,19 @@ impl AgentConfig {
                 vec!["--model".to_string(), normalised]
             }
             "opencode" => vec!["-m".to_string(), model.to_string()],
+            "pi-rust" | "pi" => {
+                let mut args = Vec::new();
+                if let Some((provider, model_id)) = model.split_once('/') {
+                    args.push("--provider".to_string());
+                    args.push(provider.to_string());
+                    args.push("--model".to_string());
+                    args.push(model_id.to_string());
+                } else {
+                    args.push("--model".to_string());
+                    args.push(model.to_string());
+                }
+                args
+            }
             _ => vec![],
         }
     }
@@ -462,5 +480,68 @@ mod tests {
         assert_eq!(AgentConfig::infer_args("/bin/bash"), vec!["-c"]);
         assert_eq!(AgentConfig::infer_args("bash"), vec!["-c"]);
         assert_eq!(AgentConfig::infer_args("/usr/bin/sh"), vec!["-c"]);
+    }
+
+    #[test]
+    fn test_infer_args_pi_rust() {
+        let args = AgentConfig::infer_args("pi-rust");
+        assert_eq!(args, vec!["-p", "--mode", "json"]);
+    }
+
+    #[test]
+    fn test_infer_args_pi_rust_full_path() {
+        let args = AgentConfig::infer_args("/home/alex/.local/bin/pi-rust");
+        assert_eq!(args, vec!["-p", "--mode", "json"]);
+    }
+
+    #[test]
+    fn test_infer_args_pi_alias() {
+        let args = AgentConfig::infer_args("pi");
+        assert_eq!(args, vec!["-p", "--mode", "json"]);
+    }
+
+    #[test]
+    fn test_model_args_pi_rust_composed() {
+        let args = AgentConfig::model_args("pi-rust", "zai-coding-plan/glm-5.1");
+        assert_eq!(
+            args,
+            vec!["--provider", "zai-coding-plan", "--model", "glm-5.1"]
+        );
+    }
+
+    #[test]
+    fn test_model_args_pi_rust_bare() {
+        let args = AgentConfig::model_args("pi-rust", "glm-5.1");
+        assert_eq!(args, vec!["--model", "glm-5.1"]);
+    }
+
+    #[test]
+    fn test_model_args_pi_rust_full_path() {
+        let args = AgentConfig::model_args("/home/alex/.local/bin/pi-rust", "kimi-for-coding/k2p6");
+        assert_eq!(
+            args,
+            vec!["--provider", "kimi-for-coding", "--model", "k2p6"]
+        );
+    }
+
+    #[test]
+    fn test_infer_supports_stdin_pi_rust() {
+        assert!(AgentConfig::infer_supports_stdin("pi-rust"));
+        assert!(AgentConfig::infer_supports_stdin(
+            "/home/alex/.local/bin/pi-rust"
+        ));
+        assert!(AgentConfig::infer_supports_stdin("pi"));
+    }
+
+    #[test]
+    fn test_infer_api_keys_pi_rust() {
+        let keys = AgentConfig::infer_api_keys("pi-rust");
+        assert!(
+            keys.is_empty(),
+            "pi-rust manages its own per-provider auth"
+        );
+
+        let keys = AgentConfig::infer_api_keys("/home/alex/.local/bin/pi-rust");
+        assert!(keys.is_empty());
     }
 }

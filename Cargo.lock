@@ -8863,7 +8863,7 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "tracing",
- "which",
+ "which 6.0.3",
 ]
 
 [[package]]
@@ -9241,6 +9241,7 @@ dependencies = [
  "tracing-subscriber",
  "ulid",
  "uuid",
+ "which 5.0.0",
 ]
 
 [[package]]
@@ -9654,7 +9655,7 @@ dependencies = [
  "tokio",
  "toml 0.8.23",
  "tracing",
- "which",
+ "which 6.0.3",
 ]
 
 [[package]]
@@ -10981,6 +10982,19 @@ dependencies = [
  "lazy_static",
  "serde",
  "wezterm-dynamic",
+]
+
+[[package]]
+name = "which"
+version = "5.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9bf3ea8596f3a0dd5980b46430f2058dfe2c36a27ccfbb1845d6fbfcd9ba6e14"
+dependencies = [
+ "either",
+ "home",
+ "once_cell",
+ "rustix 0.38.44",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
