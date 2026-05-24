@@ -50,6 +50,7 @@ fn parse_config_from_output(output: &str) -> Result<serde_json::Value> {
 }
 
 /// Parse role names from `terraphim-agent roles list` output.
+/// Pass `test_root` to query roles in a hermetic test environment; `None` uses the real HOME.
 fn list_available_roles(test_root: Option<PathBuf>) -> Result<Vec<String>> {
     let (stdout, stderr, code) = run_tui_command(&["roles", "list"], test_root)?;
     anyhow::ensure!(code == 0, "roles list should succeed, stderr: {}", stderr);
