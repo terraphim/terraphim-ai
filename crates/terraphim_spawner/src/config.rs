@@ -121,11 +121,7 @@ impl AgentConfig {
                 "--format".to_string(),
                 "json".to_string(),
             ],
-            "pi-rust" | "pi" => vec![
-                "-p".to_string(),
-                "--mode".to_string(),
-                "json".to_string(),
-            ],
+            "pi-rust" | "pi" => vec!["-p".to_string(), "--mode".to_string(), "json".to_string()],
             // Shell interpreters: pass the task as an inline script. Enables
             // shell-script agents like fleet-meta to run `cli_tool = "/bin/bash"`
             // with the task body as the script source.
@@ -536,10 +532,7 @@ mod tests {
     #[test]
     fn test_infer_api_keys_pi_rust() {
         let keys = AgentConfig::infer_api_keys("pi-rust");
-        assert!(
-            keys.is_empty(),
-            "pi-rust manages its own per-provider auth"
-        );
+        assert!(keys.is_empty(), "pi-rust manages its own per-provider auth");
 
         let keys = AgentConfig::infer_api_keys("/home/alex/.local/bin/pi-rust");
         assert!(keys.is_empty());
