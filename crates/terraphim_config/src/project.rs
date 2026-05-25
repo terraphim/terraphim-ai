@@ -9,12 +9,20 @@ pub enum ProjectDiscoveryError {
     Json(#[from] serde_json::Error),
     #[error("Not a directory: {0}")]
     NotDirectory(PathBuf),
+    #[error(
+        "multiple project roles found ({available:?}); pass --role or set selected/default role"
+    )]
+    AmbiguousRole { available: Vec<String> },
 }
 
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct ProjectConfig {
     #[serde(default)]
     pub global_shortcut: Option<String>,
+    #[serde(default)]
+    pub default_role: Option<String>,
+    #[serde(default)]
+    pub selected_role: Option<String>,
     #[serde(default)]
     pub roles: std::collections::HashMap<String, crate::Role>,
 }
@@ -58,6 +66,40 @@ impl ProjectConfig {
         }
 
         Ok(config)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.global_shortcut.is_none() && self.roles.is_empty()
+    }
+
+    pub fn resolve_role_name(
+        &self,
+        explicit_role: Option<&str>,
+    ) -> Result<Option<String>, ProjectDiscoveryError> {
+        if let Some(role) = explicit_role.filter(|role| !role.is_empty()) {
+            return Ok(Some(role.to_string()));
+        }
+
+        for candidate in [&self.selected_role, &self.default_role]
+            .into_iter()
+            .flatten()
+        {
+            if self.roles.contains_key(candidate) {
+                return Ok(Some(candidate.clone()));
+            }
+        }
+
+        if self.roles.len() == 1 {
+            return Ok(self.roles.keys().next().cloned());
+        }
+
+        if self.roles.len() > 1 {
+            let mut available = self.roles.keys().cloned().collect::<Vec<_>>();
+            available.sort();
+            return Err(ProjectDiscoveryError::AmbiguousRole { available });
+        }
+
+        Ok(None)
     }
 }
 
@@ -286,6 +328,99 @@ mod tests {
 
         let config = ProjectConfig::load_from_dir(&dir).unwrap();
         assert!(config.roles.is_empty());
+    }
+
+    #[test]
+    fn test_project_config_is_empty_with_no_roles_or_shortcut() {
+        let config = ProjectConfig::default();
+        assert!(config.is_empty());
+    }
+
+    #[test]
+    fn test_project_config_is_not_empty_with_shortcut_only() {
+        let config = ProjectConfig {
+            global_shortcut: Some("Ctrl+T".to_string()),
+            ..Default::default()
+        };
+        assert!(!config.is_empty());
+    }
+
+    #[test]
+    fn test_resolve_role_prefers_explicit_role() {
+        let mut config = ProjectConfig::default();
+        config.roles.insert(
+            "devops".to_string(),
+            serde_json::from_str(&minimal_role_json("DevOps")).unwrap(),
+        );
+
+        let role = config.resolve_role_name(Some("rust-engineer")).unwrap();
+        assert_eq!(role, Some("rust-engineer".to_string()));
+    }
+
+    #[test]
+    fn test_resolve_role_uses_single_project_role() {
+        let mut config = ProjectConfig::default();
+        config.roles.insert(
+            "devops".to_string(),
+            serde_json::from_str(&minimal_role_json("DevOps")).unwrap(),
+        );
+
+        let role = config.resolve_role_name(None).unwrap();
+        assert_eq!(role, Some("devops".to_string()));
+    }
+
+    #[test]
+    fn test_resolve_role_uses_selected_role_when_present() {
+        let mut config = ProjectConfig {
+            selected_role: Some("rust-engineer".to_string()),
+            ..Default::default()
+        };
+        config.roles.insert(
+            "devops".to_string(),
+            serde_json::from_str(&minimal_role_json("DevOps")).unwrap(),
+        );
+        config.roles.insert(
+            "rust-engineer".to_string(),
+            serde_json::from_str(&minimal_role_json("Rust Engineer")).unwrap(),
+        );
+
+        let role = config.resolve_role_name(None).unwrap();
+        assert_eq!(role, Some("rust-engineer".to_string()));
+    }
+
+    #[test]
+    fn test_resolve_role_uses_default_role_when_present() {
+        let mut config = ProjectConfig {
+            default_role: Some("devops".to_string()),
+            ..Default::default()
+        };
+        config.roles.insert(
+            "devops".to_string(),
+            serde_json::from_str(&minimal_role_json("DevOps")).unwrap(),
+        );
+        config.roles.insert(
+            "rust-engineer".to_string(),
+            serde_json::from_str(&minimal_role_json("Rust Engineer")).unwrap(),
+        );
+
+        let role = config.resolve_role_name(None).unwrap();
+        assert_eq!(role, Some("devops".to_string()));
+    }
+
+    #[test]
+    fn test_resolve_role_ambiguous_multi_role_without_default() {
+        let mut config = ProjectConfig::default();
+        config.roles.insert(
+            "devops".to_string(),
+            serde_json::from_str(&minimal_role_json("DevOps")).unwrap(),
+        );
+        config.roles.insert(
+            "rust-engineer".to_string(),
+            serde_json::from_str(&minimal_role_json("Rust Engineer")).unwrap(),
+        );
+
+        let err = config.resolve_role_name(None).unwrap_err();
+        assert!(matches!(err, ProjectDiscoveryError::AmbiguousRole { .. }));
     }
 
     #[test]
