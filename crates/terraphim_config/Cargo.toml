@@ -59,6 +59,7 @@ ulid = { version = "1.0.0", features = ["serde", "uuid"] }
 thiserror = { workspace = true }
 
 schemars = { version = "0.8.22", features = ["derive"] }
+jsonschema = "0.29"
 tsify = { version = "0.5", features = ["js"], optional = true }
 wasm-bindgen = { version = "0.2", optional = true }
 
