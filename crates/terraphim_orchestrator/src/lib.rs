@@ -1934,7 +1934,10 @@ impl AgentOrchestrator {
             .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or(&def.cli_tool);
-        let supports_model_flag = matches!(cli_name, "claude" | "claude-code" | "opencode" | "pi-rust" | "pi");
+        let supports_model_flag = matches!(
+            cli_name,
+            "claude" | "claude-code" | "opencode" | "pi-rust" | "pi"
+        );
 
         // Track KG decision for CLI override (set inside the routing block below)
         let mut kg_cli_override: Option<String> = None;

@@ -410,6 +410,190 @@ async fn test_fff_with_kg_scorer_state_is_not_discarded() {
     );
 }
 
+fn create_terraphim_graph_role() -> Role {
+    let mut role = Role::new("KGTest");
+    role.shortname = Some("KGTest".to_string());
+    role.relevance_function = RelevanceFunction::TerraphimGraph;
+    role.theme = "default".to_string();
+    role.haystacks = vec![Haystack {
+        location: "../../terraphim_server/fixtures/haystack".to_string(),
+        service: ServiceType::Ripgrep,
+        read_only: true,
+        fetch_content: false,
+        atomic_server_secret: None,
+        extra_parameters: std::collections::HashMap::new(),
+    }];
+    role
+}
+
+#[tokio::test]
+#[serial]
+async fn test_search_haystacks_injects_kg_scorer_for_terraphim_graph_role() {
+    use terraphim_config::ConfigState;
+    use terraphim_middleware::search_haystacks;
+    use terraphim_rolegraph::RoleGraphSync;
+    use terraphim_types::{NormalizedTerm, NormalizedTermValue, SearchQuery, Thesaurus};
+
+    let mut config = ConfigBuilder::new()
+        .global_shortcut("Ctrl+T")
+        .add_role("KGTest", create_terraphim_graph_role())
+        .build()
+        .unwrap();
+
+    let mut config_state = ConfigState::new(&mut config).await.unwrap();
+
+    let mut thesaurus = Thesaurus::new("kg_test".to_string());
+    let key = NormalizedTermValue::from("graph".to_string());
+    let term = NormalizedTerm {
+        id: 1,
+        value: NormalizedTermValue::from("graph".to_string()),
+        display_value: None,
+        url: None,
+        action: None,
+        priority: None,
+        trigger: None,
+        pinned: false,
+    };
+    thesaurus.insert(key, term);
+
+    let rolegraph = terraphim_rolegraph::RoleGraph::new(RoleName::new("KGTest"), thesaurus)
+        .await
+        .unwrap();
+    config_state
+        .roles
+        .insert(RoleName::new("KGTest"), RoleGraphSync::from(rolegraph));
+
+    let query = SearchQuery {
+        search_term: "graph".into(),
+        search_terms: None,
+        operator: None,
+        skip: None,
+        limit: None,
+        role: Some(RoleName::new("KGTest")),
+        layer: terraphim_types::Layer::default(),
+        include_pinned: false,
+        min_quality: None,
+    };
+
+    let result = search_haystacks(config_state, query).await;
+    assert!(
+        result.is_ok(),
+        "search_haystacks should succeed for TerraphimGraph role with thesaurus"
+    );
+    let index = result.unwrap();
+    assert!(!index.is_empty(), "Should find documents for 'graph' query");
+}
+
+#[tokio::test]
+#[serial]
+async fn test_search_haystacks_no_scorer_for_title_scorer_role() {
+    use terraphim_config::ConfigState;
+    use terraphim_middleware::search_haystacks;
+    use terraphim_types::SearchQuery;
+
+    let mut config = create_test_config();
+    let config_state = ConfigState::new(&mut config).await.unwrap();
+
+    let query = SearchQuery {
+        search_term: "graph".into(),
+        search_terms: None,
+        operator: None,
+        skip: None,
+        limit: None,
+        role: Some(RoleName::new("Test")),
+        layer: terraphim_types::Layer::default(),
+        include_pinned: false,
+        min_quality: None,
+    };
+
+    let result = search_haystacks(config_state, query).await;
+    assert!(
+        result.is_ok(),
+        "search_haystacks should succeed for TitleScorer role: {:?}",
+        result.err()
+    );
+    let index = result.unwrap();
+    assert!(
+        !index.is_empty(),
+        "Should find documents for 'graph' query without KG scorer"
+    );
+}
+
+#[tokio::test]
+#[serial]
+async fn test_search_haystacks_empty_thesaurus_no_scorer() {
+    use terraphim_config::ConfigState;
+    use terraphim_middleware::search_haystacks;
+    use terraphim_types::SearchQuery;
+
+    let mut config = ConfigBuilder::new()
+        .global_shortcut("Ctrl+T")
+        .add_role("KGTest", create_terraphim_graph_role())
+        .build()
+        .unwrap();
+
+    let config_state = ConfigState::new(&mut config).await.unwrap();
+
+    let query = SearchQuery {
+        search_term: "graph".into(),
+        search_terms: None,
+        operator: None,
+        skip: None,
+        limit: None,
+        role: Some(RoleName::new("KGTest")),
+        layer: terraphim_types::Layer::default(),
+        include_pinned: false,
+        min_quality: None,
+    };
+
+    let result = search_haystacks(config_state, query).await;
+    assert!(
+        result.is_ok(),
+        "search_haystacks should succeed even with empty thesaurus"
+    );
+}
+
+#[tokio::test]
+#[serial]
+async fn test_search_haystacks_kg_scorer_preserves_thesaurus_data() {
+    use std::sync::Arc;
+    use terraphim_file_search::kg_scorer::KgPathScorer;
+    use terraphim_middleware::FffIndexer;
+    use terraphim_types::{NormalizedTerm, NormalizedTermValue, Thesaurus};
+
+    let mut thesaurus = Thesaurus::new("verify".to_string());
+    let key = NormalizedTermValue::from("machine".to_string());
+    let term = NormalizedTerm {
+        id: 42,
+        value: NormalizedTermValue::from("machine".to_string()),
+        display_value: None,
+        url: None,
+        action: None,
+        priority: None,
+        trigger: None,
+        pinned: false,
+    };
+    thesaurus.insert(key, term);
+
+    let scorer = Arc::new(KgPathScorer::new(thesaurus.clone()));
+    let indexer = FffIndexer::default().with_kg_scorer(scorer);
+
+    let haystack = Haystack {
+        location: "../../terraphim_server/fixtures/haystack".to_string(),
+        service: ServiceType::Ripgrep,
+        read_only: true,
+        fetch_content: false,
+        atomic_server_secret: None,
+        extra_parameters: std::collections::HashMap::new(),
+    };
+
+    let index = indexer.index("graph", &haystack).await.unwrap();
+    assert!(
+        !index.is_empty(),
+        "Scorer with 'machine' thesaurus should produce results"
+    );
+}
+
 #[tokio::test]
 #[serial]
 async fn test_fff_multiple_extensions_configured() {

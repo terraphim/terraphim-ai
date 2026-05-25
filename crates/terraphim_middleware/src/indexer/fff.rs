@@ -234,8 +234,9 @@ impl FffIndexer {
             .collect();
 
         log::debug!(
-            "Found {} markdown files in haystack: {:?}",
+            "Found {} files (extensions: {:?}) in haystack: {:?}",
             files.len(),
+            allowed,
             haystack_path
         );
 
