@@ -179,6 +179,7 @@ fn extract_clean_output(output: &str) -> String {
 
 #[test]
 #[serial]
+#[ignore] // Requires live terraphim_server; run with --ignored
 fn test_extract_basic_functionality_validation() -> Result<()> {
     println!("Validating extract basic functionality");
 
@@ -232,6 +233,7 @@ fn test_extract_basic_functionality_validation() -> Result<()> {
 
 #[test]
 #[serial]
+#[ignore] // Requires live terraphim_server; run with --ignored
 fn test_extract_matching_capability() -> Result<()> {
     println!("Testing extract matching capability with various inputs");
 
@@ -395,6 +397,7 @@ fn test_extract_matching_capability() -> Result<()> {
 
 #[test]
 #[serial]
+#[ignore] // Requires live terraphim_server; run with --ignored
 fn test_extract_with_known_technical_terms() -> Result<()> {
     println!("Testing extract with well-known technical terms");
 
@@ -482,6 +485,7 @@ fn test_extract_with_known_technical_terms() -> Result<()> {
 
 #[test]
 #[serial]
+#[ignore] // Requires live terraphim_server; run with --ignored
 fn test_extract_error_conditions() -> Result<()> {
     println!("Testing extract error handling");
 
