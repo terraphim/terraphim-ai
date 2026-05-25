@@ -106,8 +106,14 @@ fn test_search_with_role_and_limit() -> Result<()> {
     println!("🔍 Testing search with role and limit options");
 
     // Test search with specific role
-    let (stdout, stderr, code) =
-        run_tui_command(&["search", "system", "--role", "AI Engineer", "--limit", "8"])?;
+    let (stdout, stderr, code) = run_tui_command(&[
+        "search",
+        "system",
+        "--role",
+        "Terraphim Engineer",
+        "--limit",
+        "8",
+    ])?;
 
     assert!(
         code == 0 || code == 1,
@@ -136,25 +142,25 @@ fn test_search_with_role_and_limit() -> Result<()> {
         println!("⚠️ Search with role found no results");
     }
 
-    // Test with AI Engineer role
+    // Test with Terraphim Engineer role
     let (_stdout, stderr, code) = run_tui_command(&[
         "search",
         "haystack",
         "--role",
-        "AI Engineer",
+        "Terraphim Engineer",
         "--limit",
         "5",
     ])?;
 
     assert!(
         code == 0 || code == 1,
-        "Search with AI Engineer role should complete: exit_code={}, stderr={}",
+        "Search with Terraphim Engineer role should complete: exit_code={}, stderr={}",
         code,
         stderr
     );
 
     if code == 0 {
-        println!("✅ Search with AI Engineer role completed");
+        println!("✅ Search with Terraphim Engineer role completed");
     }
 
     Ok(())
@@ -184,7 +190,7 @@ fn test_roles_management() -> Result<()> {
     println!("✅ Found {} roles: {:?}", roles.len(), roles);
 
     // Verify expected roles exist
-    let expected_roles = ["AI Engineer"];
+    let expected_roles = ["Terraphim Engineer"];
     for expected_role in &expected_roles {
         assert!(
             roles.iter().any(|role| role.contains(expected_role)),
@@ -265,12 +271,12 @@ fn test_config_management() -> Result<()> {
         "config",
         "set",
         "selected_role",
-        "AI Engineer", // Use a role that exists
+        "Terraphim Engineer", // Use a role that exists
     ])?;
 
     if code == 0 {
         let clean_output = extract_clean_output(&stdout);
-        if clean_output.contains("updated selected_role to AI Engineer") {
+        if clean_output.contains("updated selected_role to Terraphim Engineer") {
             println!("✅ Config set completed successfully");
         } else {
             println!("⚠️ Config set succeeded but output format may have changed");
@@ -327,7 +333,7 @@ fn test_graph_command() -> Result<()> {
 
     // Test graph with specific role
     let (_stdout, stderr, code) =
-        run_tui_command(&["graph", "--role", "AI Engineer", "--top-k", "10"])?;
+        run_tui_command(&["graph", "--role", "Terraphim Engineer", "--top-k", "10"])?;
 
     assert_eq!(
         code, 0,
@@ -376,8 +382,12 @@ fn test_chat_command() -> Result<()> {
     }
 
     // Test chat with role - accept exit code 1 if no LLM configured
-    let (_stdout, stderr, code) =
-        run_tui_command(&["chat", "Test message with role", "--role", "AI Engineer"])?;
+    let (_stdout, stderr, code) = run_tui_command(&[
+        "chat",
+        "Test message with role",
+        "--role",
+        "Terraphim Engineer",
+    ])?;
 
     assert!(
         code == 0 || stderr.to_lowercase().contains("no llm configured"),
