@@ -1,4 +1,5 @@
 use serial_test::serial;
+use tempfile::TempDir;
 use terraphim_config::{ConfigBuilder, Haystack, Role, ServiceType};
 use terraphim_middleware::{indexer::IndexMiddleware, FffIndexer};
 use terraphim_types::{RelevanceFunction, RoleName};
@@ -255,4 +256,191 @@ mod nested_tests {
 
         Ok(())
     }
+}
+
+#[tokio::test]
+#[serial]
+async fn test_fff_does_not_index_rs_file_by_default() {
+    use tempfile::TempDir;
+
+    let temp_dir = TempDir::new().unwrap();
+    let rs_file = temp_dir.path().join("example.rs");
+    tokio::fs::write(&rs_file, "pub fn hello() { println!(\"hello\"); }")
+        .await
+        .unwrap();
+
+    let haystack = Haystack {
+        location: temp_dir.path().to_string_lossy().to_string(),
+        service: ServiceType::Ripgrep,
+        read_only: true,
+        fetch_content: false,
+        atomic_server_secret: None,
+        extra_parameters: std::collections::HashMap::new(),
+    };
+
+    let indexer = FffIndexer::default();
+    let index = indexer.index("fn", &haystack).await.unwrap();
+    assert_eq!(
+        index.len(),
+        0,
+        "Default FffIndexer should not index .rs files"
+    );
+}
+
+#[tokio::test]
+#[serial]
+async fn test_fff_indexes_rs_file_when_extension_configured() {
+    use tempfile::TempDir;
+
+    let temp_dir = TempDir::new().unwrap();
+    let rs_file = temp_dir.path().join("example.rs");
+    tokio::fs::write(&rs_file, "pub fn hello() { println!(\"hello\"); }")
+        .await
+        .unwrap();
+
+    let mut extra_params = std::collections::HashMap::new();
+    extra_params.insert("extensions".to_string(), "rs".to_string());
+
+    let haystack = Haystack {
+        location: temp_dir.path().to_string_lossy().to_string(),
+        service: ServiceType::Ripgrep,
+        read_only: true,
+        fetch_content: false,
+        atomic_server_secret: None,
+        extra_parameters: extra_params,
+    };
+
+    let indexer = FffIndexer::default();
+    let index = indexer.index("fn", &haystack).await.unwrap();
+    assert!(
+        !index.is_empty(),
+        "FffIndexer with extensions=rs should index .rs files"
+    );
+}
+
+#[tokio::test]
+#[serial]
+async fn test_fff_with_kg_scorer_uses_stateful_path() {
+    use std::sync::Arc;
+    use terraphim_file_search::kg_scorer::KgPathScorer;
+    use terraphim_types::{NormalizedTerm, NormalizedTermValue, Thesaurus};
+
+    let mut extra_params = std::collections::HashMap::new();
+    extra_params.insert("extensions".to_string(), "md".to_string());
+
+    let haystack = Haystack {
+        location: "../../terraphim_server/fixtures/haystack".to_string(),
+        service: ServiceType::Ripgrep,
+        read_only: true,
+        fetch_content: false,
+        atomic_server_secret: None,
+        extra_parameters: extra_params,
+    };
+
+    let mut thesaurus = Thesaurus::new("test".to_string());
+    let key = NormalizedTermValue::from("machine".to_string());
+    let term = NormalizedTerm {
+        id: 1,
+        value: NormalizedTermValue::from("machine".to_string()),
+        display_value: None,
+        url: None,
+        action: None,
+        priority: None,
+        trigger: None,
+        pinned: false,
+    };
+    thesaurus.insert(key, term);
+
+    let scorer = Arc::new(KgPathScorer::new(thesaurus));
+    let indexer = FffIndexer::default().with_kg_scorer(scorer);
+
+    let index = indexer.index("graph", &haystack).await.unwrap();
+    assert!(
+        !index.is_empty(),
+        "Expected documents when using stateful KG scorer path"
+    );
+}
+
+#[tokio::test]
+#[serial]
+async fn test_fff_with_kg_scorer_state_is_not_discarded() {
+    use std::sync::Arc;
+    use terraphim_file_search::kg_scorer::KgPathScorer;
+    use terraphim_types::{NormalizedTerm, NormalizedTermValue, Thesaurus};
+
+    let temp_dir = TempDir::new().unwrap();
+    let md_file = temp_dir.path().join("test.md");
+    tokio::fs::write(&md_file, "# Machine Learning\n\nContent about ML.\n")
+        .await
+        .unwrap();
+
+    let mut extra_params = std::collections::HashMap::new();
+    extra_params.insert("extensions".to_string(), "md".to_string());
+
+    let haystack = Haystack {
+        location: temp_dir.path().to_string_lossy().to_string(),
+        service: ServiceType::Ripgrep,
+        read_only: true,
+        fetch_content: false,
+        atomic_server_secret: None,
+        extra_parameters: extra_params,
+    };
+
+    let mut thesaurus = Thesaurus::new("test".to_string());
+    let key = NormalizedTermValue::from("machine".to_string());
+    let term = NormalizedTerm {
+        id: 1,
+        value: NormalizedTermValue::from("machine".to_string()),
+        display_value: None,
+        url: None,
+        action: None,
+        priority: None,
+        trigger: None,
+        pinned: false,
+    };
+    thesaurus.insert(key, term);
+
+    let scorer = Arc::new(KgPathScorer::new(thesaurus));
+    let indexer = FffIndexer::default().with_kg_scorer(scorer);
+
+    let index = indexer.index("Machine", &haystack).await.unwrap();
+    assert!(
+        !index.is_empty(),
+        "KG scorer path should produce results; scorer state must not be discarded"
+    );
+}
+
+#[tokio::test]
+#[serial]
+async fn test_fff_multiple_extensions_configured() {
+    use tempfile::TempDir;
+
+    let temp_dir = TempDir::new().unwrap();
+    let rs_file = temp_dir.path().join("example.rs");
+    tokio::fs::write(&rs_file, "pub fn hello() {}")
+        .await
+        .unwrap();
+    let md_file = temp_dir.path().join("example.md");
+    tokio::fs::write(&md_file, "# Hello\n\nContent.")
+        .await
+        .unwrap();
+
+    let mut extra_params = std::collections::HashMap::new();
+    extra_params.insert("extensions".to_string(), "rs,md".to_string());
+
+    let haystack = Haystack {
+        location: temp_dir.path().to_string_lossy().to_string(),
+        service: ServiceType::Ripgrep,
+        read_only: true,
+        fetch_content: false,
+        atomic_server_secret: None,
+        extra_parameters: extra_params,
+    };
+
+    let indexer = FffIndexer::default();
+    let index = indexer.index("fn", &haystack).await.unwrap();
+    assert_eq!(index.len(), 1, "Should find the .rs file");
+
+    let index2 = indexer.index("Hello", &haystack).await.unwrap();
+    assert_eq!(index2.len(), 1, "Should find the .md file");
 }

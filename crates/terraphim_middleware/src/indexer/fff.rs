@@ -84,7 +84,11 @@ impl IndexMiddleware for FffIndexer {
     /// initialisation fails, or file I/O errors occur during document
     /// construction.
     async fn index(&self, needle: &str, haystack: &Haystack) -> Result<Index> {
-        cached_fff_index(needle, haystack).await
+        if self.is_stateful() {
+            self.index_inner(needle, haystack).await
+        } else {
+            cached_fff_index(needle, haystack).await
+        }
     }
 }
 
@@ -92,6 +96,37 @@ impl FffIndexer {
     /// Create a new `FffIndexer` with default settings.
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Returns true if this indexer has state that should bypass the cache.
+    pub(crate) fn is_stateful(&self) -> bool {
+        self.kg_scorer.is_some() || self.frecency.is_some()
+    }
+
+    /// Determine which file extensions are allowed for this haystack.
+    fn allowed_extensions(haystack: &Haystack) -> Vec<String> {
+        let params = haystack.get_extra_parameters();
+        if let Some(value) = params.get("extensions") {
+            return value.split(',').map(|s| s.trim().to_string()).collect();
+        }
+        if let Some(value) = params.get("extension") {
+            return value.split(',').map(|s| s.trim().to_string()).collect();
+        }
+        if params
+            .get("type")
+            .is_some_and(|v| v == "markdown" || v == "md")
+        {
+            return vec!["md".to_string(), "markdown".to_string()];
+        }
+        vec!["md".to_string()]
+    }
+
+    /// Returns true if the given file extension is in the allowed list.
+    fn file_extension_allowed(relative_path: &str, allowed: &[String]) -> bool {
+        Path::new(relative_path)
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .is_some_and(|ext| allowed.iter().any(|a| a == ext))
     }
 
     /// Attach a knowledge-graph path scorer for boosting results by
@@ -188,11 +223,13 @@ impl FffIndexer {
             .collect_files()
             .map_err(|e| crate::Error::FileSearch(e.to_string()))?;
 
-        // Filter to markdown files only (parity with RipgrepIndexer's -tmarkdown default)
+        // Filter files by allowed extensions derived from haystack extra_parameters.
+        // Defaults to markdown-only for parity with RipgrepIndexer's -tmarkdown default.
+        let allowed = Self::allowed_extensions(haystack);
         let mut files: Vec<_> = picker
             .get_files()
             .iter()
-            .filter(|f| f.relative_path.ends_with(".md"))
+            .filter(|f| Self::file_extension_allowed(&f.relative_path, &allowed))
             .cloned()
             .collect();
 
@@ -365,5 +402,67 @@ mod tests {
         let id = indexer.normalize_document_id("/path/to/my file.md");
         assert!(id.starts_with("fff_"));
         assert!(id.contains("my_file_md"));
+    }
+
+    #[test]
+    fn test_allowed_extensions_defaults_to_markdown() {
+        let haystack = Haystack {
+            location: "test".to_string(),
+            service: terraphim_config::ServiceType::Ripgrep,
+            read_only: true,
+            fetch_content: false,
+            atomic_server_secret: None,
+            extra_parameters: std::collections::HashMap::new(),
+        };
+        let allowed = FffIndexer::allowed_extensions(&haystack);
+        assert_eq!(allowed, vec!["md"]);
+    }
+
+    #[test]
+    fn test_allowed_extensions_parses_comma_list() {
+        let mut params = std::collections::HashMap::new();
+        params.insert("extensions".to_string(), "rs,toml,md".to_string());
+        let haystack = Haystack {
+            location: "crates".to_string(),
+            service: terraphim_config::ServiceType::Ripgrep,
+            read_only: true,
+            fetch_content: false,
+            atomic_server_secret: None,
+            extra_parameters: params,
+        };
+        let allowed = FffIndexer::allowed_extensions(&haystack);
+        assert_eq!(allowed, vec!["rs", "toml", "md"]);
+    }
+
+    #[test]
+    fn test_file_extension_allowed() {
+        let allowed = vec!["rs".to_string(), "md".to_string()];
+        assert!(FffIndexer::file_extension_allowed("lib.rs", &allowed));
+        assert!(FffIndexer::file_extension_allowed("main.md", &allowed));
+        assert!(!FffIndexer::file_extension_allowed("Cargo.toml", &allowed));
+        assert!(!FffIndexer::file_extension_allowed("lib.py", &allowed));
+        assert!(!FffIndexer::file_extension_allowed("lib", &allowed));
+    }
+
+    #[test]
+    fn test_is_stateful_returns_false_when_no_scorer_or_frecency() {
+        let indexer = FffIndexer::default();
+        assert!(!indexer.is_stateful());
+    }
+
+    #[test]
+    fn test_allowed_extensions_type_markdown() {
+        let mut params = std::collections::HashMap::new();
+        params.insert("type".to_string(), "markdown".to_string());
+        let haystack = Haystack {
+            location: "docs".to_string(),
+            service: terraphim_config::ServiceType::Ripgrep,
+            read_only: true,
+            fetch_content: false,
+            atomic_server_secret: None,
+            extra_parameters: params,
+        };
+        let allowed = FffIndexer::allowed_extensions(&haystack);
+        assert!(allowed.contains(&"md".to_string()));
     }
 }
