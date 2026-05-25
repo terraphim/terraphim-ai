@@ -1,0 +1,28 @@
+{
+  "shortname": "ai-engineer",
+  "name": "AI Engineer",
+  "relevance_function": "terraphim-graph",
+  "terraphim_it": false,
+  "theme": "default",
+  "kg": {
+    "knowledge_graph_local": {
+      "input_type": "markdown",
+      "path": ".terraphim/kg/ai-engineer"
+    },
+    "public": true,
+    "publish": true
+  },
+  "haystacks": [
+    {
+      "location": "docs/src",
+      "service": "Ripgrep",
+      "read_only": true
+    },
+    {
+      "location": "crates",
+      "service": "Ripgrep",
+      "read_only": true
+    }
+  ],
+  "extra": {}
+}

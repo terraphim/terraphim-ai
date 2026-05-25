@@ -473,4 +473,36 @@ mod tests {
         let result = discover_kg_path(&dir, None);
         assert!(result.is_none());
     }
+
+    #[test]
+    fn test_actual_terraphim_role_configs_parse() {
+        let project_dir = std::path::PathBuf::from("../../.terraphim");
+        if !project_dir.is_dir() {
+            return; // Skip if not running from workspace root
+        }
+        let config = ProjectConfig::load_from_dir(&project_dir).unwrap();
+        assert!(
+            config.roles.contains_key("devops"),
+            "devops role should be present"
+        );
+        assert!(
+            config.roles.contains_key("rust-engineer"),
+            "rust-engineer role should be present"
+        );
+        assert!(
+            config.roles.contains_key("ai-engineer"),
+            "ai-engineer role should be present"
+        );
+
+        // Verify each role has TerraphimGraph relevance function
+        for (name, role) in &config.roles {
+            assert_eq!(
+                role.relevance_function,
+                crate::RelevanceFunction::TerraphimGraph,
+                "role {} should use TerraphimGraph",
+                name
+            );
+            assert_eq!(role.haystacks.len(), 2, "role {} should have 2 haystacks", name);
+        }
+    }
 }
