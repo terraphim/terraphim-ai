@@ -30,16 +30,6 @@ exclude = [
     "terraphim_firecracker",
     # Missing Cargo.toml
     "crates/terraphim_lsp",
-    # Infrastructure templates (not a crate)
-    "infrastructure/vm-templates",
-    # Rust build cache stack -- docker compose + systemd unit, no Cargo.toml
-    "infrastructure/rust-cache-stack",
-    # Firecracker rust-ci VM image build -- shell scripts + overlay, no Cargo.toml
-    "infrastructure/firecracker-rust-ci",
-    # RCH bigbox config mirror -- toml/service files, no Cargo.toml
-    "infrastructure/rch-bigbox",
-    # fcctl-web binary lives in the private firecracker-rust repo (already running on bigbox)
-    "infrastructure/fcctl-web",
 ]
 default-members = ["terraphim_server"]
 
