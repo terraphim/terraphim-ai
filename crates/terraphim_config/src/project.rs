@@ -502,7 +502,12 @@ mod tests {
                 "role {} should use TerraphimGraph",
                 name
             );
-            assert_eq!(role.haystacks.len(), 2, "role {} should have 2 haystacks", name);
+            assert_eq!(
+                role.haystacks.len(),
+                2,
+                "role {} should have 2 haystacks",
+                name
+            );
         }
     }
 }
