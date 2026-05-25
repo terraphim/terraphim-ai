@@ -1,11 +1,13 @@
 use std::collections::HashSet;
 use std::path::Path;
+use std::sync::Arc;
 
 use cached::proc_macro::cached;
 use fff_search::{
     ContentCacheBudget, FFFMode, FilePicker, FilePickerOptions, GrepMode, GrepSearchOptions,
-    grep_search, parse_grep_query,
+    SharedFrecency, grep_search, parse_grep_query,
 };
+use fff_search::external_scorer::ExternalScorer;
 use terraphim_config::Haystack;
 use terraphim_persistence::Persistable;
 use terraphim_types::{Document, DocumentType, Index};
@@ -31,8 +33,35 @@ fn floor_char_boundary(s: &str, index: usize) -> usize {
 ///
 /// Replaces `RipgrepIndexer` with a pure-Rust implementation that does
 /// not require the external `rg` binary.
-#[derive(Default)]
-pub struct FffIndexer {}
+///
+/// Supports optional knowledge-graph path scoring and frecency tracking
+/// via builder methods.
+pub struct FffIndexer {
+    /// Optional KG path scorer for boosting results by knowledge-graph
+    /// concept matches. When `None`, no KG boosting is applied.
+    kg_scorer: Option<Arc<terraphim_file_search::kg_scorer::KgPathScorer>>,
+    /// Optional persistent frecency tracker (LMDB-backed) for access-frequency scoring.
+    frecency: Option<SharedFrecency>,
+}
+
+impl Default for FffIndexer {
+    fn default() -> Self {
+        let frecency = std::env::var("FFF_FRECENCY_PATH").ok().and_then(|path| {
+            fff_search::FrecencyTracker::new(&path, false)
+                .map(|tracker| {
+                    let shared = SharedFrecency::default();
+                    shared.init(tracker).ok();
+                    shared
+                })
+                .ok()
+        });
+
+        Self {
+            kg_scorer: None,
+            frecency,
+        }
+    }
+}
 
 /// Cached wrapper that performs fff-search indexing for a given haystack/query.
 #[cached(
@@ -63,6 +92,15 @@ impl FffIndexer {
     /// Create a new `FffIndexer` with default settings.
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Attach a knowledge-graph path scorer for boosting results by
+    /// knowledge-graph concept matches in file paths.
+    ///
+    /// This follows the same builder pattern as `McpService::with_kg_scorer()`.
+    pub fn with_kg_scorer(mut self, scorer: Arc<terraphim_file_search::kg_scorer::KgPathScorer>) -> Self {
+        self.kg_scorer = Some(scorer);
+        self
     }
 
     /// Update the underlying Markdown file on disk with the edited document body.
@@ -148,7 +186,7 @@ impl FffIndexer {
             .map_err(|e| crate::Error::FileSearch(e.to_string()))?;
 
         // Filter to markdown files only (parity with RipgrepIndexer's -tmarkdown default)
-        let files: Vec<_> = picker
+        let mut files: Vec<_> = picker
             .get_files()
             .iter()
             .filter(|f| f.relative_path.ends_with(".md"))
@@ -163,6 +201,29 @@ impl FffIndexer {
 
         if files.is_empty() {
             return Ok(Index::default());
+        }
+
+        // Apply KG path scoring to sort files by relevance when a scorer is configured.
+        // Files matching knowledge-graph concepts in their paths are searched first,
+        // ensuring conceptually relevant documents appear in results even with pagination.
+        if let Some(scorer) = &self.kg_scorer {
+            log::debug!("Applying KG path scoring to {} files", files.len());
+            files.sort_by_key(|f| std::cmp::Reverse(scorer.score(f)));
+        }
+
+        // Apply frecency scoring if a tracker is configured.
+        // This updates access-frequency scores on file items for ranking.
+        if let Some(ref frecency) = self.frecency {
+            log::debug!("Applying frecency scoring to {} files", files.len());
+            if let Ok(guard) = frecency.read() {
+                if let Some(tracker) = guard.as_ref() {
+                    for file in &mut files {
+                        if let Err(e) = file.update_frecency_scores(tracker, FFFMode::Ai) {
+                            log::trace!("Failed to update frecency for {}: {}", file.relative_path, e);
+                        }
+                    }
+                }
+            }
         }
 
         // Parse grep query
