@@ -81,7 +81,7 @@ impl CliService {
 
         // Priority 3 & 4: Persistence -> embedded defaults (existing behavior)
         log::debug!("No role_config specified, using persistence/embedded defaults");
-        let config = match ConfigBuilder::new_with_id(ConfigId::Embedded).build() {
+        let mut config = match ConfigBuilder::new_with_id(ConfigId::Embedded).build() {
             Ok(mut config) => match config.load().await {
                 Ok(config) => {
                     log::debug!("Loaded existing embedded configuration from persistence");
@@ -98,6 +98,7 @@ impl CliService {
             }
         };
 
+        Self::merge_project_config(&mut config);
         Self::from_config(config).await
     }
 
@@ -149,6 +150,9 @@ impl CliService {
                     }
                 }
 
+                // Merge project config before saving
+                Self::merge_project_config(&mut config);
+
                 // Save to persistence so subsequent runs use persisted config
                 if let Err(e) = config.save().await {
                     log::warn!("Failed to save bootstrapped config to persistence: {:?}", e);
@@ -169,10 +173,57 @@ impl CliService {
 
     /// Initialize service strictly from the embedded default configuration.
     async fn new_with_embedded_defaults() -> Result<Self> {
-        let config = ConfigBuilder::new_with_id(ConfigId::Embedded)
+        let mut config = ConfigBuilder::new_with_id(ConfigId::Embedded)
             .build_default_embedded()
             .build()?;
+        Self::merge_project_config(&mut config);
         Self::from_config(config).await
+    }
+
+    /// Merge project-level `.terraphim/` configuration into the global config.
+    fn merge_project_config(config: &mut Config) {
+        if let Ok(Some(path)) = terraphim_config::project::discover(None) {
+            let project_config = terraphim_config::project::ProjectConfig::load_from_dir(&path)
+                .unwrap_or_else(|_| {
+                    let config_path = path.join("config.json");
+                    if config_path.is_file() {
+                        terraphim_config::project::ProjectConfig::from_file(&config_path)
+                            .unwrap_or_default()
+                    } else {
+                        Default::default()
+                    }
+                });
+
+            if !project_config.is_empty() {
+                log::info!(
+                    "Merging {} project role(s) from '{}'",
+                    project_config.roles.len(),
+                    path.display()
+                );
+                let builder = ConfigBuilder::from_config(
+                    config.clone(),
+                    DeviceSettings::new(),
+                    std::path::PathBuf::new(),
+                );
+                *config = builder
+                    .merge_with(&project_config)
+                    .build()
+                    .unwrap_or_else(|_| config.clone());
+
+                // Override selected/default role if project config specifies one
+                if let Ok(Some(role_name)) = project_config.resolve_role_name(None) {
+                    let role_name = RoleName::new(&role_name);
+                    if config.roles.contains_key(&role_name) {
+                        log::info!(
+                            "Setting selected/default role to '{}' from project config",
+                            role_name
+                        );
+                        config.selected_role = role_name.clone();
+                        config.default_role = role_name;
+                    }
+                }
+            }
+        }
     }
 
     async fn from_config(mut config: Config) -> Result<Self> {
