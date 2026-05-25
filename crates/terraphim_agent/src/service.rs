@@ -215,22 +215,32 @@ impl TuiService {
 
     fn merge_project_config(config: &mut Config) {
         if let Ok(Some(path)) = terraphim_config::project::discover(None) {
-            let config_path = path.join("config.json");
-            if config_path.is_file() {
-                if let Ok(project_config) =
-                    terraphim_config::project::ProjectConfig::from_file(&config_path)
-                {
-                    log::info!("Merging project config from '{}'", config_path.display());
-                    let builder = ConfigBuilder::from_config(
-                        config.clone(),
-                        DeviceSettings::new(),
-                        PathBuf::new(),
-                    );
-                    *config = builder
-                        .merge_with(&project_config)
-                        .build()
-                        .unwrap_or_else(|_| config.clone());
-                }
+            let project_config = terraphim_config::project::ProjectConfig::load_from_dir(&path)
+                .unwrap_or_else(|_| {
+                    let config_path = path.join("config.json");
+                    if config_path.is_file() {
+                        terraphim_config::project::ProjectConfig::from_file(&config_path)
+                            .unwrap_or_default()
+                    } else {
+                        Default::default()
+                    }
+                });
+
+            if !project_config.roles.is_empty() {
+                log::info!(
+                    "Merging {} project role(s) from '{}'",
+                    project_config.roles.len(),
+                    path.display()
+                );
+                let builder = ConfigBuilder::from_config(
+                    config.clone(),
+                    DeviceSettings::new(),
+                    PathBuf::new(),
+                );
+                *config = builder
+                    .merge_with(&project_config)
+                    .build()
+                    .unwrap_or_else(|_| config.clone());
             }
         }
     }
