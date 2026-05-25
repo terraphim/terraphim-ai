@@ -226,7 +226,7 @@ impl TuiService {
                     }
                 });
 
-            if !project_config.roles.is_empty() {
+            if !project_config.is_empty() {
                 log::info!(
                     "Merging {} project role(s) from '{}'",
                     project_config.roles.len(),
