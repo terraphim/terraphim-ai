@@ -85,6 +85,25 @@ async fn shutdown_signal() {
         .expect("Failed to listen for ctrl+c");
 }
 
+fn build_profile_config(profile: &ConfigProfile) -> terraphim_config::Config {
+    match profile {
+        ConfigProfile::Desktop => {
+            info!("Using desktop configuration (Terraphim Engineer role with local KG)");
+            ConfigBuilder::new()
+                .build_default_desktop()
+                .build()
+                .expect("Failed to build default desktop configuration")
+        }
+        ConfigProfile::Server => {
+            info!("Using server configuration (Default role without KG)");
+            ConfigBuilder::new()
+                .build_default_server()
+                .build()
+                .expect("Failed to build default server configuration")
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     // Initialize logging
@@ -117,21 +136,29 @@ async fn main() -> Result<()> {
     info!("Args: {:?}", args);
 
     // Build configuration based on selected profile
-    let config = match args.profile {
-        ConfigProfile::Desktop => {
-            info!("Using desktop configuration (Terraphim Engineer role with local KG)");
-            ConfigBuilder::new()
-                .build_default_desktop()
-                .build()
-                .expect("Failed to build default desktop configuration")
+    // Priority: project .terraphim/ config > hardcoded profile
+    let config = if let Ok(Some(project_dir)) = terraphim_config::project::discover(None) {
+        match terraphim_config::project::ProjectConfig::load_from_dir(&project_dir) {
+            Ok(project_config) if !project_config.roles.is_empty() => {
+                info!(
+                    "Using project configuration from '{}' ({} role(s))",
+                    project_dir.display(),
+                    project_config.roles.len()
+                );
+                let base = build_profile_config(&args.profile);
+                let builder = ConfigBuilder::new();
+                builder.merge_with(&project_config).build().unwrap_or(base)
+            }
+            _ => {
+                info!(
+                    "No project roles found in '{}', using profile",
+                    project_dir.display()
+                );
+                build_profile_config(&args.profile)
+            }
         }
-        ConfigProfile::Server => {
-            info!("Using server configuration (Default role without KG)");
-            ConfigBuilder::new()
-                .build_default_server()
-                .build()
-                .expect("Failed to build default server configuration")
-        }
+    } else {
+        build_profile_config(&args.profile)
     };
 
     // Initialize ConfigState from the config
