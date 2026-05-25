@@ -117,14 +117,27 @@ fn init_tracing() {
 ///
 /// Returns the `.terraphim/` path if found, enabling auto-discovery of
 /// thesaurus, role config, and KG path without CLI flags.
-#[cfg(feature = "llm")]
 fn discover_project_dir() -> Option<std::path::PathBuf> {
     terraphim_config::project::discover(None).ok().flatten()
 }
 
-#[cfg(not(feature = "llm"))]
-fn discover_project_dir() -> Option<std::path::PathBuf> {
-    None
+fn load_project_config() -> Option<(PathBuf, terraphim_config::project::ProjectConfig)> {
+    let dir = discover_project_dir()?;
+    let config = terraphim_config::project::ProjectConfig::load_from_dir(&dir).ok()?;
+    Some((dir, config))
+}
+
+fn resolve_role_name(
+    explicit_role: Option<&str>,
+    project_config: Option<&terraphim_config::project::ProjectConfig>,
+) -> Result<String> {
+    if let Some(config) = project_config {
+        if let Some(role) = config.resolve_role_name(explicit_role)? {
+            return Ok(role);
+        }
+    }
+
+    Ok(explicit_role.unwrap_or("default").to_string())
 }
 
 /// Find thesaurus path with project config priority.
@@ -290,7 +303,11 @@ async fn main() -> Result<()> {
     };
 
     // Determine role and thesaurus
-    let role_name = args.role.unwrap_or_else(|| "default".to_string());
+    let project_config = load_project_config();
+    let role_name = resolve_role_name(
+        args.role.as_deref(),
+        project_config.as_ref().map(|(_, config)| config),
+    )?;
 
     let thesaurus_path = args
         .thesaurus
