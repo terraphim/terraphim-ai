@@ -44,9 +44,10 @@ use rmcp::{
     },
 };
 use terraphim_automata::builder::{Logseq, ThesaurusBuilder};
-use terraphim_config::{ConfigBuilder, ConfigState};
+use terraphim_config::{Config, ConfigBuilder, ConfigState};
 use terraphim_file_search::kg_scorer::KgPathScorer;
 use terraphim_mcp_server::McpService;
+use terraphim_types::RoleName;
 use tracing::{Level, info, warn};
 
 #[derive(Parser, Debug)]
@@ -104,6 +105,47 @@ fn build_profile_config(profile: &ConfigProfile) -> terraphim_config::Config {
     }
 }
 
+fn merge_project_into_base(
+    mut config: Config,
+    project_config: &terraphim_config::project::ProjectConfig,
+) -> Config {
+    if let Some(ref shortcut) = project_config.global_shortcut {
+        config.global_shortcut = Some(shortcut.clone());
+    }
+
+    for (name, role) in &project_config.roles {
+        config.roles.insert(RoleName::new(name), role.clone());
+    }
+
+    if let Ok(Some(role_name)) = project_config.resolve_role_name(None) {
+        let role_name = RoleName::new(&role_name);
+        if config.roles.contains_key(&role_name) {
+            config.selected_role = role_name.clone();
+            config.default_role = role_name;
+        }
+    }
+
+    repair_selected_roles(&mut config);
+    config
+}
+
+fn repair_selected_roles(config: &mut Config) {
+    if config.roles.contains_key(&config.selected_role)
+        && config.roles.contains_key(&config.default_role)
+    {
+        return;
+    }
+
+    if let Some(first_role) = config.roles.keys().next().cloned() {
+        if !config.roles.contains_key(&config.selected_role) {
+            config.selected_role = first_role.clone();
+        }
+        if !config.roles.contains_key(&config.default_role) {
+            config.default_role = first_role;
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     // Initialize logging
@@ -139,15 +181,14 @@ async fn main() -> Result<()> {
     // Priority: project .terraphim/ config > hardcoded profile
     let config = if let Ok(Some(project_dir)) = terraphim_config::project::discover(None) {
         match terraphim_config::project::ProjectConfig::load_from_dir(&project_dir) {
-            Ok(project_config) if !project_config.roles.is_empty() => {
+            Ok(project_config) if !project_config.is_empty() => {
                 info!(
                     "Using project configuration from '{}' ({} role(s))",
                     project_dir.display(),
                     project_config.roles.len()
                 );
                 let base = build_profile_config(&args.profile);
-                let builder = ConfigBuilder::new();
-                builder.merge_with(&project_config).build().unwrap_or(base)
+                merge_project_into_base(base, &project_config)
             }
             _ => {
                 info!(
@@ -252,4 +293,42 @@ async fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    #[test]
+    fn repair_selected_roles_sets_missing_selected_to_existing_role() {
+        let mut config = Config::default();
+        config.roles.clear();
+        config.roles.insert(
+            RoleName::new("devops"),
+            terraphim_config::Role::new("DevOps"),
+        );
+
+        repair_selected_roles(&mut config);
+
+        assert_eq!(config.selected_role, RoleName::new("devops"));
+        assert_eq!(config.default_role, RoleName::new("devops"));
+    }
+
+    #[test]
+    fn merge_project_into_base_selects_single_project_role() {
+        let base = build_profile_config(&ConfigProfile::Desktop);
+        let mut roles = HashMap::new();
+        roles.insert("devops".to_string(), terraphim_config::Role::new("DevOps"));
+        let project_config = terraphim_config::project::ProjectConfig {
+            roles,
+            ..Default::default()
+        };
+
+        let config = merge_project_into_base(base, &project_config);
+
+        assert!(config.roles.contains_key(&RoleName::new("devops")));
+        assert_eq!(config.selected_role, RoleName::new("devops"));
+        assert_eq!(config.default_role, RoleName::new("devops"));
+    }
 }
