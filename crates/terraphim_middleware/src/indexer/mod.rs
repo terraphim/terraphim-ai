@@ -3,6 +3,7 @@ use terraphim_types::{Index, SearchQuery};
 
 use crate::{Error, Result};
 
+mod fff;
 mod ripgrep;
 
 #[cfg(feature = "ai-assistant")]
@@ -15,6 +16,7 @@ use crate::haystack::{
     ClickUpHaystackIndexer, McpHaystackIndexer, PerplexityHaystackIndexer, QueryRsHaystackIndexer,
     QuickwitHaystackIndexer,
 };
+pub use fff::FffIndexer;
 pub use ripgrep::RipgrepIndexer;
 
 /// A Middleware is a service that creates an index of documents from
