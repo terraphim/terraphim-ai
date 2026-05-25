@@ -781,9 +781,7 @@ impl AgentOrchestrator {
         // to a TempDir-based `repo_path`.
         #[cfg(not(test))]
         {
-            let sweep_report = compound_workflow
-                .worktree_manager()
-                .sweep_stale(&[PathBuf::from("/tmp/adf-worktrees")]);
+            let sweep_report = compound_workflow.worktree_manager().sweep_stale(&[]);
             if sweep_report.swept_count + sweep_report.root_owned_skipped > 10 {
                 warn!(
                     swept_count = sweep_report.swept_count,
@@ -2218,7 +2216,7 @@ impl AgentOrchestrator {
 
         let (worktree_path, worktree_guard) = if needs_isolation {
             if let Some(path) = self.create_agent_worktree(&def.name, repo_dir).await {
-                let guard = crate::worktree_guard::WorktreeGuard::new(&path);
+                let guard = crate::worktree_guard::WorktreeGuard::for_managed(repo_dir, &path);
                 (Some(path), Some(guard))
             } else {
                 (None, None)
@@ -5528,7 +5526,7 @@ impl AgentOrchestrator {
     /// Returns the worktree path if successful, None if worktree creation fails
     /// (fail-open: agent uses shared working_dir instead).
     async fn create_agent_worktree(&self, agent_name: &str, repo_dir: &Path) -> Option<PathBuf> {
-        let worktree_root = PathBuf::from("/tmp/adf-worktrees");
+        let worktree_root = repo_dir.join(".worktrees");
         if let Err(e) = tokio::fs::create_dir_all(&worktree_root).await {
             warn!(agent = %agent_name, error = %e, "failed to create worktree root");
             return None;
