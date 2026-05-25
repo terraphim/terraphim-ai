@@ -410,13 +410,13 @@ async fn test_fff_with_kg_scorer_state_is_not_discarded() {
     );
 }
 
-fn create_terraphim_graph_role() -> Role {
+fn create_terraphim_graph_role_with_haystack(location: String) -> Role {
     let mut role = Role::new("KGTest");
     role.shortname = Some("KGTest".to_string());
     role.relevance_function = RelevanceFunction::TerraphimGraph;
     role.theme = "default".to_string();
     role.haystacks = vec![Haystack {
-        location: "../../terraphim_server/fixtures/haystack".to_string(),
+        location,
         service: ServiceType::Ripgrep,
         read_only: true,
         fetch_content: false,
@@ -424,6 +424,12 @@ fn create_terraphim_graph_role() -> Role {
         extra_parameters: std::collections::HashMap::new(),
     }];
     role
+}
+
+fn create_terraphim_graph_role() -> Role {
+    create_terraphim_graph_role_with_haystack(
+        "../../terraphim_server/fixtures/haystack".to_string(),
+    )
 }
 
 #[tokio::test]
@@ -627,4 +633,87 @@ async fn test_fff_multiple_extensions_configured() {
 
     let index2 = indexer.index("Hello", &haystack).await.unwrap();
     assert_eq!(index2.len(), 1, "Should find the .md file");
+}
+
+#[tokio::test]
+#[serial]
+async fn test_search_haystacks_kg_scorer_boosts_priority_file_above_page_limit() {
+    use terraphim_config::ConfigState;
+    use terraphim_middleware::search_haystacks;
+    use terraphim_rolegraph::RoleGraphSync;
+    use terraphim_types::{NormalizedTerm, NormalizedTermValue, SearchQuery, Thesaurus};
+
+    let temp_dir = TempDir::new().unwrap();
+    let haystack_path = temp_dir.path();
+
+    for i in 0..200 {
+        let file_path = haystack_path.join(format!("neutral-{:03}.md", i));
+        tokio::fs::write(&file_path, format!("# File {}\n\nContent with needle term.\n", i))
+            .await
+            .unwrap();
+    }
+
+    let priority_file = haystack_path.join("kg-priority/special-concept.md");
+    tokio::fs::create_dir_all(priority_file.parent().unwrap()).await.unwrap();
+    tokio::fs::write(
+        &priority_file,
+        "# Special Concept\n\nContent with needle term.\n",
+    )
+    .await
+    .unwrap();
+
+    let mut config = ConfigBuilder::new()
+        .global_shortcut("Ctrl+T")
+        .add_role(
+            "KGTest",
+            create_terraphim_graph_role_with_haystack(haystack_path.to_string_lossy().to_string()),
+        )
+        .build()
+        .unwrap();
+
+    let mut config_state = ConfigState::new(&mut config).await.unwrap();
+
+    let mut thesaurus = Thesaurus::new("kg_pagination_test".to_string());
+    let key = NormalizedTermValue::from("special-concept".to_string());
+    let term = NormalizedTerm {
+        id: 1,
+        value: NormalizedTermValue::from("special-concept".to_string()),
+        display_value: None,
+        url: None,
+        action: None,
+        priority: None,
+        trigger: None,
+        pinned: false,
+    };
+    thesaurus.insert(key, term);
+
+    let rolegraph =
+        terraphim_rolegraph::RoleGraph::new(RoleName::new("KGTest"), thesaurus)
+            .await
+            .unwrap();
+    config_state
+        .roles
+        .insert(RoleName::new("KGTest"), RoleGraphSync::from(rolegraph));
+
+    let query = SearchQuery {
+        search_term: "needle".into(),
+        search_terms: None,
+        operator: None,
+        skip: None,
+        limit: None,
+        role: Some(RoleName::new("KGTest")),
+        layer: terraphim_types::Layer::default(),
+        include_pinned: false,
+        min_quality: None,
+    };
+
+    let result = search_haystacks(config_state, query).await.unwrap();
+    let priority_found = result.values().any(|doc| {
+        doc.url
+            .ends_with("kg-priority/special-concept.md")
+    });
+    assert!(
+        priority_found,
+        "KG scorer should boost priority file into top 200 results, but it was not found"
+    );
 }
