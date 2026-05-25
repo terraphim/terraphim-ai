@@ -1,0 +1,23 @@
+# Test ADF configuration for local adf-ctl testing
+# This mimics the structure in /opt/ai-dark-factory/conf.d/terraphim.toml
+# for agent name discovery
+
+[[agents]]
+name = "meta-learning"
+project = "terraphim-ai"
+
+[[agents]]
+name = "security-sentinel"
+project = "terraphim-ai"
+
+[[agents]]
+name = "build-runner"
+project = "terraphim-ai"
+
+[[agents]]
+name = "pr-reviewer"
+project = "terraphim-ai"
+
+[[agents]]
+name = "content-generator"
+project = "terraphim-ai"
