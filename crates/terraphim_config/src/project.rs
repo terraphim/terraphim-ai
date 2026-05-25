@@ -11,21 +11,12 @@ pub enum ProjectDiscoveryError {
     NotDirectory(PathBuf),
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct ProjectConfig {
     #[serde(default)]
     pub global_shortcut: Option<String>,
     #[serde(default)]
     pub roles: std::collections::HashMap<String, crate::Role>,
-}
-
-impl Default for ProjectConfig {
-    fn default() -> Self {
-        Self {
-            global_shortcut: None,
-            roles: std::collections::HashMap::new(),
-        }
-    }
 }
 
 impl ProjectConfig {
