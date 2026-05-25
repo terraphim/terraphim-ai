@@ -260,6 +260,7 @@ impl TryFrom<&ProjectAdfConfig> for (Project, Vec<AgentDefinition>) {
                     evolution_enabled: ta.evolution_enabled,
                     rlm_enabled: ta.rlm_enabled,
                     bypass_kg_routing: false,
+                    enabled: true,
                 })
             })
             .collect::<Result<Vec<AgentDefinition>, OrchestratorError>>()?;
@@ -320,7 +321,7 @@ task = "Run safety checks"
     fn discover_and_load_returns_none_when_no_adf_toml() {
         let tmp = TempDir::new().unwrap();
         fs::create_dir_all(tmp.path().join(".terraphim")).unwrap();
-        let result = ProjectAdfConfig::discover_and_load(&tmp.path()).unwrap();
+        let result = ProjectAdfConfig::discover_and_load(tmp.path()).unwrap();
         assert!(result.is_none());
     }
 

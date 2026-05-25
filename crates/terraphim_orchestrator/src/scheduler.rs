@@ -117,6 +117,15 @@ impl TimeScheduler {
     pub fn compound_review_schedule(&self) -> Option<&Schedule> {
         self.compound_schedule.as_ref()
     }
+
+    /// Check if an agent has a valid schedule registered.
+    pub fn is_agent_scheduled(&self, agent_name: &str) -> bool {
+        self.schedules
+            .iter()
+            .find(|e| e.agent.name == agent_name)
+            .map(|e| e.schedule.is_some())
+            .unwrap_or(false)
+    }
 }
 
 /// Parse a cron expression, normalising to 7-field format for the `cron` crate.
@@ -175,6 +184,7 @@ mod tests {
             evolution_enabled: false,
             rlm_enabled: None,
             bypass_kg_routing: false,
+            enabled: true,
 
             project: None,
         }
@@ -245,5 +255,17 @@ mod tests {
         assert!(parse_cron("0 0 3 * * *").is_ok());
         assert!(parse_cron("0 0 3 * * * *").is_ok());
         assert!(parse_cron("* * *").is_err());
+    }
+
+    #[test]
+    fn test_is_agent_scheduled() {
+        let agents = vec![
+            make_agent("scheduled", AgentLayer::Core, Some("0 3 * * *")),
+            make_agent("unscheduled", AgentLayer::Growth, None),
+        ];
+        let scheduler = TimeScheduler::new(&agents, None).unwrap();
+        assert!(scheduler.is_agent_scheduled("scheduled"));
+        assert!(!scheduler.is_agent_scheduled("unscheduled"));
+        assert!(!scheduler.is_agent_scheduled("nonexistent"));
     }
 }

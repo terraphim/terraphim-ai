@@ -491,7 +491,7 @@ action:: opencode -m {{ model }} -p "{{ prompt }}"
     }
 
     #[test]
-    fn loads_real_adf_taxonomy_3_tiers() {
+    fn loads_real_adf_taxonomy_4_tiers() {
         let taxonomy = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../docs/taxonomy/routing_scenarios/adf");
         if !taxonomy.exists() {
@@ -499,7 +499,11 @@ action:: opencode -m {{ model }} -p "{{ prompt }}"
         }
 
         let router = KgRouter::load(&taxonomy).unwrap();
-        assert_eq!(router.rule_count(), 3, "expected 3 tier files");
+        assert_eq!(
+            router.rule_count(),
+            4,
+            "expected 4 tier files (planning, decision, implementation, review)"
+        );
 
         // Every route should have an action template
         for route_directive in router.all_routes() {
@@ -533,6 +537,63 @@ action:: opencode -m {{ model }} -p "{{ prompt }}"
         assert_eq!(d.priority, 50);
         assert_eq!(d.provider, "anthropic");
         assert!(d.model.contains("sonnet"));
+
+        // Decision tier (priority 65) -- "analyse logs" routes between
+        // planning and implementation
+        let d = router
+            .route_agent("analyse logs for root cause analysis")
+            .unwrap();
+        assert_eq!(d.matched_concept, "decision_tier");
+        assert_eq!(d.priority, 65);
+
+        // Decision tier covers post-merge gate work
+        let d = router
+            .route_agent("post-merge gate assessment for nightwatch retrospective")
+            .unwrap();
+        assert_eq!(d.matched_concept, "decision_tier");
+        assert_eq!(d.priority, 65);
+
+        // Planning tier exposes opencode/gpt-5.5 route
+        let pt = router
+            .all_routes()
+            .into_iter()
+            .filter(|r| {
+                r.action
+                    .as_deref()
+                    .is_some_and(|a| a.contains("opencode/gpt-5.5"))
+                    || r.model == "opencode/gpt-5.5"
+            })
+            .count();
+        assert!(
+            pt >= 1,
+            "expected at least one route with opencode/gpt-5.5 across all tiers"
+        );
+
+        // Implementation tier exposes MiniMax-M2.7-highspeed route
+        let m27 = router
+            .all_routes()
+            .into_iter()
+            .filter(|r| r.model.contains("MiniMax-M2.7-highspeed"))
+            .count();
+        assert!(
+            m27 >= 1,
+            "expected at least one route with MiniMax-M2.7-highspeed"
+        );
+
+        // pi-rust routes are present
+        let pi_rust = router
+            .all_routes()
+            .into_iter()
+            .filter(|r| {
+                r.action
+                    .as_deref()
+                    .is_some_and(|a| a.contains("/home/alex/.local/bin/pi-rust"))
+            })
+            .count();
+        assert!(
+            pi_rust >= 2,
+            "expected at least 2 pi-rust action templates (planning + impl)"
+        );
     }
 
     /// End-to-end: simulate ADF agent dispatch with phase-aware 3-tier routing.
@@ -594,8 +655,8 @@ action:: opencode -m {{ model }} -p "{{ prompt }}"
             (
                 "merge-coordinator",
                 "review merge verdict and evaluate GO NO-GO for PR approval",
-                "implementation_tier",
-                "anthropic",
+                "decision_tier",
+                "openai-codex",
             ),
             // IMPLEMENTATION TIER (sonnet)
             (
@@ -633,6 +694,13 @@ action:: opencode -m {{ model }} -p "{{ prompt }}"
                 "log analysis error pattern incident observability",
                 "implementation_tier",
                 "anthropic",
+            ),
+            // New: decision-tier dispatches use analytical keywords
+            (
+                "nightwatch-retrospective",
+                "nightwatch retrospective and quality evaluation across fleet health",
+                "decision_tier",
+                "openai-codex",
             ),
         ];
 

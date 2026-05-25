@@ -1,0 +1,12 @@
+[Unit]
+Description=Restart adf-orchestrator after failure (OnFailure target)
+# This is a oneshot triggered by adf-orchestrator.service via OnFailure=
+# It exists separately so OnFailure does not recursively trigger itself.
+
+[Service]
+Type=oneshot
+ExecStartPre=/bin/sleep 60
+ExecStart=/usr/bin/systemctl restart adf-orchestrator.service
+# Sleep 60 first to let memory pressure subside and avoid restart loop if
+# the underlying cause is persistent. systemd OnFailure also respects
+# StartLimitInterval/Burst on the parent unit.

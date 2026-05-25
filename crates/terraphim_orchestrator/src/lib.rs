@@ -30,7 +30,9 @@
 //! ```
 
 pub mod adf_commands;
+pub mod agent_run_command;
 pub mod agent_run_record;
+pub mod agent_runner;
 pub mod compound;
 pub mod concurrency;
 pub mod config;
@@ -73,8 +75,18 @@ pub mod scope;
 pub mod webhook;
 pub mod worktree_guard;
 
+pub use agent_run_command::{
+    applicable_modes, is_cron_schedule_valid, parse_agent_args, run_synthetic, run_validate,
+    run_validate_all, schedule_for_agent, validate_agent_all_modes, AgentSubcommand,
+    AgentValidateAllReport, OutputFormat,
+};
 pub use agent_run_record::{
     AgentRunRecord, ExitClass, ExitClassification, ExitClassifier, RunTrigger,
+};
+pub use agent_runner::{
+    probe_cli_tool, probe_model_available, run_agent_synthetic, validate_agent_runtime,
+    AgentRunRequest, AgentRuntimeValidationReport, GiteaTargetReport, ModeResult, SyntheticEvent,
+    TriggerMode,
 };
 pub use compound::{CompoundReviewResult, CompoundReviewWorkflow, ReviewGroupDef, SwarmConfig};
 pub use concurrency::{ConcurrencyController, FairnessPolicy, ModeQuotas};
@@ -331,6 +343,8 @@ pub struct AgentOrchestrator {
     /// Agent evolution manager. No-op when evolution feature is disabled
     /// or `evolution.enabled = false` in config.
     evolution_manager: evolution::EvolutionManager,
+    config_error_counters: HashMap<String, u32>,
+    quarantined_agents: std::collections::HashSet<String>,
 }
 
 /// Build the composite restart-state key for an agent definition.
@@ -972,6 +986,8 @@ impl AgentOrchestrator {
             },
             gitea_skill_cache_dir: None,
             evolution_manager: evolution::EvolutionManager::new(config.evolution.clone()),
+            config_error_counters: HashMap::new(),
+            quarantined_agents: std::collections::HashSet::new(),
         })
     }
 
@@ -1916,7 +1932,7 @@ impl AgentOrchestrator {
             .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or(&def.cli_tool);
-        let supports_model_flag = matches!(cli_name, "claude" | "claude-code" | "opencode");
+        let supports_model_flag = matches!(cli_name, "claude" | "claude-code" | "opencode" | "pi-rust" | "pi");
 
         // Track KG decision for CLI override (set inside the routing block below)
         let mut kg_cli_override: Option<String> = None;
@@ -6504,6 +6520,36 @@ impl AgentOrchestrator {
                 mention_chain_id,
                 mention_depth,
                 mention_parent_agent,
+                consecutive_config_errors: 0,
+            };
+
+            // Config-error circuit-breaker: quarantine after 3 consecutive failures.
+            let record = if record.exit_class == ExitClass::ConfigError {
+                let count = self
+                    .config_error_counters
+                    .entry(name.clone())
+                    .and_modify(|c| *c += 1)
+                    .or_insert(1);
+                let new_count = *count;
+                if new_count >= 3 && !self.quarantined_agents.contains(name.as_str()) {
+                    self.quarantined_agents.insert(name.clone());
+                    warn!(
+                        target: "adf.agent.quarantined",
+                        agent = %name,
+                        consecutive_config_errors = new_count,
+                        "agent quarantined after consecutive ConfigError exits"
+                    );
+                    if std::env::var("ADF_QUARANTINE_PERSIST").as_deref() == Ok("1") {
+                        // TODO: persist enabled=false to conf.d TOML (issue #1817).
+                    }
+                }
+                AgentRunRecord {
+                    consecutive_config_errors: new_count,
+                    ..record
+                }
+            } else {
+                self.config_error_counters.remove(name.as_str());
+                record
             };
 
             if record.exit_class == ExitClass::RateLimit {
@@ -7278,6 +7324,10 @@ Remove the pause flag once the underlying failure is resolved:\n\n\
         let to_spawn: Vec<(AgentDefinition, chrono::DateTime<chrono::Utc>)> = scheduled
             .into_iter()
             .filter(|(def, _schedule)| {
+                // Skip quarantined agents
+                !self.quarantined_agents.contains(&def.name)
+            })
+            .filter(|(def, _schedule)| {
                 // Skip if already active
                 !self.active_agents.contains_key(&def.name)
             })
@@ -7616,11 +7666,20 @@ Remove the pause flag once the underlying failure is resolved:\n\n\
         session_id: &str,
         model: &str,
     ) -> Option<control_plane::telemetry::CompletionEvent> {
-        let parsed = match cli_tool {
+        let cli_basename = std::path::Path::new(cli_tool)
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or(cli_tool);
+        let parsed = match cli_basename {
             "opencode" => {
                 control_plane::output_parser::parse_opencode_line(line, session_id, model, None)
             }
-            "claude" => control_plane::output_parser::parse_claude_line(line, session_id, model),
+            "claude" | "claude-code" => {
+                control_plane::output_parser::parse_claude_line(line, session_id, model)
+            }
+            "pi-rust" | "pi" => {
+                control_plane::output_parser::parse_pi_rust_line(line, session_id, model)
+            }
             _ => control_plane::output_parser::ParsedOutput::Ignored,
         };
         match parsed {
@@ -8152,6 +8211,7 @@ mod tests {
                     evolution_enabled: false,
                     rlm_enabled: None,
                     bypass_kg_routing: false,
+                    enabled: true,
 
                     project: None,
                 },
@@ -8181,6 +8241,7 @@ mod tests {
                     evolution_enabled: false,
                     rlm_enabled: None,
                     bypass_kg_routing: false,
+                    enabled: true,
 
                     project: None,
                 },
@@ -8503,6 +8564,7 @@ task = "test"
                 evolution_enabled: false,
                 rlm_enabled: None,
                 bypass_kg_routing: false,
+                enabled: true,
 
                 project: None,
             }],
@@ -8623,6 +8685,7 @@ task = "test"
             evolution_enabled: false,
             rlm_enabled: None,
             bypass_kg_routing: false,
+            enabled: true,
 
             project: None,
         }];
@@ -8831,6 +8894,7 @@ task = "test"
             evolution_enabled: false,
             rlm_enabled: None,
             bypass_kg_routing: false,
+            enabled: true,
 
             project: None,
         }];
@@ -8922,6 +8986,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             evolution_enabled: false,
             rlm_enabled: None,
             bypass_kg_routing: false,
+            enabled: true,
 
             project: None,
         }];
@@ -9260,6 +9325,7 @@ bypass_kg_routing = true
             evolution_enabled: false,
             rlm_enabled: None,
             bypass_kg_routing: false,
+            enabled: true,
             project: None,
         }];
         let mut orch = AgentOrchestrator::new(config).unwrap();
@@ -9431,6 +9497,7 @@ bypass_kg_routing = true
             evolution_enabled: false,
             rlm_enabled: None,
             bypass_kg_routing: false,
+            enabled: true,
             project: None,
         }];
 
@@ -9528,6 +9595,7 @@ bypass_kg_routing = true
                 evolution_enabled: false,
                 rlm_enabled: None,
                 bypass_kg_routing: false,
+                enabled: true,
                 project: Some("alpha".to_string()),
             }],
             restart_cooldown_secs: 0,
@@ -9825,6 +9893,7 @@ bypass_kg_routing = true
             evolution_enabled: false,
             rlm_enabled: None,
             bypass_kg_routing: false,
+            enabled: true,
             project: Some("alpha".to_string()),
         });
         config.pr_dispatch_per_project.insert(
@@ -10227,6 +10296,7 @@ bypass_kg_routing = true
             evolution_enabled: false,
             rlm_enabled: None,
             bypass_kg_routing: false,
+            enabled: true,
             project: Some("alpha".to_string()),
         });
         // The per-project block takes precedence over the top-level block,
@@ -10571,6 +10641,7 @@ bypass_kg_routing = true
             evolution_enabled: false,
             rlm_enabled: None,
             bypass_kg_routing: false,
+            enabled: true,
             project: Some("alpha".to_string()),
         });
         // The per-project block takes precedence over the top-level block,
@@ -10867,6 +10938,7 @@ bypass_kg_routing = true
             evolution_enabled: false,
             rlm_enabled: None,
             bypass_kg_routing: false,
+            enabled: true,
             project: Some("alpha".to_string()),
         });
         config.pr_dispatch = Some(crate::config::PrDispatchConfig {
@@ -11150,6 +11222,7 @@ bypass_kg_routing = true
             evolution_enabled: false,
             rlm_enabled: None,
             bypass_kg_routing: false,
+            enabled: true,
             project: Some("alpha".to_string()),
         });
         // The per-project block takes precedence over the top-level block,
@@ -11445,6 +11518,7 @@ bypass_kg_routing = true
             evolution_enabled: false,
             rlm_enabled: None,
             bypass_kg_routing: false,
+            enabled: true,
             project: None,
         }];
         // mentions config required so handle_webhook_dispatch does not bail at the top.
@@ -11501,6 +11575,7 @@ bypass_kg_routing = true
             evolution_enabled: false,
             rlm_enabled: None,
             bypass_kg_routing: false,
+            enabled: true,
             project: None,
         }];
         config.mentions = Some(crate::config::MentionConfig::default());
@@ -11559,6 +11634,7 @@ bypass_kg_routing = true
             evolution_enabled: false,
             rlm_enabled: None,
             bypass_kg_routing: false,
+            enabled: true,
             project: None,
         };
 
