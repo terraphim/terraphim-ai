@@ -2934,6 +2934,16 @@ impl ServerHandler for McpService {
 
     fn get_info(&self) -> ServerInfo {
         ServerInfo {
+            capabilities: rmcp::model::ServerCapabilities {
+                tools: Some(rmcp::model::ToolsCapability {
+                    list_changed: None,
+                }),
+                resources: Some(rmcp::model::ResourcesCapability {
+                    subscribe: None,
+                    list_changed: None,
+                }),
+                ..Default::default()
+            },
             server_info: rmcp::model::Implementation {
                 name: "terraphim-mcp".to_string(),
                 version: env!("CARGO_PKG_VERSION").to_string(),
