@@ -21,7 +21,10 @@
     {
       "location": "crates",
       "service": "Ripgrep",
-      "read_only": true
+      "read_only": true,
+      "extra_parameters": {
+        "extensions": "rs,toml,md"
+      }
     }
   ],
   "extra": {}
