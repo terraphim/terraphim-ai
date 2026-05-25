@@ -42,7 +42,10 @@ async fn test_fff_indexer_basic() {
     let indexer = FffIndexer::default();
     let index = indexer.index("test", &haystack).await.unwrap();
     println!("FffIndexer basic test: indexed {} documents", index.len());
-    assert!(!index.is_empty(), "Expected at least one document for 'test' needle");
+    assert!(
+        !index.is_empty(),
+        "Expected at least one document for 'test' needle"
+    );
 }
 
 #[tokio::test]
@@ -60,7 +63,10 @@ async fn test_fff_search_graph() {
     let indexer = FffIndexer::default();
     let index = indexer.index("graph", &haystack).await.unwrap();
     println!("FffIndexer graph search: indexed {} documents", index.len());
-    assert!(!index.is_empty(), "Expected at least one document for 'graph' needle");
+    assert!(
+        !index.is_empty(),
+        "Expected at least one document for 'graph' needle"
+    );
 }
 
 #[tokio::test]
@@ -78,7 +84,10 @@ async fn test_fff_search_machine_learning() {
 
     let indexer = FffIndexer::default();
     let index = indexer.index("graph", &haystack).await.unwrap();
-    println!("FffIndexer machine learning search: indexed {} documents", index.len());
+    println!(
+        "FffIndexer machine learning search: indexed {} documents",
+        index.len()
+    );
     for doc in index.get_all_documents() {
         println!("  Document: {} ({})", doc.title, doc.id);
         assert!(!doc.title.is_empty(), "Document title should not be empty");
@@ -207,7 +216,10 @@ async fn test_fff_with_kg_scorer() {
     let indexer = FffIndexer::default().with_kg_scorer(scorer);
 
     let index = indexer.index("test", &haystack).await.unwrap();
-    println!("FffIndexer with KG scorer: indexed {} documents", index.len());
+    println!(
+        "FffIndexer with KG scorer: indexed {} documents",
+        index.len()
+    );
     assert!(!index.is_empty(), "Expected documents with KG scorer");
 }
 

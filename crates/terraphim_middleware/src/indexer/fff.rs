@@ -3,11 +3,11 @@ use std::path::Path;
 use std::sync::Arc;
 
 use cached::proc_macro::cached;
-use fff_search::{
-    ContentCacheBudget, FFFMode, FilePicker, FilePickerOptions, GrepMode, GrepSearchOptions,
-    SharedFrecency, grep_search, parse_grep_query,
-};
 use fff_search::external_scorer::ExternalScorer;
+use fff_search::{
+    grep_search, parse_grep_query, ContentCacheBudget, FFFMode, FilePicker, FilePickerOptions,
+    GrepMode, GrepSearchOptions, SharedFrecency,
+};
 use terraphim_config::Haystack;
 use terraphim_persistence::Persistable;
 use terraphim_types::{Document, DocumentType, Index};
@@ -98,7 +98,10 @@ impl FffIndexer {
     /// knowledge-graph concept matches in file paths.
     ///
     /// This follows the same builder pattern as `McpService::with_kg_scorer()`.
-    pub fn with_kg_scorer(mut self, scorer: Arc<terraphim_file_search::kg_scorer::KgPathScorer>) -> Self {
+    pub fn with_kg_scorer(
+        mut self,
+        scorer: Arc<terraphim_file_search::kg_scorer::KgPathScorer>,
+    ) -> Self {
         self.kg_scorer = Some(scorer);
         self
     }
@@ -219,7 +222,11 @@ impl FffIndexer {
                 if let Some(tracker) = guard.as_ref() {
                     for file in &mut files {
                         if let Err(e) = file.update_frecency_scores(tracker, FFFMode::Ai) {
-                            log::trace!("Failed to update frecency for {}: {}", file.relative_path, e);
+                            log::trace!(
+                                "Failed to update frecency for {}: {}",
+                                file.relative_path,
+                                e
+                            );
                         }
                     }
                 }
