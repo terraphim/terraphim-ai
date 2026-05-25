@@ -40,6 +40,7 @@ tokio = { workspace = true, features = ["full"] }
 
 html2md = "0.2.15"
 async-trait = { workspace = true }
+fff-search = { git = "https://github.com/AlexMikhalev/fff.nvim.git", branch = "feat/external-scorer", features = ["zlob"] }
 
 url = "2.5"
 urlencoding = "2.1"
