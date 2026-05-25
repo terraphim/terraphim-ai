@@ -648,13 +648,18 @@ async fn test_search_haystacks_kg_scorer_boosts_priority_file_above_page_limit()
 
     for i in 0..200 {
         let file_path = haystack_path.join(format!("neutral-{:03}.md", i));
-        tokio::fs::write(&file_path, format!("# File {}\n\nContent with needle term.\n", i))
-            .await
-            .unwrap();
+        tokio::fs::write(
+            &file_path,
+            format!("# File {}\n\nContent with needle term.\n", i),
+        )
+        .await
+        .unwrap();
     }
 
     let priority_file = haystack_path.join("kg-priority/special-concept.md");
-    tokio::fs::create_dir_all(priority_file.parent().unwrap()).await.unwrap();
+    tokio::fs::create_dir_all(priority_file.parent().unwrap())
+        .await
+        .unwrap();
     tokio::fs::write(
         &priority_file,
         "# Special Concept\n\nContent with needle term.\n",
@@ -687,10 +692,9 @@ async fn test_search_haystacks_kg_scorer_boosts_priority_file_above_page_limit()
     };
     thesaurus.insert(key, term);
 
-    let rolegraph =
-        terraphim_rolegraph::RoleGraph::new(RoleName::new("KGTest"), thesaurus)
-            .await
-            .unwrap();
+    let rolegraph = terraphim_rolegraph::RoleGraph::new(RoleName::new("KGTest"), thesaurus)
+        .await
+        .unwrap();
     config_state
         .roles
         .insert(RoleName::new("KGTest"), RoleGraphSync::from(rolegraph));
@@ -708,10 +712,9 @@ async fn test_search_haystacks_kg_scorer_boosts_priority_file_above_page_limit()
     };
 
     let result = search_haystacks(config_state, query).await.unwrap();
-    let priority_found = result.values().any(|doc| {
-        doc.url
-            .ends_with("kg-priority/special-concept.md")
-    });
+    let priority_found = result
+        .values()
+        .any(|doc| doc.url.ends_with("kg-priority/special-concept.md"));
     assert!(
         priority_found,
         "KG scorer should boost priority file into top 200 results, but it was not found"
