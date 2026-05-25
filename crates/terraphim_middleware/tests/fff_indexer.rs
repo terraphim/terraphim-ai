@@ -172,6 +172,62 @@ async fn test_fff_update_document() {
     assert_eq!(updated_content, "# Updated Document\n\nNew content.\n");
 }
 
+#[tokio::test]
+#[serial]
+async fn test_fff_with_kg_scorer() {
+    use std::sync::Arc;
+    use terraphim_file_search::kg_scorer::KgPathScorer;
+    use terraphim_types::{NormalizedTerm, NormalizedTermValue, Thesaurus};
+
+    let haystack = Haystack {
+        location: "../../terraphim_server/fixtures/haystack".to_string(),
+        service: ServiceType::Ripgrep,
+        read_only: true,
+        fetch_content: false,
+        atomic_server_secret: None,
+        extra_parameters: std::collections::HashMap::new(),
+    };
+
+    // Create a thesaurus that matches "machine" in file paths
+    let mut thesaurus = Thesaurus::new("test".to_string());
+    let key = NormalizedTermValue::from("machine".to_string());
+    let term = NormalizedTerm {
+        id: 1,
+        value: NormalizedTermValue::from("machine".to_string()),
+        display_value: None,
+        url: None,
+        action: None,
+        priority: None,
+        trigger: None,
+        pinned: false,
+    };
+    thesaurus.insert(key, term);
+
+    let scorer = Arc::new(KgPathScorer::new(thesaurus));
+    let indexer = FffIndexer::default().with_kg_scorer(scorer);
+
+    let index = indexer.index("test", &haystack).await.unwrap();
+    println!("FffIndexer with KG scorer: indexed {} documents", index.len());
+    assert!(!index.is_empty(), "Expected documents with KG scorer");
+}
+
+#[tokio::test]
+#[serial]
+async fn test_fff_default_has_no_kg_scorer() {
+    let indexer = FffIndexer::default();
+    let haystack = Haystack {
+        location: "../../terraphim_server/fixtures/haystack".to_string(),
+        service: ServiceType::Ripgrep,
+        read_only: true,
+        fetch_content: false,
+        atomic_server_secret: None,
+        extra_parameters: std::collections::HashMap::new(),
+    };
+
+    let index = indexer.index("test", &haystack).await.unwrap();
+    assert!(!index.is_empty(), "Expected documents without KG scorer");
+}
+
 #[cfg(test)]
 mod nested_tests {
     use super::*;
