@@ -47,7 +47,7 @@ pub async fn search_haystacks(
     let search_query_role = search_query.role.unwrap_or(config.default_role);
     let needle = search_query.search_term.as_str();
 
-    let ripgrep = RipgrepIndexer::default();
+    let fff = FffIndexer::default();
     let query_rs = QueryRsHaystackIndexer::default();
     let clickup = ClickUpHaystackIndexer::default();
     let mut full_index = Index::new();
@@ -62,9 +62,9 @@ pub async fn search_haystacks(
 
         let index = match haystack.service {
             ServiceType::Ripgrep => {
-                // Search through documents using ripgrep
-                // This indexes the haystack using the ripgrep middleware
-                ripgrep.index(needle, haystack).await?
+                // Search through documents using fff-search
+                // This indexes the haystack using the fff-search middleware
+                fff.index(needle, haystack).await?
             }
             ServiceType::Atomic => {
                 log::warn!(
