@@ -1,8 +1,12 @@
+use std::sync::Arc;
+
 use terraphim_config::{ConfigState, ServiceType};
-use terraphim_types::{Index, SearchQuery};
+use terraphim_file_search::kg_scorer::KgPathScorer;
+use terraphim_types::{Index, RelevanceFunction, RoleName, SearchQuery};
 
 use crate::{Error, Result};
 
+mod fff;
 mod ripgrep;
 
 #[cfg(feature = "ai-assistant")]
@@ -15,7 +19,27 @@ use crate::haystack::{
     ClickUpHaystackIndexer, McpHaystackIndexer, PerplexityHaystackIndexer, QueryRsHaystackIndexer,
     QuickwitHaystackIndexer,
 };
+pub use fff::FffIndexer;
 pub use ripgrep::RipgrepIndexer;
+
+async fn kg_scorer_for_role(
+    config_state: &ConfigState,
+    role_name: &RoleName,
+    role: &terraphim_config::Role,
+) -> Option<Arc<KgPathScorer>> {
+    if role.relevance_function != RelevanceFunction::TerraphimGraph {
+        return None;
+    }
+    let rg_sync = config_state.roles.get(role_name)?;
+    let thesaurus = {
+        let rg = rg_sync.lock().await;
+        if rg.thesaurus.is_empty() {
+            return None;
+        }
+        rg.thesaurus.clone()
+    };
+    Some(Arc::new(KgPathScorer::new(thesaurus)))
+}
 
 /// A Middleware is a service that creates an index of documents from
 /// a haystack.
@@ -45,24 +69,29 @@ pub async fn search_haystacks(
     let search_query_role = search_query.role.unwrap_or(config.default_role);
     let needle = search_query.search_term.as_str();
 
-    let ripgrep = RipgrepIndexer::default();
-    let query_rs = QueryRsHaystackIndexer::default();
-    let clickup = ClickUpHaystackIndexer::default();
-    let mut full_index = Index::new();
-
     let role = config
         .roles
         .get(&search_query_role)
         .ok_or_else(|| Error::RoleNotFound(search_query_role.to_string()))?;
+
+    let kg_scorer = kg_scorer_for_role(&config_state, &search_query_role, role).await;
+
+    let mut fff = FffIndexer::default();
+    if let Some(scorer) = kg_scorer {
+        fff = fff.with_kg_scorer(scorer);
+    }
+    let query_rs = QueryRsHaystackIndexer::default();
+    let clickup = ClickUpHaystackIndexer::default();
+    let mut full_index = Index::new();
 
     for haystack in &role.haystacks {
         log::info!("Finding documents in haystack: {:#?}", haystack);
 
         let index = match haystack.service {
             ServiceType::Ripgrep => {
-                // Search through documents using ripgrep
-                // This indexes the haystack using the ripgrep middleware
-                ripgrep.index(needle, haystack).await?
+                // Search through documents using fff-search
+                // This indexes the haystack using the fff-search middleware
+                fff.index(needle, haystack).await?
             }
             ServiceType::Atomic => {
                 log::warn!(

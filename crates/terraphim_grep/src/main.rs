@@ -108,9 +108,74 @@ fn init_tracing() {
         .unwrap_or_else(|_| EnvFilter::new("info,terraphim_grep=debug"));
 
     tracing_subscriber::registry()
-        .with(fmt::layer())
+        .with(fmt::layer().with_writer(std::io::stderr))
         .with(filter)
         .init();
+}
+
+/// Discover project-level config from `.terraphim/` directory.
+///
+/// Returns the `.terraphim/` path if found, enabling auto-discovery of
+/// thesaurus, role config, and KG path without CLI flags.
+fn discover_project_dir() -> Option<std::path::PathBuf> {
+    terraphim_config::project::discover(None).ok().flatten()
+}
+
+fn load_project_config() -> Option<(PathBuf, terraphim_config::project::ProjectConfig)> {
+    let dir = discover_project_dir()?;
+    let config = terraphim_config::project::ProjectConfig::load_from_dir(&dir).ok()?;
+    Some((dir, config))
+}
+
+fn resolve_role_name(
+    explicit_role: Option<&str>,
+    project_config: Option<&terraphim_config::project::ProjectConfig>,
+) -> Result<String> {
+    if let Some(config) = project_config {
+        if let Some(role) = config.resolve_role_name(explicit_role)? {
+            return Ok(role);
+        }
+    }
+
+    Ok(explicit_role.unwrap_or("default").to_string())
+}
+
+/// Find thesaurus path with project config priority.
+///
+/// Resolution order:
+///   1. `.terraphim/thesaurus-<role>.json` (project config)
+///   2. `*_thesaurus.json` in CWD or nearby directories (filesystem heuristic)
+fn find_default_thesaurus(role_name: &str) -> Option<PathBuf> {
+    if let Some(dir) = discover_project_dir() {
+        if let Some(path) = terraphim_config::project::discover_thesaurus(&dir, role_name) {
+            tracing::info!("Using project thesaurus: {:?}", path);
+            return Some(path);
+        }
+    }
+
+    let possible_paths = vec![
+        PathBuf::from("."),
+        PathBuf::from("../docs/src"),
+        PathBuf::from("../../docs/src"),
+    ];
+
+    for base in possible_paths {
+        if let Ok(cwd) = std::env::current_dir() {
+            let candidate = cwd.join(&base);
+            if candidate.exists() {
+                if let Ok(entries) = std::fs::read_dir(&candidate) {
+                    for entry in entries.flatten() {
+                        let name = entry.file_name();
+                        let name_str = name.to_string_lossy();
+                        if name_str.ends_with("_thesaurus.json") {
+                            return Some(candidate.join(&name));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    None
 }
 
 /// Build an `LlmClient` for the requested role.
@@ -147,7 +212,21 @@ fn build_llm_for_role(
                 return None;
             }
         },
-        None => role_from_env(role_name)?,
+        None => {
+            // Try project config (.terraphim/role-<name>.json) before env vars
+            if let Some(dir) = discover_project_dir() {
+                let role_file = dir.join(format!("role-{}.json", role_name));
+                if role_file.is_file() {
+                    tracing::info!("Using project role config: {:?}", role_file);
+                    if let Ok(contents) = std::fs::read_to_string(&role_file) {
+                        if let Ok(r) = serde_json::from_str::<terraphim_config::Role>(&contents) {
+                            return terraphim_service::llm::build_llm_from_role(&r);
+                        }
+                    }
+                }
+            }
+            role_from_env(role_name)?
+        }
     };
 
     terraphim_service::llm::build_llm_from_role(&role)
@@ -209,34 +288,6 @@ fn role_from_env(role_name: &str) -> Option<terraphim_config::Role> {
     Some(role)
 }
 
-fn find_default_thesaurus() -> Option<PathBuf> {
-    // Look for thesaurus in standard locations
-    let possible_paths = vec![
-        PathBuf::from("."),
-        PathBuf::from("../docs/src"),
-        PathBuf::from("../../docs/src"),
-    ];
-
-    for base in possible_paths {
-        if let Ok(cwd) = std::env::current_dir() {
-            let candidate = cwd.join(&base);
-            if candidate.exists() {
-                // Look for any *_thesaurus.json file
-                if let Ok(entries) = std::fs::read_dir(&candidate) {
-                    for entry in entries.flatten() {
-                        let name = entry.file_name();
-                        let name_str = name.to_string_lossy();
-                        if name_str.ends_with("_thesaurus.json") {
-                            return Some(candidate.join(&name));
-                        }
-                    }
-                }
-            }
-        }
-    }
-    None
-}
-
 #[tokio::main]
 async fn main() -> Result<()> {
     init_tracing();
@@ -252,11 +303,18 @@ async fn main() -> Result<()> {
     };
 
     // Determine role and thesaurus
-    let role_name = args.role.unwrap_or_else(|| "default".to_string());
-
-    let thesaurus_path = args.thesaurus.or_else(find_default_thesaurus).context(
-        "No thesaurus specified and could not find default. Use --thesaurus to specify path.",
+    let project_config = load_project_config();
+    let role_name = resolve_role_name(
+        args.role.as_deref(),
+        project_config.as_ref().map(|(_, config)| config),
     )?;
+
+    let thesaurus_path = args
+        .thesaurus
+        .or_else(|| find_default_thesaurus(&role_name))
+        .context(
+            "No thesaurus specified and could not find default. Use --thesaurus to specify path.",
+        )?;
 
     // Load thesaurus
     let automata_path = AutomataPath::from_local(&thesaurus_path);

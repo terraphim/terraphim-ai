@@ -3,8 +3,13 @@ name = "terraphim_multi_agent"
 version = "1.0.0"
 edition = "2021"
 description = "Multi-agent system for Terraphim built on roles with rust-genai integration"
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
+repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["ai", "multi-agent", "roles", "genai"]
 license = "MIT"
 publish = false
+readme = "../../README.md"
 
 [features]
 default = ["test-utils"]

@@ -2,13 +2,14 @@
 name = "terraphim_hooks"
 version = "1.4.10"
 edition.workspace = true
-authors = ["Terraphim AI"]
+authors = ["Terraphim AI <team@terraphim.ai>"]
 description = "Unified hooks infrastructure for Terraphim AI - knowledge graph-based text replacement and validation"
 documentation = "https://terraphim.ai"
 homepage = "https://terraphim.ai"
-license = "Apache-2.0"
 repository = "https://github.com/terraphim/terraphim-ai"
 keywords = ["hooks", "ai", "text-replacement", "knowledge-graph", "validation"]
+license = "Apache-2.0"
+readme = "../../README.md"
 
 [dependencies]
 terraphim_automata = { path = "../terraphim_automata", version = "1.19.2" }

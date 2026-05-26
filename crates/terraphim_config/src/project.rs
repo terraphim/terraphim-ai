@@ -9,12 +9,20 @@ pub enum ProjectDiscoveryError {
     Json(#[from] serde_json::Error),
     #[error("Not a directory: {0}")]
     NotDirectory(PathBuf),
+    #[error(
+        "multiple project roles found ({available:?}); pass --role or set selected/default role"
+    )]
+    AmbiguousRole { available: Vec<String> },
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct ProjectConfig {
     #[serde(default)]
     pub global_shortcut: Option<String>,
+    #[serde(default)]
+    pub default_role: Option<String>,
+    #[serde(default)]
+    pub selected_role: Option<String>,
     #[serde(default)]
     pub roles: std::collections::HashMap<String, crate::Role>,
 }
@@ -25,6 +33,97 @@ impl ProjectConfig {
         let config: ProjectConfig = serde_json::from_str(&content)?;
         Ok(config)
     }
+
+    /// Load a ProjectConfig by scanning a `.terraphim/` directory.
+    ///
+    /// If `config.json` exists, loads it first (backward compat).
+    /// Then scans for `role-*.json` files and merges them in.
+    /// Role name is derived from filename: `role-devops.json` -> `"devops"`.
+    pub fn load_from_dir(dir: &Path) -> Result<Self, ProjectDiscoveryError> {
+        let mut config = Self::default();
+
+        let config_json = dir.join("config.json");
+        if config_json.is_file() {
+            config = Self::from_file(&config_json)?;
+        }
+
+        let entries = match std::fs::read_dir(dir) {
+            Ok(e) => e,
+            Err(_) => return Ok(config),
+        };
+
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            if name.starts_with("role-") && name.ends_with(".json") {
+                let role_name = name
+                    .trim_start_matches("role-")
+                    .trim_end_matches(".json")
+                    .to_string();
+                let content = std::fs::read_to_string(entry.path())?;
+                let role: crate::Role = serde_json::from_str(&content)?;
+                config.roles.insert(role_name, role);
+            }
+        }
+
+        Ok(config)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.global_shortcut.is_none() && self.roles.is_empty()
+    }
+
+    pub fn resolve_role_name(
+        &self,
+        explicit_role: Option<&str>,
+    ) -> Result<Option<String>, ProjectDiscoveryError> {
+        if let Some(role) = explicit_role.filter(|role| !role.is_empty()) {
+            return Ok(Some(role.to_string()));
+        }
+
+        for candidate in [&self.selected_role, &self.default_role]
+            .into_iter()
+            .flatten()
+        {
+            if self.roles.contains_key(candidate) {
+                return Ok(Some(candidate.clone()));
+            }
+        }
+
+        if self.roles.len() == 1 {
+            return Ok(self.roles.keys().next().cloned());
+        }
+
+        if self.roles.len() > 1 {
+            let mut available = self.roles.keys().cloned().collect::<Vec<_>>();
+            available.sort();
+            return Err(ProjectDiscoveryError::AmbiguousRole { available });
+        }
+
+        Ok(None)
+    }
+}
+
+/// Find the thesaurus file for a given role inside a `.terraphim/` directory.
+///
+/// Looks for `thesaurus-<role_name>.json`.
+pub fn discover_thesaurus(dir: &Path, role_name: &str) -> Option<PathBuf> {
+    let filename = format!("thesaurus-{}.json", role_name);
+    let path = dir.join(&filename);
+    if path.is_file() { Some(path) } else { None }
+}
+
+/// Find the KG directory within `.terraphim/`.
+///
+/// Looks for `.terraphim/kg/` (top-level) or `.terraphim/kg/<role_name>/` (role-specific).
+pub fn discover_kg_path(dir: &Path, role_name: Option<&str>) -> Option<PathBuf> {
+    if let Some(name) = role_name {
+        let role_kg = dir.join("kg").join(name);
+        if role_kg.is_dir() {
+            return Some(role_kg);
+        }
+    }
+    let kg_dir = dir.join("kg");
+    if kg_dir.is_dir() { Some(kg_dir) } else { None }
 }
 
 pub fn discover(start_dir: Option<&Path>) -> Result<Option<PathBuf>, ProjectDiscoveryError> {
@@ -176,5 +275,239 @@ mod tests {
         let canonical = std::fs::canonicalize(real.join(".terraphim")).unwrap();
         let result = discover(Some(&linked.join("src"))).unwrap();
         assert_eq!(result, Some(canonical));
+    }
+
+    fn minimal_role_json(name: &str) -> String {
+        format!(
+            r#"{{"shortname":"{}","name":"{}","relevance_function":"title-scorer","terraphim_it":false,"theme":"default","haystacks":[]}}"#,
+            name, name
+        )
+    }
+
+    #[test]
+    fn test_load_from_dir_reads_role_files() {
+        let temp = TempDir::new().unwrap();
+        let dir = temp.path().join(".terraphim");
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(dir.join("role-devops.json"), minimal_role_json("DevOps")).unwrap();
+        fs::write(
+            dir.join("role-rust-engineer.json"),
+            minimal_role_json("Rust Engineer"),
+        )
+        .unwrap();
+
+        let config = ProjectConfig::load_from_dir(&dir).unwrap();
+        assert_eq!(config.roles.len(), 2);
+        assert!(config.roles.contains_key("devops"));
+        assert!(config.roles.contains_key("rust-engineer"));
+    }
+
+    #[test]
+    fn test_load_from_dir_merges_with_config_json() {
+        let temp = TempDir::new().unwrap();
+        let dir = temp.path().join(".terraphim");
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(
+            dir.join("config.json"),
+            r#"{"global_shortcut":"Ctrl+T","roles":{}}"#,
+        )
+        .unwrap();
+        fs::write(dir.join("role-devops.json"), minimal_role_json("DevOps")).unwrap();
+
+        let config = ProjectConfig::load_from_dir(&dir).unwrap();
+        assert_eq!(config.global_shortcut, Some("Ctrl+T".to_string()));
+        assert_eq!(config.roles.len(), 1);
+        assert!(config.roles.contains_key("devops"));
+    }
+
+    #[test]
+    fn test_load_from_dir_empty_is_ok() {
+        let temp = TempDir::new().unwrap();
+        let dir = temp.path().join(".terraphim");
+        fs::create_dir_all(&dir).unwrap();
+
+        let config = ProjectConfig::load_from_dir(&dir).unwrap();
+        assert!(config.roles.is_empty());
+    }
+
+    #[test]
+    fn test_project_config_is_empty_with_no_roles_or_shortcut() {
+        let config = ProjectConfig::default();
+        assert!(config.is_empty());
+    }
+
+    #[test]
+    fn test_project_config_is_not_empty_with_shortcut_only() {
+        let config = ProjectConfig {
+            global_shortcut: Some("Ctrl+T".to_string()),
+            ..Default::default()
+        };
+        assert!(!config.is_empty());
+    }
+
+    #[test]
+    fn test_resolve_role_prefers_explicit_role() {
+        let mut config = ProjectConfig::default();
+        config.roles.insert(
+            "devops".to_string(),
+            serde_json::from_str(&minimal_role_json("DevOps")).unwrap(),
+        );
+
+        let role = config.resolve_role_name(Some("rust-engineer")).unwrap();
+        assert_eq!(role, Some("rust-engineer".to_string()));
+    }
+
+    #[test]
+    fn test_resolve_role_uses_single_project_role() {
+        let mut config = ProjectConfig::default();
+        config.roles.insert(
+            "devops".to_string(),
+            serde_json::from_str(&minimal_role_json("DevOps")).unwrap(),
+        );
+
+        let role = config.resolve_role_name(None).unwrap();
+        assert_eq!(role, Some("devops".to_string()));
+    }
+
+    #[test]
+    fn test_resolve_role_uses_selected_role_when_present() {
+        let mut config = ProjectConfig {
+            selected_role: Some("rust-engineer".to_string()),
+            ..Default::default()
+        };
+        config.roles.insert(
+            "devops".to_string(),
+            serde_json::from_str(&minimal_role_json("DevOps")).unwrap(),
+        );
+        config.roles.insert(
+            "rust-engineer".to_string(),
+            serde_json::from_str(&minimal_role_json("Rust Engineer")).unwrap(),
+        );
+
+        let role = config.resolve_role_name(None).unwrap();
+        assert_eq!(role, Some("rust-engineer".to_string()));
+    }
+
+    #[test]
+    fn test_resolve_role_uses_default_role_when_present() {
+        let mut config = ProjectConfig {
+            default_role: Some("devops".to_string()),
+            ..Default::default()
+        };
+        config.roles.insert(
+            "devops".to_string(),
+            serde_json::from_str(&minimal_role_json("DevOps")).unwrap(),
+        );
+        config.roles.insert(
+            "rust-engineer".to_string(),
+            serde_json::from_str(&minimal_role_json("Rust Engineer")).unwrap(),
+        );
+
+        let role = config.resolve_role_name(None).unwrap();
+        assert_eq!(role, Some("devops".to_string()));
+    }
+
+    #[test]
+    fn test_resolve_role_ambiguous_multi_role_without_default() {
+        let mut config = ProjectConfig::default();
+        config.roles.insert(
+            "devops".to_string(),
+            serde_json::from_str(&minimal_role_json("DevOps")).unwrap(),
+        );
+        config.roles.insert(
+            "rust-engineer".to_string(),
+            serde_json::from_str(&minimal_role_json("Rust Engineer")).unwrap(),
+        );
+
+        let err = config.resolve_role_name(None).unwrap_err();
+        assert!(matches!(err, ProjectDiscoveryError::AmbiguousRole { .. }));
+    }
+
+    #[test]
+    fn test_discover_thesaurus_found() {
+        let temp = TempDir::new().unwrap();
+        let dir = temp.path().join(".terraphim");
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(dir.join("thesaurus-devops.json"), "{}").unwrap();
+
+        let result = discover_thesaurus(&dir, "devops");
+        assert_eq!(result, Some(dir.join("thesaurus-devops.json")));
+    }
+
+    #[test]
+    fn test_discover_thesaurus_not_found() {
+        let temp = TempDir::new().unwrap();
+        let dir = temp.path().join(".terraphim");
+        fs::create_dir_all(&dir).unwrap();
+
+        let result = discover_thesaurus(&dir, "devops");
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_discover_kg_path_found() {
+        let temp = TempDir::new().unwrap();
+        let dir = temp.path().join(".terraphim");
+        fs::create_dir_all(dir.join("kg")).unwrap();
+
+        let result = discover_kg_path(&dir, None);
+        assert_eq!(result, Some(dir.join("kg")));
+    }
+
+    #[test]
+    fn test_discover_kg_path_role_specific() {
+        let temp = TempDir::new().unwrap();
+        let dir = temp.path().join(".terraphim");
+        fs::create_dir_all(dir.join("kg").join("devops")).unwrap();
+
+        let result = discover_kg_path(&dir, Some("devops"));
+        assert_eq!(result, Some(dir.join("kg").join("devops")));
+    }
+
+    #[test]
+    fn test_discover_kg_path_not_found() {
+        let temp = TempDir::new().unwrap();
+        let dir = temp.path().join(".terraphim");
+        fs::create_dir_all(&dir).unwrap();
+
+        let result = discover_kg_path(&dir, None);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_actual_terraphim_role_configs_parse() {
+        let project_dir = std::path::PathBuf::from("../../.terraphim");
+        if !project_dir.is_dir() {
+            return; // Skip if not running from workspace root
+        }
+        let config = ProjectConfig::load_from_dir(&project_dir).unwrap();
+        assert!(
+            config.roles.contains_key("devops"),
+            "devops role should be present"
+        );
+        assert!(
+            config.roles.contains_key("rust-engineer"),
+            "rust-engineer role should be present"
+        );
+        assert!(
+            config.roles.contains_key("ai-engineer"),
+            "ai-engineer role should be present"
+        );
+
+        // Verify each role has TerraphimGraph relevance function
+        for (name, role) in &config.roles {
+            assert_eq!(
+                role.relevance_function,
+                crate::RelevanceFunction::TerraphimGraph,
+                "role {} should use TerraphimGraph",
+                name
+            );
+            assert_eq!(
+                role.haystacks.len(),
+                2,
+                "role {} should have 2 haystacks",
+                name
+            );
+        }
     }
 }

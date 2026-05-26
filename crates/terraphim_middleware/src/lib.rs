@@ -30,7 +30,7 @@ pub mod learning_query;
 pub mod feedback_loop;
 
 pub use haystack::QueryRsHaystackIndexer;
-pub use indexer::{search_haystacks, RipgrepIndexer};
+pub use indexer::{search_haystacks, FffIndexer, RipgrepIndexer};
 
 // #[cfg(test)]
 // mod tests; // Removed - no tests module
@@ -64,6 +64,9 @@ pub enum Error {
 
     #[error("Validation error: {0}")]
     Validation(String),
+
+    #[error("File search error: {0}")]
+    FileSearch(String),
 }
 
 /// Convenience alias for `Result<T, Error>` used throughout this crate.

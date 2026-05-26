@@ -2,10 +2,14 @@
 name = "haystack_core"
 version.workspace = true
 edition.workspace = true
-authors = ["Terraphim"]
+authors = ["Terraphim <team@terraphim.ai>"]
 description = "Core traits and types for Terraphim haystack integrations"
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
 license = "MIT"
 repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["ai", "haystack", "core", "traits", "integrations"]
+readme = "../../README.md"
 
 [dependencies]
 terraphim_types = { path = "../terraphim_types", version = "1.0.0" }

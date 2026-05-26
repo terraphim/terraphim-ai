@@ -3,7 +3,12 @@ name = "haystack_jmap"
 version = "1.19.2"
 edition.workspace = true
 description = "JMAP haystack provider for Terraphim AI"
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
+repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["ai", "jmap", "haystack", "email", "search"]
 license = "MIT"
+readme = "../../README.md"
 
 [dependencies]
 haystack_core = { path = "../haystack_core", version = "1.19.3" }

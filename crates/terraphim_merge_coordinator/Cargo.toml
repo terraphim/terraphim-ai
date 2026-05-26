@@ -2,6 +2,13 @@
 name = "terraphim_merge_coordinator"
 version.workspace = true
 edition.workspace = true
+description = "Merge coordinator for Terraphim AI - coordinates code merge operations"
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
+repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["ai", "merge", "git", "coordination"]
+license = "Apache-2.0"
+readme = "../../README.md"
 
 [dependencies]
 thiserror.workspace = true

@@ -2,9 +2,14 @@
 name = "terraphim-firecracker"
 version = "1.19.2"
 edition.workspace = true
-authors = ["Terraphim AI Team"]
+authors = ["Terraphim AI Team <team@terraphim.ai>"]
 description = "Sub-2 second VM boot optimization system for Terraphim AI coding assistant"
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
+repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["ai", "firecracker", "vm", "sandbox", "coding-assistant"]
 license = "AGPL-3.0-or-later"
+readme = "../README.md"
 
 [lib]
 name = "terraphim_firecracker"

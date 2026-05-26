@@ -3,7 +3,12 @@ name = "terraphim_codebase_eval"
 version.workspace = true
 edition.workspace = true
 description = "Manifest types and loaders for AI-agent codebase evaluation"
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
+repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["ai", "codebase", "evaluation", "manifest", "agent"]
 license = "MIT"
+readme = "../../README.md"
 
 [dependencies]
 serde = { workspace = true, features = ["derive"] }

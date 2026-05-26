@@ -7,7 +7,9 @@ description = "Shared auto-update functionality for Terraphim AI binaries"
 documentation = "https://terraphim.ai"
 homepage = "https://terraphim.ai"
 repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["ai", "auto-update", "self-update", "binary", "release"]
 license = "Apache-2.0"
+readme = "../../README.md"
 
 [dependencies]
 anyhow = { workspace = true }
