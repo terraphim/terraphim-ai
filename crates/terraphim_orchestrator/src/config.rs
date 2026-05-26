@@ -224,6 +224,9 @@ pub struct OrchestratorConfig {
     /// Gitea skill repository configuration for loading skills from a remote repo.
     #[serde(default)]
     pub gitea_skill_repo: Option<GiteaSkillRepoConfig>,
+    /// Direct dispatch configuration for Unix domain socket access by adf-ctl.
+    #[serde(default)]
+    pub direct_dispatch: Option<DirectDispatchConfig>,
 }
 
 /// Configuration for loading skills from a Gitea repository.
@@ -607,6 +610,31 @@ impl std::fmt::Debug for WebhookConfig {
 
 fn default_webhook_bind() -> String {
     "127.0.0.1:9090".to_string()
+}
+
+/// Configuration for direct dispatch via Unix domain socket.
+///
+/// When present, the orchestrator listens on the specified Unix domain socket
+/// and accepts JSON dispatch commands from `adf-ctl --local trigger --direct`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DirectDispatchConfig {
+    /// Path to the Unix domain socket.  Defaults to `/tmp/adf-ctl.sock`.
+    #[serde(default = "DirectDispatchConfig::default_socket_path")]
+    pub socket_path: PathBuf,
+}
+
+impl Default for DirectDispatchConfig {
+    fn default() -> Self {
+        Self {
+            socket_path: Self::default_socket_path(),
+        }
+    }
+}
+
+impl DirectDispatchConfig {
+    fn default_socket_path() -> PathBuf {
+        PathBuf::from("/tmp/adf-ctl.sock")
+    }
 }
 
 /// Quickwit log shipping configuration.

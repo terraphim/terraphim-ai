@@ -86,6 +86,7 @@ fn minimal_config(working_dir: PathBuf) -> OrchestratorConfig {
         pr_dispatch: None,
         pr_dispatch_per_project: Default::default(),
         gitea_skill_repo: None,
+        direct_dispatch: None,
         gate_reconcile_interval_ticks: 20,
     }
 }

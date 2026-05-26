@@ -10,7 +10,7 @@ use hmac::{Hmac, Mac};
 use jiff::Timestamp;
 use serde::Serialize;
 use sha2::Sha256;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus, Stdio};
 
@@ -68,6 +68,10 @@ enum AdfSub {
         /// Timeout in seconds when --wait is used
         #[arg(long, default_value_t = DEFAULT_WAIT_TIMEOUT_SECS)]
         timeout: u64,
+        /// Dispatch directly via Unix domain socket (local mode only).
+        /// Bypasses HTTP webhook and HMAC verification.
+        #[arg(long, default_value_t = false)]
+        direct: bool,
     },
     /// Show running agents and recent exits [best-effort via SSH or local]
     Status {
@@ -115,6 +119,7 @@ fn run(local: bool, sub: AdfSub) -> Result<()> {
             secret,
             wait,
             timeout,
+            direct,
         } => {
             let resolved_endpoint = resolve_endpoint(local, endpoint.as_deref());
             cmd_trigger(
@@ -126,6 +131,7 @@ fn run(local: bool, sub: AdfSub) -> Result<()> {
                 secret.as_deref(),
                 wait,
                 timeout,
+                direct,
             )
         }
         AdfSub::Status {
@@ -307,6 +313,97 @@ fn local_run(cmd: &str) -> Result<(String, String, i32)> {
     Ok((stdout, stderr, code))
 }
 
+// --- Direct dispatch via Unix domain socket ---
+
+const DEFAULT_SOCKET_PATH: &str = "/tmp/adf-ctl.sock";
+
+/// Resolve the Unix domain socket path for direct dispatch.
+///
+/// Search order:
+/// 1. `ADF_DIRECT_SOCKET` environment variable
+/// 2. `socket_path` field in `.terraphim/adf.toml`
+/// 3. `ADF_ORCHESTRATOR_TOML` env var / default orchestrator.toml → `direct_dispatch.socket_path`
+/// 4. Default: `/tmp/adf-ctl.sock`
+fn resolve_socket_path() -> Result<PathBuf> {
+    if let Ok(p) = std::env::var("ADF_DIRECT_SOCKET") {
+        if !p.is_empty() {
+            return Ok(PathBuf::from(p));
+        }
+    }
+    if let Some(config_path) = discover_local_config() {
+        if let Some(path) = parse_socket_path_from_toml(&config_path) {
+            return Ok(path);
+        }
+    }
+    if let Ok(orch_path) = std::env::var("ADF_ORCHESTRATOR_TOML") {
+        if !orch_path.is_empty() {
+            if let Some(path) = parse_socket_path_from_toml(Path::new(&orch_path)) {
+                return Ok(path);
+            }
+        }
+    }
+    let orch_toml = Path::new("/opt/ai-dark-factory/orchestrator.toml");
+    if let Some(path) = parse_socket_path_from_toml(orch_toml) {
+        return Ok(path);
+    }
+    Ok(PathBuf::from(DEFAULT_SOCKET_PATH))
+}
+
+/// Parse `socket_path` from a TOML file's `[direct_dispatch]` section.
+fn parse_socket_path_from_toml(path: &Path) -> Option<PathBuf> {
+    let content = std::fs::read_to_string(path).ok()?;
+    let parsed: toml::Value = toml::from_str(&content).ok()?;
+    let socket = parsed.get("direct_dispatch")?.get("socket_path")?;
+    socket.as_str().map(PathBuf::from)
+}
+
+/// Send a dispatch command to the orchestrator via Unix domain socket.
+/// Returns `Ok(())` on success, `Err` with descriptive message on failure.
+fn direct_dispatch_via_socket(
+    socket_path: &Path,
+    agent_name: &str,
+    context: Option<&str>,
+) -> Result<()> {
+    let payload = serde_json::json!({
+        "agent": agent_name,
+        "context": context.filter(|c| !c.is_empty()),
+    });
+
+    let mut stream = std::os::unix::net::UnixStream::connect(socket_path)
+        .with_context(|| format!("failed to connect to {}", socket_path.display()))?;
+
+    // Send newline-terminated JSON.
+    writeln!(stream, "{}", payload.to_string())
+        .context("failed to write to direct dispatch socket")?;
+
+    // Read response.
+    let mut response = String::new();
+    stream
+        .read_to_string(&mut response)
+        .context("failed to read from direct dispatch socket")?;
+
+    let response: serde_json::Value = serde_json::from_str(response.trim())
+        .with_context(|| format!("invalid JSON from orchestrator: {}", response))?;
+
+    match response.get("status").and_then(|s| s.as_str()) {
+        Some("ok") => {
+            println!("Agent dispatched via direct socket: {}", agent_name);
+            println!("Monitor: journalctl -u adf-orchestrator -f");
+            Ok(())
+        }
+        Some("error") => {
+            let msg = response
+                .get("message")
+                .and_then(|m| m.as_str())
+                .unwrap_or("unknown error");
+            bail!("Direct dispatch error: {}", msg);
+        }
+        _ => {
+            bail!("Unexpected direct dispatch response: {}", response);
+        }
+    }
+}
+
 // --- Subcommand implementations ---
 
 #[allow(clippy::too_many_arguments)]
@@ -319,10 +416,29 @@ fn cmd_trigger(
     secret: Option<&str>,
     wait: bool,
     timeout: u64,
+    direct: bool,
 ) -> Result<()> {
+    if direct && !local {
+        anyhow::bail!("--direct requires --local");
+    }
+
     if local {
         println!("[local mode]");
     }
+
+    if direct {
+        let socket_path = resolve_socket_path()?;
+        direct_dispatch_via_socket(&socket_path, name, Some(context))?;
+        if wait {
+            println!(
+                "Waiting for agent '{}' to complete (timeout: {}s)...",
+                name, timeout
+            );
+            wait_for_agent_exit(local, name, host, timeout)?;
+        }
+        return Ok(());
+    }
+
     let secret = resolve_secret(local, secret, host)?;
     let payload = build_payload(name, context);
     let sig = sign_payload(&secret, payload.as_bytes());
@@ -1013,5 +1129,61 @@ mod tests {
         .unwrap();
         let names = parse_agent_names_from_toml(&path).unwrap();
         assert_eq!(names, vec!["test-agent", "other-agent"]);
+    }
+
+    #[test]
+    fn test_trigger_direct_requires_local() {
+        let result = cmd_trigger(
+            false,
+            "meta-learning",
+            "",
+            "localhost",
+            "http://localhost:9090/webhook",
+            None,
+            false,
+            60,
+            true,
+        );
+        assert!(result.is_err(), "direct without local should fail");
+        let err = result.unwrap_err();
+        assert!(
+            err.to_string().contains("--direct requires --local"),
+            "error message should mention --direct requires --local: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_parse_socket_path_from_toml() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("orchestrator.toml");
+        std::fs::write(
+            &path,
+            "[direct_dispatch]\nsocket_path = \"/var/run/adf-ctl.sock\"\n",
+        )
+        .unwrap();
+        let result = super::parse_socket_path_from_toml(&path);
+        assert_eq!(
+            result,
+            Some(std::path::PathBuf::from("/var/run/adf-ctl.sock"))
+        );
+    }
+
+    #[test]
+    fn test_parse_socket_path_from_toml_missing_section() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("orchestrator.toml");
+        std::fs::write(&path, "agents = []\n").unwrap();
+        let result = super::parse_socket_path_from_toml(&path);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_parse_socket_path_from_toml_missing_field() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("orchestrator.toml");
+        std::fs::write(&path, "[direct_dispatch]\nother_field = \"value\"\n").unwrap();
+        let result = super::parse_socket_path_from_toml(&path);
+        assert_eq!(result, None);
     }
 }

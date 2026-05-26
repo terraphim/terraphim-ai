@@ -228,8 +228,8 @@ pub fn parse_pi_rust_line(line: &str, session_id: &str, model: &str) -> ParsedOu
 
     match event_type {
         "turn_end" => parse_pi_rust_turn_end(&value, session_id, model),
-        "session" | "agent_start" | "agent_end" | "message_start"
-        | "message_end" | "message_update" | "turn_start" => ParsedOutput::Ignored,
+        "session" | "agent_start" | "agent_end" | "message_start" | "message_end"
+        | "message_update" | "turn_start" => ParsedOutput::Ignored,
         _ => ParsedOutput::Ignored,
     }
 }
