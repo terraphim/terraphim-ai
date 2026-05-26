@@ -2,10 +2,14 @@
 name = "grepapp_haystack"
 version.workspace = true
 edition.workspace = true
-authors = ["Terraphim"]
+authors = ["Terraphim <team@terraphim.ai>"]
 description = "Grep.app integration for searching code across GitHub repositories"
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
 license = "MIT"
 repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["ai", "grep", "github", "code-search", "haystack"]
+readme = "../../README.md"
 
 [dependencies]
 haystack_core = { path = "../haystack_core", version = "1.19.2" }

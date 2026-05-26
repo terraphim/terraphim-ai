@@ -2,12 +2,15 @@
 name = "terraphim_validation"
 version = "0.1.0"
 edition.workspace = true
-authors = ["Terraphim AI Team"]
+authors = ["Terraphim AI Team <team@terraphim.ai>"]
 description = "Release validation system for Terraphim AI"
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/terraphim/terraphim-ai"
 keywords = ["validation", "release", "testing", "ci-cd"]
 categories = ["development-tools", "development-tools::testing"]
+readme = "../../README.md"
 
 [dependencies]
 # Core dependencies

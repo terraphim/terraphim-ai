@@ -2,8 +2,10 @@
 name = "terraphim_grep"
 version.workspace = true
 edition.workspace = true
-authors = ["Terraphim AI Team"]
+authors = ["Terraphim AI Team <team@terraphim.ai>"]
 description = "Intelligent hybrid grep with RLM fallback and KG curation"
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
 readme = "README.md"
 license = "MIT"
 repository = "https://github.com/terraphim/terraphim-ai"

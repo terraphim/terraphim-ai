@@ -2,5 +2,12 @@
 name = "terraphim_lsp"
 version = "0.1.0"
 edition = "2021"
+description = "Language Server Protocol (LSP) implementation for Terraphim AI"
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
+repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["ai", "lsp", "language-server", "ide"]
+license = "Apache-2.0"
+readme = "../../README.md"
 
 [dependencies]

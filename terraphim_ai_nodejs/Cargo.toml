@@ -2,7 +2,13 @@
 edition.workspace = true
 name = "terraphim_ai_nodejs"
 version = "1.19.2"
+description = "Node.js bindings for Terraphim AI"
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
+repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["ai", "nodejs", "bindings", "napi"]
 license = "MIT"
+readme = "../README.md"
 
 [lib]
 name = "terraphim_ai_nodejs"

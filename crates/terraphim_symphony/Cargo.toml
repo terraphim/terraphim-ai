@@ -2,10 +2,14 @@
 name = "terraphim_symphony"
 version = "1.13.0"
 edition = "2024"
-authors = ["Terraphim Team"]
+authors = ["Terraphim Team <team@terraphim.ai>"]
 description = "Symphony orchestration service - reads issues from trackers and dispatches coding agent sessions"
-license = "Apache-2.0"
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
 repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["ai", "orchestration", "agents", "coding", "workflow"]
+license = "Apache-2.0"
+readme = "../../README.md"
 
 [dependencies]
 tokio = { version = "1.0", features = ["full"] }

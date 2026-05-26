@@ -3,8 +3,13 @@ name = "terraphim_tinyclaw"
 version.workspace = true
 edition.workspace = true
 description = "Multi-channel AI assistant for Terraphim - Telegram, Discord, and CLI"
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
+repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["ai", "assistant", "telegram", "discord", "cli"]
 license = "MIT OR Apache-2.0"
 authors = ["Terraphim AI"]
+readme = "../../README.md"
 
 [[bin]]
 name = "terraphim-tinyclaw"

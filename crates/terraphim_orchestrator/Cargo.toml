@@ -2,10 +2,14 @@
 name = "terraphim_orchestrator"
 version = "1.8.0"
 edition = "2021"
-authors = ["Terraphim Team"]
+authors = ["Terraphim Team <team@terraphim.ai>"]
 description = "AI Dark Factory orchestrator wiring spawner, router, supervisor into a reconciliation loop"
-license = "Apache-2.0"
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
 repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["ai", "orchestrator", "agents", "dark-factory", "supervisor"]
+license = "Apache-2.0"
+readme = "../../README.md"
 
 [features]
 default = ["quickwit", "evolution"]

@@ -2,10 +2,14 @@
 name = "discourse_haystack"
 version = "1.0.0"
 edition.workspace = true
-authors = ["Terraphim"]
+authors = ["Terraphim <team@terraphim.ai>"]
 description = "A CLI client for fetching Discourse posts and messages"
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
 license = "MIT"
-repository = "https://github.com/terraphim/discourse_haystack"
+repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["ai", "discourse", "haystack", "cli", "posts"]
+readme = "../../README.md"
 
 [dependencies]
 haystack_core = { path = "../haystack_core" }

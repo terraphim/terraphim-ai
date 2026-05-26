@@ -3,7 +3,12 @@ name = "terraphim_test_utils"
 version.workspace = true
 edition.workspace = true
 description = "Shared test utilities for Terraphim crates"
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
+repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["ai", "testing", "utilities", "test-utils"]
 license = "MIT"
+readme = "../../README.md"
 
 [dependencies]
 
