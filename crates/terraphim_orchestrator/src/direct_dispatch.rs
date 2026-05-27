@@ -209,7 +209,53 @@ async fn write_response(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
+    use tokio::net::UnixStream;
+    use tokio::sync::mpsc;
+
+    #[cfg(unix)]
+    async fn wait_for_socket(path: &std::path::Path) {
+        use std::os::unix::fs::FileTypeExt;
+        for _ in 0..50 {
+            if path.exists()
+                && path
+                    .metadata()
+                    .map(|m| m.file_type().is_socket())
+                    .unwrap_or(false)
+            {
+                return;
+            }
+            tokio::task::yield_now().await;
+        }
+        panic!("socket was not created at {}", path.display());
+    }
+
+    #[cfg(unix)]
+    async fn send_command(path: &std::path::Path, json: &str) -> serde_json::Value {
+        let stream =
+            tokio::time::timeout(std::time::Duration::from_secs(2), UnixStream::connect(path))
+                .await
+                .expect("socket connect timed out")
+                .expect("socket connect failed");
+
+        let mut stream = tokio::io::BufReader::new(stream);
+        tokio::time::timeout(std::time::Duration::from_secs(2), async {
+            use tokio::io::{AsyncReadExt, AsyncWriteExt};
+            let stream = stream.get_mut();
+            stream
+                .write_all(json.as_bytes())
+                .await
+                .expect("write failed");
+            stream.write_all(b"\n").await.expect("newline failed");
+            let mut response = String::new();
+            stream
+                .read_to_string(&mut response)
+                .await
+                .expect("read failed");
+            serde_json::from_str(response.trim()).expect("invalid JSON response")
+        })
+        .await
+        .expect("send_command timed out")
+    }
 
     #[test]
     fn test_dispatch_command_deserialize() {
@@ -244,7 +290,6 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn test_remove_stale_socket_rejects_regular_file() {
-        use std::os::unix::fs::PermissionsExt;
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("not-a-socket.txt");
         std::fs::write(&path, "hello").unwrap();
@@ -286,5 +331,78 @@ mod tests {
             !valid_agents.contains(&cmd_unknown.agent),
             "unknown-agent should be rejected"
         );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn test_direct_dispatch_socket_valid_agent_round_trip() {
+        let dir = tempfile::tempdir().unwrap();
+        let socket_path = dir.path().join("adf.sock");
+        let (tx, mut rx) = mpsc::channel::<WebhookDispatch>(1);
+        let agent_names = ["meta-learning".to_string()].into_iter().collect();
+
+        let handle = start_direct_dispatch_listener(socket_path.clone(), tx, agent_names);
+        wait_for_socket(&socket_path).await;
+
+        let response = send_command(
+            &socket_path,
+            r#"{"agent":"meta-learning","context":"test"}"#,
+        )
+        .await;
+        assert_eq!(response["status"], "ok", "expected ok response");
+
+        let dispatch = tokio::time::timeout(std::time::Duration::from_secs(2), rx.recv())
+            .await
+            .expect("dispatch receive timed out")
+            .expect("dispatch channel closed");
+
+        match dispatch {
+            WebhookDispatch::SpawnAgent {
+                agent_name,
+                context,
+                issue_number,
+                comment_id,
+                ..
+            } => {
+                assert_eq!(agent_name, "meta-learning");
+                assert_eq!(context, "test");
+                assert_eq!(issue_number, 0);
+                assert_eq!(comment_id, 0);
+            }
+            other => panic!("unexpected dispatch: {other:?}"),
+        }
+
+        handle.abort();
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn test_direct_dispatch_socket_unknown_agent_returns_error() {
+        let dir = tempfile::tempdir().unwrap();
+        let socket_path = dir.path().join("adf.sock");
+        let (tx, mut rx) = mpsc::channel::<WebhookDispatch>(1);
+        let agent_names = ["meta-learning".to_string()].into_iter().collect();
+
+        let handle = start_direct_dispatch_listener(socket_path.clone(), tx, agent_names);
+        wait_for_socket(&socket_path).await;
+
+        let response = send_command(&socket_path, r#"{"agent":"unknown-agent"}"#).await;
+        assert_eq!(
+            response["status"], "error",
+            "expected error response for unknown agent"
+        );
+        assert!(
+            response["message"]
+                .as_str()
+                .unwrap()
+                .contains("unknown agent"),
+            "error message should mention unknown agent"
+        );
+        assert!(
+            rx.try_recv().is_err(),
+            "unknown agent must not emit a dispatch"
+        );
+
+        handle.abort();
     }
 }
