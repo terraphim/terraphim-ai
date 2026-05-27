@@ -8504,6 +8504,58 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_handle_direct_dispatch_rejects_disabled_agent() {
+        let mut config = test_config();
+        config.agents = vec![AgentDefinition {
+            name: "disabled-agent".to_string(),
+            layer: AgentLayer::Core,
+            cli_tool: "echo".to_string(),
+            task: "echo hello".to_string(),
+            schedule: None,
+            model: None,
+            capabilities: vec!["echo".to_string()],
+            max_memory_bytes: None,
+            budget_monthly_cents: None,
+            provider: None,
+            persona: None,
+            terraphim_role: None,
+            skill_chain: vec![],
+            sfia_skills: vec![],
+            fallback_provider: None,
+            fallback_model: None,
+            grace_period_secs: None,
+            max_cpu_seconds: None,
+            pre_check: None,
+            gitea_issue: None,
+            event_only: false,
+            evolution_enabled: false,
+            rlm_enabled: None,
+            bypass_kg_routing: false,
+            enabled: false,
+            project: None,
+        }];
+        config.mentions = None;
+
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        let dispatch = webhook::WebhookDispatch::SpawnAgent {
+            agent_name: "disabled-agent".to_string(),
+            detected_project: None,
+            issue_number: 0,
+            comment_id: 0,
+            context: String::new(),
+        };
+
+        orch.handle_direct_dispatch(dispatch).await;
+
+        assert!(
+            !orch.active_agents.contains_key("disabled-agent"),
+            "direct dispatch must not spawn disabled agent; active_agents: {:?}",
+            orch.active_agents.keys().collect::<Vec<_>>()
+        );
+    }
+
+    #[tokio::test]
     async fn test_orchestrator_compound_review_manual() {
         // Use empty groups to avoid git worktree operations during test.
         // Worktree creation fails when git index is locked (e.g. pre-commit hooks).
