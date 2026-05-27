@@ -180,14 +180,16 @@ jobs:
       - name: Setup zig for cross builds
         if: matrix.use_cross
         run: |
-          # Mount bigbox's zig binary and lib into cross containers
-          # Bigbox has zig 0.16.0 installed at /usr/local/bin/zig
-          ZIG_OPTS="-v /usr/local/bin/zig:/usr/local/bin/zig"
-          if [ -d /usr/local/lib/zig ]; then
-            ZIG_OPTS="$ZIG_OPTS -v /usr/local/lib/zig:/usr/local/lib/zig"
-          fi
-          echo "CROSS_CONTAINER_OPTS=$ZIG_OPTS -e ZIG=/usr/local/bin/zig" >> $GITHUB_ENV
-          echo "ZIG=/usr/local/bin/zig" >> $GITHUB_ENV
+          # Mount bigbox's zig installation into cross containers
+          # Bigbox has zig 0.16.0 installed at /usr/local/zig-x86_64-linux-0.16.0/
+          ZIG_INSTALL="/usr/local/zig-x86_64-linux-0.16.0"
+          ZIG_BIN="$ZIG_INSTALL/zig"
+          ZIG_OPTS="-v $ZIG_INSTALL:$ZIG_INSTALL"
+          ZIG_OPTS="$ZIG_OPTS -e ZIG=$ZIG_BIN"
+          ZIG_OPTS="$ZIG_OPTS -e ZIG_GLOBAL_CACHE_DIR=/tmp/zig-global-cache"
+          ZIG_OPTS="$ZIG_OPTS -e ZIG_LOCAL_CACHE_DIR=/tmp/zig-local-cache"
+          echo "CROSS_CONTAINER_OPTS=$ZIG_OPTS" >> $GITHUB_ENV
+          echo "ZIG=$ZIG_BIN" >> $GITHUB_ENV
 
       - name: Cache dependencies
         if: matrix.target != 'x86_64-unknown-linux-gnu'
