@@ -284,6 +284,7 @@ fn run_agent(sub_args: Vec<String>) -> ExitCode {
                 pr_dispatch: adf_config.pr_dispatch,
                 pr_dispatch_per_project: std::collections::HashMap::new(),
                 gitea_skill_repo: None,
+                direct_dispatch: None,
             };
 
             config.substitute_env_vars();
@@ -387,6 +388,7 @@ fn run_agent(sub_args: Vec<String>) -> ExitCode {
                 pr_dispatch: adf_config.pr_dispatch,
                 pr_dispatch_per_project: std::collections::HashMap::new(),
                 gitea_skill_repo: None,
+                direct_dispatch: None,
             };
 
             config.substitute_env_vars();
@@ -509,6 +511,7 @@ fn run_local_check(cwd: PathBuf) -> ExitCode {
         pr_dispatch: adf_config.pr_dispatch,
         pr_dispatch_per_project: std::collections::HashMap::new(),
         gitea_skill_repo: None,
+        direct_dispatch: None,
     };
 
     config.substitute_env_vars();
@@ -628,6 +631,7 @@ async fn run_local_agent(agent_name: &str, cwd: PathBuf) -> ExitCode {
         pr_dispatch: adf_config.pr_dispatch,
         pr_dispatch_per_project: std::collections::HashMap::new(),
         gitea_skill_repo: None,
+        direct_dispatch: None,
     };
 
     config.substitute_env_vars();

@@ -39,6 +39,7 @@ pub mod config;
 pub mod control_plane;
 pub mod cost_tracker;
 pub mod dispatcher;
+pub mod direct_dispatch;
 pub mod dual_mode;
 pub mod error;
 pub mod error_signatures;
@@ -8281,6 +8282,7 @@ mod tests {
             evolution: config::EvolutionConfig::default(),
             pr_dispatch: None,
             pr_dispatch_per_project: Default::default(),
+            direct_dispatch: None,
         }
     }
 
@@ -8603,6 +8605,7 @@ task = "test"
             evolution: config::EvolutionConfig::default(),
             pr_dispatch: None,
             pr_dispatch_per_project: Default::default(),
+            direct_dispatch: None,
         }
     }
 
@@ -9644,6 +9647,7 @@ bypass_kg_routing = true
             evolution: config::EvolutionConfig::default(),
             pr_dispatch: None,
             pr_dispatch_per_project: Default::default(),
+            direct_dispatch: None,
         };
         (config, tmp)
     }
