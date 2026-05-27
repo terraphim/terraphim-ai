@@ -97,8 +97,8 @@ jobs:
   build-binaries:
     name: Build binaries for ${{ matrix.target }}
     needs: verify-versions
-    # Allow build to continue even if version check failed - use fallback version
-    if: always()
+    # Only build if version verification passed
+    if: needs.verify-versions.result == 'success'
     strategy:
       fail-fast: false
       matrix:
@@ -118,11 +118,12 @@ jobs:
           - os: [self-hosted, bigbox]
             target: armv7-unknown-linux-musleabihf
             use_cross: true
-          # macOS builds
+          # macOS builds -- both run on self-hosted Apple Silicon Mac
+          # (has zig installed for zlob dependency, can build both architectures)
           - os: [self-hosted, macOS]
             target: x86_64-apple-darwin
             use_cross: false
-          - os: macos-14
+          - os: [self-hosted, macOS]
             target: aarch64-apple-darwin
             use_cross: false
           # Windows builds
@@ -151,6 +152,19 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
+
+      - name: Install zig (required by zlob dependency)
+        if: contains(matrix.target, 'apple-darwin')
+        run: |
+          if ! command -v zig &>/dev/null; then
+            if command -v brew &>/dev/null; then
+              brew install zig
+            else
+              echo "Neither zig nor brew found. Please install zig."
+              exit 1
+            fi
+          fi
+          zig version
 
       - name: Install cross
         if: matrix.use_cross
@@ -340,8 +354,8 @@ jobs:
   create-universal-macos:
     name: Create macOS universal binaries
     needs: build-binaries
-    # Run even if some build jobs failed, as long as macOS builds succeeded
-    if: always()
+    # Only run if both macOS builds succeeded
+    if: needs.build-binaries.result == 'success'
     runs-on: [self-hosted, macOS]
     steps:
       - name: Download x86_64 macOS binaries
@@ -400,7 +414,7 @@ jobs:
     name: Sign and notarize macOS binaries
     needs: create-universal-macos
     # Only run if universal binaries were created successfully
-    if: always() && needs.create-universal-macos.result == 'success'
+    if: needs.create-universal-macos.result == 'success'
     runs-on: [self-hosted, macOS]
     steps:
       - name: Checkout repository
@@ -592,11 +606,65 @@ jobs:
       test_run: ${{ inputs.test_run || false }}
     secrets: inherit  # pragma: allowlist secret
 
+  verify-release-assets:
+    name: Verify release assets
+    needs: [build-binaries, sign-and-notarize-macos, build-debian-packages]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Download all binary artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: binaries-*
+          path: all-binaries
+          merge-multiple: true
+        continue-on-error: true
+
+      - name: Verify expected macOS assets exist
+        env:
+          VERSION: ${{ needs.verify-versions.outputs.version }}
+        run: |
+          echo "Downloaded artifacts:"
+          find all-binaries -type f 2>/dev/null | sort || true
+          echo ""
+
+          # Critical macOS assets that must exist for auto-update to work
+          CRITICAL_ASSETS=(
+            "terraphim-agent-x86_64-apple-darwin"
+            "terraphim-agent-aarch64-apple-darwin"
+            "terraphim-agent-universal-apple-darwin"
+            "terraphim-grep-x86_64-apple-darwin"
+            "terraphim-grep-aarch64-apple-darwin"
+            "terraphim-grep-universal-apple-darwin"
+          )
+
+          MISSING=0
+          for asset in "${CRITICAL_ASSETS[@]}"; do
+            if [ -f "all-binaries/$asset" ]; then
+              echo "  ✅ $asset"
+            else
+              echo "  ❌ MISSING: $asset"
+              MISSING=$((MISSING + 1))
+            fi
+          done
+
+          if [ $MISSING -gt 0 ]; then
+            echo ""
+            echo "❌ Verification failed: $MISSING critical macOS assets are missing"
+            echo "This will break auto-update for macOS users. Aborting release."
+            exit 1
+          fi
+
+          echo ""
+          echo "✅ All critical macOS assets verified"
+
   create-release:
     name: Create GitHub release
-    needs: [build-binaries, sign-and-notarize-macos, build-debian-packages]
-    # Run even if some jobs failed - release whatever was built successfully
-    if: always() && (needs.sign-and-notarize-macos.result == 'success' || needs.build-binaries.result == 'success' || needs.build-debian-packages.result == 'success')
+    needs: [verify-versions, verify-release-assets]
+    # Only create release if version verification and asset verification passed
+    if: success()
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -609,14 +677,16 @@ jobs:
         id: download
         with:
           pattern: binaries-*
-        continue-on-error: true
+          path: release-assets
+          merge-multiple: true
 
       - name: Download Debian package artifacts
         uses: actions/download-artifact@v4
         id: download_debian
         with:
           name: debian-packages
-        continue-on-error: true
+          path: release-assets
+          merge-multiple: true
 
       - name: Retry artifact download if needed
         if: steps.download.outcome == 'failure' || steps.download_debian.outcome == 'failure'
@@ -648,37 +718,8 @@ jobs:
 
       - name: Prepare release assets
         run: |
-          mkdir -p release-assets
-
-          # Copy binary artifacts - look for specific binary names since -executable
-          # doesn't work for cross-platform binaries downloaded as artifacts
-          for artifact_dir in binaries-*; do
-            if [ -d "$artifact_dir" ]; then
-              echo "Processing $artifact_dir..."
-              # Copy archive files (tar.gz, zip) for auto-update compatibility
-              find "$artifact_dir" -type f \( -name "*.tar.gz" -o -name "*.zip" \) | while read file; do
-                echo "  Copying archive: $file"
-                cp "$file" release-assets/
-              done
-              # Copy raw binaries for backward compatibility
-              find "$artifact_dir" -type f \( -name "terraphim*" -o -name "*.exe" \) | while read file; do
-                echo "  Copying binary: $file"
-                cp "$file" release-assets/
-              done
-            fi
-          done
-
-          # Copy Debian packages
-          if [ -d "debian-packages" ]; then
-            find debian-packages -name "*.deb" -type f | while read file; do
-              cp "$file" release-assets/
-            done
-          fi
-
-          # Note: Desktop artifacts are now built in terraphim-ai-desktop repo
-          # and released separately. See trigger-desktop-release job above.
-
-          # List all assets
+          # Artifacts are already downloaded to release-assets/ with merge-multiple
+          # Just verify everything is there
           echo "Release assets:"
           ls -la release-assets/
 
