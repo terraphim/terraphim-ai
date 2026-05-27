@@ -173,6 +173,22 @@ jobs:
         if: matrix.use_cross
         run: cargo install cross
 
+      - name: Clear cross custom images
+        if: matrix.use_cross
+        run: docker rmi $(docker images -q cross-custom-*) 2>/dev/null || true
+
+      - name: Setup zig for cross builds
+        if: matrix.use_cross
+        run: |
+          # Mount bigbox's zig binary and lib into cross containers
+          # Bigbox has zig 0.16.0 installed at /usr/local/bin/zig
+          ZIG_OPTS="-v /usr/local/bin/zig:/usr/local/bin/zig"
+          if [ -d /usr/local/lib/zig ]; then
+            ZIG_OPTS="$ZIG_OPTS -v /usr/local/lib/zig:/usr/local/lib/zig"
+          fi
+          echo "CROSS_CONTAINER_OPTS=$ZIG_OPTS -e ZIG=/usr/local/bin/zig" >> $GITHUB_ENV
+          echo "ZIG=/usr/local/bin/zig" >> $GITHUB_ENV
+
       - name: Cache dependencies
         if: matrix.target != 'x86_64-unknown-linux-gnu'
         uses: Swatinem/rust-cache@v2

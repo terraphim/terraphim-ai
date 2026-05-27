@@ -209,6 +209,7 @@ jobs:
           build-args: |
             UBUNTU_VERSION=${{ matrix.ubuntu-version }}
             RUST_VERSION=1.92.0
+          no-cache: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
           provenance: false
@@ -228,6 +229,7 @@ jobs:
           build-args: |
             UBUNTU_VERSION=${{ matrix.ubuntu-version }}
             RUST_VERSION=1.92.0
+          no-cache: true
           cache-from: type=gha
           provenance: false
           sbom: false
