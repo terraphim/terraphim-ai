@@ -10,7 +10,9 @@ use hmac::{Hmac, Mac};
 use jiff::Timestamp;
 use serde::Serialize;
 use sha2::Sha256;
-use std::io::{Read, Write};
+#[cfg(unix)]
+use std::io::Read;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus, Stdio};
 
@@ -315,15 +317,10 @@ fn local_run(cmd: &str) -> Result<(String, String, i32)> {
 
 // --- Direct dispatch via Unix domain socket ---
 
+#[cfg(unix)]
 const DEFAULT_SOCKET_PATH: &str = "/tmp/adf-ctl.sock";
 
-/// Resolve the Unix domain socket path for direct dispatch.
-///
-/// Search order:
-/// 1. `ADF_DIRECT_SOCKET` environment variable
-/// 2. `socket_path` field in `.terraphim/adf.toml`
-/// 3. `ADF_ORCHESTRATOR_TOML` env var / default orchestrator.toml → `direct_dispatch.socket_path`
-/// 4. Default: `/tmp/adf-ctl.sock`
+#[cfg(unix)]
 fn resolve_socket_path() -> Result<PathBuf> {
     if let Ok(p) = std::env::var("ADF_DIRECT_SOCKET") {
         if !p.is_empty() {
@@ -349,7 +346,7 @@ fn resolve_socket_path() -> Result<PathBuf> {
     Ok(PathBuf::from(DEFAULT_SOCKET_PATH))
 }
 
-/// Parse `socket_path` from a TOML file's `[direct_dispatch]` section.
+#[cfg(unix)]
 fn parse_socket_path_from_toml(path: &Path) -> Option<PathBuf> {
     let content = std::fs::read_to_string(path).ok()?;
     let parsed: toml::Value = toml::from_str(&content).ok()?;
@@ -357,8 +354,7 @@ fn parse_socket_path_from_toml(path: &Path) -> Option<PathBuf> {
     socket.as_str().map(PathBuf::from)
 }
 
-/// Send a dispatch command to the orchestrator via Unix domain socket.
-/// Returns `Ok(())` on success, `Err` with descriptive message on failure.
+#[cfg(unix)]
 fn direct_dispatch_via_socket(
     socket_path: &Path,
     agent_name: &str,
@@ -421,10 +417,16 @@ fn cmd_trigger(
         anyhow::bail!("--direct requires --local");
     }
 
+    #[cfg(not(unix))]
+    if direct {
+        anyhow::bail!("--direct dispatch requires Unix (UDS not available on this platform)");
+    }
+
     if local {
         println!("[local mode]");
     }
 
+    #[cfg(unix)]
     if direct {
         let socket_path = resolve_socket_path()?;
         direct_dispatch_via_socket(&socket_path, name, Some(context))?;
@@ -1152,6 +1154,7 @@ mod tests {
         );
     }
 
+    #[cfg(unix)]
     #[test]
     fn test_parse_socket_path_from_toml() {
         let dir = tempfile::tempdir().unwrap();
@@ -1168,6 +1171,7 @@ mod tests {
         );
     }
 
+    #[cfg(unix)]
     #[test]
     fn test_parse_socket_path_from_toml_missing_section() {
         let dir = tempfile::tempdir().unwrap();
@@ -1177,6 +1181,7 @@ mod tests {
         assert_eq!(result, None);
     }
 
+    #[cfg(unix)]
     #[test]
     fn test_parse_socket_path_from_toml_missing_field() {
         let dir = tempfile::tempdir().unwrap();

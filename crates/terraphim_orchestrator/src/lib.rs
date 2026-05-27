@@ -38,6 +38,7 @@ pub mod concurrency;
 pub mod config;
 pub mod control_plane;
 pub mod cost_tracker;
+#[cfg(unix)]
 pub mod direct_dispatch;
 pub mod dispatcher;
 pub mod dual_mode;
@@ -1261,12 +1262,18 @@ impl AgentOrchestrator {
             None
         };
 
+        #[cfg(unix)]
         let direct_dispatch_rx = if self.config.direct_dispatch.is_some() {
             let (tx, rx) = tokio::sync::mpsc::channel(64);
             Some((tx, rx))
         } else {
             None
         };
+        #[cfg(not(unix))]
+        let direct_dispatch_rx: Option<(
+            tokio::sync::mpsc::Sender<webhook::WebhookDispatch>,
+            tokio::sync::mpsc::Receiver<webhook::WebhookDispatch>,
+        )> = None;
 
         // Start webhook server if configured
         if let Some(ref webhook_cfg) = self.config.webhook {
@@ -1313,6 +1320,7 @@ impl AgentOrchestrator {
             });
         }
 
+        #[cfg(unix)]
         let direct_dispatch_rx = if let Some(ref direct_cfg) = self.config.direct_dispatch {
             let (direct_tx, direct_rx) = direct_dispatch_rx.expect(
                 "direct dispatch channel is initialised when direct_dispatch is configured",
@@ -1334,6 +1342,10 @@ impl AgentOrchestrator {
         } else {
             None
         };
+        #[cfg(not(unix))]
+        let direct_dispatch_rx: Option<
+            tokio::sync::mpsc::Receiver<webhook::WebhookDispatch>,
+        > = None;
 
         enum LoopEvent {
             Tick,

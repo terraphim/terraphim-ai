@@ -13,6 +13,8 @@ use tracing::{error, info};
 
 use crate::webhook::WebhookDispatch;
 
+const MAX_COMMAND_SIZE: u64 = 8192;
+
 /// JSON command received from adf-ctl over the Unix domain socket.
 #[derive(Debug, serde::Deserialize)]
 pub struct DispatchCommand {
@@ -149,12 +151,12 @@ async fn handle_connection(
     dispatch_tx: &tokio::sync::mpsc::Sender<WebhookDispatch>,
     agent_names: &HashSet<String>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    use tokio::io::AsyncBufReadExt;
+    use tokio::io::{AsyncBufReadExt, AsyncReadExt};
 
-    let mut reader = tokio::io::BufReader::new(stream);
+    let (read_half, write_half) = stream.into_split();
+    let mut reader = tokio::io::BufReader::new(read_half.take(MAX_COMMAND_SIZE));
     let mut line = String::new();
 
-    // Read one JSON line (adf-ctl sends a single JSON object terminated by newline).
     let bytes_read = reader.read_line(&mut line).await?;
     if bytes_read == 0 {
         return Ok(());
@@ -164,14 +166,14 @@ async fn handle_connection(
         Ok(cmd) => cmd,
         Err(e) => {
             let response = DispatchResponse::error(&format!("invalid JSON: {}", e));
-            write_response(&mut reader, response).await?;
+            write_response(write_half, response).await?;
             return Ok(());
         }
     };
 
     if !agent_names.contains(&cmd.agent) {
         let response = DispatchResponse::error(&format!("unknown agent: {}", cmd.agent));
-        write_response(&mut reader, response).await?;
+        write_response(write_half, response).await?;
         return Ok(());
     }
 
@@ -185,24 +187,23 @@ async fn handle_connection(
 
     if dispatch_tx.send(dispatch).await.is_err() {
         let response = DispatchResponse::error("orchestrator channel closed");
-        write_response(&mut reader, response).await?;
+        write_response(write_half, response).await?;
         return Ok(());
     }
 
     let response = DispatchResponse::ok();
-    write_response(&mut reader, response).await?;
+    write_response(write_half, response).await?;
     Ok(())
 }
 
 async fn write_response(
-    reader: &mut tokio::io::BufReader<tokio::net::UnixStream>,
+    mut writer: tokio::net::unix::OwnedWriteHalf,
     response: DispatchResponse,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     use tokio::io::AsyncWriteExt;
-    let stream = reader.get_mut();
     let json = serde_json::to_string(&response)?;
-    stream.write_all(json.as_bytes()).await?;
-    stream.write_all(b"\n").await?;
+    writer.write_all(json.as_bytes()).await?;
+    writer.write_all(b"\n").await?;
     Ok(())
 }
 
@@ -401,6 +402,46 @@ mod tests {
         assert!(
             rx.try_recv().is_err(),
             "unknown agent must not emit a dispatch"
+        );
+
+        handle.abort();
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn test_direct_dispatch_rejects_oversized_command() {
+        let dir = tempfile::tempdir().unwrap();
+        let socket_path = dir.path().join("adf.sock");
+        let (tx, _rx) = mpsc::channel::<WebhookDispatch>(1);
+        let agent_names = ["meta-learning".to_string()].into_iter().collect();
+
+        let handle = start_direct_dispatch_listener(socket_path.clone(), tx, agent_names);
+        wait_for_socket(&socket_path).await;
+
+        let oversized = "x".repeat(16384);
+        let stream = tokio::time::timeout(
+            std::time::Duration::from_secs(2),
+            tokio::net::UnixStream::connect(&socket_path),
+        )
+        .await
+        .expect("connect timed out")
+        .expect("connect failed");
+
+        use tokio::io::AsyncWriteExt;
+        let (_, mut write_half) = stream.into_split();
+        let _ = write_half.write_all(oversized.as_bytes()).await;
+        drop(write_half);
+
+        tokio::task::yield_now().await;
+
+        let response = send_command(
+            &socket_path,
+            r#"{"agent":"meta-learning","context":"after-oversize"}"#,
+        )
+        .await;
+        assert_eq!(
+            response["status"], "ok",
+            "listener must survive oversized input"
         );
 
         handle.abort();

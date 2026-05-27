@@ -47,6 +47,9 @@ releases/
 # Beads task database (local working state)
 .beads/
 
+# Learning capture artefacts (auto-generated, machine-local)
+.terraphim/learnings/
+
 # Nested crates directories (build artifacts)
 crates/**/crates/
 
