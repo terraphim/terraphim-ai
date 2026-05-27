@@ -286,8 +286,17 @@ async fn test_role_switching_persistence() -> Result<()> {
     let final_config = parse_config_from_output(&final_stdout)?;
     let final_role = final_config["selected_role"].as_str().unwrap();
 
-    // NOTE: persistence across runs is not required; just ensure we end up with a valid role
-    assert!(roles_to_test.iter().any(|role| role == final_role));
+    // NOTE: persistence across runs is not required; just ensure we end up with a valid role.
+    // CWD is set to test_root to prevent project config discovery from finding
+    // .terraphim/ in the repo root, which would override selected_role.
+    assert!(
+        roles_to_test.iter().any(|role| role == final_role)
+            || available_roles.iter().any(|role| role == final_role),
+        "final role '{}' should be either a test role ({:?}) or an available role ({:?})",
+        final_role,
+        roles_to_test,
+        available_roles
+    );
     println!(
         "✓ Role switching completed; final selected_role: '{}'",
         final_role

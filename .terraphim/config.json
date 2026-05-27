@@ -1,6 +1,6 @@
 {
   "global_shortcut": "Ctrl+Shift+T",
-  "default_role": "rust-engineer",
-  "selected_role": "rust-engineer",
+  "default_role": "Rust Engineer",
+  "selected_role": "Rust Engineer",
   "roles": {}
 }
