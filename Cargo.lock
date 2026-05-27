@@ -3010,7 +3010,7 @@ dependencies = [
 
 [[package]]
 name = "grepapp_haystack"
-version = "1.20.0"
+version = "1.20.2"
 dependencies = [
  "anyhow",
  "haystack_core",
@@ -3134,7 +3134,7 @@ dependencies = [
 
 [[package]]
 name = "haystack_core"
-version = "1.20.0"
+version = "1.20.2"
 dependencies = [
  "terraphim_types",
  "tokio",
@@ -8738,7 +8738,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim-cli"
-version = "1.20.0"
+version = "1.20.2"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -8802,7 +8802,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim-session-analyzer"
-version = "1.20.0"
+version = "1.20.2"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -8841,7 +8841,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_agent"
-version = "1.20.0"
+version = "1.20.2"
 dependencies = [
  "ahash",
  "anyhow",
@@ -9072,7 +9072,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_ccusage"
-version = "1.20.0"
+version = "1.20.2"
 dependencies = [
  "chrono",
  "serde",
@@ -9085,7 +9085,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_codebase_eval"
-version = "1.20.0"
+version = "1.20.2"
 dependencies = [
  "serde",
  "serde_json",
@@ -9131,7 +9131,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_dsm"
-version = "1.20.0"
+version = "1.20.2"
 dependencies = [
  "anyhow",
  "clap",
@@ -9147,7 +9147,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_file_search"
-version = "1.20.0"
+version = "1.20.2"
 dependencies = [
  "ahash",
  "criterion 0.5.1",
@@ -9190,7 +9190,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_grep"
-version = "1.20.0"
+version = "1.20.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -9331,7 +9331,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_merge_coordinator"
-version = "1.20.0"
+version = "1.20.2"
 dependencies = [
  "chrono",
  "fs2",
@@ -9346,7 +9346,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_middleware"
-version = "1.20.0"
+version = "1.20.2"
 dependencies = [
  "ahash",
  "async-trait",
@@ -9520,7 +9520,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_rlm"
-version = "1.20.0"
+version = "1.20.2"
 dependencies = [
  "ahash",
  "anyhow",
@@ -9608,7 +9608,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_server"
-version = "1.20.0"
+version = "1.20.2"
 dependencies = [
  "ahash",
  "anyhow",
@@ -9686,7 +9686,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_sessions"
-version = "1.20.0"
+version = "1.20.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -9770,14 +9770,14 @@ dependencies = [
 
 [[package]]
 name = "terraphim_test_utils"
-version = "1.20.0"
+version = "1.20.2"
 dependencies = [
  "rustc_version",
 ]
 
 [[package]]
 name = "terraphim_tinyclaw"
-version = "1.20.0"
+version = "1.20.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -9880,7 +9880,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_usage"
-version = "1.20.0"
+version = "1.20.2"
 dependencies = [
  "anyhow",
  "async-trait",

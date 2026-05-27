@@ -1470,22 +1470,33 @@ mod tests {
     #[test]
     fn test_get_asset_names_includes_binary_prefix() {
         // Raw binaries should be prefixed with the binary name
-        let assets = TerraphimUpdater::get_asset_names("terraphim-agent", "x86_64-apple-darwin", "1.20.0");
-        
+        let assets =
+            TerraphimUpdater::get_asset_names("terraphim-agent", "x86_64-apple-darwin", "1.20.0");
+
         // First should be the archive
-        assert_eq!(assets[0], "terraphim-agent-1.20.0-x86_64-apple-darwin.tar.gz");
-        
+        assert_eq!(
+            assets[0],
+            "terraphim-agent-1.20.0-x86_64-apple-darwin.tar.gz"
+        );
+
         // Second should be the raw binary with prefix
         assert_eq!(assets[1], "terraphim-agent-x86_64-apple-darwin");
     }
 
     #[test]
     fn test_get_asset_names_for_universal_binary() {
-        let assets = TerraphimUpdater::get_asset_names("terraphim-agent", "universal-apple-darwin", "1.20.0");
-        
+        let assets = TerraphimUpdater::get_asset_names(
+            "terraphim-agent",
+            "universal-apple-darwin",
+            "1.20.0",
+        );
+
         // Archive should include version and target
-        assert_eq!(assets[0], "terraphim-agent-1.20.0-universal-apple-darwin.tar.gz");
-        
+        assert_eq!(
+            assets[0],
+            "terraphim-agent-1.20.0-universal-apple-darwin.tar.gz"
+        );
+
         // Raw binary should include binary name prefix
         assert_eq!(assets[1], "terraphim-agent-universal-apple-darwin");
     }
@@ -1495,7 +1506,7 @@ mod tests {
         // This test verifies the target list includes universal binary fallback
         // We can't easily mock std::env::consts, but we can verify the function
         // doesn't panic and returns the expected structure for known platforms
-        
+
         // For x86_64-macos, should include both native and universal
         // For aarch64-macos, should include both native and universal
         // Note: We can't directly test the match arms without mocking,
@@ -1507,9 +1518,8 @@ mod tests {
     #[test]
     fn test_config_with_binary_version() {
         // Verify that with_version correctly sets the binary version
-        let config = UpdaterConfig::new("terraphim-agent")
-            .with_version("1.17.0");
-        
+        let config = UpdaterConfig::new("terraphim-agent").with_version("1.17.0");
+
         assert_eq!(config.current_version, "1.17.0");
         assert_eq!(config.bin_name, "terraphim-agent");
     }

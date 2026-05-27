@@ -154,15 +154,18 @@ jobs:
           targets: ${{ matrix.target }}
 
       - name: Install zig (required by zlob dependency)
-        if: contains(matrix.target, 'apple-darwin')
+        if: contains(matrix.target, 'apple-darwin') || contains(matrix.target, 'windows')
+        shell: bash
         run: |
-          if ! command -v zig &>/dev/null; then
-            if command -v brew &>/dev/null; then
-              brew install zig
-            else
-              echo "Neither zig nor brew found. Please install zig."
-              exit 1
-            fi
+          if command -v zig &>/dev/null; then
+            echo "zig already installed"
+          elif command -v brew &>/dev/null; then
+            brew install zig
+          elif command -v choco &>/dev/null; then
+            choco install zig -y
+          else
+            echo "No package manager found for zig installation"
+            exit 1
           fi
           zig version
 

@@ -1,20 +1,27 @@
-[build]
-# Default target follows host; pass --target when cross-compiling
+# Cross configuration for terraphim-ai
+# See: https://github.com/cross-rs/cross/wiki/Configuration
+
+# Install zig in cross-compilation containers for zlob dependency
+[target.aarch64-unknown-linux-musl]
+pre-build = [
+    "apt-get update && apt-get install -y curl tar xz-utils",
+    "curl -L https://ziglang.org/download/0.13.0/zig-linux-x86_64-0.13.0.tar.xz -o /tmp/zig.tar.xz",
+    "tar -xf /tmp/zig.tar.xz -C /usr/local --strip-components=1",
+    "zig version",
+]
 
 [target.x86_64-unknown-linux-musl]
-image = "ghcr.io/cross-rs/x86_64-unknown-linux-musl:latest"
-
-[target.aarch64-unknown-linux-musl]
-image = "ghcr.io/cross-rs/aarch64-unknown-linux-musl:latest"
+pre-build = [
+    "apt-get update && apt-get install -y curl tar xz-utils",
+    "curl -L https://ziglang.org/download/0.13.0/zig-linux-x86_64-0.13.0.tar.xz -o /tmp/zig.tar.xz",
+    "tar -xf /tmp/zig.tar.xz -C /usr/local --strip-components=1",
+    "zig version",
+]
 
 [target.armv7-unknown-linux-musleabihf]
-image = "ghcr.io/cross-rs/armv7-unknown-linux-musleabihf:latest"
-
-[target.aarch64-unknown-linux-gnu]
-image = "ghcr.io/cross-rs/aarch64-unknown-linux-gnu:latest"
-
-[target.x86_64-apple-darwin]
-image = "ghcr.io/cross-rs/x86_64-apple-darwin:latest"
-
-[target.aarch64-apple-darwin]
-image = "ghcr.io/cross-rs/aarch64-apple-darwin:latest"
+pre-build = [
+    "apt-get update && apt-get install -y curl tar xz-utils",
+    "curl -L https://ziglang.org/download/0.13.0/zig-linux-x86_64-0.13.0.tar.xz -o /tmp/zig.tar.xz",
+    "tar -xf /tmp/zig.tar.xz -C /usr/local --strip-components=1",
+    "zig version",
+]

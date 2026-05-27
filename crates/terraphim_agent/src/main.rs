@@ -1707,8 +1707,7 @@ fn main() -> Result<()> {
     // Check for updates on startup (non-blocking, debug logging on failure)
     let rt = Runtime::new()?;
     rt.block_on(async {
-        let config = UpdaterConfig::new("terraphim-agent")
-            .with_version(env!("CARGO_PKG_VERSION"));
+        let config = UpdaterConfig::new("terraphim-agent").with_version(env!("CARGO_PKG_VERSION"));
         let updater = TerraphimUpdater::new(config);
         if let Err(e) = updater.check_update().await {
             log::debug!("Update check failed: {}", e);
@@ -2006,8 +2005,7 @@ async fn run_offline_command(
     // CheckUpdate is stateless - handle before TuiService initialization
     if let Command::CheckUpdate = &command {
         println!("Checking for terraphim-agent updates...");
-        let config = UpdaterConfig::new("terraphim-agent")
-            .with_version(env!("CARGO_PKG_VERSION"));
+        let config = UpdaterConfig::new("terraphim-agent").with_version(env!("CARGO_PKG_VERSION"));
         let updater = TerraphimUpdater::new(config);
         match updater.check_update().await {
             Ok(status) => {
@@ -2024,8 +2022,7 @@ async fn run_offline_command(
     // Update is stateless - handle before TuiService initialization
     if let Command::Update = &command {
         println!("Updating terraphim-agent...");
-        let config = UpdaterConfig::new("terraphim-agent")
-            .with_version(env!("CARGO_PKG_VERSION"));
+        let config = UpdaterConfig::new("terraphim-agent").with_version(env!("CARGO_PKG_VERSION"));
         let updater = TerraphimUpdater::new(config);
         match updater.check_and_update().await {
             Ok(status) => {
@@ -4581,8 +4578,8 @@ async fn run_server_command(
         }
         Command::CheckUpdate => {
             println!("🔍 Checking for terraphim-agent updates...");
-            let config = UpdaterConfig::new("terraphim-agent")
-                .with_version(env!("CARGO_PKG_VERSION"));
+            let config =
+                UpdaterConfig::new("terraphim-agent").with_version(env!("CARGO_PKG_VERSION"));
             let updater = TerraphimUpdater::new(config);
             match updater.check_update().await {
                 Ok(status) => {
@@ -4597,8 +4594,8 @@ async fn run_server_command(
         }
         Command::Update => {
             println!("🚀 Updating terraphim-agent...");
-            let config = UpdaterConfig::new("terraphim-agent")
-                .with_version(env!("CARGO_PKG_VERSION"));
+            let config =
+                UpdaterConfig::new("terraphim-agent").with_version(env!("CARGO_PKG_VERSION"));
             let updater = TerraphimUpdater::new(config);
             match updater.check_and_update().await {
                 Ok(status) => {

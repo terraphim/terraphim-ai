@@ -889,8 +889,7 @@ async fn handle_update() -> Result<serde_json::Value> {
     let bin_name = "terraphim-cli";
     let current_version = env!("CARGO_PKG_VERSION");
 
-    let config = terraphim_update::UpdaterConfig::new(bin_name)
-        .with_version(current_version);
+    let config = terraphim_update::UpdaterConfig::new(bin_name).with_version(current_version);
     let updater = terraphim_update::TerraphimUpdater::new(config);
     let status = updater.check_and_update().await?;
 

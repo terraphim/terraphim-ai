@@ -109,6 +109,10 @@ COPY terraphim_server ./terraphim_server
 COPY terraphim_ai_nodejs ./terraphim_ai_nodejs
 COPY terraphim_firecracker/Cargo.toml terraphim_firecracker/
 
+# Create infrastructure directory to satisfy workspace member glob
+# (infrastructure/* is in workspace.members but contains no actual crates)
+RUN mkdir -p infrastructure
+
 # Replace any committed server assets with the CI-built frontend bundle.
 RUN rm -rf terraphim_server/dist && mkdir -p terraphim_server/dist
 COPY --from=frontend-builder /app/dist ./terraphim_server/dist
