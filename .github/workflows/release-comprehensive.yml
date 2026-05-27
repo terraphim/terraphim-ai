@@ -195,7 +195,7 @@ jobs:
         if: matrix.target != 'x86_64-unknown-linux-gnu'
         uses: Swatinem/rust-cache@v2
         with:
-          key: ${{ matrix.target }}
+          key: ${{ matrix.os }}-${{ matrix.target }}
 
       - name: Setup Node.js (for frontend build)
         if: "!matrix.use_cross"
