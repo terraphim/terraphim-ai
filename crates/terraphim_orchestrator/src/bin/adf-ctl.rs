@@ -373,8 +373,7 @@ fn direct_dispatch_via_socket(
         .with_context(|| format!("failed to connect to {}", socket_path.display()))?;
 
     // Send newline-terminated JSON.
-    writeln!(stream, "{}", payload.to_string())
-        .context("failed to write to direct dispatch socket")?;
+    writeln!(stream, "{payload}").context("failed to write to direct dispatch socket")?;
 
     // Read response.
     let mut response = String::new();

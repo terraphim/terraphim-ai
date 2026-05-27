@@ -7,10 +7,8 @@
 
 use std::collections::HashSet;
 use std::path::PathBuf;
-use std::sync::Arc;
 
 use tokio::net::UnixListener;
-use tokio::sync::Mutex;
 use tracing::{error, info};
 
 use crate::webhook::WebhookDispatch;
@@ -151,7 +149,7 @@ async fn handle_connection(
     dispatch_tx: &tokio::sync::mpsc::Sender<WebhookDispatch>,
     agent_names: &HashSet<String>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
+    use tokio::io::AsyncBufReadExt;
 
     let mut reader = tokio::io::BufReader::new(stream);
     let mut line = String::new();
