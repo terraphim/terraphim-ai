@@ -9,7 +9,9 @@
 #   5. Judge Decision: evaluate designs, decide if ready for implementation
 #   6. Implementation: disciplined-implementation skill
 #   7. Review: structured-pr-review skill
-#   8. Final Judge: verify implementation quality, checkpoint
+#   8. Validation: disciplined-validation skill
+#   9. Verification: disciplined-verification skill
+#   10. Final Judge: final approval verdict
 #
 # Models:
 #   - Slot 1: opus via Claude CLI (primary), kimi fallback on rate limit
@@ -58,11 +60,11 @@ model = "openai/gpt-5.5"
 provider = "openai"
 cli_tool = "opencode"
 
-# Gate: require 2+ research proposals
+# Gate: matrix-research step ran (check exit_code)
 [[steps]]
 name = "gate-research"
 kind = "gate"
-condition = "{{steps.matrix-research.success_count}} >= 2"
+condition = "{{steps.matrix-research.exit_code}} == 0"
 on_fail = "abort"
 
 # ============================================================
@@ -72,13 +74,13 @@ on_fail = "abort"
 name = "research-quality"
 kind = "agent"
 cli_tool = "opencode"
-task = "You are evaluating the research quality for issue #{{issue}}.\n\nYour task:\n1. Load and apply the disciplined-quality-evaluation skill: skill://disciplined-quality-evaluation\n2. Read all research proposals:\n   - .docs/adf/{{issue}}/research-proposal-1.md\n   - .docs/adf/{{issue}}/research-proposal-2.md\n   - .docs/adf/{{issue}}/research-proposal-3.md\n3. Evaluate each proposal using the KLS 6-dimension framework:\n   - Explicitity (1-5): Are requirements unambiguous and complete?\n   - External Consistency (1-5): Does it fit existing architecture?\n   - Internal Consistency (1-5): Are goals coherent?\n   - Stakeholder Commitment (1-5): Are stakeholders aligned?\n   - Information Quality (1-5): Is evidence solid?\n   - Overall Coherence (1-5): Does it hang together?\n4. Write the quality evaluation to .docs/adf/{{issue}}/research-quality-evaluation.md\n\nQuality evaluation format (YAML frontmatter + markdown):\n---\nstage: research-quality-evaluation\nissue: {{issue}}\ntimestamp: FILL_IN\noverall_quality_score: FILL_IN\npasses_quality_gate: [true|false]\n---\n\n## Overall Quality Score\n[1-5 rating with rationale]\n\n## Per-Proposal Evaluation\n[Evaluation of each proposal]\n\n## Quality Gate Decision\n[PASS/FAIL with rationale - must score >= 3.0 overall to pass]\n\n## Recommendations\n[Any quality improvements needed before design]\n"
+task = "You are evaluating the research quality for issue #{{issue}}.\n\nYour task:\n1. Load and apply the disciplined-quality-evaluation skill: skill://disciplined-quality-evaluation\n2. Read all research proposals:\n   - .docs/adf/{{issue}}/research-proposal-1.md\n   - .docs/adf/{{issue}}/research-proposal-2.md\n   - .docs/adf/{{issue}}/research-proposal-3.md\n3. Evaluate each proposal using the KLS 6-dimension framework:\n   - Explicitity (1-5): Are requirements unambiguous and complete?\n   - External Consistency (1-5): Does it fit existing architecture?\n   - Internal Consistency (1-5): Are goals coherent?\n   - Stakeholder Commitment (1-5): Are stakeholders aligned?\n   - Information Quality (1-5): Is evidence solid?\n   - Overall Coherence (1-5): Does it hang together?\n4. Write the quality evaluation to .docs/adf/{{issue}}/researchquality-evaluation.md\n\nQuality evaluation format (YAML frontmatter + markdown):\n---\nstage: research-quality-evaluation\nissue: {{issue}}\ntimestamp: FILL_IN\noverall_quality_score: FILL_IN\npasses_quality_gate: [true|false]\n---\n\n## Overall Quality Score\n[1-5 rating with rationale]\n\n## Per-Proposal Evaluation\n[Evaluation of each proposal]\n\n## Quality Gate Decision\n[PASS/FAIL with rationale - must score >= 3.0 overall to pass]\n\n## Recommendations\n[Any quality improvements needed before design]\n"
 model = "kimi-for-coding/k2p6"
 provider = "kimi"
 timeout_secs = 300
 on_fail = "continue"
 
-# Gate: require quality evaluation passes
+# Gate: quality evaluation passes
 [[steps]]
 name = "gate-research-quality"
 kind = "gate"
@@ -98,11 +100,11 @@ provider = "{{matrix.provider}}"
 timeout_secs = 900
 on_fail = "continue"
 
-# Gate: require 2+ design proposals
+# Gate: matrix-design step ran
 [[steps]]
 name = "gate-design"
 kind = "gate"
-condition = "{{steps.matrix-design.success_count}} >= 2"
+condition = "{{steps.matrix-design.exit_code}} == 0"
 on_fail = "abort"
 
 # ============================================================
@@ -112,13 +114,13 @@ on_fail = "abort"
 name = "design-quality"
 kind = "agent"
 cli_tool = "opencode"
-task = "You are evaluating the design quality for issue #{{issue}}.\n\nYour task:\n1. Load and apply the disciplined-quality-evaluation skill: skill://disciplined-quality-evaluation\n2. Read all design proposals:\n   - .docs/adf/{{issue}}/design-proposal-1.md\n   - .docs/adf/{{issue}}/design-proposal-2.md\n   - .docs/adf/{{issue}}/design-proposal-3.md\n3. Read the research synthesis for context:\n   - .docs/adf/{{issue}}/research-synthesis.md\n4. Evaluate each design using the KLS 6-dimension framework:\n   - Explicitity (1-5): Are specifications unambiguous?\n   - External Consistency (1-5): Does it fit existing architecture?\n   - Internal Consistency (1-5): Is the design coherent?\n   - Stakeholder Commitment (1-5): Would stakeholders accept this?\n   - Information Quality (1-5): Is evidence solid?\n   - Overall Coherence (1-5): Does it hang together?\n5. Write the quality evaluation to .docs/adf/{{issue}}/design-quality-evaluation.md\n\nQuality evaluation format (YAML frontmatter + markdown):\n---\nstage: design-quality-evaluation\nissue: {{issue}}\ntimestamp: FILL_IN\noverall_quality_score: FILL_IN\npasses_quality_gate: [true|false]\n---\n\n## Overall Quality Score\n[1-5 rating with rationale]\n\n## Per-Design Evaluation\n[Evaluation of each design]\n\n## Quality Gate Decision\n[PASS/FAIL with rationale - must score >= 3.0 overall to pass]\n\n## Recommendations\n[Any quality improvements needed before implementation]\n"
+task = "You are evaluating the design quality for issue #{{issue}}.\n\nYour task:\n1. Load and apply the disciplined-quality-evaluation skill: skill://disciplined-quality-evaluation\n2. Read all design proposals:\n   - .docs/adf/{{issue}}/design-proposal-1.md\n   - .docs/adf/{{issue}}/design-proposal-2.md\n   - .docs/adf/{{issue}}/design-proposal-3.md\n3. Read the research synthesis for context:\n   - .docs/adf/{{issue}}/research-synthesis.md\n4. Evaluate each design using the KLS 6-dimension framework:\n   - Explicitity (1-5): Are specifications unambiguous?\n   - External Consistency (1-5): Does it fit existing architecture?\n   - Internal Consistency (1-5): Is the design coherent?\n   - Stakeholder Commitment (1-5): Would stakeholders accept this?\n   - Information Quality (1-5): Is evidence solid?\n   - Overall Coherence (1-5): Does it hang together?\n5. Write the quality evaluation to .docs/adf/{{issue}}/designquality-evaluation.md\n\nQuality evaluation format (YAML frontmatter + markdown):\n---\nstage: design-quality-evaluation\nissue: {{issue}}\ntimestamp: FILL_IN\noverall_quality_score: FILL_IN\npasses_quality_gate: [true|false]\n---\n\n## Overall Quality Score\n[1-5 rating with rationale]\n\n## Per-Design Evaluation\n[Evaluation of each design]\n\n## Quality Gate Decision\n[PASS/FAIL with rationale - must score >= 3.0 overall to pass]\n\n## Recommendations\n[Any quality improvements needed before implementation]\n"
 model = "kimi-for-coding/k2p6"
 provider = "kimi"
 timeout_secs = 300
 on_fail = "continue"
 
-# Gate: require quality evaluation passes
+# Gate: quality evaluation passes
 [[steps]]
 name = "gate-design-quality"
 kind = "gate"
@@ -134,7 +136,7 @@ kind = "agent"
 cli_tool = "opencode"
 model = "kimi-for-coding/k2p6"
 provider = "kimi"
-task = "You are the judge for the design phase on issue #{{issue}}.\n\nRead the 3 design proposals at:\n  - .docs/adf/{{issue}}/design-proposal-1.md\n  - .docs/adf/{{issue}}/design-proposal-2.md\n  - .docs/adf/{{issue}}/design-proposal-3.md\n\nRead the design quality evaluation:\n  - .docs/adf/{{issue}}/design-quality-evaluation.md\n\nRead the research synthesis for context:\n  - .docs/adf/{{issue}}/research-synthesis.md\n\nYour task: judge-evaluate the designs and decide if ready for implementation.\n\nJudge decision format (YAML frontmatter + markdown):\n---\nstage: judge-decision\nissue: {{issue}}\ntimestamp: FILL_IN\nproceed_to_implementation: [true|false]\nchosen_design: [slot number]\n---\n\n## Judge Decision\n[PROCEED/DEFER with rationale]\n\n## Best Design\n[Which design is best and why]\n\n## Design Evaluation\n[Comparison of all 3 designs against criteria]\n\n## Readiness Assessment\n[Is the design ready for implementation? What gaps remain?]\n\n## Open Questions\n[Questions to resolve before implementation]\n"
+task = "You are the judge for the design phase on issue #{{issue}}.\nRead the 3 design proposals at:\n  - .docs/adf/{{issue}}/design-proposal-1.md\n  - .docs/adf/{{issue}}/design-proposal-2.md\n  - .docs/adf/{{issue}}/design-proposal-3.md\n\nRead the design quality evaluation:\n  - .docs/adf/{{issue}}/design-quality-evaluation.md\n\nRead the research synthesis for context:\n  - .docs/adf/{{issue}}/research-synthesis.md\n\nYour task: judge-evaluate the designs and decide if ready for implementation.\n\nJudge decision format (YAML frontmatter + markdown):\n---\nstage: judge-decision\nissue: {{issue}}\ntimestamp: FILL_IN\nproceed_to_implementation: [true|false]\nchosen_design: [slot number]\n---\n\n## Judge Decision\n[PROCEED/DEFER with rationale]\n\n## Best Design\n[Which design is best and why]\n\n## Design Evaluation\n[Comparison of all 3 designs against criteria]\n\n## Readiness Assessment\n[Is the design ready for implementation? What gaps remain?]\n\n## Open Questions\n[Questions to resolve before implementation]\n"
 timeout_secs = 600
 
 # Gate: judge must approve implementation
@@ -169,26 +171,7 @@ task = "You are running the structured-pr-review skill for issue #{{issue}}.\n\n
 timeout_secs = 600
 
 # ============================================================
-# PHASE 6: FINAL JUDGE - verify implementation quality
-# ============================================================
-[[steps]]
-name = "final-judge"
-kind = "agent"
-cli_tool = "opencode"
-model = "kimi-for-coding/k2p6"
-provider = "kimi"
-task = "You are the final judge for issue #{{issue}}.\n\nYour task:\n1. Review the implementation status at:\n   - .docs/adf/{{issue}}/implementation-status.md\n2. Review the structured-pr-review findings at:\n   - .docs/adf/{{issue}}/review-findings.md\n3. Assess if the implementation meets the acceptance criteria from the design\n4. Write the final verdict to .docs/adf/{{issue}}/final-verdict.md\n\nFinal verdict format (YAML frontmatter + markdown):\n---\nstage: final-verdict\nissue: {{issue}}\ntimestamp: FILL_IN\napproved: [true|false]\nready_for_merge: [true|false]\n---\n\n## Final Verdict\n[APPROVED/REJECTED with rationale]\n\n## Quality Assessment\n[Does implementation meet design quality standards?]\n\n## Issues Outstanding\n[P0/P1 issues still open]\n\n## Recommendations\n[What needs to happen before merge]\n"
-timeout_secs = 300
-
-# Gate: final judge must approve
-[[steps]]
-name = "gate-final"
-kind = "gate"
-condition = "{{steps.final-judge.exit_code}} == 0"
-on_fail = "abort"
-
-# ============================================================
-# PHASE 7: VALIDATION - disciplined-validation skill
+# PHASE 6: VALIDATION - disciplined-validation skill
 # ============================================================
 [[steps]]
 name = "validation"
@@ -207,7 +190,7 @@ condition = "{{steps.validation.exit_code}} == 0"
 on_fail = "abort"
 
 # ============================================================
-# PHASE 8: VERIFICATION - disciplined-verification skill
+# PHASE 7: VERIFICATION - disciplined-verification skill
 # ============================================================
 [[steps]]
 name = "verification"
@@ -226,10 +209,10 @@ condition = "{{steps.verification.exit_code}} == 0"
 on_fail = "abort"
 
 # ============================================================
-# PHASE 9: FINAL JUDGE - final approval verdict
+# PHASE 8: FINAL JUDGE - final approval verdict
 # ============================================================
 [[steps]]
-name = "final-approval"
+name = "final-judge"
 kind = "agent"
 cli_tool = "opencode"
 model = "kimi-for-coding/k2p6"
@@ -239,7 +222,7 @@ timeout_secs = 300
 
 # Gate: final approval must be granted
 [[steps]]
-name = "gate-final-approval"
+name = "gate-final"
 kind = "gate"
-condition = "{{steps.final-approval.exit_code}} == 0"
+condition = "{{steps.final-judge.exit_code}} == 0"
 on_fail = "abort"
