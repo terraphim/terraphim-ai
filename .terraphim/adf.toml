@@ -1,9 +1,13 @@
-# Local ADF configuration for repository-level end-to-end dispatch testing.
+# Local ADF configuration for Terraphim AI.
+# Provides real issue processing via adf-issue-stage and k=3 planning via adf flow.
 #
-# This file intentionally satisfies both local loaders:
-# - `adf --local --check` / `adf --local --agent NAME` use ProjectAdfConfig.
-# - `adf .terraphim/adf.toml` uses the full OrchestratorConfig and enables
-#   the direct Unix socket consumed by `adf-ctl --local trigger --direct`.
+# Discovery:
+#   - `adf --local --check` validates this file
+#   - `adf --local --agent NAME` runs a named agent via adf-issue-stage
+#   - `adf flow <name> --context "issue=N"` runs a flow from .terraphim/flows/<name>.toml
+#
+# Agents use adf-issue-stage which produces structured artefacts in .docs/adf/<issue>/
+# instead of template comments.
 
 project_id = "terraphim-ai"
 name = "Terraphim AI"
@@ -24,93 +28,98 @@ socket_path = "/tmp/adf-ctl.sock"
 id = "terraphim-ai"
 working_dir = "/home/alex/projects/terraphim/terraphim-ai"
 
-[[agents]]
-name = "implementation-swarm"
-layer = "Core"
-cli_tool = "/home/alex/projects/terraphim/terraphim-ai/.terraphim/bin/adf-e2e-stage"
-task = "stage=implementation-swarm; pick and progress the Gitea task via local direct dispatch"
-project = "terraphim-ai"
+# --- Core ZDP agents ---
 
 [[agents]]
 name = "disciplined-research-agent"
 layer = "Core"
-cli_tool = "/home/alex/projects/terraphim/terraphim-ai/.terraphim/bin/adf-e2e-stage"
-task = "stage=disciplined-research; research badlogic/pi CLI support"
+cli_tool = "/home/alex/projects/terraphim/terraphim-ai/.terraphim/bin/adf-issue-stage"
+task = "stage=disciplined-research; issue={{issue}}"
 project = "terraphim-ai"
 
 [[agents]]
-name = "implementation-plan-agent"
+name = "disciplined-design-agent"
 layer = "Core"
-cli_tool = "/home/alex/projects/terraphim/terraphim-ai/.terraphim/bin/adf-e2e-stage"
-task = "stage=implementation-plan; create detailed implementation plan"
+cli_tool = "/home/alex/projects/terraphim/terraphim-ai/.terraphim/bin/adf-issue-stage"
+task = "stage=disciplined-design; issue={{issue}}"
 project = "terraphim-ai"
 
 [[agents]]
 name = "disciplined-implementation-agent"
 layer = "Core"
-cli_tool = "/home/alex/projects/terraphim/terraphim-ai/.terraphim/bin/adf-e2e-stage"
-task = "stage=disciplined-implementation; implement badlogic/pi CLI support"
+cli_tool = "/home/alex/projects/terraphim/terraphim-ai/.terraphim/bin/adf-issue-stage"
+task = "stage=disciplined-implementation; issue={{issue}}"
 project = "terraphim-ai"
 
 [[agents]]
 name = "structured-pr-review-agent"
 layer = "Core"
-cli_tool = "/home/alex/projects/terraphim/terraphim-ai/.terraphim/bin/adf-e2e-stage"
-task = "stage=structured-pr-review; review badlogic/pi CLI support"
+cli_tool = "/home/alex/projects/terraphim/terraphim-ai/.terraphim/bin/adf-issue-stage"
+task = "stage=structured-pr-review; issue={{issue}}"
 project = "terraphim-ai"
 
 [[agents]]
 name = "disciplined-verification-agent"
 layer = "Core"
-cli_tool = "/home/alex/projects/terraphim/terraphim-ai/.terraphim/bin/adf-e2e-stage"
-task = "stage=disciplined-verification; verify badlogic/pi CLI support"
+cli_tool = "/home/alex/projects/terraphim/terraphim-ai/.terraphim/bin/adf-issue-stage"
+task = "stage=disciplined-verification; issue={{issue}}"
 project = "terraphim-ai"
 
 [[agents]]
 name = "disciplined-validation-agent"
 layer = "Core"
-cli_tool = "/home/alex/projects/terraphim/terraphim-ai/.terraphim/bin/adf-e2e-stage"
-task = "stage=disciplined-validation; validate badlogic/pi CLI support end to end"
+cli_tool = "/home/alex/projects/terraphim/terraphim-ai/.terraphim/bin/adf-issue-stage"
+task = "stage=disciplined-validation; issue={{issue}}"
 project = "terraphim-ai"
+
+# --- Corrections and review ---
 
 [[agents]]
 name = "pr-reviewer"
 layer = "Core"
-cli_tool = "/home/alex/projects/terraphim/terraphim-ai/.terraphim/bin/adf-e2e-stage"
-task = "stage=pr-reviewer; review implementation-swarm output and update Gitea"
+capabilities = ["structured-pr-review", "review-findings", "quality-gate"]
+cli_tool = "/home/alex/projects/terraphim/terraphim-ai/.terraphim/bin/adf-issue-stage"
+task = "stage=pr-reviewer; issue={{issue}}"
 project = "terraphim-ai"
 
 [[agents]]
 name = "corrections"
 layer = "Core"
-cli_tool = "/home/alex/projects/terraphim/terraphim-ai/.terraphim/bin/adf-e2e-stage"
-task = "stage=corrections; apply or record correction outcome in Gitea"
+capabilities = ["remediation", "review-fix", "quality-gate"]
+cli_tool = "/home/alex/projects/terraphim/terraphim-ai/.terraphim/bin/adf-issue-stage"
+task = "stage=corrections; issue={{issue}}"
 project = "terraphim-ai"
+
+# --- Fleet agents ---
 
 [[agents]]
 name = "meta-learning"
 layer = "Growth"
-cli_tool = "echo"
-task = "ADF E2E meta-learning completed"
+capabilities = ["learning", "fleet-improvement", "retrospective-analysis"]
+cli_tool = "/home/alex/projects/terraphim/terraphim-ai/.terraphim/bin/adf-issue-stage"
+task = "stage=meta-learning; issue={{issue}}"
 project = "terraphim-ai"
 
 [[agents]]
 name = "security-sentinel"
-layer = "Safety"
-cli_tool = "echo"
-task = "ADF E2E security sentinel completed"
+layer = "Core"
+persona = "Vigil"
+capabilities = ["security", "vulnerability-scanning", "compliance"]
+cli_tool = "/home/alex/projects/terraphim/terraphim-ai/.terraphim/bin/adf-issue-stage"
+task = "stage=security-sentinel; issue={{issue}}"
 project = "terraphim-ai"
 
 [[agents]]
 name = "build-runner"
 layer = "Core"
-cli_tool = "echo"
-task = "ADF E2E build runner completed"
+capabilities = ["build", "verification", "status-check"]
+cli_tool = "/home/alex/projects/terraphim/terraphim-ai/.terraphim/bin/adf-issue-stage"
+task = "stage=build-runner; issue={{issue}}"
 project = "terraphim-ai"
 
 [[agents]]
-name = "content-generator"
-layer = "Growth"
-cli_tool = "echo"
-task = "ADF E2E content generator completed"
+name = "implementation-swarm"
+layer = "Core"
+cli_tool = "/home/alex/projects/terraphim/terraphim-ai/.terraphim/bin/adf-issue-stage"
+task = "stage=implementation-swarm; issue={{issue}}"
 project = "terraphim-ai"

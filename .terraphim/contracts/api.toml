@@ -1,0 +1,33 @@
+# Example drift_check contract for API implementation.
+# Used by drift_check.sh to validate API implementations.
+#
+# Supported rule kinds:
+#   - lsp.diagnostic_clean  -> terraphim_lsp query
+#   - kg.concept_required    -> terraphim-agent validate + KG match
+#   - regex.pattern_match    -> terraphim_grep fallback
+
+[meta]
+phase = "implementation"
+applies_to = ["src/api/**/*.rs"]
+
+[[rule]]
+id = "API-1-no-unwrap"
+severity = "high"
+kind = "regex.pattern_match"
+message = "API handlers must not use .unwrap()"
+pattern_bad = "\\.unwrap\\("
+
+[[rule]]
+id = "API-2-result-return"
+severity = "critical"
+kind = "kg.concept_required"
+message = "Public API endpoints must return Result<_, ApiError>"
+concept = "ApiError"
+role = "Rust Engineer"
+
+[[rule]]
+id = "API-3-no-panic"
+severity = "critical"
+kind = "regex.pattern_match"
+message = "API handlers must not call std::panic"
+pattern_bad = "std::panic"

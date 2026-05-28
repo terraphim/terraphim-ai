@@ -1,0 +1,64 @@
+# Per-phase model selection for local ADF.
+# Used by adf-flow-runner and adf-issue-stage.
+# Models are subscription-gated (pay-per-use excluded from planning roster).
+#
+# Planning phase: k=3 parallel proposals + judge-comparison
+# Implementation phase: k=1 + verification stack
+# Review phase: k=2 consensus
+
+[planning]
+parallel_proposals = 3
+synthesis = "judge_compare"
+timeout_per_proposal = "10m"
+
+[[planning.models]]
+provider = "anthropic"
+model = "opus"
+
+[[planning.models]]
+provider = "kimi"
+model = "kimi-for-coding/k2p6"
+
+[[planning.models]]
+provider = "openai"
+model = "openai/gpt-5.4"
+
+[planning.judge]
+provider = "kimi"
+model = "kimi-for-coding/k2p6"
+
+[implementation]
+parallel_proposals = 1
+provider = "kimi"
+model = "kimi-for-coding/k2p6"
+verification = ["drift_check", "kg_validate", "tests"]
+
+[verification.drift_check]
+engine = "terraphim_grep"
+contracts_dir = ".terraphim/contracts"
+
+[verification.kg_validate]
+binary = "~/.cargo/bin/terraphim-agent"
+role = "Terraphim Engineer"
+command = "validate"
+
+[verification.lsp_diagnostics]
+languages = ["rust", "python", "typescript"]
+on_error = "block"
+on_warning = "report"
+
+[verification.tests]
+command = "cargo test"
+contract_tests_dir = "tests/contract"
+
+[review]
+parallel_proposals = 2
+synthesis = "consensus"
+
+[[review.models]]
+provider = "anthropic"
+model = "sonnet"
+
+[[review.models]]
+provider = "kimi"
+model = "kimi-for-coding/k2p6"
