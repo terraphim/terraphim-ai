@@ -273,8 +273,8 @@ impl FlowExecutor {
             terraphim_role: None,
             skill_chain: vec![],
             sfia_skills: vec![],
-            fallback_provider: None,
-            fallback_model: None,
+            fallback_provider: step.fallback_provider.clone(),
+            fallback_model: step.fallback_model.clone(),
             grace_period_secs: None,
             max_cpu_seconds: None,
             pre_check: None,
@@ -307,6 +307,32 @@ impl FlowExecutor {
 
         if let Some(ref model) = agent_def.model {
             request = request.with_primary_model(model);
+        }
+
+        // Set fallback provider and model for rate limit scenarios
+        // For opencode-based fallbacks, use the same CLI tool; for claude, use claude CLI
+        if let (Some(ref fb_provider), Some(ref fb_model)) = (&agent_def.fallback_provider, &agent_def.fallback_model) {
+            let fb_cli = if fb_provider == "claude" || fb_provider == "claude-code" {
+                "claude".to_string()
+            } else {
+                // For kimi, openai, etc. use opencode
+                cli_tool.clone()
+            };
+            let fallback_provider = Provider {
+                id: format!("{}-fallback", agent_def.name),
+                name: fb_provider.clone(),
+                provider_type: terraphim_types::capability::ProviderType::Agent {
+                    agent_id: format!("{}-fallback", agent_def.name),
+                    cli_command: fb_cli,
+                    working_dir: self.working_dir.clone(),
+                },
+                capabilities: vec![],
+                cost_level: terraphim_types::capability::CostLevel::Cheap,
+                latency: terraphim_types::capability::Latency::Medium,
+                keywords: vec![],
+            };
+            request = request.with_fallback_provider(fallback_provider);
+            request = request.with_fallback_model(fb_model);
         }
 
         // Spawn the agent using the flow's project context

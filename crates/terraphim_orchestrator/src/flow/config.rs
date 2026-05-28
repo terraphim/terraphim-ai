@@ -104,6 +104,12 @@ pub struct FlowStepDef {
     /// LLM provider (for agent steps).
     #[serde(default)]
     pub provider: Option<String>,
+    /// Fallback provider for rate limit scenarios (e.g., Claude primary, kimi fallback).
+    #[serde(default)]
+    pub fallback_provider: Option<String>,
+    /// Fallback model for rate limit scenarios.
+    #[serde(default)]
+    pub fallback_model: Option<String>,
     /// Persona name (for agent steps).
     #[serde(default)]
     pub persona: Option<String>,

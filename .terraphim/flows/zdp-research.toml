@@ -1,22 +1,32 @@
-# k=3 research flow: disciplined-research skill + judge-compare synthesis.
+# k=3 research+design flow with disciplined skills.
 # Run with: adf-ctl flow zdp-research --context "issue=1882"
 #
 # Steps:
-#   1. matrix-research: 3 parallel proposals using disciplined-research skill
-#   2. gate-check: require at least 2 proposals to succeed
-#   3. synthesize: judge-compares 3 proposals -> research-synthesis.md
-#   4. checkpoint: pause for human review
+#   1. matrix-research: 3 parallel proposals using disciplined-research skill (KLS evaluation)
+#   2. gate-check: require at least 2 research proposals to succeed
+#   3. matrix-design: 3 parallel design proposals using disciplined-design skill
+#   4. gate-check: require at least 2 design proposals to succeed
+#   5. synthesize: judge-evaluates designs -> design-synthesis.md
+#   6. checkpoint: pause for human review
+#
+# Models:
+#   - Slot 1: opus via Claude CLI (primary), kimi fallback on rate limit
+#   - Slot 2: kimi-for-coding/k2p6 via opencode
+#   - Slot 3: openai/gpt-5.5 via opencode
 
 name = "zdp-research"
 project = "terraphim-ai"
 repo_path = "/home/alex/projects/terraphim/terraphim-ai"
-timeout_secs = 1800
+timeout_secs = 3600
 
+# ============================================================
+# Step 1: Research - disciplined-research skill (KLS evaluation)
+# ============================================================
 [[steps]]
 name = "matrix-research"
 kind = "agent"
 cli_tool = "opencode"
-task = "You are running the disciplined-research skill for issue #{{issue}}.\n\nYour task:\n1. Use the disciplined-research skill to produce a research proposal\n2. Load the skill: skill://disciplined-research\n3. Read the issue at https://git.terraphim.cloud/terraphim/terraphim-ai/issues/{{issue}}\n4. Analyse the codebase to understand current state\n5. Write a research proposal to .docs/adf/{{issue}}/research-proposal-{{matrix.slot}}.md\n6. Classify the issue as: valid, stale, duplicate, blocked, or needs-rescope\n\nResearch proposal format (YAML frontmatter + markdown):\n---\nstage: research-proposal\nissue: {{issue}}\nslot: {{matrix.slot}}\nmodel: {{matrix.model}}\ntimestamp: FILL_IN\nclassification: FILL_IN\n---\n\n## Issue Summary\n[1 paragraph: what the issue asks for]\n\n## Current State\n[What exists in the codebase today]\n\n## Classification\n[valid|stale|duplicate|blocked|needs-rescope with rationale]\n\n## Key Findings\n- [Finding 1]\n- [Finding 2]\n\n## Recommendations\n[What should happen next]\n"
+task = "You are running the disciplined-research skill for issue #{{issue}}.\n\nYour task:\n1. Load and apply the disciplined-research skill: skill://disciplined-research\n2. Read the issue at https://git.terraphim.cloud/terraphim/terraphim-ai/issues/{{issue}}\n3. Apply the KLS 6-dimension framework to evaluate the research quality:\n   - Explicitity (are requirements unambiguous?)\n   - External Consistency (does it fit existing architecture?)\n   - Internal Consistency (are goals coherent?)\n   - Stakeholder Commitment (are stakeholders aligned?)\n   - Information Quality (is evidence solid?)\n   - Overall Coherence (does it hang together?)\n4. Write your research proposal to .docs/adf/{{issue}}/research-proposal-{{matrix.slot}}.md\n5. Classify the issue as: valid, stale, duplicate, blocked, or needs-rescope\n\nResearch proposal format (YAML frontmatter + markdown):\n---\nstage: research-proposal\nissue: {{issue}}\nslot: {{matrix.slot}}\nmodel: {{matrix.model}}\nprovider: {{matrix.provider}}\ntimestamp: FILL_IN\nclassification: FILL_IN\nkls_scores:\n  explicitity: FILL_IN\n  external_consistency: FILL_IN\n  internal_consistency: FILL_IN\n  stakeholder_commitment: FILL_IN\n  information_quality: FILL_IN\n  overall_coherence: FILL_IN\n---\n\n## Issue Summary\n[1 paragraph: what the issue asks for]\n\n## KLS Evaluation\n[Rate each dimension 1-5 with justification]\n\n## Classification\n[valid|stale|duplicate|blocked|needs-rescope with rationale]\n\n## Key Findings\n- [Finding 1]\n- [Finding 2]\n\n## Recommendations\n[What should happen next]\n"
 model = "{{matrix.model}}"
 provider = "{{matrix.provider}}"
 timeout_secs = 600
@@ -30,32 +40,66 @@ fail_strategy = "continue"
 slot = "1"
 model = "opus"
 provider = "claude"
+cli_tool = "claude"
 
 [[steps.matrix.params]]
 slot = "2"
 model = "kimi-for-coding/k2p6"
 provider = "kimi"
+cli_tool = "opencode"
 
 [[steps.matrix.params]]
 slot = "3"
 model = "openai/gpt-5.5"
 provider = "openai"
+cli_tool = "opencode"
 
+# ============================================================
+# Step 2: Gate - require 2+ research proposals
+# ============================================================
 [[steps]]
-name = "gate-check"
+name = "gate-research"
 kind = "gate"
 condition = "{{steps.matrix-research.success_count}} >= 2"
-on_fail = "skip_failed"
+on_fail = "abort"
 
+# ============================================================
+# Step 3: Design - disciplined-design skill
+# ============================================================
+[[steps]]
+name = "matrix-design"
+kind = "agent"
+cli_tool = "opencode"
+task = "You are running the disciplined-design skill for issue #{{issue}}.\n\nYour task:\n1. Load and apply the disciplined-design skill: skill://disciplined-design\n2. Read the research synthesis at .docs/adf/{{issue}}/research-synthesis.md\n3. Read the research proposals at:\n   - .docs/adf/{{issue}}/research-proposal-1.md\n   - .docs/adf/{{issue}}/research-proposal-2.md\n   - .docs/adf/{{issue}}/research-proposal-3.md\n4. Create a design proposal using disciplined-design methodology\n5. Write your design to .docs/adf/{{issue}}/design-proposal-{{matrix.slot}}.md\n\nDesign proposal format (YAML frontmatter + markdown):\n---\nstage: design-proposal\nissue: {{issue}}\nslot: {{matrix.slot}}\nmodel: {{matrix.model}}\nprovider: {{matrix.provider}}\ntimestamp: FILL_IN\n---\n\n## Problem Statement\n[What this design solves]\n\n## Architecture\n[Proposed architecture with trade-offs]\n\n## Implementation Plan\n[Step-by-step implementation]\n\n## File Changes\n[List of files to create/modify]\n\n## Risks and Mitigations\n[Identified risks and how to mitigate]\n\n## Acceptance Criteria\n[How to verify the implementation]\n"
+model = "{{matrix.model}}"
+provider = "{{matrix.provider}}"
+timeout_secs = 900
+on_fail = "continue"
+
+# ============================================================
+# Step 4: Gate - require 2+ design proposals
+# ============================================================
+[[steps]]
+name = "gate-design"
+kind = "gate"
+condition = "{{steps.matrix-design.success_count}} >= 2"
+on_fail = "abort"
+
+# ============================================================
+# Step 5: Judge - evaluate designs (not research)
+# ============================================================
 [[steps]]
 name = "synthesize"
 kind = "agent"
 cli_tool = "opencode"
 model = "kimi-for-coding/k2p6"
 provider = "kimi"
-task = "You are the judge for a k=3 research panel on issue #{{issue}}.\n\nRead the 3 proposals at:\n  - .docs/adf/{{issue}}/research-proposal-1.md\n  - .docs/adf/{{issue}}/research-proposal-2.md\n  - .docs/adf/{{issue}}/research-proposal-3.md\n\nYour task: judge-compare the 3 proposals and write a synthesis to:\n.docs/adf/{{issue}}/research-synthesis.md\n\nUse the classification from the research proposals. If they disagree, pick the best reasoning.\nIdentify the strongest findings from any proposal.\n\nSynthesis format:\n---\nstage: research-synthesis\nissue: {{issue}}\ntimestamp: FILL_IN\nclassification: [chosen classification]\n---\n\n## Final Classification\n[Classification with rationale]\n\n## Synthesis of Findings\n[What the 3 proposals agree on, and where they differ]\n\n## Strongest Proposal\n[Which proposal is best and why]\n\n## Recommendations\n[Next steps based on the synthesis]\n"
+task = "You are the judge for a k=3 design panel on issue #{{issue}}.\n\nRead the 3 design proposals at:\n  - .docs/adf/{{issue}}/design-proposal-1.md\n  - .docs/adf/{{issue}}/design-proposal-2.md\n  - .docs/adf/{{issue}}/design-proposal-3.md\n\nRead the research synthesis for context:\n  - .docs/adf/{{issue}}/research-synthesis.md\n\nYour task: judge-evaluate the 3 design proposals and write a synthesis to:\n.docs/adf/{{issue}}/design-synthesis.md\n\nEvaluate each design on:\n- Completeness (covers all acceptance criteria)\n- Feasibility (can be implemented in scope)\n- Risk (identifies and mitigates risks)\n- Consistency (consistent with existing architecture)\n- KLS Quality (use KLS 6-dimension framework)\n\nDesign synthesis format:\n---\nstage: design-synthesis\nissue: {{issue}}\ntimestamp: FILL_IN\nchosen_design: [slot number]\n---\n\n## Best Design\n[Which design is best and why]\n\n## Design Evaluation\n[Comparison of all 3 designs against criteria]\n\n## Recommended Implementation\n[Hybrid approach if needed, or single best design]\n\n## Open Questions\n[Questions to resolve before implementation]\n"
 timeout_secs = 600
 
+# ============================================================
+# Step 6: Human review checkpoint
+# ============================================================
 [[steps]]
 name = "human-review"
 kind = "checkpoint"

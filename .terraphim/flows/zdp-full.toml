@@ -1,0 +1,139 @@
+# k=3 research+design flow with disciplined skills and quality gates.
+# Run with: adf-ctl flow zdp-full --context "issue=1882"
+#
+# Research Phase: disciplined-research skill + KLS quality evaluation
+# Design Phase: disciplined-design skill + KLS quality evaluation
+# Judge: evaluates design proposals
+#
+# Models:
+#   - Slot 1: opus via Claude CLI (primary), kimi fallback on rate limit
+#   - Slot 2: kimi-for-coding/k2p6 via opencode
+#   - Slot 3: openai/gpt-5.5 via opencode
+
+name = "zdp-full"
+project = "terraphim-ai"
+repo_path = "/home/alex/projects/terraphim/terraphim-ai"
+timeout_secs = 7200
+
+# ============================================================
+# PHASE 1: RESEARCH
+# ============================================================
+[[steps]]
+name = "matrix-research"
+kind = "agent"
+cli_tool = "opencode"
+task = "You are running the disciplined-research skill for issue #{{issue}}.\n\nYour task:\n1. Load and apply the disciplined-research skill: skill://disciplined-research\n2. Read the issue at https://git.terraphim.cloud/terraphim/terraphim-ai/issues/{{issue}}\n3. Apply the KLS 6-dimension framework to evaluate the research quality:\n   - Explicitity (are requirements unambiguous?)\n   - External Consistency (does it fit existing architecture?)\n   - Internal Consistency (are goals coherent?)\n   - Stakeholder Commitment (are stakeholders aligned?)\n   - Information Quality (is evidence solid?)\n   - Overall Coherence (does it hang together?)\n4. Write your research proposal to .docs/adf/{{issue}}/research-proposal-{{matrix.slot}}.md\n5. Classify the issue as: valid, stale, duplicate, blocked, or needs-rescope\n\nResearch proposal format (YAML frontmatter + markdown):\n---\nstage: research-proposal\nissue: {{issue}}\nslot: {{matrix.slot}}\nmodel: {{matrix.model}}\nprovider: {{matrix.provider}}\ntimestamp: FILL_IN\nclassification: FILL_IN\nkls_scores:\n  explicitity: FILL_IN\n  external_consistency: FILL_IN\n  internal_consistency: FILL_IN\n  stakeholder_commitment: FILL_IN\n  information_quality: FILL_IN\n  overall_coherence: FILL_IN\n---\n\n## Issue Summary\n[1 paragraph: what the issue asks for]\n\n## KLS Evaluation\n[Rate each dimension 1-5 with justification]\n\n## Classification\n[valid|stale|duplicate|blocked|needs-rescope with rationale]\n\n## Key Findings\n- [Finding 1]\n- [Finding 2]\n\n## Recommendations\n[What should happen next]\n"
+model = "{{matrix.model}}"
+provider = "{{matrix.provider}}"
+timeout_secs = 600
+on_fail = "continue"
+
+[steps.matrix]
+max_parallel = 3
+fail_strategy = "continue"
+
+[[steps.matrix.params]]
+slot = "1"
+model = "opus"
+provider = "claude"
+cli_tool = "claude"
+fallback_model = "kimi-for-coding/k2p6"
+fallback_provider = "kimi"
+
+[[steps.matrix.params]]
+slot = "2"
+model = "kimi-for-coding/k2p6"
+provider = "kimi"
+cli_tool = "opencode"
+
+[[steps.matrix.params]]
+slot = "3"
+model = "openai/gpt-5.5"
+provider = "openai"
+cli_tool = "opencode"
+
+# Gate: require 2+ research proposals
+[[steps]]
+name = "gate-research"
+kind = "gate"
+condition = "{{steps.matrix-research.success_count}} >= 2"
+on_fail = "abort"
+
+# ============================================================
+# PHASE 2: RESEARCH QUALITY EVALUATION (KLS)
+# ============================================================
+[[steps]]
+name = "research-quality"
+kind = "agent"
+cli_tool = "opencode"
+task = "You are evaluating the research quality for issue #{{issue}}.\n\nYour task:\n1. Load and apply the disciplined-quality-evaluation skill: skill://disciplined-quality-evaluation\n2. Read all research proposals:\n   - .docs/adf/{{issue}}/research-proposal-1.md\n   - .docs/adf/{{issue}}/research-proposal-2.md\n   - .docs/adf/{{issue}}/research-proposal-3.md\n3. Evaluate each proposal using the KLS 6-dimension framework:\n   - Explicitity (1-5): Are requirements unambiguous and complete?\n   - External Consistency (1-5): Does it fit existing architecture?\n   - Internal Consistency (1-5): Are goals coherent?\n   - Stakeholder Commitment (1-5): Are stakeholders aligned?\n   - Information Quality (1-5): Is evidence solid?\n   - Overall Coherence (1-5): Does it hang together?\n4. Write the quality evaluation to .docs/adf/{{issue}}/research-quality-evaluation.md\n\nQuality evaluation format (YAML frontmatter + markdown):\n---\nstage: research-quality-evaluation\nissue: {{issue}}\ntimestamp: FILL_IN\noverall_quality_score: FILL_IN\npasses_quality_gate: [true|false]\n---\n\n## Overall Quality Score\n[1-5 rating with rationale]\n\n## Per-Proposal Evaluation\n[Evaluation of each proposal]\n\n## Quality Gate Decision\n[PASS/FAIL with rationale - must score >= 3.0 overall to pass]\n\n## Recommendations\n[Any quality improvements needed before design]\n"
+model = "kimi-for-coding/k2p6"
+provider = "kimi"
+timeout_secs = 300
+on_fail = "continue"
+
+# Gate: require quality evaluation passes
+[[steps]]
+name = "gate-research-quality"
+kind = "gate"
+condition = "{{steps.research-quality.exit_code}} == 0"
+on_fail = "abort"
+
+# ============================================================
+# PHASE 3: DESIGN
+# ============================================================
+[[steps]]
+name = "matrix-design"
+kind = "agent"
+cli_tool = "opencode"
+task = "You are running the disciplined-design skill for issue #{{issue}}.\n\nYour task:\n1. Load and apply the disciplined-design skill: skill://disciplined-design\n2. Read the research synthesis at .docs/adf/{{issue}}/research-synthesis.md\n3. Read the research quality evaluation at .docs/adf/{{issue}}/research-quality-evaluation.md\n4. Read the research proposals at:\n   - .docs/adf/{{issue}}/research-proposal-1.md\n   - .docs/adf/{{issue}}/research-proposal-2.md\n   - .docs/adf/{{issue}}/research-proposal-3.md\n5. Create a design proposal using disciplined-design methodology\n6. Write your design to .docs/adf/{{issue}}/design-proposal-{{matrix.slot}}.md\n\nDesign proposal format (YAML frontmatter + markdown):\n---\nstage: design-proposal\nissue: {{issue}}\nslot: {{matrix.slot}}\nmodel: {{matrix.model}}\nprovider: {{matrix.provider}}\ntimestamp: FILL_IN\n---\n\n## Problem Statement\n[What this design solves]\n\n## Architecture\n[Proposed architecture with trade-offs]\n\n## Implementation Plan\n[Step-by-step implementation]\n\n## File Changes\n[List of files to create/modify]\n\n## Risks and Mitigations\n[Identified risks and how to mitigate]\n\n## Acceptance Criteria\n[How to verify the implementation]\n"
+model = "{{matrix.model}}"
+provider = "{{matrix.provider}}"
+timeout_secs = 900
+on_fail = "continue"
+
+# Gate: require 2+ design proposals
+[[steps]]
+name = "gate-design"
+kind = "gate"
+condition = "{{steps.matrix-design.success_count}} >= 2"
+on_fail = "abort"
+
+# ============================================================
+# PHASE 4: DESIGN QUALITY EVALUATION (KLS)
+# ============================================================
+[[steps]]
+name = "design-quality"
+kind = "agent"
+cli_tool = "opencode"
+task = "You are evaluating the design quality for issue #{{issue}}.\n\nYour task:\n1. Load and apply the disciplined-quality-evaluation skill: skill://disciplined-quality-evaluation\n2. Read all design proposals:\n   - .docs/adf/{{issue}}/design-proposal-1.md\n   - .docs/adf/{{issue}}/design-proposal-2.md\n   - .docs/adf/{{issue}}/design-proposal-3.md\n3. Read the research synthesis for context:\n   - .docs/adf/{{issue}}/research-synthesis.md\n4. Evaluate each design using the KLS 6-dimension framework:\n   - Explicitity (1-5): Are specifications unambiguous?\n   - External Consistency (1-5): Does it fit existing architecture?\n   - Internal Consistency (1-5): Is the design coherent?\n   - Stakeholder Commitment (1-5): Would stakeholders accept this?\n   - Information Quality (1-5): Is evidence solid?\n   - Overall Coherence (1-5): Does it hang together?\n5. Write the quality evaluation to .docs/adf/{{issue}}/design-quality-evaluation.md\n\nQuality evaluation format (YAML frontmatter + markdown):\n---\nstage: design-quality-evaluation\nissue: {{issue}}\ntimestamp: FILL_IN\noverall_quality_score: FILL_IN\npasses_quality_gate: [true|false]\n---\n\n## Overall Quality Score\n[1-5 rating with rationale]\n\n## Per-Design Evaluation\n[Evaluation of each design]\n\n## Quality Gate Decision\n[PASS/FAIL with rationale - must score >= 3.0 overall to pass]\n\n## Recommendations\n[Any quality improvements needed before implementation]\n"
+model = "kimi-for-coding/k2p6"
+provider = "kimi"
+timeout_secs = 300
+on_fail = "continue"
+
+# Gate: require quality evaluation passes
+[[steps]]
+name = "gate-design-quality"
+kind = "gate"
+condition = "{{steps.design-quality.exit_code}} == 0"
+on_fail = "abort"
+
+# ============================================================
+# PHASE 5: JUDGE - evaluate designs (not research)
+# ============================================================
+[[steps]]
+name = "synthesize"
+kind = "agent"
+cli_tool = "opencode"
+model = "kimi-for-coding/k2p6"
+provider = "kimi"
+task = "You are the judge for a k=3 design panel on issue #{{issue}}.\n\nRead the 3 design proposals at:\n  - .docs/adf/{{issue}}/design-proposal-1.md\n  - .docs/adf/{{issue}}/design-proposal-2.md\n  - .docs/adf/{{issue}}/design-proposal-3.md\n\nRead the design quality evaluation for context:\n  - .docs/adf/{{issue}}/design-quality-evaluation.md\n\nRead the research synthesis for context:\n  - .docs/adf/{{issue}}/research-synthesis.md\n\nYour task: judge-evaluate the 3 design proposals and write a synthesis to:\n.docs/adf/{{issue}}/design-synthesis.md\n\nEvaluate each design on:\n- Completeness (covers all acceptance criteria)\n- Feasibility (can be implemented in scope)\n- Risk (identifies and mitigates risks)\n- Consistency (consistent with existing architecture)\n- Quality (KLS 6-dimension score)\n\nDesign synthesis format:\n---\nstage: design-synthesis\nissue: {{issue}}\ntimestamp: FILL_IN\nchosen_design: [slot number]\n---\n\n## Best Design\n[Which design is best and why]\n\n## Design Evaluation\n[Comparison of all 3 designs against criteria]\n\n## Recommended Implementation\n[Hybrid approach if needed, or single best design]\n\n## Open Questions\n[Questions to resolve before implementation]\n"
+timeout_secs = 600
+
+# ============================================================
+# CHECKPOINT: Human review
+# ============================================================
+[[steps]]
+name = "human-review"
+kind = "checkpoint"
