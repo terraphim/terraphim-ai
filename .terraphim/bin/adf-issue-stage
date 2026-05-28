@@ -1,0 +1,533 @@
+#!/usr/bin/env bash
+# adf-issue-stage: Real stage logic for ADF.
+# Each stage produces a structured artefact in .docs/adf/<issue>/
+# No template comments -- only meaningful output is posted to Gitea.
+set -euo pipefail
+
+ADF_DOCS="${ADF_DOCS:-/home/alex/projects/terraphim/terraphim-ai/.docs/adf}"
+GITEA_API="${GITEA_API:-https://git.terraphim.cloud/api/v1}"
+GITEA_TOKEN="${GITEA_TOKEN:-}"
+ADF_CTL="${ADF_CTL:-/home/alex/projects/terraphim/terraphim-ai/target/debug/adf-ctl}"
+
+task="${1:-}"
+issue=""
+
+# --- Context parsing ---
+
+extract_issue_from_task() {
+    local t="$1"
+    if [[ "$t" =~ (^|[[:space:];])issue=([0-9]+) ]]; then
+        printf '%s' "${BASH_REMATCH[2]}"
+        return 0
+    fi
+    return 1
+}
+
+extract_artefact_from_task() {
+    local t="$1"
+    if [[ "$t" =~ (^|[[:space:];])artefact=([^[:space:];]+) ]]; then
+        printf '%s' "${BASH_REMATCH[2]}"
+        return 0
+    fi
+    return 1
+}
+
+has_task_flag() {
+    local flag="$1"
+    local t="$task"
+    [[ "$t" =~ (^|[[:space:];])${flag}(=true)?($|[[:space:];]) ]]
+}
+
+pick_ready_issue() {
+    if ! command -v gtr >/dev/null 2>&1; then
+        printf 'ERROR: gtr not available for auto-pick\n' >&2
+        return 1
+    fi
+    local ready_json
+    ready_json="$(gtr ready --owner terraphim --repo terraphim-ai 2>/dev/null)" || return 1
+    if command -v jq >/dev/null 2>&1; then
+        jq -r '.ready_issues[0].index // empty' <<< "$ready_json" 2>/dev/null || return 1
+    else
+        printf '%s' "$ready_json" | sed -n 's/.*"ready_issues":\[{"id":[0-9][0-9]*,"index":\([0-9][0-9]*\).*/\1/p' | head -1
+    fi
+}
+
+# --- Issue context ---
+
+fetch_issue_body() {
+    local iss="$1"
+    if [[ -z "$GITEA_TOKEN" ]]; then
+        curl -sf -H "Authorization: token ${GITEA_TOKEN}" \
+            "${GITEA_API}/repos/terraphim/terraphim-ai/issues/${iss}" 2>/dev/null | \
+            jq -r '.body // empty'
+    else
+        curl -sf \
+            "${GITEA_API}/repos/terraphim/terraphim-ai/issues/${iss}" 2>/dev/null | \
+            jq -r '.body // empty'
+    fi
+}
+
+fetch_issue_title() {
+    local iss="$1"
+    curl -sf \
+        "${GITEA_API}/repos/terraphim/terraphim-ai/issues/${iss}" 2>/dev/null | \
+        jq -r '.title // empty'
+}
+
+# --- Artefact helpers ---
+
+ensure_issue_dir() {
+    local iss="$1"
+    mkdir -p "${ADF_DOCS}/${iss}"
+}
+
+write_frontmatter_artefact() {
+    local path="$1"
+    local stage="$2"
+    local iss="$3"
+    local classification="${4:-pending}"
+    local agent="${5:-adf-issue-stage}"
+
+    cat > "$path" <<EOF
+---
+stage: ${stage}
+issue: ${iss}
+classification: ${classification}
+timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+agent: ${agent}
+---
+
+## Summary
+<!-- Fill in -->
+
+## Details
+<!-- Fill in -->
+
+## Classification Rationale
+<!-- Fill in (for research stage) -->
+EOF
+}
+
+post_structured_comment() {
+    local iss="$1"
+    local stage="$2"
+    local artefact_path="$3"
+    local summary="${4:-}"
+
+    if [[ -z "$summary" ]]; then
+        summary="Stage '${stage}' completed for issue #${iss}"
+    fi
+
+    local body="## ADF ${stage^} Progress
+
+**Issue:** #${iss}
+**Stage:** ${stage}
+**Artefact:** \`${artefact_path}\`
+
+${summary}"
+
+    if command -v gtr >/dev/null 2>&1; then
+        gtr comment --owner terraphim --repo terraphim-ai --index "$iss" --body "$body" 2>/dev/null || {
+            printf 'WARNING: gtr comment failed for issue #%s\n' "$iss" >&2
+        }
+    fi
+}
+
+# --- Stage handlers ---
+
+handle_research() {
+    local iss="$1"
+    local artefact="${ADF_DOCS}/${iss}/research.md"
+
+    ensure_issue_dir "$iss"
+
+    if [[ -f "$artefact" ]]; then
+        printf 'Research artefact already exists: %s\n' "$artefact"
+        return 0
+    fi
+
+    local title
+    title="$(fetch_issue_title "$iss")"
+    local body
+    body="$(fetch_issue_body "$iss")"
+
+    write_frontmatter_artefact "$artefact" "research" "$iss" "pending"
+
+    cat >> "$artefact" <<EOF
+
+## Issue Title
+${title}
+
+## Issue Body
+\`\`\`
+${body}
+\`\`\`
+
+## Classification (fill in below)
+Classification: **valid | stale | duplicate | blocked | needs-rescope**
+
+<!-- Agent fills in: -->
+## Current State
+<!-- What exists in the codebase -->
+
+## Key Findings
+- Finding 1
+- Finding 2
+
+## Recommendations
+<!-- What should happen next -->
+EOF
+
+    post_structured_comment "$iss" "research" "$artefact" \
+        "Research artefact created. Classification and findings to be populated by agent."
+    printf 'Research artefact created: %s\n' "$artefact"
+}
+
+handle_design() {
+    local iss="$1"
+    local research_artefact="${ADF_DOCS}/${iss}/research.md"
+
+    if [[ ! -f "$research_artefact" ]]; then
+        printf 'ERROR: Research artefact not found: %s\n' "$research_artefact" >&2
+        printf 'Run disciplined-research-agent first.\n' >&2
+        return 1
+    fi
+
+    local artefact="${ADF_DOCS}/${iss}/design.md"
+    ensure_issue_dir "$iss"
+
+    if [[ -f "$artefact" ]]; then
+        printf 'Design artefact already exists: %s\n' "$artefact"
+        return 0
+    fi
+
+    write_frontmatter_artefact "$artefact" "design" "$iss" "pending"
+
+    cat >> "$artefact" <<EOF
+
+## Research Summary
+<!-- Agent summarises research findings from ${research_artefact} -->
+
+## Design Overview
+<!-- What this plan accomplishes -->
+
+## File Changes
+
+### New Files
+| File | Purpose |
+|------|---------|
+| | |
+
+### Modified Files
+| File | Change |
+|------|--------|
+| | |
+
+### Deleted Files
+| File | Reason |
+|------|--------|
+| | |
+
+## Implementation Steps
+1. <!-- Step 1 -->
+2. <!-- Step 2 -->
+3. <!-- Step 3 -->
+
+## Test Strategy
+<!-- How to verify -->
+
+## Rollback Plan
+<!-- How to undo if needed -->
+EOF
+
+    post_structured_comment "$iss" "design" "$artefact" \
+        "Design artefact created. Implementation plan to be populated by agent."
+    printf 'Design artefact created: %s\n' "$artefact"
+}
+
+handle_implementation() {
+    local iss="$1"
+    local design_artefact="${ADF_DOCS}/${iss}/design.md"
+
+    if [[ ! -f "$design_artefact" ]]; then
+        printf 'ERROR: Design artefact not found: %s\n' "$design_artefact" >&2
+        printf 'Run disciplined-design-agent first.\n' >&2
+        return 1
+    fi
+
+    local artefact="${ADF_DOCS}/${iss}/implementation.md"
+    ensure_issue_dir "$iss"
+
+    write_frontmatter_artefact "$artefact" "implementation" "$iss" "in-progress"
+
+    cat >> "$artefact" <<EOF
+
+## Implementation Status
+**Status:** In Progress
+
+<!-- Agent populates: -->
+## Changes Made
+<!-- Diff or summary of changes -->
+
+## Verification
+<!-- How changes were verified -->
+EOF
+
+    post_structured_comment "$iss" "implementation" "$artefact" \
+        "Implementation artefact created."
+    printf 'Implementation artefact created: %s\n' "$artefact"
+}
+
+handle_review() {
+    local iss="$1"
+    local artefact="${ADF_DOCS}/${iss}/review-findings.json"
+    ensure_issue_dir "$iss"
+
+    cat > "$artefact" <<EOF
+{
+  "stage": "review",
+  "issue": "${iss}",
+  "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "agent": "structured-pr-review",
+  "findings": [],
+  "outstanding": false,
+  "summary": "pending"
+}
+EOF
+
+    post_structured_comment "$iss" "review" "$artefact" \
+        "Review findings artefact created."
+    printf 'Review artefacts created: %s\n' "$artefact"
+}
+
+handle_corrections() {
+    local iss="$1"
+    local review_artefact="${ADF_DOCS}/${iss}/review-findings.json"
+
+    if [[ ! -f "$review_artefact" ]]; then
+        printf 'No review findings. Nothing to correct for issue #%s.\n' "$iss"
+        return 0
+    fi
+
+    if ! command -v jq >/dev/null 2>&1; then
+        printf 'ERROR: jq required for corrections stage\n' >&2
+        return 1
+    fi
+
+    local outstanding
+    outstanding="$(jq -r '.outstanding // false' "$review_artefact")"
+
+    local p0_count
+    p0_count="$(jq '[.findings[] | select(.severity == "P0")] | length' "$review_artefact")"
+    local p1_count
+    p1_count="$(jq '[.findings[] | select(.severity == "P1")] | length' "$review_artefact")"
+
+    local total_critical=$((p0_count + p1_count))
+
+    if [[ "$outstanding" == "true" ]] && [[ $total_critical -gt 0 ]]; then
+        printf 'Corrections triggered: outstanding=true, P0+P1=%d\n' "$total_critical"
+
+        "$ADF_CTL" --local trigger disciplined-research-agent --direct \
+            --context "issue=${iss} reason=corrections-p0-p1" 2>/dev/null || true
+        "$ADF_CTL" --local trigger disciplined-design-agent --direct \
+            --context "issue=${iss} reason=corrections-p0-p1" 2>/dev/null || true
+
+        printf 'Corrections: re-triggered research + design for issue #%s\n' "$iss"
+    else
+        printf 'Corrections: no outstanding P0/P1 findings for issue #%s\n' "$iss"
+    fi
+}
+
+handle_verification() {
+    local iss="$1"
+    local impl_artefact="${ADF_DOCS}/${iss}/implementation.md"
+    local artefact="${ADF_DOCS}/${iss}/verification.md"
+    ensure_issue_dir "$iss"
+
+    write_frontmatter_artefact "$artefact" "verification" "$iss" "pending"
+
+    cat >> "$artefact" <<EOF
+
+## Verification Results
+<!-- Agent fills in: -->
+
+## Test Results
+| Test | Result |
+|------|--------|
+| | |
+
+## Coverage
+<!-- Test coverage summary -->
+EOF
+
+    post_structured_comment "$iss" "verification" "$artefact" \
+        "Verification artefact created."
+    printf 'Verification artefact created: %s\n' "$artefact"
+}
+
+handle_validation() {
+    local iss="$1"
+    local artefact="${ADF_DOCS}/${iss}/validation.md"
+    ensure_issue_dir "$iss"
+
+    write_frontmatter_artefact "$artefact" "validation" "$iss" "pending"
+
+    cat >> "$artefact" <<EOF
+
+## Validation Results
+<!-- Agent fills in: end-to-end validation -->
+
+## Acceptance Criteria
+| Criterion | Met? |
+|-----------|------|
+| | |
+
+## Sign-off
+<!-- Stakeholder sign-off -->
+EOF
+
+    post_structured_comment "$iss" "validation" "$artefact" \
+        "Validation artefact created."
+    printf 'Validation artefact created: %s\n' "$artefact"
+}
+
+handle_security() {
+    local iss="$1"
+    local artefact="${ADF_DOCS}/${iss}/security.md"
+    ensure_issue_dir "$iss"
+
+    write_frontmatter_artefact "$artefact" "security" "$iss" "pending" "security-sentinel"
+
+    cat >> "$artefact" <<EOF
+
+## Security Review
+<!-- Agent fills in: -->
+
+## Findings
+| Severity | Description | Status |
+|----------|-------------|--------|
+| | | |
+
+## Recommendations
+<!-- Security recommendations -->
+EOF
+
+    post_structured_comment "$iss" "security" "$artefact" \
+        "Security review artefact created."
+    printf 'Security artefact created: %s\n' "$artefact"
+}
+
+handle_build() {
+    local iss="$1"
+    local artefact="${ADF_DOCS}/${iss}/build.md"
+    ensure_issue_dir "$iss"
+
+    write_frontmatter_artefact "$artefact" "build" "$iss" "pending" "build-runner"
+
+    cat >> "$artefact" <<EOF
+
+## Build Results
+<!-- Agent fills in: -->
+
+## Artifacts
+| Artifact | Path |
+|----------|------|
+| | |
+EOF
+
+    post_structured_comment "$iss" "build" "$artefact" \
+        "Build artefact created."
+    printf 'Build artefact created: %s\n' "$artefact"
+}
+
+handle_meta_learning() {
+    local iss="$1"
+    local artefact="${ADF_DOCS}/${iss}/meta-learning.md"
+    ensure_issue_dir "$iss"
+
+    write_frontmatter_artefact "$artefact" "meta-learning" "$iss" "pending" "meta-learning"
+
+    cat >> "$artefact" <<EOF
+
+## Learning Summary
+<!-- Agent fills in: what was learned from this issue -->
+
+## Patterns Identified
+- Pattern 1
+- Pattern 2
+
+## Recommendations for Fleet
+<!-- Recommendations for future agents -->
+EOF
+
+    printf 'Meta-learning artefact created: %s\n' "$artefact"
+}
+
+handle_unknown() {
+    local iss="$1"
+    local stage="$2"
+    local artefact="${ADF_DOCS}/${iss}/${stage}.md"
+    ensure_issue_dir "$iss"
+
+    write_frontmatter_artefact "$artefact" "$stage" "$iss" "pending"
+
+    printf 'Stage artefact created: %s\n' "$artefact"
+}
+
+# --- Main ---
+
+parse_stage() {
+    local t="$1"
+    case "$t" in
+        stage=disciplined-research*)  printf 'research' ;;
+        stage=disciplined-design*)      printf 'design' ;;
+        stage=disciplined-implementation*) printf 'implementation' ;;
+        stage=structured-pr-review*|stage=pr-reviewer*) printf 'review' ;;
+        stage=disciplined-verification*) printf 'verification' ;;
+        stage=disciplined-validation*)  printf 'validation' ;;
+        stage=corrections*)             printf 'corrections' ;;
+        stage=security-sentinel*)       printf 'security' ;;
+        stage=build-runner*)           printf 'build' ;;
+        stage=meta-learning*)           printf 'meta-learning' ;;
+        stage=implementation-swarm*)    printf 'implementation' ;;
+        *)                             printf 'unknown' ;;
+    esac
+}
+
+main() {
+    if [[ -z "$task" ]]; then
+        printf 'ERROR: no task string provided\n' >&2
+        printf 'Usage: %s \"stage=<stage>; issue=<number>\"\n' "$0" >&2
+        exit 2
+    fi
+
+    if ! issue="$(extract_issue_from_task "$task")"; then
+        printf 'No issue in task string, auto-picking...\n' >&2
+        if ! issue="$(pick_ready_issue)"; then
+            printf 'ERROR: no issue available and gtr not available\n' >&2
+            exit 2
+        fi
+        task="${task}; issue=${issue} auto-picked-by=adf-issue-stage"
+        printf 'Auto-picked issue: %s\n' "$issue"
+    fi
+
+    local stage
+    stage="$(parse_stage "$task")"
+    printf 'Stage: %s, Issue: %s\n' "$stage" "$issue"
+
+    case "$stage" in
+        research)    handle_research "$issue" ;;
+        design)      handle_design "$issue" ;;
+        implementation) handle_implementation "$issue" ;;
+        review)     handle_review "$issue" ;;
+        corrections) handle_corrections "$issue" ;;
+        verification) handle_verification "$issue" ;;
+        validation)  handle_validation "$issue" ;;
+        security)    handle_security "$issue" ;;
+        build)       handle_build "$issue" ;;
+        meta-learning) handle_meta_learning "$issue" ;;
+        *)           handle_unknown "$issue" "$stage" ;;
+    esac
+}
+
+main "$@"
