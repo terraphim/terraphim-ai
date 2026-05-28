@@ -188,8 +188,58 @@ condition = "{{steps.final-judge.exit_code}} == 0"
 on_fail = "abort"
 
 # ============================================================
-# CHECKPOINT: Final approval (human or automated)
+# PHASE 7: VALIDATION - disciplined-validation skill
+# ============================================================
+[[steps]]
+name = "validation"
+kind = "agent"
+cli_tool = "opencode"
+model = "kimi-for-coding/k2p6"
+provider = "kimi"
+task = "You are running the disciplined-validation skill for issue #{{issue}}.\n\nYour task:\n1. Load and apply the disciplined-validation skill: skill://disciplined-validation\n2. Read the implementation status at:\n   - .docs/adf/{{issue}}/implementation-status.md\n3. Read the review findings at:\n   - .docs/adf/{{issue}}/review-findings.md\n4. Read the final verdict at:\n   - .docs/adf/{{issue}}/final-verdict.md\n5. Validate the implementation against original requirements\n6. Write validation report to .docs/adf/{{issue}}/validation-report.md\n\nValidation report format (YAML frontmatter + markdown):\n---\nstage: validation-report\nissue: {{issue}}\ntimestamp: FILL_IN\nvalidation_complete: [true|false]\npasses_validation: [true|false]\n---\n\n## Validation Summary\n[Overall validation result]\n\n## Requirements Verification\n[Does implementation meet each requirement?]\n\n## Acceptance Criteria Check\n[Does implementation meet acceptance criteria from design?]\n\n## Issues Found\n[Any issues discovered during validation]\n\n## Recommendations\n[What needs to happen before final approval]\n"
+timeout_secs = 600
+
+# Gate: validation must pass
+[[steps]]
+name = "gate-validation"
+kind = "gate"
+condition = "{{steps.validation.exit_code}} == 0"
+on_fail = "abort"
+
+# ============================================================
+# PHASE 8: VERIFICATION - disciplined-verification skill
+# ============================================================
+[[steps]]
+name = "verification"
+kind = "agent"
+cli_tool = "opencode"
+model = "kimi-for-coding/k2p6"
+provider = "kimi"
+task = "You are running the disciplined-verification skill for issue #{{issue}}.\n\nYour task:\n1. Load and apply the disciplined-verification skill: skill://disciplined-verification\n2. Read the validation report at:\n   - .docs/adf/{{issue}}/validation-report.md\n3. Read the implementation status at:\n   - .docs/adf/{{issue}}/implementation-status.md\n4. Verify implementation against design specifications\n5. Write verification report to .docs/adf/{{issue}}/verification-report.md\n\nVerification report format (YAML frontmatter + markdown):\n---\nstage: verification-report\nissue: {{issue}}\ntimestamp: FILL_IN\nverification_complete: [true|false]\npasses_verification: [true|false]\n---\n\n## Verification Summary\n[Overall verification result]\n\n## Design Specification Check\n[Does implementation match design?]\n\n## Test Coverage\n[Are tests adequate?]\n\n## Code Quality\n[Does code meet quality standards?]\n\n## Issues Found\n[Any issues discovered during verification]\n\n## Recommendations\n[What needs to happen before final approval]\n"
+timeout_secs = 600
+
+# Gate: verification must pass
+[[steps]]
+name = "gate-verification"
+kind = "gate"
+condition = "{{steps.verification.exit_code}} == 0"
+on_fail = "abort"
+
+# ============================================================
+# PHASE 9: FINAL JUDGE - final approval verdict
 # ============================================================
 [[steps]]
 name = "final-approval"
-kind = "checkpoint"
+kind = "agent"
+cli_tool = "opencode"
+model = "kimi-for-coding/k2p6"
+provider = "kimi"
+task = "You are the final approval judge for issue #{{issue}}.\n\nYour task:\n1. Review the validation report at:\n   - .docs/adf/{{issue}}/validation-report.md\n2. Review the verification report at:\n   - .docs/adf/{{issue}}/verification-report.md\n3. Review the implementation status at:\n   - .docs/adf/{{issue}}/implementation-status.md\n4. Review the review findings at:\n   - .docs/adf/{{issue}}/review-findings.md\n5. Make final approval decision\n6. Write final approval verdict to .docs/adf/{{issue}}/final-approval-verdict.md\n\nFinal approval verdict format (YAML frontmatter + markdown):\n---\nstage: final-approval-verdict\nissue: {{issue}}\ntimestamp: FILL_IN\napproved: [true|false]\nready_for_merge: [true|false]\n---\n\n## Final Approval Decision\n[APPROVED/REJECTED with rationale]\n\n## Validation Summary\n[Did validation pass?]\n\n## Verification Summary\n[Did verification pass?]\n\n## Outstanding Issues\n[Any remaining P0/P1 issues]\n\n## Final Recommendations\n[What must happen before merge]\n"
+timeout_secs = 300
+
+# Gate: final approval must be granted
+[[steps]]
+name = "gate-final-approval"
+kind = "gate"
+condition = "{{steps.final-approval.exit_code}} == 0"
+on_fail = "abort"
