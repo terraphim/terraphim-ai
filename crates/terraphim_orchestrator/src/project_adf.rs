@@ -593,6 +593,7 @@ context = "adf/build"
             pr_dispatch: adf.pr_dispatch,
             pr_dispatch_per_project: std::collections::HashMap::new(),
             gitea_skill_repo: None,
+            direct_dispatch: None,
         };
 
         config.substitute_env_vars();

@@ -49,6 +49,7 @@ fn fixture_config(agents: Vec<AgentDefinition>) -> OrchestratorConfig {
         pr_dispatch: None,
         pr_dispatch_per_project: std::collections::HashMap::new(),
         gitea_skill_repo: None,
+        direct_dispatch: None,
     }
 }
 

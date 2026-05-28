@@ -38,6 +38,8 @@ pub mod concurrency;
 pub mod config;
 pub mod control_plane;
 pub mod cost_tracker;
+#[cfg(unix)]
+pub mod direct_dispatch;
 pub mod dispatcher;
 pub mod dual_mode;
 pub mod error;
@@ -130,7 +132,7 @@ use terraphim_types::{FindingSeverity, ReviewFinding};
 pub use worktree_guard::{with_worktree_guard, with_worktree_guard_async, WorktreeGuard};
 
 use chrono::Timelike;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::time::{Duration, Instant};
@@ -1249,10 +1251,36 @@ impl AgentOrchestrator {
             "safety agents spawned, entering reconciliation loop"
         );
 
+        // Webhook and direct dispatch use separate channels so the bridge tasks
+        // can emit distinct LoopEvent variants without needing to tag messages.
+        let webhook_dispatch_rx = if self.config.webhook.is_some() {
+            let (tx, rx) = tokio::sync::mpsc::channel(64);
+            self.webhook_dispatch_rx = Some(rx);
+            Some(tx)
+        } else {
+            self.webhook_dispatch_rx = None;
+            None
+        };
+
+        #[cfg(unix)]
+        let direct_dispatch_rx = if self.config.direct_dispatch.is_some() {
+            let (tx, rx) = tokio::sync::mpsc::channel(64);
+            Some((tx, rx))
+        } else {
+            None
+        };
+        #[cfg(not(unix))]
+        let direct_dispatch_rx: Option<(
+            tokio::sync::mpsc::Sender<webhook::WebhookDispatch>,
+            tokio::sync::mpsc::Receiver<webhook::WebhookDispatch>,
+        )> = None;
+
         // Start webhook server if configured
         if let Some(ref webhook_cfg) = self.config.webhook {
-            let (dispatch_tx, dispatch_rx) = tokio::sync::mpsc::channel(64);
-            self.webhook_dispatch_rx = Some(dispatch_rx);
+            let dispatch_tx = webhook_dispatch_rx
+                .as_ref()
+                .expect("webhook dispatch channel is initialised when webhook is configured")
+                .clone();
 
             let agent_names: Vec<String> =
                 self.config.agents.iter().map(|a| a.name.clone()).collect();
@@ -1292,11 +1320,39 @@ impl AgentOrchestrator {
             });
         }
 
+        #[cfg(unix)]
+        let direct_dispatch_rx = if let Some(ref direct_cfg) = self.config.direct_dispatch {
+            let (direct_tx, direct_rx) = direct_dispatch_rx.expect(
+                "direct dispatch channel is initialised when direct_dispatch is configured",
+            );
+            let agent_names: HashSet<String> = self
+                .config
+                .agents
+                .iter()
+                .map(|agent| agent.name.clone())
+                .collect();
+
+            direct_dispatch::start_direct_dispatch_listener(
+                direct_cfg.socket_path.clone(),
+                direct_tx,
+                agent_names,
+            );
+
+            Some(direct_rx)
+        } else {
+            None
+        };
+        #[cfg(not(unix))]
+        let direct_dispatch_rx: Option<
+            tokio::sync::mpsc::Receiver<webhook::WebhookDispatch>,
+        > = None;
+
         enum LoopEvent {
             Tick,
             Schedule(ScheduleEvent),
             DriftAlert(DriftAlert),
             Webhook(webhook::WebhookDispatch),
+            DirectDispatch(webhook::WebhookDispatch),
         }
 
         let tick_interval = self.config.tick_interval_secs;
@@ -1366,6 +1422,23 @@ impl AgentOrchestrator {
             });
         }
 
+        if let Some(direct_rx) = direct_dispatch_rx {
+            let dd_tx = loop_tx.clone();
+            tokio::spawn(async move {
+                let mut rx = direct_rx;
+                while let Some(dispatch) = rx.recv().await {
+                    if dd_tx
+                        .lock()
+                        .unwrap()
+                        .send(LoopEvent::DirectDispatch(dispatch))
+                        .is_err()
+                    {
+                        break;
+                    }
+                }
+            });
+        }
+
         let reconcile_timeout = Duration::from_secs(self.config.tick_interval_secs.max(30) * 3);
 
         loop {
@@ -1381,6 +1454,9 @@ impl AgentOrchestrator {
                     self.mark_webhook_comment_processed(comment_id).await;
                     let _ = loop_tx.lock().unwrap().send(LoopEvent::Tick);
                 }
+                Ok(LoopEvent::DirectDispatch(dispatch)) => {
+                    self.handle_direct_dispatch(dispatch).await;
+                }
                 Ok(LoopEvent::Schedule(event)) => {
                     self.handle_schedule_event(event).await;
                 }
@@ -1394,6 +1470,9 @@ impl AgentOrchestrator {
                                 let comment_id = dispatch.comment_id();
                                 self.handle_webhook_dispatch(dispatch).await;
                                 self.mark_webhook_comment_processed(comment_id).await;
+                            }
+                            Ok(LoopEvent::DirectDispatch(dispatch)) => {
+                                self.handle_direct_dispatch(dispatch).await;
                             }
                             Ok(LoopEvent::Schedule(event)) => {
                                 self.handle_schedule_event(event).await;
@@ -3830,6 +3909,43 @@ impl AgentOrchestrator {
                     pusher_login,
                     files_changed,
                 });
+            }
+        }
+    }
+
+    async fn handle_direct_dispatch(&mut self, dispatch: webhook::WebhookDispatch) {
+        match dispatch {
+            webhook::WebhookDispatch::SpawnAgent {
+                agent_name,
+                context,
+                ..
+            } => {
+                let def = match self.config.agents.iter().find(|a| a.name == agent_name) {
+                    Some(def) => def,
+                    None => {
+                        warn!(agent = %agent_name, "direct dispatch: agent not found in config");
+                        return;
+                    }
+                };
+
+                if !def.enabled {
+                    info!(agent = %agent_name, "direct dispatch rejected: agent is disabled");
+                    return;
+                }
+
+                let mut direct_def = def.clone();
+                if !context.is_empty() {
+                    direct_def.task =
+                        format!("{}\n\n[direct dispatch context]\n{}", def.task, context);
+                }
+
+                info!(agent = %agent_name, "direct dispatch: spawning agent");
+                if let Err(e) = self.spawn_agent(&direct_def).await {
+                    error!(agent = %agent_name, error = %e, "direct dispatch: failed to spawn agent");
+                }
+            }
+            other => {
+                warn!(dispatch = ?other, "direct dispatch ignored unsupported dispatch type");
             }
         }
     }
@@ -8281,6 +8397,7 @@ mod tests {
             evolution: config::EvolutionConfig::default(),
             pr_dispatch: None,
             pr_dispatch_per_project: Default::default(),
+            direct_dispatch: None,
         }
     }
 
@@ -8308,6 +8425,146 @@ mod tests {
         assert!(!orch.shutdown_requested);
         orch.shutdown();
         assert!(orch.shutdown_requested);
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn test_direct_dispatch_config_starts_socket_listener() {
+        use std::os::unix::fs::FileTypeExt;
+
+        let temp = TempDir::new().unwrap();
+        let socket_path = temp.path().join("direct-dispatch.sock");
+        let mut config = test_config();
+        config.agents.clear();
+        config.direct_dispatch = Some(crate::config::DirectDispatchConfig {
+            socket_path: socket_path.clone(),
+        });
+
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+        orch.shutdown();
+        orch.run().await.unwrap();
+
+        let mut socket_created = false;
+        for _ in 0..50 {
+            if std::fs::symlink_metadata(&socket_path)
+                .map(|metadata| metadata.file_type().is_socket())
+                .unwrap_or(false)
+            {
+                socket_created = true;
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+
+        assert!(
+            socket_created,
+            "direct dispatch listener did not create socket at {}",
+            socket_path.display()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_handle_direct_dispatch_spawns_agent_without_mentions() {
+        let mut config = test_config();
+        config.agents = vec![AgentDefinition {
+            name: "echo-agent".to_string(),
+            layer: AgentLayer::Core,
+            cli_tool: "echo".to_string(),
+            task: "echo hello".to_string(),
+            schedule: None,
+            model: None,
+            capabilities: vec!["echo".to_string()],
+            max_memory_bytes: None,
+            budget_monthly_cents: None,
+            provider: None,
+            persona: None,
+            terraphim_role: None,
+            skill_chain: vec![],
+            sfia_skills: vec![],
+            fallback_provider: None,
+            fallback_model: None,
+            grace_period_secs: None,
+            max_cpu_seconds: None,
+            pre_check: None,
+            gitea_issue: None,
+            event_only: false,
+            evolution_enabled: false,
+            rlm_enabled: None,
+            bypass_kg_routing: false,
+            enabled: true,
+            project: None,
+        }];
+        config.mentions = None;
+
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        let dispatch = webhook::WebhookDispatch::SpawnAgent {
+            agent_name: "echo-agent".to_string(),
+            detected_project: None,
+            issue_number: 0,
+            comment_id: 0,
+            context: "test context".to_string(),
+        };
+
+        orch.handle_direct_dispatch(dispatch).await;
+
+        assert!(
+            orch.active_agents.contains_key("echo-agent"),
+            "direct dispatch must spawn agent even without mentions config; active_agents: {:?}",
+            orch.active_agents.keys().collect::<Vec<_>>()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_handle_direct_dispatch_rejects_disabled_agent() {
+        let mut config = test_config();
+        config.agents = vec![AgentDefinition {
+            name: "disabled-agent".to_string(),
+            layer: AgentLayer::Core,
+            cli_tool: "echo".to_string(),
+            task: "echo hello".to_string(),
+            schedule: None,
+            model: None,
+            capabilities: vec!["echo".to_string()],
+            max_memory_bytes: None,
+            budget_monthly_cents: None,
+            provider: None,
+            persona: None,
+            terraphim_role: None,
+            skill_chain: vec![],
+            sfia_skills: vec![],
+            fallback_provider: None,
+            fallback_model: None,
+            grace_period_secs: None,
+            max_cpu_seconds: None,
+            pre_check: None,
+            gitea_issue: None,
+            event_only: false,
+            evolution_enabled: false,
+            rlm_enabled: None,
+            bypass_kg_routing: false,
+            enabled: false,
+            project: None,
+        }];
+        config.mentions = None;
+
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        let dispatch = webhook::WebhookDispatch::SpawnAgent {
+            agent_name: "disabled-agent".to_string(),
+            detected_project: None,
+            issue_number: 0,
+            comment_id: 0,
+            context: String::new(),
+        };
+
+        orch.handle_direct_dispatch(dispatch).await;
+
+        assert!(
+            !orch.active_agents.contains_key("disabled-agent"),
+            "direct dispatch must not spawn disabled agent; active_agents: {:?}",
+            orch.active_agents.keys().collect::<Vec<_>>()
+        );
     }
 
     #[tokio::test]
@@ -8603,6 +8860,7 @@ task = "test"
             evolution: config::EvolutionConfig::default(),
             pr_dispatch: None,
             pr_dispatch_per_project: Default::default(),
+            direct_dispatch: None,
         }
     }
 
@@ -9644,6 +9902,7 @@ bypass_kg_routing = true
             evolution: config::EvolutionConfig::default(),
             pr_dispatch: None,
             pr_dispatch_per_project: Default::default(),
+            direct_dispatch: None,
         };
         (config, tmp)
     }

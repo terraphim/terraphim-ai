@@ -77,6 +77,7 @@ pub struct PrRef {
 }
 
 /// A dispatch request sent from the webhook handler to the orchestrator.
+#[derive(Debug)]
 pub enum WebhookDispatch {
     SpawnAgent {
         agent_name: String,
