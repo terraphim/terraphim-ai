@@ -592,7 +592,7 @@ impl FlowExecutor {
 
     /// Resolve template variables in a string.
     /// Supports: {{repo_path}}, {{base_branch}}, {{flow.name}}, {{flow.correlation_id}},
-    /// `{{steps.<name>.stdout}}`, `{{steps.<name>.stderr}}`, `{{steps.<name>.exit_code}}`,
+    /// {{issue}}, `{{steps.<name>.stdout}}`, `{{steps.<name>.stderr}}`, `{{steps.<name>.exit_code}}`,
     /// `{{steps.<name>.stdout_file}}`
     pub fn resolve_templates(
         &self,
@@ -605,6 +605,9 @@ impl FlowExecutor {
         result = result.replace("{{base_branch}}", &flow.base_branch);
         result = result.replace("{{flow.name}}", &flow.name);
         result = result.replace("{{flow.correlation_id}}", &state.correlation_id.to_string());
+        if let Some(ref issue) = state.issue {
+            result = result.replace("{{issue}}", issue);
+        }
 
         // Resolve step references: {{steps.<name>.stdout}}, etc.
         for envelope in &state.step_envelopes {

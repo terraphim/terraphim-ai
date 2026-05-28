@@ -21,6 +21,9 @@ pub struct FlowRunState {
     pub matrix_envelopes: HashMap<String, Vec<StepEnvelope>>,
     #[serde(default)]
     pub error: Option<String>,
+    /// Issue number injected via --context "issue=N" for {{issue}} template variable.
+    #[serde(default)]
+    pub issue: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -45,6 +48,7 @@ impl FlowRunState {
             step_envelopes: Vec::new(),
             matrix_envelopes: HashMap::new(),
             error: None,
+            issue: None,
         }
     }
 
@@ -54,6 +58,11 @@ impl FlowRunState {
         state.finished_at = Some(Utc::now());
         state.error = Some(reason.to_string());
         state
+    }
+
+    pub fn with_issue(mut self, issue: String) -> Self {
+        self.issue = Some(issue);
+        self
     }
 
     pub fn step_output(&self, step_name: &str) -> Option<&StepEnvelope> {

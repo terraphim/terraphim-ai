@@ -104,6 +104,20 @@ enum AdfSub {
         #[arg(long, value_enum, default_value_t)]
         format: OutputFormat,
     },
+    /// Run a named flow from a local .terraphim/flows/<name>.toml file.
+    /// Resolves {{issue}} from --context and dispatches matrix steps sequentially.
+    Flow {
+        /// Flow name (e.g. zdp-research). Looks for .terraphim/flows/<name>.toml
+        name: String,
+        /// Issue number or key=value context passed to the flow.
+        /// Use: --context "issue=1882" to set {{issue}} template variable.
+        #[arg(long, default_value = "")]
+        context: String,
+        /// Path to local orchestrator TOML (auto-discovered if not provided).
+        /// Required for local flow execution.
+        #[arg(long)]
+        config: Option<String>,
+    },
 }
 
 fn main() -> Result<()> {
@@ -143,6 +157,11 @@ fn run(local: bool, sub: AdfSub) -> Result<()> {
         } => cmd_status(local, &host, &since, format),
         AdfSub::Cancel { name, host } => cmd_cancel(local, &name, &host),
         AdfSub::Agents { host, format } => cmd_agents(local, &host, format),
+        AdfSub::Flow {
+            name,
+            context,
+            config,
+        } => cmd_flow(&name, &context, config.as_deref()),
     }
 }
 
@@ -878,6 +897,116 @@ fn cmd_agents(local: bool, host: &str, format: OutputFormat) -> Result<()> {
             println!("{}", serde_json::to_string_pretty(&report)?);
         }
     }
+    Ok(())
+}
+
+/// Discover a flow definition file from .terraphim/flows/<name>.toml
+/// starting from cwd and walking up the directory tree.
+fn discover_flow_file(cwd: &Path, name: &str) -> Option<PathBuf> {
+    let mut current = Some(cwd.to_path_buf());
+    while let Some(dir) = current {
+        let flow_path = dir
+            .join(".terraphim")
+            .join("flows")
+            .join(format!("{}.toml", name));
+        if flow_path.is_file() {
+            return Some(flow_path);
+        }
+        current = dir.parent().map(|p| p.to_path_buf());
+    }
+    None
+}
+
+/// Parse context string (e.g. "issue=1882") into key-value pairs.
+/// Returns a HashMap of parsed values.
+fn parse_context(context: &str) -> std::collections::HashMap<String, String> {
+    let mut map = std::collections::HashMap::new();
+    for part in context.split_whitespace() {
+        if let Some((k, v)) = part.split_once('=') {
+            map.insert(k.trim().to_string(), v.trim().to_string());
+        }
+    }
+    map
+}
+
+use terraphim_orchestrator::flow::config::FlowDefinition;
+use terraphim_orchestrator::flow::executor::FlowExecutor;
+use terraphim_orchestrator::flow::executor::ProjectRuntime;
+use terraphim_orchestrator::flow::state::FlowRunState;
+
+/// Run a named flow definition locally.
+fn cmd_flow(name: &str, context: &str, _config_path: Option<&str>) -> Result<()> {
+    let cwd = std::env::current_dir().context("failed to get current working directory")?;
+
+    let flow_path = discover_flow_file(&cwd, name).with_context(|| {
+        format!(
+            "flow '{}' not found in any .terraphim/flows/ directory from {} upward",
+            name,
+            cwd.display()
+        )
+    })?;
+
+    println!("Loading flow from: {}", flow_path.display());
+
+    let flow_content = std::fs::read_to_string(&flow_path)
+        .with_context(|| format!("failed to read {}", flow_path.display()))?;
+
+    let flow: FlowDefinition = toml::from_str(&flow_content)
+        .with_context(|| format!("failed to parse flow TOML from {}", flow_path.display()))?;
+
+    println!("Flow '{}' loaded: {} step(s)", flow.name, flow.steps.len());
+
+    // Parse context for issue
+    let ctx_map = parse_context(context);
+    let issue = ctx_map.get("issue").cloned();
+
+    // Create initial state with issue injected
+    let mut state = FlowRunState::new(&flow.name);
+    if let Some(ref iss) = issue {
+        println!("Issue context: {}", iss);
+        state = state.with_issue(iss.clone());
+    }
+
+    // Set up flow state directory
+    let flow_state_dir = cwd.join(".terraphim").join("flow-state");
+    std::fs::create_dir_all(&flow_state_dir).with_context(|| {
+        format!(
+            "failed to create flow state dir {}",
+            flow_state_dir.display()
+        )
+    })?;
+
+    // Build project runtime from the flow's project
+    let project_runtime = ProjectRuntime {
+        working_dir: cwd.clone(),
+        gitea_owner: Some("terraphim".to_string()),
+        gitea_repo: Some("terraphim-ai".to_string()),
+    };
+
+    let executor = FlowExecutor::new(cwd.clone(), flow_state_dir).with_projects(
+        std::collections::HashMap::from([(flow.project.clone(), project_runtime)]),
+    );
+
+    // Run the flow
+    println!("Running flow '{}'...", flow.name);
+    let rt = tokio::runtime::Runtime::new().context("failed to create Tokio runtime")?;
+
+    let final_state = rt
+        .block_on(async { executor.run(&flow, Some(state)).await })
+        .map_err(|e| anyhow::anyhow!("flow '{}' failed: {}", flow.name, e))?;
+
+    // Print summary
+    println!();
+    println!("Flow '{}' finished: {:?}", flow.name, final_state.status);
+    if let Some(ref err) = final_state.error {
+        println!("Error: {}", err);
+    }
+    println!(
+        "Steps completed: {}/{}",
+        final_state.step_envelopes.len(),
+        flow.steps.len()
+    );
+
     Ok(())
 }
 
