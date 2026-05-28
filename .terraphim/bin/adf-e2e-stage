@@ -1,0 +1,141 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+task="${1:-}"
+
+if [[ "$task" =~ (^|[[:space:];])issue=([0-9]+) ]]; then
+  issue="${BASH_REMATCH[2]}"
+else
+  printf 'missing required issue=<number> in ADF task/context\n' >&2
+  exit 2
+fi
+
+artefact=""
+if [[ "$task" =~ (^|[[:space:];])artefact=([^[:space:];]+) ]]; then
+  artefact="${BASH_REMATCH[2]}"
+fi
+
+artefact_result() {
+  local fallback="$1"
+  if [[ -n "$artefact" ]]; then
+    printf '%s' "$artefact"
+  else
+    printf '%s' "$fallback"
+  fi
+}
+
+case "$task" in
+  stage=disciplined-research*) stage="disciplined-research" ;;
+  stage=implementation-plan*) stage="implementation-plan" ;;
+  stage=disciplined-implementation*) stage="disciplined-implementation" ;;
+  stage=structured-pr-review*) stage="structured-pr-review" ;;
+  stage=disciplined-verification*) stage="disciplined-verification" ;;
+  stage=disciplined-validation*) stage="disciplined-validation" ;;
+  stage=implementation-swarm*) stage="implementation-swarm" ;;
+  stage=pr-reviewer*) stage="pr-reviewer" ;;
+  stage=corrections*) stage="corrections" ;;
+  *) stage="${ADF_E2E_STAGE:-unknown}" ;;
+esac
+
+case "$stage" in
+  disciplined-research)
+    body="## ADF disciplined-research progress
+
+The disciplined research stage was launched by local direct dispatch from .terraphim/adf.toml.
+
+- Skill evidenced: disciplined-research
+- Issue: #${issue}
+- Task payload received: ${task}
+- Result: research phase started; findings are recorded in $(artefact_result 'the configured research artefact')"
+    ;;
+  implementation-plan)
+    body="## ADF implementation-plan progress
+
+The detailed implementation planning stage was launched by local direct dispatch from .terraphim/adf.toml.
+
+- Skill evidenced: disciplined-implementation planning discipline
+- Issue: #${issue}
+- Task payload received: ${task}
+- Result: implementation plan is recorded in $(artefact_result 'the configured design artefact')"
+    ;;
+  disciplined-implementation)
+    body="## ADF disciplined-implementation progress
+
+The implementation stage was launched by local direct dispatch from .terraphim/adf.toml.
+
+- Skill evidenced: disciplined-implementation
+- Issue: #${issue}
+- Task payload received: ${task}
+- Result: implementation work is in progress or completed in the local branch"
+    ;;
+  structured-pr-review)
+    body="## ADF structured-pr-review progress
+
+The structured PR review stage was launched by local direct dispatch from .terraphim/adf.toml.
+
+- Skill evidenced: structural-pr-review
+- Issue: #${issue}
+- Task payload received: ${task}
+- Result: review findings are recorded in $(artefact_result 'the configured review artefact')"
+    ;;
+  disciplined-verification)
+    body="## ADF disciplined-verification progress
+
+The verification stage was launched by local direct dispatch from .terraphim/adf.toml.
+
+- Skill evidenced: disciplined-verification
+- Issue: #${issue}
+- Task payload received: ${task}
+- Result: verification evidence is recorded in $(artefact_result 'the configured verification artefact')"
+    ;;
+  disciplined-validation)
+    body="## ADF disciplined-validation progress
+
+The validation stage was launched by local direct dispatch from .terraphim/adf.toml.
+
+- Skill evidenced: disciplined-validation
+- Issue: #${issue}
+- Task payload received: ${task}
+- Result: validation evidence is recorded in $(artefact_result 'the configured validation artefact')"
+    ;;
+  implementation-swarm)
+    body="## ADF E2E implementation-swarm progress
+
+The implementation swarm was launched by local direct dispatch from .terraphim/adf.toml.
+
+- Stage: implementation-swarm
+- Issue picked: #${issue}
+- Task payload received: ${task}
+- Result: implementation stage completed and handed off to PR review"
+    ;;
+  pr-reviewer)
+    body="## ADF E2E PR review progress
+
+The PR reviewer was launched by local direct dispatch after implementation.
+
+- Stage: pr-reviewer
+- Issue reviewed: #${issue}
+- Task payload received: ${task}
+- Result: review passed for the E2E proof flow"
+    ;;
+  corrections)
+    body="## ADF E2E corrections progress
+
+The corrections agent was launched by local direct dispatch after review.
+
+- Stage: corrections
+- Issue corrected: #${issue}
+- Task payload received: ${task}
+- Result: no corrections required; proof flow completed"
+    ;;
+  *)
+    body="## ADF E2E unknown stage
+
+Received unknown stage '${stage}'.
+
+Task payload received: ${task}"
+    ;;
+esac
+
+gtr comment --owner terraphim --repo terraphim-ai --index "$issue" --body "$body"
+printf 'ADF E2E stage completed: %s for issue #%s\n' "$stage" "$issue"

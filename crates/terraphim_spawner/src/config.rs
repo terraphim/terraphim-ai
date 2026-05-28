@@ -108,6 +108,8 @@ impl AgentConfig {
     /// - codex: `exec <prompt>` runs a single task and exits
     /// - claude: `-p <prompt>` prints output without interactive UI
     /// - opencode: `run --format json` runs in non-interactive mode
+    /// - pi-rust: `-p --mode json <prompt>` runs a single task and exits
+    /// - badlogic/pi: `prompt <model> <prompt>` sends a prompt to a running model
     fn infer_args(cli_command: &str) -> Vec<String> {
         match Self::cli_name(cli_command) {
             "codex" => vec!["exec".to_string(), "--full-auto".to_string()],
@@ -121,7 +123,8 @@ impl AgentConfig {
                 "--format".to_string(),
                 "json".to_string(),
             ],
-            "pi-rust" | "pi" => vec!["-p".to_string(), "--mode".to_string(), "json".to_string()],
+            "pi-rust" => vec!["-p".to_string(), "--mode".to_string(), "json".to_string()],
+            "pi" => vec!["prompt".to_string()],
             // Shell interpreters: pass the task as an inline script. Enables
             // shell-script agents like fleet-meta to run `cli_tool = "/bin/bash"`
             // with the task body as the script source.
@@ -157,7 +160,7 @@ impl AgentConfig {
                 vec!["--model".to_string(), normalised]
             }
             "opencode" => vec!["-m".to_string(), model.to_string()],
-            "pi-rust" | "pi" => {
+            "pi-rust" => {
                 let mut args = Vec::new();
                 if let Some((provider, model_id)) = model.split_once('/') {
                     args.push("--provider".to_string());
@@ -170,6 +173,7 @@ impl AgentConfig {
                 }
                 args
             }
+            "pi" => vec![model.to_string()],
             _ => vec![],
         }
     }
@@ -207,6 +211,9 @@ pub enum ValidationError {
 
     #[error("Working directory does not exist: {0}")]
     WorkingDirNotFound(PathBuf),
+
+    #[error("pi CLI requires a model alias for `pi prompt <model> <prompt>`")]
+    PiModelRequired,
 }
 
 /// Validator for agent configuration
@@ -229,6 +236,9 @@ impl AgentValidator {
 
         // Check required API keys
         self.validate_api_keys().await?;
+
+        // Check CLI-specific contracts that cannot be inferred from PATH alone.
+        self.validate_cli_contract()?;
 
         // Check working directory
         self.validate_working_dir().await?;
@@ -267,6 +277,16 @@ impl AgentValidator {
             if std::env::var(key).is_err() {
                 return Err(ValidationError::ApiKeyNotSet(key.clone()));
             }
+        }
+        Ok(())
+    }
+
+    /// Validate CLI-specific argument contracts.
+    fn validate_cli_contract(&self) -> Result<(), ValidationError> {
+        if AgentConfig::cli_name(&self.config.cli_command) == "pi"
+            && self.config.args == ["prompt".to_string()]
+        {
+            return Err(ValidationError::PiModelRequired);
         }
         Ok(())
     }
@@ -493,7 +513,44 @@ mod tests {
     #[test]
     fn test_infer_args_pi_alias() {
         let args = AgentConfig::infer_args("pi");
-        assert_eq!(args, vec!["-p", "--mode", "json"]);
+        assert_eq!(args, vec!["prompt"]);
+    }
+
+    #[test]
+    fn test_model_args_pi_badlogic() {
+        let args = AgentConfig::model_args("pi", "phi3");
+        assert_eq!(args, vec!["phi3"]);
+    }
+
+    #[test]
+    fn test_model_args_pi_badlogic_full_path() {
+        let args = AgentConfig::model_args("/home/alex/.npm/bin/pi", "qwen");
+        assert_eq!(args, vec!["qwen"]);
+    }
+
+    #[tokio::test]
+    async fn test_validate_pi_requires_model_alias() {
+        let provider = terraphim_types::capability::Provider {
+            id: "test-pi".into(),
+            name: "test-pi".into(),
+            provider_type: terraphim_types::capability::ProviderType::Agent {
+                agent_id: "test".into(),
+                cli_command: "/bin/pi".into(),
+                working_dir: std::env::current_dir().unwrap(),
+            },
+            capabilities: vec![],
+            cost_level: terraphim_types::capability::CostLevel::Cheap,
+            latency: terraphim_types::capability::Latency::Medium,
+            keywords: vec![],
+        };
+        let config = AgentConfig::from_provider(&provider).unwrap();
+        let validator = AgentValidator::new(&config);
+        let result = validator.validate_cli_contract();
+        assert!(matches!(result, Err(ValidationError::PiModelRequired)));
+
+        let config_with_model = config.with_model("phi3");
+        let validator = AgentValidator::new(&config_with_model);
+        assert!(validator.validate_cli_contract().is_ok());
     }
 
     #[test]

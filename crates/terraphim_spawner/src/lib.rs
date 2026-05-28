@@ -1292,6 +1292,54 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_spawn_pi_receives_prompt_model_and_task() {
+        use std::os::unix::fs::PermissionsExt;
+        use tempfile::TempDir;
+
+        let tmpdir = TempDir::new().expect("create tempdir");
+        let script_path = tmpdir.path().join("pi");
+        let args_path = tmpdir.path().join("pi-args.txt");
+
+        std::fs::write(
+            &script_path,
+            "#!/bin/sh\nprintf '%s\n' \"$@\" > \"$PI_ARGS_CAPTURE\"\n",
+        )
+        .expect("write pi test script");
+        let mut perms = std::fs::metadata(&script_path).unwrap().permissions();
+        perms.set_mode(0o755);
+        std::fs::set_permissions(&script_path, perms).expect("chmod pi test script");
+
+        let provider = Provider::new(
+            "@pi-agent",
+            "Pi Agent",
+            terraphim_types::capability::ProviderType::Agent {
+                agent_id: "@pi".to_string(),
+                cli_command: script_path.to_string_lossy().to_string(),
+                working_dir: tmpdir.path().to_path_buf(),
+            },
+            vec![terraphim_types::capability::Capability::CodeGeneration],
+        );
+
+        let spawner = AgentSpawner::new();
+        let mut handle = spawner
+            .spawn_with_model(
+                &provider,
+                "What is 2+2?",
+                Some("phi3"),
+                SpawnContext::global()
+                    .with_env("PI_ARGS_CAPTURE", args_path.to_string_lossy().to_string()),
+            )
+            .await
+            .expect("pi spawn should succeed");
+        let status = handle.wait().await.expect("pi test process should exit");
+        assert!(status.success(), "pi test process should exit successfully");
+
+        let args = std::fs::read_to_string(&args_path).expect("read captured pi args");
+        let args: Vec<&str> = args.lines().collect();
+        assert_eq!(args, vec!["prompt", "phi3", "What is 2+2?"]);
+    }
+
+    #[tokio::test]
     async fn test_spawn_env_override_propagates() {
         // Use /usr/bin/printenv VAR_NAME to verify env override.
         // printenv takes the variable name as its argument and prints the value.
