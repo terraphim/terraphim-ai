@@ -1,14 +1,11 @@
-# k=3 design flow: matrix fan-out with 3 design proposals + judge synthesis.
-# Run with: adf flow zdp-design --context "issue=1882"
+# k=3 design flow: disciplined-design skill + judge-evaluate synthesis.
+# Run with: adf-ctl flow zdp-design --context "issue=1882"
 #
 # Steps:
-#   1. matrix-design: 3 parallel design proposals (sequential execution, k=3)
+#   1. matrix-design: 3 parallel design proposals using disciplined-design skill
 #   2. gate-check: require at least 2 proposals to succeed
-#   3. synthesize: judge-compares 3 proposals -> design-synthesis.md
+#   3. synthesize: judge-evaluates designs -> design-synthesis.md
 #   4. checkpoint: pause for human review
-#
-# Prerequisites: zdp-research flow should have been run first so that
-#   research-synthesis.md exists at .docs/adf/{{issue}}/
 
 name = "zdp-design"
 project = "terraphim-ai"
@@ -19,9 +16,10 @@ timeout_secs = 1800
 name = "matrix-design"
 kind = "agent"
 cli_tool = "opencode"
-task = "You are running the disciplined-design skill for issue #{{issue}}.\n\nFirst read the research synthesis at .docs/adf/{{issue}}/research-synthesis.md\nto understand the classification and findings.\n\nYour task: Create a detailed implementation plan and write it to:\n.docs/adf/{{issue}}/design-proposal-{{matrix.slot}}.md\n\nDesign proposal format:\n---\nstage: design-proposal\nissue: {{issue}}\nslot: {{matrix.slot}}\nmodel: {{matrix.model}}\ntimestamp: FILL_IN\n---\n\n## Design Overview\n[High-level description of the approach]\n\n## File Changes\n| File | Change |\n|------|--------|\n| | |\n\n## Implementation Steps\n1. [Step 1]\n2. [Step 2]\n3. [Step 3]\n\n## Test Strategy\n[How to verify this works]\n\n## Rollback Plan\n[How to undo if needed]\n\n## Risk Assessment\n| Risk | Likelihood | Impact | Mitigation |\n|------|------------|--------|------------|\n| | | | |\n"
+task = "You are running the disciplined-design skill for issue #{{issue}}.\n\nYour task:\n1. Use the disciplined-design skill to produce a design plan\n2. Load the skill: skill://disciplined-design\n3. Read the research synthesis at .docs/adf/{{issue}}/research-synthesis.md\n4. Read any existing design docs in .docs/design-*.md related to this issue\n5. Create a comprehensive design plan in .docs/adf/{{issue}}/design-proposal-{{matrix.slot}}.md\n\nDesign proposal format (YAML frontmatter + markdown):\n---\nstage: design-proposal\nissue: {{issue}}\nslot: {{matrix.slot}}\nmodel: {{matrix.model}}\ntimestamp: FILL_IN\n---\n\n## Problem Statement\n[What this design solves]\n\n## Architecture\n[Proposed architecture with trade-offs]\n\n## Implementation Plan\n[Step-by-step implementation]\n\n## File Changes\n[List of files to create/modify]\n\n## Risks and Mitigations\n[Identified risks and how to mitigate]\n\n## Acceptance Criteria\n[How to verify the implementation]\n"
 model = "{{matrix.model}}"
-timeout_secs = 600
+provider = "{{matrix.provider}}"
+timeout_secs = 900
 on_fail = "continue"
 
 [steps.matrix]
@@ -31,7 +29,7 @@ fail_strategy = "continue"
 [[steps.matrix.params]]
 slot = "1"
 model = "opus"
-provider = "anthropic"
+provider = "claude"
 
 [[steps.matrix.params]]
 slot = "2"
@@ -55,7 +53,7 @@ kind = "agent"
 cli_tool = "opencode"
 model = "kimi-for-coding/k2p6"
 provider = "kimi"
-task = "You are the judge for a k=3 design panel on issue #{{issue}}.\n\nRead the 3 design proposals at:\n  - .docs/adf/{{issue}}/design-proposal-1.md\n  - .docs/adf/{{issue}}/design-proposal-2.md\n  - .docs/adf/{{issue}}/design-proposal-3.md\n\nAlso read the research synthesis:\n.docs/adf/{{issue}}/research-synthesis.md\n\nYour task: judge-compare the 3 proposals and write a synthesis to:\n.docs/adf/{{issue}}/design-synthesis.md\n\nPick the best elements from each proposal. Produce a merged implementation plan.\n\nSynthesis format:\n---\nstage: design-synthesis\nissue: {{issue}}\ntimestamp: FILL_IN\n---\n\n## Final Design\n[Merged design overview]\n\n## File Changes (Final)\n| File | Change |\n|------|--------|\n| | |\n\n## Implementation Steps (Final)\n1. [Step 1]\n2. [Step 2]\n...\n\n## Test Strategy (Final)\n[Verification approach]\n\n## Risk Mitigation\n[How risks are addressed]\n"
+task = "You are the judge for a k=3 design panel on issue #{{issue}}.\n\nRead the 3 design proposals at:\n  - .docs/adf/{{issue}}/design-proposal-1.md\n  - .docs/adf/{{issue}}/design-proposal-2.md\n  - .docs/adf/{{issue}}/design-proposal-3.md\n\nRead the research synthesis for context:\n  - .docs/adf/{{issue}}/research-synthesis.md\n\nYour task: judge-evaluate the 3 designs and write a synthesis to:\n.docs/adf/{{issue}}/design-synthesis.md\n\nEvaluate each design on:\n- Completeness (covers all acceptance criteria)\n- Feasibility (can be implemented in scope)\n- Risk (identifies and mitigates risks)\n- Consistency (consistent with existing architecture)\n\nDesign synthesis format:\n---\nstage: design-synthesis\nissue: {{issue}}\ntimestamp: FILL_IN\nchosen_design: [slot number]\n---\n\n## Best Design\n[Which design is best and why]\n\n## Design Evaluation\n[Comparison of all 3 designs against criteria]\n\n## Recommended Implementation\n[Hybrid approach if needed, or single best design]\n\n## Open Questions\n[Questions to resolve before implementation]\n"
 timeout_secs = 600
 
 [[steps]]

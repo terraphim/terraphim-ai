@@ -1,8 +1,8 @@
-# k=3 research flow: matrix fan-out with 3 model proposals + judge synthesis.
-# Run with: adf flow zdp-research --context "issue=1882"
+# k=3 research flow: disciplined-research skill + judge-compare synthesis.
+# Run with: adf-ctl flow zdp-research --context "issue=1882"
 #
 # Steps:
-#   1. matrix-research: 3 parallel proposals (sequential execution, k=3)
+#   1. matrix-research: 3 parallel proposals using disciplined-research skill
 #   2. gate-check: require at least 2 proposals to succeed
 #   3. synthesize: judge-compares 3 proposals -> research-synthesis.md
 #   4. checkpoint: pause for human review
@@ -16,8 +16,9 @@ timeout_secs = 1800
 name = "matrix-research"
 kind = "agent"
 cli_tool = "opencode"
-task = "You are running the disciplined-research skill for issue #{{issue}}.\n\nYour task:\n1. Read the issue at https://git.terraphim.cloud/terraphim/terraphim-ai/issues/{{issue}}\n2. Analyse the codebase to understand current state\n3. Write a research proposal to .docs/adf/{{issue}}/research-proposal-{{matrix.slot}}.md\n4. Classify the issue as: valid, stale, duplicate, blocked, or needs-rescope\n\nResearch proposal format (YAML frontmatter + markdown):\n---\nstage: research-proposal\nissue: {{issue}}\nslot: {{matrix.slot}}\nmodel: {{matrix.model}}\ntimestamp: FILL_IN\nclassification: FILL_IN\n---\n\n## Issue Summary\n[1 paragraph: what the issue asks for]\n\n## Current State\n[What exists in the codebase today]\n\n## Classification\n[valid|stale|duplicate|blocked|needs-rescope with rationale]\n\n## Key Findings\n- [Finding 1]\n- [Finding 2]\n\n## Recommendations\n[What should happen next]\n"
+task = "You are running the disciplined-research skill for issue #{{issue}}.\n\nYour task:\n1. Use the disciplined-research skill to produce a research proposal\n2. Load the skill: skill://disciplined-research\n3. Read the issue at https://git.terraphim.cloud/terraphim/terraphim-ai/issues/{{issue}}\n4. Analyse the codebase to understand current state\n5. Write a research proposal to .docs/adf/{{issue}}/research-proposal-{{matrix.slot}}.md\n6. Classify the issue as: valid, stale, duplicate, blocked, or needs-rescope\n\nResearch proposal format (YAML frontmatter + markdown):\n---\nstage: research-proposal\nissue: {{issue}}\nslot: {{matrix.slot}}\nmodel: {{matrix.model}}\ntimestamp: FILL_IN\nclassification: FILL_IN\n---\n\n## Issue Summary\n[1 paragraph: what the issue asks for]\n\n## Current State\n[What exists in the codebase today]\n\n## Classification\n[valid|stale|duplicate|blocked|needs-rescope with rationale]\n\n## Key Findings\n- [Finding 1]\n- [Finding 2]\n\n## Recommendations\n[What should happen next]\n"
 model = "{{matrix.model}}"
+provider = "{{matrix.provider}}"
 timeout_secs = 600
 on_fail = "continue"
 
@@ -28,7 +29,7 @@ fail_strategy = "continue"
 [[steps.matrix.params]]
 slot = "1"
 model = "opus"
-provider = "anthropic"
+provider = "claude"
 
 [[steps.matrix.params]]
 slot = "2"

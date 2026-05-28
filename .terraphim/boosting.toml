@@ -2,7 +2,8 @@
 # Used by adf-flow-runner and adf-issue-stage.
 # Models are subscription-gated (pay-per-use excluded from planning roster).
 #
-# Planning phase: k=3 parallel proposals + judge-comparison
+# Planning phase: k=3 parallel proposals + judge-compare
+# Claude (opus) uses Claude CLI with rate-limit fallback to kimi
 # Implementation phase: k=1 + verification stack
 # Review phase: k=2 consensus
 
@@ -12,25 +13,32 @@ synthesis = "judge_compare"
 timeout_per_proposal = "10m"
 
 [[planning.models]]
-provider = "anthropic"
+provider = "claude"
 model = "opus"
+cli_tool = "claude"
+fallback_provider = "kimi"
+fallback_model = "kimi-for-coding/k2p6"
 
 [[planning.models]]
 provider = "kimi"
 model = "kimi-for-coding/k2p6"
+cli_tool = "opencode"
 
 [[planning.models]]
 provider = "openai"
 model = "openai/gpt-5.4"
+cli_tool = "opencode"
 
 [planning.judge]
 provider = "kimi"
 model = "kimi-for-coding/k2p6"
+cli_tool = "opencode"
 
 [implementation]
 parallel_proposals = 1
 provider = "kimi"
 model = "kimi-for-coding/k2p6"
+cli_tool = "opencode"
 verification = ["drift_check", "kg_validate", "tests"]
 
 [verification.drift_check]
@@ -56,9 +64,11 @@ parallel_proposals = 2
 synthesis = "consensus"
 
 [[review.models]]
-provider = "anthropic"
+provider = "claude"
 model = "sonnet"
+cli_tool = "claude"
 
 [[review.models]]
 provider = "kimi"
 model = "kimi-for-coding/k2p6"
+cli_tool = "opencode"
