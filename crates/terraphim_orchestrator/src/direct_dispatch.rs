@@ -504,8 +504,7 @@ mod tests {
             ..
         } = dispatch
         else {
-            assert!(false, "direct dispatch emits only SpawnAgent variants");
-            return;
+            unreachable!("direct dispatch emits only SpawnAgent variants");
         };
         assert_eq!(agent_name, "build-runner");
         assert_eq!(detected_project.as_deref(), Some("terraphim-ai"));
