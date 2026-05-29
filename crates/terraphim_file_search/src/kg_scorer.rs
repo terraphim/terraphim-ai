@@ -4,16 +4,12 @@ use terraphim_automata::find_matches;
 use terraphim_types::Thesaurus;
 
 use crate::config::KgScorerConfig;
-use fff_search::external_scorer::ExternalScorer;
-use fff_search::types::FileItem;
 
 /// Scores files by counting knowledge-graph concept matches in their path.
 ///
-/// Implements [`ExternalScorer`] so it can be plugged directly into a
-/// `fff-search` `ScoringContext`.  The scorer reads the file's
-/// `relative_path`, runs it through the Aho-Corasick automata built from
-/// the thesaurus, and returns `min(unique_matches * weight_per_term,
-/// max_boost)`.
+/// The scorer reads a resolved relative path, runs it through the Aho-Corasick
+/// automata built from the thesaurus, and returns
+/// `min(unique_matches * weight_per_term, max_boost)`.
 pub struct KgPathScorer {
     thesaurus: RwLock<Thesaurus>,
     config: KgScorerConfig,
@@ -40,21 +36,20 @@ impl KgPathScorer {
     pub fn update_thesaurus(&self, thesaurus: Thesaurus) {
         *self.thesaurus.write() = thesaurus;
     }
-}
 
-impl ExternalScorer for KgPathScorer {
-    fn score(&self, file: &FileItem) -> i32 {
+    /// Calculate the KG boost for a resolved relative file path.
+    pub fn score_path(&self, relative_path: &str) -> i32 {
         let thesaurus = self.thesaurus.read().clone();
 
         if thesaurus.is_empty() {
             return 0;
         }
 
-        let matches = match find_matches(&file.relative_path, thesaurus, false) {
+        let matches = match find_matches(relative_path, thesaurus, false) {
             Ok(m) => m,
             Err(err) => {
                 tracing::warn!(
-                    path = %file.relative_path,
+                    path = %relative_path,
                     error = %err,
                     "KgPathScorer: find_matches failed"
                 );
@@ -71,27 +66,9 @@ impl ExternalScorer for KgPathScorer {
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
-
     use terraphim_types::{NormalizedTerm, NormalizedTermValue};
 
     use super::*;
-
-    fn make_file(relative_path: &str) -> FileItem {
-        FileItem::new_raw(
-            PathBuf::from(relative_path),
-            relative_path.to_string(),
-            relative_path
-                .rsplit('/')
-                .next()
-                .unwrap_or(relative_path)
-                .to_string(),
-            0,
-            0,
-            None,
-            false,
-        )
-    }
 
     fn make_term(id: u64, value: &str) -> (NormalizedTermValue, NormalizedTerm) {
         let key = NormalizedTermValue::from(value.to_string());
@@ -120,25 +97,22 @@ mod tests {
     #[test]
     fn empty_thesaurus_returns_zero() {
         let scorer = KgPathScorer::new(Thesaurus::new("empty".to_string()));
-        let file = make_file("src/main.rs");
-        assert_eq!(scorer.score(&file), 0);
+        assert_eq!(scorer.score_path("src/main.rs"), 0);
     }
 
     #[test]
     fn path_match_returns_weight() {
         let t = thesaurus_with(&[(1, "automata")]);
         let scorer = KgPathScorer::new(t);
-        let file = make_file("crates/terraphim_automata/src/lib.rs");
         // "automata" appears once -> 1 * 5 = 5
-        assert_eq!(scorer.score(&file), 5);
+        assert_eq!(scorer.score_path("crates/terraphim_automata/src/lib.rs"), 5);
     }
 
     #[test]
     fn no_match_returns_zero() {
         let t = thesaurus_with(&[(1, "blockchain")]);
         let scorer = KgPathScorer::new(t);
-        let file = make_file("src/main.rs");
-        assert_eq!(scorer.score(&file), 0);
+        assert_eq!(scorer.score_path("src/main.rs"), 0);
     }
 
     #[test]
@@ -146,9 +120,11 @@ mod tests {
         let t = thesaurus_with(&[(1, "terraphim"), (2, "automata")]);
         let scorer = KgPathScorer::new(t);
         // path contains both "terraphim" and "automata"
-        let file = make_file("crates/terraphim_automata/src/lib.rs");
         // 2 unique terms * 5 = 10
-        assert_eq!(scorer.score(&file), 10);
+        assert_eq!(
+            scorer.score_path("crates/terraphim_automata/src/lib.rs"),
+            10
+        );
     }
 
     #[test]
@@ -166,26 +142,23 @@ mod tests {
             .collect::<Vec<_>>()
             .join("/");
         let scorer = KgPathScorer::new(t);
-        let file = make_file(&path);
-        assert_eq!(scorer.score(&file), 30);
+        assert_eq!(scorer.score_path(&path), 30);
     }
 
     #[test]
     fn hot_reload_updates_thesaurus() {
         let old = thesaurus_with(&[(1, "oldterm")]);
         let scorer = KgPathScorer::new(old);
-        let file = make_file("src/oldterm.rs");
 
-        assert_eq!(scorer.score(&file), 5);
+        assert_eq!(scorer.score_path("src/oldterm.rs"), 5);
 
         // Replace with a thesaurus that does not match
         let new_t = thesaurus_with(&[(2, "newterm")]);
         scorer.update_thesaurus(new_t);
 
         // "oldterm" no longer in thesaurus
-        assert_eq!(scorer.score(&file), 0);
+        assert_eq!(scorer.score_path("src/oldterm.rs"), 0);
         // "newterm" now matches
-        let file2 = make_file("src/newterm.rs");
-        assert_eq!(scorer.score(&file2), 5);
+        assert_eq!(scorer.score_path("src/newterm.rs"), 5);
     }
 }

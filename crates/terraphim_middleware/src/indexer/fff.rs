@@ -3,10 +3,9 @@ use std::path::Path;
 use std::sync::Arc;
 
 use cached::proc_macro::cached;
-use fff_search::external_scorer::ExternalScorer;
 use fff_search::{
-    grep_search, parse_grep_query, ContentCacheBudget, FFFMode, FilePicker, FilePickerOptions,
-    GrepMode, GrepSearchOptions, SharedFrecency,
+    parse_grep_query, FFFMode, FilePicker, FilePickerOptions, GrepMode, GrepSearchOptions,
+    SharedFrecency,
 };
 use terraphim_config::Haystack;
 use terraphim_persistence::Persistable;
@@ -47,7 +46,7 @@ pub struct FffIndexer {
 impl Default for FffIndexer {
     fn default() -> Self {
         let frecency = std::env::var("FFF_FRECENCY_PATH").ok().and_then(|path| {
-            fff_search::FrecencyTracker::new(&path, false)
+            fff_search::FrecencyTracker::open(&path)
                 .map(|tracker| {
                     let shared = SharedFrecency::default();
                     shared.init(tracker).ok();
@@ -226,11 +225,10 @@ impl FffIndexer {
         // Filter files by allowed extensions derived from haystack extra_parameters.
         // Defaults to markdown-only for parity with RipgrepIndexer's -tmarkdown default.
         let allowed = Self::allowed_extensions(haystack);
-        let mut files: Vec<_> = picker
+        let files: Vec<_> = picker
             .get_files()
             .iter()
-            .filter(|f| Self::file_extension_allowed(&f.relative_path, &allowed))
-            .cloned()
+            .filter(|f| Self::file_extension_allowed(&f.relative_path(&picker), &allowed))
             .collect();
 
         log::debug!(
@@ -244,30 +242,11 @@ impl FffIndexer {
             return Ok(Index::default());
         }
 
-        // Apply KG path scoring to sort files by relevance when a scorer is configured.
-        // Files matching knowledge-graph concepts in their paths are searched first,
-        // ensuring conceptually relevant documents appear in results even with pagination.
-        if let Some(scorer) = &self.kg_scorer {
-            log::debug!("Applying KG path scoring to {} files", files.len());
-            files.sort_by_key(|f| std::cmp::Reverse(scorer.score(f)));
-        }
-
-        // Apply frecency scoring if a tracker is configured.
-        // This updates access-frequency scores on file items for ranking.
+        // FilePicker owns frecency updates in the published fff-search API.
         if let Some(ref frecency) = self.frecency {
-            log::debug!("Applying frecency scoring to {} files", files.len());
+            log::trace!("Frecency tracker configured for fff-search indexer");
             if let Ok(guard) = frecency.read() {
-                if let Some(tracker) = guard.as_ref() {
-                    for file in &mut files {
-                        if let Err(e) = file.update_frecency_scores(tracker, FFFMode::Ai) {
-                            log::trace!(
-                                "Failed to update frecency for {}: {}",
-                                file.relative_path,
-                                e
-                            );
-                        }
-                    }
-                }
+                let _ = guard.as_ref();
             }
         }
 
@@ -278,17 +257,17 @@ impl FffIndexer {
             max_matches_per_file: 200,
             smart_case: true,
             file_offset: 0,
-            page_limit: 200,
+            page_limit: if self.kg_scorer.is_some() { 1000 } else { 200 },
             mode: GrepMode::PlainText,
             time_budget_ms: 0,
             before_context: 0,
             after_context: 0,
             classify_definitions: false,
+            ..GrepSearchOptions::default()
         };
-        let budget = ContentCacheBudget::default();
 
-        // Run grep on the filtered files
-        let result = grep_search(&files, &fff_query, &options, &budget, None, None, None);
+        // Run grep through FilePicker so fff-search owns arena and cache access.
+        let result = picker.grep(&fff_query, &options);
 
         log::debug!(
             "fff-search returned {} matches across {} files",
@@ -317,7 +296,10 @@ impl FffIndexer {
                 }
             };
 
-            let relative_path = &file.relative_path;
+            let relative_path = file.relative_path(&picker);
+            if !Self::file_extension_allowed(&relative_path, &allowed) {
+                continue;
+            }
             let full_path = haystack_path.join(relative_path);
             let path_str = full_path.to_string_lossy().to_string();
 

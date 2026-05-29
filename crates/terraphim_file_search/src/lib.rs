@@ -5,4 +5,5 @@
 //! re-indexing when monitored directories change.
 pub mod config;
 pub mod kg_scorer;
+pub mod result_ranking;
 pub mod watcher;

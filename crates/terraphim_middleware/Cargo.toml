@@ -40,7 +40,7 @@ tokio = { workspace = true, features = ["full"] }
 
 html2md = "0.2.15"
 async-trait = { workspace = true }
-fff-search = { git = "https://github.com/AlexMikhalev/fff.nvim.git", branch = "feat/external-scorer", features = ["zlob"] }
+fff-search = { version = "0.8.4", features = ["zlob"] }
 terraphim_file_search = { path = "../terraphim_file_search", version = "1.20.0" }
 
 url = "2.5"

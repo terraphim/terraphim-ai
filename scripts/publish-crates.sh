@@ -57,6 +57,7 @@ CRATES=(
   "haystack_core"
   "haystack_jmap"
   "grepapp_haystack"
+  "terraphim_file_search"
   "terraphim_middleware"
   "terraphim_service"
   "terraphim_update"

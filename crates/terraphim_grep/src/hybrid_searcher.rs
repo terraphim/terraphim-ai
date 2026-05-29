@@ -299,9 +299,6 @@ impl HybridSearcher {
     ) -> Result<Vec<RetrievedChunk>, String> {
         #[cfg(feature = "code-search")]
         {
-            // fff-search Git branch API (aligned with terraphim_mcp_server):
-            //   - `FilePicker::grep` is the public API for grep search
-            //   - `FileItem.relative_path` is a field (String), not a method
             use fff_search::{
                 FFFMode, FilePicker, FilePickerOptions, GrepMode, GrepSearchOptions,
                 parse_grep_query,
@@ -336,6 +333,7 @@ impl HybridSearcher {
                 before_context: 0,
                 after_context: 0,
                 classify_definitions: false,
+                ..GrepSearchOptions::default()
             };
 
             let result = picker.grep(&fff_query, &options);
@@ -348,7 +346,7 @@ impl HybridSearcher {
                     let file = result.files.get(m.file_index)?;
                     Some(RetrievedChunk {
                         content: m.line_content.clone(),
-                        source: file.relative_path.clone(),
+                        source: file.relative_path(&picker),
                         line_start: Some(m.line_number as usize),
                         line_end: Some(m.line_number as usize),
                         relevance_score: 1.0,

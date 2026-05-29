@@ -31,7 +31,7 @@ terraphim_automata = { path = "../terraphim_automata", version = "1.19.2" }
 terraphim_service = { path = "../terraphim_service", version = "1.16.15", optional = true }
 terraphim_config = { path = "../terraphim_config", version = "1.15.0" }
 
-fff-search = { git = "https://github.com/AlexMikhalev/fff.nvim.git", branch = "feat/external-scorer", optional = true }
+fff-search = { version = "0.8.4", optional = true }
 
 async-trait.workspace = true
 parking_lot = "0.12"

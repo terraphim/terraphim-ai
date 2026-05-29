@@ -181,7 +181,7 @@ mod tests {
     ///
     /// The test polls for up to 10 s (debounce 500 ms + FSEvents latency on macOS).
     #[test]
-    fn watcher_triggers_update_on_file_write() {
+    fn watcher_triggers_update_on_file_write() -> Result<(), String> {
         let tmp = TempDir::new().unwrap();
         let scorer = Arc::new(KgPathScorer::new(empty_thesaurus()));
         let _watcher =
@@ -197,22 +197,11 @@ mod tests {
         // (macOS FSEvents can have variable latency under load).
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
         loop {
-            use fff_search::external_scorer::ExternalScorer;
-            use fff_search::types::FileItem;
-            let item = FileItem::new_raw(
-                std::path::PathBuf::from("src/rust.rs"),
-                "src/rust.rs".to_string(),
-                "rust.rs".to_string(),
-                0,
-                0,
-                None,
-                false,
-            );
-            if scorer.score(&item) > 0 {
-                return; // thesaurus was reloaded successfully
+            if scorer.score_path("src/rust.rs") > 0 {
+                return Ok(()); // thesaurus was reloaded successfully
             }
             if std::time::Instant::now() >= deadline {
-                panic!("KgWatcher did not reload thesaurus within 10 seconds");
+                return Err("KgWatcher did not reload thesaurus within 10 seconds".to_string());
             }
             std::thread::sleep(std::time::Duration::from_millis(100));
         }

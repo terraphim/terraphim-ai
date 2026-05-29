@@ -1,27 +1,8 @@
 use criterion::{Criterion, black_box, criterion_group, criterion_main};
-use fff_search::external_scorer::ExternalScorer;
-use fff_search::types::FileItem;
-use std::path::PathBuf;
 use terraphim_file_search::kg_scorer::KgPathScorer;
 use terraphim_types::{NormalizedTerm, NormalizedTermValue, Thesaurus};
 
 // ---- helpers ----------------------------------------------------------------
-
-fn make_file(relative_path: &str) -> FileItem {
-    FileItem::new_raw(
-        PathBuf::from(relative_path),
-        relative_path.to_string(),
-        relative_path
-            .rsplit('/')
-            .next()
-            .unwrap_or(relative_path)
-            .to_string(),
-        0,
-        0,
-        None,
-        false,
-    )
-}
 
 fn make_thesaurus(terms: &[&str]) -> Thesaurus {
     let mut t = Thesaurus::new("bench".to_string());
@@ -43,7 +24,7 @@ fn make_thesaurus(terms: &[&str]) -> Thesaurus {
 }
 
 /// Synthetic file paths: mix of matching and non-matching entries.
-fn synthetic_files(count: usize) -> Vec<FileItem> {
+fn synthetic_files(count: usize) -> Vec<&'static str> {
     // Path components that overlap with KG terms (matching paths)
     let matching = [
         "src/challenge/model.rs",
@@ -74,9 +55,9 @@ fn synthetic_files(count: usize) -> Vec<FileItem> {
     (0..count)
         .map(|i| {
             if i % 3 == 0 {
-                make_file(matching[i % matching.len()])
+                matching[i % matching.len()]
             } else {
-                make_file(non_matching[i % non_matching.len()])
+                non_matching[i % non_matching.len()]
             }
         })
         .collect()
@@ -315,7 +296,7 @@ fn bench_kg_scorer_empty_thesaurus(c: &mut Criterion) {
     c.bench_function("kg_scorer_empty_thesaurus_1k_files", |b| {
         b.iter(|| {
             for f in &files {
-                black_box(scorer.score(black_box(f)));
+                black_box(scorer.score_path(black_box(f)));
             }
         });
     });
@@ -329,7 +310,7 @@ fn bench_kg_scorer_500_terms(c: &mut Criterion) {
     c.bench_function("kg_scorer_500_terms_1k_files", |b| {
         b.iter(|| {
             for f in &files {
-                black_box(scorer.score(black_box(f)));
+                black_box(scorer.score_path(black_box(f)));
             }
         });
     });
@@ -343,7 +324,7 @@ fn bench_kg_scorer_10k_files(c: &mut Criterion) {
     c.bench_function("kg_scorer_100_terms_10k_files", |b| {
         b.iter(|| {
             for f in &files {
-                black_box(scorer.score(black_box(f)));
+                black_box(scorer.score_path(black_box(f)));
             }
         });
     });
