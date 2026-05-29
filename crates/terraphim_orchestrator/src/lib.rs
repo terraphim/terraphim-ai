@@ -132,7 +132,7 @@ use terraphim_types::{FindingSeverity, ReviewFinding};
 pub use worktree_guard::{with_worktree_guard, with_worktree_guard_async, WorktreeGuard};
 
 use chrono::Timelike;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::time::{Duration, Instant};
@@ -1325,17 +1325,13 @@ impl AgentOrchestrator {
             let (direct_tx, direct_rx) = direct_dispatch_rx.expect(
                 "direct dispatch channel is initialised when direct_dispatch is configured",
             );
-            let agent_names: HashSet<String> = self
-                .config
-                .agents
-                .iter()
-                .map(|agent| agent.name.clone())
-                .collect();
+            let agent_index =
+                direct_dispatch::DirectDispatchAgentIndex::from_agents(&self.config.agents);
 
             direct_dispatch::start_direct_dispatch_listener(
                 direct_cfg.socket_path.clone(),
                 direct_tx,
-                agent_names,
+                agent_index,
             );
 
             Some(direct_rx)

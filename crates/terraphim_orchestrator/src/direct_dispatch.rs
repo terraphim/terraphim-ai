@@ -32,6 +32,43 @@ pub struct DispatchCommand {
     pub synthetic_event: Option<SyntheticEvent>,
 }
 
+/// Index of valid agent names for direct dispatch validation.
+///
+/// Allows the UDS listener to synchronously reject invalid project-qualified
+/// dispatches rather than returning ok and later being dropped by the orchestrator.
+#[derive(Debug, Clone)]
+pub struct DirectDispatchAgentIndex {
+    bare_names: HashSet<String>,
+    qualified_names: HashSet<(String, String)>,
+}
+
+impl DirectDispatchAgentIndex {
+    pub fn from_agents(agents: &[crate::config::AgentDefinition]) -> Self {
+        let bare_names: HashSet<String> = agents
+            .iter()
+            .filter(|a| a.project.is_none())
+            .map(|a| a.name.clone())
+            .collect();
+        let qualified_names: HashSet<(String, String)> = agents
+            .iter()
+            .filter_map(|a| a.project.clone().map(|p| (p, a.name.clone())))
+            .collect();
+        Self {
+            bare_names,
+            qualified_names,
+        }
+    }
+
+    pub fn is_valid(&self, project: Option<&str>, agent: &str) -> bool {
+        match project {
+            Some(p) => self
+                .qualified_names
+                .contains(&(p.to_string(), agent.to_string())),
+            None => self.bare_names.contains(agent),
+        }
+    }
+}
+
 /// JSON response written back to adf-ctl.
 #[derive(Debug, serde::Serialize)]
 pub struct DispatchResponse {
@@ -89,7 +126,7 @@ fn remove_stale_socket_if_present(socket_path: &std::path::Path) -> std::io::Res
 pub fn start_direct_dispatch_listener(
     socket_path: PathBuf,
     dispatch_tx: tokio::sync::mpsc::Sender<WebhookDispatch>,
-    agent_names: HashSet<String>,
+    agent_index: DirectDispatchAgentIndex,
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         if let Err(e) = remove_stale_socket_if_present(&socket_path) {
@@ -137,9 +174,9 @@ pub fn start_direct_dispatch_listener(
             match listener.accept().await {
                 Ok((stream, _)) => {
                     let dispatch_tx = dispatch_tx.clone();
-                    let agent_names = agent_names.clone();
+                    let agent_index = agent_index.clone();
                     tokio::spawn(async move {
-                        if let Err(e) = handle_connection(stream, &dispatch_tx, &agent_names).await
+                        if let Err(e) = handle_connection(stream, &dispatch_tx, &agent_index).await
                         {
                             error!(error = %e, "direct dispatch connection error");
                         }
@@ -156,7 +193,7 @@ pub fn start_direct_dispatch_listener(
 async fn handle_connection(
     stream: tokio::net::UnixStream,
     dispatch_tx: &tokio::sync::mpsc::Sender<WebhookDispatch>,
-    agent_names: &HashSet<String>,
+    agent_index: &DirectDispatchAgentIndex,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     use tokio::io::{AsyncBufReadExt, AsyncReadExt};
 
@@ -178,8 +215,12 @@ async fn handle_connection(
         }
     };
 
-    if !agent_names.contains(&cmd.agent) {
-        let response = DispatchResponse::error(&format!("unknown agent: {}", cmd.agent));
+    if !agent_index.is_valid(cmd.project.as_deref(), &cmd.agent) {
+        let msg = match cmd.project.as_deref() {
+            Some(p) => format!("unknown project-qualified agent: {}/{}", p, cmd.agent),
+            None => format!("unknown agent: {}", cmd.agent),
+        };
+        let response = DispatchResponse::error(&msg);
         write_response(write_half, response).await?;
         return Ok(());
     }
@@ -345,12 +386,17 @@ mod tests {
     #[cfg(unix)]
     #[tokio::test]
     async fn test_direct_dispatch_socket_valid_agent_round_trip() {
+        use std::collections::HashSet;
         let dir = tempfile::tempdir().unwrap();
         let socket_path = dir.path().join("adf.sock");
         let (tx, mut rx) = mpsc::channel::<WebhookDispatch>(1);
-        let agent_names = ["meta-learning".to_string()].into_iter().collect();
+        let bare_names: HashSet<String> = ["meta-learning".to_string()].into_iter().collect();
+        let agent_index = super::DirectDispatchAgentIndex {
+            bare_names,
+            qualified_names: HashSet::new(),
+        };
 
-        let handle = start_direct_dispatch_listener(socket_path.clone(), tx, agent_names);
+        let handle = start_direct_dispatch_listener(socket_path.clone(), tx, agent_index);
         wait_for_socket(&socket_path).await;
 
         let response = send_command(
@@ -387,12 +433,17 @@ mod tests {
     #[cfg(unix)]
     #[tokio::test]
     async fn test_direct_dispatch_socket_unknown_agent_returns_error() {
+        use std::collections::HashSet;
         let dir = tempfile::tempdir().unwrap();
         let socket_path = dir.path().join("adf.sock");
         let (tx, mut rx) = mpsc::channel::<WebhookDispatch>(1);
-        let agent_names = ["meta-learning".to_string()].into_iter().collect();
+        let bare_names: HashSet<String> = ["meta-learning".to_string()].into_iter().collect();
+        let agent_index = super::DirectDispatchAgentIndex {
+            bare_names,
+            qualified_names: HashSet::new(),
+        };
 
-        let handle = start_direct_dispatch_listener(socket_path.clone(), tx, agent_names);
+        let handle = start_direct_dispatch_listener(socket_path.clone(), tx, agent_index);
         wait_for_socket(&socket_path).await;
 
         let response = send_command(&socket_path, r#"{"agent":"unknown-agent"}"#).await;
@@ -418,12 +469,17 @@ mod tests {
     #[cfg(unix)]
     #[tokio::test]
     async fn test_direct_dispatch_rejects_oversized_command() {
+        use std::collections::HashSet;
         let dir = tempfile::tempdir().unwrap();
         let socket_path = dir.path().join("adf.sock");
         let (tx, _rx) = mpsc::channel::<WebhookDispatch>(1);
-        let agent_names = ["meta-learning".to_string()].into_iter().collect();
+        let bare_names: HashSet<String> = ["meta-learning".to_string()].into_iter().collect();
+        let agent_index = super::DirectDispatchAgentIndex {
+            bare_names,
+            qualified_names: HashSet::new(),
+        };
 
-        let handle = start_direct_dispatch_listener(socket_path.clone(), tx, agent_names);
+        let handle = start_direct_dispatch_listener(socket_path.clone(), tx, agent_index);
         wait_for_socket(&socket_path).await;
 
         let oversized = "x".repeat(16384);
@@ -453,5 +509,77 @@ mod tests {
         );
 
         handle.abort();
+    }
+
+    #[test]
+    fn test_direct_dispatch_agent_index_bare_agent() {
+        let agents = vec![crate::config::AgentDefinition {
+            name: "meta-learning".to_string(),
+            layer: crate::config::AgentLayer::Growth,
+            cli_tool: "claude".to_string(),
+            task: "do stuff".to_string(),
+            schedule: None,
+            model: None,
+            capabilities: vec![],
+            max_memory_bytes: None,
+            budget_monthly_cents: None,
+            provider: None,
+            persona: None,
+            terraphim_role: None,
+            skill_chain: vec![],
+            sfia_skills: vec![],
+            fallback_provider: None,
+            fallback_model: None,
+            grace_period_secs: None,
+            max_cpu_seconds: None,
+            pre_check: None,
+            gitea_issue: None,
+            event_only: false,
+            project: None,
+            evolution_enabled: false,
+            rlm_enabled: None,
+            bypass_kg_routing: false,
+            enabled: true,
+        }];
+        let index = super::DirectDispatchAgentIndex::from_agents(&agents);
+        assert!(index.is_valid(None, "meta-learning"));
+        assert!(!index.is_valid(None, "unknown-agent"));
+    }
+
+    #[test]
+    fn test_direct_dispatch_agent_index_qualified_agent() {
+        let agents = vec![crate::config::AgentDefinition {
+            name: "build-runner".to_string(),
+            layer: crate::config::AgentLayer::Core,
+            cli_tool: "claude".to_string(),
+            task: "run builds".to_string(),
+            schedule: None,
+            model: None,
+            capabilities: vec![],
+            max_memory_bytes: None,
+            budget_monthly_cents: None,
+            provider: None,
+            persona: None,
+            terraphim_role: None,
+            skill_chain: vec![],
+            sfia_skills: vec![],
+            fallback_provider: None,
+            fallback_model: None,
+            grace_period_secs: None,
+            max_cpu_seconds: None,
+            pre_check: None,
+            gitea_issue: None,
+            event_only: false,
+            project: Some("terraphim-ai".to_string()),
+            evolution_enabled: false,
+            rlm_enabled: None,
+            bypass_kg_routing: false,
+            enabled: true,
+        }];
+        let index = super::DirectDispatchAgentIndex::from_agents(&agents);
+        assert!(index.is_valid(Some("terraphim-ai"), "build-runner"));
+        assert!(!index.is_valid(Some("terraphim-ai"), "unknown-agent"));
+        assert!(!index.is_valid(Some("other-project"), "build-runner"));
+        assert!(!index.is_valid(None, "build-runner"));
     }
 }

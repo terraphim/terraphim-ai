@@ -535,6 +535,26 @@ fn validate_agent_name_for_shell(name: &str) -> Result<String> {
     Ok(name.to_string())
 }
 
+fn validate_since_for_shell(since: &str) -> Result<String> {
+    if since.is_empty() {
+        bail!("--since value cannot be empty");
+    }
+    let mut chars = since.chars();
+    match (chars.next(), chars.next_back()) {
+        (Some(n), Some(u))
+            if n.is_ascii_digit() && "smhdw".contains(u) && chars.all(|c| c.is_ascii_digit()) =>
+        {
+            Ok(since.to_string())
+        }
+        _ => {
+            bail!(
+                "--since '{}' must match ^[0-9]+[smhdw]$ (e.g. 30m, 1h, 2d, 1w)",
+                since
+            );
+        }
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 fn cmd_trigger(
     local: bool,
@@ -585,7 +605,7 @@ fn cmd_trigger(
                 "Waiting for agent '{}' to complete (timeout: {}s)...",
                 name, timeout
             );
-            wait_for_agent_exit(local, name, host, timeout)?;
+            wait_for_agent_exit(local, &agent_name, host, timeout)?;
         }
         return Ok(());
     }
@@ -764,6 +784,7 @@ fn cmd_status(local: bool, host: &str, since: &str, format: OutputFormat) -> Res
     if local {
         println!("[local mode]");
     }
+    let since = validate_since_for_shell(since)?;
     let journal_cmd = format!(
         "journalctl -u adf-orchestrator --since '{} ago' --no-pager 2>/dev/null \
          | grep -E 'exit classified|spawning agent|Agent spawned' | tail -30",
@@ -827,7 +848,7 @@ fn cmd_status(local: bool, host: &str, since: &str, format: OutputFormat) -> Res
         OutputFormat::Json => {
             let report = StatusReport {
                 host,
-                since,
+                since: &since,
                 recent_activity: activity,
                 running_processes: processes,
                 best_effort: true,
@@ -1354,5 +1375,108 @@ mod tests {
         std::fs::write(&path, "[direct_dispatch]\nother_field = \"value\"\n").unwrap();
         let result = super::parse_socket_path_from_toml(&path);
         assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_split_project_agent_bare() {
+        let (project, agent) = super::split_project_agent("meta-learning");
+        assert_eq!(project, None);
+        assert_eq!(agent, "meta-learning");
+    }
+
+    #[test]
+    fn test_split_project_agent_qualified() {
+        let (project, agent) = super::split_project_agent("terraphim-ai/build-runner");
+        assert_eq!(project, Some("terraphim-ai".to_string()));
+        assert_eq!(agent, "build-runner");
+    }
+
+    #[test]
+    fn test_validate_agent_name_for_shell_valid() {
+        super::validate_agent_name_for_shell("meta-learning").unwrap();
+        super::validate_agent_name_for_shell("build_runner").unwrap();
+        super::validate_agent_name_for_shell("agent-123").unwrap();
+    }
+
+    #[test]
+    fn test_validate_agent_name_for_shell_rejects_slash() {
+        let result = super::validate_agent_name_for_shell("project/agent");
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("invalid characters"),
+            "error should mention invalid characters: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_validate_agent_name_for_shell_rejects_empty() {
+        let result = super::validate_agent_name_for_shell("");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_agent_name_for_shell_rejects_too_long() {
+        let long_name = "a".repeat(65);
+        let result = super::validate_agent_name_for_shell(&long_name);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("too long"),
+            "error should mention too long: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_validate_since_for_shell_valid() {
+        super::validate_since_for_shell("30m").unwrap();
+        super::validate_since_for_shell("1h").unwrap();
+        super::validate_since_for_shell("2d").unwrap();
+        super::validate_since_for_shell("1w").unwrap();
+        super::validate_since_for_shell("10s").unwrap();
+    }
+
+    #[test]
+    fn test_validate_since_for_shell_rejects_empty() {
+        let result = super::validate_since_for_shell("");
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("cannot be empty"),
+            "error should mention empty: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_validate_since_for_shell_rejects_now() {
+        let result = super::validate_since_for_shell("now");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_since_for_shell_rejects_injection() {
+        let result = super::validate_since_for_shell("1h'; rm -rf /");
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("must match"),
+            "error should mention grammar: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_validate_since_for_shell_rejects_no_unit() {
+        let result = super::validate_since_for_shell("30");
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("must match"),
+            "error should mention grammar: {}",
+            err
+        );
     }
 }
