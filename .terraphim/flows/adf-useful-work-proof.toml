@@ -1,0 +1,43 @@
+# Proves adf-ctl flow can execute useful non-model work end-to-end.
+# Run with: cargo run -p terraphim_orchestrator --bin adf-ctl -- flow adf-useful-work-proof --context "issue=1882"
+
+name = "adf-useful-work-proof"
+project = "terraphim-ai"
+repo_path = "/home/alex/projects/terraphim/terraphim-ai"
+timeout_secs = 300
+
+[[steps]]
+name = "matrix-slot-work"
+kind = "action"
+command = "mkdir -p .docs/adf/{{issue}} && printf 'slot=%s\nmodel=%s\nissue=%s\n' '{{matrix.slot}}' '{{matrix.model}}' '{{issue}}' > .docs/adf/{{issue}}/adf-flow-proof-slot-{{matrix.slot}}.txt"
+timeout_secs = 30
+on_fail = "continue"
+
+[steps.matrix]
+max_parallel = 3
+fail_strategy = "continue"
+
+[[steps.matrix.params]]
+slot = "1"
+model = "claude-opus"
+
+[[steps.matrix.params]]
+slot = "2"
+model = "kimi-k2p6"
+
+[[steps.matrix.params]]
+slot = "3"
+model = "openai-gpt-5-5"
+
+[[steps]]
+name = "require-all-slots"
+kind = "gate"
+condition = "{{steps.matrix-slot-work.success_count}} >= 3"
+on_fail = "abort"
+
+[[steps]]
+name = "assemble-proof"
+kind = "action"
+command = "printf '# ADF Flow Useful Work Proof\n\nIssue: %s\nFlow: adf-useful-work-proof\nMatrix successes: %s\nMatrix exit codes: %s\nGenerated: 2026-05-29 11:43 BST\n\n## Slot Outputs\n\n' '{{issue}}' '{{steps.matrix-slot-work.success_count}}' '{{steps.matrix-slot-work.all_exit_codes}}' > .docs/adf/{{issue}}/adf-flow-useful-work-proof.md && for file in .docs/adf/{{issue}}/adf-flow-proof-slot-*.txt; do printf '### %s\n\n```text\n' \"$file\" >> .docs/adf/{{issue}}/adf-flow-useful-work-proof.md; sed 's/$//' \"$file\" >> .docs/adf/{{issue}}/adf-flow-useful-work-proof.md; printf '\n```\n\n' >> .docs/adf/{{issue}}/adf-flow-useful-work-proof.md; done"
+timeout_secs = 30
+on_fail = "abort"

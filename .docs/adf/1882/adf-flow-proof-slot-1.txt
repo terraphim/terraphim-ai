@@ -1,0 +1,3 @@
+slot=1
+model=claude-opus
+issue=1882

@@ -1,0 +1,81 @@
+{
+  "flow_name": "adf-useful-work-proof",
+  "correlation_id": "87420ce4-0936-40e4-a2b3-c5afff685a5e",
+  "status": "completed",
+  "started_at": "2026-05-29T10:54:15.628426954Z",
+  "finished_at": "2026-05-29T10:54:16.122549506Z",
+  "next_step_index": 3,
+  "step_envelopes": [
+    {
+      "step_name": "require-all-slots",
+      "started_at": "2026-05-29T10:54:16.007802497Z",
+      "finished_at": "2026-05-29T10:54:16.007803179Z",
+      "exit_code": 0,
+      "stdout": "gate passed",
+      "stderr": "",
+      "cost_usd": null,
+      "session_id": null,
+      "input_tokens": null,
+      "output_tokens": null,
+      "stdout_file": "/tmp/flow-87420ce4-0936-40e4-a2b3-c5afff685a5e-require-all-slots.stdout"
+    },
+    {
+      "step_name": "assemble-proof",
+      "started_at": "2026-05-29T10:54:16.011362261Z",
+      "finished_at": "2026-05-29T10:54:16.122257285Z",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": "",
+      "cost_usd": null,
+      "session_id": null,
+      "input_tokens": null,
+      "output_tokens": null,
+      "stdout_file": "/tmp/flow-87420ce4-0936-40e4-a2b3-c5afff685a5e-assemble-proof.stdout"
+    }
+  ],
+  "matrix_envelopes": {
+    "matrix-slot-work": [
+      {
+        "step_name": "matrix-slot-work-matrix-0",
+        "started_at": "2026-05-29T10:54:15.633778251Z",
+        "finished_at": "2026-05-29T10:54:15.769437600Z",
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": "",
+        "cost_usd": null,
+        "session_id": null,
+        "input_tokens": null,
+        "output_tokens": null,
+        "stdout_file": null
+      },
+      {
+        "step_name": "matrix-slot-work-matrix-1",
+        "started_at": "2026-05-29T10:54:15.772780194Z",
+        "finished_at": "2026-05-29T10:54:15.886620205Z",
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": "",
+        "cost_usd": null,
+        "session_id": null,
+        "input_tokens": null,
+        "output_tokens": null,
+        "stdout_file": null
+      },
+      {
+        "step_name": "matrix-slot-work-matrix-2",
+        "started_at": "2026-05-29T10:54:15.890121847Z",
+        "finished_at": "2026-05-29T10:54:16.004039769Z",
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": "",
+        "cost_usd": null,
+        "session_id": null,
+        "input_tokens": null,
+        "output_tokens": null,
+        "stdout_file": null
+      }
+    ]
+  },
+  "error": null,
+  "issue": "1882"
+}

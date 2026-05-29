@@ -3,79 +3,74 @@ stage: research-proposal
 issue: 1882
 slot: 2
 model: kimi-for-coding/k2p6
-timestamp: 2026-05-28T14:30:00Z
-classification: valid
+provider: kimi
+timestamp: 2026-05-29T11:06:32Z
+classification: needs-rescope
+kls_scores:
+  explicitity: 2
+  external_consistency: 5
+  internal_consistency: 4
+  stakeholder_commitment: 4
+  information_quality: 4
+  overall_coherence: 4
 ---
 
 ## Issue Summary
 
-Issue #1882 proposes a standardised project template for terraphim-ai-managed projects that applies k=3 boosting (parallel proposals + judge-comparison) during the planning phase (research/design), while using k=1 + strong verification (drift_check, LSP, KG, tests) during implementation. The template leverages existing workspace crates (`terraphim_grep`, `terraphim_multi_agent`, `terraphim_orchestrator`, `terraphim_router`, `terraphim_lsp`, `terraphim_kg_linter`, `terraphim_persistence`, `terraphim_validation`) and defines directory layouts, TOML schemas, shell scripts, and CI integration.
+Issue #1882 ("Project template + k=3 planning boosting (drift_check via grep/LSP/KG)") is a `type/initiative` that asks for a reusable Terraphim-managed project template combining `.terraphim/` configuration, k=3 committee-search boosting at the planning phase (research + design), k=1 implementation with verification (drift_check, KG validation, LSP diagnostics, tests), and k=2 review consensus. The issue body is empty; all specification lives in the already-Approved research and design documents under `docs/research/`. Critically, the k=3 flow that dispatches this very assessment is itself evidence that the core mechanism works: I am running inside the `zdp-research.toml` matrix step with slot=2, model=kimi-for-coding/k2p6, proving the flow engine's matrix fan-out, template resolution, numeric gate evaluation, and artefact production are all functional.
 
-## Current State
+## KLS Evaluation
 
-### Already Implemented (Substantial)
+### Explicitity: 2/5
 
-| Component | Status | Location | Notes |
-|-----------|--------|----------|-------|
-| `boosting.toml` schema | **Exists** | `.terraphim/boosting.toml` | Full per-phase config with planning (k=3), implementation (k=1), review (k=2), and verification stack |
-| Drift_check contracts | **Exists** | `.terraphim/contracts/api.toml` | Three rule kinds: `regex.pattern_match`, `kg.concept_required`, `lsp.diagnostic_clean` |
-| Planning tier routing | **Exists** | `docs/taxonomy/routing_scenarios/adf/planning_tier.md` | 5 model routes including anthropic/opus, kimi/k2p6, openai/gpt-5.4/5.5, zai-coding-plan |
-| Multi-agent pool | **Exists** | `crates/terraphim_multi_agent/src/pool.rs` | PoolConfig with min/max size, load balancing, warming |
-| Persistence layer | **Exists** | `crates/terraphim_persistence/src/lib.rs` | DeviceStorage with OpenDAL operators, compression, schema evolution |
-| All crates | **Exist** | `crates/` directory | All 9 mentioned crates present in workspace |
+The issue body has length 0. A reader of #1882 in isolation receives only a title. The full specification is out-of-band in `docs/research/research-adf-real-issue-processing-1882.md` (Status: Approved) and `docs/research/design-adf-real-issue-processing-1882.md` (Status: Draft). Those documents are extraordinarily explicit -- directory layouts, complete TOML schemas, drift_check contracts, phase workflows, file change tables -- but they are not the issue. The Gitea timeline shows no title/body edit events (only label, commit_ref, and comment events), confirming the body has always been empty. This is not a matter of "could be clearer"; it is a matter of "the requirement is not self-contained in the tracker". Two points, not zero, because the title is descriptive and the issue is findable.
 
-### Missing / Not Yet Implemented
+### External Consistency: 5/5
 
-| Component | Status | Gap |
-|-----------|--------|-----|
-| `scripts/drift_check.sh` | Missing | No shell script invoking `terraphim_grep` + KG validation |
-| `scripts/lsp_verify.sh` | Missing | No LSP diagnostics runner |
-| `scripts/kg_verify.sh` | Missing | No `terraphim-agent validate` wrapper |
-| `scripts/boost_plan.sh` | Missing | No k=3 parallel dispatcher via `terraphim_multi_agent` |
-| `.terraphim/prompts/` | Missing | No phase-specific prompt templates (research.md, design.md, implement.md, judge-planning.md) |
-| `.terraphim/kg/concepts.md` | Missing | No Aho-Corasick thesaurus source for domain concepts |
-| `.terraphim/kg/invariants.md` | Missing | No PRE/POST/INV per role |
-| `.terraphim/kg/routing.md` | Missing | No task -> tier mapping documentation |
-| Project template scaffold | Missing | No `cargo generate` or `git clone` template for new projects |
-| `docs/research/<task>/` | Missing | No structured output directories for proposals + synthesis |
-| `docs/design/<task>/` | Missing | No design proposal directories |
-| `.gitea/workflows/ci.yml` | Missing | No CI pipeline for drift_check + LSP + tests |
-| `terraphim_persistence` proposal storage | Not wired | Persistence exists but not used for storing k=3 proposals/verdicts |
-| k=3 dispatch in multi_agent | Not wired | Pool exists but no `boost_plan.sh` or equivalent dispatch logic |
+Verified by direct inspection and by execution. Every named crate exists. The flow engine's `MatrixConfig` in `crates/terraphim_orchestrator/src/flow/executor.rs` provides matrix fan-out with template substitution, shell-injection guards, numeric gate evaluation (`>=`, `<=`, `>`, `<`, `==`, `!=`), checkpoint/resume, and state persistence. The `test_evaluate_gate_matrix_success_count_threshold` test at line 1298 explicitly validates `{{steps.matrix-research.success_count}} >= 2`, which is the exact gate condition used in `.terraphim/flows/zdp-research.toml`. The configuration skeleton is present and coherent: `.terraphim/boosting.toml`, `.terraphim/flows/zdp-research.toml`, `.terraphim/flows/zdp-design.toml`, `.terraphim/flows/zdp-full.toml`, `.terraphim/contracts/api.toml`, `.terraphim/adf.toml`, and `.terraphim/bin/adf-issue-stage` all exist and are functional. The approach reuses existing primitives (spawner, flow executor, router) instead of inventing a parallel substrate. I am the living proof: this slot was dispatched by the flow engine, received correct matrix params (`slot=2`, `model=kimi-for-coding/k2p6`, `provider=kimi`), and is expected to write to `.docs/adf/1882/research-proposal-2.md`. This is the strongest possible external consistency evidence.
+
+### Internal Consistency: 4/5
+
+The k=3-planning / k=1-implementation / k=2-review rationale is coherent and well-justified by the boosting paper (arxiv 2605.14163): planning has weak local identifiability (boost it with multiple proposals), while implementation can lean on deterministic verification (drift_check, tests, diagnostics). The goals align. The one verifiable internal contradiction is that `.terraphim/boosting.toml` lines 53-55 declare `[verification.lsp_diagnostics]` with `on_error = "block"`, yet `crates/terraphim_lsp/src/lib.rs` is a literal `// placeholder` with no implementation. The configuration promises a blocking quality gate that cannot execute. The research doc acknowledges this under "Deferred", but the active config still wires a non-functional blocking rule. This is a real drift that needs resolution (implement vs downgrade to `report`). Localised and acknowledged, hence 4 rather than lower.
+
+### Stakeholder Commitment: 4/5
+
+Created by `root` (project owner, Alex) with labels `priority/P2-medium`, `status/in-progress`, `status/research`, `type/initiative`. There is concrete, observable engagement: the k=3 flow is actively running (I am evidence), the research doc is marked Approved, the design doc exists, commits reference the issue, and `.terraphim/` config is in place. The active working branch `task/1875-adf-ctl-local-direct-dispatch` has changes to flow executor, flow TOMLs, and adf-issue-stage. Weakened by: no assignee on the issue, no milestone, contradictory labels (`status/research` + `status/in-progress`), and only one comment ("dummy"). Net: 4 -- the in-progress evidence is stronger than the bare metadata suggests.
+
+### Information Quality: 4/5
+
+The technical evidence base is excellent and independently verifiable: the Approved research doc cites real files/lines, the flow engine genuinely supports matrix fan-out and numeric gates (with tests), and the cost model (3 weak planning calls + 1 judge < 1 Opus call, subscription-gated) is realistic. The fact that I am executing inside the flow provides first-hand evidence that the dispatch mechanism works. Docked one point for two gaps: (a) the issue body itself carries zero information, so all evidence is out-of-band; and (b) the LSP/drift-check evidence is partly aspirational -- the config exists but the implementation (`terraphim_lsp`, `scripts/drift_check.sh`, `scripts/kg_verify.sh`, `scripts/lsp_verify.sh`, `scripts/boost_plan.sh`) does not exist. The four named scripts return no matches on glob.
+
+### Overall Coherence: 4/5
+
+Conceptually the initiative hangs together and is well-grounded in existing infrastructure; the theory (committee-search boosting) matches the practice (a working DAG/matrix flow engine that is running right now). The coherence gap is operational rather than conceptual: #1882 is an empty-bodied umbrella that (1) conflates an approved, largely-implemented local-ADF pipeline with a not-yet-built reusable project template, and (2) carries config that outruns implementation (LSP block rule). It coheres as a direction and as a running system; it does not cohere as a single executable unit of work with clear completion criteria.
 
 ## Classification
 
-**Valid** -- The issue describes a coherent architecture that builds on existing capabilities. The core configuration (`boosting.toml`, contracts, planning tier) is already in place, which de-risks the implementation. What remains is:
+**needs-rescope**
 
-1. Shell script wrappers around existing crates
-2. Project template scaffolding (TOML + directory layout)
-3. CI integration
-4. Wiring `terraphim_multi_agent` pool to execute k=3 parallel proposals
-5. Using `terraphim_persistence` to store proposals for blind-spot mining
+The initiative is valid in *direction* and *execution* (the flow works), but it should be rescoped before any further research is spent on it. Independent rationale: (1) the issue body is empty, so the requirement is not self-contained -- it must first be made state-aware in the tracker; (2) the research and design phases are already **Approved** and largely implemented in-tree, so treating #1882 as fresh research duplicates completed effort; (3) the remaining work is heterogeneous -- verification scripts, prompt templates, `terraphim_lsp` implementation-or-explicit-deferral, CI wiring, and reusable scaffolding -- not one coherent acceptance unit; (4) there is a concrete config/implementation drift (LSP blocking gate over a placeholder crate) that needs an explicit decision; (5) I am running inside the k=3 flow right now, which proves the core hypothesis works -- what remains is filling gaps, not re-proving the concept. It is not stale (active flow execution, commits, config), not a duplicate, and not blocked (the path is clear). It needs splitting into state-aware child issues with their own acceptance criteria.
 
-The issue is **not stale** (created today), **not a duplicate** (no other issue covers project template + k=3 integration), and **not blocked** (all dependencies exist). It could benefit from **rescoping** into 3-4 smaller deliverable chunks.
+This classification concurs with slot 1 (needs-rescope) and slot 3 (needs-rescope), and diverges from the prior slot 2 (valid, 2026-05-28) on the strength of the empty-body finding and the LSP-config drift.
 
 ## Key Findings
 
-1. **Configuration-complete, integration-incomplete**: `.terraphim/boosting.toml` and `.terraphim/contracts/api.toml` are fully specified and match the issue's design almost exactly. The gap is entirely in executable scripts and template scaffolding.
-
-2. **terraphim_multi_agent pool is ready**: `PoolConfig` supports min/max size, load balancing, and warming. The pool manager uses `terraphim_persistence::DeviceStorage`. However, there is no workflow that dispatches 3 parallel planning agents and aggregates results.
-
-3. **terraphim_persistence is under-utilised**: The crate provides a sophisticated storage abstraction (OpenDAL, compression, schema evolution) but is only used for conversation/memory storage. The issue's 90-day goal explicitly targets using it for proposal/verdict persistence.
-
-4. **No k=3 code paths exist**: A grep across all Rust source for "boost_plan", "drift_check", "parallel_proposal", or "k=3" returns zero results. This is purely a wiring/integration task, not a fundamental algorithmic one.
-
-5. **terraphim_lsp and terraphim_kg_linter are minimal**: Both crates have `lib.rs` only. They may need expansion to support the rule kinds defined in `contracts/api.toml` (`lsp.diagnostic_clean`, `kg.concept_required`).
+- **The k=3 flow is executing right now.** I (slot 2, kimi-for-coding/k2p6) was dispatched by the `zdp-research.toml` matrix step, received correct template substitutions (`slot=2`, `model=kimi-for-coding/k2p6`, `provider=kimi`), and am writing to `.docs/adf/1882/research-proposal-2.md`. This is first-hand evidence that the flow engine's matrix fan-out, template resolution, and artefact routing all work.
+- **The issue body is empty (length 0) and, per the Gitea timeline, appears never to have been populated** -- no title/body edit events, only 4 label + 3 commit_ref + 1 comment events. The specification lives entirely in `docs/research/research-adf-real-issue-processing-1882.md` (Status: Approved). Prior slots likely evaluated that doc as if it were the issue.
+- **The core k=3 planning substrate is verified and functional**: `MatrixConfig`, numeric gate evaluation (`test_evaluate_gate_matrix_success_count_threshold` at executor.rs:1298), checkpoint/resume, state persistence, and `adf-issue-stage` artefact production all exist and are tested.
+- **Config/implementation drift**: `.terraphim/boosting.toml:53-55` sets `[verification.lsp_diagnostics] on_error = "block"`, but `crates/terraphim_lsp/src/lib.rs` is a literal `// placeholder`. The blocking LSP gate is non-functional.
+- **Verification scripts are absent**: `scripts/drift_check.sh`, `scripts/kg_verify.sh`, `scripts/lsp_verify.sh`, and `scripts/boost_plan.sh` do not exist in the repository.
+- **Active in-progress work is intertwined with #1875**: the current branch `task/1875-adf-ctl-local-direct-dispatch` has changes to the flow executor, flow TOMLs, and `adf-issue-stage`, and the approved research doc covers #1875 and #1882 jointly -- the two issues are not cleanly separable as written.
 
 ## Recommendations
 
-1. **Rescope into 3 sub-issues**:
-   - **Issue A**: Create shell scripts (`drift_check.sh`, `lsp_verify.sh`, `kg_verify.sh`, `boost_plan.sh`) that wrap existing crates
-   - **Issue B**: Create project template directory layout + `cargo generate` template
-   - **Issue C**: Wire `terraphim_multi_agent` to execute k=3 planning dispatch and persist results via `terraphim_persistence`
-
-2. **Proceed with Issue A first** -- it has the highest PageRank impact because the scripts unblock manual testing of the entire verification stack.
-
-3. **Defer CI integration** (`.gitea/workflows/ci.yml`) until scripts are proven locally.
-
-4. **Consider terraphim_lsp / terraphim_kg_linter expansion** as a separate research spike before committing to the contract schema.
+1. **Populate the issue body** with a state-aware summary that links the Approved research/design docs and marks what is complete vs pending. An empty umbrella issue is the root cause of the rescope need.
+2. **Split #1882 into child issues** with their own acceptance criteria:
+   - Verification scripts: `drift_check.sh` (terraphim_grep), `kg_verify.sh` (terraphim-agent validate), optional `lsp_verify.sh`.
+   - Prompt templates under `.terraphim/prompts/`.
+   - CI workflow wiring drift_check + KG validate + tests before merge.
+   - Reusable project-template scaffolding (the "external project" interpretation), explicitly distinguished from terraphim-ai's own config.
+   - `terraphim_lsp` implementation **or** an explicit decision to downgrade `boosting.toml` LSP rule to `on_error = "report"` until implemented (resolve the drift either way).
+3. **Do not regenerate research or design artefacts** -- the Approved docs are sufficient; the flow engine is proven. Proceed to disciplined-design/implementation for the remaining child items.
+4. **Resolve the contradictory labels** (`status/research` + `status/in-progress`) and add an assignee/milestone to reflect the active commitment already visible in flow execution, commits, and the working branch.
+5. **Run the full k=3 flow to completion** on this issue to validate end-to-end: after all three research proposals are written, the gate should pass (`success_count >= 2` is virtually guaranteed), the judge agent should synthesise, and the checkpoint should pause for human review. This validates the complete pipeline.

@@ -9653,6 +9653,9 @@ bypass_kg_routing = true
                 on_fail: crate::flow::config::FailStrategy::Abort,
                 provider: None,
                 persona: None,
+                fallback_provider: None,
+                fallback_model: None,
+
                 matrix: None,
             }],
         }];
@@ -10089,8 +10092,10 @@ bypass_kg_routing = true
             }
         }
 
-        let dump = std::fs::read_to_string(&dump_path)
-            .unwrap_or_else(|e| panic!("env dump not written to {}: {e}", dump_path.display()));
+        let dump = match std::fs::read_to_string(&dump_path) {
+            Ok(dump) => dump,
+            Err(e) => format!("env dump not written to {}: {e}", dump_path.display()),
+        };
         assert!(
             dump.contains("ADF_PR_NUMBER=641"),
             "ADF_PR_NUMBER missing from dump:\n{dump}"

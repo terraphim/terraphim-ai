@@ -56,7 +56,7 @@ pick_ready_issue() {
 
 fetch_issue_body() {
     local iss="$1"
-    if [[ -z "$GITEA_TOKEN" ]]; then
+    if [[ -n "$GITEA_TOKEN" ]]; then
         curl -sf -H "Authorization: token ${GITEA_TOKEN}" \
             "${GITEA_API}/repos/terraphim/terraphim-ai/issues/${iss}" 2>/dev/null | \
             jq -r '.body // empty'
@@ -69,9 +69,15 @@ fetch_issue_body() {
 
 fetch_issue_title() {
     local iss="$1"
-    curl -sf \
-        "${GITEA_API}/repos/terraphim/terraphim-ai/issues/${iss}" 2>/dev/null | \
-        jq -r '.title // empty'
+    if [[ -n "$GITEA_TOKEN" ]]; then
+        curl -sf -H "Authorization: token ${GITEA_TOKEN}" \
+            "${GITEA_API}/repos/terraphim/terraphim-ai/issues/${iss}" 2>/dev/null | \
+            jq -r '.title // empty'
+    else
+        curl -sf \
+            "${GITEA_API}/repos/terraphim/terraphim-ai/issues/${iss}" 2>/dev/null | \
+            jq -r '.title // empty'
+    fi
 }
 
 # --- Artefact helpers ---

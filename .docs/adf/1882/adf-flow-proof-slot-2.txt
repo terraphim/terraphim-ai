@@ -1,0 +1,3 @@
+slot=2
+model=kimi-k2p6
+issue=1882

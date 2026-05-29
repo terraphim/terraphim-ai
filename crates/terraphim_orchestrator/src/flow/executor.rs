@@ -178,7 +178,9 @@ impl FlowExecutor {
     }
 
     /// Evaluate a gate condition against completed step outputs.
-    /// Supports simple expressions: `steps.<name>.exit_code == 0` and `steps.<name>.exit_code != 0`
+    /// Supports simple expressions: `steps.<name>.exit_code == 0`,
+    /// `steps.<name>.exit_code != 0`, and numeric comparisons such as
+    /// `steps.<name>.success_count >= 2`.
     pub fn evaluate_gate(
         &self,
         step: &FlowStepDef,
@@ -195,20 +197,52 @@ impl FlowExecutor {
 
         let resolved = self.resolve_templates(condition, flow, state);
 
-        // Parse simple expressions: "X == Y" or "X != Y"
-        if let Some((lhs, rhs)) = resolved.split_once(" == ") {
-            Ok(lhs.trim() == rhs.trim())
-        } else if let Some((lhs, rhs)) = resolved.split_once(" != ") {
-            Ok(lhs.trim() != rhs.trim())
-        } else {
-            Err(OrchestratorError::FlowFailed {
-                flow_name: flow.name.clone(),
-                reason: format!(
-                    "gate step '{}': unsupported condition expression: {}",
-                    step.name, resolved
-                ),
-            })
+        for op in [" >= ", " <= ", " > ", " < ", " == ", " != "] {
+            if let Some((lhs, rhs)) = resolved.split_once(op) {
+                let lhs = lhs.trim();
+                let rhs = rhs.trim();
+                return match op.trim() {
+                    "==" => Ok(lhs == rhs),
+                    "!=" => Ok(lhs != rhs),
+                    ">=" | "<=" | ">" | "<" => {
+                        let lhs_num = lhs.parse::<i64>().map_err(|_| {
+                            OrchestratorError::FlowFailed {
+                                flow_name: flow.name.clone(),
+                                reason: format!(
+                                    "gate step '{}': left side '{}' is not numeric in condition: {}",
+                                    step.name, lhs, resolved
+                                ),
+                            }
+                        })?;
+                        let rhs_num = rhs.parse::<i64>().map_err(|_| {
+                            OrchestratorError::FlowFailed {
+                                flow_name: flow.name.clone(),
+                                reason: format!(
+                                    "gate step '{}': right side '{}' is not numeric in condition: {}",
+                                    step.name, rhs, resolved
+                                ),
+                            }
+                        })?;
+                        match op.trim() {
+                            ">=" => Ok(lhs_num >= rhs_num),
+                            "<=" => Ok(lhs_num <= rhs_num),
+                            ">" => Ok(lhs_num > rhs_num),
+                            "<" => Ok(lhs_num < rhs_num),
+                            _ => unreachable!(),
+                        }
+                    }
+                    _ => unreachable!(),
+                };
+            }
         }
+
+        Err(OrchestratorError::FlowFailed {
+            flow_name: flow.name.clone(),
+            reason: format!(
+                "gate step '{}': unsupported condition expression: {}",
+                step.name, resolved
+            ),
+        })
     }
 
     /// Execute an agent step by spawning a CLI tool.
@@ -311,7 +345,9 @@ impl FlowExecutor {
 
         // Set fallback provider and model for rate limit scenarios
         // For opencode-based fallbacks, use the same CLI tool; for claude, use claude CLI
-        if let (Some(ref fb_provider), Some(ref fb_model)) = (&agent_def.fallback_provider, &agent_def.fallback_model) {
+        if let (Some(ref fb_provider), Some(ref fb_model)) =
+            (&agent_def.fallback_provider, &agent_def.fallback_model)
+        {
             let fb_cli = if fb_provider == "claude" || fb_provider == "claude-code" {
                 "claude".to_string()
             } else {
@@ -703,6 +739,8 @@ impl FlowExecutor {
         sub_step.matrix = None; // prevent recursion
 
         // Resolve {{matrix.*}} in mutable fields.
+        // Priority: matrix_row has key -> use that value directly (overrides step default).
+        // Otherwise resolve any {{matrix.*}} placeholders in the step's value.
         if let Some(ref task) = sub_step.task {
             sub_step.task = Some(resolve_matrix_vars(task, matrix_row));
         }
@@ -717,6 +755,18 @@ impl FlowExecutor {
         }
         if let Some(ref provider) = sub_step.provider {
             sub_step.provider = Some(resolve_matrix_vars(provider, matrix_row));
+        }
+        // cli_tool: matrix_row overrides step default if present
+        if let Some(val) = matrix_row.get("cli_tool") {
+            sub_step.cli_tool = Some(val.clone());
+        }
+        // fallback_provider: matrix_row overrides step default if present
+        if let Some(val) = matrix_row.get("fallback_provider") {
+            sub_step.fallback_provider = Some(val.clone());
+        }
+        // fallback_model: matrix_row overrides step default if present
+        if let Some(val) = matrix_row.get("fallback_model") {
+            sub_step.fallback_model = Some(val.clone());
         }
 
         match sub_step.kind {
@@ -1081,6 +1131,9 @@ mod tests {
             on_fail: FailStrategy::Abort,
             provider: None,
             persona: None,
+            fallback_provider: None,
+            fallback_model: None,
+
             matrix: None,
         };
 
@@ -1122,6 +1175,9 @@ mod tests {
             on_fail: FailStrategy::Abort,
             provider: None,
             persona: None,
+            fallback_provider: None,
+            fallback_model: None,
+
             matrix: None,
         };
 
@@ -1174,6 +1230,9 @@ mod tests {
             on_fail: FailStrategy::Abort,
             provider: None,
             persona: None,
+            fallback_provider: None,
+            fallback_model: None,
+
             matrix: None,
         };
 
@@ -1224,12 +1283,92 @@ mod tests {
             on_fail: FailStrategy::Abort,
             provider: None,
             persona: None,
+            fallback_provider: None,
+            fallback_model: None,
+
             matrix: None,
         };
 
         let result = executor.evaluate_gate(&step, &flow, &state).unwrap();
 
         assert!(!result, "Gate should fail when exit_code != 0");
+    }
+
+    #[test]
+    fn test_evaluate_gate_matrix_success_count_threshold() {
+        let executor = FlowExecutor::new(PathBuf::from("/tmp"), PathBuf::from("/tmp/state"));
+        let flow = create_test_flow();
+        let mut state = FlowRunState::new("test-flow");
+
+        state.matrix_envelopes.insert(
+            "matrix-research".to_string(),
+            vec![
+                StepEnvelope {
+                    step_name: "matrix-research-0".to_string(),
+                    started_at: Utc::now(),
+                    finished_at: Utc::now(),
+                    exit_code: 0,
+                    stdout: String::new(),
+                    stderr: String::new(),
+                    cost_usd: None,
+                    session_id: None,
+                    input_tokens: None,
+                    output_tokens: None,
+                    stdout_file: None,
+                },
+                StepEnvelope {
+                    step_name: "matrix-research-1".to_string(),
+                    started_at: Utc::now(),
+                    finished_at: Utc::now(),
+                    exit_code: 0,
+                    stdout: String::new(),
+                    stderr: String::new(),
+                    cost_usd: None,
+                    session_id: None,
+                    input_tokens: None,
+                    output_tokens: None,
+                    stdout_file: None,
+                },
+                StepEnvelope {
+                    step_name: "matrix-research-2".to_string(),
+                    started_at: Utc::now(),
+                    finished_at: Utc::now(),
+                    exit_code: 1,
+                    stdout: String::new(),
+                    stderr: String::new(),
+                    cost_usd: None,
+                    session_id: None,
+                    input_tokens: None,
+                    output_tokens: None,
+                    stdout_file: None,
+                },
+            ],
+        );
+
+        let step = FlowStepDef {
+            name: "gate-research".to_string(),
+            kind: StepKind::Gate,
+            command: None,
+            cli_tool: None,
+            model: None,
+            task: None,
+            task_file: None,
+            condition: Some("{{steps.matrix-research.success_count}} >= 2".to_string()),
+            timeout_secs: 10,
+            on_fail: FailStrategy::Abort,
+            provider: None,
+            fallback_provider: None,
+            fallback_model: None,
+            persona: None,
+            matrix: None,
+        };
+
+        let result = executor.evaluate_gate(&step, &flow, &state).unwrap();
+
+        assert!(
+            result,
+            "Gate should pass when at least two matrix slots succeed"
+        );
     }
 
     #[tokio::test]
@@ -1259,6 +1398,9 @@ mod tests {
                     on_fail: FailStrategy::Abort,
                     provider: None,
                     persona: None,
+                    fallback_provider: None,
+                    fallback_model: None,
+
                     matrix: None,
                 },
                 FlowStepDef {
@@ -1274,6 +1416,9 @@ mod tests {
                     on_fail: FailStrategy::Abort,
                     provider: None,
                     persona: None,
+                    fallback_provider: None,
+                    fallback_model: None,
+
                     matrix: None,
                 },
             ],
@@ -1320,6 +1465,9 @@ mod tests {
                     on_fail: FailStrategy::Abort,
                     provider: None,
                     persona: None,
+                    fallback_provider: None,
+                    fallback_model: None,
+
                     matrix: None,
                 },
                 FlowStepDef {
@@ -1335,6 +1483,9 @@ mod tests {
                     on_fail: FailStrategy::Abort,
                     provider: None,
                     persona: None,
+                    fallback_provider: None,
+                    fallback_model: None,
+
                     matrix: None,
                 },
                 FlowStepDef {
@@ -1350,6 +1501,9 @@ mod tests {
                     on_fail: FailStrategy::Abort,
                     provider: None,
                     persona: None,
+                    fallback_provider: None,
+                    fallback_model: None,
+
                     matrix: None,
                 },
             ],
@@ -1388,6 +1542,9 @@ mod tests {
                     on_fail: FailStrategy::Abort,
                     provider: None,
                     persona: None,
+                    fallback_provider: None,
+                    fallback_model: None,
+
                     matrix: None,
                 },
                 FlowStepDef {
@@ -1403,6 +1560,9 @@ mod tests {
                     on_fail: FailStrategy::Abort,
                     provider: None,
                     persona: None,
+                    fallback_provider: None,
+                    fallback_model: None,
+
                     matrix: None,
                 },
                 FlowStepDef {
@@ -1418,6 +1578,9 @@ mod tests {
                     on_fail: FailStrategy::Abort,
                     provider: None,
                     persona: None,
+                    fallback_provider: None,
+                    fallback_model: None,
+
                     matrix: None,
                 },
             ],
@@ -1459,6 +1622,9 @@ mod tests {
                     on_fail: FailStrategy::Abort,
                     provider: None,
                     persona: None,
+                    fallback_provider: None,
+                    fallback_model: None,
+
                     matrix: None,
                 },
                 FlowStepDef {
@@ -1474,6 +1640,9 @@ mod tests {
                     on_fail: FailStrategy::Abort,
                     provider: None,
                     persona: None,
+                    fallback_provider: None,
+                    fallback_model: None,
+
                     matrix: None,
                 },
                 FlowStepDef {
@@ -1489,6 +1658,9 @@ mod tests {
                     on_fail: FailStrategy::Abort,
                     provider: None,
                     persona: None,
+                    fallback_provider: None,
+                    fallback_model: None,
+
                     matrix: None,
                 },
             ],
@@ -1542,6 +1714,9 @@ mod tests {
                     on_fail: FailStrategy::Abort,
                     provider: None,
                     persona: None,
+                    fallback_provider: None,
+                    fallback_model: None,
+
                     matrix: None,
                 },
                 FlowStepDef {
@@ -1557,6 +1732,9 @@ mod tests {
                     on_fail: FailStrategy::Abort,
                     provider: None,
                     persona: None,
+                    fallback_provider: None,
+                    fallback_model: None,
+
                     matrix: None,
                 },
                 FlowStepDef {
@@ -1572,6 +1750,9 @@ mod tests {
                     on_fail: FailStrategy::Abort,
                     provider: None,
                     persona: None,
+                    fallback_provider: None,
+                    fallback_model: None,
+
                     matrix: None,
                 },
             ],
@@ -1633,6 +1814,9 @@ mod tests {
                     on_fail: FailStrategy::Abort,
                     provider: None,
                     persona: None,
+                    fallback_provider: None,
+                    fallback_model: None,
+
                     matrix: None,
                 },
                 FlowStepDef {
@@ -1648,6 +1832,9 @@ mod tests {
                     on_fail: FailStrategy::Abort,
                     provider: None,
                     persona: None,
+                    fallback_provider: None,
+                    fallback_model: None,
+
                     matrix: None,
                 },
                 FlowStepDef {
@@ -1663,6 +1850,9 @@ mod tests {
                     on_fail: FailStrategy::Abort,
                     provider: None,
                     persona: None,
+                    fallback_provider: None,
+                    fallback_model: None,
+
                     matrix: None,
                 },
             ],
@@ -1717,6 +1907,9 @@ mod tests {
                     on_fail: FailStrategy::Abort,
                     provider: None,
                     persona: None,
+                    fallback_provider: None,
+                    fallback_model: None,
+
                     matrix: None,
                 },
                 FlowStepDef {
@@ -1732,6 +1925,9 @@ mod tests {
                     on_fail: FailStrategy::Abort,
                     provider: None,
                     persona: None,
+                    fallback_provider: None,
+                    fallback_model: None,
+
                     matrix: None,
                 },
             ],
@@ -1782,6 +1978,9 @@ mod tests {
                 on_fail: FailStrategy::Abort,
                 provider: None,
                 persona: None,
+                fallback_provider: None,
+                fallback_model: None,
+
                 matrix: Some(MatrixConfig {
                     params: vec![row0, row1],
                     max_parallel: 1,
@@ -1837,6 +2036,9 @@ mod tests {
                 on_fail: FailStrategy::Abort,
                 provider: None,
                 persona: None,
+                fallback_provider: None,
+                fallback_model: None,
+
                 matrix: Some(MatrixConfig {
                     params: vec![row0, row1],
                     max_parallel: 1,
@@ -1957,6 +2159,9 @@ mod tests {
                 on_fail: FailStrategy::Abort,
                 provider: None,
                 persona: None,
+                fallback_provider: None,
+                fallback_model: None,
+
                 matrix: Some(MatrixConfig {
                     params,
                     max_parallel: 1,
@@ -2005,6 +2210,9 @@ mod tests {
                 on_fail: FailStrategy::Abort,
                 provider: None,
                 persona: None,
+                fallback_provider: None,
+                fallback_model: None,
+
                 matrix: Some(MatrixConfig {
                     params: vec![row],
                     max_parallel: 1,

@@ -64,7 +64,7 @@ cli_tool = "opencode"
 [[steps]]
 name = "gate-research"
 kind = "gate"
-condition = "{{steps.matrix-research.exit_code}} == 0"
+condition = "{{steps.matrix-research.success_count}} == 3"
 on_fail = "abort"
 
 # ============================================================
@@ -74,7 +74,7 @@ on_fail = "abort"
 name = "research-quality"
 kind = "agent"
 cli_tool = "opencode"
-task = "You are evaluating the research quality for issue #{{issue}}.\n\nYour task:\n1. Load and apply the disciplined-quality-evaluation skill: skill://disciplined-quality-evaluation\n2. Read all research proposals:\n   - .docs/adf/{{issue}}/research-proposal-1.md\n   - .docs/adf/{{issue}}/research-proposal-2.md\n   - .docs/adf/{{issue}}/research-proposal-3.md\n3. Evaluate each proposal using the KLS 6-dimension framework:\n   - Explicitity (1-5): Are requirements unambiguous and complete?\n   - External Consistency (1-5): Does it fit existing architecture?\n   - Internal Consistency (1-5): Are goals coherent?\n   - Stakeholder Commitment (1-5): Are stakeholders aligned?\n   - Information Quality (1-5): Is evidence solid?\n   - Overall Coherence (1-5): Does it hang together?\n4. Write the quality evaluation to .docs/adf/{{issue}}/researchquality-evaluation.md\n\nQuality evaluation format (YAML frontmatter + markdown):\n---\nstage: research-quality-evaluation\nissue: {{issue}}\ntimestamp: FILL_IN\noverall_quality_score: FILL_IN\npasses_quality_gate: [true|false]\n---\n\n## Overall Quality Score\n[1-5 rating with rationale]\n\n## Per-Proposal Evaluation\n[Evaluation of each proposal]\n\n## Quality Gate Decision\n[PASS/FAIL with rationale - must score >= 3.0 overall to pass]\n\n## Recommendations\n[Any quality improvements needed before design]\n"
+task = "You are evaluating the research quality for issue #{{issue}}.\n\nYour task:\n1. Load and apply the disciplined-quality-evaluation skill: skill://disciplined-quality-evaluation\n2. Read all research proposals:\n   - .docs/adf/{{issue}}/research-proposal-1.md\n   - .docs/adf/{{issue}}/research-proposal-2.md\n   - .docs/adf/{{issue}}/research-proposal-3.md\n3. Evaluate each proposal using the KLS 6-dimension framework:\n   - Explicitity (1-5): Are requirements unambiguous and complete?\n   - External Consistency (1-5): Does it fit existing architecture?\n   - Internal Consistency (1-5): Are goals coherent?\n   - Stakeholder Commitment (1-5): Are stakeholders aligned?\n   - Information Quality (1-5): Is evidence solid?\n   - Overall Coherence (1-5): Does it hang together?\n4. Write the quality evaluation to .docs/adf/{{issue}}/research-quality-evaluation.md\n\nQuality evaluation format (YAML frontmatter + markdown):\n---\nstage: research-quality-evaluation\nissue: {{issue}}\ntimestamp: FILL_IN\noverall_quality_score: FILL_IN\npasses_quality_gate: [true|false]\n---\n\n## Overall Quality Score\n[1-5 rating with rationale]\n\n## Per-Proposal Evaluation\n[Evaluation of each proposal]\n\n## Quality Gate Decision\n[PASS/FAIL with rationale - must score >= 3.0 overall to pass]\n\n## Recommendations\n[Any quality improvements needed before design]\n"
 model = "kimi-for-coding/k2p6"
 provider = "kimi"
 timeout_secs = 300
@@ -100,11 +100,35 @@ provider = "{{matrix.provider}}"
 timeout_secs = 900
 on_fail = "continue"
 
+[steps.matrix]
+max_parallel = 3
+fail_strategy = "continue"
+
+[[steps.matrix.params]]
+slot = "1"
+model = "opus"
+provider = "claude"
+cli_tool = "claude"
+fallback_model = "kimi-for-coding/k2p6"
+fallback_provider = "kimi"
+
+[[steps.matrix.params]]
+slot = "2"
+model = "kimi-for-coding/k2p6"
+provider = "kimi"
+cli_tool = "opencode"
+
+[[steps.matrix.params]]
+slot = "3"
+model = "openai/gpt-5.5"
+provider = "openai"
+cli_tool = "opencode"
+
 # Gate: matrix-design step ran
 [[steps]]
 name = "gate-design"
 kind = "gate"
-condition = "{{steps.matrix-design.exit_code}} == 0"
+condition = "{{steps.matrix-design.success_count}} == 3"
 on_fail = "abort"
 
 # ============================================================
@@ -114,7 +138,7 @@ on_fail = "abort"
 name = "design-quality"
 kind = "agent"
 cli_tool = "opencode"
-task = "You are evaluating the design quality for issue #{{issue}}.\n\nYour task:\n1. Load and apply the disciplined-quality-evaluation skill: skill://disciplined-quality-evaluation\n2. Read all design proposals:\n   - .docs/adf/{{issue}}/design-proposal-1.md\n   - .docs/adf/{{issue}}/design-proposal-2.md\n   - .docs/adf/{{issue}}/design-proposal-3.md\n3. Read the research synthesis for context:\n   - .docs/adf/{{issue}}/research-synthesis.md\n4. Evaluate each design using the KLS 6-dimension framework:\n   - Explicitity (1-5): Are specifications unambiguous?\n   - External Consistency (1-5): Does it fit existing architecture?\n   - Internal Consistency (1-5): Is the design coherent?\n   - Stakeholder Commitment (1-5): Would stakeholders accept this?\n   - Information Quality (1-5): Is evidence solid?\n   - Overall Coherence (1-5): Does it hang together?\n5. Write the quality evaluation to .docs/adf/{{issue}}/designquality-evaluation.md\n\nQuality evaluation format (YAML frontmatter + markdown):\n---\nstage: design-quality-evaluation\nissue: {{issue}}\ntimestamp: FILL_IN\noverall_quality_score: FILL_IN\npasses_quality_gate: [true|false]\n---\n\n## Overall Quality Score\n[1-5 rating with rationale]\n\n## Per-Design Evaluation\n[Evaluation of each design]\n\n## Quality Gate Decision\n[PASS/FAIL with rationale - must score >= 3.0 overall to pass]\n\n## Recommendations\n[Any quality improvements needed before implementation]\n"
+task = "You are evaluating the design quality for issue #{{issue}}.\n\nYour task:\n1. Load and apply the disciplined-quality-evaluation skill: skill://disciplined-quality-evaluation\n2. Read all design proposals:\n   - .docs/adf/{{issue}}/design-proposal-1.md\n   - .docs/adf/{{issue}}/design-proposal-2.md\n   - .docs/adf/{{issue}}/design-proposal-3.md\n3. Read the research quality evaluation for context:\n   - .docs/adf/{{issue}}/research-quality-evaluation.md\n4. Evaluate each design using the KLS 6-dimension framework:\n   - Explicitity (1-5): Are specifications unambiguous?\n   - External Consistency (1-5): Does it fit existing architecture?\n   - Internal Consistency (1-5): Is the design coherent?\n   - Stakeholder Commitment (1-5): Would stakeholders accept this?\n   - Information Quality (1-5): Is evidence solid?\n   - Overall Coherence (1-5): Does it hang together?\n5. Write the quality evaluation to .docs/adf/{{issue}}/design-quality-evaluation.md\n\nQuality evaluation format (YAML frontmatter + markdown):\n---\nstage: design-quality-evaluation\nissue: {{issue}}\ntimestamp: FILL_IN\noverall_quality_score: FILL_IN\npasses_quality_gate: [true|false]\n---\n\n## Overall Quality Score\n[1-5 rating with rationale]\n\n## Per-Design Evaluation\n[Evaluation of each design]\n\n## Quality Gate Decision\n[PASS/FAIL with rationale - must score >= 3.0 overall to pass]\n\n## Recommendations\n[Any quality improvements needed before implementation]\n"
 model = "kimi-for-coding/k2p6"
 provider = "kimi"
 timeout_secs = 300
@@ -136,7 +160,7 @@ kind = "agent"
 cli_tool = "opencode"
 model = "kimi-for-coding/k2p6"
 provider = "kimi"
-task = "You are the judge for the design phase on issue #{{issue}}.\nRead the 3 design proposals at:\n  - .docs/adf/{{issue}}/design-proposal-1.md\n  - .docs/adf/{{issue}}/design-proposal-2.md\n  - .docs/adf/{{issue}}/design-proposal-3.md\n\nRead the design quality evaluation:\n  - .docs/adf/{{issue}}/design-quality-evaluation.md\n\nRead the research synthesis for context:\n  - .docs/adf/{{issue}}/research-synthesis.md\n\nYour task: judge-evaluate the designs and decide if ready for implementation.\n\nJudge decision format (YAML frontmatter + markdown):\n---\nstage: judge-decision\nissue: {{issue}}\ntimestamp: FILL_IN\nproceed_to_implementation: [true|false]\nchosen_design: [slot number]\n---\n\n## Judge Decision\n[PROCEED/DEFER with rationale]\n\n## Best Design\n[Which design is best and why]\n\n## Design Evaluation\n[Comparison of all 3 designs against criteria]\n\n## Readiness Assessment\n[Is the design ready for implementation? What gaps remain?]\n\n## Open Questions\n[Questions to resolve before implementation]\n"
+task = "You are the judge for the design phase on issue #{{issue}}.\nRead the 3 design proposals at:\n  - .docs/adf/{{issue}}/design-proposal-1.md\n  - .docs/adf/{{issue}}/design-proposal-2.md\n  - .docs/adf/{{issue}}/design-proposal-3.md\n\nRead the design quality evaluation:\n  - .docs/adf/{{issue}}/design-quality-evaluation.md\n\nRead the research quality evaluation for context:\n  - .docs/adf/{{issue}}/research-quality-evaluation.md\n\nYour task: judge-evaluate the designs and decide if ready for implementation.\n\nJudge decision format (YAML frontmatter + markdown):\n---\nstage: judge-decision\nissue: {{issue}}\ntimestamp: FILL_IN\nproceed_to_implementation: [true|false]\nchosen_design: [slot number]\n---\n\n## Judge Decision\n[PROCEED/DEFER with rationale]\n\n## Best Design\n[Which design is best and why]\n\n## Design Evaluation\n[Comparison of all 3 designs against criteria]\n\n## Readiness Assessment\n[Is the design ready for implementation? What gaps remain?]\n\n## Open Questions\n[Questions to resolve before implementation]\n"
 timeout_secs = 600
 
 # Gate: judge must approve implementation
@@ -155,7 +179,7 @@ kind = "agent"
 cli_tool = "opencode"
 model = "kimi-for-coding/k2p6"
 provider = "kimi"
-task = "You are running the disciplined-implementation skill for issue #{{issue}}.\n\nYour task:\n1. Load and apply the disciplined-implementation skill: skill://disciplined-implementation\n2. Read the chosen design at:\n   - .docs/adf/{{issue}}/design-proposal-[chosen-slot].md\n3. Read the design synthesis for context:\n   - .docs/adf/{{issue}}/design-synthesis.md\n4. Implement the design following disciplined-implementation methodology:\n   - TDD approach: write tests first\n   - Incremental commits\n   - Verify each step\n5. Write implementation status to .docs/adf/{{issue}}/implementation-status.md\n\nImplementation status format (YAML frontmatter + markdown):\n---\nstage: implementation-status\nissue: {{issue}}\ntimestamp: FILL_IN\nimplementation_complete: [true|false]\nfiles_created: [list]\nfiles_modified: [list]\ntests_added: [list]\n---\n\n## Implementation Summary\n[What was implemented]\n\n## Files Created\n[List of new files]\n\n## Files Modified\n[List of changed files]\n\n## Tests Added\n[List of tests]\n\n## Verification\n[How implementation was verified]\n\n## Issues Encountered\n[Any problems during implementation]\n"
+task = "You are running the disciplined-implementation skill for issue #{{issue}}.\n\nYour task:\n1. Load and apply the disciplined-implementation skill: skill://disciplined-implementation\n2. Read the judge decision at:\n   - .docs/adf/{{issue}}/judge-decision.md\n3. Read all design proposals for context:\n   - .docs/adf/{{issue}}/design-proposal-1.md\n   - .docs/adf/{{issue}}/design-proposal-2.md\n   - .docs/adf/{{issue}}/design-proposal-3.md\n4. Implement the chosen design following disciplined-implementation methodology:\n   - TDD approach: write tests first\n   - Incremental commits\n   - Verify each step\n5. Write implementation status to .docs/adf/{{issue}}/implementation-status.md\n\nImplementation status format (YAML frontmatter + markdown):\n---\nstage: implementation-status\nissue: {{issue}}\ntimestamp: FILL_IN\nimplementation_complete: [true|false]\nfiles_created: [list]\nfiles_modified: [list]\ntests_added: [list]\n---\n\n## Implementation Summary\n[What was implemented]\n\n## Files Created\n[List of new files]\n\n## Files Modified\n[List of changed files]\n\n## Tests Added\n[List of tests]\n\n## Verification\n[How implementation was verified]\n\n## Issues Encountered\n[Any problems during implementation]\n"
 timeout_secs = 3600
 
 # ============================================================
@@ -179,7 +203,7 @@ kind = "agent"
 cli_tool = "opencode"
 model = "kimi-for-coding/k2p6"
 provider = "kimi"
-task = "You are running the disciplined-validation skill for issue #{{issue}}.\n\nYour task:\n1. Load and apply the disciplined-validation skill: skill://disciplined-validation\n2. Read the implementation status at:\n   - .docs/adf/{{issue}}/implementation-status.md\n3. Read the review findings at:\n   - .docs/adf/{{issue}}/review-findings.md\n4. Read the final verdict at:\n   - .docs/adf/{{issue}}/final-verdict.md\n5. Validate the implementation against original requirements\n6. Write validation report to .docs/adf/{{issue}}/validation-report.md\n\nValidation report format (YAML frontmatter + markdown):\n---\nstage: validation-report\nissue: {{issue}}\ntimestamp: FILL_IN\nvalidation_complete: [true|false]\npasses_validation: [true|false]\n---\n\n## Validation Summary\n[Overall validation result]\n\n## Requirements Verification\n[Does implementation meet each requirement?]\n\n## Acceptance Criteria Check\n[Does implementation meet acceptance criteria from design?]\n\n## Issues Found\n[Any issues discovered during validation]\n\n## Recommendations\n[What needs to happen before final approval]\n"
+task = "You are running the disciplined-validation skill for issue #{{issue}}.\n\nYour task:\n1. Load and apply the disciplined-validation skill: skill://disciplined-validation\n2. Read the implementation status at:\n   - .docs/adf/{{issue}}/implementation-status.md\n3. Read the review findings at:\n   - .docs/adf/{{issue}}/review-findings.md\n4. Validate the implementation against original requirements\n5. Write validation report to .docs/adf/{{issue}}/validation-report.md\n\nValidation report format (YAML frontmatter + markdown):\n---\nstage: validation-report\nissue: {{issue}}\ntimestamp: FILL_IN\nvalidation_complete: [true|false]\npasses_validation: [true|false]\n---\n\n## Validation Summary\n[Overall validation result]\n\n## Requirements Verification\n[Does implementation meet each requirement?]\n\n## Acceptance Criteria Check\n[Does implementation meet acceptance criteria from design?]\n\n## Issues Found\n[Any issues discovered during validation]\n\n## Recommendations\n[What needs to happen before final approval]\n"
 timeout_secs = 600
 
 # Gate: validation must pass
