@@ -208,6 +208,53 @@ adf-ctl trigger --local --direct AGENT
 
 Proceed with a minimal remediation patch. The P1 and P2 findings are concrete, bounded, and low-risk to fix.
 
+## 2026-05-28 Refinement: Existing Code Reuse for Local/Event-Only Direct Dispatch
+
+### Context
+
+After structural review, the `event_only` finding was reclassified from a defect to an intentional product requirement: direct dispatch is the local/admin path for running event-only agents such as `build-runner` and `pr-reviewer` outside their normal webhook triggers.
+
+The remaining problem is not that event-only agents can be run locally. The problem is that the current direct-dispatch protocol runs them as bare agent spawns, without a first-class way to supply the synthetic push or pull-request context those agents normally expect.
+
+### Existing Code We Can Leverage
+
+| Existing Component | Location | Reuse Opportunity |
+|--------------------|----------|-------------------|
+| `TriggerMode::{Local, Push, PullRequest}` | `crates/terraphim_orchestrator/src/agent_runner.rs` | Represents local and event-driven execution modes already. |
+| `SyntheticEvent::{Push, PullRequest}` | `crates/terraphim_orchestrator/src/agent_runner.rs` | Already defines event metadata and `env_vars()` for local simulation. |
+| `validate_agent_runtime` | `crates/terraphim_orchestrator/src/agent_runner.rs` | Can provide direct-dispatch preflight warnings for missing CLI, bad working directory, disabled agent, or event-only context expectations. |
+| `mention::resolve_mention` | `crates/terraphim_orchestrator/src/mention.rs` | Existing project-aware resolver for `project/agent` and unqualified mentions. |
+| `ProjectAdfConfig::discover_and_load` | `crates/terraphim_orchestrator/src/project_adf.rs` | Already discovers `.terraphim/adf.toml`, expands env vars, and converts project-local config into orchestrator fragments. |
+| `OrchestratorConfig::load_and_validate` | `crates/terraphim_orchestrator/src/config.rs` | Existing full config loader with env expansion, include expansion, validation, and world-readable config warnings. |
+| `control_plane::NormalizedAgentEvent` | `crates/terraphim_orchestrator/src/control_plane/events.rs` | Can be extended with `EventOrigin::Direct` for consistent audit/dedupe/telemetry metadata. |
+| `dispatcher::DispatchTask` | `crates/terraphim_orchestrator/src/dispatcher.rs` | Existing queue could host direct dispatch later, but should not be required for the immediate admin/local override path. |
+
+### Revised Assumptions
+
+| Assumption | Basis | Risk if Wrong | Verified? |
+|------------|-------|---------------|-----------|
+| Direct dispatch is allowed to run `event_only` agents locally. | User explicitly confirmed: "How else can you run event only agents locally?" | Future reviewers may treat it as a policy bypass unless documented. | Yes. |
+| Event-only direct runs should ideally receive synthetic event context. | `SyntheticEvent::env_vars()` already exists for push/PR simulation. | Bare local spawns may behave differently from webhook-triggered spawns. | Yes. |
+| Project-aware resolution matters for multi-project fleets. | `mention::resolve_mention` exists and is used by webhook/poll dispatch paths. | Duplicate agent names can resolve to the wrong project. | Yes. |
+| The first improvement should reuse existing types, not introduce a broad admin socket. | Direct dispatch is already implemented and needs refinement, not a rewrite. | Future admin features may need a larger protocol later. | Yes. |
+
+### Revised Findings
+
+1. The direct-dispatch socket should remain a local/admin override, including for event-only agents.
+2. Direct dispatch should make event-only local execution explicit in logs and documentation, not silently mimic mention dispatch policy.
+3. The highest-value improvement is adding optional synthetic event context to the direct command payload and CLI flags, backed by existing `SyntheticEvent::env_vars()`.
+4. The second highest-value improvement is project-aware agent resolution using the existing mention resolver.
+5. The shell-injection issue in `adf-ctl` remains valid and should be fixed by validating agent names and filtering fixed command output in Rust rather than interpolating user input into shell pipelines.
+
+### Revised Success Criteria
+
+1. `adf-ctl --local trigger build-runner --direct --event push ...` can run an event-only agent with synthetic push env vars.
+2. `adf-ctl --local trigger pr-reviewer --direct --event pr ...` can run an event-only agent with synthetic PR env vars.
+3. `adf-ctl --local trigger project/agent --direct` resolves the intended project-bound agent.
+4. Bare direct dispatch for event-only agents remains possible, but emits an explicit admin/local override log line.
+5. CLI-provided agent names are validated before being used in shell command strings.
+6. The existing remediation goals remain intact: safe socket cleanup, real UDS round-trip tests, and aligned socket-path documentation.
+
 ### Scope Recommendations
 
 Implement exactly four remediation items:
@@ -216,6 +263,14 @@ Implement exactly four remediation items:
 2. Harden stale socket cleanup to remove sockets only.
 3. Align default socket path documentation and tests with `/tmp/adf-ctl.sock` unless the user explicitly chooses working-dir default.
 4. Add real UDS round-trip tests for valid and invalid agents.
+
+Then implement the focused reuse improvements in a second step:
+
+5. Extend the direct-dispatch JSON command with optional project and synthetic event fields.
+6. Add `adf-ctl --local trigger --direct --event push|pr` flags that construct existing `SyntheticEvent` values.
+7. Resolve agent names through the existing project-aware mention resolver.
+8. Inject `SyntheticEvent::env_vars()` into direct-dispatched event-only agents.
+9. Add `EventOrigin::Direct` normalisation only if audit/telemetry consumers need it in the same change; otherwise defer to avoid widening scope.
 
 ### Risk Mitigation Recommendations
 
