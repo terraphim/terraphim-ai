@@ -24,6 +24,8 @@ disciplined engineering V-model to fix a real codebase bug.
 | 1 | .docs/adf/1806/research.md | disciplined-research |
 | 2 | .docs/adf/1806/design.md | disciplined-design |
 | 3 | .docs/adf/1806/verification.md | disciplined-implementation |
+| 4 | .docs/adf/1806/verification-report.md | disciplined-verification |
+| 5 | .docs/adf/1806/validation-report.md | disciplined-validation |
 
 ## Evidence of Skill Usage
 
