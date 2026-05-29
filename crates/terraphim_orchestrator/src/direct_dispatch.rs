@@ -468,6 +468,97 @@ mod tests {
 
     #[cfg(unix)]
     #[tokio::test]
+    async fn test_direct_dispatch_socket_project_qualified_agent_round_trip() {
+        use std::collections::HashSet;
+        let dir = tempfile::tempdir().unwrap();
+        let socket_path = dir.path().join("adf.sock");
+        let (tx, mut rx) = mpsc::channel::<WebhookDispatch>(1);
+        let qualified_names: HashSet<(String, String)> =
+            [("terraphim-ai".to_string(), "build-runner".to_string())]
+                .into_iter()
+                .collect();
+        let agent_index = super::DirectDispatchAgentIndex {
+            bare_names: HashSet::new(),
+            qualified_names,
+        };
+
+        let handle = start_direct_dispatch_listener(socket_path.clone(), tx, agent_index);
+        wait_for_socket(&socket_path).await;
+
+        let response = send_command(
+            &socket_path,
+            r#"{"project":"terraphim-ai","agent":"build-runner","context":"test"}"#,
+        )
+        .await;
+        assert_eq!(response["status"], "ok", "expected ok response");
+
+        let dispatch = tokio::time::timeout(std::time::Duration::from_secs(2), rx.recv())
+            .await
+            .expect("dispatch receive timed out")
+            .expect("dispatch channel closed");
+
+        let WebhookDispatch::SpawnAgent {
+            agent_name,
+            detected_project,
+            context,
+            ..
+        } = dispatch
+        else {
+            assert!(false, "direct dispatch emits only SpawnAgent variants");
+            return;
+        };
+        assert_eq!(agent_name, "build-runner");
+        assert_eq!(detected_project.as_deref(), Some("terraphim-ai"));
+        assert_eq!(context, "test");
+
+        handle.abort();
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn test_direct_dispatch_socket_bad_project_returns_error() {
+        use std::collections::HashSet;
+        let dir = tempfile::tempdir().unwrap();
+        let socket_path = dir.path().join("adf.sock");
+        let (tx, mut rx) = mpsc::channel::<WebhookDispatch>(1);
+        let qualified_names: HashSet<(String, String)> =
+            [("terraphim-ai".to_string(), "build-runner".to_string())]
+                .into_iter()
+                .collect();
+        let agent_index = super::DirectDispatchAgentIndex {
+            bare_names: HashSet::new(),
+            qualified_names,
+        };
+
+        let handle = start_direct_dispatch_listener(socket_path.clone(), tx, agent_index);
+        wait_for_socket(&socket_path).await;
+
+        let response = send_command(
+            &socket_path,
+            r#"{"project":"bad-project","agent":"build-runner"}"#,
+        )
+        .await;
+        assert_eq!(
+            response["status"], "error",
+            "expected error response for bad project"
+        );
+        assert!(
+            response["message"]
+                .as_str()
+                .unwrap()
+                .contains("unknown project-qualified agent: bad-project/build-runner"),
+            "error message should mention project-qualified agent"
+        );
+        assert!(
+            rx.try_recv().is_err(),
+            "bad project-qualified agent must not emit a dispatch"
+        );
+
+        handle.abort();
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
     async fn test_direct_dispatch_rejects_oversized_command() {
         use std::collections::HashSet;
         let dir = tempfile::tempdir().unwrap();

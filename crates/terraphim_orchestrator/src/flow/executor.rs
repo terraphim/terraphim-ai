@@ -605,6 +605,9 @@ impl FlowExecutor {
         result = result.replace("{{base_branch}}", &flow.base_branch);
         result = result.replace("{{flow.name}}", &flow.name);
         result = result.replace("{{flow.correlation_id}}", &state.correlation_id.to_string());
+        if let Some(ref issue) = state.issue {
+            result = result.replace("{{issue}}", issue);
+        }
 
         // Resolve step references: {{steps.<name>.stdout}}, etc.
         for envelope in &state.step_envelopes {
@@ -867,6 +870,17 @@ mod tests {
         assert!(result.contains("ID: "));
         // The correlation_id should be a valid UUID in the result
         assert!(!result.contains("{{flow.correlation_id}}"));
+    }
+
+    #[test]
+    fn test_resolve_templates_issue_var() {
+        let executor = FlowExecutor::new(PathBuf::from("/tmp"), PathBuf::from("/tmp/state"));
+        let flow = create_test_flow();
+        let state = FlowRunState::new("test-flow").with_issue("1890".to_string());
+
+        let result = executor.resolve_templates("Issue: {{issue}}", &flow, &state);
+
+        assert_eq!(result, "Issue: 1890");
     }
 
     #[test]

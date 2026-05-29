@@ -132,6 +132,17 @@ enum AdfSub {
         #[arg(long, value_enum, default_value_t)]
         format: OutputFormat,
     },
+    /// Run a named flow from a local .terraphim/flows/<name>.toml file
+    Flow {
+        /// Flow name (e.g. adf-useful-work-proof)
+        name: String,
+        /// Key=value context passed to the flow (e.g. "issue=1890")
+        #[arg(long, default_value = "")]
+        context: String,
+        /// Path to local orchestrator TOML (reserved for future flow runtime wiring)
+        #[arg(long)]
+        config: Option<String>,
+    },
 }
 
 fn main() -> Result<()> {
@@ -185,6 +196,11 @@ fn run(local: bool, sub: AdfSub) -> Result<()> {
         } => cmd_status(local, &host, &since, format),
         AdfSub::Cancel { name, host } => cmd_cancel(local, &name, &host),
         AdfSub::Agents { host, format } => cmd_agents(local, &host, format),
+        AdfSub::Flow {
+            name,
+            context,
+            config,
+        } => cmd_flow(&name, &context, config.as_deref()),
     }
 }
 
@@ -1060,6 +1076,133 @@ fn cmd_agents(local: bool, host: &str, format: OutputFormat) -> Result<()> {
     Ok(())
 }
 
+/// Discover a flow definition file from `.terraphim/flows/<name>.toml`, walking
+/// up from the current directory so nested workspace commands still work.
+fn discover_flow_file(cwd: &Path, name: &str) -> Option<PathBuf> {
+    let mut current = Some(cwd.to_path_buf());
+    while let Some(dir) = current {
+        let flow_path = dir
+            .join(".terraphim")
+            .join("flows")
+            .join(format!("{}.toml", name));
+        if flow_path.is_file() {
+            return Some(flow_path);
+        }
+        current = dir.parent().map(|p| p.to_path_buf());
+    }
+    None
+}
+
+fn validate_flow_context_atom(label: &str, value: &str) -> Result<()> {
+    if value.is_empty() {
+        bail!("flow context {} cannot be empty", label);
+    }
+    if !value
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.')
+    {
+        bail!(
+            "flow context {} '{}' contains invalid characters (only alphanumeric, '-', '_', '.' allowed)",
+            label,
+            value
+        );
+    }
+    Ok(())
+}
+
+fn parse_context(context: &str) -> Result<std::collections::HashMap<String, String>> {
+    let mut map = std::collections::HashMap::new();
+    for token in context.split_whitespace() {
+        if let Some((key, value)) = token.split_once('=') {
+            if !key.is_empty() && !value.is_empty() {
+                validate_flow_context_atom("key", key)?;
+                validate_flow_context_atom("value", value)?;
+                map.insert(key.to_string(), value.to_string());
+            }
+        }
+    }
+    Ok(map)
+}
+
+/// Run a named flow definition locally. The current proof path is intentionally
+/// one-slot (`k=1`) via a committed fixture, so it proves executor behaviour
+/// without requiring runtime matrix rewriting.
+fn cmd_flow(name: &str, context: &str, _config_path: Option<&str>) -> Result<()> {
+    let cwd = std::env::current_dir().context("failed to get current working directory")?;
+
+    let flow_path = discover_flow_file(&cwd, name).with_context(|| {
+        format!(
+            "flow '{}' not found in any .terraphim/flows/ directory from {} upward",
+            name,
+            cwd.display()
+        )
+    })?;
+
+    println!("Loading flow from: {}", flow_path.display());
+
+    let flow_content = std::fs::read_to_string(&flow_path)
+        .with_context(|| format!("failed to read {}", flow_path.display()))?;
+
+    let flow: terraphim_orchestrator::flow::config::FlowDefinition = toml::from_str(&flow_content)
+        .with_context(|| format!("failed to parse flow TOML from {}", flow_path.display()))?;
+
+    println!("Flow '{}' loaded: {} step(s)", flow.name, flow.steps.len());
+
+    let ctx_map = parse_context(context)?;
+    let issue = ctx_map.get("issue").cloned();
+
+    let mut state = terraphim_orchestrator::flow::state::FlowRunState::new(&flow.name);
+    if let Some(ref issue) = issue {
+        println!("Issue context: {}", issue);
+        state = state.with_issue(issue.clone());
+    }
+
+    let flow_state_dir = cwd.join(".terraphim").join("flow-state");
+    std::fs::create_dir_all(&flow_state_dir).with_context(|| {
+        format!(
+            "failed to create flow state dir {}",
+            flow_state_dir.display()
+        )
+    })?;
+
+    let project_runtime = terraphim_orchestrator::flow::executor::ProjectRuntime {
+        working_dir: cwd.clone(),
+        gitea_owner: Some("terraphim".to_string()),
+        gitea_repo: Some("terraphim-ai".to_string()),
+    };
+
+    let executor =
+        terraphim_orchestrator::flow::executor::FlowExecutor::new(cwd.clone(), flow_state_dir)
+            .with_projects(std::collections::HashMap::from([(
+                flow.project.clone(),
+                project_runtime,
+            )]));
+
+    println!("Running flow '{}'...", flow.name);
+    let rt = tokio::runtime::Runtime::new().context("failed to create Tokio runtime")?;
+
+    let final_state = rt
+        .block_on(async { executor.run(&flow, Some(state)).await })
+        .map_err(|e| anyhow::anyhow!("flow '{}' failed: {}", flow.name, e))?;
+
+    println!();
+    println!("Flow '{}' finished: {:?}", flow.name, final_state.status);
+    if let Some(ref err) = final_state.error {
+        println!("Error: {}", err);
+    }
+    println!(
+        "Steps completed: {}/{}",
+        final_state.next_step_index,
+        flow.steps.len()
+    );
+    let matrix_slots: usize = final_state.matrix_envelopes.values().map(Vec::len).sum();
+    if matrix_slots > 0 {
+        println!("Matrix slots completed: {}", matrix_slots);
+    }
+
+    Ok(())
+}
+
 #[derive(Debug, Serialize)]
 struct AgentsReport<'a> {
     host: &'a str,
@@ -1159,6 +1302,19 @@ mod tests {
     fn test_parse_agents_list_empty_returns_empty() {
         assert!(parse_agents_list("").is_empty());
         assert!(parse_agents_list("\n\n\n").is_empty());
+    }
+
+    #[test]
+    fn test_parse_context_key_values() {
+        let parsed = parse_context("issue=1890 k=1").unwrap();
+        assert_eq!(parsed.get("issue").map(String::as_str), Some("1890"));
+        assert_eq!(parsed.get("k").map(String::as_str), Some("1"));
+    }
+
+    #[test]
+    fn test_parse_context_rejects_shell_metacharacters() {
+        let result = parse_context("issue=1890;rm");
+        assert!(result.is_err());
     }
 
     #[test]

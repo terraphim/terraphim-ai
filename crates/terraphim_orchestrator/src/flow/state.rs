@@ -14,6 +14,9 @@ pub struct FlowRunState {
     pub started_at: DateTime<Utc>,
     pub finished_at: Option<DateTime<Utc>>,
     pub next_step_index: usize,
+    /// Optional issue id supplied by local flow context.
+    #[serde(default)]
+    pub issue: Option<String>,
     pub step_envelopes: Vec<StepEnvelope>,
     /// Results from matrix-expanded steps. Key is step name; value is the
     /// ordered list of sub-execution envelopes (one per matrix params row).
@@ -42,10 +45,16 @@ impl FlowRunState {
             started_at: Utc::now(),
             finished_at: None,
             next_step_index: 0,
+            issue: None,
             step_envelopes: Vec::new(),
             matrix_envelopes: HashMap::new(),
             error: None,
         }
+    }
+
+    pub fn with_issue(mut self, issue: String) -> Self {
+        self.issue = Some(issue);
+        self
     }
 
     pub fn failed(flow_name: &str, reason: &str) -> Self {
@@ -116,6 +125,7 @@ mod tests {
         assert_eq!(state.flow_name, "test-flow");
         assert_eq!(state.status, FlowRunStatus::Running);
         assert_eq!(state.next_step_index, 0);
+        assert_eq!(state.issue, None);
         assert!(state.step_envelopes.is_empty());
         assert!(state.matrix_envelopes.is_empty());
         assert!(state.error.is_none());
@@ -123,6 +133,12 @@ mod tests {
 
         // Correlation ID should be a valid UUID
         assert_ne!(state.correlation_id, Uuid::nil());
+    }
+
+    #[test]
+    fn test_state_with_issue() {
+        let state = FlowRunState::new("test-flow").with_issue("1890".to_string());
+        assert_eq!(state.issue.as_deref(), Some("1890"));
     }
 
     #[test]
