@@ -1,6 +1,6 @@
 [package]
 name = "terraphim_hooks"
-version = "1.4.10"
+version = "1.20.2"
 edition.workspace = true
 authors = ["Terraphim AI <team@terraphim.ai>"]
 description = "Unified hooks infrastructure for Terraphim AI - knowledge graph-based text replacement and validation"

@@ -1,6 +1,6 @@
 [package]
 name = "terraphim_spawner"
-version = "1.8.0"
+version = "1.20.2"
 edition = "2021"
 authors = ["Terraphim Team <team@terraphim.ai>"]
 description = "Agent spawner for Terraphim with health checking and output capture"

@@ -505,12 +505,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bindet"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5afee99ef5f7527f3944f2bf4f5d443749fa47d43eb1d4f83a36e839be7900a3"
-
-[[package]]
 name = "bindgen"
 version = "0.70.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2466,56 +2460,69 @@ dependencies = [
 
 [[package]]
 name = "fff-grep"
-version = "0.5.1"
-source = "git+https://github.com/AlexMikhalev/fff.nvim.git?branch=feat%2Fexternal-scorer#efd15524383babd4d2d18a191240d3dcf494eb31"
+version = "0.8.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "68286213d07412846c0010a0b227b79c08fbc214cf7822f85cabd9e3f36606ae"
 dependencies = [
  "bstr",
  "memchr",
 ]
 
 [[package]]
+name = "fff-notify-debouncer-full"
+version = "0.9.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "29a4ebea7b8a2840cd59358bbf396f6f04313ce8eae84ac79703ce80298b8731"
+dependencies = [
+ "file-id",
+ "log",
+ "notify 9.0.0-rc.4",
+ "notify-types",
+ "rustc-hash 2.1.2",
+ "walkdir",
+]
+
+[[package]]
 name = "fff-query-parser"
-version = "0.5.1"
-source = "git+https://github.com/AlexMikhalev/fff.nvim.git?branch=feat%2Fexternal-scorer#efd15524383babd4d2d18a191240d3dcf494eb31"
+version = "0.8.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f5eb0a0363657b57a3a60d12a76a41f799406514b238123487e54290a6f1a62f"
 dependencies = [
  "zlob",
 ]
 
 [[package]]
 name = "fff-search"
-version = "0.5.1"
-source = "git+https://github.com/AlexMikhalev/fff.nvim.git?branch=feat%2Fexternal-scorer#efd15524383babd4d2d18a191240d3dcf494eb31"
+version = "0.8.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1b6b4517eb8a9b87a46d09e9958f2ddbc036440a9fb5d5ddfc05e6dcf4655ce2"
 dependencies = [
  "ahash",
  "aho-corasick",
- "bindet",
  "blake3",
- "chrono",
  "dirs 5.0.1",
  "dunce",
  "fff-grep",
+ "fff-notify-debouncer-full",
  "fff-query-parser",
  "git2",
  "glidesort",
  "globset",
  "heed",
  "ignore",
+ "libc",
  "memchr",
  "memmap2",
  "neo_frizbee",
- "notify 8.2.0",
- "notify-debouncer-full 0.7.0",
- "once_cell",
+ "notify 9.0.0-rc.4",
  "parking_lot 0.12.5",
  "pathdiff",
  "rayon",
  "regex",
+ "regex-syntax",
  "serde",
- "serde_json",
  "smallvec",
- "smartstring",
  "thiserror 2.0.18",
- "toml 0.8.23",
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
@@ -3142,7 +3149,7 @@ dependencies = [
 
 [[package]]
 name = "haystack_jmap"
-version = "1.19.2"
+version = "1.20.2"
 dependencies = [
  "anyhow",
  "clap",
@@ -4584,9 +4591,9 @@ dependencies = [
 
 [[package]]
 name = "neo_frizbee"
-version = "0.8.5"
+version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "34a8a11f48357cecd5ada0751f1490d8da4dd935e595d34cc2727567d5288ead"
+checksum = "728e0731ad3a0083b9f72a82df72c298641ba970d4e308e0897ec4c89212c31d"
 dependencies = [
  "itertools 0.14.0",
  "raw-cpuid",
@@ -4727,23 +4734,30 @@ dependencies = [
 ]
 
 [[package]]
-name = "notify-debouncer-full"
-version = "0.6.0"
+name = "notify"
+version = "9.0.0-rc.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "375bd3a138be7bfeff3480e4a623df4cbfb55b79df617c055cd810ba466fa078"
+checksum = "b44b771d4dd781ef14c84078693e67495da6b47f609f72e8a4da8420a861240e"
 dependencies = [
- "file-id",
+ "bitflags 2.11.1",
+ "inotify 0.11.1",
+ "kqueue",
+ "libc",
  "log",
- "notify 8.2.0",
+ "mio 1.2.0",
  "notify-types",
+ "objc2-core-foundation",
+ "objc2-core-services",
  "walkdir",
+ "windows-sys 0.61.2",
+ "xxhash-rust",
 ]
 
 [[package]]
 name = "notify-debouncer-full"
-version = "0.7.0"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c02b49179cfebc9932238d04d6079912d26de0379328872846118a0fa0dbb302"
+checksum = "375bd3a138be7bfeff3480e4a623df4cbfb55b79df617c055cd810ba466fa078"
 dependencies = [
  "file-id",
  "log",
@@ -4998,6 +5012,16 @@ checksum = "ca347214e24bc973fc025fd0d36ebb179ff30536ed1f80252706db19ee452009"
 dependencies = [
  "objc2",
  "objc2-foundation",
+]
+
+[[package]]
+name = "objc2-core-services"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "583300ad934cba24ff5292aee751ecc070f7ca6b39a574cc21b7b5e588e06a0b"
+dependencies = [
+ "libc",
+ "objc2-core-foundation",
 ]
 
 [[package]]
@@ -7739,18 +7763,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "smartstring"
-version = "1.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3fb72c633efbaa2dd666986505016c32c3044395ceaf881518399d2f4127ee29"
-dependencies = [
- "autocfg",
- "serde",
- "static_assertions",
- "version_check",
-]
-
-[[package]]
 name = "socket2"
 version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8791,7 +8803,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim-markdown-parser"
-version = "1.19.2"
+version = "1.20.2"
 dependencies = [
  "markdown",
  "serde",
@@ -8900,7 +8912,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_agent_evolution"
-version = "1.19.2"
+version = "1.20.2"
 dependencies = [
  "async-trait",
  "chrono",
@@ -9040,7 +9052,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_automata"
-version = "1.19.2"
+version = "1.20.2"
 dependencies = [
  "ahash",
  "aho-corasick",
@@ -9096,7 +9108,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_config"
-version = "1.15.0"
+version = "1.20.2"
 dependencies = [
  "ahash",
  "anyhow",
@@ -9153,7 +9165,7 @@ dependencies = [
  "criterion 0.5.1",
  "fff-search",
  "notify 8.2.0",
- "notify-debouncer-full 0.6.0",
+ "notify-debouncer-full",
  "parking_lot 0.12.5",
  "tempfile",
  "terraphim_automata",
@@ -9217,7 +9229,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_hooks"
-version = "1.4.10"
+version = "1.20.2"
 dependencies = [
  "dirs 5.0.1",
  "serde",
@@ -9449,7 +9461,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_orchestrator"
-version = "1.8.0"
+version = "1.20.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -9492,7 +9504,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_persistence"
-version = "1.15.0"
+version = "1.20.2"
 dependencies = [
  "async-once-cell",
  "async-trait",
@@ -9556,7 +9568,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_rolegraph"
-version = "1.15.0"
+version = "1.20.2"
 dependencies = [
  "ahash",
  "aho-corasick",
@@ -9582,7 +9594,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_router"
-version = "1.8.0"
+version = "1.20.2"
 dependencies = [
  "async-trait",
  "chrono",
@@ -9650,7 +9662,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_service"
-version = "1.16.15"
+version = "1.20.2"
 dependencies = [
  "ahash",
  "anyhow",
@@ -9714,7 +9726,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_settings"
-version = "1.15.0"
+version = "1.20.2"
 dependencies = [
  "directories 6.0.0",
  "envtestkit",
@@ -9730,7 +9742,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_spawner"
-version = "1.8.0"
+version = "1.20.2"
 dependencies = [
  "nix 0.27.1",
  "proptest",
@@ -9813,7 +9825,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_tracker"
-version = "1.13.0"
+version = "1.20.2"
 dependencies = [
  "async-trait",
  "axum 0.8.9",
@@ -9831,7 +9843,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_types"
-version = "1.15.0"
+version = "1.20.2"
 dependencies = [
  "ahash",
  "anyhow",
@@ -9853,7 +9865,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_update"
-version = "1.5.1"
+version = "1.20.2"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -11917,6 +11929,12 @@ dependencies = [
  "mac",
  "markup5ever 0.12.1",
 ]
+
+[[package]]
+name = "xxhash-rust"
+version = "0.8.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fdd20c5420375476fbd4394763288da7eb0cc0b8c11deed431a91562af7335d3"
 
 [[package]]
 name = "yaml-rust2"

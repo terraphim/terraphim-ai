@@ -1,6 +1,6 @@
 [package]
 name = "terraphim_agent_evolution"
-version = "1.19.2"
+version = "1.20.2"
 edition.workspace = true
 description = "Agent evolution system for Terraphim AI"
 documentation = "https://terraphim.ai"
