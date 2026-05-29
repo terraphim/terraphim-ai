@@ -1930,6 +1930,14 @@ impl AgentOrchestrator {
     /// Otherwise, route the task prompt through the RoutingEngine to select
     /// a model based on keyword matching.
     async fn spawn_agent(&mut self, def: &AgentDefinition) -> Result<(), OrchestratorError> {
+        self.spawn_agent_with_event(def, None).await
+    }
+
+    async fn spawn_agent_with_event(
+        &mut self,
+        def: &AgentDefinition,
+        synthetic_event: Option<&SyntheticEvent>,
+    ) -> Result<(), OrchestratorError> {
         // === PROJECT PAUSE GATE ===
         // Operators and the project circuit breaker can block all dispatches
         // for a given project by creating a sentinel file at
@@ -2397,8 +2405,13 @@ impl AgentOrchestrator {
             return Ok(());
         }
 
-        let spawn_ctx =
+        let mut spawn_ctx =
             build_spawn_context_for_agent(&self.config, def, self.output_poster.as_ref());
+        if let Some(event) = synthetic_event {
+            for (key, value) in event.env_vars() {
+                spawn_ctx = spawn_ctx.with_env(key, value);
+            }
+        }
         let handle = self
             .spawner
             .spawn_with_fallback(&request, spawn_ctx)
@@ -3636,6 +3649,7 @@ impl AgentOrchestrator {
                 issue_number,
                 comment_id,
                 context,
+                synthetic_event: _,
             } => {
                 info!(
                     agent = %agent_name,
@@ -3917,12 +3931,23 @@ impl AgentOrchestrator {
         match dispatch {
             webhook::WebhookDispatch::SpawnAgent {
                 agent_name,
+                detected_project,
                 context,
+                synthetic_event,
                 ..
             } => {
-                let def = match self.config.agents.iter().find(|a| a.name == agent_name) {
+                // Use project-aware resolution for qualified agent names.
+                let def = mention::resolve_mention(
+                    detected_project.as_deref(),
+                    dispatcher::LEGACY_PROJECT_ID,
+                    &agent_name,
+                    &self.config.agents,
+                );
+
+                let def = match def {
                     Some(def) => def,
                     None => {
+                        // Fallback to simple name lookup for legacy compatibility.
                         warn!(agent = %agent_name, "direct dispatch: agent not found in config");
                         return;
                     }
@@ -3939,8 +3964,19 @@ impl AgentOrchestrator {
                         format!("{}\n\n[direct dispatch context]\n{}", def.task, context);
                 }
 
-                info!(agent = %agent_name, "direct dispatch: spawning agent");
-                if let Err(e) = self.spawn_agent(&direct_def).await {
+                if def.event_only {
+                    info!(
+                        agent = %agent_name,
+                        event = ?synthetic_event,
+                        "direct dispatch override: spawning event_only agent locally"
+                    );
+                } else {
+                    info!(agent = %agent_name, "direct dispatch: spawning agent");
+                }
+                if let Err(e) = self
+                    .spawn_agent_with_event(&direct_def, synthetic_event.as_ref())
+                    .await
+                {
                     error!(agent = %agent_name, error = %e, "direct dispatch: failed to spawn agent");
                 }
             }
@@ -8504,6 +8540,7 @@ mod tests {
             issue_number: 0,
             comment_id: 0,
             context: "test context".to_string(),
+            synthetic_event: None,
         };
 
         orch.handle_direct_dispatch(dispatch).await;
@@ -8556,6 +8593,7 @@ mod tests {
             issue_number: 0,
             comment_id: 0,
             context: String::new(),
+            synthetic_event: None,
         };
 
         orch.handle_direct_dispatch(dispatch).await;
@@ -11794,6 +11832,7 @@ bypass_kg_routing = true
             issue_number: 9999,
             comment_id: 99999,
             context: "@adf:build-runner please run".to_string(),
+            synthetic_event: None,
         };
 
         orch.handle_webhook_dispatch(dispatch).await;

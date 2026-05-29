@@ -11,6 +11,7 @@ use std::path::PathBuf;
 use tokio::net::UnixListener;
 use tracing::{error, info};
 
+use crate::agent_runner::SyntheticEvent;
 use crate::webhook::WebhookDispatch;
 
 const MAX_COMMAND_SIZE: u64 = 8192;
@@ -20,9 +21,15 @@ const MAX_COMMAND_SIZE: u64 = 8192;
 pub struct DispatchCommand {
     /// Agent name to spawn (must match a configured agent name).
     pub agent: String,
+    /// Optional project hint for project-qualified agent resolution.
+    #[serde(default)]
+    pub project: Option<String>,
     /// Optional context string appended to the agent mention.
     #[serde(default)]
     pub context: Option<String>,
+    /// Optional synthetic event for event-only agents.
+    #[serde(default)]
+    pub synthetic_event: Option<SyntheticEvent>,
 }
 
 /// JSON response written back to adf-ctl.
@@ -178,11 +185,12 @@ async fn handle_connection(
     }
 
     let dispatch = WebhookDispatch::SpawnAgent {
-        agent_name: cmd.agent,
-        detected_project: None,
+        agent_name: cmd.agent.clone(),
+        detected_project: cmd.project.clone(),
         issue_number: 0,
         comment_id: 0,
         context: cmd.context.unwrap_or_default(),
+        synthetic_event: cmd.synthetic_event.clone(),
     };
 
     if dispatch_tx.send(dispatch).await.is_err() {

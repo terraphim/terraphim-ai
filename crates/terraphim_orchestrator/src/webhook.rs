@@ -11,6 +11,7 @@ use sha2::Sha256;
 use tracing::{info, warn};
 
 use crate::adf_commands::AdfCommandParser;
+use crate::agent_runner::SyntheticEvent;
 use crate::persona::PersonaRegistry;
 
 type HmacSha256 = Hmac<Sha256>;
@@ -77,7 +78,7 @@ pub struct PrRef {
 }
 
 /// A dispatch request sent from the webhook handler to the orchestrator.
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub enum WebhookDispatch {
     SpawnAgent {
         agent_name: String,
@@ -87,6 +88,9 @@ pub enum WebhookDispatch {
         issue_number: u64,
         comment_id: u64,
         context: String,
+        /// Optional synthetic event for direct dispatch of event-only agents.
+        #[serde(default)]
+        synthetic_event: Option<SyntheticEvent>,
     },
     SpawnPersona {
         persona_name: String,
@@ -316,6 +320,7 @@ async fn handle_gitea_webhook(
             issue_number: payload.issue.number,
             comment_id: payload.comment.id,
             context: String::new(),
+            synthetic_event: None,
         })
         .collect();
 
@@ -338,6 +343,7 @@ async fn handle_gitea_webhook(
                 issue_number,
                 comment_id,
                 context,
+                synthetic_event: None,
             },
             crate::adf_commands::AdfCommand::SpawnPersona {
                 persona_name,
