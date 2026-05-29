@@ -1,0 +1,161 @@
+# ADF Disciplined Engineering Proof Flow
+#
+# Proves ADF can coordinate LLMs through disciplined engineering phases
+# (research -> design -> implement -> verify) to fix a real bug.
+#
+# Run with:
+#   cargo run -p terraphim_orchestrator --bin adf-ctl -- \
+#     flow adf-disciplined-fix --context "issue=1806 k=1"
+#
+# Each phase invokes claude code with a prompt that encodes the
+# disciplined engineering skill for that phase. Output is captured
+# and gated before the next phase proceeds.
+
+name = "adf-disciplined-fix"
+project = "terraphim-ai"
+repo_path = "."
+timeout_secs = 1800
+
+# ── Phase 1: Research ──
+
+[[steps]]
+name = "research-bug"
+kind = "action"
+command = '''
+mkdir -p .docs/adf/1806
+claude -p - --output-format text --model sonnet \
+  --permission-mode bypassPermissions \
+  --allowedTools "Read Write Edit Glob Grep Bash" \
+  < .terraphim/flows/prompts/adf-disciplined-fix-research.md \
+  > .docs/adf/1806/research.md 2>&1
+'''
+timeout_secs = 300
+on_fail = "abort"
+
+[[steps]]
+name = "gate-research"
+kind = "gate"
+condition = "{{steps.research-bug.exit_code}} == 0"
+on_fail = "abort"
+
+# ── Phase 2: Design ──
+
+[[steps]]
+name = "design-fix"
+kind = "action"
+command = '''
+claude -p - --output-format text --model sonnet \
+  --permission-mode bypassPermissions \
+  --allowedTools "Read Write Edit Glob Grep Bash" \
+  < .terraphim/flows/prompts/adf-disciplined-fix-design.md \
+  > .docs/adf/1806/design.md 2>&1
+'''
+timeout_secs = 300
+on_fail = "abort"
+
+[[steps]]
+name = "gate-design"
+kind = "gate"
+condition = "{{steps.design-fix.exit_code}} == 0"
+on_fail = "abort"
+
+# ── Phase 3: Implement ──
+
+[[steps]]
+name = "implement-fix"
+kind = "action"
+command = '''
+claude -p - --output-format text --model sonnet \
+  --permission-mode bypassPermissions \
+  --allowedTools "Read Write Edit Glob Grep Bash" \
+  < .terraphim/flows/prompts/adf-disciplined-fix-implement.md \
+  > .docs/adf/1806/verification.md 2>&1
+'''
+timeout_secs = 600
+on_fail = "abort"
+
+[[steps]]
+name = "gate-implement"
+kind = "gate"
+condition = "{{steps.implement-fix.exit_code}} == 0"
+on_fail = "abort"
+
+# ── Phase 4: Independent Verification ──
+
+# The LLM claims it applied the fix. Verify independently.
+
+[[steps]]
+name = "verify-fix-applied"
+kind = "action"
+command = '''
+rg "agent_working_dir" crates/terraphim_orchestrator/src/lib.rs | rg "spawn_ctx" > /dev/null 2>&1
+if [ $? -ne 0 ]; then
+  echo "FAIL: spawn_ctx.working_dir override NOT found in lib.rs"
+  echo "The LLM may have reported success without actually editing the file."
+  exit 1
+fi
+echo "PASS: spawn_ctx.working_dir override verified in lib.rs"
+'''
+timeout_secs = 30
+on_fail = "abort"
+
+[[steps]]
+name = "run-tests"
+kind = "action"
+command = '''
+cargo test -p terraphim_orchestrator --lib 2>&1
+'''
+timeout_secs = 600
+on_fail = "abort"
+
+[[steps]]
+name = "gate-tests"
+kind = "gate"
+condition = "{{steps.run-tests.exit_code}} == 0"
+on_fail = "abort"
+
+# ── Phase 5: Assemble Proof ──
+
+[[steps]]
+name = "assemble-proof"
+kind = "action"
+command = '''
+printf '# ADF Disciplined Engineering Proof\n\n' > .docs/adf/1806/adf-disciplined-fix-proof.md
+printf "Issue: 1806\n" >> .docs/adf/1806/adf-disciplined-fix-proof.md
+printf "Flow: adf-disciplined-fix\n" >> .docs/adf/1806/adf-disciplined-fix-proof.md
+printf "Status: Completed\n" >> .docs/adf/1806/adf-disciplined-fix-proof.md
+printf "Generated: %s\n" "$(date '+%Y-%m-%d %H:%M %Z')" >> .docs/adf/1806/adf-disciplined-fix-proof.md
+printf "\n## Summary\n\n" >> .docs/adf/1806/adf-disciplined-fix-proof.md
+printf "This flow demonstrates ADF coordinating LLM agents through the full\n" >> .docs/adf/1806/adf-disciplined-fix-proof.md
+printf "disciplined engineering V-model to fix a real codebase bug.\n\n" >> .docs/adf/1806/adf-disciplined-fix-proof.md
+printf "## Phases Executed\n\n" >> .docs/adf/1806/adf-disciplined-fix-proof.md
+printf "1. Research (Phase 1): disciplined-research skill\n" >> .docs/adf/1806/adf-disciplined-fix-proof.md
+printf "2. Design (Phase 2): disciplined-design skill\n" >> .docs/adf/1806/adf-disciplined-fix-proof.md
+printf "3. Implementation (Phase 3): disciplined-implementation skill\n" >> .docs/adf/1806/adf-disciplined-fix-proof.md
+printf "4. Independent Verification: grep + cargo test\n\n" >> .docs/adf/1806/adf-disciplined-fix-proof.md
+printf "## Artefacts Produced\n\n" >> .docs/adf/1806/adf-disciplined-fix-proof.md
+printf "| Phase | Artefact | Skill Used |\n" >> .docs/adf/1806/adf-disciplined-fix-proof.md
+printf "|-------|----------|-------------|\n" >> .docs/adf/1806/adf-disciplined-fix-proof.md
+printf "| 1 | .docs/adf/1806/research.md | disciplined-research |\n" >> .docs/adf/1806/adf-disciplined-fix-proof.md
+printf "| 2 | .docs/adf/1806/design.md | disciplined-design |\n" >> .docs/adf/1806/adf-disciplined-fix-proof.md
+printf "| 3 | .docs/adf/1806/verification.md | disciplined-implementation |\n" >> .docs/adf/1806/adf-disciplined-fix-proof.md
+printf "\n## Evidence of Skill Usage\n\n" >> .docs/adf/1806/adf-disciplined-fix-proof.md
+printf "Each LLM prompt encoded the methodology, output format, and evidence\n" >> .docs/adf/1806/adf-disciplined-fix-proof.md
+printf "requirements of the corresponding disciplined engineering skill.\n" >> .docs/adf/1806/adf-disciplined-fix-proof.md
+printf "Phase outputs reference the skill by name.\n\n" >> .docs/adf/1806/adf-disciplined-fix-proof.md
+printf "## What This Proves\n\n" >> .docs/adf/1806/adf-disciplined-fix-proof.md
+printf "- ADF flow engine coordinates sequential LLM invocations\n" >> .docs/adf/1806/adf-disciplined-fix-proof.md
+printf "- LLMs perform disciplined engineering without human intervention\n" >> .docs/adf/1806/adf-disciplined-fix-proof.md
+printf "- Gate steps validate each phase before proceeding\n" >> .docs/adf/1806/adf-disciplined-fix-proof.md
+printf "- Independent verification catches false success claims\n" >> .docs/adf/1806/adf-disciplined-fix-proof.md
+printf "- The loop is closed: issue -> research -> design -> implement -> verify -> proof\n" >> .docs/adf/1806/adf-disciplined-fix-proof.md
+echo "Proof assembled."
+'''
+timeout_secs = 30
+on_fail = "abort"
+
+[[steps]]
+name = "final-gate"
+kind = "gate"
+condition = "{{steps.assemble-proof.exit_code}} == 0"
+on_fail = "abort"

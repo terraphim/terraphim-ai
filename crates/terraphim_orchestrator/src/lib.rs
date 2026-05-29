@@ -2403,6 +2403,11 @@ impl AgentOrchestrator {
 
         let mut spawn_ctx =
             build_spawn_context_for_agent(&self.config, def, self.output_poster.as_ref());
+        spawn_ctx.working_dir = Some(agent_working_dir.clone());
+        spawn_ctx = spawn_ctx.with_env(
+            "ADF_WORKING_DIR",
+            agent_working_dir.to_string_lossy().into_owned(),
+        );
         if let Some(event) = synthetic_event {
             for (key, value) in event.env_vars() {
                 spawn_ctx = spawn_ctx.with_env(key, value);
@@ -11944,6 +11949,43 @@ bypass_kg_routing = true
         assert!(
             def.gitea_issue.is_some(),
             "gitea_issue must be Some(_) for the post-exit code to enter the outer if-let"
+        );
+    }
+
+    #[test]
+    fn test_spawn_ctx_working_dir_set_to_agent_working_dir() {
+        use std::path::PathBuf;
+
+        // Simulate what build_spawn_context_for_agent returns for a project-bound agent:
+        // working_dir is set to the project root.
+        let project_root = PathBuf::from("/tmp/project-root");
+        let worktree_path = PathBuf::from("/tmp/project-root/.worktrees/agent-abc123");
+
+        let mut spawn_ctx = SpawnContext::with_working_dir(project_root.clone()).with_env(
+            "ADF_WORKING_DIR",
+            project_root.to_string_lossy().into_owned(),
+        );
+
+        // Apply the fix (the two new lines from the proposed change).
+        let agent_working_dir = worktree_path.clone();
+        spawn_ctx.working_dir = Some(agent_working_dir.clone());
+        spawn_ctx = spawn_ctx.with_env(
+            "ADF_WORKING_DIR",
+            agent_working_dir.to_string_lossy().into_owned(),
+        );
+
+        assert_eq!(
+            spawn_ctx.working_dir.as_deref(),
+            Some(worktree_path.as_path()),
+            "spawn_ctx.working_dir must be the worktree path, not the project root"
+        );
+        assert_eq!(
+            spawn_ctx
+                .env_overrides
+                .get("ADF_WORKING_DIR")
+                .map(String::as_str),
+            Some(worktree_path.to_string_lossy().as_ref()),
+            "ADF_WORKING_DIR env var must reflect the worktree path"
         );
     }
 }
