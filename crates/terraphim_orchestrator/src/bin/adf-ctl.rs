@@ -143,6 +143,14 @@ enum AdfSub {
         #[arg(long)]
         config: Option<String>,
     },
+    /// Show ADF pipeline stage artefact completion for an issue
+    PipelineStatus {
+        /// Issue number (e.g. 1887)
+        issue: String,
+        /// Base directory containing per-issue artefact subdirectories
+        #[arg(long, default_value = ".docs/adf")]
+        base_dir: PathBuf,
+    },
 }
 
 fn main() -> Result<()> {
@@ -201,6 +209,7 @@ fn run(local: bool, sub: AdfSub) -> Result<()> {
             context,
             config,
         } => cmd_flow(&name, &context, config.as_deref()),
+        AdfSub::PipelineStatus { issue, base_dir } => cmd_pipeline_status(&issue, &base_dir),
     }
 }
 
@@ -1203,6 +1212,61 @@ fn cmd_flow(name: &str, context: &str, _config_path: Option<&str>) -> Result<()>
     Ok(())
 }
 
+/// Canonical ADF disciplined-development stage artefact filenames (in order).
+const STAGE_ARTEFACTS: &[&str] = &["research.md", "design.md", "implementation.md", "review.md"];
+
+/// Print ADF pipeline artefact completion summary for a given issue.
+///
+/// Reads `.docs/adf/<issue>/` (or `base_dir/<issue>/`) and shows each
+/// canonical stage artefact with its completion status, line count, and
+/// last-modified timestamp.  Returns `Ok(())` when the directory exists
+/// (even with partial artefacts); bails with exit code 1 when the directory
+/// is missing.
+fn cmd_pipeline_status(issue: &str, base_dir: &Path) -> Result<()> {
+    let issue_dir = base_dir.join(issue);
+
+    if !issue_dir.exists() {
+        bail!(
+            "artefact directory '{}' does not exist",
+            issue_dir.display()
+        );
+    }
+
+    println!("Issue: #{}", issue);
+    println!("Directory: {}/", issue_dir.display());
+    println!();
+    println!("Stage Artefacts:");
+
+    let mut complete: usize = 0;
+    let total = STAGE_ARTEFACTS.len();
+
+    for &stage in STAGE_ARTEFACTS {
+        let path = issue_dir.join(stage);
+        if path.exists() {
+            let content = std::fs::read_to_string(&path)
+                .with_context(|| format!("failed to read {}", path.display()))?;
+            let lines = content.lines().count();
+            let meta = std::fs::metadata(&path)
+                .with_context(|| format!("failed to stat {}", path.display()))?;
+            let mtime = meta
+                .modified()
+                .with_context(|| format!("failed to get mtime for {}", path.display()))?;
+            let ts = jiff::Timestamp::try_from(mtime)
+                .map(|t| t.to_string())
+                .unwrap_or_else(|_| "unknown".to_string());
+            println!("  {:<20} | COMPLETE | {:>5} lines | {}", stage, lines, ts);
+            complete += 1;
+        } else {
+            println!("  {:<20} | MISSING  | {:>5}       | -", stage, "-");
+        }
+    }
+
+    println!();
+    println!("Summary: {}/{} artefacts complete", complete, total);
+
+    Ok(())
+}
+
 #[derive(Debug, Serialize)]
 struct AgentsReport<'a> {
     host: &'a str,
@@ -1633,6 +1697,60 @@ mod tests {
             err.contains("must match"),
             "error should mention grammar: {}",
             err
+        );
+    }
+
+    #[test]
+    fn test_pipeline_status_missing_directory_returns_error() {
+        let dir = tempfile::tempdir().unwrap();
+        let base = dir.path();
+        let result = super::cmd_pipeline_status("9999", base);
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(
+            msg.contains("does not exist"),
+            "error should mention missing directory: {}",
+            msg
+        );
+    }
+
+    #[test]
+    fn test_pipeline_status_all_artefacts_present() {
+        let dir = tempfile::tempdir().unwrap();
+        let issue_dir = dir.path().join("42");
+        std::fs::create_dir_all(&issue_dir).unwrap();
+        for stage in super::STAGE_ARTEFACTS {
+            std::fs::write(
+                issue_dir.join(stage),
+                format!("# {}\n\nContent line.\n", stage),
+            )
+            .unwrap();
+        }
+        let result = super::cmd_pipeline_status("42", dir.path());
+        assert!(result.is_ok(), "should succeed when all artefacts present");
+    }
+
+    #[test]
+    fn test_pipeline_status_partial_artefacts() {
+        let dir = tempfile::tempdir().unwrap();
+        let issue_dir = dir.path().join("100");
+        std::fs::create_dir_all(&issue_dir).unwrap();
+        // Only write research.md; design.md, implementation.md, review.md are missing
+        std::fs::write(issue_dir.join("research.md"), "# Research\n\nDone.\n").unwrap();
+        let result = super::cmd_pipeline_status("100", dir.path());
+        assert!(result.is_ok(), "should succeed even with partial artefacts");
+    }
+
+    #[test]
+    fn test_pipeline_status_empty_directory() {
+        let dir = tempfile::tempdir().unwrap();
+        let issue_dir = dir.path().join("0");
+        std::fs::create_dir_all(&issue_dir).unwrap();
+        // No artefacts at all — directory exists but is empty
+        let result = super::cmd_pipeline_status("0", dir.path());
+        assert!(
+            result.is_ok(),
+            "should succeed when directory exists with no artefacts"
         );
     }
 }
