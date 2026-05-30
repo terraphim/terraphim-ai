@@ -24,6 +24,12 @@ const DEFAULT_LOCAL_ENDPOINT: &str = "http://127.0.0.1:9091/webhooks/gitea";
 const DEFAULT_ORCHESTRATOR_TOML: &str = "/opt/ai-dark-factory/orchestrator.toml";
 const DEFAULT_WAIT_TIMEOUT_SECS: u64 = 1200;
 
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum DirectEventKind {
+    Push,
+    Pr,
+}
+
 #[derive(Parser, Debug)]
 #[command(name = "adf-ctl", about = "Control the AI Dark Factory orchestrator")]
 struct Cli {
@@ -50,7 +56,8 @@ enum OutputFormat {
 enum AdfSub {
     /// Trigger an agent or persona by name
     Trigger {
-        /// Agent or persona name (e.g. meta-learning, security-sentinel)
+        /// Agent or persona name (e.g. meta-learning, security-sentinel).
+        /// Use `project/agent` for project-qualified dispatch.
         name: String,
         /// Optional context appended to the @adf: mention
         #[arg(long, default_value = "")]
@@ -74,6 +81,27 @@ enum AdfSub {
         /// Bypasses HTTP webhook and HMAC verification.
         #[arg(long, default_value_t = false)]
         direct: bool,
+        /// Synthetic event type for direct dispatch of event-only agents.
+        #[arg(long, value_enum)]
+        event: Option<DirectEventKind>,
+        /// Git SHA for push events (used with --event push).
+        #[arg(long)]
+        sha: Option<String>,
+        /// Git ref name for push events (e.g. refs/heads/main).
+        #[arg(long)]
+        ref_name: Option<String>,
+        /// PR number for pull_request events (used with --event pr).
+        #[arg(long)]
+        pr: Option<u64>,
+        /// Head SHA for pull_request events.
+        #[arg(long)]
+        head_sha: Option<String>,
+        /// Author login for pull_request events.
+        #[arg(long)]
+        author: Option<String>,
+        /// Title for pull_request events.
+        #[arg(long)]
+        title: Option<String>,
     },
     /// Show running agents and recent exits [best-effort via SSH or local]
     Status {
@@ -104,6 +132,17 @@ enum AdfSub {
         #[arg(long, value_enum, default_value_t)]
         format: OutputFormat,
     },
+    /// Run a named flow from a local .terraphim/flows/<name>.toml file
+    Flow {
+        /// Flow name (e.g. adf-useful-work-proof)
+        name: String,
+        /// Key=value context passed to the flow (e.g. "issue=1890")
+        #[arg(long, default_value = "")]
+        context: String,
+        /// Path to local orchestrator TOML (reserved for future flow runtime wiring)
+        #[arg(long)]
+        config: Option<String>,
+    },
 }
 
 fn main() -> Result<()> {
@@ -122,6 +161,13 @@ fn run(local: bool, sub: AdfSub) -> Result<()> {
             wait,
             timeout,
             direct,
+            event,
+            sha,
+            ref_name,
+            pr,
+            head_sha,
+            author,
+            title,
         } => {
             let resolved_endpoint = resolve_endpoint(local, endpoint.as_deref());
             cmd_trigger(
@@ -134,6 +180,13 @@ fn run(local: bool, sub: AdfSub) -> Result<()> {
                 wait,
                 timeout,
                 direct,
+                event,
+                sha.as_deref(),
+                ref_name.as_deref(),
+                pr,
+                head_sha.as_deref(),
+                author.as_deref(),
+                title.as_deref(),
             )
         }
         AdfSub::Status {
@@ -143,6 +196,11 @@ fn run(local: bool, sub: AdfSub) -> Result<()> {
         } => cmd_status(local, &host, &since, format),
         AdfSub::Cancel { name, host } => cmd_cancel(local, &name, &host),
         AdfSub::Agents { host, format } => cmd_agents(local, &host, format),
+        AdfSub::Flow {
+            name,
+            context,
+            config,
+        } => cmd_flow(&name, &context, config.as_deref()),
     }
 }
 
@@ -358,12 +416,31 @@ fn parse_socket_path_from_toml(path: &Path) -> Option<PathBuf> {
 fn direct_dispatch_via_socket(
     socket_path: &Path,
     agent_name: &str,
+    project: Option<&str>,
     context: Option<&str>,
+    synthetic_event: Option<serde_json::Value>,
 ) -> Result<()> {
-    let payload = serde_json::json!({
-        "agent": agent_name,
-        "context": context.filter(|c| !c.is_empty()),
-    });
+    let mut payload_map = serde_json::Map::new();
+    payload_map.insert(
+        "agent".to_string(),
+        serde_json::Value::String(agent_name.to_string()),
+    );
+    if let Some(p) = project {
+        payload_map.insert(
+            "project".to_string(),
+            serde_json::Value::String(p.to_string()),
+        );
+    }
+    if let Some(c) = context.filter(|c| !c.is_empty()) {
+        payload_map.insert(
+            "context".to_string(),
+            serde_json::Value::String(c.to_string()),
+        );
+    }
+    if let Some(se) = synthetic_event {
+        payload_map.insert("synthetic_event".to_string(), se);
+    }
+    let payload = serde_json::Value::Object(payload_map);
 
     let mut stream = std::os::unix::net::UnixStream::connect(socket_path)
         .with_context(|| format!("failed to connect to {}", socket_path.display()))?;
@@ -401,6 +478,99 @@ fn direct_dispatch_via_socket(
 
 // --- Subcommand implementations ---
 
+fn split_project_agent(input: &str) -> (Option<String>, String) {
+    match input.split_once('/') {
+        Some((project, agent)) => (Some(project.to_string()), agent.to_string()),
+        None => (None, input.to_string()),
+    }
+}
+
+fn build_synthetic_event(
+    event: Option<DirectEventKind>,
+    sha: Option<&str>,
+    ref_name: Option<&str>,
+    pr: Option<u64>,
+    head_sha: Option<&str>,
+    author: Option<&str>,
+    title: Option<&str>,
+) -> Result<Option<serde_json::Value>> {
+    let event = match event {
+        Some(e) => e,
+        None => return Ok(None),
+    };
+
+    let value = match event {
+        DirectEventKind::Push => {
+            let sha = sha.unwrap_or("0000000000000000000000000000000000000000");
+            let ref_name = ref_name.unwrap_or("refs/heads/main");
+            serde_json::json!({
+                "Push": {
+                    "sha": sha,
+                    "ref_name": ref_name,
+                    "pusher": author.unwrap_or("local-user"),
+                    "files": <Vec<String>>::new(),
+                }
+            })
+        }
+        DirectEventKind::Pr => {
+            let number = pr.unwrap_or(0);
+            let head_sha = head_sha.unwrap_or("0000000000000000000000000000000000000000");
+            let author = author.unwrap_or("local-user");
+            let title = title.unwrap_or("Local direct dispatch");
+            serde_json::json!({
+                "PullRequest": {
+                    "number": number,
+                    "head_sha": head_sha,
+                    "author": author,
+                    "title": title,
+                    "diff_loc": 0usize,
+                }
+            })
+        }
+    };
+
+    Ok(Some(value))
+}
+
+fn validate_agent_name_for_shell(name: &str) -> Result<String> {
+    if name.is_empty() {
+        bail!("agent name cannot be empty");
+    }
+    if name.len() > 64 {
+        bail!("agent name too long (max 64 chars)");
+    }
+    if !name
+        .chars()
+        .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+    {
+        bail!(
+            "agent name '{}' contains invalid characters (only alphanumeric, '-', '_' allowed)",
+            name
+        );
+    }
+    Ok(name.to_string())
+}
+
+fn validate_since_for_shell(since: &str) -> Result<String> {
+    if since.is_empty() {
+        bail!("--since value cannot be empty");
+    }
+    let mut chars = since.chars();
+    match (chars.next(), chars.next_back()) {
+        (Some(n), Some(u))
+            if n.is_ascii_digit() && "smhdw".contains(u) && chars.all(|c| c.is_ascii_digit()) =>
+        {
+            Ok(since.to_string())
+        }
+        _ => {
+            bail!(
+                "--since '{}' must match ^[0-9]+[smhdw]$ (e.g. 30m, 1h, 2d, 1w)",
+                since
+            );
+        }
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 fn cmd_trigger(
     local: bool,
@@ -412,6 +582,13 @@ fn cmd_trigger(
     wait: bool,
     timeout: u64,
     direct: bool,
+    event: Option<DirectEventKind>,
+    sha: Option<&str>,
+    ref_name: Option<&str>,
+    pr: Option<u64>,
+    head_sha: Option<&str>,
+    author: Option<&str>,
+    title: Option<&str>,
 ) -> Result<()> {
     if direct && !local {
         anyhow::bail!("--direct requires --local");
@@ -429,13 +606,22 @@ fn cmd_trigger(
     #[cfg(unix)]
     if direct {
         let socket_path = resolve_socket_path()?;
-        direct_dispatch_via_socket(&socket_path, name, Some(context))?;
+        let synthetic_event =
+            build_synthetic_event(event, sha, ref_name, pr, head_sha, author, title)?;
+        let (project, agent_name) = split_project_agent(name);
+        direct_dispatch_via_socket(
+            &socket_path,
+            &agent_name,
+            project.as_deref(),
+            Some(context),
+            synthetic_event,
+        )?;
         if wait {
             println!(
                 "Waiting for agent '{}' to complete (timeout: {}s)...",
                 name, timeout
             );
-            wait_for_agent_exit(local, name, host, timeout)?;
+            wait_for_agent_exit(local, &agent_name, host, timeout)?;
         }
         return Ok(());
     }
@@ -562,6 +748,7 @@ fn cmd_trigger(
 }
 
 fn wait_for_agent_exit(local: bool, name: &str, host: &str, timeout_secs: u64) -> Result<()> {
+    let validated_name = validate_agent_name_for_shell(name)?;
     let start = std::time::Instant::now();
     let poll_interval = std::time::Duration::from_secs(10);
 
@@ -569,7 +756,7 @@ fn wait_for_agent_exit(local: bool, name: &str, host: &str, timeout_secs: u64) -
         if start.elapsed().as_secs() >= timeout_secs {
             bail!(
                 "Timed out waiting for agent '{}' to complete after {}s",
-                name,
+                validated_name,
                 timeout_secs
             );
         }
@@ -579,7 +766,7 @@ fn wait_for_agent_exit(local: bool, name: &str, host: &str, timeout_secs: u64) -
         let cmd = format!(
             "journalctl -u adf-orchestrator --since '{}' --no-pager 2>/dev/null \
              | grep 'exit classified agent={}'",
-            since, name
+            since, validated_name
         );
 
         let (stdout, _, _) = if local {
@@ -594,12 +781,12 @@ fn wait_for_agent_exit(local: bool, name: &str, host: &str, timeout_secs: u64) -
             }
             if stdout.contains("exit_class=success") || stdout.contains("exit_class=empty_success")
             {
-                println!("Agent '{}' completed successfully.", name);
+                println!("Agent '{}' completed successfully.", validated_name);
                 return Ok(());
             } else {
                 bail!(
                     "Agent '{}' exited with non-success status:\n{}",
-                    name,
+                    validated_name,
                     stdout.trim()
                 );
             }
@@ -613,6 +800,7 @@ fn cmd_status(local: bool, host: &str, since: &str, format: OutputFormat) -> Res
     if local {
         println!("[local mode]");
     }
+    let since = validate_since_for_shell(since)?;
     let journal_cmd = format!(
         "journalctl -u adf-orchestrator --since '{} ago' --no-pager 2>/dev/null \
          | grep -E 'exit classified|spawning agent|Agent spawned' | tail -30",
@@ -676,7 +864,7 @@ fn cmd_status(local: bool, host: &str, since: &str, format: OutputFormat) -> Res
         OutputFormat::Json => {
             let report = StatusReport {
                 host,
-                since,
+                since: &since,
                 recent_activity: activity,
                 running_processes: processes,
                 best_effort: true,
@@ -762,18 +950,25 @@ fn parse_running_processes(stdout: &str) -> Vec<ProcessInfo> {
 }
 
 fn cmd_cancel(local: bool, name: &str, host: &str) -> Result<()> {
+    let validated_name = validate_agent_name_for_shell(name)?;
     if local {
         println!("[local mode]");
     }
     if !local {
         println!("[best-effort via SSH process scan; not authoritative without admin socket]");
     }
-    println!("Searching for agent '{}' processes on {}...", name, host);
+    println!(
+        "Searching for agent '{}' processes on {}...",
+        validated_name, host
+    );
 
     let find_cmd = if local {
-        format!("ls .worktrees/ 2>/dev/null | grep '^{}-'", name)
+        format!("ls .worktrees/ 2>/dev/null | grep '^{}-'", validated_name)
     } else {
-        format!("ls /tmp/adf-worktrees/ 2>/dev/null | grep '^{}-'", name)
+        format!(
+            "ls /tmp/adf-worktrees/ 2>/dev/null | grep '^{}-'",
+            validated_name
+        )
     };
     let (worktrees, _, _) = if local {
         local_run(&find_cmd)?
@@ -795,13 +990,13 @@ fn cmd_cancel(local: bool, name: &str, host: &str) -> Result<()> {
     if worktrees.trim().is_empty() && procs.trim().is_empty() {
         println!(
             "No active worktrees or agent CLI processes found for '{}'.",
-            name
+            validated_name
         );
         return Ok(());
     }
 
     if !worktrees.trim().is_empty() {
-        println!("Active worktrees for '{}':", name);
+        println!("Active worktrees for '{}':", validated_name);
         for wt in worktrees.lines() {
             if local {
                 println!("  .worktrees/{}", wt.trim());
@@ -878,6 +1073,133 @@ fn cmd_agents(local: bool, host: &str, format: OutputFormat) -> Result<()> {
             println!("{}", serde_json::to_string_pretty(&report)?);
         }
     }
+    Ok(())
+}
+
+/// Discover a flow definition file from `.terraphim/flows/<name>.toml`, walking
+/// up from the current directory so nested workspace commands still work.
+fn discover_flow_file(cwd: &Path, name: &str) -> Option<PathBuf> {
+    let mut current = Some(cwd.to_path_buf());
+    while let Some(dir) = current {
+        let flow_path = dir
+            .join(".terraphim")
+            .join("flows")
+            .join(format!("{}.toml", name));
+        if flow_path.is_file() {
+            return Some(flow_path);
+        }
+        current = dir.parent().map(|p| p.to_path_buf());
+    }
+    None
+}
+
+fn validate_flow_context_atom(label: &str, value: &str) -> Result<()> {
+    if value.is_empty() {
+        bail!("flow context {} cannot be empty", label);
+    }
+    if !value
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.')
+    {
+        bail!(
+            "flow context {} '{}' contains invalid characters (only alphanumeric, '-', '_', '.' allowed)",
+            label,
+            value
+        );
+    }
+    Ok(())
+}
+
+fn parse_context(context: &str) -> Result<std::collections::HashMap<String, String>> {
+    let mut map = std::collections::HashMap::new();
+    for token in context.split_whitespace() {
+        if let Some((key, value)) = token.split_once('=') {
+            if !key.is_empty() && !value.is_empty() {
+                validate_flow_context_atom("key", key)?;
+                validate_flow_context_atom("value", value)?;
+                map.insert(key.to_string(), value.to_string());
+            }
+        }
+    }
+    Ok(map)
+}
+
+/// Run a named flow definition locally. The current proof path is intentionally
+/// one-slot (`k=1`) via a committed fixture, so it proves executor behaviour
+/// without requiring runtime matrix rewriting.
+fn cmd_flow(name: &str, context: &str, _config_path: Option<&str>) -> Result<()> {
+    let cwd = std::env::current_dir().context("failed to get current working directory")?;
+
+    let flow_path = discover_flow_file(&cwd, name).with_context(|| {
+        format!(
+            "flow '{}' not found in any .terraphim/flows/ directory from {} upward",
+            name,
+            cwd.display()
+        )
+    })?;
+
+    println!("Loading flow from: {}", flow_path.display());
+
+    let flow_content = std::fs::read_to_string(&flow_path)
+        .with_context(|| format!("failed to read {}", flow_path.display()))?;
+
+    let flow: terraphim_orchestrator::flow::config::FlowDefinition = toml::from_str(&flow_content)
+        .with_context(|| format!("failed to parse flow TOML from {}", flow_path.display()))?;
+
+    println!("Flow '{}' loaded: {} step(s)", flow.name, flow.steps.len());
+
+    let ctx_map = parse_context(context)?;
+    let issue = ctx_map.get("issue").cloned();
+
+    let mut state = terraphim_orchestrator::flow::state::FlowRunState::new(&flow.name);
+    if let Some(ref issue) = issue {
+        println!("Issue context: {}", issue);
+        state = state.with_issue(issue.clone());
+    }
+
+    let flow_state_dir = cwd.join(".terraphim").join("flow-state");
+    std::fs::create_dir_all(&flow_state_dir).with_context(|| {
+        format!(
+            "failed to create flow state dir {}",
+            flow_state_dir.display()
+        )
+    })?;
+
+    let project_runtime = terraphim_orchestrator::flow::executor::ProjectRuntime {
+        working_dir: cwd.clone(),
+        gitea_owner: Some("terraphim".to_string()),
+        gitea_repo: Some("terraphim-ai".to_string()),
+    };
+
+    let executor =
+        terraphim_orchestrator::flow::executor::FlowExecutor::new(cwd.clone(), flow_state_dir)
+            .with_projects(std::collections::HashMap::from([(
+                flow.project.clone(),
+                project_runtime,
+            )]));
+
+    println!("Running flow '{}'...", flow.name);
+    let rt = tokio::runtime::Runtime::new().context("failed to create Tokio runtime")?;
+
+    let final_state = rt
+        .block_on(async { executor.run(&flow, Some(state)).await })
+        .map_err(|e| anyhow::anyhow!("flow '{}' failed: {}", flow.name, e))?;
+
+    println!();
+    println!("Flow '{}' finished: {:?}", flow.name, final_state.status);
+    if let Some(ref err) = final_state.error {
+        println!("Error: {}", err);
+    }
+    println!(
+        "Steps completed: {}/{}",
+        final_state.next_step_index,
+        flow.steps.len()
+    );
+    let matrix_slots: usize = final_state.matrix_envelopes.values().map(Vec::len).sum();
+    if matrix_slots > 0 {
+        println!("Matrix slots completed: {}", matrix_slots);
+    }
+
     Ok(())
 }
 
@@ -980,6 +1302,19 @@ mod tests {
     fn test_parse_agents_list_empty_returns_empty() {
         assert!(parse_agents_list("").is_empty());
         assert!(parse_agents_list("\n\n\n").is_empty());
+    }
+
+    #[test]
+    fn test_parse_context_key_values() {
+        let parsed = parse_context("issue=1890 k=1").unwrap();
+        assert_eq!(parsed.get("issue").map(String::as_str), Some("1890"));
+        assert_eq!(parsed.get("k").map(String::as_str), Some("1"));
+    }
+
+    #[test]
+    fn test_parse_context_rejects_shell_metacharacters() {
+        let result = parse_context("issue=1890;rm");
+        assert!(result.is_err());
     }
 
     #[test]
@@ -1144,6 +1479,13 @@ mod tests {
             false,
             60,
             true,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
         );
         assert!(result.is_err(), "direct without local should fail");
         let err = result.unwrap_err();
@@ -1189,5 +1531,108 @@ mod tests {
         std::fs::write(&path, "[direct_dispatch]\nother_field = \"value\"\n").unwrap();
         let result = super::parse_socket_path_from_toml(&path);
         assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_split_project_agent_bare() {
+        let (project, agent) = super::split_project_agent("meta-learning");
+        assert_eq!(project, None);
+        assert_eq!(agent, "meta-learning");
+    }
+
+    #[test]
+    fn test_split_project_agent_qualified() {
+        let (project, agent) = super::split_project_agent("terraphim-ai/build-runner");
+        assert_eq!(project, Some("terraphim-ai".to_string()));
+        assert_eq!(agent, "build-runner");
+    }
+
+    #[test]
+    fn test_validate_agent_name_for_shell_valid() {
+        super::validate_agent_name_for_shell("meta-learning").unwrap();
+        super::validate_agent_name_for_shell("build_runner").unwrap();
+        super::validate_agent_name_for_shell("agent-123").unwrap();
+    }
+
+    #[test]
+    fn test_validate_agent_name_for_shell_rejects_slash() {
+        let result = super::validate_agent_name_for_shell("project/agent");
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("invalid characters"),
+            "error should mention invalid characters: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_validate_agent_name_for_shell_rejects_empty() {
+        let result = super::validate_agent_name_for_shell("");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_agent_name_for_shell_rejects_too_long() {
+        let long_name = "a".repeat(65);
+        let result = super::validate_agent_name_for_shell(&long_name);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("too long"),
+            "error should mention too long: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_validate_since_for_shell_valid() {
+        super::validate_since_for_shell("30m").unwrap();
+        super::validate_since_for_shell("1h").unwrap();
+        super::validate_since_for_shell("2d").unwrap();
+        super::validate_since_for_shell("1w").unwrap();
+        super::validate_since_for_shell("10s").unwrap();
+    }
+
+    #[test]
+    fn test_validate_since_for_shell_rejects_empty() {
+        let result = super::validate_since_for_shell("");
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("cannot be empty"),
+            "error should mention empty: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_validate_since_for_shell_rejects_now() {
+        let result = super::validate_since_for_shell("now");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_since_for_shell_rejects_injection() {
+        let result = super::validate_since_for_shell("1h'; rm -rf /");
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("must match"),
+            "error should mention grammar: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_validate_since_for_shell_rejects_no_unit() {
+        let result = super::validate_since_for_shell("30");
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("must match"),
+            "error should mention grammar: {}",
+            err
+        );
     }
 }
