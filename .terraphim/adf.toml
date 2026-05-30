@@ -1,13 +1,11 @@
 # Local ADF configuration for Terraphim AI.
-# Provides real issue processing via adf-issue-stage and k=3 planning via adf flow.
+# Agents use opencode directly with disciplined skill prompts.
+# Artefacts are produced in .docs/adf/<issue>/
 #
 # Discovery:
 #   - `adf --local --check` validates this file
-#   - `adf --local --agent NAME` runs a named agent via adf-issue-stage
+#   - `adf --local --agent NAME` runs a named agent
 #   - `adf flow <name> --context "issue=N"` runs a flow from .terraphim/flows/<name>.toml
-#
-# Agents use adf-issue-stage which produces structured artefacts in .docs/adf/<issue>/
-# instead of template comments.
 
 project_id = "terraphim-ai"
 name = "Terraphim AI"
@@ -28,48 +26,110 @@ socket_path = "/tmp/adf-ctl.sock"
 id = "terraphim-ai"
 working_dir = "/home/alex/projects/terraphim/terraphim-ai"
 
-# --- Core ZDP agents ---
+# --- Core ZDP agents (use opencode with real LLM invocation) ---
 
 [[agents]]
 name = "disciplined-research-agent"
 layer = "Core"
-cli_tool = "/home/alex/projects/terraphim/terraphim-ai/.terraphim/bin/adf-issue-stage"
-task = "stage=disciplined-research; issue={{issue}}"
+cli_tool = "opencode"
+model = "kimi-for-coding/k2p6"
+skill_chain = ["disciplined-research"]
+task = """You are the disciplined-research agent. Your task:
+1. Load skill://disciplined-research
+2. Read the issue at https://git.terraphim.cloud/terraphim/terraphim-ai/issues/{{issue}}
+3. Fetch issue body: curl -sf "https://git.terraphim.cloud/api/v1/repos/terraphim/terraphim-ai/issues/{{issue}}" | jq -r '.title, .body'
+4. Search the codebase for relevant files
+5. Classify: valid, stale, duplicate, blocked, or needs-rescope
+6. Write research to .docs/adf/{{issue}}/research.md (no placeholders)
+7. Post summary: gtr comment --owner terraphim --repo terraphim-ai --index {{issue}} --body "Research complete for #{{issue}}"
+"""
 project = "terraphim-ai"
 
 [[agents]]
 name = "disciplined-design-agent"
 layer = "Core"
-cli_tool = "/home/alex/projects/terraphim/terraphim-ai/.terraphim/bin/adf-issue-stage"
-task = "stage=disciplined-design; issue={{issue}}"
+cli_tool = "opencode"
+model = "kimi-for-coding/k2p6"
+skill_chain = ["disciplined-design"]
+task = """You are the disciplined-design agent. Your task:
+1. Load skill://disciplined-design
+2. Read research at .docs/adf/{{issue}}/research.md
+3. Read the issue at https://git.terraphim.cloud/terraphim/terraphim-ai/issues/{{issue}}
+4. Design implementation with specific file changes, test strategy, acceptance criteria
+5. Write design to .docs/adf/{{issue}}/design.md (no placeholders, real file paths)
+6. Post summary: gtr comment --owner terraphim --repo terraphim-ai --index {{issue}} --body "Design complete for #{{issue}}"
+"""
 project = "terraphim-ai"
 
 [[agents]]
 name = "disciplined-implementation-agent"
 layer = "Core"
-cli_tool = "/home/alex/projects/terraphim/terraphim-ai/.terraphim/bin/adf-issue-stage"
-task = "stage=disciplined-implementation; issue={{issue}}"
+cli_tool = "opencode"
+model = "kimi-for-coding/k2p6"
+skill_chain = ["disciplined-implementation"]
+task = """You are the disciplined-implementation agent. Your task:
+1. Load skill://disciplined-implementation
+2. Read design at .docs/adf/{{issue}}/design.md
+3. Read research at .docs/adf/{{issue}}/research.md
+4. Create branch: git checkout -b task/{{issue}}-short-title
+5. Implement the design step by step (TDD: write tests first)
+6. Run cargo test, cargo fmt, cargo clippy
+7. Commit: git add -A && git commit -m "feat: implement for #{{issue}} Refs #{{issue}}"
+8. Write status to .docs/adf/{{issue}}/implementation-status.md
+9. Post summary: gtr comment --owner terraphim --repo terraphim-ai --index {{issue}} --body "Implementation complete for #{{issue}}"
+"""
 project = "terraphim-ai"
 
 [[agents]]
 name = "structured-pr-review-agent"
 layer = "Core"
-cli_tool = "/home/alex/projects/terraphim/terraphim-ai/.terraphim/bin/adf-issue-stage"
-task = "stage=structured-pr-review; issue={{issue}}"
+cli_tool = "opencode"
+model = "kimi-for-coding/k2p6"
+skill_chain = ["structural-pr-review"]
+capabilities = ["structured-pr-review", "review-findings", "quality-gate"]
+task = """You are the structured-pr-review agent. Your task:
+1. Load skill://structural-pr-review
+2. Read implementation status at .docs/adf/{{issue}}/implementation-status.md
+3. Review code: git diff main..task/{{issue}}-short-title
+4. Produce findings with P0/P1/P2 severity, file:line references, confidence 1-5
+5. Write findings to .docs/adf/{{issue}}/review-findings.md
+6. Post summary: gtr comment --owner terraphim --repo terraphim-ai --index {{issue}} --body "Review complete for #{{issue}}"
+"""
 project = "terraphim-ai"
 
 [[agents]]
 name = "disciplined-verification-agent"
 layer = "Core"
-cli_tool = "/home/alex/projects/terraphim/terraphim-ai/.terraphim/bin/adf-issue-stage"
-task = "stage=disciplined-verification; issue={{issue}}"
+cli_tool = "opencode"
+model = "kimi-for-coding/k2p6"
+skill_chain = ["disciplined-verification"]
+task = """You are the disciplined-verification agent. Your task:
+1. Load skill://disciplined-verification
+2. Read design at .docs/adf/{{issue}}/design.md
+3. Read implementation status at .docs/adf/{{issue}}/implementation-status.md
+4. Verify implementation matches design specification
+5. Run: cargo test, cargo clippy
+6. Check test coverage for changed files
+7. Write report to .docs/adf/{{issue}}/verification-report.md
+8. Post summary: gtr comment --owner terraphim --repo terraphim-ai --index {{issue}} --body "Verification complete for #{{issue}}"
+"""
 project = "terraphim-ai"
 
 [[agents]]
 name = "disciplined-validation-agent"
 layer = "Core"
-cli_tool = "/home/alex/projects/terraphim/terraphim-ai/.terraphim/bin/adf-issue-stage"
-task = "stage=disciplined-validation; issue={{issue}}"
+cli_tool = "opencode"
+model = "kimi-for-coding/k2p6"
+skill_chain = ["disciplined-validation"]
+task = """You are the disciplined-validation agent. Your task:
+1. Load skill://disciplined-validation
+2. Read the original issue at https://git.terraphim.cloud/terraphim/terraphim-ai/issues/{{issue}}
+3. Read design acceptance criteria at .docs/adf/{{issue}}/design.md
+4. Read verification report at .docs/adf/{{issue}}/verification-report.md
+5. Validate implementation meets original requirements
+6. Write report to .docs/adf/{{issue}}/validation-report.md
+7. Post summary: gtr comment --owner terraphim --repo terraphim-ai --index {{issue}} --body "Validation complete for #{{issue}}"
+"""
 project = "terraphim-ai"
 
 # --- Corrections and review ---
@@ -78,16 +138,35 @@ project = "terraphim-ai"
 name = "pr-reviewer"
 layer = "Core"
 capabilities = ["structured-pr-review", "review-findings", "quality-gate"]
-cli_tool = "/home/alex/projects/terraphim/terraphim-ai/.terraphim/bin/adf-issue-stage"
-task = "stage=pr-reviewer; issue={{issue}}"
+cli_tool = "opencode"
+model = "kimi-for-coding/k2p6"
+skill_chain = ["structural-pr-review"]
+task = """You are the PR reviewer. Your task:
+1. Load skill://structural-pr-review
+2. Read review findings at .docs/adf/{{issue}}/review-findings.md
+3. Review code: git diff main..task/{{issue}}-short-title
+4. Produce findings with P0/P1/P2 severity, confidence score
+5. Write findings to .docs/adf/{{issue}}/review-findings.md
+6. Post summary: gtr comment --owner terraphim --repo terraphim-ai --index {{issue}} --body "PR review complete for #{{issue}}"
+"""
 project = "terraphim-ai"
 
 [[agents]]
 name = "corrections"
 layer = "Core"
 capabilities = ["remediation", "review-fix", "quality-gate"]
-cli_tool = "/home/alex/projects/terraphim/terraphim-ai/.terraphim/bin/adf-issue-stage"
-task = "stage=corrections; issue={{issue}}"
+cli_tool = "opencode"
+model = "kimi-for-coding/k2p6"
+skill_chain = ["disciplined-implementation"]
+task = """You are the corrections agent. Your task:
+1. Read review findings at .docs/adf/{{issue}}/review-findings.md
+2. For each P0 and P1 finding, implement the suggested fix
+3. Run cargo test after each fix
+4. Commit: git add -A && git commit -m "fix: address review findings Refs #{{issue}}"
+5. Update review-findings.md to mark each addressed finding as [FIXED]
+6. If all findings are P2 or lower, write "No corrections needed" and exit 0
+7. Post summary: gtr comment --owner terraphim --repo terraphim-ai --index {{issue}} --body "Corrections complete for #{{issue}}"
+"""
 project = "terraphim-ai"
 
 # --- Fleet agents ---
@@ -96,8 +175,13 @@ project = "terraphim-ai"
 name = "meta-learning"
 layer = "Growth"
 capabilities = ["learning", "fleet-improvement", "retrospective-analysis"]
-cli_tool = "/home/alex/projects/terraphim/terraphim-ai/.terraphim/bin/adf-issue-stage"
-task = "stage=meta-learning; issue={{issue}}"
+cli_tool = "opencode"
+model = "kimi-for-coding/k2p6"
+task = """You are the meta-learning agent. Your task:
+1. Review recent ADF artefacts in .docs/adf/
+2. Identify patterns: what works, what fails, what to improve
+3. Write findings to .docs/adf/{{issue}}/meta-learning.md
+"""
 project = "terraphim-ai"
 
 [[agents]]
@@ -105,21 +189,42 @@ name = "security-sentinel"
 layer = "Core"
 persona = "Vigil"
 capabilities = ["security", "vulnerability-scanning", "compliance"]
-cli_tool = "/home/alex/projects/terraphim/terraphim-ai/.terraphim/bin/adf-issue-stage"
-task = "stage=security-sentinel; issue={{issue}}"
+cli_tool = "opencode"
+model = "kimi-for-coding/k2p6"
+skill_chain = ["security-audit"]
+task = """You are the security sentinel. Your task:
+1. Load skill://security-audit
+2. Run: cargo audit, grep for secrets, check unsafe blocks
+3. Write security review to .docs/adf/{{issue}}/security.md
+4. Post findings: gtr comment --owner terraphim --repo terraphim-ai --index {{issue}} --body "Security review complete for #{{issue}}"
+"""
 project = "terraphim-ai"
 
 [[agents]]
 name = "build-runner"
 layer = "Core"
 capabilities = ["build", "verification", "status-check"]
-cli_tool = "/home/alex/projects/terraphim/terraphim-ai/.terraphim/bin/adf-issue-stage"
-task = "stage=build-runner; issue={{issue}}"
+cli_tool = "opencode"
+model = "kimi-for-coding/k2p6"
+task = """You are the build runner. Your task:
+1. Run: cargo build --workspace
+2. Run: cargo test -p terraphim_orchestrator
+3. Run: cargo clippy
+4. Write results to .docs/adf/{{issue}}/build.md
+"""
 project = "terraphim-ai"
 
 [[agents]]
 name = "implementation-swarm"
 layer = "Core"
-cli_tool = "/home/alex/projects/terraphim/terraphim-ai/.terraphim/bin/adf-issue-stage"
-task = "stage=implementation-swarm; issue={{issue}}"
+cli_tool = "opencode"
+model = "kimi-for-coding/k2p6"
+skill_chain = ["disciplined-research", "disciplined-design", "disciplined-implementation"]
+task = """You are the implementation swarm. Your task:
+1. Run: gtr ready --owner terraphim --repo terraphim-ai
+2. Pick the highest PageRank unblocked issue
+3. Execute the full disciplined development cycle: research, design, implement
+4. Run tests, commit, push branch
+5. Create PR via gtr create-pull
+"""
 project = "terraphim-ai"

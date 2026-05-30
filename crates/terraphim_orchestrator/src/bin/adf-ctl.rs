@@ -118,6 +118,14 @@ enum AdfSub {
         #[arg(long)]
         config: Option<String>,
     },
+    /// Show ADF pipeline artefacts for an issue
+    PipelineStatus {
+        /// Issue number or key
+        issue: String,
+        /// Output format: human (default) or json for automation
+        #[arg(long, value_enum, default_value_t)]
+        format: OutputFormat,
+    },
 }
 
 fn main() -> Result<()> {
@@ -162,6 +170,7 @@ fn run(local: bool, sub: AdfSub) -> Result<()> {
             context,
             config,
         } => cmd_flow(&name, &context, config.as_deref()),
+        AdfSub::PipelineStatus { issue, format } => cmd_pipeline_status(&issue, format),
     }
 }
 
@@ -976,14 +985,23 @@ fn cmd_flow(name: &str, context: &str, _config_path: Option<&str>) -> Result<()>
         )
     })?;
 
+    // Resolve repo_path: use flow's repo_path if set, falling back to cwd.
+    // Absolute repo_path is used as-is; relative paths resolve from the flow
+    // file's parent directory so agents run in the correct repository root.
+    let repo_path = if std::path::Path::new(&flow.repo_path).is_absolute() {
+        std::path::PathBuf::from(&flow.repo_path)
+    } else {
+        flow_path.parent().unwrap_or(&cwd).join(&flow.repo_path)
+    };
+
     // Build project runtime from the flow's project
     let project_runtime = ProjectRuntime {
-        working_dir: cwd.clone(),
+        working_dir: repo_path.clone(),
         gitea_owner: Some("terraphim".to_string()),
         gitea_repo: Some("terraphim-ai".to_string()),
     };
 
-    let executor = FlowExecutor::new(cwd.clone(), flow_state_dir).with_projects(
+    let executor = FlowExecutor::new(repo_path, flow_state_dir).with_projects(
         std::collections::HashMap::from([(flow.project.clone(), project_runtime)]),
     );
 
@@ -1006,6 +1024,99 @@ fn cmd_flow(name: &str, context: &str, _config_path: Option<&str>) -> Result<()>
         final_state.step_envelopes.len(),
         flow.steps.len()
     );
+
+    Ok(())
+}
+
+#[derive(Debug, Serialize)]
+struct ArtefactInfo {
+    stage: String,
+    filename: String,
+    status: String,
+    size: Option<u64>,
+    timestamp: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct PipelineStatusReport {
+    issue: String,
+    directory: String,
+    artefacts: Vec<ArtefactInfo>,
+    summary: String,
+}
+
+fn cmd_pipeline_status(issue: &str, format: OutputFormat) -> Result<()> {
+    let path = PathBuf::from(format!(".docs/adf/{}/", issue));
+    if !path.exists() || !path.is_dir() {
+        bail!("Issue directory not found: {}", path.display());
+    }
+
+    let filenames = ["research.md", "design.md", "implementation.md", "review.md"];
+    let mut artefacts = Vec::new();
+    let mut complete_count = 0;
+
+    for filename in &filenames {
+        let file_path = path.join(filename);
+        let (status, size, timestamp) = if let Ok(meta) = std::fs::metadata(&file_path) {
+            complete_count += 1;
+            let size = meta.len();
+            let timestamp = meta
+                .modified()
+                .ok()
+                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                .map(|d| {
+                    let secs = d.as_secs() as i64;
+                    let nanos = d.subsec_nanos() as i32;
+                    jiff::Timestamp::new(secs, nanos)
+                        .map(|ts| ts.to_string())
+                        .unwrap_or_default()
+                });
+            ("COMPLETE".to_string(), Some(size), timestamp)
+        } else {
+            ("MISSING".to_string(), None, None)
+        };
+
+        artefacts.push(ArtefactInfo {
+            stage: filename.strip_suffix(".md").unwrap_or(filename).to_string(),
+            filename: filename.to_string(),
+            status,
+            size,
+            timestamp,
+        });
+    }
+
+    let summary = format!("{}/{} artefacts complete", complete_count, filenames.len());
+
+    match format {
+        OutputFormat::Human => {
+            println!("Issue: #{}", issue);
+            println!("Directory: {}", path.display());
+            println!();
+            println!("Stage Artefacts:");
+            for art in &artefacts {
+                let size_str = art
+                    .size
+                    .map(|s| format!("{} bytes", s))
+                    .unwrap_or_else(|| "-".to_string());
+                let time_str = art.timestamp.as_deref().unwrap_or("-");
+                println!(
+                    "  {:<16} | {:<8} | {:<9} | {}",
+                    art.filename, art.status, size_str, time_str
+                );
+            }
+            println!();
+            println!("Summary: {}", summary);
+        }
+        OutputFormat::Json => {
+            let report = PipelineStatusReport {
+                issue: issue.to_string(),
+                directory: path.display().to_string(),
+                artefacts,
+                summary,
+            };
+            println!("{}", serde_json::to_string_pretty(&report)?);
+        }
+    }
 
     Ok(())
 }
@@ -1318,5 +1429,69 @@ mod tests {
         std::fs::write(&path, "[direct_dispatch]\nother_field = \"value\"\n").unwrap();
         let result = super::parse_socket_path_from_toml(&path);
         assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_pipeline_status_all_present() {
+        let dir = tempfile::tempdir().unwrap();
+        let adf_dir = dir.path().join(".docs").join("adf").join("9999");
+        std::fs::create_dir_all(&adf_dir).unwrap();
+        for name in ["research.md", "design.md", "implementation.md", "review.md"] {
+            std::fs::write(adf_dir.join(name), format!("content of {}\n", name)).unwrap();
+        }
+        let original_dir = std::env::current_dir().unwrap();
+        std::env::set_current_dir(&dir).unwrap();
+        let result = cmd_pipeline_status("9999", OutputFormat::Human);
+        std::env::set_current_dir(original_dir).unwrap();
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_pipeline_status_missing_dir() {
+        let result = cmd_pipeline_status("nonexistent-issue-99999", OutputFormat::Human);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("nonexistent-issue-99999"));
+    }
+
+    #[test]
+    fn test_pipeline_status_partial() {
+        let dir = tempfile::tempdir().unwrap();
+        let adf_dir = dir.path().join(".docs").join("adf").join("9998");
+        std::fs::create_dir_all(&adf_dir).unwrap();
+        std::fs::write(adf_dir.join("research.md"), "research content").unwrap();
+        std::fs::write(adf_dir.join("design.md"), "design content").unwrap();
+        let original_dir = std::env::current_dir().unwrap();
+        std::env::set_current_dir(&dir).unwrap();
+        let result = cmd_pipeline_status("9998", OutputFormat::Human);
+        std::env::set_current_dir(original_dir).unwrap();
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_pipeline_status_json_shape() {
+        let dir = tempfile::tempdir().unwrap();
+        let adf_dir = dir.path().join(".docs").join("adf").join("9997");
+        std::fs::create_dir_all(&adf_dir).unwrap();
+        for name in ["research.md", "design.md", "implementation.md", "review.md"] {
+            std::fs::write(adf_dir.join(name), format!("content of {}\n", name)).unwrap();
+        }
+        let original_dir = std::env::current_dir().unwrap();
+        std::env::set_current_dir(&dir).unwrap();
+        let result = cmd_pipeline_status("9997", OutputFormat::Json);
+        std::env::set_current_dir(original_dir).unwrap();
+        assert!(result.is_ok(), "cmd_pipeline_status failed: {:?}", result);
+    }
+
+    #[test]
+    fn test_pipeline_status_empty_dir() {
+        let dir = tempfile::tempdir().unwrap();
+        let adf_dir = dir.path().join(".docs").join("adf").join("9996");
+        std::fs::create_dir_all(&adf_dir).unwrap();
+        let original_dir = std::env::current_dir().unwrap();
+        std::env::set_current_dir(&dir).unwrap();
+        let result = cmd_pipeline_status("9996", OutputFormat::Human);
+        std::env::set_current_dir(original_dir).unwrap();
+        assert!(result.is_ok());
     }
 }

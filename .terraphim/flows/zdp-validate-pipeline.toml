@@ -1,0 +1,545 @@
+# ADF Pipeline Validation Flow
+# Runs a single issue through the complete disciplined development pipeline
+# with single-model (faster) execution and content-aware gates.
+#
+# Usage:
+#   cargo run -p terraphim_orchestrator --bin adf-ctl -- \
+#     --local flow zdp-validate-pipeline --context "issue=<ISSUE>"
+
+name = "zdp-validate-pipeline"
+project = "terraphim-ai"
+repo_path = "/home/alex/projects/terraphim/terraphim-ai"
+timeout_secs = 14400
+
+# ============================================================
+# PHASE 1: RESEARCH (single model for speed)
+# ============================================================
+[[steps]]
+name = "research"
+kind = "agent"
+cli_tool = "opencode"
+model = "kimi-for-coding/k2p6"
+provider = "kimi"
+timeout_secs = 600
+on_fail = "abort"
+task = """You are the disciplined-research agent for issue #{{issue}}.
+
+CRITICAL: You MUST produce a meaningful research document. Do NOT leave any section as a placeholder.
+
+Your task:
+1. Read the issue at https://git.terraphim.cloud/terraphim/terraphim-ai/issues/{{issue}}
+2. Fetch the issue title and body using: curl -sf "https://git.terraphim.cloud/api/v1/repos/terraphim/terraphim-ai/issues/{{issue}}" | jq -r '.title, .body'
+3. Search the codebase for relevant files using grep, glob, and read tools
+4. Classify the issue: valid (proceed), stale (close), duplicate (close), blocked (defer), needs-rescope (split)
+
+Write your research to .docs/adf/{{issue}}/research.md with this EXACT format (replace ALL placeholders):
+
+```
+---
+stage: research
+issue: {{issue}}
+classification: [valid|stale|duplicate|blocked|needs-rescope]
+timestamp: [UTC timestamp]
+agent: disciplined-research-agent
+---
+
+## Issue Title
+[actual title]
+
+## Issue Body
+[actual body, or "Empty" if no body]
+
+## Classification: [classification]
+[Rationale in 2-3 sentences]
+
+## Current State
+[What exists in the codebase right now - specific file paths and line numbers]
+
+## Key Findings
+- [Finding 1 with evidence: file:line]
+- [Finding 2 with evidence: file:line]
+- [Finding 3 with evidence: file:line]
+
+## Recommendations
+1. [What should happen next - specific and actionable]
+
+## Files Affected
+- [path/to/file1]: [why it's relevant]
+- [path/to/file2]: [why it's relevant]
+```
+
+RULES:
+- Every section MUST have real content, not HTML comments or "Fill in"
+- Classification MUST be one of: valid, stale, duplicate, blocked, needs-rescope
+- File paths MUST actually exist in the repository (verify before writing)
+- Findings MUST include evidence (file paths, line numbers, code snippets)
+"""
+
+# Gate: research has meaningful content
+[[steps]]
+name = "gate-research-content"
+kind = "action"
+command = "test -f .docs/adf/{{issue}}/research.md && ! grep -q '<!-- Fill in -->' .docs/adf/{{issue}}/research.md && ! grep -q 'FILL_IN' .docs/adf/{{issue}}/research.md"
+timeout_secs = 10
+on_fail = "abort"
+
+# ============================================================
+# PHASE 2: DESIGN (single model)
+# ============================================================
+[[steps]]
+name = "design"
+kind = "agent"
+cli_tool = "opencode"
+model = "kimi-for-coding/k2p6"
+provider = "kimi"
+timeout_secs = 600
+on_fail = "abort"
+task = """You are the disciplined-design agent for issue #{{issue}}.
+
+CRITICAL: You MUST produce a meaningful design document with SPECIFIC file changes. Do NOT leave any section as a placeholder.
+
+Your task:
+1. Read the research at .docs/adf/{{issue}}/research.md
+2. Read the issue at https://git.terraphim.cloud/terraphim/terraphim-ai/issues/{{issue}}
+3. Design an implementation plan that is SPECIFIC about which files change and how
+4. The design must be directly actionable by an implementation agent
+
+Write your design to .docs/adf/{{issue}}/design.md with this EXACT format:
+
+```
+---
+stage: design
+issue: {{issue}}
+timestamp: [UTC timestamp]
+agent: disciplined-design-agent
+---
+
+## Problem Statement
+[What this implementation solves - 1 paragraph]
+
+## Research Summary
+[Key findings from research.md that drive this design]
+
+## Design Overview
+[What will be built - high level]
+
+## File Changes
+
+### New Files
+| File | Purpose |
+|------|---------|
+| [actual/path/file.rs] | [specific purpose] |
+
+### Modified Files
+| File | Change Description |
+|------|--------------------|
+| [actual/path/file.rs] | [what changes, which functions] |
+
+## Implementation Steps
+1. [Step 1: specific action on specific file]
+2. [Step 2: specific action on specific file]
+3. [Step 3: specific action on specific file]
+
+## Test Strategy
+- [Test 1: what it tests, which file]
+- [Test 2: what it tests, which file]
+
+## Acceptance Criteria
+- [ ] [Criterion 1: specific and measurable]
+- [ ] [Criterion 2: specific and measurable]
+
+## Risks
+- [Risk 1]: [mitigation]
+```
+
+RULES:
+- File paths in the tables MUST exist or be plausible new file paths
+- Implementation steps MUST be ordered and specific
+- Each step should be completable in < 15 minutes
+- Test strategy MUST include at least 1 test
+- Acceptance criteria MUST be verifiable (can run a command to check)
+"""
+
+# Gate: design has file changes table with actual paths
+[[steps]]
+name = "gate-design-content"
+kind = "action"
+command = "test -f .docs/adf/{{issue}}/design.md && ! grep -q '<!-- Fill in -->' .docs/adf/{{issue}}/design.md && grep -q '\\.rs\\|\\.toml\\|\\.sh' .docs/adf/{{issue}}/design.md"
+timeout_secs = 10
+on_fail = "abort"
+
+# ============================================================
+# PHASE 3: IMPLEMENTATION (the critical stage)
+# ============================================================
+[[steps]]
+name = "implementation"
+kind = "agent"
+cli_tool = "opencode"
+model = "kimi-for-coding/k2p6"
+provider = "kimi"
+timeout_secs = 3600
+on_fail = "abort"
+task = """You are the disciplined-implementation agent for issue #{{issue}}.
+
+CRITICAL: You MUST write actual code, create a git branch, commit your changes, and ensure tests pass.
+
+Your task:
+1. Read the design at .docs/adf/{{issue}}/design.md
+2. Read the research at .docs/adf/{{issue}}/research.md
+3. Create a git branch: git checkout -b task/{{issue}}-validation
+4. Implement the design EXACTLY as specified, step by step
+5. Write tests for each new function/feature
+6. Run cargo test to verify everything passes
+7. Run cargo fmt to format code
+8. Commit with message: "feat(adf): implement validation for #{{issue}} Refs #{{issue}}"
+9. Write implementation status
+
+WRITE the implementation status to .docs/adf/{{issue}}/implementation-status.md:
+
+```
+---
+stage: implementation-status
+issue: {{issue}}
+timestamp: [UTC timestamp]
+implementation_complete: true
+files_created: [list]
+files_modified: [list]
+tests_added: [list]
+---
+
+## Implementation Summary
+[What was implemented]
+
+## Files Created
+- [path]: [what it contains]
+
+## Files Modified
+- [path]: [what changed]
+
+## Tests Added
+- [test name in file]: [what it tests]
+
+## Verification
+- cargo test: [PASS/FAIL with output]
+- cargo fmt --check: [PASS/FAIL]
+- cargo clippy: [PASS/FAIL with any warnings]
+
+## Commit
+[git commit hash]
+```
+
+MANDATORY RULES:
+- You MUST create a git branch before making changes
+- You MUST write at least 1 test for new code
+- You MUST run `cargo test` and report results
+- You MUST commit your changes
+- Do NOT modify files unrelated to the issue
+- Do NOT skip any implementation step from the design
+- If a step fails, document why and continue with the next
+"""
+
+# Gate: implementation has actual code changes
+[[steps]]
+name = "gate-implementation-content"
+kind = "action"
+command = "test -f .docs/adf/{{issue}}/implementation-status.md && ! grep -q 'FILL_IN\\|<!-- Fill in -->' .docs/adf/{{issue}}/implementation-status.md && git diff --name-only main..task/{{issue}}-validation | head -1 | grep -q '.'"
+timeout_secs = 10
+on_fail = "abort"
+
+# ============================================================
+# PHASE 4: STRUCTURED PR REVIEW
+# ============================================================
+[[steps]]
+name = "review"
+kind = "agent"
+cli_tool = "opencode"
+model = "kimi-for-coding/k2p6"
+provider = "kimi"
+timeout_secs = 1200
+on_fail = "continue"
+task = """You are the structured-pr-review agent for issue #{{issue}}.
+
+CRITICAL: You MUST review the actual code changes and produce REAL findings.
+
+Your task:
+1. Read the implementation status at .docs/adf/{{issue}}/implementation-status.md
+2. Read the design at .docs/adf/{{issue}}/design.md
+3. Review the actual code changes: git diff main..task/{{issue}}-validation
+4. Review the test code specifically
+5. Check for: security issues, performance problems, correctness, API design, error handling
+6. Assign severity: P0 (must fix), P1 (should fix), P2 (nice to have)
+
+Write review findings to .docs/adf/{{issue}}/review-findings.md:
+
+```
+---
+stage: review-findings
+issue: {{issue}}
+timestamp: [UTC timestamp]
+review_complete: true
+confidence_score: [1-5]
+total_findings: [number]
+p0_count: [number]
+p1_count: [number]
+p2_count: [number]
+---
+
+## Review Summary
+[Overall assessment: 2-3 sentences]
+
+## Architecture Diagram
+```mermaid
+[Simple diagram of changed components]
+```
+
+## P0 Critical (Must Fix Before Merge)
+| # | File:Line | Description | Suggested Fix |
+|---|-----------|-------------|---------------|
+| [or "None"] |
+
+## P1 Important (Should Fix Before Merge)
+| # | File:Line | Description | Suggested Fix |
+|---|-----------|-------------|---------------|
+| [or "None"] |
+
+## P2 Minor (Consider Fixing)
+| # | File:Line | Description | Suggested Fix |
+|---|-----------|-------------|---------------|
+| [or "None"] |
+
+## Positive Observations
+- [What was done well]
+
+## Recommendations
+1. [Recommendation]
+```
+
+RULES:
+- Every finding MUST reference a specific file and line number
+- Confidence score MUST be 1-5
+- If code is clean, state "No findings" in the relevant severity section
+- Do NOT produce generic/vague findings - every finding must be actionable
+"""
+
+# ============================================================
+# PHASE 5: CORRECTIONS (conditional on P0/P1)
+# ============================================================
+[[steps]]
+name = "corrections-check"
+kind = "action"
+command = "if grep -q '^| [0-9]' .docs/adf/{{issue}}/review-findings.md 2>/dev/null; then echo 'corrections-needed'; else echo 'no-corrections'; fi"
+timeout_secs = 10
+on_fail = "continue"
+
+[[steps]]
+name = "corrections"
+kind = "agent"
+cli_tool = "opencode"
+model = "kimi-for-coding/k2p6"
+provider = "kimi"
+timeout_secs = 1800
+on_fail = "continue"
+task = """You are the corrections agent for issue #{{issue}}.
+
+Your task:
+1. Read the review findings at .docs/adf/{{issue}}/review-findings.md
+2. For each P0 and P1 finding, implement the suggested fix
+3. Run cargo test after each fix to verify nothing broke
+4. Commit fixes with: "fix(adf): address review findings Refs #{{issue}}"
+5. Update the review-findings.md to mark each addressed finding as [FIXED]
+
+RULES:
+- Only fix P0 and P1 findings, skip P2
+- Make minimal targeted fixes, do not refactor surrounding code
+- Run tests after each fix
+- If a finding is a false positive, mark it as [FALSE POSITIVE] with rationale
+"""
+
+# Gate: verify corrections applied
+[[steps]]
+name = "gate-corrections"
+kind = "action"
+command = "cargo test -p terraphim_orchestrator 2>&1 | tail -5 | grep -q 'test result:'"
+timeout_secs = 120
+on_fail = "continue"
+
+# ============================================================
+# PHASE 6: VERIFICATION
+# ============================================================
+[[steps]]
+name = "verification"
+kind = "agent"
+cli_tool = "opencode"
+model = "kimi-for-coding/k2p6"
+provider = "kimi"
+timeout_secs = 600
+on_fail = "continue"
+task = """You are the disciplined-verification agent for issue #{{issue}}.
+
+Your task:
+1. Read the design at .docs/adf/{{issue}}/design.md
+2. Read the implementation status at .docs/adf/{{issue}}/implementation-status.md
+3. Verify implementation matches design specification
+4. Run: cargo test -p terraphim_orchestrator
+5. Run: cargo clippy -p terraphim_orchestrator
+6. Check test coverage for changed files
+
+Write verification report to .docs/adf/{{issue}}/verification-report.md:
+
+```
+---
+stage: verification-report
+issue: {{issue}}
+timestamp: [UTC timestamp]
+verification_complete: true
+passes_verification: [true|false]
+---
+
+## Verification Summary
+[Overall result]
+
+## Design Compliance
+| Design Step | Implemented? | Notes |
+|-------------|-------------|-------|
+| [Step 1] | YES/NO | [evidence] |
+
+## Test Results
+- cargo test: [PASS/FAIL with summary]
+- cargo clippy: [PASS/FAIL with any warnings]
+
+## Test Coverage
+- [Changed file]: [X% coverage, N tests covering it]
+
+## Issues Found
+[Any issues discovered during verification]
+```
+"""
+
+# ============================================================
+# PHASE 7: VALIDATION
+# ============================================================
+[[steps]]
+name = "validation"
+kind = "agent"
+cli_tool = "opencode"
+model = "kimi-for-coding/k2p6"
+provider = "kimi"
+timeout_secs = 600
+on_fail = "continue"
+task = """You are the disciplined-validation agent for issue #{{issue}}.
+
+Your task:
+1. Read the original issue at https://git.terraphim.cloud/terraphim/terraphim-ai/issues/{{issue}}
+2. Read the design acceptance criteria at .docs/adf/{{issue}}/design.md
+3. Read the verification report at .docs/adf/{{issue}}/verification-report.md
+4. Validate that the implementation meets the ORIGINAL requirements from the issue
+5. Check each acceptance criterion
+
+Write validation report to .docs/adf/{{issue}}/validation-report.md:
+
+```
+---
+stage: validation-report
+issue: {{issue}}
+timestamp: [UTC timestamp]
+validation_complete: true
+passes_validation: [true|false]
+---
+
+## Validation Summary
+[Does the implementation meet the original issue requirements?]
+
+## Requirements Verification
+| Requirement | Met? | Evidence |
+|-------------|------|----------|
+| [Req 1] | YES/NO | [how verified] |
+
+## Acceptance Criteria
+| Criterion | Met? | Evidence |
+|-----------|------|----------|
+| [Crit 1] | YES/NO | [how verified] |
+
+## Issues Found
+[Any issues discovered during validation]
+
+## Sign-off
+[APPROVED/REJECTED with rationale]
+```
+"""
+
+# ============================================================
+# PHASE 8: FINAL JUDGE
+# ============================================================
+[[steps]]
+name = "final-judge"
+kind = "agent"
+cli_tool = "opencode"
+model = "kimi-for-coding/k2p6"
+provider = "kimi"
+timeout_secs = 300
+on_fail = "continue"
+task = """You are the final approval judge for issue #{{issue}}.
+
+Your task:
+1. Read the validation report at .docs/adf/{{issue}}/validation-report.md
+2. Read the verification report at .docs/adf/{{issue}}/verification-report.md
+3. Read the review findings at .docs/adf/{{issue}}/review-findings.md
+4. Read the implementation status at .docs/adf/{{issue}}/implementation-status.md
+5. Make final approval decision
+
+Write final verdict to .docs/adf/{{issue}}/final-approval-verdict.md:
+
+```
+---
+stage: final-approval-verdict
+issue: {{issue}}
+timestamp: [UTC timestamp]
+approved: [true|false]
+ready_for_merge: [true|false]
+confidence: [1-5]
+---
+
+## Final Approval Decision
+[APPROVED/REJECTED]
+
+## Rationale
+[Why this decision was made]
+
+## Outstanding Issues
+[Any remaining P0/P1 issues - must be NONE for approval]
+
+## Quality Summary
+- Research quality: [assessment]
+- Design quality: [assessment]
+- Implementation quality: [assessment]
+- Review thoroughness: [assessment]
+- Test coverage: [assessment]
+
+## Merge Readiness
+- All tests pass: [YES/NO]
+- No P0 findings: [YES/NO]
+- No P1 findings: [YES/NO]
+- Acceptance criteria met: [YES/NO]
+- Code formatted: [YES/NO]
+```
+"""
+
+# ============================================================
+# PHASE 9: CREATE PR (action step)
+# ============================================================
+[[steps]]
+name = "create-pr"
+kind = "action"
+command = "git push origin task/{{issue}}-validation 2>&1 && gtr create-pull --owner terraphim --repo terraphim-ai --title \"feat(adf): validation pipeline for #{{issue}}\" --base main --head task/{{issue}}-validation --body \"Automated ADF pipeline validation for #{{issue}}. See .docs/adf/{{issue}}/ for all artefacts.\""
+timeout_secs = 60
+on_fail = "continue"
+
+# ============================================================
+# PHASE 10: GENERATE VALIDATION REPORT
+# ============================================================
+[[steps]]
+name = "validation-report"
+kind = "action"
+command = """printf '# ADF Pipeline Validation Report\\n\\nIssue: %s\\nDate: %s\\n\\n## Artefacts\\n\\n' '{{issue}}' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > .docs/adf/{{issue}}/pipeline-validation-report.md && for f in research.md design.md implementation-status.md review-findings.md verification-report.md validation-report.md final-approval-verdict.md; do if [ -f ".docs/adf/{{issue}}/$f" ]; then printf '- %s: EXISTS\\n' "$f" >> .docs/adf/{{issue}}/pipeline-validation-report.md; else printf '- %s: MISSING\\n' "$f" >> .docs/adf/{{issue}}/pipeline-validation-report.md; fi; done && printf '\\n## Git Changes\\n\\n```\\n' >> .docs/adf/{{issue}}/pipeline-validation-report.md && git diff --stat main..task/{{issue}}-validation >> .docs/adf/{{issue}}/pipeline-validation-report.md 2>/dev/null || echo "No branch changes" >> .docs/adf/{{issue}}/pipeline-validation-report.md && printf '```\\n' >> .docs/adf/{{issue}}/pipeline-validation-report.md"""
+timeout_secs = 30
+on_fail = "continue"
