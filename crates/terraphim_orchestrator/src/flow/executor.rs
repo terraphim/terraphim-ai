@@ -1067,6 +1067,7 @@ mod tests {
             provider: None,
             persona: None,
             matrix: None,
+            loop_target: None,
         };
 
         let envelope = executor.execute_action(&step, &flow, &state).await.unwrap();
@@ -1108,6 +1109,7 @@ mod tests {
             provider: None,
             persona: None,
             matrix: None,
+            loop_target: None,
         };
 
         let result = executor.execute_action(&step, &flow, &state).await;
@@ -1160,6 +1162,7 @@ mod tests {
             provider: None,
             persona: None,
             matrix: None,
+            loop_target: None,
         };
 
         let result = executor.evaluate_gate(&step, &flow, &state).unwrap();
@@ -1210,6 +1213,7 @@ mod tests {
             provider: None,
             persona: None,
             matrix: None,
+            loop_target: None,
         };
 
         let result = executor.evaluate_gate(&step, &flow, &state).unwrap();
@@ -1245,6 +1249,7 @@ mod tests {
                     provider: None,
                     persona: None,
                     matrix: None,
+                    loop_target: None,
                 },
                 FlowStepDef {
                     name: "step2".to_string(),
@@ -1260,6 +1265,7 @@ mod tests {
                     provider: None,
                     persona: None,
                     matrix: None,
+                    loop_target: None,
                 },
             ],
         };
@@ -1306,6 +1312,7 @@ mod tests {
                     provider: None,
                     persona: None,
                     matrix: None,
+                    loop_target: None,
                 },
                 FlowStepDef {
                     name: "gate1".to_string(),
@@ -1321,6 +1328,7 @@ mod tests {
                     provider: None,
                     persona: None,
                     matrix: None,
+                    loop_target: None,
                 },
                 FlowStepDef {
                     name: "action2".to_string(),
@@ -1336,6 +1344,7 @@ mod tests {
                     provider: None,
                     persona: None,
                     matrix: None,
+                    loop_target: None,
                 },
             ],
         };
@@ -1374,6 +1383,7 @@ mod tests {
                     provider: None,
                     persona: None,
                     matrix: None,
+                    loop_target: None,
                 },
                 FlowStepDef {
                     name: "gate1".to_string(),
@@ -1389,6 +1399,7 @@ mod tests {
                     provider: None,
                     persona: None,
                     matrix: None,
+                    loop_target: None,
                 },
                 FlowStepDef {
                     name: "action2".to_string(),
@@ -1404,6 +1415,7 @@ mod tests {
                     provider: None,
                     persona: None,
                     matrix: None,
+                    loop_target: None,
                 },
             ],
         };
@@ -1445,6 +1457,7 @@ mod tests {
                     provider: None,
                     persona: None,
                     matrix: None,
+                    loop_target: None,
                 },
                 FlowStepDef {
                     name: "step2".to_string(),
@@ -1460,6 +1473,7 @@ mod tests {
                     provider: None,
                     persona: None,
                     matrix: None,
+                    loop_target: None,
                 },
                 FlowStepDef {
                     name: "step3".to_string(),
@@ -1475,6 +1489,7 @@ mod tests {
                     provider: None,
                     persona: None,
                     matrix: None,
+                    loop_target: None,
                 },
             ],
         };
@@ -1528,6 +1543,7 @@ mod tests {
                     provider: None,
                     persona: None,
                     matrix: None,
+                    loop_target: None,
                 },
                 FlowStepDef {
                     name: "step2".to_string(),
@@ -1543,6 +1559,7 @@ mod tests {
                     provider: None,
                     persona: None,
                     matrix: None,
+                    loop_target: None,
                 },
                 FlowStepDef {
                     name: "step3".to_string(),
@@ -1558,6 +1575,7 @@ mod tests {
                     provider: None,
                     persona: None,
                     matrix: None,
+                    loop_target: None,
                 },
             ],
         };
@@ -1619,6 +1637,7 @@ mod tests {
                     provider: None,
                     persona: None,
                     matrix: None,
+                    loop_target: None,
                 },
                 FlowStepDef {
                     name: "checkpoint1".to_string(),
@@ -1634,6 +1653,7 @@ mod tests {
                     provider: None,
                     persona: None,
                     matrix: None,
+                    loop_target: None,
                 },
                 FlowStepDef {
                     name: "step2".to_string(),
@@ -1649,6 +1669,7 @@ mod tests {
                     provider: None,
                     persona: None,
                     matrix: None,
+                    loop_target: None,
                 },
             ],
         };
@@ -1703,6 +1724,7 @@ mod tests {
                     provider: None,
                     persona: None,
                     matrix: None,
+                    loop_target: None,
                 },
                 FlowStepDef {
                     name: "never-runs".to_string(),
@@ -1718,6 +1740,7 @@ mod tests {
                     provider: None,
                     persona: None,
                     matrix: None,
+                    loop_target: None,
                 },
             ],
         };
@@ -1772,6 +1795,7 @@ mod tests {
                     max_parallel: 1,
                     fail_strategy: FailStrategy::Continue,
                 }),
+                loop_target: None,
             }],
         };
 
@@ -1827,6 +1851,7 @@ mod tests {
                     max_parallel: 1,
                     fail_strategy: FailStrategy::Abort,
                 }),
+                loop_target: None,
             }],
         };
 
@@ -1947,6 +1972,7 @@ mod tests {
                     max_parallel: 1,
                     fail_strategy: FailStrategy::Continue,
                 }),
+                loop_target: None,
             }],
         };
         let state = FlowRunState::new("oversize-test");
@@ -1995,6 +2021,7 @@ mod tests {
                     max_parallel: 1,
                     fail_strategy: FailStrategy::Continue,
                 }),
+                loop_target: None,
             }],
         };
         let state = FlowRunState::new("injection-test");
