@@ -9693,6 +9693,7 @@ bypass_kg_routing = true
                 provider: None,
                 persona: None,
                 matrix: None,
+                loop_target: None,
             }],
         }];
 

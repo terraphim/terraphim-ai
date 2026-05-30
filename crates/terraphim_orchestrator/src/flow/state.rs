@@ -24,6 +24,10 @@ pub struct FlowRunState {
     pub matrix_envelopes: HashMap<String, Vec<StepEnvelope>>,
     #[serde(default)]
     pub error: Option<String>,
+    /// Current iteration count for re-iteration loops.
+    /// Incremented each time a checkpoint with loop_target resumes.
+    #[serde(default)]
+    pub iteration_count: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -49,6 +53,7 @@ impl FlowRunState {
             step_envelopes: Vec::new(),
             matrix_envelopes: HashMap::new(),
             error: None,
+            iteration_count: 0,
         }
     }
 
@@ -336,5 +341,58 @@ mod tests {
         // All IDs should be unique
         let unique_count = ids.iter().collect::<std::collections::HashSet<_>>().len();
         assert_eq!(unique_count, ids.len());
+    }
+
+    #[test]
+    fn test_iteration_count_default() {
+        let state = FlowRunState::new("test-flow");
+        assert_eq!(state.iteration_count, 0);
+    }
+
+    #[test]
+    fn test_iteration_count_serialization() {
+        let mut state = FlowRunState::new("test-flow");
+        state.iteration_count = 3;
+
+        let json = serde_json::to_string(&state).unwrap();
+        assert!(json.contains("\"iteration_count\":3"));
+
+        let deserialized: FlowRunState = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.iteration_count, 3);
+    }
+
+    #[test]
+    fn test_iteration_count_backward_compat() {
+        // Old JSON without iteration_count should deserialize to 0
+        let old_json = r#"{
+            "flow_name": "test-flow",
+            "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+            "status": "running",
+            "started_at": "2024-01-01T00:00:00Z",
+            "finished_at": null,
+            "next_step_index": 0,
+            "issue": null,
+            "step_envelopes": [],
+            "matrix_envelopes": {},
+            "error": null
+        }"#;
+
+        let state: FlowRunState = serde_json::from_str(old_json).unwrap();
+        assert_eq!(state.iteration_count, 0);
+    }
+
+    #[test]
+    fn test_iteration_count_roundtrip_in_save_load() {
+        let temp_dir = tempfile::tempdir().unwrap();
+
+        let mut original = FlowRunState::new("test-flow");
+        original.iteration_count = 2;
+        original.next_step_index = 5;
+
+        let path = original.save_to_file(temp_dir.path()).unwrap();
+        let loaded = FlowRunState::load_from_file(&path).unwrap();
+
+        assert_eq!(loaded.iteration_count, 2);
+        assert_eq!(loaded.next_step_index, 5);
     }
 }

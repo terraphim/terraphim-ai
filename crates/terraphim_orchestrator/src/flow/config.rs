@@ -73,7 +73,7 @@ fn default_flow_timeout() -> u64 {
     3600 // 1 hour default
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct FlowStepDef {
     pub name: String,
     pub kind: StepKind,
@@ -111,15 +111,21 @@ pub struct FlowStepDef {
     /// one per entry in `matrix.params`.
     #[serde(default)]
     pub matrix: Option<MatrixConfig>,
+    /// Target step name for checkpoint backward jumps.
+    /// When set on a Checkpoint step, the flow resumes from the named step
+    /// instead of continuing to the next step. Used for re-iteration loops.
+    #[serde(default)]
+    pub loop_target: Option<String>,
 }
 
 fn default_timeout() -> u64 {
     600
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum StepKind {
+    #[default]
     Action,
     Agent,
     Gate,
@@ -425,8 +431,76 @@ kind = "action"
             FailStrategy::SkipFailed
         );
         assert_eq!(
-            serde_json::from_str::<FailStrategy>("\"continue\"").unwrap(),
+            serde_json::from_str::<FailStrategy>("\"continue\"") .unwrap(),
             FailStrategy::Continue
         );
+    }
+
+    #[test]
+    fn test_loop_target_parsing() {
+        let toml_str = r#"
+name = "test"
+project = "default"
+repo_path = "/tmp"
+
+[[steps]]
+name = "checkpoint-with-loop"
+kind = "checkpoint"
+loop_target = "review"
+"#;
+
+        let flow: FlowDefinition = toml::from_str(toml_str).unwrap();
+        assert_eq!(flow.steps.len(), 1);
+        let step = &flow.steps[0];
+        assert_eq!(step.name, "checkpoint-with-loop");
+        assert_eq!(step.kind, StepKind::Checkpoint);
+        assert_eq!(step.loop_target, Some("review".to_string()));
+    }
+
+    #[test]
+    fn test_loop_target_default_none() {
+        let toml_str = r#"
+name = "test"
+project = "default"
+repo_path = "/tmp"
+
+[[steps]]
+name = "plain-checkpoint"
+kind = "checkpoint"
+"#;
+
+        let flow: FlowDefinition = toml::from_str(toml_str).unwrap();
+        let step = &flow.steps[0];
+        assert_eq!(step.loop_target, None);
+    }
+
+    #[test]
+    fn test_loop_target_in_full_flow() {
+        let toml_str = r#"
+name = "reiteration-flow"
+project = "terraphim"
+repo_path = "/tmp/repo"
+
+[[steps]]
+name = "setup"
+kind = "action"
+command = "echo start"
+
+[[steps]]
+name = "gate"
+kind = "gate"
+condition = "iterations.current < 2"
+
+[[steps]]
+name = "loopback"
+kind = "checkpoint"
+loop_target = "setup"
+"#;
+
+        let flow: FlowDefinition = toml::from_str(toml_str).unwrap();
+        assert_eq!(flow.steps.len(), 3);
+        assert_eq!(flow.steps[2].name, "loopback");
+        assert_eq!(flow.steps[2].kind, StepKind::Checkpoint);
+        assert_eq!(flow.steps[2].loop_target, Some("setup".to_string()));
     }
 }
