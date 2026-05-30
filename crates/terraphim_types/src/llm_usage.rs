@@ -2,34 +2,47 @@
 
 use serde::{Deserialize, Serialize};
 
+/// Token usage and cost data for a single LLM call.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LlmUsage {
+    /// Number of prompt/input tokens consumed.
     pub input_tokens: u64,
+    /// Number of completion/output tokens generated.
     pub output_tokens: u64,
+    /// Model identifier (e.g. `"gpt-4o"`, `"claude-sonnet-4-5"`).
     pub model: String,
+    /// Provider name (e.g. `"openrouter"`, `"anthropic"`).
     pub provider: String,
+    /// Calculated cost in USD, if pricing data was available.
     pub cost_usd: Option<f64>,
+    /// End-to-end request latency in milliseconds.
     pub latency_ms: u64,
 }
 
 impl LlmUsage {
+    /// Returns the sum of input and output tokens.
     pub fn total_tokens(&self) -> u64 {
         self.input_tokens + self.output_tokens
     }
 
+    /// Attaches a cost figure and returns the updated value.
     pub fn with_cost(mut self, cost_usd: f64) -> Self {
         self.cost_usd = Some(cost_usd);
         self
     }
 }
 
+/// The text content produced by an LLM call together with optional usage metadata.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LlmResult {
+    /// Generated text returned by the model.
     pub content: String,
+    /// Token usage and cost metadata, if available.
     pub usage: Option<LlmUsage>,
 }
 
 impl LlmResult {
+    /// Creates a result with the given content and no usage metadata.
     pub fn new(content: String) -> Self {
         Self {
             content,
@@ -37,20 +50,26 @@ impl LlmResult {
         }
     }
 
+    /// Attaches usage metadata and returns the updated value.
     pub fn with_usage(mut self, usage: LlmUsage) -> Self {
         self.usage = Some(usage);
         self
     }
 }
 
+/// Per-model pricing configuration for cost estimation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModelPricing {
+    /// Glob-style pattern matched against model identifiers (e.g. `"openai/gpt-4*"`).
     pub model_pattern: String,
+    /// Cost per one million input tokens, in USD.
     pub input_cost_per_million_tokens: f64,
+    /// Cost per one million output tokens, in USD.
     pub output_cost_per_million_tokens: f64,
 }
 
 impl ModelPricing {
+    /// Calculates the cost in USD for the given token counts.
     pub fn calculate_cost(&self, input_tokens: u64, output_tokens: u64) -> f64 {
         let input_cost = (input_tokens as f64 / 1_000_000.0) * self.input_cost_per_million_tokens;
         let output_cost =
