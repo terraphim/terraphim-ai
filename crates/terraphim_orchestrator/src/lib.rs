@@ -30,6 +30,7 @@
 //! ```
 
 pub mod adf_commands;
+pub mod agent_registry;
 pub mod agent_run_command;
 pub mod agent_run_record;
 pub mod agent_runner;
@@ -78,6 +79,7 @@ pub mod scope;
 pub mod webhook;
 pub mod worktree_guard;
 
+pub use agent_registry::{AgentKey, AgentRegistry, AgentScope, AgentSource, RegisteredAgent};
 pub use agent_run_command::{
     applicable_modes, is_cron_schedule_valid, parse_agent_args, run_synthetic, run_validate,
     run_validate_all, schedule_for_agent, validate_agent_all_modes, AgentSubcommand,
@@ -219,6 +221,7 @@ struct PersistedRestartState {
 /// The main orchestrator that runs the dark factory.
 pub struct AgentOrchestrator {
     config: OrchestratorConfig,
+    agent_registry: AgentRegistry,
     spawner: AgentSpawner,
     router: RoutingEngine,
     nightwatch: NightwatchMonitor,
@@ -772,6 +775,7 @@ impl AgentOrchestrator {
         let scheduler = TimeScheduler::new(&config.agents, Some(&config.compound_review.schedule))?;
         let compound_workflow =
             CompoundReviewWorkflow::from_compound_config(config.compound_review.clone());
+        let agent_registry = AgentRegistry::from_config(&config)?;
 
         // Layer 2 startup sweep (epic #1567, issue #1570).
         //
@@ -909,6 +913,7 @@ impl AgentOrchestrator {
 
         Ok(Self {
             config: config.clone(),
+            agent_registry,
             spawner,
             router,
             nightwatch,
@@ -2058,6 +2063,7 @@ impl AgentOrchestrator {
                 cli_tool: def.cli_tool.clone(),
                 layer: def.layer,
                 session_id: None,
+                default_tier: def.default_tier.clone(),
             };
             let budget_verdict = self.cost_tracker.check(&def.name);
             let decision = engine.decide_route(&ctx, &budget_verdict).await;
@@ -2094,7 +2100,8 @@ impl AgentOrchestrator {
             let mut unhealthy = self.provider_health.unhealthy_providers();
             unhealthy.extend(self.provider_rate_limits.blocked_providers());
             let kg_decision = self.kg_router.as_ref().and_then(|router| {
-                let decision = router.route_agent(&def.task)?;
+                let decision =
+                    router.route_agent_with_tier(&def.task, def.default_tier.as_deref())?;
                 // If primary provider is unhealthy, try fallback routes
                 if !unhealthy.is_empty() {
                     if let Some(healthy_route) = decision.first_healthy_route(&unhealthy) {
@@ -2294,9 +2301,9 @@ impl AgentOrchestrator {
         let use_stdin =
             persona_found || !skill_content.is_empty() || composed_task.len() > STDIN_THRESHOLD;
 
-        // Create isolated git worktree for implementation-tier agents that modify code.
-        // Review-tier agents (haiku) are read-only and don't need isolation.
-        let needs_isolation = model.as_ref().map(|m| !m.contains("haiku")).unwrap_or(true);
+        // Create isolated git worktrees for AI/model-backed agents that may modify code.
+        // Review-tier agents (haiku) and simple local commands used in tests do not need isolation.
+        let needs_isolation = requires_isolated_worktree(def, model.as_deref());
 
         // Resolve the git repo directory for worktree operations. Project-bound
         // agents need a worktree from their own repo, not the orchestrator's.
@@ -2318,12 +2325,9 @@ impl AgentOrchestrator {
         };
 
         let (worktree_path, worktree_guard) = if needs_isolation {
-            if let Some(path) = self.create_agent_worktree(&def.name, repo_dir).await {
-                let guard = crate::worktree_guard::WorktreeGuard::for_managed(repo_dir, &path);
-                (Some(path), Some(guard))
-            } else {
-                (None, None)
-            }
+            let path = self.create_agent_worktree(&def.name, repo_dir).await?;
+            let guard = crate::worktree_guard::WorktreeGuard::for_managed(repo_dir, &path);
+            (Some(path), Some(guard))
         } else {
             (None, None)
         };
@@ -2585,12 +2589,10 @@ impl AgentOrchestrator {
         // fan-out list must skip silently (no `pending` posted) — a
         // hung pending would block the PR forever.
         let def = match self
-            .config
-            .agents
-            .iter()
-            .find(|a| a.name == agent_name && a.project.as_deref() == Some(project.as_str()))
+            .agent_registry
+            .lookup_project(project.as_str(), agent_name)
         {
-            Some(d) => d.clone(),
+            Some(agent) => agent.definition.clone(),
             None => {
                 warn!(
                     pr_number,
@@ -2665,6 +2667,7 @@ impl AgentOrchestrator {
             cli_tool: def.cli_tool.clone(),
             layer: def.layer,
             session_id: None,
+            default_tier: def.default_tier.clone(),
         };
         let decision = engine.decide_route(&dispatch_ctx, &budget_verdict).await;
         info!(
@@ -2850,20 +2853,20 @@ impl AgentOrchestrator {
 
         // Look up the build-runner agent for this project. Missing must
         // skip silently — no `pending` posted by the caller.
-        let def =
-            match self.config.agents.iter().find(|a| {
-                a.name == "build-runner" && a.project.as_deref() == Some(project.as_str())
-            }) {
-                Some(d) => d.clone(),
-                None => {
-                    warn!(
-                        pr_number,
-                        project = %project,
-                        "ReviewPr skipped: no build-runner agent configured for project"
-                    );
-                    return Ok(false);
-                }
-            };
+        let def = match self
+            .agent_registry
+            .lookup_project(project.as_str(), "build-runner")
+        {
+            Some(agent) => agent.definition.clone(),
+            None => {
+                warn!(
+                    pr_number,
+                    project = %project,
+                    "ReviewPr skipped: no build-runner agent configured for project"
+                );
+                return Ok(false);
+            }
+        };
 
         // === STATIC ALLOW-LIST GATE ===
         // build-runner is bash-only (no LLM), so def.model is normally None
@@ -3156,20 +3159,20 @@ impl AgentOrchestrator {
 
         // Look up the build-runner agent for this project. Repos without
         // build-runner shouldn't break the orchestrator -- log and skip.
-        let def =
-            match self.config.agents.iter().find(|a| {
-                a.name == "build-runner" && a.project.as_deref() == Some(project.as_str())
-            }) {
-                Some(d) => d.clone(),
-                None => {
-                    warn!(
-                        project = %project,
-                        after_sha = %after_sha,
-                        "Push skipped: no build-runner agent configured for project"
-                    );
-                    return Ok(());
-                }
-            };
+        let def = match self
+            .agent_registry
+            .lookup_project(project.as_str(), "build-runner")
+        {
+            Some(agent) => agent.definition.clone(),
+            None => {
+                warn!(
+                    project = %project,
+                    after_sha = %after_sha,
+                    "Push skipped: no build-runner agent configured for project"
+                );
+                return Ok(());
+            }
+        };
 
         if self.active_agents.contains_key("build-runner") {
             info!(
@@ -5696,13 +5699,20 @@ impl AgentOrchestrator {
     /// For project-bound agents this is the project's working_dir; otherwise
     /// it is the orchestrator's top-level working_dir.
     ///
-    /// Returns the worktree path if successful, None if worktree creation fails
-    /// (fail-open: agent uses shared working_dir instead).
-    async fn create_agent_worktree(&self, agent_name: &str, repo_dir: &Path) -> Option<PathBuf> {
+    /// Returns the worktree path if successful. Mutating agents fail closed when
+    /// git cannot create an isolated worktree; they must not use the shared checkout.
+    async fn create_agent_worktree(
+        &self,
+        agent_name: &str,
+        repo_dir: &Path,
+    ) -> Result<PathBuf, OrchestratorError> {
         let worktree_root = repo_dir.join(".worktrees");
         if let Err(e) = tokio::fs::create_dir_all(&worktree_root).await {
-            warn!(agent = %agent_name, error = %e, "failed to create worktree root");
-            return None;
+            return Err(OrchestratorError::WorktreeCreationFailed {
+                agent: agent_name.to_string(),
+                repo: repo_dir.display().to_string(),
+                reason: format!("failed to create worktree root: {e}"),
+            });
         }
 
         let id = uuid::Uuid::new_v4().to_string()[..8].to_string();
@@ -5728,21 +5738,21 @@ impl AgentOrchestrator {
                     repo = %repo_dir.display(),
                     "created isolated git worktree"
                 );
-                Some(worktree_path)
+                Ok(worktree_path)
             }
             Ok(o) => {
                 let stderr = String::from_utf8_lossy(&o.stderr);
-                warn!(
-                    agent = %agent_name,
-                    error = %stderr.chars().take(200).collect::<String>(),
-                    "git worktree add failed, using shared working_dir"
-                );
-                None
+                Err(OrchestratorError::WorktreeCreationFailed {
+                    agent: agent_name.to_string(),
+                    repo: repo_dir.display().to_string(),
+                    reason: stderr.chars().take(500).collect::<String>(),
+                })
             }
-            Err(e) => {
-                warn!(agent = %agent_name, error = %e, "git worktree command failed");
-                None
-            }
+            Err(e) => Err(OrchestratorError::WorktreeCreationFailed {
+                agent: agent_name.to_string(),
+                repo: repo_dir.display().to_string(),
+                reason: format!("git worktree command failed: {e}"),
+            }),
         }
     }
 
@@ -7070,7 +7080,9 @@ impl AgentOrchestrator {
                 local_unhealthy.extend(self.provider_rate_limits.blocked_providers());
 
                 let respawned = if let Some(ref kg_router) = self.kg_router {
-                    if let Some(decision) = kg_router.route_agent(&def.task) {
+                    if let Some(decision) =
+                        kg_router.route_agent_with_tier(&def.task, def.default_tier.as_deref())
+                    {
                         if let Some(healthy_route) = decision.first_healthy_route(&local_unhealthy)
                         {
                             let retry_count = self
@@ -8311,6 +8323,34 @@ fn has_matching_changes(changed_files: &[String], watch_paths: &[String]) -> boo
     false
 }
 
+/// Determine whether an agent requires an isolated git worktree.
+///
+/// Review-tier agents (haiku) and simple local commands used in tests do not
+/// need isolation. AI/model-backed agents that may modify code do.
+fn requires_isolated_worktree(def: &AgentDefinition, model: Option<&str>) -> bool {
+    if model
+        .map(|m| m.to_ascii_lowercase().contains("haiku"))
+        .unwrap_or(false)
+    {
+        return false;
+    }
+
+    if model.is_some() {
+        return true;
+    }
+
+    let cli_name = Path::new(&def.cli_tool)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or(def.cli_tool.as_str())
+        .to_ascii_lowercase();
+
+    matches!(
+        cli_name.as_str(),
+        "claude" | "codex" | "opencode" | "opencode-go" | "gemini" | "aider"
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -8348,6 +8388,7 @@ mod tests {
                     cli_tool: "echo".to_string(),
                     task: "safety watch".to_string(),
                     model: None,
+                    default_tier: None,
                     schedule: None,
                     capabilities: vec!["security".to_string()],
                     max_memory_bytes: None,
@@ -8378,6 +8419,7 @@ mod tests {
                     cli_tool: "echo".to_string(),
                     task: "sync upstream".to_string(),
                     model: None,
+                    default_tier: None,
                     schedule: Some("0 3 * * *".to_string()),
                     capabilities: vec!["sync".to_string()],
                     max_memory_bytes: None,
@@ -8511,6 +8553,7 @@ mod tests {
             task: "echo hello".to_string(),
             schedule: None,
             model: None,
+            default_tier: None,
             capabilities: vec!["echo".to_string()],
             max_memory_bytes: None,
             budget_monthly_cents: None,
@@ -8564,6 +8607,7 @@ mod tests {
             task: "echo hello".to_string(),
             schedule: None,
             model: None,
+            default_tier: None,
             capabilities: vec!["echo".to_string()],
             max_memory_bytes: None,
             budget_monthly_cents: None,
@@ -8845,6 +8889,7 @@ task = "test"
                 cli_tool: "echo".to_string(),
                 task: "safety watch".to_string(),
                 model: None,
+                default_tier: None,
                 schedule: None,
                 capabilities: vec![],
                 max_memory_bytes: None,
@@ -8967,6 +9012,7 @@ task = "test"
             cli_tool: "echo".to_string(),
             task: "core task".to_string(),
             model: None,
+            default_tier: None,
             schedule: Some("0 3 * * *".to_string()),
             capabilities: vec![],
             max_memory_bytes: None,
@@ -9176,6 +9222,7 @@ task = "test"
             cli_tool: "cat".to_string(),
             task: "test task".to_string(),
             model: None,
+            default_tier: None,
             schedule: None,
             capabilities: vec![],
             max_memory_bytes: None,
@@ -9268,6 +9315,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             cli_tool: "echo".to_string(),
             task: "test task".to_string(),
             model: None,
+            default_tier: None,
             schedule: None,
             capabilities: vec![],
             max_memory_bytes: None,
@@ -9608,6 +9656,7 @@ bypass_kg_routing = true
             cli_tool: "sleep".to_string(),
             task: "60".to_string(),
             model: None,
+            default_tier: None,
             schedule: None,
             capabilities: vec![],
             max_memory_bytes: None,
@@ -9780,6 +9829,7 @@ bypass_kg_routing = true
             cli_tool: "echo".to_string(),
             task: "should not run".to_string(),
             model: None,
+            default_tier: None,
             schedule: None,
             capabilities: vec![],
             max_memory_bytes: None,
@@ -9879,6 +9929,7 @@ bypass_kg_routing = true
                 cli_tool: cli_tool.to_string(),
                 task: "review".to_string(),
                 model: None,
+                default_tier: None,
                 schedule: None,
                 capabilities: vec!["review".to_string()],
                 max_memory_bytes: None,
@@ -10081,11 +10132,12 @@ bypass_kg_routing = true
     /// short-circuited by the C1/C3 allow-list gate; no spawn happens.
     #[tokio::test]
     async fn reviewpr_dispatch_rejects_banned_provider() {
-        let (config, _tmp) = review_pr_config("echo");
+        let (mut config, _tmp) = review_pr_config("echo");
+        // Bypass load-time validation by mutating the test config before
+        // construction to simulate a stale/poisoned config entry reaching the
+        // dispatcher.
+        config.agents[0].model = Some("google/gemini-2".to_string());
         let mut orch = AgentOrchestrator::new(config).unwrap();
-        // Bypass load-time validation by mutating after construction to
-        // simulate a stale/poisoned config entry reaching the dispatcher.
-        orch.config.agents[0].model = Some("google/gemini-2".to_string());
 
         orch.handle_review_pr(review_pr_task()).await.unwrap();
 
@@ -10178,6 +10230,7 @@ bypass_kg_routing = true
             cli_tool: cli_tool.to_string(),
             task: "build".to_string(),
             model: None,
+            default_tier: None,
             schedule: None,
             capabilities: vec!["build".to_string()],
             max_memory_bytes: None,
@@ -10581,6 +10634,7 @@ bypass_kg_routing = true
             cli_tool: cli_tool.to_string(),
             task: "spec".to_string(),
             model: None,
+            default_tier: None,
             schedule: None,
             capabilities: vec!["review".to_string()],
             max_memory_bytes: None,
@@ -10926,6 +10980,7 @@ bypass_kg_routing = true
             cli_tool: cli_tool.to_string(),
             task: "test".to_string(),
             model: None,
+            default_tier: None,
             schedule: None,
             capabilities: vec!["review".to_string(), "test".to_string()],
             max_memory_bytes: None,
@@ -11223,6 +11278,7 @@ bypass_kg_routing = true
             cli_tool: cli_tool.to_string(),
             task: "compliance".to_string(),
             model: None,
+            default_tier: None,
             schedule: None,
             capabilities: vec!["compliance".to_string()],
             max_memory_bytes: None,
@@ -11507,6 +11563,7 @@ bypass_kg_routing = true
             cli_tool: cli_tool.to_string(),
             task: "security".to_string(),
             model: None,
+            default_tier: None,
             schedule: None,
             capabilities: vec!["review".to_string(), "security".to_string()],
             max_memory_bytes: None,
@@ -11804,6 +11861,7 @@ bypass_kg_routing = true
             task: "echo would-build".to_string(),
             schedule: None,
             model: None,
+            default_tier: None,
             capabilities: vec!["build".to_string()],
             max_memory_bytes: None,
             budget_monthly_cents: None,
@@ -11862,6 +11920,7 @@ bypass_kg_routing = true
             task: "echo would-build".to_string(),
             schedule: None,
             model: None,
+            default_tier: None,
             capabilities: vec!["build".to_string()],
             max_memory_bytes: None,
             budget_monthly_cents: None,
@@ -11921,6 +11980,7 @@ bypass_kg_routing = true
             task: "echo would-build".to_string(),
             schedule: None,
             model: None,
+            default_tier: None,
             capabilities: vec!["build".to_string()],
             max_memory_bytes: None,
             budget_monthly_cents: None,
@@ -11989,6 +12049,44 @@ bypass_kg_routing = true
                 .map(String::as_str),
             Some(worktree_path.to_string_lossy().as_ref()),
             "ADF_WORKING_DIR env var must reflect the worktree path"
+        );
+    }
+
+    #[test]
+    fn test_requires_isolated_worktree_for_mutating_ai_agents() {
+        let mut def = test_config_fast_lifecycle().agents[0].clone();
+
+        def.cli_tool = "echo".to_string();
+        assert!(!requires_isolated_worktree(&def, None));
+
+        assert!(requires_isolated_worktree(
+            &def,
+            Some("kimi-for-coding/k2p6")
+        ));
+
+        def.cli_tool = "/home/alex/.local/bin/claude".to_string();
+        assert!(requires_isolated_worktree(&def, None));
+        assert!(!requires_isolated_worktree(&def, Some("claude-3-haiku")));
+    }
+
+    #[tokio::test]
+    async fn test_mutating_agent_fails_closed_when_worktree_creation_fails() {
+        let temp_repo = TempDir::new().unwrap();
+        let mut config = test_config_fast_lifecycle();
+        config.working_dir = temp_repo.path().to_path_buf();
+        config.agents[0].cli_tool = "claude".to_string();
+
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+        let def = orch.config.agents[0].clone();
+        let result = orch.spawn_agent(&def).await;
+
+        assert!(matches!(
+            result,
+            Err(OrchestratorError::WorktreeCreationFailed { .. })
+        ));
+        assert!(
+            !orch.active_agents.contains_key("echo-safety"),
+            "agent must not spawn in the shared checkout after worktree failure"
         );
     }
 }

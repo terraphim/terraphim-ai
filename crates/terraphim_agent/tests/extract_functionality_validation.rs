@@ -60,12 +60,12 @@ fn start_test_server() -> Result<(Child, u16)> {
     let client = reqwest::blocking::Client::new();
     let health_url = format!("http://127.0.0.1:{}/health", port);
 
-    let mut retries = 10;
+    let mut retries = 5;
     let mut backoff = Duration::from_millis(50);
     while retries > 0 {
         if let Ok(response) = client
             .get(&health_url)
-            .timeout(Duration::from_secs(2))
+            .timeout(Duration::from_secs(1))
             .send()
         {
             if response.status().is_success() {

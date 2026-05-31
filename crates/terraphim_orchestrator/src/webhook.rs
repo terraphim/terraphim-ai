@@ -146,6 +146,24 @@ impl WebhookDispatch {
     }
 }
 
+/// Default maximum number of agents a group alias can expand to.
+/// Prevents mention-spam DoS via overly broad prefix matches.
+const DEFAULT_MAX_GROUP_ALIAS_MEMBERS: usize = 10;
+
+/// Expand a group alias like "implementation-swarm" into all agent names
+/// that match the `{alias}-*` pattern (e.g. "implementation-swarm-A").
+///
+/// The expansion is capped at `DEFAULT_MAX_GROUP_ALIAS_MEMBERS` to prevent
+/// a single mention from spawning an unbounded number of agents.
+fn group_alias_members<'a>(alias: &str, agent_names: &'a [String]) -> Vec<&'a str> {
+    let prefix = format!("{}-", alias);
+    agent_names
+        .iter()
+        .filter_map(|name| name.strip_prefix(&prefix).map(|_| name.as_str()))
+        .take(DEFAULT_MAX_GROUP_ALIAS_MEMBERS)
+        .collect()
+}
+
 fn deserialize_null_default_vec<'de, D, T>(deserializer: D) -> Result<Vec<T>, D::Error>
 where
     D: serde::Deserializer<'de>,
@@ -309,22 +327,49 @@ async fn handle_gitea_webhook(
         payload.comment.id,
     );
 
-    // Collect qualified tokens that AdfCommandParser cannot match (it only knows
-    // `@adf:{name}` patterns and `@adf:project/name` is not a substring of those).
-    let qualified_dispatches: Vec<WebhookDispatch> = mention_tokens
-        .into_iter()
-        .filter(|t| t.project.is_some())
-        .map(|t| WebhookDispatch::SpawnAgent {
-            detected_project: t.project,
-            agent_name: t.agent,
-            issue_number: payload.issue.number,
-            comment_id: payload.comment.id,
-            context: String::new(),
-            synthetic_event: None,
-        })
-        .collect();
+    // Expand group aliases and collect qualified tokens that AdfCommandParser
+    // cannot match (it only knows `@adf:{name}` patterns and `@adf:project/name`
+    // is not a substring of those).
+    let mut token_dispatches = Vec::new();
+    for token in &mention_tokens {
+        let group_members = if state.agent_names.iter().any(|name| name == &token.agent) {
+            Vec::new()
+        } else {
+            group_alias_members(&token.agent, &state.agent_names)
+        };
 
-    if commands.is_empty() && qualified_dispatches.is_empty() {
+        if !group_members.is_empty() {
+            for member in group_members {
+                token_dispatches.push(WebhookDispatch::SpawnAgent {
+                    detected_project: token
+                        .project
+                        .clone()
+                        .or_else(|| repo_derived_project.clone()),
+                    agent_name: member.to_string(),
+                    issue_number: payload.issue.number,
+                    comment_id: payload.comment.id,
+                    context: payload.comment.body.clone(),
+                    synthetic_event: None,
+                });
+            }
+            continue;
+        }
+
+        // Qualified mentions cannot be matched by AdfCommandParser because it
+        // only knows `@adf:{name}` patterns, not `@adf:project/name`.
+        if token.project.is_some() {
+            token_dispatches.push(WebhookDispatch::SpawnAgent {
+                detected_project: token.project.clone(),
+                agent_name: token.agent.clone(),
+                issue_number: payload.issue.number,
+                comment_id: payload.comment.id,
+                context: String::new(),
+                synthetic_event: None,
+            });
+        }
+    }
+
+    if commands.is_empty() && token_dispatches.is_empty() {
         return StatusCode::OK;
     }
 
@@ -376,10 +421,10 @@ async fn handle_gitea_webhook(
         commands_dispatched += 1;
     }
 
-    // Dispatch qualified mentions separately (AdfCommandParser can't see `@adf:proj/name`).
-    for dispatch in qualified_dispatches {
+    // Dispatch qualified mentions and group aliases separately.
+    for dispatch in token_dispatches {
         if let Err(e) = state.dispatch_tx.send(dispatch).await {
-            warn!(error = %e, "failed to send qualified mention dispatch to orchestrator");
+            warn!(error = %e, "failed to send token-derived mention dispatch to orchestrator");
             return StatusCode::SERVICE_UNAVAILABLE;
         }
         commands_dispatched += 1;
@@ -624,5 +669,111 @@ mod tests {
             serde_json::from_str(payload).expect("should parse populated arrays");
         assert_eq!(parsed.commits[0].added, vec!["foo.rs"]);
         assert_eq!(parsed.commits[0].modified, vec!["bar.rs"]);
+    }
+
+    #[test]
+    fn test_group_alias_members_matches_dash_prefixed_agents_only() {
+        let agents = vec![
+            "implementation-swarm-A".to_string(),
+            "implementation-swarm-B".to_string(),
+            "implementation-swarmish".to_string(),
+            "other-agent".to_string(),
+        ];
+
+        assert_eq!(
+            group_alias_members("implementation-swarm", &agents),
+            vec!["implementation-swarm-A", "implementation-swarm-B"]
+        );
+    }
+
+    #[test]
+    fn test_group_alias_members_respects_cap() {
+        let agents: Vec<String> = (0..15).map(|i| format!("test-swarm-{}", i)).collect();
+
+        let members = group_alias_members("test-swarm", &agents);
+        assert_eq!(
+            members.len(),
+            DEFAULT_MAX_GROUP_ALIAS_MEMBERS,
+            "group alias expansion must be capped at {} members",
+            DEFAULT_MAX_GROUP_ALIAS_MEMBERS
+        );
+    }
+
+    #[test]
+    fn test_group_alias_members_no_false_matches() {
+        let agents = vec!["implementation-swarmish".to_string()];
+        assert_eq!(
+            group_alias_members("implementation-swarm", &agents),
+            Vec::<&str>::new(),
+            "'implementation-swarmish' must NOT match 'implementation-swarm' prefix"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_issue_comment_group_alias_dispatches_all_members() {
+        let (tx, mut rx) = tokio::sync::mpsc::channel(4);
+        let mut project_by_repo = std::collections::HashMap::new();
+        project_by_repo.insert(
+            "terraphim/terraphim-ai".to_string(),
+            "terraphim-ai".to_string(),
+        );
+        let state = WebhookState {
+            agent_names: vec![
+                "implementation-swarm-A".to_string(),
+                "implementation-swarm-B".to_string(),
+            ],
+            persona_registry: std::sync::Arc::new(PersonaRegistry::new()),
+            dispatch_tx: tx,
+            secret: None,
+            project_by_repo,
+        };
+        let body = Bytes::from_static(
+            br#"{
+                "action":"created",
+                "comment":{
+                    "id":30005,
+                    "body":"@adf:implementation-swarm please implement issue #1769",
+                    "user":{"login":"root"},
+                    "created_at":"2026-05-20T23:46:52Z"
+                },
+                "issue":{"number":1769,"title":"load repo-local ADF configs","state":"open"},
+                "repository":{"full_name":"terraphim/terraphim-ai"}
+            }"#,
+        );
+
+        let status = handle_gitea_webhook(State(state), axum::http::HeaderMap::new(), body).await;
+        assert_eq!(status, StatusCode::ACCEPTED);
+
+        let mut dispatched = Vec::new();
+        while let Ok(dispatch) = rx.try_recv() {
+            if let WebhookDispatch::SpawnAgent {
+                agent_name,
+                detected_project,
+                issue_number,
+                comment_id,
+                ..
+            } = dispatch
+            {
+                dispatched.push((agent_name, detected_project, issue_number, comment_id));
+            }
+        }
+
+        assert_eq!(
+            dispatched,
+            vec![
+                (
+                    "implementation-swarm-A".to_string(),
+                    Some("terraphim-ai".to_string()),
+                    1769,
+                    30005
+                ),
+                (
+                    "implementation-swarm-B".to_string(),
+                    Some("terraphim-ai".to_string()),
+                    1769,
+                    30005
+                ),
+            ]
+        );
     }
 }

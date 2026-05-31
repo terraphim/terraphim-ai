@@ -138,6 +138,7 @@ mod tests {
             task: String::new(),
             schedule: None,
             model: None,
+            default_tier: None,
             capabilities: Vec::new(),
             max_memory_bytes: None,
             budget_monthly_cents: None,

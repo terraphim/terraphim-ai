@@ -349,6 +349,7 @@ mod tests {
             task: "hello".to_string(),
             schedule: Some("0 2 * * *".to_string()),
             model: Some("minimax-coding-plan/MiniMax-M2.7-highspeed".to_string()),
+            default_tier: None,
             capabilities: vec!["build".to_string()],
             max_memory_bytes: None,
             budget_monthly_cents: None,
