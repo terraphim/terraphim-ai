@@ -468,10 +468,11 @@ mod tests {
 
     #[test]
     fn test_debug_redacts_sensitive_fields() {
-        let mut config = RlmConfig::default();
-        config.alert_webhook_url =
-            Some("https://hooks.slack.com/services/T00/B00/XXXX".to_string());
-        config.e2b_api_key = Some("e2b_sk_secret_key".to_string());
+        let config = RlmConfig {
+            alert_webhook_url: Some("https://hooks.slack.com/services/T00/B00/XXXX".to_string()),
+            e2b_api_key: Some("e2b_sk_secret_key".to_string()),
+            ..Default::default()
+        };
 
         let debug_output = format!("{:?}", config);
 

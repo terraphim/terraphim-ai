@@ -28,7 +28,7 @@ fn fetch_first_role() -> Result<String> {
     extract_clean_output(&stdout)
         .lines()
         .filter_map(|line| {
-            let s = line.trim_start_matches(|c| c == '*' || c == '-' || c == ' ');
+            let s = line.trim_start_matches(['*', '-', ' ']);
             let name = s
                 .split_once(" (")
                 .map(|(n, _)| n.trim())

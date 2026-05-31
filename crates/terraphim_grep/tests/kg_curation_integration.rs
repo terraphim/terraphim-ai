@@ -12,8 +12,8 @@ fn test_persist_concepts_creates_markdown() {
 
     // Create test concepts matching the NewConcept structure
     let concept_name = "Test Concept";
-    let synonyms = vec!["test".to_string(), "example".to_string()];
-    let relationships = vec!["related-concept".to_string()];
+    let synonyms = ["test".to_string(), "example".to_string()];
+    let relationships = ["related-concept".to_string()];
 
     // Simulate what persist_concepts does
     std::fs::create_dir_all(&kg_path).unwrap();

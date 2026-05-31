@@ -79,12 +79,14 @@ fn create_test_role(name: &str, provider: &str) -> Role {
     role
 }
 
+#[allow(dead_code)]
 fn openrouter_api_key_available() -> bool {
     env::var("OPENROUTER_API_KEY")
         .map(|key| key.starts_with("sk-or-"))
         .unwrap_or(false)
 }
 
+#[allow(dead_code)]
 async fn run_openrouter_smoke(role_name: &str, prompt: &str, expected_terms: &[&str]) {
     load_env_config();
 
