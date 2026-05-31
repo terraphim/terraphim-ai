@@ -132,7 +132,7 @@ enum AdfSub {
         #[arg(long, value_enum, default_value_t)]
         format: OutputFormat,
     },
-    /// Run a named flow from a local .terraphim/flows/<name>.toml file
+    /// Run a named flow from a local `.terraphim/flows/\<name\>.toml` file
     Flow {
         /// Flow name (e.g. adf-useful-work-proof)
         name: String,

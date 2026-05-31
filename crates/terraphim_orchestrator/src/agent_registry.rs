@@ -1,7 +1,7 @@
 //! Project-scoped registry for ADF agent definitions.
 //!
 //! This module is a read-only index over the already merged
-//! [`OrchestratorConfig`](crate::config::OrchestratorConfig). It does not load
+//! [`OrchestratorConfig`]. It does not load
 //! TOML, merge project sources, spawn agents, or post statuses.
 
 use std::collections::{BTreeMap, BTreeSet};
