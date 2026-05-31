@@ -314,6 +314,7 @@ async fn test_concurrent_connectivity_tests() {
 }
 
 #[tokio::test]
+#[ignore = "flaky: hits external httpbin.org, timing-dependent on network conditions"]
 async fn test_timeout_configuration() {
     let client = LlmProxyClient::new("anthropic".to_string()).unwrap();
 

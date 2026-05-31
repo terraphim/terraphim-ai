@@ -1576,7 +1576,7 @@ mod tests {
     }
 
     #[test]
-    fn gitea_config_debug_redacts_token() {
+    fn gitea_config_debug_redacts_token_v2() {
         let config = GiteaConfig::new(
             "https://git.example.com".to_string(),
             "secret-gitea-api-token".to_string(),
