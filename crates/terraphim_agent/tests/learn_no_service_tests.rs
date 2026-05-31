@@ -6,47 +6,23 @@
 
 use std::process::Command;
 
-fn agent_binary() -> Option<String> {
-    let output = match Command::new("cargo")
-        .args(["build", "-p", "terraphim_agent"])
-        .output()
-    {
-        Ok(o) => o,
-        Err(_) => return None,
-    };
-    if !output.status.success() {
-        return None;
-    }
-
-    let workspace_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap();
-    let path = workspace_root.join("target/debug/terraphim-agent");
-    if path.exists() {
-        Some(path.to_string_lossy().to_string())
-    } else {
-        None
-    }
+// Use the already-compiled binary rather than spawning a nested `cargo build`.
+// `CARGO_BIN_EXE_terraphim-agent` is set by Cargo for integration tests so no
+// separate build step is needed and there is no contention on the cargo file lock.
+fn agent_binary() -> &'static str {
+    env!("CARGO_BIN_EXE_terraphim-agent")
 }
 
 #[test]
 fn learn_list_succeeds_from_tmp_dir() {
-    let binary = match agent_binary() {
-        Some(b) => b,
-        None => return,
-    };
+    let binary = agent_binary();
     let tmp = tempfile::tempdir().expect("create temp dir");
 
-    let output = match Command::new(&binary)
+    let output = Command::new(binary)
         .args(["learn", "list"])
         .current_dir(tmp.path())
         .output()
-    {
-        Ok(o) => o,
-        Err(_) => return,
-    };
+        .expect("failed to run terraphim-agent learn list");
 
     assert!(
         output.status.success(),
@@ -58,31 +34,24 @@ fn learn_list_succeeds_from_tmp_dir() {
 
 #[test]
 fn learn_hook_succeeds_from_tmp_dir() {
-    let binary = match agent_binary() {
-        Some(b) => b,
-        None => return,
-    };
+    let binary = agent_binary();
     let tmp = tempfile::tempdir().expect("create temp dir");
 
-    let mut child = match Command::new(&binary)
+    let mut child = Command::new(binary)
         .args(["learn", "hook"])
         .current_dir(tmp.path())
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .spawn()
-    {
-        Ok(c) => c,
-        Err(_) => return,
-    };
+        .expect("failed to spawn terraphim-agent learn hook");
 
     // Close stdin immediately to signal EOF
     drop(child.stdin.take());
 
-    let output = match child.wait_with_output() {
-        Ok(o) => o,
-        Err(_) => return,
-    };
+    let output = child
+        .wait_with_output()
+        .expect("failed to wait on terraphim-agent learn hook");
 
     // Hook with empty input may return non-zero (invalid JSON), but it must NOT
     // crash with a panic or TuiService initialization error.
@@ -96,13 +65,10 @@ fn learn_hook_succeeds_from_tmp_dir() {
 
 #[test]
 fn learn_capture_succeeds_from_tmp_dir() {
-    let binary = match agent_binary() {
-        Some(b) => b,
-        None => return,
-    };
+    let binary = agent_binary();
     let tmp = tempfile::tempdir().expect("create temp dir");
 
-    let output = match Command::new(&binary)
+    let output = Command::new(binary)
         .args([
             "learn",
             "capture",
@@ -114,10 +80,7 @@ fn learn_capture_succeeds_from_tmp_dir() {
         ])
         .current_dir(tmp.path())
         .output()
-    {
-        Ok(o) => o,
-        Err(_) => return,
-    };
+        .expect("failed to run terraphim-agent learn capture");
 
     assert!(
         output.status.success(),
@@ -129,13 +92,10 @@ fn learn_capture_succeeds_from_tmp_dir() {
 
 #[test]
 fn learn_correction_succeeds_from_tmp_dir() {
-    let binary = match agent_binary() {
-        Some(b) => b,
-        None => return,
-    };
+    let binary = agent_binary();
     let tmp = tempfile::tempdir().expect("create temp dir");
 
-    let output = match Command::new(&binary)
+    let output = Command::new(binary)
         .args([
             "learn",
             "correction",
@@ -150,10 +110,7 @@ fn learn_correction_succeeds_from_tmp_dir() {
         ])
         .current_dir(tmp.path())
         .output()
-    {
-        Ok(o) => o,
-        Err(_) => return,
-    };
+        .expect("failed to run terraphim-agent learn correction");
 
     assert!(
         output.status.success(),
