@@ -67,6 +67,9 @@ struct Args {
         help = "Path to a JSON file containing a terraphim_config::Role with LLM/router settings"
     )]
     role_config: Option<PathBuf>,
+
+    #[arg(long, help = "KG directory for persisting learned concepts")]
+    kg_path: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, ValueEnum)]
@@ -347,7 +350,14 @@ async fn main() -> Result<()> {
     let terraphim_grep = match build_llm_for_role(&role_name, args.role_config.as_deref()) {
         Some(client) => {
             tracing::info!("LLM client wired: {}", client.name());
-            terraphim_grep.with_llm_client(client)
+            let mut grep = terraphim_grep.with_llm_client(client.clone());
+            if let Some(ref kg_path) = args.kg_path {
+                let curation =
+                    terraphim_grep::KgCurationRlm::new(client).with_kg_path(kg_path.clone());
+                grep = grep.with_kg_curation(Arc::new(curation));
+                tracing::info!("KG curation enabled, writing to {:?}", kg_path);
+            }
+            grep
         }
         None => {
             tracing::debug!(
