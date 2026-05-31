@@ -10,6 +10,8 @@ use terraphim_config::{Haystack, Role, ServiceType};
 use terraphim_service::llm::{ChatOptions, build_llm_from_role};
 use tokio::time::sleep;
 
+const DEFAULT_OPENROUTER_FREE_MODEL: &str = "liquid/lfm-2.5-1.2b-instruct:free";
+
 /// Load configuration from .env file
 fn load_env_config() {
     // Environment variables loaded by shell or test environment
@@ -51,11 +53,14 @@ fn create_test_role(name: &str, provider: &str) -> Role {
         "openrouter" => {
             if let Ok(api_key) = env::var("OPENROUTER_API_KEY") {
                 role.llm_enabled = true;
-                role.llm_api_key = Some(api_key);
-                role.llm_model = Some("openai/gpt-3.5-turbo".to_string());
+                role.llm_api_key.replace(api_key);
+                let model = env::var("OPENROUTER_MODEL")
+                    .unwrap_or_else(|_| DEFAULT_OPENROUTER_FREE_MODEL.to_string());
+                role.llm_model = Some(model.clone());
                 role.llm_chat_enabled = true;
                 role.extra
                     .insert("llm_provider".to_string(), json!("openrouter"));
+                role.extra.insert("llm_model".to_string(), json!(model));
             }
         }
         _ => {}
@@ -72,6 +77,101 @@ fn create_test_role(name: &str, provider: &str) -> Role {
     }];
 
     role
+}
+
+fn openrouter_api_key_available() -> bool {
+    env::var("OPENROUTER_API_KEY")
+        .map(|key| key.starts_with("sk-or-"))
+        .unwrap_or(false)
+}
+
+async fn run_openrouter_smoke(role_name: &str, prompt: &str, expected_terms: &[&str]) {
+    load_env_config();
+
+    if !openrouter_api_key_available() {
+        println!("Skipping test: OPENROUTER_API_KEY not configured as sk-or-* token");
+        return;
+    }
+
+    let role = create_test_role(role_name, "openrouter");
+    let model = role
+        .llm_model
+        .clone()
+        .unwrap_or_else(|| DEFAULT_OPENROUTER_FREE_MODEL.to_string());
+    let llm_client = build_llm_from_role(&role).expect("Failed to create OpenRouter client");
+
+    let messages = vec![json!({"role": "user", "content": prompt})];
+    let mut attempts = 0;
+    let max_attempts = 3;
+
+    while attempts < max_attempts {
+        let start = Instant::now();
+        match llm_client
+            .chat_completion(
+                messages.clone(),
+                ChatOptions {
+                    max_tokens: Some(128),
+                    temperature: Some(0.2),
+                },
+            )
+            .await
+        {
+            Ok(response) => {
+                let duration = start.elapsed();
+                assert!(!response.is_empty(), "Empty response from {model}");
+                assert!(
+                    duration < Duration::from_secs(20),
+                    "OpenRouter response too slow from {model}: {duration:?}"
+                );
+
+                if !expected_terms.is_empty() {
+                    let response_lower = response.to_lowercase();
+                    assert!(
+                        expected_terms
+                            .iter()
+                            .any(|term| response_lower.contains(&term.to_lowercase())),
+                        "Response did not contain any expected terms {:?}: {}",
+                        expected_terms,
+                        response
+                    );
+                }
+
+                println!(
+                    "PASS: {} + Ripgrep + OpenRouter ({}) test passed in {:?}",
+                    role_name, model, duration
+                );
+                println!("Response: {}", response);
+                return;
+            }
+            Err(e) if e.to_string().contains("429") || e.to_string().contains("rate limit") => {
+                attempts += 1;
+                if attempts < max_attempts {
+                    let delay = Duration::from_secs(2_u64.pow(attempts));
+                    println!("Rate limited by OpenRouter, retrying in {:?}...", delay);
+                    sleep(delay).await;
+                } else {
+                    panic!(
+                        "OpenRouter test failed after {} retries: {}",
+                        max_attempts, e
+                    );
+                }
+            }
+            Err(e)
+                if e.to_string().contains("401")
+                    || e.to_string().contains("403")
+                    || e.to_string()
+                        .to_lowercase()
+                        .contains("insufficient credits") =>
+            {
+                println!(
+                    "Skipping OpenRouter smoke due to account/quota issue: {}",
+                    e
+                );
+                return;
+            }
+            Err(e) => panic!("OpenRouter test failed: {}", e),
+        }
+    }
 }
 
 /// Check if a service is available
@@ -369,62 +469,61 @@ async fn test_system_operator_ripgrep_ollama() {
 #[tokio::test]
 #[ignore] // Run with --ignored flag
 #[cfg(feature = "openrouter")]
+async fn test_default_ripgrep_openrouter() {
+    run_openrouter_smoke(
+        "Default",
+        "Reply with exactly: Test successful",
+        &["test", "successful"],
+    )
+    .await;
+}
+
+#[tokio::test]
+#[ignore] // Run with --ignored flag
+#[cfg(feature = "openrouter")]
+async fn test_rust_engineer_ripgrep_openrouter() {
+    run_openrouter_smoke(
+        "Rust Engineer",
+        "Explain async/await in Rust in one short sentence.",
+        &["rust", "async", "await"],
+    )
+    .await;
+}
+
+#[tokio::test]
+#[ignore] // Run with --ignored flag
+#[cfg(feature = "openrouter")]
 async fn test_ai_engineer_ripgrep_openrouter() {
-    load_env_config();
+    run_openrouter_smoke(
+        "AI Engineer",
+        "What is machine learning in one short sentence?",
+        &["machine", "learning", "model", "data"],
+    )
+    .await;
+}
 
-    // Skip if OpenRouter not configured
-    if env::var("OPENROUTER_API_KEY").is_err() {
-        println!("Skipping test: OpenRouter not configured");
-        return;
-    }
+#[tokio::test]
+#[ignore] // Run with --ignored flag
+#[cfg(feature = "openrouter")]
+async fn test_terraphim_engineer_ripgrep_openrouter() {
+    run_openrouter_smoke(
+        "Terraphim Engineer",
+        "What is Terraphim AI in one short sentence?",
+        &["terraphim", "search", "knowledge", "graph"],
+    )
+    .await;
+}
 
-    let role = create_test_role("AI Engineer", "openrouter");
-    let llm_client = build_llm_from_role(&role).expect("Failed to create OpenRouter client");
-
-    let messages =
-        vec![json!({"role": "user", "content": "What is machine learning in exactly 10 words?"})];
-
-    // Test with retry logic for rate limits
-    let mut attempts = 0;
-    let max_attempts = 3;
-
-    while attempts < max_attempts {
-        let start = Instant::now();
-        match llm_client
-            .chat_completion(
-                messages.clone(),
-                ChatOptions {
-                    max_tokens: Some(1000),
-                    temperature: Some(0.7),
-                },
-            )
-            .await
-        {
-            Ok(response) => {
-                let duration = start.elapsed();
-                assert!(!response.is_empty(), "Empty response");
-                assert!(duration < Duration::from_secs(15), "Response too slow");
-
-                println!(
-                    "✓ AI Engineer + Ripgrep + OpenRouter test passed in {:?}",
-                    duration
-                );
-                println!("Response: {}", response);
-                return;
-            }
-            Err(e) if e.to_string().contains("429") || e.to_string().contains("rate limit") => {
-                attempts += 1;
-                if attempts < max_attempts {
-                    let delay = Duration::from_secs(2_u64.pow(attempts));
-                    println!("Rate limited, retrying in {:?}...", delay);
-                    sleep(delay).await;
-                } else {
-                    panic!("Test failed after {} retries: {}", max_attempts, e);
-                }
-            }
-            Err(e) => panic!("Test failed: {}", e),
-        }
-    }
+#[tokio::test]
+#[ignore] // Run with --ignored flag
+#[cfg(feature = "openrouter")]
+async fn test_system_operator_ripgrep_openrouter() {
+    run_openrouter_smoke(
+        "System Operator",
+        "Name one important principle for reliable systems.",
+        &["reliable", "reliability", "monitor", "redund", "recover"],
+    )
+    .await;
 }
 
 #[tokio::test]
