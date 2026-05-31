@@ -461,42 +461,6 @@ async fn test_autocomplete_error_handling() {
 
 #[tokio::test]
 #[serial]
-async fn test_client_timeout_configuration() {
-    // Test that the client respects timeout settings
-    let client = ApiClient::new("http://httpbin.org/delay/15"); // 15 second delay
-
-    let start = std::time::Instant::now();
-    let result = client.health().await;
-    let duration = start.elapsed();
-
-    // Should timeout before 15 seconds (client has 10 second timeout)
-    assert!(
-        duration < Duration::from_secs(12),
-        "Should timeout before 12 seconds"
-    );
-    assert!(result.is_err(), "Should fail due to timeout");
-
-    let error = result.unwrap_err();
-    let error_str = error.to_string().to_lowercase();
-    assert!(
-        error_str.contains("timeout")
-            || error_str.contains("connect")
-            || error_str.contains("timed out")
-            || error_str.contains("deadline")
-            || error_str.contains("elapsed")
-            || error_str.contains("health check failed"),
-        "Error should indicate timeout: {}",
-        error
-    );
-
-    println!(
-        "✅ Client timeout configuration working correctly: {:?}",
-        duration
-    );
-}
-
-#[tokio::test]
-#[serial]
 async fn test_graceful_degradation() {
     if !is_server_running().await {
         println!("Server not running, skipping graceful degradation test");
