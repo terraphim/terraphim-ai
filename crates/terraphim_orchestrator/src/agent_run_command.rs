@@ -796,7 +796,7 @@ mod tests {
         assert_eq!(report.agent_name, "security-sentinel");
         assert!(mode_results.contains_key(&TriggerMode::Cron));
         assert!(mode_results.contains_key(&TriggerMode::Local));
-        assert_eq!(mode_results.get(&TriggerMode::Cron).unwrap().runnable, true);
+        assert!(mode_results.get(&TriggerMode::Cron).unwrap().runnable);
     }
 
     #[test]

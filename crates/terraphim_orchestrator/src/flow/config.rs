@@ -431,7 +431,7 @@ kind = "action"
             FailStrategy::SkipFailed
         );
         assert_eq!(
-            serde_json::from_str::<FailStrategy>("\"continue\"") .unwrap(),
+            serde_json::from_str::<FailStrategy>("\"continue\"").unwrap(),
             FailStrategy::Continue
         );
     }

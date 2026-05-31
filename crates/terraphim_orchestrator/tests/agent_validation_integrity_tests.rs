@@ -287,7 +287,7 @@ fn test_schedule_for_agent_returns_correct_expression() {
 
 #[test]
 fn test_applicable_modes_for_mixed_agents() {
-    let agents = vec![
+    let agents = [
         make_agent("cron-mention", AgentLayer::Core, Some("0 */6 * * *"), false),
         make_agent("event-only", AgentLayer::Growth, None, true),
         make_agent("safety-only", AgentLayer::Safety, None, false),

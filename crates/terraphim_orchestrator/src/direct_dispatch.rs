@@ -345,9 +345,8 @@ mod tests {
         std::fs::write(&path, "hello").unwrap();
         let result = super::remove_stale_socket_if_present(&path);
         assert!(result.is_err(), "regular file should not be removed");
-        assert_eq!(
+        assert!(
             path.exists(),
-            true,
             "regular file must still exist after rejected removal"
         );
     }

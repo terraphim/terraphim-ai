@@ -161,6 +161,14 @@ impl TomlProjectAdfConfig {
 }
 
 impl ProjectAdfConfig {
+    pub fn project_root(&self) -> PathBuf {
+        self.discovered_path
+            .parent()
+            .and_then(Path::parent)
+            .map(Path::to_path_buf)
+            .unwrap_or_else(|| self.discovered_path.clone())
+    }
+
     fn discover_terraphim_dir(start_dir: &Path) -> Option<PathBuf> {
         let mut current = Some(start_dir.to_path_buf());
 
@@ -208,11 +216,7 @@ impl TryFrom<&ProjectAdfConfig> for (Project, Vec<AgentDefinition>) {
     fn try_from(cfg: &ProjectAdfConfig) -> Result<Self, Self::Error> {
         let project = Project {
             id: cfg.project_id.clone(),
-            working_dir: cfg
-                .discovered_path
-                .parent()
-                .unwrap_or(&cfg.discovered_path)
-                .to_path_buf(),
+            working_dir: cfg.project_root(),
             schedule_offset_minutes: 0,
             gitea: None,
             mentions: None,
@@ -304,6 +308,7 @@ task = "Run safety checks"
             .expect("adf.toml must be found");
         assert_eq!(result.project_id, "test-project");
         assert_eq!(result.name, "Test Project");
+        assert_eq!(result.project_root(), project_dir.canonicalize().unwrap());
         assert_eq!(result.agents.len(), 1);
         assert_eq!(result.agents[0].name, "safety-bot");
         assert_eq!(result.agents[0].layer, "Safety");
