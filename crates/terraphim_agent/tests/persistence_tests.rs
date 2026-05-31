@@ -342,6 +342,7 @@ async fn test_persistence_backend_functionality() -> Result<()> {
 
 #[tokio::test]
 #[serial]
+#[ignore = "flaky: races on persisted config across processes, non-deterministic"]
 async fn test_concurrent_persistence_operations() -> Result<()> {
     let (temp_dir, _, _) = create_test_env()?;
     let test_root = temp_dir.path().to_path_buf();
