@@ -10,6 +10,13 @@ pub enum OrchestratorError {
     #[error("agent spawn failed for '{agent}': {reason}")]
     SpawnFailed { agent: String, reason: String },
 
+    #[error("agent worktree creation failed for '{agent}' in '{repo}': {reason}")]
+    WorktreeCreationFailed {
+        agent: String,
+        repo: String,
+        reason: String,
+    },
+
     #[error("agent '{0}' not found")]
     AgentNotFound(String),
 
