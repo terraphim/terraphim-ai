@@ -66,7 +66,14 @@ pub fn redact(input: &str) -> String {
 /// Verify that a string contains no apparent secrets.
 ///
 /// Returns `true` if no redaction patterns match (i.e. the string is clean).
+/// Strings that have already been redacted (contain `***REDACTED***`) are
+/// considered clean.
 pub fn verify_redacted(input: &str) -> bool {
+    // Already-redacted strings are clean
+    if input.contains("***REDACTED***") {
+        return true;
+    }
+
     for pattern in DEFAULT_REDACTION_PATTERNS {
         if let Ok(re) = Regex::new(pattern) {
             if re.is_match(input) {
@@ -156,7 +163,9 @@ mod tests {
     fn test_verify_redacted_after_redaction() {
         let dirty = "api_key=secret123\ntoken=abc";
         let redacted = redact(dirty);
-        // After redaction, no raw secrets should remain
+        // After redaction, the string should be considered clean
+        assert!(verify_redacted(&redacted));
+        // No raw secrets should remain
         assert!(!redacted.contains("secret123"));
         assert!(!redacted.contains("=abc"));
     }

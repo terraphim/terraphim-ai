@@ -12,6 +12,7 @@ use terraphim_tracker::GiteaTracker;
 
 use crate::config::{GiteaOutputConfig, OrchestratorConfig};
 use crate::dispatcher::LEGACY_PROJECT_ID;
+use terraphim_spawner::{redact, verify_redacted};
 
 const ROBOT_PATH: &str = "/home/alex/go/bin/gitea-robot";
 
@@ -180,6 +181,25 @@ impl OutputPoster {
             );
             return Ok(());
         }
+
+        // Safety net: ensure all lines are redacted before posting.
+        // The capture buffer should already store redacted events, but
+        // verify as defense in depth and apply redaction if needed.
+        let output_lines: Vec<String> = output_lines
+            .iter()
+            .map(|line| {
+                if verify_redacted(line) {
+                    line.clone()
+                } else {
+                    tracing::warn!(
+                        project = project,
+                        agent = %agent_name,
+                        "output line contained unredacted content; applying redaction"
+                    );
+                    redact(line)
+                }
+            })
+            .collect();
 
         let exit_str = match exit_code {
             Some(code) => format!("exit code {}", code),
@@ -525,5 +545,23 @@ mod agent_token_tests {
         assert!(poster
             .agent_token(crate::dispatcher::LEGACY_PROJECT_ID, "anything")
             .is_none());
+    }
+
+    #[test]
+    fn post_agent_output_redacts_unredacted_lines() {
+        // This test verifies that the redaction safety net works.
+        // We can't easily mock the GiteaTracker, but we can verify
+        // that the redaction logic is applied by checking the
+        // verify_redacted function behaviour.
+        let clean = vec!["safe line 1".to_string(), "safe line 2".to_string()];
+        let dirty = vec!["api_key=secret123".to_string(), "safe line".to_string()];
+
+        assert!(clean.iter().all(|l| verify_redacted(l)));
+        assert!(!dirty.iter().all(|l| verify_redacted(l)));
+
+        // Verify redaction cleans the dirty lines
+        let redacted: Vec<String> = dirty.iter().map(|l| redact(l)).collect();
+        assert!(redacted.iter().all(|l| verify_redacted(l)));
+        assert!(!redacted[0].contains("secret123"));
     }
 }

@@ -64,6 +64,7 @@ pub use health::{
 };
 pub use mention::{MentionEvent, MentionRouter};
 pub use output::{OutputCapture, OutputEvent};
+pub use redaction::{redact, verify_redacted};
 
 /// Errors that can occur during agent spawning
 #[derive(thiserror::Error, Debug)]
