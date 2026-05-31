@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Context rot detection** `RotStatus` enum with `Fresh`/`Warning`/`Critical` states; `Conversation::with_token_budget()` and `Conversation::check_rot()` methods for monitoring token budget utilization in `terraphim_types` (Refs #1443, 2026-05-31)
 - **Rustdoc CI gate** `RUSTDOCFLAGS=-D warnings` enforcement added to PR validation pipeline; fixed broken intra-doc links in `terraphim_persistence`, `terraphim_rolegraph`, and `terraphim_orchestrator` (Refs #1362, 2026-05-31)
 - **ADF direct-dispatch remediation** project-aware routing, synthetic event context, and shell hardening in `adf-ctl --local trigger --direct` (Refs #1890, PR#1885, 2026-05-30)
 - **adf-ctl Unix socket dispatch** `adf-ctl trigger --local --direct` via UDS (`/tmp/adf-ctl.sock`, 0600 permissions) for zero-latency local agent dispatch without SSH (PR#1876, 2026-05-28)

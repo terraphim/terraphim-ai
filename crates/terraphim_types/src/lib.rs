@@ -1803,7 +1803,30 @@ impl ChatMessage {
     }
 }
 
-/// A conversation containing multiple messages and context
+/// Health status of conversation context based on token budget utilization.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "typescript", derive(Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+#[serde(rename_all = "snake_case")]
+pub enum RotStatus {
+    /// Context well within budget (< 75%)
+    Fresh,
+    /// Context approaching budget limit (75-90%)
+    Warning,
+    /// Context critically close to or over budget (> 90%)
+    Critical,
+}
+
+impl std::fmt::Display for RotStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RotStatus::Fresh => write!(f, "fresh"),
+            RotStatus::Warning => write!(f, "warning"),
+            RotStatus::Critical => write!(f, "critical"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
@@ -1824,6 +1847,9 @@ pub struct Conversation {
     pub updated_at: chrono::DateTime<chrono::Utc>,
     /// Metadata about the conversation
     pub metadata: AHashMap<String, String>,
+    /// Token budget for this conversation (if set)
+    #[serde(default)]
+    pub token_budget: Option<usize>,
 }
 
 impl Conversation {
@@ -1839,6 +1865,38 @@ impl Conversation {
             created_at: now,
             updated_at: now,
             metadata: AHashMap::new(),
+            token_budget: None,
+        }
+    }
+
+    /// Set the token budget for this conversation.
+    pub fn with_token_budget(mut self, budget: usize) -> Self {
+        self.token_budget = Some(budget);
+        self
+    }
+
+    /// Check the rot status of this conversation based on token budget.
+    ///
+    /// Returns `None` if no token budget is set.
+    /// Uses `estimated_context_length()` as a conservative proxy for token count
+    /// (byte count is always >= token count, so this errs on the side of caution).
+    pub fn check_rot(&self) -> Option<RotStatus> {
+        let budget = self.token_budget?;
+        if budget == 0 {
+            return Some(RotStatus::Critical);
+        }
+
+        let current_size = self.estimated_context_length();
+        // Conservative ratio: bytes are always >= tokens, so we may flag
+        // rot slightly earlier than a true tokenizer would.
+        let ratio = current_size as f32 / budget as f32;
+
+        if ratio > 0.9 {
+            Some(RotStatus::Critical)
+        } else if ratio > 0.75 {
+            Some(RotStatus::Warning)
+        } else {
+            Some(RotStatus::Fresh)
         }
     }
 
@@ -3433,5 +3491,64 @@ mod tests {
     fn test_thesaurus_with_source_hash() {
         let thesaurus = Thesaurus::new("test".to_string()).with_source_hash("hash123".to_string());
         assert_eq!(thesaurus.source_hash, Some("hash123".to_string()));
+    }
+
+    #[test]
+    fn test_context_rot_no_budget_returns_none() {
+        let conv = Conversation::new("test".to_string(), RoleName::new("engineer"));
+        assert!(conv.check_rot().is_none());
+    }
+
+    #[test]
+    fn test_context_rot_fresh() {
+        let conv = Conversation::new("test".to_string(), RoleName::new("engineer"))
+            .with_token_budget(1000);
+        // Empty conversation should be fresh
+        assert_eq!(conv.check_rot(), Some(RotStatus::Fresh));
+    }
+
+    #[test]
+    fn test_context_rot_warning() {
+        let mut conv = Conversation::new("test".to_string(), RoleName::new("engineer"))
+            .with_token_budget(1000);
+        // Add enough content to hit 75-90% ratio
+        // Need ~750-900 bytes to trigger warning
+        let content = "x".repeat(800);
+        conv.add_message(ChatMessage::user(content));
+        assert_eq!(conv.check_rot(), Some(RotStatus::Warning));
+    }
+
+    #[test]
+    fn test_context_rot_critical() {
+        let mut conv = Conversation::new("test".to_string(), RoleName::new("engineer"))
+            .with_token_budget(1000);
+        // Add enough content to exceed 90% ratio
+        // Need >900 bytes to trigger critical
+        let content = "x".repeat(950);
+        conv.add_message(ChatMessage::user(content));
+        assert_eq!(conv.check_rot(), Some(RotStatus::Critical));
+    }
+
+    #[test]
+    fn test_context_rot_zero_budget_is_critical() {
+        let conv = Conversation::new("test".to_string(), RoleName::new("engineer"))
+            .with_token_budget(0);
+        assert_eq!(conv.check_rot(), Some(RotStatus::Critical));
+    }
+
+    #[test]
+    fn test_context_rot_display() {
+        assert_eq!(format!("{}", RotStatus::Fresh), "fresh");
+        assert_eq!(format!("{}", RotStatus::Warning), "warning");
+        assert_eq!(format!("{}", RotStatus::Critical), "critical");
+    }
+
+    #[test]
+    fn test_context_rot_serde_roundtrip() {
+        let status = RotStatus::Warning;
+        let json = serde_json::to_string(&status).unwrap();
+        assert_eq!(json, "\"warning\"");
+        let deserialized: RotStatus = serde_json::from_str(&json).unwrap();
+        assert_eq!(status, deserialized);
     }
 }
