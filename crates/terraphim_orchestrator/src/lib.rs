@@ -2058,6 +2058,7 @@ impl AgentOrchestrator {
                 cli_tool: def.cli_tool.clone(),
                 layer: def.layer,
                 session_id: None,
+                default_tier: def.default_tier.clone(),
             };
             let budget_verdict = self.cost_tracker.check(&def.name);
             let decision = engine.decide_route(&ctx, &budget_verdict).await;
@@ -2094,7 +2095,8 @@ impl AgentOrchestrator {
             let mut unhealthy = self.provider_health.unhealthy_providers();
             unhealthy.extend(self.provider_rate_limits.blocked_providers());
             let kg_decision = self.kg_router.as_ref().and_then(|router| {
-                let decision = router.route_agent(&def.task)?;
+                let decision =
+                    router.route_agent_with_tier(&def.task, def.default_tier.as_deref())?;
                 // If primary provider is unhealthy, try fallback routes
                 if !unhealthy.is_empty() {
                     if let Some(healthy_route) = decision.first_healthy_route(&unhealthy) {
@@ -2665,6 +2667,7 @@ impl AgentOrchestrator {
             cli_tool: def.cli_tool.clone(),
             layer: def.layer,
             session_id: None,
+            default_tier: def.default_tier.clone(),
         };
         let decision = engine.decide_route(&dispatch_ctx, &budget_verdict).await;
         info!(
@@ -7070,7 +7073,9 @@ impl AgentOrchestrator {
                 local_unhealthy.extend(self.provider_rate_limits.blocked_providers());
 
                 let respawned = if let Some(ref kg_router) = self.kg_router {
-                    if let Some(decision) = kg_router.route_agent(&def.task) {
+                    if let Some(decision) =
+                        kg_router.route_agent_with_tier(&def.task, def.default_tier.as_deref())
+                    {
                         if let Some(healthy_route) = decision.first_healthy_route(&local_unhealthy)
                         {
                             let retry_count = self
@@ -8348,6 +8353,7 @@ mod tests {
                     cli_tool: "echo".to_string(),
                     task: "safety watch".to_string(),
                     model: None,
+                    default_tier: None,
                     schedule: None,
                     capabilities: vec!["security".to_string()],
                     max_memory_bytes: None,
@@ -8378,6 +8384,7 @@ mod tests {
                     cli_tool: "echo".to_string(),
                     task: "sync upstream".to_string(),
                     model: None,
+                    default_tier: None,
                     schedule: Some("0 3 * * *".to_string()),
                     capabilities: vec!["sync".to_string()],
                     max_memory_bytes: None,
@@ -8845,6 +8852,7 @@ task = "test"
                 cli_tool: "echo".to_string(),
                 task: "safety watch".to_string(),
                 model: None,
+                default_tier: None,
                 schedule: None,
                 capabilities: vec![],
                 max_memory_bytes: None,
@@ -8967,6 +8975,7 @@ task = "test"
             cli_tool: "echo".to_string(),
             task: "core task".to_string(),
             model: None,
+            default_tier: None,
             schedule: Some("0 3 * * *".to_string()),
             capabilities: vec![],
             max_memory_bytes: None,
@@ -9176,6 +9185,7 @@ task = "test"
             cli_tool: "cat".to_string(),
             task: "test task".to_string(),
             model: None,
+            default_tier: None,
             schedule: None,
             capabilities: vec![],
             max_memory_bytes: None,
@@ -9268,6 +9278,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             cli_tool: "echo".to_string(),
             task: "test task".to_string(),
             model: None,
+            default_tier: None,
             schedule: None,
             capabilities: vec![],
             max_memory_bytes: None,
@@ -9608,6 +9619,7 @@ bypass_kg_routing = true
             cli_tool: "sleep".to_string(),
             task: "60".to_string(),
             model: None,
+            default_tier: None,
             schedule: None,
             capabilities: vec![],
             max_memory_bytes: None,
@@ -9780,6 +9792,7 @@ bypass_kg_routing = true
             cli_tool: "echo".to_string(),
             task: "should not run".to_string(),
             model: None,
+            default_tier: None,
             schedule: None,
             capabilities: vec![],
             max_memory_bytes: None,
@@ -9879,6 +9892,7 @@ bypass_kg_routing = true
                 cli_tool: cli_tool.to_string(),
                 task: "review".to_string(),
                 model: None,
+                default_tier: None,
                 schedule: None,
                 capabilities: vec!["review".to_string()],
                 max_memory_bytes: None,
@@ -10178,6 +10192,7 @@ bypass_kg_routing = true
             cli_tool: cli_tool.to_string(),
             task: "build".to_string(),
             model: None,
+            default_tier: None,
             schedule: None,
             capabilities: vec!["build".to_string()],
             max_memory_bytes: None,
@@ -10581,6 +10596,7 @@ bypass_kg_routing = true
             cli_tool: cli_tool.to_string(),
             task: "spec".to_string(),
             model: None,
+            default_tier: None,
             schedule: None,
             capabilities: vec!["review".to_string()],
             max_memory_bytes: None,
@@ -10926,6 +10942,7 @@ bypass_kg_routing = true
             cli_tool: cli_tool.to_string(),
             task: "test".to_string(),
             model: None,
+            default_tier: None,
             schedule: None,
             capabilities: vec!["review".to_string(), "test".to_string()],
             max_memory_bytes: None,
@@ -11223,6 +11240,7 @@ bypass_kg_routing = true
             cli_tool: cli_tool.to_string(),
             task: "compliance".to_string(),
             model: None,
+            default_tier: None,
             schedule: None,
             capabilities: vec!["compliance".to_string()],
             max_memory_bytes: None,
@@ -11507,6 +11525,7 @@ bypass_kg_routing = true
             cli_tool: cli_tool.to_string(),
             task: "security".to_string(),
             model: None,
+            default_tier: None,
             schedule: None,
             capabilities: vec!["review".to_string(), "security".to_string()],
             max_memory_bytes: None,
@@ -11804,6 +11823,7 @@ bypass_kg_routing = true
             task: "echo would-build".to_string(),
             schedule: None,
             model: None,
+            default_tier: None,
             capabilities: vec!["build".to_string()],
             max_memory_bytes: None,
             budget_monthly_cents: None,
@@ -11862,6 +11882,7 @@ bypass_kg_routing = true
             task: "echo would-build".to_string(),
             schedule: None,
             model: None,
+            default_tier: None,
             capabilities: vec!["build".to_string()],
             max_memory_bytes: None,
             budget_monthly_cents: None,
@@ -11921,6 +11942,7 @@ bypass_kg_routing = true
             task: "echo would-build".to_string(),
             schedule: None,
             model: None,
+            default_tier: None,
             capabilities: vec!["build".to_string()],
             max_memory_bytes: None,
             budget_monthly_cents: None,

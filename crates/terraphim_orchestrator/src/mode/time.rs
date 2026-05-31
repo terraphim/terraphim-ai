@@ -173,6 +173,7 @@ mod tests {
             cli_tool: "echo".into(),
             task: "test".into(),
             model: None,
+            default_tier: None,
             schedule: None,
             capabilities: vec![],
             max_memory_bytes: None,
