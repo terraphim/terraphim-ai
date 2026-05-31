@@ -243,8 +243,13 @@ impl LearningStore for InMemoryLearningStore {
             .ok_or_else(|| StoreError::NotFound(id.to_string()))?;
         learning.quality.record_application(applied_by, true);
         learning.updated_at = Utc::now();
-        if learning.quality.meets_l2_criteria() && learning.trust_level == TrustLevel::L1 {
-            learning.promote_to_l2();
+        if learning.quality.meets_l2_criteria() {
+            if learning.trust_level == TrustLevel::L0 {
+                learning.promote_to_l1();
+            }
+            if learning.trust_level == TrustLevel::L1 {
+                learning.promote_to_l2();
+            }
         }
         Ok(())
     }
@@ -464,7 +469,7 @@ impl SharedLearning {
             id,
             title,
             content,
-            trust_level: TrustLevel::L1,
+            trust_level: TrustLevel::L0,
             quality: QualityMetrics::new(),
             source,
             source_agent,
@@ -518,6 +523,15 @@ impl SharedLearning {
     pub fn with_correction(mut self, correction: String) -> Self {
         self.correction = Some(correction);
         self
+    }
+
+    /// Promote to L1 (reviewed — no longer raw extract)
+    pub fn promote_to_l1(&mut self) {
+        if self.trust_level == TrustLevel::L0 {
+            self.trust_level = TrustLevel::L1;
+            self.promoted_at = Some(Utc::now());
+            self.updated_at = Utc::now();
+        }
     }
 
     /// Promote to L2 (peer-validated)
@@ -757,7 +771,7 @@ mod tests {
 
         assert!(learning.id.starts_with("learning-"));
         assert_eq!(learning.title, "Test Learning");
-        assert_eq!(learning.trust_level, TrustLevel::L1);
+        assert_eq!(learning.trust_level, TrustLevel::L0);
         assert_eq!(learning.source_agent, "test-agent");
     }
 
@@ -770,11 +784,14 @@ mod tests {
             "agent".to_string(),
         );
 
+        assert_eq!(learning.trust_level, TrustLevel::L0);
+
+        learning.promote_to_l1();
         assert_eq!(learning.trust_level, TrustLevel::L1);
+        assert!(learning.promoted_at.is_some());
 
         learning.promote_to_l2();
         assert_eq!(learning.trust_level, TrustLevel::L2);
-        assert!(learning.promoted_at.is_some());
 
         learning.promote_to_l3();
         assert_eq!(learning.trust_level, TrustLevel::L3);
@@ -796,6 +813,7 @@ mod tests {
             LearningSource::Manual,
             "agent".to_string(),
         );
+        l2.promote_to_l1();
         l2.promote_to_l2();
         assert!(l2.should_sync_to_wiki());
     }
@@ -923,13 +941,14 @@ mod tests {
     #[test]
     fn test_in_memory_store_query_relevant() {
         let store = InMemoryLearningStore::new();
-        let learning = SharedLearning::new(
+        let mut learning = SharedLearning::new(
             "Rust compilation error".to_string(),
             "Use cargo clippy".to_string(),
             LearningSource::Manual,
             "test-agent".to_string(),
         )
         .with_keywords(vec!["rust".to_string(), "clippy".to_string()]);
+        learning.promote_to_l1();
         store.insert(learning).unwrap();
 
         let results = store
@@ -1063,5 +1082,69 @@ mod tests {
         let all = store.list_by_trust(TrustLevel::L0).unwrap();
         assert_eq!(all.len(), 1);
         assert_eq!(all[0].trust_level, TrustLevel::L1);
+    }
+
+    #[test]
+    fn test_new_defaults_to_l0() {
+        let learning = SharedLearning::new(
+            "title".to_string(),
+            "content".to_string(),
+            LearningSource::BashHook,
+            "agent".to_string(),
+        );
+        assert_eq!(learning.trust_level, TrustLevel::L0);
+    }
+
+    #[test]
+    fn test_promote_to_l1_from_l0() {
+        let mut learning = SharedLearning::new(
+            "title".to_string(),
+            "content".to_string(),
+            LearningSource::BashHook,
+            "agent".to_string(),
+        );
+        assert_eq!(learning.trust_level, TrustLevel::L0);
+        assert!(learning.promoted_at.is_none());
+
+        learning.promote_to_l1();
+
+        assert_eq!(learning.trust_level, TrustLevel::L1);
+        assert!(learning.promoted_at.is_some());
+    }
+
+    #[test]
+    fn test_promote_to_l1_no_op_from_l1() {
+        let mut learning = SharedLearning::new(
+            "title".to_string(),
+            "content".to_string(),
+            LearningSource::Manual,
+            "agent".to_string(),
+        );
+        learning.promote_to_l1();
+        assert_eq!(learning.trust_level, TrustLevel::L1);
+        let promoted_at = learning.promoted_at;
+
+        // Calling again is a no-op
+        learning.promote_to_l1();
+        assert_eq!(learning.trust_level, TrustLevel::L1);
+        assert_eq!(learning.promoted_at, promoted_at);
+    }
+
+    #[test]
+    fn test_promote_to_l2_requires_l1() {
+        let mut learning = SharedLearning::new(
+            "title".to_string(),
+            "content".to_string(),
+            LearningSource::Manual,
+            "agent".to_string(),
+        );
+        // At L0, promote_to_l2 is a no-op
+        learning.promote_to_l2();
+        assert_eq!(learning.trust_level, TrustLevel::L0);
+
+        // Must go through L1 first
+        learning.promote_to_l1();
+        learning.promote_to_l2();
+        assert_eq!(learning.trust_level, TrustLevel::L2);
     }
 }
