@@ -30,6 +30,7 @@
 //! ```
 
 pub mod adf_commands;
+pub mod agent_registry;
 pub mod agent_run_command;
 pub mod agent_run_record;
 pub mod agent_runner;
@@ -78,6 +79,7 @@ pub mod scope;
 pub mod webhook;
 pub mod worktree_guard;
 
+pub use agent_registry::{AgentKey, AgentRegistry, AgentScope, AgentSource, RegisteredAgent};
 pub use agent_run_command::{
     applicable_modes, is_cron_schedule_valid, parse_agent_args, run_synthetic, run_validate,
     run_validate_all, schedule_for_agent, validate_agent_all_modes, AgentSubcommand,
@@ -219,6 +221,7 @@ struct PersistedRestartState {
 /// The main orchestrator that runs the dark factory.
 pub struct AgentOrchestrator {
     config: OrchestratorConfig,
+    agent_registry: AgentRegistry,
     spawner: AgentSpawner,
     router: RoutingEngine,
     nightwatch: NightwatchMonitor,
@@ -772,6 +775,7 @@ impl AgentOrchestrator {
         let scheduler = TimeScheduler::new(&config.agents, Some(&config.compound_review.schedule))?;
         let compound_workflow =
             CompoundReviewWorkflow::from_compound_config(config.compound_review.clone());
+        let agent_registry = AgentRegistry::from_config(&config)?;
 
         // Layer 2 startup sweep (epic #1567, issue #1570).
         //
@@ -909,6 +913,7 @@ impl AgentOrchestrator {
 
         Ok(Self {
             config: config.clone(),
+            agent_registry,
             spawner,
             router,
             nightwatch,
@@ -2584,12 +2589,10 @@ impl AgentOrchestrator {
         // fan-out list must skip silently (no `pending` posted) — a
         // hung pending would block the PR forever.
         let def = match self
-            .config
-            .agents
-            .iter()
-            .find(|a| a.name == agent_name && a.project.as_deref() == Some(project.as_str()))
+            .agent_registry
+            .lookup_project(project.as_str(), agent_name)
         {
-            Some(d) => d.clone(),
+            Some(agent) => agent.definition.clone(),
             None => {
                 warn!(
                     pr_number,
@@ -2850,20 +2853,20 @@ impl AgentOrchestrator {
 
         // Look up the build-runner agent for this project. Missing must
         // skip silently — no `pending` posted by the caller.
-        let def =
-            match self.config.agents.iter().find(|a| {
-                a.name == "build-runner" && a.project.as_deref() == Some(project.as_str())
-            }) {
-                Some(d) => d.clone(),
-                None => {
-                    warn!(
-                        pr_number,
-                        project = %project,
-                        "ReviewPr skipped: no build-runner agent configured for project"
-                    );
-                    return Ok(false);
-                }
-            };
+        let def = match self
+            .agent_registry
+            .lookup_project(project.as_str(), "build-runner")
+        {
+            Some(agent) => agent.definition.clone(),
+            None => {
+                warn!(
+                    pr_number,
+                    project = %project,
+                    "ReviewPr skipped: no build-runner agent configured for project"
+                );
+                return Ok(false);
+            }
+        };
 
         // === STATIC ALLOW-LIST GATE ===
         // build-runner is bash-only (no LLM), so def.model is normally None
@@ -3156,20 +3159,20 @@ impl AgentOrchestrator {
 
         // Look up the build-runner agent for this project. Repos without
         // build-runner shouldn't break the orchestrator -- log and skip.
-        let def =
-            match self.config.agents.iter().find(|a| {
-                a.name == "build-runner" && a.project.as_deref() == Some(project.as_str())
-            }) {
-                Some(d) => d.clone(),
-                None => {
-                    warn!(
-                        project = %project,
-                        after_sha = %after_sha,
-                        "Push skipped: no build-runner agent configured for project"
-                    );
-                    return Ok(());
-                }
-            };
+        let def = match self
+            .agent_registry
+            .lookup_project(project.as_str(), "build-runner")
+        {
+            Some(agent) => agent.definition.clone(),
+            None => {
+                warn!(
+                    project = %project,
+                    after_sha = %after_sha,
+                    "Push skipped: no build-runner agent configured for project"
+                );
+                return Ok(());
+            }
+        };
 
         if self.active_agents.contains_key("build-runner") {
             info!(
@@ -10129,11 +10132,12 @@ bypass_kg_routing = true
     /// short-circuited by the C1/C3 allow-list gate; no spawn happens.
     #[tokio::test]
     async fn reviewpr_dispatch_rejects_banned_provider() {
-        let (config, _tmp) = review_pr_config("echo");
+        let (mut config, _tmp) = review_pr_config("echo");
+        // Bypass load-time validation by mutating the test config before
+        // construction to simulate a stale/poisoned config entry reaching the
+        // dispatcher.
+        config.agents[0].model = Some("google/gemini-2".to_string());
         let mut orch = AgentOrchestrator::new(config).unwrap();
-        // Bypass load-time validation by mutating after construction to
-        // simulate a stale/poisoned config entry reaching the dispatcher.
-        orch.config.agents[0].model = Some("google/gemini-2".to_string());
 
         orch.handle_review_pr(review_pr_task()).await.unwrap();
 
