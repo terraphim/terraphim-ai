@@ -55,6 +55,7 @@ pub mod config;
 pub mod health;
 pub mod mention;
 pub mod output;
+pub mod redaction;
 
 pub use audit::AuditEvent;
 pub use config::{AgentConfig, AgentValidator, ResourceLimits, ValidationError};
