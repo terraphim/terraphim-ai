@@ -52,7 +52,9 @@ services:
     container_name: terraphim-redis
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      # Bind only to localhost to prevent unintended public exposure of the cache.
+      # Internal docker-compose services use the terraphim-network and do not need host port access.
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis-data:/data
     command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
