@@ -553,8 +553,8 @@ mod agent_token_tests {
         // We can't easily mock the GiteaTracker, but we can verify
         // that the redaction logic is applied by checking the
         // verify_redacted function behaviour.
-        let clean = vec!["safe line 1".to_string(), "safe line 2".to_string()];
-        let dirty = vec!["api_key=secret123".to_string(), "safe line".to_string()];
+        let clean = ["safe line 1".to_string(), "safe line 2".to_string()];
+        let dirty = ["api_key=secret123".to_string(), "safe line".to_string()];
 
         assert!(clean.iter().all(|l| verify_redacted(l)));
         assert!(!dirty.iter().all(|l| verify_redacted(l)));

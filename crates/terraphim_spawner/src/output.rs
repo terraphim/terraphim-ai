@@ -285,8 +285,8 @@ mod tests {
 
     #[test]
     fn test_captured_events_bounded() {
-        let (event_sender, _event_receiver) = mpsc::channel::<OutputEvent>(100);
-        let (broadcast_sender, _) = broadcast::channel::<OutputEvent>(256);
+        let (_event_sender, _event_receiver) = mpsc::channel::<OutputEvent>(100);
+        let (_broadcast_sender, _) = broadcast::channel::<OutputEvent>(256);
         let captured = Arc::new(Mutex::new(VecDeque::new()));
 
         // Simulate recording MAX_CAPTURED_EVENTS + 10 events
@@ -311,8 +311,8 @@ mod tests {
 
     #[test]
     fn test_captured_events_redacts_before_storage() {
-        let (event_sender, _event_receiver) = mpsc::channel::<OutputEvent>(100);
-        let (broadcast_sender, _) = broadcast::channel::<OutputEvent>(256);
+        let (_event_sender, _event_receiver) = mpsc::channel::<OutputEvent>(100);
+        let (_broadcast_sender, _) = broadcast::channel::<OutputEvent>(256);
         let captured = Arc::new(Mutex::new(VecDeque::new()));
 
         let event = OutputEvent::Stdout {
