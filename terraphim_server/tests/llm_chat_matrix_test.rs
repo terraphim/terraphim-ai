@@ -53,7 +53,7 @@ fn create_test_role(name: &str, provider: &str) -> Role {
         "openrouter" => {
             if let Ok(api_key) = env::var("OPENROUTER_API_KEY") {
                 role.llm_enabled = true;
-                role.llm_api_key = Some(api_key);
+                role.llm_api_key.replace(api_key);
                 let model = env::var("OPENROUTER_MODEL")
                     .unwrap_or_else(|_| DEFAULT_OPENROUTER_FREE_MODEL.to_string());
                 role.llm_model = Some(model.clone());
