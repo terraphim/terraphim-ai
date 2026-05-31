@@ -57,7 +57,10 @@ impl OutputEvent {
                 target: target.clone(),
                 message: redaction::redact(message),
             },
-            Self::Completed { process_id, exit_code } => Self::Completed {
+            Self::Completed {
+                process_id,
+                exit_code,
+            } => Self::Completed {
                 process_id: *process_id,
                 exit_code: *exit_code,
             },
@@ -166,7 +169,7 @@ impl OutputCapture {
                                     target,
                                     message,
                                 };
-                                Self::record_event(&captured_events,&mention_event);
+                                Self::record_event(&captured_events, &mention_event);
                                 let _ = event_sender.send(mention_event.clone()).await;
                                 let _ = broadcast_sender.send(mention_event);
                             }
@@ -177,7 +180,7 @@ impl OutputCapture {
                             process_id,
                             line: line.clone(),
                         };
-                        Self::record_event(&captured_events,&stdout_event);
+                        Self::record_event(&captured_events, &stdout_event);
                         let _ = event_sender.send(stdout_event.clone()).await;
                         let _ = broadcast_sender.send(stdout_event);
                     }
@@ -214,7 +217,7 @@ impl OutputCapture {
                             process_id,
                             line: line.clone(),
                         };
-                        Self::record_event(&captured_events,&stderr_event);
+                        Self::record_event(&captured_events, &stderr_event);
                         let _ = event_sender.send(stderr_event.clone()).await;
                         let _ = broadcast_sender.send(stderr_event);
                     }
@@ -298,8 +301,12 @@ mod tests {
         let events = captured.lock().unwrap();
         assert_eq!(events.len(), MAX_CAPTURED_EVENTS);
         // The oldest events should have been evicted
-        assert!(!events.iter().any(|e| matches!(e, OutputEvent::Stdout { line, .. } if line == "line 0")));
-        assert!(events.iter().any(|e| matches!(e, OutputEvent::Stdout { line, .. } if line == "line 10")));
+        assert!(!events
+            .iter()
+            .any(|e| matches!(e, OutputEvent::Stdout { line, .. } if line == "line 0")));
+        assert!(events
+            .iter()
+            .any(|e| matches!(e, OutputEvent::Stdout { line, .. } if line == "line 10")));
     }
 
     #[test]
