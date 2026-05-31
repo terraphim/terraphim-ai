@@ -40,8 +40,6 @@ pub mod enrichment;
 #[cfg(feature = "search-index")]
 pub mod search;
 
-
-
 // Re-exports for convenience
 pub use connector::{ConnectorRegistry, ConnectorStatus, ImportOptions, SessionConnector};
 pub use model::{
@@ -62,8 +60,6 @@ pub use search::{search_sessions, session_to_document};
 
 #[cfg(all(feature = "search-index", feature = "enrichment"))]
 pub use search::search_sessions_hybrid;
-
-
 
 /// Crate version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
