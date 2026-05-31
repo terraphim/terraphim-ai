@@ -6,7 +6,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Main configuration for the RLM system.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct RlmConfig {
     // ============================================
     // VM Pool Configuration
@@ -139,6 +139,63 @@ pub struct RlmConfig {
 
     /// Default model for LLM calls.
     pub default_model: Option<String>,
+}
+
+impl std::fmt::Debug for RlmConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RlmConfig")
+            // VM Pool
+            .field("pool_min_size", &self.pool_min_size)
+            .field("pool_max_size", &self.pool_max_size)
+            .field("pool_target_size", &self.pool_target_size)
+            .field("vm_boot_timeout_ms", &self.vm_boot_timeout_ms)
+            .field("allocation_timeout_ms", &self.allocation_timeout_ms)
+            .field("max_overflow_vms", &self.max_overflow_vms)
+            .field("scale_up_queue_depth", &self.scale_up_queue_depth)
+            .field("scale_down_idle_secs", &self.scale_down_idle_secs)
+            // Budget
+            .field("token_budget", &self.token_budget)
+            .field("time_budget_ms", &self.time_budget_ms)
+            .field("max_recursion_depth", &self.max_recursion_depth)
+            .field("max_iterations", &self.max_iterations)
+            // Session
+            .field("session_duration_secs", &self.session_duration_secs)
+            .field("extension_increment_secs", &self.extension_increment_secs)
+            .field("max_extensions", &self.max_extensions)
+            .field("max_snapshots_per_session", &self.max_snapshots_per_session)
+            // Output
+            .field("max_inline_output_bytes", &self.max_inline_output_bytes)
+            .field("enable_verbose_tracing", &self.enable_verbose_tracing)
+            // Knowledge Graph
+            .field("kg_strictness", &self.kg_strictness)
+            .field("kg_max_retries", &self.kg_max_retries)
+            // Network Security
+            .field("dns_allowlist", &self.dns_allowlist)
+            .field("log_blocked_dns", &self.log_blocked_dns)
+            // OverlayFS
+            .field("initial_overlay_mb", &self.initial_overlay_mb)
+            .field("max_overlay_mb", &self.max_overlay_mb)
+            // Operations
+            .field(
+                "alert_webhook_url",
+                &self.alert_webhook_url.as_ref().map(|_| "***REDACTED***"),
+            )
+            .field("alert_failure_threshold", &self.alert_failure_threshold)
+            .field("alert_failure_window_secs", &self.alert_failure_window_secs)
+            .field("enable_auto_remediation", &self.enable_auto_remediation)
+            // Backend
+            .field("backend_preference", &self.backend_preference)
+            .field(
+                "e2b_api_key",
+                &self.e2b_api_key.as_ref().map(|_| "***REDACTED***"),
+            )
+            .field("e2b_template", &self.e2b_template)
+            .field("backend_session_models", &self.backend_session_models)
+            // LLM
+            .field("llm_provider", &self.llm_provider)
+            .field("default_model", &self.default_model)
+            .finish()
+    }
 }
 
 impl Default for RlmConfig {
@@ -407,5 +464,32 @@ mod tests {
         let json = serde_json::to_string(&config).unwrap();
         let deserialized: RlmConfig = serde_json::from_str(&json).unwrap();
         assert_eq!(config.pool_min_size, deserialized.pool_min_size);
+    }
+
+    #[test]
+    fn test_debug_redacts_sensitive_fields() {
+        let mut config = RlmConfig::default();
+        config.alert_webhook_url =
+            Some("https://hooks.slack.com/services/T00/B00/XXXX".to_string());
+        config.e2b_api_key = Some("e2b_sk_secret_key".to_string());
+
+        let debug_output = format!("{:?}", config);
+
+        assert!(
+            !debug_output.contains("hooks.slack.com"),
+            "alert_webhook_url must be redacted"
+        );
+        assert!(
+            !debug_output.contains("e2b_sk_secret_key"),
+            "e2b_api_key must be redacted"
+        );
+        assert!(
+            debug_output.contains("***REDACTED***"),
+            "Redaction marker must appear"
+        );
+        assert!(
+            debug_output.contains("pool_min_size"),
+            "Non-sensitive fields must be visible"
+        );
     }
 }
