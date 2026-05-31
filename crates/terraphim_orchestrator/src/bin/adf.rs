@@ -460,11 +460,7 @@ fn run_local_check(cwd: PathBuf) -> ExitCode {
         }
     };
 
-    let working_dir = adf_config
-        .discovered_path
-        .parent()
-        .map(|p| p.to_path_buf())
-        .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
+    let working_dir = adf_config.project_root();
 
     let nightwatch = terraphim_orchestrator::config::NightwatchConfig::default();
     let compound_review = terraphim_orchestrator::config::CompoundReviewConfig {
@@ -580,11 +576,7 @@ async fn run_local_agent(agent_name: &str, cwd: PathBuf) -> ExitCode {
         }
     };
 
-    let working_dir = adf_config
-        .discovered_path
-        .parent()
-        .map(|p| p.to_path_buf())
-        .unwrap_or_else(|| cwd);
+    let working_dir = adf_config.project_root();
 
     let nightwatch = terraphim_orchestrator::config::NightwatchConfig::default();
     let compound_review = terraphim_orchestrator::config::CompoundReviewConfig {
@@ -666,6 +658,11 @@ async fn run_local_agent(agent_name: &str, cwd: PathBuf) -> ExitCode {
     };
 
     let ctx = build_local_spawn_context(&config, &def);
+    let ctx = terraphim_orchestrator::local_skills::prepare_local_skill_loading(
+        &def.cli_tool,
+        &config.working_dir,
+        ctx,
+    );
 
     let primary_provider = Provider {
         id: def.name.clone(),
@@ -703,7 +700,7 @@ async fn run_local_agent(agent_name: &str, cwd: PathBuf) -> ExitCode {
         limits.max_memory_bytes = Some(max_mem);
     }
 
-    let task = &def.task;
+    let task = def.task.as_str();
     let spawner = AgentSpawner::new();
 
     let mut handle = match &def.model {

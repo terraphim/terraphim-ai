@@ -483,7 +483,9 @@ impl FlowExecutor {
 
                 // Handle loop target for re-iteration
                 if let Some(ref target_name) = step.loop_target {
-                    if let Some(target_index) = flow.steps.iter().position(|s| s.name == *target_name) {
+                    if let Some(target_index) =
+                        flow.steps.iter().position(|s| s.name == *target_name)
+                    {
                         state.next_step_index = target_index;
                         state.iteration_count += 1;
                         tracing::info!(

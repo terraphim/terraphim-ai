@@ -50,6 +50,7 @@ pub mod gitea_skill_loader;
 pub mod handoff;
 pub mod kg_router;
 pub mod learning;
+pub mod local_skills;
 pub mod mention;
 pub mod mention_chain;
 pub mod meta_coordinator;
