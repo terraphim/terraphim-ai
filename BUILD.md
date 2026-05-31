@@ -52,8 +52,8 @@ When `Cargo.toml` is detected:
 ```bash
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
-cargo build --workspace --profile ci
-cargo test --workspace --no-fail-fast --profile ci
+cargo build --workspace --profile ci --profile ci
+cargo test --workspace --no-fail-fast --profile ci --profile ci
 ```
 
 ## Command Transformation
@@ -191,7 +191,7 @@ cost:: low|medium|high
 ## Auto-corrected (2026-05-29T22:58:17Z)
 
 Failed: `cargo clippy --workspace --all-targets -- -D warnings`
-CORRECTION: `cargo build --workspace --tests`
+CORRECTION: `cargo build --workspace --profile ci --tests`
 
 REASON: The `terraphim_orchestrator` crate has compilation errors (not clippy warnings) that prevent the build from completing. Clippy cannot run on code that won't compile. Run a plain build to reveal the actual errors before attempting linting.
 
@@ -208,7 +208,7 @@ REASON: View the full clippy warning/error message instead of the truncated outp
 
 After you see the full error, you'll likely need to either:
 - Fix the clippy warning in the code, then re-run with `-D warnings`
-- Or run `cargo build --workspace && cargo test --workspace --no-fail-fast` first to verify compilation and tests work, then address the specific clippy warning
+- Or run `cargo build --workspace --profile ci && cargo test --workspace --no-fail-fast --profile ci` first to verify compilation and tests work, then address the specific clippy warning
 
 ## Auto-corrected (2026-05-29T23:02:05Z)
 
@@ -232,3 +232,10 @@ CORRECTION: echo deliberate-failure-trigger
 REASON: The `false` command always exits with code 1; remove it to allow the pipeline to succeed after echoing the message.
 
 Alternatively, if you intended this as a conditional check that should fail under specific conditions, replace `false` with an actual test condition (e.g., `[[ $? -eq 0 ]]` or `test -f some_file`).
+
+## Auto-corrected (2026-05-31T21:12:08Z)
+
+Failed: `cargo build --workspace --profile ci --profile ci`
+CORRECTION: `cargo build --workspace --profile ci`
+
+REASON: The `--profile` argument was specified twice; Cargo doesn't support duplicate profile flags. Remove the duplicate `--profile ci`.
