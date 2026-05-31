@@ -31,7 +31,9 @@ pub enum LlmProxyError {
 pub type Result<T> = std::result::Result<T, LlmProxyError>;
 
 /// Configuration for LLM proxy settings
-#[derive(Debug, Clone)]
+///
+/// `api_key` is redacted in `Debug` output to prevent credential leakage in logs.
+#[derive(Clone)]
 pub struct ProxyConfig {
     pub provider: String,
     pub model: String,
@@ -40,6 +42,20 @@ pub struct ProxyConfig {
     pub timeout: Duration,
     pub max_retries: u32,
     pub enable_fallback: bool,
+}
+
+impl std::fmt::Debug for ProxyConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ProxyConfig")
+            .field("provider", &self.provider)
+            .field("model", &self.model)
+            .field("base_url", &self.base_url)
+            .field("api_key", &self.api_key.as_ref().map(|_| "***REDACTED***"))
+            .field("timeout", &self.timeout)
+            .field("max_retries", &self.max_retries)
+            .field("enable_fallback", &self.enable_fallback)
+            .finish()
+    }
 }
 
 impl ProxyConfig {
@@ -404,5 +420,26 @@ mod tests {
 
         client.configure(config);
         assert!(client.is_using_proxy("anthropic"));
+    }
+
+    #[test]
+    fn test_proxy_config_debug_redacts_api_key() {
+        let config = ProxyConfig::new("openai".to_string(), "gpt-4".to_string())
+            .with_api_key("sk-secret-key-123".to_string());
+
+        let debug_output = format!("{:?}", config);
+
+        assert!(
+            !debug_output.contains("sk-secret-key-123"),
+            "API key value must be redacted in Debug output"
+        );
+        assert!(
+            debug_output.contains("***REDACTED***"),
+            "Redaction marker must appear for api_key"
+        );
+        assert!(
+            debug_output.contains("openai"),
+            "Non-sensitive fields must be visible"
+        );
     }
 }
