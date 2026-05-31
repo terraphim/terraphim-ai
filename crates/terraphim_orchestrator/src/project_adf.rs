@@ -245,6 +245,7 @@ impl TryFrom<&ProjectAdfConfig> for (Project, Vec<AgentDefinition>) {
                     task: ta.task.clone(),
                     schedule: ta.schedule.clone(),
                     model: ta.model.clone(),
+                    default_tier: None,
                     capabilities: ta.capabilities.clone(),
                     max_memory_bytes: None,
                     budget_monthly_cents: ta.budget_monthly_cents,

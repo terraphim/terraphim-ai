@@ -66,6 +66,7 @@ fn make_agent(
         task: "test task".to_string(),
         schedule: schedule.map(String::from),
         model: Some("minimax-coding-plan/MiniMax-M2.5".to_string()),
+        default_tier: None,
         capabilities: vec![],
         max_memory_bytes: None,
         budget_monthly_cents: None,
