@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **ADF direct-dispatch remediation** project-aware routing, synthetic event context, and shell hardening in `adf-ctl --local trigger --direct` (Refs #1890, PR#1885, 2026-05-30)
+- **adf-ctl Unix socket dispatch** `adf-ctl trigger --local --direct` via UDS (`/tmp/adf-ctl.sock`, 0600 permissions) for zero-latency local agent dispatch without SSH (PR#1876, 2026-05-28)
+- **terraphim_grep hybrid searcher** complete implementation: parallel KG + grep execution via `tokio::spawn`, CLI with thesaurus discovery, `Serialize` on `GrepResult`/`GrepStats`/`SufficiencyState` (Refs #1743, PR#1825, 2026-05-24)
+- **terraphim_merge_coordinator** minimal skeleton proving crate structure (Refs #1805, PR#1823, 2026-05-23)
+- **Config-error circuit-breaker** `ExitClass::ConfigError` quarantines agents after 3 consecutive config failures; `AgentDefinition.enabled` field; memory watchdog systemd units; `bigbox-sync.sh` (Refs #1817, PR#1822, 2026-05-23)
+- **Rustdoc gaps resolved** doc comments added to all public items in `terraphim_types` (`LlmUsage`, `LlmResult`, `ModelPricing`, `ReviewFinding`, `ReviewAgentOutput`, `FindingSeverity`, `FindingCategory`, `DocumentType`, `MarkdownDirectives`, `Scorer`, `Query`, `Similarity`, `ScoreError`, and score sub-modules) -- 93 warnings eliminated (2026-05-30)
 - **terraphim_rlm CLI binary** with 6 commands (code, bash, query, context, snapshot, status) for stateless RLM execution (Refs #RLM-CLI, 2026-05-18)
 - **MCP server RLM integration** via process spawning — 6 new tools exposed without linking terraphim_rlm (avoids static init hang) (Refs #RLM-CLI, 2026-05-18)
 - **Session search capability** enabled in `terraphim_agent` binary (2026-05-17)
@@ -20,6 +26,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **ADF KG-router fallback respawn loop** closed after quota exit — agents no longer re-routed to `anthropic/sonnet` indefinitely when per-agent config or quota-fallback chose another provider (Refs #1793, PR#1794, 2026-05-22)
+- **terraphim_service genai dependency** switched from GitHub fork to crates.io release (PR#1844, 2026-05-24)
+- **`publish = false`** removed from `terraphim_service`; publishing constraints hardened workspace-wide (PR#1843, 2026-05-24)
 - **`ProxyConfig` and `LlmConfig` api_key** redacted from `Debug` output (Refs #1667, 2026-05-18)
 - **`llm_api_key` and `atomic_server_secret`** redacted from `Debug` output (Refs #1661, 2026-05-18)
 - **Credential fields** in `Debug` output hardened across config structs (Refs #1667, 2026-05-18)

@@ -1,6 +1,15 @@
+//! Scoring algorithms and query types for document relevance ranking.
+//!
+//! This module provides BM25 variants, similarity metrics, and the `Scorer` / `Query`
+//! types used to rank [`Document`](crate::Document) results.
+
+/// BM25F multi-field relevance scoring implementation.
 pub mod bm25;
+/// Additional BM25 variants: Okapi BM25, BM25+, TF-IDF, Jaccard, and QueryRatio scorers.
 pub mod bm25_additional;
+/// Common scoring traits and utilities shared across scorer implementations.
 pub mod common;
+/// Query scorer selector enum mapping scorer names to implementations.
 pub mod names;
 mod scored;
 
@@ -16,6 +25,9 @@ use serde::{Serialize, Serializer};
 
 use crate::Document;
 
+/// Sorts `documents` by relevance to `query` using the scorer specified in the query.
+///
+/// Falls back to the original ordering if scoring fails.
 pub fn sort_documents(query: &Query, documents: Vec<Document>) -> Vec<Document> {
     let mut scorer = Scorer::new().with_similarity(query.similarity);
 
@@ -62,6 +74,7 @@ pub fn sort_documents(query: &Query, documents: Vec<Document>) -> Vec<Document> 
     }
 }
 
+/// Configurable document scorer combining a similarity metric with an optional BM25 variant.
 #[derive(Debug, Default)]
 pub struct Scorer {
     similarity: Similarity,
@@ -69,20 +82,24 @@ pub struct Scorer {
 }
 
 impl Scorer {
+    /// Creates a default scorer (no similarity, no BM25).
     pub fn new() -> Scorer {
         Scorer::default()
     }
 
+    /// Sets the string similarity algorithm used for title matching.
     pub fn with_similarity(mut self, similarity: Similarity) -> Scorer {
         self.similarity = similarity;
         self
     }
 
+    /// Attaches a BM25 scorer (or any other `Any`-based scorer).
     pub fn with_scorer(mut self, scorer: Box<dyn std::any::Any>) -> Scorer {
         self.scorer = Some(scorer);
         self
     }
 
+    /// Scores `documents` against `query`, trims to the requested result size, and normalises scores.
     pub fn score(
         &mut self,
         query: &Query,
@@ -171,21 +188,29 @@ impl Scorer {
     }
 }
 
+/// Error type returned when document scoring fails.
 #[derive(Debug, thiserror::Error)]
 pub enum ScoreError {
+    /// The underlying scorer returned an error.
     #[error("scoring error: {0}")]
     Scoring(String),
 }
 
+/// Search query carrying the term, scoring algorithm, similarity metric, and result size.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Query {
+    /// The raw search term.
     pub name: String,
+    /// Which BM25 variant (or other scorer) to use.
     pub name_scorer: QueryScorer,
+    /// Optional string similarity metric applied to title matching.
     pub similarity: Similarity,
+    /// Maximum number of results to return.
     pub size: usize,
 }
 
 impl Query {
+    /// Creates a query for `name` with default scorer, no similarity, and a limit of 30 results.
     pub fn new(name: &str) -> Query {
         Query {
             name: name.to_string(),
@@ -195,15 +220,18 @@ impl Query {
         }
     }
 
+    /// Returns `true` when the query term is the empty string.
     pub fn is_empty(&self) -> bool {
         self.name.is_empty()
     }
 
+    /// Sets the scorer algorithm and returns the updated query.
     pub fn name_scorer(mut self, scorer: QueryScorer) -> Query {
         self.name_scorer = scorer;
         self
     }
 
+    /// Sets the similarity metric and returns the updated query.
     pub fn similarity(mut self, sim: Similarity) -> Query {
         self.similarity = sim;
         self
@@ -226,16 +254,24 @@ impl fmt::Display for Query {
     }
 }
 
+/// String similarity algorithm applied to title comparisons.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Default)]
 pub enum Similarity {
+    /// No similarity: always returns 1.0 (treats all titles as equally relevant).
     #[default]
     None,
+    /// Levenshtein edit-distance converted to a similarity score in (0, 1].
     Levenshtein,
+    /// Jaro similarity in [0, 1].
     Jaro,
+    /// Jaro-Winkler similarity (boosts common-prefix matches) in [0, 1].
     JaroWinkler,
 }
 
 impl Similarity {
+    /// Computes the similarity score between `q1` and `q2` using this metric.
+    ///
+    /// Returns a value in (0, 1]. Never returns exactly 0 — floored at `f64::EPSILON`.
     pub fn similarity(&self, q1: &str, q2: &str) -> f64 {
         let sim = match *self {
             Similarity::None => 1.0,
