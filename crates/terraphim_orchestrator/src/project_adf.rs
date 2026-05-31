@@ -169,6 +169,10 @@ impl ProjectAdfConfig {
             .unwrap_or_else(|| self.discovered_path.clone())
     }
 
+    pub fn skills_dir(&self) -> PathBuf {
+        self.project_root().join(".terraphim/skills")
+    }
+
     fn discover_terraphim_dir(start_dir: &Path) -> Option<PathBuf> {
         let mut current = Some(start_dir.to_path_buf());
 
@@ -310,6 +314,13 @@ task = "Run safety checks"
         assert_eq!(result.project_id, "test-project");
         assert_eq!(result.name, "Test Project");
         assert_eq!(result.project_root(), project_dir.canonicalize().unwrap());
+        assert_eq!(
+            result.skills_dir(),
+            project_dir
+                .canonicalize()
+                .unwrap()
+                .join(".terraphim/skills")
+        );
         assert_eq!(result.agents.len(), 1);
         assert_eq!(result.agents[0].name, "safety-bot");
         assert_eq!(result.agents[0].layer, "Safety");

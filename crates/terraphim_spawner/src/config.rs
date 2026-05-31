@@ -139,6 +139,15 @@ impl AgentConfig {
         !matches!(Self::cli_name(cli_command), "opencode")
     }
 
+    /// Return the native project-local skill directory for CLIs that support skills.
+    pub fn skill_dir_name(cli_command: &str) -> Option<&'static str> {
+        match Self::cli_name(cli_command) {
+            "opencode" => Some(".opencode/skill"),
+            "claude" | "claude-code" => Some(".claude/skills"),
+            _ => None,
+        }
+    }
+
     /// Infer CLI-specific arguments for non-interactive execution.
     ///
     /// Each CLI tool has its own subcommand/flag for non-interactive mode:
@@ -461,6 +470,27 @@ mod tests {
 
         // Unknown tools default to true (stdin is the safe assumption)
         assert!(AgentConfig::infer_supports_stdin("unknown-tool"));
+    }
+
+    #[test]
+    fn test_skill_dir_name() {
+        assert_eq!(
+            AgentConfig::skill_dir_name("opencode"),
+            Some(".opencode/skill")
+        );
+        assert_eq!(
+            AgentConfig::skill_dir_name("/home/alex/.bun/bin/opencode"),
+            Some(".opencode/skill")
+        );
+        assert_eq!(
+            AgentConfig::skill_dir_name("claude"),
+            Some(".claude/skills")
+        );
+        assert_eq!(
+            AgentConfig::skill_dir_name("claude-code"),
+            Some(".claude/skills")
+        );
+        assert_eq!(AgentConfig::skill_dir_name("codex"), None);
     }
 
     #[test]
