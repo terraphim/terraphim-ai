@@ -52,8 +52,8 @@ When `Cargo.toml` is detected:
 ```bash
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
-cargo build --workspace
-cargo test --workspace --no-fail-fast
+cargo build --workspace --profile ci
+cargo test --workspace --no-fail-fast --profile ci
 ```
 
 ## Command Transformation

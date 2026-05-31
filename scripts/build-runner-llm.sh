@@ -59,8 +59,8 @@ detect_commands() {
     # Hardcoded Rust workspace fallback
     echo "cargo fmt --all -- --check"
     echo "cargo clippy --workspace --all-targets -- -D warnings"
-    echo "cargo build --workspace"
-    echo "cargo test --workspace --no-fail-fast"
+    echo "cargo build --workspace --profile ci"
+    echo "cargo test --workspace --no-fail-fast --profile ci"
 }
 
 # --- Phase 2: Transform command via KG ---
