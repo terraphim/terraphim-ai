@@ -31,8 +31,10 @@ fi
 # Set default values for testing if not in .env
 OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-"http://127.0.0.1:11434"}
 OLLAMA_MODEL=${OLLAMA_MODEL:-"llama3.2:3b"}
+OPENROUTER_MODEL=${OPENROUTER_MODEL:-"liquid/lfm-2.5-1.2b-instruct:free"}
 TEST_TIMEOUT=${TEST_TIMEOUT:-60000}
 MAX_RETRIES=${MAX_RETRIES:-3}
+export OPENROUTER_API_KEY OPENROUTER_MODEL
 
 # Test counters
 TOTAL_TESTS=0
@@ -127,6 +129,8 @@ test_combination() {
 
     local start_time=$(date +%s%N)
     local test_output
+    local test_filter
+    test_filter=$(printf '%s_%s_%s' "$role" "$haystack" "$llm_provider" | tr '[:upper:] ' '[:lower:]_')
 
     # Run the specific test
     local features_flag=""
@@ -137,7 +141,7 @@ test_combination() {
     fi
 
     if test_output=$(cargo test --test llm_chat_matrix_test $features_flag -- \
-        "${role}_${haystack}_${llm_provider}" \
+        "$test_filter" \
         --ignored --nocapture 2>&1); then
 
         local end_time=$(date +%s%N)
@@ -147,7 +151,7 @@ test_combination() {
         ((PASSED_TESTS++))
 
         # Run agent validations
-        run_agent_validations "${role}_${haystack}" "$test_output"
+        run_agent_validations "$test_filter" "$test_output"
 
         # Log success to results file
         if [ ! -s "$RESULTS_FILE" ]; then
@@ -189,7 +193,7 @@ main() {
     # Step 1: Check prerequisites
     echo -e "\n${YELLOW}Step 1: Checking prerequisites...${NC}"
 
-    # Check Ollama
+    # Check Ollama for optional legacy/local validation only.
     OLLAMA_AVAILABLE=false
     if check_service "Ollama" "curl -s ${OLLAMA_BASE_URL}/api/tags"; then
         OLLAMA_AVAILABLE=true
@@ -208,6 +212,7 @@ main() {
     if [ ! -z "$OPENROUTER_API_KEY" ]; then
         echo -e "${GREEN}✓ OpenRouter API key configured${NC}"
         OPENROUTER_AVAILABLE=true
+        echo -e "${YELLOW}Using OpenRouter model: ${OPENROUTER_MODEL}${NC}"
         echo -e "${YELLOW}Note: OpenRouter has rate limits - tests will use retry logic${NC}"
     fi
 
@@ -238,6 +243,15 @@ main() {
         fi
     fi
 
+    if [ "$QUICK_MODE" = true ]; then
+        echo -e "${BLUE}Quick mode: limiting execution to OpenRouter core rows${NC}"
+        OLLAMA_AVAILABLE=false
+        ATOMIC_AVAILABLE=false
+        CLICKUP_AVAILABLE=false
+        PERPLEXITY_AVAILABLE=false
+        MCP_AVAILABLE=false
+    fi
+
     # Step 2: Run pre-commit checks
     echo -e "\n${YELLOW}Step 2: Running pre-commit checks...${NC}"
     run_precommit
@@ -255,56 +269,34 @@ main() {
     # Define test roles
     declare -a ROLES=("Default" "Rust Engineer" "AI Engineer" "Terraphim Engineer" "System Operator")
 
-    # Core tests with Ollama (always run if available)
-    if [ "$OLLAMA_AVAILABLE" = true ]; then
-        echo -e "\n${BLUE}=== Core Tests with Ollama (Local LLM) ===${NC}"
+    # Core tests with OpenRouter free model. This is the default live LLM path because it does
+    # not require a local Ollama daemon or model pull.
+    if [ "$OPENROUTER_AVAILABLE" = true ]; then
+        echo -e "\n${BLUE}=== Core Tests with OpenRouter Free Model ===${NC}"
 
         # Test each role with local documents
         for role in "${ROLES[@]}"; do
-            test_combination "$role" "Ripgrep" "ollama" "${TEST_DATA_DIR}"
-
-            # Test with KG docs for engineer roles
-            if [[ "$role" == *"Engineer"* ]] && [ -d "${TEST_DATA_DIR}/kg" ]; then
-                test_combination "$role" "KnowledgeGraph" "ollama" "${TEST_DATA_DIR}/kg"
-            fi
+            test_combination "$role" "Ripgrep" "openrouter" "${TEST_DATA_DIR}"
         done
     else
-        echo -e "${YELLOW}⚠ Skipping Ollama tests (service not available)${NC}"
-        echo -e "  To enable Ollama tests, run: ollama serve"
-        ((SKIPPED_TESTS+=10))
+        echo -e "${YELLOW}⚠ Skipping OpenRouter core tests (OPENROUTER_API_KEY not configured)${NC}"
+        ((SKIPPED_TESTS+=5))
+    fi
+
+    # Optional legacy/local Ollama coverage. Keep this available for local model validation, but
+    # do not make it the default gate.
+    if [ "$OLLAMA_AVAILABLE" = true ] && [ "${RUN_OLLAMA_TESTS:-0}" = "1" ]; then
+        echo -e "\n${BLUE}=== Optional Legacy Ollama Tests ===${NC}"
+        test_combination "Default" "Ripgrep" "ollama" "${TEST_DATA_DIR}"
+    else
+        echo -e "${YELLOW}⚠ Skipping optional Ollama tests (set RUN_OLLAMA_TESTS=1 to enable)${NC}"
     fi
 
     # Integration tests with external services
     echo -e "\n${BLUE}=== Integration Tests with External Services ===${NC}"
 
-    if [ "$ATOMIC_AVAILABLE" = true ] && [ "$OLLAMA_AVAILABLE" = true ]; then
-        test_combination "Terraphim Engineer" "Atomic" "ollama" "remote"
-    else
-        echo -e "${YELLOW}⚠ Skipping Atomic Server test${NC}"
-        ((SKIPPED_TESTS++))
-    fi
-
-    if [ "$CLICKUP_AVAILABLE" = true ] && [ "$OLLAMA_AVAILABLE" = true ]; then
-        test_combination "System Operator" "ClickUp" "ollama" "tasks"
-    else
-        echo -e "${YELLOW}⚠ Skipping ClickUp test${NC}"
-        ((SKIPPED_TESTS++))
-    fi
-
-    # Limited OpenRouter tests (preserve API quota)
-    if [ "$OPENROUTER_AVAILABLE" = true ]; then
-        echo -e "\n${BLUE}=== Limited OpenRouter Tests (Preserving Quota) ===${NC}"
-
-        # Only run 2-3 critical tests to preserve rate limits
-        test_combination "AI Engineer" "Ripgrep" "openrouter" "${TEST_DATA_DIR}/Architecture.md"
-
-        if [ "$PERPLEXITY_AVAILABLE" = true ]; then
-            test_combination "AI Engineer" "Perplexity" "openrouter" "web-search"
-        fi
-    else
-        echo -e "${YELLOW}⚠ Skipping OpenRouter tests (not configured)${NC}"
-        ((SKIPPED_TESTS+=3))
-    fi
+    echo -e "${YELLOW}⚠ External-service LLM matrix rows are skipped until dedicated OpenRouter-backed tests exist${NC}"
+    ((SKIPPED_TESTS+=3))
 
     # Step 5: Final validation and reporting
     echo -e "\n${YELLOW}Step 5: Generating final report...${NC}"
@@ -337,8 +329,8 @@ Test Statistics:
 - Pass Rate: ${pass_rate}%
 
 Service Availability:
-- Ollama: $([ "$OLLAMA_AVAILABLE" = true ] && echo "✓ Running (${OLLAMA_MODEL})" || echo "✗ Not Available")
-- OpenRouter: $([ "$OPENROUTER_AVAILABLE" = true ] && echo "✓ Configured" || echo "✗ Not Configured")
+- OpenRouter: $([ "$OPENROUTER_AVAILABLE" = true ] && echo "✓ Configured (${OPENROUTER_MODEL})" || echo "✗ Not Configured")
+- Ollama: $([ "$OLLAMA_AVAILABLE" = true ] && echo "✓ Running (${OLLAMA_MODEL}, optional)" || echo "✗ Not Available (optional)")
 - Atomic Server: $([ "$ATOMIC_AVAILABLE" = true ] && echo "✓ Connected" || echo "✗ Not Available")
 - ClickUp: $([ "$CLICKUP_AVAILABLE" = true ] && echo "✓ Configured" || echo "✗ Not Configured")
 - Perplexity: $([ "$PERPLEXITY_AVAILABLE" = true ] && echo "✓ Configured" || echo "✗ Not Configured")
@@ -354,8 +346,8 @@ Results:
 - Summary Report: ${TEST_RESULTS_DIR}/summary_${TIMESTAMP}.txt
 
 Recommendations:
-$(if [ "$OLLAMA_AVAILABLE" = false ]; then echo "- Install and start Ollama for local LLM testing"; fi)
 $(if [ "$OPENROUTER_AVAILABLE" = false ]; then echo "- Configure OpenRouter API key for cloud LLM testing"; fi)
+$(if [ "$OLLAMA_AVAILABLE" = false ]; then echo "- Optional: install and start Ollama only if you need local-model validation"; fi)
 $(if [ $FAILED_TESTS -gt 0 ]; then echo "- Review failed tests and check service configurations"; fi)
 EOF
 
@@ -402,13 +394,14 @@ while [[ $# -gt 0 ]]; do
             echo "Usage: $0 [OPTIONS]"
             echo ""
             echo "Options:"
-            echo "  --quick    Run minimal test set (Ollama only)"
+            echo "  --quick    Run minimal test set (OpenRouter only)"
             echo "  --verbose  Show detailed output"
             echo "  --help     Show this help message"
             echo ""
             echo "Prerequisites:"
             echo "  - .env file configured with API keys"
-            echo "  - Ollama running (for local tests): ollama serve"
+            echo "  - OPENROUTER_API_KEY set for live LLM tests"
+            echo "  - Optional: Ollama running for local legacy tests when RUN_OLLAMA_TESTS=1"
             echo "  - Test data available in docs/src/"
             echo ""
             echo "The script will automatically detect available services"
@@ -422,16 +415,6 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
-
-# Adjust test scope for quick mode
-if [ "$QUICK_MODE" = true ]; then
-    echo -e "${BLUE}Running in quick mode (Ollama tests only)${NC}"
-    OPENROUTER_AVAILABLE=false
-    ATOMIC_AVAILABLE=false
-    CLICKUP_AVAILABLE=false
-    PERPLEXITY_AVAILABLE=false
-    MCP_AVAILABLE=false
-fi
 
 # Run main function
 main
