@@ -65,6 +65,13 @@ if [[ "$ACTUAL_RUST_VERSION" != "$RUST_VERSION"* ]]; then
     echo -e "${YELLOW}⚠️  Warning: Rust version mismatch. Expected: $RUST_VERSION, Got: $ACTUAL_RUST_VERSION${NC}"
 fi
 
+# Install cargo-nextest if not present
+if ! command -v cargo-nextest &> /dev/null; then
+    echo -e "${BLUE}📦 Installing cargo-nextest...${NC}"
+    curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C "${CARGO_HOME:-$HOME/.cargo}/bin"
+fi
+cargo nextest --version
+
 # Set environment variables
 export CARGO_TERM_COLOR="$CARGO_TERM_COLOR"
 
@@ -103,13 +110,14 @@ run_test() {
 
 echo -e "${BLUE}🧪 Running Unit Tests${NC}"
 run_test "Unit Tests" \
-    "cargo test --workspace --lib"
+    "cargo nextest run --workspace --lib"
 
 echo -e "${BLUE}🧪 Running Integration Tests${NC}"
 run_test "Integration Tests" \
-    "cargo test --workspace --test '*'"
+    "cargo nextest run --workspace --tests"
 
 echo -e "${BLUE}🧪 Running Documentation Tests${NC}"
+# Note: cargo-nextest does not support doc tests; use plain cargo test.
 run_test "Documentation Tests" \
     "cargo test --workspace --doc"
 

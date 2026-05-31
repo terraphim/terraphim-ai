@@ -60,12 +60,12 @@ repos:
 
       - id: cargo-test
         name: Cargo test
-        entry: bash -c 'if command -v rch >/dev/null 2>&1; then echo "Using rch for remote tests..."; rch exec -- cargo test --workspace --lib; else cargo test --workspace --lib; fi'
+        entry: bash -c 'if command -v rch >/dev/null 2>&1; then echo "Using rch for remote tests..."; rch exec -- cargo nextest run --workspace --lib; else cargo nextest run --workspace --lib; fi'
         language: system
         types: [rust]
         pass_filenames: false
         stages: [manual]
-        description: "Run Rust tests via rch remote worker if available (manual stage)"
+        description: "Run Rust tests via cargo-nextest with per-test timeouts (manual stage)"
 
       - id: cargo-audit
         name: Cargo audit

@@ -430,12 +430,19 @@ jobs:
             ${{ runner.os }}-cargo-ranking-
             ${{ runner.os }}-cargo-
 
+      - name: Install cargo-nextest
+        run: |
+          if ! command -v cargo-nextest >/dev/null 2>&1; then
+            cargo install cargo-nextest --locked
+          fi
+          cargo nextest --version
+
       - name: Run ranking regression gate
         run: |
           # Fails if Kendall-tau < 0.95 against committed snapshots.
           # To accept an intentional ranking change, run locally with
           # UPDATE_RANKING_SNAPSHOTS=1 and add "Ranking change ACK" to the PR.
-          cargo test -p terraphim_service ranking_regression
+          cargo nextest run -p terraphim_service --profile ci ranking_regression
 
       - name: sccache stats
         if: always()
