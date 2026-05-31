@@ -8608,6 +8608,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "flaky: depends on live git repo state which may be shallow clone in CI/rch"]
     async fn test_orchestrator_compound_review_manual() {
         // Use empty groups to avoid git worktree operations during test.
         // Worktree creation fails when git index is locked (e.g. pre-commit hooks).
