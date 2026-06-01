@@ -2,6 +2,7 @@ use anyhow::Result;
 use base64::Engine;
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
+use std::fmt;
 
 #[derive(Debug, Deserialize)]
 pub struct SearchResult {
@@ -81,12 +82,56 @@ pub struct Comment {
     pub updated_date: Option<DateTime<Utc>>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 pub struct Author {
     #[serde(rename = "displayName")]
     pub display_name: String,
     #[serde(default)]
     pub email: Option<String>,
+}
+
+impl fmt::Debug for Author {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("Author")
+            .field("display_name", &self.display_name)
+            .field("email", &self.email.as_deref().map(|_| "***REDACTED***"))
+            .finish()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn author_debug_redacts_email() {
+        let author = Author {
+            display_name: "Jane Doe".to_string(),
+            email: Some("jane.doe@example.com".to_string()),
+        };
+        let dbg = format!("{:?}", author);
+        assert!(
+            !dbg.contains("jane.doe@example.com"),
+            "Debug output must not expose email address, got: {dbg}"
+        );
+        assert!(
+            dbg.contains("***REDACTED***"),
+            "Debug output must mark email as redacted, got: {dbg}"
+        );
+    }
+
+    #[test]
+    fn author_debug_none_email_safe() {
+        let author = Author {
+            display_name: "Anonymous".to_string(),
+            email: None,
+        };
+        let dbg = format!("{:?}", author);
+        assert!(
+            !dbg.contains('@'),
+            "Debug output must not contain email-like data, got: {dbg}"
+        );
+    }
 }
 
 pub async fn search(
