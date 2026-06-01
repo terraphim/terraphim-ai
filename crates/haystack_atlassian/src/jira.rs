@@ -2,6 +2,7 @@ use anyhow::Result;
 use base64::Engine;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::fmt;
 
 #[derive(Debug, Deserialize)]
 pub struct Issue {
@@ -61,7 +62,7 @@ pub struct Priority {
     pub name: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 pub struct User {
     #[serde(rename = "displayName")]
     pub display_name: String,
@@ -69,6 +70,17 @@ pub struct User {
     pub email_address: Option<String>,
 }
 
+impl fmt::Debug for User {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("User")
+            .field("display_name", &self.display_name)
+            .field(
+                "email_address",
+                &self.email_address.as_deref().map(|_| "***REDACTED***"),
+            )
+            .finish()
+    }
+}
 pub async fn get_issue(
     base_url: &str,
     username: &str,
@@ -189,4 +201,39 @@ pub async fn get_project_issues(
 ) -> Result<Vec<Issue>> {
     let jql = format!("project = {} ORDER BY created DESC", project_key);
     search(base_url, username, token, &jql, "*all", limit).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn user_debug_redacts_email_address() {
+        let user = User {
+            display_name: "John Smith".to_string(),
+            email_address: Some("john.smith@example.com".to_string()),
+        };
+        let dbg = format!("{:?}", user);
+        assert!(
+            !dbg.contains("john.smith@example.com"),
+            "Debug output must not expose email address, got: {dbg}"
+        );
+        assert!(
+            dbg.contains("***REDACTED***"),
+            "Debug output must mark email_address as redacted, got: {dbg}"
+        );
+    }
+
+    #[test]
+    fn user_debug_none_email_safe() {
+        let user = User {
+            display_name: "Anonymous".to_string(),
+            email_address: None,
+        };
+        let dbg = format!("{:?}", user);
+        assert!(
+            !dbg.contains('@'),
+            "Debug output must not contain email-like data, got: {dbg}"
+        );
+    }
 }
