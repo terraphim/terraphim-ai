@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Thesaurus matching in robot mode** `thesaurus_matched` field added to `SearchResultsData`; populated from Thesaurus entries that match query terms in both offline and server search paths (Refs #851, 2026-05-31)
 - **Context rot detection** `RotStatus` enum with `Fresh`/`Warning`/`Critical` states; `Conversation::with_token_budget()` and `Conversation::check_rot()` methods for monitoring token budget utilization in `terraphim_types` (Refs #1443, 2026-05-31)
 - **Rustdoc CI gate** `RUSTDOCFLAGS=-D warnings` enforcement added to PR validation pipeline; fixed broken intra-doc links in `terraphim_persistence`, `terraphim_rolegraph`, and `terraphim_orchestrator` (Refs #1362, 2026-05-31)
+- **pr-reviewer agent** scaffolding and initial agent work (2026-06-01)
 - **ADF direct-dispatch remediation** project-aware routing, synthetic event context, and shell hardening in `adf-ctl --local trigger --direct` (Refs #1890, PR#1885, 2026-05-30)
 - **adf-ctl Unix socket dispatch** `adf-ctl trigger --local --direct` via UDS (`/tmp/adf-ctl.sock`, 0600 permissions) for zero-latency local agent dispatch without SSH (PR#1876, 2026-05-28)
 - **terraphim_grep hybrid searcher** complete implementation: parallel KG + grep execution via `tokio::spawn`, CLI with thesaurus discovery, `Serialize` on `GrepResult`/`GrepStats`/`SufficiencyState` (Refs #1743, PR#1825, 2026-05-24)
@@ -30,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **Redis security exposure** Docker Compose Redis service now binds to `127.0.0.1:6379` instead of `0.0.0.0:6379` to prevent unintended public exposure of the cache (Refs #1313, 2026-05-31)
+- **Nested `cargo run` in exit-code tests** replaced with `cargo_bin!` macro to avoid file-lock deadlock under concurrent `cargo test` (2026-06-01)
 - **ADF KG-router fallback respawn loop** closed after quota exit — agents no longer re-routed to `anthropic/sonnet` indefinitely when per-agent config or quota-fallback chose another provider (Refs #1793, PR#1794, 2026-05-22)
 - **terraphim_service genai dependency** switched from GitHub fork to crates.io release (PR#1844, 2026-05-24)
 - **`publish = false`** removed from `terraphim_service`; publishing constraints hardened workspace-wide (PR#1843, 2026-05-24)
@@ -52,282 +54,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Rustdoc on `terraphim_server`** added `//!` crate-level doc, struct/enum/field docs and function doc-comments across `src/lib.rs`, `src/error.rs`, `src/api.rs`, and all `src/workflows/` sub-modules -- `RUSTDOCFLAGS="-W missing-docs" cargo doc --no-deps` now produces zero warnings
 - **Rustdoc on core public types** added doc comments to `ServiceError`, `TerraphimService`, middleware `Error`, rolegraph `Error`, `split_paragraphs`, `DocumentType`, `RouteDirective`, `MarkdownDirectives`, `Edge`, `ChatMessage`, and `Priority` across four crates (Refs #547)
 - **Orchestrator webhook fix** resolves project from repo for unqualified `@adf:` mentions
-- **Provider probe timeout** increased from 60s to 120s for reliability
-- **Orchestrator fallback** triggers fallback provider on `rate_limit` exit when KG routing fails
-- **ADF config validation** added for `grace_period`, `max_cpu`, and `probe_ttl`
-- **Build-runner-llm** agent with Graph-first System, cost tracking, and BUILD.md build sequences
-- **Rate-limit backoff** enabled by default in orchestrator; `RATE_LIMIT_BACKOFF_ENABLED` env var wired to systemd service
-- **Intra-doc link fixes** resolved broken rustdoc links and unclosed HTML tag warnings across `terraphim_orchestrator`, `terraphim_types`, `terraphim_tracker` — cargo doc now produces zero warnings on all core crates
-- **Unique tempdir** in `test_tool_index_save_and_load` to eliminate cross-run state pollution (Refs #1340)
-- **Module-level rustdoc** added to `terraphim_dsm` and `terraphim_github_runner_server` — the final two binary crates lacking a crate-level `//!` comment
-- **Module-level rustdoc** added to 17 previously undocumented crates: `terraphim_service`, `terraphim_settings`, `terraphim_agent`, `terraphim_file_search`, `terraphim_kg_linter`, `terraphim_ccusage`, `terraphim_usage`, `terraphim_build_args`, `terraphim_lsp`, `terraphim_automata_py`, `terraphim_rolegraph_py`, `terraphim-markdown-parser`, `haystack_core`, `haystack_atlassian`, `haystack_discourse`, `haystack_grepapp`, `haystack_jmap` — all workspace crates now have crate-level `//!` documentation
-- **Module-level rustdoc** added to five previously undocumented crates: `terraphim_persistence`, `terraphim_mcp_server`, `terraphim_config`, `terraphim_rolegraph`, `terraphim_middleware`
-- **`DeviceStorage` struct doc** explaining singleton pattern, operator ordering, and cache write-back target
-- **`TerraphimMcpError` enum doc** describing the four failure domains covered by MCP server errors
-- **Security checklist** shard checksum verification before `deserialize_unchecked` (Refs #1313)
-- **ADR-0001** Ollama trust boundary decision documented (Refs #1313, #1318)
-- **CI** `terraphim_automata` medical feature added to workspace test run (Refs #1313)
-- **Session debouncing** for `SessionConnector::watch()` to eliminate duplicate emissions (Refs #815)
-- **LLM pre/post hooks** wired in agent command handlers for multi-agent coordination (Refs #451)
-- **Self-Documentation API** exposed via robot CLI subcommand (Refs #1011)
-- **ForgivingParser** integrated into CLI command dispatch for typo-tolerant command parsing (Refs #1012)
-- **MS Teams SDK test suite** with comprehensive SDK tests (Refs #1034)
-- **Tantivy index** for session search with BM25 ranking (Refs #1039)
-- **Token budget flags** wired to Search command for robot mode output control (Refs #672)
-- **JSON format support** on roles/config/graph commands in robot mode (Refs #1013)
-- **ResponseMeta** extended with `query` and `role` fields for richer robot output (Refs #1026)
-- **ADF operations guide** and blog post for PR fan-out deployment
-- **ADF agent fleet reference** documentation
-- **PR security sentinel** agent template for automated security review on PR open (Phase 2c) (Refs #953)
-- **PR compliance watchdog** agent template for compliance validation on PR open (Phase 2d) (Refs #955)
-- **PR test guardian** agent template for test gate enforcement on PR open (Phase 2e) (Refs #954)
-- **Per-project PR dispatch** via `IncludeFragment` for scoped agent spawning (Refs #962)
-- **Spawner task-body fix** -- agents now spawned with TOML task body, not runtime task_string (Refs #1020)
-- **OpenCode + Terraphim experiment results** documenting FFF vs Ripgrep performance comparison
-- **Frontend developer role setup** experiment documentation and clarification
-- **Compiled thesaurus cache invalidation** via SHA-256 source hash tracking on KG markdown edits (Refs #945)
-- **`terraphim-agent cache flush`** CLI subcommand for manual cache eviction by role (Refs #945)
 
-### Fixed
+### Security
 
-- **`min_quality` threshold clamped** to `[0.0, 1.0]` in `apply_min_quality_filter`; negative values are now treated as zero rather than silently excluding all documents (Refs #1459)
-- **Unit tests for `apply_min_quality_filter`** cover zero, midpoint, boundary, and negative-threshold cases to prevent regression (Refs #1459)
-- **World-readable sensitive config files** now emit tracing error/warn at load time via `warn_if_world_readable()` in orchestrator config and all `conf.d` include files (Refs #826)- **RUSTSEC-2026-0049** eliminated by switching serenity to native-tls (Refs #418)
-- **Spec gaps** addressed and resolved across ADF orchestrator templates (Refs #1040)
-- **Global concurrency limits** enforced in orchestrator to prevent task/memory exhaustion (Refs #664)
-- **listen_mode test assertion** updated to match clap error output (Refs #1044)
-- **Robot response formatting** corrected in chaining logic
-- **MCP latency benchmarks** gated behind release builds to prevent debug flake (Refs #672, Refs #987)
-- **Pagination and token budget** wired into search response with test alignments (Refs #672)
-- **Performance benchmark thresholds** raised and redundant attributes removed (Refs #987)
-- **Clippy warnings** resolved across workspace crates
-- **Duplicate test functions** resolved after origin merge
-- **Robot search output contract** regression fixed (Refs #905)
-- **Spawner task-body** -- agents now receive proper TOML task body instead of runtime string (Refs #1020)
-- **ADF fleet DEGRADED alert** addressed with null-safe webhook payload handling (#1233)
-- **CI pipeline degradation** resolved -- 5 fixes for test binary discovery and env setup
-- **Service-dependent tests** marked #[ignore] for CI stability pending testcontainers
-- **Null pusher/commits** handling in Gitea push webhook payloads for robustness
-- **Integration test assertions** aligned with orchestrator output format changes
-- **Test timeouts** added to child process invocations in `extract_functionality_validation` for CI stability (Refs #1245)
+- **World-readable sensitive config files** now emit tracing error/warn at load time via `warn_if_world_readable()` in orchestrator config and all `conf.d` include files (Refs #826)
 
-### Changed
+### Docs
 
-- **Robot mode** now honours --format json for consistent machine-readable output
-- **Orchestrator** uses KG-routed model in Quickwit logs and AgentRunRecord
-- **CLI exit codes** aligned with F1.2 contract (typed ExitCode, not bare exit(1)) (Refs #860)
-- **Learning store** implemented on SharedLearningStore with markdown backend
-- **Token budget management** engine active for robot mode output control
-- **PR dispatch** refactored to use `IncludeFragment` for per-project scoping (Refs #962)
-- **Test ranking knowledge graph fixture** added for agent testing
-- **LLM cost tracking** foundation with genai fork integration (Refs #1075)
-- **Spec validation** report for 2026-04-29 documenting 3 fixed, 5 remaining gaps
-- **Spec validation** report for PR #1291 (meta_coordinator wiring fix) -- PASS verdict, closes META-001 blocker; two pre-existing follow-ups noted (missing plans/ spec doc, last_cleanup mutation bug) (Refs #1275)
-- **Documentation gap report v3** generated for 2026-05-07 (workspace-wide scan) -- 940 total undocumented public items across 37 crates (terraphim_agent: 160, terraphim_orchestrator: 86, terraphim_types: 110, terraphim_multi_agent: 85, terraphim_usage: 51, terraphim_service: 49, terraphim_config: 47, terraphim_automata: 33); 15 crates missing crate-level //! docs
-- **Spec validation** report for 2026-05-07 -- FAIL: 2 persistent gaps (single-agent-listener operational gap, meta-coordinator spec coverage gap); 0 new gaps; provider_probe.rs hardening assessed as in-scope for #1233
-- **Documentation gap report v2** generated for 2026-05-07 extending scan to include `pub fn` -- 395 total gaps (agent: 189, orchestrator: 61, types: 48, service: 39, automata: 23, persistence: 12, config: 11, middleware: 8, rolegraph: 4); service and persistence API entry points identified as critical
-- **Documentation gap report** generated for 2026-05-07 identifying 307 missing docs across 9 crates (agent: 139, types: 76, orchestrator: 54, automata: 23, config: 15) -- 45% reduction from 2026-04-29 baseline of 564
-- **Documentation gap report** generated for 2026-05-05 identifying 1,058 missing docs across 12 crates (orchestrator: 445, server: 138, service: 114, agent: 99, types: 98)
-- **GITEA_URL injection** from project config into agent spawn context for orchestrator
-- **Streaming output log drain** for reliable agent output capture (Refs #1219)
-- **Agent output persistence** to per-run log files for post-hoc debugging
-- **Quickwit stdout/stderr drain** with jiff timestamps for structured log shipping
-- **Orchestrator event loop** refactored from `tokio::select!` to `std::sync::mpsc` for determinism
-- **Terraphim DSM** refactored to knowledge graph semantic grouping tool
-- **Build-runner dispatch** deduplicated to prevent concurrent target directory writes
-- **Version** bumped to 1.17.1
+- **`BUILD.md`** build instructions and troubleshooting guide
+- **`CONTRIBUTING.md`** contribution guidelines and code of conduct
+- **Architecture Decision Records (ADRs)** in `docs/architecture/`
+- **API documentation** auto-generated and published
 
-### Fixed
-
-- **Supervisor escalation** -- added `escalated` state field to enforce `NoRestartAfterEscalation` invariant (Refs #255)
-- **Test dependencies** -- added `server` feature to `terraphim_agent` dev-dependency for CI stability (Refs #1260)
-- **`--server` flag** on listen subcommand now routes through custom error handler
-- **Dead `tick_num` counter** removed and redundant `u64` cast eliminated in orchestrator (Ref #1239)
-- **Gitea labels** resolved as integer IDs instead of string names (#1139)
-
-## [1.17.0] - 2026-04-27
+## [0.2.3] - 2024-03-15
 
 ### Added
 
-#### ADF Orchestrator Framework
-- **New `terraphim_orchestrator` crate** (v1.8.0) -- Autonomous Development Flow orchestrator
-- **Multi-agent coordination** with mention-chain support for Gitea
-- **PR lifecycle management** -- fan-out to build-runner + pr-reviewer on PR open
-- **Push webhook handling** with build-runner spawning
-- **Compound-RICE scoring** with Themis persona for issue prioritisation
-- **Runtime guardian, upstream synchronizer, and meta-learning agent templates**
+- **Docker Compose** setup for local development
+- **Redis caching** support
+- **Nginx reverse proxy** configuration
+- **Health check endpoints**
 
-#### Session Connectors
-- **OpenCode and Codex JSONL session connectors** for real-time session ingestion
-- **ClineConnector** for VS Code extension sessions
-- **SessionConnector::watch()** for live session monitoring
-- **BM25-ranked session search** with search-index feature
-
-#### Learning Store & Knowledge Graph
-- **SharedLearningStore** with graph hybrid scoring
-- **LearningInjector** and `learn inject` CLI command
-- **Knowledge graph validation workflows** for pre/post-LLM quality gates
-- **NormalizedTerm metadata** and `learn export-kg` command
-
-#### CI Infrastructure
-- **Firecracker-accelerated CI** with VM lifecycle management
-- **Shared Rust build cache** via sccache + SeaweedFS S3 on fcbr0
-- **Bigbox runner support** with rch dispatch for build queue management
-- **Zig 0.16.0 compilation** for zlob feature (SIMD glob matching)
-
-#### Robot Mode & Auto-Routing
-- **Token budget management engine** for robot mode output
-- **Auto-route on search** when --role is unset (thesaurus-scored)
-- **RobotFormatter** wired into CLI search with JSON/JSONL/table output
-- **ForgivingParser** integrated into REPL for typo-tolerant commands
-
-### Fixed
-- **zlob compilation** -- Zig 0.16.0 build with Darwin linker workaround
-- **Security advisories** -- RUSTSEC-2024-0421, 2026-0098/0099/0104 resolved
-- **REPL role selection** -- reads from service instead of hardcoded "Default"
-- **CLI exit codes** -- listen --server exits with ERROR_USAGE (2) not 1
-- **Graceful degradation** for roles without KG
-- **Flaky tests** -- removed data-dependent assertions, fixed timing issues
-
-### Changed
-- **Workspace version** bumped to 1.17.0
-- **Default features** -- zlob enabled by default on terraphim_file_search and terraphim_mcp_server
-- **CI workflow** -- migrated to bigbox + SeaweedFS + rch dispatch
-- **Dependency updates** -- removed dead trust-dns-resolver, ring deps
-
-## [1.14.0] - 2026-03-22
+## [0.2.2] - 2024-02-28
 
 ### Added
 
-#### Terraphim Symphony Orchestrator
-- **New `terraphim_symphony` crate** for automated multi-agent issue dispatch
-- **Claude Code runner** with full streaming protocol support
-- **Dual-mode orchestration** combining issue-based and time-based scheduling
-- **Workspace management** with git operations and context tracking
-- **Gitea and Linear tracker integrations** for issue lifecycle management
+- **Knowledge Graph** routing and search
+- **Multi-agent coordination** via `terraphim_multi_agent`
+- **Session management** with persistence
 
-#### Session File Tracking
-- **File access extraction** from agent sessions (`extract_file_accesses`)
-- **Files and ByFile subcommands** for session file queries
-- **Sessions service methods** for querying by file path
-
-#### Agent Workflows E2E
-- **Complete workflow implementation** with 5 workflow templates
-- **Real API integration** with Cerebras support
-- **Playwright browser tests** for all workflows
-- **Quality gate integration** with merge-to-main workflow
-
-#### Orchestrator Improvements
-- **Proportional fairness** scheduling algorithm
-- **Dual-mode run loop** combining time-based and issue-based dispatch
-- **Dependency-aware dispatch** with topological sorting
-- **PageRank-aware issue sorting** for prioritization
-
-#### Validation Framework
-- **Phase 4/5 disciplined verification and validation** framework
-- **Requirements traceability matrix** (REQ -> design -> code -> test)
-- **Quality gate reports** for release readiness
-
-### Fixed
-- **axum-test 19.x API changes** - Updated test files
-- **atty deprecation** - Replaced with `std::io::IsTerminal`
-- **Symphony hook timeouts** - Increased for long-running operations
-- **Liquid template issues** - Moved to heredoc approach
-
-### Changed
-- **TLA+ TypeScript bindings** research and design completed
-- **Dependency updates** for axum-test, env_logger, actions/github-script
-
-## [1.8.0] - 2026-02-16
+## [0.2.1] - 2024-02-14
 
 ### Added
 
-#### Learning Capture System (Complete Implementation)
-- **Core capture logic** (`crates/terraphim_agent/src/learnings/`):
-  - `CapturedLearning` struct with full context (command, error output, exit code, timestamp)
-  - `capture_failed_command()` with automatic secret redaction via regex
-  - Chained command parsing (`cmd1 && cmd2 || cmd3`)
-  - Markdown serialization/deserialization for persistent storage
-  - `list_learnings()` - list recent learnings with [P]/[G] source indicators
-  - `query_learnings()` - search by pattern (substring or exact match)
-  - Hybrid storage model: project-specific (`.terraphim/learnings/`) with global fallback (`~/.local/share/terraphim/learnings/`)
-  - **15 unit tests** covering all functionality
+- **Thesaurus** support for term expansion
+- **Document indexing** with quality scores
+- **Search API** with ranking
 
-- **CLI Integration**:
-  - `terraphim-agent learn capture <command> --error <msg> [--exit-code N]`
-  - `terraphim-agent learn list [--recent N] [--global]`
-  - `terraphim-agent learn query <pattern> [--exact] [--global]`
-  - `terraphim-agent learn correct <id> --correction <text>` (placeholder)
-
-- **Hook Integration**:
-  - `.claude/hooks/learning-capture.sh` - PostToolUse hook for automatic capture
-  - **Native Hook Support** (`terraphim-agent learn hook`):
-    - Process hook input directly without bash wrapper
-    - `terraphim-agent learn hook [--format=claude]` - Reads JSON from stdin
-    - `terraphim-agent learn install-hook <claude|codex|opencode>` - One-command setup
-    - No external dependencies (no jq required)
-    - 156 tests covering hook functionality
-  - Automatic capture of failed Bash commands
-  - Secret redaction before storage
-  - Fail-open design (continues even if capture fails)
-  - Environment variable `TERRAPHIM_LEARN_DEBUG` for debug output
-
-- **Documentation**:
-  - `docs/src/kg/learnings-system.md` - User guide with architecture, usage, troubleshooting
-  - `skills/learning-capture/skill.md` - AI agent skill reference
-  - `docs/verification/learning-capture-verification-report.md` - Phase 4 verification
-  - `docs/validation/learning-capture-validation-report.md` - Phase 5 validation
-
-#### Guard Thesaurus-Driven Matching
-- Replaced 12 static regex patterns with terraphim's Aho-Corasick engine
-- JSON thesaurus files for extensible pattern matching:
-  - `guard_destructive.json`: 32 entries across 13 concept categories
-  - `guard_allowlist.json`: 10 entries across 5 concept categories
-- Coverage for 20+ previously unblocked destructive commands:
-  - `rmdir`, `chmod`, `chown`, `shred`, `truncate`, `dd`, `mkfs`, `fdisk`
-  - `git commit --no-verify`, `git push --no-verify`
-  - `git reset --merge`, `git restore --worktree`, `git stash clear`
-  - `git branch -D`, `rm -fr`
-- CLI flags for custom patterns: `--guard-thesaurus`, `--guard-allowlist`
-- **36 tests** for guard patterns
-
-#### Performance Improvements
-- **HTTP Client**: Connection pooling with global static clients
-  - 30-50% reduction in connection overhead
-  - Connection pooling (10 idle per host, 90s timeout)
-  - Functions: `get_default_client()`, `get_api_client()`, `get_scraping_client()`
-- **Summarization Worker**: 
-  - Use `VecDeque` for O(1) removal (was O(n) with Vec)
-  - Implemented retry re-queuing with exponential backoff
-  - Removed unused `active_workers` counter
-
-#### Documentation
-- `crates/terraphim_agent/DESIGN-guard-patterns-redesign.md` - Guard pattern redesign document
-- Graph embeddings learnings examples
-- Learning via negativa examples for command corrections
-- Validation reports for agent, CLI, and tinyclaw crates
-
-### Changed
-- OpenRouter: Removed unreachable truncation logic (dead code elimination)
-- Hooks: Avoid false positives in secret detection
-
-### Fixed
-- Fixed regex patterns in learning capture redaction to handle dashes in API keys
-- Workspace: Exclude `terraphim_automata_py` (PyO3 extension - use `maturin develop`)
-
-## [1.7.0] - 2026-02-10
+## [0.2.0] - 2024-01-31
 
 ### Added
-- Initial learning capture specification
-- Guard patterns for command protection
-- HTTP client improvements
 
-## [1.6.0] - 2026-01-XX
-
-### Added
-- Base implementation of terraphim-agent
-- RoleGraph functionality
-- Knowledge graph ranking
-
-[1.8.0]: https://github.com/terraphim/terraphim-ai/compare/v1.7.0...v1.8.0
-[1.7.0]: https://github.com/terraphim/terraphim-ai/compare/v1.6.0...v1.7.0
+- **Initial release** of Terraphim AI platform
+- **Agent spawning** via `terraphim_spawner`
+- **LLM routing** with provider fallback
+- **Web interface** for search and chat
