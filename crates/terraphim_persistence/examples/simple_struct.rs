@@ -97,9 +97,7 @@ async fn main() -> Result<()> {
             .await
             .map_err(|e| terraphim_persistence::Error::Serde(e.to_string()))?;
 
-        use std::ptr;
-        let storage_copy = unsafe { ptr::read(storage_ref) };
-        let persistence = Arc::new(storage_copy);
+        let persistence = Arc::clone(storage_ref);
 
         // Create intelligent agent for data management
         let role = create_test_role();
