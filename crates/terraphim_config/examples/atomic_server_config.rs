@@ -6,7 +6,10 @@ use terraphim_types::RelevanceFunction;
 // #[cfg(feature = "multi_agent")]
 #[allow(unused_imports)]
 use std::sync::Arc;
-use terraphim_multi_agent::{CommandInput, CommandType, TerraphimAgent};
+// Commented out to keep terraphim_config -> terraphim_multi_agent out of the
+// dev-dependency graph (cycle break, Gitea #1910). The dedicated multi-agent
+// example lives in multi_agent_atomic_server_config.rs.
+// use terraphim_multi_agent::{CommandInput, CommandType, TerraphimAgent};
 use terraphim_persistence::DeviceStorage;
 
 /// Enhanced Atomic Server Configuration with Multi-Agent Intelligence
@@ -337,44 +340,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("     ✓ Team-specific resources");
 
     // Example 6: Multi-Agent System Integration (if feature enabled)
-    // Commented out - requires terraphim_multi_agent dependency
+    // Commented out - requires terraphim_multi_agent dependency, which is kept
+    // out of terraphim_config's dev-dependency graph to preserve the acyclic
+    // dependency direction (cycle break, Gitea #1910). The full, runnable
+    // multi-agent demonstration lives in multi_agent_atomic_server_config.rs.
+    //
     // #[cfg(feature = "multi_agent")]
-    if false {
-        println!("\n🤖 Example 6: Multi-Agent System Integration");
-        println!("============================================");
-
-        // This would create an intelligent agent from the role
-        let persistence = create_test_storage().await?;
-        let role = basic_config.roles.values().next().unwrap();
-        let agent = TerraphimAgent::new(role.clone(), persistence, None).await?;
-        agent.initialize().await?;
-
-        println!("✅ Intelligent agent created from configuration:");
-        println!("   Agent ID: {}", agent.agent_id);
-        println!("   Status: {:?}", agent.status);
-        println!("   Capabilities: {:?}", agent.get_capabilities());
-
-        // Demonstrate intelligent query processing
-        let query = "Find resources about atomic data modeling best practices";
-        let input = CommandInput::new(query.to_string(), CommandType::Answer);
-        let output = agent.process_command(input).await?;
-
-        println!("\n🔍 Intelligent Query Processing:");
-        println!("   Query: {}", query);
-        println!("   AI Response: {}", output.text);
-        println!("   Metadata: {:?}", output.metadata);
-
-        // Show tracking information
-        let token_tracker = agent.token_tracker.read().await;
-        let cost_tracker = agent.cost_tracker.read().await;
-
-        println!("\n📊 Tracking Information:");
-        println!(
-            "   Tokens: {} in / {} out",
-            token_tracker.total_input_tokens, token_tracker.total_output_tokens
-        );
-        println!("   Cost: ${:.6}", cost_tracker.current_month_spending);
-    }
+    // {
+    //     let persistence = create_test_storage().await?;
+    //     let role = basic_config.roles.values().next().unwrap();
+    //     let agent = TerraphimAgent::new(role.clone(), persistence, None).await?;
+    //     agent.initialize().await?;
+    //     let input = CommandInput::new(query.to_string(), CommandType::Answer);
+    //     let output = agent.process_command(input).await?;
+    //     // ... see multi_agent_atomic_server_config.rs for the complete flow.
+    // }
 
     // Multi-agent system information
     {
