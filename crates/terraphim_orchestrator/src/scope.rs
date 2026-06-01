@@ -677,25 +677,57 @@ impl WorktreeManager {
     /// non-zero exit. Permission-denied during the fallback path is
     /// counted as `root_owned_skipped` (Layer 3 territory) rather
     /// than a hard failure.
+    /// Age threshold for orphaned worktrees without manifests.
+    /// Worktrees older than this are assumed abandoned and safe to remove.
+    const ORPHAN_AGE_THRESHOLD_HOURS: u64 = 24;
+
     fn sweep_one(&self, path: &Path, report: &mut SweepReport) {
-        // Reject entries that do not carry a valid manifest.
-        let manifest = match WorktreeManifest::read_valid(path, &self.repo_path) {
-            Some(m) => m,
-            None => {
-                warn!(
-                    path = %path.display(),
-                    "sweep_stale skipping directory without valid ADF manifest"
-                );
-                report.no_manifest_skipped += 1;
-                return;
-            }
+        // Prefer manifest-based cleanup for safety.
+        if let Some(manifest) = WorktreeManifest::read_valid(path, &self.repo_path) {
+            debug!(
+                path = %path.display(),
+                creator = %manifest.creator,
+                session_id = %manifest.session_id,
+                "sweep_stale found valid manifest, proceeding with removal"
+            );
+            return self.sweep_remove(path, report);
+        }
+
+        // No manifest: check if this is an orphaned git worktree older than
+        // the threshold. These are left behind when the orchestrator crashes
+        // between `git worktree add` and manifest write, or from before the
+        // manifest feature existed.
+        let is_git_worktree = path.join(".git").exists();
+        let is_old_enough = match std::fs::metadata(path) {
+            Ok(meta) => match meta.modified() {
+                Ok(mtime) => {
+                    mtime.elapsed().unwrap_or_default()
+                        > std::time::Duration::from_secs(60 * 60 * Self::ORPHAN_AGE_THRESHOLD_HOURS)
+                }
+                Err(_) => false,
+            },
+            Err(_) => false,
         };
-        debug!(
+
+        if is_git_worktree && is_old_enough {
+            info!(
+                path = %path.display(),
+                hours = Self::ORPHAN_AGE_THRESHOLD_HOURS,
+                "sweep_stale removing orphaned worktree without manifest"
+            );
+            return self.sweep_remove(path, report);
+        }
+
+        // Otherwise preserve the directory -- it may be in use or not ours.
+        warn!(
             path = %path.display(),
-            creator = %manifest.creator,
-            session_id = %manifest.session_id,
-            "sweep_stale found valid manifest, proceeding with removal"
+            "sweep_stale skipping directory without valid ADF manifest"
         );
+        report.no_manifest_skipped += 1;
+    }
+
+    /// Remove a worktree, trying `git worktree remove` first then fs fallback.
+    fn sweep_remove(&self, path: &Path, report: &mut SweepReport) {
         let status = std::process::Command::new("git")
             .arg("-C")
             .arg(&self.repo_path)
