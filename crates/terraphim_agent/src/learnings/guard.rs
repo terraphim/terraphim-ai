@@ -7,6 +7,9 @@
 //!
 //! The guard integrates with the learning system to elevate caution for commands
 //! that have previously failed.
+//!
+//! Wiring this guard into the REPL command execution path is tracked by #1953.
+#![allow(dead_code)]
 
 use std::fmt;
 
