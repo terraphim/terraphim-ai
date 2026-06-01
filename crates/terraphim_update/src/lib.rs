@@ -112,6 +112,8 @@ impl UpdaterConfig {
     /// creating the config from a binary:
     ///
     /// ```rust
+    /// use terraphim_update::UpdaterConfig;
+    ///
     /// let config = UpdaterConfig::new("terraphim-agent")
     ///     .with_version(env!("CARGO_PKG_VERSION"));
     /// ```

@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 //! Graduated Guard for command execution safety.
 //!
 //! Provides a three-tier execution model:

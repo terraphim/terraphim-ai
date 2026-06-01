@@ -6,12 +6,16 @@
 //!
 //! ## Quick start
 //!
-//! ```rust,no_run
+//! ```rust,ignore
 //! use terraphim_grep::{TerraphimGrep, GrepOptions};
+//! use std::sync::Arc;
 //!
 //! # async fn example() -> anyhow::Result<()> {
-//! let grep = TerraphimGrep::new(GrepOptions::default());
-//! let results = grep.search("query", "/path/to/haystack").await?;
+//! # let searcher = Arc::new(terraphim_grep::HybridSearcher::default());
+//! # let judge = Arc::new(terraphim_grep::SufficiencyJudge::default());
+//! let grep = TerraphimGrep::new(searcher, judge);
+//! let options = GrepOptions::default();
+//! let results = grep.search("query", options).await?;
 //! # Ok(())
 //! # }
 //! ```

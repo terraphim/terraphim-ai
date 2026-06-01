@@ -2,7 +2,7 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use terraphim_orchestrator::config::{OrchestratorConfig, check_file_permissions};
+use terraphim_orchestrator::config::{check_file_permissions, OrchestratorConfig};
 use terraphim_orchestrator::AgentOrchestrator;
 use terraphim_orchestrator::{
     parse_agent_args, run_synthetic, run_validate, run_validate_all, AgentSubcommand,
@@ -94,11 +94,21 @@ fn register_providers(orchestrator: &mut AgentOrchestrator) {
 }
 
 enum Cli {
-    Run { config: PathBuf, strict_permissions: bool },
-    Check { config: PathBuf, strict_permissions: bool },
+    Run {
+        config: PathBuf,
+        strict_permissions: bool,
+    },
+    Check {
+        config: PathBuf,
+        strict_permissions: bool,
+    },
     LocalCheck,
-    LocalAgent { agent_name: String },
-    Agent { sub_args: Vec<String> },
+    LocalAgent {
+        agent_name: String,
+    },
+    Agent {
+        sub_args: Vec<String>,
+    },
     Version,
     Help,
 }
@@ -167,11 +177,17 @@ fn parse_args() -> Result<Cli, String> {
             agent_name: agent_name.clone(),
         })
     } else if let Some(config) = check {
-        Ok(Cli::Check { config, strict_permissions })
+        Ok(Cli::Check {
+            config,
+            strict_permissions,
+        })
     } else {
         let config =
             positional.unwrap_or_else(|| PathBuf::from("/opt/ai-dark-factory/orchestrator.toml"));
-        Ok(Cli::Run { config, strict_permissions })
+        Ok(Cli::Run {
+            config,
+            strict_permissions,
+        })
     }
 }
 
@@ -190,7 +206,9 @@ fn print_help() {
     println!("    adf --version               Show version");
     println!();
     println!("OPTIONS:");
-    println!("    --strict-permissions        Exit with error if config file is group/world-readable");
+    println!(
+        "    --strict-permissions        Exit with error if config file is group/world-readable"
+    );
     println!();
     println!("AGENT SUB_COMMANDS:");
     println!("    adf agent validate [NAME] [--project ID] [--format json|human]");
@@ -928,7 +946,10 @@ async fn main() -> ExitCode {
             run_local_agent(&agent_name, std::env::current_dir().unwrap_or_default()).await
         }
         Cli::Agent { sub_args } => run_agent(sub_args),
-        Cli::Check { config, strict_permissions } => {
+        Cli::Check {
+            config,
+            strict_permissions,
+        } => {
             if strict_permissions {
                 if let Err(e) = check_file_permissions(&config) {
                     eprintln!("{e}");
@@ -937,7 +958,10 @@ async fn main() -> ExitCode {
             }
             run_check(config)
         }
-        Cli::Run { config, strict_permissions } => {
+        Cli::Run {
+            config,
+            strict_permissions,
+        } => {
             if strict_permissions {
                 if let Err(e) = check_file_permissions(&config) {
                     eprintln!("{e}");

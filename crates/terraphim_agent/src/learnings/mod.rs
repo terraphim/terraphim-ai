@@ -35,7 +35,7 @@ mod replay;
 #[cfg(feature = "shared-learning")]
 pub mod suggest;
 
-// Guard API — not yet wired into the binary; suppressed pending #1953.
+// Guard API — newly added, will be wired into the binary in a future iteration.
 #[allow(unused_imports)]
 pub use guard::{ExecutionTier, GuardDecision, evaluate_command, evaluate_command_with_learning};
 pub use procedure::ProcedureStore;
