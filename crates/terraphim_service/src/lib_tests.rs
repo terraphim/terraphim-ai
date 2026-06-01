@@ -4,7 +4,7 @@
 use super::*;
 use std::path::PathBuf;
 use terraphim_config::ConfigBuilder;
-use terraphim_types::{Layer, NormalizedTermValue, RoleName};
+use terraphim_types::{Document, Layer, NormalizedTermValue, RoleName};
 
 #[tokio::test]
 async fn test_get_config() {
