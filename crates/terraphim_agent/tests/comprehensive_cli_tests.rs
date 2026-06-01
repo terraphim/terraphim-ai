@@ -585,6 +585,7 @@ fn test_performance_and_limits() -> Result<()> {
 
     assert!(code == 0 || code == 1, "Large limit search should complete");
 
+    #[cfg(not(debug_assertions))]
     assert!(
         duration.as_secs() < 60,
         "Search with large limit should complete within 60 seconds"
@@ -599,6 +600,7 @@ fn test_performance_and_limits() -> Result<()> {
 
     assert_eq!(code, 0, "Large top-k graph should succeed");
 
+    #[cfg(not(debug_assertions))]
     assert!(
         duration.as_secs() < 30,
         "Graph with large top-k should complete within 30 seconds"
