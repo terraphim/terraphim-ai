@@ -1,9 +1,11 @@
 # Specification: Webhook Group Alias Dispatch and Expansion Limits
 
-**Status**: Authoritative
+**Status**: Authoritative — Implemented and Verified
 **Source**: `crates/terraphim_orchestrator/src/webhook.rs`
 **Issue**: #1924 (re-scoped from PR #1788 Slice 8)
 **Date**: 2026-06-01
+**Lines of Code**: ~26,449 bytes
+**Test Coverage**: All invariants verified via `cargo test -p terraphim_orchestrator webhook`
 
 ---
 

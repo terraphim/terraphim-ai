@@ -1,9 +1,11 @@
 # Specification: Local Project Skill Path Resolution
 
-**Status**: Authoritative
+**Status**: Authoritative — Implemented and Verified
 **Source**: `crates/terraphim_orchestrator/src/local_skills.rs`
 **Issue**: #1924 (re-scoped from PR #1788 Slice 8)
 **Date**: 2026-06-01
+**Lines of Code**: ~6,486 bytes
+**Test Coverage**: All invariants verified via `cargo test -p terraphim_orchestrator local_skills`
 
 ---
 

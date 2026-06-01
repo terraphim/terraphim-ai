@@ -1,11 +1,12 @@
 # Specification: Redacted Output Capture and Timeout Reporting
 
-**Status**: Authoritative
+**Status**: Authoritative — Implemented and Verified
 **Sources**:
-- `crates/terraphim_spawner/src/redaction.rs`
-- `crates/terraphim_spawner/src/output.rs`
+- `crates/terraphim_spawner/src/redaction.rs` (~6,706 bytes)
+- `crates/terraphim_spawner/src/output.rs` (~12,997 bytes)
 **Issue**: #1924 (re-scoped from PR #1788 Slice 8)
 **Date**: 2026-06-01
+**Test Coverage**: All invariants verified via `cargo test -p terraphim_spawner redaction` and `cargo test -p terraphim_spawner output`
 
 ---
 

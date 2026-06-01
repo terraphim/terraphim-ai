@@ -1,8 +1,8 @@
 # Terraphim Desktop Application - Technical Specification
 
 **Version:** 1.0.0
-**Last Updated:** 2025-11-24
-**Status:** Production
+**Last Updated:** 2026-06-01
+**Status:** Production — Implementation Verified
 
 ---
 
@@ -215,15 +215,15 @@ Terraphim Desktop enables users to:
 - `update_context(conversation_id, context_id, content)`: Edit context
 
 **Persistent Conversation Commands**
-- `create_persistent_conversation(role, title)`: Create persistent conversation
-- `list_persistent_conversations()`: List all saved conversations
-- `get_persistent_conversation(id)`: Get conversation with messages
-- `update_persistent_conversation(id, data)`: Update conversation
-- `delete_persistent_conversation(id)`: Delete conversation
-- `search_persistent_conversations(query)`: Search conversations
-- `export_persistent_conversation(id)`: Export to JSON
-- `import_persistent_conversation(data)`: Import from JSON
-- `get_conversation_statistics()`: Get usage statistics
+- ✅ `create_persistent_conversation(role, title)`: Create persistent conversation
+- ✅ `list_persistent_conversations()`: List all saved conversations
+- ✅ `get_persistent_conversation(id)`: Get conversation with messages
+- ✅ `update_persistent_conversation(id, data)`: Update conversation
+- ✅ `delete_persistent_conversation(id)`: Delete conversation
+- ✅ `search_persistent_conversations(query)`: Search conversations
+- ✅ `export_persistent_conversation(id)`: Export to JSON
+- ✅ `import_persistent_conversation(data)`: Import from JSON
+- ✅ `get_conversation_statistics()`: Get usage statistics
 
 **Integration Commands**
 - `onepassword_status()`: Check 1Password CLI availability
@@ -298,14 +298,16 @@ Terraphim Desktop enables users to:
 
 ### 4.3 AI Chat
 
+> **Implementation Note**: All chat features are fully implemented. Session persistence via `terraphim_persistence` with OpenDAL. See `desktop/src/lib/Chat/` for Svelte components.
+
 #### Chat Features
-- **Conversation Management**: Create, list, switch, delete conversations
-- **Context Management**: Add/edit/remove context items
-- **Search Integration**: Add search results as context
-- **KG Integration**: Add knowledge graph terms/indices as context
-- **Streaming Responses**: Real-time LLM output
-- **Session Persistence**: Save/load conversations
-- **Statistics**: Track usage by role
+- ✅ **Conversation Management**: Create, list, switch, delete conversations
+- ✅ **Context Management**: Add/edit/remove context items
+- ✅ **Search Integration**: Add search results as context
+- ✅ **KG Integration**: Add knowledge graph terms/indices as context
+- ✅ **Streaming Responses**: Real-time LLM output
+- ✅ **Session Persistence**: Save/load conversations via persistent storage
+- ✅ **Statistics**: Track usage by role
 
 #### Chat Context Types
 - **Document**: Full document content

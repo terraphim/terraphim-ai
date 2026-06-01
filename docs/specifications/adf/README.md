@@ -45,3 +45,5 @@ rather than to ephemeral session artefacts.
 No TLA+ model-checking toolbox is configured for this codebase. Validation is performed
 through the Rust unit test suites listed in each specification's verification note.
 All tests referenced were verified to pass on `gitea/main` as of 2026-06-01.
+
+> **Implementation Status**: All specifications in this directory are implemented and in production use.

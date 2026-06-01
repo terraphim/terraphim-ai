@@ -1,5 +1,9 @@
 # Terraphim-Based Codebase Evaluation Check
 
+> **Status**: Specification Only — NOT IMPLEMENTED
+> **Updated**: 2026-06-01
+> **Note**: This document describes a proposed feature. No implementation exists in the codebase.
+
 ## Purpose and Scope
 - Establish a deterministic, repeatable process for assessing whether an AI agent improves or degrades a codebase.
 - Use Terraphim AI's local knowledge graphs, deterministic search, and metrics aggregation to provide quantitative and qualitative comparisons of "before" and "after" states.

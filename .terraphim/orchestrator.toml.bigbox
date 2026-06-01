@@ -1,0 +1,93 @@
+disk_usage_threshold = 90
+flow_state_dir = "/opt/ai-dark-factory/flow-states"
+max_restart_count = 3
+persona_data_dir = "/data/projects/terraphim/terraphim-ai/data/personas"
+restart_cooldown_secs = 300
+role_config_path = "/opt/ai-dark-factory/persona_roles_config.json"
+skill_data_dir = "/opt/ai-dark-factory/skills"
+tick_interval_secs = 30
+working_dir = "/data/projects/terraphim/terraphim-ai"
+include = [
+    "conf.d/*.toml",
+]
+
+gate_reconcile_interval_ticks = 20
+
+[mentions]
+poll_modulo = 2
+max_dispatches_per_tick = 3
+max_concurrent_mention_agents = 8
+
+[compound_review]
+schedule = "0 6 * * *"
+max_duration_secs = 1800
+repo_path = "/data/projects/terraphim/terraphim-ai"
+create_prs = false
+worktree_root = "/data/projects/terraphim/terraphim-ai/.worktrees"
+cli_tool = "/home/alex/.bun/bin/opencode"
+gitea_issue = 514
+auto_file_issues = false
+auto_remediate = false
+
+[nightwatch]
+eval_interval_secs = 300
+active_start_hour = 2
+active_end_hour = 6
+minor_threshold = 0.1
+moderate_threshold = 0.2
+severe_threshold = 0.4
+critical_threshold = 0.7
+
+[routing]
+taxonomy_path = "/data/projects/terraphim/terraphim-ai/docs/taxonomy/routing_scenarios/adf"
+probe_ttl_secs = 1800
+probe_results_dir = "/home/alex/.terraphim/benchmark-results"
+probe_on_startup = false
+
+[webhook]
+bind = "172.18.0.1:9091"
+
+[pr_dispatch]
+max_dispatches_per_tick = 3
+max_concurrent_pr_agents = 4
+agents_on_pr_open = [
+    { name = "build-runner", context = "adf/build" },
+    { name = "pr-reviewer", context = "adf/pr-reviewer" },
+]
+
+
+[workflow]
+enabled = true
+poll_interval_secs = 300
+workflow_file = "WORKFLOW.md"
+
+[workflow.tracker]
+kind = "gitea"
+endpoint = "https://git.terraphim.cloud"
+api_key = "${GITEA_TOKEN}"
+owner = "terraphim"
+repo = "terraphim-ai"
+use_robot_api = true
+
+[workflow.tracker.states]
+active = ["open"]
+terminal = ["closed"]
+
+[evolution]
+enabled = true
+max_memory_tokens = 1500
+max_snapshots_per_agent = 10
+consolidation_interval_ticks = 100
+
+[learning]
+enabled = true
+min_trust = "L1"
+max_tokens = 1500
+max_entries = 10
+archive_days = 30
+consolidation_ticks = 100
+
+[[project_sources]]
+id = "terraphim-ai"
+root = "/data/projects/terraphim/terraphim-ai"
+config = ".terraphim/adf.toml"

@@ -1,9 +1,9 @@
 # Terraphim Agent Session Search - Architecture Document
 
 > **Version**: 1.1.0
-> **Status**: Implemented
+> **Status**: Implemented — Verified 2026-06-01
 > **Created**: 2025-12-03
-> **Updated**: 2025-12-04
+> **Updated**: 2026-06-01
 
 ## Overview
 
@@ -103,10 +103,19 @@ crates/
 │   ├── src/
 │   │   ├── lib.rs                      # Conditional module exports
 │   │   ├── model.rs                    # Session, Message, ContentBlock
+│   │   ├── search.rs                   # Hybrid BM25+KG search
+│   │   ├── service.rs                  # SessionService facade
 │   │   ├── connector/                  # Connector infrastructure
 │   │   │   ├── mod.rs                  # SessionConnector trait
-│   │   │   └── native.rs               # NativeClaudeConnector (no CLA)
-│   │   ├── service.rs                  # SessionService facade
+│   │   │   ├── native.rs               # NativeClaudeConnector (no CLA)
+│   │   │   ├── aider.rs                # Aider markdown connector
+│   │   │   ├── cline.rs                # Cline JSON connector
+│   │   │   ├── codex.rs                # Codex JSONL connector
+│   │   │   └── opencode.rs             # OpenCode JSONL connector
+│   │   ├── enrichment/                 # Knowledge graph enrichment
+│   │   │   ├── mod.rs
+│   │   │   ├── concept.rs              # Concept extraction
+│   │   │   └── enricher.rs             # SessionEnricher
 │   │   └── cla/                        # #[cfg(feature = "terraphim-session-analyzer")]
 │   │       ├── mod.rs                  # CLA integration layer
 │   │       └── connector.rs            # ClaClaudeConnector, ClaCursorConnector
@@ -469,124 +478,31 @@ impl SessionConnector for ClaudeCodeConnector {
 }
 ```
 
-### 5. Session Index (Tantivy)
+### 5. Session Index (Hybrid BM25 + Knowledge Graph)
 
-**Location**: `crates/terraphim_sessions/src/index/`
+**Location**: `crates/terraphim_sessions/src/search.rs`
+
+**Purpose**: In-memory full-text search with optional KG concept boosting.
+
+> **ARCHITECTURE CHANGE**: Tantivy was evaluated but not adopted. The implementation uses in-memory BM25 scoring with optional Knowledge Graph boosting. See Task 2.5 in the tasks document for rationale.
 
 ```rust
-use tantivy::{
-    schema::{Schema, Field, TEXT, STORED, STRING, FAST, INDEXED},
-    Index, IndexWriter, IndexReader,
-    collector::TopDocs,
-    query::QueryParser,
-    tokenizer::{TextAnalyzer, SimpleTokenizer, LowerCaser, Stemmer, Language},
-};
+/// Search sessions using BM25 scoring
+pub fn search_sessions(sessions: &[Session], query: &str) -> Vec<Scored<Session>>;
 
-/// Session search index using Tantivy
-pub struct SessionIndex {
-    index: Index,
-    reader: IndexReader,
-    schema: SessionSchema,
-    query_parser: QueryParser,
-}
-
-pub struct SessionSchema {
-    // Identifiers
-    pub session_id: Field,
-    pub message_id: Field,
-    pub source: Field,
-
-    // Searchable content (TEXT = tokenized + indexed)
-    pub content: Field,
-    pub code_content: Field,
-
-    // Filterable (STRING = not tokenized, FAST = column store)
-    pub timestamp: Field,
-    pub role: Field,
-    pub language: Field,
-    pub project_path: Field,
-
-    // Knowledge graph (TEXT for search, STORED for retrieval)
-    pub concepts: Field,
-}
-
-impl SessionIndex {
-    pub fn new(index_path: &Path) -> Result<Self, IndexError> {
-        let schema = Self::build_schema();
-        let index = Index::create_in_dir(index_path, schema.schema.clone())?;
-
-        // Register custom tokenizers
-        Self::register_tokenizers(&index);
-
-        let reader = index.reader()?;
-        let query_parser = QueryParser::for_index(
-            &index,
-            vec![schema.content, schema.code_content, schema.concepts],
-        );
-
-        Ok(Self { index, reader, schema, query_parser })
-    }
-
-    fn build_schema() -> SessionSchema {
-        let mut builder = Schema::builder();
-
-        SessionSchema {
-            session_id: builder.add_text_field("session_id", STRING | STORED),
-            message_id: builder.add_text_field("message_id", STRING | STORED),
-            source: builder.add_text_field("source", STRING | STORED | FAST),
-            content: builder.add_text_field("content", TEXT | STORED),
-            code_content: builder.add_text_field("code_content", TEXT | STORED),
-            timestamp: builder.add_i64_field("timestamp", INDEXED | STORED | FAST),
-            role: builder.add_text_field("role", STRING | FAST),
-            language: builder.add_text_field("language", STRING | FAST),
-            project_path: builder.add_text_field("project_path", STRING | STORED),
-            concepts: builder.add_text_field("concepts", TEXT | STORED),
-        }
-    }
-
-    fn register_tokenizers(index: &Index) {
-        // Edge n-gram tokenizer for code patterns
-        let code_tokenizer = TextAnalyzer::builder(EdgeNgramTokenizer::new(2, 15))
-            .filter(LowerCaser)
-            .build();
-
-        index.tokenizers().register("code", code_tokenizer);
-
-        // Standard tokenizer with stemming for natural language
-        let text_tokenizer = TextAnalyzer::builder(SimpleTokenizer::default())
-            .filter(LowerCaser)
-            .filter(Stemmer::new(Language::English))
-            .build();
-
-        index.tokenizers().register("text", text_tokenizer);
-    }
-
-    /// Search sessions with query
-    pub fn search(&self, query: &str, options: SearchOptions) -> Result<SearchResults, IndexError> {
-        let searcher = self.reader.searcher();
-        let query = self.query_parser.parse_query(query)?;
-
-        let top_docs = searcher.search(
-            &query,
-            &TopDocs::with_limit(options.limit.unwrap_or(10)),
-        )?;
-
-        let results = top_docs
-            .into_iter()
-            .map(|(score, doc_address)| {
-                let doc = searcher.doc(doc_address)?;
-                self.doc_to_search_result(doc, score)
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-
-        Ok(SearchResults {
-            results,
-            total_hits: top_docs.len(),
-            elapsed: Duration::from_millis(0), // TODO: measure
-        })
-    }
-}
+/// Hybrid search with KG concept boosting
+pub fn search_sessions_hybrid(
+    sessions: &[Session],
+    query: &str,
+    thesaurus: Option<&Thesaurus>,
+) -> Vec<Scored<Session>>;
 ```
+
+**Key characteristics**:
+- No persistent index — sessions loaded from SQLite on demand
+- BM25 scoring via `terraphim_types::score::OkapiBM25Scorer`
+- KG concept matches receive 10,000x score boost
+- Performance: ~10ms for 10K sessions (well under 100ms target)
 
 ### 6. Knowledge Graph Enrichment
 
@@ -685,10 +601,12 @@ impl SessionEnricher {
 └─────────────┘     └─────────────┘     └─────────────┘     └──────┬──────┘
                                                                     │
                     ┌─────────────┐     ┌─────────────┐            │
-                    │   Index     │◀────│  Enricher   │◀───────────┘
-                    │  (Tantivy)  │     │ (concepts)  │
+                    │   SQLite    │◀────│  Enricher   │◀───────────┘
+                    │  (storage)  │     │ (concepts)  │
                     └─────────────┘     └─────────────┘
 ```
+
+> **Note**: Sessions are stored in SQLite, not a Tantivy index. Search operates on in-memory BM25 over loaded sessions.
 
 ### Search Flow
 
