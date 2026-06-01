@@ -120,7 +120,7 @@ Output format:
 CORRECTION: <corrected bash command>
 REASON: <one-line explanation>"
 
-    "$claude_bin" -p "$prompt" --model haiku --output-format text 2>/dev/null || echo ""
+    "$claude_bin" -p "$prompt" --model haiku --output-format text < /dev/null 2>/dev/null || echo ""
 }
 
 update_build_md() {

@@ -161,8 +161,7 @@ impl AgentConfig {
             "codex" => vec!["exec".to_string(), "--full-auto".to_string()],
             "claude" | "claude-code" => vec![
                 "-p".to_string(),
-                "--allowedTools".to_string(),
-                "Bash,Read,Write,Edit,Glob,Grep".to_string(),
+                "--allowedTools=Bash,Read,Write,Edit,Glob,Grep".to_string(),
             ],
             "opencode" => vec![
                 "run".to_string(),
