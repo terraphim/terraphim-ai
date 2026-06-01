@@ -1,7 +1,7 @@
 
 [workspace]
 resolver = "2"
-members = ["crates/*", "terraphim_server", "terraphim_firecracker", "terraphim_ai_nodejs", "infrastructure/*"]
+members = ["crates/*", "crates/terraphim_grep", "crates/terraphim_merge_coordinator", "terraphim_server", "terraphim_firecracker", "terraphim_ai_nodejs"]
 # Note: terraphim_usage and terraphim_ccusage are new crates in crates/*
 exclude = [
     # Experimental crates"
@@ -30,22 +30,18 @@ exclude = [
     "terraphim_firecracker",
     # Missing Cargo.toml
     "crates/terraphim_lsp",
-    # Infrastructure templates (not a crate)
-    "infrastructure/vm-templates",
-    # Rust build cache stack -- docker compose + systemd unit, no Cargo.toml
-    "infrastructure/rust-cache-stack",
-    # Firecracker rust-ci VM image build -- shell scripts + overlay, no Cargo.toml
-    "infrastructure/firecracker-rust-ci",
-    # RCH bigbox config mirror -- toml/service files, no Cargo.toml
-    "infrastructure/rch-bigbox",
-    # fcctl-web binary lives in the private firecracker-rust repo (already running on bigbox)
-    "infrastructure/fcctl-web",
 ]
 default-members = ["terraphim_server"]
 
 [workspace.package]
-version = "1.19.3"
+version = "1.20.3"
 edition = "2024"
+authors = ["Terraphim Team <team@terraphim.ai>"]
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
+repository = "https://github.com/terraphim/terraphim-ai"
+license = "Apache-2.0"
+readme = "README.md"
 
 [workspace.dependencies]
 # OpenRouter AI integration dependencies
@@ -74,7 +70,8 @@ rustls-webpki = "0.103.12"
 # LLM Router integration
 
 [patch.crates-io]
-genai = { git = "https://github.com/terraphim/rust-genai.git", branch = "merge-upstream-20251103" }
+# genai patch temporarily disabled to test crates.io 0.6.0 compatibility for v1.20.0 publish chain.
+# genai = { git = "https://github.com/terraphim/rust-genai.git", branch = "merge-upstream-20251103" }
 self_update = { git = "https://github.com/AlexMikhalev/self_update.git", branch = "update-zipsign-api-v0.2" }
 # Security: Patch tokio-tungstenite to use rustls 0.23+ for RUSTSEC-2026-0049
 tokio-tungstenite = { git = "https://github.com/snapview/tokio-tungstenite.git", tag = "v0.28.0" }

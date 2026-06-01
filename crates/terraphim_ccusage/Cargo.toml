@@ -2,7 +2,13 @@
 name = "terraphim_ccusage"
 version.workspace = true
 edition.workspace = true
+description = "Claude Code usage tracking for Terraphim AI"
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
+repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["ai", "usage", "claude-code", "tracking", "analytics"]
 license = "Apache-2.0 OR MIT"
+readme = "../../README.md"
 
 [dependencies]
 serde = { workspace = true }

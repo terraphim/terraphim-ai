@@ -1,11 +1,20 @@
-//! Output capture with @mention detection
+//! Output capture with @mention detection and redaction
+//!
+//! Captures stdout/stderr from agent processes, detects @mentions, and
+//! stores a bounded buffer of redacted events for timeout reporting.
 
 use regex::Regex;
+use std::collections::VecDeque;
+use std::sync::{Arc, Mutex};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::{ChildStderr, ChildStdout};
 use tokio::sync::{broadcast, mpsc};
 
+use crate::redaction;
 use terraphim_types::capability::ProcessId;
+
+/// Maximum number of captured events to retain per agent.
+const MAX_CAPTURED_EVENTS: usize = 4096;
 
 /// Events that can be captured from agent output
 #[derive(Debug, Clone)]
@@ -27,14 +36,50 @@ pub enum OutputEvent {
     },
 }
 
+impl OutputEvent {
+    /// Return a redacted copy of this event with secrets scrubbed.
+    fn redacted(&self) -> Self {
+        match self {
+            Self::Stdout { process_id, line } => Self::Stdout {
+                process_id: *process_id,
+                line: redaction::redact(line),
+            },
+            Self::Stderr { process_id, line } => Self::Stderr {
+                process_id: *process_id,
+                line: redaction::redact(line),
+            },
+            Self::Mention {
+                process_id,
+                target,
+                message,
+            } => Self::Mention {
+                process_id: *process_id,
+                target: target.clone(),
+                message: redaction::redact(message),
+            },
+            Self::Completed {
+                process_id,
+                exit_code,
+            } => Self::Completed {
+                process_id: *process_id,
+                exit_code: *exit_code,
+            },
+        }
+    }
+}
+
 /// Captures output from agent processes with @mention detection
 #[derive(Debug)]
 pub struct OutputCapture {
     process_id: ProcessId,
     mention_regex: Regex,
     event_sender: mpsc::Sender<OutputEvent>,
-    /// Broadcast sender for live output streaming (e.g., WebSocket subscribers)
+    /// Broadcast sender for live output streaming (e.g. WebSocket subscribers)
     broadcast_sender: broadcast::Sender<OutputEvent>,
+    /// Bounded buffer of redacted events for timeout reporting.
+    captured_events: Arc<Mutex<VecDeque<OutputEvent>>>,
+    /// Optional path to write raw stderr lines for post-mortem debugging.
+    stderr_log_path: Option<std::path::PathBuf>,
 }
 
 impl OutputCapture {
@@ -44,7 +89,21 @@ impl OutputCapture {
         stdout: BufReader<ChildStdout>,
         stderr: BufReader<ChildStderr>,
     ) -> Self {
-        let (event_sender, _event_receiver) = mpsc::channel(100);
+        Self::new_with_stderr_log(process_id, stdout, stderr, None)
+    }
+
+    /// Create a new output capture with optional stderr log file.
+    ///
+    /// When `stderr_log_path` is Some, every stderr line is appended to the
+    /// file in addition to being broadcast. This provides a durable fallback
+    /// when the broadcast channel lags or the drain task drops events.
+    pub fn new_with_stderr_log(
+        process_id: ProcessId,
+        stdout: BufReader<ChildStdout>,
+        stderr: BufReader<ChildStderr>,
+        stderr_log_path: Option<std::path::PathBuf>,
+    ) -> Self {
+        let (event_sender, _event_receiver) = mpsc::channel::<OutputEvent>(100);
         let (broadcast_sender, _) = broadcast::channel(256);
 
         let capture = Self {
@@ -52,6 +111,8 @@ impl OutputCapture {
             mention_regex: Regex::new(r"@(\w+)").unwrap(),
             event_sender,
             broadcast_sender,
+            captured_events: Arc::new(Mutex::new(VecDeque::new())),
+            stderr_log_path,
         };
 
         // Start capturing stdout and stderr
@@ -74,12 +135,32 @@ impl OutputCapture {
         &self.broadcast_sender
     }
 
+    /// Return a snapshot of captured redacted output events.
+    pub fn captured_events(&self) -> Vec<OutputEvent> {
+        self.captured_events
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .iter()
+            .cloned()
+            .collect()
+    }
+
+    /// Record a redacted event into the bounded buffer.
+    fn record_event(captured_events: &Arc<Mutex<VecDeque<OutputEvent>>>, event: &OutputEvent) {
+        let mut events = captured_events.lock().unwrap_or_else(|e| e.into_inner());
+        if events.len() >= MAX_CAPTURED_EVENTS {
+            events.pop_front();
+        }
+        events.push_back(event.redacted());
+    }
+
     /// Start capturing stdout
     fn capture_stdout(&self, mut stdout: BufReader<ChildStdout>) {
         let process_id = self.process_id;
         let mention_regex = self.mention_regex.clone();
         let event_sender = self.event_sender.clone();
         let broadcast_sender = self.broadcast_sender.clone();
+        let captured_events = self.captured_events.clone();
 
         tokio::spawn(async move {
             let mut line = String::new();
@@ -105,13 +186,18 @@ impl OutputCapture {
                                     target,
                                     message,
                                 };
+                                Self::record_event(&captured_events, &mention_event);
                                 let _ = event_sender.send(mention_event.clone()).await;
                                 let _ = broadcast_sender.send(mention_event);
                             }
                         }
 
                         // Send stdout event
-                        let stdout_event = OutputEvent::Stdout { process_id, line };
+                        let stdout_event = OutputEvent::Stdout {
+                            process_id,
+                            line: line.clone(),
+                        };
+                        Self::record_event(&captured_events, &stdout_event);
                         let _ = event_sender.send(stdout_event.clone()).await;
                         let _ = broadcast_sender.send(stdout_event);
                     }
@@ -129,9 +215,18 @@ impl OutputCapture {
         let process_id = self.process_id;
         let event_sender = self.event_sender.clone();
         let broadcast_sender = self.broadcast_sender.clone();
+        let captured_events = self.captured_events.clone();
+        let stderr_log_path = self.stderr_log_path.clone();
 
         tokio::spawn(async move {
             let mut line = String::new();
+            let mut log_file = stderr_log_path.and_then(|path| {
+                std::fs::OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open(&path)
+                    .ok()
+            });
 
             loop {
                 line.clear();
@@ -143,7 +238,17 @@ impl OutputCapture {
                             continue;
                         }
 
-                        let stderr_event = OutputEvent::Stderr { process_id, line };
+                        // Write to durable stderr log if configured
+                        if let Some(ref mut file) = log_file {
+                            use std::io::Write;
+                            let _ = writeln!(file, "{}", line);
+                        }
+
+                        let stderr_event = OutputEvent::Stderr {
+                            process_id,
+                            line: line.clone(),
+                        };
+                        Self::record_event(&captured_events, &stderr_event);
                         let _ = event_sender.send(stderr_event.clone()).await;
                         let _ = broadcast_sender.send(stderr_event);
                     }
@@ -176,5 +281,85 @@ mod tests {
 
         let text = "No mentions here";
         assert!(regex.captures(text).is_none());
+    }
+
+    #[test]
+    fn test_output_event_redacted_scrubs_secrets() {
+        let event = OutputEvent::Stdout {
+            process_id: ProcessId::new(),
+            line: "api_key=secret123".to_string(),
+        };
+        let redacted = event.redacted();
+        match redacted {
+            OutputEvent::Stdout { line, .. } => {
+                assert!(line.contains("***REDACTED***"));
+                assert!(!line.contains("secret123"));
+            }
+            _ => panic!("Expected Stdout event"),
+        }
+    }
+
+    #[test]
+    fn test_output_event_redacted_preserves_structure() {
+        let event = OutputEvent::Stderr {
+            process_id: ProcessId::new(),
+            line: "Error: timeout after 30s".to_string(),
+        };
+        let redacted = event.redacted();
+        match redacted {
+            OutputEvent::Stderr { line, .. } => {
+                assert_eq!(line, "Error: timeout after 30s");
+            }
+            _ => panic!("Expected Stderr event"),
+        }
+    }
+
+    #[test]
+    fn test_captured_events_bounded() {
+        let (_event_sender, _event_receiver) = mpsc::channel::<OutputEvent>(100);
+        let (_broadcast_sender, _) = broadcast::channel::<OutputEvent>(256);
+        let captured = Arc::new(Mutex::new(VecDeque::new()));
+
+        // Simulate recording MAX_CAPTURED_EVENTS + 10 events
+        for i in 0..MAX_CAPTURED_EVENTS + 10 {
+            let event = OutputEvent::Stdout {
+                process_id: ProcessId::new(),
+                line: format!("line {}", i),
+            };
+            OutputCapture::record_event(&captured, &event);
+        }
+
+        let events = captured.lock().unwrap();
+        assert_eq!(events.len(), MAX_CAPTURED_EVENTS);
+        // The oldest events should have been evicted
+        assert!(!events
+            .iter()
+            .any(|e| matches!(e, OutputEvent::Stdout { line, .. } if line == "line 0")));
+        assert!(events
+            .iter()
+            .any(|e| matches!(e, OutputEvent::Stdout { line, .. } if line == "line 10")));
+    }
+
+    #[test]
+    fn test_captured_events_redacts_before_storage() {
+        let (_event_sender, _event_receiver) = mpsc::channel::<OutputEvent>(100);
+        let (_broadcast_sender, _) = broadcast::channel::<OutputEvent>(256);
+        let captured = Arc::new(Mutex::new(VecDeque::new()));
+
+        let event = OutputEvent::Stdout {
+            process_id: ProcessId::new(),
+            line: "api_key=secret123".to_string(),
+        };
+        OutputCapture::record_event(&captured, &event);
+
+        let events = captured.lock().unwrap();
+        assert_eq!(events.len(), 1);
+        match &events[0] {
+            OutputEvent::Stdout { line, .. } => {
+                assert!(line.contains("***REDACTED***"));
+                assert!(!line.contains("secret123"));
+            }
+            _ => panic!("Expected Stdout event"),
+        }
     }
 }

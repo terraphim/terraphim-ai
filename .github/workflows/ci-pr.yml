@@ -223,17 +223,26 @@ jobs:
             ${{ runner.os }}-cargo-pr-
             ${{ runner.os }}-cargo-
 
+      - name: Enforce terraphim_agent server-mode feature contract
+        run: ./scripts/ci-guard-terraphim-agent-server-mode.sh
+
+      - name: Check compilation
+        run: |
+          # Quick compilation check without building all binaries
+          /home/alex/.local/bin/rch exec -- cargo check --workspace --features zlob
+          # Check key binaries compile
+          /home/alex/.local/bin/rch exec -- cargo check --package terraphim_server
+          /home/alex/.local/bin/rch exec -- cargo check --package terraphim_mcp_server --features zlob
+
       - name: sccache stats
         if: always()
         run: /home/alex/.local/bin/sccache --show-stats
 
-  # Fast-fail compile gate: check the entire workspace before any test jobs start.
-  # Catches type errors and broken APIs within ~2 minutes, preventing downstream
-  # test jobs from launching and failing independently on compile regressions.
-  compile-check:
-    name: Compile Check
+  # Rustdoc documentation check (gate on warnings)
+  rustdoc:
+    name: Rustdoc Check
     runs-on: [self-hosted, bigbox]
-    timeout-minutes: 3
+    timeout-minutes: 5
     needs: changes
     if: needs.changes.outputs.rust-changed == 'true'
     env:
@@ -272,11 +281,9 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: "1.94.0"
-          components: rustfmt, clippy
 
       - name: sccache start and zero stats
         run: |
-
           /home/alex/.local/bin/sccache --start-server || true
           /home/alex/.local/bin/sccache --zero-stats
 
@@ -288,23 +295,21 @@ jobs:
             ~/.cargo/registry/cache
             ~/.cargo/git/db
             target
-          key: ${{ runner.os }}-cargo-compile-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-rustdoc-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-compile-
+            ${{ runner.os }}-cargo-rustdoc-
             ${{ runner.os }}-cargo-
 
-      - name: Compile check
+      - name: Check rustdoc
+        env:
+          RUSTDOCFLAGS: "-D warnings"
         run: |
-          # Fast-fail gate: check the entire workspace including tests and benches.
-          # This surfaces compilation errors before any test jobs start.
-          /home/alex/.local/bin/rch exec -- cargo check --workspace --all-targets --features zlob
-          # Verify key binaries compile
-          /home/alex/.local/bin/rch exec -- cargo check --package terraphim_server
-          /home/alex/.local/bin/rch exec -- cargo check --package terraphim_mcp_server --features zlob
+          /home/alex/.local/bin/rch exec -- cargo doc --no-deps --workspace --features zlob
 
       - name: sccache stats
         if: always()
         run: /home/alex/.local/bin/sccache --show-stats
+
   # Frontend linting and type checking
   frontend-check:
     name: Frontend Check
@@ -360,8 +365,8 @@ jobs:
     name: Rust Unit Tests
     runs-on: [self-hosted, bigbox]
     timeout-minutes: 8
-    needs: [changes, compile-check]
-    if: needs.changes.outputs.rust-changed == 'true' && needs.compile-check.result == 'success'
+    needs: [changes, rust-format]
+    if: needs.changes.outputs.rust-changed == 'true' && needs.rust-format.result == 'success'
     env:
       RUSTC_WRAPPER: /home/alex/.local/bin/sccache
       SCCACHE_BUCKET: rust-cache
@@ -497,12 +502,19 @@ jobs:
             ${{ runner.os }}-cargo-ranking-
             ${{ runner.os }}-cargo-
 
+      - name: Install cargo-nextest
+        run: |
+          if ! command -v cargo-nextest >/dev/null 2>&1; then
+            cargo install cargo-nextest --locked
+          fi
+          cargo nextest --version
+
       - name: Run ranking regression gate
         run: |
           # Fails if Kendall-tau < 0.95 against committed snapshots.
           # To accept an intentional ranking change, run locally with
           # UPDATE_RANKING_SNAPSHOTS=1 and add "Ranking change ACK" to the PR.
-          cargo test -p terraphim_service ranking_regression
+          cargo nextest run -p terraphim_service --profile ci ranking_regression
 
       - name: sccache stats
         if: always()
@@ -625,7 +637,7 @@ jobs:
     name: PR Validation Summary
     runs-on: [self-hosted, bigbox]
     timeout-minutes: 1
-    needs: [changes, build-frontend, rust-format, compile-check, rust-tests, frontend-check, wasm-build, ranking-regression-gate]
+    needs: [changes, build-frontend, rust-format, rustdoc, rust-clippy, rust-compile, rust-tests, frontend-check, wasm-build, ranking-regression-gate]
     if: always()
 
     steps:
@@ -644,7 +656,9 @@ jobs:
           echo "| Changes Detected | ${{ needs.changes.result }} | Rust: ${{ needs.changes.outputs.rust-changed }}, Frontend: ${{ needs.changes.outputs.frontend-changed }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Build Frontend | ${{ needs.build-frontend.result || 'skipped' }} | Frontend build (frontend-only changes) |" >> $GITHUB_STEP_SUMMARY
           echo "| Rust Format | ${{ needs.rust-format.result || 'skipped' }} | Code formatting check |" >> $GITHUB_STEP_SUMMARY
-          echo "| Compile Check | ${{ needs.compile-check.result || 'skipped' }} | Compilation fast-fail gate |" >> $GITHUB_STEP_SUMMARY
+          echo "| Rustdoc | ${{ needs.rustdoc.result || 'skipped' }} | Documentation warnings gate |" >> $GITHUB_STEP_SUMMARY
+          echo "| Rust Clippy | ${{ needs.rust-clippy.result || 'skipped' }} | Linting and warnings |" >> $GITHUB_STEP_SUMMARY
+          echo "| Rust Compile | ${{ needs.rust-compile.result || 'skipped' }} | Compilation verification |" >> $GITHUB_STEP_SUMMARY
           echo "| Rust Tests | ${{ needs.rust-tests.result || 'skipped' }} | Unit test execution |" >> $GITHUB_STEP_SUMMARY
           echo "| Frontend Check | ${{ needs.frontend-check.result || 'skipped' }} | Frontend linting and types |" >> $GITHUB_STEP_SUMMARY
           echo "| WASM Build | ${{ needs.wasm-build.result || 'skipped' }} | WebAssembly compilation |" >> $GITHUB_STEP_SUMMARY
@@ -652,7 +666,9 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
 
           if [[ "${{ needs.rust-format.result }}" == "failure" ]] || \
-             [[ "${{ needs.compile-check.result }}" == "failure" ]] || \
+             [[ "${{ needs.rustdoc.result }}" == "failure" ]] || \
+             [[ "${{ needs.rust-clippy.result }}" == "failure" ]] || \
+             [[ "${{ needs.rust-compile.result }}" == "failure" ]] || \
              [[ "${{ needs.rust-tests.result }}" == "failure" ]] || \
              [[ "${{ needs.ranking-regression-gate.result }}" == "failure" ]]; then
             echo "❌ **PR Validation Failed** - Please fix the failing checks before merging." >> $GITHUB_STEP_SUMMARY

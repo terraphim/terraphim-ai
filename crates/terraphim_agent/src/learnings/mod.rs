@@ -26,6 +26,7 @@
 pub(crate) mod capture;
 pub mod compile;
 pub mod export_kg;
+pub mod guard;
 mod hook;
 mod install;
 pub(crate) mod procedure;
@@ -34,6 +35,9 @@ mod replay;
 #[cfg(feature = "shared-learning")]
 pub mod suggest;
 
+// Guard API — newly added, will be wired into the binary in a future iteration.
+#[allow(unused_imports)]
+pub use guard::{ExecutionTier, GuardDecision, evaluate_command, evaluate_command_with_learning};
 pub use procedure::ProcedureStore;
 pub use replay::{StepOutcome, replay_procedure};
 
@@ -44,8 +48,8 @@ pub use capture::{
 // Re-export for testing and external use
 #[allow(unused_imports)]
 pub use capture::{
-    CapturedLearning, ImportanceScore, LearningContext, LearningError, annotate_with_entities,
-    annotate_with_thesaurus, query_all_entries,
+    CapturedLearning, CorrectionEvent, ImportanceScore, LearningContext, LearningEntry,
+    LearningError, annotate_with_entities, annotate_with_thesaurus, query_all_entries,
 };
 // Re-export KG thesaurus building utilities for use by hook validation pipeline
 pub(crate) use capture::{build_kg_thesaurus_with_hash, find_kg_dir};

@@ -1,9 +1,14 @@
 [package]
 name = "terraphim_agent_evolution"
-version = "1.19.2"
+version = "1.20.2"
 edition.workspace = true
 description = "Agent evolution system for Terraphim AI"
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
+repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["ai", "agents", "evolution", "learning", "adaptation"]
 license = "MIT"
+readme = "../../README.md"
 
 [dependencies]
 async-trait = { workspace = true }

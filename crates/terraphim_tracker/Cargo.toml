@@ -1,11 +1,15 @@
 [package]
 name = "terraphim_tracker"
-version = "1.13.0"
+version = "1.20.2"
 edition = "2024"
-authors = ["Terraphim Team"]
+authors = ["Terraphim Team <team@terraphim.ai>"]
 description = "Issue tracker abstraction for Gitea and Linear with PageRank support"
-license = "Apache-2.0"
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
 repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["ai", "issue-tracker", "gitea", "linear", "pagerank"]
+license = "Apache-2.0"
+readme = "../../README.md"
 
 [dependencies]
 tokio = { workspace = true, features = ["rt", "macros"] }

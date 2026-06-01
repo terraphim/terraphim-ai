@@ -198,7 +198,14 @@ jobs:
           path: target/*.deb
           retention-days: 30
 
+      - name: Install cargo-nextest
+        run: |
+          if ! command -v cargo-nextest >/dev/null 2>&1; then
+            curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C "${CARGO_HOME:-$HOME/.cargo}/bin"
+          fi
+          cargo nextest --version
+
       - name: Run basic tests
         run: |
           # rocksdb feature disabled in CI
-          cargo test --target ${{ matrix.target }} --workspace --exclude terraphim_agent
+          cargo nextest run --target ${{ matrix.target }} --workspace --exclude terraphim_agent --profile ci

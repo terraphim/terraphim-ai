@@ -226,6 +226,7 @@ fn test_concepts_matched_populated_in_search_results_data() {
         results: vec![],
         total_matches: 0,
         concepts_matched: vec!["knowledge graph".to_string()],
+        thesaurus_matched: vec!["kg".to_string()],
         wildcard_fallback: false,
     };
     let meta = ResponseMeta::new("search");
@@ -275,6 +276,7 @@ fn test_wildcard_fallback_true_when_no_concepts_matched() {
         }],
         total_matches: 1,
         concepts_matched,
+        thesaurus_matched: vec![],
         wildcard_fallback,
     };
 
@@ -299,5 +301,69 @@ fn test_wildcard_fallback_true_when_no_concepts_matched() {
     assert!(
         json.pointer("/data/concepts_matched").is_none(),
         "concepts_matched must be absent from JSON when empty (serde skip_serializing_if)"
+    );
+}
+
+/// AC-c: thesaurus_matched field is populated in JSON when non-empty.
+#[test]
+fn test_thesaurus_matched_populated_in_search_results_data() {
+    let data = SearchResultsData {
+        results: vec![],
+        total_matches: 0,
+        concepts_matched: vec!["rust".to_string()],
+        thesaurus_matched: vec!["async".to_string(), "tokio".to_string()],
+        wildcard_fallback: false,
+    };
+    let meta = ResponseMeta::new("search");
+    let response = RobotResponse::success(data, meta);
+    let config = RobotConfig::new().with_format(OutputFormat::Json);
+    let formatter = RobotFormatter::new(config);
+    let output = formatter.format(&response).unwrap();
+    let json: serde_json::Value = serde_json::from_str(&output).unwrap();
+    let thesaurus = json
+        .pointer("/data/thesaurus_matched")
+        .and_then(|v| v.as_array())
+        .expect("thesaurus_matched must be present and an array");
+    assert!(
+        thesaurus.iter().any(|t| t.as_str() == Some("async")),
+        "thesaurus_matched must contain 'async'; got {:?}",
+        thesaurus
+    );
+    assert!(
+        thesaurus.iter().any(|t| t.as_str() == Some("tokio")),
+        "thesaurus_matched must contain 'tokio'; got {:?}",
+        thesaurus
+    );
+}
+
+/// AC-d: thesaurus_matched is omitted from JSON when empty.
+#[test]
+fn test_thesaurus_matched_omitted_when_empty() {
+    let data = SearchResultsData {
+        results: vec![SearchResultItem {
+            rank: 1,
+            id: "doc-1".to_string(),
+            title: "Test".to_string(),
+            url: None,
+            score: 0.5,
+            preview: None,
+            source: None,
+            date: None,
+            preview_truncated: false,
+        }],
+        total_matches: 1,
+        concepts_matched: vec!["test".to_string()],
+        thesaurus_matched: vec![],
+        wildcard_fallback: false,
+    };
+    let meta = ResponseMeta::new("search");
+    let response = RobotResponse::success(data, meta);
+    let config = RobotConfig::new().with_format(OutputFormat::Json);
+    let formatter = RobotFormatter::new(config);
+    let output = formatter.format(&response).unwrap();
+    let json: serde_json::Value = serde_json::from_str(&output).unwrap();
+    assert!(
+        json.pointer("/data/thesaurus_matched").is_none(),
+        "thesaurus_matched must be absent from JSON when empty (serde skip_serializing_if)"
     );
 }

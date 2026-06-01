@@ -1,11 +1,15 @@
 [package]
 name = "terraphim_orchestrator"
-version = "1.8.0"
+version = "1.20.2"
 edition = "2021"
-authors = ["Terraphim Team"]
+authors = ["Terraphim Team <team@terraphim.ai>"]
 description = "AI Dark Factory orchestrator wiring spawner, router, supervisor into a reconciliation loop"
-license = "Apache-2.0"
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
 repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["ai", "orchestrator", "agents", "dark-factory", "supervisor"]
+license = "Apache-2.0"
+readme = "../../README.md"
 
 [features]
 default = ["quickwit", "evolution"]
@@ -45,6 +49,9 @@ uuid = { workspace = true, features = ["v4", "serde"] }
 
 # Scheduling
 cron = "0.13"
+
+# CLI tool resolution
+which = "5"
 
 # Command parsing via terraphim-automata
 terraphim_automata = { path = "../terraphim_automata", version = "1.19.2" }

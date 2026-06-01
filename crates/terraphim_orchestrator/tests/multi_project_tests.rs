@@ -6,6 +6,7 @@ use std::path::PathBuf;
 
 use terraphim_orchestrator::config::OrchestratorConfig;
 use terraphim_orchestrator::error::OrchestratorError;
+use terraphim_orchestrator::{AgentRegistry, AgentScope};
 
 fn fixture(name: &str) -> PathBuf {
     let mut p = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -54,6 +55,81 @@ fn expands_include_glob_and_merges_fragments() {
     assert_eq!(config.include, vec!["conf.d/*.toml".to_string()]);
 
     config.validate().unwrap();
+}
+
+#[test]
+fn registry_indexes_merged_project_agents() -> Result<(), Box<dyn std::error::Error>> {
+    let config = OrchestratorConfig::from_file(fixture("base_include.toml"))?;
+    config.validate()?;
+
+    let registry = AgentRegistry::from_config(&config)?;
+    assert_eq!(registry.len(), config.agents.len());
+    assert!(registry.lookup_project("alpha", "alpha-watcher").is_some());
+    assert!(registry.lookup_project("beta", "beta-watcher").is_some());
+    assert!(registry.lookup_project("alpha", "beta-watcher").is_none());
+    assert_eq!(
+        registry.names_for_scope(&AgentScope::Project("beta".to_string())),
+        vec!["beta-reviewer", "beta-watcher"]
+    );
+    Ok(())
+}
+
+#[test]
+fn registry_lookup_does_not_cross_project_boundaries() -> Result<(), Box<dyn std::error::Error>> {
+    let toml_str = r#"
+working_dir = "/tmp/t"
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 2 * * *"
+repo_path = "/tmp/repo"
+
+[[projects]]
+id = "alpha"
+working_dir = "/tmp/alpha"
+
+[[projects]]
+id = "beta"
+working_dir = "/tmp/beta"
+
+[[agents]]
+name = "build-runner"
+layer = "Growth"
+cli_tool = "echo"
+task = "alpha-build"
+project = "alpha"
+event_only = true
+
+[[agents]]
+name = "build-runner"
+layer = "Growth"
+cli_tool = "echo"
+task = "beta-build"
+project = "beta"
+event_only = true
+"#;
+    let config = OrchestratorConfig::from_toml(toml_str)?;
+    config.validate()?;
+
+    let registry = AgentRegistry::from_config(&config)?;
+    let alpha_runner = registry
+        .lookup_project("alpha", "build-runner")
+        .ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::NotFound, "missing alpha build-runner")
+        })?;
+    let beta_runner = registry
+        .lookup_project("beta", "build-runner")
+        .ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::NotFound, "missing beta build-runner")
+        })?;
+
+    assert_eq!(alpha_runner.definition.task, "alpha-build");
+    assert_eq!(beta_runner.definition.task, "beta-build");
+    assert!(alpha_runner.event_only());
+    assert!(beta_runner.event_only());
+    assert!(registry.lookup_legacy("build-runner").is_none());
+    Ok(())
 }
 
 #[test]

@@ -17,11 +17,9 @@
 
 use anyhow::Result;
 use base64::Engine;
-use fff_search::external_scorer::ExternalScorer;
 use fff_search::{
-    ContentCacheBudget, FFFMode, FilePicker, FilePickerOptions, FuzzySearchOptions, GrepMode,
-    GrepSearchOptions, PaginationArgs, QueryParser, SharedFrecency, grep_search, multi_grep_search,
-    parse_grep_query,
+    FFFMode, FilePicker, FilePickerOptions, FuzzySearchOptions, GrepMode, GrepSearchOptions,
+    PaginationArgs, QueryParser, SharedFrecency, parse_grep_query,
 };
 use rmcp::{
     RoleServer, ServerHandler,
@@ -111,7 +109,7 @@ impl McpService {
     /// Create a new service instance
     pub fn new(config_state: Arc<ConfigState>) -> Self {
         let frecency = std::env::var("FFF_FRECENCY_PATH").ok().and_then(|path| {
-            fff_search::FrecencyTracker::new(&path, false)
+            fff_search::FrecencyTracker::open(&path)
                 .map(|tracker| {
                     let shared = SharedFrecency::default();
                     shared.init(tracker).ok();
@@ -1269,8 +1267,8 @@ impl McpService {
             base_path: base_path.clone(),
             mode: FFFMode::Ai,
             watch: false,
-            warmup_mmap_cache: false,
             cache_budget: None,
+            ..FilePickerOptions::default()
         })
         .map_err(|e| ErrorData::internal_error(format!("FilePicker init failed: {e}"), None))?;
 
@@ -1288,8 +1286,7 @@ impl McpService {
         let parser = QueryParser::default();
         let fff_query = parser.parse(&query);
 
-        let result = FilePicker::fuzzy_search(
-            files,
+        let result = picker.fuzzy_search(
             &fff_query,
             None,
             FuzzySearchOptions {
@@ -1302,15 +1299,20 @@ impl McpService {
             },
         );
 
-        // Apply KG boost: add scorer.score() to the fuzzy score, re-sort.
-        let mut scored: Vec<(i32, &str)> = result
+        // Apply KG boost: add path concept score to the fuzzy score, re-sort.
+        let mut scored: Vec<(i32, String)> = result
             .items
             .iter()
             .zip(result.scores.iter())
             .map(|(file, score)| {
                 let base = score.total;
-                let kg_boost = self.kg_scorer.as_ref().map(|s| s.score(file)).unwrap_or(0);
-                (base + kg_boost, file.relative_path.as_str())
+                let relative_path = file.relative_path(&picker);
+                let kg_boost = self
+                    .kg_scorer
+                    .as_ref()
+                    .map(|s| s.score_path(&relative_path))
+                    .unwrap_or(0);
+                (base + kg_boost, relative_path)
             })
             .collect();
         #[allow(clippy::unnecessary_sort_by)]
@@ -1363,8 +1365,8 @@ impl McpService {
             base_path: base_path.clone(),
             mode: FFFMode::Ai,
             watch: false,
-            warmup_mmap_cache: false,
             cache_budget: None,
+            ..FilePickerOptions::default()
         })
         .map_err(|e| ErrorData::internal_error(format!("FilePicker init failed: {e}"), None))?;
 
@@ -1372,19 +1374,13 @@ impl McpService {
             .collect_files()
             .map_err(|e| ErrorData::internal_error(format!("File scan failed: {e}"), None))?;
 
-        let mut files = picker.get_files().to_vec();
-        if files.is_empty() {
+        if picker.get_files().is_empty() {
             return Ok(CallToolResult::success(vec![Content::text(format!(
                 "No files found under '{base_path}'"
             ))]));
         }
 
-        if let Some(scorer) = &self.kg_scorer {
-            files.sort_by_key(|f| std::cmp::Reverse(scorer.score(f)));
-        }
-
         let fff_query = parse_grep_query(&query);
-        let budget = ContentCacheBudget::default();
         let options = GrepSearchOptions {
             max_file_size: 10 * 1024 * 1024,
             max_matches_per_file: 200,
@@ -1396,9 +1392,10 @@ impl McpService {
             before_context: 0,
             after_context: 0,
             classify_definitions: false,
+            ..GrepSearchOptions::default()
         };
 
-        let result = grep_search(&files, &fff_query, &options, &budget, None, None, None);
+        let result = picker.grep(&fff_query, &options);
 
         let mut contents = Vec::new();
         let header = format!(
@@ -1414,17 +1411,19 @@ impl McpService {
             let mut seen = std::collections::HashSet::new();
             for m in &result.matches {
                 if let Some(file) = result.files.get(m.file_index) {
-                    if seen.insert(file.relative_path.as_str()) {
-                        contents.push(Content::text(file.relative_path.clone()));
+                    let relative_path = file.relative_path(&picker);
+                    if seen.insert(relative_path.clone()) {
+                        contents.push(Content::text(relative_path));
                     }
                 }
             }
         } else {
             for m in result.matches.iter().take(max_results) {
                 if let Some(file) = result.files.get(m.file_index) {
+                    let relative_path = file.relative_path(&picker);
                     let line = format!(
                         "{}:{}:{}",
-                        file.relative_path,
+                        relative_path,
                         m.line_number,
                         m.line_content.trim_end()
                     );
@@ -1479,8 +1478,8 @@ impl McpService {
             base_path: base_path.clone(),
             mode: FFFMode::Ai,
             watch: false,
-            warmup_mmap_cache: false,
             cache_budget: None,
+            ..FilePickerOptions::default()
         })
         .map_err(|e| ErrorData::internal_error(format!("FilePicker init failed: {e}"), None))?;
 
@@ -1488,15 +1487,10 @@ impl McpService {
             .collect_files()
             .map_err(|e| ErrorData::internal_error(format!("File scan failed: {e}"), None))?;
 
-        let mut files = picker.get_files().to_vec();
-        if files.is_empty() {
+        if picker.get_files().is_empty() {
             return Ok(CallToolResult::success(vec![Content::text(format!(
                 "No files found under '{base_path}'"
             ))]));
-        }
-
-        if let Some(scorer) = &self.kg_scorer {
-            files.sort_by_key(|f| std::cmp::Reverse(scorer.score(f)));
         }
 
         let patterns_refs: Vec<&str> = patterns.iter().map(|s| s.as_str()).collect();
@@ -1506,7 +1500,6 @@ impl McpService {
         let parsed = parser.parse(constraint_str);
         let parsed_constraints = parsed.constraints.as_slice();
 
-        let budget = ContentCacheBudget::default();
         let options = GrepSearchOptions {
             max_file_size: 10 * 1024 * 1024,
             max_matches_per_file: 200,
@@ -1518,16 +1511,10 @@ impl McpService {
             before_context: 0,
             after_context: 0,
             classify_definitions: false,
+            ..GrepSearchOptions::default()
         };
 
-        let result = multi_grep_search(
-            &files,
-            &patterns_refs,
-            parsed_constraints,
-            &options,
-            &budget,
-            None,
-        );
+        let result = picker.multi_grep(&patterns_refs, parsed_constraints, &options);
 
         let mut contents = Vec::new();
         let header = format!(
@@ -1544,17 +1531,19 @@ impl McpService {
             let mut seen = std::collections::HashSet::new();
             for m in &result.matches {
                 if let Some(file) = result.files.get(m.file_index) {
-                    if seen.insert(file.relative_path.as_str()) {
-                        contents.push(Content::text(file.relative_path.clone()));
+                    let relative_path = file.relative_path(&picker);
+                    if seen.insert(relative_path.clone()) {
+                        contents.push(Content::text(relative_path));
                     }
                 }
             }
         } else {
             for m in result.matches.iter().take(max_results) {
                 if let Some(file) = result.files.get(m.file_index) {
+                    let relative_path = file.relative_path(&picker);
                     let line = format!(
                         "{}:{}:{}",
-                        file.relative_path,
+                        relative_path,
                         m.line_number,
                         m.line_content.trim_end()
                     );

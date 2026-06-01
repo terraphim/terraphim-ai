@@ -1,0 +1,29 @@
+[package]
+name = "terraphim_merge_coordinator"
+version.workspace = true
+edition.workspace = true
+description = "Merge coordinator for Terraphim AI - coordinates code merge operations"
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
+repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["ai", "merge", "git", "coordination"]
+license = "Apache-2.0"
+readme = "../../README.md"
+
+[dependencies]
+thiserror.workspace = true
+fs2 = "0.4"
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+reqwest = { workspace = true }
+tracing = { workspace = true }
+chrono.workspace = true
+
+[dev-dependencies]
+tempfile = "3.27"
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "test-util", "time"] }
+
+[[bin]]
+name = "merge-coordinator"
+path = "src/main.rs"

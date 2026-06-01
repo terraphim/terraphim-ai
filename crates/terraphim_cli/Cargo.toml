@@ -2,12 +2,15 @@
 name = "terraphim-cli"
 version.workspace = true
 edition.workspace = true
-authors = ["Terraphim Team"]
+authors = ["Terraphim Team <team@terraphim.ai>"]
 description = "CLI tool for semantic knowledge graph search with JSON output for automation"
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
 repository = "https://github.com/terraphim/terraphim-ai"
 license = "Apache-2.0"
 keywords = ["search", "knowledge-graph", "semantic", "cli", "automation"]
 categories = ["command-line-utilities", "text-processing"]
+readme = "../../README.md"
 
 [[bin]]
 name = "terraphim-cli"

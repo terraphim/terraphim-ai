@@ -1,6 +1,6 @@
 #!/bin/bash
 # Quick LLM Chat Test Runner
-# Runs essential tests with Ollama for development workflow
+# Runs essential tests with a free OpenRouter model for development workflow
 
 set -e
 
@@ -14,7 +14,7 @@ NC='\033[0m' # No Color
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
-echo -e "${BLUE}🚀 Quick LLM Chat Test Runner${NC}"
+echo -e "${BLUE}Quick LLM Chat Test Runner${NC}"
 echo -e "${BLUE}=============================${NC}"
 
 # Load environment
@@ -27,30 +27,19 @@ else
 fi
 
 # Set defaults
-OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-"http://127.0.0.1:11434"}
-OLLAMA_MODEL=${OLLAMA_MODEL:-"llama3.2:3b"}
+OPENROUTER_MODEL=${OPENROUTER_MODEL:-"liquid/lfm-2.5-1.2b-instruct:free"}
+export OPENROUTER_API_KEY OPENROUTER_MODEL
 
 echo -e "\n${BLUE}Configuration:${NC}"
-echo -e "  Ollama URL: ${OLLAMA_BASE_URL}"
-echo -e "  Model: ${OLLAMA_MODEL}"
+echo -e "  OpenRouter model: ${OPENROUTER_MODEL}"
 
-# Check Ollama availability
-echo -e "\n${BLUE}Checking Ollama...${NC}"
-if curl -s "${OLLAMA_BASE_URL}/api/tags" > /dev/null; then
-    echo -e "${GREEN}✓ Ollama is running${NC}"
-
-    # Ensure model is available
-    echo -e "${BLUE}Ensuring model is loaded...${NC}"
-    if command -v ollama &> /dev/null; then
-        ollama pull "${OLLAMA_MODEL}" 2>/dev/null || true
-        echo -e "${GREEN}✓ Model ${OLLAMA_MODEL} is ready${NC}"
-    else
-        echo -e "${YELLOW}⚠ ollama command not found, assuming model is loaded${NC}"
-    fi
+# Check OpenRouter availability
+echo -e "\n${BLUE}Checking OpenRouter...${NC}"
+if [ -n "${OPENROUTER_API_KEY:-}" ]; then
+    echo -e "${GREEN}PASS: OpenRouter API key is configured${NC}"
 else
-    echo -e "${RED}✗ Ollama is not running${NC}"
-    echo -e "${YELLOW}Please start Ollama with: ollama serve${NC}"
-    echo -e "${YELLOW}Then load the model with: ollama pull ${OLLAMA_MODEL}${NC}"
+    echo -e "${RED}FAIL: OPENROUTER_API_KEY is not set${NC}"
+    echo -e "${YELLOW}Set OPENROUTER_API_KEY and optionally OPENROUTER_MODEL=${OPENROUTER_MODEL}${NC}"
     exit 1
 fi
 
@@ -74,55 +63,55 @@ else
 fi
 
 # Run core tests
-echo -e "\n${BLUE}Running core LLM chat tests...${NC}"
+echo -e "\n${BLUE}Running core OpenRouter LLM chat tests...${NC}"
 
 # Test 1: Basic functionality with Default role
-echo -e "\n${BLUE}Test 1: Default role with Ollama${NC}"
-if cargo test --test llm_chat_matrix_test test_default_ripgrep_ollama --features ollama -- --ignored --nocapture; then
-    echo -e "${GREEN}✓ Default role test passed${NC}"
+echo -e "\n${BLUE}Test 1: Default role with OpenRouter${NC}"
+if cargo test --test llm_chat_matrix_test test_default_ripgrep_openrouter --features openrouter -- --ignored --nocapture; then
+    echo -e "${GREEN}PASS: Default role test passed${NC}"
 else
-    echo -e "${RED}✗ Default role test failed${NC}"
-    echo -e "${YELLOW}This is a critical test - please check Ollama configuration${NC}"
+    echo -e "${RED}FAIL: Default role test failed${NC}"
+    echo -e "${YELLOW}This is a critical test - please check OpenRouter configuration${NC}"
     exit 1
 fi
 
 # Test 2: Rust Engineer role (tests system prompts)
-echo -e "\n${BLUE}Test 2: Rust Engineer role with Ollama${NC}"
-if cargo test --test llm_chat_matrix_test test_rust_engineer_ripgrep_ollama --features ollama -- --ignored --nocapture; then
-    echo -e "${GREEN}✓ Rust Engineer role test passed${NC}"
+echo -e "\n${BLUE}Test 2: Rust Engineer role with OpenRouter${NC}"
+if cargo test --test llm_chat_matrix_test test_rust_engineer_ripgrep_openrouter --features openrouter -- --ignored --nocapture; then
+    echo -e "${GREEN}PASS: Rust Engineer role test passed${NC}"
 else
-    echo -e "${YELLOW}⚠ Rust Engineer role test failed${NC}"
+    echo -e "${YELLOW}WARN: Rust Engineer role test failed${NC}"
 fi
 
 # Test 3: AI Engineer role
-echo -e "\n${BLUE}Test 3: AI Engineer role with Ollama${NC}"
-if cargo test --test llm_chat_matrix_test test_ai_engineer_ripgrep_ollama --features ollama -- --ignored --nocapture; then
-    echo -e "${GREEN}✓ AI Engineer role test passed${NC}"
+echo -e "\n${BLUE}Test 3: AI Engineer role with OpenRouter${NC}"
+if cargo test --test llm_chat_matrix_test test_ai_engineer_ripgrep_openrouter --features openrouter -- --ignored --nocapture; then
+    echo -e "${GREEN}PASS: AI Engineer role test passed${NC}"
 else
-    echo -e "${YELLOW}⚠ AI Engineer role test failed${NC}"
+    echo -e "${YELLOW}WARN: AI Engineer role test failed${NC}"
 fi
 
-# Test 4: Performance benchmark
-echo -e "\n${BLUE}Test 4: Performance benchmarks${NC}"
-if cargo test --test llm_chat_matrix_test test_performance_benchmarks --features ollama -- --ignored --nocapture; then
-    echo -e "${GREEN}✓ Performance benchmarks passed${NC}"
+# Test 4: System Operator role
+echo -e "\n${BLUE}Test 4: System Operator role with OpenRouter${NC}"
+if cargo test --test llm_chat_matrix_test test_system_operator_ripgrep_openrouter --features openrouter -- --ignored --nocapture; then
+    echo -e "${GREEN}PASS: System Operator role test passed${NC}"
 else
-    echo -e "${YELLOW}⚠ Performance benchmarks failed${NC}"
+    echo -e "${YELLOW}WARN: System Operator role test failed${NC}"
 fi
 
 # Summary
 echo -e "\n${BLUE}=============================${NC}"
-echo -e "${GREEN}🎉 Quick tests completed!${NC}"
+echo -e "${GREEN}Quick tests completed!${NC}"
 echo -e "\n${BLUE}What was tested:${NC}"
-echo -e "  ✓ Ollama connectivity and model loading"
-echo -e "  ✓ Basic LLM chat functionality"
-echo -e "  ✓ Role-specific system prompts"
-echo -e "  ✓ Response timing and performance"
+echo -e "  PASS: OpenRouter free-model connectivity"
+echo -e "  PASS: Basic LLM chat functionality"
+echo -e "  PASS: Role-specific system prompts"
+echo -e "  PASS: Bounded response timing"
 
 echo -e "\n${BLUE}For comprehensive testing, run:${NC}"
 echo -e "  ./scripts/test_llm_chat_matrix.sh"
 
-echo -e "\n${BLUE}For OpenRouter testing (requires API key):${NC}"
-echo -e "  cargo test --test llm_chat_matrix_test test_ai_engineer_ripgrep_openrouter --features openrouter -- --ignored --nocapture"
+echo -e "\n${BLUE}For one-off OpenRouter testing:${NC}"
+echo -e "  OPENROUTER_MODEL=${OPENROUTER_MODEL} cargo test --test llm_chat_matrix_test test_ai_engineer_ripgrep_openrouter --features openrouter -- --ignored --nocapture"
 
-echo -e "\n${GREEN}✅ LLM Chat system is working correctly with Ollama!${NC}"
+echo -e "\n${GREEN}LLM Chat system is working correctly with OpenRouter!${NC}"

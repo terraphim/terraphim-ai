@@ -99,6 +99,7 @@ pub mod shared_learning;
 pub mod capability;
 pub use capability::*;
 
+/// Scoring algorithms and query types for document relevance ranking.
 pub mod score;
 
 // MCP Tool types for self-learning system
@@ -261,11 +262,13 @@ impl<'de> Deserialize<'de> for RoleName {
 pub struct NormalizedTermValue(String);
 
 impl NormalizedTermValue {
+    /// Creates a new value by trimming whitespace and lowercasing `term`.
     pub fn new(term: String) -> Self {
         let value = term.trim().to_lowercase();
         Self(value)
     }
-    // convert to &str
+
+    /// Returns the normalised term as a string slice.
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -471,16 +474,21 @@ impl Display for Concept {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DocumentType {
+    /// A knowledge graph entry (synonym / concept definition). Default variant.
     #[default]
     KgEntry,
+    /// A regular content document (article, note, etc.).
     Document,
+    /// A configuration document (role config, settings file, etc.).
     ConfigDocument,
 }
 
 /// Routing directive specifying which LLM provider and model to use.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RouteDirective {
+    /// LLM provider name (e.g. `"anthropic"`, `"openrouter"`).
     pub provider: String,
+    /// Model identifier within the provider (e.g. `"claude-sonnet-4-5"`).
     pub model: String,
     /// CLI action template with `{{ model }}` and `{{ prompt }}` placeholders.
     #[serde(default)]
@@ -490,11 +498,116 @@ pub struct RouteDirective {
     pub is_free: bool,
 }
 
+impl RouteDirective {
+    /// Extract the CLI basename from the first whitespace-delimited token of
+    /// the action template, e.g. `"opencode"` from
+    /// `"/home/alex/.bun/bin/opencode run -m {{ model }} ..."`.
+    ///
+    /// Returns `None` when the action template is missing or empty.
+    pub fn cli_basename(&self) -> Option<&str> {
+        let first = self.action.as_deref()?.split_whitespace().next()?;
+        std::path::Path::new(first).file_name()?.to_str()
+    }
+
+    /// Build a probe/health cache key from the route's `(cli, provider, model)`
+    /// triple. Used so that the same `(provider, model)` reached via two
+    /// different CLIs (e.g. opencode vs. pi-rust) has independent health.
+    ///
+    /// Returns an empty CLI segment when the action template is missing.
+    pub fn route_key(&self) -> String {
+        format!(
+            "{}:{}:{}",
+            self.cli_basename().unwrap_or(""),
+            self.provider,
+            self.model,
+        )
+    }
+}
+
+#[cfg(test)]
+mod route_directive_tests {
+    use super::*;
+
+    #[test]
+    fn cli_basename_extracts_opencode() {
+        let r = RouteDirective {
+            provider: "kimi".into(),
+            model: "kimi-for-coding/k2p6".into(),
+            action: Some(
+                "/home/alex/.bun/bin/opencode run -m {{ model }} --format json \"{{ prompt }}\""
+                    .into(),
+            ),
+            is_free: false,
+        };
+        assert_eq!(r.cli_basename(), Some("opencode"));
+    }
+
+    #[test]
+    fn cli_basename_extracts_pi_rust() {
+        let r = RouteDirective {
+            provider: "zai-coding-plan".into(),
+            model: "glm-5.1".into(),
+            action: Some(
+                "/home/alex/.local/bin/pi-rust --provider zai-coding-plan --model {{ model }} -p \"{{ prompt }}\""
+                    .into(),
+            ),
+            is_free: true,
+        };
+        assert_eq!(r.cli_basename(), Some("pi-rust"));
+    }
+
+    #[test]
+    fn cli_basename_extracts_claude() {
+        let r = RouteDirective {
+            provider: "anthropic".into(),
+            model: "opus".into(),
+            action: Some(
+                "/home/alex/.local/bin/claude --model {{ model }} -p \"{{ prompt }}\" --max-turns 50"
+                    .into(),
+            ),
+            is_free: false,
+        };
+        assert_eq!(r.cli_basename(), Some("claude"));
+    }
+
+    #[test]
+    fn cli_basename_none_when_action_missing() {
+        let r = RouteDirective {
+            provider: "x".into(),
+            model: "y".into(),
+            action: None,
+            is_free: false,
+        };
+        assert_eq!(r.cli_basename(), None);
+    }
+
+    #[test]
+    fn route_key_distinguishes_cli() {
+        let opencode_zai = RouteDirective {
+            provider: "zai-coding-plan".into(),
+            model: "glm-5.1".into(),
+            action: Some("/home/alex/.bun/bin/opencode run -m {{ model }}".into()),
+            is_free: true,
+        };
+        let pi_rust_zai = RouteDirective {
+            provider: "zai-coding-plan".into(),
+            model: "glm-5.1".into(),
+            action: Some("/home/alex/.local/bin/pi-rust --provider zai-coding-plan".into()),
+            is_free: true,
+        };
+        assert_eq!(opencode_zai.route_key(), "opencode:zai-coding-plan:glm-5.1");
+        assert_eq!(pi_rust_zai.route_key(), "pi-rust:zai-coding-plan:glm-5.1");
+        assert_ne!(opencode_zai.route_key(), pi_rust_zai.route_key());
+    }
+}
+
 /// Parsed directives extracted from the YAML front matter of a markdown KG entry.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MarkdownDirectives {
+    /// How to classify this entry in the knowledge graph.
     #[serde(default)]
     pub doc_type: DocumentType,
+    /// Alternative names and synonyms for the concept.
     #[serde(default)]
     pub synonyms: Vec<String>,
     /// Primary route (first in the list). Kept for backward compatibility.
@@ -504,10 +617,13 @@ pub struct MarkdownDirectives {
     /// Each route may have an `action::` template for CLI invocation.
     #[serde(default)]
     pub routes: Vec<RouteDirective>,
+    /// Optional display/sort priority hint (lower = higher priority).
     #[serde(default)]
     pub priority: Option<u8>,
+    /// Optional trigger term that activates this entry during indexing.
     #[serde(default)]
     pub trigger: Option<String>,
+    /// Whether this entry is pinned to the top of search results.
     #[serde(default)]
     pub pinned: bool,
     /// First `# Heading` from the markdown file, preserving original case.
@@ -649,6 +765,7 @@ pub struct Edge {
 }
 
 impl Edge {
+    /// Creates an edge with the given ID pointing to `document_id` with an initial rank of 1.
     pub fn new(id: u64, document_id: String) -> Self {
         let mut doc_hash = AHashMap::new();
         doc_hash.insert(document_id, 1);
@@ -771,6 +888,7 @@ impl Thesaurus {
         self.data.get(key)
     }
 
+    /// Returns an iterator over all normalised term keys in the thesaurus.
     pub fn keys(
         &self,
     ) -> std::collections::hash_map::Keys<'_, NormalizedTermValue, NormalizedTerm> {
@@ -961,9 +1079,12 @@ pub struct IndexedDocument {
 }
 
 impl IndexedDocument {
+    /// Serialises this document to a JSON string.
     pub fn to_json_string(&self) -> Result<String, serde_json::Error> {
         serde_json::to_string(&self)
     }
+
+    /// Creates a minimal `IndexedDocument` from a [`Document`], with empty edge/node lists.
     pub fn from_document(document: Document) -> Self {
         IndexedDocument {
             id: document.id,
@@ -1250,14 +1371,17 @@ pub enum KnowledgeGraphInputType {
 pub struct ConversationId(pub String);
 
 impl ConversationId {
+    /// Generates a new random UUID-based conversation ID.
     pub fn new() -> Self {
         Self(uuid::Uuid::new_v4().to_string())
     }
 
+    /// Wraps an existing string as a conversation ID.
     pub fn from_string(id: String) -> Self {
         Self(id)
     }
 
+    /// Returns the ID as a string slice.
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -1303,14 +1427,17 @@ pub enum ContextType {
 pub struct MessageId(pub String);
 
 impl MessageId {
+    /// Generates a new random UUID-based message ID.
     pub fn new() -> Self {
         Self(uuid::Uuid::new_v4().to_string())
     }
 
+    /// Wraps an existing string as a message ID.
     pub fn from_string(id: String) -> Self {
         Self(id)
     }
 
+    /// Returns the ID as a string slice.
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -1676,7 +1803,30 @@ impl ChatMessage {
     }
 }
 
-/// A conversation containing multiple messages and context
+/// Health status of conversation context based on token budget utilization.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "typescript", derive(Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+#[serde(rename_all = "snake_case")]
+pub enum RotStatus {
+    /// Context well within budget (< 75%)
+    Fresh,
+    /// Context approaching budget limit (75-90%)
+    Warning,
+    /// Context critically close to or over budget (> 90%)
+    Critical,
+}
+
+impl std::fmt::Display for RotStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RotStatus::Fresh => write!(f, "fresh"),
+            RotStatus::Warning => write!(f, "warning"),
+            RotStatus::Critical => write!(f, "critical"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
@@ -1697,6 +1847,9 @@ pub struct Conversation {
     pub updated_at: chrono::DateTime<chrono::Utc>,
     /// Metadata about the conversation
     pub metadata: AHashMap<String, String>,
+    /// Token budget for this conversation (if set)
+    #[serde(default)]
+    pub token_budget: Option<usize>,
 }
 
 impl Conversation {
@@ -1712,6 +1865,38 @@ impl Conversation {
             created_at: now,
             updated_at: now,
             metadata: AHashMap::new(),
+            token_budget: None,
+        }
+    }
+
+    /// Set the token budget for this conversation.
+    pub fn with_token_budget(mut self, budget: usize) -> Self {
+        self.token_budget = Some(budget);
+        self
+    }
+
+    /// Check the rot status of this conversation based on token budget.
+    ///
+    /// Returns `None` if no token budget is set.
+    /// Uses `estimated_context_length()` as a conservative proxy for token count
+    /// (byte count is always >= token count, so this errs on the side of caution).
+    pub fn check_rot(&self) -> Option<RotStatus> {
+        let budget = self.token_budget?;
+        if budget == 0 {
+            return Some(RotStatus::Critical);
+        }
+
+        let current_size = self.estimated_context_length();
+        // Conservative ratio: bytes are always >= tokens, so we may flag
+        // rot slightly earlier than a true tokenizer would.
+        let ratio = current_size as f32 / budget as f32;
+
+        if ratio > 0.9 {
+            Some(RotStatus::Critical)
+        } else if ratio > 0.75 {
+            Some(RotStatus::Warning)
+        } else {
+            Some(RotStatus::Fresh)
         }
     }
 
@@ -1818,6 +2003,7 @@ pub struct ContextHistory {
 }
 
 impl ContextHistory {
+    /// Creates an empty context history with the given capacity limit.
     pub fn new(max_entries: usize) -> Self {
         Self {
             used_contexts: Vec::new(),
@@ -2299,6 +2485,7 @@ pub struct MultiAgentContext {
 }
 
 impl MultiAgentContext {
+    /// Creates a new multi-agent context with a fresh session ID and empty agent/shared-context lists.
     pub fn new() -> Self {
         let now = chrono::Utc::now();
         Self {
@@ -3304,5 +3491,64 @@ mod tests {
     fn test_thesaurus_with_source_hash() {
         let thesaurus = Thesaurus::new("test".to_string()).with_source_hash("hash123".to_string());
         assert_eq!(thesaurus.source_hash, Some("hash123".to_string()));
+    }
+
+    #[test]
+    fn test_context_rot_no_budget_returns_none() {
+        let conv = Conversation::new("test".to_string(), RoleName::new("engineer"));
+        assert!(conv.check_rot().is_none());
+    }
+
+    #[test]
+    fn test_context_rot_fresh() {
+        let conv = Conversation::new("test".to_string(), RoleName::new("engineer"))
+            .with_token_budget(1000);
+        // Empty conversation should be fresh
+        assert_eq!(conv.check_rot(), Some(RotStatus::Fresh));
+    }
+
+    #[test]
+    fn test_context_rot_warning() {
+        let mut conv = Conversation::new("test".to_string(), RoleName::new("engineer"))
+            .with_token_budget(1000);
+        // Add enough content to hit 75-90% ratio
+        // Need ~750-900 bytes to trigger warning
+        let content = "x".repeat(800);
+        conv.add_message(ChatMessage::user(content));
+        assert_eq!(conv.check_rot(), Some(RotStatus::Warning));
+    }
+
+    #[test]
+    fn test_context_rot_critical() {
+        let mut conv = Conversation::new("test".to_string(), RoleName::new("engineer"))
+            .with_token_budget(1000);
+        // Add enough content to exceed 90% ratio
+        // Need >900 bytes to trigger critical
+        let content = "x".repeat(950);
+        conv.add_message(ChatMessage::user(content));
+        assert_eq!(conv.check_rot(), Some(RotStatus::Critical));
+    }
+
+    #[test]
+    fn test_context_rot_zero_budget_is_critical() {
+        let conv =
+            Conversation::new("test".to_string(), RoleName::new("engineer")).with_token_budget(0);
+        assert_eq!(conv.check_rot(), Some(RotStatus::Critical));
+    }
+
+    #[test]
+    fn test_context_rot_display() {
+        assert_eq!(format!("{}", RotStatus::Fresh), "fresh");
+        assert_eq!(format!("{}", RotStatus::Warning), "warning");
+        assert_eq!(format!("{}", RotStatus::Critical), "critical");
+    }
+
+    #[test]
+    fn test_context_rot_serde_roundtrip() {
+        let status = RotStatus::Warning;
+        let json = serde_json::to_string(&status).unwrap();
+        assert_eq!(json, "\"warning\"");
+        let deserialized: RotStatus = serde_json::from_str(&json).unwrap();
+        assert_eq!(status, deserialized);
     }
 }

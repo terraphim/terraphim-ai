@@ -12,10 +12,7 @@ async fn test_multi_agent_integration_proof() {
 
     // Step 1: Initialize storage
     println!("1️⃣ Initializing storage...");
-    DeviceStorage::init_memory_only().await.unwrap();
-    let storage_ref = DeviceStorage::instance().await.unwrap();
-    let storage_copy = unsafe { std::ptr::read(storage_ref) };
-    let persistence = Arc::new(storage_copy);
+    let persistence = DeviceStorage::arc_memory_only().await.unwrap();
     println!("✅ Storage initialized successfully");
 
     // Step 2: Create test role with OpenAI configuration

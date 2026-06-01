@@ -50,7 +50,19 @@ RUN apt-get update -qq && apt-get install -yqq --no-install-recommends \
     pkg-config \
     musl-tools \
     musl-dev \
+    software-properties-common \
     && rm -rf /var/lib/apt/lists/*
+
+# Ubuntu 20.04 ships GCC 9 which has a memcmp bug (GCC #95189) that aws-lc-sys
+# refuses to compile with. Install GCC 10 from the ubuntu-toolchain-r PPA.
+RUN if [ "${UBUNTU_VERSION}" = "20.04" ]; then \
+        add-apt-repository -y ppa:ubuntu-toolchain-r/test && \
+        apt-get update -qq && \
+        apt-get install -yqq --no-install-recommends gcc-10 g++-10 && \
+        update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-10 100 && \
+        update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-10 100 && \
+        rm -rf /var/lib/apt/lists/*; \
+    fi
 
 # Install cross-compilation tools based on target architecture
 RUN case "${TARGETARCH}" in \

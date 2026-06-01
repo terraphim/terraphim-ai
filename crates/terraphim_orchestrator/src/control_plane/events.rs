@@ -460,6 +460,7 @@ mod tests {
             issue_number: 42,
             comment_id: 12345,
             context: "review this".to_string(),
+            synthetic_event: None,
         };
 
         let poll_cmd = AdfCommand::SpawnAgent {
@@ -598,6 +599,7 @@ mod tests {
             issue_number: 42,
             comment_id: 12345,
             context: "check for vulnerabilities".to_string(),
+            synthetic_event: None,
         };
 
         let event = normalize_webhook_dispatch(&dispatch, &ctx);
@@ -636,6 +638,7 @@ mod tests {
             issue_number: 42,
             comment_id: 123,
             context: "do something".to_string(),
+            synthetic_event: None,
         };
 
         let event1 = normalize_webhook_dispatch(&dispatch, &ctx);
@@ -671,6 +674,7 @@ mod tests {
             issue_number: 42,
             comment_id: 123,
             context: "do something".to_string(),
+            synthetic_event: None,
         };
 
         let dispatch2 = WebhookDispatch::SpawnAgent {
@@ -679,6 +683,7 @@ mod tests {
             issue_number: 42,
             comment_id: 124, // Different comment
             context: "do something".to_string(),
+            synthetic_event: None,
         };
 
         let event1 = normalize_webhook_dispatch(&dispatch1, &ctx1);
@@ -716,6 +721,7 @@ mod tests {
             issue_number: 42,
             comment_id: 123,
             context: "do something".to_string(),
+            synthetic_event: None,
         };
 
         let dispatch2 = WebhookDispatch::SpawnAgent {
@@ -724,6 +730,7 @@ mod tests {
             issue_number: 43, // Different issue
             comment_id: 123,
             context: "do something".to_string(),
+            synthetic_event: None,
         };
 
         let event1 = normalize_webhook_dispatch(&dispatch1, &ctx1);
@@ -761,6 +768,7 @@ mod tests {
             issue_number: 42,
             comment_id: 12345,
             context: "review".to_string(),
+            synthetic_event: None,
         };
 
         let poll_event = normalize_polled_command(

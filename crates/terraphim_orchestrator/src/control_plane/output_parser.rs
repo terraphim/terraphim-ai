@@ -203,6 +203,96 @@ fn parse_claude_result(value: &serde_json::Value, session_id: &str, model: &str)
     })
 }
 
+/// Parse a single line from `pi-rust -p --mode json` output.
+///
+/// pi-rust emits newline-delimited JSON events. The telemetry-relevant event
+/// is `turn_end`, which carries token usage, cost, and latency:
+///
+/// ```json
+/// {"type":"turn_end","sessionId":"...","turnIndex":0,"message":{"role":"assistant",
+///  "usage":{"input":6938,"output":4,"cacheRead":64,"cacheWrite":0,"totalTokens":6942,
+///  "cost":{"total":0.0}},"stopReason":"stop"},
+///  "latencyBreakdown":{"totalMs":3905}}
+/// ```
+pub fn parse_pi_rust_line(line: &str, session_id: &str, model: &str) -> ParsedOutput {
+    let line = line.trim();
+    if line.is_empty() {
+        return ParsedOutput::Ignored;
+    }
+
+    let Ok(value) = serde_json::from_str::<serde_json::Value>(line) else {
+        return ParsedOutput::Unparseable(line.to_string());
+    };
+
+    let event_type = value.get("type").and_then(|v| v.as_str()).unwrap_or("");
+
+    match event_type {
+        "turn_end" => parse_pi_rust_turn_end(&value, session_id, model),
+        "session" | "agent_start" | "agent_end" | "message_start" | "message_end"
+        | "message_update" | "turn_start" => ParsedOutput::Ignored,
+        _ => ParsedOutput::Ignored,
+    }
+}
+
+fn parse_pi_rust_turn_end(
+    value: &serde_json::Value,
+    session_id: &str,
+    model: &str,
+) -> ParsedOutput {
+    let message = match value.get("message") {
+        Some(m) => m,
+        None => return ParsedOutput::Unparseable(value.to_string()),
+    };
+
+    let usage = message.get("usage");
+
+    let tokens = usage
+        .map(|u| TokenBreakdown {
+            total: u.get("totalTokens").and_then(|v| v.as_u64()).unwrap_or(0),
+            input: u.get("input").and_then(|v| v.as_u64()).unwrap_or(0),
+            output: u.get("output").and_then(|v| v.as_u64()).unwrap_or(0),
+            reasoning: 0,
+            cache_read: u.get("cacheRead").and_then(|v| v.as_u64()).unwrap_or(0),
+            cache_write: u.get("cacheWrite").and_then(|v| v.as_u64()).unwrap_or(0),
+        })
+        .unwrap_or_default();
+
+    let cost_usd = usage
+        .and_then(|u| u.get("cost"))
+        .and_then(|c| c.get("total"))
+        .and_then(|v| v.as_f64())
+        .unwrap_or(0.0);
+
+    let latency_ms = value
+        .get("latencyBreakdown")
+        .and_then(|lb| lb.get("totalMs"))
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0);
+
+    let stop_reason = message
+        .get("stopReason")
+        .and_then(|v| v.as_str())
+        .unwrap_or("stop");
+
+    let success = stop_reason == "stop";
+    let error = if success {
+        None
+    } else {
+        Some(format!("completion ended with reason: {}", stop_reason))
+    };
+
+    ParsedOutput::Completion(CompletionEvent {
+        model: model.to_string(),
+        session_id: session_id.to_string(),
+        completed_at: Utc::now(),
+        latency_ms,
+        success,
+        tokens,
+        cost_usd,
+        error,
+    })
+}
+
 /// Parse stderr output for error patterns (subscription limits, rate limits).
 ///
 /// Returns Some(error_message) if a subscription-limit error is detected.
@@ -359,5 +449,88 @@ mod tests {
 
         let stderr = "connection refused\nno route to host";
         assert!(parse_stderr_for_limit_errors(stderr).is_none());
+    }
+
+    #[test]
+    fn test_parse_pi_rust_turn_end() {
+        let line = r#"{"type":"turn_end","sessionId":"1e4e4498","turnIndex":0,"message":{"role":"assistant","content":[{"type":"text","text":"4"}],"api":"openai-completions","provider":"zai-coding-plan","model":"glm-5.1","usage":{"input":6938,"output":4,"cacheRead":64,"cacheWrite":0,"totalTokens":6942,"cost":{"input":0.0,"output":0.0,"cacheRead":0.0,"cacheWrite":0.0,"total":0.01}},"stopReason":"stop"},"latencyBreakdown":{"totalMs":3905,"dominantComponent":"provider_streaming"}}"#;
+
+        let result = parse_pi_rust_line(line, "sess-1", "zai-coding-plan/glm-5.1");
+        match result {
+            ParsedOutput::Completion(event) => {
+                assert_eq!(event.model, "zai-coding-plan/glm-5.1");
+                assert_eq!(event.session_id, "sess-1");
+                assert!(event.success);
+                assert_eq!(event.tokens.total, 6942);
+                assert_eq!(event.tokens.input, 6938);
+                assert_eq!(event.tokens.output, 4);
+                assert_eq!(event.tokens.cache_read, 64);
+                assert_eq!(event.tokens.cache_write, 0);
+                assert_eq!(event.latency_ms, 3905);
+                assert!((event.cost_usd - 0.01).abs() < f64::EPSILON);
+            }
+            _ => panic!("Expected Completion, got {:?}", result),
+        }
+    }
+
+    #[test]
+    fn test_parse_pi_rust_ignored_events() {
+        assert_eq!(
+            parse_pi_rust_line(
+                r#"{"type":"session","version":3,"id":"abc"}"#,
+                "sess-1",
+                "model-a"
+            ),
+            ParsedOutput::Ignored
+        );
+        assert_eq!(
+            parse_pi_rust_line(
+                r#"{"type":"agent_start","sessionId":"abc"}"#,
+                "sess-1",
+                "model-a"
+            ),
+            ParsedOutput::Ignored
+        );
+        assert_eq!(
+            parse_pi_rust_line(
+                r#"{"type":"message_update","message":{}}"#,
+                "sess-1",
+                "model-a"
+            ),
+            ParsedOutput::Ignored
+        );
+    }
+
+    #[test]
+    fn test_parse_pi_rust_unparseable() {
+        let result = parse_pi_rust_line("not json at all", "sess-1", "model-a");
+        assert!(matches!(result, ParsedOutput::Unparseable(_)));
+    }
+
+    #[test]
+    fn test_parse_pi_rust_non_stop_reason() {
+        let line = r#"{"type":"turn_end","sessionId":"abc","turnIndex":0,"message":{"role":"assistant","usage":{"input":100,"output":50,"cacheRead":0,"cacheWrite":0,"totalTokens":150,"cost":{"total":0.0}},"stopReason":"error"},"latencyBreakdown":{"totalMs":100}}"#;
+
+        let result = parse_pi_rust_line(line, "sess-1", "model-a");
+        match result {
+            ParsedOutput::Completion(event) => {
+                assert!(!event.success);
+                assert!(event.error.is_some());
+                assert!(event.error.unwrap().contains("error"));
+            }
+            _ => panic!("Expected Completion, got {:?}", result),
+        }
+    }
+
+    #[test]
+    fn test_parse_pi_rust_empty_line() {
+        assert_eq!(
+            parse_pi_rust_line("", "sess-1", "model-a"),
+            ParsedOutput::Ignored
+        );
+        assert_eq!(
+            parse_pi_rust_line("   ", "sess-1", "model-a"),
+            ParsedOutput::Ignored
+        );
     }
 }

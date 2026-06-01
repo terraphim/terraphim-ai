@@ -1,0 +1,5 @@
+slot=1
+model=local-shell-proof
+issue=1890
+flow=adf-useful-work-proof
+exit_status=success

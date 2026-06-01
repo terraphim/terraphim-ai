@@ -228,7 +228,7 @@ impl CompoundReviewResult {
 ///
 /// Dispatches review agents in parallel, collects findings,
 /// and optionally creates PRs with results.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CompoundReviewWorkflow {
     config: SwarmConfig,
     worktree_manager: WorktreeManager,

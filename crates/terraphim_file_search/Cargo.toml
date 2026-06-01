@@ -4,7 +4,6 @@ version.workspace = true
 edition.workspace = true
 authors = ["Terraphim Contributors"]
 description = "Knowledge-graph scored file search integration for Terraphim AI"
-publish = false
 documentation = "https://terraphim.ai"
 homepage = "https://terraphim.ai"
 repository = "https://github.com/terraphim/terraphim-ai"
@@ -13,9 +12,9 @@ license = "Apache-2.0"
 readme = "../../README.md"
 
 [dependencies]
-terraphim_automata = { path = "../terraphim_automata" }
-terraphim_types = { path = "../terraphim_types" }
-fff-search = { git = "https://github.com/AlexMikhalev/fff.nvim.git", branch = "feat/external-scorer" }
+terraphim_automata = { path = "../terraphim_automata", version = "1.19.2" }
+terraphim_types = { path = "../terraphim_types", version = "1.15.0" }
+fff-search = { version = "0.8.4" }
 
 ahash = "0.8"
 parking_lot = "0.12"
@@ -30,7 +29,7 @@ notify-debouncer-full = "0.6"
 # build time (installed on bigbox, the rust-ci VM image, and local Mac dev
 # machines via homebrew). On Darwin, see .cargo/config.toml for the
 # `-undefined dynamic_lookup` linker workaround.
-default = ["zlob"]
+default = []
 zlob = ["fff-search/zlob"]
 
 [dev-dependencies]

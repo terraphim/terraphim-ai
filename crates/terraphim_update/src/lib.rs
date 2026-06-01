@@ -102,6 +102,21 @@ pub struct UpdaterConfig {
 
 impl UpdaterConfig {
     /// Create a new updater config for Terraphim AI binaries
+    ///
+    /// **IMPORTANT**: The default version returned by this constructor is the
+    /// version of the `terraphim_update` library crate, NOT the version of the
+    /// binary being updated. This is because `cargo_crate_version!()` returns
+    /// the version of the crate where the macro is invoked.
+    ///
+    /// To report the correct version, always chain `.with_version()` when
+    /// creating the config from a binary:
+    ///
+    /// ```rust
+    /// use terraphim_update::UpdaterConfig;
+    ///
+    /// let config = UpdaterConfig::new("terraphim-agent")
+    ///     .with_version(env!("CARGO_PKG_VERSION"));
+    /// ```
     pub fn new(bin_name: impl Into<String>) -> Self {
         Self {
             bin_name: bin_name.into(),
@@ -112,7 +127,10 @@ impl UpdaterConfig {
         }
     }
 
-    /// Set a custom current version (useful for testing)
+    /// Set the current version of the binary being updated
+    ///
+    /// This should be called with `env!("CARGO_PKG_VERSION")` from the binary
+    /// crate to ensure the updater reports the correct version.
     pub fn with_version(mut self, version: impl Into<String>) -> Self {
         self.current_version = version.into();
         self
@@ -666,10 +684,11 @@ impl TerraphimUpdater {
 
         // Raw binary name second (terraphim-agent-x86_64-unknown-linux-gnu)
         // Raw binaries may not have embedded signatures
+        // Note: raw binaries are prefixed with the binary name in our releases
         let raw_name = if cfg!(windows) {
-            format!("{}.exe", target)
+            format!("{}-{}.exe", bin_name, target)
         } else {
-            target.to_string()
+            format!("{}-{}", bin_name, target)
         };
         assets.push(raw_name);
 
@@ -692,6 +711,8 @@ impl TerraphimUpdater {
 
         // Map Rust targets to common release naming conventions
         // For Linux x86_64, try GNU first, then MUSL as fallback
+        // For macOS, try the native architecture first, then fall back to
+        // universal binaries which work on both Intel and Apple Silicon
         let targets = match target.as_str() {
             "x86_64-linux" => vec![
                 "x86_64-unknown-linux-gnu".to_string(),
@@ -702,8 +723,14 @@ impl TerraphimUpdater {
                 "aarch64-unknown-linux-musl".to_string(),
             ],
             "x86_64-windows" => vec!["x86_64-pc-windows-msvc".to_string()],
-            "x86_64-macos" => vec!["x86_64-apple-darwin".to_string()],
-            "aarch64-macos" => vec!["aarch64-apple-darwin".to_string()],
+            "x86_64-macos" => vec![
+                "x86_64-apple-darwin".to_string(),
+                "universal-apple-darwin".to_string(),
+            ],
+            "aarch64-macos" => vec![
+                "aarch64-apple-darwin".to_string(),
+                "universal-apple-darwin".to_string(),
+            ],
             _ => vec![target],
         };
 
@@ -1440,5 +1467,62 @@ mod tests {
             format!("v{}", version_with_v)
         };
         assert_eq!(version_tag_2, "v1.5.2");
+    }
+
+    #[test]
+    fn test_get_asset_names_includes_binary_prefix() {
+        // Raw binaries should be prefixed with the binary name
+        let assets =
+            TerraphimUpdater::get_asset_names("terraphim-agent", "x86_64-apple-darwin", "1.20.0");
+
+        // First should be the archive
+        assert_eq!(
+            assets[0],
+            "terraphim-agent-1.20.0-x86_64-apple-darwin.tar.gz"
+        );
+
+        // Second should be the raw binary with prefix
+        assert_eq!(assets[1], "terraphim-agent-x86_64-apple-darwin");
+    }
+
+    #[test]
+    fn test_get_asset_names_for_universal_binary() {
+        let assets = TerraphimUpdater::get_asset_names(
+            "terraphim-agent",
+            "universal-apple-darwin",
+            "1.20.0",
+        );
+
+        // Archive should include version and target
+        assert_eq!(
+            assets[0],
+            "terraphim-agent-1.20.0-universal-apple-darwin.tar.gz"
+        );
+
+        // Raw binary should include binary name prefix
+        assert_eq!(assets[1], "terraphim-agent-universal-apple-darwin");
+    }
+
+    #[test]
+    fn test_macos_targets_include_universal_fallback() {
+        // This test verifies the target list includes universal binary fallback
+        // We can't easily mock std::env::consts, but we can verify the function
+        // doesn't panic and returns the expected structure for known platforms
+
+        // For x86_64-macos, should include both native and universal
+        // For aarch64-macos, should include both native and universal
+        // Note: We can't directly test the match arms without mocking,
+        // but we can verify the function runs without error
+        let targets = TerraphimUpdater::get_target_triples_with_fallback().unwrap();
+        assert!(!targets.is_empty(), "Should return at least one target");
+    }
+
+    #[test]
+    fn test_config_with_binary_version() {
+        // Verify that with_version correctly sets the binary version
+        let config = UpdaterConfig::new("terraphim-agent").with_version("1.17.0");
+
+        assert_eq!(config.current_version, "1.17.0");
+        assert_eq!(config.bin_name, "terraphim-agent");
     }
 }

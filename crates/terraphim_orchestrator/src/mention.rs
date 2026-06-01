@@ -442,50 +442,58 @@ pub fn resolve_mention(
     agent_name: &str,
     agents: &[AgentDefinition],
 ) -> Option<AgentDefinition> {
-    if let Some(proj) = detected_project {
+    let result = if let Some(proj) = detected_project {
         // Qualified form: `@adf:<proj>/<name>` — exact (name, project) match.
         let matches: Vec<&AgentDefinition> = agents
             .iter()
             .filter(|a| a.name == agent_name && a.project.as_deref() == Some(proj))
             .collect();
-        return match matches.len() {
+        match matches.len() {
             1 => Some(matches[0].clone()),
             _ => None,
-        };
-    }
-
-    // Unqualified form: `@adf:<name>`.
-    if hinted_project == LEGACY_PROJECT_ID {
+        }
+    } else if hinted_project == LEGACY_PROJECT_ID {
         // Legacy single-project mode: ignore the agent's project field.
         let matches: Vec<&AgentDefinition> =
             agents.iter().filter(|a| a.name == agent_name).collect();
-        return match matches.len() {
+        match matches.len() {
             1 => Some(matches[0].clone()),
             _ => None,
-        };
-    }
+        }
+    } else {
+        // Multi-project mode: prefer an agent bound to the hinted project.
+        let hinted: Vec<&AgentDefinition> = agents
+            .iter()
+            .filter(|a| a.name == agent_name && a.project.as_deref() == Some(hinted_project))
+            .collect();
+        if hinted.len() == 1 {
+            Some(hinted[0].clone())
+        } else if hinted.len() > 1 {
+            None
+        } else {
+            // Fallback: project-less agent with matching name.
+            let unbound: Vec<&AgentDefinition> = agents
+                .iter()
+                .filter(|a| a.name == agent_name && a.project.is_none())
+                .collect();
+            match unbound.len() {
+                1 => Some(unbound[0].clone()),
+                _ => None,
+            }
+        }
+    };
 
-    // Multi-project mode: prefer an agent bound to the hinted project.
-    let hinted: Vec<&AgentDefinition> = agents
-        .iter()
-        .filter(|a| a.name == agent_name && a.project.as_deref() == Some(hinted_project))
-        .collect();
-    if hinted.len() == 1 {
-        return Some(hinted[0].clone());
+    // Defence-in-depth: reject disabled agents even if they match by name.
+    if let Some(ref def) = result {
+        if !def.enabled {
+            tracing::info!(
+                agent = %def.name,
+                "mention resolved to disabled agent; returning None"
+            );
+            return None;
+        }
     }
-    if hinted.len() > 1 {
-        return None;
-    }
-
-    // Fallback: project-less agent with matching name.
-    let unbound: Vec<&AgentDefinition> = agents
-        .iter()
-        .filter(|a| a.name == agent_name && a.project.is_none())
-        .collect();
-    match unbound.len() {
-        1 => Some(unbound[0].clone()),
-        _ => None,
-    }
+    result
 }
 
 /// Parse and resolve all @adf:name mentions from a comment.
@@ -582,6 +590,7 @@ mod tests {
             task: "test task".to_string(),
             schedule: None,
             model: None,
+            default_tier: None,
             capabilities: vec![],
             max_memory_bytes: None,
             budget_monthly_cents: None,
@@ -600,6 +609,7 @@ mod tests {
             evolution_enabled: false,
             rlm_enabled: None,
             bypass_kg_routing: false,
+            enabled: true,
             project: None,
         }
     }

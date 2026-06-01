@@ -138,6 +138,7 @@ mod tests {
             task: String::new(),
             schedule: None,
             model: None,
+            default_tier: None,
             capabilities: Vec::new(),
             max_memory_bytes: None,
             budget_monthly_cents: None,
@@ -156,6 +157,7 @@ mod tests {
             evolution_enabled: false,
             rlm_enabled: None,
             bypass_kg_routing: false,
+            enabled: true,
             project: Some("odilo".to_string()),
         }
     }

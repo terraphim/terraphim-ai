@@ -2,7 +2,13 @@
 name = "terraphim_usage"
 version.workspace = true
 edition.workspace = true
+description = "Usage tracking and analytics for Terraphim AI"
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
+repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["ai", "usage", "tracking", "analytics", "metrics"]
 license = "Apache-2.0 OR MIT"
+readme = "../../README.md"
 
 [dependencies]
 serde = { workspace = true }

@@ -2,10 +2,12 @@
 name = "terraphim_kg_linter"
 version = "0.1.0"
 edition.workspace = true
-authors = ["Terraphim Contributors"]
+authors = ["Terraphim Contributors <team@terraphim.ai>"]
 description = "Linter for markdown-based Terraphim KG schemas (commands, types, permissions)"
+documentation = "https://terraphim.ai"
 homepage = "https://terraphim.ai"
 repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["ai", "linter", "knowledge-graph", "markdown", "schema"]
 license = "Apache-2.0"
 readme = "../../README.md"
 

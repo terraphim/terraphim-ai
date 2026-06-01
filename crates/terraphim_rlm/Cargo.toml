@@ -2,12 +2,15 @@
 name = "terraphim_rlm"
 version.workspace = true
 edition.workspace = true
-authors = ["Terraphim AI Team"]
+authors = ["Terraphim AI Team <team@terraphim.ai>"]
 description = "Recursive Language Model (RLM) orchestration for Terraphim AI"
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
 license = "MIT"
 repository = "https://github.com/terraphim/terraphim-ai"
 keywords = ["rlm", "llm", "code-execution", "firecracker", "ai"]
 categories = ["development-tools", "asynchronous"]
+readme = "../../README.md"
 
 [dependencies]
 # Workspace dependencies

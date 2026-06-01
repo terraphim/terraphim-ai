@@ -224,6 +224,9 @@ pub struct OrchestratorConfig {
     /// Gitea skill repository configuration for loading skills from a remote repo.
     #[serde(default)]
     pub gitea_skill_repo: Option<GiteaSkillRepoConfig>,
+    /// Direct dispatch configuration for Unix domain socket access by adf-ctl.
+    #[serde(default)]
+    pub direct_dispatch: Option<DirectDispatchConfig>,
 }
 
 /// Configuration for loading skills from a Gitea repository.
@@ -609,6 +612,31 @@ fn default_webhook_bind() -> String {
     "127.0.0.1:9090".to_string()
 }
 
+/// Configuration for direct dispatch via Unix domain socket.
+///
+/// When present, the orchestrator listens on the specified Unix domain socket
+/// and accepts JSON dispatch commands from `adf-ctl --local trigger --direct`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DirectDispatchConfig {
+    /// Path to the Unix domain socket.  Defaults to `/tmp/adf-ctl.sock`.
+    #[serde(default = "DirectDispatchConfig::default_socket_path")]
+    pub socket_path: PathBuf,
+}
+
+impl Default for DirectDispatchConfig {
+    fn default() -> Self {
+        Self {
+            socket_path: Self::default_socket_path(),
+        }
+    }
+}
+
+impl DirectDispatchConfig {
+    fn default_socket_path() -> PathBuf {
+        PathBuf::from("/tmp/adf-ctl.sock")
+    }
+}
+
 /// Quickwit log shipping configuration.
 #[cfg(feature = "quickwit")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -699,6 +727,11 @@ pub struct AgentDefinition {
     pub schedule: Option<String>,
     /// Model to use with the CLI tool (e.g., "o3" for codex, "sonnet" for claude).
     pub model: Option<String>,
+    /// Default KG tier concept for this agent (e.g., "review_tier" or "review").
+    /// When KG routing matches a different tier with confidence below the
+    /// escalation threshold, the router falls back to this tier instead.
+    #[serde(default)]
+    pub default_tier: Option<String>,
     /// Capabilities this agent provides.
     #[serde(default)]
     pub capabilities: Vec<String>,
@@ -786,6 +819,15 @@ pub struct AgentDefinition {
     /// spawns -- KG tier routing continues to dominate static config.
     #[serde(default)]
     pub bypass_kg_routing: bool,
+
+    /// Whether this agent is enabled. Set to false by the config-error
+    /// circuit-breaker after 3 consecutive ConfigError exits. Defaults to true.
+    #[serde(default = "default_agent_enabled")]
+    pub enabled: bool,
+}
+
+fn default_agent_enabled() -> bool {
+    true
 }
 
 /// Agent layer in the dark factory hierarchy.
@@ -1153,14 +1195,16 @@ pub const ALLOWED_PROVIDER_PREFIXES: &[&str] = &[
     "opencode-go",
     "kimi-for-coding",
     "minimax-coding-plan",
-    "zai-coding-plan",
     "openai",
+    "zai-coding-plan",
 ];
 
 /// Explicitly banned provider prefixes. Anything matching these is rejected
 /// at load time so a misconfigured fleet never reaches a pay-per-use
 /// provider at runtime. Note `minimax/` is banned but the
 /// `minimax-coding-plan/` subscription variant remains allowed.
+/// `opencode/` is banned because raw Opencode API calls are pay-per-use; the
+/// subscription-safe equivalent is `opencode-go` (no slash prefix needed).
 pub const BANNED_PROVIDER_PREFIXES: &[&str] = &[
     "opencode",
     "github-copilot",
@@ -1304,6 +1348,63 @@ pub fn warn_if_world_readable(path: &std::path::Path) {
                 tracing::debug!(path = %path.display(), error = %e, "could not stat file for permission check");
             }
         }
+    }
+}
+
+/// Strict permission check that returns an error if the file is too readable.
+///
+/// Returns `Ok(())` if permissions are secure (owner-only, 0o600),
+/// or `Err` with a descriptive message if group-readable or world-readable.
+///
+/// # Examples
+///
+/// ```no_run
+/// use std::path::Path;
+/// use terraphim_orchestrator::config::check_file_permissions;
+///
+/// match check_file_permissions(Path::new("/etc/secrets.toml")) {
+///     Ok(()) => println!("Permissions OK"),
+///     Err(e) => eprintln!("Permission check failed: {}", e),
+/// }
+/// ```
+pub fn check_file_permissions(path: &std::path::Path) -> Result<(), String> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        match std::fs::metadata(path) {
+            Ok(meta) => {
+                let mode = meta.permissions().mode();
+                if mode & 0o004 != 0 {
+                    Err(format!(
+                        "SECURITY: {} is world-readable (mode {:04o}). \
+                         Fix with: chmod 600 {}",
+                        path.display(),
+                        mode & 0o777,
+                        path.display()
+                    ))
+                } else if mode & 0o040 != 0 {
+                    Err(format!(
+                        "SECURITY: {} is group-readable (mode {:04o}). \
+                         Fix with: chmod 600 {}",
+                        path.display(),
+                        mode & 0o777,
+                        path.display()
+                    ))
+                } else {
+                    Ok(())
+                }
+            }
+            Err(e) => Err(format!(
+                "Could not check permissions for {}: {}",
+                path.display(),
+                e
+            )),
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        // On non-Unix systems, permission checks are not applicable
+        Ok(())
     }
 }
 
@@ -2603,10 +2704,8 @@ task = "t"
         assert!(is_allowed_provider("opencode-go/kimi-k2.5"));
         assert!(is_allowed_provider("kimi-for-coding/k2p5"));
         assert!(is_allowed_provider("minimax-coding-plan/MiniMax-M2.5"));
+        assert!(is_allowed_provider("openai/gpt-5.4"));
         assert!(is_allowed_provider("zai-coding-plan/glm-4.6"));
-        assert!(is_allowed_provider("openai/gpt-5.4"));
-        assert!(is_allowed_provider("openai/gpt-5.3-codex"));
-        assert!(is_allowed_provider("openai/gpt-5.4"));
     }
 
     #[test]
@@ -3110,6 +3209,47 @@ task = "build"
             let path = std::path::Path::new("/nonexistent/path/config.toml");
             // Should silently log debug and return without panic.
             super::super::warn_if_world_readable(path);
+        }
+
+        #[test]
+        fn check_file_permissions_passes_for_secure_file() {
+            let dir = temp_file_with_mode("content", 0o600);
+            let path = dir.path().join("test_config.toml");
+            assert!(super::super::check_file_permissions(&path).is_ok());
+        }
+
+        #[test]
+        fn check_file_permissions_fails_for_world_readable_file() {
+            let dir = temp_file_with_mode("content", 0o644);
+            let path = dir.path().join("test_config.toml");
+            let err = super::super::check_file_permissions(&path).unwrap_err();
+            assert!(
+                err.contains("world-readable"),
+                "Error should mention world-readable: {err}"
+            );
+            assert!(err.contains("644"), "Error should mention mode 644: {err}");
+        }
+
+        #[test]
+        fn check_file_permissions_fails_for_group_readable_file() {
+            let dir = temp_file_with_mode("content", 0o640);
+            let path = dir.path().join("test_config.toml");
+            let err = super::super::check_file_permissions(&path).unwrap_err();
+            assert!(
+                err.contains("group-readable"),
+                "Error should mention group-readable: {err}"
+            );
+            assert!(err.contains("640"), "Error should mention mode 640: {err}");
+        }
+
+        #[test]
+        fn check_file_permissions_fails_for_missing_file() {
+            let path = std::path::Path::new("/nonexistent/path/config.toml");
+            let err = super::super::check_file_permissions(path).unwrap_err();
+            assert!(
+                err.contains("Could not check permissions"),
+                "Error should mention inability to check: {err}"
+            );
         }
     }
 

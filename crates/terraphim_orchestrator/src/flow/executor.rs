@@ -195,11 +195,55 @@ impl FlowExecutor {
 
         let resolved = self.resolve_templates(condition, flow, state);
 
-        // Parse simple expressions: "X == Y" or "X != Y"
+        // Parse simple expressions: "X == Y", "X != Y", "X < Y", "X > Y", "X <= Y", "X >= Y"
         if let Some((lhs, rhs)) = resolved.split_once(" == ") {
             Ok(lhs.trim() == rhs.trim())
         } else if let Some((lhs, rhs)) = resolved.split_once(" != ") {
             Ok(lhs.trim() != rhs.trim())
+        } else if let Some((lhs, rhs)) = resolved.split_once(" < ") {
+            match (lhs.trim().parse::<i64>(), rhs.trim().parse::<i64>()) {
+                (Ok(l), Ok(r)) => Ok(l < r),
+                _ => Err(OrchestratorError::FlowFailed {
+                    flow_name: flow.name.clone(),
+                    reason: format!(
+                        "gate step '{}': non-numeric comparison: {}",
+                        step.name, resolved
+                    ),
+                }),
+            }
+        } else if let Some((lhs, rhs)) = resolved.split_once(" > ") {
+            match (lhs.trim().parse::<i64>(), rhs.trim().parse::<i64>()) {
+                (Ok(l), Ok(r)) => Ok(l > r),
+                _ => Err(OrchestratorError::FlowFailed {
+                    flow_name: flow.name.clone(),
+                    reason: format!(
+                        "gate step '{}': non-numeric comparison: {}",
+                        step.name, resolved
+                    ),
+                }),
+            }
+        } else if let Some((lhs, rhs)) = resolved.split_once(" <= ") {
+            match (lhs.trim().parse::<i64>(), rhs.trim().parse::<i64>()) {
+                (Ok(l), Ok(r)) => Ok(l <= r),
+                _ => Err(OrchestratorError::FlowFailed {
+                    flow_name: flow.name.clone(),
+                    reason: format!(
+                        "gate step '{}': non-numeric comparison: {}",
+                        step.name, resolved
+                    ),
+                }),
+            }
+        } else if let Some((lhs, rhs)) = resolved.split_once(" >= ") {
+            match (lhs.trim().parse::<i64>(), rhs.trim().parse::<i64>()) {
+                (Ok(l), Ok(r)) => Ok(l >= r),
+                _ => Err(OrchestratorError::FlowFailed {
+                    flow_name: flow.name.clone(),
+                    reason: format!(
+                        "gate step '{}': non-numeric comparison: {}",
+                        step.name, resolved
+                    ),
+                }),
+            }
         } else {
             Err(OrchestratorError::FlowFailed {
                 flow_name: flow.name.clone(),
@@ -264,6 +308,7 @@ impl FlowExecutor {
             cli_tool: cli_tool.clone(),
             task: task.clone(),
             model: step.model.clone(),
+            default_tier: None,
             schedule: None,
             capabilities: vec![],
             max_memory_bytes: None,
@@ -284,6 +329,7 @@ impl FlowExecutor {
             evolution_enabled: false,
             rlm_enabled: None,
             bypass_kg_routing: false,
+            enabled: true,
         };
 
         // Build provider for spawner
@@ -435,9 +481,37 @@ impl FlowExecutor {
             // Handle checkpoint step: persist state and pause
             if step.kind == StepKind::Checkpoint {
                 state.status = FlowRunStatus::Paused;
-                state.next_step_index = i + 1;
+
+                // Handle loop target for re-iteration
+                if let Some(ref target_name) = step.loop_target {
+                    if let Some(target_index) =
+                        flow.steps.iter().position(|s| s.name == *target_name)
+                    {
+                        state.next_step_index = target_index;
+                        state.iteration_count += 1;
+                        tracing::info!(
+                            flow = %flow.name,
+                            step = %step.name,
+                            target = %target_name,
+                            target_index = target_index,
+                            iteration = state.iteration_count,
+                            "checkpoint with loop target"
+                        );
+                    } else {
+                        tracing::warn!(
+                            flow = %flow.name,
+                            step = %step.name,
+                            target = %target_name,
+                            "loop_target step not found, continuing to next step"
+                        );
+                        state.next_step_index = i + 1;
+                    }
+                } else {
+                    state.next_step_index = i + 1;
+                }
+
                 let _ = state.save_to_file(&self.flow_state_dir);
-                tracing::info!(flow = %flow.name, step = %step.name, next_index = i + 1, "flow paused at checkpoint");
+                tracing::info!(flow = %flow.name, step = %step.name, next_index = state.next_step_index, "flow paused at checkpoint");
                 return Ok(state);
             }
 
@@ -604,6 +678,12 @@ impl FlowExecutor {
         result = result.replace("{{base_branch}}", &flow.base_branch);
         result = result.replace("{{flow.name}}", &flow.name);
         result = result.replace("{{flow.correlation_id}}", &state.correlation_id.to_string());
+        if let Some(ref issue) = state.issue {
+            result = result.replace("{{issue}}", issue);
+        }
+
+        // Resolve iteration count: {{iterations.current}}
+        result = result.replace("{{iterations.current}}", &state.iteration_count.to_string());
 
         // Resolve step references: {{steps.<name>.stdout}}, etc.
         for envelope in &state.step_envelopes {
@@ -869,6 +949,17 @@ mod tests {
     }
 
     #[test]
+    fn test_resolve_templates_issue_var() {
+        let executor = FlowExecutor::new(PathBuf::from("/tmp"), PathBuf::from("/tmp/state"));
+        let flow = create_test_flow();
+        let state = FlowRunState::new("test-flow").with_issue("1890".to_string());
+
+        let result = executor.resolve_templates("Issue: {{issue}}", &flow, &state);
+
+        assert_eq!(result, "Issue: 1890");
+    }
+
+    #[test]
     fn test_resolve_templates_step_ref() {
         let executor = FlowExecutor::new(PathBuf::from("/tmp"), PathBuf::from("/tmp/state"));
         let flow = create_test_flow();
@@ -1052,6 +1143,7 @@ mod tests {
             provider: None,
             persona: None,
             matrix: None,
+            loop_target: None,
         };
 
         let envelope = executor.execute_action(&step, &flow, &state).await.unwrap();
@@ -1093,6 +1185,7 @@ mod tests {
             provider: None,
             persona: None,
             matrix: None,
+            loop_target: None,
         };
 
         let result = executor.execute_action(&step, &flow, &state).await;
@@ -1145,6 +1238,7 @@ mod tests {
             provider: None,
             persona: None,
             matrix: None,
+            loop_target: None,
         };
 
         let result = executor.evaluate_gate(&step, &flow, &state).unwrap();
@@ -1195,6 +1289,7 @@ mod tests {
             provider: None,
             persona: None,
             matrix: None,
+            loop_target: None,
         };
 
         let result = executor.evaluate_gate(&step, &flow, &state).unwrap();
@@ -1230,6 +1325,7 @@ mod tests {
                     provider: None,
                     persona: None,
                     matrix: None,
+                    loop_target: None,
                 },
                 FlowStepDef {
                     name: "step2".to_string(),
@@ -1245,6 +1341,7 @@ mod tests {
                     provider: None,
                     persona: None,
                     matrix: None,
+                    loop_target: None,
                 },
             ],
         };
@@ -1291,6 +1388,7 @@ mod tests {
                     provider: None,
                     persona: None,
                     matrix: None,
+                    loop_target: None,
                 },
                 FlowStepDef {
                     name: "gate1".to_string(),
@@ -1306,6 +1404,7 @@ mod tests {
                     provider: None,
                     persona: None,
                     matrix: None,
+                    loop_target: None,
                 },
                 FlowStepDef {
                     name: "action2".to_string(),
@@ -1321,6 +1420,7 @@ mod tests {
                     provider: None,
                     persona: None,
                     matrix: None,
+                    loop_target: None,
                 },
             ],
         };
@@ -1359,6 +1459,7 @@ mod tests {
                     provider: None,
                     persona: None,
                     matrix: None,
+                    loop_target: None,
                 },
                 FlowStepDef {
                     name: "gate1".to_string(),
@@ -1374,6 +1475,7 @@ mod tests {
                     provider: None,
                     persona: None,
                     matrix: None,
+                    loop_target: None,
                 },
                 FlowStepDef {
                     name: "action2".to_string(),
@@ -1389,6 +1491,7 @@ mod tests {
                     provider: None,
                     persona: None,
                     matrix: None,
+                    loop_target: None,
                 },
             ],
         };
@@ -1430,6 +1533,7 @@ mod tests {
                     provider: None,
                     persona: None,
                     matrix: None,
+                    loop_target: None,
                 },
                 FlowStepDef {
                     name: "step2".to_string(),
@@ -1445,6 +1549,7 @@ mod tests {
                     provider: None,
                     persona: None,
                     matrix: None,
+                    loop_target: None,
                 },
                 FlowStepDef {
                     name: "step3".to_string(),
@@ -1460,6 +1565,7 @@ mod tests {
                     provider: None,
                     persona: None,
                     matrix: None,
+                    loop_target: None,
                 },
             ],
         };
@@ -1513,6 +1619,7 @@ mod tests {
                     provider: None,
                     persona: None,
                     matrix: None,
+                    loop_target: None,
                 },
                 FlowStepDef {
                     name: "step2".to_string(),
@@ -1528,6 +1635,7 @@ mod tests {
                     provider: None,
                     persona: None,
                     matrix: None,
+                    loop_target: None,
                 },
                 FlowStepDef {
                     name: "step3".to_string(),
@@ -1543,6 +1651,7 @@ mod tests {
                     provider: None,
                     persona: None,
                     matrix: None,
+                    loop_target: None,
                 },
             ],
         };
@@ -1604,6 +1713,7 @@ mod tests {
                     provider: None,
                     persona: None,
                     matrix: None,
+                    loop_target: None,
                 },
                 FlowStepDef {
                     name: "checkpoint1".to_string(),
@@ -1619,6 +1729,7 @@ mod tests {
                     provider: None,
                     persona: None,
                     matrix: None,
+                    loop_target: None,
                 },
                 FlowStepDef {
                     name: "step2".to_string(),
@@ -1634,6 +1745,7 @@ mod tests {
                     provider: None,
                     persona: None,
                     matrix: None,
+                    loop_target: None,
                 },
             ],
         };
@@ -1688,6 +1800,7 @@ mod tests {
                     provider: None,
                     persona: None,
                     matrix: None,
+                    loop_target: None,
                 },
                 FlowStepDef {
                     name: "never-runs".to_string(),
@@ -1703,6 +1816,7 @@ mod tests {
                     provider: None,
                     persona: None,
                     matrix: None,
+                    loop_target: None,
                 },
             ],
         };
@@ -1757,6 +1871,7 @@ mod tests {
                     max_parallel: 1,
                     fail_strategy: FailStrategy::Continue,
                 }),
+                loop_target: None,
             }],
         };
 
@@ -1812,6 +1927,7 @@ mod tests {
                     max_parallel: 1,
                     fail_strategy: FailStrategy::Abort,
                 }),
+                loop_target: None,
             }],
         };
 
@@ -1932,6 +2048,7 @@ mod tests {
                     max_parallel: 1,
                     fail_strategy: FailStrategy::Continue,
                 }),
+                loop_target: None,
             }],
         };
         let state = FlowRunState::new("oversize-test");
@@ -1980,6 +2097,7 @@ mod tests {
                     max_parallel: 1,
                     fail_strategy: FailStrategy::Continue,
                 }),
+                loop_target: None,
             }],
         };
         let state = FlowRunState::new("injection-test");
@@ -1992,5 +2110,98 @@ mod tests {
             msg.contains("shell metacharacter"),
             "expected 'shell metacharacter' in: {msg}"
         );
+    }
+
+    #[tokio::test]
+    async fn test_checkpoint_loop_target() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let executor =
+            FlowExecutor::new(temp_dir.path().to_path_buf(), temp_dir.path().to_path_buf());
+
+        let flow = FlowDefinition {
+            name: "loop-test".to_string(),
+            project: "test".to_string(),
+            schedule: None,
+            repo_path: "/tmp/repo".to_string(),
+            base_branch: "main".to_string(),
+            timeout_secs: 3600,
+            steps: vec![
+                FlowStepDef {
+                    name: "setup".to_string(),
+                    kind: StepKind::Action,
+                    command: Some("echo setup".to_string()),
+                    timeout_secs: 10,
+                    ..Default::default()
+                },
+                FlowStepDef {
+                    name: "loopback".to_string(),
+                    kind: StepKind::Checkpoint,
+                    loop_target: Some("setup".to_string()),
+                    timeout_secs: 10,
+                    ..Default::default()
+                },
+            ],
+        };
+
+        let state = executor.run(&flow, None).await.unwrap();
+        assert_eq!(state.status, FlowRunStatus::Paused);
+        assert_eq!(state.next_step_index, 0);
+        assert_eq!(state.iteration_count, 1);
+        assert_eq!(state.step_envelopes.len(), 1);
+
+        let state2 = executor.run(&flow, Some(state)).await.unwrap();
+        assert_eq!(state2.status, FlowRunStatus::Paused);
+        assert_eq!(state2.next_step_index, 0);
+        assert_eq!(state2.iteration_count, 2);
+        assert_eq!(state2.step_envelopes.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_checkpoint_without_loop_target() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let executor =
+            FlowExecutor::new(temp_dir.path().to_path_buf(), temp_dir.path().to_path_buf());
+
+        let flow = FlowDefinition {
+            name: "plain-checkpoint-test".to_string(),
+            project: "test".to_string(),
+            schedule: None,
+            repo_path: "/tmp/repo".to_string(),
+            base_branch: "main".to_string(),
+            timeout_secs: 3600,
+            steps: vec![
+                FlowStepDef {
+                    name: "setup".to_string(),
+                    kind: StepKind::Action,
+                    command: Some("echo setup".to_string()),
+                    timeout_secs: 10,
+                    ..Default::default()
+                },
+                FlowStepDef {
+                    name: "checkpoint".to_string(),
+                    kind: StepKind::Checkpoint,
+                    timeout_secs: 10,
+                    ..Default::default()
+                },
+            ],
+        };
+
+        let state = executor.run(&flow, None).await.unwrap();
+        assert_eq!(state.status, FlowRunStatus::Paused);
+        assert_eq!(state.next_step_index, 2);
+        assert_eq!(state.iteration_count, 0);
+    }
+
+    #[test]
+    fn test_resolve_templates_iterations_current() {
+        let executor = FlowExecutor::new(PathBuf::from("/tmp"), PathBuf::from("/tmp/state"));
+        let flow = create_test_flow();
+        let mut state = FlowRunState::new("test-flow");
+        state.iteration_count = 3;
+
+        let template = "iterations.current < 3 evaluates to {{iterations.current}} < 3";
+        let result = executor.resolve_templates(template, &flow, &state);
+
+        assert_eq!(result, "iterations.current < 3 evaluates to 3 < 3");
     }
 }

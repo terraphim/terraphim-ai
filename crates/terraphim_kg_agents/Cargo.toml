@@ -3,7 +3,12 @@ name = "terraphim_kg_agents"
 version = "1.0.0"
 edition.workspace = true
 description = "Specialized knowledge graph-based agent implementations"
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
+repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["ai", "agents", "knowledge-graph", "specialized"]
 license = "MIT OR Apache-2.0"
+readme = "../../README.md"
 
 [dependencies]
 # Core dependencies

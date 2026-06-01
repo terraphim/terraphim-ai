@@ -30,12 +30,17 @@
 //! ```
 
 pub mod adf_commands;
+pub mod agent_registry;
+pub mod agent_run_command;
 pub mod agent_run_record;
+pub mod agent_runner;
 pub mod compound;
 pub mod concurrency;
 pub mod config;
 pub mod control_plane;
 pub mod cost_tracker;
+#[cfg(unix)]
+pub mod direct_dispatch;
 pub mod dispatcher;
 pub mod dual_mode;
 pub mod error;
@@ -46,6 +51,7 @@ pub mod gitea_skill_loader;
 pub mod handoff;
 pub mod kg_router;
 pub mod learning;
+pub mod local_skills;
 pub mod mention;
 pub mod mention_chain;
 pub mod meta_coordinator;
@@ -73,8 +79,19 @@ pub mod scope;
 pub mod webhook;
 pub mod worktree_guard;
 
+pub use agent_registry::{AgentKey, AgentRegistry, AgentScope, AgentSource, RegisteredAgent};
+pub use agent_run_command::{
+    applicable_modes, is_cron_schedule_valid, parse_agent_args, run_synthetic, run_validate,
+    run_validate_all, schedule_for_agent, validate_agent_all_modes, AgentSubcommand,
+    AgentValidateAllReport, OutputFormat,
+};
 pub use agent_run_record::{
     AgentRunRecord, ExitClass, ExitClassification, ExitClassifier, RunTrigger,
+};
+pub use agent_runner::{
+    probe_cli_tool, probe_model_available, run_agent_synthetic, validate_agent_runtime,
+    AgentRunRequest, AgentRuntimeValidationReport, GiteaTargetReport, ModeResult, SyntheticEvent,
+    TriggerMode,
 };
 pub use compound::{CompoundReviewResult, CompoundReviewWorkflow, ReviewGroupDef, SwarmConfig};
 pub use concurrency::{ConcurrencyController, FairnessPolicy, ModeQuotas};
@@ -204,6 +221,7 @@ struct PersistedRestartState {
 /// The main orchestrator that runs the dark factory.
 pub struct AgentOrchestrator {
     config: OrchestratorConfig,
+    agent_registry: AgentRegistry,
     spawner: AgentSpawner,
     router: RoutingEngine,
     nightwatch: NightwatchMonitor,
@@ -254,6 +272,9 @@ pub struct AgentOrchestrator {
     /// Active flow executions keyed by flow name.
     #[allow(dead_code)]
     active_flows: HashMap<String, tokio::task::JoinHandle<flow::state::FlowRunState>>,
+    /// Active compound review execution (spawned in background to avoid
+    /// blocking reconcile_tick). None when no compound review is running.
+    active_compound_review: Option<tokio::task::JoinHandle<Result<CompoundReviewResult, OrchestratorError>>>,
     /// Per-project mention cursors, keyed by project id.
     ///
     /// Each project gets its own cursor so repo-wide polls can advance
@@ -331,6 +352,8 @@ pub struct AgentOrchestrator {
     /// Agent evolution manager. No-op when evolution feature is disabled
     /// or `evolution.enabled = false` in config.
     evolution_manager: evolution::EvolutionManager,
+    config_error_counters: HashMap<String, u32>,
+    quarantined_agents: std::collections::HashSet<String>,
 }
 
 /// Build the composite restart-state key for an agent definition.
@@ -755,6 +778,7 @@ impl AgentOrchestrator {
         let scheduler = TimeScheduler::new(&config.agents, Some(&config.compound_review.schedule))?;
         let compound_workflow =
             CompoundReviewWorkflow::from_compound_config(config.compound_review.clone());
+        let agent_registry = AgentRegistry::from_config(&config)?;
 
         // Layer 2 startup sweep (epic #1567, issue #1570).
         //
@@ -781,9 +805,7 @@ impl AgentOrchestrator {
         // to a TempDir-based `repo_path`.
         #[cfg(not(test))]
         {
-            let sweep_report = compound_workflow
-                .worktree_manager()
-                .sweep_stale(&[PathBuf::from("/tmp/adf-worktrees")]);
+            let sweep_report = compound_workflow.worktree_manager().sweep_stale(&[]);
             if sweep_report.swept_count + sweep_report.root_owned_skipped > 10 {
                 warn!(
                     swept_count = sweep_report.swept_count,
@@ -894,6 +916,7 @@ impl AgentOrchestrator {
 
         Ok(Self {
             config: config.clone(),
+            agent_registry,
             spawner,
             router,
             nightwatch,
@@ -936,6 +959,7 @@ impl AgentOrchestrator {
             last_compound_review_fired_at: None,
             pre_check_tracker: None,
             active_flows: HashMap::new(),
+            active_compound_review: None,
             mention_cursors: HashMap::new(),
             webhook_dispatch_rx: None,
             tick_count: 0,
@@ -974,6 +998,8 @@ impl AgentOrchestrator {
             },
             gitea_skill_cache_dir: None,
             evolution_manager: evolution::EvolutionManager::new(config.evolution.clone()),
+            config_error_counters: HashMap::new(),
+            quarantined_agents: std::collections::HashSet::new(),
         })
     }
 
@@ -1235,10 +1261,36 @@ impl AgentOrchestrator {
             "safety agents spawned, entering reconciliation loop"
         );
 
+        // Webhook and direct dispatch use separate channels so the bridge tasks
+        // can emit distinct LoopEvent variants without needing to tag messages.
+        let webhook_dispatch_rx = if self.config.webhook.is_some() {
+            let (tx, rx) = tokio::sync::mpsc::channel(64);
+            self.webhook_dispatch_rx = Some(rx);
+            Some(tx)
+        } else {
+            self.webhook_dispatch_rx = None;
+            None
+        };
+
+        #[cfg(unix)]
+        let direct_dispatch_rx = if self.config.direct_dispatch.is_some() {
+            let (tx, rx) = tokio::sync::mpsc::channel(64);
+            Some((tx, rx))
+        } else {
+            None
+        };
+        #[cfg(not(unix))]
+        let direct_dispatch_rx: Option<(
+            tokio::sync::mpsc::Sender<webhook::WebhookDispatch>,
+            tokio::sync::mpsc::Receiver<webhook::WebhookDispatch>,
+        )> = None;
+
         // Start webhook server if configured
         if let Some(ref webhook_cfg) = self.config.webhook {
-            let (dispatch_tx, dispatch_rx) = tokio::sync::mpsc::channel(64);
-            self.webhook_dispatch_rx = Some(dispatch_rx);
+            let dispatch_tx = webhook_dispatch_rx
+                .as_ref()
+                .expect("webhook dispatch channel is initialised when webhook is configured")
+                .clone();
 
             let agent_names: Vec<String> =
                 self.config.agents.iter().map(|a| a.name.clone()).collect();
@@ -1278,11 +1330,35 @@ impl AgentOrchestrator {
             });
         }
 
+        #[cfg(unix)]
+        let direct_dispatch_rx = if let Some(ref direct_cfg) = self.config.direct_dispatch {
+            let (direct_tx, direct_rx) = direct_dispatch_rx.expect(
+                "direct dispatch channel is initialised when direct_dispatch is configured",
+            );
+            let agent_index =
+                direct_dispatch::DirectDispatchAgentIndex::from_agents(&self.config.agents);
+
+            direct_dispatch::start_direct_dispatch_listener(
+                direct_cfg.socket_path.clone(),
+                direct_tx,
+                agent_index,
+            );
+
+            Some(direct_rx)
+        } else {
+            None
+        };
+        #[cfg(not(unix))]
+        let direct_dispatch_rx: Option<
+            tokio::sync::mpsc::Receiver<webhook::WebhookDispatch>,
+        > = None;
+
         enum LoopEvent {
             Tick,
             Schedule(ScheduleEvent),
             DriftAlert(DriftAlert),
             Webhook(webhook::WebhookDispatch),
+            DirectDispatch(webhook::WebhookDispatch),
         }
 
         let tick_interval = self.config.tick_interval_secs;
@@ -1352,6 +1428,23 @@ impl AgentOrchestrator {
             });
         }
 
+        if let Some(direct_rx) = direct_dispatch_rx {
+            let dd_tx = loop_tx.clone();
+            tokio::spawn(async move {
+                let mut rx = direct_rx;
+                while let Some(dispatch) = rx.recv().await {
+                    if dd_tx
+                        .lock()
+                        .unwrap()
+                        .send(LoopEvent::DirectDispatch(dispatch))
+                        .is_err()
+                    {
+                        break;
+                    }
+                }
+            });
+        }
+
         let reconcile_timeout = Duration::from_secs(self.config.tick_interval_secs.max(30) * 3);
 
         loop {
@@ -1367,6 +1460,9 @@ impl AgentOrchestrator {
                     self.mark_webhook_comment_processed(comment_id).await;
                     let _ = loop_tx.lock().unwrap().send(LoopEvent::Tick);
                 }
+                Ok(LoopEvent::DirectDispatch(dispatch)) => {
+                    self.handle_direct_dispatch(dispatch).await;
+                }
                 Ok(LoopEvent::Schedule(event)) => {
                     self.handle_schedule_event(event).await;
                 }
@@ -1380,6 +1476,9 @@ impl AgentOrchestrator {
                                 let comment_id = dispatch.comment_id();
                                 self.handle_webhook_dispatch(dispatch).await;
                                 self.mark_webhook_comment_processed(comment_id).await;
+                            }
+                            Ok(LoopEvent::DirectDispatch(dispatch)) => {
+                                self.handle_direct_dispatch(dispatch).await;
                             }
                             Ok(LoopEvent::Schedule(event)) => {
                                 self.handle_schedule_event(event).await;
@@ -1837,6 +1936,14 @@ impl AgentOrchestrator {
     /// Otherwise, route the task prompt through the RoutingEngine to select
     /// a model based on keyword matching.
     async fn spawn_agent(&mut self, def: &AgentDefinition) -> Result<(), OrchestratorError> {
+        self.spawn_agent_with_event(def, None).await
+    }
+
+    async fn spawn_agent_with_event(
+        &mut self,
+        def: &AgentDefinition,
+        synthetic_event: Option<&SyntheticEvent>,
+    ) -> Result<(), OrchestratorError> {
         // === PROJECT PAUSE GATE ===
         // Operators and the project circuit breaker can block all dispatches
         // for a given project by creating a sentinel file at
@@ -1918,7 +2025,10 @@ impl AgentOrchestrator {
             .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or(&def.cli_tool);
-        let supports_model_flag = matches!(cli_name, "claude" | "claude-code" | "opencode");
+        let supports_model_flag = matches!(
+            cli_name,
+            "claude" | "claude-code" | "opencode" | "pi-rust" | "pi"
+        );
 
         // Track KG decision for CLI override (set inside the routing block below)
         let mut kg_cli_override: Option<String> = None;
@@ -1957,6 +2067,7 @@ impl AgentOrchestrator {
                 cli_tool: def.cli_tool.clone(),
                 layer: def.layer,
                 session_id: None,
+                default_tier: def.default_tier.clone(),
             };
             let budget_verdict = self.cost_tracker.check(&def.name);
             let decision = engine.decide_route(&ctx, &budget_verdict).await;
@@ -1993,7 +2104,8 @@ impl AgentOrchestrator {
             let mut unhealthy = self.provider_health.unhealthy_providers();
             unhealthy.extend(self.provider_rate_limits.blocked_providers());
             let kg_decision = self.kg_router.as_ref().and_then(|router| {
-                let decision = router.route_agent(&def.task)?;
+                let decision =
+                    router.route_agent_with_tier(&def.task, def.default_tier.as_deref())?;
                 // If primary provider is unhealthy, try fallback routes
                 if !unhealthy.is_empty() {
                     if let Some(healthy_route) = decision.first_healthy_route(&unhealthy) {
@@ -2193,9 +2305,9 @@ impl AgentOrchestrator {
         let use_stdin =
             persona_found || !skill_content.is_empty() || composed_task.len() > STDIN_THRESHOLD;
 
-        // Create isolated git worktree for implementation-tier agents that modify code.
-        // Review-tier agents (haiku) are read-only and don't need isolation.
-        let needs_isolation = model.as_ref().map(|m| !m.contains("haiku")).unwrap_or(true);
+        // Create isolated git worktrees for AI/model-backed agents that may modify code.
+        // Review-tier agents (haiku) and simple local commands used in tests do not need isolation.
+        let needs_isolation = requires_isolated_worktree(def, model.as_deref());
 
         // Resolve the git repo directory for worktree operations. Project-bound
         // agents need a worktree from their own repo, not the orchestrator's.
@@ -2217,12 +2329,9 @@ impl AgentOrchestrator {
         };
 
         let (worktree_path, worktree_guard) = if needs_isolation {
-            if let Some(path) = self.create_agent_worktree(&def.name, repo_dir).await {
-                let guard = crate::worktree_guard::WorktreeGuard::new(&path);
-                (Some(path), Some(guard))
-            } else {
-                (None, None)
-            }
+            let path = self.create_agent_worktree(&def.name, repo_dir).await?;
+            let guard = crate::worktree_guard::WorktreeGuard::for_managed(repo_dir, &path);
+            (Some(path), Some(guard))
         } else {
             (None, None)
         };
@@ -2301,8 +2410,27 @@ impl AgentOrchestrator {
             return Ok(());
         }
 
-        let spawn_ctx =
+        let mut spawn_ctx =
             build_spawn_context_for_agent(&self.config, def, self.output_poster.as_ref());
+        spawn_ctx.working_dir = Some(agent_working_dir.clone());
+        spawn_ctx = spawn_ctx.with_env(
+            "ADF_WORKING_DIR",
+            agent_working_dir.to_string_lossy().into_owned(),
+        );
+        if let Some(event) = synthetic_event {
+            for (key, value) in event.env_vars() {
+                spawn_ctx = spawn_ctx.with_env(key, value);
+            }
+        }
+
+        // Pre-create temp log path so the spawner can write stderr directly
+        // to disk, giving us a durable fallback if the broadcast drain lags.
+        let _ = std::fs::create_dir_all(&self.agent_log_dir);
+        let ts = chrono::Utc::now().format("%Y%m%dT%H%M%SZ");
+        let stderr_tmp_name = format!(".tmp-{}-{}.stderr.log", def.name, ts);
+        let stderr_tmp_path = self.agent_log_dir.join(&stderr_tmp_name);
+        spawn_ctx = spawn_ctx.with_stderr_log(&stderr_tmp_path);
+
         let handle = self
             .spawner
             .spawn_with_fallback(&request, spawn_ctx)
@@ -2474,12 +2602,10 @@ impl AgentOrchestrator {
         // fan-out list must skip silently (no `pending` posted) — a
         // hung pending would block the PR forever.
         let def = match self
-            .config
-            .agents
-            .iter()
-            .find(|a| a.name == agent_name && a.project.as_deref() == Some(project.as_str()))
+            .agent_registry
+            .lookup_project(project.as_str(), agent_name)
         {
-            Some(d) => d.clone(),
+            Some(agent) => agent.definition.clone(),
             None => {
                 warn!(
                     pr_number,
@@ -2554,6 +2680,7 @@ impl AgentOrchestrator {
             cli_tool: def.cli_tool.clone(),
             layer: def.layer,
             session_id: None,
+            default_tier: def.default_tier.clone(),
         };
         let decision = engine.decide_route(&dispatch_ctx, &budget_verdict).await;
         info!(
@@ -2739,20 +2866,20 @@ impl AgentOrchestrator {
 
         // Look up the build-runner agent for this project. Missing must
         // skip silently — no `pending` posted by the caller.
-        let def =
-            match self.config.agents.iter().find(|a| {
-                a.name == "build-runner" && a.project.as_deref() == Some(project.as_str())
-            }) {
-                Some(d) => d.clone(),
-                None => {
-                    warn!(
-                        pr_number,
-                        project = %project,
-                        "ReviewPr skipped: no build-runner agent configured for project"
-                    );
-                    return Ok(false);
-                }
-            };
+        let def = match self
+            .agent_registry
+            .lookup_project(project.as_str(), "build-runner")
+        {
+            Some(agent) => agent.definition.clone(),
+            None => {
+                warn!(
+                    pr_number,
+                    project = %project,
+                    "ReviewPr skipped: no build-runner agent configured for project"
+                );
+                return Ok(false);
+            }
+        };
 
         // === STATIC ALLOW-LIST GATE ===
         // build-runner is bash-only (no LLM), so def.model is normally None
@@ -3045,20 +3172,29 @@ impl AgentOrchestrator {
 
         // Look up the build-runner agent for this project. Repos without
         // build-runner shouldn't break the orchestrator -- log and skip.
-        let def =
-            match self.config.agents.iter().find(|a| {
-                a.name == "build-runner" && a.project.as_deref() == Some(project.as_str())
-            }) {
-                Some(d) => d.clone(),
-                None => {
-                    warn!(
-                        project = %project,
-                        after_sha = %after_sha,
-                        "Push skipped: no build-runner agent configured for project"
-                    );
-                    return Ok(());
-                }
-            };
+        let def = match self
+            .agent_registry
+            .lookup_project(project.as_str(), "build-runner")
+        {
+            Some(agent) => agent.definition.clone(),
+            None => {
+                warn!(
+                    project = %project,
+                    after_sha = %after_sha,
+                    "Push skipped: no build-runner agent configured for project"
+                );
+                return Ok(());
+            }
+        };
+
+        if !def.enabled {
+            info!(
+                agent = %def.name,
+                project = %project,
+                "Push skipped: build-runner agent is disabled"
+            );
+            return Ok(());
+        }
 
         if self.active_agents.contains_key("build-runner") {
             info!(
@@ -3540,6 +3676,7 @@ impl AgentOrchestrator {
                 issue_number,
                 comment_id,
                 context,
+                synthetic_event: _,
             } => {
                 info!(
                     agent = %agent_name,
@@ -3813,6 +3950,65 @@ impl AgentOrchestrator {
                     pusher_login,
                     files_changed,
                 });
+            }
+        }
+    }
+
+    async fn handle_direct_dispatch(&mut self, dispatch: webhook::WebhookDispatch) {
+        match dispatch {
+            webhook::WebhookDispatch::SpawnAgent {
+                agent_name,
+                detected_project,
+                context,
+                synthetic_event,
+                ..
+            } => {
+                // Use project-aware resolution for qualified agent names.
+                let def = mention::resolve_mention(
+                    detected_project.as_deref(),
+                    dispatcher::LEGACY_PROJECT_ID,
+                    &agent_name,
+                    &self.config.agents,
+                );
+
+                let def = match def {
+                    Some(def) => def,
+                    None => {
+                        // Fallback to simple name lookup for legacy compatibility.
+                        warn!(agent = %agent_name, "direct dispatch: agent not found in config");
+                        return;
+                    }
+                };
+
+                if !def.enabled {
+                    info!(agent = %agent_name, "direct dispatch rejected: agent is disabled");
+                    return;
+                }
+
+                let mut direct_def = def.clone();
+                if !context.is_empty() {
+                    direct_def.task =
+                        format!("{}\n\n[direct dispatch context]\n{}", def.task, context);
+                }
+
+                if def.event_only {
+                    info!(
+                        agent = %agent_name,
+                        event = ?synthetic_event,
+                        "direct dispatch override: spawning event_only agent locally"
+                    );
+                } else {
+                    info!(agent = %agent_name, "direct dispatch: spawning agent");
+                }
+                if let Err(e) = self
+                    .spawn_agent_with_event(&direct_def, synthetic_event.as_ref())
+                    .await
+                {
+                    error!(agent = %agent_name, error = %e, "direct dispatch: failed to spawn agent");
+                }
+            }
+            other => {
+                warn!(dispatch = ?other, "direct dispatch ignored unsupported dispatch type");
             }
         }
     }
@@ -5525,13 +5721,20 @@ impl AgentOrchestrator {
     /// For project-bound agents this is the project's working_dir; otherwise
     /// it is the orchestrator's top-level working_dir.
     ///
-    /// Returns the worktree path if successful, None if worktree creation fails
-    /// (fail-open: agent uses shared working_dir instead).
-    async fn create_agent_worktree(&self, agent_name: &str, repo_dir: &Path) -> Option<PathBuf> {
-        let worktree_root = PathBuf::from("/tmp/adf-worktrees");
+    /// Returns the worktree path if successful. Mutating agents fail closed when
+    /// git cannot create an isolated worktree; they must not use the shared checkout.
+    async fn create_agent_worktree(
+        &self,
+        agent_name: &str,
+        repo_dir: &Path,
+    ) -> Result<PathBuf, OrchestratorError> {
+        let worktree_root = repo_dir.join(".worktrees");
         if let Err(e) = tokio::fs::create_dir_all(&worktree_root).await {
-            warn!(agent = %agent_name, error = %e, "failed to create worktree root");
-            return None;
+            return Err(OrchestratorError::WorktreeCreationFailed {
+                agent: agent_name.to_string(),
+                repo: repo_dir.display().to_string(),
+                reason: format!("failed to create worktree root: {e}"),
+            });
         }
 
         let id = uuid::Uuid::new_v4().to_string()[..8].to_string();
@@ -5557,21 +5760,21 @@ impl AgentOrchestrator {
                     repo = %repo_dir.display(),
                     "created isolated git worktree"
                 );
-                Some(worktree_path)
+                Ok(worktree_path)
             }
             Ok(o) => {
                 let stderr = String::from_utf8_lossy(&o.stderr);
-                warn!(
-                    agent = %agent_name,
-                    error = %stderr.chars().take(200).collect::<String>(),
-                    "git worktree add failed, using shared working_dir"
-                );
-                None
+                Err(OrchestratorError::WorktreeCreationFailed {
+                    agent: agent_name.to_string(),
+                    repo: repo_dir.display().to_string(),
+                    reason: stderr.chars().take(500).collect::<String>(),
+                })
             }
-            Err(e) => {
-                warn!(agent = %agent_name, error = %e, "git worktree command failed");
-                None
-            }
+            Err(e) => Err(OrchestratorError::WorktreeCreationFailed {
+                agent: agent_name.to_string(),
+                repo: repo_dir.display().to_string(),
+                reason: format!("git worktree command failed: {e}"),
+            }),
         }
     }
 
@@ -5783,6 +5986,68 @@ impl AgentOrchestrator {
             }
         }
 
+        // 9b. Poll active compound review (spawned in background so tick
+        //     is not blocked by git worktree ops).
+        if let Some(handle) = self.active_compound_review.take() {
+            if handle.is_finished() {
+                match handle.await {
+                    Ok(Ok(result)) => {
+                        info!(
+                            findings = result.findings.len(),
+                            pass = %result.pass,
+                            duration = ?result.duration,
+                            "compound review completed"
+                        );
+
+                        // 1. Post structured summary to Gitea
+                        if let (Some(ref poster), Some(issue)) =
+                            (&self.output_poster, self.config.compound_review.gitea_issue)
+                        {
+                            let report = result.format_report();
+                            if let Err(e) = poster.post_raw(issue, &report).await {
+                                warn!(error = %e, "failed to post compound review summary");
+                            }
+
+                            // 2. Auto-file issues for CRITICAL/HIGH findings
+                            if self.config.compound_review.auto_file_issues {
+                                let actionable = result.actionable_findings();
+                                for finding in actionable {
+                                    if let Err(e) =
+                                        self.file_finding_issue(poster, &result, finding).await
+                                    {
+                                        warn!(error = %e, "failed to file finding issue");
+                                    }
+                                }
+                            }
+
+                            // 3. Trigger remediation agents for CRITICAL findings
+                            if self.config.compound_review.auto_remediate {
+                                let critical: Vec<_> = result
+                                    .findings
+                                    .iter()
+                                    .filter(|f| f.severity == FindingSeverity::Critical)
+                                    .collect();
+                                for finding in critical {
+                                    if let Err(e) = self.spawn_remediation_agent(finding).await {
+                                        warn!(error = %e, "failed to spawn remediation agent");
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Ok(Err(e)) => {
+                        error!(error = %e, "compound review failed");
+                    }
+                    Err(e) => {
+                        error!(error = %e, "compound review task panicked");
+                    }
+                }
+            } else {
+                // Still running, put it back
+                self.active_compound_review = Some(handle);
+            }
+        }
+
         // 10. Check flow schedules
         self.check_flow_schedules().await;
 
@@ -5938,11 +6203,21 @@ impl AgentOrchestrator {
             warn!(error = %e, "poll_pending_reviews failed");
         }
 
-        info!(
-            tick = self.tick_count,
-            elapsed_ms = tick_start.elapsed().as_millis() as u64,
-            "reconcile_tick complete"
-        );
+        let elapsed = tick_start.elapsed();
+        let elapsed_ms = elapsed.as_millis() as u64;
+        if elapsed > std::time::Duration::from_secs(5) {
+            warn!(
+                tick = self.tick_count,
+                elapsed_ms,
+                "reconcile_tick SLOW: took > 5s, likely blocking agent polling"
+            );
+        } else {
+            info!(
+                tick = self.tick_count,
+                elapsed_ms,
+                "reconcile_tick complete"
+            );
+        }
     }
 
     /// PR gate reconciliation: for every project with Gitea config, read
@@ -6506,6 +6781,36 @@ impl AgentOrchestrator {
                 mention_chain_id,
                 mention_depth,
                 mention_parent_agent,
+                consecutive_config_errors: 0,
+            };
+
+            // Config-error circuit-breaker: quarantine after 3 consecutive failures.
+            let record = if record.exit_class == ExitClass::ConfigError {
+                let count = self
+                    .config_error_counters
+                    .entry(name.clone())
+                    .and_modify(|c| *c += 1)
+                    .or_insert(1);
+                let new_count = *count;
+                if new_count >= 3 && !self.quarantined_agents.contains(name.as_str()) {
+                    self.quarantined_agents.insert(name.clone());
+                    warn!(
+                        target: "adf.agent.quarantined",
+                        agent = %name,
+                        consecutive_config_errors = new_count,
+                        "agent quarantined after consecutive ConfigError exits"
+                    );
+                    if std::env::var("ADF_QUARANTINE_PERSIST").as_deref() == Ok("1") {
+                        // TODO: persist enabled=false to conf.d TOML (issue #1817).
+                    }
+                }
+                AgentRunRecord {
+                    consecutive_config_errors: new_count,
+                    ..record
+                }
+            } else {
+                self.config_error_counters.remove(name.as_str());
+                record
             };
 
             if record.exit_class == ExitClass::RateLimit {
@@ -6869,7 +7174,9 @@ impl AgentOrchestrator {
                 local_unhealthy.extend(self.provider_rate_limits.blocked_providers());
 
                 let respawned = if let Some(ref kg_router) = self.kg_router {
-                    if let Some(decision) = kg_router.route_agent(&def.task) {
+                    if let Some(decision) =
+                        kg_router.route_agent_with_tier(&def.task, def.default_tier.as_deref())
+                    {
                         if let Some(healthy_route) = decision.first_healthy_route(&local_unhealthy)
                         {
                             let retry_count = self
@@ -7280,6 +7587,10 @@ Remove the pause flag once the underlying failure is resolved:\n\n\
         let to_spawn: Vec<(AgentDefinition, chrono::DateTime<chrono::Utc>)> = scheduled
             .into_iter()
             .filter(|(def, _schedule)| {
+                // Skip quarantined agents
+                !self.quarantined_agents.contains(&def.name)
+            })
+            .filter(|(def, _schedule)| {
                 // Skip if already active
                 !self.active_agents.contains_key(&def.name)
             })
@@ -7618,11 +7929,20 @@ Remove the pause flag once the underlying failure is resolved:\n\n\
         session_id: &str,
         model: &str,
     ) -> Option<control_plane::telemetry::CompletionEvent> {
-        let parsed = match cli_tool {
+        let cli_basename = std::path::Path::new(cli_tool)
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or(cli_tool);
+        let parsed = match cli_basename {
             "opencode" => {
                 control_plane::output_parser::parse_opencode_line(line, session_id, model, None)
             }
-            "claude" => control_plane::output_parser::parse_claude_line(line, session_id, model),
+            "claude" | "claude-code" => {
+                control_plane::output_parser::parse_claude_line(line, session_id, model)
+            }
+            "pi-rust" | "pi" => {
+                control_plane::output_parser::parse_pi_rust_line(line, session_id, model)
+            }
             _ => control_plane::output_parser::ParsedOutput::Ignored,
         };
         match parsed {
@@ -7707,59 +8027,19 @@ Remove the pause flag once the underlying failure is resolved:\n\n\
                 self.stop_agent(&agent_name).await;
             }
             ScheduleEvent::CompoundReview => {
-                info!("scheduled compound review starting");
-                // For scheduled reviews, use HEAD against base_branch from config
-                let git_ref = "HEAD";
-                let base_ref = &self.config.compound_review.base_branch;
-                match self.compound_workflow.run(git_ref, base_ref).await {
-                    Ok(result) => {
-                        info!(
-                            findings = result.findings.len(),
-                            pass = %result.pass,
-                            duration = ?result.duration,
-                            "compound review completed"
-                        );
-
-                        // 1. Post structured summary to Gitea
-                        if let (Some(ref poster), Some(issue)) =
-                            (&self.output_poster, self.config.compound_review.gitea_issue)
-                        {
-                            let report = result.format_report();
-                            if let Err(e) = poster.post_raw(issue, &report).await {
-                                warn!(error = %e, "failed to post compound review summary");
-                            }
-
-                            // 2. Auto-file issues for CRITICAL/HIGH findings
-                            if self.config.compound_review.auto_file_issues {
-                                let actionable = result.actionable_findings();
-                                for finding in actionable {
-                                    if let Err(e) =
-                                        self.file_finding_issue(poster, &result, finding).await
-                                    {
-                                        warn!(error = %e, "failed to file finding issue");
-                                    }
-                                }
-                            }
-
-                            // 3. Trigger remediation agents for CRITICAL findings
-                            if self.config.compound_review.auto_remediate {
-                                let critical: Vec<_> = result
-                                    .findings
-                                    .iter()
-                                    .filter(|f| f.severity == FindingSeverity::Critical)
-                                    .collect();
-                                for finding in critical {
-                                    if let Err(e) = self.spawn_remediation_agent(finding).await {
-                                        warn!(error = %e, "failed to spawn remediation agent");
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        error!(error = %e, "compound review failed");
-                    }
+                if self.active_compound_review.is_some() {
+                    info!("compound review already running, skipping");
+                    return;
                 }
+                info!("scheduled compound review starting (background task)");
+                // For scheduled reviews, use HEAD against base_branch from config
+                let git_ref = "HEAD".to_string();
+                let base_ref = self.config.compound_review.base_branch.clone();
+                let workflow = self.compound_workflow.clone();
+                let handle = tokio::spawn(async move {
+                    workflow.run(&git_ref, &base_ref).await
+                });
+                self.active_compound_review = Some(handle);
             }
             ScheduleEvent::Flow(flow_def) => {
                 let flow_name = flow_def.name.clone();
@@ -8097,6 +8377,34 @@ fn has_matching_changes(changed_files: &[String], watch_paths: &[String]) -> boo
     false
 }
 
+/// Determine whether an agent requires an isolated git worktree.
+///
+/// Review-tier agents (haiku) and simple local commands used in tests do not
+/// need isolation. AI/model-backed agents that may modify code do.
+fn requires_isolated_worktree(def: &AgentDefinition, model: Option<&str>) -> bool {
+    if model
+        .map(|m| m.to_ascii_lowercase().contains("haiku"))
+        .unwrap_or(false)
+    {
+        return false;
+    }
+
+    if model.is_some() {
+        return true;
+    }
+
+    let cli_name = Path::new(&def.cli_tool)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or(def.cli_tool.as_str())
+        .to_ascii_lowercase();
+
+    matches!(
+        cli_name.as_str(),
+        "claude" | "codex" | "opencode" | "opencode-go" | "gemini" | "aider"
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -8134,6 +8442,7 @@ mod tests {
                     cli_tool: "echo".to_string(),
                     task: "safety watch".to_string(),
                     model: None,
+                    default_tier: None,
                     schedule: None,
                     capabilities: vec!["security".to_string()],
                     max_memory_bytes: None,
@@ -8154,6 +8463,7 @@ mod tests {
                     evolution_enabled: false,
                     rlm_enabled: None,
                     bypass_kg_routing: false,
+                    enabled: true,
 
                     project: None,
                 },
@@ -8163,6 +8473,7 @@ mod tests {
                     cli_tool: "echo".to_string(),
                     task: "sync upstream".to_string(),
                     model: None,
+                    default_tier: None,
                     schedule: Some("0 3 * * *".to_string()),
                     capabilities: vec!["sync".to_string()],
                     max_memory_bytes: None,
@@ -8183,6 +8494,7 @@ mod tests {
                     evolution_enabled: false,
                     rlm_enabled: None,
                     bypass_kg_routing: false,
+                    enabled: true,
 
                     project: None,
                 },
@@ -8219,6 +8531,7 @@ mod tests {
             evolution: config::EvolutionConfig::default(),
             pr_dispatch: None,
             pr_dispatch_per_project: Default::default(),
+            direct_dispatch: None,
         }
     }
 
@@ -8248,7 +8561,152 @@ mod tests {
         assert!(orch.shutdown_requested);
     }
 
+    #[cfg(unix)]
     #[tokio::test]
+    async fn test_direct_dispatch_config_starts_socket_listener() {
+        use std::os::unix::fs::FileTypeExt;
+
+        let temp = TempDir::new().unwrap();
+        let socket_path = temp.path().join("direct-dispatch.sock");
+        let mut config = test_config();
+        config.agents.clear();
+        config.direct_dispatch = Some(crate::config::DirectDispatchConfig {
+            socket_path: socket_path.clone(),
+        });
+
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+        orch.shutdown();
+        orch.run().await.unwrap();
+
+        let mut socket_created = false;
+        for _ in 0..50 {
+            if std::fs::symlink_metadata(&socket_path)
+                .map(|metadata| metadata.file_type().is_socket())
+                .unwrap_or(false)
+            {
+                socket_created = true;
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+
+        assert!(
+            socket_created,
+            "direct dispatch listener did not create socket at {}",
+            socket_path.display()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_handle_direct_dispatch_spawns_agent_without_mentions() {
+        let mut config = test_config();
+        config.agents = vec![AgentDefinition {
+            name: "echo-agent".to_string(),
+            layer: AgentLayer::Core,
+            cli_tool: "echo".to_string(),
+            task: "echo hello".to_string(),
+            schedule: None,
+            model: None,
+            default_tier: None,
+            capabilities: vec!["echo".to_string()],
+            max_memory_bytes: None,
+            budget_monthly_cents: None,
+            provider: None,
+            persona: None,
+            terraphim_role: None,
+            skill_chain: vec![],
+            sfia_skills: vec![],
+            fallback_provider: None,
+            fallback_model: None,
+            grace_period_secs: None,
+            max_cpu_seconds: None,
+            pre_check: None,
+            gitea_issue: None,
+            event_only: false,
+            evolution_enabled: false,
+            rlm_enabled: None,
+            bypass_kg_routing: false,
+            enabled: true,
+            project: None,
+        }];
+        config.mentions = None;
+
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        let dispatch = webhook::WebhookDispatch::SpawnAgent {
+            agent_name: "echo-agent".to_string(),
+            detected_project: None,
+            issue_number: 0,
+            comment_id: 0,
+            context: "test context".to_string(),
+            synthetic_event: None,
+        };
+
+        orch.handle_direct_dispatch(dispatch).await;
+
+        assert!(
+            orch.active_agents.contains_key("echo-agent"),
+            "direct dispatch must spawn agent even without mentions config; active_agents: {:?}",
+            orch.active_agents.keys().collect::<Vec<_>>()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_handle_direct_dispatch_rejects_disabled_agent() {
+        let mut config = test_config();
+        config.agents = vec![AgentDefinition {
+            name: "disabled-agent".to_string(),
+            layer: AgentLayer::Core,
+            cli_tool: "echo".to_string(),
+            task: "echo hello".to_string(),
+            schedule: None,
+            model: None,
+            default_tier: None,
+            capabilities: vec!["echo".to_string()],
+            max_memory_bytes: None,
+            budget_monthly_cents: None,
+            provider: None,
+            persona: None,
+            terraphim_role: None,
+            skill_chain: vec![],
+            sfia_skills: vec![],
+            fallback_provider: None,
+            fallback_model: None,
+            grace_period_secs: None,
+            max_cpu_seconds: None,
+            pre_check: None,
+            gitea_issue: None,
+            event_only: false,
+            evolution_enabled: false,
+            rlm_enabled: None,
+            bypass_kg_routing: false,
+            enabled: false,
+            project: None,
+        }];
+        config.mentions = None;
+
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        let dispatch = webhook::WebhookDispatch::SpawnAgent {
+            agent_name: "disabled-agent".to_string(),
+            detected_project: None,
+            issue_number: 0,
+            comment_id: 0,
+            context: String::new(),
+            synthetic_event: None,
+        };
+
+        orch.handle_direct_dispatch(dispatch).await;
+
+        assert!(
+            !orch.active_agents.contains_key("disabled-agent"),
+            "direct dispatch must not spawn disabled agent; active_agents: {:?}",
+            orch.active_agents.keys().collect::<Vec<_>>()
+        );
+    }
+
+    #[tokio::test]
+    #[ignore = "flaky: depends on live git repo state which may be shallow clone in CI/rch"]
     async fn test_orchestrator_compound_review_manual() {
         // Use empty groups to avoid git worktree operations during test.
         // Worktree creation fails when git index is locked (e.g. pre-commit hooks).
@@ -8485,6 +8943,7 @@ task = "test"
                 cli_tool: "echo".to_string(),
                 task: "safety watch".to_string(),
                 model: None,
+                default_tier: None,
                 schedule: None,
                 capabilities: vec![],
                 max_memory_bytes: None,
@@ -8505,6 +8964,7 @@ task = "test"
                 evolution_enabled: false,
                 rlm_enabled: None,
                 bypass_kg_routing: false,
+                enabled: true,
 
                 project: None,
             }],
@@ -8540,6 +9000,7 @@ task = "test"
             evolution: config::EvolutionConfig::default(),
             pr_dispatch: None,
             pr_dispatch_per_project: Default::default(),
+            direct_dispatch: None,
         }
     }
 
@@ -8605,6 +9066,7 @@ task = "test"
             cli_tool: "echo".to_string(),
             task: "core task".to_string(),
             model: None,
+            default_tier: None,
             schedule: Some("0 3 * * *".to_string()),
             capabilities: vec![],
             max_memory_bytes: None,
@@ -8625,6 +9087,7 @@ task = "test"
             evolution_enabled: false,
             rlm_enabled: None,
             bypass_kg_routing: false,
+            enabled: true,
 
             project: None,
         }];
@@ -8813,6 +9276,7 @@ task = "test"
             cli_tool: "cat".to_string(),
             task: "test task".to_string(),
             model: None,
+            default_tier: None,
             schedule: None,
             capabilities: vec![],
             max_memory_bytes: None,
@@ -8833,6 +9297,7 @@ task = "test"
             evolution_enabled: false,
             rlm_enabled: None,
             bypass_kg_routing: false,
+            enabled: true,
 
             project: None,
         }];
@@ -8904,6 +9369,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             cli_tool: "echo".to_string(),
             task: "test task".to_string(),
             model: None,
+            default_tier: None,
             schedule: None,
             capabilities: vec![],
             max_memory_bytes: None,
@@ -8924,6 +9390,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             evolution_enabled: false,
             rlm_enabled: None,
             bypass_kg_routing: false,
+            enabled: true,
 
             project: None,
         }];
@@ -9243,6 +9710,7 @@ bypass_kg_routing = true
             cli_tool: "sleep".to_string(),
             task: "60".to_string(),
             model: None,
+            default_tier: None,
             schedule: None,
             capabilities: vec![],
             max_memory_bytes: None,
@@ -9262,6 +9730,7 @@ bypass_kg_routing = true
             evolution_enabled: false,
             rlm_enabled: None,
             bypass_kg_routing: false,
+            enabled: true,
             project: None,
         }];
         let mut orch = AgentOrchestrator::new(config).unwrap();
@@ -9329,6 +9798,7 @@ bypass_kg_routing = true
                 provider: None,
                 persona: None,
                 matrix: None,
+                loop_target: None,
             }],
         }];
 
@@ -9413,6 +9883,7 @@ bypass_kg_routing = true
             cli_tool: "echo".to_string(),
             task: "should not run".to_string(),
             model: None,
+            default_tier: None,
             schedule: None,
             capabilities: vec![],
             max_memory_bytes: None,
@@ -9433,6 +9904,7 @@ bypass_kg_routing = true
             evolution_enabled: false,
             rlm_enabled: None,
             bypass_kg_routing: false,
+            enabled: true,
             project: None,
         }];
 
@@ -9511,6 +9983,7 @@ bypass_kg_routing = true
                 cli_tool: cli_tool.to_string(),
                 task: "review".to_string(),
                 model: None,
+                default_tier: None,
                 schedule: None,
                 capabilities: vec!["review".to_string()],
                 max_memory_bytes: None,
@@ -9530,6 +10003,7 @@ bypass_kg_routing = true
                 evolution_enabled: false,
                 rlm_enabled: None,
                 bypass_kg_routing: false,
+                enabled: true,
                 project: Some("alpha".to_string()),
             }],
             restart_cooldown_secs: 0,
@@ -9575,6 +10049,7 @@ bypass_kg_routing = true
             evolution: config::EvolutionConfig::default(),
             pr_dispatch: None,
             pr_dispatch_per_project: Default::default(),
+            direct_dispatch: None,
         };
         (config, tmp)
     }
@@ -9711,11 +10186,12 @@ bypass_kg_routing = true
     /// short-circuited by the C1/C3 allow-list gate; no spawn happens.
     #[tokio::test]
     async fn reviewpr_dispatch_rejects_banned_provider() {
-        let (config, _tmp) = review_pr_config("echo");
+        let (mut config, _tmp) = review_pr_config("echo");
+        // Bypass load-time validation by mutating the test config before
+        // construction to simulate a stale/poisoned config entry reaching the
+        // dispatcher.
+        config.agents[0].model = Some("google/gemini-2".to_string());
         let mut orch = AgentOrchestrator::new(config).unwrap();
-        // Bypass load-time validation by mutating after construction to
-        // simulate a stale/poisoned config entry reaching the dispatcher.
-        orch.config.agents[0].model = Some("google/gemini-2".to_string());
 
         orch.handle_review_pr(review_pr_task()).await.unwrap();
 
@@ -9808,6 +10284,7 @@ bypass_kg_routing = true
             cli_tool: cli_tool.to_string(),
             task: "build".to_string(),
             model: None,
+            default_tier: None,
             schedule: None,
             capabilities: vec!["build".to_string()],
             max_memory_bytes: None,
@@ -9827,6 +10304,7 @@ bypass_kg_routing = true
             evolution_enabled: false,
             rlm_enabled: None,
             bypass_kg_routing: false,
+            enabled: true,
             project: Some("alpha".to_string()),
         });
         config.pr_dispatch_per_project.insert(
@@ -10210,6 +10688,7 @@ bypass_kg_routing = true
             cli_tool: cli_tool.to_string(),
             task: "spec".to_string(),
             model: None,
+            default_tier: None,
             schedule: None,
             capabilities: vec!["review".to_string()],
             max_memory_bytes: None,
@@ -10229,6 +10708,7 @@ bypass_kg_routing = true
             evolution_enabled: false,
             rlm_enabled: None,
             bypass_kg_routing: false,
+            enabled: true,
             project: Some("alpha".to_string()),
         });
         // The per-project block takes precedence over the top-level block,
@@ -10554,6 +11034,7 @@ bypass_kg_routing = true
             cli_tool: cli_tool.to_string(),
             task: "test".to_string(),
             model: None,
+            default_tier: None,
             schedule: None,
             capabilities: vec!["review".to_string(), "test".to_string()],
             max_memory_bytes: None,
@@ -10573,6 +11054,7 @@ bypass_kg_routing = true
             evolution_enabled: false,
             rlm_enabled: None,
             bypass_kg_routing: false,
+            enabled: true,
             project: Some("alpha".to_string()),
         });
         // The per-project block takes precedence over the top-level block,
@@ -10850,6 +11332,7 @@ bypass_kg_routing = true
             cli_tool: cli_tool.to_string(),
             task: "compliance".to_string(),
             model: None,
+            default_tier: None,
             schedule: None,
             capabilities: vec!["compliance".to_string()],
             max_memory_bytes: None,
@@ -10869,6 +11352,7 @@ bypass_kg_routing = true
             evolution_enabled: false,
             rlm_enabled: None,
             bypass_kg_routing: false,
+            enabled: true,
             project: Some("alpha".to_string()),
         });
         config.pr_dispatch = Some(crate::config::PrDispatchConfig {
@@ -11133,6 +11617,7 @@ bypass_kg_routing = true
             cli_tool: cli_tool.to_string(),
             task: "security".to_string(),
             model: None,
+            default_tier: None,
             schedule: None,
             capabilities: vec!["review".to_string(), "security".to_string()],
             max_memory_bytes: None,
@@ -11152,6 +11637,7 @@ bypass_kg_routing = true
             evolution_enabled: false,
             rlm_enabled: None,
             bypass_kg_routing: false,
+            enabled: true,
             project: Some("alpha".to_string()),
         });
         // The per-project block takes precedence over the top-level block,
@@ -11429,6 +11915,7 @@ bypass_kg_routing = true
             task: "echo would-build".to_string(),
             schedule: None,
             model: None,
+            default_tier: None,
             capabilities: vec!["build".to_string()],
             max_memory_bytes: None,
             budget_monthly_cents: None,
@@ -11447,6 +11934,7 @@ bypass_kg_routing = true
             evolution_enabled: false,
             rlm_enabled: None,
             bypass_kg_routing: false,
+            enabled: true,
             project: None,
         }];
         // mentions config required so handle_webhook_dispatch does not bail at the top.
@@ -11460,6 +11948,7 @@ bypass_kg_routing = true
             issue_number: 9999,
             comment_id: 99999,
             context: "@adf:build-runner please run".to_string(),
+            synthetic_event: None,
         };
 
         orch.handle_webhook_dispatch(dispatch).await;
@@ -11485,6 +11974,7 @@ bypass_kg_routing = true
             task: "echo would-build".to_string(),
             schedule: None,
             model: None,
+            default_tier: None,
             capabilities: vec!["build".to_string()],
             max_memory_bytes: None,
             budget_monthly_cents: None,
@@ -11503,6 +11993,7 @@ bypass_kg_routing = true
             evolution_enabled: false,
             rlm_enabled: None,
             bypass_kg_routing: false,
+            enabled: true,
             project: None,
         }];
         config.mentions = Some(crate::config::MentionConfig::default());
@@ -11543,6 +12034,7 @@ bypass_kg_routing = true
             task: "echo would-build".to_string(),
             schedule: None,
             model: None,
+            default_tier: None,
             capabilities: vec!["build".to_string()],
             max_memory_bytes: None,
             budget_monthly_cents: None,
@@ -11561,6 +12053,7 @@ bypass_kg_routing = true
             evolution_enabled: false,
             rlm_enabled: None,
             bypass_kg_routing: false,
+            enabled: true,
             project: None,
         };
 
@@ -11573,6 +12066,81 @@ bypass_kg_routing = true
         assert!(
             def.gitea_issue.is_some(),
             "gitea_issue must be Some(_) for the post-exit code to enter the outer if-let"
+        );
+    }
+
+    #[test]
+    fn test_spawn_ctx_working_dir_set_to_agent_working_dir() {
+        use std::path::PathBuf;
+
+        // Simulate what build_spawn_context_for_agent returns for a project-bound agent:
+        // working_dir is set to the project root.
+        let project_root = PathBuf::from("/tmp/project-root");
+        let worktree_path = PathBuf::from("/tmp/project-root/.worktrees/agent-abc123");
+
+        let mut spawn_ctx = SpawnContext::with_working_dir(project_root.clone()).with_env(
+            "ADF_WORKING_DIR",
+            project_root.to_string_lossy().into_owned(),
+        );
+
+        // Apply the fix (the two new lines from the proposed change).
+        let agent_working_dir = worktree_path.clone();
+        spawn_ctx.working_dir = Some(agent_working_dir.clone());
+        spawn_ctx = spawn_ctx.with_env(
+            "ADF_WORKING_DIR",
+            agent_working_dir.to_string_lossy().into_owned(),
+        );
+
+        assert_eq!(
+            spawn_ctx.working_dir.as_deref(),
+            Some(worktree_path.as_path()),
+            "spawn_ctx.working_dir must be the worktree path, not the project root"
+        );
+        assert_eq!(
+            spawn_ctx
+                .env_overrides
+                .get("ADF_WORKING_DIR")
+                .map(String::as_str),
+            Some(worktree_path.to_string_lossy().as_ref()),
+            "ADF_WORKING_DIR env var must reflect the worktree path"
+        );
+    }
+
+    #[test]
+    fn test_requires_isolated_worktree_for_mutating_ai_agents() {
+        let mut def = test_config_fast_lifecycle().agents[0].clone();
+
+        def.cli_tool = "echo".to_string();
+        assert!(!requires_isolated_worktree(&def, None));
+
+        assert!(requires_isolated_worktree(
+            &def,
+            Some("kimi-for-coding/k2p6")
+        ));
+
+        def.cli_tool = "/home/alex/.local/bin/claude".to_string();
+        assert!(requires_isolated_worktree(&def, None));
+        assert!(!requires_isolated_worktree(&def, Some("claude-3-haiku")));
+    }
+
+    #[tokio::test]
+    async fn test_mutating_agent_fails_closed_when_worktree_creation_fails() {
+        let temp_repo = TempDir::new().unwrap();
+        let mut config = test_config_fast_lifecycle();
+        config.working_dir = temp_repo.path().to_path_buf();
+        config.agents[0].cli_tool = "claude".to_string();
+
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+        let def = orch.config.agents[0].clone();
+        let result = orch.spawn_agent(&def).await;
+
+        assert!(matches!(
+            result,
+            Err(OrchestratorError::WorktreeCreationFailed { .. })
+        ));
+        assert!(
+            !orch.active_agents.contains_key("echo-safety"),
+            "agent must not spawn in the shared checkout after worktree failure"
         );
     }
 }

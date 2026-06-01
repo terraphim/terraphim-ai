@@ -2,7 +2,13 @@
 name = "terraphim_atomic_client"
 version = "1.19.2"
 edition.workspace = true
+description = "Atomic Data client for Terraphim AI"
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
+repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["ai", "atomic-data", "client", "knowledge-graph"]
 license = "MIT"
+readme = "../../README.md"
 
 [dependencies]
 serde = { workspace = true, features = ["derive"] }

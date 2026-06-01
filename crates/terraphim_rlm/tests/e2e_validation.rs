@@ -14,6 +14,7 @@
 //! compiled when that feature is enabled, so this whole file is skipped
 //! in default workspace builds.
 #![cfg(feature = "firecracker")]
+#![cfg(feature = "firecracker")]
 
 use terraphim_rlm::{
     config::{BackendType, RlmConfig},

@@ -161,6 +161,18 @@ impl TomlProjectAdfConfig {
 }
 
 impl ProjectAdfConfig {
+    pub fn project_root(&self) -> PathBuf {
+        self.discovered_path
+            .parent()
+            .and_then(Path::parent)
+            .map(Path::to_path_buf)
+            .unwrap_or_else(|| self.discovered_path.clone())
+    }
+
+    pub fn skills_dir(&self) -> PathBuf {
+        self.project_root().join(".terraphim/skills")
+    }
+
     fn discover_terraphim_dir(start_dir: &Path) -> Option<PathBuf> {
         let mut current = Some(start_dir.to_path_buf());
 
@@ -208,11 +220,7 @@ impl TryFrom<&ProjectAdfConfig> for (Project, Vec<AgentDefinition>) {
     fn try_from(cfg: &ProjectAdfConfig) -> Result<Self, Self::Error> {
         let project = Project {
             id: cfg.project_id.clone(),
-            working_dir: cfg
-                .discovered_path
-                .parent()
-                .unwrap_or(&cfg.discovered_path)
-                .to_path_buf(),
+            working_dir: cfg.project_root(),
             schedule_offset_minutes: 0,
             gitea: None,
             mentions: None,
@@ -241,6 +249,7 @@ impl TryFrom<&ProjectAdfConfig> for (Project, Vec<AgentDefinition>) {
                     task: ta.task.clone(),
                     schedule: ta.schedule.clone(),
                     model: ta.model.clone(),
+                    default_tier: None,
                     capabilities: ta.capabilities.clone(),
                     max_memory_bytes: None,
                     budget_monthly_cents: ta.budget_monthly_cents,
@@ -260,6 +269,7 @@ impl TryFrom<&ProjectAdfConfig> for (Project, Vec<AgentDefinition>) {
                     evolution_enabled: ta.evolution_enabled,
                     rlm_enabled: ta.rlm_enabled,
                     bypass_kg_routing: false,
+                    enabled: true,
                 })
             })
             .collect::<Result<Vec<AgentDefinition>, OrchestratorError>>()?;
@@ -303,6 +313,14 @@ task = "Run safety checks"
             .expect("adf.toml must be found");
         assert_eq!(result.project_id, "test-project");
         assert_eq!(result.name, "Test Project");
+        assert_eq!(result.project_root(), project_dir.canonicalize().unwrap());
+        assert_eq!(
+            result.skills_dir(),
+            project_dir
+                .canonicalize()
+                .unwrap()
+                .join(".terraphim/skills")
+        );
         assert_eq!(result.agents.len(), 1);
         assert_eq!(result.agents[0].name, "safety-bot");
         assert_eq!(result.agents[0].layer, "Safety");
@@ -320,7 +338,7 @@ task = "Run safety checks"
     fn discover_and_load_returns_none_when_no_adf_toml() {
         let tmp = TempDir::new().unwrap();
         fs::create_dir_all(tmp.path().join(".terraphim")).unwrap();
-        let result = ProjectAdfConfig::discover_and_load(&tmp.path()).unwrap();
+        let result = ProjectAdfConfig::discover_and_load(tmp.path()).unwrap();
         assert!(result.is_none());
     }
 
@@ -592,6 +610,7 @@ context = "adf/build"
             pr_dispatch: adf.pr_dispatch,
             pr_dispatch_per_project: std::collections::HashMap::new(),
             gitea_skill_repo: None,
+            direct_dispatch: None,
         };
 
         config.substitute_env_vars();

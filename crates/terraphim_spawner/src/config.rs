@@ -21,7 +21,7 @@ pub struct ResourceLimits {
 }
 
 /// Configuration for an agent
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct AgentConfig {
     /// Agent identifier
     pub agent_id: String,
@@ -42,6 +42,43 @@ pub struct AgentConfig {
     /// Whether the CLI tool supports reading the task from stdin.
     /// When false, the task is always passed as a positional argument.
     pub supports_stdin: bool,
+}
+
+/// Returns `true` if an env-var key name indicates a sensitive credential.
+fn is_sensitive_key(key: &str) -> bool {
+    let upper = key.to_uppercase();
+    upper.contains("TOKEN")
+        || upper.contains("KEY")
+        || upper.contains("SECRET")
+        || upper.contains("PASSWORD")
+}
+
+impl std::fmt::Debug for AgentConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let redacted: std::collections::HashMap<&str, &str> = self
+            .env_vars
+            .iter()
+            .map(|(k, v)| {
+                let val: &str = if is_sensitive_key(k) {
+                    "***REDACTED***"
+                } else {
+                    v.as_str()
+                };
+                (k.as_str(), val)
+            })
+            .collect();
+        f.debug_struct("AgentConfig")
+            .field("agent_id", &self.agent_id)
+            .field("cli_command", &self.cli_command)
+            .field("args", &self.args)
+            .field("working_dir", &self.working_dir)
+            .field("env_vars", &redacted)
+            .field("required_api_keys", &self.required_api_keys)
+            .field("resource_limits", &self.resource_limits)
+            .field("use_stdin", &self.use_stdin)
+            .field("supports_stdin", &self.supports_stdin)
+            .finish()
+    }
 }
 
 impl AgentConfig {
@@ -99,9 +136,15 @@ impl AgentConfig {
     /// opencode hangs on stdin for large tasks (>~50KB), so it must
     /// always receive the task as a positional argument.
     fn infer_supports_stdin(cli_command: &str) -> bool {
+        !matches!(Self::cli_name(cli_command), "opencode")
+    }
+
+    /// Return the native project-local skill directory for CLIs that support skills.
+    pub fn skill_dir_name(cli_command: &str) -> Option<&'static str> {
         match Self::cli_name(cli_command) {
-            "opencode" => false,
-            _ => true,
+            "opencode" => Some(".opencode/skill"),
+            "claude" | "claude-code" => Some(".claude/skills"),
+            _ => None,
         }
     }
 
@@ -111,19 +154,22 @@ impl AgentConfig {
     /// - codex: `exec <prompt>` runs a single task and exits
     /// - claude: `-p <prompt>` prints output without interactive UI
     /// - opencode: `run --format json` runs in non-interactive mode
+    /// - pi-rust: `-p --mode json <prompt>` runs a single task and exits
+    /// - badlogic/pi: `prompt <model> <prompt>` sends a prompt to a running model
     fn infer_args(cli_command: &str) -> Vec<String> {
         match Self::cli_name(cli_command) {
             "codex" => vec!["exec".to_string(), "--full-auto".to_string()],
             "claude" | "claude-code" => vec![
                 "-p".to_string(),
-                "--allowedTools".to_string(),
-                "Bash,Read,Write,Edit,Glob,Grep".to_string(),
+                "--allowedTools=Bash,Read,Write,Edit,Glob,Grep".to_string(),
             ],
             "opencode" => vec![
                 "run".to_string(),
                 "--format".to_string(),
                 "json".to_string(),
             ],
+            "pi-rust" => vec!["-p".to_string(), "--mode".to_string(), "json".to_string()],
+            "pi" => vec!["prompt".to_string()],
             // Shell interpreters: pass the task as an inline script. Enables
             // shell-script agents like fleet-meta to run `cli_tool = "/bin/bash"`
             // with the task body as the script source.
@@ -159,6 +205,20 @@ impl AgentConfig {
                 vec!["--model".to_string(), normalised]
             }
             "opencode" => vec!["-m".to_string(), model.to_string()],
+            "pi-rust" => {
+                let mut args = Vec::new();
+                if let Some((provider, model_id)) = model.split_once('/') {
+                    args.push("--provider".to_string());
+                    args.push(provider.to_string());
+                    args.push("--model".to_string());
+                    args.push(model_id.to_string());
+                } else {
+                    args.push("--model".to_string());
+                    args.push(model.to_string());
+                }
+                args
+            }
+            "pi" => vec![model.to_string()],
             _ => vec![],
         }
     }
@@ -196,6 +256,9 @@ pub enum ValidationError {
 
     #[error("Working directory does not exist: {0}")]
     WorkingDirNotFound(PathBuf),
+
+    #[error("pi CLI requires a model alias for `pi prompt <model> <prompt>`")]
+    PiModelRequired,
 }
 
 /// Validator for agent configuration
@@ -218,6 +281,9 @@ impl AgentValidator {
 
         // Check required API keys
         self.validate_api_keys().await?;
+
+        // Check CLI-specific contracts that cannot be inferred from PATH alone.
+        self.validate_cli_contract()?;
 
         // Check working directory
         self.validate_working_dir().await?;
@@ -256,6 +322,16 @@ impl AgentValidator {
             if std::env::var(key).is_err() {
                 return Err(ValidationError::ApiKeyNotSet(key.clone()));
             }
+        }
+        Ok(())
+    }
+
+    /// Validate CLI-specific argument contracts.
+    fn validate_cli_contract(&self) -> Result<(), ValidationError> {
+        if AgentConfig::cli_name(&self.config.cli_command) == "pi"
+            && self.config.args == ["prompt".to_string()]
+        {
+            return Err(ValidationError::PiModelRequired);
         }
         Ok(())
     }
@@ -396,6 +472,27 @@ mod tests {
     }
 
     #[test]
+    fn test_skill_dir_name() {
+        assert_eq!(
+            AgentConfig::skill_dir_name("opencode"),
+            Some(".opencode/skill")
+        );
+        assert_eq!(
+            AgentConfig::skill_dir_name("/home/alex/.bun/bin/opencode"),
+            Some(".opencode/skill")
+        );
+        assert_eq!(
+            AgentConfig::skill_dir_name("claude"),
+            Some(".claude/skills")
+        );
+        assert_eq!(
+            AgentConfig::skill_dir_name("claude-code"),
+            Some(".claude/skills")
+        );
+        assert_eq!(AgentConfig::skill_dir_name("codex"), None);
+    }
+
+    #[test]
     fn test_from_provider_sets_supports_stdin() {
         let provider = terraphim_types::capability::Provider {
             id: "test-opencode".into(),
@@ -465,5 +562,192 @@ mod tests {
         assert_eq!(AgentConfig::infer_args("/bin/bash"), vec!["-c"]);
         assert_eq!(AgentConfig::infer_args("bash"), vec!["-c"]);
         assert_eq!(AgentConfig::infer_args("/usr/bin/sh"), vec!["-c"]);
+    }
+
+    #[test]
+    fn test_infer_args_pi_rust() {
+        let args = AgentConfig::infer_args("pi-rust");
+        assert_eq!(args, vec!["-p", "--mode", "json"]);
+    }
+
+    #[test]
+    fn test_infer_args_pi_rust_full_path() {
+        let args = AgentConfig::infer_args("/home/alex/.local/bin/pi-rust");
+        assert_eq!(args, vec!["-p", "--mode", "json"]);
+    }
+
+    #[test]
+    fn test_infer_args_pi_alias() {
+        let args = AgentConfig::infer_args("pi");
+        assert_eq!(args, vec!["prompt"]);
+    }
+
+    #[test]
+    fn test_model_args_pi_badlogic() {
+        let args = AgentConfig::model_args("pi", "phi3");
+        assert_eq!(args, vec!["phi3"]);
+    }
+
+    #[test]
+    fn test_model_args_pi_badlogic_full_path() {
+        let args = AgentConfig::model_args("/home/alex/.npm/bin/pi", "qwen");
+        assert_eq!(args, vec!["qwen"]);
+    }
+
+    #[tokio::test]
+    async fn test_validate_pi_requires_model_alias() {
+        let provider = terraphim_types::capability::Provider {
+            id: "test-pi".into(),
+            name: "test-pi".into(),
+            provider_type: terraphim_types::capability::ProviderType::Agent {
+                agent_id: "test".into(),
+                cli_command: "/bin/pi".into(),
+                working_dir: std::env::current_dir().unwrap(),
+            },
+            capabilities: vec![],
+            cost_level: terraphim_types::capability::CostLevel::Cheap,
+            latency: terraphim_types::capability::Latency::Medium,
+            keywords: vec![],
+        };
+        let config = AgentConfig::from_provider(&provider).unwrap();
+        let validator = AgentValidator::new(&config);
+        let result = validator.validate_cli_contract();
+        assert!(matches!(result, Err(ValidationError::PiModelRequired)));
+
+        let config_with_model = config.with_model("phi3");
+        let validator = AgentValidator::new(&config_with_model);
+        assert!(validator.validate_cli_contract().is_ok());
+    }
+
+    #[test]
+    fn test_model_args_pi_rust_composed() {
+        let args = AgentConfig::model_args("pi-rust", "zai-coding-plan/glm-5.1");
+        assert_eq!(
+            args,
+            vec!["--provider", "zai-coding-plan", "--model", "glm-5.1"]
+        );
+    }
+
+    #[test]
+    fn test_is_sensitive_key_detects_known_patterns() {
+        assert!(is_sensitive_key("ANTHROPIC_API_KEY"));
+        assert!(is_sensitive_key("OPENAI_API_KEY"));
+        assert!(is_sensitive_key("GITHUB_TOKEN"));
+        assert!(is_sensitive_key("DB_PASSWORD"));
+        assert!(is_sensitive_key("APP_SECRET"));
+        assert!(is_sensitive_key("api_key"));
+        assert!(is_sensitive_key("auth_token"));
+    }
+
+    #[test]
+    fn test_is_sensitive_key_allows_safe_keys() {
+        assert!(!is_sensitive_key("HOME"));
+        assert!(!is_sensitive_key("PATH"));
+        assert!(!is_sensitive_key("LOG_LEVEL"));
+        assert!(!is_sensitive_key("RUST_LOG"));
+        assert!(!is_sensitive_key("AGENT_ID"));
+    }
+
+    #[test]
+    fn test_debug_redacts_sensitive_env_vars() {
+        let mut env_vars = HashMap::new();
+        env_vars.insert(
+            "ANTHROPIC_API_KEY".to_string(),
+            "sk-ant-real-secret".to_string(),
+        );
+        env_vars.insert("GITHUB_TOKEN".to_string(), "ghp_real_token".to_string());
+        env_vars.insert("LOG_LEVEL".to_string(), "debug".to_string());
+        env_vars.insert("HOME".to_string(), "/home/agent".to_string());
+
+        let config = AgentConfig {
+            agent_id: "test-agent".to_string(),
+            cli_command: "claude".to_string(),
+            args: vec![],
+            working_dir: None,
+            env_vars,
+            required_api_keys: vec![],
+            resource_limits: ResourceLimits::default(),
+            use_stdin: false,
+            supports_stdin: true,
+        };
+
+        let debug_output = format!("{:?}", config);
+
+        // Sensitive values must not appear
+        assert!(
+            !debug_output.contains("sk-ant-real-secret"),
+            "API key value must be redacted"
+        );
+        assert!(
+            !debug_output.contains("ghp_real_token"),
+            "Token value must be redacted"
+        );
+
+        // Redaction marker must appear
+        assert!(
+            debug_output.contains("***REDACTED***"),
+            "Redaction marker must appear for sensitive keys"
+        );
+
+        // Non-sensitive values must be visible
+        assert!(
+            debug_output.contains("debug"),
+            "Non-sensitive env var value must be visible"
+        );
+        assert!(
+            debug_output.contains("/home/agent"),
+            "Non-sensitive env var value must be visible"
+        );
+    }
+
+    #[test]
+    fn test_model_args_pi_rust_bare() {
+        let args = AgentConfig::model_args("pi-rust", "glm-5.1");
+        assert_eq!(args, vec!["--model", "glm-5.1"]);
+    }
+
+    #[test]
+    fn test_model_args_pi_rust_full_path() {
+        let args = AgentConfig::model_args("/home/alex/.local/bin/pi-rust", "kimi-for-coding/k2p6");
+        assert_eq!(
+            args,
+            vec!["--provider", "kimi-for-coding", "--model", "k2p6"]
+        );
+    }
+
+    #[test]
+    fn test_infer_supports_stdin_pi_rust() {
+        assert!(AgentConfig::infer_supports_stdin("pi-rust"));
+        assert!(AgentConfig::infer_supports_stdin(
+            "/home/alex/.local/bin/pi-rust"
+        ));
+        assert!(AgentConfig::infer_supports_stdin("pi"));
+    }
+
+    #[test]
+    fn test_infer_api_keys_pi_rust() {
+        let keys = AgentConfig::infer_api_keys("pi-rust");
+        assert!(keys.is_empty(), "pi-rust manages its own per-provider auth");
+
+        let keys = AgentConfig::infer_api_keys("/home/alex/.local/bin/pi-rust");
+        assert!(keys.is_empty());
+    }
+
+    #[test]
+    fn test_debug_empty_env_vars_shows_nothing_redacted() {
+        let config = AgentConfig {
+            agent_id: "test".to_string(),
+            cli_command: "claude".to_string(),
+            args: vec![],
+            working_dir: None,
+            env_vars: HashMap::new(),
+            required_api_keys: vec![],
+            resource_limits: ResourceLimits::default(),
+            use_stdin: false,
+            supports_stdin: true,
+        };
+        let debug_output = format!("{:?}", config);
+        assert!(!debug_output.contains("***REDACTED***"));
+        assert!(debug_output.contains("AgentConfig"));
     }
 }

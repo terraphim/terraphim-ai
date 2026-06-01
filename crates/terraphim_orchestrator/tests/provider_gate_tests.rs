@@ -42,6 +42,7 @@ fn dispatch_ctx_with_static(agent: &str, model: &str) -> DispatchContext {
         cli_tool: "opencode".to_string(),
         layer: terraphim_orchestrator::config::AgentLayer::Core,
         session_id: None,
+        default_tier: None,
     }
 }
 
@@ -289,6 +290,7 @@ fn agent_with_model(name: &str, model: &str) -> AgentDefinition {
         cli_tool: "echo".to_string(),
         task: "task".to_string(),
         model: Some(model.to_string()),
+        default_tier: None,
         schedule: None,
         capabilities: vec![],
         max_memory_bytes: None,
@@ -308,6 +310,7 @@ fn agent_with_model(name: &str, model: &str) -> AgentDefinition {
         evolution_enabled: false,
         rlm_enabled: None,
         bypass_kg_routing: false,
+        enabled: true,
         project: None,
     }
 }
@@ -368,6 +371,7 @@ fn budget_aware_config(
         pr_dispatch: None,
         pr_dispatch_per_project: Default::default(),
         gitea_skill_repo: None,
+        direct_dispatch: None,
         gate_reconcile_interval_ticks: 20,
     }
 }

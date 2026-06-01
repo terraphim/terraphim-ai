@@ -180,6 +180,60 @@ impl KgRouter {
     /// Uses [`terraphim_automata::find_matches`] to match task text against
     /// KG synonyms, then returns the highest-priority matched rule's primary route.
     pub fn route_agent(&self, task_description: &str) -> Option<KgRouteDecision> {
+        self.route_agent_with_tier(task_description, None)
+    }
+
+    /// Route with an optional default tier bias.
+    ///
+    /// If KG matching returns a tier that differs from `default_tier`, the
+    /// confidence must exceed the escalation threshold (0.7) to override the
+    /// default.  This prevents agents from being mis-routed by ambient
+    /// keywords in long task descriptions (e.g. issue bodies).
+    pub fn route_agent_with_tier(
+        &self,
+        task_description: &str,
+        default_tier: Option<&str>,
+    ) -> Option<KgRouteDecision> {
+        let raw = self.route_agent_raw(task_description);
+
+        if let Some(ref d) = raw {
+            if let Some(default) = default_tier {
+                if d.matched_concept != default {
+                    if d.confidence > 0.7 {
+                        info!(
+                            concept = %d.matched_concept,
+                            confidence = d.confidence,
+                            default_tier = %default,
+                            "KG tier escalation allowed (confidence above threshold)"
+                        );
+                        return raw;
+                    }
+                    info!(
+                        concept = %d.matched_concept,
+                        confidence = d.confidence,
+                        default_tier = %default,
+                        "KG tier overridden by default_tier (confidence below threshold)"
+                    );
+                    return self.decision_for_concept(default);
+                }
+            }
+            return raw;
+        }
+
+        // No KG match but a default tier is configured — fall back to it.
+        if let Some(default) = default_tier {
+            info!(
+                default_tier = %default,
+                "no KG match; falling back to default_tier"
+            );
+            return self.decision_for_concept(default);
+        }
+
+        None
+    }
+
+    /// Internal: pure KG matching without tier bias.
+    fn route_agent_raw(&self, task_description: &str) -> Option<KgRouteDecision> {
         if self.thesaurus.is_empty() {
             return None;
         }
@@ -231,6 +285,41 @@ impl KgRouter {
             model = %primary.model,
             confidence = confidence,
             "KG route matched"
+        );
+
+        Some(KgRouteDecision {
+            provider: primary.provider.clone(),
+            model: primary.model.clone(),
+            action: primary.action.clone(),
+            confidence,
+            matched_concept: rule.concept.clone(),
+            priority: rule.directives.priority.unwrap_or(50),
+            fallback_routes: rule.directives.routes.clone(),
+        })
+    }
+
+    /// Build a decision for a specific concept by name.
+    ///
+    /// Accepts both the exact concept name and the short form
+    /// (e.g. "review" -> "review_tier").
+    fn decision_for_concept(&self, concept: &str) -> Option<KgRouteDecision> {
+        let rule = self
+            .rules
+            .iter()
+            .find(|r| r.concept == concept)
+            .or_else(|| {
+                let with_suffix = format!("{}_tier", concept);
+                self.rules.iter().find(|r| r.concept == with_suffix)
+            })?;
+        let primary = rule.directives.routes.first()?;
+        let confidence = rule.directives.priority.unwrap_or(50) as f64 / 100.0;
+
+        info!(
+            concept = %rule.concept,
+            provider = %primary.provider,
+            model = %primary.model,
+            confidence = confidence,
+            "KG route selected by default_tier"
         );
 
         Some(KgRouteDecision {
@@ -491,7 +580,7 @@ action:: opencode -m {{ model }} -p "{{ prompt }}"
     }
 
     #[test]
-    fn loads_real_adf_taxonomy_3_tiers() {
+    fn loads_real_adf_taxonomy_4_tiers() {
         let taxonomy = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../docs/taxonomy/routing_scenarios/adf");
         if !taxonomy.exists() {
@@ -499,7 +588,11 @@ action:: opencode -m {{ model }} -p "{{ prompt }}"
         }
 
         let router = KgRouter::load(&taxonomy).unwrap();
-        assert_eq!(router.rule_count(), 3, "expected 3 tier files");
+        assert_eq!(
+            router.rule_count(),
+            4,
+            "expected 4 tier files (planning, decision, implementation, review)"
+        );
 
         // Every route should have an action template
         for route_directive in router.all_routes() {
@@ -533,6 +626,63 @@ action:: opencode -m {{ model }} -p "{{ prompt }}"
         assert_eq!(d.priority, 50);
         assert_eq!(d.provider, "anthropic");
         assert!(d.model.contains("sonnet"));
+
+        // Decision tier (priority 65) -- "analyse logs" routes between
+        // planning and implementation
+        let d = router
+            .route_agent("analyse logs for root cause analysis")
+            .unwrap();
+        assert_eq!(d.matched_concept, "decision_tier");
+        assert_eq!(d.priority, 65);
+
+        // Decision tier covers post-merge gate work
+        let d = router
+            .route_agent("post-merge gate assessment for nightwatch retrospective")
+            .unwrap();
+        assert_eq!(d.matched_concept, "decision_tier");
+        assert_eq!(d.priority, 65);
+
+        // Planning tier exposes opencode/gpt-5.5 route
+        let pt = router
+            .all_routes()
+            .into_iter()
+            .filter(|r| {
+                r.action
+                    .as_deref()
+                    .is_some_and(|a| a.contains("opencode/gpt-5.5"))
+                    || r.model == "opencode/gpt-5.5"
+            })
+            .count();
+        assert!(
+            pt >= 1,
+            "expected at least one route with opencode/gpt-5.5 across all tiers"
+        );
+
+        // Implementation tier exposes MiniMax-M2.7-highspeed route
+        let m27 = router
+            .all_routes()
+            .into_iter()
+            .filter(|r| r.model.contains("MiniMax-M2.7-highspeed"))
+            .count();
+        assert!(
+            m27 >= 1,
+            "expected at least one route with MiniMax-M2.7-highspeed"
+        );
+
+        // pi-rust routes are present
+        let pi_rust = router
+            .all_routes()
+            .into_iter()
+            .filter(|r| {
+                r.action
+                    .as_deref()
+                    .is_some_and(|a| a.contains("/home/alex/.local/bin/pi-rust"))
+            })
+            .count();
+        assert!(
+            pi_rust >= 2,
+            "expected at least 2 pi-rust action templates (planning + impl)"
+        );
     }
 
     /// End-to-end: simulate ADF agent dispatch with phase-aware 3-tier routing.
@@ -594,8 +744,8 @@ action:: opencode -m {{ model }} -p "{{ prompt }}"
             (
                 "merge-coordinator",
                 "review merge verdict and evaluate GO NO-GO for PR approval",
-                "implementation_tier",
-                "anthropic",
+                "decision_tier",
+                "openai-codex",
             ),
             // IMPLEMENTATION TIER (sonnet)
             (
@@ -634,6 +784,13 @@ action:: opencode -m {{ model }} -p "{{ prompt }}"
                 "implementation_tier",
                 "anthropic",
             ),
+            // New: decision-tier dispatches use analytical keywords
+            (
+                "nightwatch-retrospective",
+                "nightwatch retrospective and quality evaluation across fleet health",
+                "decision_tier",
+                "openai-codex",
+            ),
         ];
 
         let mut all_passed = true;
@@ -671,5 +828,141 @@ action:: opencode -m {{ model }} -p "{{ prompt }}"
             }
         }
         assert!(all_passed, "some agents did not route to correct tier");
+    }
+
+    #[test]
+    fn default_tier_overrides_low_confidence_mismatch() {
+        let dir = tempdir().unwrap();
+        // Implementation tier (priority 50, confidence 0.5)
+        write_rule(
+            dir.path(),
+            "implementation_tier",
+            "priority:: 50\nsynonyms:: code review, build\nroute:: anthropic, sonnet\n",
+        );
+        // Review tier (priority 40, confidence 0.4)
+        write_rule(
+            dir.path(),
+            "review_tier",
+            "priority:: 40\nsynonyms:: verify, validate\nroute:: anthropic, haiku\n",
+        );
+
+        let router = KgRouter::load(dir.path()).unwrap();
+
+        // Without bias: "code review" matches implementation_tier (confidence 0.5)
+        let d = router.route_agent("code review the PR").unwrap();
+        assert_eq!(d.matched_concept, "implementation_tier");
+
+        // With default_tier="review": implementation_tier confidence (0.5) < 0.7,
+        // so it should fall back to review_tier.
+        let d = router
+            .route_agent_with_tier("code review the PR", Some("review_tier"))
+            .unwrap();
+        assert_eq!(
+            d.matched_concept, "review_tier",
+            "expected default_tier override for low-confidence mismatch"
+        );
+        assert_eq!(d.model, "haiku");
+    }
+
+    #[test]
+    fn default_tier_allows_high_confidence_escalation() {
+        let dir = tempdir().unwrap();
+        // Planning tier (priority 80, confidence 0.8)
+        write_rule(
+            dir.path(),
+            "planning_tier",
+            "priority:: 80\nsynonyms:: strategic planning\nroute:: anthropic, opus\n",
+        );
+        // Review tier (priority 40, confidence 0.4)
+        write_rule(
+            dir.path(),
+            "review_tier",
+            "priority:: 40\nsynonyms:: verify\nroute:: anthropic, haiku\n",
+        );
+
+        let router = KgRouter::load(dir.path()).unwrap();
+
+        // With default_tier="review": planning_tier confidence (0.8) > 0.7,
+        // so escalation is allowed.
+        let d = router
+            .route_agent_with_tier("strategic planning session", Some("review_tier"))
+            .unwrap();
+        assert_eq!(
+            d.matched_concept, "planning_tier",
+            "expected escalation when confidence exceeds threshold"
+        );
+        assert_eq!(d.model, "opus");
+    }
+
+    #[test]
+    fn default_tier_short_form_with_suffix() {
+        let dir = tempdir().unwrap();
+        write_rule(
+            dir.path(),
+            "review_tier",
+            "priority:: 40\nsynonyms:: verify\nroute:: anthropic, haiku\n",
+        );
+
+        let router = KgRouter::load(dir.path()).unwrap();
+
+        // "review" should resolve to "review_tier" via suffix fallback.
+        let d = router
+            .route_agent_with_tier("do something", Some("review"))
+            .unwrap();
+        assert_eq!(d.matched_concept, "review_tier");
+        assert_eq!(d.model, "haiku");
+    }
+
+    #[test]
+    fn default_tier_fallback_when_no_match() {
+        let dir = tempdir().unwrap();
+        write_rule(
+            dir.path(),
+            "implementation_tier",
+            "priority:: 50\nsynonyms:: build\nroute:: anthropic, sonnet\n",
+        );
+
+        let router = KgRouter::load(dir.path()).unwrap();
+
+        // No match for "write docs", but default_tier is set.
+        let d = router
+            .route_agent_with_tier("write docs", Some("implementation_tier"))
+            .unwrap();
+        assert_eq!(d.matched_concept, "implementation_tier");
+        assert_eq!(d.model, "sonnet");
+    }
+
+    #[test]
+    fn default_tier_none_uses_pure_kg_matching() {
+        let dir = tempdir().unwrap();
+        write_rule(
+            dir.path(),
+            "implementation_tier",
+            "priority:: 50\nsynonyms:: build\nroute:: anthropic, sonnet\n",
+        );
+
+        let router = KgRouter::load(dir.path()).unwrap();
+
+        // No default_tier — pure KG matching, no fallback.
+        assert!(router.route_agent_with_tier("write docs", None).is_none());
+    }
+
+    #[test]
+    fn default_tier_same_as_match_returns_match() {
+        let dir = tempdir().unwrap();
+        write_rule(
+            dir.path(),
+            "implementation_tier",
+            "priority:: 50\nsynonyms:: build\nroute:: anthropic, sonnet\n",
+        );
+
+        let router = KgRouter::load(dir.path()).unwrap();
+
+        // Match equals default_tier — no override needed.
+        let d = router
+            .route_agent_with_tier("build it", Some("implementation_tier"))
+            .unwrap();
+        assert_eq!(d.matched_concept, "implementation_tier");
+        assert_eq!(d.model, "sonnet");
     }
 }

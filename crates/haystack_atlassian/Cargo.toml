@@ -2,7 +2,13 @@
 name = "atlassian_haystack"
 version = "1.0.0"
 edition.workspace = true
+description = "Atlassian haystack provider for Terraphim AI"
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
+repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["ai", "atlassian", "haystack", "integration"]
 license = "MIT"
+readme = "../../README.md"
 
 [dependencies]
 haystack_core = { path = "../haystack_core" }

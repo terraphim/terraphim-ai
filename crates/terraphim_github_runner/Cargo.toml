@@ -3,8 +3,12 @@ name = "terraphim_github_runner"
 version = "0.1.0"
 edition.workspace = true
 description = "GitHub Actions runner with Firecracker sandbox integration for Terraphim AI"
-license = "Apache-2.0"
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
 repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["ai", "github-actions", "firecracker", "sandbox", "ci-cd"]
+license = "Apache-2.0"
+readme = "../../README.md"
 
 [features]
 default = []

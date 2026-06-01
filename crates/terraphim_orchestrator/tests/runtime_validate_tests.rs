@@ -145,3 +145,44 @@ fn accepts_valid_legacy_config_at_startup() {
     assert_eq!(cfg.agents.len(), 1);
     assert!(cfg.agents[0].project.is_none());
 }
+
+#[test]
+fn rejects_missing_opencode_model_at_startup() {
+    let result = AgentOrchestrator::from_config_file(fixture("missing_opencode_model.toml"));
+    assert!(result.is_err(), "expected Err for bare 'opencode' model");
+    let err = result.err().unwrap();
+    match err {
+        OrchestratorError::BannedProvider {
+            agent,
+            provider,
+            field,
+        } => {
+            assert_eq!(agent, "opencode-agent");
+            assert_eq!(provider, "opencode");
+            assert_eq!(field, "model");
+        }
+        other => panic!("expected BannedProvider, got {other:?}"),
+    }
+}
+
+#[test]
+fn rejects_google_model_prefix_at_startup() {
+    let result = AgentOrchestrator::from_config_file(fixture("openai_model_banned.toml"));
+    assert!(result.is_err(), "expected Err for google/ model prefix");
+    let err = result.err().unwrap();
+    match err {
+        OrchestratorError::BannedProvider {
+            agent,
+            provider,
+            field,
+        } => {
+            assert_eq!(agent, "google-agent");
+            assert!(
+                provider.starts_with("google/"),
+                "expected google/ prefix, got {provider}"
+            );
+            assert_eq!(field, "model");
+        }
+        other => panic!("expected BannedProvider, got {other:?}"),
+    }
+}

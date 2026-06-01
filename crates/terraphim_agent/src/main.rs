@@ -53,7 +53,7 @@ use service::TuiService;
 use terraphim_types::{
     Document, Layer, LogicalOperator, NormalizedTermValue, RoleName, SearchQuery,
 };
-use terraphim_update::{check_for_updates, check_for_updates_startup, update_binary};
+use terraphim_update::{TerraphimUpdater, UpdaterConfig};
 
 #[derive(clap::ValueEnum, Debug, Clone)]
 enum LogicalOperatorCli {
@@ -1707,7 +1707,9 @@ fn main() -> Result<()> {
     // Check for updates on startup (non-blocking, debug logging on failure)
     let rt = Runtime::new()?;
     rt.block_on(async {
-        if let Err(e) = check_for_updates_startup("terraphim-agent").await {
+        let config = UpdaterConfig::new("terraphim-agent").with_version(env!("CARGO_PKG_VERSION"));
+        let updater = TerraphimUpdater::new(config);
+        if let Err(e) = updater.check_update().await {
             log::debug!("Update check failed: {}", e);
         }
     });
@@ -2003,7 +2005,9 @@ async fn run_offline_command(
     // CheckUpdate is stateless - handle before TuiService initialization
     if let Command::CheckUpdate = &command {
         println!("Checking for terraphim-agent updates...");
-        match check_for_updates("terraphim-agent").await {
+        let config = UpdaterConfig::new("terraphim-agent").with_version(env!("CARGO_PKG_VERSION"));
+        let updater = TerraphimUpdater::new(config);
+        match updater.check_update().await {
             Ok(status) => {
                 println!("{}", status);
                 return Ok(());
@@ -2018,7 +2022,9 @@ async fn run_offline_command(
     // Update is stateless - handle before TuiService initialization
     if let Command::Update = &command {
         println!("Updating terraphim-agent...");
-        match update_binary("terraphim-agent").await {
+        let config = UpdaterConfig::new("terraphim-agent").with_version(env!("CARGO_PKG_VERSION"));
+        let updater = TerraphimUpdater::new(config);
+        match updater.check_and_update().await {
             Ok(status) => {
                 println!("{}", status);
                 return Ok(());
@@ -2194,25 +2200,38 @@ async fn run_offline_command(
                     })
                     .collect();
 
-                let concepts_matched = match service.get_thesaurus(&role_name).await {
-                    Ok(thesaurus) => {
-                        terraphim_automata::compute_concepts_matched(&query, &thesaurus)
-                    }
-                    Err(e) => {
-                        log::debug!(
-                            "get_thesaurus failed for {}: {}; concepts_matched empty",
-                            role_name,
-                            e
-                        );
-                        Vec::new()
-                    }
-                };
+                let (concepts_matched, thesaurus_matched) =
+                    match service.get_thesaurus(&role_name).await {
+                        Ok(thesaurus) => {
+                            let concepts =
+                                terraphim_automata::compute_concepts_matched(&query, &thesaurus);
+                            let thesaurus_terms: Vec<String> = thesaurus
+                                .keys()
+                                .filter(|key| {
+                                    query
+                                        .to_lowercase()
+                                        .contains(&key.to_string().to_lowercase())
+                                })
+                                .map(|key| key.to_string())
+                                .collect();
+                            (concepts, thesaurus_terms)
+                        }
+                        Err(e) => {
+                            log::debug!(
+                                "get_thesaurus failed for {}: {}; concepts_matched empty",
+                                role_name,
+                                e
+                            );
+                            (Vec::new(), Vec::new())
+                        }
+                    };
 
                 let wildcard_fallback = concepts_matched.is_empty();
                 let data = SearchResultsData {
                     results: items,
                     total_matches: total,
                     concepts_matched,
+                    thesaurus_matched,
                     wildcard_fallback,
                 };
 
@@ -4276,32 +4295,44 @@ async fn run_server_command(
                     })
                     .collect();
 
-                let concepts_matched = match api.get_thesaurus(role_name.as_str()).await {
-                    Ok(thesaurus_res) => match thesaurus_res.thesaurus {
-                        Some(entries) => {
-                            let thesaurus = terraphim_automata::thesaurus_from_terms(
-                                &role_name,
-                                entries.values().map(String::as_str),
+                let (concepts_matched, thesaurus_matched) =
+                    match api.get_thesaurus(role_name.as_str()).await {
+                        Ok(thesaurus_res) => match thesaurus_res.thesaurus {
+                            Some(entries) => {
+                                let thesaurus = terraphim_automata::thesaurus_from_terms(
+                                    &role_name,
+                                    entries.values().map(String::as_str),
+                                );
+                                let concepts = terraphim_automata::compute_concepts_matched(
+                                    &query, &thesaurus,
+                                );
+                                let thesaurus_terms: Vec<String> = entries
+                                    .values()
+                                    .filter(|value| {
+                                        query.to_lowercase().contains(&value.to_lowercase())
+                                    })
+                                    .cloned()
+                                    .collect();
+                                (concepts, thesaurus_terms)
+                            }
+                            None => (Vec::new(), Vec::new()),
+                        },
+                        Err(e) => {
+                            log::debug!(
+                                "get_thesaurus failed for {}: {}; concepts_matched empty",
+                                role_name,
+                                e
                             );
-                            terraphim_automata::compute_concepts_matched(&query, &thesaurus)
+                            (Vec::new(), Vec::new())
                         }
-                        None => Vec::new(),
-                    },
-                    Err(e) => {
-                        log::debug!(
-                            "get_thesaurus failed for {}: {}; concepts_matched empty",
-                            role_name,
-                            e
-                        );
-                        Vec::new()
-                    }
-                };
+                    };
 
                 let wildcard_fallback = concepts_matched.is_empty();
                 let data = SearchResultsData {
                     results: items,
                     total_matches: total,
                     concepts_matched,
+                    thesaurus_matched,
                     wildcard_fallback,
                 };
 
@@ -4572,7 +4603,10 @@ async fn run_server_command(
         }
         Command::CheckUpdate => {
             println!("🔍 Checking for terraphim-agent updates...");
-            match check_for_updates("terraphim-agent").await {
+            let config =
+                UpdaterConfig::new("terraphim-agent").with_version(env!("CARGO_PKG_VERSION"));
+            let updater = TerraphimUpdater::new(config);
+            match updater.check_update().await {
                 Ok(status) => {
                     println!("{}", status);
                     Ok(())
@@ -4585,7 +4619,10 @@ async fn run_server_command(
         }
         Command::Update => {
             println!("🚀 Updating terraphim-agent...");
-            match update_binary("terraphim-agent").await {
+            let config =
+                UpdaterConfig::new("terraphim-agent").with_version(env!("CARGO_PKG_VERSION"));
+            let updater = TerraphimUpdater::new(config);
+            match updater.check_and_update().await {
                 Ok(status) => {
                     println!("{}", status);
                     Ok(())

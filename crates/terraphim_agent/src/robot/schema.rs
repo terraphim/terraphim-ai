@@ -289,6 +289,9 @@ pub struct SearchResultsData {
     /// Concepts matched in the query
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub concepts_matched: Vec<String>,
+    /// Thesaurus terms matched in the query (synonyms expanded)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub thesaurus_matched: Vec<String>,
     /// Whether wildcard fallback was used
     #[serde(default)]
     pub wildcard_fallback: bool,

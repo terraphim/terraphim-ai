@@ -57,11 +57,14 @@ CRATES=(
   "haystack_core"
   "haystack_jmap"
   "grepapp_haystack"
+  "terraphim_file_search"
   "terraphim_middleware"
+  "terraphim_service"
   "terraphim_update"
   "terraphim_tracker"
   "terraphim_agent_evolution"
   "terraphim_orchestrator"
+  "terraphim_grep"
 )
 
 # Map package names to directory names (for crates where they differ)
@@ -263,6 +266,12 @@ publish_crate() {
       # Check if it failed because the crate already exists
       if echo "$output" | grep -q "already exists on"; then
         log_warning "$crate v$version already exists - skipping"
+        return 0
+      # Check if it failed because the crate is opted out of publishing.
+      # Treat as a skip rather than a fatal error -- downstream crates may still
+      # publish fine, and a single opted-out crate shouldn't bury the chain.
+      elif echo "$output" | grep -q "cannot be published"; then
+        log_warning "$crate has publish = false in Cargo.toml - skipping"
         return 0
       else
         log_error "Failed to publish $crate"

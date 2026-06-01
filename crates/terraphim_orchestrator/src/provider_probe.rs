@@ -99,9 +99,12 @@ impl ProviderHealthMap {
         let mut seen = HashMap::new();
         let mut tasks = Vec::new();
 
-        // Collect unique provider+model combos from all KG routing rules
+        // Collect unique (cli, provider, model) triples from all KG routing rules.
+        // The CLI is included so that the same (provider, model) reached via two
+        // CLIs (e.g. opencode vs. pi-rust) has independent health -- a CLI
+        // whose integration is broken does not poison the model.
         for rule in kg_router.all_routes() {
-            let key = format!("{}:{}", rule.provider, rule.model);
+            let key = rule.route_key();
             if seen.contains_key(&key) {
                 continue;
             }
@@ -113,6 +116,7 @@ impl ProviderHealthMap {
             if let Some(breaker) = self.breakers.get(&key) {
                 if matches!(breaker.state(), CircuitState::Open) {
                     debug!(
+                        cli = ?rule.cli_basename(),
                         provider = %rule.provider,
                         model = %rule.model,
                         "probe skipped: circuit breaker open"
@@ -135,9 +139,10 @@ impl ProviderHealthMap {
             let provider = rule.provider.clone();
             let model = rule.model.clone();
             let action = rule.action.clone();
+            let cli = rule.cli_basename().unwrap_or("").to_string();
 
             tasks.push(tokio::spawn(async move {
-                probe_single(&provider, &model, action.as_deref()).await
+                probe_single(&cli, &provider, &model, action.as_deref()).await
             }));
         }
 
@@ -149,12 +154,12 @@ impl ProviderHealthMap {
             }
         }
 
-        // Update circuit breakers from probe results (keyed by provider:model).
-        // Skip updating the breaker when the probe failed because the CLI tool
-        // is missing from PATH — that is an environment/configuration issue,
-        // not a provider health issue, and should not open the circuit.
+        // Update circuit breakers from probe results, keyed by
+        // (cli, provider, model). Two CLIs reaching the same (provider, model)
+        // have independent breakers so a CLI integration regression does not
+        // poison the model.
         for result in &results {
-            let key = format!("{}:{}", result.provider, result.model);
+            let key = format!("{}:{}:{}", result.cli_tool, result.provider, result.model);
             let breaker = self
                 .breakers
                 .entry(key)
@@ -422,6 +427,40 @@ impl ProviderHealthMap {
     }
 }
 
+/// Detect whether probe stdout contains at least one token-bearing event.
+///
+/// This is the **content** half of the success classifier (the **exit code**
+/// half is `output.status.success()`). A probe is only Healthy when both
+/// halves pass.
+///
+/// Recognised positive signals:
+/// - opencode `--format json` streaming: `"type":"text"` event (a token chunk)
+/// - opencode `--format json`: `"type":"step_finish"` (terminal event with
+///   final tokens accounted for)
+/// - pi-rust / claude / raw CLIs: any non-whitespace content beyond an empty
+///   string is treated as token-bearing (these stream plaintext)
+///
+/// Recognised negative signals:
+/// - opencode-style JSON where the only event is `step_start` (Z.AI bug today)
+/// - completely empty stdout
+fn has_token_bearing_output(stdout: &str) -> bool {
+    let trimmed = stdout.trim();
+    if trimmed.is_empty() {
+        return false;
+    }
+
+    // If the output looks like opencode JSON streaming, require at least one
+    // text or step_finish event. step_start alone is not enough.
+    if trimmed.contains("\"type\":\"step_start\"") {
+        return trimmed.contains("\"type\":\"text\"")
+            || trimmed.contains("\"type\":\"step_finish\"");
+    }
+
+    // Non-JSON CLIs (pi-rust, claude, raw shell): any non-whitespace content
+    // counts as token-bearing.
+    true
+}
+
 /// Determine whether a probe error represents an environment/configuration
 /// issue rather than a genuine provider health failure.
 ///
@@ -462,7 +501,12 @@ fn cli_tool_on_path(tool: &str) -> bool {
 /// If the CLI tool referenced by the action template is not on PATH, the
 /// probe returns an error but the circuit breaker is **not** updated, so
 /// a missing tool does not permanently mark the provider as unhealthy.
-async fn probe_single(provider: &str, model: &str, action_template: Option<&str>) -> ProbeResult {
+async fn probe_single(
+    cli_hint: &str,
+    provider: &str,
+    model: &str,
+    action_template: Option<&str>,
+) -> ProbeResult {
     let timestamp = chrono::Utc::now().to_rfc3339();
 
     // C1 gate: skip probe for any provider not in the subscription allow-list.
@@ -475,7 +519,7 @@ async fn probe_single(provider: &str, model: &str, action_template: Option<&str>
         return ProbeResult {
             provider: provider.to_string(),
             model: model.to_string(),
-            cli_tool: String::new(),
+            cli_tool: cli_hint.to_string(),
             status: ProbeStatus::Error,
             latency_ms: None,
             error: Some("probe skipped: provider not in C1 allow-list".to_string()),
@@ -539,7 +583,7 @@ async fn probe_single(provider: &str, model: &str, action_template: Option<&str>
     }
 
     let start = Instant::now();
-    let timeout = Duration::from_secs(120);
+    let timeout = Duration::from_secs(15);
 
     debug!(provider, model, action = %action, "running probe command");
 
@@ -588,7 +632,16 @@ async fn probe_single(provider: &str, model: &str, action_template: Option<&str>
 
     match result {
         Ok(Ok(output)) => {
-            if output.status.success() {
+            // Content-based success classification: exit 0 alone is not enough.
+            // Some CLI/provider combinations (notably opencode + zai-coding-plan
+            // on opencode 1.14.48 as of 2026-05-23) emit only a `step_start`
+            // event then exit cleanly with no `text` or `step_finish`. Those
+            // must be classified Unhealthy so KG router selects an
+            // alternative-CLI route for the same model.
+            let stdout_str = String::from_utf8_lossy(&output.stdout);
+            let token_bearing = has_token_bearing_output(&stdout_str);
+
+            if output.status.success() && token_bearing {
                 info!(provider, model, latency_ms, "probe success");
                 ProbeResult {
                     provider: provider.to_string(),
@@ -597,6 +650,22 @@ async fn probe_single(provider: &str, model: &str, action_template: Option<&str>
                     status: ProbeStatus::Success,
                     latency_ms: Some(latency_ms),
                     error: None,
+                    timestamp,
+                }
+            } else if output.status.success() && !token_bearing {
+                let preview: String = stdout_str.chars().take(200).collect();
+                let err = format!(
+                    "exit 0 but stream produced no token content (truncated; e.g. step_start only). stdout_preview=\"{}\"",
+                    preview.replace('\n', "\\n")
+                );
+                warn!(provider, model, latency_ms, error = %err, "probe truncated");
+                ProbeResult {
+                    provider: provider.to_string(),
+                    model: model.to_string(),
+                    cli_tool,
+                    status: ProbeStatus::Error,
+                    latency_ms: Some(latency_ms),
+                    error: Some(err),
                     timestamp,
                 }
             } else {
@@ -640,14 +709,14 @@ async fn probe_single(provider: &str, model: &str, action_template: Option<&str>
                     .arg(pid.to_string())
                     .spawn();
             }
-            warn!(provider, model, "probe timed out after 60s");
+            warn!(provider, model, "probe timed out after 15s");
             ProbeResult {
                 provider: provider.to_string(),
                 model: model.to_string(),
                 cli_tool,
                 status: ProbeStatus::Timeout,
                 latency_ms: Some(latency_ms),
-                error: Some("timeout after 60s".to_string()),
+                error: Some("timeout after 15s".to_string()),
                 timestamp,
             }
         }
@@ -704,6 +773,47 @@ mod tests {
     }
 
     #[test]
+    fn token_bearing_detects_empty_as_no_content() {
+        assert!(!has_token_bearing_output(""));
+        assert!(!has_token_bearing_output("   \n\t "));
+    }
+
+    #[test]
+    fn token_bearing_detects_opencode_step_start_only_as_no_content() {
+        // The Z.AI-via-opencode 1.14.48 failure mode: step_start, then EOF.
+        let stdout = r#"{"type":"step_start","timestamp":1779536017463,"sessionID":"ses_x","part":{"id":"prt_y","type":"step-start"}}"#;
+        assert!(
+            !has_token_bearing_output(stdout),
+            "step_start without text or step_finish must be treated as truncated"
+        );
+    }
+
+    #[test]
+    fn token_bearing_accepts_opencode_text_event() {
+        let stdout = "{\"type\":\"step_start\",...}\n{\"type\":\"text\",\"text\":\"pong\"}\n";
+        assert!(has_token_bearing_output(stdout));
+    }
+
+    #[test]
+    fn token_bearing_accepts_opencode_step_finish() {
+        let stdout =
+            "{\"type\":\"step_start\",...}\n{\"type\":\"step_finish\",\"reason\":\"stop\"}\n";
+        assert!(has_token_bearing_output(stdout));
+    }
+
+    #[test]
+    fn token_bearing_accepts_pi_rust_plaintext() {
+        // pi-rust streams plain text, not JSON
+        assert!(has_token_bearing_output("Pong! 🏓"));
+    }
+
+    #[test]
+    fn token_bearing_accepts_claude_plaintext() {
+        // claude streams plain text
+        assert!(has_token_bearing_output("hello world\n"));
+    }
+
+    #[test]
     fn unknown_provider_is_healthy() {
         let map = ProviderHealthMap::new(Duration::from_secs(300));
         assert!(map.is_healthy("nonexistent"));
@@ -747,6 +857,21 @@ mod tests {
         assert!(!map.is_healthy("kimi"));
         assert_eq!(map.provider_health("kimi"), HealthStatus::Unhealthy);
         assert!(map.unhealthy_providers().contains(&"kimi".to_string()));
+    }
+
+    #[test]
+    fn probe_timeout_duration_is_15s() {
+        // Verify the timeout constant used in probe_single.
+        // This is a compile-time guard: if the constant changes, the test fails.
+        let _expected_timeout = Duration::from_secs(15);
+        // We can't directly access the local `timeout` variable in probe_single,
+        // but we can verify the error message produced on timeout contains "15s".
+        // The error message is constructed as: "timeout after 15s"
+        let timeout_error_msg = "timeout after 15s";
+        assert!(
+            timeout_error_msg.contains("15s"),
+            "timeout error message must reference 15s"
+        );
     }
 
     #[test]

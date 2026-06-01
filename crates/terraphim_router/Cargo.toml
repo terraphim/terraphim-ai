@@ -1,11 +1,15 @@
 [package]
 name = "terraphim_router"
-version = "1.8.0"
+version = "1.20.2"
 edition = "2021"
-authors = ["Terraphim Team"]
+authors = ["Terraphim Team <team@terraphim.ai>"]
 description = "Unified routing engine for LLM and Agent providers"
-license = "Apache-2.0"
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
 repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["ai", "llm", "router", "routing", "agent"]
+license = "Apache-2.0"
+readme = "../../README.md"
 
 [dependencies]
 # Terraphim internal crates

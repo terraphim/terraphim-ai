@@ -49,6 +49,10 @@ impl TimeScheduler {
         let mut schedules = Vec::new();
 
         for agent in agents {
+            if !agent.enabled {
+                tracing::debug!(agent_name = %agent.name, "skipping disabled agent in scheduler");
+                continue;
+            }
             let parsed = match &agent.schedule {
                 Some(cron_expr) => {
                     let schedule = parse_cron(cron_expr)?;
@@ -100,7 +104,7 @@ impl TimeScheduler {
     pub fn immediate_agents(&self) -> Vec<AgentDefinition> {
         self.schedules
             .iter()
-            .filter(|e| e.agent.layer == AgentLayer::Safety)
+            .filter(|e| e.agent.layer == AgentLayer::Safety && e.agent.enabled)
             .map(|e| e.agent.clone())
             .collect()
     }
@@ -116,6 +120,15 @@ impl TimeScheduler {
     /// Get the compound review schedule if configured.
     pub fn compound_review_schedule(&self) -> Option<&Schedule> {
         self.compound_schedule.as_ref()
+    }
+
+    /// Check if an agent has a valid schedule registered.
+    pub fn is_agent_scheduled(&self, agent_name: &str) -> bool {
+        self.schedules
+            .iter()
+            .find(|e| e.agent.name == agent_name)
+            .map(|e| e.schedule.is_some())
+            .unwrap_or(false)
     }
 }
 
@@ -155,6 +168,7 @@ mod tests {
             cli_tool: "codex".to_string(),
             task: "test task".to_string(),
             model: None,
+            default_tier: None,
             schedule: schedule.map(String::from),
             capabilities: vec![],
             max_memory_bytes: None,
@@ -175,6 +189,7 @@ mod tests {
             evolution_enabled: false,
             rlm_enabled: None,
             bypass_kg_routing: false,
+            enabled: true,
 
             project: None,
         }
@@ -245,5 +260,17 @@ mod tests {
         assert!(parse_cron("0 0 3 * * *").is_ok());
         assert!(parse_cron("0 0 3 * * * *").is_ok());
         assert!(parse_cron("* * *").is_err());
+    }
+
+    #[test]
+    fn test_is_agent_scheduled() {
+        let agents = vec![
+            make_agent("scheduled", AgentLayer::Core, Some("0 3 * * *")),
+            make_agent("unscheduled", AgentLayer::Growth, None),
+        ];
+        let scheduler = TimeScheduler::new(&agents, None).unwrap();
+        assert!(scheduler.is_agent_scheduled("scheduled"));
+        assert!(!scheduler.is_agent_scheduled("unscheduled"));
+        assert!(!scheduler.is_agent_scheduled("nonexistent"));
     }
 }

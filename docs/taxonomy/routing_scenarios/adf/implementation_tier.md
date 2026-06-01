@@ -30,6 +30,15 @@ action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ promp
 route:: openai, openai/gpt-5.3-codex
 action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"
 
-route:: zai, zai-coding-plan/glm-5.1
-is_free:: true
+route:: minimax, minimax-coding-plan/MiniMax-M2.7-highspeed
 action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"
+
+route:: minimax-coding-plan, MiniMax-M2.7-highspeed
+action:: /home/alex/.local/bin/pi-rust --provider minimax-coding-plan --model {{ model }} -p "{{ prompt }}"
+
+# Z.AI Coding Plan healthy via pi-rust; broken via opencode 1.14.48
+# (opencode emits only step_start, no text). Investigation: 2026-05-23.
+# Route through pi-rust until opencode integration is fixed upstream.
+route:: zai-coding-plan, glm-5.1
+is_free:: true
+action:: /home/alex/.local/bin/pi-rust --provider zai-coding-plan --model {{ model }} -p "{{ prompt }}"

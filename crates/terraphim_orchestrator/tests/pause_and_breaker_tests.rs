@@ -25,6 +25,7 @@ fn project_agent(name: &str, project: Option<&str>) -> AgentDefinition {
         task: String::new(),
         schedule: None,
         model: None,
+        default_tier: None,
         capabilities: Vec::new(),
         max_memory_bytes: None,
         budget_monthly_cents: None,
@@ -43,6 +44,7 @@ fn project_agent(name: &str, project: Option<&str>) -> AgentDefinition {
         evolution_enabled: false,
         rlm_enabled: None,
         bypass_kg_routing: false,
+        enabled: true,
         project: project.map(|s| s.to_string()),
     }
 }
@@ -106,6 +108,7 @@ fn test_config_with_pause(
         pr_dispatch: None,
         pr_dispatch_per_project: Default::default(),
         gitea_skill_repo: None,
+        direct_dispatch: None,
         gate_reconcile_interval_ticks: 20,
     }
 }
