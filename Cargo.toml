@@ -26,8 +26,6 @@ exclude = [
     # "crates/terraphim_rlm",
     "crates/terraphim_github_runner",
     "crates/terraphim_github_runner_server",
-    # Missing Cargo.toml
-    "crates/terraphim_lsp",
 ]
 default-members = ["terraphim_server"]
 

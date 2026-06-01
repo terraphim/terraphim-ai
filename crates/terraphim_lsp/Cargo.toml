@@ -1,8 +1,9 @@
 [package]
 name = "terraphim_lsp"
 version = "0.1.0"
-edition = "2021"
-description = "Language Server Protocol (LSP) implementation for Terraphim AI"
+edition.workspace = true
+authors = ["Terraphim AI <team@terraphim.ai>"]
+description = "Language Server Protocol (LSP) implementation for Terraphim AI with EDM scanner diagnostics"
 documentation = "https://terraphim.ai"
 homepage = "https://terraphim.ai"
 repository = "https://github.com/terraphim/terraphim-ai"
@@ -10,4 +11,23 @@ keywords = ["ai", "lsp", "language-server", "ide"]
 license = "Apache-2.0"
 readme = "../../README.md"
 
+[features]
+default = []
+terraphim-lsp = []
+
+[[bin]]
+name = "terraphim-lsp"
+path = "src/bin/terraphim-lsp.rs"
+required-features = ["terraphim-lsp"]
+
 [dependencies]
+terraphim_negative_contribution = { path = "../terraphim_negative_contribution", version = "0.1.0" }
+terraphim_types = { path = "../terraphim_types", version = "1.0.0" }
+tower-lsp = "0.20"
+tokio = { workspace = true, features = ["full"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+log = { workspace = true }
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }
