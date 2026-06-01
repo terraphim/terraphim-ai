@@ -272,6 +272,9 @@ pub struct AgentOrchestrator {
     /// Active flow executions keyed by flow name.
     #[allow(dead_code)]
     active_flows: HashMap<String, tokio::task::JoinHandle<flow::state::FlowRunState>>,
+    /// Active compound review execution (spawned in background to avoid
+    /// blocking reconcile_tick). None when no compound review is running.
+    active_compound_review: Option<tokio::task::JoinHandle<Result<CompoundReviewResult, OrchestratorError>>>,
     /// Per-project mention cursors, keyed by project id.
     ///
     /// Each project gets its own cursor so repo-wide polls can advance
@@ -956,6 +959,7 @@ impl AgentOrchestrator {
             last_compound_review_fired_at: None,
             pre_check_tracker: None,
             active_flows: HashMap::new(),
+            active_compound_review: None,
             mention_cursors: HashMap::new(),
             webhook_dispatch_rx: None,
             tick_count: 0,
@@ -5973,6 +5977,68 @@ impl AgentOrchestrator {
             }
         }
 
+        // 9b. Poll active compound review (spawned in background so tick
+        //     is not blocked by git worktree ops).
+        if let Some(handle) = self.active_compound_review.take() {
+            if handle.is_finished() {
+                match handle.await {
+                    Ok(Ok(result)) => {
+                        info!(
+                            findings = result.findings.len(),
+                            pass = %result.pass,
+                            duration = ?result.duration,
+                            "compound review completed"
+                        );
+
+                        // 1. Post structured summary to Gitea
+                        if let (Some(ref poster), Some(issue)) =
+                            (&self.output_poster, self.config.compound_review.gitea_issue)
+                        {
+                            let report = result.format_report();
+                            if let Err(e) = poster.post_raw(issue, &report).await {
+                                warn!(error = %e, "failed to post compound review summary");
+                            }
+
+                            // 2. Auto-file issues for CRITICAL/HIGH findings
+                            if self.config.compound_review.auto_file_issues {
+                                let actionable = result.actionable_findings();
+                                for finding in actionable {
+                                    if let Err(e) =
+                                        self.file_finding_issue(poster, &result, finding).await
+                                    {
+                                        warn!(error = %e, "failed to file finding issue");
+                                    }
+                                }
+                            }
+
+                            // 3. Trigger remediation agents for CRITICAL findings
+                            if self.config.compound_review.auto_remediate {
+                                let critical: Vec<_> = result
+                                    .findings
+                                    .iter()
+                                    .filter(|f| f.severity == FindingSeverity::Critical)
+                                    .collect();
+                                for finding in critical {
+                                    if let Err(e) = self.spawn_remediation_agent(finding).await {
+                                        warn!(error = %e, "failed to spawn remediation agent");
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Ok(Err(e)) => {
+                        error!(error = %e, "compound review failed");
+                    }
+                    Err(e) => {
+                        error!(error = %e, "compound review task panicked");
+                    }
+                }
+            } else {
+                // Still running, put it back
+                self.active_compound_review = Some(handle);
+            }
+        }
+
         // 10. Check flow schedules
         self.check_flow_schedules().await;
 
@@ -7942,59 +8008,19 @@ Remove the pause flag once the underlying failure is resolved:\n\n\
                 self.stop_agent(&agent_name).await;
             }
             ScheduleEvent::CompoundReview => {
-                info!("scheduled compound review starting");
-                // For scheduled reviews, use HEAD against base_branch from config
-                let git_ref = "HEAD";
-                let base_ref = &self.config.compound_review.base_branch;
-                match self.compound_workflow.run(git_ref, base_ref).await {
-                    Ok(result) => {
-                        info!(
-                            findings = result.findings.len(),
-                            pass = %result.pass,
-                            duration = ?result.duration,
-                            "compound review completed"
-                        );
-
-                        // 1. Post structured summary to Gitea
-                        if let (Some(ref poster), Some(issue)) =
-                            (&self.output_poster, self.config.compound_review.gitea_issue)
-                        {
-                            let report = result.format_report();
-                            if let Err(e) = poster.post_raw(issue, &report).await {
-                                warn!(error = %e, "failed to post compound review summary");
-                            }
-
-                            // 2. Auto-file issues for CRITICAL/HIGH findings
-                            if self.config.compound_review.auto_file_issues {
-                                let actionable = result.actionable_findings();
-                                for finding in actionable {
-                                    if let Err(e) =
-                                        self.file_finding_issue(poster, &result, finding).await
-                                    {
-                                        warn!(error = %e, "failed to file finding issue");
-                                    }
-                                }
-                            }
-
-                            // 3. Trigger remediation agents for CRITICAL findings
-                            if self.config.compound_review.auto_remediate {
-                                let critical: Vec<_> = result
-                                    .findings
-                                    .iter()
-                                    .filter(|f| f.severity == FindingSeverity::Critical)
-                                    .collect();
-                                for finding in critical {
-                                    if let Err(e) = self.spawn_remediation_agent(finding).await {
-                                        warn!(error = %e, "failed to spawn remediation agent");
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        error!(error = %e, "compound review failed");
-                    }
+                if self.active_compound_review.is_some() {
+                    info!("compound review already running, skipping");
+                    return;
                 }
+                info!("scheduled compound review starting (background task)");
+                // For scheduled reviews, use HEAD against base_branch from config
+                let git_ref = "HEAD".to_string();
+                let base_ref = self.config.compound_review.base_branch.clone();
+                let workflow = self.compound_workflow.clone();
+                let handle = tokio::spawn(async move {
+                    workflow.run(&git_ref, &base_ref).await
+                });
+                self.active_compound_review = Some(handle);
             }
             ScheduleEvent::Flow(flow_def) => {
                 let flow_name = flow_def.name.clone();
