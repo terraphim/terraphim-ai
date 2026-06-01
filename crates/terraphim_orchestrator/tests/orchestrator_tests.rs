@@ -9,6 +9,51 @@ use terraphim_orchestrator::{
 };
 use uuid::Uuid;
 
+/// Create a self-contained git repository in a temp directory with two commits:
+/// - initial commit with a README only (no crates/)
+/// - second commit that adds crates/lib.rs
+///
+/// Returns (TempDir, initial_commit_hash). The caller must keep TempDir alive
+/// for the duration of the test or the directory will be cleaned up.
+fn make_git_repo_with_crates_changes() -> (tempfile::TempDir, String) {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = dir.path();
+
+    let git = |args: &[&str]| {
+        let out = std::process::Command::new("git")
+            .args(args)
+            .current_dir(path)
+            .output()
+            .unwrap_or_else(|e| panic!("git {:?} failed: {e}", args));
+        assert!(
+            out.status.success(),
+            "git {:?} exited {}: {}",
+            args,
+            out.status,
+            String::from_utf8_lossy(&out.stderr)
+        );
+        String::from_utf8_lossy(&out.stdout).trim().to_string()
+    };
+
+    git(&["init"]);
+    git(&["config", "user.email", "test@example.com"]);
+    git(&["config", "user.name", "Test"]);
+
+    // Initial commit: README only, no crates/
+    std::fs::write(path.join("README.md"), "test repo").unwrap();
+    git(&["add", "README.md"]);
+    git(&["commit", "-m", "initial commit"]);
+    let initial = git(&["rev-parse", "HEAD"]);
+
+    // Second commit: add crates/lib.rs
+    std::fs::create_dir_all(path.join("crates")).unwrap();
+    std::fs::write(path.join("crates/lib.rs"), "// placeholder").unwrap();
+    git(&["add", "crates/lib.rs"]);
+    git(&["commit", "-m", "add crates"]);
+
+    (dir, initial)
+}
+
 /// Return a deterministic baseline for git-diff tests.
 /// Prefer the repository root commit, but fall back to the empty tree when the
 /// checkout is shallow and history before HEAD is unavailable.
@@ -521,22 +566,27 @@ async fn test_git_diff_no_changes_skips() {
 }
 
 /// Git-diff: changes in watched paths -> spawn (Findings).
+/// Uses a self-contained git repo so the test is immune to shallow-history
+/// or environments where the real workspace diff does not touch crates/.
 #[tokio::test]
 async fn test_git_diff_matching_changes_spawns() {
+    let (repo_dir, initial_commit) = make_git_repo_with_crates_changes();
+
     let mut config = test_config(tempfile::tempdir().unwrap().keep());
-    config.working_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    config.working_dir = repo_dir.path().to_path_buf();
     config.agents[0].pre_check = Some(terraphim_orchestrator::PreCheckStrategy::GitDiff {
         watch_paths: vec!["crates/".to_string()],
     });
     let mut orch = AgentOrchestrator::new(config).unwrap();
 
-    // Seed with initial commit so there ARE changes
-    let baseline_commit = git_diff_baseline();
-    orch.set_last_run_commit("sentinel", &baseline_commit);
+    // Baseline = first commit; HEAD = second commit which added crates/lib.rs
+    orch.set_last_run_commit("sentinel", &initial_commit);
 
     let result = orch.spawn_agent_for_test("sentinel").await;
     assert!(result.is_ok());
     assert!(orch.is_agent_active("sentinel")); // changes found in crates/
+
+    drop(repo_dir); // explicit: keep alive until assertions complete
 }
 
 /// Git-diff: changes exist but NOT in watched paths -> skip (NoFindings).
@@ -689,23 +739,27 @@ async fn test_spawn_agent_skipped_by_git_diff_no_matching() {
 }
 
 /// Integration: spawn_agent proceeds when git-diff finds matching changes.
-/// Uses real git repo with empty tree as baseline.
+/// Uses a self-contained git repo so the test is immune to shallow-history
+/// or environments where the real workspace diff does not touch crates/.
 #[tokio::test]
 async fn test_spawn_agent_proceeds_with_git_diff_findings() {
+    let (repo_dir, initial_commit) = make_git_repo_with_crates_changes();
+
     let mut config = test_config(tempfile::tempdir().unwrap().keep());
-    config.working_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    config.working_dir = repo_dir.path().to_path_buf();
     config.agents[0].pre_check = Some(terraphim_orchestrator::PreCheckStrategy::GitDiff {
         watch_paths: vec!["crates/".to_string()],
     });
     let mut orch = AgentOrchestrator::new(config).unwrap();
 
-    // Use initial commit as baseline -> every file is a change
-    let baseline_commit = git_diff_baseline();
-    orch.set_last_run_commit("sentinel", &baseline_commit);
+    // Baseline = first commit; HEAD = second commit which added crates/lib.rs
+    orch.set_last_run_commit("sentinel", &initial_commit);
 
     let result = orch.spawn_agent_for_test("sentinel").await;
     assert!(result.is_ok());
     assert!(orch.is_agent_active("sentinel")); // changes match crates/ watch_path
+
+    drop(repo_dir); // explicit: keep alive until assertions complete
 }
 
 #[test]

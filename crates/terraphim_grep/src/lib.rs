@@ -1,3 +1,21 @@
+//! # terraphim_grep
+//!
+//! Hybrid search combining knowledge-graph concept expansion with ripgrep-backed
+//! full-text search. Runs both pipelines concurrently via `tokio::spawn` and
+//! merges results ranked by KG relevance boost and BM25 score.
+//!
+//! ## Quick start
+//!
+//! ```rust,no_run
+//! use terraphim_grep::{TerraphimGrep, GrepOptions};
+//!
+//! # async fn example() -> anyhow::Result<()> {
+//! let grep = TerraphimGrep::new(GrepOptions::default());
+//! let results = grep.search("query", "/path/to/haystack").await?;
+//! # Ok(())
+//! # }
+//! ```
+
 pub mod error;
 pub mod hybrid_searcher;
 pub mod kg_curation;
