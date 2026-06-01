@@ -6559,8 +6559,8 @@ impl AgentOrchestrator {
                     warn!(
                         agent = %name,
                         elapsed_secs = elapsed.as_secs(),
-                        max_wall_secs = max_secs,
-                        "agent exceeded wall-clock timeout, killing for fallback respawn"
+                        max_cpu_seconds = max_secs,
+                        "AGENT EXCEEDED max_cpu_seconds: killing for fallback respawn"
                     );
                     timed_out.push(name.clone());
                 }
@@ -6631,8 +6631,8 @@ impl AgentOrchestrator {
                             warn!(
                                 agent = %name,
                                 elapsed_secs = elapsed.as_secs(),
-                                max_secs = max_secs,
-                                "agent exceeded wall-clock timeout, killing"
+                                max_cpu_seconds = max_secs,
+                                "AGENT EXCEEDED max_cpu_seconds: killing"
                             );
                             timed_out.push(name.clone());
                         }
