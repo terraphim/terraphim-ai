@@ -8,7 +8,6 @@ use assert_cmd::Command;
 #[allow(unused_imports)] // Used in test assertions
 use predicates::prelude::*;
 use serial_test::serial;
-use std::process::Command as StdCommand;
 
 /// Get a command for the terraphim-cli binary
 #[allow(deprecated)] // cargo_bin is deprecated but still functional
@@ -18,8 +17,8 @@ fn cli_command() -> Command {
 
 /// Helper to run CLI and get JSON output
 fn run_cli_json(args: &[&str]) -> Result<serde_json::Value, String> {
-    let output = StdCommand::new("cargo")
-        .args(["run", "-p", "terraphim-cli", "--"])
+    let output = Command::cargo_bin("terraphim-cli")
+        .map_err(|e| format!("Failed to find binary: {}", e))?
         .args(args)
         .output()
         .map_err(|e| format!("Failed to execute: {}", e))?;
@@ -692,8 +691,7 @@ mod output_format_tests {
     #[test]
     #[serial]
     fn test_json_pretty_output() {
-        let output = StdCommand::new("cargo")
-            .args(["run", "-p", "terraphim-cli", "--"])
+        let output = cli_command()
             .args(["--format", "json-pretty", "config"])
             .output()
             .expect("Failed to execute");
@@ -709,8 +707,7 @@ mod output_format_tests {
     #[test]
     #[serial]
     fn test_text_output() {
-        let output = StdCommand::new("cargo")
-            .args(["run", "-p", "terraphim-cli", "--"])
+        let output = cli_command()
             .args(["--format", "text", "config"])
             .output()
             .expect("Failed to execute");
