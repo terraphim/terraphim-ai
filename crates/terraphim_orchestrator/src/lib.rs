@@ -3174,6 +3174,15 @@ impl AgentOrchestrator {
             }
         };
 
+        if !def.enabled {
+            info!(
+                agent = %def.name,
+                project = %project,
+                "Push skipped: build-runner agent is disabled"
+            );
+            return Ok(());
+        }
+
         if self.active_agents.contains_key("build-runner") {
             info!(
                 project = %project,

@@ -151,6 +151,32 @@ fn test_scheduler_layer_partitioning() {
     assert!(scheduled.iter().all(|(a, _)| a.layer == AgentLayer::Core));
 }
 
+/// Integration test: disabled agents are excluded from scheduling.
+#[test]
+fn test_scheduler_skips_disabled_agents() {
+    let mut disabled = make_agent("disabled-core", AgentLayer::Core, Some("0 3 * * *"));
+    disabled.enabled = false;
+
+    let mut disabled_safety = make_agent("disabled-safety", AgentLayer::Safety, None);
+    disabled_safety.enabled = false;
+
+    let agents = vec![
+        make_agent("safety-1", AgentLayer::Safety, None),
+        disabled_safety,
+        make_agent("core-1", AgentLayer::Core, Some("0 1 * * *")),
+        disabled,
+    ];
+    let scheduler = TimeScheduler::new(&agents, None).unwrap();
+
+    let immediate = scheduler.immediate_agents();
+    assert_eq!(immediate.len(), 1);
+    assert_eq!(immediate[0].name, "safety-1");
+
+    let scheduled = scheduler.scheduled_agents();
+    assert_eq!(scheduled.len(), 1);
+    assert_eq!(scheduled[0].0.name, "core-1");
+}
+
 // =============================================================================
 // Synthetic Time Tests for Cron Scheduling
 // =============================================================================
@@ -336,4 +362,27 @@ fn test_cron_production_schedule_test_guardian() {
 
     let result = should_fire("35 0-10 * * *", last_tick, now, None);
     assert!(result, "test-guardian schedule should fire at 00:35");
+}
+
+/// Test mention resolution rejects disabled agents.
+#[test]
+fn test_resolve_mention_rejects_disabled_agent() {
+    use terraphim_orchestrator::mention;
+
+    let mut disabled = make_agent("disabled-agent", AgentLayer::Core, None);
+    disabled.enabled = false;
+
+    let agents = vec![
+        make_agent("enabled-agent", AgentLayer::Core, None),
+        disabled,
+    ];
+
+    // Disabled agent should not resolve
+    let result = mention::resolve_mention(None, "__legacy__", "disabled-agent", &agents);
+    assert!(result.is_none(), "Disabled agent should not resolve");
+
+    // Enabled agent should still resolve
+    let result = mention::resolve_mention(None, "__legacy__", "enabled-agent", &agents);
+    assert!(result.is_some(), "Enabled agent should resolve");
+    assert_eq!(result.unwrap().name, "enabled-agent");
 }

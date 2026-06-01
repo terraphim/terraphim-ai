@@ -49,6 +49,10 @@ impl TimeScheduler {
         let mut schedules = Vec::new();
 
         for agent in agents {
+            if !agent.enabled {
+                tracing::debug!(agent_name = %agent.name, "skipping disabled agent in scheduler");
+                continue;
+            }
             let parsed = match &agent.schedule {
                 Some(cron_expr) => {
                     let schedule = parse_cron(cron_expr)?;
@@ -100,7 +104,7 @@ impl TimeScheduler {
     pub fn immediate_agents(&self) -> Vec<AgentDefinition> {
         self.schedules
             .iter()
-            .filter(|e| e.agent.layer == AgentLayer::Safety)
+            .filter(|e| e.agent.layer == AgentLayer::Safety && e.agent.enabled)
             .map(|e| e.agent.clone())
             .collect()
     }
