@@ -1,6 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 # build-runner-llm.sh -- KG-first adaptive build runner
+
+# Error tracing: print line number and failing command on ERR
+trap 'echo "[build-runner ERROR] line $LINENO: $BASH_COMMAND" >&2' ERR
 # Design: .docs/design-build-runner-llm-v4-leverage-existing.md
 # Epic: #1423
 
