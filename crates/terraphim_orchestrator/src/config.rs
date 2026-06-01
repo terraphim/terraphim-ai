@@ -1352,6 +1352,63 @@ pub fn warn_if_world_readable(path: &std::path::Path) {
     }
 }
 
+/// Strict permission check that returns an error if the file is too readable.
+///
+/// Returns `Ok(())` if permissions are secure (owner-only, 0o600),
+/// or `Err` with a descriptive message if group-readable or world-readable.
+///
+/// # Examples
+///
+/// ```no_run
+/// use std::path::Path;
+/// use terraphim_orchestrator::config::check_file_permissions;
+///
+/// match check_file_permissions(Path::new("/etc/secrets.toml")) {
+///     Ok(()) => println!("Permissions OK"),
+///     Err(e) => eprintln!("Permission check failed: {}", e),
+/// }
+/// ```
+pub fn check_file_permissions(path: &std::path::Path) -> Result<(), String> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        match std::fs::metadata(path) {
+            Ok(meta) => {
+                let mode = meta.permissions().mode();
+                if mode & 0o004 != 0 {
+                    Err(format!(
+                        "SECURITY: {} is world-readable (mode {:04o}). \
+                         Fix with: chmod 600 {}",
+                        path.display(),
+                        mode & 0o777,
+                        path.display()
+                    ))
+                } else if mode & 0o040 != 0 {
+                    Err(format!(
+                        "SECURITY: {} is group-readable (mode {:04o}). \
+                         Fix with: chmod 600 {}",
+                        path.display(),
+                        mode & 0o777,
+                        path.display()
+                    ))
+                } else {
+                    Ok(())
+                }
+            }
+            Err(e) => Err(format!(
+                "Could not check permissions for {}: {}",
+                path.display(),
+                e
+            )),
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        // On non-Unix systems, permission checks are not applicable
+        Ok(())
+    }
+}
+
 /// Expand `${VAR_NAME}` placeholders in a TOML string using environment variables.
 ///
 /// Variables that are not set in the environment are replaced with an empty string,
@@ -3154,6 +3211,38 @@ task = "build"
             let path = std::path::Path::new("/nonexistent/path/config.toml");
             // Should silently log debug and return without panic.
             super::super::warn_if_world_readable(path);
+        }
+
+        #[test]
+        fn check_file_permissions_passes_for_secure_file() {
+            let dir = temp_file_with_mode("content", 0o600);
+            let path = dir.path().join("test_config.toml");
+            assert!(super::super::check_file_permissions(&path).is_ok());
+        }
+
+        #[test]
+        fn check_file_permissions_fails_for_world_readable_file() {
+            let dir = temp_file_with_mode("content", 0o644);
+            let path = dir.path().join("test_config.toml");
+            let err = super::super::check_file_permissions(&path).unwrap_err();
+            assert!(err.contains("world-readable"), "Error should mention world-readable: {err}");
+            assert!(err.contains("644"), "Error should mention mode 644: {err}");
+        }
+
+        #[test]
+        fn check_file_permissions_fails_for_group_readable_file() {
+            let dir = temp_file_with_mode("content", 0o640);
+            let path = dir.path().join("test_config.toml");
+            let err = super::super::check_file_permissions(&path).unwrap_err();
+            assert!(err.contains("group-readable"), "Error should mention group-readable: {err}");
+            assert!(err.contains("640"), "Error should mention mode 640: {err}");
+        }
+
+        #[test]
+        fn check_file_permissions_fails_for_missing_file() {
+            let path = std::path::Path::new("/nonexistent/path/config.toml");
+            let err = super::super::check_file_permissions(path).unwrap_err();
+            assert!(err.contains("Could not check permissions"), "Error should mention inability to check: {err}");
         }
     }
 

@@ -2,7 +2,7 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use terraphim_orchestrator::config::OrchestratorConfig;
+use terraphim_orchestrator::config::{OrchestratorConfig, check_file_permissions};
 use terraphim_orchestrator::AgentOrchestrator;
 use terraphim_orchestrator::{
     parse_agent_args, run_synthetic, run_validate, run_validate_all, AgentSubcommand,
@@ -94,8 +94,8 @@ fn register_providers(orchestrator: &mut AgentOrchestrator) {
 }
 
 enum Cli {
-    Run { config: PathBuf },
-    Check { config: PathBuf },
+    Run { config: PathBuf, strict_permissions: bool },
+    Check { config: PathBuf, strict_permissions: bool },
     LocalCheck,
     LocalAgent { agent_name: String },
     Agent { sub_args: Vec<String> },
@@ -108,10 +108,14 @@ fn parse_args() -> Result<Cli, String> {
     let mut check: Option<PathBuf> = None;
     let mut local_mode: Option<String> = None;
     let mut positional: Option<PathBuf> = None;
+    let mut strict_permissions = false;
 
     let mut iter = args.into_iter();
     while let Some(arg) = iter.next() {
         match arg.as_str() {
+            "--strict-permissions" => {
+                strict_permissions = true;
+            }
             "--check" => {
                 let path = iter
                     .next()
@@ -163,11 +167,11 @@ fn parse_args() -> Result<Cli, String> {
             agent_name: agent_name.clone(),
         })
     } else if let Some(config) = check {
-        Ok(Cli::Check { config })
+        Ok(Cli::Check { config, strict_permissions })
     } else {
         let config =
             positional.unwrap_or_else(|| PathBuf::from("/opt/ai-dark-factory/orchestrator.toml"));
-        Ok(Cli::Run { config })
+        Ok(Cli::Run { config, strict_permissions })
     }
 }
 
@@ -184,6 +188,9 @@ fn print_help() {
     println!("    adf agent run NAME           Run agent with synthetic event injection");
     println!("    adf --help                  Show this message");
     println!("    adf --version               Show version");
+    println!();
+    println!("OPTIONS:");
+    println!("    --strict-permissions        Exit with error if config file is group/world-readable");
     println!();
     println!("AGENT SUB_COMMANDS:");
     println!("    adf agent validate [NAME] [--project ID] [--format json|human]");
@@ -921,8 +928,22 @@ async fn main() -> ExitCode {
             run_local_agent(&agent_name, std::env::current_dir().unwrap_or_default()).await
         }
         Cli::Agent { sub_args } => run_agent(sub_args),
-        Cli::Check { config } => run_check(config),
-        Cli::Run { config } => {
+        Cli::Check { config, strict_permissions } => {
+            if strict_permissions {
+                if let Err(e) = check_file_permissions(&config) {
+                    eprintln!("{e}");
+                    return ExitCode::from(1);
+                }
+            }
+            run_check(config)
+        }
+        Cli::Run { config, strict_permissions } => {
+            if strict_permissions {
+                if let Err(e) = check_file_permissions(&config) {
+                    eprintln!("{e}");
+                    return ExitCode::from(1);
+                }
+            }
             tracing::info!(config = %config.display(), "loading orchestrator config");
 
             let mut orchestrator = match AgentOrchestrator::from_config_file(&config) {
