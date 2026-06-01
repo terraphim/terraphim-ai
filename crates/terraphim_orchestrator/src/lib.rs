@@ -6203,11 +6203,21 @@ impl AgentOrchestrator {
             warn!(error = %e, "poll_pending_reviews failed");
         }
 
-        info!(
-            tick = self.tick_count,
-            elapsed_ms = tick_start.elapsed().as_millis() as u64,
-            "reconcile_tick complete"
-        );
+        let elapsed = tick_start.elapsed();
+        let elapsed_ms = elapsed.as_millis() as u64;
+        if elapsed > std::time::Duration::from_secs(5) {
+            warn!(
+                tick = self.tick_count,
+                elapsed_ms,
+                "reconcile_tick SLOW: took > 5s, likely blocking agent polling"
+            );
+        } else {
+            info!(
+                tick = self.tick_count,
+                elapsed_ms,
+                "reconcile_tick complete"
+            );
+        }
     }
 
     /// PR gate reconciliation: for every project with Gitea config, read

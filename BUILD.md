@@ -239,3 +239,8 @@ Failed: `cargo build --workspace --profile ci --profile ci --profile ci --profil
 CORRECTION: `cargo build --workspace --profile ci`
 
 REASON: The `--profile` flag was specified 4 times; Cargo only accepts it once. Remove the duplicate flags, keeping a single `--profile ci`.
+
+## Auto-corrected (2026-06-01T16:48:30Z)
+
+Failed: `git definitely-not-a-real-subcommand`
+Not logged in · Please run /login
