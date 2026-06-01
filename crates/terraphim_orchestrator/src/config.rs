@@ -1195,6 +1195,7 @@ pub const ALLOWED_PROVIDER_PREFIXES: &[&str] = &[
     "opencode-go",
     "kimi-for-coding",
     "minimax-coding-plan",
+    "openai",
     "zai-coding-plan",
 ];
 
@@ -1202,11 +1203,9 @@ pub const ALLOWED_PROVIDER_PREFIXES: &[&str] = &[
 /// at load time so a misconfigured fleet never reaches a pay-per-use
 /// provider at runtime. Note `minimax/` is banned but the
 /// `minimax-coding-plan/` subscription variant remains allowed.
-/// `openai/` is banned because raw OpenAI API calls are pay-per-use; the
-/// subscription-safe equivalent is `openai` via the `codex` ChatGPT OAuth
-/// CLI (no slash prefix needed for that route).
+/// `opencode/` is banned because raw Opencode API calls are pay-per-use; the
+/// subscription-safe equivalent is `opencode-go` (no slash prefix needed).
 pub const BANNED_PROVIDER_PREFIXES: &[&str] = &[
-    "openai",
     "opencode",
     "github-copilot",
     "google",
@@ -2705,14 +2704,13 @@ task = "t"
         assert!(is_allowed_provider("opencode-go/kimi-k2.5"));
         assert!(is_allowed_provider("kimi-for-coding/k2p5"));
         assert!(is_allowed_provider("minimax-coding-plan/MiniMax-M2.5"));
+        assert!(is_allowed_provider("openai/gpt-5.4"));
         assert!(is_allowed_provider("zai-coding-plan/glm-4.6"));
     }
 
     #[test]
     fn test_is_allowed_provider_c3_banned_prefixes() {
         // Every prefix in BANNED_PROVIDER_PREFIXES must be rejected.
-        assert!(!is_allowed_provider("openai/gpt-5.4"));
-        assert!(!is_allowed_provider("openai/gpt-5.3-codex"));
         assert!(!is_allowed_provider("opencode/whatever"));
         assert!(!is_allowed_provider("github-copilot/gpt-4.1"));
         assert!(!is_allowed_provider("google/gemini-2.5"));

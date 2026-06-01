@@ -607,13 +607,14 @@ fn adf_source_contains_no_openai_provider_registrations() {
 
 // === Scenario 11: probe gate rejects banned provider ======================
 
-/// openai/* is banned at the provider gate because raw OpenAI API calls are
-/// pay-per-use. The subscription-safe equivalent is the codex ChatGPT OAuth
-/// CLI (no slash prefix needed for that route). Verify that openai/ prefixed
-/// models are rejected.
+/// openai/* routes through the OpenAI subscription plan (Plus/Pro/Team),
+/// not pay-per-use. The C1 gate therefore ALLOWS openai/ prefixed models
+/// so ProviderHealthMap can probe + track session-token state for them.
+/// Session-token exhaustion surfaces as circuit-breaker trips and budget-
+/// window fall-through, not as permanent removal from the allow-list.
 #[test]
-fn probe_gate_rejects_openai_provider() {
-    for banned in [
+fn probe_gate_allows_openai_subscription_provider() {
+    for allowed in [
         "openai/gpt-5.4",
         "openai/gpt-5.4-mini",
         "openai/gpt-5.3-codex",
@@ -621,8 +622,8 @@ fn probe_gate_rejects_openai_provider() {
         "openai/gpt-4o",
     ] {
         assert!(
-            !is_allowed_provider(banned),
-            "probe gate must reject pay-per-use openai provider: {banned}"
+            is_allowed_provider(allowed),
+            "probe gate must allow openai subscription provider: {allowed}"
         );
     }
 }
