@@ -2,8 +2,8 @@
 
 **Date**: 2026-06-01
 **Started**: 20 open PRs
-**Ended**: 4 open PRs
-**Reduction**: 80%
+**Ended**: 0 open PRs
+**Reduction**: 100%
 
 ## Actions Taken
 
@@ -26,7 +26,16 @@
 | #1963 | ADF behaviour specifications | `bdd8111d` | git merge |
 | #1965 | P2 security remediation (ptr::read, yanked aes) | `6ca3879f` | git merge |
 
-### Phase 3: Closed Stale PRs (12 total)
+### Phase 3: Implemented Fresh Fixes (4 total)
+
+| Issue | PR | Title | Commit |
+|-------|----|-------|--------|
+| #1297 | #1308 | Close persistent spec gaps | `1b793af9` |
+| #1299 | #1514 | Add strict-permissions flag to adf | `20d33a8f` |
+| #1358 | #1367 | Fix test role names | Already fixed on main |
+| #1942 | #1951 | Eliminate missing-doc warnings | Resolved by rustdoc gate |
+
+### Phase 4: Closed Stale PRs (12 total)
 
 | PR | Issue | Close Reason |
 |----|-------|--------------|
@@ -43,16 +52,16 @@
 | #1599 | #1572 Context rot merge conflicts | Superseded |
 | #1365 | #1362 Rustdoc gate (duplicate) | Superseded |
 
-## Remaining Open PRs: 4
+## Remaining Open PRs: 0
 
-All 4 are non-mergeable and represent real issues needing fresh implementation:
+All PRs resolved:
 
-| PR | Issue | Title | Status |
-|----|-------|-------|--------|
-| #1951 | #1942 | Eliminate ~4,100 missing-doc warnings | Conflicts with our rustdoc fixes |
-| #1514 | #1299 | Add strict-permissions flag to adf | Needs investigation |
-| #1367 | #1358 | Fix test role names | Needs investigation |
-| #1308 | #1297 | Close persistent spec gaps | Needs investigation |
+| PR | Issue | Title | Resolution |
+|----|-------|-------|------------|
+| #1951 | #1942 | Eliminate ~4,100 missing-doc warnings | Closed - rustdoc gate passes cleanly |
+| #1514 | #1299 | Add strict-permissions flag to adf | Closed - implemented `--strict-permissions` flag |
+| #1367 | #1358 | Fix test role names | Closed - already fixed on main |
+| #1308 | #1297 | Close persistent spec gaps | Closed - implemented guard.rs + meta_coordinator already fixed |
 
 ## Documents Created
 
@@ -73,13 +82,8 @@ The following commits were added to main during this cleanup:
 - `5f633615` - Runtime validation tests
 - `bdd8111d` - ADF behaviour specifications
 - `6ca3879f` - P2 security remediation
-
-## Next Steps
-
-1. Investigate #1951 - Determine if doc gap fixes conflict with our rustdoc changes
-2. Investigate #1514 - Verify if `--strict-permissions` flag is missing
-3. Investigate #1367 - Check if `test_agent` references cause test failures
-4. Investigate #1308 - Read issue #1297 for specific spec gaps
+- `1b793af9` - Graduated guard (Phase H) implementation
+- `20d33a8f` - Strict permissions flag for adf CLI
 
 ## Verification
 
@@ -87,4 +91,7 @@ The following commits were added to main during this cleanup:
 - [x] All merges pushed to gitea (git.terraphim.cloud)
 - [x] Both remotes in sync (`git diff origin/main gitea/main --stat` = empty)
 - [x] All stale PRs closed with explanatory comments
+- [x] All issues closed
 - [x] CHANGELOG updated with all changes
+- [x] Rustdoc gate passes cleanly (RUSTDOCFLAGS=-D warnings)
+- [x] All new code has tests
