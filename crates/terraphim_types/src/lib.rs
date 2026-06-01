@@ -3531,8 +3531,8 @@ mod tests {
 
     #[test]
     fn test_context_rot_zero_budget_is_critical() {
-        let conv = Conversation::new("test".to_string(), RoleName::new("engineer"))
-            .with_token_budget(0);
+        let conv =
+            Conversation::new("test".to_string(), RoleName::new("engineer")).with_token_budget(0);
         assert_eq!(conv.check_rot(), Some(RotStatus::Critical));
     }
 

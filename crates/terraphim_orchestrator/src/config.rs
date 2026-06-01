@@ -3225,7 +3225,10 @@ task = "build"
             let dir = temp_file_with_mode("content", 0o644);
             let path = dir.path().join("test_config.toml");
             let err = super::super::check_file_permissions(&path).unwrap_err();
-            assert!(err.contains("world-readable"), "Error should mention world-readable: {err}");
+            assert!(
+                err.contains("world-readable"),
+                "Error should mention world-readable: {err}"
+            );
             assert!(err.contains("644"), "Error should mention mode 644: {err}");
         }
 
@@ -3234,7 +3237,10 @@ task = "build"
             let dir = temp_file_with_mode("content", 0o640);
             let path = dir.path().join("test_config.toml");
             let err = super::super::check_file_permissions(&path).unwrap_err();
-            assert!(err.contains("group-readable"), "Error should mention group-readable: {err}");
+            assert!(
+                err.contains("group-readable"),
+                "Error should mention group-readable: {err}"
+            );
             assert!(err.contains("640"), "Error should mention mode 640: {err}");
         }
 
@@ -3242,7 +3248,10 @@ task = "build"
         fn check_file_permissions_fails_for_missing_file() {
             let path = std::path::Path::new("/nonexistent/path/config.toml");
             let err = super::super::check_file_permissions(path).unwrap_err();
-            assert!(err.contains("Could not check permissions"), "Error should mention inability to check: {err}");
+            assert!(
+                err.contains("Could not check permissions"),
+                "Error should mention inability to check: {err}"
+            );
         }
     }
 
