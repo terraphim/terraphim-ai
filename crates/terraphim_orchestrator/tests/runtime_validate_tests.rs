@@ -166,9 +166,9 @@ fn rejects_missing_opencode_model_at_startup() {
 }
 
 #[test]
-fn rejects_openai_model_prefix_at_startup() {
+fn rejects_google_model_prefix_at_startup() {
     let result = AgentOrchestrator::from_config_file(fixture("openai_model_banned.toml"));
-    assert!(result.is_err(), "expected Err for openai/ model prefix");
+    assert!(result.is_err(), "expected Err for google/ model prefix");
     let err = result.err().unwrap();
     match err {
         OrchestratorError::BannedProvider {
@@ -176,10 +176,10 @@ fn rejects_openai_model_prefix_at_startup() {
             provider,
             field,
         } => {
-            assert_eq!(agent, "openai-agent");
+            assert_eq!(agent, "google-agent");
             assert!(
-                provider.starts_with("openai/"),
-                "expected openai/ prefix, got {provider}"
+                provider.starts_with("google/"),
+                "expected google/ prefix, got {provider}"
             );
             assert_eq!(field, "model");
         }

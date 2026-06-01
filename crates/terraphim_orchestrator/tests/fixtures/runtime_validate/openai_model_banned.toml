@@ -11,9 +11,9 @@ id = "p"
 working_dir = "/tmp/p"
 
 [[agents]]
-name = "openai-agent"
+name = "google-agent"
 layer = "Safety"
 cli_tool = "claude"
 task = "t"
 project = "p"
-model = "openai/gpt-4o"
+model = "google/gemini-2.5"
