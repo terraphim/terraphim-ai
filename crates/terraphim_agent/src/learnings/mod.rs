@@ -26,6 +26,7 @@
 pub(crate) mod capture;
 pub mod compile;
 pub mod export_kg;
+pub mod guard;
 mod hook;
 mod install;
 pub(crate) mod procedure;
@@ -34,6 +35,7 @@ mod replay;
 #[cfg(feature = "shared-learning")]
 pub mod suggest;
 
+pub use guard::{ExecutionTier, GuardDecision, evaluate_command, evaluate_command_with_learning};
 pub use procedure::ProcedureStore;
 pub use replay::{StepOutcome, replay_procedure};
 
