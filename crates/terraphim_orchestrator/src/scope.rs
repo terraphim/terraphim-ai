@@ -693,11 +693,11 @@ impl WorktreeManager {
             return self.sweep_remove(path, report);
         }
 
-        // No manifest: check if this is an orphaned git worktree older than
-        // the threshold. These are left behind when the orchestrator crashes
-        // between `git worktree add` and manifest write, or from before the
-        // manifest feature existed.
-        let is_git_worktree = path.join(".git").exists();
+        // No manifest: check if this is an orphaned worktree directory older
+        // than the threshold. These are left behind when the orchestrator
+        // crashes between `git worktree add` and manifest write, or from
+        // before the manifest feature existed. Empty directories (where git
+        // worktree add failed) are also cleaned up.
         let is_old_enough = match std::fs::metadata(path) {
             Ok(meta) => match meta.modified() {
                 Ok(mtime) => {
@@ -709,7 +709,7 @@ impl WorktreeManager {
             Err(_) => false,
         };
 
-        if is_git_worktree && is_old_enough {
+        if is_old_enough {
             info!(
                 path = %path.display(),
                 hours = Self::ORPHAN_AGE_THRESHOLD_HOURS,
