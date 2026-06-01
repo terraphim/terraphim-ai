@@ -78,6 +78,8 @@ pub struct OutputCapture {
     broadcast_sender: broadcast::Sender<OutputEvent>,
     /// Bounded buffer of redacted events for timeout reporting.
     captured_events: Arc<Mutex<VecDeque<OutputEvent>>>,
+    /// Optional path to write raw stderr lines for post-mortem debugging.
+    stderr_log_path: Option<std::path::PathBuf>,
 }
 
 impl OutputCapture {
@@ -86,6 +88,20 @@ impl OutputCapture {
         process_id: ProcessId,
         stdout: BufReader<ChildStdout>,
         stderr: BufReader<ChildStderr>,
+    ) -> Self {
+        Self::new_with_stderr_log(process_id, stdout, stderr, None)
+    }
+
+    /// Create a new output capture with optional stderr log file.
+    ///
+    /// When `stderr_log_path` is Some, every stderr line is appended to the
+    /// file in addition to being broadcast. This provides a durable fallback
+    /// when the broadcast channel lags or the drain task drops events.
+    pub fn new_with_stderr_log(
+        process_id: ProcessId,
+        stdout: BufReader<ChildStdout>,
+        stderr: BufReader<ChildStderr>,
+        stderr_log_path: Option<std::path::PathBuf>,
     ) -> Self {
         let (event_sender, _event_receiver) = mpsc::channel::<OutputEvent>(100);
         let (broadcast_sender, _) = broadcast::channel(256);
@@ -96,6 +112,7 @@ impl OutputCapture {
             event_sender,
             broadcast_sender,
             captured_events: Arc::new(Mutex::new(VecDeque::new())),
+            stderr_log_path,
         };
 
         // Start capturing stdout and stderr
@@ -199,9 +216,17 @@ impl OutputCapture {
         let event_sender = self.event_sender.clone();
         let broadcast_sender = self.broadcast_sender.clone();
         let captured_events = self.captured_events.clone();
+        let stderr_log_path = self.stderr_log_path.clone();
 
         tokio::spawn(async move {
             let mut line = String::new();
+            let mut log_file = stderr_log_path.and_then(|path| {
+                std::fs::OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open(&path)
+                    .ok()
+            });
 
             loop {
                 line.clear();
@@ -211,6 +236,12 @@ impl OutputCapture {
                         let line = line.trim().to_string();
                         if line.is_empty() {
                             continue;
+                        }
+
+                        // Write to durable stderr log if configured
+                        if let Some(ref mut file) = log_file {
+                            use std::io::Write;
+                            let _ = writeln!(file, "{}", line);
                         }
 
                         let stderr_event = OutputEvent::Stderr {

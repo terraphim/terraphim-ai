@@ -2422,6 +2422,15 @@ impl AgentOrchestrator {
                 spawn_ctx = spawn_ctx.with_env(key, value);
             }
         }
+
+        // Pre-create temp log path so the spawner can write stderr directly
+        // to disk, giving us a durable fallback if the broadcast drain lags.
+        let _ = std::fs::create_dir_all(&self.agent_log_dir);
+        let ts = chrono::Utc::now().format("%Y%m%dT%H%M%SZ");
+        let stderr_tmp_name = format!(".tmp-{}-{}.stderr.log", def.name, ts);
+        let stderr_tmp_path = self.agent_log_dir.join(&stderr_tmp_name);
+        spawn_ctx = spawn_ctx.with_stderr_log(&stderr_tmp_path);
+
         let handle = self
             .spawner
             .spawn_with_fallback(&request, spawn_ctx)

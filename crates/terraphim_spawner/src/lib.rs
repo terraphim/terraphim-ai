@@ -27,6 +27,10 @@ pub struct SpawnContext {
     pub working_dir: Option<PathBuf>,
     /// Env vars to set on the child process (added to inherited env).
     pub env_overrides: HashMap<String, String>,
+    /// Optional path to write raw stderr lines for post-mortem debugging.
+    /// When set, the spawner creates the file and appends every stderr line
+    /// directly, bypassing the bounded in-memory buffer.
+    pub stderr_log_path: Option<PathBuf>,
 }
 
 impl SpawnContext {
@@ -40,12 +44,19 @@ impl SpawnContext {
         Self {
             working_dir: Some(path.into()),
             env_overrides: HashMap::new(),
+            stderr_log_path: None,
         }
     }
 
     /// Builder-style env addition.
     pub fn with_env(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
         self.env_overrides.insert(key.into(), value.into());
+        self
+    }
+
+    /// Set a dedicated stderr log file for this spawn.
+    pub fn with_stderr_log(mut self, path: impl Into<PathBuf>) -> Self {
+        self.stderr_log_path = Some(path.into());
         self
     }
 }
@@ -627,8 +638,12 @@ impl AgentSpawner {
             .take()
             .ok_or_else(|| SpawnerError::SpawnError("Failed to capture stderr".to_string()))?;
 
-        let output_capture =
-            OutputCapture::new(process_id, BufReader::new(stdout), BufReader::new(stderr));
+        let output_capture = OutputCapture::new_with_stderr_log(
+            process_id,
+            BufReader::new(stdout),
+            BufReader::new(stderr),
+            ctx.stderr_log_path.clone(),
+        );
 
         tracing::info!(
             target: "terraphim_spawner::audit",
