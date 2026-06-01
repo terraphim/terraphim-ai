@@ -1,31 +1,25 @@
 //! Integration tests for typed exit code contracts (Task #860 Phase 4)
 //!
 //! Validates that CLI exit paths return the correct typed exit codes for various scenarios.
+//!
+//! Uses `assert_cmd::Command::cargo_bin` to invoke the pre-built binary rather than
+//! nested `cargo run`, avoiding artifact lock contention under `cargo test --workspace`.
 
-use std::process::Command;
+use assert_cmd::Command;
+
+fn cmd() -> Command {
+    Command::cargo_bin("terraphim-agent").expect("terraphim-agent binary not found")
+}
 
 #[test]
 fn help_flag_exits_success() {
-    let output = Command::new("cargo")
-        .args(["run", "-p", "terraphim_agent", "--", "--help"])
-        .output()
-        .expect("Failed to execute terraphim-agent --help");
-
-    assert_eq!(
-        output.status.code(),
-        Some(0),
-        "Help should exit with SUCCESS (0)"
-    );
+    cmd().arg("--help").assert().success();
 }
 
 #[test]
 fn invalid_subcommand_exits_with_error_usage() {
-    let output = Command::new("cargo")
-        .args(["run", "-p", "terraphim_agent", "--", "invalid-subcommand"])
-        .output()
-        .expect("Failed to execute terraphim-agent with invalid subcommand");
-
-    let exit_code = output.status.code().unwrap_or(-1);
+    let assert = cmd().arg("invalid-subcommand").assert();
+    let exit_code = assert.get_output().status.code().unwrap_or(-1);
     assert!(
         exit_code == 2 || exit_code == 1,
         "Invalid subcommand should exit with ERROR_USAGE (2) or ERROR_GENERAL (1), got {}",
@@ -35,8 +29,8 @@ fn invalid_subcommand_exits_with_error_usage() {
 
 #[test]
 fn listen_mode_with_server_flag_exits_error_usage() {
-    let output = Command::new("cargo")
-        .args(["run", "-p", "terraphim_agent", "--", "listen", "--server"])
+    let output = cmd()
+        .args(["listen", "--server"])
         .output()
         .expect("Failed to execute listen mode with --server flag");
 
