@@ -33,6 +33,7 @@ pub enum TrustLevel {
 }
 
 impl TrustLevel {
+    /// Return the short canonical string representation (`"L0"`, `"L1"`, …).
     pub fn as_str(&self) -> &'static str {
         match self {
             TrustLevel::L0 => "L0",
@@ -42,6 +43,7 @@ impl TrustLevel {
         }
     }
 
+    /// Numeric weight used for ordering trust levels (0 = lowest, 3 = highest).
     pub fn weight(&self) -> u8 {
         match self {
             TrustLevel::L0 => 0,
@@ -51,10 +53,12 @@ impl TrustLevel {
         }
     }
 
+    /// Return `true` if this trust level allows synchronisation to the wiki.
     pub fn allows_wiki_sync(&self) -> bool {
         matches!(self, TrustLevel::L2 | TrustLevel::L3)
     }
 
+    /// Return a human-readable label (e.g. `"Peer-Validated"` for L2).
     pub fn display_name(&self) -> &'static str {
         match self {
             TrustLevel::L0 => "Extracted",
@@ -91,8 +95,10 @@ impl PartialOrd for TrustLevel {
     }
 }
 
+/// Errors from parsing a [`TrustLevel`] from a string.
 #[derive(Error, Debug)]
 pub enum TrustLevelError {
+    /// The supplied string did not match any known trust level.
     #[error("invalid trust level: {0}")]
     InvalidTrustLevel(String),
 }
@@ -101,10 +107,15 @@ pub enum TrustLevelError {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum LearningCategory {
+    /// A technical insight about code, tools, or infrastructure.
     Technical,
+    /// A process or workflow improvement.
     Process,
+    /// Domain-specific knowledge about the problem space.
     Domain,
+    /// A failure pattern to avoid.
     Failure,
+    /// A success pattern to replicate.
     SuccessPattern,
 }
 
@@ -127,8 +138,11 @@ impl std::fmt::Display for LearningCategory {
 /// remains free of async runtime dependencies. Implementations that need
 /// async I/O can use internal synchronisation (e.g. `tokio::runtime::Handle`).
 pub trait LearningStore: Send + Sync {
+    /// Persist a new learning and return its assigned ID.
     fn insert(&self, learning: SharedLearning) -> Result<String, StoreError>;
+    /// Retrieve a learning by its unique ID.
     fn get(&self, id: &str) -> Result<SharedLearning, StoreError>;
+    /// Return learnings relevant to an agent and context, filtered by minimum trust level.
     fn query_relevant(
         &self,
         agent: &str,
@@ -136,9 +150,13 @@ pub trait LearningStore: Send + Sync {
         min_trust: TrustLevel,
         limit: usize,
     ) -> Result<Vec<SharedLearning>, StoreError>;
+    /// Record that a learning was applied by the named agent.
     fn record_applied(&self, id: &str, applied_by: &str) -> Result<(), StoreError>;
+    /// Record that a learning proved effective after being applied.
     fn record_effective(&self, id: &str, applied_by: &str) -> Result<(), StoreError>;
+    /// List all learnings at or above the given trust level.
     fn list_by_trust(&self, min_trust: TrustLevel) -> Result<Vec<SharedLearning>, StoreError>;
+    /// Archive (remove) learnings older than `max_age_days`; returns count archived.
     fn archive_stale(&self, max_age_days: u32) -> Result<usize, StoreError>;
 }
 
@@ -151,6 +169,7 @@ pub struct InMemoryLearningStore {
 }
 
 impl InMemoryLearningStore {
+    /// Create a new empty in-memory store.
     pub fn new() -> Self {
         Self {
             learnings: std::sync::Mutex::new(HashMap::new()),
@@ -340,9 +359,12 @@ impl QualityMetrics {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum SuggestionStatus {
+    /// Awaiting human review.
     #[default]
     Pending,
+    /// Approved by a human reviewer.
     Approved,
+    /// Rejected by a human reviewer.
     Rejected,
 }
 
@@ -672,14 +694,19 @@ fn timestamp_millis() -> u64 {
 /// Error type for store operations
 #[derive(Error, Debug)]
 pub enum StoreError {
+    /// A storage backend error (e.g. database write failure).
     #[error("persistence error: {0}")]
     Persistence(String),
+    /// No learning with the given ID was found.
     #[error("learning not found: {0}")]
     NotFound(String),
+    /// An error occurred during BM25 relevance calculation.
     #[error("BM25 calculation error: {0}")]
     Bm25(String),
+    /// The provided input is invalid.
     #[error("invalid input: {0}")]
     InvalidInput(String),
+    /// JSON serialisation or deserialisation failed.
     #[error("serialization error: {0}")]
     Serialization(#[from] serde_json::Error),
 }

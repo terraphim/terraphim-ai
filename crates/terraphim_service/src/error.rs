@@ -45,46 +45,69 @@ pub enum ErrorCategory {
 /// Common error patterns used across terraphim crates
 #[derive(Error, Debug)]
 pub enum CommonError {
+    /// A network-level error such as a connection failure or timeout
     #[error("Network error: {message}")]
     Network {
+        /// Human-readable description of the network error
         message: String,
+        /// Underlying error that caused this network failure, if any
         #[source]
         source: Option<Box<dyn std::error::Error + Send + Sync>>,
     },
 
+    /// An error caused by invalid or missing configuration
     #[error("Configuration error: {message}")]
     Configuration {
+        /// Human-readable description of the configuration problem
         message: String,
+        /// The specific configuration field that is invalid or missing
         field: Option<String>,
     },
 
+    /// An error caused by invalid input data
     #[error("Validation error: {message}")]
     Validation {
+        /// Human-readable description of the validation failure
         message: String,
+        /// The specific field that failed validation
         field: Option<String>,
     },
 
+    /// An authentication or authorisation error
     #[error("Authentication error: {message}")]
-    Auth { message: String },
+    Auth {
+        /// Human-readable description of the authentication error
+        message: String,
+    },
 
+    /// An error arising from the storage or persistence layer
     #[error("Storage error: {message}")]
     Storage {
+        /// Human-readable description of the storage error
         message: String,
+        /// Underlying error from the storage backend, if any
         #[source]
         source: Option<Box<dyn std::error::Error + Send + Sync>>,
     },
 
+    /// An error from an external service integration
     #[error("Integration error with {service}: {message}")]
     Integration {
+        /// Name of the external service that produced the error
         service: String,
+        /// Human-readable description of the integration error
         message: String,
+        /// Underlying error returned by the external service, if any
         #[source]
         source: Option<Box<dyn std::error::Error + Send + Sync>>,
     },
 
+    /// An internal system error
     #[error("System error: {message}")]
     System {
+        /// Human-readable description of the system error
         message: String,
+        /// Underlying cause of the system error, if any
         #[source]
         source: Option<Box<dyn std::error::Error + Send + Sync>>,
     },
@@ -113,6 +136,7 @@ impl TerraphimError for CommonError {
 
 /// Helper functions for creating common error types
 impl CommonError {
+    /// Create a network error with the given message and no underlying source
     pub fn network(message: impl Into<String>) -> Self {
         CommonError::Network {
             message: message.into(),
@@ -120,6 +144,7 @@ impl CommonError {
         }
     }
 
+    /// Create a network error wrapping an existing source error
     pub fn network_with_source(
         message: impl Into<String>,
         source: impl std::error::Error + Send + Sync + 'static,
@@ -130,6 +155,7 @@ impl CommonError {
         }
     }
 
+    /// Create a configuration error with the given message and no specific field
     pub fn config(message: impl Into<String>) -> Self {
         CommonError::Configuration {
             message: message.into(),
@@ -137,6 +163,7 @@ impl CommonError {
         }
     }
 
+    /// Create a configuration error pointing to a specific configuration field
     pub fn config_field(message: impl Into<String>, field: impl Into<String>) -> Self {
         CommonError::Configuration {
             message: message.into(),
@@ -144,6 +171,7 @@ impl CommonError {
         }
     }
 
+    /// Create a validation error with the given message and no specific field
     pub fn validation(message: impl Into<String>) -> Self {
         CommonError::Validation {
             message: message.into(),
@@ -151,6 +179,7 @@ impl CommonError {
         }
     }
 
+    /// Create a validation error pointing to a specific input field
     pub fn validation_field(message: impl Into<String>, field: impl Into<String>) -> Self {
         CommonError::Validation {
             message: message.into(),
@@ -158,12 +187,14 @@ impl CommonError {
         }
     }
 
+    /// Create an authentication error with the given message
     pub fn auth(message: impl Into<String>) -> Self {
         CommonError::Auth {
             message: message.into(),
         }
     }
 
+    /// Create a storage error with the given message and no underlying source
     pub fn storage(message: impl Into<String>) -> Self {
         CommonError::Storage {
             message: message.into(),
@@ -171,6 +202,7 @@ impl CommonError {
         }
     }
 
+    /// Create a storage error wrapping an existing source error
     pub fn storage_with_source(
         message: impl Into<String>,
         source: impl std::error::Error + Send + Sync + 'static,
@@ -181,6 +213,7 @@ impl CommonError {
         }
     }
 
+    /// Create an integration error for the named external service with no source
     pub fn integration(service: impl Into<String>, message: impl Into<String>) -> Self {
         CommonError::Integration {
             service: service.into(),
@@ -189,6 +222,7 @@ impl CommonError {
         }
     }
 
+    /// Create an integration error for the named external service wrapping a source error
     pub fn integration_with_source(
         service: impl Into<String>,
         message: impl Into<String>,
@@ -201,6 +235,7 @@ impl CommonError {
         }
     }
 
+    /// Create a system error with the given message and no underlying source
     pub fn system(message: impl Into<String>) -> Self {
         CommonError::System {
             message: message.into(),
@@ -208,6 +243,7 @@ impl CommonError {
         }
     }
 
+    /// Create a system error wrapping an existing source error
     pub fn system_with_source(
         message: impl Into<String>,
         source: impl std::error::Error + Send + Sync + 'static,

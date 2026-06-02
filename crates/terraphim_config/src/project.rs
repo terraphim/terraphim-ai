@@ -1,33 +1,50 @@
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 
+/// Errors that can occur while discovering or loading a project-level configuration.
 #[derive(Error, Debug)]
 pub enum ProjectDiscoveryError {
+    /// An I/O error while reading configuration files.
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
+    /// A JSON deserialisation error in a configuration file.
     #[error("JSON error: {0}")]
     Json(#[from] serde_json::Error),
+    /// The given path exists but is not a directory.
     #[error("Not a directory: {0}")]
     NotDirectory(PathBuf),
+    /// Multiple roles are defined but no explicit or default role was specified.
     #[error(
         "multiple project roles found ({available:?}); pass --role or set selected/default role"
     )]
-    AmbiguousRole { available: Vec<String> },
+    AmbiguousRole {
+        /// Names of the available roles that the caller must choose from.
+        available: Vec<String>,
+    },
 }
 
+/// Project-local configuration loaded from a `.terraphim/` directory.
+///
+/// Allows teams to ship a `.terraphim/config.json` (or per-role `role-*.json` files)
+/// alongside their source code to override global Terraphim settings.
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct ProjectConfig {
+    /// Optional global keyboard shortcut override for this project.
     #[serde(default)]
     pub global_shortcut: Option<String>,
+    /// Name of the default role to use when no role is specified.
     #[serde(default)]
     pub default_role: Option<String>,
+    /// Name of the currently selected role (persisted across sessions).
     #[serde(default)]
     pub selected_role: Option<String>,
+    /// Role definitions keyed by role name.
     #[serde(default)]
     pub roles: std::collections::HashMap<String, crate::Role>,
 }
 
 impl ProjectConfig {
+    /// Load a `ProjectConfig` from a single JSON file.
     pub fn from_file(path: &Path) -> Result<Self, ProjectDiscoveryError> {
         let content = std::fs::read_to_string(path)?;
         let config: ProjectConfig = serde_json::from_str(&content)?;
@@ -68,10 +85,22 @@ impl ProjectConfig {
         Ok(config)
     }
 
+    /// Return `true` if no shortcut and no roles are configured.
     pub fn is_empty(&self) -> bool {
         self.global_shortcut.is_none() && self.roles.is_empty()
     }
 
+    /// Resolve the effective role name from an optional explicit override.
+    ///
+    /// Resolution order:
+    /// 1. Explicit `--role` flag (if non-empty)
+    /// 2. `selected_role` (if present in `roles`)
+    /// 3. `default_role` (if present in `roles`)
+    /// 4. The sole role (if exactly one role is configured)
+    /// 5. `None` (no roles configured)
+    ///
+    /// Returns [`ProjectDiscoveryError::AmbiguousRole`] when multiple roles exist
+    /// and no selection can be made automatically.
     pub fn resolve_role_name(
         &self,
         explicit_role: Option<&str>,
@@ -126,6 +155,11 @@ pub fn discover_kg_path(dir: &Path, role_name: Option<&str>) -> Option<PathBuf> 
     if kg_dir.is_dir() { Some(kg_dir) } else { None }
 }
 
+/// Walk up the directory tree from `start_dir` looking for a `.terraphim/` directory.
+///
+/// Returns the canonicalised path to the first `.terraphim/` directory found, or
+/// `None` if no such directory exists anywhere up to the filesystem root.
+/// Uses the current working directory when `start_dir` is `None`.
 pub fn discover(start_dir: Option<&Path>) -> Result<Option<PathBuf>, ProjectDiscoveryError> {
     let start_dir = match start_dir {
         Some(d) => d.to_path_buf(),
