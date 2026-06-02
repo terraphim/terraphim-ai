@@ -63,6 +63,7 @@ jobs:
               - '**/*.rs'
               - 'Cargo.toml'
               - 'Cargo.lock'
+              - 'deny.toml'
               - 'rust-toolchain.toml'
               - '.github/rust-toolchain.toml'
             frontend:
@@ -632,12 +633,45 @@ jobs:
           cargo audit || echo "::warning::cargo audit found issues or had parsing errors"
         continue-on-error: true  # Don't fail PR for security advisories
 
+  # License and advisory compliance gate (WIG-4)
+  cargo-deny:
+    name: Cargo Deny Check
+    runs-on: [self-hosted, bigbox]
+    timeout-minutes: 5
+    needs: changes
+    if: needs.changes.outputs.rust-changed == 'true'
+
+    steps:
+      - name: Fix workspace permissions
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo chown -R $(id -u):$(id -g) "${WORKDIR}" 2>/dev/null || true
+          sudo chmod -R u+rw "${WORKDIR}" 2>/dev/null || true
+
+      - name: Pre-checkout cleanup
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo rm -rf "${WORKDIR}/target" || true
+
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install cargo-deny
+        run: |
+          if ! command -v cargo-deny >/dev/null 2>&1; then
+            cargo install cargo-deny --locked
+          fi
+          cargo-deny --version
+
+      - name: Run cargo deny check
+        run: cargo deny check
+
   # Job summary
   pr-summary:
     name: PR Validation Summary
     runs-on: [self-hosted, bigbox]
     timeout-minutes: 1
-    needs: [changes, build-frontend, rust-format, rustdoc, rust-clippy, rust-compile, rust-tests, frontend-check, wasm-build, ranking-regression-gate]
+    needs: [changes, build-frontend, rust-format, rustdoc, rust-clippy, rust-compile, rust-tests, frontend-check, wasm-build, ranking-regression-gate, cargo-deny]
     if: always()
 
     steps:
@@ -663,6 +697,7 @@ jobs:
           echo "| Frontend Check | ${{ needs.frontend-check.result || 'skipped' }} | Frontend linting and types |" >> $GITHUB_STEP_SUMMARY
           echo "| WASM Build | ${{ needs.wasm-build.result || 'skipped' }} | WebAssembly compilation |" >> $GITHUB_STEP_SUMMARY
           echo "| Ranking Regression Gate | ${{ needs.ranking-regression-gate.result || 'skipped' }} | Kendall-tau snapshot gate (WIG-1) |" >> $GITHUB_STEP_SUMMARY
+          echo "| Cargo Deny | ${{ needs.cargo-deny.result || 'skipped' }} | License and advisory compliance gate (WIG-4) |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
           if [[ "${{ needs.rust-format.result }}" == "failure" ]] || \
@@ -670,7 +705,8 @@ jobs:
              [[ "${{ needs.rust-clippy.result }}" == "failure" ]] || \
              [[ "${{ needs.rust-compile.result }}" == "failure" ]] || \
              [[ "${{ needs.rust-tests.result }}" == "failure" ]] || \
-             [[ "${{ needs.ranking-regression-gate.result }}" == "failure" ]]; then
+             [[ "${{ needs.ranking-regression-gate.result }}" == "failure" ]] || \
+             [[ "${{ needs.cargo-deny.result }}" == "failure" ]]; then
             echo "❌ **PR Validation Failed** - Please fix the failing checks before merging." >> $GITHUB_STEP_SUMMARY
             exit 1
           else

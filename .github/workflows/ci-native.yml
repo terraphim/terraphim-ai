@@ -167,6 +167,16 @@ jobs:
         # rchd's queue, sharing slots with ADF agents.
         run: /home/alex/.local/bin/rch exec -- ./scripts/ci-check-format.sh
 
+      - name: Install cargo-deny
+        run: |
+          if ! command -v cargo-deny >/dev/null 2>&1; then
+            cargo install cargo-deny --locked
+          fi
+          cargo-deny --version
+
+      - name: Run cargo deny check
+        run: cargo deny check
+
       - name: sccache stats
         if: always()
         run: /home/alex/.local/bin/sccache --show-stats
