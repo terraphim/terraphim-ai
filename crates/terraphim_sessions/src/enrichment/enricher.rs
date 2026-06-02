@@ -407,4 +407,209 @@ mod tests {
         // rust and tokio appear in same messages, should co-occur
         assert!(!result.concepts.co_occurrences.is_empty());
     }
+
+    #[tokio::test]
+    async fn test_enrich_sessions_multiple() {
+        let thesaurus = create_test_thesaurus();
+        let enricher = SessionEnricher::new(thesaurus);
+
+        let session2 = Session {
+            id: "session-2".to_string(),
+            source: "test".to_string(),
+            external_id: "test-2".to_string(),
+            title: Some("Second Session".to_string()),
+            source_path: PathBuf::from("."),
+            started_at: None,
+            ended_at: None,
+            messages: vec![Message::text(
+                0,
+                MessageRole::User,
+                "Learning wasm with rust",
+            )],
+            metadata: SessionMetadata::default(),
+        };
+        let sessions = vec![create_test_session(), session2];
+
+        let results = enricher.enrich_sessions(&sessions).await.unwrap();
+
+        assert_eq!(results.len(), 2, "Should process both sessions");
+        assert_eq!(
+            results[0].messages_processed, 3,
+            "First session has 3 messages"
+        );
+        assert_eq!(
+            results[1].messages_processed, 1,
+            "Second session has 1 message"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_search_by_concept_empty_map() {
+        let sessions = vec![create_test_session()];
+        let concepts_map = std::collections::HashMap::new();
+
+        let found = search_by_concept(&sessions, &concepts_map, "rust");
+        assert!(found.is_empty(), "Empty concepts map returns no results");
+    }
+
+    #[tokio::test]
+    async fn test_search_by_concept_returns_session_with_match() {
+        let mut concepts_map = std::collections::HashMap::new();
+        let session = create_test_session();
+
+        let mut rust_concept = ConceptMatch::new(
+            "rust".to_string(),
+            "Rust Programming".to_string(),
+            1,
+            Some("https://rust-lang.org".to_string()),
+        );
+        rust_concept.add_occurrence(ConceptOccurrence {
+            message_idx: 0,
+            start_pos: 0,
+            end_pos: 4,
+            context: Some("rust async".to_string()),
+        });
+
+        let mut session_concepts = SessionConcepts::new(session.id.clone());
+        session_concepts.insert_or_update(rust_concept);
+        concepts_map.insert(session.id.clone(), session_concepts);
+
+        let sessions = vec![session];
+        let found = search_by_concept(&sessions, &concepts_map, "rust");
+
+        assert_eq!(found.len(), 1, "Should find the session with rust concept");
+        assert_eq!(found[0].1.term, "rust");
+    }
+
+    #[tokio::test]
+    async fn test_search_by_concept_case_insensitive() {
+        let mut concepts_map = std::collections::HashMap::new();
+        let session = create_test_session();
+
+        let mut rust_concept =
+            ConceptMatch::new("Rust".to_string(), "Rust Programming".to_string(), 1, None);
+        rust_concept.add_occurrence(ConceptOccurrence {
+            message_idx: 0,
+            start_pos: 0,
+            end_pos: 4,
+            context: None,
+        });
+
+        let mut session_concepts = SessionConcepts::new(session.id.clone());
+        session_concepts.insert_or_update(rust_concept);
+        concepts_map.insert(session.id.clone(), session_concepts);
+
+        let sessions = vec![session];
+
+        let found_lower = search_by_concept(&sessions, &concepts_map, "rust");
+        let found_upper = search_by_concept(&sessions, &concepts_map, "RUST");
+        let found_mixed = search_by_concept(&sessions, &concepts_map, "Rust");
+
+        assert!(!found_lower.is_empty(), "Lowercase query should match");
+        assert!(!found_upper.is_empty(), "Uppercase query should match");
+        assert!(!found_mixed.is_empty(), "Mixed case query should match");
+    }
+
+    #[tokio::test]
+    async fn test_find_related_sessions_unknown_id() {
+        let concepts_map = std::collections::HashMap::new();
+        let related = find_related_sessions("unknown-id", &concepts_map, 1);
+        assert!(
+            related.is_empty(),
+            "Unknown session ID returns no related sessions"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_find_related_sessions_with_shared_concepts() {
+        let mut concepts_map = std::collections::HashMap::new();
+
+        let add_rust_concept = |session_id: &str, concepts: &mut SessionConcepts| {
+            let mut rust =
+                ConceptMatch::new("rust".to_string(), "Rust Programming".to_string(), 1, None);
+            rust.add_occurrence(ConceptOccurrence {
+                message_idx: 0,
+                start_pos: 0,
+                end_pos: 4,
+                context: None,
+            });
+            concepts.insert_or_update(rust);
+            let _ = session_id;
+        };
+
+        let mut concepts_a = SessionConcepts::new("session-a".to_string());
+        add_rust_concept("session-a", &mut concepts_a);
+        let mut tokio_concept =
+            ConceptMatch::new("tokio".to_string(), "Tokio Runtime".to_string(), 2, None);
+        tokio_concept.add_occurrence(ConceptOccurrence {
+            message_idx: 0,
+            start_pos: 5,
+            end_pos: 10,
+            context: None,
+        });
+        concepts_a.insert_or_update(tokio_concept);
+        concepts_map.insert("session-a".to_string(), concepts_a);
+
+        let mut concepts_b = SessionConcepts::new("session-b".to_string());
+        add_rust_concept("session-b", &mut concepts_b);
+        concepts_map.insert("session-b".to_string(), concepts_b);
+
+        let related = find_related_sessions("session-a", &concepts_map, 1);
+
+        assert_eq!(related.len(), 1, "Should find session-b as related");
+        assert_eq!(related[0].0, "session-b");
+        assert_eq!(related[0].1, 1, "Should share 1 concept (rust)");
+        assert!(related[0].2.contains(&"Rust Programming".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_find_related_sessions_min_threshold() {
+        let mut concepts_map = std::collections::HashMap::new();
+
+        let make_concepts = |id: &str, terms: &[(&str, &str, u64)]| {
+            let mut concepts = SessionConcepts::new(id.to_string());
+            for (term, normalized, concept_id) in terms {
+                let mut c =
+                    ConceptMatch::new(term.to_string(), normalized.to_string(), *concept_id, None);
+                c.add_occurrence(ConceptOccurrence {
+                    message_idx: 0,
+                    start_pos: 0,
+                    end_pos: term.len(),
+                    context: None,
+                });
+                concepts.insert_or_update(c);
+            }
+            concepts
+        };
+
+        concepts_map.insert(
+            "session-a".to_string(),
+            make_concepts(
+                "session-a",
+                &[
+                    ("rust", "Rust", 1),
+                    ("tokio", "Tokio", 2),
+                    ("async", "Async", 3),
+                ],
+            ),
+        );
+        concepts_map.insert(
+            "session-b".to_string(),
+            make_concepts("session-b", &[("rust", "Rust", 1), ("tokio", "Tokio", 2)]),
+        );
+        concepts_map.insert(
+            "session-c".to_string(),
+            make_concepts("session-c", &[("rust", "Rust", 1)]),
+        );
+
+        let related_min1 = find_related_sessions("session-a", &concepts_map, 1);
+        assert_eq!(related_min1.len(), 2, "Both b and c share ≥1 concept");
+
+        let related_min2 = find_related_sessions("session-a", &concepts_map, 2);
+        assert_eq!(related_min2.len(), 1, "Only b shares ≥2 concepts");
+        assert_eq!(related_min2[0].0, "session-b");
+
+        let related_min3 = find_related_sessions("session-a", &concepts_map, 3);
+        assert_eq!(related_min3.len(), 0, "No session shares ≥3 concepts");
+    }
 }
