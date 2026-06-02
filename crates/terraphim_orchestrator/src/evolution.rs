@@ -8,6 +8,9 @@ use terraphim_agent_evolution::{
     TaskId,
 };
 
+/// Manages per-agent evolution systems, providing memory, task tracking, and
+/// lesson capture. When the `evolution` feature is disabled all methods are
+/// no-ops so callers require no conditional compilation.
 #[derive(Debug)]
 pub struct EvolutionManager {
     #[cfg(feature = "evolution")]
@@ -17,15 +20,21 @@ pub struct EvolutionManager {
     enabled: bool,
 }
 
+/// A single agent output event to be recorded in the evolution memory store.
 #[derive(Debug)]
 pub struct EvolutionOutput {
+    /// Identifier of the agent that produced this output.
     pub agent_id: String,
+    /// The text content of the output event.
     pub content: String,
+    /// Classifier for the event: `"stdout"`, `"stderr"`, `"workflow"`, or `"lesson"`.
     pub event_type: String,
+    /// Priority of the event: `"critical"`, `"high"`, `"medium"`, or `"low"`.
     pub importance: String,
 }
 
 impl EvolutionManager {
+    /// Create a new `EvolutionManager` from the given configuration.
     pub fn new(config: EvolutionConfig) -> Self {
         let enabled = config.enabled;
         Self {
@@ -36,10 +45,12 @@ impl EvolutionManager {
         }
     }
 
+    /// Return `true` when evolution tracking is enabled by the configuration.
     pub fn is_enabled(&self) -> bool {
         self.enabled
     }
 
+    /// Ensure an evolution system exists for `agent_id`, creating one if absent.
     #[cfg(feature = "evolution")]
     pub fn ensure_agent(&mut self, agent_id: &str) {
         if !self.enabled {
@@ -50,9 +61,11 @@ impl EvolutionManager {
             .or_insert_with(|| AgentEvolutionSystem::new(agent_id.to_string()));
     }
 
+    /// No-op stub used when the `evolution` feature is disabled.
     #[cfg(not(feature = "evolution"))]
     pub fn ensure_agent(&mut self, _agent_id: &str) {}
 
+    /// Record an agent output event into the evolution memory store.
     #[cfg(feature = "evolution")]
     pub fn record_output(&mut self, output: EvolutionOutput) -> Result<(), String> {
         if !self.enabled {
@@ -94,11 +107,13 @@ impl EvolutionManager {
         .map_err(|e| format!("evolution record_output: {e}"))
     }
 
+    /// No-op stub used when the `evolution` feature is disabled.
     #[cfg(not(feature = "evolution"))]
     pub fn record_output(&mut self, _output: EvolutionOutput) -> Result<(), String> {
         Ok(())
     }
 
+    /// Record the start of a task for `agent_id` and return its generated task ID.
     #[cfg(feature = "evolution")]
     pub fn record_task_start(&mut self, agent_id: &str, task_content: &str) -> Option<TaskId> {
         if !self.enabled {
@@ -114,11 +129,13 @@ impl EvolutionManager {
         Some(task_id)
     }
 
+    /// No-op stub used when the `evolution` feature is disabled.
     #[cfg(not(feature = "evolution"))]
     pub fn record_task_start(&mut self, _agent_id: &str, _task_content: &str) -> Option<String> {
         None
     }
 
+    /// Mark a previously started task as complete and store its result string.
     #[cfg(feature = "evolution")]
     pub fn record_task_complete(
         &mut self,
@@ -141,6 +158,7 @@ impl EvolutionManager {
         .map_err(|e| format!("evolution record_task_complete: {e}"))
     }
 
+    /// No-op stub used when the `evolution` feature is disabled.
     #[cfg(not(feature = "evolution"))]
     pub fn record_task_complete(
         &mut self,
@@ -151,6 +169,7 @@ impl EvolutionManager {
         Ok(())
     }
 
+    /// Capture a structured lesson learned by an agent into the lessons store.
     #[cfg(feature = "evolution")]
     pub fn record_lesson(
         &mut self,
@@ -179,6 +198,7 @@ impl EvolutionManager {
         .map_err(|e| format!("evolution record_lesson: {e}"))
     }
 
+    /// No-op stub used when the `evolution` feature is disabled.
     #[cfg(not(feature = "evolution"))]
     pub fn record_lesson(
         &mut self,
@@ -191,6 +211,7 @@ impl EvolutionManager {
         Ok(())
     }
 
+    /// Persist the evolution state for `agent_id` and return the snapshot key, if any.
     #[cfg(feature = "evolution")]
     pub fn snapshot_on_exit(&mut self, agent_id: &str) -> Option<String> {
         if !self.enabled {
@@ -215,11 +236,14 @@ impl EvolutionManager {
         }
     }
 
+    /// No-op stub used when the `evolution` feature is disabled.
     #[cfg(not(feature = "evolution"))]
     pub fn snapshot_on_exit(&mut self, _agent_id: &str) -> Option<String> {
         None
     }
 
+    /// Build a markdown-formatted summary of the agent's evolution memory for
+    /// injection into an LLM prompt context, truncated to `max_memory_tokens`.
     #[cfg(feature = "evolution")]
     pub fn render_context(&self, agent_id: &str) -> String {
         if !self.enabled {
@@ -280,11 +304,14 @@ impl EvolutionManager {
         }
     }
 
+    /// No-op stub used when the `evolution` feature is disabled.
     #[cfg(not(feature = "evolution"))]
     pub fn render_context(&self, _agent_id: &str) -> String {
         String::new()
     }
 
+    /// Trigger memory consolidation for all registered agents and return the
+    /// number of agents that consolidated successfully.
     #[cfg(feature = "evolution")]
     pub fn consolidate_all(&mut self) -> usize {
         if !self.enabled {
@@ -303,6 +330,7 @@ impl EvolutionManager {
         count
     }
 
+    /// No-op stub used when the `evolution` feature is disabled.
     #[cfg(not(feature = "evolution"))]
     pub fn consolidate_all(&mut self) -> usize {
         0

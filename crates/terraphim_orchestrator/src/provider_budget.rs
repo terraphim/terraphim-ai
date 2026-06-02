@@ -55,13 +55,16 @@ pub struct WindowState {
 /// Serialisable snapshot of a single provider's two windows.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ProviderSnapshotEntry {
+    /// Hour-window state for this provider.
     pub hour: WindowState,
+    /// Day-window state for this provider.
     pub day: WindowState,
 }
 
 /// Serialisable snapshot of the whole tracker.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ProviderBudgetSnapshot {
+    /// Per-provider window state, keyed by provider id.
     pub providers: HashMap<String, ProviderSnapshotEntry>,
 }
 
@@ -261,6 +264,7 @@ impl ProviderBudgetTracker {
         self.configs.keys().map(|s| s.as_str())
     }
 
+    /// Returns `true` if no provider configs have been registered.
     pub fn is_empty(&self) -> bool {
         self.configs.is_empty()
     }

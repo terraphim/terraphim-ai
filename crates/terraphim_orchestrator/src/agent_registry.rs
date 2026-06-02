@@ -39,11 +39,14 @@ impl AgentScope {
 /// Stable key for a registered agent definition.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct AgentKey {
+    /// Scope that qualifies this agent (legacy or project-specific).
     pub scope: AgentScope,
+    /// Name of the agent as declared in the config.
     pub name: String,
 }
 
 impl AgentKey {
+    /// Construct a key from an explicit scope and name.
     pub fn new(scope: AgentScope, name: impl Into<String>) -> Self {
         Self {
             scope,
@@ -51,10 +54,12 @@ impl AgentKey {
         }
     }
 
+    /// Construct a project-scoped key from a project id and agent name.
     pub fn project(project: impl Into<String>, name: impl Into<String>) -> Self {
         Self::new(AgentScope::Project(project.into()), name)
     }
 
+    /// Construct a legacy (single-project) key from an agent name.
     pub fn legacy(name: impl Into<String>) -> Self {
         Self::new(AgentScope::Legacy, name)
     }
@@ -76,16 +81,21 @@ pub enum AgentSource {
 /// Registry entry for an agent definition.
 #[derive(Debug, Clone)]
 pub struct RegisteredAgent {
+    /// Stable lookup key for this agent within the registry.
     pub key: AgentKey,
+    /// Full agent definition as loaded from the merged config.
     pub definition: AgentDefinition,
+    /// Where this entry originated (always [`AgentSource::ConfigMerged`] for now).
     pub source: AgentSource,
 }
 
 impl RegisteredAgent {
+    /// Return the project id this agent belongs to, or `None` for legacy agents.
     pub fn project_id(&self) -> Option<&str> {
         self.definition.project.as_deref()
     }
 
+    /// Return `true` if this agent should only run in response to events, not on a schedule.
     pub fn event_only(&self) -> bool {
         self.definition.event_only
     }
@@ -138,6 +148,7 @@ impl AgentRegistry {
         self.by_key.len()
     }
 
+    /// Return `true` if no agents are registered.
     pub fn is_empty(&self) -> bool {
         self.by_key.is_empty()
     }

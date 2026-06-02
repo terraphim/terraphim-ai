@@ -1,3 +1,7 @@
+//! ADF (Agent Development Framework) binary entry point.
+//!
+//! Parses command-line arguments, loads the orchestrator configuration,
+//! and dispatches to the appropriate sub-command (run, validate, synthetic).
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::ExitCode;

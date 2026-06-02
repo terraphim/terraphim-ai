@@ -124,36 +124,54 @@ impl<T> From<mpsc::error::SendError<T>> for QuickwitError {
 pub enum OrchestratorEvent {
     /// Reviewer agent completed and a verdict was successfully parsed.
     PrReviewed {
+        /// Gitea pull-request number.
         pr_number: u64,
+        /// Project identifier owning the PR.
         project: String,
+        /// HEAD commit SHA at the time of review.
         head_sha: String,
+        /// Gitea login of the reviewer agent.
         reviewer_login: String,
         /// Confidence score 1-5 from the `structural-pr-review` comment.
         confidence: u8,
+        /// Number of P0 (blocker) findings in the review.
         p0_count: u32,
+        /// Number of P1 (major) findings in the review.
         p1_count: u32,
         /// `"GO"` | `"CONDITIONAL"` | `"NO-GO"`
         verdict: String,
     },
     /// AutoMerge handler merged the PR successfully.
     PrAutoMerged {
+        /// Gitea pull-request number.
         pr_number: u64,
+        /// Project identifier owning the PR.
         project: String,
+        /// Merge commit SHA produced by Gitea.
         merge_sha: String,
+        /// PR title at time of merge.
         title: String,
     },
     /// Post-merge test gate passed; the merge is stable.
     PrAutoMergedVerified {
+        /// Gitea pull-request number.
         pr_number: u64,
+        /// Project identifier owning the PR.
         project: String,
+        /// Merge commit SHA that passed the gate.
         merge_sha: String,
+        /// Wall-clock seconds from merge to gate completion.
         wall_time_secs: f64,
     },
     /// Post-merge test gate failed and the merge was reverted.
     PrAutoReverted {
+        /// Gitea pull-request number.
         pr_number: u64,
+        /// Project identifier owning the PR.
         project: String,
+        /// Merge commit SHA that was reverted.
         merge_sha: String,
+        /// Revert commit SHA.
         revert_sha: String,
         /// Classified failure kind (e.g. `"TestFailure"`, `"Timeout"`).
         reason: String,

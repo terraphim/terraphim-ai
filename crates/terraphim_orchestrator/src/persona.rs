@@ -111,10 +111,13 @@ const TEMPLATE_NAME: &str = "metaprompt";
 #[derive(Debug, thiserror::Error)]
 pub enum MetapromptRenderError {
     #[error("IO error: {0}")]
+    /// An I/O error occurred while reading a template file.
     Io(#[from] std::io::Error),
     #[error("Template compilation error: {0}")]
+    /// The Handlebars template failed to compile.
     Template(String),
     #[error("Template render error: {0}")]
+    /// The template rendered with an error (e.g. missing variable in strict mode).
     Render(String),
 }
 

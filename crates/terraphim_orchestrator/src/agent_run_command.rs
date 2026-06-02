@@ -31,6 +31,7 @@ fn parse_cron(expr: &str) -> Result<Schedule, OrchestratorError> {
         .map_err(|e| OrchestratorError::Config(format!("invalid cron '{}': {}", expr, e)))
 }
 
+/// Return all trigger modes applicable to the given agent definition.
 pub fn applicable_modes(agent: &AgentDefinition) -> Vec<TriggerMode> {
     let mut modes = vec![TriggerMode::Local];
     if agent.schedule.is_some() {
@@ -46,6 +47,7 @@ pub fn applicable_modes(agent: &AgentDefinition) -> Vec<TriggerMode> {
     modes
 }
 
+/// Return the cron schedule string for a named agent, if one is configured.
 pub fn schedule_for_agent(config: &OrchestratorConfig, agent_name: &str) -> Option<String> {
     config
         .agents
@@ -54,6 +56,7 @@ pub fn schedule_for_agent(config: &OrchestratorConfig, agent_name: &str) -> Opti
         .and_then(|a| a.schedule.clone())
 }
 
+/// Return `true` if the given cron expression can be parsed successfully.
 pub fn is_cron_schedule_valid(expr: &str) -> bool {
     parse_cron(expr).is_ok()
 }
@@ -119,6 +122,9 @@ fn validate_agent_mode(
     }
 }
 
+/// Validate an agent against all of its applicable trigger modes.
+///
+/// Returns the overall runtime validation report and a per-mode result map.
 pub fn validate_agent_all_modes(
     config: &OrchestratorConfig,
     agent: &AgentDefinition,
@@ -169,30 +175,48 @@ pub fn validate_agent_all_modes(
     (report, mode_results)
 }
 
+/// Parsed subcommand for the `agent` CLI entry-point.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AgentSubcommand {
+    /// Validate a single agent or all agents if no name is provided.
     Validate {
+        /// Name of the agent to validate, or `None` to validate all agents.
         agent_name: Option<String>,
+        /// Optional project context to restrict the validation scope.
         project: Option<String>,
+        /// Output format for the validation report.
         format: OutputFormat,
+        /// Skip the live model availability probe.
         skip_model_probe: bool,
     },
+    /// Validate all agents defined in an explicit config file.
     ValidateAll {
+        /// Path to the orchestrator configuration file.
         config: PathBuf,
+        /// Output format for the validation report.
         format: OutputFormat,
+        /// Skip the live model availability probe.
         skip_model_probe: bool,
     },
+    /// Run an agent with a synthetic trigger event for testing purposes.
     RunSynthetic {
+        /// Name of the agent to run.
         agent_name: String,
+        /// Optional project context for the run.
         project: Option<String>,
+        /// The synthetic event to inject as the trigger.
         event: SyntheticEvent,
+        /// Output format for the run report.
         format: OutputFormat,
     },
 }
 
+/// Output format for validation and run reports.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum OutputFormat {
+    /// Human-readable plain-text output.
     Human,
+    /// Machine-readable JSON output (default).
     #[default]
     Json,
 }
@@ -208,16 +232,27 @@ impl std::str::FromStr for OutputFormat {
     }
 }
 
+/// Aggregate report produced by `validate-all`, covering every configured agent.
 #[derive(Debug, Clone, Serialize)]
 pub struct AgentValidateAllReport {
+    /// Per-agent runtime validation reports, keyed by agent name.
     pub agents: HashMap<String, AgentRuntimeValidationReport>,
+    /// Per-agent, per-mode validation results, keyed by agent name then trigger mode.
     pub mode_results: HashMap<String, HashMap<TriggerMode, ModeResult>>,
+    /// Total number of agents validated.
     pub total: usize,
+    /// Number of agents that are fully runnable across all modes.
     pub runnable: usize,
+    /// Number of agents that failed validation in at least one mode.
     pub failed: usize,
+    /// `true` if every agent is runnable in all its applicable modes.
     pub all_modes_runnable: bool,
 }
 
+/// Parse CLI arguments into an `AgentSubcommand`.
+///
+/// Supports `validate`, `validate-all`, and `run` subcommands with their
+/// respective flags.
 pub fn parse_agent_args(args: &[String]) -> Result<AgentSubcommand, String> {
     let mut iter = args.iter();
     let mut subcommand: Option<String> = None;
@@ -329,6 +364,9 @@ pub fn parse_agent_args(args: &[String]) -> Result<AgentSubcommand, String> {
     }
 }
 
+/// Run the `validate` subcommand, printing a report and returning an exit code.
+///
+/// Validates a single named agent or all agents when `agent_name` is `None`.
 pub fn run_validate(
     config: &OrchestratorConfig,
     agent_name: Option<String>,
@@ -388,6 +426,9 @@ pub fn run_validate(
     }
 }
 
+/// Run the `validate-all` subcommand, loading config from `config` path.
+///
+/// Validates every agent defined in the file and prints an aggregate report.
 pub fn run_validate_all(
     config: PathBuf,
     format: OutputFormat,
@@ -431,6 +472,9 @@ pub fn run_validate_all(
     }
 }
 
+/// Run the `run` subcommand with a synthetic trigger event.
+///
+/// Currently not fully implemented; prints a stub report and returns exit code 1.
 pub fn run_synthetic(
     _config: &OrchestratorConfig,
     agent_name: &str,

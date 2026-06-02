@@ -398,11 +398,14 @@ impl KgRouter {
     }
 }
 
+/// Errors that can occur when loading or querying KG routing rules.
 #[derive(Debug, thiserror::Error)]
 pub enum KgRouterError {
     #[error("taxonomy directory not found: {0}")]
+    /// The taxonomy directory path does not exist or is not accessible.
     TaxonomyNotFound(String),
     #[error("failed to parse taxonomy: {0}")]
+    /// A taxonomy file could not be parsed as valid YAML or JSON.
     ParseError(String),
 }
 

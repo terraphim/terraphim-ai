@@ -2,17 +2,24 @@ use std::path::{Path, PathBuf};
 
 use terraphim_spawner::SpawnContext;
 
+/// Configuration for locally discovered skills in a project.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LocalSkillConfig {
+    /// Absolute path to the `.terraphim/skills` directory within the project.
     pub skills_dir: PathBuf,
 }
 
+/// CLI tools that have native skill directory support.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum SupportedSkillCli {
+    /// The `opencode` CLI, which uses `.opencode/skill/`.
     Opencode,
+    /// The `claude` / `claude-code` CLI, which uses `.claude/skills/`.
     Claude,
 }
 
+/// Discover a `.terraphim/skills` directory beneath `project_root`.
+/// Returns `None` when no such directory exists.
 pub fn discover_local_skills(project_root: &Path) -> Option<LocalSkillConfig> {
     let skills_dir = project_root.join(".terraphim/skills");
     skills_dir
@@ -20,6 +27,8 @@ pub fn discover_local_skills(project_root: &Path) -> Option<LocalSkillConfig> {
         .then_some(LocalSkillConfig { skills_dir })
 }
 
+/// Identify whether `cli_tool` (a path or bare name) corresponds to a
+/// supported skill CLI. Returns `None` for unknown tools.
 pub fn detect_skill_cli(cli_tool: &str) -> Option<SupportedSkillCli> {
     match cli_name(cli_tool) {
         "opencode" => Some(SupportedSkillCli::Opencode),
@@ -28,6 +37,10 @@ pub fn detect_skill_cli(cli_tool: &str) -> Option<SupportedSkillCli> {
     }
 }
 
+/// Configure `ctx` so that local skills from `project_root` are visible to
+/// `cli_tool`. Creates a native skill symlink when the CLI is recognised, and
+/// always sets the `TERRAPHIM_LOCAL_SKILLS_DIR` environment variable.
+/// Returns `ctx` unchanged when no skills directory is found.
 pub fn prepare_local_skill_loading(
     cli_tool: &str,
     project_root: &Path,

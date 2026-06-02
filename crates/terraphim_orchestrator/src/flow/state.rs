@@ -6,22 +6,34 @@ use uuid::Uuid;
 
 use super::envelope::{MatrixResult, StepEnvelope};
 
+/// Runtime state of a single flow execution, persisted across steps.
+///
+/// Holds the current progress, accumulated step outputs, and any error
+/// information so that a flow run can be resumed or inspected after a restart.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FlowRunState {
+    /// Human-readable name of the flow being executed.
     pub flow_name: String,
+    /// Unique identifier for this execution instance, used in filenames and logs.
     pub correlation_id: Uuid,
+    /// Current lifecycle status of the flow run.
     pub status: FlowRunStatus,
+    /// Wall-clock time at which this flow run began.
     pub started_at: DateTime<Utc>,
+    /// Wall-clock time at which this flow run ended, or `None` if still running.
     pub finished_at: Option<DateTime<Utc>>,
+    /// Index into the steps list indicating which step will execute next.
     pub next_step_index: usize,
     /// Optional issue id supplied by local flow context.
     #[serde(default)]
     pub issue: Option<String>,
+    /// Ordered list of envelopes produced by completed sequential steps.
     pub step_envelopes: Vec<StepEnvelope>,
     /// Results from matrix-expanded steps. Key is step name; value is the
     /// ordered list of sub-execution envelopes (one per matrix params row).
     #[serde(default)]
     pub matrix_envelopes: HashMap<String, Vec<StepEnvelope>>,
+    /// Error message recorded when the flow transitions to `Failed`.
     #[serde(default)]
     pub error: Option<String>,
     /// Current iteration count for re-iteration loops.
@@ -30,17 +42,24 @@ pub struct FlowRunState {
     pub iteration_count: u32,
 }
 
+/// Lifecycle status of a flow execution.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum FlowRunStatus {
+    /// The flow is actively executing steps.
     Running,
+    /// The flow has been suspended and is awaiting resumption.
     Paused,
+    /// All steps finished successfully.
     Completed,
+    /// The flow stopped due to an error or a failing gate.
     Failed,
+    /// The flow was cancelled before completing.
     Aborted,
 }
 
 impl FlowRunState {
+    /// Create a new flow run state with `Running` status and zeroed counters.
     pub fn new(flow_name: &str) -> Self {
         Self {
             flow_name: flow_name.to_string(),
@@ -57,11 +76,13 @@ impl FlowRunState {
         }
     }
 
+    /// Attach a Gitea issue identifier to this flow run and return `self`.
     pub fn with_issue(mut self, issue: String) -> Self {
         self.issue = Some(issue);
         self
     }
 
+    /// Construct a flow run state that is already in the `Failed` state with the given reason.
     pub fn failed(flow_name: &str, reason: &str) -> Self {
         let mut state = Self::new(flow_name);
         state.status = FlowRunStatus::Failed;
@@ -70,6 +91,7 @@ impl FlowRunState {
         state
     }
 
+    /// Look up the envelope produced by the sequential step named `step_name`.
     pub fn step_output(&self, step_name: &str) -> Option<&StepEnvelope> {
         self.step_envelopes
             .iter()
@@ -84,6 +106,10 @@ impl FlowRunState {
             .map(|envelopes| MatrixResult::from_envelopes(envelopes))
     }
 
+    /// Atomically serialise this state to a JSON file inside `dir` and return the path.
+    ///
+    /// The filename encodes both the flow name and the correlation id so that
+    /// multiple concurrent runs do not collide.
     pub fn save_to_file(&self, dir: &Path) -> std::io::Result<PathBuf> {
         std::fs::create_dir_all(dir)?;
         let filename = format!("flow-{}-{}.json", self.flow_name, self.correlation_id);
@@ -95,6 +121,7 @@ impl FlowRunState {
         Ok(path)
     }
 
+    /// Deserialise a flow run state from the JSON file at `path`.
     pub fn load_from_file(path: &Path) -> std::io::Result<Self> {
         let json = std::fs::read_to_string(path)?;
         serde_json::from_str(&json)

@@ -31,40 +31,53 @@
 
 pub mod adf_commands;
 pub mod agent_registry;
+/// CLI subcommands and helpers for running and validating agents.
 pub mod agent_run_command;
 pub mod agent_run_record;
+/// Background task runner that spawns and supervises individual agents.
 pub mod agent_runner;
+/// Compound (multi-agent) review workflow coordination.
 pub mod compound;
 pub mod concurrency;
+/// Orchestrator configuration types and loading utilities.
 pub mod config;
 pub mod control_plane;
+/// Budget tracking and spend enforcement for agent API calls.
 pub mod cost_tracker;
 #[cfg(unix)]
 pub mod direct_dispatch;
 pub mod dispatcher;
 pub mod dual_mode;
+/// Orchestrator-level error types.
 pub mod error;
 pub mod error_signatures;
+/// Agent evolution and self-improvement mechanisms.
 pub mod evolution;
+/// Workflow flow-control primitives (gates, barriers, forks).
 pub mod flow;
 pub mod gitea_skill_loader;
+/// Inter-agent state handoff with TTL management.
 pub mod handoff;
 pub mod kg_router;
 pub mod learning;
+/// Locally-cached skill content loader.
 pub mod local_skills;
 pub mod mention;
 pub mod mention_chain;
 pub mod meta_coordinator;
 pub mod metrics_persistence;
 pub mod mode;
+/// Drift detection and rate-limiting monitor (Nightwatch).
 pub mod nightwatch;
 pub mod output_poster;
+/// Agent persona definitions used in compound review swarms.
 pub mod persona;
 pub mod post_merge_gate;
 pub mod pr_dispatch;
 pub mod pr_gate;
 pub mod pr_poller;
 pub mod pr_review;
+/// ADF (AI Dark Factory) project-level orchestration logic.
 pub mod project_adf;
 pub mod project_control;
 pub mod provider_budget;
@@ -74,7 +87,9 @@ pub mod quickwit;
 #[cfg(feature = "quickwit")]
 pub mod quickwit_bulk;
 pub mod rate_limiter;
+/// Time-based and event-driven task scheduling.
 pub mod scheduler;
+/// Scope definitions that constrain where agents may operate.
 pub mod scope;
 pub mod webhook;
 pub mod worktree_guard;
@@ -163,12 +178,19 @@ pub enum PreCheckResult {
 /// Status of a single agent in the fleet.
 #[derive(Debug, Clone)]
 pub struct AgentStatus {
+    /// Human-readable name identifying this agent.
     pub name: String,
+    /// Architectural layer this agent belongs to.
     pub layer: AgentLayer,
+    /// Whether the agent process is currently active.
     pub running: bool,
+    /// Current health classification of the agent.
     pub health: HealthStatus,
+    /// Optional drift score indicating deviation from expected behaviour.
     pub drift_score: Option<f64>,
+    /// Elapsed time since the agent was last started.
     pub uptime: Duration,
+    /// Number of times this agent has been restarted.
     pub restart_count: u32,
     /// API calls remaining per provider (None if no limit known).
     pub api_calls_remaining: HashMap<String, Option<u32>>,
@@ -274,7 +296,8 @@ pub struct AgentOrchestrator {
     active_flows: HashMap<String, tokio::task::JoinHandle<flow::state::FlowRunState>>,
     /// Active compound review execution (spawned in background to avoid
     /// blocking reconcile_tick). None when no compound review is running.
-    active_compound_review: Option<tokio::task::JoinHandle<Result<CompoundReviewResult, OrchestratorError>>>,
+    active_compound_review:
+        Option<tokio::task::JoinHandle<Result<CompoundReviewResult, OrchestratorError>>>,
     /// Per-project mention cursors, keyed by project id.
     ///
     /// Each project gets its own cursor so repo-wide polls can advance
@@ -1694,11 +1717,13 @@ impl AgentOrchestrator {
         &mut self.cost_tracker
     }
 
+    /// Set the Quickwit fleet sink used to forward log events.
     #[cfg(feature = "quickwit")]
     pub fn set_quickwit_sink(&mut self, sink: quickwit::QuickwitFleetSink) {
         self.quickwit_sink = Some(sink);
     }
 
+    /// Return the top-level Quickwit configuration if present.
     #[cfg(feature = "quickwit")]
     pub fn quickwit_config(&self) -> Option<&QuickwitConfig> {
         self.config.quickwit.as_ref()
@@ -6208,14 +6233,12 @@ impl AgentOrchestrator {
         if elapsed > std::time::Duration::from_secs(5) {
             warn!(
                 tick = self.tick_count,
-                elapsed_ms,
-                "reconcile_tick SLOW: took > 5s, likely blocking agent polling"
+                elapsed_ms, "reconcile_tick SLOW: took > 5s, likely blocking agent polling"
             );
         } else {
             info!(
                 tick = self.tick_count,
-                elapsed_ms,
-                "reconcile_tick complete"
+                elapsed_ms, "reconcile_tick complete"
             );
         }
     }
@@ -8036,9 +8059,7 @@ Remove the pause flag once the underlying failure is resolved:\n\n\
                 let git_ref = "HEAD".to_string();
                 let base_ref = self.config.compound_review.base_branch.clone();
                 let workflow = self.compound_workflow.clone();
-                let handle = tokio::spawn(async move {
-                    workflow.run(&git_ref, &base_ref).await
-                });
+                let handle = tokio::spawn(async move { workflow.run(&git_ref, &base_ref).await });
                 self.active_compound_review = Some(handle);
             }
             ScheduleEvent::Flow(flow_def) => {

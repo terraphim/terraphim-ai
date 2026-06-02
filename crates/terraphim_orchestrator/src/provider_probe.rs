@@ -16,12 +16,19 @@ use crate::rate_limiter::RateLimiter;
 /// Result of probing a single provider+model combination.
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct ProbeResult {
+    /// Provider name (e.g. `"kimi"`, `"minimax"`).
     pub provider: String,
+    /// Model identifier as used in routing rules (e.g. `"kimi-for-coding/k2p5"`).
     pub model: String,
+    /// Base name of the CLI tool that executed the probe (e.g. `"opencode"`).
     pub cli_tool: String,
+    /// Outcome of the probe attempt.
     pub status: ProbeStatus,
+    /// Round-trip latency in milliseconds, absent when the process failed to spawn.
     pub latency_ms: Option<u64>,
+    /// Human-readable error description when `status` is not `Success`.
     pub error: Option<String>,
+    /// RFC 3339 timestamp of when the probe was executed.
     pub timestamp: String,
 }
 
@@ -29,9 +36,13 @@ pub struct ProbeResult {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ProbeStatus {
+    /// The probe command exited successfully and produced token-bearing output.
     Success,
+    /// The probe command exited with a non-zero status or produced no token content.
     Error,
+    /// The probe command did not complete within the allotted 15 seconds.
     Timeout,
+    /// The provider responded with a rate-limit signal.
     RateLimited,
 }
 
@@ -74,11 +85,13 @@ impl ProviderHealthMap {
         }
     }
 
+    /// Attach a shared [`RateLimiter`] that gates per-provider probe frequency.
     pub fn with_rate_limiter(mut self, rate_limiter: RateLimiter) -> Self {
         self.rate_limiter = Some(rate_limiter);
         self
     }
 
+    /// Return `true` when `provider` is currently marked as rate-limited.
     pub fn is_rate_limited(&self, provider: &str) -> bool {
         self.rate_limited.contains(provider)
     }
@@ -724,6 +737,7 @@ async fn probe_single(
 }
 
 impl ProviderHealthMap {
+    /// Ship the latest probe results to a Quickwit index via `sink`.
     pub async fn send_to_quickwit(
         &self,
         sink: &crate::quickwit::QuickwitFleetSink,

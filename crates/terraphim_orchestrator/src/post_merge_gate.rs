@@ -161,8 +161,10 @@ pub struct FailureClassification {
 /// Errors produced while running or reverting on the gate.
 #[derive(Debug, thiserror::Error)]
 pub enum GateError {
+    /// A subprocess command failed with an I/O error or timed out.
     #[error("command error: {0}")]
     Command(#[from] CommandError),
+    /// The `git revert` step or its subsequent push failed.
     #[error("revert failed: {0}")]
     Revert(String),
 }
@@ -429,8 +431,11 @@ async fn tail_stream<R: AsyncRead + Unpin>(reader: R, max_lines: usize) -> Strin
 /// assert the handler invoked the expected commands in the expected order.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CallRecord {
+    /// The executable name that was passed to `run` (e.g. `"cargo"` or `"git"`).
     pub cmd: String,
+    /// The argument list that was passed alongside `cmd`.
     pub args: Vec<String>,
+    /// The working directory in which the command was executed.
     pub cwd: PathBuf,
 }
 
@@ -444,10 +449,12 @@ pub struct ScriptedRunner {
 }
 
 impl ScriptedRunner {
+    /// Create a new empty [`ScriptedRunner`] with no queued responses.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Enqueue a successful response with the given exit code and output text.
     pub fn push_ok(&self, code: i32, stdout: &str, stderr: &str) {
         self.responses.lock().unwrap().push_back(Ok(CommandOutput {
             exit_code: Some(code),
@@ -457,10 +464,12 @@ impl ScriptedRunner {
         }));
     }
 
+    /// Enqueue an error response that will be returned on the next `run` call.
     pub fn push_err(&self, err: CommandError) {
         self.responses.lock().unwrap().push_back(Err(err));
     }
 
+    /// Return a snapshot of all recorded [`CallRecord`]s in invocation order.
     pub fn calls(&self) -> Vec<CallRecord> {
         self.calls.lock().unwrap().clone()
     }

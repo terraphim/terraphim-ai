@@ -28,14 +28,21 @@ static MENTION_RE: LazyLock<Regex> = LazyLock::new(|| {
 /// How a mention was resolved.
 #[derive(Debug, Clone, PartialEq)]
 pub enum MentionResolution {
+    /// The mention resolved to a known agent name.
     AgentName,
-    PersonaName { persona: String },
+    /// The mention resolved to a persona, with the persona name captured.
+    PersonaName {
+        /// Name of the persona the mention resolved to.
+        persona: String,
+    },
 }
 
 /// Parsed tokens of a single `@adf:[project/]name` mention.
 #[derive(Debug, Clone, PartialEq)]
 pub struct MentionTokens {
+    /// Optional project prefix extracted from a qualified `@adf:<project>/<name>` mention.
     pub project: Option<String>,
+    /// Bare agent or persona name from the mention.
     pub agent: String,
 }
 
@@ -61,13 +68,21 @@ pub fn parse_mention_tokens(text: &str) -> Vec<MentionTokens> {
 /// A detected and resolved mention.
 #[derive(Debug, Clone)]
 pub struct DetectedMention {
+    /// Gitea issue number the comment belongs to.
     pub issue_number: u64,
+    /// Gitea comment ID.
     pub comment_id: u64,
+    /// Raw agent or persona string from the `@adf:` mention.
     pub raw_mention: String,
+    /// Resolved agent name (after persona lookup if needed).
     pub agent_name: String,
+    /// How the mention was resolved (direct agent name or via persona).
     pub resolution: MentionResolution,
+    /// Full body of the comment containing the mention.
     pub comment_body: String,
+    /// Login of the user who posted the mention.
     pub mentioner: String,
+    /// RFC 3339 timestamp of the comment.
     pub timestamp: String,
     /// Project id the mention was detected in.
     ///
@@ -162,6 +177,10 @@ impl MentionCursor {
         format!("adf/mention_cursor/{}", project_id)
     }
 
+    /// Load from persistence or create a "now" cursor for `project_id`.
+    ///
+    /// On first run (no persisted cursor), returns a cursor set to the current
+    /// time, effectively skipping all historical mentions.
     pub async fn load_or_now(project_id: &str) -> Self {
         let key = Self::cursor_key(project_id);
 
@@ -550,6 +569,7 @@ pub struct MentionTracker {
 }
 
 impl MentionTracker {
+    /// Create a new tracker with the given per-issue dispatch limit.
     pub fn new(max_dispatches_per_issue: u32) -> Self {
         Self {
             max_dispatches_per_issue,
