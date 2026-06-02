@@ -11,15 +11,6 @@ exclude = [
     # terraphim-config-persistence crates were extracted to the standalone
     # terraphim-config-persistence repo and are consumed from the registry (E2, #1910).
     # terraphim-service crates: consumed from the `terraphim` registry (E3, #1910).
-    "crates/haystack_core",
-    "crates/haystack_grepapp",
-    "crates/haystack_jmap",
-    "crates/terraphim_ccusage",
-    "crates/terraphim_file_search",
-    "crates/terraphim_middleware",
-    "crates/terraphim_router",
-    "crates/terraphim_service",
-    "crates/terraphim_usage",
     # Experimental crates
     "crates/terraphim_agent_application",
     "crates/terraphim_truthforge",
