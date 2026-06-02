@@ -8,7 +8,10 @@ homepage = "https://terraphim.ai"
 repository = "https://github.com/terraphim/terraphim-ai"
 keywords = ["ai", "multi-agent", "roles", "genai"]
 license = "MIT"
-publish = false
+# Restrict publishing to the private Terraphim registry (was `false`; the
+# polyrepo split (Gitea #1910) requires this crate on the terraphim registry,
+# but it must never go to crates.io).
+publish = ["terraphim"]
 readme = "../../README.md"
 
 [features]
