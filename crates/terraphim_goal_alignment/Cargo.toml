@@ -16,7 +16,7 @@ readme = "../../README.md"
 terraphim_types = { version = "1.0.0", registry = "terraphim" }
 terraphim_automata = { version = "1.19.2", registry = "terraphim" }
 terraphim_rolegraph = { version = "1.0.0", registry = "terraphim" }
-terraphim_agent_registry = { path = "../terraphim_agent_registry", version = "1.19.2" }
+terraphim_agent_registry = { path = "../terraphim_agent_registry", version = "1.19.2", registry = "terraphim" }
 
 # Core async runtime and utilities
 tokio = { workspace = true }
