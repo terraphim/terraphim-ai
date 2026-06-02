@@ -579,12 +579,15 @@ pub trait RunRecordPersistence: Send + Sync {
 #[derive(Debug, thiserror::Error)]
 pub enum RunRecordError {
     #[error("storage error: {0}")]
+    /// A low-level storage backend error.
     Storage(String),
 
     #[error("serialization error: {0}")]
+    /// JSON serialisation or deserialisation failed.
     Serialization(#[from] serde_json::Error),
 
     #[error("IO error: {0}")]
+    /// An I/O error occurred during persistence.
     Io(#[from] std::io::Error),
 }
 

@@ -59,15 +59,30 @@ pub enum MultiAgentError {
 
     /// Token limit exceeded
     #[error("Token limit exceeded: {current}/{limit}")]
-    TokenLimitExceeded { current: u64, limit: u64 },
+    TokenLimitExceeded {
+        /// Actual token count that triggered the limit
+        current: u64,
+        /// Maximum allowed token count
+        limit: u64,
+    },
 
     /// Budget limit exceeded
     #[error("Budget limit exceeded: ${current:.2}/${limit:.2}")]
-    BudgetLimitExceeded { current: f64, limit: f64 },
+    BudgetLimitExceeded {
+        /// Current spend in USD
+        current: f64,
+        /// Maximum budget in USD
+        limit: f64,
+    },
 
     /// Rate limit exceeded
     #[error("Rate limit exceeded: {requests} requests in {window_seconds}s")]
-    RateLimitExceeded { requests: u64, window_seconds: u64 },
+    RateLimitExceeded {
+        /// Number of requests made in the window
+        requests: u64,
+        /// Length of the rate-limit window in seconds
+        window_seconds: u64,
+    },
 
     /// Configuration error
     #[error("Configuration error: {0}")]
@@ -91,7 +106,10 @@ pub enum MultiAgentError {
 
     /// Timeout error
     #[error("Operation timed out after {seconds}s")]
-    Timeout { seconds: u64 },
+    Timeout {
+        /// Number of seconds after which the operation was cancelled
+        seconds: u64,
+    },
 
     /// Session not found
     #[error("Session with ID {0} not found")]

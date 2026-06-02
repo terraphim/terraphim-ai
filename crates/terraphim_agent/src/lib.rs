@@ -5,7 +5,9 @@
 //! Feature flags gate heavier subsystems: `server`, `repl`, `shared-learning`.
 #[cfg(feature = "server")]
 pub mod client;
+/// Onboarding workflow for first-run setup and guided configuration.
 pub mod onboarding;
+/// Service layer wrapping TerraphimService for use by the TUI and robot mode.
 pub mod service;
 #[cfg(feature = "shared-learning")]
 pub mod shared_learning;

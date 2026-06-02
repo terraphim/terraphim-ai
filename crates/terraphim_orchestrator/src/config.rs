@@ -11,15 +11,23 @@ pub enum PreCheckStrategy {
     Always,
     /// Check git diff between last recorded commit and HEAD.
     /// Only spawn if changed files match watch_paths prefixes.
-    GitDiff { watch_paths: Vec<String> },
+    GitDiff {
+        /// Path prefixes to watch; the agent spawns only when a diff touches at least one.
+        watch_paths: Vec<String>,
+    },
     /// Query latest comments on a Gitea issue. Skip if PASS verdict
     /// and no new commits since.
-    GiteaIssue { issue_number: u64 },
+    GiteaIssue {
+        /// Gitea issue number to inspect for a recent PASS verdict.
+        issue_number: u64,
+    },
     /// Run an arbitrary shell command via sh -c.
     /// Exit 0 + non-empty stdout = Findings; Exit 0 + empty stdout = NoFindings;
     /// Non-zero exit or timeout = Failed (fail-open).
     Shell {
+        /// Shell script body passed to `sh -c`.
         script: String,
+        /// Maximum wall-clock seconds before the script is considered Failed.
         #[serde(default = "default_pre_check_timeout")]
         timeout_secs: u64,
     },
@@ -349,16 +357,22 @@ impl PrDispatchConfig {
 /// prompts at spawn time and records exit outcomes as validation evidence.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LearningConfig {
+    /// Whether the shared learning system is active for this fleet.
     #[serde(default)]
     pub enabled: bool,
+    /// Minimum trust level (`L1`–`L4`) of learnings to inject into prompts.
     #[serde(default = "default_learning_min_trust")]
     pub min_trust: String,
+    /// Maximum token budget for injected learnings per agent spawn.
     #[serde(default = "default_learning_max_tokens")]
     pub max_tokens: usize,
+    /// Maximum number of learning entries to inject per agent spawn.
     #[serde(default = "default_learning_max_entries")]
     pub max_entries: usize,
+    /// Days after which a learning entry is archived and no longer injected.
     #[serde(default = "default_learning_archive_days")]
     pub archive_days: u32,
+    /// Number of reconcile ticks between learning consolidation passes.
     #[serde(default = "default_learning_consolidation_ticks")]
     pub consolidation_ticks: u64,
 }
@@ -396,14 +410,22 @@ impl Default for LearningConfig {
     }
 }
 
+/// Configuration for agent evolution and memory consolidation.
+///
+/// Controls how the orchestrator manages per-agent memory snapshots and
+/// the periodic consolidation of those snapshots into compact summaries.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EvolutionConfig {
+    /// Whether agent evolution and memory consolidation are active.
     #[serde(default)]
     pub enabled: bool,
+    /// Maximum token budget for the memory injected into each agent prompt.
     #[serde(default = "default_evolution_max_memory_tokens")]
     pub max_memory_tokens: usize,
+    /// Maximum number of memory snapshots retained per agent before pruning.
     #[serde(default = "default_evolution_max_snapshots")]
     pub max_snapshots_per_agent: usize,
+    /// Number of reconcile ticks between memory consolidation passes.
     #[serde(default = "default_evolution_consolidation_ticks")]
     pub consolidation_interval_ticks: u64,
 }
@@ -517,10 +539,13 @@ fn default_true_routing() -> bool {
 /// Configuration for posting agent output to Gitea issues.
 #[derive(Clone, Serialize, Deserialize)]
 pub struct GiteaOutputConfig {
+    /// Base URL of the Gitea instance (e.g. `https://git.example.com`).
     pub base_url: String,
     /// Gitea API token. Redacted in `Debug` output.
     pub token: String,
+    /// Gitea organisation or user that owns the target repository.
     pub owner: String,
+    /// Name of the Gitea repository where agent output is posted.
     pub repo: String,
     /// Path to JSON file mapping agent names to Gitea API tokens.
     /// When present, agents post comments under their own Gitea user.
@@ -708,7 +733,9 @@ fn default_quickwit_use_es_bulk() -> bool {
 /// Lightweight reference to an SFIA skill code and level.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SfiaSkillRef {
+    /// Four-letter SFIA skill code (e.g. `SWDN`, `TEST`).
     pub code: String,
+    /// SFIA responsibility level (1–7).
     pub level: u8,
 }
 

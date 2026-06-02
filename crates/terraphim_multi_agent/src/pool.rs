@@ -18,14 +18,20 @@ use crate::{
 /// Load metrics for an agent in the pool
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LoadMetrics {
+    /// Number of commands currently being processed
     pub active_commands: u32,
+    /// Number of commands waiting to be picked up
     pub queue_length: u32,
+    /// Exponential moving average of response time in milliseconds
     pub average_response_time_ms: f64,
+    /// Rolling success rate between 0.0 and 1.0
     pub success_rate: f64,
+    /// UTC timestamp when these metrics were last refreshed
     pub last_updated: DateTime<Utc>,
 }
 
 impl LoadMetrics {
+    /// Create a new `LoadMetrics` with zero counters and a 100% success rate.
     pub fn new() -> Self {
         Self {
             active_commands: 0,
@@ -178,13 +184,21 @@ pub struct AgentPool {
 /// Pool statistics for monitoring
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PoolStats {
+    /// Cumulative number of agents ever created by this pool
     pub total_agents_created: u64,
+    /// Cumulative number of agents removed and destroyed by this pool
     pub total_agents_destroyed: u64,
+    /// Cumulative number of operations processed across all agents
     pub total_operations_processed: u64,
+    /// Current number of agents in the available queue
     pub current_pool_size: usize,
+    /// Current number of agents with active operations
     pub current_busy_agents: usize,
+    /// Exponential moving average of operation duration in milliseconds
     pub average_operation_time_ms: f64,
+    /// Ratio of pool-cache hits (agent reused) to total acquisitions
     pub pool_hit_rate: f64,
+    /// UTC timestamp when these stats were last refreshed
     pub last_updated: DateTime<Utc>,
 }
 

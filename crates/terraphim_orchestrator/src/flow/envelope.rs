@@ -17,6 +17,7 @@ pub struct MatrixResult {
 }
 
 impl MatrixResult {
+    /// Compute aggregate success/failure counts and exit code list from a slice of envelopes.
     pub fn from_envelopes(envelopes: &[StepEnvelope]) -> Self {
         let success_count = envelopes.iter().filter(|e| e.exit_code == 0).count();
         let failure_count = envelopes.len() - success_count;
@@ -33,21 +34,35 @@ impl MatrixResult {
     }
 }
 
+/// Execution record for a single completed ADF step.
+///
+/// Produced by the step runner after each command exits and consumed by
+/// downstream template rendering and matrix aggregation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StepEnvelope {
+    /// Logical name of the step as declared in the workflow definition.
     pub step_name: String,
+    /// UTC timestamp when the step started executing.
     pub started_at: DateTime<Utc>,
+    /// UTC timestamp when the step finished executing.
     pub finished_at: DateTime<Utc>,
+    /// Process exit code; 0 indicates success.
     pub exit_code: i32,
+    /// Captured standard output of the step process (may be truncated).
     pub stdout: String,
+    /// Captured standard error of the step process (may be truncated).
     pub stderr: String,
     #[serde(default)]
+    /// Approximate cost in US dollars consumed by any LLM calls made during this step.
     pub cost_usd: Option<f64>,
     #[serde(default)]
+    /// Session identifier returned by the LLM provider, if applicable.
     pub session_id: Option<String>,
     #[serde(default)]
+    /// Number of input/prompt tokens consumed by LLM calls in this step.
     pub input_tokens: Option<u64>,
     #[serde(default)]
+    /// Number of output/completion tokens produced by LLM calls in this step.
     pub output_tokens: Option<u64>,
     /// Path to temp file containing stdout (for downstream action steps).
     #[serde(default)]

@@ -39,6 +39,7 @@ struct MiniMaxModelRemains {
     plan: Option<String>,
 }
 
+/// Usage provider for the MiniMax subscription platform (global and CN regions).
 pub struct MiniMaxProvider {
     api_key: Option<String>,
     cn_api_key: Option<String>,
@@ -46,6 +47,8 @@ pub struct MiniMaxProvider {
 }
 
 impl MiniMaxProvider {
+    /// Creates a new `MiniMaxProvider`, reading keys from `MINIMAX_API_KEY`/`MINIMAX_API_TOKEN`
+    /// and `MINIMAX_CN_API_KEY` environment variables.
     pub fn new() -> Self {
         Self {
             api_key: std::env::var("MINIMAX_API_KEY")
@@ -59,6 +62,7 @@ impl MiniMaxProvider {
         }
     }
 
+    /// Creates a `MiniMaxProvider` with an explicit global-region API key.
     pub fn with_api_key(api_key: String) -> Self {
         Self {
             api_key: Some(api_key),

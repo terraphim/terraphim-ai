@@ -10,6 +10,10 @@ use terraphim_settings::{DeviceSettings, Error as DeviceSettingsError};
 use terraphim_types::{Document, Layer, NormalizedTermValue, RoleName, SearchQuery, Thesaurus};
 use tokio::sync::Mutex;
 
+/// High-level TUI service that wraps `TerraphimService` and `ConfigState`.
+///
+/// Provides async methods for search, role management, knowledge graph access,
+/// and optional LLM features consumed by both the interactive REPL and robot mode.
 #[derive(Clone)]
 pub struct TuiService {
     config_state: ConfigState,
@@ -898,24 +902,34 @@ impl TuiService {
 /// Result of connectivity check
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct ConnectivityResult {
+    /// Whether all matched terms are connected by a single path.
     pub connected: bool,
+    /// The terms from the knowledge graph that were matched in the text.
     pub matched_terms: Vec<String>,
+    /// Human-readable summary of the connectivity result.
     pub message: String,
 }
 
 /// Fuzzy suggestion result
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct FuzzySuggestion {
+    /// The suggested term from the thesaurus.
     pub term: String,
+    /// Jaro-Winkler similarity score between the query and this term.
     pub similarity: f64,
 }
 
 /// Checklist validation result
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct ChecklistResult {
+    /// Name of the checklist that was validated (e.g., `"code_review"`, `"security"`).
     pub checklist_name: String,
+    /// Whether all checklist categories were satisfied.
     pub passed: bool,
+    /// Total number of categories checked.
     pub total_items: usize,
+    /// Categories that were found in the text.
     pub satisfied: Vec<String>,
+    /// Categories that were not found in the text.
     pub missing: Vec<String>,
 }

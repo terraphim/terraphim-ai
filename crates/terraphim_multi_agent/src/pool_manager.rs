@@ -44,10 +44,15 @@ impl Default for PoolManagerConfig {
 /// Pool information for management
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PoolInfo {
+    /// Name of the role this pool serves
     pub role_name: String,
+    /// UTC timestamp when the pool was created
     pub created_at: DateTime<Utc>,
+    /// UTC timestamp of the most recent pool access
     pub last_used: DateTime<Utc>,
+    /// Current snapshot of pool statistics
     pub stats: PoolStats,
+    /// Whether the pool is still running and accepting requests
     pub is_active: bool,
 }
 
@@ -70,12 +75,19 @@ pub struct PoolManager {
 /// Global statistics across all pools
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GlobalStats {
+    /// Number of active pools currently managed
     pub total_pools: usize,
+    /// Total number of agents across all pools
     pub total_agents: usize,
+    /// Cumulative number of operations processed across all pools
     pub total_operations: u64,
+    /// Exponential moving average of operation duration in milliseconds across all pools
     pub average_operation_time_ms: f64,
+    /// Total number of times an existing pool was reused for a role
     pub total_pool_hits: u64,
+    /// Total number of times a new pool was created for a role
     pub total_pool_misses: u64,
+    /// UTC timestamp when these statistics were last refreshed
     pub last_updated: DateTime<Utc>,
 }
 

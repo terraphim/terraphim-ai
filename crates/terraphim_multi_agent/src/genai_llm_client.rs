@@ -23,28 +23,33 @@ pub struct GenAiLlmClient {
 /// Configuration for different LLM providers
 #[derive(Debug, Clone)]
 pub struct ProviderConfig {
+    /// Model name to use for this provider
     pub model: String,
 }
 
 impl ProviderConfig {
+    /// Create an Ollama provider configuration, defaulting to `gemma3:270m`.
     pub fn ollama(model: Option<String>) -> Self {
         Self {
             model: model.unwrap_or_else(|| "gemma3:270m".to_string()),
         }
     }
 
+    /// Create an OpenAI provider configuration, defaulting to `gpt-3.5-turbo`.
     pub fn openai(model: Option<String>) -> Self {
         Self {
             model: model.unwrap_or_else(|| "gpt-3.5-turbo".to_string()),
         }
     }
 
+    /// Create an Anthropic provider configuration, defaulting to `claude-3-sonnet-20240229`.
     pub fn anthropic(model: Option<String>) -> Self {
         Self {
             model: model.unwrap_or_else(|| "claude-3-sonnet-20240229".to_string()),
         }
     }
 
+    /// Create an OpenRouter provider configuration, defaulting to `anthropic/claude-3.5-sonnet`.
     pub fn openrouter(model: Option<String>) -> Self {
         Self {
             model: model.unwrap_or_else(|| "anthropic/claude-3.5-sonnet".to_string()),

@@ -43,6 +43,7 @@ pub struct DirectDispatchAgentIndex {
 }
 
 impl DirectDispatchAgentIndex {
+    /// Build an index from a slice of agent definitions.
     pub fn from_agents(agents: &[crate::config::AgentDefinition]) -> Self {
         let bare_names: HashSet<String> = agents
             .iter()
@@ -59,6 +60,7 @@ impl DirectDispatchAgentIndex {
         }
     }
 
+    /// Return `true` if `(project, agent)` names a known configured agent.
     pub fn is_valid(&self, project: Option<&str>, agent: &str) -> bool {
         match project {
             Some(p) => self
@@ -72,12 +74,15 @@ impl DirectDispatchAgentIndex {
 /// JSON response written back to adf-ctl.
 #[derive(Debug, serde::Serialize)]
 pub struct DispatchResponse {
+    /// `"ok"` on success or `"error"` on failure.
     pub status: String,
+    /// Human-readable error description; omitted from JSON when `None`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
 }
 
 impl DispatchResponse {
+    /// Construct a successful response with no message.
     pub fn ok() -> Self {
         Self {
             status: "ok".to_string(),
@@ -85,6 +90,7 @@ impl DispatchResponse {
         }
     }
 
+    /// Construct an error response with the given human-readable message.
     pub fn error(msg: &str) -> Self {
         Self {
             status: "error".to_string(),
@@ -93,22 +99,10 @@ impl DispatchResponse {
     }
 }
 
-/// Start the Unix domain socket listener for direct dispatch.
-//
+/// Remove a stale socket file at `socket_path` if it exists.
 ///
-///
-/// The listener task:
-///
-/// 1. Removes any stale socket file at `socket_path`.
-/// 2. Binds and listens on the socket path.
-/// 3. For each incoming connection:
-///    a. Reads a single JSON command from the stream.
-///    b. Validates the agent name against `agent_names`.
-///    c. Sends `WebhookDispatch::SpawnAgent` to `dispatch_tx`.
-///    d. Writes a JSON response back to the client.
-/// 4. Logs errors and continues accepting connections.
-///
-/// The socket is cleaned up automatically when the listener task is dropped.
+/// Returns an error if the path exists but is not a socket, leaving it
+/// untouched to avoid accidental data loss.
 #[cfg(unix)]
 fn remove_stale_socket_if_present(socket_path: &std::path::Path) -> std::io::Result<()> {
     use std::os::unix::fs::FileTypeExt;
@@ -123,6 +117,15 @@ fn remove_stale_socket_if_present(socket_path: &std::path::Path) -> std::io::Res
     }
 }
 
+/// Start the Unix domain socket listener for direct dispatch.
+///
+/// Spawns a Tokio task that:
+/// 1. Removes any stale socket file at `socket_path`.
+/// 2. Binds and listens on the socket path.
+/// 3. For each connection: reads a JSON [`DispatchCommand`], validates the
+///    agent name against `agent_index`, and forwards a
+///    `WebhookDispatch::SpawnAgent` to `dispatch_tx`.
+/// 4. Writes a JSON [`DispatchResponse`] back to the caller.
 pub fn start_direct_dispatch_listener(
     socket_path: PathBuf,
     dispatch_tx: tokio::sync::mpsc::Sender<WebhookDispatch>,

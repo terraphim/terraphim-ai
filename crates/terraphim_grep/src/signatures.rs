@@ -2,23 +2,33 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::TerraphimGrepError;
 
+/// A typed prompt-and-parser pair for a single RLM output format.
 pub trait RlmSignature: Send + Sync {
+    /// The Rust type this signature deserialises the LLM response into.
     type Output: serde::Serialize + serde::de::DeserializeOwned;
 
+    /// Returns the natural-language instructions to include in the LLM prompt.
     fn instructions(&self) -> String;
+    /// Parse the raw LLM response string into [`Self::Output`].
     fn parse(&self, raw: &str) -> Result<Self::Output, TerraphimGrepError>;
 }
 
+/// A single file-level match returned by the search-result RLM signature.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Match {
+    /// Relative path of the matching file.
     pub path: String,
+    /// Line number of the match (1-based).
     pub line: usize,
+    /// Inclusive end line of the match, if the match spans multiple lines.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub line_end: Option<usize>,
+    /// Surrounding lines included as context for the match.
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub context: Vec<String>,
 }
 
+/// RLM signature that parses a JSON array of [`Match`] objects from the LLM response.
 pub struct SearchResultSignature;
 
 impl RlmSignature for SearchResultSignature {
@@ -35,21 +45,30 @@ impl RlmSignature for SearchResultSignature {
     }
 }
 
+/// A source citation accompanying a synthesised answer.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Citation {
+    /// File path or URL of the cited source.
     pub source: String,
+    /// Line number within the source, if applicable.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub line: Option<usize>,
+    /// Short excerpt from the cited source supporting the answer.
     pub excerpt: String,
 }
 
+/// A synthesised answer produced by the RLM, paired with its source citations.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AnswerWithCitations {
+    /// The synthesised natural-language answer.
     pub answer: String,
+    /// Sources cited in support of the answer.
     pub citations: Vec<Citation>,
+    /// Confidence score in the range `[0.0, 1.0]` reported by the LLM.
     pub confidence: f64,
 }
 
+/// RLM signature that parses an [`AnswerWithCitations`] object from the LLM response.
 pub struct AnswerSignature;
 
 impl RlmSignature for AnswerSignature {
@@ -69,15 +88,20 @@ impl RlmSignature for AnswerSignature {
     }
 }
 
+/// A newly discovered knowledge-graph concept extracted from a query/answer pair.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NewConcept {
+    /// Canonical name of the concept (e.g. `"retry configuration"`).
     pub name: String,
+    /// Alternative names or synonyms for the concept.
     #[serde(default)]
     pub synonyms: Vec<String>,
+    /// Names of related concepts in the knowledge graph.
     #[serde(default)]
     pub relationships: Vec<String>,
 }
 
+/// RLM signature that parses a JSON array of [`NewConcept`] objects from the LLM response.
 pub struct ConceptExtractionSignature;
 
 impl RlmSignature for ConceptExtractionSignature {

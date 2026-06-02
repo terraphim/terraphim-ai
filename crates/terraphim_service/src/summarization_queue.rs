@@ -21,6 +21,7 @@ impl Default for TaskId {
 }
 
 impl TaskId {
+    /// Create a new randomly-generated task identifier
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
@@ -51,35 +52,49 @@ pub enum Priority {
 pub enum TaskStatus {
     /// Task is queued and waiting to be processed
     Pending {
+        /// Timestamp when the task was added to the queue
         queued_at: DateTime<Utc>,
+        /// Current position of the task in the queue, if known
         position_in_queue: Option<usize>,
     },
     /// Task is currently being processed
     Processing {
+        /// Timestamp when processing began
         started_at: DateTime<Utc>,
+        /// Processing progress as a fraction in `[0.0, 1.0]`, if available
         progress: Option<f32>,
     },
     /// Task completed successfully
     Completed {
+        /// The generated summary text
         summary: String,
+        /// Timestamp when processing finished
         completed_at: DateTime<Utc>,
+        /// Wall-clock time taken to produce the summary, in seconds
         processing_duration_seconds: u64,
     },
     /// Task failed with error
     Failed {
+        /// Human-readable description of the failure
         error: String,
+        /// Timestamp when the failure was recorded
         failed_at: DateTime<Utc>,
+        /// Number of attempts made so far
         retry_count: u32,
+        /// Earliest time at which the task may be retried, if applicable
         next_retry_at: Option<DateTime<Utc>>,
     },
     /// Task was cancelled
     Cancelled {
+        /// Timestamp when the cancellation was recorded
         cancelled_at: DateTime<Utc>,
+        /// Human-readable reason for the cancellation
         reason: String,
     },
 }
 
 impl TaskStatus {
+    /// Returns `true` if the task has reached a terminal state (completed, failed, or cancelled)
     pub fn is_terminal(&self) -> bool {
         matches!(
             self,
@@ -87,10 +102,12 @@ impl TaskStatus {
         )
     }
 
+    /// Returns `true` if the task is actively being processed
     pub fn is_processing(&self) -> bool {
         matches!(self, TaskStatus::Processing { .. })
     }
 
+    /// Returns `true` if the task is waiting in the queue
     pub fn is_pending(&self) -> bool {
         matches!(self, TaskStatus::Pending { .. })
     }
@@ -124,6 +141,7 @@ pub struct SummarizationTask {
 }
 
 impl SummarizationTask {
+    /// Create a new summarization task for `document` using the given `role` configuration
     pub fn new(document: Document, role: Role) -> Self {
         Self {
             id: TaskId::new(),
@@ -140,44 +158,53 @@ impl SummarizationTask {
         }
     }
 
+    /// Set the task priority, returning the updated task
     pub fn with_priority(mut self, priority: Priority) -> Self {
         self.priority = priority;
         self
     }
 
+    /// Set the maximum number of retry attempts, returning the updated task
     pub fn with_max_retries(mut self, max_retries: u32) -> Self {
         self.max_retries = max_retries;
         self
     }
 
+    /// Set the maximum desired summary length in words, returning the updated task
     pub fn with_max_summary_length(mut self, length: usize) -> Self {
         self.max_summary_length = Some(length);
         self
     }
 
+    /// Set whether to force regeneration even if a summary already exists
     pub fn with_force_regenerate(mut self, force: bool) -> Self {
         self.force_regenerate = force;
         self
     }
 
+    /// Set the callback URL to notify on completion, returning the updated task
     pub fn with_callback_url(mut self, url: String) -> Self {
         self.callback_url = Some(url);
         self
     }
 
+    /// Attach a global configuration for fallback provider settings
     pub fn with_config(mut self, config: Config) -> Self {
         self.config = Some(config);
         self
     }
 
+    /// Returns `true` if the task has not yet exhausted its retry budget
     pub fn can_retry(&self) -> bool {
         self.retry_count < self.max_retries
     }
 
+    /// Increment the retry counter by one
     pub fn increment_retry(&mut self) {
         self.retry_count += 1;
     }
 
+    /// Return the effective maximum summary length, falling back to 250 if unset
     pub fn get_summary_length(&self) -> usize {
         self.max_summary_length.unwrap_or(250)
     }
@@ -305,8 +332,11 @@ pub struct RateLimiterStatus {
 pub enum SubmitResult {
     /// Task was successfully queued
     Queued {
+        /// Identifier assigned to the newly queued task
         task_id: TaskId,
+        /// One-based position of the task in the queue at submission time
         position_in_queue: usize,
+        /// Estimated seconds until the task begins processing, if calculable
         estimated_wait_time_seconds: Option<u64>,
     },
     /// Task was rejected due to queue being full

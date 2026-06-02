@@ -1,10 +1,15 @@
 use super::hybrid_searcher::{HybridResults, RetrievedChunk};
 
+/// Configurable thresholds used by [`SufficiencyJudge`] to classify search quality.
 #[derive(Debug, Clone)]
 pub struct HeuristicThresholds {
+    /// Minimum fraction of query terms that must appear in the retrieved chunks.
     pub min_coverage: f64,
+    /// Minimum average KG concept score required to consider results confident.
     pub min_kg_confidence: f64,
+    /// Minimum number of distinct haystacks that must contribute chunks.
     pub min_diversity: usize,
+    /// Minimum total number of chunks required before any positive verdict.
     pub min_results: usize,
 }
 
@@ -19,23 +24,31 @@ impl Default for HeuristicThresholds {
     }
 }
 
+/// The verdict returned by [`SufficiencyJudge::judge`], along with the ranked chunks.
 #[derive(Debug, Clone)]
 pub enum Sufficiency {
+    /// Retrieval results are good enough to return directly without synthesis.
     Sufficient(Vec<RetrievedChunk>),
+    /// Results exist but need LLM synthesis to produce a coherent answer.
     NeedsSynthesis(Vec<RetrievedChunk>),
+    /// Results are sparse; additional expansion or synthesis is required.
     NeedsExpansion(Vec<RetrievedChunk>),
+    /// Results are too poor to be useful; return empty or a failure message.
     Insufficient(Vec<RetrievedChunk>),
 }
 
+/// Evaluates whether a set of hybrid search results is sufficient or requires further synthesis.
 pub struct SufficiencyJudge {
     thresholds: HeuristicThresholds,
 }
 
 impl SufficiencyJudge {
+    /// Create a new judge with the given heuristic thresholds.
     pub fn new(thresholds: HeuristicThresholds) -> Self {
         Self { thresholds }
     }
 
+    /// Classify `results` for `query` and return the appropriate [`Sufficiency`] variant.
     pub fn judge(&self, results: &HybridResults, query: &str) -> Sufficiency {
         let chunks = results.to_chunks();
 

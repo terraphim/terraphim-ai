@@ -10,10 +10,15 @@ use crate::{AgentId, MultiAgentError, MultiAgentResult};
 /// Cost record for tracking agent expenses
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CostRecord {
+    /// UTC timestamp of the operation that incurred this cost
     pub timestamp: DateTime<Utc>,
+    /// Agent that performed the operation
     pub agent_id: AgentId,
+    /// Human-readable description of the operation type
     pub operation_type: String,
+    /// Cost in US dollars
     pub cost_usd: f64,
+    /// Arbitrary key-value metadata attached to this record
     pub metadata: HashMap<String, String>,
 }
 
@@ -43,6 +48,7 @@ pub struct TokenUsageRecord {
 }
 
 impl TokenUsageRecord {
+    /// Create a new usage record, generating a fresh request ID and current timestamp
     pub fn new(
         agent_id: AgentId,
         model: String,
@@ -65,6 +71,7 @@ impl TokenUsageRecord {
         }
     }
 
+    /// Attach a quality score in the range `[0.0, 1.0]` to this record
     pub fn with_quality_score(mut self, score: f64) -> Self {
         self.quality_score = Some(score.clamp(0.0, 1.0));
         self
@@ -87,6 +94,7 @@ pub struct ModelPricing {
 }
 
 impl ModelPricing {
+    /// Calculate the total cost in USD for a request with the given token counts
     pub fn calculate_cost(&self, input_tokens: u64, output_tokens: u64) -> f64 {
         let input_cost = (input_tokens as f64 / 1000.0) * self.input_cost_per_1k;
         let output_cost = (output_tokens as f64 / 1000.0) * self.output_cost_per_1k;
@@ -118,6 +126,7 @@ pub struct TokenUsageTracker {
 }
 
 impl TokenUsageTracker {
+    /// Create a new, empty tracker for the specified agent
     pub fn new(agent_id: AgentId) -> Self {
         Self {
             agent_id,
@@ -208,6 +217,7 @@ impl TokenUsageTracker {
         self.get_usage_in_period(start, end)
     }
 
+    /// Drain and return all usage records, leaving the internal list empty
     pub fn drain_records(&mut self) -> Vec<TokenUsageRecord> {
         std::mem::take(&mut self.records)
     }
@@ -216,14 +226,23 @@ impl TokenUsageTracker {
 /// Usage statistics for a time period
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UsageStats {
+    /// Start of the reporting period (inclusive)
     pub period_start: DateTime<Utc>,
+    /// End of the reporting period (inclusive)
     pub period_end: DateTime<Utc>,
+    /// Number of LLM requests made during the period
     pub request_count: u64,
+    /// Total prompt tokens consumed during the period
     pub total_input_tokens: u64,
+    /// Total completion tokens generated during the period
     pub total_output_tokens: u64,
+    /// Combined total of input and output tokens
     pub total_tokens: u64,
+    /// Total cost in USD for the period
     pub total_cost_usd: f64,
+    /// Mean tokens per request over the period
     pub avg_tokens_per_request: f64,
+    /// Mean cost in USD per request over the period
     pub avg_cost_per_request: f64,
 }
 
@@ -247,20 +266,29 @@ pub struct BudgetAlert {
 /// Time window for budget alerts
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum AlertWindow {
+    /// Alert evaluated over the current hour
     Hourly,
+    /// Alert evaluated over the current calendar day
     Daily,
+    /// Alert evaluated over the current calendar week
     Weekly,
+    /// Alert evaluated over the current calendar month
     Monthly,
 }
 
 /// Actions to take when budget alert is triggered
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum AlertAction {
+    /// Write a log entry when the threshold is crossed
     Log,
+    /// Send an alert email to the given address
     Email(String),
+    /// POST an alert payload to the given URL
     Webhook(String),
+    /// Disable the agent that exceeded the threshold
     DisableAgent,
-    RateLimit(u64), // requests per minute
+    /// Apply a rate limit of the specified number of requests per minute
+    RateLimit(u64),
 }
 
 /// Cost tracker with budget monitoring
@@ -285,6 +313,7 @@ pub struct CostTracker {
 }
 
 impl CostTracker {
+    /// Create a new `CostTracker` populated with default model pricing
     pub fn new() -> Self {
         Self {
             model_pricing: Self::default_model_pricing(),

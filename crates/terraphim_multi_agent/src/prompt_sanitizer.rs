@@ -53,13 +53,19 @@ static UNICODE_SPECIAL_CHARS: LazyLock<HashSet<char>> = LazyLock::new(|| {
     .collect()
 });
 
+/// The result of sanitising a system prompt, including the cleaned text and any warnings raised.
 #[derive(Debug, Clone)]
 pub struct SanitizedPrompt {
+    /// The cleaned prompt text after all sanitisation passes
     pub content: String,
+    /// `true` if the original prompt was altered in any way
     pub was_modified: bool,
+    /// Human-readable warnings describing what was removed or truncated
     pub warnings: Vec<String>,
 }
 
+/// Sanitise a system prompt by removing injection patterns, control characters, and obfuscation
+/// sequences. Returns the cleaned prompt together with a modification flag and any warnings.
 pub fn sanitize_system_prompt(prompt: &str) -> SanitizedPrompt {
     let mut warnings = Vec::new();
     let mut was_modified = false;
@@ -132,6 +138,9 @@ pub fn sanitize_system_prompt(prompt: &str) -> SanitizedPrompt {
     }
 }
 
+/// Validate a system prompt without modifying it.
+///
+/// Returns `Ok(())` if the prompt is acceptable, or an `Err` describing the problem.
 pub fn validate_system_prompt(prompt: &str) -> Result<(), String> {
     if prompt.is_empty() {
         return Err("System prompt cannot be empty".to_string());

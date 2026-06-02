@@ -10,6 +10,7 @@
 #![allow(unused)]
 #![allow(ambiguous_glob_reexports)]
 #![allow(clippy::all)]
+#![allow(missing_docs)]
 
 pub mod artifacts;
 pub mod orchestrator;

@@ -14,18 +14,32 @@ pub const DEFAULT_MAX_MENTION_DEPTH: u32 = 3;
 /// Errors from mention chain validation.
 #[derive(Debug, thiserror::Error)]
 pub enum MentionChainError {
+    /// An agent attempted to mention itself directly.
     #[error("agent '{agent}' cannot mention itself")]
-    SelfMention { agent: String },
-
-    #[error("mention chain depth {depth} exceeds max {max_depth} for agent '{agent}'")]
-    DepthExceeded {
-        depth: u32,
-        max_depth: u32,
+    SelfMention {
+        /// Name of the agent that tried to self-mention.
         agent: String,
     },
 
+    /// The mention chain has reached the configured maximum nesting depth.
+    #[error("mention chain depth {depth} exceeds max {max_depth} for agent '{agent}'")]
+    DepthExceeded {
+        /// Current depth at the time of the rejected dispatch.
+        depth: u32,
+        /// Configured maximum depth that was exceeded.
+        max_depth: u32,
+        /// Name of the agent that could not be dispatched.
+        agent: String,
+    },
+
+    /// A direct A->B->A cycle was detected in the mention chain.
     #[error("cycle detected: {from} -> {to} would create a loop")]
-    CycleDetected { from: String, to: String },
+    CycleDetected {
+        /// Agent that initiated the mention.
+        from: String,
+        /// Agent that would close the cycle.
+        to: String,
+    },
 }
 
 /// Stateless mention chain validation.

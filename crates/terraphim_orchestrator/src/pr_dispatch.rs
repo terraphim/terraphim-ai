@@ -21,11 +21,17 @@ use crate::config::{AgentDefinition, OrchestratorConfig};
 /// have to know about the dispatcher enum variant shape.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReviewPrRequest {
+    /// Pull-request number in the Gitea repository.
     pub pr_number: u64,
+    /// Project identifier (e.g. `"terraphim-ai"`).
     pub project: String,
+    /// HEAD commit SHA of the pull-request branch.
     pub head_sha: String,
+    /// Gitea login of the PR author.
     pub author_login: String,
+    /// PR title.
     pub title: String,
+    /// Approximate lines-of-code changed (used for budget gating).
     pub diff_loc: u32,
 }
 

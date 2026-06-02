@@ -22,8 +22,11 @@ pub struct PolicyResult {
 /// A candidate with its policy score.
 #[derive(Debug, Clone)]
 pub struct ScoredCandidate {
+    /// The routing candidate being scored.
     pub candidate: RouteCandidate,
+    /// Composite policy score (higher is better).
     pub score: f64,
+    /// Per-dimension score contributions for debugging and observability.
     pub rationale_breakdown: Vec<(String, f64)>,
 }
 
@@ -55,6 +58,7 @@ impl Default for PolicyConfig {
 }
 
 impl PolicyConfig {
+    /// Create a new `PolicyConfig` with default weights.
     pub fn new() -> Self {
         Self::default()
     }

@@ -1,3 +1,4 @@
+#![warn(missing_docs)]
 //! Configuration management for Terraphim AI.
 //!
 //! Provides role-based configuration where each [`Role`] describes a user profile with
@@ -46,7 +47,7 @@ use crate::llm_router::LlmRouterConfig;
 // LLM Router configuration
 pub mod llm_router;
 
-// Project-level configuration discovery
+/// Project-level configuration discovery for `.terraphim/config.json` files.
 pub mod project;
 
 /// Convenience alias for `Result<T, TerraphimConfigError>` used throughout this crate.
@@ -59,36 +60,47 @@ type PersistenceResult<T> = std::result::Result<T, terraphim_persistence::Error>
 /// Errors arising from loading, validating, or persisting Terraphim configuration.
 #[derive(Error, Debug)]
 pub enum TerraphimConfigError {
+    /// No configuration file was found at the expected location.
     #[error("Unable to load config")]
     NotFound,
 
+    /// Configuration contains no role definitions; at least one role is required.
     #[error("At least one role is required")]
     NoRoles,
 
+    /// A named profile was requested but could not be applied.
     #[error("Profile error")]
     Profile(String),
 
+    /// An error from the underlying persistence layer.
     #[error("Persistence error")]
     Persistence(Box<terraphim_persistence::Error>),
 
+    /// JSON serialisation or deserialisation failed.
     #[error("Serde JSON error")]
     Json(#[from] serde_json::Error),
 
+    /// Failed to initialise the tracing subscriber.
     #[error("Cannot initialize tracing subscriber")]
     TracingSubscriber(Box<dyn std::error::Error + Send + Sync>),
 
+    /// An error propagated from the rolegraph pipeline.
     #[error("Pipe error")]
     Pipe(#[from] terraphim_rolegraph::Error),
 
+    /// An error from the Aho-Corasick automata layer.
     #[error("Automata error")]
     Automata(#[from] terraphim_automata::TerraphimAutomataError),
 
+    /// A URL could not be parsed.
     #[error("Url error")]
     Url(#[from] url::ParseError),
 
+    /// An I/O error occurred while reading or writing configuration.
     #[error("IO error")]
     Io(#[from] std::io::Error),
 
+    /// A general configuration error with a descriptive message.
     #[error("Config error")]
     Config(String),
 }
@@ -222,13 +234,19 @@ fn default_context_window() -> Option<u64> {
 #[cfg_attr(feature = "typescript", derive(Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct Role {
+    /// Optional short alias used for command-line role selection.
     pub shortname: Option<String>,
+    /// Primary name that uniquely identifies this role.
     pub name: RoleName,
     /// The relevance function used to rank search results
     pub relevance_function: RelevanceFunction,
+    /// Whether Terraphim-specific post-processing is applied to search results.
     pub terraphim_it: bool,
+    /// UI theme name applied when this role is active.
     pub theme: String,
+    /// Optional knowledge graph configuration for semantic search.
     pub kg: Option<KnowledgeGraph>,
+    /// Haystack data sources searched under this role.
     pub haystacks: Vec<Haystack>,
     /// Enable AI-powered article summaries using LLM providers
     #[serde(default)]
@@ -254,6 +272,7 @@ pub struct Role {
     /// Maximum tokens for LLM context window (default: 32768)
     #[serde(default = "default_context_window")]
     pub llm_context_window: Option<u64>,
+    /// Arbitrary provider-specific or experiment-specific key/value pairs.
     #[serde(flatten)]
     #[schemars(skip)]
     #[cfg_attr(feature = "typescript", tsify(type = "Record<string, unknown>"))]
@@ -504,7 +523,9 @@ pub struct KnowledgeGraph {
     pub automata_path: Option<AutomataPath>,
     /// Knowlege graph can be re-build from local files, for example Markdown files
     pub knowledge_graph_local: Option<KnowledgeGraphLocal>,
+    /// Whether this knowledge graph is publicly accessible.
     pub public: bool,
+    /// Whether this knowledge graph should be published to the registry.
     pub publish: bool,
 }
 impl KnowledgeGraph {
@@ -519,7 +540,9 @@ impl KnowledgeGraph {
 #[cfg_attr(feature = "typescript", derive(Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct KnowledgeGraphLocal {
+    /// Format of the source documents (e.g. Markdown, plain text).
     pub input_type: KnowledgeGraphInputType,
+    /// Filesystem path to the directory containing the source documents.
     pub path: PathBuf,
 }
 /// Builder, which allows to create a new `Config`
@@ -933,8 +956,11 @@ impl Default for ConfigBuilder {
 #[cfg_attr(feature = "typescript", derive(Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum ConfigId {
+    /// Configuration deployed as a background HTTP server.
     Server,
+    /// Configuration deployed as a desktop (Tauri) application.
     Desktop,
+    /// Configuration compiled in (WASM/library) with no external server.
     Embedded,
 }
 
@@ -955,6 +981,7 @@ pub struct Config {
     pub roles: AHashMap<RoleName, Role>,
     /// The default role to use if no role is specified
     pub default_role: RoleName,
+    /// The role currently selected by the user (may differ from `default_role`).
     pub selected_role: RoleName,
 }
 
@@ -1271,6 +1298,7 @@ impl ConfigState {
         config.default_role.clone()
     }
 
+    /// Return the currently selected role name.
     pub async fn get_selected_role(&self) -> RoleName {
         let config = self.config.lock().await;
         config.selected_role.clone()

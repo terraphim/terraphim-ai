@@ -1,3 +1,4 @@
+#![warn(missing_docs)]
 //! Main service layer for Terraphim AI.
 //!
 //! Provides document search, indexing, and AI-assisted summarisation across
@@ -27,35 +28,32 @@ pub use auto_route::{
 #[cfg(feature = "openrouter")]
 pub mod openrouter;
 
-// Generic LLM layer for multiple providers (OpenRouter, Ollama, etc.)
+/// Generic LLM client trait and provider implementations (OpenRouter, Ollama, etc.).
 pub mod llm;
-
-// LLM proxy service for unified provider management
-
-// LLM Proxy service\npub mod proxy_client;
-// LLM Router configuration integration\n
 
 pub mod llm_proxy;
 
-// LLM Router configuration integration\n
-
-// Centralized HTTP client creation and configuration
+/// Centralised HTTP client creation with connection pooling and timeout configuration.
 pub mod http_client;
 
 // Standardized logging initialization utilities
 pub mod logging;
 
-// Summarization queue system for production-ready async processing
+/// Async conversation service backed by a persistent store.
 pub mod conversation_service;
+/// Rate-limiting utilities for outbound API calls.
 pub mod rate_limiter;
+/// Manages the lifecycle of document summarisation tasks.
 pub mod summarization_manager;
+/// Bounded queue for deduplicating and batching summarisation requests.
 pub mod summarization_queue;
+/// Background worker that processes the summarisation queue.
 pub mod summarization_worker;
 
-// Centralized error handling patterns and utilities
+/// Centralised error handling patterns and shared error types.
 pub mod error;
 
-// Context management for LLM conversations
+/// Context management: assembles and trims LLM conversation history.
 pub mod context;
 
 #[cfg(test)]
@@ -72,22 +70,28 @@ fn normalize_filename_to_id(filename: &str) -> String {
 /// Top-level error type for the Terraphim service layer.
 #[derive(thiserror::Error, Debug)]
 pub enum ServiceError {
+    /// An error from the haystack middleware layer.
     #[error("Middleware error: {0}")]
     Middleware(#[from] terraphim_middleware::Error),
 
+    /// An error from the OpenDAL storage abstraction.
     #[error("OpenDal error: {0}")]
     OpenDal(Box<opendal::Error>),
 
+    /// An error from the persistence layer.
     #[error("Persistence error: {0}")]
     Persistence(#[from] terraphim_persistence::Error),
 
+    /// A configuration-related error with a descriptive message.
     #[error("Config error: {0}")]
     Config(String),
 
     #[cfg(feature = "openrouter")]
+    /// An error from the OpenRouter LLM provider.
     #[error("OpenRouter error: {0}")]
     OpenRouter(#[from] crate::openrouter::OpenRouterError),
 
+    /// A common/shared error from the service error module.
     #[error("Common error: {0}")]
     Common(#[from] crate::error::CommonError),
 }
@@ -125,6 +129,7 @@ impl crate::error::TerraphimError for ServiceError {
     }
 }
 
+/// Convenience alias for `Result<T, ServiceError>` used throughout this crate.
 pub type Result<T> = std::result::Result<T, ServiceError>;
 
 /// Main entry point for search, indexing, and AI operations in Terraphim.

@@ -1,8 +1,10 @@
 use crate::{ProviderUsage, Result, UsageError, UsageProvider};
 
+/// Usage provider for Kimi (Moonshot AI) — implementation pending.
 pub struct KimiProvider;
 
 impl KimiProvider {
+    /// Creates a new `KimiProvider`.
     pub fn new() -> Self {
         Self
     }

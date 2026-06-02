@@ -51,11 +51,17 @@ pub struct ReviewVerdict {
 /// policy with a 500 LoC diff cap and an agent-author requirement.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AutoMergeCriteria {
+    /// Minimum confidence score (1–5) required for auto-merge.
     pub min_confidence: u8,
+    /// Maximum number of P0 findings permitted before requiring human review.
     pub max_p0: u32,
+    /// Maximum number of P1 findings permitted before requiring human review.
     pub max_p1: u32,
+    /// When `true`, every acceptance-criteria checkbox must be ticked.
     pub require_all_criteria: bool,
+    /// Upper bound on total lines-of-code changed in the diff.
     pub max_diff_loc: u32,
+    /// When `true`, the PR author must be a recognised automation account.
     pub require_agent_author: bool,
 }
 
@@ -75,10 +81,15 @@ impl Default for AutoMergeCriteria {
 /// Minimum PR metadata required by [`evaluate`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PrMetadata {
+    /// Numeric identifier of the pull request.
     pub pr_number: u64,
+    /// Gitea/GitHub login of the PR author.
     pub author_login: String,
+    /// Total lines of code changed (additions + deletions) in the diff.
     pub diff_loc: u32,
+    /// Full SHA of the head commit being reviewed.
     pub head_sha: String,
+    /// Target branch the PR is merging into (e.g. `"main"`).
     pub base_branch: String,
 }
 
@@ -97,12 +108,16 @@ pub enum AutoMergeDecision {
 #[derive(Error, Debug, PartialEq, Eq)]
 pub enum VerdictParseError {
     #[error("missing confidence score header in review comment")]
+    /// No confidence score header was found in the review comment.
     MissingConfidence,
     #[error("confidence score out of range: got {0}")]
+    /// Confidence score was present but outside the valid 0–100 range.
     ConfidenceOutOfRange(u8),
     #[error("missing inline findings section")]
+    /// The inline findings section was absent from the review comment.
     MissingFindings,
     #[error("malformed footer (expected `Last reviewed commit: <short>`)")]
+    /// The footer line did not match the expected format.
     MalformedFooter,
 }
 

@@ -27,6 +27,7 @@ pub struct ContextItem {
 }
 
 impl ContextItem {
+    /// Create a new context item with the given type, content, token count, and relevance score.
     pub fn new(
         item_type: ContextItemType,
         content: String,
@@ -44,6 +45,7 @@ impl ContextItem {
         }
     }
 
+    /// Attach custom metadata to this context item and return the modified item.
     pub fn with_metadata(mut self, metadata: ContextMetadata) -> Self {
         self.metadata = metadata;
         self
@@ -110,6 +112,7 @@ pub struct AgentContext {
 }
 
 impl AgentContext {
+    /// Create a new empty context for the given agent with the specified token and item limits.
     pub fn new(agent_id: AgentId, max_tokens: u64, max_items: usize) -> Self {
         Self {
             agent_id,
@@ -410,6 +413,7 @@ pub struct ContextSnapshot {
 }
 
 impl ContextSnapshot {
+    /// Create a snapshot from the current state of an `AgentContext`, recording the given trigger.
     pub fn from_context(context: &AgentContext, trigger: SnapshotTrigger) -> Self {
         Self {
             id: Uuid::new_v4(),

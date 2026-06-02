@@ -50,10 +50,15 @@ pub const PR_POLL_MIN_INTERVAL: Duration = Duration::from_secs(60);
 /// that tests can construct it without a live Gitea server.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PrSummary {
+    /// Pull request number in the Gitea repository.
     pub number: u64,
+    /// Login of the PR author.
     pub author_login: String,
+    /// Current HEAD commit SHA of the PR branch.
     pub head_sha: String,
+    /// Target branch (e.g. `main`) that the PR will merge into.
     pub base_ref: String,
+    /// Total lines of code changed (additions + deletions) as reported by Gitea.
     pub diff_loc: u32,
 }
 
@@ -61,8 +66,11 @@ pub struct PrSummary {
 /// parsing are captured; the full Gitea payload is deliberately not mirrored.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PrComment {
+    /// Unique comment ID assigned by Gitea.
     pub id: u64,
+    /// Login of the user who posted the comment.
     pub user_login: String,
+    /// Raw Markdown body of the comment.
     pub body: String,
     /// RFC3339-ish `updated_at` string from the Gitea API. Used only for
     /// ordering; comments without a timestamp sort as the earliest.
@@ -74,7 +82,9 @@ pub struct PrComment {
 /// PR N carry?". Kept minimal so the test impl stays trivial.
 #[async_trait]
 pub trait PrTracker: Send + Sync {
+    /// Return all currently open pull requests for the tracked project.
     async fn list_open_prs(&self) -> Result<Vec<PrSummary>, String>;
+    /// Return all comments on the pull request identified by `pr_number`.
     async fn fetch_pr_comments(&self, pr_number: u64) -> Result<Vec<PrComment>, String>;
 }
 
@@ -84,8 +94,11 @@ pub trait PrTracker: Send + Sync {
 /// concrete types into test code.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MergeOutcome {
+    /// Number of the pull request that was merged.
     pub pr_number: u64,
+    /// SHA of the merge commit created on the base branch.
     pub merge_commit_sha: String,
+    /// Title of the pull request at the time it was merged.
     pub title: String,
 }
 
@@ -121,6 +134,7 @@ pub struct GiteaPrTracker {
 }
 
 impl GiteaPrTracker {
+    /// Wrap an existing [`terraphim_tracker::GiteaTracker`] in a [`GiteaPrTracker`].
     pub fn new(inner: terraphim_tracker::GiteaTracker) -> Self {
         Self { inner }
     }
@@ -196,14 +210,23 @@ impl AutoMergeExecutor for GiteaPrTracker {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EvaluationOutcome {
     /// Every gate cleared; the caller should enqueue [`crate::dispatcher::DispatchTask::AutoMerge`].
-    Merge { head_sha: String },
+    Merge {
+        /// HEAD SHA of the PR branch at the time the verdict was parsed.
+        head_sha: String,
+    },
     /// At least one gate failed. The reason is a short human-readable string
     /// suitable for logging or posting back to the PR.
-    HumanReviewNeeded { reason: String },
+    HumanReviewNeeded {
+        /// Short human-readable explanation of which gate failed.
+        reason: String,
+    },
     /// No pr-reviewer comment found yet — nothing to evaluate this tick.
     NoReviewerComment,
     /// A reviewer comment exists but did not parse as a structural verdict.
-    ParseError { reason: String },
+    ParseError {
+        /// Description of the parse failure (e.g. missing confidence header).
+        reason: String,
+    },
 }
 
 /// Return `true` when `comment.user_login == PR_REVIEWER_LOGIN` **or** the
@@ -316,6 +339,7 @@ pub struct PrPollRateLimiter {
 }
 
 impl PrPollRateLimiter {
+    /// Create a new rate limiter with the given minimum interval between polls of the same PR.
     pub fn new(min_interval: Duration) -> Self {
         Self {
             last_poll: HashMap::new(),
@@ -346,6 +370,7 @@ pub struct AutoMergeDedupeSet {
 }
 
 impl AutoMergeDedupeSet {
+    /// Create an empty dedupe set.
     pub fn new() -> Self {
         Self::default()
     }

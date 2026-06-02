@@ -287,8 +287,11 @@ pub struct BudgetSnapshotRecord {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum BudgetVerdict {
+    /// Spending is below 80% of the monthly budget.
     WithinBudget,
+    /// Spending is between 80% and 100% of the monthly budget.
     ApproachingLimit,
+    /// Spending has reached or exceeded the monthly budget.
     Exceeded,
 }
 

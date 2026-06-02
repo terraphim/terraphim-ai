@@ -17,22 +17,33 @@ mod router_config;
 
 use crate::Result as ServiceResult;
 
+/// Options controlling the output of a document summarisation call.
 #[derive(Clone, Debug)]
 pub struct SummarizeOptions {
+    /// Approximate maximum character length of the generated summary.
     pub max_length: usize,
 }
 
 #[allow(dead_code)]
+/// Options for a chat completion request.
 #[derive(Clone, Debug)]
 pub struct ChatOptions {
+    /// Maximum number of output tokens to generate.
     pub max_tokens: Option<u32>,
+    /// Sampling temperature (0.0 = deterministic, higher = more creative).
     pub temperature: Option<f32>,
 }
 
+/// Abstraction over LLM providers (Ollama, OpenRouter, …).
+///
+/// Implement this trait to add a new backend. All methods are async and
+/// must be `Send + Sync` so the client can be shared across tokio tasks.
 #[async_trait::async_trait]
 pub trait LlmClient: Send + Sync {
+    /// Return a human-readable name identifying this provider.
     fn name(&self) -> &'static str;
 
+    /// Summarise the given content and return a shorter version.
     async fn summarize(&self, content: &str, opts: SummarizeOptions) -> ServiceResult<String>;
 
     /// List available models for this provider (best-effort)

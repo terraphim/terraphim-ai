@@ -348,13 +348,21 @@ pub struct CapabilitiesData {
 /// Feature flags
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FeatureFlags {
+    /// Document search is available.
     pub search: bool,
+    /// LLM chat is available (requires `llm` feature).
     pub chat: bool,
+    /// MCP tool operations are available (requires `repl-mcp` feature).
     pub mcp_tools: bool,
+    /// File system operations are available (requires `repl-file` feature).
     pub file_operations: bool,
+    /// Web operations are available (requires `repl-web` feature).
     pub web_operations: bool,
+    /// Firecracker VM execution is available.
     pub vm_execution: bool,
+    /// Session search is available (requires `repl-sessions` feature).
     pub session_search: bool,
+    /// Knowledge graph operations are available.
     pub knowledge_graph: bool,
 }
 

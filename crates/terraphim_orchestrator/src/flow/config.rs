@@ -47,20 +47,29 @@ fn default_matrix_fail_strategy() -> FailStrategy {
     FailStrategy::Continue
 }
 
+/// Top-level definition of a flow, typically loaded from a TOML configuration file.
+///
+/// A flow is a named, ordered sequence of steps executed against a Git repository.
+/// It may be triggered manually or on a cron schedule.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FlowDefinition {
+    /// Unique human-readable name for this flow.
     pub name: String,
     /// Project this flow belongs to. Required -- flows are per-project only (D14).
     /// Must match a `Project.id` when projects are defined.
     pub project: String,
+    /// Optional cron expression for scheduled execution (e.g. `"0 2 * * *"`).
     #[serde(default)]
-    pub schedule: Option<String>, // cron expression
+    pub schedule: Option<String>,
+    /// Absolute path to the Git repository that steps operate on.
     pub repo_path: String,
+    /// Branch that serves as the merge target; defaults to `"main"`.
     #[serde(default = "default_base_branch")]
     pub base_branch: String,
     /// Global flow timeout in seconds. If the entire flow exceeds this, it is aborted.
     #[serde(default = "default_flow_timeout")]
     pub timeout_secs: u64,
+    /// Ordered list of step definitions that make up this flow.
     #[serde(default)]
     pub steps: Vec<FlowStepDef>,
 }
@@ -73,9 +82,16 @@ fn default_flow_timeout() -> u64 {
     3600 // 1 hour default
 }
 
+/// Definition of a single step within a flow.
+///
+/// The active fields depend on the `kind`: shell commands apply to `Action`
+/// steps, agent-related fields apply to `Agent` steps, and `condition` applies
+/// to `Gate` steps.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct FlowStepDef {
+    /// Unique name for this step within the flow; used for output lookup and loop targets.
     pub name: String,
+    /// Execution mode for this step.
     pub kind: StepKind,
     /// Shell command (for action steps).
     #[serde(default)]
@@ -122,22 +138,31 @@ fn default_timeout() -> u64 {
     600
 }
 
+/// Execution mode of a flow step.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum StepKind {
+    /// Runs a shell command via `bash -lc`.
     #[default]
     Action,
+    /// Invokes an AI agent CLI tool with a task prompt.
     Agent,
+    /// Evaluates a boolean condition expression; aborts the flow on failure.
     Gate,
+    /// Saves the current flow state; may loop back to an earlier step.
     Checkpoint,
 }
 
+/// What the executor should do when a step (or matrix sub-execution) fails.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum FailStrategy {
+    /// Stop the flow immediately and mark it as failed.
     #[default]
     Abort,
+    /// Record the failure but skip this step and continue with the next one.
     SkipFailed,
+    /// Continue collecting results even if this step fails; evaluate outcome later.
     Continue,
 }
 

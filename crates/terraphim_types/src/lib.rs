@@ -1,3 +1,4 @@
+#![warn(missing_docs)]
 //! Core type definitions for the Terraphim AI system.
 //!
 //! This crate provides the fundamental data structures used throughout the Terraphim ecosystem:
@@ -1827,6 +1828,10 @@ impl std::fmt::Display for RotStatus {
     }
 }
 
+/// A multi-turn conversation between a user and the Terraphim AI system.
+///
+/// Holds the full message history, shared context items, and metadata
+/// needed to continue or replay the conversation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]

@@ -38,18 +38,23 @@ use uuid::Uuid;
 /// Errors for the shared learning store.
 #[derive(Debug, Error)]
 pub enum LearningError {
+    /// A persistence backend error occurred.
     #[error("storage error: {0}")]
     Storage(String),
 
+    /// A JSON serialisation or deserialisation error occurred.
     #[error("serialization error: {0}")]
     Serialization(#[from] serde_json::Error),
 
+    /// The supplied trust level string is not a recognised variant.
     #[error("invalid trust level: {0}")]
     InvalidTrustLevel(String),
 
+    /// No learning was found for the given identifier.
     #[error("learning not found: {0}")]
     NotFound(String),
 
+    /// An I/O error occurred, typically while writing context files.
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 }
@@ -100,12 +105,19 @@ impl std::str::FromStr for TrustLevel {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum LearningCategory {
+    /// An LLM model returned an error or behaved unexpectedly.
     ModelError,
+    /// A pipeline step failed during agent execution.
     StepFailure,
+    /// A tool was unavailable or produced unexpected results.
     ToolHealth,
+    /// A general behavioural or process pattern.
     Pattern,
+    /// A practical tip for improving agent reliability or efficiency.
     Tip,
+    /// An unexpected timing anomaly, such as a timeout or latency spike.
     TimingAnomaly,
+    /// A pattern that recurs across multiple agent runs.
     RecurringPattern,
 }
 
@@ -145,36 +157,53 @@ impl std::str::FromStr for LearningCategory {
 /// A shared learning extracted from agent runs.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Learning {
+    /// Unique identifier for this learning (UUID v4).
     pub id: String,
+    /// Name of the agent that originally produced this learning.
     pub source_agent: String,
+    /// Category classifying the type of learning.
     pub category: LearningCategory,
+    /// Short human-readable summary of the learning.
     pub summary: String,
+    /// Optional extended description or remediation steps.
     pub details: Option<String>,
     /// Agents this learning applies to. Empty means all agents.
     pub applicable_agents: Vec<String>,
+    /// Current trust level, auto-promoted as more agents confirm effectiveness.
     pub trust_level: TrustLevel,
     /// Shell command that must exit 0 for this learning to remain valid.
     pub verify_pattern: Option<String>,
+    /// Number of times this learning has been applied by any agent.
     pub applied_count: u32,
+    /// Number of times this learning has been confirmed as effective.
     pub effective_count: u32,
     /// Distinct agent names that have applied or confirmed this learning.
     #[serde(default)]
     pub agent_names: Vec<String>,
+    /// Timestamp at which the learning was first created.
     pub created_at: DateTime<Utc>,
+    /// Timestamp of the most recent update to this learning.
     pub updated_at: DateTime<Utc>,
+    /// Timestamp at which the learning was archived, if applicable.
     pub archived_at: Option<DateTime<Utc>>,
 }
 
 /// Input for creating a new learning (no id/timestamps).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NewLearning {
+    /// Name of the agent submitting this learning.
     pub source_agent: String,
+    /// Category classifying the type of learning.
     pub category: LearningCategory,
+    /// Short human-readable summary of the learning.
     pub summary: String,
+    /// Optional extended description or remediation steps.
     #[serde(default)]
     pub details: Option<String>,
+    /// Agent names this learning applies to; empty means all agents.
     #[serde(default)]
     pub applicable_agents: Vec<String>,
+    /// Optional shell command that must exit 0 to validate this learning.
     #[serde(default)]
     pub verify_pattern: Option<String>,
 }
@@ -228,6 +257,7 @@ pub struct InMemoryLearningPersistence {
 }
 
 impl InMemoryLearningPersistence {
+    /// Create a new, empty in-memory learning persistence store.
     pub fn new() -> Self {
         Self {
             data: std::sync::RwLock::new(HashMap::new()),
@@ -402,6 +432,7 @@ impl LearningPersistence for InMemoryLearningPersistence {
 /// Each learning is stored as a JSON document keyed by `adf/learnings/{uuid}`.
 /// An index document at `adf/learnings/_index` maps ids for listing/querying.
 pub struct DeviceStorageLearningPersistence {
+    /// Storage key prefix, e.g. `adf/learnings`.
     key_prefix: String,
     /// In-memory cache loaded from persistence on startup.
     cache: tokio::sync::RwLock<HashMap<String, Learning>>,
@@ -665,7 +696,9 @@ impl LearningPersistence for DeviceStorageLearningPersistence {
 /// Wraps a `LearningPersistence` impl and adds context-file generation
 /// and JSONL import capabilities.
 pub struct SharedLearningStore {
+    /// Underlying persistence backend.
     persistence: Box<dyn LearningPersistence>,
+    /// Minimum trust level required for learnings to be returned by queries.
     min_trust: TrustLevel,
 }
 
@@ -691,24 +724,29 @@ impl SharedLearningStore {
         self.persistence.insert(learning).await
     }
 
+    /// Retrieve a learning by its unique identifier.
     pub async fn get(&self, id: &str) -> Result<Option<Learning>, LearningError> {
         self.persistence.get(id).await
     }
 
+    /// Query learnings relevant to the given agent, using the store's minimum trust level.
     pub async fn query_relevant(&self, agent_name: &str) -> Result<Vec<Learning>, LearningError> {
         self.persistence
             .query_relevant(agent_name, self.min_trust)
             .await
     }
 
+    /// Record that a learning was applied by the given agent.
     pub async fn record_applied(&self, id: &str, applied_by: &str) -> Result<(), LearningError> {
         self.persistence.record_applied(id, applied_by).await
     }
 
+    /// Record that a learning was confirmed effective by the given agent, and auto-promote trust.
     pub async fn record_effective(&self, id: &str, applied_by: &str) -> Result<(), LearningError> {
         self.persistence.record_effective(id, applied_by).await
     }
 
+    /// Archive L0 learnings that have not been updated within `max_age_days` days.
     pub async fn archive_stale(&self, max_age_days: u32) -> Result<usize, LearningError> {
         self.persistence.archive_stale(max_age_days).await
     }
@@ -812,6 +850,9 @@ impl SharedLearningStore {
     }
 }
 
+/// Run an async future to completion on the current Tokio runtime, blocking the calling thread.
+///
+/// Used to adapt the async persistence layer to the synchronous `LearningStore` trait.
 fn block_on<F: std::future::Future>(fut: F) -> F::Output {
     tokio::task::block_in_place(|| {
         let rt = tokio::runtime::Handle::current();
@@ -819,6 +860,7 @@ fn block_on<F: std::future::Future>(fut: F) -> F::Output {
     })
 }
 
+/// Convert a `terraphim_types` trust level to the local `TrustLevel` enum.
 fn convert_trust(tl: terraphim_types::shared_learning::TrustLevel) -> TrustLevel {
     match tl {
         terraphim_types::shared_learning::TrustLevel::L0 => TrustLevel::L0,
@@ -828,6 +870,7 @@ fn convert_trust(tl: terraphim_types::shared_learning::TrustLevel) -> TrustLevel
     }
 }
 
+/// Convert a local `Learning` into the `terraphim_types` `SharedLearning` representation.
 fn to_shared_learning(l: &Learning) -> terraphim_types::shared_learning::SharedLearning {
     let mut sl = terraphim_types::shared_learning::SharedLearning::new(
         l.summary.clone(),

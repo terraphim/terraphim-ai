@@ -25,54 +25,83 @@ struct GiteaWebhookPayload {
     repository: GiteaRepository,
 }
 
+/// A single comment on a Gitea issue or pull request.
 #[derive(Debug, Deserialize)]
 struct GiteaComment {
+    /// Unique numeric identifier of this comment.
     id: u64,
+    /// Raw text body of the comment.
     body: String,
+    /// Author of the comment.
     user: GiteaUser,
+    /// ISO-8601 timestamp when the comment was created.
     created_at: String,
 }
 
+/// A Gitea user identity extracted from webhook payloads.
 #[derive(Debug, Deserialize)]
 pub struct GiteaUser {
+    /// The user's Gitea username (login handle).
     pub login: String,
 }
 
+/// Minimal issue data embedded in a Gitea issue_comment webhook payload.
 #[derive(Debug, Deserialize)]
 struct GiteaIssue {
+    /// Issue number within the repository.
     number: u64,
+    /// Title of the issue.
     title: String,
+    /// Current state of the issue, e.g. `"open"` or `"closed"`.
     state: String,
 }
 
+/// Repository identity extracted from Gitea webhook payloads.
 #[derive(Debug, Deserialize)]
 pub struct GiteaRepository {
+    /// Full repository name in `owner/repo` format, e.g. `"terraphim/terraphim-ai"`.
     pub full_name: String,
 }
 
 /// Gitea webhook payload for pull_request events.
 #[derive(Debug, Deserialize)]
 pub struct GiteaPullRequestPayload {
+    /// Action that triggered the event, e.g. `"opened"`, `"synchronize"`, `"closed"`.
     pub action: String,
+    /// Pull request number within the repository.
     pub number: u64,
+    /// Detailed fields for the pull request.
     pub pull_request: PullRequestFields,
+    /// Repository in which the pull request was opened.
     pub repository: GiteaRepository,
 }
 
+/// Detailed fields for a Gitea pull request embedded in webhook payloads.
 #[derive(Debug, Deserialize)]
 pub struct PullRequestFields {
+    /// Head (source) branch reference of the pull request.
     pub head: PrRef,
+    /// Base (target) branch reference of the pull request.
     pub base: PrRef,
+    /// Author who opened the pull request.
     pub user: GiteaUser,
+    /// Title of the pull request.
     pub title: String,
+    /// Whether the pull request is marked as a draft.
     pub draft: bool,
+    /// Total number of lines added across all commits.
     pub additions: u32,
+    /// Total number of lines deleted across all commits.
     pub deletions: u32,
 }
 
+/// A git ref (branch or tag) endpoint in a pull request, carrying both the
+/// branch name and the resolved commit SHA.
 #[derive(Debug, Deserialize)]
 pub struct PrRef {
+    /// Full commit SHA at the tip of this ref.
     pub sha: String,
+    /// Branch or tag name, deserialized from the JSON `ref` key.
     #[serde(rename = "ref")]
     pub ref_name: String,
 }
@@ -80,34 +109,54 @@ pub struct PrRef {
 /// A dispatch request sent from the webhook handler to the orchestrator.
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub enum WebhookDispatch {
+    /// Spawn a named ADF agent in response to an `@adf:name` mention.
     SpawnAgent {
+        /// Name of the agent to spawn.
         agent_name: String,
         /// Project extracted from a qualified `@adf:project/name` mention, or
         /// `None` for unqualified `@adf:name` mentions.
         detected_project: Option<String>,
+        /// Issue number the mention appeared on.
         issue_number: u64,
+        /// Comment ID that contained the mention.
         comment_id: u64,
+        /// Full text body of the triggering comment.
         context: String,
         /// Optional synthetic event for direct dispatch of event-only agents.
         #[serde(default)]
         synthetic_event: Option<SyntheticEvent>,
     },
+    /// Spawn a named persona in response to an `@adf:persona:name` mention.
     SpawnPersona {
+        /// Name of the persona to invoke.
         persona_name: String,
+        /// Issue number the mention appeared on.
         issue_number: u64,
+        /// Comment ID that contained the mention.
         comment_id: u64,
+        /// Full text body of the triggering comment.
         context: String,
     },
+    /// Trigger a compound review across all registered reviewers for an issue.
     CompoundReview {
+        /// Issue number to review.
         issue_number: u64,
+        /// Comment ID that triggered the compound review.
         comment_id: u64,
     },
+    /// Trigger a structural PR review for a newly opened or updated pull request.
     ReviewPr {
+        /// Pull request number to review.
         pr_number: u64,
+        /// Project identifier derived from the repository name.
         project: String,
+        /// Commit SHA at the head of the pull request.
         head_sha: String,
+        /// Gitea login of the PR author.
         author_login: String,
+        /// Title of the pull request.
         title: String,
+        /// Sum of additions and deletions (lines of change) for the PR.
         diff_loc: u32,
     },
     /// Push event dispatch — triggers the deterministic `build-runner` agent
@@ -164,6 +213,7 @@ fn group_alias_members<'a>(alias: &str, agent_names: &'a [String]) -> Vec<&'a st
         .collect()
 }
 
+/// Deserialise a JSON null or missing array as an empty `Vec<T>`.
 fn deserialize_null_default_vec<'de, D, T>(deserializer: D) -> Result<Vec<T>, D::Error>
 where
     D: serde::Deserializer<'de>,
@@ -172,6 +222,7 @@ where
     Option::<Vec<T>>::deserialize(deserializer).map(|v| v.unwrap_or_default())
 }
 
+/// Deserialise a JSON null or missing value as `T::default()`.
 fn deserialize_null_default<'de, D, T>(deserializer: D) -> Result<T, D::Error>
 where
     D: serde::Deserializer<'de>,
@@ -183,29 +234,41 @@ where
 /// Gitea webhook payload for `push` events (Phase 3).
 #[derive(Debug, Deserialize)]
 pub struct GiteaPushPayload {
+    /// Full git ref that was pushed, e.g. `"refs/heads/main"`.
     #[serde(rename = "ref")]
     pub ref_name: String,
+    /// Commit SHA before the push (all zeros for a newly created branch).
     pub before: String,
+    /// Commit SHA after the push (the new tip).
     pub after: String,
+    /// Identity of the user who performed the push.
     #[serde(default, deserialize_with = "deserialize_null_default")]
     pub pusher: GiteaPusher,
+    /// Repository that received the push.
     pub repository: GiteaRepository,
+    /// List of commits included in this push.
     #[serde(default, deserialize_with = "deserialize_null_default_vec")]
     pub commits: Vec<GiteaPushCommit>,
 }
 
+/// Identity of the user who performed a push, extracted from push webhook payloads.
 #[derive(Debug, Default, Deserialize)]
 pub struct GiteaPusher {
+    /// Gitea login of the pusher; empty string when omitted by the server.
     #[serde(default)]
     pub login: String,
 }
 
+/// File change summary for a single commit in a push webhook payload.
 #[derive(Debug, Deserialize)]
 pub struct GiteaPushCommit {
+    /// Paths of files added by this commit.
     #[serde(default, deserialize_with = "deserialize_null_default_vec")]
     pub added: Vec<String>,
+    /// Paths of files removed by this commit.
     #[serde(default, deserialize_with = "deserialize_null_default_vec")]
     pub removed: Vec<String>,
+    /// Paths of files modified by this commit.
     #[serde(default, deserialize_with = "deserialize_null_default_vec")]
     pub modified: Vec<String>,
 }
@@ -213,10 +276,15 @@ pub struct GiteaPushCommit {
 /// Shared state for the webhook handler.
 #[derive(Clone)]
 pub struct WebhookState {
+    /// List of all registered agent names, used for mention matching and group alias expansion.
     pub agent_names: Vec<String>,
+    /// Registry of available personas, used to resolve `@adf:persona:name` mentions.
     pub persona_registry: std::sync::Arc<PersonaRegistry>,
+    /// Channel sender used to forward parsed dispatches to the orchestrator.
     pub dispatch_tx: tokio::sync::mpsc::Sender<WebhookDispatch>,
+    /// Optional shared secret for HMAC-SHA256 signature verification; `None` disables verification.
     pub secret: Option<String>,
+    /// Mapping from Gitea `owner/repo` full names to project identifiers.
     pub project_by_repo: std::collections::HashMap<String, String>,
 }
 
