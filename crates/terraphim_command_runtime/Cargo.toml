@@ -1,0 +1,17 @@
+[package]
+name = "terraphim_command_runtime"
+version = "0.1.0"
+edition.workspace = true
+authors = ["Terraphim AI <team@terraphim.ai>"]
+description = "Shared command-runtime helpers for Terraphim CLI front-ends (config and role resolution)"
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
+license = "Apache-2.0"
+repository = "https://github.com/terraphim/terraphim-ai"
+readme = "../../README.md"
+
+[dependencies]
+terraphim_config = { path = "../terraphim_config", version = "1.0.0" }
+terraphim_persistence = { path = "../terraphim_persistence", version = "1.0.0" }
+terraphim_types = { path = "../terraphim_types", version = "1.0.0" }
+anyhow = { workspace = true }

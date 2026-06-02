@@ -8513,6 +8513,7 @@ dependencies = [
  "serial_test",
  "tempfile",
  "terraphim_automata",
+ "terraphim_command_runtime",
  "terraphim_config",
  "terraphim_hooks",
  "terraphim_persistence",
@@ -8638,6 +8639,7 @@ dependencies = [
  "tempfile",
  "terraphim_agent",
  "terraphim_automata",
+ "terraphim_command_runtime",
  "terraphim_config",
  "terraphim_hooks",
  "terraphim_middleware",
@@ -8854,6 +8856,16 @@ dependencies = [
  "tempfile",
  "thiserror 1.0.69",
  "toml 0.8.23",
+]
+
+[[package]]
+name = "terraphim_command_runtime"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "terraphim_config",
+ "terraphim_persistence",
+ "terraphim_types",
 ]
 
 [[package]]
