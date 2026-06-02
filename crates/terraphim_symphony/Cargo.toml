@@ -41,7 +41,7 @@ anyhow = "1"
 nix = { version = "0.27", features = ["process", "signal"] }
 
 # Issue tracker abstraction
-terraphim_tracker = { path = "../terraphim_tracker" }
+terraphim_tracker = { version = "1.20.2", registry = "terraphim" }
 
 # File watching (for WORKFLOW.md hot-reload)
 notify = { version = "6.1", optional = true }

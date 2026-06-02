@@ -11,6 +11,17 @@ exclude = [
     # terraphim-config-persistence crates were extracted to the standalone
     # terraphim-config-persistence repo and are consumed from the registry (E2, #1910).
     # terraphim-service crates: consumed from the `terraphim` registry (E3, #1910).
+    # terraphim-agents crates: consumed from the `terraphim` registry (E4a, #1910).
+    "crates/terraphim_agent_evolution",
+    "crates/terraphim_agent_messaging",
+    "crates/terraphim_agent_registry",
+    "crates/terraphim_agent_supervisor",
+    "crates/terraphim_goal_alignment",
+    "crates/terraphim_kg_orchestration",
+    "crates/terraphim_multi_agent",
+    "crates/terraphim_orchestrator",
+    "crates/terraphim_task_decomposition",
+    "crates/terraphim_tracker",
     # Experimental crates
     "crates/terraphim_agent_application",
     "crates/terraphim_truthforge",

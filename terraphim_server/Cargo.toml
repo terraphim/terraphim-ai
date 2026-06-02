@@ -20,7 +20,7 @@ terraphim_settings = { version = "1.0.0", registry = "terraphim" }
 terraphim_types = { version = "1.0.0", registry = "terraphim", default-features = false }
 terraphim_automata = { version = "1.19.2", registry = "terraphim", default-features = false, features = ["tokio-runtime"] }
 terraphim_service = { version = "1.0.0", default-features = false, registry = "terraphim" }
-terraphim_multi_agent = { path = "../crates/terraphim_multi_agent", version = "1.0.0" }
+terraphim_multi_agent = { version = "1.0.0", registry = "terraphim" }
 
 
 anyhow = { workspace = true }
