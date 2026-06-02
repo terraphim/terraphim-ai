@@ -8,7 +8,7 @@ homepage = "https://terraphim.ai"
 repository = "https://github.com/terraphim/terraphim-ai"
 keywords = ["ai", "mcp", "server", "model-context-protocol"]
 license = "MIT"
-publish = false
+publish = ["terraphim"]  # E5 #1910: clients repo publishes to terraphim registry
 readme = "../../README.md"
 
 [[bin]]
@@ -27,7 +27,7 @@ fff-search = { version = "0.8.4" }
 terraphim_automata = { version = "1.20.2", registry = "terraphim", features = ["tokio-runtime"] }
 terraphim_config = { version = "1.20.2", registry = "terraphim" }
 terraphim_file_search = { version = "1.20.3", registry = "terraphim" }
-terraphim_hooks = { path = "../terraphim_hooks" }
+terraphim_hooks = { version = "1.20.2", path = "../terraphim_hooks", registry = "terraphim" }
 terraphim_rolegraph = { version = "1.20.2", registry = "terraphim" }
 terraphim_service = { version = "1.20.2", registry = "terraphim" }
 terraphim_types = { version = "1.20.2", registry = "terraphim" }

@@ -21,7 +21,7 @@ path = "src/bin/terraphim-lsp.rs"
 required-features = ["terraphim-lsp"]
 
 [dependencies]
-terraphim_negative_contribution = { path = "../terraphim_negative_contribution", version = "0.1.0" }
+terraphim_negative_contribution = { path = "../terraphim_negative_contribution", version = "0.1.0", registry = "terraphim" }
 terraphim_types = { version = "1.0.0", registry = "terraphim" }
 tower-lsp = "0.20"
 tokio = { workspace = true, features = ["full"] }

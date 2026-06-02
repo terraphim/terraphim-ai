@@ -1,7 +1,7 @@
 
 [workspace]
 resolver = "2"
-members = ["crates/*", "crates/terraphim_grep", "crates/terraphim_merge_coordinator", "terraphim_server", "terraphim_firecracker", "terraphim_ai_nodejs"]
+members = ["crates/*", "terraphim_server", "terraphim_firecracker", "terraphim_ai_nodejs"]
 # Note: terraphim_usage and terraphim_ccusage are new crates in crates/*
 exclude = [
     # terraphim-core crates (terraphim_types, terraphim_test_utils,
@@ -22,10 +22,23 @@ exclude = [
     "crates/terraphim_orchestrator",
     "crates/terraphim_task_decomposition",
     "crates/terraphim_tracker",
+    "crates/terraphim_spawner",
     # terraphim-kg-agents crates: consumed from the `terraphim` registry (E4b, #1910).
     "crates/terraphim_codebase_eval",
     "crates/terraphim_kg_agents",
     "crates/terraphim_kg_linter",
+    # clients-and-integrations crates: consumed from the `terraphim` registry (E5, #1910).
+    "crates/terraphim-session-analyzer",
+    "crates/terraphim_agent",
+    "crates/terraphim_cli",
+    "crates/terraphim_command_runtime",
+    "crates/terraphim_grep",
+    "crates/terraphim_hooks",
+    "crates/terraphim_lsp",
+    "crates/terraphim_mcp_server",
+    "crates/terraphim_negative_contribution",
+    "crates/terraphim_sessions",
+    "crates/terraphim_update",
     # Experimental crates
     "crates/terraphim_agent_application",
     "crates/terraphim_truthforge",
