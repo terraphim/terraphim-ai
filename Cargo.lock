@@ -8469,6 +8469,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "terraphim_gitea_runner"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "axum 0.8.9",
+ "base64",
+ "chrono",
+ "env_logger",
+ "log",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "terraphim_github_runner",
+ "thiserror 1.0.69",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "terraphim_github_runner"
 version = "0.1.0"
 dependencies = [

