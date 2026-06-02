@@ -1,7 +1,7 @@
 //! CLI integration tests for auto-routing (design step 4, tests T8 and T9).
 //!
-//! These tests shell out to `cargo run -p terraphim_agent` so they exercise the
-//! same dispatch path users hit. The fixture config is the existing
+//! These tests invoke the `terraphim-agent` binary built by the test harness so they
+//! exercise the same dispatch path users hit. The fixture config is the existing
 //! `crates/terraphim_agent/tests/test_config.json` (a single-role config), which
 //! is enough for these assertions because:
 //!   - T8 (explicit --role): asserts that stderr is silent on `[auto-route]`,
@@ -12,19 +12,18 @@
 //!
 //! Tests scrub `RUST_LOG` and `JMAP_ACCESS_TOKEN` so dev-shell variables don't
 //! poison stderr matching. Marked `#[serial]` to avoid clobbering the workspace
-//! cargo build lock with peer tests in the same crate.
-
-use std::process::Command;
+//! build lock with peer tests in the same crate.
 
 use anyhow::{Context, Result};
+use assert_cmd::Command;
 use serde_json::Value;
 use serial_test::serial;
 
 const FIXTURE_CONFIG: &str = "tests/test_config.json";
 
 fn run_agent(args: &[&str]) -> Result<(String, String, i32)> {
-    let output = Command::new("cargo")
-        .args(["run", "-p", "terraphim_agent", "--quiet", "--"])
+    let output = Command::cargo_bin("terraphim-agent")
+        .context("terraphim-agent binary not found")?
         .args(args)
         .env_remove("RUST_LOG")
         .env_remove("JMAP_ACCESS_TOKEN")

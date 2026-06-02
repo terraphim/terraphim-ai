@@ -3,17 +3,12 @@
 //! Tests all TUI CLI commands including multi-term search, chat, graph, and more
 
 use anyhow::Result;
+use assert_cmd::Command;
 use serial_test::serial;
-use std::process::Command;
-use std::str;
 
 /// Helper function to run TUI command with arguments
 fn run_tui_command(args: &[&str]) -> Result<(String, String, i32)> {
-    let mut cmd = Command::new("cargo");
-    cmd.args(["run", "-p", "terraphim_agent", "--"]).args(args);
-
-    let output = cmd.output()?;
-
+    let output = Command::cargo_bin("terraphim-agent")?.args(args).output()?;
     Ok((
         String::from_utf8_lossy(&output.stdout).to_string(),
         String::from_utf8_lossy(&output.stderr).to_string(),
