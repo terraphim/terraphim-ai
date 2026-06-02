@@ -8641,17 +8641,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "terraphim_codebase_eval"
-version = "1.20.3"
-dependencies = [
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 1.0.69",
- "toml 0.8.23",
-]
-
-[[package]]
 name = "terraphim_command_runtime"
 version = "0.1.0"
 dependencies = [
@@ -8765,47 +8754,6 @@ dependencies = [
  "terraphim_types",
  "thiserror 1.0.69",
  "tokio",
-]
-
-[[package]]
-name = "terraphim_kg_agents"
-version = "1.0.0"
-dependencies = [
- "async-trait",
- "fastrand",
- "log",
- "serde",
- "serde_json",
- "terraphim_agent_registry",
- "terraphim_agent_supervisor",
- "terraphim_automata",
- "terraphim_rolegraph",
- "terraphim_task_decomposition",
- "terraphim_types",
- "thiserror 1.0.69",
- "tokio",
- "tokio-test",
- "uuid",
-]
-
-[[package]]
-name = "terraphim_kg_linter"
-version = "0.1.0"
-dependencies = [
- "aho-corasick",
- "clap",
- "env_logger",
- "log",
- "regex",
- "serde",
- "serde_json",
- "serde_yaml",
- "tempfile",
- "terraphim_automata",
- "terraphim_types",
- "thiserror 1.0.69",
- "tokio",
- "walkdir",
 ]
 
 [[package]]
@@ -9230,28 +9178,6 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "tracing",
-]
-
-[[package]]
-name = "terraphim_task_decomposition"
-version = "1.0.0"
-source = "sparse+https://git.terraphim.cloud/api/packages/terraphim/cargo/"
-checksum = "df6a1a85b81b1c3ebba74ec191c31e0c8aece9903c67a4a6207bf65fc6b5875b"
-dependencies = [
- "ahash",
- "async-trait",
- "chrono",
- "futures-util",
- "indexmap 2.14.0",
- "log",
- "serde",
- "serde_json",
- "terraphim_automata",
- "terraphim_rolegraph",
- "terraphim_types",
- "thiserror 1.0.69",
- "tokio",
- "uuid",
 ]
 
 [[package]]

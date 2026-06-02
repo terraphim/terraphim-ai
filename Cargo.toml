@@ -22,6 +22,10 @@ exclude = [
     "crates/terraphim_orchestrator",
     "crates/terraphim_task_decomposition",
     "crates/terraphim_tracker",
+    # terraphim-kg-agents crates: consumed from the `terraphim` registry (E4b, #1910).
+    "crates/terraphim_codebase_eval",
+    "crates/terraphim_kg_agents",
+    "crates/terraphim_kg_linter",
     # Experimental crates
     "crates/terraphim_agent_application",
     "crates/terraphim_truthforge",
