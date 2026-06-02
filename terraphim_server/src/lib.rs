@@ -191,6 +191,134 @@ pub struct AppState {
     pub websocket_broadcaster: workflows::WebSocketBroadcaster,
 }
 
+/// Build the application router: all API routes, shared `AppState`, and layers.
+///
+/// Single source of truth for route composition (ADR-005) so the production
+/// server and the test harness can never drift. `serve_static` toggles the
+/// static-asset fallback used by the production binary (the test harness omits
+/// it so unmatched paths surface as 404s).
+pub fn build_router(
+    app_state: AppState,
+    tx: tokio::sync::broadcast::Sender<IndexedDocument>,
+    summarization_manager: Arc<SummarizationManager>,
+    serve_static: bool,
+) -> Router {
+    let router = Router::new()
+        .route("/health", get(health))
+        .route("/documents", post(create_document))
+        .route("/documents/", post(create_document))
+        .route("/documents/search", get(search_documents))
+        .route("/documents/search", post(search_documents_post))
+        .route("/documents/summarize", post(api::summarize_document))
+        .route("/documents/summarize/", post(api::summarize_document))
+        .route("/summarization/status", get(api::get_summarization_status))
+        .route("/summarization/status/", get(api::get_summarization_status))
+        .route(
+            "/documents/async_summarize",
+            post(api::async_summarize_document),
+        )
+        .route(
+            "/documents/async_summarize/",
+            post(api::async_summarize_document),
+        )
+        .route("/summarization/batch", post(api::batch_summarize_documents))
+        .route(
+            "/summarization/batch/",
+            post(api::batch_summarize_documents),
+        )
+        .route(
+            "/summarization/task/{task_id}/status",
+            get(api::get_task_status),
+        )
+        .route(
+            "/summarization/task/{task_id}/status/",
+            get(api::get_task_status),
+        )
+        .route(
+            "/summarization/task/{task_id}/cancel",
+            post(api::cancel_task),
+        )
+        .route(
+            "/summarization/task/{task_id}/cancel/",
+            post(api::cancel_task),
+        )
+        .route("/summarization/queue/stats", get(api::get_queue_stats))
+        .route("/summarization/queue/stats/", get(api::get_queue_stats))
+        .route("/chat", post(api::chat_completion))
+        .route("/chat/", post(api::chat_completion))
+        .route("/config", get(api::get_config))
+        .route("/config/", get(api::get_config))
+        .route("/config", post(api::update_config))
+        .route("/config/", post(api::update_config))
+        .route("/config/schema", get(api::get_config_schema))
+        .route("/config/schema/", get(api::get_config_schema))
+        .route("/config/selected_role", post(api::update_selected_role))
+        .route("/config/selected_role/", post(api::update_selected_role))
+        .route("/rolegraph", get(get_rolegraph))
+        .route("/rolegraph/", get(get_rolegraph))
+        .route(
+            "/roles/{role_name}/kg_search",
+            get(find_documents_by_kg_term),
+        )
+        .route("/thesaurus/{role_name}", get(api::get_thesaurus))
+        .route(
+            "/autocomplete/{role_name}/{query}",
+            get(api::get_autocomplete),
+        )
+        .route("/conversations", post(api::create_conversation))
+        .route("/conversations", get(api::list_conversations))
+        .route("/conversations/", post(api::create_conversation))
+        .route("/conversations/", get(api::list_conversations))
+        .route("/conversations/{id}", get(api::get_conversation))
+        .route("/conversations/{id}/", get(api::get_conversation))
+        .route(
+            "/conversations/{id}/messages",
+            post(api::add_message_to_conversation),
+        )
+        .route(
+            "/conversations/{id}/messages/",
+            post(api::add_message_to_conversation),
+        )
+        .route(
+            "/conversations/{id}/context",
+            post(api::add_context_to_conversation),
+        )
+        .route(
+            "/conversations/{id}/context/",
+            post(api::add_context_to_conversation),
+        )
+        .route(
+            "/conversations/{id}/search-context",
+            post(api::add_search_context_to_conversation),
+        )
+        .route(
+            "/conversations/{id}/search-context/",
+            post(api::add_search_context_to_conversation),
+        )
+        .route(
+            "/conversations/{id}/context/{context_id}",
+            delete(api::delete_context_from_conversation).put(api::update_context_in_conversation),
+        )
+        .merge(workflows::create_router());
+
+    let router = if serve_static {
+        router.fallback(static_handler)
+    } else {
+        router
+    };
+
+    router
+        .with_state(app_state)
+        .layer(Extension(tx))
+        .layer(Extension(summarization_manager))
+        .layer(
+            CorsLayer::new()
+                .allow_origin(Any)
+                .allow_headers(Any)
+                .allow_methods(Any),
+        )
+}
+
 /// Starts the Axum HTTP server, builds all routes, and serves until shutdown.
 pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigState) -> Result<()> {
     log::info!("Starting axum server");
@@ -498,117 +626,7 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
         websocket_broadcaster,
     };
 
-    let app = Router::new()
-        .route("/health", get(health))
-        // .route("/documents", get(list_documents))
-        .route("/documents", post(create_document))
-        .route("/documents/", post(create_document))
-        .route("/documents/search", get(search_documents))
-        .route("/documents/search", post(search_documents_post))
-        .route("/documents/summarize", post(api::summarize_document))
-        .route("/documents/summarize/", post(api::summarize_document))
-        .route("/summarization/status", get(api::get_summarization_status))
-        .route("/summarization/status/", get(api::get_summarization_status))
-        // New async summarization endpoints
-        .route(
-            "/documents/async_summarize",
-            post(api::async_summarize_document),
-        )
-        .route(
-            "/documents/async_summarize/",
-            post(api::async_summarize_document),
-        )
-        .route("/summarization/batch", post(api::batch_summarize_documents))
-        .route(
-            "/summarization/batch/",
-            post(api::batch_summarize_documents),
-        )
-        .route(
-            "/summarization/task/{task_id}/status",
-            get(api::get_task_status),
-        )
-        .route(
-            "/summarization/task/{task_id}/status/",
-            get(api::get_task_status),
-        )
-        .route(
-            "/summarization/task/{task_id}/cancel",
-            post(api::cancel_task),
-        )
-        .route(
-            "/summarization/task/{task_id}/cancel/",
-            post(api::cancel_task),
-        )
-        .route("/summarization/queue/stats", get(api::get_queue_stats))
-        .route("/summarization/queue/stats/", get(api::get_queue_stats))
-        .route("/chat", post(api::chat_completion))
-        .route("/chat/", post(api::chat_completion))
-        .route("/config", get(api::get_config))
-        .route("/config/", get(api::get_config))
-        .route("/config", post(api::update_config))
-        .route("/config/", post(api::update_config))
-        .route("/config/schema", get(api::get_config_schema))
-        .route("/config/schema/", get(api::get_config_schema))
-        .route("/config/selected_role", post(api::update_selected_role))
-        .route("/config/selected_role/", post(api::update_selected_role))
-        .route("/rolegraph", get(get_rolegraph))
-        .route("/rolegraph/", get(get_rolegraph))
-        .route(
-            "/roles/{role_name}/kg_search",
-            get(find_documents_by_kg_term),
-        )
-        .route("/thesaurus/{role_name}", get(api::get_thesaurus))
-        .route(
-            "/autocomplete/{role_name}/{query}",
-            get(api::get_autocomplete),
-        )
-        // Conversation management routes
-        .route("/conversations", post(api::create_conversation))
-        .route("/conversations", get(api::list_conversations))
-        .route("/conversations/", post(api::create_conversation))
-        .route("/conversations/", get(api::list_conversations))
-        .route("/conversations/{id}", get(api::get_conversation))
-        .route("/conversations/{id}/", get(api::get_conversation))
-        .route(
-            "/conversations/{id}/messages",
-            post(api::add_message_to_conversation),
-        )
-        .route(
-            "/conversations/{id}/messages/",
-            post(api::add_message_to_conversation),
-        )
-        .route(
-            "/conversations/{id}/context",
-            post(api::add_context_to_conversation),
-        )
-        .route(
-            "/conversations/{id}/context/",
-            post(api::add_context_to_conversation),
-        )
-        .route(
-            "/conversations/{id}/search-context",
-            post(api::add_search_context_to_conversation),
-        )
-        .route(
-            "/conversations/{id}/search-context/",
-            post(api::add_search_context_to_conversation),
-        )
-        .route(
-            "/conversations/{id}/context/{context_id}",
-            delete(api::delete_context_from_conversation).put(api::update_context_in_conversation),
-        )
-        // Add workflow management routes
-        .merge(workflows::create_router())
-        .fallback(static_handler)
-        .with_state(app_state)
-        .layer(Extension(tx))
-        .layer(Extension(summarization_manager))
-        .layer(
-            CorsLayer::new()
-                .allow_origin(Any)
-                .allow_headers(Any)
-                .allow_methods(Any),
-        );
+    let app = build_router(app_state, tx, summarization_manager, true);
 
     // Note: Prefixing the host with `http://` makes the URL clickable in some terminals
     println!("listening on http://{server_hostname}");
@@ -689,112 +707,5 @@ pub async fn build_router_for_tests() -> Router {
         websocket_broadcaster,
     };
 
-    Router::new()
-        .route("/health", get(health))
-        .route("/documents", post(create_document))
-        .route("/documents/", post(create_document))
-        .route("/documents/search", get(search_documents))
-        .route("/documents/search", post(search_documents_post))
-        .route("/documents/summarize", post(api::summarize_document))
-        .route("/documents/summarize/", post(api::summarize_document))
-        .route("/summarization/status", get(api::get_summarization_status))
-        .route("/summarization/status/", get(api::get_summarization_status))
-        .route(
-            "/documents/async_summarize",
-            post(api::async_summarize_document),
-        )
-        .route(
-            "/documents/async_summarize/",
-            post(api::async_summarize_document),
-        )
-        .route("/summarization/batch", post(api::batch_summarize_documents))
-        .route(
-            "/summarization/batch/",
-            post(api::batch_summarize_documents),
-        )
-        .route(
-            "/summarization/task/{task_id}/status",
-            get(api::get_task_status),
-        )
-        .route(
-            "/summarization/task/{task_id}/status/",
-            get(api::get_task_status),
-        )
-        .route(
-            "/summarization/task/{task_id}/cancel",
-            post(api::cancel_task),
-        )
-        .route(
-            "/summarization/task/{task_id}/cancel/",
-            post(api::cancel_task),
-        )
-        .route("/summarization/queue/stats", get(api::get_queue_stats))
-        .route("/summarization/queue/stats/", get(api::get_queue_stats))
-        .route("/chat", post(api::chat_completion))
-        .route("/chat/", post(api::chat_completion))
-        .route("/config", get(api::get_config))
-        .route("/config/", get(api::get_config))
-        .route("/config", post(api::update_config))
-        .route("/config/", post(api::update_config))
-        .route("/config/schema", get(api::get_config_schema))
-        .route("/config/schema/", get(api::get_config_schema))
-        .route("/config/selected_role", post(api::update_selected_role))
-        .route("/config/selected_role/", post(api::update_selected_role))
-        .route("/rolegraph", get(get_rolegraph))
-        .route("/rolegraph/", get(get_rolegraph))
-        .route(
-            "/roles/{role_name}/kg_search",
-            get(find_documents_by_kg_term),
-        )
-        .route("/thesaurus/{role_name}", get(api::get_thesaurus))
-        .route(
-            "/autocomplete/{role_name}/{query}",
-            get(api::get_autocomplete),
-        )
-        // Conversation management routes
-        .route("/conversations", post(api::create_conversation))
-        .route("/conversations", get(api::list_conversations))
-        .route("/conversations/", post(api::create_conversation))
-        .route("/conversations/", get(api::list_conversations))
-        .route("/conversations/{id}", get(api::get_conversation))
-        .route("/conversations/{id}/", get(api::get_conversation))
-        .route(
-            "/conversations/{id}/messages",
-            post(api::add_message_to_conversation),
-        )
-        .route(
-            "/conversations/{id}/messages/",
-            post(api::add_message_to_conversation),
-        )
-        .route(
-            "/conversations/{id}/context",
-            post(api::add_context_to_conversation),
-        )
-        .route(
-            "/conversations/{id}/context/",
-            post(api::add_context_to_conversation),
-        )
-        .route(
-            "/conversations/{id}/search-context",
-            post(api::add_search_context_to_conversation),
-        )
-        .route(
-            "/conversations/{id}/search-context/",
-            post(api::add_search_context_to_conversation),
-        )
-        .route(
-            "/conversations/{id}/context/{context_id}",
-            delete(api::delete_context_from_conversation).put(api::update_context_in_conversation),
-        )
-        // Add workflow management routes for tests
-        .merge(workflows::create_router())
-        .with_state(app_state)
-        .layer(Extension(tx))
-        .layer(Extension(summarization_manager))
-        .layer(
-            CorsLayer::new()
-                .allow_origin(Any)
-                .allow_headers(Any)
-                .allow_methods(Any),
-        )
+    build_router(app_state, tx, summarization_manager, false)
 }
