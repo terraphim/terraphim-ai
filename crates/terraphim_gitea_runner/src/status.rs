@@ -48,6 +48,20 @@ impl SingleStatusWriter {
         }
     }
 
+    /// Idempotency gate: record `(sha, context) -> state` and report whether a
+    /// network post is warranted. Returns `false` (skip the post) when the same
+    /// `(sha, context)` was already set to the same `state` -- the single-writer
+    /// guarantee that keeps the native lane from re-posting an identical status.
+    fn should_send(&self, sha: &str, context: &str, state: StatusState) -> bool {
+        let mut seen = self.seen.lock().unwrap();
+        let key = (sha.to_string(), context.to_string());
+        if seen.get(&key).map(|s| s.as_str()) == Some(state.as_str()) {
+            return false;
+        }
+        seen.insert(key, state.as_str().to_string());
+        true
+    }
+
     /// Post a commit status. No-ops if the same `(sha, context)` was already set
     /// to the same `state`.
     pub async fn post(
@@ -59,13 +73,8 @@ impl SingleStatusWriter {
         context: &str,
         description: &str,
     ) -> Result<()> {
-        {
-            let mut seen = self.seen.lock().unwrap();
-            let key = (sha.to_string(), context.to_string());
-            if seen.get(&key).map(|s| s.as_str()) == Some(state.as_str()) {
-                return Ok(());
-            }
-            seen.insert(key, state.as_str().to_string());
+        if !self.should_send(sha, context, state) {
+            return Ok(());
         }
         let url = format!(
             "{}/api/v1/repos/{}/{}/statuses/{}",
@@ -92,5 +101,33 @@ impl SingleStatusWriter {
             )));
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn idempotent_on_sha_context_state() {
+        let w = SingleStatusWriter::new("https://git.example", "tok");
+        // First transition to pending warrants a post.
+        assert!(w.should_send("deadbeef", "terraphim-native/build", StatusState::Pending));
+        // Same (sha, context, state) is deduplicated -- single writer, no re-post.
+        assert!(!w.should_send("deadbeef", "terraphim-native/build", StatusState::Pending));
+        // A genuine state transition for the same (sha, context) is allowed.
+        assert!(w.should_send("deadbeef", "terraphim-native/build", StatusState::Success));
+        assert!(!w.should_send("deadbeef", "terraphim-native/build", StatusState::Success));
+    }
+
+    #[test]
+    fn distinct_contexts_do_not_collide() {
+        let w = SingleStatusWriter::new("https://git.example", "tok");
+        // The native lane and the interim ADF lane write distinct contexts for the
+        // same sha and must each be allowed (coexistence guard, AC-8).
+        assert!(w.should_send("deadbeef", "terraphim-native/build", StatusState::Success));
+        assert!(w.should_send("deadbeef", "adf/build", StatusState::Success));
+        // Different sha, same context, also distinct.
+        assert!(w.should_send("cafef00d", "terraphim-native/build", StatusState::Success));
     }
 }

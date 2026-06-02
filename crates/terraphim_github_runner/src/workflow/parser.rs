@@ -261,6 +261,21 @@ mod payload_tests {
     fn empty_workflow_errors() {
         assert!(parse_single_workflow_yaml("name: empty\njobs: {}\n").is_err());
     }
+
+    #[test]
+    fn gzip_payload_is_detected_and_inflated() {
+        use std::io::Write;
+        let yaml = "jobs:\n  j:\n    steps:\n      - run: echo hi\n";
+        let mut encoder = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
+        encoder.write_all(yaml.as_bytes()).unwrap();
+        let gz = encoder.finish().unwrap();
+        // gzip magic header present so the inflate branch is taken.
+        assert_eq!(&gz[0..2], &[0x1f, 0x8b]);
+
+        let wf = parse_workflow_payload(&gz).unwrap();
+        assert_eq!(wf.steps.len(), 1);
+        assert_eq!(wf.steps[0].command, "echo hi");
+    }
 }
 
 /// Workflow parser using LLM for understanding

@@ -56,3 +56,65 @@ impl RunnerState {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample() -> RunnerState {
+        RunnerState {
+            uuid: "uuid-xyz".into(),
+            token: "super-secret-token".into(),
+            name: "terraphim-native-0".into(),
+            version: "0.1.0".into(),
+            labels: vec!["terraphim-native".into()],
+            ephemeral: false,
+        }
+    }
+
+    #[test]
+    fn save_then_load_round_trips_identity() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join(".runner");
+        let original = sample();
+        original.save(&path).unwrap();
+
+        let loaded = RunnerState::load(&path).unwrap().expect("state present");
+        assert_eq!(loaded.uuid, original.uuid);
+        assert_eq!(loaded.token, original.token);
+        assert_eq!(loaded.name, original.name);
+        assert_eq!(loaded.version, original.version);
+        assert_eq!(loaded.labels, original.labels);
+        assert_eq!(loaded.ephemeral, original.ephemeral);
+    }
+
+    #[test]
+    fn load_absent_file_is_none() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("does-not-exist");
+        assert!(RunnerState::load(&path).unwrap().is_none());
+    }
+
+    #[test]
+    fn debug_redacts_token() {
+        let dbg = format!("{:?}", sample());
+        assert!(dbg.contains("<redacted>"), "Debug should redact: {dbg}");
+        assert!(
+            !dbg.contains("super-secret-token"),
+            "token must not appear in Debug: {dbg}"
+        );
+        // Non-sensitive fields remain observable for diagnostics.
+        assert!(dbg.contains("uuid-xyz"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn saved_file_is_owner_only() {
+        use std::os::unix::fs::PermissionsExt;
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join(".runner");
+        sample().save(&path).unwrap();
+        let mode = std::fs::metadata(&path).unwrap().permissions().mode();
+        assert_eq!(mode & 0o777, 0o600, "expected 0600, got {:o}", mode & 0o777);
+    }
+}
