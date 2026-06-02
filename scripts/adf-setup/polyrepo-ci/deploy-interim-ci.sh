@@ -1,0 +1,109 @@
+#!/usr/bin/env bash
+# deploy-interim-ci.sh -- interim CI (Part A) for the #1910 polyrepos via ADF.
+#
+# Wires the 6 new Gitea polyrepos into the existing ADF orchestrator so each
+# push/PR gets an `adf/build` commit status, reusing rch + sccache. No act_runner.
+# Mirrors the proven better-auth-rust.toml pattern (project header + event_only
+# build-runner spawned by handle_push). Run ON bigbox after review.
+#
+# Idempotent: safe to re-run. Does NOT touch terraphim.toml or the orchestrator
+# binary -- only adds conf.d/<repo>.toml files, clones, and Gitea webhooks.
+#
+# Refs #1910. Convergence: each build-runner runs build-runner-llm.sh against the
+# repo's own BUILD.md (the single command source shared with the future native
+# runner), so cargo->rch transform + sccache->SeaweedFS apply automatically.
+set -euo pipefail
+
+GITEA_URL="${GITEA_URL:-https://git.terraphim.cloud}"
+ORG="${ORG:-terraphim}"
+CONFD="${CONFD:-/opt/ai-dark-factory/conf.d}"
+WORKROOT="${WORKROOT:-/home/alex/projects/terraphim}"
+RUNNER_SCRIPT="${RUNNER_SCRIPT:-/data/projects/terraphim/terraphim-ai/scripts/build-runner-llm.sh}"
+# ADF webhook receiver (HMAC). Override if the endpoint differs.
+ADF_WEBHOOK_URL="${ADF_WEBHOOK_URL:-http://172.18.0.1:9091/webhooks/gitea}"
+
+: "${GITEA_TOKEN:?set GITEA_TOKEN (the bigbox gitea token used by other conf.d projects)}"
+: "${ADF_WEBHOOK_SECRET:?set ADF_WEBHOOK_SECRET (the orchestrator HMAC secret)}"
+
+REPOS=(terraphim-core terraphim-config-persistence terraphim-service \
+       terraphim-agents terraphim-kg-agents terraphim-clients)
+
+emit_confd() {
+  local repo="$1" wd="$2"
+  cat > "${CONFD}/${repo}.toml" <<TOML
+[[projects]]
+id = "${repo}"
+name = "${repo}"
+working_dir = "${wd}"
+gitea = { owner = "${ORG}", repo = "${repo}", base_url = "${GITEA_URL}", token = "${GITEA_TOKEN}" }
+
+# Interim CI build-runner (Part A, #1910). event_only -> spawned by handle_push.
+# Runs build-runner-llm.sh against this repo's BUILD.md: KG transforms
+# cargo build/clippy/test -> rch exec (sccache->SeaweedFS); cargo fmt stays host.
+# Posts adf/build commit status. Retire on native-runner cutover (active_lane).
+[[agents]]
+evolution_enabled = true
+name = "${repo}-build-runner"
+layer = "Growth"
+cli_tool = "/bin/bash"
+max_cpu_seconds = 1800
+grace_period_secs = 30
+capabilities = ["build", "test", "adaptive-ci"]
+event_only = true
+project = "${repo}"
+task = '''
+source ~/.profile
+export GITEA_URL=${GITEA_URL}
+
+if [ -z "\${ADF_PUSH_SHA:-}" ]; then echo "build-runner: missing ADF_PUSH_SHA" >&2; exit 1; fi
+if [ -z "\${ADF_PUSH_REF:-}" ]; then echo "build-runner: missing ADF_PUSH_REF" >&2; exit 1; fi
+
+cd "\$GITEA_WORKING_DIR"
+git fetch origin "\$ADF_PUSH_REF"
+git checkout -f "\$ADF_PUSH_SHA"
+
+# Reuse the canonical KG-first runner against THIS repo's BUILD.md.
+# build-runner-llm.sh reads \$ADF_WORKING_DIR/BUILD.md, transforms cargo->rch,
+# and posts adf/build for \$ADF_PUSH_SHA on \$GITEA_OWNER/\$GITEA_REPO.
+export ADF_WORKING_DIR="\$GITEA_WORKING_DIR"
+bash ${RUNNER_SCRIPT}
+'''
+TOML
+  echo "  wrote ${CONFD}/${repo}.toml"
+}
+
+for repo in "${REPOS[@]}"; do
+  echo "=== ${repo} ==="
+  wd="${WORKROOT}/${repo}"
+
+  # 1. clone if absent (private repos -> token in URL, then scrub remote)
+  if [ ! -d "${wd}/.git" ]; then
+    echo "  cloning -> ${wd}"
+    git clone "https://oauth2:${GITEA_TOKEN}@git.terraphim.cloud/${ORG}/${repo}.git" "${wd}"
+    git -C "${wd}" remote set-url origin "${GITEA_URL}/${ORG}/${repo}.git"
+  else
+    echo "  clone present"
+  fi
+
+  # 2. conf.d project + build-runner agent
+  emit_confd "${repo}" "${wd}"
+
+  # 3. Gitea webhook -> ADF (push + pull_request), idempotent by URL
+  existing=$(curl -fsS -H "Authorization: token ${GITEA_TOKEN}" \
+    "${GITEA_URL}/api/v1/repos/${ORG}/${repo}/hooks" \
+    | python3 -c "import sys,json;print(any(h.get('config',{}).get('url')=='${ADF_WEBHOOK_URL}' for h in json.load(sys.stdin)))" 2>/dev/null || echo False)
+  if [ "${existing}" = "True" ]; then
+    echo "  webhook present"
+  else
+    curl -fsS -X POST -H "Authorization: token ${GITEA_TOKEN}" -H "Content-Type: application/json" \
+      "${GITEA_URL}/api/v1/repos/${ORG}/${repo}/hooks" \
+      -d "{\"type\":\"gitea\",\"active\":true,\"events\":[\"push\",\"pull_request\"],\"config\":{\"url\":\"${ADF_WEBHOOK_URL}\",\"content_type\":\"json\",\"secret\":\"${ADF_WEBHOOK_SECRET}\"}}" \
+      >/dev/null && echo "  webhook created"
+  fi
+done
+
+echo
+echo "Reload the orchestrator to pick up conf.d/*.toml:"
+echo "  sudo systemctl reload adf-orchestrator  ||  sudo systemctl restart adf-orchestrator"
+echo
+echo "Then verify per repo: push a no-op commit and watch for adf/build pending->success."
