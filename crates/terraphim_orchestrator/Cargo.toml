@@ -23,7 +23,7 @@ test-helpers = ["dep:tempfile"]
 
 [dependencies]
 # Terraphim internal crates
-terraphim_spawner = { path = "../terraphim_spawner", version = "1.0.0" }
+terraphim_spawner = { path = "../terraphim_spawner", version = "1.0.0", registry = "terraphim" }
 terraphim_router = { version = "1.0.0", registry = "terraphim" }
 terraphim_types = { version = "1.0.0", registry = "terraphim", features = ["kg-integration"] }
 terraphim_tracker = {  path = "../terraphim_tracker", version = "1.0.0", registry = "terraphim" }
