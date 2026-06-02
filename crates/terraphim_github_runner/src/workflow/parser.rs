@@ -99,6 +99,170 @@ fn default_timeout() -> u64 {
     300
 }
 
+fn indent_of(s: &str) -> usize {
+    s.len() - s.trim_start().len()
+}
+
+/// Parse a Gitea `WorkflowPayload` into a [`ParsedWorkflow`].
+///
+/// The payload is the SingleWorkflow YAML for one job (nektos/act format),
+/// already base64-decoded; it may be gzip-compressed. Used by the native Gitea
+/// runner (#1910). Returns an error if no `run:` steps are found.
+pub fn parse_workflow_payload(payload: &[u8]) -> Result<ParsedWorkflow> {
+    let yaml = if payload.len() >= 2 && payload[0] == 0x1f && payload[1] == 0x8b {
+        use std::io::Read;
+        let mut decoder = flate2::read::GzDecoder::new(payload);
+        let mut s = String::new();
+        decoder.read_to_string(&mut s).map_err(|e| {
+            GitHubRunnerError::WorkflowParsing(format!("failed to gunzip workflow payload: {e}"))
+        })?;
+        s
+    } else {
+        String::from_utf8(payload.to_vec()).map_err(|e| {
+            GitHubRunnerError::WorkflowParsing(format!("workflow payload is not valid UTF-8: {e}"))
+        })?
+    };
+    parse_single_workflow_yaml(&yaml)
+}
+
+/// Deterministic line-based parser for a single-job SingleWorkflow YAML.
+///
+/// Extracts each step's `run:` command (and optional `name:`) from
+/// `jobs.<job>.steps[]`. Handles inline `run:` and block scalars (`run: |`,
+/// `run: >`). `uses:` steps (marketplace actions) are skipped -- not supported
+/// in M1. The top-level `name:` (column 0) becomes the workflow name.
+pub fn parse_single_workflow_yaml(yaml: &str) -> Result<ParsedWorkflow> {
+    let mut wf = ParsedWorkflow {
+        trigger: "gitea".to_string(),
+        ..ParsedWorkflow::default()
+    };
+    let mut steps: Vec<WorkflowStep> = Vec::new();
+    let mut cur_name: Option<String> = None;
+    let mut cur_run: Option<String> = None;
+    let mut cur_uses = false;
+    // When collecting a block scalar: indent of the `run:` key.
+    let mut block_key_indent: Option<usize> = None;
+    let mut block_lines: Vec<String> = Vec::new();
+
+    fn push_step(
+        steps: &mut Vec<WorkflowStep>,
+        name: &mut Option<String>,
+        run: &mut Option<String>,
+        uses: &mut bool,
+    ) {
+        if !*uses {
+            if let Some(cmd) = run.take() {
+                let cmd = cmd.trim_end().to_string();
+                if !cmd.trim().is_empty() {
+                    let nm = name
+                        .clone()
+                        .unwrap_or_else(|| cmd.lines().next().unwrap_or("step").trim().to_string());
+                    steps.push(WorkflowStep {
+                        name: nm,
+                        command: cmd,
+                        working_dir: default_working_dir(),
+                        continue_on_error: false,
+                        timeout_seconds: default_timeout(),
+                    });
+                }
+            }
+        }
+        *name = None;
+        *run = None;
+        *uses = false;
+    }
+
+    for raw in yaml.lines() {
+        // If collecting a block scalar, consume more-indented (or blank) lines.
+        if let Some(key_indent) = block_key_indent {
+            if raw.trim().is_empty() || indent_of(raw) > key_indent {
+                block_lines.push(raw.trim_start().to_string());
+                continue;
+            }
+            // Block ended: commit it, then fall through to process this line.
+            cur_run = Some(block_lines.join("\n"));
+            block_key_indent = None;
+            block_lines.clear();
+        }
+
+        let ind = indent_of(raw);
+        let trimmed = raw.trim_start();
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            continue;
+        }
+
+        // A new list item under steps flushes the previous step.
+        if trimmed.starts_with("- ") {
+            push_step(&mut steps, &mut cur_name, &mut cur_run, &mut cur_uses);
+        }
+        let body = trimmed.strip_prefix("- ").unwrap_or(trimmed);
+
+        if let Some(rest) = body.strip_prefix("run:") {
+            let val = rest.trim();
+            if matches!(val, "|" | ">" | "|-" | ">-" | "|+" | ">+") {
+                block_key_indent = Some(ind);
+                block_lines.clear();
+            } else {
+                cur_run = Some(val.to_string());
+            }
+        } else if body.strip_prefix("uses:").is_some() {
+            cur_uses = true;
+        } else if let Some(rest) = body.strip_prefix("name:") {
+            if ind == 0 {
+                wf.name = rest.trim().to_string();
+            } else {
+                cur_name = Some(rest.trim().to_string());
+            }
+        }
+    }
+
+    // Flush a trailing block scalar and the final step.
+    if block_key_indent.is_some() {
+        cur_run = Some(block_lines.join("\n"));
+    }
+    push_step(&mut steps, &mut cur_name, &mut cur_run, &mut cur_uses);
+
+    if steps.is_empty() {
+        return Err(GitHubRunnerError::WorkflowParsing(
+            "no run: steps found in workflow payload".to_string(),
+        ));
+    }
+    wf.steps = steps;
+    Ok(wf)
+}
+
+#[cfg(test)]
+mod payload_tests {
+    use super::*;
+
+    #[test]
+    fn parses_inline_and_block_run_steps() {
+        let yaml = "name: CI\njobs:\n  build:\n    runs-on: terraphim-native\n    steps:\n      - name: Fmt\n        run: cargo fmt --all -- --check\n      - name: Build and test\n        run: |\n          cargo build --workspace\n          cargo test --workspace\n      - uses: actions/checkout@v4\n";
+        let wf = parse_single_workflow_yaml(yaml).unwrap();
+        assert_eq!(wf.name, "CI");
+        assert_eq!(wf.steps.len(), 2, "uses: step must be skipped");
+        assert_eq!(wf.steps[0].command, "cargo fmt --all -- --check");
+        assert_eq!(wf.steps[0].name, "Fmt");
+        assert_eq!(
+            wf.steps[1].command,
+            "cargo build --workspace\ncargo test --workspace"
+        );
+    }
+
+    #[test]
+    fn plain_payload_bytes_parse() {
+        let wf =
+            parse_workflow_payload(b"jobs:\n  j:\n    steps:\n      - run: echo hi\n").unwrap();
+        assert_eq!(wf.steps.len(), 1);
+        assert_eq!(wf.steps[0].command, "echo hi");
+    }
+
+    #[test]
+    fn empty_workflow_errors() {
+        assert!(parse_single_workflow_yaml("name: empty\njobs: {}\n").is_err());
+    }
+}
+
 /// Workflow parser using LLM for understanding
 pub struct WorkflowParser {
     llm_client: Arc<dyn LlmClient>,

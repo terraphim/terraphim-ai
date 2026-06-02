@@ -10,7 +10,11 @@ pub mod parser;
 pub mod vm_executor;
 
 pub use executor::{
-    CommandExecutor, CommandResult, MockCommandExecutor, WorkflowExecutor, WorkflowExecutorConfig,
+    CommandExecutor, CommandResult, HostCommandExecutor, MockCommandExecutor, WorkflowExecutor,
+    WorkflowExecutorConfig,
 };
-pub use parser::{ParsedWorkflow, WorkflowParser, WorkflowStep};
+pub use parser::{
+    ParsedWorkflow, WorkflowParser, WorkflowStep, parse_single_workflow_yaml,
+    parse_workflow_payload,
+};
 pub use vm_executor::{SimulatedVmExecutor, VmCommandExecutor};

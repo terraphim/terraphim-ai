@@ -131,6 +131,85 @@ impl CommandExecutor for MockCommandExecutor {
     }
 }
 
+/// Command executor that runs commands directly on the host (no VM).
+///
+/// Used by the native Gitea runner's host route (#1910 M1). Each command runs via
+/// `sh -c` in `base_dir` with the step timeout. Snapshots/rollback are unsupported
+/// (the runner must disable `snapshot_on_success`/`auto_rollback`), so they return
+/// errors that should never be reached.
+pub struct HostCommandExecutor {
+    base_dir: std::path::PathBuf,
+}
+
+impl HostCommandExecutor {
+    /// Create a host executor that runs commands in `base_dir` (the checkout root).
+    pub fn new(base_dir: impl Into<std::path::PathBuf>) -> Self {
+        Self {
+            base_dir: base_dir.into(),
+        }
+    }
+}
+
+#[async_trait]
+impl CommandExecutor for HostCommandExecutor {
+    async fn execute(
+        &self,
+        _session: &Session,
+        command: &str,
+        timeout: Duration,
+        _working_dir: &str,
+    ) -> Result<CommandResult> {
+        let start = std::time::Instant::now();
+        let child = tokio::process::Command::new("sh")
+            .arg("-c")
+            .arg(command)
+            .current_dir(&self.base_dir)
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .map_err(|e| crate::error::GitHubRunnerError::ExecutionFailed {
+                command: command.to_string(),
+                reason: format!("spawn failed: {e}"),
+            })?;
+
+        let output = match tokio::time::timeout(timeout, child.wait_with_output()).await {
+            Ok(Ok(o)) => o,
+            Ok(Err(e)) => {
+                return Err(crate::error::GitHubRunnerError::ExecutionFailed {
+                    command: command.to_string(),
+                    reason: e.to_string(),
+                });
+            }
+            Err(_) => {
+                return Err(crate::error::GitHubRunnerError::Timeout {
+                    operation: command.to_string(),
+                    duration_ms: timeout.as_millis() as u64,
+                });
+            }
+        };
+
+        Ok(CommandResult {
+            exit_code: output.status.code().unwrap_or(-1),
+            stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
+            stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+            duration: start.elapsed(),
+        })
+    }
+
+    async fn create_snapshot(&self, _session: &Session, _name: &str) -> Result<SnapshotId> {
+        Err(crate::error::GitHubRunnerError::SnapshotFailed(
+            "snapshots are unsupported on the host command executor".to_string(),
+        ))
+    }
+
+    async fn rollback(&self, _session: &Session, snapshot_id: &SnapshotId) -> Result<()> {
+        Err(crate::error::GitHubRunnerError::RollbackFailed {
+            snapshot_id: snapshot_id.to_string(),
+            reason: "rollback is unsupported on the host command executor".to_string(),
+        })
+    }
+}
+
 /// Configuration for workflow execution
 #[derive(Debug, Clone)]
 pub struct WorkflowExecutorConfig {
@@ -191,19 +270,33 @@ impl WorkflowExecutor {
         }
     }
 
-    /// Execute a complete workflow
+    /// Execute a complete workflow: creates a session from the GitHub `context`,
+    /// then delegates to
+    /// [`execute_workflow_in_session`](Self::execute_workflow_in_session).
     pub async fn execute_workflow(
         &self,
         workflow: &ParsedWorkflow,
         context: &WorkflowContext,
     ) -> Result<WorkflowResult> {
+        let session = self.session_manager.create_session(context).await?;
+        self.execute_workflow_in_session(workflow, &session).await
+    }
+
+    /// Execute a workflow in a pre-created session.
+    ///
+    /// Protocol-neutral entrypoint (no GitHub event): the caller owns the session
+    /// lifecycle, which lets the native Gitea runner interleave log streaming with
+    /// step execution. `execute_workflow` is a thin wrapper that creates the
+    /// session first, so step/failure/snapshot semantics are identical.
+    pub async fn execute_workflow_in_session(
+        &self,
+        workflow: &ParsedWorkflow,
+        session: &Session,
+    ) -> Result<WorkflowResult> {
         let started_at = Utc::now();
         let mut executed_steps = Vec::new();
         let mut snapshots = Vec::new();
         let mut last_snapshot: Option<SnapshotId> = None;
-
-        // Create or get session
-        let session = self.session_manager.create_session(context).await?;
 
         log::info!(
             "Starting workflow '{}' for session {}",
@@ -221,7 +314,7 @@ impl WorkflowExecutor {
             let result = self
                 .command_executor
                 .execute(
-                    &session,
+                    session,
                     setup_cmd,
                     self.config.default_timeout,
                     "/workspace",
@@ -262,7 +355,7 @@ impl WorkflowExecutor {
             );
 
             let step_result =
-                self.execute_step(&session, step, index, &mut last_snapshot, &mut snapshots);
+                self.execute_step(session, step, index, &mut last_snapshot, &mut snapshots);
             let step_result = step_result.await;
 
             match step_result {
@@ -275,7 +368,7 @@ impl WorkflowExecutor {
                         if self.config.auto_rollback {
                             if let Some(ref snapshot_id) = last_snapshot {
                                 log::info!("Rolling back to snapshot {}", snapshot_id);
-                                let _ = self.command_executor.rollback(&session, snapshot_id).await;
+                                let _ = self.command_executor.rollback(session, snapshot_id).await;
                             }
                         }
 
@@ -309,7 +402,7 @@ impl WorkflowExecutor {
                         if self.config.auto_rollback {
                             if let Some(ref snapshot_id) = last_snapshot {
                                 log::info!("Rolling back to snapshot {}", snapshot_id);
-                                let _ = self.command_executor.rollback(&session, snapshot_id).await;
+                                let _ = self.command_executor.rollback(session, snapshot_id).await;
                             }
                         }
 
@@ -331,7 +424,7 @@ impl WorkflowExecutor {
             let _ = self
                 .command_executor
                 .execute(
-                    &session,
+                    session,
                     cleanup_cmd,
                     self.config.default_timeout,
                     "/workspace",
