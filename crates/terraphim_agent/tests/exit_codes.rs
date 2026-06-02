@@ -71,14 +71,17 @@ fn search_succeeds_exits_0() {
 
 #[test]
 fn validate_with_no_kg_exits_3() {
-    // Load a fixture config where the role has kg: null so the service layer
-    // returns "Knowledge graph not configured", which classify_error maps to
-    // ErrorIndexMissing (3).  This avoids relying on the developer's local KG.
-    let fixture = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/no_kg_config.json");
+    // Embed the fixture content at compile time so this test works even when
+    // compiled from a git worktree that is later deleted (shared target dir).
+    // Writing to a temp file avoids a runtime path dependency on CARGO_MANIFEST_DIR.
+    let fixture_content = include_str!("no_kg_config.json");
+    let dir = tempfile::tempdir().expect("temp dir");
+    let fixture_path = dir.path().join("no_kg_config.json");
+    std::fs::write(&fixture_path, fixture_content).expect("write fixture");
     cmd()
         .args([
             "--config",
-            fixture,
+            fixture_path.to_str().expect("valid path"),
             "validate",
             "xyzzy_f1_2_exit_code_test_sentinel",
         ])
