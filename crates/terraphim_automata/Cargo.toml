@@ -13,8 +13,8 @@ readme = "README.md"
 
 
 [dependencies]
-terraphim_types = { path = "../terraphim_types", version = "1.0.0" }
-terraphim-markdown-parser = { path = "../terraphim-markdown-parser", version = "1.19.2" }
+terraphim_types = { path = "../terraphim_types", version = "1.0.0", registry = "terraphim" }
+terraphim-markdown-parser = { path = "../terraphim-markdown-parser", version = "1.19.2", registry = "terraphim" }
 
 ahash = { version = "0.8.6", features = ["serde"] }
 aho-corasick = "1.0.2"
