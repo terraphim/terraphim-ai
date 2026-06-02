@@ -43,9 +43,6 @@ reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-feature
 terraphim_multi_agent = { version = "1.0.0",  optional = true, registry = "terraphim" }
 terraphim_agent_evolution = { version = "1.20.2",  optional = true, registry = "terraphim" }
 
-# (terraphim-firecracker dep removed -- it was unused; VM access is via the
-# fcctl HTTP API in vm_executor.rs, not this crate. Host-only build for #1910 M1.)
-
 # LLM integration for workflow understanding
 terraphim_service = { version = "1.20.2", registry = "terraphim" }
 
@@ -54,6 +51,14 @@ terraphim_types = { version = "1.20.2", registry = "terraphim" }
 
 # Knowledge graph for learning
 terraphim_rolegraph = { version = "1.20.2", registry = "terraphim" }
+
+# Firecracker VM integration -- Linux-only (Firecracker is a Linux/KVM technology).
+# Not directly imported in M1 (the host + rch routes need no VM), but carried on
+# Linux for the Firecracker execution route (M2/M3) and parity with
+# terraphim_github_runner_server::FirecrackerVmProvider. Target-gated so the
+# host-only dev/CI build (e.g. macOS) stays lean while Linux retains it.
+[target.'cfg(target_os = "linux")'.dependencies]
+terraphim-firecracker = { path = "../../terraphim_firecracker" }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util", "macros"] }
