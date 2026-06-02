@@ -4,13 +4,10 @@ resolver = "2"
 members = ["crates/*", "crates/terraphim_grep", "crates/terraphim_merge_coordinator", "terraphim_server", "terraphim_firecracker", "terraphim_ai_nodejs"]
 # Note: terraphim_usage and terraphim_ccusage are new crates in crates/*
 exclude = [
-    # terraphim-core crates: now consumed from the `terraphim` registry (E1, #1910).
-    # Directories remain in place; the physical repo move is a separate later step.
-    "crates/terraphim_types",
-    "crates/terraphim_test_utils",
-    "crates/terraphim-markdown-parser",
-    "crates/terraphim_automata",
-    "crates/terraphim_rolegraph",
+    # terraphim-core crates (terraphim_types, terraphim_test_utils,
+    # terraphim-markdown-parser, terraphim_automata, terraphim_rolegraph) were
+    # extracted to the standalone terraphim-core repo and are now consumed from
+    # the `terraphim` registry (E1, Gitea #1910).
     # Experimental crates
     "crates/terraphim_agent_application",
     "crates/terraphim_truthforge",
