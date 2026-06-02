@@ -12,7 +12,7 @@ license = "Apache-2.0"
 readme = "../../README.md"
 
 [dependencies]
-terraphim_persistence = { path = "../terraphim_persistence", version = "1.0.0" }
+terraphim_persistence = { version = "1.0.0", registry = "terraphim" }
 terraphim_types = { version = "1.0.0", registry = "terraphim" }
 
 # Core async runtime and utilities

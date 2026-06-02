@@ -8,6 +8,13 @@ exclude = [
     # terraphim-markdown-parser, terraphim_automata, terraphim_rolegraph) were
     # extracted to the standalone terraphim-core repo and are now consumed from
     # the `terraphim` registry (E1, Gitea #1910).
+    # terraphim-config-persistence crates: consumed from the `terraphim`
+    # registry (E2, Gitea #1910).
+    "crates/terraphim_config",
+    "crates/terraphim_persistence",
+    "crates/terraphim_settings",
+    "crates/terraphim_atomic_client",
+    "crates/terraphim_onepassword_cli",
     # Experimental crates
     "crates/terraphim_agent_application",
     "crates/terraphim_truthforge",

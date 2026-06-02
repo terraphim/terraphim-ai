@@ -21,9 +21,9 @@ napi-derive = "3.5.2"
 serde_json = { workspace = true }
 terraphim_automata = { version = "1.20.2", registry = "terraphim", default-features = false }
 terraphim_service = { path = "../crates/terraphim_service" }
-terraphim_config = { path = "../crates/terraphim_config", default-features = false }
-terraphim_persistence = { path = "../crates/terraphim_persistence" }
-terraphim_settings = { path = "../crates/terraphim_settings" }
+terraphim_config = { version = "1.20.2",  default-features = false, registry = "terraphim" }
+terraphim_persistence = { version = "1.20.2", registry = "terraphim" }
+terraphim_settings = { version = "1.20.2", registry = "terraphim" }
 terraphim_types = { version = "1.20.2", registry = "terraphim", default-features = false }
 terraphim_rolegraph = { version = "1.20.2", registry = "terraphim" }
 anyhow = { workspace = true }

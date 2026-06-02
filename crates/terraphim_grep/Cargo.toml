@@ -29,7 +29,7 @@ terraphim_types = { version = "1.15.0", registry = "terraphim" }
 terraphim_rolegraph = { version = "1.15.0", registry = "terraphim" }
 terraphim_automata = { version = "1.19.2", registry = "terraphim" }
 terraphim_service = { path = "../terraphim_service", version = "1.16.15", optional = true }
-terraphim_config = { path = "../terraphim_config", version = "1.15.0" }
+terraphim_config = { version = "1.15.0", registry = "terraphim" }
 
 fff-search = { version = "0.8.4", optional = true }
 

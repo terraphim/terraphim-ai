@@ -12,11 +12,11 @@ license = "Apache-2.0"
 readme = "../README.md"
 
 [dependencies]
-terraphim_persistence = { path = "../crates/terraphim_persistence", version = "1.0.0", default-features = false, features = ["memory"] }
-terraphim_config = { path = "../crates/terraphim_config", version = "1.0.0", default-features = false }
+terraphim_persistence = { version = "1.0.0", default-features = false, features = ["memory"], registry = "terraphim" }
+terraphim_config = { version = "1.0.0", default-features = false, registry = "terraphim" }
 terraphim_middleware = { path = "../crates/terraphim_middleware", version = "1.0.0", default-features = false }
 terraphim_rolegraph = { version = "1.0.0", registry = "terraphim" }
-terraphim_settings = { path = "../crates/terraphim_settings", version = "1.0.0" }
+terraphim_settings = { version = "1.0.0", registry = "terraphim" }
 terraphim_types = { version = "1.0.0", registry = "terraphim", default-features = false }
 terraphim_automata = { version = "1.19.2", registry = "terraphim", default-features = false, features = ["tokio-runtime"] }
 terraphim_service = { path = "../crates/terraphim_service", version = "1.0.0", default-features = false }

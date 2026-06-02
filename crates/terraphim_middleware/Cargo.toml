@@ -13,11 +13,11 @@ readme = "../../README.md"
 
 
 [dependencies]
-terraphim_config = { path = "../terraphim_config", version = "1.0.0" }
+terraphim_config = { version = "1.0.0", registry = "terraphim" }
 terraphim_rolegraph = { version = "1.0.0", registry = "terraphim" }
 terraphim_automata = { version = "1.19.2", registry = "terraphim", features = ["tokio-runtime"] }
 terraphim_types = { version = "1.0.0", registry = "terraphim" }
-terraphim_persistence = { path = "../terraphim_persistence", version = "1.0.0" }
+terraphim_persistence = { version = "1.0.0", registry = "terraphim" }
 haystack_jmap = { path = "../haystack_jmap", version = "1.19.2", optional = true }
 # NOTE: Atomic Data Server commented out for crates.io publishing (not published yet)
 # terraphim_atomic_client = { path = "../terraphim_atomic_client", version = "1.0.0", features = ["native"], optional = true }
@@ -52,8 +52,8 @@ reqwest-eventsource = { version = "0.6", optional = true }
 rmcp = { version = "0.9", features = ["client", "transport-child-process"], optional = true }
 
 [dev-dependencies]
-terraphim_persistence = { path = "../terraphim_persistence", features = ["memory"] }
-terraphim_settings = { path = "../terraphim_settings" }
+terraphim_persistence = { version = "1.20.2",  features = ["memory"], registry = "terraphim" }
+terraphim_settings = { version = "1.20.2", registry = "terraphim" }
 terraphim_test_utils = { version = "1.20.3", registry = "terraphim" }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 
