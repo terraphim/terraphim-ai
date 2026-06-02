@@ -98,7 +98,7 @@ terraphim_test_utils = { version = "1.20.3", registry = "terraphim" }
 insta = { version = "1.41", features = ["yaml", "redactions"] }
 
 # Enable REPL features for testing
-terraphim_agent = { version = "1.20.3", path = ".", features = ["repl-full"], registry = "terraphim" }
+terraphim_agent = { path = ".", features = ["repl-full"] }
 
 [build-dependencies]
 rustc_version = "0.4"
