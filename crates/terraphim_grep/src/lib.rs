@@ -20,11 +20,17 @@
 //! # }
 //! ```
 
+/// Error types for the terraphim-grep crate.
 pub mod error;
+/// Hybrid KG + code-search orchestration and result types.
 pub mod hybrid_searcher;
+/// LLM-backed knowledge-graph curation from query/answer pairs.
 pub mod kg_curation;
+/// Context builder passed to the RLM synthesis step.
 pub mod rlm_context;
+/// Typed prompt/parser pairs (signatures) for LLM output formats.
 pub mod signatures;
+/// Heuristic judge that decides whether retrieval results are sufficient.
 pub mod sufficiency_judge;
 
 use std::sync::Arc;
@@ -39,30 +45,46 @@ pub use rlm_context::RlmContext;
 pub use signatures::{AnswerWithCitations, Citation, Match, NewConcept, RlmSignature};
 pub use sufficiency_judge::{HeuristicThresholds, Sufficiency, SufficiencyJudge};
 
+/// The top-level result returned by [`TerraphimGrep::search`].
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct GrepResult {
+    /// Ranked list of text chunks retrieved from the haystacks.
     pub chunks: Vec<RetrievedChunk>,
+    /// Synthesised answer with source citations, present only when RLM synthesis ran.
     pub answer: Option<AnswerWithCitations>,
+    /// Knowledge-graph concepts that matched the query.
     pub concepts: Vec<KgConcept>,
+    /// Indicates whether the result was produced by search alone or required RLM synthesis.
     pub sufficiency: SufficiencyState,
+    /// Timing and count statistics for this search invocation.
     pub stats: GrepStats,
 }
 
+/// Describes how the search result was produced.
 #[derive(Debug, Clone, serde::Serialize)]
 pub enum SufficiencyState {
+    /// Results came from retrieval alone; the RLM synthesis step was not invoked.
     SearchOnly,
+    /// The RLM synthesis step ran and produced a synthesised answer.
     RlmSynthesis,
+    /// The RLM synthesis step ran but could not produce a sufficiently confident answer.
     RlmInsufficient,
 }
 
+/// Timing and result-count statistics for a single search invocation.
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct GrepStats {
+    /// Wall-clock time in milliseconds spent on the retrieval phase.
     pub search_latency_ms: u64,
+    /// Wall-clock time in milliseconds spent in the RLM synthesis step, if it ran.
     pub rlm_latency_ms: Option<u64>,
+    /// Number of chunks included in the final result.
     pub chunks_returned: usize,
+    /// Number of KG concept matches that contributed to ranking.
     pub kg_hits: usize,
 }
 
+/// Top-level search engine that combines hybrid retrieval with optional RLM synthesis.
 pub struct TerraphimGrep {
     hybrid_searcher: Arc<HybridSearcher>,
     sufficiency_judge: Arc<SufficiencyJudge>,
@@ -73,6 +95,7 @@ pub struct TerraphimGrep {
 }
 
 impl TerraphimGrep {
+    /// Create a new `TerraphimGrep` with the given searcher and sufficiency judge.
     #[cfg(feature = "llm")]
     pub fn new(
         hybrid_searcher: Arc<HybridSearcher>,
@@ -86,6 +109,7 @@ impl TerraphimGrep {
         }
     }
 
+    /// Create a new `TerraphimGrep` with the given searcher and sufficiency judge.
     #[cfg(not(feature = "llm"))]
     pub fn new(
         hybrid_searcher: Arc<HybridSearcher>,
@@ -97,12 +121,14 @@ impl TerraphimGrep {
         }
     }
 
+    /// Attach a KG-curation pipeline that extracts and persists new concepts from RLM answers.
     #[cfg(feature = "llm")]
     pub fn with_kg_curation(mut self, kg_curation: Arc<KgCurationRlm>) -> Self {
         self.kg_curation = Some(kg_curation);
         self
     }
 
+    /// Attach an LLM client used for RLM synthesis when retrieval is insufficient.
     #[cfg(feature = "llm")]
     pub fn with_llm_client(
         mut self,
@@ -112,6 +138,7 @@ impl TerraphimGrep {
         self
     }
 
+    /// Search for `query` using the configured hybrid retrieval and optional RLM synthesis.
     pub async fn search(&self, query: &str, options: GrepOptions) -> Result<GrepResult> {
         let start = std::time::Instant::now();
 
@@ -315,6 +342,7 @@ impl TerraphimGrep {
         .await
     }
 
+    /// Return a zeroed-out [`GrepStats`] snapshot (placeholder for future instrumentation).
     pub fn stats(&self) -> GrepStats {
         GrepStats {
             search_latency_ms: 0,

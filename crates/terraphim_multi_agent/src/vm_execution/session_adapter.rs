@@ -1,3 +1,5 @@
+//! Direct session adapter for communicating with the fcctl session API.
+
 use anyhow::Result;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -7,6 +9,7 @@ use tracing::{debug, info};
 
 use super::models::*;
 
+/// Manages long-lived VM sessions by communicating directly with the fcctl HTTP API.
 #[derive(Debug)]
 #[allow(dead_code)]
 pub struct DirectSessionAdapter {
@@ -27,6 +30,7 @@ struct SessionHandle {
 }
 
 impl DirectSessionAdapter {
+    /// Create a new `DirectSessionAdapter` pointing at the given data directory and API URL.
     pub fn new(data_dir: PathBuf, fcctl_api_url: String) -> Self {
         Self {
             sessions: Arc::new(RwLock::new(HashMap::new())),
@@ -35,6 +39,7 @@ impl DirectSessionAdapter {
         }
     }
 
+    /// Return the session key for an existing session, or create a new one via the API.
     pub async fn get_or_create_session(
         &self,
         vm_id: &str,
@@ -104,6 +109,7 @@ impl DirectSessionAdapter {
         Ok(session_key)
     }
 
+    /// Execute a shell command inside the session and return `(stdout, exit_code)`.
     pub async fn execute_command_direct(
         &self,
         session_id: &str,
@@ -162,6 +168,7 @@ impl DirectSessionAdapter {
         Ok((output, exit_code))
     }
 
+    /// Create a named snapshot for the session and return the snapshot ID.
     pub async fn create_snapshot_direct(
         &self,
         session_id: &str,
@@ -218,6 +225,7 @@ impl DirectSessionAdapter {
         Ok(snapshot_id)
     }
 
+    /// Roll the session back to a previously created snapshot.
     pub async fn rollback_direct(
         &self,
         session_id: &str,
@@ -266,6 +274,7 @@ impl DirectSessionAdapter {
         Ok(())
     }
 
+    /// Return metadata about a session, or `None` if the session does not exist.
     pub async fn get_session_info(&self, session_id: &str) -> Option<SessionInfo> {
         let sessions = self.sessions.read().await;
         sessions.get(session_id).map(|handle| SessionInfo {
@@ -276,6 +285,7 @@ impl DirectSessionAdapter {
         })
     }
 
+    /// Fetch connection details (host, port, credentials) for the session from the API.
     pub async fn get_connection_info(&self, session_id: &str) -> Result<String, VmExecutionError> {
         let sessions = self.sessions.read().await;
         let handle = sessions
@@ -308,6 +318,7 @@ impl DirectSessionAdapter {
         Ok(info)
     }
 
+    /// Close and delete the session, releasing its resources.
     pub async fn close_session(&self, session_id: &str) -> Result<(), VmExecutionError> {
         debug!("Closing session: {}", session_id);
 
@@ -333,6 +344,7 @@ impl DirectSessionAdapter {
         Ok(())
     }
 
+    /// List metadata for all currently tracked sessions.
     pub async fn list_sessions(&self) -> Vec<SessionInfo> {
         let sessions = self.sessions.read().await;
         sessions
@@ -347,11 +359,16 @@ impl DirectSessionAdapter {
     }
 }
 
+/// Snapshot of metadata describing a tracked VM session.
 #[derive(Debug, Clone)]
 pub struct SessionInfo {
+    /// Identifier of the VM that hosts this session
     pub vm_id: String,
+    /// Identifier of the agent that owns this session
     pub agent_id: String,
+    /// UTC timestamp when the session was created
     pub created_at: chrono::DateTime<chrono::Utc>,
+    /// Total number of commands executed in this session
     pub command_count: usize,
 }
 

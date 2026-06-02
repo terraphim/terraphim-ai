@@ -64,6 +64,7 @@ impl VmExecutionClient {
         }
     }
 
+    /// Override the default hook manager with a custom one.
     pub fn with_hook_manager(mut self, hook_manager: Arc<HookManager>) -> Self {
         self.hook_manager = hook_manager;
         self

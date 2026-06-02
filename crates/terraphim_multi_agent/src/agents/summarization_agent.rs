@@ -32,11 +32,16 @@ impl Default for SummarizationConfig {
     }
 }
 
+/// Style variants for generated summaries
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SummaryStyle {
+    /// Short, high-level overview
     Brief,
+    /// Comprehensive coverage of all major points
     Detailed,
+    /// Formatted as a bulleted list
     BulletPoints,
+    /// Business-oriented summary for stakeholders
     Executive,
 }
 

@@ -31,6 +31,7 @@ pub struct AgentGoals {
 }
 
 impl AgentGoals {
+    /// Create a new `AgentGoals` with a neutral alignment score
     pub fn new(global_goal: String, individual_goals: Vec<String>) -> Self {
         Self {
             global_goal,
@@ -40,11 +41,13 @@ impl AgentGoals {
         }
     }
 
+    /// Update the alignment score, clamping to `[0.0, 1.0]`
     pub fn update_alignment_score(&mut self, score: f64) {
         self.alignment_score = score.clamp(0.0, 1.0);
         self.last_updated = Utc::now();
     }
 
+    /// Append an individual goal to this agent's goal list
     pub fn add_individual_goal(&mut self, goal: String) {
         self.individual_goals.push(goal);
         self.last_updated = Utc::now();
@@ -112,46 +115,55 @@ impl Default for AgentConfig {
 /// Core Terraphim Agent that wraps a Role configuration with Rig integration
 #[derive(Debug)]
 pub struct TerraphimAgent {
-    // Core identity
+    /// Unique identifier for this agent instance
     pub agent_id: AgentId,
+    /// Role configuration that defines the agent's domain and capabilities
     pub role_config: Role,
+    /// Operational configuration (token limits, timeouts, etc.)
     pub config: AgentConfig,
+    /// Current lifecycle status of the agent
     pub status: Arc<RwLock<AgentStatus>>,
 
-    // Knowledge graph context
+    /// Knowledge graph used for semantic context enrichment
     pub rolegraph: Arc<RoleGraph>,
+    /// Autocomplete index built from the role's thesaurus
     pub automata: Arc<AutocompleteIndex>,
 
-    // Individual evolution tracking
+    /// Versioned memory store for this agent's learned state
     pub memory: Arc<RwLock<VersionedMemory>>,
+    /// Versioned task list tracking in-progress and completed tasks
     pub tasks: Arc<RwLock<VersionedTaskList>>,
+    /// Versioned lessons accumulated from past interactions
     pub lessons: Arc<RwLock<VersionedLessons>>,
 
-    // Goals and alignment
+    /// Goal configuration for this agent
     pub goals: AgentGoals,
 
-    // Context and history
+    /// Sliding-window conversation context fed to the LLM
     pub context: Arc<RwLock<AgentContext>>,
+    /// Persistent record of all commands processed by this agent
     pub command_history: Arc<RwLock<CommandHistory>>,
 
-    // Tracking
+    /// Tracks token consumption per request
     pub token_tracker: Arc<RwLock<TokenUsageTracker>>,
+    /// Tracks monetary cost and budget limits
     pub cost_tracker: Arc<RwLock<CostTracker>>,
 
-    // Persistence
+    /// Backend storage used to persist agent state
     pub persistence: Arc<DeviceStorage>,
 
-    // LLM Client
+    /// LLM client used for text generation
     pub llm_client: Arc<GenAiLlmClient>,
 
-    // VM Execution Client (optional)
+    /// Optional VM execution client for sandboxed code execution
     pub vm_execution_client: Option<Arc<crate::vm_execution::VmExecutionClient>>,
 
-    // Hook Manager for pre/post LLM validation
+    /// Hook manager that runs pre- and post-LLM validation hooks
     pub hook_manager: Arc<crate::vm_execution::hooks::HookManager>,
 
-    // Metadata
+    /// UTC timestamp when this agent was created
     pub created_at: DateTime<Utc>,
+    /// UTC timestamp of the most recent activity
     pub last_active: Arc<RwLock<DateTime<Utc>>>,
 }
 
@@ -313,6 +325,7 @@ impl TerraphimAgent {
         Ok(())
     }
 
+    /// Flush all buffered token usage records to the persistent usage store
     pub async fn flush_usage(&self) {
         let records = {
             let mut tracker = self.token_tracker.write().await;

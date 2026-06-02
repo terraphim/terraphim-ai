@@ -1,3 +1,5 @@
+//! Bridge between the multi-agent system and the fcctl execution history / rollback API.
+
 use super::models::*;
 use super::session_adapter::DirectSessionAdapter;
 use chrono::Utc;
@@ -8,6 +10,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, error, info, warn};
 
+/// Tracks command history and provides snapshot/rollback capabilities for VMs.
 #[derive(Debug)]
 pub struct FcctlBridge {
     config: HistoryConfig,
@@ -28,6 +31,7 @@ struct VmSession {
 }
 
 impl FcctlBridge {
+    /// Create a new `FcctlBridge` with the supplied history configuration and API base URL.
     pub fn new(config: HistoryConfig, api_base_url: String) -> Self {
         let direct_adapter = if config.integration_mode == "direct" {
             let data_dir = PathBuf::from("/tmp/fcctl-sessions");
@@ -48,6 +52,7 @@ impl FcctlBridge {
         }
     }
 
+    /// Record the result of a VM execution and optionally create a snapshot, returning the snapshot ID.
     pub async fn track_execution(
         &self,
         vm_id: &str,
@@ -201,6 +206,7 @@ impl FcctlBridge {
         Ok(())
     }
 
+    /// Query the command history for a VM, optionally filtering to failures only.
     pub async fn query_history(
         &self,
         request: HistoryQueryRequest,
@@ -295,6 +301,7 @@ impl FcctlBridge {
         })
     }
 
+    /// Rollback a VM to the specified snapshot, optionally capturing a pre-rollback snapshot.
     pub async fn rollback_to_snapshot(
         &self,
         request: RollbackRequest,
@@ -355,6 +362,7 @@ impl FcctlBridge {
         })
     }
 
+    /// If auto-rollback is enabled and a prior snapshot exists, restore the VM to it after a failure.
     pub async fn auto_rollback_on_failure(
         &self,
         vm_id: &str,
@@ -402,6 +410,7 @@ impl FcctlBridge {
         }
     }
 
+    /// Return the snapshot ID of the most recent successful execution for a VM/agent pair, if any.
     pub async fn get_last_successful_snapshot(
         &self,
         vm_id: &str,

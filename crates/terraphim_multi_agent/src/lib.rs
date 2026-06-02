@@ -27,20 +27,33 @@
 //! }
 //! ```
 
+/// Core agent implementation and lifecycle management.
 pub mod agent;
+/// Specialised agent implementations (chat, summarization).
 pub mod agents;
+/// Context window management for agents.
 pub mod context;
+/// Error types for the multi-agent system.
 pub mod error;
+/// Rust-GenAI backed LLM client implementation.
 pub mod genai_llm_client;
+/// Command and interaction history tracking.
 pub mod history;
+/// Shared LLM request/response and message types.
 pub mod llm_types;
+/// System prompt sanitisation and validation utilities.
 pub mod prompt_sanitizer;
+/// VM execution subsystem for sandboxed code execution.
 pub mod vm_execution;
 // pub mod llm_client;      // Disabled - uses rig-core
 // pub mod simple_llm_client; // Disabled - uses rig-core
+/// Agent pooling for efficient agent reuse.
 pub mod pool;
+/// Centralised manager for multiple agent pools.
 pub mod pool_manager;
+/// Token and cost tracking for agent operations.
 pub mod tracking;
+/// Multi-agent workflow patterns and orchestration.
 pub mod workflows;
 
 // Re-export KG-backed registry from terraphim_agent_registry (consolidated implementation)
@@ -72,7 +85,7 @@ pub type MultiAgentResult<T> = Result<T, MultiAgentError>;
 /// Agent identifier type
 pub type AgentId = uuid::Uuid;
 
-// Test utilities using real Ollama with gemma3:270m model
+/// Test utilities using real Ollama with gemma3:270m model.
 #[cfg(any(test, feature = "test-utils"))]
 pub mod test_utils {
     use super::*;
@@ -80,6 +93,7 @@ pub mod test_utils {
     use terraphim_config::Role;
     use terraphim_persistence::DeviceStorage;
 
+    /// Create a minimal `Role` configured to use a local Ollama instance for testing.
     pub fn create_test_role() -> Role {
         let mut role = Role::new("TestAgent");
         role.shortname = Some("test".to_string());
@@ -96,6 +110,7 @@ pub mod test_utils {
         role
     }
 
+    /// Create a `TerraphimAgent` backed by in-memory storage, suitable for fast unit tests.
     pub async fn create_test_agent_simple() -> Result<TerraphimAgent, MultiAgentError> {
         use terraphim_persistence::memory::create_memory_only_device_settings;
 
@@ -110,7 +125,7 @@ pub mod test_utils {
         TerraphimAgent::new(role, persistence, None).await
     }
 
-    // For now, alias the simpler version for tests
+    /// Alias for [`create_test_agent_simple`] — creates a test agent backed by in-memory storage.
     pub async fn create_test_agent() -> Result<TerraphimAgent, MultiAgentError> {
         create_test_agent_simple().await
     }

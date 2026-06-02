@@ -21,6 +21,7 @@ pub struct CommandRecord {
 
     /// Input and context
     pub input: CommandInput,
+    /// Snapshot of the agent context at the time the command was issued.
     pub context_snapshot: HistoryContextSnapshot,
 
     /// Execution details
@@ -31,11 +32,14 @@ pub struct CommandRecord {
 
     /// Resource usage
     pub token_usage: Option<TokenUsageRecord>,
+    /// Monetary cost of this command in USD, if known
     pub cost_usd: Option<f64>,
 
     /// Quality and learning
     pub quality_score: Option<f64>,
+    /// Lessons captured from this command's execution
     pub lessons_learned: Vec<String>,
+    /// Memory entries updated as a result of this command
     pub memory_updates: Vec<String>,
 
     /// Error information if command failed
@@ -43,6 +47,7 @@ pub struct CommandRecord {
 }
 
 impl CommandRecord {
+    /// Creates a new `CommandRecord` for the given agent and input, with all other fields at their defaults.
     pub fn new(agent_id: AgentId, input: CommandInput) -> Self {
         Self {
             command_id: Uuid::new_v4(),
@@ -145,6 +150,7 @@ pub struct CommandInput {
 }
 
 impl CommandInput {
+    /// Creates a new `CommandInput` with default source (`User`), normal priority, and no timeout.
     pub fn new(text: String, command_type: CommandType) -> Self {
         Self {
             text,
@@ -156,21 +162,25 @@ impl CommandInput {
         }
     }
 
+    /// Sets the parameters map for this input.
     pub fn with_parameters(mut self, parameters: HashMap<String, serde_json::Value>) -> Self {
         self.parameters = parameters;
         self
     }
 
+    /// Sets the source of this command.
     pub fn with_source(mut self, source: CommandSource) -> Self {
         self.source = source;
         self
     }
 
+    /// Sets the priority level for this command.
     pub fn with_priority(mut self, priority: CommandPriority) -> Self {
         self.priority = priority;
         self
     }
 
+    /// Sets an execution timeout in milliseconds.
     pub fn with_timeout(mut self, timeout_ms: u64) -> Self {
         self.timeout_ms = Some(timeout_ms);
         self
@@ -222,10 +232,15 @@ pub enum CommandSource {
 /// Command priority levels
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub enum CommandPriority {
+    /// Lowest priority; processed when the queue is quiet
     Low,
+    /// Standard priority for routine commands
     Normal,
+    /// Elevated priority; processed before `Normal` commands
     High,
+    /// Near-real-time priority for time-sensitive operations
     Critical,
+    /// Highest priority; bypasses all ordinary queuing
     Emergency,
 }
 
@@ -268,6 +283,7 @@ pub struct ExecutionStep {
 }
 
 impl ExecutionStep {
+    /// Creates a new `ExecutionStep` with `Running` status and the current timestamp.
     pub fn new(name: String) -> Self {
         Self {
             step_id: Uuid::new_v4(),
@@ -281,6 +297,7 @@ impl ExecutionStep {
         }
     }
 
+    /// Marks this step as completed, recording its output and wall-clock duration.
     pub fn complete(mut self, output: String, duration_ms: u64) -> Self {
         self.output = Some(output);
         self.duration_ms = duration_ms;
@@ -288,6 +305,7 @@ impl ExecutionStep {
         self
     }
 
+    /// Marks this step as failed, recording the error message and wall-clock duration.
     pub fn fail(mut self, error: String, duration_ms: u64) -> Self {
         self.error = Some(error);
         self.duration_ms = duration_ms;
@@ -299,10 +317,15 @@ impl ExecutionStep {
 /// Status of an execution step
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum StepStatus {
+    /// Step has not yet started
     Pending,
+    /// Step is currently executing
     Running,
+    /// Step finished successfully
     Completed,
+    /// Step encountered an error and did not finish
     Failed,
+    /// Step was intentionally bypassed
     Skipped,
 }
 
@@ -324,6 +347,7 @@ pub struct CommandOutput {
 }
 
 impl CommandOutput {
+    /// Creates a plain-text `CommandOutput` with no structured data, confidence, or sources.
     pub fn new(text: String) -> Self {
         Self {
             text,
@@ -335,17 +359,20 @@ impl CommandOutput {
         }
     }
 
+    /// Attaches structured JSON data to this output and sets the output type to `Structured`.
     pub fn with_data(mut self, data: serde_json::Value) -> Self {
         self.data = Some(data);
         self.output_type = OutputType::Structured;
         self
     }
 
+    /// Sets the confidence score, clamped to the range `[0.0, 1.0]`.
     pub fn with_confidence(mut self, confidence: f64) -> Self {
         self.confidence = Some(confidence.clamp(0.0, 1.0));
         self
     }
 
+    /// Attaches the list of source references used to produce this output.
     pub fn with_sources(mut self, sources: Vec<String>) -> Self {
         self.sources = sources;
         self
@@ -355,10 +382,14 @@ impl CommandOutput {
 /// Types of command output
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub enum OutputType {
+    /// Plain text output (default)
     #[default]
     Text,
+    /// Structured JSON or other structured data
     Structured,
+    /// Raw binary data
     Binary,
+    /// Streaming output delivered incrementally
     Stream,
 }
 
@@ -380,6 +411,7 @@ pub struct CommandError {
 }
 
 impl CommandError {
+    /// Creates a non-recoverable `CommandError` with no code, details, or suggestions.
     pub fn new(error_type: ErrorType, message: String) -> Self {
         Self {
             error_type,
@@ -391,21 +423,25 @@ impl CommandError {
         }
     }
 
+    /// Attaches a short error code (e.g. an HTTP status or application error code).
     pub fn with_code(mut self, code: String) -> Self {
         self.code = Some(code);
         self
     }
 
+    /// Attaches additional details such as a stack trace or diagnostic information.
     pub fn with_details(mut self, details: String) -> Self {
         self.details = Some(details);
         self
     }
 
+    /// Marks this error as recoverable, indicating the caller may retry.
     pub fn recoverable(mut self) -> Self {
         self.recoverable = true;
         self
     }
 
+    /// Sets the list of suggested remediation actions for the caller.
     pub fn with_suggestions(mut self, suggestions: Vec<String>) -> Self {
         self.suggestions = suggestions;
         self
@@ -455,6 +491,7 @@ pub struct HistoryContextSnapshot {
 }
 
 impl HistoryContextSnapshot {
+    /// Creates an empty snapshot for the given agent (no items, zero tokens).
     pub fn empty(agent_id: AgentId) -> Self {
         Self {
             agent_id,
@@ -465,6 +502,7 @@ impl HistoryContextSnapshot {
         }
     }
 
+    /// Builds a snapshot from a live [`AgentContext`], capturing counts and the top items.
     pub fn from_context(context: &AgentContext) -> Self {
         let key_items = context
             .get_relevant_items(1000) // Top 1000 tokens worth
@@ -514,6 +552,7 @@ pub struct CommandHistory {
 }
 
 impl CommandHistory {
+    /// Creates a new `CommandHistory` for the given agent, keeping at most `max_records` entries.
     pub fn new(agent_id: AgentId, max_records: usize) -> Self {
         Self {
             agent_id,
@@ -645,16 +684,27 @@ impl CommandHistory {
 /// Statistics about command history
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CommandStatistics {
+    /// Total number of commands recorded.
     pub total_commands: u64,
+    /// Number of commands that completed without error.
     pub successful_commands: u64,
+    /// Number of commands that resulted in an error.
     pub failed_commands: u64,
+    /// Fraction of commands that succeeded (`successful_commands / total_commands`).
     pub success_rate: f64,
+    /// Mean quality score across all commands that have a score.
     pub average_quality_score: f64,
+    /// Cumulative execution time across all commands, in milliseconds.
     pub total_duration_ms: u64,
+    /// Mean execution time per command, in milliseconds.
     pub average_duration_ms: u64,
+    /// Total cost in US dollars across all commands with recorded cost.
     pub total_cost_usd: f64,
+    /// Mean cost per command in US dollars.
     pub average_cost_per_command: f64,
+    /// Total tokens consumed across all commands with recorded token usage.
     pub total_tokens: u64,
+    /// Mean token consumption per command.
     pub average_tokens_per_command: f64,
 }
 
