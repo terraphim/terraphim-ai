@@ -51,7 +51,7 @@ tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
 log = { workspace = true }
 urlencoding = { version = "2.1", optional = true }
 ahash = "0.8"
-terraphim_update = { path = "../terraphim_update", version = "1.0.0" }
+terraphim_update = { path = "../terraphim_update", version = "1.0.0", registry = "terraphim" }
 pulldown-cmark = { version = "0.13", default-features = false, features = ["html"] }
 regex = "1.12"
 glob = "0.3"
@@ -72,16 +72,16 @@ terraphim_types = { version = "1.0.0", registry = "terraphim" }
 terraphim_settings = { version = "1.0.0", registry = "terraphim" }
 terraphim_persistence = { version = "1.0.0", registry = "terraphim" }
 terraphim_config = { version = "1.0.0", registry = "terraphim" }
-terraphim_command_runtime = { path = "../terraphim_command_runtime", version = "0.1.0" }
+terraphim_command_runtime = { path = "../terraphim_command_runtime", version = "0.1.0", registry = "terraphim" }
 terraphim_automata = { version = "1.19.2", registry = "terraphim" }
 terraphim_service = { version = "1.0.0", default-features = false, registry = "terraphim" }
 terraphim_middleware = { version = "1.0.0", registry = "terraphim" }
 terraphim_rolegraph = { version = "1.0.0", registry = "terraphim" }
-terraphim_hooks = { path = "../terraphim_hooks", version = "1.0.0" }
+terraphim_hooks = { path = "../terraphim_hooks", version = "1.0.0", registry = "terraphim" }
 terraphim_tracker = { version = "1.0.0", registry = "terraphim" }
 terraphim_orchestrator = { version = "1.0.0", registry = "terraphim" }
 # Session search - uses workspace version (path for dev, version for crates.io)
-terraphim_sessions = { path = "../terraphim_sessions", version = "1.6.0", optional = true, features = ["tsa-full", "aider-connector", "search-index"] }
+terraphim_sessions = { path = "../terraphim_sessions", version = "1.6.0", optional = true, features = ["tsa-full", "aider-connector", "search-index"], registry = "terraphim" }
 
 [dev-dependencies]
 assert_cmd = "2"
@@ -98,7 +98,7 @@ terraphim_test_utils = { version = "1.20.3", registry = "terraphim" }
 insta = { version = "1.41", features = ["yaml", "redactions"] }
 
 # Enable REPL features for testing
-terraphim_agent = { path = ".", features = ["repl-full"] }
+terraphim_agent = { version = "1.20.3", path = ".", features = ["repl-full"], registry = "terraphim" }
 
 [build-dependencies]
 rustc_version = "0.4"
