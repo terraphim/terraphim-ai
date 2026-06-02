@@ -52,8 +52,8 @@ When `Cargo.toml` is detected:
 ```bash
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
-cargo build --workspace --profile ci
-cargo test --workspace --no-fail-fast --profile ci
+cargo build --workspace --profile ci --profile ci
+cargo test --workspace --no-fail-fast --profile ci --profile ci
 ```
 
 ## Command Transformation
@@ -191,7 +191,7 @@ cost:: low|medium|high
 ## Auto-corrected (2026-05-29T22:58:17Z)
 
 Failed: `cargo clippy --workspace --all-targets -- -D warnings`
-CORRECTION: `cargo build --workspace --tests`
+CORRECTION: `cargo build --workspace --profile ci --tests`
 
 REASON: The `terraphim_orchestrator` crate has compilation errors (not clippy warnings) that prevent the build from completing. Clippy cannot run on code that won't compile. Run a plain build to reveal the actual errors before attempting linting.
 
@@ -208,7 +208,7 @@ REASON: View the full clippy warning/error message instead of the truncated outp
 
 After you see the full error, you'll likely need to either:
 - Fix the clippy warning in the code, then re-run with `-D warnings`
-- Or run `cargo build --workspace --profile ci && cargo test --workspace --no-fail-fast --profile ci` first to verify compilation and tests work, then address the specific clippy warning
+- Or run `cargo build --workspace --profile ci --profile ci && cargo test --workspace --no-fail-fast --profile ci --profile ci` first to verify compilation and tests work, then address the specific clippy warning
 
 ## Auto-corrected (2026-05-29T23:02:05Z)
 
@@ -235,8 +235,8 @@ Alternatively, if you intended this as a conditional check that should fail unde
 
 ## Auto-corrected (2026-06-01T05:22:46Z)
 
-Failed: `cargo build --workspace --profile ci --profile ci --profile ci --profile ci`
-CORRECTION: `cargo build --workspace --profile ci`
+Failed: `cargo build --workspace --profile ci --profile ci --profile ci --profile ci --profile ci`
+CORRECTION: `cargo build --workspace --profile ci --profile ci`
 
 REASON: The `--profile` flag was specified 4 times; Cargo only accepts it once. Remove the duplicate flags, keeping a single `--profile ci`.
 
@@ -244,3 +244,17 @@ REASON: The `--profile` flag was specified 4 times; Cargo only accepts it once. 
 
 Failed: `git definitely-not-a-real-subcommand`
 Not logged in · Please run /login
+
+## Auto-corrected (2026-06-02T02:59:11Z)
+
+Failed: `cargo build --workspace --profile ci --profile ci`
+CORRECTION: `cargo build --workspace --profile ci`
+
+REASON: The `--profile` argument was specified twice with the same value (`ci`); cargo does not allow duplicate profile specifications.
+
+## Auto-corrected (2026-06-02T02:59:19Z)
+
+Failed: `cargo test --workspace --no-fail-fast --profile ci --profile ci`
+CORRECTION: `cargo test --workspace --no-fail-fast --profile ci`
+
+REASON: The `--profile` argument cannot be used multiple times; it was specified twice (`--profile ci --profile ci`), causing the error. Remove the duplicate.
