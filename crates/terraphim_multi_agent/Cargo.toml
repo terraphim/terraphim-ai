@@ -36,7 +36,7 @@ reqwest = { workspace = true, features = ["json", "stream", "rustls-tls"] }
 
 
 # Multi-provider generative AI client (using terraphim fork with OpenRouter support)
-genai = { git = "https://github.com/terraphim/rust-genai.git", branch = "merge-upstream-20251103" }
+genai = "0.6"
 
 # Additional dependencies
 ahash = { version = "0.8.8", features = ["serde"] }
@@ -53,9 +53,9 @@ terraphim_config = { version = "1.20.2",  features = ["openrouter"], registry = 
 terraphim_rolegraph = { version = "1.20.2", registry = "terraphim" }
 terraphim_automata = { version = "1.20.2", registry = "terraphim" }
 terraphim_persistence = { version = "1.20.2", registry = "terraphim" }
-terraphim_agent_evolution = {  path = "../terraphim_agent_evolution", registry = "terraphim" }
+terraphim_agent_evolution = { path = "../terraphim_agent_evolution", version = "1.20.2", registry = "terraphim" }
 terraphim_service = { version = "1.20.2", registry = "terraphim" }
-terraphim_agent_registry = { path = "../terraphim_agent_registry" }
+terraphim_agent_registry = { path = "../terraphim_agent_registry", version = "1.19.2", registry = "terraphim" }
 terraphim_usage = { version = "1.20.3", registry = "terraphim" }
 
 # Firecracker VM dependencies (optional, feature-gated)
