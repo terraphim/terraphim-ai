@@ -82,4 +82,4 @@ tokio-test = "0.4"
 tempfile = "3.0"
 test-log = "0.2"
 ahash = "0.8"
-terraphim_config = { path = "../terraphim_config" }
+terraphim_config = { version = "1.20.2", registry = "terraphim" }

@@ -19,13 +19,13 @@ path = "src/main.rs"
 [dependencies]
 # Core terraphim crates
 terraphim_service = { path = "../terraphim_service", version = "1.0.0" }
-terraphim_config = { path = "../terraphim_config", version = "1.0.0" }
+terraphim_config = { version = "1.0.0", registry = "terraphim" }
 terraphim_command_runtime = { path = "../terraphim_command_runtime", version = "0.1.0" }
 terraphim_types = { version = "1.0.0", registry = "terraphim" }
 terraphim_automata = { version = "1.19.2", registry = "terraphim" }
 terraphim_rolegraph = { version = "1.0.0", registry = "terraphim" }
-terraphim_settings = { path = "../terraphim_settings", version = "1.0.0" }
-terraphim_persistence = { path = "../terraphim_persistence", version = "1.0.0" }
+terraphim_settings = { version = "1.0.0", registry = "terraphim" }
+terraphim_persistence = { version = "1.0.0", registry = "terraphim" }
 terraphim_update = { path = "../terraphim_update", version = "1.0.0" }
 terraphim_hooks = { path = "../terraphim_hooks", version = "1.0.0" }
 

@@ -77,7 +77,7 @@ anyhow = { workspace = true }
 
 # Persistence layer for shared learnings
 opendal = { version = "0.54", default-features = false }
-terraphim_persistence = { path = "../terraphim_persistence", version = "1.4.10", features = ["sqlite"] }
+terraphim_persistence = { version = "1.4.10", features = ["sqlite"], registry = "terraphim" }
 
 # Agent evolution system (optional)
 terraphim_agent_evolution = { path = "../terraphim_agent_evolution", version = "1.19.2", optional = true }
