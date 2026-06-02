@@ -37,8 +37,8 @@ dashmap = "6.1"
 reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
 
 # Internal dependencies (feature-gated)
-terraphim_multi_agent = { path = "../terraphim_multi_agent", optional = true }
-terraphim_agent_evolution = { path = "../terraphim_agent_evolution", optional = true }
+terraphim_multi_agent = { version = "1.0.0",  optional = true, registry = "terraphim" }
+terraphim_agent_evolution = { version = "1.20.2",  optional = true, registry = "terraphim" }
 
 # Firecracker VM integration
 terraphim-firecracker = { path = "../../terraphim_firecracker" }

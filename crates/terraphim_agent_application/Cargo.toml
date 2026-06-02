@@ -26,13 +26,13 @@ toml = "0.8"
 notify = "6.0"
 
 # Terraphim dependencies
-terraphim_agent_supervisor = { path = "../terraphim_agent_supervisor" }
-terraphim_agent_messaging = { path = "../terraphim_agent_messaging" }
-terraphim_agent_registry = { path = "../terraphim_agent_registry" }
-terraphim_kg_orchestration = { path = "../terraphim_kg_orchestration" }
+terraphim_agent_supervisor = { version = "1.19.2", registry = "terraphim" }
+terraphim_agent_messaging = { version = "1.19.2", registry = "terraphim" }
+terraphim_agent_registry = { version = "1.19.2", registry = "terraphim" }
+terraphim_kg_orchestration = { version = "1.0.0", registry = "terraphim" }
 terraphim_kg_agents = { path = "../terraphim_kg_agents" }
-terraphim_task_decomposition = { path = "../terraphim_task_decomposition" }
-terraphim_goal_alignment = { path = "../terraphim_goal_alignment" }
+terraphim_task_decomposition = { version = "1.0.0", registry = "terraphim" }
+terraphim_goal_alignment = { version = "1.0.0", registry = "terraphim" }
 terraphim_types = { version = "1.20.2", registry = "terraphim" }
 
 [dev-dependencies]
