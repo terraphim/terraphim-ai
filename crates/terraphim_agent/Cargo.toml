@@ -68,15 +68,15 @@ colored = { version = "3.0", optional = true }
 comfy-table = { version = "7.0", optional = true }
 dirs = { version = "5.0" }
 directories = "5.0"
-terraphim_types = { path = "../terraphim_types", version = "1.0.0" }
+terraphim_types = { version = "1.0.0", registry = "terraphim" }
 terraphim_settings = { path = "../terraphim_settings", version = "1.0.0" }
 terraphim_persistence = { path = "../terraphim_persistence", version = "1.0.0" }
 terraphim_config = { path = "../terraphim_config", version = "1.0.0" }
 terraphim_command_runtime = { path = "../terraphim_command_runtime", version = "0.1.0" }
-terraphim_automata = { path = "../terraphim_automata", version = "1.19.2" }
+terraphim_automata = { version = "1.19.2", registry = "terraphim" }
 terraphim_service = { path = "../terraphim_service", version = "1.0.0", default-features = false }
 terraphim_middleware = { path = "../terraphim_middleware", version = "1.0.0" }
-terraphim_rolegraph = { path = "../terraphim_rolegraph", version = "1.0.0" }
+terraphim_rolegraph = { version = "1.0.0", registry = "terraphim" }
 terraphim_hooks = { path = "../terraphim_hooks", version = "1.0.0" }
 terraphim_tracker = { path = "../terraphim_tracker", version = "1.0.0" }
 terraphim_orchestrator = { path = "../terraphim_orchestrator", version = "1.0.0" }
@@ -94,7 +94,7 @@ tokio = { workspace = true }
 tempfile = { workspace = true }
 wiremock = "0.6"
 
-terraphim_test_utils = { path = "../terraphim_test_utils" }
+terraphim_test_utils = { version = "1.20.3", registry = "terraphim" }
 insta = { version = "1.41", features = ["yaml", "redactions"] }
 
 # Enable REPL features for testing

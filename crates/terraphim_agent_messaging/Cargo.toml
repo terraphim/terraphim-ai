@@ -13,7 +13,7 @@ readme = "../../README.md"
 
 [dependencies]
 terraphim_agent_supervisor = { path = "../terraphim_agent_supervisor", version = "1.19.2" }
-terraphim_types = { path = "../terraphim_types", version = "1.0.0" }
+terraphim_types = { version = "1.0.0", registry = "terraphim" }
 
 # Core async runtime and utilities
 tokio = { workspace = true }

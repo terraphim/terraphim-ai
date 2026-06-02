@@ -12,8 +12,8 @@ license = "Apache-2.0"
 readme = "../../README.md"
 
 [dependencies]
-terraphim_automata = { path = "../terraphim_automata", version = "1.19.2", features = ["tokio-runtime"] }
-terraphim_types = { path = "../terraphim_types", version = "1.0.0" }
+terraphim_automata = { version = "1.19.2", registry = "terraphim", features = ["tokio-runtime"] }
+terraphim_types = { version = "1.0.0", registry = "terraphim" }
 aho-corasick = "1.1"
 walkdir = "2.5"
 regex = "1.12"

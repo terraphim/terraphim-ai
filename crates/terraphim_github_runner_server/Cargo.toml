@@ -63,4 +63,4 @@ openrouter = ["terraphim_service/openrouter"]
 
 [dev-dependencies]
 salvo = { version = "0.89.2", features = ["test"] }
-terraphim_test_utils = { path = "../terraphim_test_utils" }
+terraphim_test_utils = { version = "1.20.3", registry = "terraphim" }

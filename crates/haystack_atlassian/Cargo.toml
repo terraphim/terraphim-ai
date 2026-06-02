@@ -12,7 +12,7 @@ readme = "../../README.md"
 
 [dependencies]
 haystack_core = { path = "../haystack_core" }
-terraphim_types = { path = "../terraphim_types" }
+terraphim_types = { version = "1.20.2", registry = "terraphim" }
 reqwest = { workspace = true, features = ["json", "rustls-tls"] }
 
 tokio = { workspace = true, features = ["full"] }

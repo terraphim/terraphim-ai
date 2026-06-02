@@ -47,10 +47,10 @@ terraphim-firecracker = { path = "../../terraphim_firecracker" }
 terraphim_service = { path = "../terraphim_service" }
 
 # Always needed for types
-terraphim_types = { path = "../terraphim_types" }
+terraphim_types = { version = "1.20.2", registry = "terraphim" }
 
 # Knowledge graph for learning
-terraphim_rolegraph = { path = "../terraphim_rolegraph" }
+terraphim_rolegraph = { version = "1.20.2", registry = "terraphim" }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util", "macros"] }

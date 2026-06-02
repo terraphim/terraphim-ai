@@ -12,7 +12,7 @@ keywords = ["ai", "haystack", "core", "traits", "integrations"]
 readme = "../../README.md"
 
 [dependencies]
-terraphim_types = { path = "../terraphim_types", version = "1.0.0" }
+terraphim_types = { version = "1.0.0", registry = "terraphim" }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }

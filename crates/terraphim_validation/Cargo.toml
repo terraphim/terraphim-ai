@@ -27,7 +27,7 @@ reqwest = { workspace = true, features = ["json"] }
 
 # Terraphim crates for testing
 terraphim_config = { path = "../terraphim_config" }
-terraphim_types = { path = "../terraphim_types" }
+terraphim_types = { version = "1.20.2", registry = "terraphim" }
 terraphim_server = { path = "../../terraphim_server" }
 
 # Configuration and CLI
