@@ -16,8 +16,8 @@ name = "terraphim_automata"
 crate-type = ["cdylib"]
 
 [dependencies]
-terraphim_automata = { path = "../terraphim_automata", version = "1.0.0", default-features = false }
-terraphim_types = { path = "../terraphim_types", version = "1.0.0", default-features = false }
+terraphim_automata = { version = "1.0.0", registry = "terraphim", default-features = false }
+terraphim_types = { version = "1.0.0", registry = "terraphim", default-features = false }
 
 pyo3 = { version = "0.23", features = ["extension-module", "abi3-py39"] }
 serde_json = "1"

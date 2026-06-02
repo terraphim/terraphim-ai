@@ -33,7 +33,7 @@ terraphim_kg_orchestration = { path = "../terraphim_kg_orchestration" }
 terraphim_kg_agents = { path = "../terraphim_kg_agents" }
 terraphim_task_decomposition = { path = "../terraphim_task_decomposition" }
 terraphim_goal_alignment = { path = "../terraphim_goal_alignment" }
-terraphim_types = { path = "../terraphim_types" }
+terraphim_types = { version = "1.20.2", registry = "terraphim" }
 
 [dev-dependencies]
 tokio-test = "0.4"

@@ -1645,12 +1645,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "daachorse"
-version = "1.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6f55d7153ba3b507595872a3874803f07a8a81d1e888abed8e5db7da0597d6e2"
-
-[[package]]
 name = "darling"
 version = "0.20.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8555,6 +8549,8 @@ dependencies = [
 [[package]]
 name = "terraphim-markdown-parser"
 version = "1.20.2"
+source = "sparse+https://git.terraphim.cloud/api/packages/terraphim/cargo/"
+checksum = "e836db797125d5d4972ffb55500a841dc8d749a904c9e47e5f47e7b21b464aea"
 dependencies = [
  "markdown",
  "serde",
@@ -8805,14 +8801,13 @@ dependencies = [
 [[package]]
 name = "terraphim_automata"
 version = "1.20.2"
+source = "sparse+https://git.terraphim.cloud/api/packages/terraphim/cargo/"
+checksum = "a834f00e1c1462d023b2a703d8bf6af4624a3be46420808ae98dd19c2819e2b7"
 dependencies = [
  "ahash",
  "aho-corasick",
- "anyhow",
  "bincode",
  "cached",
- "criterion 0.8.2",
- "daachorse",
  "fst",
  "getrandom 0.3.4",
  "log",
@@ -8822,16 +8817,11 @@ dependencies = [
  "serde_json",
  "sha2 0.10.9",
  "strsim",
- "tempfile",
  "terraphim-markdown-parser",
  "terraphim_types",
  "thiserror 1.0.69",
  "tokio",
- "tsify",
  "walkdir",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "zstd",
 ]
 
 [[package]]
@@ -9342,20 +9332,17 @@ dependencies = [
 [[package]]
 name = "terraphim_rolegraph"
 version = "1.20.2"
+source = "sparse+https://git.terraphim.cloud/api/packages/terraphim/cargo/"
+checksum = "ab633a304367605007cd9e278d0d4035630e1eb0251557697609b71c394327d0"
 dependencies = [
  "ahash",
  "aho-corasick",
- "anyhow",
  "cached",
- "criterion 0.8.2",
- "csv",
  "itertools 0.14.0",
  "log",
- "proptest",
  "regex",
  "serde",
  "serde_json",
- "tempfile",
  "terraphim_automata",
  "terraphim_types",
  "thiserror 1.0.69",
@@ -9555,6 +9542,8 @@ dependencies = [
 [[package]]
 name = "terraphim_test_utils"
 version = "1.20.3"
+source = "sparse+https://git.terraphim.cloud/api/packages/terraphim/cargo/"
+checksum = "cd5fe3ba2660e1df01c4d1c200c9996e3db5eebdf3b7311ae9c89d90f95f73e1"
 dependencies = [
  "rustc_version",
 ]
@@ -9616,11 +9605,12 @@ dependencies = [
 [[package]]
 name = "terraphim_types"
 version = "1.20.2"
+source = "sparse+https://git.terraphim.cloud/api/packages/terraphim/cargo/"
+checksum = "5d531933df3b41b48a6dd93602f2fbce8e0b1cfb487078ca3a5db414ca492a07"
 dependencies = [
  "ahash",
  "anyhow",
  "chrono",
- "criterion 0.5.1",
  "getrandom 0.3.4",
  "log",
  "schemars 0.8.22",
@@ -9629,10 +9619,8 @@ dependencies = [
  "strsim",
  "thiserror 1.0.69",
  "toml 0.8.23",
- "tsify",
  "ulid",
  "uuid",
- "wasm-bindgen",
 ]
 
 [[package]]

@@ -25,9 +25,9 @@ log.workspace = true
 # the release version; the field's *presence* is what the publisher requires. The
 # value here must match each crate's currently-declared local version so path
 # resolution succeeds for local builds.
-terraphim_types = { path = "../terraphim_types", version = "1.15.0" }
-terraphim_rolegraph = { path = "../terraphim_rolegraph", version = "1.15.0" }
-terraphim_automata = { path = "../terraphim_automata", version = "1.19.2" }
+terraphim_types = { version = "1.15.0", registry = "terraphim" }
+terraphim_rolegraph = { version = "1.15.0", registry = "terraphim" }
+terraphim_automata = { version = "1.19.2", registry = "terraphim" }
 terraphim_service = { path = "../terraphim_service", version = "1.16.15", optional = true }
 terraphim_config = { path = "../terraphim_config", version = "1.15.0" }
 

@@ -12,8 +12,8 @@ license = "Apache-2.0"
 readme = "../../README.md"
 
 [dependencies]
-terraphim_automata = { path = "../terraphim_automata", version = "1.19.2" }
-terraphim_types = { path = "../terraphim_types", version = "1.0.0" }
+terraphim_automata = { version = "1.19.2", registry = "terraphim" }
+terraphim_types = { version = "1.0.0", registry = "terraphim" }
 thiserror = { workspace = true }
 
 serde = { workspace = true, features = ["derive"] }

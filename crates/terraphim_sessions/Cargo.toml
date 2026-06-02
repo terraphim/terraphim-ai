@@ -74,12 +74,12 @@ regex = { version = "1.10", optional = true }
 terraphim-session-analyzer = { version = "1.19.2", path = "../terraphim-session-analyzer", optional = true }
 
 # Feature-gated: Markdown parsing for Aider/Cline connectors
-terraphim-markdown-parser = { path = "../terraphim-markdown-parser", optional = true }
+terraphim-markdown-parser = { version = "1.20.2", registry = "terraphim", optional = true }
 
 # Feature-gated: Terraphim enrichment (uses published crates.io versions)
-terraphim_automata = { version = ">=1.4.10", path = "../terraphim_automata", optional = true }
-terraphim_rolegraph = { version = ">=1.4.10", path = "../terraphim_rolegraph", optional = true }
-terraphim_types = { version = ">=1.4.10", path = "../terraphim_types", optional = true }
+terraphim_automata = { version = ">=1.4.10", registry = "terraphim", optional = true }
+terraphim_rolegraph = { version = ">=1.4.10", registry = "terraphim", optional = true }
+terraphim_types = { version = ">=1.4.10", registry = "terraphim", optional = true }
 
 
 

@@ -19,13 +19,13 @@ crate-type = ["cdylib"]
 napi = { version = "3.8.3", default-features = false, features = ["napi8", "tokio_rt"] }
 napi-derive = "3.5.2"
 serde_json = { workspace = true }
-terraphim_automata = { path = "../crates/terraphim_automata", default-features = false }
+terraphim_automata = { version = "1.20.2", registry = "terraphim", default-features = false }
 terraphim_service = { path = "../crates/terraphim_service" }
 terraphim_config = { path = "../crates/terraphim_config", default-features = false }
 terraphim_persistence = { path = "../crates/terraphim_persistence" }
 terraphim_settings = { path = "../crates/terraphim_settings" }
-terraphim_types = { path = "../crates/terraphim_types", default-features = false }
-terraphim_rolegraph = { path = "../crates/terraphim_rolegraph" }
+terraphim_types = { version = "1.20.2", registry = "terraphim", default-features = false }
+terraphim_rolegraph = { version = "1.20.2", registry = "terraphim" }
 anyhow = { workspace = true }
 tokio = { workspace = true }
 ahash = "0.8.12"
