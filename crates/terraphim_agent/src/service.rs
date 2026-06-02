@@ -247,14 +247,12 @@ impl TuiService {
 
     /// Get the current configuration
     pub async fn get_config(&self) -> terraphim_config::Config {
-        let config = self.config_state.config.lock().await;
-        config.clone()
+        terraphim_command_runtime::get_config(&self.config_state).await
     }
 
     /// Get the current selected role
     pub async fn get_selected_role(&self) -> RoleName {
-        let config = self.config_state.config.lock().await;
-        config.selected_role.clone()
+        terraphim_command_runtime::get_selected_role(&self.config_state).await
     }
 
     /// Update the selected role
@@ -268,36 +266,12 @@ impl TuiService {
 
     /// List all available roles with their shortnames
     pub async fn list_roles_with_info(&self) -> Vec<(String, Option<String>)> {
-        let config = self.config_state.config.lock().await;
-        config
-            .roles
-            .iter()
-            .map(|(name, role)| (name.to_string(), role.shortname.clone()))
-            .collect()
+        terraphim_command_runtime::list_roles_with_info(&self.config_state).await
     }
 
     /// Find a role by name or shortname (case-insensitive)
     pub async fn find_role_by_name_or_shortname(&self, query: &str) -> Option<RoleName> {
-        let config = self.config_state.config.lock().await;
-        let query_lower = query.to_lowercase();
-
-        // First try exact match on name
-        for (name, _role) in config.roles.iter() {
-            if name.to_string().to_lowercase() == query_lower {
-                return Some(name.clone());
-            }
-        }
-
-        // Then try match on shortname
-        for (name, role) in config.roles.iter() {
-            if let Some(ref shortname) = role.shortname {
-                if shortname.to_lowercase() == query_lower {
-                    return Some(name.clone());
-                }
-            }
-        }
-
-        None
+        terraphim_command_runtime::find_role_by_name_or_shortname(&self.config_state, query).await
     }
 
     /// Resolve a role string (name or shortname) to a RoleName.
