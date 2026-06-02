@@ -26,10 +26,10 @@ serde_json = { workspace = true }
 fff-search = { version = "0.8.4" }
 terraphim_automata = { version = "1.20.2", registry = "terraphim", features = ["tokio-runtime"] }
 terraphim_config = { version = "1.20.2", registry = "terraphim" }
-terraphim_file_search = { path = "../terraphim_file_search" }
+terraphim_file_search = { version = "1.20.3", registry = "terraphim" }
 terraphim_hooks = { path = "../terraphim_hooks" }
 terraphim_rolegraph = { version = "1.20.2", registry = "terraphim" }
-terraphim_service = { path = "../terraphim_service" }
+terraphim_service = { version = "1.20.2", registry = "terraphim" }
 terraphim_types = { version = "1.20.2", registry = "terraphim" }
 thiserror = { workspace = true }
 
@@ -61,8 +61,8 @@ tempfile = { workspace = true }
 
 terraphim_automata = { version = "1.20.2", registry = "terraphim" }  # For AutomataPath
 terraphim_config = { version = "1.20.2", registry = "terraphim" }
-terraphim_middleware = { path = "../terraphim_middleware" }  # For Logseq builder
+terraphim_middleware = { version = "1.20.3", registry = "terraphim" }  # For Logseq builder
 terraphim_persistence = { version = "1.20.2",  features = ["memory"], registry = "terraphim" }
-terraphim_file_search = { path = "../terraphim_file_search" }
+terraphim_file_search = { version = "1.20.3", registry = "terraphim" }
 terraphim_test_utils = { version = "1.20.3", registry = "terraphim" }
 env_logger = "0.11"

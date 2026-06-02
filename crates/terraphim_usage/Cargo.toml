@@ -31,7 +31,7 @@ which = "6.0"
 terraphim_persistence = { version = "1.20.2",  optional = true, registry = "terraphim" }
 terraphim_types = { version = "1.20.2", registry = "terraphim" }
 terraphim_settings = { version = "1.20.2", registry = "terraphim" }
-terraphim_ccusage = { path = "../terraphim_ccusage", optional = true }
+terraphim_ccusage = { path = "../terraphim_ccusage", version = "1.20.3", optional = true, registry = "terraphim" }
 opendal = { version = "0.54", optional = true }
 
 [features]

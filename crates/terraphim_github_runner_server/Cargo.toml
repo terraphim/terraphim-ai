@@ -53,7 +53,7 @@ async-trait = "0.1"
 
 # Internal crates
 terraphim_github_runner = { path = "../terraphim_github_runner" }
-terraphim_service = { path = "../terraphim_service" }
+terraphim_service = { version = "1.20.2", registry = "terraphim" }
 terraphim_config = { version = "1.20.2", registry = "terraphim" }
 
 [features]

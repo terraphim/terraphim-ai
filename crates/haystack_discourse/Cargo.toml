@@ -12,7 +12,7 @@ keywords = ["ai", "discourse", "haystack", "cli", "posts"]
 readme = "../../README.md"
 
 [dependencies]
-haystack_core = { path = "../haystack_core" }
+haystack_core = { version = "1.20.3", registry = "terraphim" }
 terraphim_types = { version = "1.20.2", registry = "terraphim" }
 clap = { version = "4.5.60", features = ["derive", "env"] }
 reqwest = { workspace = true, features = ["json", "rustls-tls"] }

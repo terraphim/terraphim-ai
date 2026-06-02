@@ -12,7 +12,7 @@ keywords = ["ai", "grep", "github", "code-search", "haystack"]
 readme = "../../README.md"
 
 [dependencies]
-haystack_core = { path = "../haystack_core", version = "1.19.2" }
+haystack_core = { path = "../haystack_core", version = "1.19.2", registry = "terraphim" }
 terraphim_types = { version = "1.0.0", registry = "terraphim" }
 reqwest = { workspace = true, features = ["json", "rustls-tls"] }
 

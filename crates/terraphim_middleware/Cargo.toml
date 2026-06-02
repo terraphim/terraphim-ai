@@ -18,10 +18,10 @@ terraphim_rolegraph = { version = "1.0.0", registry = "terraphim" }
 terraphim_automata = { version = "1.19.2", registry = "terraphim", features = ["tokio-runtime"] }
 terraphim_types = { version = "1.0.0", registry = "terraphim" }
 terraphim_persistence = { version = "1.0.0", registry = "terraphim" }
-haystack_jmap = { path = "../haystack_jmap", version = "1.19.2", optional = true }
+haystack_jmap = { path = "../haystack_jmap", version = "1.19.2", optional = true, registry = "terraphim" }
 # NOTE: Atomic Data Server commented out for crates.io publishing (not published yet)
 # terraphim_atomic_client = { path = "../terraphim_atomic_client", version = "1.0.0", features = ["native"], optional = true }
-grepapp_haystack = { path = "../haystack_grepapp", version = "1.19.2", optional = true }
+grepapp_haystack = { path = "../haystack_grepapp", version = "1.19.2", optional = true, registry = "terraphim" }
 terraphim-session-analyzer = { path = "../terraphim-session-analyzer", version = "1.19.2", features = ["connectors"], optional = true }
 jiff = { version = "0.2", optional = true }
 home = { version = "0.5", optional = true }
@@ -41,7 +41,7 @@ tokio = { workspace = true, features = ["full"] }
 html2md = "0.2.15"
 async-trait = { workspace = true }
 fff-search = { version = "0.8.4" }
-terraphim_file_search = { path = "../terraphim_file_search", version = "1.20.0" }
+terraphim_file_search = { path = "../terraphim_file_search", version = "1.20.0", registry = "terraphim" }
 
 url = "2.5"
 urlencoding = "2.1"

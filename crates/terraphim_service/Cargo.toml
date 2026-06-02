@@ -14,7 +14,7 @@ readme = "../../README.md"
 [dependencies]
 terraphim_persistence = { version = "1.0.0", registry = "terraphim" }
 terraphim_config = { version = "1.0.0", registry = "terraphim" }
-terraphim_middleware = { path = "../terraphim_middleware", version = "1.0.0" }
+terraphim_middleware = { path = "../terraphim_middleware", version = "1.0.0", registry = "terraphim" }
 terraphim_types = { version = "1.0.0", registry = "terraphim" }
 terraphim_automata = { version = "1.19.2", registry = "terraphim", features = ["remote-loading", "tokio-runtime"] }
 terraphim_rolegraph = { version = "1.0.0", registry = "terraphim" }
@@ -40,7 +40,7 @@ once_cell = "1.19"
 genai = { version = "0.6.0", optional = true }
 
 # LLM Router integration
-terraphim_router = { path = "../terraphim_router", version = "1.0.0", optional = true }
+terraphim_router = { path = "../terraphim_router", version = "1.0.0", optional = true, registry = "terraphim" }
 
 # Logging utilities
 env_logger = "0.11"

@@ -1340,32 +1340,6 @@ dependencies = [
 
 [[package]]
 name = "criterion"
-version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f2b12d017a929603d80db1831cd3a24082f8137ce19c69e6447f54f5fc8d692f"
-dependencies = [
- "anes",
- "cast",
- "ciborium",
- "clap",
- "criterion-plot 0.5.0",
- "is-terminal",
- "itertools 0.10.5",
- "num-traits",
- "once_cell",
- "oorandom",
- "plotters",
- "rayon",
- "regex",
- "serde",
- "serde_derive",
- "serde_json",
- "tinytemplate",
- "walkdir",
-]
-
-[[package]]
-name = "criterion"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "950046b2aa2492f9a536f5f4f9a3de7b9e2476e575e05bd6c333371add4d98f3"
@@ -1375,7 +1349,7 @@ dependencies = [
  "cast",
  "ciborium",
  "clap",
- "criterion-plot 0.8.2",
+ "criterion-plot",
  "itertools 0.13.0",
  "num-traits",
  "oorandom",
@@ -1388,16 +1362,6 @@ dependencies = [
  "tinytemplate",
  "tokio",
  "walkdir",
-]
-
-[[package]]
-name = "criterion-plot"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6b50826342786a51a89e2da3a28f1c32b06e387201bc2d19791f622c673706b1"
-dependencies = [
- "cast",
- "itertools 0.10.5",
 ]
 
 [[package]]
@@ -1474,7 +1438,7 @@ dependencies = [
  "crossterm_winapi",
  "derive_more 2.1.1",
  "document-features",
- "mio 1.2.1",
+ "mio",
  "parking_lot 0.12.5",
  "rustix 1.1.4",
  "signal-hook 0.3.18",
@@ -2938,6 +2902,8 @@ dependencies = [
 [[package]]
 name = "grepapp_haystack"
 version = "1.20.3"
+source = "sparse+https://git.terraphim.cloud/api/packages/terraphim/cargo/"
+checksum = "166cf94ed6e7a1b1553a4c597952590edf1a7e10cb1b4cb3eb94b461edc7d759"
 dependencies = [
  "anyhow",
  "haystack_core",
@@ -2946,10 +2912,8 @@ dependencies = [
  "serde_json",
  "terraphim_types",
  "tokio",
- "tokio-test",
  "tracing",
  "url",
- "wiremock",
 ]
 
 [[package]]
@@ -3071,14 +3035,17 @@ dependencies = [
 [[package]]
 name = "haystack_core"
 version = "1.20.3"
+source = "sparse+https://git.terraphim.cloud/api/packages/terraphim/cargo/"
+checksum = "ae07088aaefd89fc2cbd6163cbcaf3346590dead245cb71e2c7f2cd6b80c89e7"
 dependencies = [
  "terraphim_types",
- "tokio",
 ]
 
 [[package]]
 name = "haystack_jmap"
 version = "1.20.2"
+source = "sparse+https://git.terraphim.cloud/api/packages/terraphim/cargo/"
+checksum = "4f854d47e93374fedb663686cd6a77e71c29821ea0cccfe6cab4710dafcc2601"
 dependencies = [
  "anyhow",
  "clap",
@@ -3090,7 +3057,6 @@ dependencies = [
  "serde_json",
  "terraphim_types",
  "tokio",
- "wiremock",
 ]
 
 [[package]]
@@ -3657,17 +3623,6 @@ dependencies = [
 
 [[package]]
 name = "inotify"
-version = "0.9.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f8069d3ec154eb856955c1c0fbffefbf5f3c40a104ec912d4797314c1801abff"
-dependencies = [
- "bitflags 1.3.2",
- "inotify-sys",
- "libc",
-]
-
-[[package]]
-name = "inotify"
 version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "533e68a5842e734946fe159fb03fc9bbbb254f590dd0d8ad321ae5ff7beca2c1"
@@ -3749,17 +3704,6 @@ name = "ipnet"
 version = "2.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d98f6fed1fde3f8c21bc40a1abb88dd75e67924f9cffc3ef95607bad8017f8e2"
-
-[[package]]
-name = "is-terminal"
-version = "0.4.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3640c1c38b8e4e43584d8df18be5fc6b0aa314ce6ebf51b53313d4306cca8e46"
-dependencies = [
- "hermit-abi",
- "libc",
- "windows-sys 0.61.2",
-]
 
 [[package]]
 name = "is_terminal_polyfill"
@@ -4372,18 +4316,6 @@ dependencies = [
 
 [[package]]
 name = "mio"
-version = "0.8.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a4a650543ca06a924e8b371db273b2756685faae30f8487da1b56505a8f78b0c"
-dependencies = [
- "libc",
- "log",
- "wasi",
- "windows-sys 0.48.0",
-]
-
-[[package]]
-name = "mio"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "02bd0af71c67b473010cbbc60715ee815645a4dc942899111f494b4b737d6fda"
@@ -4578,36 +4510,17 @@ checksum = "61807f77802ff30975e01f4f071c8ba10c022052f98b3294119f3e615d13e5be"
 
 [[package]]
 name = "notify"
-version = "6.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6205bd8bb1e454ad2e27422015fb5e4f2bcc7e08fa8f27058670d208324a4d2d"
-dependencies = [
- "bitflags 2.11.1",
- "crossbeam-channel",
- "filetime",
- "fsevent-sys",
- "inotify 0.9.6",
- "kqueue",
- "libc",
- "log",
- "mio 0.8.11",
- "walkdir",
- "windows-sys 0.48.0",
-]
-
-[[package]]
-name = "notify"
 version = "8.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4d3d07927151ff8575b7087f245456e549fea62edf0ec4e565a5ee50c8402bc3"
 dependencies = [
  "bitflags 2.11.1",
  "fsevent-sys",
- "inotify 0.11.2",
+ "inotify",
  "kqueue",
  "libc",
  "log",
- "mio 1.2.1",
+ "mio",
  "notify-types",
  "walkdir",
  "windows-sys 0.60.2",
@@ -4620,11 +4533,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b44b771d4dd781ef14c84078693e67495da6b47f609f72e8a4da8420a861240e"
 dependencies = [
  "bitflags 2.11.1",
- "inotify 0.11.2",
+ "inotify",
  "kqueue",
  "libc",
  "log",
- "mio 1.2.1",
+ "mio",
  "notify-types",
  "objc2-core-foundation",
  "objc2-core-services",
@@ -7423,7 +7336,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b75a19a7a740b25bc7944bdee6172368f988763b744e3d4dfe753f6b4ece40cc"
 dependencies = [
  "libc",
- "mio 1.2.1",
+ "mio",
  "signal-hook 0.3.18",
 ]
 
@@ -8476,7 +8389,7 @@ dependencies = [
  "anyhow",
  "clap",
  "colored 2.2.0",
- "criterion 0.8.2",
+ "criterion",
  "csv",
  "dialoguer",
  "glob",
@@ -8500,6 +8413,40 @@ dependencies = [
  "terraphim_automata",
  "terraphim_config",
  "terraphim_types",
+ "thiserror 1.0.69",
+ "toml 0.8.23",
+ "tracing",
+ "tracing-subscriber",
+ "walkdir",
+]
+
+[[package]]
+name = "terraphim-session-analyzer"
+version = "1.20.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "365c9dc811c86bf411e2f8d1579aa5eeffff1ce9ff03ed77837c7e768f2a9004"
+dependencies = [
+ "aho-corasick",
+ "anyhow",
+ "clap",
+ "colored 2.2.0",
+ "csv",
+ "dialoguer",
+ "glob",
+ "handlebars",
+ "home",
+ "indexmap 2.14.0",
+ "indicatif 0.18.4",
+ "jiff",
+ "lazy_static",
+ "libc",
+ "rayon",
+ "regex",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "shell-words",
+ "tabled",
  "thiserror 1.0.69",
  "toml 0.8.23",
  "tracing",
@@ -8616,7 +8563,7 @@ dependencies = [
  "ahash",
  "async-trait",
  "chrono",
- "criterion 0.8.2",
+ "criterion",
  "env_logger",
  "futures-util",
  "indexmap 2.14.0",
@@ -8709,6 +8656,8 @@ dependencies = [
 [[package]]
 name = "terraphim_ccusage"
 version = "1.20.3"
+source = "sparse+https://git.terraphim.cloud/api/packages/terraphim/cargo/"
+checksum = "0c9a28bd7b5b3602bc2babf00bae85cf2abae076c89eb04e6192dcfbe6bc92ea"
 dependencies = [
  "chrono",
  "serde",
@@ -8792,17 +8741,16 @@ dependencies = [
 [[package]]
 name = "terraphim_file_search"
 version = "1.20.3"
+source = "sparse+https://git.terraphim.cloud/api/packages/terraphim/cargo/"
+checksum = "f1070007bdf04fa9de354711ba1547779542e56342960bd5af6e4c29be4269db"
 dependencies = [
  "ahash",
- "criterion 0.5.1",
  "fff-search",
  "notify 8.2.0",
  "notify-debouncer-full",
  "parking_lot 0.12.5",
- "tempfile",
  "terraphim_automata",
  "terraphim_types",
- "tokio",
  "tracing",
 ]
 
@@ -8813,7 +8761,7 @@ dependencies = [
  "ahash",
  "async-trait",
  "chrono",
- "criterion 0.8.2",
+ "criterion",
  "env_logger",
  "futures-util",
  "indexmap 2.14.0",
@@ -8839,7 +8787,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "clap",
- "criterion 0.8.2",
+ "criterion",
  "fff-search",
  "log",
  "parking_lot 0.12.5",
@@ -9005,14 +8953,13 @@ dependencies = [
 [[package]]
 name = "terraphim_middleware"
 version = "1.20.3"
+source = "sparse+https://git.terraphim.cloud/api/packages/terraphim/cargo/"
+checksum = "58ea8a43ce58b7f145f2a01e11b6b55257dda1378bea59516eec3be09dbe8846"
 dependencies = [
  "ahash",
  "async-trait",
  "cached",
- "dotenvy",
- "env_logger",
  "fff-search",
- "futures",
  "grepapp_haystack",
  "haystack_jmap",
  "home",
@@ -9025,24 +8972,17 @@ dependencies = [
  "scraper",
  "serde",
  "serde_json",
- "serial_test",
- "tempfile",
- "terraphim-session-analyzer",
+ "terraphim-session-analyzer 1.20.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "terraphim_automata",
  "terraphim_config",
  "terraphim_file_search",
  "terraphim_persistence",
  "terraphim_rolegraph",
- "terraphim_settings",
- "terraphim_test_utils",
  "terraphim_types",
- "test-log",
  "thiserror 1.0.69",
  "tokio",
  "url",
  "urlencoding",
- "uuid",
- "walkdir",
 ]
 
 [[package]]
@@ -9053,7 +8993,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "chrono",
- "criterion 0.8.2",
+ "criterion",
  "fastrand",
  "futures",
  "genai 0.4.4-WIP",
@@ -9218,26 +9158,18 @@ dependencies = [
 [[package]]
 name = "terraphim_router"
 version = "1.20.2"
+source = "sparse+https://git.terraphim.cloud/api/packages/terraphim/cargo/"
+checksum = "476d90f28cc70e3f1f5b76fed5309fa621087e7cce4acd2dd6f4a0384651ca50"
 dependencies = [
  "async-trait",
  "chrono",
- "criterion 0.8.2",
  "dirs 5.0.1",
- "notify 6.1.1",
- "proptest",
  "serde",
  "serde_yaml",
- "serial_test",
- "tempfile",
- "terraphim_persistence",
- "terraphim_spawner",
  "terraphim_types",
  "thiserror 1.0.69",
  "tokio",
- "tokio-test",
  "tracing",
- "tracing-subscriber",
- "tracing-test",
  "uuid",
 ]
 
@@ -9286,9 +9218,10 @@ dependencies = [
 [[package]]
 name = "terraphim_service"
 version = "1.20.2"
+source = "sparse+https://git.terraphim.cloud/api/packages/terraphim/cargo/"
+checksum = "78aad3cc6785348ae330791ec2cf5ccce7024a978c83854aadfcc593ed630b44"
 dependencies = [
  "ahash",
- "anyhow",
  "async-trait",
  "chrono",
  "env_logger",
@@ -9300,22 +9233,16 @@ dependencies = [
  "reqwest 0.12.28",
  "serde",
  "serde_json",
- "serial_test",
  "strsim",
- "tempfile",
  "terraphim_automata",
  "terraphim_config",
  "terraphim_middleware",
  "terraphim_persistence",
  "terraphim_rolegraph",
  "terraphim_router",
- "terraphim_settings",
- "terraphim_test_utils",
  "terraphim_types",
  "thiserror 1.0.69",
  "tokio",
- "tracing",
- "tracing-subscriber",
  "uuid",
 ]
 
@@ -9334,7 +9261,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "terraphim-markdown-parser",
- "terraphim-session-analyzer",
+ "terraphim-session-analyzer 1.20.3",
  "terraphim_automata",
  "terraphim_rolegraph",
  "terraphim_types",
@@ -9381,7 +9308,7 @@ dependencies = [
  "ahash",
  "async-trait",
  "chrono",
- "criterion 0.8.2",
+ "criterion",
  "env_logger",
  "futures-util",
  "indexmap 2.14.0",
@@ -9416,7 +9343,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "clap",
- "criterion 0.8.2",
+ "criterion",
  "dirs 5.0.1",
  "env_home",
  "env_logger",
@@ -9513,6 +9440,8 @@ dependencies = [
 [[package]]
 name = "terraphim_usage"
 version = "1.20.3"
+source = "sparse+https://git.terraphim.cloud/api/packages/terraphim/cargo/"
+checksum = "56a126227139d3c81b61fa21656e6bee08b9843d8bcf2dff9972f3b1f8a43887"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -9775,7 +9704,7 @@ checksum = "8fc7f01b389ac15039e4dc9531aa973a135d7a4135281b12d7c1bc79fd57fffe"
 dependencies = [
  "bytes",
  "libc",
- "mio 1.2.1",
+ "mio",
  "parking_lot 0.12.5",
  "pin-project-lite",
  "signal-hook-registry",
@@ -10171,27 +10100,6 @@ dependencies = [
  "tracing",
  "tracing-core",
  "tracing-log",
-]
-
-[[package]]
-name = "tracing-test"
-version = "0.2.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "19a4c448db514d4f24c5ddb9f73f2ee71bfb24c526cf0c570ba142d1119e0051"
-dependencies = [
- "tracing-core",
- "tracing-subscriber",
- "tracing-test-macro",
-]
-
-[[package]]
-name = "tracing-test-macro"
-version = "0.2.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ad06847b7afb65c7866a36664b75c40b895e318cea4f71299f013fb22965329d"
-dependencies = [
- "quote",
- "syn 2.0.117",
 ]
 
 [[package]]

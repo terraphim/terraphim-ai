@@ -25,7 +25,7 @@ anyhow.workspace = true
 log.workspace = true
 
 # Terraphim crates
-terraphim_service = { path = "../terraphim_service", optional = true }
+terraphim_service = { version = "1.20.2",  optional = true, registry = "terraphim" }
 terraphim_automata = { version = "1.20.2", registry = "terraphim", optional = true }
 terraphim_types = { version = "1.20.2", registry = "terraphim", optional = true }
 terraphim_rolegraph = { version = "1.20.2", registry = "terraphim", optional = true }
