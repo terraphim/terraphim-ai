@@ -1,6 +1,7 @@
 use crate::{MetricLine, ProviderUsage};
 use std::fmt::Write;
 
+/// Formats a [`ProviderUsage`] snapshot as a human-readable plain-text string.
 pub fn format_usage_text(usage: &ProviderUsage) -> String {
     let mut output = String::new();
     writeln!(
@@ -56,10 +57,12 @@ fn progress_bar(pct: f64) -> String {
     format!("{}{}", "█".repeat(filled), "░".repeat(empty))
 }
 
+/// Serialises a [`ProviderUsage`] snapshot to a pretty-printed JSON string.
 pub fn format_usage_json(usage: &ProviderUsage) -> Result<String, serde_json::Error> {
     serde_json::to_string_pretty(usage)
 }
 
+/// Formats a slice of [`ProviderUsage`] snapshots as a CSV string.
 pub fn format_usage_csv(usages: &[ProviderUsage]) -> String {
     let mut csv =
         String::from("provider,plan,line_type,label,value,used,limit,resets_at,fetched_at\n");

@@ -25,6 +25,7 @@ use rustyline::Editor;
 #[cfg(feature = "repl")]
 use colored::Colorize;
 
+/// Interactive REPL handler that dispatches parsed commands to service methods.
 pub struct ReplHandler {
     service: Option<TuiService>,
     #[cfg(feature = "server")]
@@ -35,6 +36,7 @@ pub struct ReplHandler {
 }
 
 impl ReplHandler {
+    /// Create a handler that operates in offline mode using a local `TuiService`.
     pub fn new_offline(service: TuiService) -> Self {
         #[cfg(feature = "repl-mcp")]
         let mcp_handler = {
@@ -52,6 +54,7 @@ impl ReplHandler {
         }
     }
 
+    /// Create a handler that delegates requests to a remote API server.
     #[cfg(feature = "server")]
     pub fn new_server(api_client: ApiClient) -> Self {
         Self {
@@ -63,6 +66,7 @@ impl ReplHandler {
         }
     }
 
+    /// Start the interactive REPL loop, reading commands until the user quits.
     #[cfg(feature = "repl")]
     pub async fn run(&mut self) -> Result<()> {
         use rustyline::completion::{Completer, Pair};
@@ -193,6 +197,7 @@ impl ReplHandler {
         Ok(())
     }
 
+    /// Placeholder run method when the `repl` feature is not compiled in.
     #[cfg(not(feature = "repl"))]
     pub async fn run(&mut self) -> Result<()> {
         println!("REPL feature not enabled. Please rebuild with --features repl");

@@ -2,6 +2,7 @@ use crate::{MetricLine, ProgressFormat, ProviderUsage, Result, UsageError, Usage
 use std::path::PathBuf;
 use std::time::Duration;
 
+/// Usage provider for Claude Code (Anthropic) using the `ccusage` client.
 pub struct ClaudeProvider {
     #[allow(dead_code)]
     credentials_path: PathBuf,
@@ -9,6 +10,8 @@ pub struct ClaudeProvider {
 }
 
 impl ClaudeProvider {
+    /// Creates a new `ClaudeProvider` using the default credentials path
+    /// (`~/.claude/.credentials.json`).
     pub fn new() -> Self {
         let home = std::env::var("HOME").unwrap_or_default();
         Self {
@@ -20,6 +23,7 @@ impl ClaudeProvider {
         }
     }
 
+    /// Creates a `ClaudeProvider` with an explicit credentials file path.
     pub fn with_credentials_path(path: PathBuf) -> Self {
         let ccusage =
             terraphim_ccusage::CcusageClient::new(terraphim_ccusage::CcusageProvider::Claude)

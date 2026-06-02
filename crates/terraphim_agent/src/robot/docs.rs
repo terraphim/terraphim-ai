@@ -586,34 +586,52 @@ impl Default for SelfDocumentation {
 /// Capabilities summary
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Capabilities {
+    /// Agent binary name.
     pub name: String,
+    /// Semver version of the agent binary.
     pub version: String,
+    /// Short human-readable description of what the agent does.
     pub description: String,
+    /// Feature flags indicating which subsystems are compiled in.
     pub features: FeatureFlags,
+    /// Names of all available REPL commands.
     pub commands: Vec<String>,
+    /// Supported output formats (e.g., `"json"`, `"table"`).
     pub supported_formats: Vec<String>,
 }
 
 /// Documentation for a single command
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CommandDoc {
+    /// Primary name of the command (e.g., `"search"`).
     pub name: String,
+    /// Alternative names that resolve to this command.
     pub aliases: Vec<String>,
+    /// Human-readable description of what the command does.
     pub description: String,
+    /// Positional arguments accepted by the command.
     pub arguments: Vec<ArgumentDoc>,
+    /// Named flags accepted by the command.
     pub flags: Vec<FlagDoc>,
+    /// Usage examples for the command.
     pub examples: Vec<ExampleDoc>,
+    /// JSON Schema describing the response payload.
     pub response_schema: serde_json::Value,
 }
 
 /// Documentation for a command argument
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ArgumentDoc {
+    /// Argument name (used as a label in help text).
     pub name: String,
+    /// Data type of the argument (e.g., `"string"`, `"integer"`).
     #[serde(rename = "type")]
     pub arg_type: String,
+    /// Whether the argument must be provided by the caller.
     pub required: bool,
+    /// Human-readable description of the argument's purpose.
     pub description: String,
+    /// Default value used when the argument is omitted.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default: Option<String>,
 }
@@ -621,21 +639,29 @@ pub struct ArgumentDoc {
 /// Documentation for a command flag
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FlagDoc {
+    /// Long-form flag name including the `--` prefix (e.g., `"--limit"`).
     pub name: String,
+    /// Short single-character alias including the `-` prefix (e.g., `"-l"`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub short: Option<String>,
+    /// Data type of the flag value (e.g., `"integer"`, `"boolean"`).
     #[serde(rename = "type")]
     pub flag_type: String,
+    /// Default value used when the flag is not provided.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default: Option<String>,
+    /// Human-readable description of the flag's effect.
     pub description: String,
 }
 
 /// Documentation for a command example
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExampleDoc {
+    /// Short description of what this example demonstrates.
     pub description: String,
+    /// The exact command string to run (including the leading `/`).
     pub command: String,
+    /// Optional expected output snippet for illustration.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output: Option<String>,
 }

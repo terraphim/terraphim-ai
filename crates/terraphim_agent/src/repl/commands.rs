@@ -3,117 +3,171 @@
 use anyhow::{Result, anyhow};
 use std::str::FromStr;
 
+/// All commands that can be issued in the Terraphim REPL.
 #[derive(Debug, Clone, PartialEq)]
 pub enum ReplCommand {
     // Base commands (always available with 'repl' feature)
+    /// Search the configured haystacks using the knowledge graph.
     Search {
+        /// The search query string.
         query: String,
+        /// Optional role override; uses the currently selected role if absent.
         role: Option<String>,
+        /// Maximum number of results to return.
         limit: Option<usize>,
+        /// Enable semantic (embedding-based) search.
         semantic: bool,
+        /// Include knowledge-graph concept matches in results.
         concepts: bool,
     },
+    /// View or modify the current configuration.
     Config {
+        /// Configuration subcommand to execute.
         subcommand: ConfigSubcommand,
     },
+    /// List or switch between roles.
     Role {
+        /// Role subcommand to execute.
         subcommand: RoleSubcommand,
     },
+    /// Display the top concepts from the knowledge graph.
     Graph {
+        /// Number of top concepts to display.
         top_k: Option<usize>,
     },
 
     // Chat commands (requires 'llm' feature)
+    /// Send a message to the configured LLM.
     #[cfg(feature = "llm")]
     Chat {
+        /// Message to send; starts interactive session if absent.
         message: Option<String>,
     },
 
+    /// Summarise a document or piece of text using the LLM.
     #[cfg(feature = "llm")]
     Summarize {
+        /// Document ID or raw text to summarise.
         target: String,
     },
 
     // MCP commands (requires 'repl-mcp' feature)
+    /// Autocomplete a partial term against the thesaurus.
     #[cfg(feature = "repl-mcp")]
     Autocomplete {
+        /// Partial query string to complete.
         query: String,
+        /// Maximum number of suggestions to return.
         limit: Option<usize>,
     },
 
+    /// Extract paragraphs that contain thesaurus-matched terms.
     #[cfg(feature = "repl-mcp")]
     Extract {
+        /// Input text to extract paragraphs from.
         text: String,
+        /// When true, omit the matched term from each extracted paragraph.
         exclude_term: bool,
     },
 
+    /// Find all thesaurus-term matches within the given text.
     #[cfg(feature = "repl-mcp")]
     Find {
+        /// Input text to search for matches.
         text: String,
     },
 
+    /// Replace thesaurus-matched terms in text with hyperlinks.
     #[cfg(feature = "repl-mcp")]
     Replace {
+        /// Input text whose matched terms will be replaced.
         text: String,
+        /// Link format: `"markdown"`, `"wiki"`, `"html"`, or `"plain"`.
         format: Option<String>,
     },
 
+    /// Display thesaurus entries for the selected role.
     #[cfg(feature = "repl-mcp")]
     Thesaurus {
+        /// Role whose thesaurus to display; defaults to the current role.
         role: Option<String>,
     },
 
     // File commands (requires 'repl-file' feature)
+    /// Perform file system operations.
     #[cfg(feature = "repl-file")]
     File {
+        /// File subcommand to execute.
         subcommand: FileSubcommand,
     },
 
     // Web commands (requires 'repl-web' feature)
+    /// Perform web operations (HTTP requests, scraping, screenshots).
     #[cfg(feature = "repl-web")]
     Web {
+        /// Web subcommand to execute.
         subcommand: WebSubcommand,
     },
 
     // VM commands (requires 'firecracker' feature)
+    /// Manage Firecracker microVMs.
     #[cfg(feature = "firecracker")]
     Vm {
+        /// VM subcommand to execute.
         subcommand: VmSubcommand,
     },
 
     // Robot mode commands (for AI agents)
+    /// Access robot-mode self-documentation for AI agent integration.
     Robot {
+        /// Robot subcommand to execute.
         subcommand: RobotSubcommand,
     },
 
     // Session commands (requires 'repl-sessions' feature)
+    /// Browse and search AI coding session history.
     #[cfg(feature = "repl-sessions")]
     Sessions {
+        /// Sessions subcommand to execute.
         subcommand: SessionsSubcommand,
     },
 
     // Update management commands (always available)
+    /// Manage binary self-updates and rollbacks.
     Update {
+        /// Update subcommand to execute.
         subcommand: UpdateSubcommand,
     },
 
     // Utility commands
+    /// Show help information, optionally for a specific command.
     Help {
+        /// Command to show help for; shows all commands if absent.
         command: Option<String>,
     },
+    /// Exit the REPL (alias for `/exit`).
     Quit,
+    /// Exit the REPL.
     Exit,
+    /// Clear the terminal screen.
     Clear,
 }
 
+/// Subcommands for robot mode self-documentation.
 #[derive(Debug, Clone, PartialEq)]
 pub enum RobotSubcommand {
     /// Get capabilities summary
     Capabilities,
     /// Get schema for a command (or all commands)
-    Schemas { command: Option<String> },
+    Schemas {
+        /// Specific command name to fetch schema for, or all schemas if absent.
+        command: Option<String>,
+    },
     /// Get examples for a command
-    Examples { command: Option<String> },
+    Examples {
+        /// Specific command name to fetch examples for, or all examples if absent.
+        command: Option<String>,
+    },
     /// List exit codes
     ExitCodes,
 }
@@ -126,31 +180,59 @@ pub enum UpdateSubcommand {
     /// Install available updates
     Install,
     /// Rollback to a previous version
-    Rollback { version: String },
+    Rollback {
+        /// Semver version string to roll back to.
+        version: String,
+    },
     /// List available backup versions
     List,
 }
 
+/// Subcommands for the `/config` command.
 #[derive(Debug, Clone, PartialEq)]
 pub enum ConfigSubcommand {
+    /// Display the current configuration as JSON.
     Show,
-    Set { key: String, value: String },
+    /// Set a configuration key to a value.
+    Set {
+        /// Configuration key to set.
+        key: String,
+        /// New value for the key.
+        value: String,
+    },
 }
 
+/// Subcommands for the `/role` command.
 #[derive(Debug, Clone, PartialEq)]
 pub enum RoleSubcommand {
+    /// List all available roles.
     List,
-    Select { name: String },
+    /// Switch the active role by name or shortname.
+    Select {
+        /// Role name or shortname to activate.
+        name: String,
+    },
 }
 
+/// Subcommands for file system operations.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg(feature = "repl-file")]
 pub enum FileSubcommand {
-    Search { query: String },
+    /// Search for files matching the given query.
+    Search {
+        /// Query string to match against file names or content.
+        query: String,
+    },
+    /// List files in the current context.
     List,
-    Info { path: String },
+    /// Show metadata for a specific file path.
+    Info {
+        /// Path of the file to inspect.
+        path: String,
+    },
 }
 
+/// Subcommands for AI coding session history management.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg(feature = "repl-sessions")]
 pub enum SessionsSubcommand {
@@ -158,41 +240,75 @@ pub enum SessionsSubcommand {
     Sources,
     /// List imported sessions (auto-imports if cache is empty)
     List {
+        /// Filter sessions to those from a specific source identifier.
         source: Option<String>,
+        /// Maximum number of sessions to display.
         limit: Option<usize>,
     },
     /// Search sessions by query
-    Search { query: String },
+    Search {
+        /// Full-text search query.
+        query: String,
+    },
     /// Show session statistics
     Stats,
     /// Show details of a specific session
-    Show { session_id: String },
+    Show {
+        /// Session ID to display.
+        session_id: String,
+    },
     /// Search sessions by concept (Phase 3 - requires enrichment)
-    Concepts { concept: String },
+    Concepts {
+        /// Concept name to match sessions against.
+        concept: String,
+    },
     /// Find sessions related to a given session
     Related {
+        /// ID of the reference session.
         session_id: String,
+        /// Minimum number of shared concepts required for a related match.
         min_shared: Option<usize>,
     },
     /// Show session timeline grouped by period
     Timeline {
-        group_by: Option<String>, // day, week, month
+        /// Grouping period: `"day"`, `"week"`, or `"month"`.
+        group_by: Option<String>,
+        /// Maximum number of periods to display.
         limit: Option<usize>,
     },
     /// Export sessions to file
     Export {
-        format: Option<String>, // json, markdown
-        output: Option<String>, // file path
+        /// Output format: `"json"` or `"markdown"`.
+        format: Option<String>,
+        /// File path to write the export to.
+        output: Option<String>,
+        /// Limit export to a single session by ID.
         session_id: Option<String>,
     },
     /// Enrich sessions with concepts (Phase 3)
-    Enrich { session_id: Option<String> },
+    Enrich {
+        /// Specific session to enrich, or all sessions if absent.
+        session_id: Option<String>,
+    },
     /// List files accessed by a session
-    Files { session_id: String, json: bool },
+    Files {
+        /// Session ID whose file accesses to list.
+        session_id: String,
+        /// Output as machine-readable JSON.
+        json: bool,
+    },
     /// Find sessions by file path
-    ByFile { file_path: String, json: bool },
+    ByFile {
+        /// File path to search for in session records.
+        file_path: String,
+        /// Output as machine-readable JSON.
+        json: bool,
+    },
     /// Build search index and show index statistics
-    Index { verbose: bool },
+    Index {
+        /// Show verbose index statistics.
+        verbose: bool,
+    },
     /// Cluster sessions by concept similarity (Spec F5.2)
     Cluster {
         /// Maximum number of clusters (auto-detect if None)
@@ -204,97 +320,165 @@ pub enum SessionsSubcommand {
     },
 }
 
+/// Subcommands for Firecracker microVM management.
 #[cfg(feature = "firecracker")]
 #[derive(Debug, Clone, PartialEq)]
 pub enum VmSubcommand {
+    /// List currently running VMs.
     List,
+    /// Show VM pool utilisation statistics.
     Pool,
+    /// Show status of a specific VM, or all VMs if absent.
     Status {
+        /// VM identifier to query; shows all VMs if absent.
         vm_id: Option<String>,
     },
+    /// Show metrics for a specific VM, or all VMs if absent.
     Metrics {
+        /// VM identifier to query; shows all VM metrics if absent.
         vm_id: Option<String>,
     },
+    /// Execute code in a VM.
     Execute {
+        /// Source code to execute.
         code: String,
+        /// Programming language identifier (e.g., `"python"`, `"rust"`).
         language: String,
+        /// VM to run the code on; uses a pooled VM if absent.
         vm_id: Option<String>,
     },
+    /// Run an agent task inside a VM.
     Agent {
+        /// Identifier of the agent to invoke.
         agent_id: String,
+        /// Task description to pass to the agent.
         task: String,
+        /// VM to run the agent on; uses a pooled VM if absent.
         vm_id: Option<String>,
     },
+    /// List tasks running on a specific VM.
     Tasks {
+        /// VM identifier whose tasks to list.
         vm_id: String,
     },
+    /// Allocate a VM from the pool by ID.
     Allocate {
+        /// VM identifier to allocate.
         vm_id: String,
     },
+    /// Release a VM back to the pool.
     Release {
+        /// VM identifier to release.
         vm_id: String,
     },
+    /// Continuously monitor a VM's status and metrics.
     Monitor {
+        /// VM identifier to monitor.
         vm_id: String,
+        /// Polling interval in seconds (default: 5).
         refresh: Option<u32>,
     },
 }
 
+/// Subcommands for web operations (HTTP, scraping, screenshots).
 #[derive(Debug, Clone, PartialEq)]
 #[cfg(feature = "repl-web")]
 pub enum WebSubcommand {
+    /// Perform an HTTP GET request.
     Get {
+        /// Target URL.
         url: String,
+        /// Optional HTTP headers to include in the request.
         headers: Option<std::collections::HashMap<String, String>>,
     },
+    /// Perform an HTTP POST request.
     Post {
+        /// Target URL.
         url: String,
+        /// Request body payload.
         body: String,
+        /// Optional HTTP headers to include in the request.
         headers: Option<std::collections::HashMap<String, String>>,
     },
+    /// Scrape content from a web page.
     Scrape {
+        /// URL of the page to scrape.
         url: String,
+        /// CSS selector to extract a specific element.
         selector: Option<String>,
+        /// CSS selector to wait for before extracting content.
         wait_for_element: Option<String>,
     },
+    /// Capture a screenshot of a web page.
     Screenshot {
+        /// URL of the page to screenshot.
         url: String,
+        /// Viewport width in pixels.
         width: Option<u32>,
+        /// Viewport height in pixels.
         height: Option<u32>,
+        /// Capture the full scrollable page height.
         full_page: Option<bool>,
     },
+    /// Render a web page to PDF.
     Pdf {
+        /// URL of the page to render.
         url: String,
+        /// Paper size (e.g., `"A4"`, `"Letter"`).
         page_size: Option<String>,
     },
+    /// Submit an HTML form on a page.
     Form {
+        /// URL of the page containing the form.
         url: String,
+        /// Field-name to value map for form submission.
         form_data: std::collections::HashMap<String, String>,
     },
+    /// Call a REST API endpoint.
     Api {
+        /// API endpoint URL.
         endpoint: String,
+        /// HTTP method (e.g., `"GET"`, `"POST"`).
         method: String,
+        /// Optional JSON body for the request.
         data: Option<serde_json::Value>,
     },
+    /// Poll the status of a long-running web operation.
     Status {
+        /// Operation ID returned by a prior async web command.
         operation_id: String,
     },
+    /// Cancel a long-running web operation.
     Cancel {
+        /// Operation ID of the operation to cancel.
         operation_id: String,
     },
+    /// Show the history of recent web operations.
     History {
+        /// Maximum number of history entries to display.
         limit: Option<usize>,
     },
+    /// View or modify web operation configuration.
     Config {
+        /// Web configuration subcommand.
         subcommand: WebConfigSubcommand,
     },
 }
 
+/// Subcommands for web operation configuration.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg(feature = "repl-web")]
 pub enum WebConfigSubcommand {
+    /// Display the current web configuration.
     Show,
-    Set { key: String, value: String },
+    /// Set a web configuration key to a value.
+    Set {
+        /// Configuration key to set.
+        key: String,
+        /// New value for the key.
+        value: String,
+    },
+    /// Reset web configuration to defaults.
     Reset,
 }
 
