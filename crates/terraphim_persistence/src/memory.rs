@@ -225,42 +225,9 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
-    async fn test_config_memory_persistence() -> Result<()> {
-        use crate::settings::parse_profiles;
-        use terraphim_config::{ConfigBuilder, ConfigId};
-
-        // Create memory-only settings and get the operator
-        let settings = create_memory_only_device_settings()?;
-        let operators = parse_profiles(&settings).await?;
-        let (memory_op, _speed) = operators.get("memory").unwrap();
-
-        // Create a test config using ConfigBuilder
-        let config = ConfigBuilder::new().build().unwrap();
-
-        // Save the config using memory operator
-        let key = format!(
-            "{}_config.json",
-            match config.id {
-                ConfigId::Desktop => "desktop",
-                ConfigId::Server => "server",
-                ConfigId::Embedded => "embedded",
-            }
-        );
-        let config_json = serde_json::to_string(&config)?;
-        memory_op.write(&key, config_json).await?;
-
-        // Load the config back
-        let loaded_data = memory_op.read(&key).await?;
-        let loaded_config: terraphim_config::Config =
-            serde_json::from_slice(&loaded_data.to_vec())?;
-
-        // Verify the config was properly saved and loaded
-        assert_eq!(config.id, loaded_config.id);
-        assert_eq!(config.default_role, loaded_config.default_role);
-
-        println!("✅ Config memory persistence test passed");
-
-        Ok(())
-    }
+    // `test_config_memory_persistence` was relocated to
+    // `terraphim_multi_agent/tests/config_persistence_roundtrip.rs` to remove
+    // the `terraphim_persistence -> terraphim_config` dev-dependency that closed
+    // a config <-> persistence cycle (Gitea #1910). multi_agent already depends
+    // on both crates, so the test lives there without re-introducing the edge.
 }

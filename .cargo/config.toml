@@ -59,6 +59,15 @@ rustflags = ["-C", "link-arg=-undefined", "-C", "link-arg=dynamic_lookup"]
 # Use sparse protocol for faster downloads
 protocol = "sparse"
 
+# Terraphim private Cargo registry (Gitea). Used by the polyrepo split (Gitea #1910)
+# so split-out crates can be published and consumed across repos.
+# Reads are unauthenticated; publishing requires a token supplied via the
+# CARGO_REGISTRIES_TERRAPHIM_TOKEN env var, which MUST include the "Bearer " prefix:
+#   export CARGO_REGISTRIES_TERRAPHIM_TOKEN="Bearer $GITEA_TOKEN"
+# Publish with: cargo publish --registry terraphim
+[registries.terraphim]
+index = "sparse+https://git.terraphim.cloud/api/packages/root/cargo/"
+
 # Network configuration
 [http]
 # Check for newer versions
