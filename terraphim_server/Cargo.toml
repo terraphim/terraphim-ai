@@ -14,12 +14,12 @@ readme = "../README.md"
 [dependencies]
 terraphim_persistence = { version = "1.0.0", default-features = false, features = ["memory"], registry = "terraphim" }
 terraphim_config = { version = "1.0.0", default-features = false, registry = "terraphim" }
-terraphim_middleware = { path = "../crates/terraphim_middleware", version = "1.0.0", default-features = false }
+terraphim_middleware = { version = "1.0.0", default-features = false, registry = "terraphim" }
 terraphim_rolegraph = { version = "1.0.0", registry = "terraphim" }
 terraphim_settings = { version = "1.0.0", registry = "terraphim" }
 terraphim_types = { version = "1.0.0", registry = "terraphim", default-features = false }
 terraphim_automata = { version = "1.19.2", registry = "terraphim", default-features = false, features = ["tokio-runtime"] }
-terraphim_service = { path = "../crates/terraphim_service", version = "1.0.0", default-features = false }
+terraphim_service = { version = "1.0.0", default-features = false, registry = "terraphim" }
 terraphim_multi_agent = { path = "../crates/terraphim_multi_agent", version = "1.0.0" }
 
 

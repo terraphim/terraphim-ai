@@ -44,7 +44,7 @@ terraphim_agent_evolution = { path = "../terraphim_agent_evolution", optional = 
 terraphim-firecracker = { path = "../../terraphim_firecracker" }
 
 # LLM integration for workflow understanding
-terraphim_service = { path = "../terraphim_service" }
+terraphim_service = { version = "1.20.2", registry = "terraphim" }
 
 # Always needed for types
 terraphim_types = { version = "1.20.2", registry = "terraphim" }

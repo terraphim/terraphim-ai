@@ -74,8 +74,8 @@ terraphim_persistence = { version = "1.0.0", registry = "terraphim" }
 terraphim_config = { version = "1.0.0", registry = "terraphim" }
 terraphim_command_runtime = { path = "../terraphim_command_runtime", version = "0.1.0" }
 terraphim_automata = { version = "1.19.2", registry = "terraphim" }
-terraphim_service = { path = "../terraphim_service", version = "1.0.0", default-features = false }
-terraphim_middleware = { path = "../terraphim_middleware", version = "1.0.0" }
+terraphim_service = { version = "1.0.0", default-features = false, registry = "terraphim" }
+terraphim_middleware = { version = "1.0.0", registry = "terraphim" }
 terraphim_rolegraph = { version = "1.0.0", registry = "terraphim" }
 terraphim_hooks = { path = "../terraphim_hooks", version = "1.0.0" }
 terraphim_tracker = { path = "../terraphim_tracker", version = "1.0.0" }
