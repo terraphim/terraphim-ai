@@ -50,7 +50,7 @@ terraphim_config = { version = "1.20.2",  features = ["openrouter"], registry = 
 terraphim_rolegraph = { version = "1.20.2", registry = "terraphim" }
 terraphim_automata = { version = "1.20.2", registry = "terraphim" }
 terraphim_persistence = { version = "1.20.2", registry = "terraphim" }
-terraphim_agent_evolution = { path = "../terraphim_agent_evolution" }
+terraphim_agent_evolution = {  path = "../terraphim_agent_evolution", registry = "terraphim" }
 terraphim_service = { version = "1.20.2", registry = "terraphim" }
 terraphim_agent_registry = { path = "../terraphim_agent_registry" }
 terraphim_usage = { version = "1.20.3", registry = "terraphim" }
@@ -65,7 +65,7 @@ tempfile = { workspace = true }
 
 criterion = { version = "0.8", features = ["html_reports"] }
 # Enable test-utils for examples and benchmarks
-terraphim_multi_agent = { path = ".", features = ["test-utils"] }
+terraphim_multi_agent = {  path = ".", features = ["test-utils"], registry = "terraphim" }
 
 [[bench]]
 name = "agent_operations"

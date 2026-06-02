@@ -26,7 +26,7 @@ test-helpers = ["dep:tempfile"]
 terraphim_spawner = { path = "../terraphim_spawner", version = "1.0.0" }
 terraphim_router = { version = "1.0.0", registry = "terraphim" }
 terraphim_types = { version = "1.0.0", registry = "terraphim", features = ["kg-integration"] }
-terraphim_tracker = { path = "../terraphim_tracker", version = "1.0.0" }
+terraphim_tracker = {  path = "../terraphim_tracker", version = "1.0.0", registry = "terraphim" }
 
 # Core dependencies
 tokio = { workspace = true, features = ["full", "signal"] }
@@ -80,7 +80,7 @@ opendal = { version = "0.54", default-features = false }
 terraphim_persistence = { version = "1.4.10", features = ["sqlite"], registry = "terraphim" }
 
 # Agent evolution system (optional)
-terraphim_agent_evolution = { path = "../terraphim_agent_evolution", version = "1.19.2", optional = true }
+terraphim_agent_evolution = {  path = "../terraphim_agent_evolution", version = "1.19.2", optional = true, registry = "terraphim" }
 
 # Quickwit integration (optional)
 reqwest = { workspace = true, optional = true }

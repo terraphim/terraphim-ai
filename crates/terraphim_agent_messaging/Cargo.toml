@@ -12,7 +12,7 @@ license = "Apache-2.0"
 readme = "../../README.md"
 
 [dependencies]
-terraphim_agent_supervisor = { path = "../terraphim_agent_supervisor", version = "1.19.2" }
+terraphim_agent_supervisor = {  path = "../terraphim_agent_supervisor", version = "1.19.2", registry = "terraphim" }
 terraphim_types = { version = "1.0.0", registry = "terraphim" }
 
 # Core async runtime and utilities
