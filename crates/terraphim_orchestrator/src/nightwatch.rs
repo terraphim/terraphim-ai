@@ -220,9 +220,13 @@ pub struct DriftMetrics {
 /// Drift score combining all metrics into a single 0.0-1.0 value.
 #[derive(Debug, Clone)]
 pub struct DriftScore {
+    /// Name of the agent that was scored.
     pub agent_name: String,
+    /// Composite drift score in the range 0.0 (none) to 1.0 (maximum).
     pub score: f64,
+    /// Raw drift metrics that produced this score.
     pub metrics: DriftMetrics,
+    /// Correction level derived from the score.
     pub level: CorrectionLevel,
 }
 
@@ -244,8 +248,11 @@ pub enum CorrectionLevel {
 /// Alert emitted by NightwatchMonitor when drift exceeds threshold.
 #[derive(Debug, Clone)]
 pub struct DriftAlert {
+    /// Name of the agent that triggered the alert.
     pub agent_name: String,
+    /// The drift score that triggered this alert.
     pub drift_score: DriftScore,
+    /// Recommended corrective action for the orchestrator to take.
     pub recommended_action: CorrectionAction,
 }
 
@@ -437,6 +444,7 @@ impl NightwatchMonitor {
             .expect("alert channel should never close while monitor exists")
     }
 
+    /// Take ownership of the alert receiver channel, replacing it with an empty one.
     pub fn take_alert_rx(&mut self) -> Option<mpsc::Receiver<DriftAlert>> {
         let (_, rx) = mpsc::channel(1);
         Some(std::mem::replace(&mut self.alert_rx, rx))

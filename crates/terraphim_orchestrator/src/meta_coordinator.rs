@@ -108,13 +108,21 @@ pub struct CandidateIssue {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DispatchResult {
     /// Successfully dispatched.
-    Dispatched { agent: String, issue_id: String },
+    Dispatched {
+        /// Name of the agent that was dispatched.
+        agent: String,
+        /// ID of the issue that was claimed.
+        issue_id: String,
+    },
     /// No ready issues found.
     NoIssues,
     /// Issue was already dispatched recently.
     AlreadyDispatched,
     /// Failed to claim the issue.
-    ClaimFailed { reason: String },
+    ClaimFailed {
+        /// Human-readable reason the claim failed.
+        reason: String,
+    },
     /// No matching agent for the issue.
     NoMatchingAgent,
 }

@@ -161,8 +161,10 @@ pub struct FailureClassification {
 /// Errors produced while running or reverting on the gate.
 #[derive(Debug, thiserror::Error)]
 pub enum GateError {
+    /// A command executed by the gate runner failed.
     #[error("command error: {0}")]
     Command(#[from] CommandError),
+    /// The automatic revert commit or push failed.
     #[error("revert failed: {0}")]
     Revert(String),
 }
@@ -429,8 +431,11 @@ async fn tail_stream<R: AsyncRead + Unpin>(reader: R, max_lines: usize) -> Strin
 /// assert the handler invoked the expected commands in the expected order.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CallRecord {
+    /// The command (binary) that was invoked.
     pub cmd: String,
+    /// Arguments passed to the command.
     pub args: Vec<String>,
+    /// Working directory in which the command was run.
     pub cwd: PathBuf,
 }
 
@@ -444,10 +449,12 @@ pub struct ScriptedRunner {
 }
 
 impl ScriptedRunner {
+    /// Create a new scripted runner with an empty response queue.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Enqueue a successful command response with the given exit code and output.
     pub fn push_ok(&self, code: i32, stdout: &str, stderr: &str) {
         self.responses.lock().unwrap().push_back(Ok(CommandOutput {
             exit_code: Some(code),
@@ -457,10 +464,12 @@ impl ScriptedRunner {
         }));
     }
 
+    /// Enqueue an error response for the next command call.
     pub fn push_err(&self, err: CommandError) {
         self.responses.lock().unwrap().push_back(Err(err));
     }
 
+    /// Return all recorded command calls in order.
     pub fn calls(&self) -> Vec<CallRecord> {
         self.calls.lock().unwrap().clone()
     }
