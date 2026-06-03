@@ -156,23 +156,38 @@ fn process_pre_tool_use(json: &str) {
     let config = LearningCaptureConfig::default();
     let storage_dir = config.storage_location();
 
-    // Query past learnings for similar commands
-    let base_cmd = command.split_whitespace().next().unwrap_or(command);
-    let learnings = match crate::learnings::capture::query_learnings(&storage_dir, base_cmd, false)
-    {
-        Ok(l) => l,
+    // Query past learnings ranked by keyword relevance to the full command
+    let scored = match crate::learnings::capture::suggest_learnings(&storage_dir, command, 10) {
+        Ok(s) => s,
         Err(_) => return,
     };
+
+    if scored.is_empty() {
+        return;
+    }
+
+    // Extract only Learning entries (not Correction or Procedure)
+    let learnings: Vec<&crate::learnings::capture::CapturedLearning> = scored
+        .iter()
+        .filter_map(|se| {
+            if let crate::learnings::capture::LearningEntry::Learning(ref l) = se.entry {
+                Some(l)
+            } else {
+                None
+            }
+        })
+        .collect();
 
     if learnings.is_empty() {
         return;
     }
 
-    // Find the best match: prefer one with a correction
+    // Results are already ordered by relevance; prefer one with a correction
     let best = learnings
         .iter()
+        .copied()
         .find(|l| l.correction.is_some())
-        .or(learnings.first());
+        .or_else(|| learnings.first().copied());
 
     if let Some(learning) = best {
         let mut warning = format!(
