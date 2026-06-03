@@ -43,6 +43,7 @@ pub struct DirectDispatchAgentIndex {
 }
 
 impl DirectDispatchAgentIndex {
+    /// Build an agent index from a slice of agent definitions.
     pub fn from_agents(agents: &[crate::config::AgentDefinition]) -> Self {
         let bare_names: HashSet<String> = agents
             .iter()
@@ -59,6 +60,7 @@ impl DirectDispatchAgentIndex {
         }
     }
 
+    /// Return true if the given (project, agent) combination is registered.
     pub fn is_valid(&self, project: Option<&str>, agent: &str) -> bool {
         match project {
             Some(p) => self
@@ -72,12 +74,15 @@ impl DirectDispatchAgentIndex {
 /// JSON response written back to adf-ctl.
 #[derive(Debug, serde::Serialize)]
 pub struct DispatchResponse {
+    /// Outcome of the dispatch: `"ok"` or `"error"`.
     pub status: String,
+    /// Optional human-readable detail message.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
 }
 
 impl DispatchResponse {
+    /// Create a successful dispatch response.
     pub fn ok() -> Self {
         Self {
             status: "ok".to_string(),
@@ -85,6 +90,7 @@ impl DispatchResponse {
         }
     }
 
+    /// Create an error dispatch response with a message.
     pub fn error(msg: &str) -> Self {
         Self {
             status: "error".to_string(),
@@ -123,6 +129,7 @@ fn remove_stale_socket_if_present(socket_path: &std::path::Path) -> std::io::Res
     }
 }
 
+/// Start the Unix domain socket listener for direct dispatch.
 pub fn start_direct_dispatch_listener(
     socket_path: PathBuf,
     dispatch_tx: tokio::sync::mpsc::Sender<WebhookDispatch>,

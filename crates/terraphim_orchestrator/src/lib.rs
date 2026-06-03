@@ -31,40 +31,54 @@
 
 pub mod adf_commands;
 pub mod agent_registry;
+/// Command-line argument definitions and validation for per-agent invocation.
 pub mod agent_run_command;
 pub mod agent_run_record;
+/// Utilities for spawning and supervising agent processes.
 pub mod agent_runner;
+/// Compound multi-agent review swarm with persona-based specialisation.
 pub mod compound;
 pub mod concurrency;
+/// Static and runtime configuration types for the orchestrator.
 pub mod config;
 pub mod control_plane;
+/// Budget enforcement and per-agent spending tracking.
 pub mod cost_tracker;
 #[cfg(unix)]
 pub mod direct_dispatch;
 pub mod dispatcher;
 pub mod dual_mode;
+/// Error types used across the orchestrator.
 pub mod error;
 pub mod error_signatures;
+/// Agent evolution, replay, and adaptation mechanisms.
 pub mod evolution;
+/// Multi-step flow execution with state persistence and matrix expansion.
 pub mod flow;
 pub mod gitea_skill_loader;
+/// Inter-agent state handoff with TTL management.
 pub mod handoff;
 pub mod kg_router;
 pub mod learning;
+/// Skill discovery from local filesystem paths.
 pub mod local_skills;
 pub mod mention;
 pub mod mention_chain;
 pub mod meta_coordinator;
 pub mod metrics_persistence;
 pub mod mode;
+/// Drift detection, rate limiting, and dual-panel certificate validation.
 pub mod nightwatch;
 pub mod output_poster;
+/// Persona registry and metaprompt rendering for specialised agent roles.
 pub mod persona;
 pub mod post_merge_gate;
 pub mod pr_dispatch;
 pub mod pr_gate;
+/// PR polling and auto-merge evaluation for the rate-of-change pipeline.
 pub mod pr_poller;
 pub mod pr_review;
+/// ADF project configuration and per-project orchestration settings.
 pub mod project_adf;
 pub mod project_control;
 pub mod provider_budget;
@@ -74,7 +88,9 @@ pub mod quickwit;
 #[cfg(feature = "quickwit")]
 pub mod quickwit_bulk;
 pub mod rate_limiter;
+/// Time-based and event-driven task scheduling.
 pub mod scheduler;
+/// Scope definitions for agent concurrency boundaries.
 pub mod scope;
 pub mod webhook;
 pub mod worktree_guard;
@@ -163,12 +179,19 @@ pub enum PreCheckResult {
 /// Status of a single agent in the fleet.
 #[derive(Debug, Clone)]
 pub struct AgentStatus {
+    /// Unique name identifying this agent.
     pub name: String,
+    /// Architectural layer this agent belongs to.
     pub layer: AgentLayer,
+    /// Whether the agent process is currently running.
     pub running: bool,
+    /// Last observed health state from the circuit breaker.
     pub health: HealthStatus,
+    /// Drift score from the nightwatch monitor, if available.
     pub drift_score: Option<f64>,
+    /// Wall-clock duration since the agent was last started.
     pub uptime: Duration,
+    /// Number of times this agent has been restarted.
     pub restart_count: u32,
     /// API calls remaining per provider (None if no limit known).
     pub api_calls_remaining: HashMap<String, Option<u32>>,
@@ -1695,11 +1718,13 @@ impl AgentOrchestrator {
     }
 
     #[cfg(feature = "quickwit")]
+    /// Attach a pre-built Quickwit fleet sink for log shipping.
     pub fn set_quickwit_sink(&mut self, sink: quickwit::QuickwitFleetSink) {
         self.quickwit_sink = Some(sink);
     }
 
     #[cfg(feature = "quickwit")]
+    /// Return the top-level Quickwit configuration, if any.
     pub fn quickwit_config(&self) -> Option<&QuickwitConfig> {
         self.config.quickwit.as_ref()
     }

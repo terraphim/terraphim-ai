@@ -10,24 +10,40 @@ use std::env;
 use std::time::Duration;
 use thiserror::Error;
 
+/// Errors that can occur within the LLM proxy service.
 #[derive(Error, Debug)]
 pub enum LlmProxyError {
+    /// The proxy configuration is invalid or missing required values.
     #[error("Invalid configuration: {0}")]
     ConfigError(String),
 
+    /// A network-level failure occurred while contacting a provider.
     #[error("Network error: {0}")]
     NetworkError(String),
 
+    /// Authentication with the specified provider failed.
     #[error("Authentication failed for provider: {provider}")]
-    AuthError { provider: String },
+    AuthError {
+        /// Name of the provider for which authentication failed.
+        provider: String,
+    },
 
+    /// The specified provider is currently rate-limiting requests.
     #[error("Rate limit exceeded for provider: {provider}")]
-    RateLimitError { provider: String },
+    RateLimitError {
+        /// Name of the provider that returned a rate-limit response.
+        provider: String,
+    },
 
+    /// The specified provider is not supported by this proxy.
     #[error("Provider not supported: {provider}")]
-    UnsupportedProvider { provider: String },
+    UnsupportedProvider {
+        /// Name of the unsupported provider.
+        provider: String,
+    },
 }
 
+/// Convenience alias for results returned by the LLM proxy module.
 pub type Result<T> = std::result::Result<T, LlmProxyError>;
 
 /// Configuration for LLM proxy settings
@@ -35,12 +51,19 @@ pub type Result<T> = std::result::Result<T, LlmProxyError>;
 /// `api_key` is redacted in `Debug` output to prevent credential leakage in logs.
 #[derive(Clone)]
 pub struct ProxyConfig {
+    /// Name of the LLM provider (e.g. `"anthropic"`, `"openrouter"`, `"ollama"`).
     pub provider: String,
+    /// Model identifier to use for requests to this provider.
     pub model: String,
+    /// Optional custom base URL for the provider endpoint or proxy.
     pub base_url: Option<String>,
+    /// Optional API key for authenticating with the provider.
     pub api_key: Option<String>,
+    /// Maximum duration to wait for a response before timing out.
     pub timeout: Duration,
+    /// Maximum number of retry attempts on transient failures.
     pub max_retries: u32,
+    /// Whether to fall back to the direct provider endpoint if the proxy fails.
     pub enable_fallback: bool,
 }
 
@@ -102,6 +125,7 @@ impl ProxyConfig {
 pub struct LlmProxyClient {
     client: Client,
     configs: HashMap<String, ProxyConfig>,
+    /// Name of the provider used when no explicit provider is specified.
     pub default_provider: String,
 }
 

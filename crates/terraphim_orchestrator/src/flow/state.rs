@@ -6,22 +6,31 @@ use uuid::Uuid;
 
 use super::envelope::{MatrixResult, StepEnvelope};
 
+/// Persisted state for a single flow run.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FlowRunState {
+    /// Name of the flow being run.
     pub flow_name: String,
+    /// Unique correlation ID for this run instance.
     pub correlation_id: Uuid,
+    /// Current execution status.
     pub status: FlowRunStatus,
+    /// Timestamp when this run started.
     pub started_at: DateTime<Utc>,
+    /// Timestamp when this run finished, if complete.
     pub finished_at: Option<DateTime<Utc>>,
+    /// Index of the next step to execute on resume.
     pub next_step_index: usize,
     /// Optional issue id supplied by local flow context.
     #[serde(default)]
     pub issue: Option<String>,
+    /// Ordered envelopes from completed steps.
     pub step_envelopes: Vec<StepEnvelope>,
     /// Results from matrix-expanded steps. Key is step name; value is the
     /// ordered list of sub-execution envelopes (one per matrix params row).
     #[serde(default)]
     pub matrix_envelopes: HashMap<String, Vec<StepEnvelope>>,
+    /// Error message if the run failed.
     #[serde(default)]
     pub error: Option<String>,
     /// Current iteration count for re-iteration loops.
@@ -30,17 +39,24 @@ pub struct FlowRunState {
     pub iteration_count: u32,
 }
 
+/// Current status of a flow run.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum FlowRunStatus {
+    /// The flow is actively executing.
     Running,
+    /// The flow is paused at a checkpoint.
     Paused,
+    /// The flow completed all steps successfully.
     Completed,
+    /// The flow terminated with an error.
     Failed,
+    /// The flow was forcibly aborted.
     Aborted,
 }
 
 impl FlowRunState {
+    /// Create a new flow run state in the `Running` status.
     pub fn new(flow_name: &str) -> Self {
         Self {
             flow_name: flow_name.to_string(),
@@ -57,11 +73,13 @@ impl FlowRunState {
         }
     }
 
+    /// Attach an issue ID to this flow run and return the updated state.
     pub fn with_issue(mut self, issue: String) -> Self {
         self.issue = Some(issue);
         self
     }
 
+    /// Create a new flow run state pre-populated as `Failed` with the given reason.
     pub fn failed(flow_name: &str, reason: &str) -> Self {
         let mut state = Self::new(flow_name);
         state.status = FlowRunStatus::Failed;
@@ -70,6 +88,7 @@ impl FlowRunState {
         state
     }
 
+    /// Return the envelope for the named step if it has already completed.
     pub fn step_output(&self, step_name: &str) -> Option<&StepEnvelope> {
         self.step_envelopes
             .iter()
@@ -84,6 +103,7 @@ impl FlowRunState {
             .map(|envelopes| MatrixResult::from_envelopes(envelopes))
     }
 
+    /// Atomically write the flow run state to a JSON file in `dir`.
     pub fn save_to_file(&self, dir: &Path) -> std::io::Result<PathBuf> {
         std::fs::create_dir_all(dir)?;
         let filename = format!("flow-{}-{}.json", self.flow_name, self.correlation_id);
@@ -95,6 +115,7 @@ impl FlowRunState {
         Ok(path)
     }
 
+    /// Load a flow run state from a JSON file at `path`.
     pub fn load_from_file(path: &Path) -> std::io::Result<Self> {
         let json = std::fs::read_to_string(path)?;
         serde_json::from_str(&json)

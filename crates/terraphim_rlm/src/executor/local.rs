@@ -29,17 +29,20 @@ use crate::types::SessionId;
 
 const BACKEND_NAME: &str = "local";
 
+/// Local process executor that runs code and commands directly on the host.
 pub struct LocalExecutor {
     python_path: String,
 }
 
 impl LocalExecutor {
+    /// Create a new `LocalExecutor` using the default `python3` interpreter.
     pub fn new() -> Self {
         Self {
             python_path: "python3".to_string(),
         }
     }
 
+    /// Override the Python interpreter path used for code execution.
     pub fn with_python(mut self, path: impl Into<String>) -> Self {
         self.python_path = path.into();
         self

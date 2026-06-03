@@ -33,6 +33,7 @@ use terraphim_types::{
     Document, Edge, IndexedDocument, Node, NormalizedTermValue, RoleName, Thesaurus,
 };
 use tokio::sync::{Mutex, MutexGuard};
+/// Input parsing utilities for role-graph construction (thesaurus and document ingestion).
 pub mod input;
 
 #[cfg(feature = "medical")]
@@ -48,14 +49,19 @@ use unicode_segmentation::UnicodeSegmentation;
 /// Errors produced by the role-graph knowledge graph operations.
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
+    /// A referenced node ID does not exist in the graph.
     #[error("The given node ID was not found")]
     NodeIdNotFound,
+    /// A referenced edge ID does not exist in the graph.
     #[error("The given Edge ID was not found")]
     EdgeIdNotFound,
+    /// Failed to serialise an indexed document to JSON.
     #[error("Cannot convert IndexedDocument to JSON: {0}")]
     JsonConversionError(#[from] serde_json::Error),
+    /// The underlying automata engine returned an error.
     #[error("Error while driving terraphim automata: {0}")]
     TerraphimAutomataError(#[from] terraphim_automata::TerraphimAutomataError),
+    /// Building the Aho-Corasick automaton failed.
     #[error("Indexing error: {0}")]
     AhoCorasickError(#[from] aho_corasick::BuildError),
 }
@@ -65,10 +71,15 @@ type Result<T> = std::result::Result<T, Error>;
 /// Statistics about the graph structure for debugging
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct GraphStats {
+    /// Number of concept nodes in the graph.
     pub node_count: usize,
+    /// Number of edges (concept-to-concept relationships) in the graph.
     pub edge_count: usize,
+    /// Number of indexed documents.
     pub document_count: usize,
+    /// Number of entries in the thesaurus automaton.
     pub thesaurus_size: usize,
+    /// Whether the graph has been populated with at least one document.
     pub is_populated: bool,
 }
 

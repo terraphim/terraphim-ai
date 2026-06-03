@@ -106,10 +106,14 @@
 //! See the [WASM package](wasm/) for browser usage.
 
 pub use self::builder::{Logseq, ThesaurusBuilder, compute_kg_source_hash};
+/// FST-backed autocomplete index and prefix/fuzzy search functions.
 pub mod autocomplete;
+/// Thesaurus builder that parses Logseq markdown files via ripgrep JSON output.
 pub mod builder;
 pub mod evaluation;
+/// Parser for `terraphim` directives embedded in markdown front-matter.
 pub mod markdown_directives;
+/// Aho-Corasick text matcher and link-replacement utilities.
 pub mod matcher;
 pub mod url_protector;
 
@@ -158,6 +162,7 @@ pub use umls::{UmlsConcept, UmlsDataset, UmlsStats};
 pub use umls_extractor::{UmlsExtractor, UmlsExtractorStats, UmlsMatch};
 
 // Re-export helpers for metadata iteration to support graph-embedding expansions in consumers
+/// Helper functions for iterating and querying autocomplete index metadata.
 pub mod autocomplete_helpers {
     use super::autocomplete::{AutocompleteIndex, AutocompleteMetadata};
     /// Iterates over all `(term, metadata)` pairs stored in the autocomplete index.

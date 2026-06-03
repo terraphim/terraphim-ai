@@ -41,6 +41,7 @@ const DEFAULT_MEMORY_BYTES: i64 = 512 * 1024 * 1024;
 /// Default container PIDs limit.
 const DEFAULT_PIDS_LIMIT: i64 = 256;
 
+/// Docker-based execution backend that isolates each session in a container.
 pub struct DockerExecutor {
     docker: Docker,
     /// Per-session container map. Each entry holds a `Mutex<Option<String>>`:
@@ -82,6 +83,7 @@ fn unsupported(op: &'static str) -> RlmError {
 }
 
 impl DockerExecutor {
+    /// Create a new `DockerExecutor` connecting to the local Docker daemon.
     pub fn new(_config: RlmConfig) -> Result<Self, RlmError> {
         let docker =
             Docker::connect_with_local_defaults().map_err(|e| RlmError::BackendInitFailed {
@@ -108,6 +110,7 @@ impl DockerExecutor {
         })
     }
 
+    /// Create a new `DockerExecutor` using the specified container image.
     pub fn with_image(config: RlmConfig, image: &str) -> Result<Self, RlmError> {
         let mut executor = Self::new(config)?;
         executor.image = image.to_string();

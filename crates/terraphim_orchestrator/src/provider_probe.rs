@@ -16,12 +16,19 @@ use crate::rate_limiter::RateLimiter;
 /// Result of probing a single provider+model combination.
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct ProbeResult {
+    /// LLM provider identifier (e.g. `"anthropic"`, `"openai"`).
     pub provider: String,
+    /// Model identifier within the provider (e.g. `"claude-sonnet-4-6"`).
     pub model: String,
+    /// CLI tool used to invoke this provider (e.g. `"claude"`, `"opencode"`).
     pub cli_tool: String,
+    /// Outcome of the probe attempt.
     pub status: ProbeStatus,
+    /// Round-trip latency in milliseconds, if the probe succeeded.
     pub latency_ms: Option<u64>,
+    /// Error message if the probe failed.
     pub error: Option<String>,
+    /// ISO 8601 timestamp of the probe.
     pub timestamp: String,
 }
 
@@ -29,9 +36,13 @@ pub struct ProbeResult {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ProbeStatus {
+    /// The provider responded successfully within the timeout.
     Success,
+    /// The provider returned an error response.
     Error,
+    /// The provider did not respond within the timeout.
     Timeout,
+    /// The probe was skipped due to an active rate limit.
     RateLimited,
 }
 
@@ -74,11 +85,13 @@ impl ProviderHealthMap {
         }
     }
 
+    /// Attach a rate limiter to throttle probe frequency.
     pub fn with_rate_limiter(mut self, rate_limiter: RateLimiter) -> Self {
         self.rate_limiter = Some(rate_limiter);
         self
     }
 
+    /// Return true if the given provider is currently rate-limited.
     pub fn is_rate_limited(&self, provider: &str) -> bool {
         self.rate_limited.contains(provider)
     }
@@ -724,6 +737,7 @@ async fn probe_single(
 }
 
 impl ProviderHealthMap {
+    /// Ship all current probe results to the Quickwit telemetry sink.
     pub async fn send_to_quickwit(
         &self,
         sink: &crate::quickwit::QuickwitFleetSink,

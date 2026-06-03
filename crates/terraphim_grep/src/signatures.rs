@@ -2,23 +2,33 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::TerraphimGrepError;
 
+/// A typed RLM prompt signature that knows how to format its instructions and parse its output.
 pub trait RlmSignature: Send + Sync {
+    /// The structured output type returned by this signature.
     type Output: serde::Serialize + serde::de::DeserializeOwned;
 
+    /// Return the natural-language instructions to include in the prompt.
     fn instructions(&self) -> String;
+    /// Parse the raw RLM text output into the structured `Output` type.
     fn parse(&self, raw: &str) -> Result<Self::Output, TerraphimGrepError>;
 }
 
+/// A single search match returned by the RLM search-result signature.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Match {
+    /// Path of the matched file.
     pub path: String,
+    /// Line number of the match (1-based).
     pub line: usize,
+    /// Optional end line number for a multi-line match.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub line_end: Option<usize>,
+    /// Surrounding context lines.
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub context: Vec<String>,
 }
 
+/// RLM signature that asks for a list of file-match locations.
 pub struct SearchResultSignature;
 
 impl RlmSignature for SearchResultSignature {
@@ -35,21 +45,30 @@ impl RlmSignature for SearchResultSignature {
     }
 }
 
+/// A source citation accompanying an RLM-synthesised answer.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Citation {
+    /// Source identifier (file path or URL).
     pub source: String,
+    /// Line number within the source, if known.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub line: Option<usize>,
+    /// The quoted excerpt from the source.
     pub excerpt: String,
 }
 
+/// An LLM-synthesised answer with supporting citations.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AnswerWithCitations {
+    /// The synthesised answer text.
     pub answer: String,
+    /// Sources cited in the answer.
     pub citations: Vec<Citation>,
+    /// Model confidence in the answer, in the range [0, 1].
     pub confidence: f64,
 }
 
+/// RLM signature that asks for a synthesised answer with citations.
 pub struct AnswerSignature;
 
 impl RlmSignature for AnswerSignature {
@@ -69,15 +88,20 @@ impl RlmSignature for AnswerSignature {
     }
 }
 
+/// A new domain concept extracted by the RLM from a query-answer pair.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NewConcept {
+    /// Canonical name of the extracted concept.
     pub name: String,
+    /// Alternative names or aliases for this concept.
     #[serde(default)]
     pub synonyms: Vec<String>,
+    /// Related concept names (free-form).
     #[serde(default)]
     pub relationships: Vec<String>,
 }
 
+/// RLM signature that extracts new domain concepts from a query-answer pair.
 pub struct ConceptExtractionSignature;
 
 impl RlmSignature for ConceptExtractionSignature {

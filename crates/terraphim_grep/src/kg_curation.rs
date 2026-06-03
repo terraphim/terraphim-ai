@@ -8,6 +8,7 @@ use terraphim_service::llm::LlmClient;
 use crate::error::Result;
 use crate::signatures::NewConcept;
 
+/// Extracts new knowledge-graph concepts from query-answer pairs via an LLM.
 #[cfg(feature = "llm")]
 pub struct KgCurationRlm {
     llm_client: Arc<dyn LlmClient>,
@@ -16,6 +17,7 @@ pub struct KgCurationRlm {
 
 #[cfg(feature = "llm")]
 impl KgCurationRlm {
+    /// Create a new curation client backed by the given LLM.
     pub fn new(llm_client: Arc<dyn LlmClient>) -> Self {
         Self {
             llm_client,
@@ -23,11 +25,13 @@ impl KgCurationRlm {
         }
     }
 
+    /// Set a filesystem path for storing extracted concepts.
     pub fn with_kg_path(mut self, path: std::path::PathBuf) -> Self {
         self.kg_path = Some(path);
         self
     }
 
+    /// Extract new concepts from a query-answer pair and return them for indexing.
     pub async fn extract_and_index(
         &self,
         query: &str,

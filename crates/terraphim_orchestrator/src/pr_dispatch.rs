@@ -21,11 +21,17 @@ use crate::config::{AgentDefinition, OrchestratorConfig};
 /// have to know about the dispatcher enum variant shape.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReviewPrRequest {
+    /// Pull request number.
     pub pr_number: u64,
+    /// Project ID this PR belongs to.
     pub project: String,
+    /// HEAD commit SHA of the PR branch.
     pub head_sha: String,
+    /// Login of the PR author.
     pub author_login: String,
+    /// Title of the pull request.
     pub title: String,
+    /// Approximate lines-of-change count.
     pub diff_loc: u32,
 }
 

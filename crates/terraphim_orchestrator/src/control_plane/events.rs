@@ -210,11 +210,17 @@ pub fn normalize_polled_command(
 /// to fully populate a NormalizedAgentEvent.
 #[derive(Debug, Clone)]
 pub struct WebhookContext {
+    /// Full repository name in `owner/repo` format.
     pub repo_full_name: String,
+    /// Title of the issue or pull request.
     pub issue_title: String,
+    /// Current state of the issue (e.g. `open` or `closed`).
     pub issue_state: String,
+    /// ISO 8601 timestamp when the triggering comment was created.
     pub comment_created_at: String,
+    /// Login of the comment author.
     pub comment_author: String,
+    /// Full body text of the triggering comment.
     pub comment_body: String,
 }
 

@@ -12,125 +12,208 @@ pub enum RlmError {
     // Session errors
     /// Session not found.
     #[error("Session not found: {session_id}")]
-    SessionNotFound { session_id: SessionId },
+    SessionNotFound {
+        /// Identifier of the session that was not found.
+        session_id: SessionId,
+    },
 
     /// Session has expired.
     #[error("Session expired: {session_id}")]
-    SessionExpired { session_id: SessionId },
+    SessionExpired {
+        /// Identifier of the session that expired.
+        session_id: SessionId,
+    },
 
     /// Session is in an invalid state for the requested operation.
     #[error("Session {session_id} is in invalid state {state} for operation {operation}")]
     InvalidSessionState {
+        /// Identifier of the session in an invalid state.
         session_id: SessionId,
+        /// Current state of the session.
         state: String,
+        /// Operation that was attempted.
         operation: String,
     },
 
     /// Maximum session extensions reached.
     #[error("Session {session_id} has reached maximum extensions ({max})")]
-    MaxExtensionsReached { session_id: SessionId, max: u32 },
+    MaxExtensionsReached {
+        /// Identifier of the session that reached the extension limit.
+        session_id: SessionId,
+        /// Maximum number of extensions allowed.
+        max: u32,
+    },
 
     // Budget errors
     /// Token budget exceeded.
     #[error("Token budget exceeded: used {used} of {budget} tokens")]
-    TokenBudgetExceeded { used: u64, budget: u64 },
+    TokenBudgetExceeded {
+        /// Number of tokens consumed.
+        used: u64,
+        /// Token budget limit.
+        budget: u64,
+    },
 
     /// Time budget exceeded.
     #[error("Time budget exceeded: used {used_ms}ms of {budget_ms}ms")]
-    TimeBudgetExceeded { used_ms: u64, budget_ms: u64 },
+    TimeBudgetExceeded {
+        /// Elapsed time in milliseconds.
+        used_ms: u64,
+        /// Time budget limit in milliseconds.
+        budget_ms: u64,
+    },
 
     /// Recursion depth limit exceeded.
     #[error("Recursion depth limit exceeded: {depth} >= {max_depth}")]
-    RecursionDepthExceeded { depth: u32, max_depth: u32 },
+    RecursionDepthExceeded {
+        /// Current recursion depth reached.
+        depth: u32,
+        /// Maximum recursion depth allowed.
+        max_depth: u32,
+    },
 
     // Execution errors
     /// Code execution failed.
     #[error("Code execution failed: {message}")]
     ExecutionFailed {
+        /// Human-readable description of the failure.
         message: String,
+        /// Exit code returned by the process, if available.
         exit_code: Option<i32>,
+        /// Standard output captured before failure, if any.
         stdout: Option<String>,
+        /// Standard error captured before failure, if any.
         stderr: Option<String>,
     },
 
     /// Command parsing failed.
     #[error("Failed to parse command from LLM output: {message}")]
-    CommandParseFailed { message: String },
+    CommandParseFailed {
+        /// Description of the parse failure.
+        message: String,
+    },
 
     /// Execution timed out.
     #[error("Execution timed out after {timeout_ms}ms")]
-    ExecutionTimeout { timeout_ms: u64 },
+    ExecutionTimeout {
+        /// Configured timeout in milliseconds that was exceeded.
+        timeout_ms: u64,
+    },
 
     /// VM crashed or became unresponsive.
     #[error("VM crashed: {message}")]
-    VmCrashed { message: String },
+    VmCrashed {
+        /// Description of the crash or unresponsiveness.
+        message: String,
+    },
 
     // Validation errors
     /// Knowledge graph validation failed.
     #[error("KG validation failed: unknown terms {unknown_terms:?}")]
-    KgValidationFailed { unknown_terms: Vec<String> },
+    KgValidationFailed {
+        /// Terms not found in the knowledge graph.
+        unknown_terms: Vec<String>,
+    },
 
     /// KG validation requires user escalation.
     #[error("KG validation requires user approval for terms: {unknown_terms:?}")]
     KgEscalationRequired {
+        /// Terms requiring user approval.
         unknown_terms: Vec<String>,
+        /// Recommended action for the user to take.
         suggested_action: String,
+        /// Context in which the unknown terms were encountered.
         context: String,
     },
 
     // Snapshot errors
     /// Snapshot not found.
     #[error("Snapshot not found: {snapshot_id}")]
-    SnapshotNotFound { snapshot_id: String },
+    SnapshotNotFound {
+        /// Identifier of the snapshot that was not found.
+        snapshot_id: String,
+    },
 
     /// Maximum snapshots per session reached.
     #[error("Maximum snapshots ({max}) reached for session")]
-    MaxSnapshotsReached { max: u32 },
+    MaxSnapshotsReached {
+        /// Maximum number of snapshots allowed per session.
+        max: u32,
+    },
 
     /// Snapshot creation failed.
     #[error("Failed to create snapshot: {message}")]
-    SnapshotCreationFailed { message: String },
+    SnapshotCreationFailed {
+        /// Description of why snapshot creation failed.
+        message: String,
+    },
 
     /// Snapshot restoration failed.
     #[error("Failed to restore snapshot: {message}")]
-    SnapshotRestoreFailed { message: String },
+    SnapshotRestoreFailed {
+        /// Description of why snapshot restoration failed.
+        message: String,
+    },
 
     // Backend errors
     /// No execution backend available.
     #[error("No execution backend available. Tried: {tried:?}")]
-    NoBackendAvailable { tried: Vec<String> },
+    NoBackendAvailable {
+        /// Names of backends that were attempted.
+        tried: Vec<String>,
+    },
 
     /// Backend initialization failed.
     #[error("Failed to initialize {backend} backend: {message}")]
-    BackendInitFailed { backend: String, message: String },
+    BackendInitFailed {
+        /// Name of the backend that failed to initialise.
+        backend: String,
+        /// Description of the initialisation failure.
+        message: String,
+    },
 
     /// VM pool exhausted (all VMs busy, no overflow capacity).
     #[error(
         "VM pool exhausted: all {pool_size} VMs busy, overflow at capacity ({overflow_count}/{max_overflow})"
     )]
     PoolExhausted {
+        /// Total number of VMs in the pool.
         pool_size: u32,
+        /// Number of overflow VMs currently in use.
         overflow_count: u32,
+        /// Maximum number of overflow VMs allowed.
         max_overflow: u32,
     },
 
     /// VM allocation timed out.
     #[error("VM allocation timed out after {timeout_ms}ms")]
-    VmAllocationTimeout { timeout_ms: u64 },
+    VmAllocationTimeout {
+        /// Allocation timeout in milliseconds that was exceeded.
+        timeout_ms: u64,
+    },
 
     // Network/DNS errors
     /// DNS query blocked by allowlist.
     #[error("DNS query blocked: {domain} not in allowlist")]
-    DnsBlocked { domain: String },
+    DnsBlocked {
+        /// Domain name that was blocked.
+        domain: String,
+    },
 
     /// Network request blocked.
     #[error("Network request blocked: {url}")]
-    NetworkBlocked { url: String },
+    NetworkBlocked {
+        /// URL that was blocked.
+        url: String,
+    },
 
     // LLM errors
     /// LLM call failed.
     #[error("LLM call failed: {message}")]
-    LlmCallFailed { message: String },
+    LlmCallFailed {
+        /// Description of why the LLM call failed.
+        message: String,
+    },
 
     /// No LLM client configured. Enable the `llm` feature and set an API key
     /// or run a local Ollama instance.
@@ -145,42 +228,72 @@ pub enum RlmError {
 
     /// Invalid session token format.
     #[error("Invalid session token: {token}")]
-    InvalidSessionToken { token: String },
+    InvalidSessionToken {
+        /// The malformed session token.
+        token: String,
+    },
 
     /// Batch query size too large.
     #[error("Batch size {size} exceeds maximum {max}")]
-    BatchSizeTooLarge { size: usize, max: usize },
+    BatchSizeTooLarge {
+        /// Requested batch size.
+        size: usize,
+        /// Maximum permitted batch size.
+        max: usize,
+    },
 
     // Output errors
     /// Output too large for inline return.
     #[error("Output exceeds inline limit ({size} > {limit} bytes), streamed to {file_path}")]
     OutputTooLarge {
+        /// Actual output size in bytes.
         size: u64,
+        /// Inline size limit in bytes.
         limit: u64,
+        /// Path to the file where the output was streamed.
         file_path: String,
     },
 
     // Operations errors
     /// Auto-remediation failed.
     #[error("Auto-remediation failed after {attempts} attempts: {message}")]
-    AutoRemediationFailed { attempts: u32, message: String },
+    AutoRemediationFailed {
+        /// Number of remediation attempts made.
+        attempts: u32,
+        /// Description of the final failure.
+        message: String,
+    },
 
     /// Alert webhook failed.
     #[error("Failed to send alert to webhook: {message}")]
-    AlertWebhookFailed { message: String },
+    AlertWebhookFailed {
+        /// Description of why the webhook call failed.
+        message: String,
+    },
 
     // Generic errors
     /// Configuration error.
     #[error("Configuration error: {message}")]
-    ConfigError { message: String },
+    ConfigError {
+        /// Description of the configuration problem.
+        message: String,
+    },
 
     /// Operation is not supported by the selected backend.
     #[error("Backend '{backend}' does not support operation '{op}'")]
-    NotSupported { backend: String, op: String },
+    NotSupported {
+        /// Name of the backend that does not support the operation.
+        backend: String,
+        /// Name of the unsupported operation.
+        op: String,
+    },
 
     /// Internal error.
     #[error("Internal error: {message}")]
-    Internal { message: String },
+    Internal {
+        /// Description of the internal error.
+        message: String,
+    },
 
     /// Cancelled by user or parent.
     #[error("Operation cancelled")]

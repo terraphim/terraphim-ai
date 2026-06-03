@@ -17,6 +17,7 @@ pub struct MatrixResult {
 }
 
 impl MatrixResult {
+    /// Aggregate a slice of step envelopes into a matrix result summary.
     pub fn from_envelopes(envelopes: &[StepEnvelope]) -> Self {
         let success_count = envelopes.iter().filter(|e| e.exit_code == 0).count();
         let failure_count = envelopes.len() - success_count;
@@ -33,20 +34,31 @@ impl MatrixResult {
     }
 }
 
+/// Output envelope produced by a single flow step execution.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StepEnvelope {
+    /// Name of the step that produced this envelope.
     pub step_name: String,
+    /// Timestamp when the step started.
     pub started_at: DateTime<Utc>,
+    /// Timestamp when the step finished.
     pub finished_at: DateTime<Utc>,
+    /// Process exit code (0 = success).
     pub exit_code: i32,
+    /// Captured standard output from the step.
     pub stdout: String,
+    /// Captured standard error from the step.
     pub stderr: String,
+    /// Estimated cost in USD for this step, if available.
     #[serde(default)]
     pub cost_usd: Option<f64>,
+    /// Agent session ID, if this step spawned an agent.
     #[serde(default)]
     pub session_id: Option<String>,
+    /// Number of input (prompt) tokens consumed, if available.
     #[serde(default)]
     pub input_tokens: Option<u64>,
+    /// Number of output (completion) tokens generated, if available.
     #[serde(default)]
     pub output_tokens: Option<u64>,
     /// Path to temp file containing stdout (for downstream action steps).

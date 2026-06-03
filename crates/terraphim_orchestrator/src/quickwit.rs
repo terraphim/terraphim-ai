@@ -124,36 +124,54 @@ impl<T> From<mpsc::error::SendError<T>> for QuickwitError {
 pub enum OrchestratorEvent {
     /// Reviewer agent completed and a verdict was successfully parsed.
     PrReviewed {
+        /// Pull request number that was reviewed.
         pr_number: u64,
+        /// Project identifier for the reviewed PR.
         project: String,
+        /// HEAD commit SHA of the reviewed PR.
         head_sha: String,
+        /// Login of the reviewer agent that produced the verdict.
         reviewer_login: String,
         /// Confidence score 1-5 from the `structural-pr-review` comment.
         confidence: u8,
+        /// Number of P0 (critical) findings.
         p0_count: u32,
+        /// Number of P1 (important) findings.
         p1_count: u32,
         /// `"GO"` | `"CONDITIONAL"` | `"NO-GO"`
         verdict: String,
     },
     /// AutoMerge handler merged the PR successfully.
     PrAutoMerged {
+        /// Pull request number that was merged.
         pr_number: u64,
+        /// Project identifier for the merged PR.
         project: String,
+        /// Commit SHA produced by the merge.
         merge_sha: String,
+        /// Pull request title.
         title: String,
     },
     /// Post-merge test gate passed; the merge is stable.
     PrAutoMergedVerified {
+        /// Pull request number whose merge was verified.
         pr_number: u64,
+        /// Project identifier.
         project: String,
+        /// Merge commit SHA that was verified.
         merge_sha: String,
+        /// Wall-clock time in seconds taken by the verification run.
         wall_time_secs: f64,
     },
     /// Post-merge test gate failed and the merge was reverted.
     PrAutoReverted {
+        /// Pull request number whose merge was reverted.
         pr_number: u64,
+        /// Project identifier.
         project: String,
+        /// The failed merge commit SHA.
         merge_sha: String,
+        /// The revert commit SHA.
         revert_sha: String,
         /// Classified failure kind (e.g. `"TestFailure"`, `"Timeout"`).
         reason: String,

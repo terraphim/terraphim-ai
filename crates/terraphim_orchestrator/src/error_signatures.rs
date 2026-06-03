@@ -63,8 +63,11 @@ pub struct ProviderErrorSignatures {
 /// Compile error building per-provider regex patterns.
 #[derive(Debug)]
 pub struct CompileError {
+    /// Name of the provider whose pattern failed to compile.
     pub provider: String,
+    /// The regex pattern string that is invalid.
     pub pattern: String,
+    /// The underlying regex compilation error.
     pub source: regex::Error,
 }
 

@@ -22,68 +22,103 @@ impl FromStr for AgentLayer {
     }
 }
 
+/// Raw TOML representation of a project ADF configuration file.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TomlProjectAdfConfig {
+    /// Unique identifier for the project.
     pub project_id: String,
+    /// Human-readable project name.
     pub name: String,
     #[serde(default)]
+    /// List of agent definitions for this project.
     pub agents: Vec<TomlAdfAgent>,
     #[serde(default)]
+    /// Optional list of PR dispatch entries for on-PR-open routing.
     pub pr_dispatch: Option<Vec<TomlPrDispatchEntry>>,
 }
 
+/// Raw TOML representation of a single agent definition within a project ADF config.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TomlAdfAgent {
+    /// Unique agent name within the project.
     pub name: String,
+    /// Orchestration layer: Safety, Core, or Growth.
     pub layer: String,
+    /// CLI binary or command used to invoke this agent.
     pub cli_tool: String,
+    /// Task description passed to the agent.
     pub task: String,
     #[serde(default)]
+    /// Optional model identifier override for this agent.
     pub model: Option<String>,
     #[serde(default)]
+    /// Optional cron schedule for periodic execution.
     pub schedule: Option<String>,
     #[serde(default)]
+    /// List of capability tags describing what this agent can do.
     pub capabilities: Vec<String>,
     #[serde(default)]
+    /// Monthly spend budget in cents for this agent.
     pub budget_monthly_cents: Option<u64>,
     #[serde(default)]
+    /// LLM provider name for this agent.
     pub provider: Option<String>,
     #[serde(default)]
+    /// Persona identifier used to load agent-specific prompts.
     pub persona: Option<String>,
     #[serde(default)]
+    /// Ordered list of skill names to execute in a chain.
     pub skill_chain: Vec<String>,
     #[serde(default)]
+    /// Fallback LLM provider if the primary provider is unavailable.
     pub fallback_provider: Option<String>,
     #[serde(default)]
+    /// Fallback model identifier used when the primary model fails.
     pub fallback_model: Option<String>,
     #[serde(default)]
+    /// Grace period in seconds before forcibly terminating the agent.
     pub grace_period_secs: Option<u64>,
     #[serde(default)]
+    /// Maximum CPU seconds this agent may consume before being killed.
     pub max_cpu_seconds: Option<u64>,
     #[serde(default)]
+    /// Strategy for pre-run health or gate checks.
     pub pre_check: Option<crate::config::PreCheckStrategy>,
     #[serde(default)]
+    /// Gitea issue number this agent is responsible for resolving.
     pub gitea_issue: Option<u64>,
     #[serde(default)]
+    /// When true, the agent only runs in response to external events.
     pub event_only: bool,
     #[serde(default)]
+    /// When true, the agent participates in the evolution feedback loop.
     pub evolution_enabled: bool,
     #[serde(default)]
+    /// When true, knowledge-graph RLM routing is enabled for this agent.
     pub rlm_enabled: Option<bool>,
 }
 
+/// Raw TOML entry describing which agent to dispatch when a PR is opened.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TomlPrDispatchEntry {
+    /// Name of the agent to dispatch on PR open.
     pub name: String,
+    /// Context string passed to the agent (e.g. a required CI check name).
     pub context: String,
 }
 
+/// Validated, runtime-ready project ADF configuration produced from a TOML file.
 #[derive(Debug, Clone)]
 pub struct ProjectAdfConfig {
+    /// Unique identifier for the project.
     pub project_id: String,
+    /// Human-readable project name.
     pub name: String,
+    /// Parsed agent definitions for this project.
     pub agents: Vec<TomlAdfAgent>,
+    /// Optional PR dispatch configuration derived from the TOML entries.
     pub pr_dispatch: Option<PrDispatchConfig>,
+    /// Absolute path to the `adf.toml` file that was loaded.
     pub discovered_path: PathBuf,
 }
 
@@ -161,6 +196,7 @@ impl TomlProjectAdfConfig {
 }
 
 impl ProjectAdfConfig {
+    /// Returns the project root directory (two levels above the `adf.toml` file).
     pub fn project_root(&self) -> PathBuf {
         self.discovered_path
             .parent()
@@ -169,6 +205,7 @@ impl ProjectAdfConfig {
             .unwrap_or_else(|| self.discovered_path.clone())
     }
 
+    /// Returns the `.terraphim/skills` directory inside the project root.
     pub fn skills_dir(&self) -> PathBuf {
         self.project_root().join(".terraphim/skills")
     }
@@ -189,6 +226,7 @@ impl ProjectAdfConfig {
         None
     }
 
+    /// Walk up from `cwd` to find a `.terraphim/adf.toml` file and parse it.
     pub fn discover_and_load(cwd: &Path) -> Result<Option<Self>, OrchestratorError> {
         let terraphim_dir = match Self::discover_terraphim_dir(cwd) {
             Some(d) => d,

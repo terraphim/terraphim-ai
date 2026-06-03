@@ -51,11 +51,17 @@ pub struct ReviewVerdict {
 /// policy with a 500 LoC diff cap and an agent-author requirement.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AutoMergeCriteria {
+    /// Minimum confidence score (1–5) required for auto-merge.
     pub min_confidence: u8,
+    /// Maximum number of P0 (critical) findings allowed.
     pub max_p0: u32,
+    /// Maximum number of P1 (important) findings allowed.
     pub max_p1: u32,
+    /// Whether all criteria must be met (true) or any single failure blocks the merge.
     pub require_all_criteria: bool,
+    /// Maximum combined lines of code changed (additions + deletions).
     pub max_diff_loc: u32,
+    /// Whether the PR author must be an agent (not a human).
     pub require_agent_author: bool,
 }
 
@@ -75,10 +81,15 @@ impl Default for AutoMergeCriteria {
 /// Minimum PR metadata required by [`evaluate`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PrMetadata {
+    /// Pull request number.
     pub pr_number: u64,
+    /// Login of the PR author.
     pub author_login: String,
+    /// Total lines changed (additions + deletions).
     pub diff_loc: u32,
+    /// HEAD commit SHA of the PR.
     pub head_sha: String,
+    /// Target branch the PR is merging into.
     pub base_branch: String,
 }
 
@@ -96,12 +107,16 @@ pub enum AutoMergeDecision {
 /// `structural-pr-review` template.
 #[derive(Error, Debug, PartialEq, Eq)]
 pub enum VerdictParseError {
+    /// The review comment is missing the confidence score header.
     #[error("missing confidence score header in review comment")]
     MissingConfidence,
+    /// The confidence score is outside the valid range (1–5).
     #[error("confidence score out of range: got {0}")]
     ConfidenceOutOfRange(u8),
+    /// The inline findings section is absent from the review comment.
     #[error("missing inline findings section")]
     MissingFindings,
+    /// The footer line does not follow the expected format.
     #[error("malformed footer (expected `Last reviewed commit: <short>`)")]
     MalformedFooter,
 }

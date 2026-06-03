@@ -13,7 +13,10 @@ pub enum ScheduleEvent {
     /// Time to spawn this agent.
     Spawn(Box<AgentDefinition>),
     /// Time to stop this agent.
-    Stop { agent_name: String },
+    Stop {
+        /// Name of the agent that should be stopped.
+        agent_name: String,
+    },
     /// Time to run compound review.
     CompoundReview,
     /// Time to run a flow.
@@ -81,6 +84,7 @@ impl TimeScheduler {
         })
     }
 
+    /// Take the event receiver, replacing it with a fresh dummy channel.
     pub fn take_event_rx(&mut self) -> Option<mpsc::Receiver<ScheduleEvent>> {
         let (_, rx) = mpsc::channel(1);
         Some(std::mem::replace(&mut self.event_rx, rx))

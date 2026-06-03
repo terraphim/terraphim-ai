@@ -87,12 +87,15 @@ pub trait MetricsPersistence: Send + Sync {
 /// Errors that can occur during metrics persistence operations.
 #[derive(Debug, thiserror::Error)]
 pub enum MetricsPersistenceError {
+    /// A storage backend operation failed.
     #[error("storage error: {0}")]
     Storage(String),
 
+    /// JSON serialisation or deserialisation failed.
     #[error("serialization error: {0}")]
     Serialization(#[from] serde_json::Error),
 
+    /// No metrics exist for the requested agent.
     #[error("agent not found: {0}")]
     NotFound(String),
 }

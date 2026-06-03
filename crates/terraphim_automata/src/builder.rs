@@ -18,10 +18,13 @@ use terraphim_types::{Concept, NormalizedTerm, NormalizedTermValue, Thesaurus};
 /// Errors that can occur while building a thesaurus or running ripgrep.
 #[derive(Error, Debug)]
 pub enum BuilderError {
+    /// An I/O error occurred while reading files or spawning processes.
     #[error("IO error")]
     Io(#[from] std::io::Error),
+    /// A JSON deserialisation error occurred while parsing ripgrep output.
     #[error("JSON error")]
     Json(#[from] serde_json::Error),
+    /// An error occurred during knowledge-graph indexation.
     #[error("Indexation error: {0}")]
     Indexation(String),
 }
@@ -97,6 +100,7 @@ pub trait ThesaurusBuilder {
 const LOGSEQ_KEY_VALUE_DELIMITER: &str = "::";
 const LOGSEQ_SYNONYMS_KEYWORD: &str = "synonyms";
 
+/// Thesaurus builder that extracts synonym definitions from Logseq markdown files.
 #[derive(Default)]
 pub struct Logseq {
     #[allow(dead_code)]
@@ -140,6 +144,7 @@ impl ThesaurusBuilder for Logseq {
     }
 }
 
+/// Wraps the `rg` (ripgrep) command used to scan Logseq markdown files for synonym lines.
 #[allow(dead_code)]
 pub struct LogseqService {
     command: String,
@@ -284,19 +289,27 @@ fn concept_from_path(path: PathBuf) -> Result<ConceptWithDisplay> {
     })
 }
 
+/// A single JSON message emitted by ripgrep in `--json` mode.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash)]
 #[serde(tag = "type", content = "data")]
 #[serde(rename_all = "snake_case")]
 pub enum Message {
+    /// Signals the start of searching a new file.
     Begin(Begin),
+    /// Signals the end of searching a file.
     End(End),
+    /// A line in a file that matched the search pattern.
     Match(Match),
+    /// A surrounding context line near a match.
     Context(Context),
+    /// Aggregate statistics for the entire search run.
     Summary(Summary),
 }
 
+/// Data accompanying a ripgrep `begin` message (start of file).
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash)]
 pub struct Begin {
+    /// Path of the file being searched, if available.
     pub path: Option<Data>,
 }
 
@@ -306,6 +319,7 @@ impl Begin {
     }
 }
 
+/// Data accompanying a ripgrep `end` message (end of file).
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash)]
 pub struct End {
     path: Option<Data>,
@@ -313,26 +327,34 @@ pub struct End {
     stats: Stats,
 }
 
+/// Aggregate statistics emitted at the end of a ripgrep run.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash)]
 pub struct Summary {
     elapsed_total: Duration,
     stats: Stats,
 }
 
+/// Data accompanying a ripgrep `match` message (a matched line).
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash)]
 pub struct Match {
+    /// Path of the file containing the match, if available.
     pub path: Option<Data>,
+    /// The full line content that produced the match.
     pub lines: Data,
     line_number: Option<u64>,
     absolute_offset: u64,
+    /// Specific byte-range sub-matches within the line.
     pub submatches: Vec<SubMatch>,
 }
 
 impl Match {}
 
+/// Data accompanying a ripgrep `context` message (a surrounding context line).
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash)]
 pub struct Context {
+    /// Path of the file containing the context line, if available.
     pub path: Option<Data>,
+    /// The full line content of this context line.
     pub lines: Data,
     line_number: Option<u64>,
     absolute_offset: u64,
@@ -341,6 +363,7 @@ pub struct Context {
 
 impl Context {}
 
+/// A single byte-range sub-match within a ripgrep `match` or `context` line.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash)]
 pub struct SubMatch {
     #[serde(rename = "match")]
@@ -349,11 +372,20 @@ pub struct SubMatch {
     end: usize,
 }
 
+/// The raw content of a ripgrep data field, either UTF-8 text or a base64-encoded byte string.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash)]
 #[serde(untagged)]
 pub enum Data {
-    Text { text: String },
-    Bytes { bytes: String },
+    /// Valid UTF-8 text content.
+    Text {
+        /// The text string value.
+        text: String,
+    },
+    /// Non-UTF-8 content encoded as a base64 string.
+    Bytes {
+        /// The base64-encoded byte string value.
+        bytes: String,
+    },
 }
 
 fn as_path(data: &Option<Data>) -> Option<String> {

@@ -398,10 +398,13 @@ impl KgRouter {
     }
 }
 
+/// Errors returned by the KG router.
 #[derive(Debug, thiserror::Error)]
 pub enum KgRouterError {
+    /// The taxonomy directory does not exist at the expected path.
     #[error("taxonomy directory not found: {0}")]
     TaxonomyNotFound(String),
+    /// The taxonomy markdown files could not be parsed.
     #[error("failed to parse taxonomy: {0}")]
     ParseError(String),
 }

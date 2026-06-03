@@ -21,17 +21,25 @@ pub struct AutocompleteIndex {
 /// Metadata associated with each autocomplete term
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AutocompleteMetadata {
+    /// Unique numeric identifier for the normalised term.
     pub id: u64,
+    /// Normalised (canonical) form of the term.
     pub normalized_term: NormalizedTermValue,
+    /// Optional URL linking the term to an external resource.
     #[serde(default)]
     pub url: Option<String>,
+    /// Original term string as it appears in the thesaurus source.
     pub original_term: String,
+    /// Optional action to perform when the term is selected.
     #[serde(default)]
     pub action: Option<String>,
+    /// Optional priority hint for ranking results.
     #[serde(default)]
     pub priority: Option<u8>,
+    /// Optional trigger string that activates this autocomplete entry.
     #[serde(default)]
     pub trigger: Option<String>,
+    /// Whether this term should always appear at the top of results.
     #[serde(default)]
     pub pinned: bool,
 }
@@ -39,18 +47,26 @@ pub struct AutocompleteMetadata {
 /// Result from autocomplete search
 #[derive(Debug, Clone, PartialEq)]
 pub struct AutocompleteResult {
+    /// Display term returned to the caller.
     pub term: String,
+    /// Normalised form of the matched term.
     pub normalized_term: NormalizedTermValue,
+    /// Unique numeric identifier of the term.
     pub id: u64,
+    /// Optional URL associated with this term.
     pub url: Option<String>,
-    pub score: f64, // FST value as relevance score
+    /// FST value used as a relevance score for ranking.
+    pub score: f64,
 }
 
 /// Configuration for autocomplete behavior
 #[derive(Debug, Clone)]
 pub struct AutocompleteConfig {
+    /// Maximum number of results to return from a single search.
     pub max_results: usize,
+    /// Minimum number of characters required before a search is performed.
     pub min_prefix_length: usize,
+    /// Whether the prefix search should be case-sensitive.
     pub case_sensitive: bool,
 }
 

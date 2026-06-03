@@ -3,6 +3,7 @@
 //! This module provides structured JSON output and self-documentation
 //! capabilities for integration with AI agents and automation tools.
 
+/// Budget engine that applies token and result-count limits to search output.
 #[allow(dead_code)]
 pub mod budget;
 #[allow(dead_code)]

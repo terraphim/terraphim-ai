@@ -45,47 +45,70 @@ pub enum ErrorCategory {
 /// Common error patterns used across terraphim crates
 #[derive(Error, Debug)]
 pub enum CommonError {
+    /// A network-level failure (timeout, connection refused, etc.).
     #[error("Network error: {message}")]
     Network {
+        /// Human-readable description of the network failure.
         message: String,
         #[source]
+        /// Optional underlying error that caused this failure.
         source: Option<Box<dyn std::error::Error + Send + Sync>>,
     },
 
+    /// Invalid or missing configuration value.
     #[error("Configuration error: {message}")]
     Configuration {
+        /// Human-readable description of the configuration problem.
         message: String,
+        /// Optional name of the specific configuration field that is invalid.
         field: Option<String>,
     },
 
+    /// Input failed validation checks.
     #[error("Validation error: {message}")]
     Validation {
+        /// Human-readable description of the validation failure.
         message: String,
+        /// Optional name of the field that failed validation.
         field: Option<String>,
     },
 
+    /// Authentication or authorisation failure.
     #[error("Authentication error: {message}")]
-    Auth { message: String },
+    Auth {
+        /// Human-readable description of the authentication failure.
+        message: String,
+    },
 
+    /// Storage or persistence failure.
     #[error("Storage error: {message}")]
     Storage {
+        /// Human-readable description of the storage failure.
         message: String,
         #[source]
+        /// Optional underlying error that caused this failure.
         source: Option<Box<dyn std::error::Error + Send + Sync>>,
     },
 
+    /// Failure when interacting with an external service.
     #[error("Integration error with {service}: {message}")]
     Integration {
+        /// Name of the external service that returned an error.
         service: String,
+        /// Human-readable description of the integration failure.
         message: String,
         #[source]
+        /// Optional underlying error that caused this failure.
         source: Option<Box<dyn std::error::Error + Send + Sync>>,
     },
 
+    /// Internal system-level failure.
     #[error("System error: {message}")]
     System {
+        /// Human-readable description of the system failure.
         message: String,
         #[source]
+        /// Optional underlying error that caused this failure.
         source: Option<Box<dyn std::error::Error + Send + Sync>>,
     },
 }
@@ -113,6 +136,7 @@ impl TerraphimError for CommonError {
 
 /// Helper functions for creating common error types
 impl CommonError {
+    /// Create a network error with the given message and no source error.
     pub fn network(message: impl Into<String>) -> Self {
         CommonError::Network {
             message: message.into(),
@@ -120,6 +144,7 @@ impl CommonError {
         }
     }
 
+    /// Create a network error with an underlying source error.
     pub fn network_with_source(
         message: impl Into<String>,
         source: impl std::error::Error + Send + Sync + 'static,
@@ -130,6 +155,7 @@ impl CommonError {
         }
     }
 
+    /// Create a configuration error with the given message.
     pub fn config(message: impl Into<String>) -> Self {
         CommonError::Configuration {
             message: message.into(),
@@ -137,6 +163,7 @@ impl CommonError {
         }
     }
 
+    /// Create a configuration error referencing a specific field.
     pub fn config_field(message: impl Into<String>, field: impl Into<String>) -> Self {
         CommonError::Configuration {
             message: message.into(),
@@ -144,6 +171,7 @@ impl CommonError {
         }
     }
 
+    /// Create a validation error with the given message.
     pub fn validation(message: impl Into<String>) -> Self {
         CommonError::Validation {
             message: message.into(),
@@ -151,6 +179,7 @@ impl CommonError {
         }
     }
 
+    /// Create a validation error referencing a specific field.
     pub fn validation_field(message: impl Into<String>, field: impl Into<String>) -> Self {
         CommonError::Validation {
             message: message.into(),
@@ -158,12 +187,14 @@ impl CommonError {
         }
     }
 
+    /// Create an authentication error with the given message.
     pub fn auth(message: impl Into<String>) -> Self {
         CommonError::Auth {
             message: message.into(),
         }
     }
 
+    /// Create a storage error with the given message and no source error.
     pub fn storage(message: impl Into<String>) -> Self {
         CommonError::Storage {
             message: message.into(),
@@ -171,6 +202,7 @@ impl CommonError {
         }
     }
 
+    /// Create a storage error with an underlying source error.
     pub fn storage_with_source(
         message: impl Into<String>,
         source: impl std::error::Error + Send + Sync + 'static,
@@ -181,6 +213,7 @@ impl CommonError {
         }
     }
 
+    /// Create an integration error for the named external service.
     pub fn integration(service: impl Into<String>, message: impl Into<String>) -> Self {
         CommonError::Integration {
             service: service.into(),
@@ -189,6 +222,7 @@ impl CommonError {
         }
     }
 
+    /// Create an integration error with an underlying source error.
     pub fn integration_with_source(
         service: impl Into<String>,
         message: impl Into<String>,
@@ -201,6 +235,7 @@ impl CommonError {
         }
     }
 
+    /// Create a system error with the given message and no source error.
     pub fn system(message: impl Into<String>) -> Self {
         CommonError::System {
             message: message.into(),
@@ -208,6 +243,7 @@ impl CommonError {
         }
     }
 
+    /// Create a system error with an underlying source error.
     pub fn system_with_source(
         message: impl Into<String>,
         source: impl std::error::Error + Send + Sync + 'static,

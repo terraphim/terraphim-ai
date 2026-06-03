@@ -9,9 +9,13 @@
 /// Terminal state of a single commit status context.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CommitStatusState {
+    /// Status has been posted but not yet resolved.
     Pending,
+    /// The check completed successfully.
     Success,
+    /// The check completed with a failure.
     Failure,
+    /// The check encountered an error (distinct from an explicit failure).
     Error,
 }
 
@@ -35,7 +39,9 @@ impl CommitStatusState {
 /// One commit status entry posted against a SHA.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommitStatusSummary {
+    /// The context name of this status (e.g. `"adf/build"`).
     pub context: String,
+    /// Current state of this status context.
     pub state: CommitStatusState,
     /// Unix timestamp (seconds) when the status was created, if available.
     pub created_at_unix: Option<i64>,
@@ -47,8 +53,11 @@ pub const STALE_PENDING_TIMEOUT_SECS: i64 = 3600;
 /// Snapshot of everything the reconciler needs to classify a PR head.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PrGateSnapshot {
+    /// Pull request number.
     pub pr_number: u64,
+    /// HEAD commit SHA of the pull request.
     pub head_sha: String,
+    /// Target branch the PR is merging into.
     pub base_branch: String,
     /// Context names required by branch protection (e.g. `["adf/build", "adf/pr-reviewer"]`).
     pub required_contexts: Vec<String>,
@@ -64,13 +73,25 @@ pub enum PrGateDecision {
     /// All required contexts green; proceed to auto-merge policy evaluation.
     ReadyForPolicy,
     /// Required contexts not yet posted; enqueue the responsible agents.
-    EnqueueMissingChecks { missing: Vec<String> },
+    EnqueueMissingChecks {
+        /// Context names that have not yet been posted.
+        missing: Vec<String>,
+    },
     /// Required contexts posted but still pending; wait for next reconcile tick.
-    AwaitingChecks { pending: Vec<String> },
+    AwaitingChecks {
+        /// Context names that are still in the pending state.
+        pending: Vec<String>,
+    },
     /// At least one required context failed; open remediation issue.
-    BlockedByFailedChecks { failed: Vec<(String, String)> },
+    BlockedByFailedChecks {
+        /// Pairs of `(context_name, failure_reason)` for each failed context.
+        failed: Vec<(String, String)>,
+    },
     /// Status API or branch protection API failure; service fault.
-    FactoryFault { error: String },
+    FactoryFault {
+        /// Human-readable error from the upstream API.
+        error: String,
+    },
 }
 
 /// Reconcile the PR gate state from a snapshot. Pure function.

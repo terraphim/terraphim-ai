@@ -578,12 +578,15 @@ pub trait RunRecordPersistence: Send + Sync {
 /// Errors for run record persistence.
 #[derive(Debug, thiserror::Error)]
 pub enum RunRecordError {
+    /// A backend storage operation failed.
     #[error("storage error: {0}")]
     Storage(String),
 
+    /// JSON serialisation or deserialisation failed.
     #[error("serialization error: {0}")]
     Serialization(#[from] serde_json::Error),
 
+    /// An underlying I/O operation failed.
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 }

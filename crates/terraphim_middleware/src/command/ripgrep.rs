@@ -24,10 +24,15 @@ use crate::Result;
 #[serde(tag = "type", content = "data")]
 #[serde(rename_all = "snake_case")]
 pub enum Message {
+    /// Marks the start of a per-file search.
     Begin(Begin),
+    /// Marks the end of a per-file search.
     End(End),
+    /// A non-overlapping pattern match within a file.
     Match(Match),
+    /// Context lines surrounding a match.
     Context(Context),
+    /// Aggregate statistics for the entire ripgrep run.
     Summary(Summary),
 }
 
@@ -35,6 +40,7 @@ pub enum Message {
 /// It contains the path that is being searched, if one exists.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash)]
 pub struct Begin {
+    /// Path of the file being searched, if provided.
     pub path: Option<Data>,
 }
 
@@ -63,10 +69,13 @@ pub struct Summary {
 /// The `Match` message is sent for each non-overlapping match of a search.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash)]
 pub struct Match {
+    /// Path of the file that contains the match, if provided.
     pub path: Option<Data>,
+    /// The matching line(s) of text.
     pub lines: Data,
     line_number: Option<u64>,
     absolute_offset: u64,
+    /// All non-overlapping pattern matches within this line.
     pub submatches: Vec<SubMatch>,
 }
 
@@ -80,7 +89,9 @@ impl Match {
 /// The `Context` specifies the lines surrounding a match.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash)]
 pub struct Context {
+    /// Path of the file containing the context lines, if provided.
     pub path: Option<Data>,
+    /// The context line(s) of text surrounding a match.
     pub lines: Data,
     line_number: Option<u64>,
     absolute_offset: u64,
@@ -108,10 +119,18 @@ pub struct SubMatch {
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash)]
 #[serde(untagged)]
 pub enum Data {
-    Text { text: String },
+    /// Valid UTF-8 text content.
+    Text {
+        /// The text string.
+        text: String,
+    },
     // This variant is used when the data isn't valid UTF-8. The bytes are
     // base64 encoded, so using a String here is OK.
-    Bytes { bytes: String },
+    /// Binary content encoded as base64.
+    Bytes {
+        /// Base64-encoded bytes for non-UTF-8 data.
+        bytes: String,
+    },
 }
 
 /// Gets the path from a `Data` type.
@@ -247,6 +266,7 @@ impl RipgrepCommand {
         )
     }
 
+    /// Run ripgrep with caller-supplied extra arguments in addition to the standard ones.
     pub async fn run_with_extra_args(
         &self,
         needle: &str,

@@ -3,19 +3,26 @@ use serde::{Deserialize, Serialize};
 use super::output::{FieldMode, RobotConfig, RobotFormatter};
 use super::schema::{Pagination, SearchResultItem, TokenBudget};
 
+/// Search results after budget constraints (token and count limits) have been applied.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BudgetedResults {
+    /// The filtered and potentially truncated search result items.
     pub results: Vec<serde_json::Value>,
+    /// Pagination metadata describing totals and offsets.
     pub pagination: Pagination,
+    /// Token budget metadata when a token limit was configured.
     pub token_budget: Option<TokenBudget>,
 }
 
+/// Errors that can occur when applying budget constraints to search results.
 #[derive(Debug, thiserror::Error)]
 pub enum BudgetError {
+    /// Failed to serialise a search result item to JSON.
     #[error("serialization error: {0}")]
     Serialization(#[from] serde_json::Error),
 }
 
+/// Applies configurable field, result-count, and token-count budgets to search results.
 pub struct BudgetEngine {
     config: RobotConfig,
     formatter: RobotFormatter,
@@ -34,11 +41,13 @@ const KNOWN_FIELDS: &[&str] = &[
 ];
 
 impl BudgetEngine {
+    /// Creates a new `BudgetEngine` from the given robot configuration.
     pub fn new(config: RobotConfig) -> Self {
         let formatter = RobotFormatter::new(config.clone());
         Self { config, formatter }
     }
 
+    /// Applies all configured budget constraints to the given search results and returns the budgeted output.
     pub fn apply(&self, results: &[SearchResultItem]) -> Result<BudgetedResults, BudgetError> {
         let total = results.len();
 

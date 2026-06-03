@@ -161,6 +161,9 @@ fn create_memory_operator() -> OpendalResult<Operator> {
     Ok(Operator::new(builder)?.finish())
 }
 
+/// Build and benchmark a single OpenDAL operator from the named settings profile.
+///
+/// Returns the operator together with its measured write latency in nanoseconds.
 pub async fn parse_profile(
     settings: &DeviceSettings,
     profile_name: &str,
@@ -346,6 +349,9 @@ pub async fn parse_profile(
     Ok((op, speed))
 }
 
+/// Build and benchmark all OpenDAL operators declared in the device settings.
+///
+/// Returns a map from profile name to `(Operator, latency_ns)`.
 pub async fn parse_profiles(
     settings: &DeviceSettings,
 ) -> Result<HashMap<String, (Operator, u128)>> {

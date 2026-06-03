@@ -7,13 +7,17 @@ use crate::{AgentOrchestrator, OrchestratorError};
 
 const LEGACY_PROJECT: &str = "<legacy>";
 
+/// Request to run or validate a specific agent.
 #[derive(Debug, Clone)]
 pub struct AgentRunRequest {
+    /// Name of the agent to run.
     pub agent_name: String,
+    /// Optional project scope constraining which agent definition is selected.
     pub project: Option<String>,
 }
 
 impl AgentRunRequest {
+    /// Create a new run request for the named agent.
     pub fn new(agent_name: impl Into<String>) -> Self {
         Self {
             agent_name: agent_name.into(),
@@ -21,38 +25,58 @@ impl AgentRunRequest {
         }
     }
 
+    /// Restrict this request to agents in the given project.
     pub fn with_project(mut self, project: impl Into<String>) -> Self {
         self.project = Some(project.into());
         self
     }
 }
 
+/// Gitea repository target information extracted from agent config.
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct GiteaTargetReport {
+    /// Base URL of the Gitea instance.
     pub base_url: String,
+    /// Repository owner name.
     pub owner: String,
+    /// Repository name.
     pub repo: String,
+    /// Optional issue number linked to this agent.
     pub issue: Option<u64>,
 }
 
+/// How an agent can be triggered to run.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TriggerMode {
+    /// Agent is triggered on a cron schedule.
     Cron,
+    /// Agent is triggered by an @mention in an issue or PR comment.
     Mention,
+    /// Agent is triggered by a git push event.
     Push,
+    /// Agent is triggered by a pull-request event.
     PullRequest,
+    /// Agent is run directly from the local CLI.
     Local,
+    /// Agent is triggered via an incoming webhook call.
     Webhook,
 }
 
+/// Validation result for a single trigger mode.
 #[derive(Debug, Clone, Serialize, Eq)]
 pub struct ModeResult {
+    /// The trigger mode this result applies to.
     pub trigger_mode: TriggerMode,
+    /// Whether the agent is considered runnable in this mode.
     pub runnable: bool,
+    /// Result of probing whether the CLI tool is available, if applicable.
     pub cli_tool_probe: Option<bool>,
+    /// Result of probing whether the configured model is available, if applicable.
     pub model_probe: Option<bool>,
+    /// Whether a synthetic event was accepted, if tested.
     pub synthetic_event_ok: Option<bool>,
+    /// Non-fatal warnings accumulated during validation.
     pub warnings: Vec<String>,
 }
 
@@ -65,32 +89,50 @@ impl PartialEq for ModeResult {
     }
 }
 
+/// Validation report for a single agent across all trigger modes.
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct AgentValidationReport {
+    /// Name of the validated agent.
     pub agent_name: String,
+    /// Project scope the agent belongs to.
     pub project: String,
+    /// Per-mode validation results.
     pub mode_results: HashMap<TriggerMode, ModeResult>,
+    /// True when the agent is runnable across every applicable trigger mode.
     pub all_modes_runnable: bool,
 }
 
+/// A synthetic event used for local testing of event-driven agents.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum SyntheticEvent {
+    /// Simulates a pull-request open or update event.
     PullRequest {
+        /// Pull request number.
         number: u64,
+        /// HEAD commit SHA of the PR branch.
         head_sha: String,
+        /// Login of the PR author.
         author: String,
+        /// Title of the pull request.
         title: String,
+        /// Approximate lines-of-change count.
         diff_loc: usize,
     },
+    /// Simulates a git push event.
     Push {
+        /// SHA of the pushed commit.
         sha: String,
+        /// Git ref that was pushed (e.g. `refs/heads/main`).
         ref_name: String,
+        /// Login of the person who pushed.
         pusher: String,
+        /// List of changed file paths.
         files: Vec<String>,
     },
 }
 
 impl SyntheticEvent {
+    /// Convert the event into environment variables for the agent process.
     pub fn env_vars(&self) -> HashMap<String, String> {
         let mut vars = HashMap::new();
         match self {
@@ -125,26 +167,43 @@ impl SyntheticEvent {
     }
 }
 
+/// Full runtime validation report for a single agent definition.
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct AgentRuntimeValidationReport {
+    /// Name of the agent that was validated.
     pub agent_name: String,
+    /// Project scope, or `<legacy>` for global agents.
     pub project: String,
+    /// Agent layer classification as a debug string.
     pub layer: String,
+    /// Configured cron schedule, if any.
     pub schedule: Option<String>,
+    /// CLI tool used to invoke the agent.
     pub cli_tool: String,
+    /// Configured model identifier, if any.
     pub model: Option<String>,
+    /// Resolved working directory for the agent.
     pub working_dir: String,
+    /// Whether the working directory exists on disk.
     pub repo_ok: bool,
+    /// Gitea repository target extracted from config, if configured.
     pub gitea_target: Option<GiteaTargetReport>,
+    /// Whether the agent has evolution mode requested.
     pub evolution_requested: bool,
+    /// Whether evolution mode is both requested and globally enabled.
     pub evolution_available: bool,
+    /// Whether the agent is fully runnable.
     pub runnable: bool,
+    /// Result of probing whether the CLI tool exists and is executable.
     pub cli_tool_probe: Option<bool>,
+    /// Result of probing whether the configured model is available.
     pub model_probe: Option<bool>,
+    /// Non-fatal warnings accumulated during validation.
     pub warnings: Vec<String>,
 }
 
 impl AgentOrchestrator {
+    /// Validate the runtime environment for the agent identified by `request`.
     pub fn validate_agent_runtime(
         &self,
         request: &AgentRunRequest,
@@ -153,6 +212,7 @@ impl AgentOrchestrator {
     }
 }
 
+/// Validate the runtime environment for the agent described by `request`.
 pub fn validate_agent_runtime(
     config: &OrchestratorConfig,
     request: &AgentRunRequest,
@@ -241,6 +301,7 @@ pub fn validate_agent_runtime(
     })
 }
 
+/// Check whether the CLI tool named by `cli_tool` is available and executable.
 pub fn probe_cli_tool(cli_tool: &str) -> Result<bool, OrchestratorError> {
     if cli_tool.trim().is_empty() {
         return Ok(false);
@@ -273,6 +334,7 @@ pub fn probe_cli_tool(cli_tool: &str) -> Result<bool, OrchestratorError> {
     }
 }
 
+/// Check whether the given model identifier is considered available on the current system.
 pub fn probe_model_available(
     model: &str,
     _provider: Option<&str>,
@@ -291,6 +353,7 @@ pub fn probe_model_available(
     }
 }
 
+/// Run an agent with a synthetic event, returning a mode result.
 pub fn run_agent_synthetic(
     _config: &OrchestratorConfig,
     _request: &AgentRunRequest,
