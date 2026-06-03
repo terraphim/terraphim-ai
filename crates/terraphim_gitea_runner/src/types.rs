@@ -7,8 +7,24 @@
 //! confirmed against a live dev Gitea during dark-launch (plan §B3); the
 //! `rename_all = "camelCase"` below is the proto3 JSON default.
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::BTreeMap;
+
+/// Deserialize an `i64` that protojson may encode as either a JSON number or a
+/// JSON string. Proto3 JSON maps 64-bit integers to strings (`"2"`) to avoid
+/// JavaScript precision loss, so every int64 field Gitea sends must accept both.
+fn de_i64<'de, D: Deserializer<'de>>(d: D) -> Result<i64, D::Error> {
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum NumOrStr {
+        Num(i64),
+        Str(String),
+    }
+    match NumOrStr::deserialize(d)? {
+        NumOrStr::Num(n) => Ok(n),
+        NumOrStr::Str(s) => s.trim().parse().map_err(serde::de::Error::custom),
+    }
+}
 
 /// `runner.v1.Result` enum values (verified against actions-proto-go v0.4.1).
 ///
@@ -53,7 +69,7 @@ pub struct RegisterResponse {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RunnerInfo {
-    #[serde(default)]
+    #[serde(default, deserialize_with = "de_i64")]
     pub id: i64,
     pub uuid: String,
     pub token: String,
@@ -98,7 +114,7 @@ pub struct FetchTaskRequest {
 pub struct FetchTaskResponse {
     #[serde(default)]
     pub task: Option<Task>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "de_i64")]
     pub tasks_version: i64,
 }
 
@@ -106,7 +122,7 @@ pub struct FetchTaskResponse {
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Task {
-    #[serde(default)]
+    #[serde(default, deserialize_with = "de_i64")]
     pub id: i64,
     /// SingleWorkflow YAML for this job, base64-encoded (maybe gzip).
     #[serde(default)]
@@ -162,7 +178,7 @@ pub struct StepState {
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateTaskResponse {
-    #[serde(default)]
+    #[serde(default, deserialize_with = "de_i64")]
     pub tasks_version: i64,
     #[serde(default)]
     pub sent_outputs: BTreeMap<String, bool>,
@@ -194,7 +210,7 @@ pub struct LogRow {
 #[serde(rename_all = "camelCase")]
 pub struct UpdateLogResponse {
     /// Server's last acknowledged row index.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "de_i64")]
     pub ack_index: i64,
 }
 
@@ -211,16 +227,17 @@ mod wire_contract_tests {
     fn fetch_task_response_camelcase_deserialises() {
         // `workflowPayload` is base64 (proto bytes); `tasksVersion` camelCase;
         // `context` a JSON object (proto Struct).
+        // int64 fields arrive as JSON strings (proto3 JSON), e.g. "42"/"7".
         let json = r#"{
             "task": {
-                "id": 42,
+                "id": "42",
                 "workflowPayload": "am9iczoKICBqOgogICAgc3RlcHM6CiAgICAgIC0gcnVuOiBlY2hvIGhp",
                 "context": {"github": {"repository": "terraphim/proof", "sha": "abc"}},
                 "secrets": {},
                 "vars": {},
                 "needs": {}
             },
-            "tasksVersion": 7
+            "tasksVersion": "7"
         }"#;
         let resp: FetchTaskResponse = serde_json::from_str(json).unwrap();
         assert_eq!(resp.tasks_version, 7);
@@ -238,17 +255,29 @@ mod wire_contract_tests {
 
     #[test]
     fn fetch_task_empty_response_deserialises() {
-        let resp: FetchTaskResponse = serde_json::from_str(r#"{"tasksVersion": 7}"#).unwrap();
+        // Accept both string- and number-encoded int64 (protojson uses strings).
+        let resp: FetchTaskResponse = serde_json::from_str(r#"{"tasksVersion": "7"}"#).unwrap();
         assert!(resp.task.is_none());
         assert_eq!(resp.tasks_version, 7);
+        let numeric: FetchTaskResponse = serde_json::from_str(r#"{"tasksVersion": 7}"#).unwrap();
+        assert_eq!(numeric.tasks_version, 7);
+    }
+
+    #[test]
+    fn register_response_id_as_string_deserialises() {
+        // Exact shape observed from live git.terraphim.cloud (id is a JSON string).
+        let json = r#"{"runner":{"id":"2","uuid":"u-1","token":"tok","name":"r","version":"0.1.0","labels":["terraphim-native"]}}"#;
+        let resp: RegisterResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(resp.runner.id, 2);
+        assert_eq!(resp.runner.uuid, "u-1");
     }
 
     #[test]
     fn update_log_and_task_responses_deserialise() {
-        let log: UpdateLogResponse = serde_json::from_str(r#"{"ackIndex": 5}"#).unwrap();
+        let log: UpdateLogResponse = serde_json::from_str(r#"{"ackIndex": "5"}"#).unwrap();
         assert_eq!(log.ack_index, 5);
         let task: UpdateTaskResponse =
-            serde_json::from_str(r#"{"tasksVersion": 8, "sentOutputs": {}}"#).unwrap();
+            serde_json::from_str(r#"{"tasksVersion": "8", "sentOutputs": {}}"#).unwrap();
         assert_eq!(task.tasks_version, 8);
     }
 
