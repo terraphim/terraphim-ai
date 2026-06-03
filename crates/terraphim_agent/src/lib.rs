@@ -6,6 +6,7 @@
 #[cfg(feature = "server")]
 pub mod client;
 pub mod onboarding;
+/// Service layer providing the `TuiService` wrapper around `TerraphimService`.
 pub mod service;
 #[cfg(feature = "shared-learning")]
 pub mod shared_learning;

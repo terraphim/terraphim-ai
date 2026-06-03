@@ -3,117 +3,167 @@
 use anyhow::{Result, anyhow};
 use std::str::FromStr;
 
+/// All commands available in the interactive REPL, parsed from `/command` strings.
 #[derive(Debug, Clone, PartialEq)]
 pub enum ReplCommand {
-    // Base commands (always available with 'repl' feature)
+    /// Search documents in the knowledge graph.
     Search {
+        /// The search query string.
         query: String,
+        /// Optional role override for this search.
         role: Option<String>,
+        /// Maximum number of results to return.
         limit: Option<usize>,
+        /// Whether to use semantic (embedding-based) search.
         semantic: bool,
+        /// Whether to expand the query using knowledge-graph concepts.
         concepts: bool,
     },
+    /// Manage agent configuration.
     Config {
+        /// The config sub-operation to perform.
         subcommand: ConfigSubcommand,
     },
+    /// Manage and switch between roles.
     Role {
+        /// The role sub-operation to perform.
         subcommand: RoleSubcommand,
     },
+    /// Display knowledge-graph statistics.
     Graph {
+        /// Number of top nodes to show (all if `None`).
         top_k: Option<usize>,
     },
 
     // Chat commands (requires 'llm' feature)
     #[cfg(feature = "llm")]
+    /// Start an AI chat session.
     Chat {
+        /// Optional opening message; opens interactive mode when `None`.
         message: Option<String>,
     },
 
     #[cfg(feature = "llm")]
+    /// Summarise a document or piece of text.
     Summarize {
+        /// Document ID or raw text to summarise.
         target: String,
     },
 
     // MCP commands (requires 'repl-mcp' feature)
     #[cfg(feature = "repl-mcp")]
+    /// Autocomplete a partial term using the loaded thesaurus.
     Autocomplete {
+        /// Partial query to complete.
         query: String,
+        /// Maximum number of suggestions to return.
         limit: Option<usize>,
     },
 
     #[cfg(feature = "repl-mcp")]
+    /// Extract paragraphs from text that start at matched terms.
     Extract {
+        /// The input text to search within.
         text: String,
+        /// When `true`, omit the matched term itself from each result.
         exclude_term: bool,
     },
 
     #[cfg(feature = "repl-mcp")]
+    /// Find automaton matches within a block of text.
     Find {
+        /// The input text to search within.
         text: String,
     },
 
     #[cfg(feature = "repl-mcp")]
+    /// Replace matched terms in text using knowledge-graph substitutions.
     Replace {
+        /// The input text to transform.
         text: String,
+        /// Output format override (e.g. `markdown`).
         format: Option<String>,
     },
 
     #[cfg(feature = "repl-mcp")]
+    /// Display thesaurus entries for the active or specified role.
     Thesaurus {
+        /// Role whose thesaurus to display; uses current role if `None`.
         role: Option<String>,
     },
 
     // File commands (requires 'repl-file' feature)
     #[cfg(feature = "repl-file")]
+    /// Perform local file operations.
     File {
+        /// The file sub-operation to perform.
         subcommand: FileSubcommand,
     },
 
     // Web commands (requires 'repl-web' feature)
     #[cfg(feature = "repl-web")]
+    /// Perform web fetch or scraping operations.
     Web {
+        /// The web sub-operation to perform.
         subcommand: WebSubcommand,
     },
 
     // VM commands (requires 'firecracker' feature)
     #[cfg(feature = "firecracker")]
+    /// Manage Firecracker microVMs.
     Vm {
+        /// The VM sub-operation to perform.
         subcommand: VmSubcommand,
     },
 
-    // Robot mode commands (for AI agents)
+    /// Access robot-mode self-documentation for AI agent integration.
     Robot {
+        /// The robot sub-operation to perform.
         subcommand: RobotSubcommand,
     },
 
     // Session commands (requires 'repl-sessions' feature)
     #[cfg(feature = "repl-sessions")]
+    /// Browse and search AI coding session history.
     Sessions {
+        /// The session sub-operation to perform.
         subcommand: SessionsSubcommand,
     },
 
-    // Update management commands (always available)
+    /// Manage agent binary updates.
     Update {
+        /// The update sub-operation to perform.
         subcommand: UpdateSubcommand,
     },
 
-    // Utility commands
+    /// Show help information for available commands.
     Help {
+        /// Optional specific command to describe; shows all commands if `None`.
         command: Option<String>,
     },
+    /// Exit the REPL (alias for `Exit`).
     Quit,
+    /// Exit the REPL.
     Exit,
+    /// Clear the terminal screen.
     Clear,
 }
 
+/// Sub-operations for the `/robot` command used by AI agents.
 #[derive(Debug, Clone, PartialEq)]
 pub enum RobotSubcommand {
     /// Get capabilities summary
     Capabilities,
     /// Get schema for a command (or all commands)
-    Schemas { command: Option<String> },
+    Schemas {
+        /// Command name to fetch schema for; fetches all schemas if `None`.
+        command: Option<String>,
+    },
     /// Get examples for a command
-    Examples { command: Option<String> },
+    Examples {
+        /// Command name to fetch examples for; fetches all examples if `None`.
+        command: Option<String>,
+    },
     /// List exit codes
     ExitCodes,
 }
@@ -126,31 +176,59 @@ pub enum UpdateSubcommand {
     /// Install available updates
     Install,
     /// Rollback to a previous version
-    Rollback { version: String },
+    Rollback {
+        /// The version string to roll back to.
+        version: String,
+    },
     /// List available backup versions
     List,
 }
 
+/// Sub-operations for the `/config` command.
 #[derive(Debug, Clone, PartialEq)]
 pub enum ConfigSubcommand {
+    /// Display the current configuration.
     Show,
-    Set { key: String, value: String },
+    /// Set a configuration key to a new value.
+    Set {
+        /// The configuration key to update.
+        key: String,
+        /// The new value to assign.
+        value: String,
+    },
 }
 
+/// Sub-operations for the `/role` command.
 #[derive(Debug, Clone, PartialEq)]
 pub enum RoleSubcommand {
+    /// List all available roles.
     List,
-    Select { name: String },
+    /// Switch to the named role.
+    Select {
+        /// Name of the role to activate.
+        name: String,
+    },
 }
 
+/// Sub-operations for the `/file` command.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg(feature = "repl-file")]
 pub enum FileSubcommand {
-    Search { query: String },
+    /// Search for files matching the given query.
+    Search {
+        /// Query string to match against file names and content.
+        query: String,
+    },
+    /// List all files visible to the current role.
     List,
-    Info { path: String },
+    /// Show metadata for a specific file.
+    Info {
+        /// Path of the file to inspect.
+        path: String,
+    },
 }
 
+/// Sub-operations for the `/sessions` command.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg(feature = "repl-sessions")]
 pub enum SessionsSubcommand {
@@ -158,41 +236,75 @@ pub enum SessionsSubcommand {
     Sources,
     /// List imported sessions (auto-imports if cache is empty)
     List {
+        /// Filter results to sessions from this source only.
         source: Option<String>,
+        /// Maximum number of sessions to show.
         limit: Option<usize>,
     },
     /// Search sessions by query
-    Search { query: String },
+    Search {
+        /// Full-text query to search session content.
+        query: String,
+    },
     /// Show session statistics
     Stats,
     /// Show details of a specific session
-    Show { session_id: String },
+    Show {
+        /// Unique identifier of the session to display.
+        session_id: String,
+    },
     /// Search sessions by concept (Phase 3 - requires enrichment)
-    Concepts { concept: String },
+    Concepts {
+        /// Knowledge-graph concept name to search for.
+        concept: String,
+    },
     /// Find sessions related to a given session
     Related {
+        /// Unique identifier of the reference session.
         session_id: String,
+        /// Minimum number of shared concepts required.
         min_shared: Option<usize>,
     },
     /// Show session timeline grouped by period
     Timeline {
-        group_by: Option<String>, // day, week, month
+        /// Grouping period: `day`, `week`, or `month`.
+        group_by: Option<String>,
+        /// Maximum number of period buckets to show.
         limit: Option<usize>,
     },
     /// Export sessions to file
     Export {
-        format: Option<String>, // json, markdown
-        output: Option<String>, // file path
+        /// Output format: `json` or `markdown`.
+        format: Option<String>,
+        /// Destination file path for the export.
+        output: Option<String>,
+        /// Export only this specific session when set.
         session_id: Option<String>,
     },
     /// Enrich sessions with concepts (Phase 3)
-    Enrich { session_id: Option<String> },
+    Enrich {
+        /// Session to enrich; enriches all sessions if `None`.
+        session_id: Option<String>,
+    },
     /// List files accessed by a session
-    Files { session_id: String, json: bool },
+    Files {
+        /// Unique identifier of the session whose files to list.
+        session_id: String,
+        /// Output machine-readable JSON instead of text.
+        json: bool,
+    },
     /// Find sessions by file path
-    ByFile { file_path: String, json: bool },
+    ByFile {
+        /// File path to search for across all sessions.
+        file_path: String,
+        /// Output machine-readable JSON instead of text.
+        json: bool,
+    },
     /// Build search index and show index statistics
-    Index { verbose: bool },
+    Index {
+        /// Show extended statistics when `true`.
+        verbose: bool,
+    },
     /// Cluster sessions by concept similarity (Spec F5.2)
     Cluster {
         /// Maximum number of clusters (auto-detect if None)

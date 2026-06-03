@@ -25,6 +25,7 @@ use rustyline::Editor;
 #[cfg(feature = "repl")]
 use colored::Colorize;
 
+/// Drives the interactive REPL loop, dispatching parsed commands to the underlying service.
 pub struct ReplHandler {
     service: Option<TuiService>,
     #[cfg(feature = "server")]
@@ -35,6 +36,7 @@ pub struct ReplHandler {
 }
 
 impl ReplHandler {
+    /// Creates a `ReplHandler` that operates directly against a local `TuiService` (no HTTP).
     pub fn new_offline(service: TuiService) -> Self {
         #[cfg(feature = "repl-mcp")]
         let mcp_handler = {
@@ -63,6 +65,7 @@ impl ReplHandler {
         }
     }
 
+    /// Starts the interactive REPL loop, reading and executing commands until the user exits.
     #[cfg(feature = "repl")]
     pub async fn run(&mut self) -> Result<()> {
         use rustyline::completion::{Completer, Pair};

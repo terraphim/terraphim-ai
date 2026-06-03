@@ -10,6 +10,7 @@ use terraphim_settings::{DeviceSettings, Error as DeviceSettingsError};
 use terraphim_types::{Document, Layer, NormalizedTermValue, RoleName, SearchQuery, Thesaurus};
 use tokio::sync::Mutex;
 
+/// Service wrapper that combines configuration state and search service for TUI use.
 #[derive(Clone)]
 pub struct TuiService {
     config_state: ConfigState,
@@ -898,24 +899,34 @@ impl TuiService {
 /// Result of connectivity check
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct ConnectivityResult {
+    /// Whether all terms are connected via a single graph path.
     pub connected: bool,
+    /// The terms that were matched by the automaton.
     pub matched_terms: Vec<String>,
+    /// Human-readable description of the connectivity result.
     pub message: String,
 }
 
 /// Fuzzy suggestion result
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct FuzzySuggestion {
+    /// The candidate term suggested as a correction.
     pub term: String,
+    /// Jaro-Winkler similarity score between the query and this term.
     pub similarity: f64,
 }
 
 /// Checklist validation result
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct ChecklistResult {
+    /// Name of the checklist that was evaluated.
     pub checklist_name: String,
+    /// Whether every checklist item was satisfied.
     pub passed: bool,
+    /// Total number of items in the checklist.
     pub total_items: usize,
+    /// Items from the checklist that were satisfied.
     pub satisfied: Vec<String>,
+    /// Items from the checklist that were not satisfied.
     pub missing: Vec<String>,
 }
