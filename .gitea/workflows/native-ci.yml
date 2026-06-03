@@ -1,0 +1,12 @@
+name: native-ci
+on:
+  push:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: terraphim-native
+    steps:
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo build --workspace
+      - run: cargo test --workspace --lib --no-fail-fast
