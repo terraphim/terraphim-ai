@@ -1,12 +1,6 @@
 name: CI Native (GitHub Actions + Docker Buildx)
 
 on:
-  push:
-    branches: [main, CI_migration]
-    tags:
-      - "*.*.*"
-  pull_request:
-    types: [opened, synchronize, reopened]
   workflow_dispatch:
 
 env:

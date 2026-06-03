@@ -2,9 +2,6 @@ name: Test Matrix Configuration
 
 on:
   workflow_dispatch:
-  push:
-    branches: [test-matrix]
-
 jobs:
   setup:
     runs-on: [self-hosted, linux, x64]
