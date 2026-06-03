@@ -15,7 +15,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use terraphim_gitea_runner::client::{GiteaRunnerClient, ReqwestRunnerClient};
-use terraphim_gitea_runner::config::RunnerConfig;
+use terraphim_gitea_runner::config::{LegacyStatusMirrorConfig, RunnerConfig};
 use terraphim_gitea_runner::policy::DeterministicPlanner;
 use terraphim_gitea_runner::poller::Poller;
 use terraphim_gitea_runner::state::RunnerState;
@@ -36,6 +36,26 @@ fn csv(key: &str, default: &[&str]) -> Vec<String> {
 async fn main() -> anyhow::Result<()> {
     env_logger::init();
 
+    let active_repos = csv("RUNNER_ACTIVE_REPOS", &[]);
+    // Coexistence guard: an org-scoped runner with an empty allowlist would claim
+    // ANY terraphim-native job in the org. Require explicit opt-in to accept-all.
+    if active_repos.is_empty() && env_or("RUNNER_ACCEPT_ALL", "0") != "1" {
+        anyhow::bail!(
+            "RUNNER_ACTIVE_REPOS is empty. Set it to the repos this runner should serve \
+             (comma-separated), or set RUNNER_ACCEPT_ALL=1 to deliberately accept every \
+             terraphim-native job in the org."
+        );
+    }
+
+    // Optional legacy adf/build mirror during migration.
+    let legacy_status_mirror =
+        std::env::var("RUNNER_LEGACY_TOKEN")
+            .ok()
+            .map(|token| LegacyStatusMirrorConfig {
+                token,
+                context: env_or("RUNNER_LEGACY_CONTEXT", "adf/build"),
+            });
+
     let config = RunnerConfig {
         instance_url: env_or("GITEA_URL", "https://git.terraphim.cloud"),
         org: env_or("GITEA_ORG", "terraphim"),
@@ -43,7 +63,8 @@ async fn main() -> anyhow::Result<()> {
         state_file: PathBuf::from(env_or("RUNNER_STATE_FILE", ".runner")),
         labels: csv("RUNNER_LABELS", &["terraphim-native"]),
         poll_interval: Duration::from_secs(3),
-        active_repos: csv("RUNNER_ACTIVE_REPOS", &[]),
+        active_repos,
+        legacy_status_mirror,
     };
     let checkout_dir = env_or("RUNNER_CHECKOUT_DIR", ".");
     let version = env!("CARGO_PKG_VERSION").to_string();

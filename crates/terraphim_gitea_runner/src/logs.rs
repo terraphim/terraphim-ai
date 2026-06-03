@@ -74,3 +74,98 @@ impl LogStreamer {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::{
+        DeclareRequest, DeclareResponse, FetchTaskResponse, RegisterRequest, RunnerInfo,
+        UpdateTaskRequest, UpdateTaskResponse,
+    };
+    use async_trait::async_trait;
+    use std::sync::Mutex;
+
+    /// Fake protocol client (external boundary, not an internal mock) that records
+    /// each `UpdateLog` batch's starting index and acks the last row.
+    #[derive(Default)]
+    struct RecordingClient {
+        indices: Mutex<Vec<i64>>,
+    }
+
+    #[async_trait]
+    impl GiteaRunnerClient for RecordingClient {
+        async fn register(&self, _: RegisterRequest) -> Result<RunnerInfo> {
+            unreachable!()
+        }
+        async fn declare(&self, _: &RunnerState, _: DeclareRequest) -> Result<DeclareResponse> {
+            unreachable!()
+        }
+        async fn fetch_task(&self, _: &RunnerState, _: i64) -> Result<FetchTaskResponse> {
+            unreachable!()
+        }
+        async fn update_task(
+            &self,
+            _: &RunnerState,
+            _: UpdateTaskRequest,
+        ) -> Result<UpdateTaskResponse> {
+            unreachable!()
+        }
+        async fn update_log(
+            &self,
+            _: &RunnerState,
+            req: crate::types::UpdateLogRequest,
+        ) -> Result<crate::types::UpdateLogResponse> {
+            self.indices.lock().unwrap().push(req.index);
+            let ack = req.index + req.rows.len() as i64 - 1;
+            Ok(crate::types::UpdateLogResponse { ack_index: ack })
+        }
+    }
+
+    fn dummy_state() -> RunnerState {
+        RunnerState {
+            uuid: "u".into(),
+            token: "t".into(),
+            name: "n".into(),
+            version: "0".into(),
+            labels: vec![],
+            ephemeral: false,
+        }
+    }
+
+    #[tokio::test]
+    async fn multi_batch_index_is_monotonic_and_contiguous() {
+        let client = RecordingClient::default();
+        let st = dummy_state();
+        let mut s = LogStreamer::new(7);
+        // Batch 1: two rows -> index 0.
+        s.add_line("a");
+        s.add_line("b");
+        s.flush(&client, &st, false).await.unwrap();
+        // Batch 2: one row -> index 2.
+        s.add_line("c");
+        s.flush(&client, &st, false).await.unwrap();
+        // Final close (empty) -> index 3.
+        s.flush(&client, &st, true).await.unwrap();
+
+        assert_eq!(s.next_index(), 3);
+        let idx = client.indices.lock().unwrap().clone();
+        assert_eq!(idx, vec![0, 2, 3], "batch start indices are contiguous");
+        assert!(
+            idx.windows(2).all(|w| w[0] <= w[1]),
+            "indices never regress"
+        );
+    }
+
+    #[tokio::test]
+    async fn empty_flush_without_no_more_is_a_noop() {
+        let client = RecordingClient::default();
+        let st = dummy_state();
+        let mut s = LogStreamer::new(1);
+        s.flush(&client, &st, false).await.unwrap();
+        assert!(
+            client.indices.lock().unwrap().is_empty(),
+            "no UpdateLog sent"
+        );
+        assert_eq!(s.next_index(), 0);
+    }
+}

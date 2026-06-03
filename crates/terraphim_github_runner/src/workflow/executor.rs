@@ -134,18 +134,37 @@ impl CommandExecutor for MockCommandExecutor {
 /// Command executor that runs commands directly on the host (no VM).
 ///
 /// Used by the native Gitea runner's host route (#1910 M1). Each command runs via
-/// `sh -c` in `base_dir` with the step timeout. Snapshots/rollback are unsupported
-/// (the runner must disable `snapshot_on_success`/`auto_rollback`), so they return
-/// errors that should never be reached.
+/// `sh -c` in the step's working directory resolved against `base_dir`.
+///
+/// INVARIANT: this executor does not support snapshots/rollback (`create_snapshot`
+/// and `rollback` return errors). Callers MUST construct the [`WorkflowExecutor`]
+/// with `snapshot_on_success = false` and `auto_rollback = false`; otherwise every
+/// step fails at snapshot time. The native runner sets these in `task_worker`.
 pub struct HostCommandExecutor {
     base_dir: std::path::PathBuf,
 }
 
 impl HostCommandExecutor {
-    /// Create a host executor that runs commands in `base_dir` (the checkout root).
+    /// Create a host executor whose commands run under `base_dir` (the checkout root).
     pub fn new(base_dir: impl Into<std::path::PathBuf>) -> Self {
         Self {
             base_dir: base_dir.into(),
+        }
+    }
+
+    /// Resolve a step `working_dir` against the checkout root.
+    ///
+    /// The default `/workspace` sentinel (and an empty string) map to `base_dir`;
+    /// an absolute path is used as-is; a relative path is joined onto `base_dir`.
+    fn resolve_dir(&self, working_dir: &str) -> std::path::PathBuf {
+        if working_dir.is_empty() || working_dir == "/workspace" {
+            return self.base_dir.clone();
+        }
+        let p = std::path::Path::new(working_dir);
+        if p.is_absolute() {
+            p.to_path_buf()
+        } else {
+            self.base_dir.join(p)
         }
     }
 }
@@ -157,13 +176,14 @@ impl CommandExecutor for HostCommandExecutor {
         _session: &Session,
         command: &str,
         timeout: Duration,
-        _working_dir: &str,
+        working_dir: &str,
     ) -> Result<CommandResult> {
         let start = std::time::Instant::now();
+        let cwd = self.resolve_dir(working_dir);
         let child = tokio::process::Command::new("sh")
             .arg("-c")
             .arg(command)
-            .current_dir(&self.base_dir)
+            .current_dir(&cwd)
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
             .spawn()

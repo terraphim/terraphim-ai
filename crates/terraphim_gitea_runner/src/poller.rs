@@ -6,6 +6,7 @@ use crate::client::GiteaRunnerClient;
 use crate::config::RunnerConfig;
 use crate::policy::PolicyPlanner;
 use crate::state::RunnerState;
+use crate::status::SingleStatusWriter;
 use crate::task_worker::TaskWorker;
 use crate::workflow_payload;
 use std::path::PathBuf;
@@ -17,6 +18,8 @@ pub struct Poller<C: GiteaRunnerClient, P: PolicyPlanner> {
     planner: Arc<P>,
     config: RunnerConfig,
     checkout_dir: PathBuf,
+    /// Built once from `config.legacy_status_mirror`: (writer, context).
+    legacy: Option<(Arc<SingleStatusWriter>, String)>,
 }
 
 impl<C: GiteaRunnerClient + 'static, P: PolicyPlanner + 'static> Poller<C, P> {
@@ -27,11 +30,21 @@ impl<C: GiteaRunnerClient + 'static, P: PolicyPlanner + 'static> Poller<C, P> {
         config: RunnerConfig,
         checkout_dir: impl Into<PathBuf>,
     ) -> Self {
+        let legacy = config.legacy_status_mirror.as_ref().map(|m| {
+            (
+                Arc::new(SingleStatusWriter::new(
+                    config.instance_url.clone(),
+                    m.token.clone(),
+                )),
+                m.context.clone(),
+            )
+        });
         Self {
             client,
             planner,
             config,
             checkout_dir: checkout_dir.into(),
+            legacy,
         }
     }
 
@@ -52,11 +65,14 @@ impl<C: GiteaRunnerClient + 'static, P: PolicyPlanner + 'static> Poller<C, P> {
             }
         }
 
-        let worker = TaskWorker::new(
+        let mut worker = TaskWorker::new(
             self.client.clone(),
             self.planner.clone(),
             self.checkout_dir.clone(),
         );
+        if let Some((writer, context)) = &self.legacy {
+            worker = worker.with_legacy_mirror(writer.clone(), context.clone());
+        }
         match worker.run(state, task).await {
             Ok(ok) => log::info!("task complete: success={ok}"),
             Err(e) => log::error!("task failed: {e}"),

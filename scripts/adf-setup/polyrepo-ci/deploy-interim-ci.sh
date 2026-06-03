@@ -76,11 +76,13 @@ for repo in "${REPOS[@]}"; do
   echo "=== ${repo} ==="
   wd="${WORKROOT}/${repo}"
 
-  # 1. clone if absent (private repos -> token in URL, then scrub remote)
+  # 1. clone if absent. Auth via a one-shot header (not the URL), so the token is
+  #    never written into .git/config or the persisted remote. The remote stays
+  #    token-free; the build-runner agent authenticates fetches via its GITEA_TOKEN env.
   if [ ! -d "${wd}/.git" ]; then
     echo "  cloning -> ${wd}"
-    git clone "https://oauth2:${GITEA_TOKEN}@git.terraphim.cloud/${ORG}/${repo}.git" "${wd}"
-    git -C "${wd}" remote set-url origin "${GITEA_URL}/${ORG}/${repo}.git"
+    git -c "http.extraHeader=Authorization: token ${GITEA_TOKEN}" \
+      clone "${GITEA_URL}/${ORG}/${repo}.git" "${wd}"
   else
     echo "  clone present"
   fi

@@ -4,6 +4,7 @@ use crate::client::GiteaRunnerClient;
 use crate::logs::LogStreamer;
 use crate::policy::PolicyPlanner;
 use crate::state::RunnerState;
+use crate::status::{SingleStatusWriter, StatusState};
 use crate::types::{Task, TaskState, UpdateTaskRequest, result};
 use crate::{Result, RunnerError, workflow_payload};
 use std::collections::BTreeMap;
@@ -21,6 +22,8 @@ pub struct TaskWorker<C: GiteaRunnerClient, P: PolicyPlanner> {
     planner: Arc<P>,
     /// Checkout root the host executor runs commands in.
     checkout_dir: PathBuf,
+    /// Optional legacy commit-status mirror (writer, context) for migration.
+    legacy: Option<(Arc<SingleStatusWriter>, String)>,
 }
 
 impl<C: GiteaRunnerClient, P: PolicyPlanner> TaskWorker<C, P> {
@@ -30,6 +33,33 @@ impl<C: GiteaRunnerClient, P: PolicyPlanner> TaskWorker<C, P> {
             client,
             planner,
             checkout_dir: checkout_dir.into(),
+            legacy: None,
+        }
+    }
+
+    /// Attach a legacy commit-status mirror (e.g. `adf/build`) posted alongside
+    /// the native protocol result during migration.
+    pub fn with_legacy_mirror(mut self, writer: Arc<SingleStatusWriter>, context: String) -> Self {
+        self.legacy = Some((writer, context));
+        self
+    }
+
+    /// Post to the legacy mirror if configured and the task carries `owner/repo`+sha.
+    async fn mirror(&self, task: &Task, state: StatusState, desc: &str) {
+        let Some((writer, context)) = &self.legacy else {
+            return;
+        };
+        let (Some(full), Some(sha)) = (
+            workflow_payload::repository(task),
+            workflow_payload::head_sha(task),
+        ) else {
+            return;
+        };
+        let mut parts = full.splitn(2, '/');
+        if let (Some(owner), Some(repo)) = (parts.next(), parts.next()) {
+            if let Err(e) = writer.post(owner, repo, &sha, state, context, desc).await {
+                log::warn!("legacy status mirror failed: {e}");
+            }
         }
     }
 
@@ -81,8 +111,10 @@ impl<C: GiteaRunnerClient, P: PolicyPlanner> TaskWorker<C, P> {
                 },
             )
             .await?;
+        self.mirror(&task, StatusState::Pending, "build started")
+            .await;
 
-        // Execute and stream logs.
+        // Execute, then stream logs in per-step batches (multi-batch UpdateLog).
         let mut logs = LogStreamer::new(task.id);
         let outcome = exec
             .execute_workflow_in_session(&plan.workflow, &session)
@@ -101,6 +133,9 @@ impl<C: GiteaRunnerClient, P: PolicyPlanner> TaskWorker<C, P> {
                     for line in step.stderr.lines() {
                         logs.add_line(line.to_string());
                     }
+                    // Flush this step's batch so the Gitea UI shows progress as
+                    // steps complete (exercises the monotonic multi-batch ack).
+                    logs.flush(&*self.client, state, false).await?;
                 }
                 logs.add_line(wf.summary.clone());
                 wf.success
@@ -111,7 +146,7 @@ impl<C: GiteaRunnerClient, P: PolicyPlanner> TaskWorker<C, P> {
             }
         };
 
-        // Flush logs (closing the stream) and report the final result.
+        // Close the log stream and report the final result.
         logs.flush(&*self.client, state, true).await?;
         self.client
             .update_task(
@@ -132,6 +167,20 @@ impl<C: GiteaRunnerClient, P: PolicyPlanner> TaskWorker<C, P> {
                 },
             )
             .await?;
+        self.mirror(
+            &task,
+            if success {
+                StatusState::Success
+            } else {
+                StatusState::Failure
+            },
+            if success {
+                "native build passed"
+            } else {
+                "native build failed"
+            },
+        )
+        .await;
 
         let _ = session_manager.release_session(&session.id).await;
         Ok(success)

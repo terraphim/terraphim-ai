@@ -22,6 +22,18 @@ pub struct RunnerConfig {
     /// migration (empty = accept all the runner is offered). Guards against
     /// double-execution with the interim ADF lane.
     pub active_repos: Vec<String>,
+    /// Optional legacy commit-status mirror (e.g. `adf/build`) posted alongside
+    /// the native result during migration. `None` disables the mirror.
+    pub legacy_status_mirror: Option<LegacyStatusMirrorConfig>,
+}
+
+/// Configuration for the optional legacy commit-status mirror.
+#[derive(Debug, Clone)]
+pub struct LegacyStatusMirrorConfig {
+    /// Gitea API token used to POST commit statuses.
+    pub token: String,
+    /// Status context to write (e.g. `adf/build`).
+    pub context: String,
 }
 
 impl Default for RunnerConfig {
@@ -34,6 +46,7 @@ impl Default for RunnerConfig {
             labels: vec!["terraphim-native".to_string()],
             poll_interval: Duration::from_secs(3),
             active_repos: Vec::new(),
+            legacy_status_mirror: None,
         }
     }
 }

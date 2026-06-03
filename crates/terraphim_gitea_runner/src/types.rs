@@ -136,7 +136,7 @@ pub struct UpdateTaskRequest {
 #[serde(rename_all = "camelCase")]
 pub struct TaskState {
     pub id: i64,
-    /// One of [`result`] (1=success, 2=failure, 6=running).
+    /// One of [`result`] (0=unspecified/in-progress, 1=success, 2=failure).
     pub result: i32,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub started_at: Option<String>,
