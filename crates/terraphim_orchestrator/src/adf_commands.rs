@@ -11,23 +11,39 @@ use terraphim_types::{NormalizedTerm, NormalizedTermValue, Thesaurus};
 #[derive(Debug, Clone, PartialEq)]
 pub enum AdfCommand {
     /// Trigger a compound review
-    CompoundReview { issue_number: u64, comment_id: u64 },
+    CompoundReview {
+        /// Issue number where the command was found.
+        issue_number: u64,
+        /// Comment ID that triggered the command.
+        comment_id: u64,
+    },
     /// Spawn a specific agent
     SpawnAgent {
+        /// Name of the agent to spawn.
         agent_name: String,
+        /// Issue number where the command was found.
         issue_number: u64,
+        /// Comment ID that triggered the command.
         comment_id: u64,
+        /// Contextual text following the command.
         context: String,
     },
     /// Trigger a persona-based agent
     SpawnPersona {
+        /// Name of the persona to activate.
         persona_name: String,
+        /// Issue number where the command was found.
         issue_number: u64,
+        /// Comment ID that triggered the command.
         comment_id: u64,
+        /// Contextual text following the command.
         context: String,
     },
     /// Unknown command
-    Unknown { raw: String },
+    Unknown {
+        /// Raw text of the unrecognised command.
+        raw: String,
+    },
 }
 
 /// Parser for ADF commands using terraphim-automata

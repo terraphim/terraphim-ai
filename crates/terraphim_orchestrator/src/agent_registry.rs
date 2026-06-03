@@ -39,11 +39,14 @@ impl AgentScope {
 /// Stable key for a registered agent definition.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct AgentKey {
+    /// Scope (legacy or project-specific) that this agent belongs to.
     pub scope: AgentScope,
+    /// Name of the agent within its scope.
     pub name: String,
 }
 
 impl AgentKey {
+    /// Create a new agent key from a scope and name.
     pub fn new(scope: AgentScope, name: impl Into<String>) -> Self {
         Self {
             scope,
@@ -51,10 +54,12 @@ impl AgentKey {
         }
     }
 
+    /// Create a project-scoped agent key.
     pub fn project(project: impl Into<String>, name: impl Into<String>) -> Self {
         Self::new(AgentScope::Project(project.into()), name)
     }
 
+    /// Create a legacy (single-project) agent key.
     pub fn legacy(name: impl Into<String>) -> Self {
         Self::new(AgentScope::Legacy, name)
     }
@@ -76,16 +81,21 @@ pub enum AgentSource {
 /// Registry entry for an agent definition.
 #[derive(Debug, Clone)]
 pub struct RegisteredAgent {
+    /// Unique key identifying this agent within its scope.
     pub key: AgentKey,
+    /// Full agent definition from the merged config.
     pub definition: AgentDefinition,
+    /// Where this agent entry originated.
     pub source: AgentSource,
 }
 
 impl RegisteredAgent {
+    /// Return the project ID this agent is scoped to, if any.
     pub fn project_id(&self) -> Option<&str> {
         self.definition.project.as_deref()
     }
 
+    /// Return whether this agent should only be triggered by events, not scheduled runs.
     pub fn event_only(&self) -> bool {
         self.definition.event_only
     }
@@ -138,6 +148,7 @@ impl AgentRegistry {
         self.by_key.len()
     }
 
+    /// Return true if the registry contains no agents.
     pub fn is_empty(&self) -> bool {
         self.by_key.is_empty()
     }
