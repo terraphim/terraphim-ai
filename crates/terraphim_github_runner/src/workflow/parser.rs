@@ -95,8 +95,13 @@ fn default_working_dir() -> String {
     "/workspace".to_string()
 }
 
+/// Default per-step timeout (seconds) when a workflow does not specify one.
+///
+/// 30 minutes: Rust workspace `cargo build`/`test` steps on larger repos easily
+/// exceed the old 5-minute default on a cold sccache. Four steps at this default
+/// stay within the executor's 2-hour overall `max_execution_time` cap.
 fn default_timeout() -> u64 {
-    300
+    1800
 }
 
 fn indent_of(s: &str) -> usize {
@@ -631,7 +636,7 @@ mod tests {
         let step: WorkflowStep =
             serde_json::from_str(r#"{"name": "test", "command": "echo hi"}"#).unwrap();
         assert_eq!(step.working_dir, "/workspace");
-        assert_eq!(step.timeout_seconds, 300);
+        assert_eq!(step.timeout_seconds, 1800);
         assert!(!step.continue_on_error);
     }
 
