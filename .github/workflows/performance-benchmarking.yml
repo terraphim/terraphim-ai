@@ -1,4 +1,9 @@
 name: Performance Benchmarking
+# Scoped to manual (workflow_dispatch) only.
+# CI benchmarking and regression gate are handled by .gitea/workflows/benchmark.yml
+# on the terraphim-native runner. This workflow is retained for deep on-demand
+# analysis: arbitrary iteration counts, explicit baseline-ref comparison,
+# full SLO report generation, and artifact publishing to GitHub Actions.
 
 on:
   workflow_dispatch:
@@ -13,18 +18,6 @@ on:
         required: false
         default: 'main'
         type: string
-  pull_request:
-    paths:
-      - 'crates/terraphim_*/src/**'
-      - 'terraphim_server/src/**'
-      - 'scripts/run-performance-benchmarks.sh'
-      - '.github/workflows/performance-benchmarking.yml'
-  push:
-    branches: [main, develop]
-    paths:
-      - 'crates/terraphim_*/src/**'
-      - 'terraphim_server/src/**'
-      - 'scripts/run-performance-benchmarks.sh'
 
 env:
   CARGO_TERM_COLOR: always

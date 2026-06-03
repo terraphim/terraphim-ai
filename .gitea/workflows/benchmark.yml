@@ -1,0 +1,130 @@
+name: benchmark
+
+# Runs Criterion benchmarks on the terraphim-native runner (sccache-backed)
+# and enforces a regression gate: any benchmark that degrades >20% relative to
+# the stored baseline fails the job.
+#
+# Baseline is stored on the runner at ~/.cache/terraphim-bench/baseline.json
+# and updated whenever a push lands on main.
+#
+# The GitHub performance-benchmarking.yml is intentionally scoped to
+# workflow_dispatch only -- this workflow owns CI benchmarking.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTC_WRAPPER: /home/alex/.local/bin/sccache
+  SCCACHE_BUCKET: rust-cache
+  SCCACHE_SERVER_PORT: "4231"
+  SCCACHE_ENDPOINT: http://172.26.0.1:8333
+  SCCACHE_S3_USE_SSL: "false"
+  SCCACHE_REGION: us-east-1
+  SCCACHE_S3_KEY_PREFIX: terraphim-ai
+  AWS_ACCESS_KEY_ID: any
+  AWS_SECRET_ACCESS_KEY: any
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  criterion-benchmarks:
+    name: Criterion Benchmarks + Regression Gate
+    runs-on: terraphim-native
+
+    steps:
+      - name: sccache start and zero stats
+        run: |
+          /home/alex/.local/bin/sccache --start-server || true
+          /home/alex/.local/bin/sccache --zero-stats
+
+      - name: Run Criterion benchmarks
+        run: |
+          mkdir -p benchmark-results
+          cargo bench -p terraphim_tinyclaw --bench tinyclaw_benchmarks \
+            2>&1 | tee benchmark-results/bench-output.txt
+
+      - name: Collect Criterion estimates
+        run: |
+          python3 - <<'PYEOF'
+          import json, os, pathlib
+          from datetime import datetime
+
+          today = datetime.now().strftime("%Y-%m-%d")
+          p = pathlib.Path("target/criterion")
+          results = {}
+          if p.exists():
+              for f in sorted(p.glob("*/new/estimates.json")):
+                  name = f.parent.parent.name
+                  data = json.loads(f.read_text())
+                  results[name] = data.get("mean", {}).get("point_estimate")
+
+          out = {"date": today, "estimates": results}
+          out_path = f"benchmark-results/current-{today}.json"
+          os.makedirs("benchmark-results", exist_ok=True)
+          with open(out_path, "w") as fh:
+              json.dump(out, fh, indent=2)
+          count = len(results)
+          names = list(results.keys())
+          print(f"Collected {count} benchmark(s): {names}")
+          PYEOF
+
+      - name: Regression gate
+        run: |
+          BASELINE_STORE="${HOME}/.cache/terraphim-bench/baseline.json"
+          CURRENT=$(ls benchmark-results/current-*.json 2>/dev/null | sort | tail -1)
+
+          if [ -z "${CURRENT}" ]; then
+            echo "No Criterion output collected -- bench step may have failed"
+            exit 1
+          fi
+
+          if [ ! -f "${BASELINE_STORE}" ]; then
+            echo "No baseline found -- publishing current results as today's baseline"
+            mkdir -p "$(dirname "${BASELINE_STORE}")"
+            cp "${CURRENT}" "${BASELINE_STORE}"
+            echo "Baseline written to ${BASELINE_STORE} ($(date +%Y-%m-%d))"
+            exit 0
+          fi
+
+          python3 - "${BASELINE_STORE}" "${CURRENT}" <<'PYEOF'
+          import json, sys
+
+          baseline = json.load(open(sys.argv[1]))["estimates"]
+          current  = json.load(open(sys.argv[2]))["estimates"]
+
+          regressions = []
+          for name, base_ns in baseline.items():
+              if base_ns is None or base_ns == 0:
+                  continue
+              curr_ns = current.get(name)
+              if curr_ns is None:
+                  print(f"  MISSING  {name} (baseline {base_ns:.1f} ns)")
+                  continue
+              pct = (curr_ns - base_ns) / base_ns * 100
+              if pct > 20:
+                  regressions.append((name, pct, base_ns, curr_ns))
+                  print(f"  REGRESS  {name}: +{pct:.1f}%  {base_ns:.1f} -> {curr_ns:.1f} ns")
+              else:
+                  print(f"  ok       {name}: {pct:+.1f}%  {base_ns:.1f} -> {curr_ns:.1f} ns")
+
+          if regressions:
+              print(f"\nFAIL: {len(regressions)} benchmark(s) regressed >20%")
+              sys.exit(1)
+          print("\nPASS: no regressions detected")
+          PYEOF
+
+      - name: Update baseline on main
+        if: github.ref == 'refs/heads/main'
+        run: |
+          CURRENT=$(ls benchmark-results/current-*.json 2>/dev/null | sort | tail -1)
+          if [ -n "${CURRENT}" ]; then
+            mkdir -p "${HOME}/.cache/terraphim-bench"
+            cp "${CURRENT}" "${HOME}/.cache/terraphim-bench/baseline.json"
+            echo "Baseline updated to $(date +%Y-%m-%d)"
+          fi
+
+      - name: sccache stats
+        if: always()
+        run: /home/alex/.local/bin/sccache --show-stats
