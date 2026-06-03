@@ -122,7 +122,12 @@ async fn runner_register_declare_fetch_execute_cycle() {
         poll_interval: Duration::from_millis(10),
         ..RunnerConfig::default()
     };
-    let poller = Poller::new(client, Arc::new(DeterministicPlanner), config, tmp.path());
+    let poller = Poller::new(
+        client,
+        Arc::new(DeterministicPlanner::default()),
+        config,
+        tmp.path(),
+    );
 
     // First poll fetches + executes the task; second poll sees no task.
     let v = poller.poll_once(&state, 0).await.unwrap();

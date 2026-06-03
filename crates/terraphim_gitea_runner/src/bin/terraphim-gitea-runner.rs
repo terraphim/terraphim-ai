@@ -123,7 +123,14 @@ async fn main() -> anyhow::Result<()> {
         .await?;
     log::info!("declared; polling for tasks (labels={:?})", state.labels);
 
-    let poller = Poller::new(client, Arc::new(DeterministicPlanner), config, checkout_dir);
+    // Probe for `rch` on the host: present -> cargo offloads to the rch farm;
+    // absent -> cargo runs directly on the host with sccache (interim-lane parity).
+    let poller = Poller::new(
+        client,
+        Arc::new(DeterministicPlanner::detect()),
+        config,
+        checkout_dir,
+    );
     poller.run_forever(&state).await?;
     Ok(())
 }

