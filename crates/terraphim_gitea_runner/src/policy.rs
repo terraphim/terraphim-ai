@@ -103,10 +103,13 @@ const ALLOWLIST: &[&str] = &[
     "source", "true", "set", "rustup",
 ];
 
-/// Cargo subcommands worth offloading to `rch` (heavy compilation).
-const RCH_CARGO_SUBCMDS: &[&str] = &[
-    "build", "test", "check", "clippy", "bench", "doc", "nextest",
-];
+/// Cargo subcommands worth offloading to `rch` (pure compilation only).
+///
+/// `test`/`bench`/`nextest` are deliberately excluded: they *execute* compiled
+/// binaries, and `rch exec` (a remote compilation helper) hangs when asked to
+/// run them. Those run on the host directly (with sccache), matching the
+/// interim ADF lane. Only compilation subcommands are offloaded.
+const RCH_CARGO_SUBCMDS: &[&str] = &["build", "check", "clippy", "doc"];
 
 impl DeterministicPlanner {
     /// Decide the route for a single command and return the (possibly rewritten)
