@@ -44,7 +44,9 @@ async fn shared_list_with_trust_level_filter() {
         SharedLearningSource::Manual,
         "test-agent".to_string(),
     );
+    let l1_id = l1.id.clone();
     store.insert(l1).await.expect("insert l1");
+    store.promote_to_l1(&l1_id).await.expect("promote l1 to L1");
 
     let mut l2 = SharedLearning::new(
         "L2 learning".to_string(),
@@ -52,6 +54,7 @@ async fn shared_list_with_trust_level_filter() {
         SharedLearningSource::Manual,
         "test-agent".to_string(),
     );
+    l2.promote_to_l1();
     l2.promote_to_l2();
     store.insert(l2).await.expect("insert l2");
 
@@ -92,6 +95,7 @@ async fn shared_promote_l1_to_l2() {
     let id = learning.id.clone();
     store.insert(learning).await.expect("insert");
 
+    store.promote_to_l1(&id).await.expect("promote to l1");
     store.promote_to_l2(&id).await.expect("promote to l2");
 
     let fetched = store.get(&id).await.expect("get after promote");
@@ -122,7 +126,7 @@ async fn shared_promote_to_l3() {
 async fn shared_stats_counts() {
     let store = create_store().await;
 
-    // Insert 2 L1, 1 L2
+    // Insert 2 L1, 1 L2 (each starts at L0 and must be explicitly promoted)
     for i in 0..2 {
         let l = SharedLearning::new(
             format!("L1 item {}", i),
@@ -130,7 +134,9 @@ async fn shared_stats_counts() {
             SharedLearningSource::Manual,
             "agent".to_string(),
         );
+        let lid = l.id.clone();
         store.insert(l).await.expect("insert l1");
+        store.promote_to_l1(&lid).await.expect("promote to L1");
     }
 
     let mut l2 = SharedLearning::new(
@@ -139,6 +145,7 @@ async fn shared_stats_counts() {
         SharedLearningSource::Manual,
         "agent".to_string(),
     );
+    l2.promote_to_l1();
     l2.promote_to_l2();
     store.insert(l2).await.expect("insert l2");
 
@@ -190,7 +197,7 @@ async fn shared_import_creates_l1_entries() {
 
     let all = store.list_all().await.expect("list_all");
     assert_eq!(all.len(), 1);
-    assert_eq!(all[0].trust_level, TrustLevel::L1);
+    assert_eq!(all[0].trust_level, TrustLevel::L0);
     assert_eq!(all[0].source_agent, "cli-import");
     assert!(all[0].original_command.is_some());
     assert!(all[0].error_context.is_some());
@@ -236,7 +243,8 @@ async fn shared_store_survives_restart() {
     let id = learning.id.clone();
     store.insert(learning).await.expect("insert");
 
-    // 3. Promote it to L2
+    // 3. Promote it to L2 (must go through L1 first)
+    store.promote_to_l1(&id).await.expect("promote to l1");
     store.promote_to_l2(&id).await.expect("promote to l2");
 
     // 4. Drop the store (simulating process exit)
@@ -262,6 +270,91 @@ async fn shared_store_survives_restart() {
     assert_eq!(retrieved.quality.applied_count, 3);
     assert_eq!(retrieved.quality.effective_count, 3);
     assert_eq!(retrieved.quality.agent_names.len(), 2);
+}
+
+/// Regression test for #2049: promoting an L0 learning directly to L2 must
+/// return an error rather than silently no-opping and printing false success.
+#[tokio::test]
+async fn promote_l0_directly_to_l2_fails() {
+    let store = create_store().await;
+
+    let learning = SharedLearning::new(
+        "L0 learning".to_string(),
+        "content".to_string(),
+        SharedLearningSource::Manual,
+        "test-agent".to_string(),
+    );
+    let id = learning.id.clone();
+    store.insert(learning).await.expect("insert");
+
+    // Verify the learning is at L0
+    let fetched = store.get(&id).await.expect("get");
+    assert_eq!(fetched.trust_level, TrustLevel::L0);
+
+    // Promoting directly to L2 from L0 must fail with a descriptive error
+    let result = store.promote_to_l2(&id).await;
+    assert!(
+        result.is_err(),
+        "promote_to_l2 from L0 must fail, not silently no-op"
+    );
+    let err_msg = result.unwrap_err().to_string();
+    assert!(
+        err_msg.contains("Extracted") || err_msg.contains("L0"),
+        "error must mention current level: {}",
+        err_msg
+    );
+    assert!(
+        err_msg.contains("l1"),
+        "error must instruct user to promote to L1 first: {}",
+        err_msg
+    );
+
+    // Learning must still be at L0 (unchanged)
+    let still_l0 = store.get(&id).await.expect("get after failed promote");
+    assert_eq!(still_l0.trust_level, TrustLevel::L0);
+}
+
+/// Regression test for #2049: promoting from L0 to L1 via --to l1 must succeed.
+#[tokio::test]
+async fn promote_l0_to_l1_via_store_succeeds() {
+    let store = create_store().await;
+
+    let learning = SharedLearning::new(
+        "L0 to L1".to_string(),
+        "content".to_string(),
+        SharedLearningSource::Manual,
+        "test-agent".to_string(),
+    );
+    let id = learning.id.clone();
+    store.insert(learning).await.expect("insert");
+
+    store
+        .promote_to_l1(&id)
+        .await
+        .expect("promote L0 -> L1 should succeed");
+
+    let fetched = store.get(&id).await.expect("get after promote");
+    assert_eq!(fetched.trust_level, TrustLevel::L1);
+    assert!(fetched.promoted_at.is_some());
+}
+
+/// Promoting an already-L1 learning to L1 again must fail (not silent no-op).
+#[tokio::test]
+async fn promote_l1_to_l1_again_fails() {
+    let store = create_store().await;
+
+    let learning = SharedLearning::new(
+        "L1 again".to_string(),
+        "content".to_string(),
+        SharedLearningSource::Manual,
+        "test-agent".to_string(),
+    );
+    let id = learning.id.clone();
+    store.insert(learning).await.expect("insert");
+    store.promote_to_l1(&id).await.expect("initial L0 -> L1");
+
+    let result = store.promote_to_l1(&id).await;
+    assert!(result.is_err(), "re-promoting L1 to L1 must fail");
 }
 
 #[tokio::test]
