@@ -9,11 +9,11 @@
 //! - `RUNNER_STATE_FILE`    default `.runner`
 //! - `RUNNER_LABELS`        comma-separated, default `terraphim-native`
 //! - `RUNNER_ACTIVE_REPOS`  comma-separated repo allowlist (required unless
-//!                          `RUNNER_ACCEPT_ALL=1`, which opts into all org jobs)
+//!   `RUNNER_ACCEPT_ALL=1`, which opts into all org jobs)
 //! - `RUNNER_ACCEPT_ALL`    set `1` to accept every terraphim-native job (no allowlist)
 //! - `RUNNER_LEGACY_TOKEN`  enable the legacy commit-status mirror with this API token
 //! - `RUNNER_LEGACY_CONTEXT` legacy mirror context, default `adf/build`
-//! - `RUNNER_CHECKOUT_DIR`  default `.`
+//! - `RUNNER_CHECKOUT_DIR`  checkout root; per-repo trees at `<root>/<owner>/<repo>` (default `.`)
 
 use std::path::PathBuf;
 use std::sync::Arc;

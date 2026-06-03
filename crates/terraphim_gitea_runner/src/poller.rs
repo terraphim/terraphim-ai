@@ -68,6 +68,7 @@ impl<C: GiteaRunnerClient + 'static, P: PolicyPlanner + 'static> Poller<C, P> {
         let mut worker = TaskWorker::new(
             self.client.clone(),
             self.planner.clone(),
+            self.config.instance_url.clone(),
             self.checkout_dir.clone(),
         );
         if let Some((writer, context)) = &self.legacy {

@@ -1,5 +1,6 @@
 //! End-to-end task execution: compile -> policy -> host execution -> logs -> result.
 
+use crate::checkout;
 use crate::client::GiteaRunnerClient;
 use crate::logs::LogStreamer;
 use crate::policy::PolicyPlanner;
@@ -20,18 +21,31 @@ use terraphim_github_runner::{
 pub struct TaskWorker<C: GiteaRunnerClient, P: PolicyPlanner> {
     client: Arc<C>,
     planner: Arc<P>,
-    /// Checkout root the host executor runs commands in.
+    /// Clone base URL (Gitea `instance_url`) used to fetch the target repo.
+    instance_url: String,
+    /// Checkout root: per-repo working trees live at `<root>/<owner>/<repo>`.
+    /// Also the fallback working dir for tasks that carry no repository/sha.
     checkout_dir: PathBuf,
     /// Optional legacy commit-status mirror (writer, context) for migration.
     legacy: Option<(Arc<SingleStatusWriter>, String)>,
 }
 
 impl<C: GiteaRunnerClient, P: PolicyPlanner> TaskWorker<C, P> {
-    /// Create a worker bound to a client, planner, and checkout directory.
-    pub fn new(client: Arc<C>, planner: Arc<P>, checkout_dir: impl Into<PathBuf>) -> Self {
+    /// Create a worker bound to a client, planner, clone base URL, and checkout
+    /// root. `instance_url` is the Gitea base the target repository is fetched
+    /// from before the build runs; `checkout_dir` is the root under which
+    /// per-repo working trees are materialised (and the fallback working dir for
+    /// tasks that carry no repository/sha).
+    pub fn new(
+        client: Arc<C>,
+        planner: Arc<P>,
+        instance_url: impl Into<String>,
+        checkout_dir: impl Into<PathBuf>,
+    ) -> Self {
         Self {
             client,
             planner,
+            instance_url: instance_url.into(),
             checkout_dir: checkout_dir.into(),
             legacy: None,
         }
@@ -63,19 +77,78 @@ impl<C: GiteaRunnerClient, P: PolicyPlanner> TaskWorker<C, P> {
         }
     }
 
+    /// Resolve the working directory the build should run in.
+    ///
+    /// If the task carries `owner/repo` + sha, the target repo is checked out at
+    /// that commit under `checkout_dir` and the resolved tree is returned. If the
+    /// task carries no repository/sha, or the checkout fails, the bare
+    /// `checkout_dir` is returned and a message is logged so existing
+    /// proof/one-step tasks (which have no repo to fetch) still run.
+    async fn resolve_work_dir(&self, state: &RunnerState, task: &Task) -> PathBuf {
+        let (Some(full), Some(sha)) = (
+            workflow_payload::repository(task),
+            workflow_payload::head_sha(task),
+        ) else {
+            log::info!(
+                "task {} carries no repository/sha; running in checkout_dir without checkout",
+                task.id
+            );
+            return self.checkout_dir.clone();
+        };
+
+        let mut parts = full.splitn(2, '/');
+        let (Some(owner), Some(repo)) = (parts.next(), parts.next()) else {
+            log::warn!(
+                "task {} repository `{full}` is not `owner/repo`; skipping checkout",
+                task.id
+            );
+            return self.checkout_dir.clone();
+        };
+
+        match checkout::ensure_checkout(
+            &self.instance_url,
+            owner,
+            repo,
+            &sha,
+            Some(state.token.as_str()),
+            &self.checkout_dir,
+        )
+        .await
+        {
+            Ok(dir) => {
+                log::info!("checked out {owner}/{repo}@{sha} into {}", dir.display());
+                dir
+            }
+            Err(e) => {
+                // Surface the failure but degrade gracefully: the build then runs
+                // in the bare checkout_dir and will fail loudly if it needs repo
+                // content, rather than the runner crashing here.
+                log::warn!("checkout of {owner}/{repo}@{sha} failed: {e}; using checkout_dir");
+                self.checkout_dir.clone()
+            }
+        }
+    }
+
     /// Run `task` to completion; returns whether it succeeded.
     pub async fn run(&self, state: &RunnerState, task: Task) -> Result<bool> {
         // Compile the workflow payload, then apply policy (allowlist + cargo->rch).
         let workflow = workflow_payload::compile_task(&task)?;
         let plan = self.planner.compile(workflow).await?;
 
-        // Build the reused host execution stack (no VM, no snapshots).
+        // Check out the target repo at the task's sha so the build runs against
+        // real repo content. Tasks that carry no repository/sha (e.g. existing
+        // protocol-proof / one-step tasks) skip checkout gracefully and run in
+        // the bare `checkout_dir`, preserving prior behaviour.
+        let work_dir = self.resolve_work_dir(state, &task).await;
+
+        // Build the reused host execution stack (no VM, no snapshots) rooted at
+        // the resolved per-repo working tree.
         let session_manager = Arc::new(SessionManager::with_provider(
             Arc::new(HostVmProvider),
             SessionManagerConfig::default(),
         ));
         let exec = WorkflowExecutor::with_executor(
-            Arc::new(HostCommandExecutor::new(self.checkout_dir.clone())),
+            Arc::new(HostCommandExecutor::new(work_dir)),
             session_manager.clone(),
             WorkflowExecutorConfig {
                 snapshot_on_success: false,

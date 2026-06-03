@@ -19,6 +19,7 @@
 //! - [`config`] -- [`config::RunnerConfig`].
 //! - [`policy`] -- command allowlist + host/rch routing.
 //! - [`build_md`] -- compile a repo `BUILD.md` into a `ParsedWorkflow`.
+//! - [`checkout`] -- check out the target repo at the task's sha before build.
 //! - [`workflow_payload`] -- decode a Gitea `WorkflowPayload` into a `ParsedWorkflow`.
 //! - [`logs`] -- `UpdateLog` batching with monotonic ack.
 //! - [`status`] -- single-writer commit-status helper.
@@ -26,6 +27,7 @@
 //! - [`poller`] -- the fetch/dispatch loop.
 
 pub mod build_md;
+pub mod checkout;
 pub mod client;
 pub mod config;
 pub mod logs;
