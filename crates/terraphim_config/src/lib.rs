@@ -1385,9 +1385,8 @@ mod tests {
     use std::io::Write;
     use tempfile::tempfile;
     use terraphim_test_utils::EnvVarGuard;
-    use tokio::test;
 
-    #[test]
+    #[tokio::test]
     async fn test_write_config_to_json() {
         let config = Config::empty();
         let json_str = serde_json::to_string_pretty(&config).unwrap();
@@ -1396,7 +1395,7 @@ mod tests {
         tempfile.write_all(json_str.as_bytes()).unwrap();
     }
 
-    #[test]
+    #[tokio::test]
     async fn test_get_key() {
         let config = Config::empty();
         serde_json::to_string_pretty(&config).unwrap();
@@ -1466,7 +1465,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[tokio::test]
     async fn test_write_config_to_toml() {
         let config = Config::empty();
         let toml = toml::to_string_pretty(&config).unwrap();
@@ -1544,7 +1543,7 @@ mod tests {
         assert_eq!(config.default_role, RoleName::new("Default"));
     }
 
-    #[test]
+    #[tokio::test]
     async fn test_update_global_shortcut() {
         let config = ConfigBuilder::new()
             .add_role("dummy", dummy_role())
@@ -1582,7 +1581,7 @@ mod tests {
         role
     }
 
-    #[test]
+    #[tokio::test]
     async fn test_add_role() {
         // Create a new role by building a new config
         let config = ConfigBuilder::new()
@@ -1710,7 +1709,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[tokio::test]
     async fn test_load_from_json_file_with_fixture() {
         // Build path relative to workspace root
         let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -1734,13 +1733,13 @@ mod tests {
         );
     }
 
-    #[test]
+    #[tokio::test]
     async fn test_load_from_json_file_not_found() {
         let result = Config::load_from_json_file("/nonexistent/path/does_not_exist.json");
         assert!(result.is_err(), "Should return error for missing file");
     }
 
-    #[test]
+    #[tokio::test]
     async fn test_load_from_json_file_invalid_json() {
         // Create a temp file with invalid JSON
         let mut tmpfile = tempfile().unwrap();
@@ -1754,7 +1753,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[tokio::test]
     async fn role_llm_api_key_redacted_in_debug() {
         let role = Role {
             llm_api_key: Some("super-secret-api-key-do-not-leak".to_string()),
@@ -1771,7 +1770,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[tokio::test]
     async fn role_none_llm_api_key_debug_shows_none() {
         let role = Role::default();
         let dbg = format!("{:?}", role);
@@ -1781,7 +1780,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[tokio::test]
     async fn haystack_atomic_server_secret_redacted_in_debug() {
         let mut haystack =
             Haystack::new("http://example.com".to_string(), ServiceType::Atomic, false);
@@ -1797,7 +1796,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[tokio::test]
     async fn haystack_none_atomic_server_secret_debug_shows_none() {
         let haystack = Haystack::new(
             "http://example.com".to_string(),
