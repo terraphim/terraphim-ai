@@ -60,6 +60,10 @@ event_only = true
 project = "${repo}"
 task = '''
 source ~/.profile
+# rch + cargo + bun must be on PATH: build-runner-llm.sh transforms cargo build/test
+# -> "rch exec -- ..." via the KG, so a missing rch makes those steps fail with
+# "command not found" (matches the terraphim-ai build-runner agent's PATH export).
+export PATH=\$HOME/.cargo/bin:\$HOME/.local/bin:\$HOME/bin:\$HOME/.bun/bin:/usr/local/bin:/usr/bin:/bin:\$PATH
 export GITEA_URL=${GITEA_URL}
 
 if [ -z "\${ADF_PUSH_SHA:-}" ]; then echo "build-runner: missing ADF_PUSH_SHA" >&2; exit 1; fi
