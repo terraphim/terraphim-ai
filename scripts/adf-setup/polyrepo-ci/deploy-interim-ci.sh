@@ -19,11 +19,14 @@ ORG="${ORG:-terraphim}"
 CONFD="${CONFD:-/opt/ai-dark-factory/conf.d}"
 WORKROOT="${WORKROOT:-/home/alex/projects/terraphim}"
 RUNNER_SCRIPT="${RUNNER_SCRIPT:-/data/projects/terraphim/terraphim-ai/scripts/build-runner-llm.sh}"
-# ADF webhook receiver (HMAC). Override if the endpoint differs.
+# ADF webhook receiver. The orchestrator accepts unsigned webhooks (the live
+# [webhook] block binds 172.18.0.1:9091 with no secret; existing project hooks
+# have has_secret=false), so no HMAC secret is configured here.
 ADF_WEBHOOK_URL="${ADF_WEBHOOK_URL:-http://172.18.0.1:9091/webhooks/gitea}"
 
+# Run on bigbox as root / with sudo: conf.d is root-owned and the orchestrator is
+# a system service.
 : "${GITEA_TOKEN:?set GITEA_TOKEN (the bigbox gitea token used by other conf.d projects)}"
-: "${ADF_WEBHOOK_SECRET:?set ADF_WEBHOOK_SECRET (the orchestrator HMAC secret)}"
 
 REPOS=(terraphim-core terraphim-config-persistence terraphim-service \
        terraphim-agents terraphim-kg-agents terraphim-clients)
@@ -99,13 +102,13 @@ for repo in "${REPOS[@]}"; do
   else
     curl -fsS -X POST -H "Authorization: token ${GITEA_TOKEN}" -H "Content-Type: application/json" \
       "${GITEA_URL}/api/v1/repos/${ORG}/${repo}/hooks" \
-      -d "{\"type\":\"gitea\",\"active\":true,\"events\":[\"push\",\"pull_request\"],\"config\":{\"url\":\"${ADF_WEBHOOK_URL}\",\"content_type\":\"json\",\"secret\":\"${ADF_WEBHOOK_SECRET}\"}}" \
+      -d "{\"type\":\"gitea\",\"active\":true,\"events\":[\"push\",\"pull_request\"],\"config\":{\"url\":\"${ADF_WEBHOOK_URL}\",\"content_type\":\"json\"}}" \
       >/dev/null && echo "  webhook created"
   fi
 done
 
 echo
-echo "Reload the orchestrator to pick up conf.d/*.toml:"
-echo "  sudo systemctl reload adf-orchestrator  ||  sudo systemctl restart adf-orchestrator"
+echo "Restart the orchestrator to pick up conf.d/*.toml:"
+echo "  sudo systemctl restart adf-orchestrator"
 echo
 echo "Then verify per repo: push a no-op commit and watch for adf/build pending->success."
