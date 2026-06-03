@@ -1,11 +1,6 @@
 name: Sentrux Quality Gate
 on:
-  pull_request:
-    branches: [ main, develop ]
-    types: [ opened, synchronize, reopened ]
-  push:
-    branches: [ main, develop ]
-
+  workflow_dispatch:
 concurrency:
   group: sentrux-quality-${{ github.ref }}
   cancel-in-progress: true

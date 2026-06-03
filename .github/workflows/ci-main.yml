@@ -2,10 +2,6 @@ name: CI Main Branch
 
 # NOTE: Tag trigger disabled - release-comprehensive.yml handles releases
 on:
-  push:
-    branches: [main, develop]
-    # Disabled tag trigger - release-comprehensive.yml handles releases
-    # tags: ["*.*.*"]
   workflow_dispatch:
     inputs:
       build-release:
