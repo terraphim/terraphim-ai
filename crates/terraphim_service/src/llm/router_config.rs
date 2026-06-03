@@ -106,6 +106,8 @@ mod tests {
     fn test_merged_config_from_role() {
         // Defensive: another test in this module sets LLM_PROXY_URL.
         // Tests in the same binary share process-wide env, so remove first.
+        // SAFETY: test is serialised with #[serial_test::serial]; no other
+        // thread reads or writes LLM_PROXY_URL concurrently.
         unsafe {
             env::remove_var("LLM_PROXY_URL");
         }
@@ -131,6 +133,8 @@ mod tests {
     #[test]
     #[serial_test::serial]
     fn test_env_overrides() {
+        // SAFETY: test is serialised with #[serial_test::serial]; no other
+        // thread reads or writes LLM_PROXY_URL concurrently.
         unsafe {
             env::set_var("LLM_PROXY_URL", "http://env-proxy:9999");
         }
@@ -146,6 +150,8 @@ mod tests {
 
         assert_eq!(merged.proxy_url, Some("http://env-proxy:9999".to_string()));
 
+        // SAFETY: test is serialised with #[serial_test::serial]; no other
+        // thread reads or writes LLM_PROXY_URL concurrently.
         unsafe {
             env::remove_var("LLM_PROXY_URL");
         }

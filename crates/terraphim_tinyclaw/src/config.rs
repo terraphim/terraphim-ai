@@ -616,6 +616,8 @@ model = "llama3.2"
 
     #[test]
     fn test_env_var_expansion() {
+        // SAFETY: TEST_VAR is a unique name used only in this test;
+        // no concurrent thread reads or writes it.
         unsafe {
             std::env::set_var("TEST_VAR", "test_value");
         }

@@ -684,6 +684,8 @@ mod tests {
         unsafe { std::env::set_var("SYMPHONY_TEST_KEY_RES", "resolved_value") };
         assert_eq!(resolve_env_var("$SYMPHONY_TEST_KEY_RES"), "resolved_value");
         assert_eq!(resolve_env_var("literal"), "literal");
+        // SAFETY: test is single-threaded and the env var is unique to this test;
+        // no concurrent thread reads SYMPHONY_TEST_KEY_RES.
         unsafe { std::env::remove_var("SYMPHONY_TEST_KEY_RES") };
     }
 
@@ -693,6 +695,8 @@ mod tests {
         unsafe { std::env::set_var("SYMPHONY_TEST_EMPTY_RES", "") };
         let cfg = config_from_yaml("tracker:\n  api_key: $SYMPHONY_TEST_EMPTY_RES");
         assert!(cfg.tracker_api_key().is_none());
+        // SAFETY: test is single-threaded and the env var is unique to this test;
+        // no concurrent thread reads SYMPHONY_TEST_EMPTY_RES.
         unsafe { std::env::remove_var("SYMPHONY_TEST_EMPTY_RES") };
     }
 

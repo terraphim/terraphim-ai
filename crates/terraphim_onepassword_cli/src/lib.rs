@@ -506,6 +506,8 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(result, "secret123");
+        // SAFETY: test is single-threaded and the env var is unique to this test;
+        // no concurrent thread reads TEST_VAULT_TEST_ITEM_API_KEY.
         unsafe {
             std::env::remove_var("TEST_VAULT_TEST_ITEM_API_KEY");
         }
@@ -542,6 +544,8 @@ mod tests {
         let config = r#"{"api_token": "op://myvault/myitem/token"}"#;
         let result = loader.process_config(config).await.unwrap();
         assert_eq!(result, r#"{"api_token": "resolved-token"}"#);
+        // SAFETY: test is single-threaded and the env var is unique to this test;
+        // no concurrent thread reads MYVAULT_MYITEM_TOKEN.
         unsafe {
             std::env::remove_var("MYVAULT_MYITEM_TOKEN");
         }

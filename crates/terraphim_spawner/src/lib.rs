@@ -1404,6 +1404,8 @@ mod tests {
     async fn test_inherited_env_flows_through_without_override() {
         // Set an env var in the test process and verify a child sees it.
         // Using /usr/bin/printenv VAR_NAME avoids shell argument-parsing issues.
+        // SAFETY: this test is the only place that sets ADF_INHERITED_SPAWN_CTX;
+        // the variable name is unique and no other thread reads it concurrently.
         unsafe {
             std::env::set_var("ADF_INHERITED_SPAWN_CTX", "inherited-value");
         }
