@@ -43,12 +43,14 @@ working_dir = "${wd}"
 gitea = { owner = "${ORG}", repo = "${repo}", base_url = "${GITEA_URL}", token = "${GITEA_TOKEN}" }
 
 # Interim CI build-runner (Part A, #1910). event_only -> spawned by handle_push.
+# The agent MUST be named exactly "build-runner": handle_push resolves it via
+# agent_registry.lookup_project(project, "build-runner") (scoped per project).
 # Runs build-runner-llm.sh against this repo's BUILD.md: KG transforms
 # cargo build/clippy/test -> rch exec (sccache->SeaweedFS); cargo fmt stays host.
 # Posts adf/build commit status. Retire on native-runner cutover (active_lane).
 [[agents]]
 evolution_enabled = true
-name = "${repo}-build-runner"
+name = "build-runner"
 layer = "Growth"
 cli_tool = "/bin/bash"
 max_cpu_seconds = 1800
