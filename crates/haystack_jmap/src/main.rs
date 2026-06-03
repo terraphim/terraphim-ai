@@ -1,3 +1,4 @@
+//! Binary entry point for the JMAP haystack search tool.
 use anyhow::Result;
 use clap::Parser;
 use haystack_jmap::JMAPClient;

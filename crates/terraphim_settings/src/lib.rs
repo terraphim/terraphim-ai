@@ -17,10 +17,13 @@ use terraphim_onepassword_cli::{OnePasswordLoader, SecretLoader};
 /// Errors arising from loading or applying device settings.
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
+    /// A configuration layer failed to load or parse.
     #[error("config error: {0}")]
     ConfigError(#[from] twelf::Error),
+    /// An I/O error occurred while reading a settings file.
     #[error("io error: {0}")]
     IoError(#[from] std::io::Error),
+    /// A required environment variable was absent or malformed.
     #[error("env error: {0}")]
     EnvError(#[from] std::env::VarError),
     #[cfg(feature = "onepassword")]
@@ -63,6 +66,9 @@ where
 /// These values are set when the server is initialized, and do not change while
 /// running. These are constructed from default or local files and ENV
 /// variables.
+// The `#[config]` macro generates a `with_layers` constructor that cannot
+// receive a doc comment; suppress the resulting lint.
+#[allow(missing_docs)]
 #[config]
 #[derive(Debug, Serialize, Clone)]
 pub struct DeviceSettings {

@@ -40,6 +40,7 @@ use terraphim_types::{Layer, NormalizedTermValue, RoleName, SearchQuery};
 use thiserror::Error;
 use tracing::{error, info};
 
+/// Resource mapping utilities for converting Terraphim documents to MCP resources.
 pub mod resource_mapper;
 
 use crate::resource_mapper::TerraphimResourceMapper;
@@ -74,14 +75,19 @@ fn find_terraphim_rlm_binary() -> std::path::PathBuf {
 /// ([`ErrorData`]), and general I/O or third-party errors via [`anyhow`].
 #[derive(Error, Debug)]
 pub enum TerraphimMcpError {
+    /// A service-layer operation failed.
     #[error("Service error: {0}")]
     Service(#[from] terraphim_service::ServiceError),
+    /// JSON serialisation or deserialisation failed.
     #[error("JSON error: {0}")]
     Json(#[from] serde_json::Error),
+    /// An MCP protocol error was returned.
     #[error("MCP error: {0}")]
     Mcp(#[from] ErrorData),
+    /// An I/O operation failed.
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
+    /// A general error from an upstream library.
     #[error("Anyhow error: {0}")]
     Anyhow(#[from] anyhow::Error),
 }

@@ -61,21 +61,33 @@ impl std::fmt::Display for MessageRole {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ContentBlock {
     /// Plain text content
-    Text { text: String },
+    Text {
+        /// The text string.
+        text: String,
+    },
     /// Tool use request
     ToolUse {
+        /// Unique identifier for this tool use call.
         id: String,
+        /// Name of the tool being called.
         name: String,
+        /// Input arguments for the tool call.
         input: serde_json::Value,
     },
     /// Tool result
     ToolResult {
+        /// Identifier matching the originating tool use request.
         tool_use_id: String,
+        /// Output produced by the tool.
         content: String,
+        /// Exit code returned by the tool (0 = success).
         exit_code: i32,
     },
     /// Image content
-    Image { source: String },
+    Image {
+        /// Source reference for the image (URL, base64, or file path).
+        source: String,
+    },
 }
 
 impl<'de> serde::Deserialize<'de> for ContentBlock {
@@ -754,7 +766,9 @@ mod tests {
 /// File access operation type
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FileOperation {
+    /// A file was opened for reading.
     Read,
+    /// A file was opened for writing.
     Write,
 }
 

@@ -5,10 +5,13 @@
 //! async search interface over heterogeneous backends.
 use terraphim_types::{Document, SearchQuery};
 
+/// A data-source integration that exposes a uniform async search interface.
 pub trait HaystackProvider {
+    /// The error type returned by this provider's operations.
     type Error: std::fmt::Display + std::fmt::Debug + Send + Sync + 'static;
 
     #[allow(async_fn_in_trait)]
+    /// Search this haystack for documents matching `query`.
     async fn search(&self, query: &SearchQuery) -> Result<Vec<Document>, Self::Error>;
 }
 

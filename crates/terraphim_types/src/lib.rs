@@ -1827,6 +1827,7 @@ impl std::fmt::Display for RotStatus {
     }
 }
 
+/// A chat conversation with its history, context, and associated role.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]

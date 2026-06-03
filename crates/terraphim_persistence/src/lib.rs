@@ -16,11 +16,16 @@
 //! - [`Persistable`] -- blanket trait implemented by every serialisable type
 
 pub mod compression;
+/// Persistence operations for [`terraphim_types::Conversation`] objects.
 pub mod conversation;
+/// Persistence operations for [`terraphim_types::Document`] objects.
 pub mod document;
+/// Error types for the persistence layer.
 pub mod error;
 pub mod memory;
+/// OpenDAL operator construction from device settings profiles.
 pub mod settings;
+/// Persistence operations for [`terraphim_types::Thesaurus`] objects.
 pub mod thesaurus;
 
 use async_once_cell::OnceCell as AsyncOnceCell;
@@ -64,7 +69,9 @@ static DEVICE_STORAGE: AsyncOnceCell<DeviceStorage> = AsyncOnceCell::new();
 /// [`DeviceStorage::init_memory_only`] in tests to avoid touching the filesystem.
 #[derive(Debug)]
 pub struct DeviceStorage {
+    /// Named storage operators with their measured latency in nanoseconds.
     pub ops: HashMap<String, (Operator, u128)>,
+    /// Pre-selected lowest-latency operator used as the cache write-back target.
     pub fastest_op: Operator,
 }
 
@@ -458,7 +465,9 @@ pub trait Persistable: Serialize + DeserializeOwned {
         }.instrument(span).await
     }
 
+    /// Return the storage key that uniquely identifies this value.
     fn get_key(&self) -> String;
+    /// Normalise an arbitrary key string to a storage-safe form.
     fn normalize_key(&self, key: &str) -> String {
         // Replace non-alphanumeric characters with underscores to preserve semantic meaning
         let re = regex::Regex::new(r"[^a-zA-Z0-9]+").expect("Failed to create regex");
