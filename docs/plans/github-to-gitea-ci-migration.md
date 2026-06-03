@@ -49,3 +49,5 @@ push/PR triggers (the site-publish step may stay on GitHub if it needs GitHub Pa
 W2 first (gives a working authoritative gate) -> then W1 merges through it -> W3 after
 the runner Firecracker route (#2076) -> W4 after W2. Each retirement of a GitHub
 workflow happens only after its Gitea equivalent is proven green.
+
+<!-- verdict-agents e2e probe -->
