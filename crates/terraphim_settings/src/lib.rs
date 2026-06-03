@@ -3,6 +3,9 @@
 //! Loads configuration from TOML files, environment variables, and optional
 //! 1Password secrets via the `onepassword` feature flag. Settings follow a
 //! layered precedence: defaults < file < environment < 1Password.
+// The `twelf::config` macro generates a `with_layers` constructor that the
+// compiler flags as missing-docs; suppress at crate level for that one item.
+#![allow(missing_docs)]
 use directories::ProjectDirs;
 use serde::de::{self, Deserializer};
 use serde::{Deserialize, Serialize};
