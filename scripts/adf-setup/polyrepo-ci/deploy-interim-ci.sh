@@ -93,7 +93,10 @@ ok=1
 run_step cargo fmt --all -- --check || ok=0
 run_step cargo clippy --workspace --all-targets -- -D warnings || ok=0
 run_step cargo build --workspace || ok=0
-run_step cargo test --workspace --no-fail-fast || ok=0
+# Unit tests only: integration tests (tests/) need live services/data (fff, KG
+# corpora, ollama) not provisioned in this lightweight lane -- they belong in a
+# fuller CI. --lib keeps the gate deterministic and environment-independent.
+run_step cargo test --workspace --lib --no-fail-fast || ok=0
 
 if [ "\$ok" -eq 1 ]; then
   POST_STATUS success "fmt+clippy+build+test pass (sccache)"
