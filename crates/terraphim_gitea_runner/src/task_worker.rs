@@ -89,9 +89,16 @@ impl<C: GiteaRunnerClient, P: PolicyPlanner> TaskWorker<C, P> {
             workflow_payload::repository(task),
             workflow_payload::head_sha(task),
         ) else {
+            // Keys only -- the context Struct carries a token, so never log values.
+            let keys: Vec<&str> = task
+                .context
+                .as_object()
+                .map(|o| o.keys().map(String::as_str).collect())
+                .unwrap_or_default();
             log::info!(
-                "task {} carries no repository/sha; running in checkout_dir without checkout",
-                task.id
+                "task {} carries no repository/sha; running in checkout_dir without checkout (context keys: {:?})",
+                task.id,
+                keys
             );
             return self.checkout_dir.clone();
         };

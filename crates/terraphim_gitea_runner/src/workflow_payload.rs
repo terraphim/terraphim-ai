@@ -15,28 +15,48 @@ pub fn compile_task(task: &Task) -> Result<ParsedWorkflow> {
     parse_workflow_payload(&bytes).map_err(|e| RunnerError::Compile(e.to_string()))
 }
 
-/// Extract the `github.repository` value (`owner/name`) from the task context.
-pub fn repository(task: &Task) -> Option<String> {
-    task.context
-        .get("github")
-        .and_then(|g| g.get("repository"))
-        .and_then(|r| r.as_str())
-        .map(|s| s.to_string())
-        .or_else(|| {
-            task.context
-                .get("repository")
-                .and_then(|r| r.as_str())
-                .map(|s| s.to_string())
-        })
+/// Read a string field from the task context, tolerating both shapes Gitea
+/// uses: the whole context Struct mirrors the GitHub `github` context, so the
+/// value is normally top-level (`context.<key>`), but some fixtures/older
+/// payloads nest it under a `github` object (`context.github.<key>`). We try
+/// the nested form first, then the top-level form, for each candidate key.
+fn context_str(task: &Task, keys: &[&str]) -> Option<String> {
+    let ctx = &task.context;
+    for key in keys {
+        if let Some(s) = ctx
+            .get("github")
+            .and_then(|g| g.get(key))
+            .and_then(|v| v.as_str())
+        {
+            return Some(s.to_string());
+        }
+        if let Some(s) = ctx.get(key).and_then(|v| v.as_str()) {
+            return Some(s.to_string());
+        }
+    }
+    None
 }
 
-/// Extract the commit SHA (`github.sha`) from the task context.
+/// Extract the repository (`owner/name`) from the task context. Live Gitea sends
+/// it as a top-level string; an object form (`{ "full_name": "owner/name" }`)
+/// is also tolerated.
+pub fn repository(task: &Task) -> Option<String> {
+    context_str(task, &["repository"]).or_else(|| {
+        // Object form: `repository.full_name`.
+        let ctx = &task.context;
+        ctx.get("github")
+            .and_then(|g| g.get("repository"))
+            .or_else(|| ctx.get("repository"))
+            .and_then(|r| r.get("full_name"))
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
+    })
+}
+
+/// Extract the commit SHA from the task context. Live Gitea sends `sha` at the
+/// top level; `head_sha`/`headSha` are tolerated as alternates.
 pub fn head_sha(task: &Task) -> Option<String> {
-    task.context
-        .get("github")
-        .and_then(|g| g.get("sha"))
-        .and_then(|s| s.as_str())
-        .map(|s| s.to_string())
+    context_str(task, &["sha", "head_sha", "headSha"])
 }
 
 #[cfg(test)]
