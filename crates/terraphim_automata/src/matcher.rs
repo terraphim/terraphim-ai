@@ -5,10 +5,14 @@ use crate::url_protector::UrlProtector;
 
 use crate::{Result, TerraphimAutomataError};
 
+/// A single thesaurus term found within an input text.
 #[derive(Debug, PartialEq, Clone)]
 pub struct Matched {
+    /// The surface form of the term as it appears in the thesaurus key.
     pub term: String,
+    /// The normalised term entry associated with this match.
     pub normalized_term: NormalizedTerm,
+    /// Byte start and end positions within the source text, if requested.
     pub pos: Option<(usize, usize)>,
 }
 
@@ -146,11 +150,16 @@ where
     thesaurus
 }
 
+/// The format used when replacing matched terms with hyperlinks.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum LinkType {
+    /// Replace matches with `[[term]]` wiki-style links.
     WikiLinks,
+    /// Replace matches with `<a href="url">term</a>` HTML links.
     HTMLLinks,
+    /// Replace matches with `[term](url)` Markdown links.
     MarkdownLinks,
+    /// Leave matched terms as plain text without any link markup.
     #[default]
     PlainText,
 }

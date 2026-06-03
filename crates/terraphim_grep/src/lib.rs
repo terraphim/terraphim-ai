@@ -20,11 +20,17 @@
 //! # }
 //! ```
 
+/// Error types for the terraphim_grep crate.
 pub mod error;
+/// Hybrid KG + ripgrep searcher and supporting types.
 pub mod hybrid_searcher;
+/// Knowledge-graph curation via the RLM pipeline.
 pub mod kg_curation;
+/// Context assembly for RLM prompts.
 pub mod rlm_context;
+/// RLM signature traits and output structs.
 pub mod signatures;
+/// Heuristic sufficiency judge for determining when RLM synthesis is needed.
 pub mod sufficiency_judge;
 
 use std::sync::Arc;
@@ -39,30 +45,46 @@ pub use rlm_context::RlmContext;
 pub use signatures::{AnswerWithCitations, Citation, Match, NewConcept, RlmSignature};
 pub use sufficiency_judge::{HeuristicThresholds, Sufficiency, SufficiencyJudge};
 
+/// The result of a complete hybrid grep operation.
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct GrepResult {
+    /// Retrieved text chunks, ranked by relevance.
     pub chunks: Vec<RetrievedChunk>,
+    /// LLM-synthesised answer, if RLM synthesis was invoked.
     pub answer: Option<AnswerWithCitations>,
+    /// Knowledge-graph concepts matched by the query.
     pub concepts: Vec<KgConcept>,
+    /// Which synthesis path was taken.
     pub sufficiency: SufficiencyState,
+    /// Latency and count statistics for the operation.
     pub stats: GrepStats,
 }
 
+/// Describes which synthesis pipeline produced the final result.
 #[derive(Debug, Clone, serde::Serialize)]
 pub enum SufficiencyState {
+    /// Search results were sufficient; no RLM synthesis was needed.
     SearchOnly,
+    /// RLM synthesis was invoked to summarise the retrieved chunks.
     RlmSynthesis,
+    /// RLM synthesis was attempted but deemed insufficient.
     RlmInsufficient,
 }
 
+/// Timing and throughput statistics for a single grep operation.
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct GrepStats {
+    /// Wall-clock time in milliseconds taken by the search phase.
     pub search_latency_ms: u64,
+    /// Wall-clock time in milliseconds taken by the RLM phase, if invoked.
     pub rlm_latency_ms: Option<u64>,
+    /// Total number of chunks returned to the caller.
     pub chunks_returned: usize,
+    /// Number of knowledge-graph concept hits.
     pub kg_hits: usize,
 }
 
+/// Orchestrates hybrid search combining ripgrep, KG, and optional RLM synthesis.
 pub struct TerraphimGrep {
     hybrid_searcher: Arc<HybridSearcher>,
     sufficiency_judge: Arc<SufficiencyJudge>,
@@ -74,6 +96,7 @@ pub struct TerraphimGrep {
 
 impl TerraphimGrep {
     #[cfg(feature = "llm")]
+    /// Create a new `TerraphimGrep` with the given searcher and sufficiency judge.
     pub fn new(
         hybrid_searcher: Arc<HybridSearcher>,
         sufficiency_judge: Arc<SufficiencyJudge>,
@@ -87,6 +110,7 @@ impl TerraphimGrep {
     }
 
     #[cfg(not(feature = "llm"))]
+    /// Create a new `TerraphimGrep` with the given searcher and sufficiency judge.
     pub fn new(
         hybrid_searcher: Arc<HybridSearcher>,
         sufficiency_judge: Arc<SufficiencyJudge>,
@@ -98,12 +122,14 @@ impl TerraphimGrep {
     }
 
     #[cfg(feature = "llm")]
+    /// Attach a KG curation module for post-query concept extraction.
     pub fn with_kg_curation(mut self, kg_curation: Arc<KgCurationRlm>) -> Self {
         self.kg_curation = Some(kg_curation);
         self
     }
 
     #[cfg(feature = "llm")]
+    /// Attach an LLM client for RLM synthesis.
     pub fn with_llm_client(
         mut self,
         llm_client: Arc<dyn terraphim_service::llm::LlmClient>,
@@ -112,6 +138,7 @@ impl TerraphimGrep {
         self
     }
 
+    /// Execute a hybrid search and return ranked results, invoking RLM synthesis when needed.
     pub async fn search(&self, query: &str, options: GrepOptions) -> Result<GrepResult> {
         let start = std::time::Instant::now();
 
@@ -315,6 +342,7 @@ impl TerraphimGrep {
         .await
     }
 
+    /// Return an empty `GrepStats` placeholder (used when stats are unavailable).
     pub fn stats(&self) -> GrepStats {
         GrepStats {
             search_latency_ms: 0,

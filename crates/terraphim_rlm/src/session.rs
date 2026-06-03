@@ -463,8 +463,11 @@ impl SessionManager {
 /// Session statistics.
 #[derive(Debug, Clone)]
 pub struct SessionStats {
+    /// Total number of sessions created since the manager started.
     pub total_sessions_created: u32,
+    /// Number of currently active (non-expired) sessions.
     pub active_sessions: u32,
+    /// Number of active sessions that have an associated VM.
     pub sessions_with_vm: u32,
 }
 

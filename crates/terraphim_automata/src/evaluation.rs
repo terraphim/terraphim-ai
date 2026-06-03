@@ -35,35 +35,50 @@ pub struct ExpectedMatch {
 /// Precision, recall, and F1 metrics computed from true/false positive/negative counts.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClassificationMetrics {
+    /// Fraction of predicted positives that are correct.
     pub precision: f64,
+    /// Fraction of actual positives that were predicted correctly.
     pub recall: f64,
+    /// Harmonic mean of precision and recall.
     pub f1: f64,
+    /// Number of correctly predicted positive instances.
     pub true_positives: usize,
+    /// Number of incorrectly predicted positive instances.
     pub false_positives: usize,
+    /// Number of actual positive instances that were missed.
     pub false_negatives: usize,
 }
 
 /// Metrics for a single term across all evaluated documents.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TermReport {
+    /// The term these metrics were computed for.
     pub term: String,
+    /// Classification metrics for this term.
     pub metrics: ClassificationMetrics,
 }
 
 /// Full evaluation result covering all documents and terms.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EvaluationResult {
+    /// Total number of documents evaluated.
     pub total_documents: usize,
+    /// Aggregate metrics across all documents and terms.
     pub overall: ClassificationMetrics,
+    /// Per-term breakdown of classification metrics.
     pub per_term: Vec<TermReport>,
+    /// Terms that repeatedly produce false positives across documents.
     pub systematic_errors: Vec<SystematicError>,
 }
 
 /// A term that consistently appears as a false positive across multiple documents.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SystematicError {
+    /// The term that produces systematic false positives.
     pub term: String,
+    /// Number of documents in which this term was a false positive.
     pub false_positive_count: usize,
+    /// Identifiers of the documents where the false positive occurred.
     pub document_ids: Vec<String>,
 }
 

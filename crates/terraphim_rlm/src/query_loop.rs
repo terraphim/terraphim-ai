@@ -49,7 +49,10 @@ pub enum TerminationReason {
     /// FINAL command was executed.
     FinalReached,
     /// FINAL_VAR command was executed.
-    FinalVarReached { variable: String },
+    FinalVarReached {
+        /// Name of the variable returned as the final result.
+        variable: String,
+    },
     /// Token budget exhausted.
     TokenBudgetExhausted,
     /// Time budget exhausted.
@@ -59,7 +62,10 @@ pub enum TerminationReason {
     /// Maximum recursion depth reached.
     RecursionDepthExhausted,
     /// Error occurred during execution.
-    Error { message: String },
+    Error {
+        /// Description of the error that caused termination.
+        message: String,
+    },
     /// Cancelled by user.
     Cancelled,
 }

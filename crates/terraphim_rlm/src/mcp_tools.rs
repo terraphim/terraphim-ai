@@ -774,39 +774,56 @@ impl Default for RlmMcpService {
 /// Response from rlm_code tool.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RlmCodeResponse {
+    /// Standard output produced by the executed code.
     pub stdout: String,
+    /// Standard error produced by the executed code.
     pub stderr: String,
+    /// Exit code returned by the process.
     pub exit_code: i32,
+    /// Wall-clock execution time in milliseconds.
     pub execution_time_ms: u64,
+    /// Whether the execution completed successfully (exit code 0).
     pub success: bool,
 }
 
 /// Response from rlm_bash tool.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RlmBashResponse {
+    /// Standard output produced by the executed command.
     pub stdout: String,
+    /// Standard error produced by the executed command.
     pub stderr: String,
+    /// Exit code returned by the process.
     pub exit_code: i32,
+    /// Wall-clock execution time in milliseconds.
     pub execution_time_ms: u64,
+    /// Whether the execution completed successfully (exit code 0).
     pub success: bool,
 }
 
 /// Response from rlm_query tool.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RlmQueryResponse {
+    /// Text response returned by the LLM.
     pub response: String,
+    /// Number of tokens consumed by the query.
     pub tokens_used: u64,
+    /// Identifier of the model that handled the query.
     pub model: String,
 }
 
 /// Response from rlm_context tool.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RlmContextResponse {
+    /// Action that was performed on the context store.
     pub action: String,
+    /// Key involved in the action, if applicable.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub key: Option<String>,
+    /// Value retrieved or stored, if applicable.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub value: Option<String>,
+    /// Full map of context variables, returned for list actions.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub variables: Option<std::collections::HashMap<String, String>>,
 }
@@ -814,11 +831,15 @@ pub struct RlmContextResponse {
 /// Response from rlm_snapshot tool.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RlmSnapshotResponse {
+    /// Snapshot action that was performed.
     pub action: String,
+    /// Name of the snapshot, if provided.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub snapshot_name: Option<String>,
+    /// Identifier of the snapshot created or restored.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub snapshot_id: Option<String>,
+    /// List of available snapshot identifiers, returned for list actions.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub snapshots: Option<Vec<String>>,
 }

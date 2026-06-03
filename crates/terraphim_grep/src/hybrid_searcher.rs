@@ -4,12 +4,18 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use terraphim_types::Document;
 
+/// Options controlling a hybrid search operation.
 #[derive(Debug, Clone)]
 pub struct GrepOptions {
+    /// Which haystack (code, docs, or both) to search.
     pub haystack: Haystack,
+    /// Number of context lines to include around each match.
     pub context_lines: usize,
+    /// Maximum number of results to return.
     pub max_results: usize,
+    /// When true, always invoke the RLM synthesis pipeline regardless of sufficiency.
     pub force_rlm: bool,
+    /// When true, include an LLM-generated answer alongside raw chunks.
     pub include_answer: bool,
 }
 
@@ -25,21 +31,32 @@ impl Default for GrepOptions {
     }
 }
 
+/// Selects which haystack corpus to search.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Haystack {
+    /// Search only code-related sources (the default).
     #[default]
     Code,
+    /// Search only documentation sources.
     Docs,
+    /// Search both code and documentation sources.
     All,
 }
 
+/// A single chunk of text retrieved from a haystack source.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RetrievedChunk {
+    /// The text content of the retrieved chunk.
     pub content: String,
+    /// Identifier for the source file or URL this chunk came from.
     pub source: String,
+    /// First line number of this chunk within its source file, if known.
     pub line_start: Option<usize>,
+    /// Last line number of this chunk within its source file, if known.
     pub line_end: Option<usize>,
+    /// Relevance score used for ranking (higher is more relevant).
     pub relevance_score: f64,
+    /// Name of the haystack that produced this chunk (e.g. `"code"`, `"docs"`).
     pub haystack: &'static str,
 }
 
@@ -56,22 +73,32 @@ impl From<Document> for RetrievedChunk {
     }
 }
 
+/// A concept node matched from the knowledge graph.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KgConcept {
+    /// Unique numeric identifier of this concept in the knowledge graph.
     pub id: u64,
+    /// Canonical name of the concept.
     pub name: String,
+    /// Optional human-readable display label for the concept.
     pub display_value: Option<String>,
+    /// Relevance score for this concept relative to the query.
     pub score: f64,
 }
 
+/// Combined results from the parallel code-search and documentation pipelines.
 #[derive(Debug, Clone)]
 pub struct HybridResults {
+    /// Chunks retrieved from code-search haystacks.
     pub code_results: Vec<RetrievedChunk>,
+    /// Chunks retrieved from documentation haystacks.
     pub doc_results: Vec<RetrievedChunk>,
+    /// Knowledge-graph concepts matched against the query.
     pub kg_concepts: Vec<KgConcept>,
 }
 
 impl HybridResults {
+    /// Merge code and doc results into a single ordered list.
     pub fn to_chunks(&self) -> Vec<RetrievedChunk> {
         let mut chunks = Vec::with_capacity(self.code_results.len() + self.doc_results.len());
         chunks.extend(self.code_results.clone());
@@ -79,10 +106,12 @@ impl HybridResults {
         chunks
     }
 
+    /// Return the total number of results across all pipelines.
     pub fn total_results(&self) -> usize {
         self.code_results.len() + self.doc_results.len() + self.kg_concepts.len()
     }
 
+    /// Return true if all result lists are empty.
     pub fn is_empty(&self) -> bool {
         self.code_results.is_empty() && self.doc_results.is_empty() && self.kg_concepts.is_empty()
     }
@@ -150,6 +179,7 @@ pub fn boost_chunks_with_kg(
     chunks
 }
 
+/// Runs parallel KG-concept and ripgrep searches and merges the results.
 pub struct HybridSearcher {
     role_graph: Arc<tokio::sync::RwLock<terraphim_rolegraph::RoleGraph>>,
     /// Kept alongside the rolegraph so KG-style boosting still works when no documents
@@ -161,6 +191,7 @@ pub struct HybridSearcher {
 }
 
 impl HybridSearcher {
+    /// Create a new searcher initialised with the given role name and thesaurus.
     pub fn new(
         role_name: String,
         thesaurus: terraphim_types::Thesaurus,
@@ -177,11 +208,13 @@ impl HybridSearcher {
         })
     }
 
+    /// Override the filesystem root used for ripgrep searches.
     pub fn with_search_path(mut self, path: PathBuf) -> Self {
         self.search_path = path;
         self
     }
 
+    /// Run the hybrid search and return merged results.
     pub async fn search(
         &self,
         query: &str,
@@ -365,6 +398,7 @@ impl HybridSearcher {
         }
     }
 
+    /// Sort retrieved chunks by descending relevance score.
     pub fn fuse_and_rank(&self, mut results: Vec<RetrievedChunk>) -> Vec<RetrievedChunk> {
         results.sort_by(|a, b| {
             b.relevance_score
