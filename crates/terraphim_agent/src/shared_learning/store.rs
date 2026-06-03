@@ -333,6 +333,12 @@ impl SharedLearningStore {
         let learning = index
             .get_mut(id)
             .ok_or_else(|| StoreError::NotFound(id.to_string()))?;
+        if learning.trust_level != TrustLevel::L0 {
+            return Err(StoreError::InvalidInput(format!(
+                "Learning {} is at {}; it can only be promoted to L1 from L0",
+                id, learning.trust_level
+            )));
+        }
         learning.promote_to_l1();
         let updated = learning.clone();
         drop(index);
@@ -347,6 +353,12 @@ impl SharedLearningStore {
         let learning = index
             .get_mut(id)
             .ok_or_else(|| StoreError::NotFound(id.to_string()))?;
+        if learning.trust_level != TrustLevel::L1 {
+            return Err(StoreError::InvalidInput(format!(
+                "Learning {} is at {}; promote to L1 first using --to l1",
+                id, learning.trust_level
+            )));
+        }
         learning.promote_to_l2();
         let updated = learning.clone();
         drop(index);

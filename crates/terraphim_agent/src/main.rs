@@ -4013,9 +4013,11 @@ async fn run_shared_learning_command(
                     println!("Promoted learning {} to L3 (Human-Approved).", id);
                 }
                 TrustLevel::L1 => {
-                    return Err(anyhow::anyhow!(
-                        "Cannot promote to L1 -- learnings start at L1. Use l2 or l3."
-                    ));
+                    store
+                        .promote_to_l1(&id)
+                        .await
+                        .map_err(|e| anyhow::anyhow!("{}", e))?;
+                    println!("Promoted learning {} to L1 (Unverified).", id);
                 }
                 TrustLevel::L0 => {
                     return Err(anyhow::anyhow!(
