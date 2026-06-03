@@ -9433,6 +9433,7 @@ dependencies = [
  "jiff",
  "notify 8.2.0",
  "regex",
+ "rusqlite",
  "serde",
  "serde_json",
  "tempfile",

@@ -32,8 +32,11 @@ opencode-connector = []
 # Enable Codex (OpenAI) session connector
 codex-connector = []
 
+# Enable Cursor IDE SQLite connector
+cursor-connector = ["dep:rusqlite"]
+
 # Enable all extra connectors
-extra-connectors = ["aider-connector", "cline-connector", "opencode-connector", "codex-connector"]
+extra-connectors = ["aider-connector", "cline-connector", "opencode-connector", "codex-connector", "cursor-connector"]
 
 # Enable terraphim knowledge graph enrichment
 enrichment = ["terraphim_automata", "terraphim_rolegraph", "terraphim_types"]
@@ -69,6 +72,9 @@ notify = "8.2"
 
 # Feature-gated: regex for Aider/Cline connectors
 regex = { version = "1.10", optional = true }
+
+# Feature-gated: SQLite for Cursor connector (match terraphim-session-analyzer's version)
+rusqlite = { version = "0.32", features = ["bundled"], optional = true }
 
 # Feature-gated: Terraphim Session Analyzer
 terraphim-session-analyzer = { version = "1.19.2", path = "../terraphim-session-analyzer", optional = true }
