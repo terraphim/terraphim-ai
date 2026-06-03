@@ -17,22 +17,30 @@ mod router_config;
 
 use crate::Result as ServiceResult;
 
+/// Options controlling how content is summarised by an LLM.
 #[derive(Clone, Debug)]
 pub struct SummarizeOptions {
+    /// Maximum character length for the generated summary.
     pub max_length: usize,
 }
 
 #[allow(dead_code)]
+/// Options for chat-completion requests sent to an LLM.
 #[derive(Clone, Debug)]
 pub struct ChatOptions {
+    /// Maximum number of tokens the model may generate.
     pub max_tokens: Option<u32>,
+    /// Sampling temperature controlling response randomness.
     pub temperature: Option<f32>,
 }
 
+/// Abstraction over different LLM providers for summarisation and chat.
 #[async_trait::async_trait]
 pub trait LlmClient: Send + Sync {
+    /// Return the human-readable name of this LLM provider.
     fn name(&self) -> &'static str;
 
+    /// Summarise the provided content according to the given options.
     async fn summarize(&self, content: &str, opts: SummarizeOptions) -> ServiceResult<String>;
 
     /// List available models for this provider (best-effort)
