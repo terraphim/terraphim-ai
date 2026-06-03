@@ -112,12 +112,17 @@ impl<C: GiteaRunnerClient, P: PolicyPlanner> TaskWorker<C, P> {
             return self.checkout_dir.clone();
         };
 
+        // Authenticate the checkout with the per-job repository token Gitea puts
+        // in the task (github.token / secrets.GITHUB_TOKEN). The runner's own
+        // registration token (`state.token`) cannot fetch repository content, so
+        // it is only a last-resort fallback (e.g. public repos / odd payloads).
+        let job_token = workflow_payload::job_token(task).unwrap_or_else(|| state.token.clone());
         match checkout::ensure_checkout(
             &self.instance_url,
             owner,
             repo,
             &sha,
-            Some(state.token.as_str()),
+            Some(job_token.as_str()),
             &self.checkout_dir,
         )
         .await

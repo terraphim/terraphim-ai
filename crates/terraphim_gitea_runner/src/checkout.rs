@@ -7,14 +7,18 @@
 //! `sha`, reusing the on-disk clone across tasks for the same repository.
 //!
 //! ## Authentication
-//! The runner's Gitea token is passed to git via a transient
-//! `-c http.extraHeader=AUTHORIZATION: token <TOKEN>` argument, never embedded in
-//! the remote URL. This keeps the token out of `.git/config` and out of any
+//! The per-job repository token is passed to git via a transient
+//! `-c http.extraHeader=Authorization: Basic <base64(x-access-token:TOKEN)>`
+//! argument, never embedded in the remote URL. Gitea's git-over-HTTP backend
+//! expects HTTP Basic auth (not the `Authorization: token` API scheme), so we
+//! mirror `actions/checkout`: synthetic user `x-access-token`, token as the
+//! password. This keeps the token out of `.git/config` and out of any
 //! argv-visible remote URL. The token only ever appears in the single `-c`
 //! argument we pass per invocation; captured stderr never echoes the full
 //! command, so it is not leaked on failure.
 
 use crate::{Result, RunnerError};
+use base64::Engine;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use tokio::process::Command;
@@ -39,9 +43,13 @@ fn git_command(dir: Option<&Path>, token: Option<&str>) -> Command {
         cmd.arg("-C").arg(dir);
     }
     if let Some(token) = token {
-        // Authorisation header carried in-memory for this invocation only.
+        // Basic auth header carried in-memory for this invocation only. Gitea
+        // smart-HTTP requires Basic (not `Authorization: token`); the synthetic
+        // `x-access-token` user with the token as password matches actions/checkout.
+        let basic =
+            base64::engine::general_purpose::STANDARD.encode(format!("x-access-token:{token}"));
         cmd.arg("-c")
-            .arg(format!("http.extraHeader=AUTHORIZATION: token {token}"));
+            .arg(format!("http.extraHeader=Authorization: Basic {basic}"));
     }
     cmd.stdin(Stdio::null());
     cmd

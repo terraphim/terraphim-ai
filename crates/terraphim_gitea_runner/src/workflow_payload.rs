@@ -59,6 +59,17 @@ pub fn head_sha(task: &Task) -> Option<String> {
     context_str(task, &["sha", "head_sha", "headSha"])
 }
 
+/// Extract the per-job repository token used to authenticate the checkout.
+///
+/// Gitea generates an automatic token for each workflow run, exposed as
+/// `${{ github.token }}` (context `token`) and `${{ secrets.GITHUB_TOKEN }}`.
+/// This token -- not the runner's registration token -- grants git read access
+/// to the repository for the duration of the job. Prefer the context value,
+/// then the secret.
+pub fn job_token(task: &Task) -> Option<String> {
+    context_str(task, &["token"]).or_else(|| task.secrets.get("GITHUB_TOKEN").cloned())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
