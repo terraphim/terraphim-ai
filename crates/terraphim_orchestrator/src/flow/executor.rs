@@ -59,14 +59,21 @@ fn resolve_matrix_vars(template: &str, row: &MatrixParams) -> String {
 /// constructed.
 #[derive(Debug, Clone, Default)]
 pub struct ProjectRuntime {
+    /// Working directory for agents in this project.
     pub working_dir: PathBuf,
+    /// Gitea repository owner for status posting, if configured.
     pub gitea_owner: Option<String>,
+    /// Gitea repository name for status posting, if configured.
     pub gitea_repo: Option<String>,
 }
 
+/// Executor that drives flow steps sequentially or in a matrix fan-out.
 pub struct FlowExecutor {
+    /// Top-level working directory used when no per-project override is present.
     pub working_dir: PathBuf,
+    /// Spawner used to launch agent processes.
     pub spawner: AgentSpawner,
+    /// Directory where flow run state files are persisted.
     pub flow_state_dir: PathBuf,
     /// Per-project runtime metadata, keyed by project id. Missing entries
     /// mean "use the FlowExecutor's top-level working_dir" (legacy mode).
@@ -74,6 +81,7 @@ pub struct FlowExecutor {
 }
 
 impl FlowExecutor {
+    /// Create a new executor with the given working directory and state directory.
     pub fn new(working_dir: PathBuf, flow_state_dir: PathBuf) -> Self {
         Self {
             working_dir: working_dir.clone(),

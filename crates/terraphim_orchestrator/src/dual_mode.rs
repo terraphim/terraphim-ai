@@ -71,9 +71,17 @@ impl std::fmt::Display for ExecutionMode {
 #[derive(Debug, Clone)]
 pub enum SpawnTask {
     /// Time-driven agent task.
-    TimeTask { agent: Box<AgentDefinition> },
+    TimeTask {
+        /// The agent definition to spawn.
+        agent: Box<AgentDefinition>,
+    },
     /// Issue-driven agent task.
-    IssueTask { issue_id: String, title: String },
+    IssueTask {
+        /// Unique identifier of the issue that triggered this task.
+        issue_id: String,
+        /// Title of the triggering issue.
+        title: String,
+    },
 }
 
 /// Full dual-mode orchestrator.

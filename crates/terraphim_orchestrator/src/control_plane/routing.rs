@@ -13,12 +13,18 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use terraphim_types::capability::{CostLevel, Latency, Provider, ProviderType};
 
+/// The signal that produced a route candidate.
 #[derive(Debug, Clone, PartialEq)]
 pub enum RouteSource {
+    /// Route selected via knowledge-graph path scoring.
     KnowledgeGraph,
+    /// Route selected via keyword-based provider matching.
     KeywordRouting,
+    /// Route taken from the static `model` field in the agent definition.
     StaticConfig,
+    /// Route selected by combining KG and keyword signals.
     CombinedKgKeyword,
+    /// Default CLI model used as a last-resort fallback.
     CliDefault,
 }
 
@@ -34,14 +40,19 @@ impl std::fmt::Display for RouteSource {
     }
 }
 
+/// Current budget pressure level for a provider.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum BudgetPressure {
+    /// No budget concerns; full provider access.
     NoPressure,
+    /// Budget is approaching its limit; cheaper models preferred.
     NearExhaustion,
+    /// Budget is fully exhausted; provider should be avoided.
     Exhausted,
 }
 
 impl BudgetPressure {
+    /// Derive budget pressure from a budget verdict.
     pub fn from_verdict(verdict: &BudgetVerdict) -> Self {
         match verdict {
             BudgetVerdict::Exhausted { .. } => BudgetPressure::Exhausted,
@@ -50,6 +61,7 @@ impl BudgetPressure {
         }
     }
 
+    /// Return the fractional score penalty to apply based on pressure level and cost tier.
     pub fn cost_penalty(&self, cost_level: &CostLevel) -> f64 {
         match self {
             BudgetPressure::NoPressure => 0.0,
@@ -67,37 +79,59 @@ impl BudgetPressure {
     }
 }
 
+/// Context used by the routing engine to select a model for an agent dispatch.
 #[derive(Debug, Clone)]
 pub struct DispatchContext {
+    /// Name of the agent being dispatched.
     pub agent_name: String,
+    /// Task description used for KG and keyword matching.
     pub task: String,
+    /// Statically configured model override from the agent definition.
     pub static_model: Option<String>,
+    /// CLI tool used to invoke the selected model.
     pub cli_tool: String,
+    /// Agent layer classification used to adjust routing priorities.
     pub layer: crate::config::AgentLayer,
+    /// Optional session ID for telemetry grouping.
     pub session_id: Option<String>,
     /// Default KG tier concept for this agent (e.g., "review_tier").
     /// Passed through to KG router for tier-biased routing.
     pub default_tier: Option<String>,
 }
 
+/// A single candidate model selected by one routing signal.
 #[derive(Debug, Clone)]
 pub struct RouteCandidate {
+    /// Provider descriptor for this candidate.
     pub provider: Provider,
+    /// Model identifier to pass to the CLI tool.
     pub model: String,
+    /// CLI tool used to invoke this candidate.
     pub cli_tool: String,
+    /// Signal that produced this candidate.
     pub source: RouteSource,
+    /// Confidence score from the originating signal (0.0–1.0).
     pub confidence: f64,
 }
 
+/// The final routing decision returned after evaluating all candidates.
 #[derive(Debug, Clone)]
 pub struct RoutingDecision {
+    /// The winning candidate that will be used for dispatch.
     pub candidate: RouteCandidate,
+    /// Human-readable rationale explaining the selection.
     pub rationale: String,
+    /// All candidates that were evaluated, for diagnostics.
     pub all_candidates: Vec<RouteCandidate>,
+    /// Whether the primary (highest-confidence) candidate is available.
     pub primary_available: bool,
+    /// Which routing signal dominated the final selection.
     pub dominant_signal: RouteSource,
+    /// Current budget pressure at the time of the decision.
     pub budget_pressure: BudgetPressure,
+    /// Whether budget pressure altered the selected candidate.
     pub budget_influenced: bool,
+    /// Whether telemetry data influenced the final ranking.
     pub telemetry_influenced: bool,
 }
 
@@ -128,6 +162,7 @@ struct CollectedCandidates {
     static_model: Option<RouteCandidate>,
 }
 
+/// Engine that combines multiple routing signals to select the best model for a dispatch.
 pub struct RoutingDecisionEngine {
     kg_router: Option<Arc<KgRouter>>,
     /// Snapshot of unhealthy provider names at construction time.
@@ -143,6 +178,7 @@ pub struct RoutingDecisionEngine {
 }
 
 impl RoutingDecisionEngine {
+    /// Create a new routing engine without budget tracking and using the `Fastest` strategy.
     pub fn new(
         kg_router: Option<Arc<KgRouter>>,
         unhealthy_providers: Vec<String>,
@@ -159,6 +195,7 @@ impl RoutingDecisionEngine {
         )
     }
 
+    /// Create a new routing engine with budget tracking and using the `Fastest` strategy.
     pub fn with_provider_budget(
         kg_router: Option<Arc<KgRouter>>,
         unhealthy_providers: Vec<String>,
@@ -176,6 +213,7 @@ impl RoutingDecisionEngine {
         )
     }
 
+    /// Create a routing engine with explicit budget tracker and route selection strategy.
     pub fn with_provider_budget_and_strategy(
         kg_router: Option<Arc<KgRouter>>,
         unhealthy_providers: Vec<String>,
@@ -311,6 +349,7 @@ impl RoutingDecisionEngine {
         base * (1.0 - penalty)
     }
 
+    /// Select the best model for the given dispatch context.
     pub async fn decide_route(
         &self,
         ctx: &DispatchContext,

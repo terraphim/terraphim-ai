@@ -1,3 +1,4 @@
+//! ADF orchestrator binary — parses config, registers providers and runs agents.
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::ExitCode;

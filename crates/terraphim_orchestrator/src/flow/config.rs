@@ -47,20 +47,26 @@ fn default_matrix_fail_strategy() -> FailStrategy {
     FailStrategy::Continue
 }
 
+/// Top-level definition of a multi-step flow.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FlowDefinition {
+    /// Unique name identifying this flow.
     pub name: String,
     /// Project this flow belongs to. Required -- flows are per-project only (D14).
     /// Must match a `Project.id` when projects are defined.
     pub project: String,
+    /// Optional cron schedule expression for time-driven execution.
     #[serde(default)]
     pub schedule: Option<String>, // cron expression
+    /// Filesystem path to the repository where this flow runs.
     pub repo_path: String,
+    /// Git base branch used as the comparison reference.
     #[serde(default = "default_base_branch")]
     pub base_branch: String,
     /// Global flow timeout in seconds. If the entire flow exceeds this, it is aborted.
     #[serde(default = "default_flow_timeout")]
     pub timeout_secs: u64,
+    /// Ordered list of steps that form this flow.
     #[serde(default)]
     pub steps: Vec<FlowStepDef>,
 }
@@ -73,9 +79,12 @@ fn default_flow_timeout() -> u64 {
     3600 // 1 hour default
 }
 
+/// Definition of a single step within a flow.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct FlowStepDef {
+    /// Unique name for this step within the flow.
     pub name: String,
+    /// The kind of step (action, agent, gate, or checkpoint).
     pub kind: StepKind,
     /// Shell command (for action steps).
     #[serde(default)]
@@ -122,22 +131,31 @@ fn default_timeout() -> u64 {
     600
 }
 
+/// The kind of execution a flow step performs.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum StepKind {
+    /// Execute a shell command.
     #[default]
     Action,
+    /// Spawn an AI agent.
     Agent,
+    /// Evaluate a gate condition and optionally block the flow.
     Gate,
+    /// Save a checkpoint and optionally loop back to a prior step.
     Checkpoint,
 }
 
+/// What the executor should do when a step fails.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum FailStrategy {
+    /// Abort the entire flow immediately on failure.
     #[default]
     Abort,
+    /// Skip the failed step and continue with the next.
     SkipFailed,
+    /// Record the failure but continue to the end before deciding.
     Continue,
 }
 

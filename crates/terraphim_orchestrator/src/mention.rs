@@ -28,14 +28,21 @@ static MENTION_RE: LazyLock<Regex> = LazyLock::new(|| {
 /// How a mention was resolved.
 #[derive(Debug, Clone, PartialEq)]
 pub enum MentionResolution {
+    /// The mention resolved to a registered agent name.
     AgentName,
-    PersonaName { persona: String },
+    /// The mention resolved to a persona.
+    PersonaName {
+        /// The persona name that was resolved.
+        persona: String,
+    },
 }
 
 /// Parsed tokens of a single `@adf:[project/]name` mention.
 #[derive(Debug, Clone, PartialEq)]
 pub struct MentionTokens {
+    /// Optional project prefix extracted from a qualified mention.
     pub project: Option<String>,
+    /// Bare agent name extracted from the mention.
     pub agent: String,
 }
 
@@ -61,13 +68,21 @@ pub fn parse_mention_tokens(text: &str) -> Vec<MentionTokens> {
 /// A detected and resolved mention.
 #[derive(Debug, Clone)]
 pub struct DetectedMention {
+    /// Gitea issue number containing the mention.
     pub issue_number: u64,
+    /// Gitea comment ID containing the mention.
     pub comment_id: u64,
+    /// The raw `@adf:name` text as it appeared in the comment.
     pub raw_mention: String,
+    /// Resolved agent name to dispatch.
     pub agent_name: String,
+    /// How the mention was resolved (agent or persona).
     pub resolution: MentionResolution,
+    /// Full body of the comment containing the mention.
     pub comment_body: String,
+    /// Login of the user who posted the comment.
     pub mentioner: String,
+    /// ISO 8601 timestamp of the comment.
     pub timestamp: String,
     /// Project id the mention was detected in.
     ///
@@ -162,6 +177,7 @@ impl MentionCursor {
         format!("adf/mention_cursor/{}", project_id)
     }
 
+    /// Load the cursor from persistence or create a fresh one at the current time.
     pub async fn load_or_now(project_id: &str) -> Self {
         let key = Self::cursor_key(project_id);
 
@@ -550,6 +566,7 @@ pub struct MentionTracker {
 }
 
 impl MentionTracker {
+    /// Create a tracker that enforces the given per-issue dispatch limit.
     pub fn new(max_dispatches_per_issue: u32) -> Self {
         Self {
             max_dispatches_per_issue,

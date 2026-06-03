@@ -15,9 +15,19 @@ pub enum BudgetVerdict {
     /// Spend is within normal budget range.
     WithinBudget,
     /// Spend has reached warning threshold (80%).
-    NearExhaustion { spent_cents: u64, budget_cents: u64 },
+    NearExhaustion {
+        /// Amount spent in hundredths of a cent.
+        spent_cents: u64,
+        /// Monthly budget cap in hundredths of a cent.
+        budget_cents: u64,
+    },
     /// Spend has reached or exceeded 100% of budget.
-    Exhausted { spent_cents: u64, budget_cents: u64 },
+    Exhausted {
+        /// Amount spent in hundredths of a cent.
+        spent_cents: u64,
+        /// Monthly budget cap in hundredths of a cent.
+        budget_cents: u64,
+    },
 }
 
 impl BudgetVerdict {
@@ -316,9 +326,13 @@ impl AgentCost {
 /// Snapshot of an agent's cost status (for serialization).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CostSnapshot {
+    /// Name of the agent this snapshot belongs to.
     pub agent_name: String,
+    /// Total amount spent this month in USD.
     pub spent_usd: f64,
+    /// Monthly budget cap in hundredths of a cent, if set.
     pub budget_cents: Option<u64>,
+    /// Human-readable budget verdict string.
     pub verdict: String,
 }
 

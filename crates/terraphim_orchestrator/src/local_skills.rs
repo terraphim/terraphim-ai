@@ -2,17 +2,23 @@ use std::path::{Path, PathBuf};
 
 use terraphim_spawner::SpawnContext;
 
+/// Configuration for local skill discovery in a project directory.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LocalSkillConfig {
+    /// Path to the `.terraphim/skills` directory containing skill definitions.
     pub skills_dir: PathBuf,
 }
 
+/// CLI tools that natively support loading local skills.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum SupportedSkillCli {
+    /// The `opencode` CLI tool.
     Opencode,
+    /// The `claude` or `claude-code` CLI tool.
     Claude,
 }
 
+/// Discover a local skill configuration in the given project root, if present.
 pub fn discover_local_skills(project_root: &Path) -> Option<LocalSkillConfig> {
     let skills_dir = project_root.join(".terraphim/skills");
     skills_dir
@@ -20,6 +26,7 @@ pub fn discover_local_skills(project_root: &Path) -> Option<LocalSkillConfig> {
         .then_some(LocalSkillConfig { skills_dir })
 }
 
+/// Detect which supported skill CLI (if any) matches the given tool name.
 pub fn detect_skill_cli(cli_tool: &str) -> Option<SupportedSkillCli> {
     match cli_name(cli_tool) {
         "opencode" => Some(SupportedSkillCli::Opencode),
@@ -28,6 +35,7 @@ pub fn detect_skill_cli(cli_tool: &str) -> Option<SupportedSkillCli> {
     }
 }
 
+/// Augment a spawn context with local skill loading directives for the given CLI.
 pub fn prepare_local_skill_loading(
     cli_tool: &str,
     project_root: &Path,

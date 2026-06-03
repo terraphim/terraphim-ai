@@ -45,11 +45,17 @@ pub struct CompletionEvent {
 /// Token breakdown from a completion event.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct TokenBreakdown {
+    /// Total tokens consumed (input + output).
     pub total: u64,
+    /// Input (prompt) token count.
     pub input: u64,
+    /// Output (completion) token count.
     pub output: u64,
+    /// Tokens used for extended reasoning, if applicable.
     pub reasoning: u64,
+    /// Tokens read from the prompt cache.
     pub cache_read: u64,
+    /// Tokens written to the prompt cache.
     pub cache_write: u64,
 }
 
@@ -83,6 +89,7 @@ pub struct ModelPerformanceSnapshot {
 }
 
 impl ModelPerformanceSnapshot {
+    /// Create an empty snapshot for the given model with no recorded events.
     pub fn empty(model: &str, window_secs: u64) -> Self {
         Self {
             model: model.to_string(),
@@ -100,6 +107,7 @@ impl ModelPerformanceSnapshot {
         }
     }
 
+    /// Return true when the snapshot's data is older than `max_staleness_secs`.
     pub fn is_stale(&self, max_staleness_secs: u64) -> bool {
         match self.last_event_at {
             None => true,
@@ -110,6 +118,7 @@ impl ModelPerformanceSnapshot {
         }
     }
 
+    /// Return true when this model's subscription limit is currently active.
     pub fn is_subscription_limited(&self) -> bool {
         if !self.subscription_limit_reached {
             return false;
@@ -140,14 +149,20 @@ pub struct UsageSnapshot {
 /// Per-model usage totals.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ModelUsage {
+    /// Total input (prompt) tokens consumed.
     pub input_tokens: u64,
+    /// Total output (completion) tokens generated.
     pub output_tokens: u64,
+    /// Combined input and output token count.
     pub total_tokens: u64,
+    /// Estimated cost in USD.
     pub cost_usd: f64,
+    /// Number of messages in this window.
     pub message_count: u64,
 }
 
 impl ModelUsage {
+    /// Accumulate totals from another `ModelUsage` into this one.
     pub fn merge(&mut self, other: &ModelUsage) {
         self.input_tokens += other.input_tokens;
         self.output_tokens += other.output_tokens;
@@ -293,6 +308,7 @@ struct TelemetryStoreInner {
 }
 
 impl TelemetryStore {
+    /// Create a new telemetry store with the given rolling window duration.
     pub fn new(window_secs: u64) -> Self {
         Self {
             inner: Arc::new(RwLock::new(TelemetryStoreInner {
@@ -304,6 +320,7 @@ impl TelemetryStore {
         }
     }
 
+    /// Set a custom TTL for subscription-limit flags and return the updated store.
     pub fn with_subscription_limit_ttl(self, ttl_secs: u64) -> Self {
         let window_secs = self.inner.blocking_read().window_secs;
         Self {

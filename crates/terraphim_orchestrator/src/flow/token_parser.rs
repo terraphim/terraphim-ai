@@ -9,9 +9,13 @@ use std::sync::LazyLock;
 /// Token usage data extracted from CLI output.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct TokenUsage {
+    /// Number of input (prompt) tokens consumed.
     pub input_tokens: Option<u64>,
+    /// Number of output (completion) tokens generated.
     pub output_tokens: Option<u64>,
+    /// Total tokens (input + output).
     pub total_tokens: Option<u64>,
+    /// Estimated cost in USD for this completion.
     pub cost_usd: Option<f64>,
 }
 
@@ -104,12 +108,14 @@ pub fn parse_opencode_output(output: &str) -> TokenUsage {
     parse_token_usage(output)
 }
 
+/// Parse token usage from Claude CLI output.
 pub fn parse_claude_output(output: &str) -> TokenUsage {
     // Claude CLI may output usage differently
     // Example: "Input tokens: 1234, Output tokens: 567"
     parse_token_usage(output)
 }
 
+/// Parse token usage from Codex/OpenAI CLI output.
 pub fn parse_codex_output(output: &str) -> TokenUsage {
     // Codex/OpenAI CLI output
     parse_token_usage(output)
