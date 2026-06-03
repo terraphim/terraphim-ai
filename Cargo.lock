@@ -8469,6 +8469,52 @@ dependencies = [
 ]
 
 [[package]]
+name = "terraphim_gitea_runner"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "axum 0.8.9",
+ "base64",
+ "chrono",
+ "env_logger",
+ "log",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "terraphim_github_runner",
+ "thiserror 1.0.69",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "terraphim_github_runner"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "dashmap 6.2.1",
+ "env_logger",
+ "flate2",
+ "log",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "terraphim-firecracker",
+ "terraphim_agent_evolution",
+ "terraphim_multi_agent",
+ "terraphim_rolegraph",
+ "terraphim_service",
+ "terraphim_types",
+ "thiserror 1.0.69",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "terraphim_hooks"
 version = "1.20.2"
 source = "sparse+https://git.terraphim.cloud/api/packages/terraphim/cargo/"

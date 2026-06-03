@@ -1,0 +1,37 @@
+[package]
+name = "terraphim_gitea_runner"
+version = "0.1.0"
+edition.workspace = true
+description = "Native Gitea Actions runner: speaks Gitea RunnerService (Connect-JSON) and executes jobs under Terraphim policy (host/rch), reusing the terraphim_github_runner stack"
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
+repository = "https://git.terraphim.cloud/terraphim/terraphim-ai"
+keywords = ["ci", "gitea", "actions", "runner", "rch"]
+license = "Apache-2.0"
+readme = "../../README.md"
+
+[[bin]]
+name = "terraphim-gitea-runner"
+path = "src/bin/terraphim-gitea-runner.rs"
+
+[dependencies]
+tokio = { workspace = true, features = ["full"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+async-trait = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+log = { workspace = true }
+chrono = { workspace = true, features = ["serde"] }
+uuid = { workspace = true, features = ["v4"] }
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+base64 = "0.22"
+env_logger = "0.11"
+
+# Reused execution stack (host-only; #1910 M1)
+terraphim_github_runner = { path = "../terraphim_github_runner" }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full", "test-util", "macros"] }
+axum = "0.8"
+tempfile = { workspace = true }

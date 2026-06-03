@@ -77,6 +77,36 @@ impl VmProvider for MockVmProvider {
     }
 }
 
+/// VM provider that runs work directly on the host (no VM allocation).
+///
+/// Used by the native Gitea runner's host-execution route (#1910 M1). `allocate`
+/// returns a synthetic vm id with zero allocation time; `release` is a no-op.
+pub struct HostVmProvider;
+
+#[async_trait]
+impl VmProvider for HostVmProvider {
+    async fn allocate(&self, _vm_type: &str) -> Result<(String, Duration)> {
+        Ok((format!("host-{}", uuid::Uuid::new_v4()), Duration::ZERO))
+    }
+
+    async fn release(&self, _vm_id: &str) -> Result<()> {
+        Ok(())
+    }
+}
+
+/// Minimal, protocol-neutral spec for starting a session without a GitHub event.
+///
+/// `create_session` historically required a [`WorkflowContext`] but only read its
+/// `session_id`. `SessionStartSpec` lets non-GitHub callers (the Gitea runner)
+/// create sessions directly. See [`SessionManager::create_session_from_spec`].
+#[derive(Debug, Clone)]
+pub struct SessionStartSpec {
+    /// The session identifier to allocate a VM for.
+    pub session_id: SessionId,
+    /// Optional VM type override; `None` uses the manager's configured default.
+    pub vm_type: Option<String>,
+}
+
 /// Configuration for the session manager
 #[derive(Debug, Clone)]
 pub struct SessionManagerConfig {
@@ -143,8 +173,20 @@ impl SessionManager {
         Ok(())
     }
 
-    /// Create a new session for a workflow
+    /// Create a new session for a workflow.
+    ///
+    /// Thin wrapper over [`create_session_from_spec`](Self::create_session_from_spec);
+    /// it reads only `context.session_id`.
     pub async fn create_session(&self, context: &WorkflowContext) -> Result<Session> {
+        self.create_session_from_spec(&SessionStartSpec {
+            session_id: context.session_id.clone(),
+            vm_type: None,
+        })
+        .await
+    }
+
+    /// Create a new session from a protocol-neutral spec (no GitHub event needed).
+    pub async fn create_session_from_spec(&self, spec: &SessionStartSpec) -> Result<Session> {
         // Check concurrent session limit
         if self.sessions.len() >= self.config.max_concurrent_sessions {
             return Err(GitHubRunnerError::VmAllocation(format!(
@@ -153,8 +195,11 @@ impl SessionManager {
             )));
         }
 
-        let session_id = context.session_id.clone();
-        let vm_type = self.config.default_vm_type.clone();
+        let session_id = spec.session_id.clone();
+        let vm_type = spec
+            .vm_type
+            .clone()
+            .unwrap_or_else(|| self.config.default_vm_type.clone());
 
         // Allocate a VM
         let (vm_id, allocation_time) = self.vm_provider.allocate(&vm_type).await?;

@@ -7,6 +7,6 @@
 pub mod manager;
 
 pub use manager::{
-    MockVmProvider, Session, SessionManager, SessionManagerConfig, SessionState, SessionStats,
-    VmProvider,
+    HostVmProvider, MockVmProvider, Session, SessionManager, SessionManagerConfig,
+    SessionStartSpec, SessionState, SessionStats, VmProvider,
 };

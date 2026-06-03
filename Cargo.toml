@@ -34,7 +34,7 @@ exclude = [
     # Firecracker-based crates (private git dependency fcctl-core)
     # terraphim_rlm temporarily included for full configuration
     # "crates/terraphim_rlm",
-    "crates/terraphim_github_runner",
+    # terraphim_github_runner un-excluded for host-only reuse by terraphim_gitea_runner (#1910 M1).
     "crates/terraphim_github_runner_server",
 ]
 default-members = ["terraphim_server"]
