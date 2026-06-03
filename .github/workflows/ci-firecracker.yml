@@ -11,14 +11,6 @@ on:
         options:
           - focal-ci
           - focal
-  pull_request:
-    paths:
-      - 'crates/**'
-      - 'Cargo.toml'
-      - 'Cargo.lock'
-      - 'terraphim_server/**'
-
-# Cancel in-progress runs on the same branch
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true

@@ -1,10 +1,6 @@
 name: CI PR Validation
 on:
-  pull_request:
-    branches: [ main, develop ]
-    types: [ opened, synchronize, reopened ]
-
-# Concurrency to prevent duplicate runs
+  workflow_dispatch:
 concurrency:
   group: ci-pr-${{ github.ref }}
   cancel-in-progress: true

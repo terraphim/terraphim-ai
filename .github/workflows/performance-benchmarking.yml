@@ -13,19 +13,6 @@ on:
         required: false
         default: 'main'
         type: string
-  pull_request:
-    paths:
-      - 'crates/terraphim_*/src/**'
-      - 'terraphim_server/src/**'
-      - 'scripts/run-performance-benchmarks.sh'
-      - '.github/workflows/performance-benchmarking.yml'
-  push:
-    branches: [main, develop]
-    paths:
-      - 'crates/terraphim_*/src/**'
-      - 'terraphim_server/src/**'
-      - 'scripts/run-performance-benchmarks.sh'
-
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1

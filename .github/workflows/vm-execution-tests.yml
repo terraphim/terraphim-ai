@@ -7,20 +7,6 @@ name: VM Execution Tests
 # Triggered manually for adaptive concurrency testing
 
 on:
-  push:
-    branches: [ main, develop, agent_system ]
-    paths:
-      - 'crates/terraphim_multi_agent/**'
-      - 'scratchpad/firecracker-rust/**'
-      - 'scripts/test-vm-execution.sh'
-      - '.github/workflows/vm-execution-tests.yml'
-  pull_request:
-    branches: [ main, develop ]
-    paths:
-      - 'crates/terraphim_multi_agent/**'
-      - 'scratchpad/firecracker-rust/**'
-      - 'scripts/test-vm-execution.sh'
-      - '.github/workflows/vm-execution-tests.yml'
   workflow_dispatch:  # Allow manual triggering
 
 env:
