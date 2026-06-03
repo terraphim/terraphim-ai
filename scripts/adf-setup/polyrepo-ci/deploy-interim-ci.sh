@@ -33,7 +33,9 @@ REPOS=(terraphim-core terraphim-config-persistence terraphim-service \
 
 emit_confd() {
   local repo="$1" wd="$2"
-  cat > "${CONFD}/${repo}.toml" <<TOML
+  # conf.d is root-owned; write via sudo so the rest of the script can run as the
+  # unprivileged user (clones/webhooks owned by that user, not root).
+  sudo tee "${CONFD}/${repo}.toml" >/dev/null <<TOML
 [[projects]]
 id = "${repo}"
 name = "${repo}"
