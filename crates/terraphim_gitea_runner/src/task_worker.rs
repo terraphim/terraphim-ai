@@ -70,7 +70,9 @@ impl<C: GiteaRunnerClient, P: PolicyPlanner> TaskWorker<C, P> {
                 UpdateTaskRequest {
                     state: TaskState {
                         id: task.id,
-                        result: result::RUNNING,
+                        // In-progress heartbeat: non-terminal (UNSPECIFIED) so the
+                        // server records startedAt without completing the task.
+                        result: result::UNSPECIFIED,
                         started_at: Some(chrono::Utc::now().to_rfc3339()),
                         stopped_at: None,
                         steps: Vec::new(),

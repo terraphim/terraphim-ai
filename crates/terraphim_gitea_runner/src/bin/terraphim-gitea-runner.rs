@@ -66,7 +66,6 @@ async fn main() -> anyhow::Result<()> {
                     name: format!("terraphim-native-{}", uuid::Uuid::new_v4()),
                     version: version.clone(),
                     labels: config.labels.clone(),
-                    ephemeral: false,
                 })
                 .await?;
             let s = RunnerState {

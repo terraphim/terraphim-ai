@@ -132,8 +132,12 @@ async fn runner_register_declare_fetch_execute_cycle() {
 
     let g = shared.lock().unwrap();
     assert!(g.fetch_calls >= 2);
-    // running -> success reported
-    assert_eq!(g.task_results, vec![6, 1], "running then success");
+    // in-progress (UNSPECIFIED=0) heartbeat then terminal success (1)
+    assert_eq!(
+        g.task_results,
+        vec![0, 1],
+        "in-progress(UNSPECIFIED) then success"
+    );
     assert!(g.log_no_more, "log stream was closed");
     assert!(
         g.log_rows

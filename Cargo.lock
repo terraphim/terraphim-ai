@@ -8503,6 +8503,7 @@ dependencies = [
  "reqwest 0.12.28",
  "serde",
  "serde_json",
+ "terraphim-firecracker",
  "terraphim_agent_evolution",
  "terraphim_multi_agent",
  "terraphim_rolegraph",
