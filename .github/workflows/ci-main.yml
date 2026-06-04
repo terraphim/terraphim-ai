@@ -293,6 +293,12 @@ jobs:
           # slow-timeout and fail-fast are configured in .config/nextest.toml [profile.ci]
           /home/alex/.local/bin/rch exec -- cargo nextest run --release --target ${{ matrix.target }} --workspace --profile ci --features "self_update/signatures,zlob,terraphim_automata/medical"
 
+      - name: Test shared-learning feature
+        run: |
+          # shared-learning is feature-gated and not in the default nextest run.
+          # Without this step all 9 tests in shared_learning_cli_tests.rs are silently skipped.
+          /home/alex/.local/bin/rch exec -- cargo nextest run --release --target ${{ matrix.target }} -p terraphim_agent --profile ci --features shared-learning
+
       - name: sccache stats
         if: always()
         run: /home/alex/.local/bin/sccache --show-stats
