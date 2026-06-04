@@ -2434,4 +2434,118 @@ mod tests {
         let entry2 = LearningEntry::Correction(correction);
         assert!(matches!(entry2, LearningEntry::Correction(_)));
     }
+
+    #[test]
+    fn test_suggest_learnings_empty_storage() {
+        let temp_dir = TempDir::new().unwrap();
+        let storage = temp_dir.path().join("learnings");
+        fs::create_dir(&storage).unwrap();
+
+        let results = suggest_learnings(&storage, "cargo build", 10).unwrap();
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn test_suggest_learnings_returns_matching_entries() {
+        let temp_dir = TempDir::new().unwrap();
+        let storage = temp_dir.path().join("learnings");
+        fs::create_dir(&storage).unwrap();
+
+        let cargo_learning = CapturedLearning::new(
+            "cargo build".to_string(),
+            "compilation error".to_string(),
+            1,
+            LearningSource::Project,
+        );
+        let git_learning = CapturedLearning::new(
+            "git push -f".to_string(),
+            "remote rejected".to_string(),
+            1,
+            LearningSource::Project,
+        );
+        fs::write(storage.join("cargo-learning.md"), cargo_learning.to_markdown()).unwrap();
+        fs::write(storage.join("git-learning.md"), git_learning.to_markdown()).unwrap();
+
+        // Context matches "cargo" keyword -- should return the cargo entry with score > 0
+        let results = suggest_learnings(&storage, "cargo test", 10).unwrap();
+        assert!(!results.is_empty());
+        // At least one entry has a non-zero score
+        assert!(results.iter().any(|se| se.score > 0));
+        // First result should be the cargo-related one
+        if let LearningEntry::Learning(ref l) = results[0].entry {
+            assert!(l.command.contains("cargo"));
+        }
+    }
+
+    #[test]
+    fn test_suggest_learnings_short_keywords_fallback_to_recent() {
+        let temp_dir = TempDir::new().unwrap();
+        let storage = temp_dir.path().join("learnings");
+        fs::create_dir(&storage).unwrap();
+
+        let learning = CapturedLearning::new(
+            "git status".to_string(),
+            "error".to_string(),
+            1,
+            LearningSource::Project,
+        );
+        fs::write(storage.join("test.md"), learning.to_markdown()).unwrap();
+
+        // All words <= 2 chars -- no keywords extracted, falls back to recent
+        let results = suggest_learnings(&storage, "ls -a", 10).unwrap();
+        assert!(!results.is_empty());
+        assert_eq!(results[0].score, 0);
+    }
+
+    #[test]
+    fn test_suggest_learnings_respects_limit() {
+        let temp_dir = TempDir::new().unwrap();
+        let storage = temp_dir.path().join("learnings");
+        fs::create_dir(&storage).unwrap();
+
+        for i in 0..5 {
+            let learning = CapturedLearning::new(
+                format!("cargo build --target {}", i),
+                "error".to_string(),
+                1,
+                LearningSource::Project,
+            );
+            fs::write(storage.join(format!("learning-{}.md", i)), learning.to_markdown()).unwrap();
+        }
+
+        // Request at most 3 results
+        let results = suggest_learnings(&storage, "cargo build target", 3).unwrap();
+        assert!(results.len() <= 3);
+    }
+
+    #[test]
+    fn test_suggest_learnings_ordered_by_score() {
+        let temp_dir = TempDir::new().unwrap();
+        let storage = temp_dir.path().join("learnings");
+        fs::create_dir(&storage).unwrap();
+
+        // One entry with many cargo keywords in the error text
+        let high_relevance = CapturedLearning::new(
+            "cargo build".to_string(),
+            "cargo compilation cargo error cargo failed".to_string(),
+            1,
+            LearningSource::Project,
+        );
+        // One entry with only one cargo keyword match
+        let low_relevance = CapturedLearning::new(
+            "cargo test".to_string(),
+            "test failed".to_string(),
+            1,
+            LearningSource::Project,
+        );
+        fs::write(storage.join("high.md"), high_relevance.to_markdown()).unwrap();
+        fs::write(storage.join("low.md"), low_relevance.to_markdown()).unwrap();
+
+        let results = suggest_learnings(&storage, "cargo build", 10).unwrap();
+        assert!(results.len() >= 2);
+        // Results must be in descending score order
+        for window in results.windows(2) {
+            assert!(window[0].score >= window[1].score, "results not sorted by score");
+        }
+    }
 }
