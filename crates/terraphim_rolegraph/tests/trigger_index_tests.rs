@@ -1,5 +1,41 @@
 use ahash::AHashMap;
-use terraphim_rolegraph::{DEFAULT_TRIGGER_THRESHOLD, TriggerIndex};
+use std::path::Path;
+use terraphim_automata::parse_markdown_directives_dir;
+use terraphim_rolegraph::{DEFAULT_TRIGGER_THRESHOLD, RoleGraph, TriggerIndex};
+use terraphim_types::Thesaurus;
+
+/// Resolves the fixture haystack directory relative to this crate's manifest.
+fn fixture_haystack_dir() -> std::path::PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../terraphim_server/fixtures/haystack")
+}
+
+/// Parse the fixture directory, assign sequential node IDs to concepts that have
+/// a `trigger::` directive, and return (triggers_map, pinned_ids).
+fn build_trigger_data_from_fixtures() -> (AHashMap<u64, String>, Vec<u64>) {
+    let fixture_path = fixture_haystack_dir();
+    let parse_result =
+        parse_markdown_directives_dir(&fixture_path).expect("fixture dir should be parseable");
+
+    let mut triggers: AHashMap<u64, String> = AHashMap::new();
+    let mut pinned_ids: Vec<u64> = Vec::new();
+    let mut next_id: u64 = 1;
+
+    // Sort by concept name for deterministic ID assignment across test runs.
+    let mut concepts: Vec<_> = parse_result.directives.iter().collect();
+    concepts.sort_by_key(|(k, _)| k.as_str());
+
+    for (_concept, directives) in concepts {
+        if let Some(trigger_text) = &directives.trigger {
+            triggers.insert(next_id, trigger_text.clone());
+            if directives.pinned {
+                pinned_ids.push(next_id);
+            }
+            next_id += 1;
+        }
+    }
+
+    (triggers, pinned_ids)
+}
 
 #[test]
 fn test_empty_index_returns_empty() {
@@ -269,4 +305,99 @@ fn test_default_stopwords_filter() {
     assert!(TriggerIndex::is_default_stopword("with"));
     assert!(!TriggerIndex::is_default_stopword("cancer"));
     assert!(!TriggerIndex::is_default_stopword("treatment"));
+}
+
+// --- Fixture-based integration tests (AC4 of Gitea #84) ---
+// These tests load KG markdown files from disk and verify that
+// trigger:: and pinned:: directives are correctly parsed and integrated.
+
+#[test]
+fn test_kg_fixture_trigger_index_populated() {
+    let (triggers, _pinned_ids) = build_trigger_data_from_fixtures();
+
+    assert!(
+        !triggers.is_empty(),
+        "Expected at least one trigger:: directive in fixture files under \
+         terraphim_server/fixtures/haystack/; add a .md file with 'trigger::' to proceed"
+    );
+}
+
+#[test]
+fn test_kg_fixture_pinned_entries_present() {
+    let (_triggers, pinned_ids) = build_trigger_data_from_fixtures();
+
+    assert!(
+        !pinned_ids.is_empty(),
+        "Expected at least one pinned:: true directive in fixture files under \
+         terraphim_server/fixtures/haystack/; add a .md file with 'pinned:: true'"
+    );
+}
+
+#[tokio::test]
+async fn test_kg_fixture_trigger_fallback_returns_node_id() {
+    let (triggers, pinned_ids) = build_trigger_data_from_fixtures();
+
+    assert!(
+        !triggers.is_empty(),
+        "No trigger:: directives found in fixture files"
+    );
+
+    // Capture the first entry before moving the map.
+    let (expected_id, trigger_text) = {
+        let (id, text) = triggers.iter().next().unwrap();
+        (*id, text.clone())
+    };
+
+    let thesaurus = Thesaurus::new("fixture-trigger-test".to_string());
+    let mut rolegraph = RoleGraph::new("fixture-trigger-test".into(), thesaurus)
+        .await
+        .unwrap();
+    rolegraph.load_trigger_index(triggers, pinned_ids, DEFAULT_TRIGGER_THRESHOLD);
+
+    // A query closely matching the trigger text should return the node via TF-IDF fallback
+    // (the thesaurus is empty so Aho-Corasick finds nothing first).
+    let results = rolegraph.find_matching_node_ids_with_fallback(&trigger_text, false);
+    assert!(
+        results.contains(&expected_id),
+        "Expected trigger fallback to return node {expected_id} for query '{trigger_text}', \
+         got: {results:?}"
+    );
+}
+
+#[tokio::test]
+async fn test_kg_fixture_pinned_always_included() {
+    let (triggers, pinned_ids) = build_trigger_data_from_fixtures();
+
+    assert!(
+        !pinned_ids.is_empty(),
+        "No pinned:: true directives found in fixture files"
+    );
+
+    let first_pinned = pinned_ids[0];
+
+    let thesaurus = Thesaurus::new("fixture-pinned-test".to_string());
+    let mut rolegraph = RoleGraph::new("fixture-pinned-test".into(), thesaurus)
+        .await
+        .unwrap();
+    rolegraph.load_trigger_index(triggers, pinned_ids, DEFAULT_TRIGGER_THRESHOLD);
+
+    // Completely unrelated query — pinned entries must still appear when include_pinned=true.
+    let results =
+        rolegraph.find_matching_node_ids_with_fallback("completely unrelated xyz zyx", true);
+    assert!(
+        results.contains(&first_pinned),
+        "Expected pinned node {first_pinned} to appear with include_pinned=true, \
+         got: {:?}",
+        results
+    );
+
+    // With include_pinned=false, a totally unrelated query must NOT return pinned entries.
+    let results_no_pin =
+        rolegraph.find_matching_node_ids_with_fallback("completely unrelated xyz zyx", false);
+    assert!(
+        !results_no_pin.contains(&first_pinned),
+        "Pinned node {first_pinned} should NOT appear when include_pinned=false, \
+         got: {:?}",
+        results_no_pin
+    );
 }

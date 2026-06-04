@@ -56,3 +56,5 @@ criterion = "0.8"
 tempfile = { workspace = true }
 
 proptest = "1.4"
+terraphim_automata = { path = "../terraphim_automata", version = "1.19.2", features = ["tokio-runtime", "remote-loading"] }
+terraphim_types = { path = "../terraphim_types", version = "1.0.0" }
