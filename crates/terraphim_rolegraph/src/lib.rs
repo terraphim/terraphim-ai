@@ -296,8 +296,10 @@ pub struct SerializableRoleGraph {
     /// reverse lookup - matched id into normalized term
     pub ac_reverse_nterm: AHashMap<u64, NormalizedTermValue>,
     /// Trigger descriptions for each node_id (used to rebuild TriggerIndex)
+    #[serde(default)]
     pub trigger_descriptions: AHashMap<u64, String>,
     /// Node IDs that are pinned (always included in results)
+    #[serde(default)]
     pub pinned_node_ids: Vec<u64>,
     /// Document IDs that were indexed from shared learnings
     #[serde(default)]
@@ -2301,5 +2303,35 @@ mod tests {
         // Verify trigger index is functional after restore
         let results = restored.find_matching_node_ids_with_fallback("trigger one text", false);
         assert!(results.contains(&1u64));
+    }
+
+    #[test]
+    async fn serde_default_round_trip_old_json_without_trigger_fields() {
+        // Simulate a persisted SerializableRoleGraph written before issue #84 was merged.
+        // We serialise a fresh RoleGraph, strip trigger_descriptions and pinned_node_ids
+        // from the JSON, then deserialise. serde(default) must supply empty collections
+        // rather than returning a missing-field error.
+        let role = "test role".to_string();
+        let thesaurus = Thesaurus::new("test".to_string());
+        let rolegraph = RoleGraph::new(role.into(), thesaurus).await.unwrap();
+        let serializable = rolegraph.to_serializable();
+        let full_json = serializable.to_json().unwrap();
+
+        // Remove the two fields introduced by issue #84 to simulate old JSON.
+        let mut value: serde_json::Value =
+            serde_json::from_str(&full_json).expect("serialization produced invalid JSON");
+        value
+            .as_object_mut()
+            .unwrap()
+            .remove("trigger_descriptions");
+        value.as_object_mut().unwrap().remove("pinned_node_ids");
+        let old_json = serde_json::to_string(&value).unwrap();
+
+        let result = SerializableRoleGraph::from_json(&old_json);
+        assert!(result.is_ok(), "expected Ok but got: {:?}", result.err());
+        let sg = result.unwrap();
+        assert!(sg.trigger_descriptions.is_empty());
+        assert!(sg.pinned_node_ids.is_empty());
+        assert!(sg.learning_document_ids.is_empty());
     }
 }
