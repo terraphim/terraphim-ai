@@ -167,14 +167,12 @@ fn server_http_error_exits_1() {
     let port = listener.local_addr().unwrap().port();
 
     std::thread::spawn(move || {
-        for stream in listener.incoming() {
-            if let Ok(mut s) = stream {
-                let mut buf = [0u8; 2048];
-                let _ = std::io::Read::read(&mut s, &mut buf);
-                let _ = s.write_all(
-                    b"HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
-                );
-            }
+        for mut s in listener.incoming().flatten() {
+            let mut buf = [0u8; 2048];
+            let _ = std::io::Read::read(&mut s, &mut buf);
+            let _ = s.write_all(
+                b"HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+            );
         }
     });
 
