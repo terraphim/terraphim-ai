@@ -28,7 +28,6 @@ impl ApiClient {
         }
     }
 
-    #[allow(dead_code)]
     pub async fn health(&self) -> Result<()> {
         let url = format!("{}/health", self.base);
         let res = self.http.get(url).send().await?;
@@ -94,7 +93,6 @@ impl ApiClient {
         Ok(body)
     }
 
-    #[allow(dead_code)]
     pub async fn get_rolegraph_edges(&self, role: Option<&str>) -> Result<RoleGraphResponseDto> {
         self.rolegraph(role).await
     }
@@ -256,23 +254,26 @@ pub struct BatchSummarizeResponse {
 }
 
 // VM Management Types
+// These types represent the server-side Firecracker VM API surface. They are
+// kept for deserialization correctness when the VM management feature is gated
+// in (see `execute_vm_code`, `list_vms`, etc. below).
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-#[allow(dead_code)]
+#[allow(dead_code)] // Firecracker VM API type — not yet wired into active call sites
 pub struct VmWithIp {
     pub vm_id: String,
     pub ip_address: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-#[allow(dead_code)]
+#[allow(dead_code)] // Firecracker VM API type — not yet wired into active call sites
 pub struct VmPoolListResponse {
     pub vms: Vec<VmWithIp>,
     pub stats: VmPoolStatsResponse,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-#[allow(dead_code)]
+#[allow(dead_code)] // Firecracker VM API type — not yet wired into active call sites
 pub struct VmPoolStatsResponse {
     pub total_ips: usize,
     pub allocated_ips: usize,
@@ -281,7 +282,7 @@ pub struct VmPoolStatsResponse {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-#[allow(dead_code)]
+#[allow(dead_code)] // Firecracker VM API type — not yet wired into active call sites
 pub struct VmStatusResponse {
     pub vm_id: String,
     pub status: String,
@@ -291,7 +292,7 @@ pub struct VmStatusResponse {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-#[allow(dead_code)]
+#[allow(dead_code)] // Firecracker VM API type — not yet wired into active call sites
 pub struct VmExecuteRequest {
     pub code: String,
     pub language: String,
@@ -301,7 +302,7 @@ pub struct VmExecuteRequest {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-#[allow(dead_code)]
+#[allow(dead_code)] // Firecracker VM API type — not yet wired into active call sites
 pub struct VmExecuteResponse {
     pub execution_id: String,
     pub vm_id: String,
@@ -315,7 +316,7 @@ pub struct VmExecuteResponse {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-#[allow(dead_code)]
+#[allow(dead_code)] // Firecracker VM API type — not yet wired into active call sites
 pub struct VmTask {
     pub id: String,
     pub vm_id: String,
@@ -325,7 +326,7 @@ pub struct VmTask {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-#[allow(dead_code)]
+#[allow(dead_code)] // Firecracker VM API type — not yet wired into active call sites
 pub struct VmTasksResponse {
     pub tasks: Vec<VmTask>,
     pub vm_id: String,
@@ -333,20 +334,20 @@ pub struct VmTasksResponse {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-#[allow(dead_code)]
+#[allow(dead_code)] // Firecracker VM API type — not yet wired into active call sites
 pub struct VmAllocateRequest {
     pub vm_id: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-#[allow(dead_code)]
+#[allow(dead_code)] // Firecracker VM API type — not yet wired into active call sites
 pub struct VmAllocateResponse {
     pub vm_id: String,
     pub ip_address: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-#[allow(dead_code)]
+#[allow(dead_code)] // Firecracker VM API type — not yet wired into active call sites
 pub struct VmMetricsResponse {
     pub vm_id: String,
     pub status: String,
@@ -360,7 +361,7 @@ pub struct VmMetricsResponse {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-#[allow(dead_code)]
+#[allow(dead_code)] // Firecracker VM API type — not yet wired into active call sites
 pub struct VmAgentRequest {
     pub agent_id: String,
     pub task: String,
@@ -369,7 +370,7 @@ pub struct VmAgentRequest {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-#[allow(dead_code)]
+#[allow(dead_code)] // Firecracker VM API type — not yet wired into active call sites
 pub struct VmAgentResponse {
     pub task_id: String,
     pub agent_id: String,
@@ -445,7 +446,7 @@ impl ApiClient {
         Ok(body)
     }
 
-    #[allow(dead_code)]
+    #[allow(dead_code)] // Async summarisation API — not yet wired into TUI; retained for future UI integration
     pub async fn async_summarize_document(
         &self,
         document: &Document,
@@ -464,7 +465,7 @@ impl ApiClient {
         Ok(body)
     }
 
-    #[allow(dead_code)]
+    #[allow(dead_code)] // Async summarisation API — not yet wired into TUI; retained for future UI integration
     pub async fn get_task_status(&self, task_id: &str) -> Result<TaskStatusResponse> {
         let url = format!(
             "{}/summarization/task/{}/status",
@@ -476,7 +477,7 @@ impl ApiClient {
         Ok(body)
     }
 
-    #[allow(dead_code)]
+    #[allow(dead_code)] // Async summarisation API — not yet wired into TUI; retained for future UI integration
     pub async fn cancel_task(&self, task_id: &str) -> Result<TaskStatusResponse> {
         let url = format!(
             "{}/summarization/task/{}/cancel",
@@ -488,7 +489,7 @@ impl ApiClient {
         Ok(body)
     }
 
-    #[allow(dead_code)]
+    #[allow(dead_code)] // Async summarisation API — not yet wired into TUI; retained for future UI integration
     pub async fn get_queue_stats(&self) -> Result<QueueStatsResponse> {
         let url = format!("{}/summarization/queue/stats", self.base);
         let res = self.http.get(url).send().await?;
@@ -496,7 +497,7 @@ impl ApiClient {
         Ok(body)
     }
 
-    #[allow(dead_code)]
+    #[allow(dead_code)] // Async summarisation API — not yet wired into TUI; retained for future UI integration
     pub async fn batch_summarize_documents(
         &self,
         documents: &[Document],
@@ -517,7 +518,7 @@ impl ApiClient {
 
     // VM Management APIs
 
-    #[allow(dead_code)]
+    #[allow(dead_code)] // Firecracker VM management — call sites removed pending re-gating under vm feature flag
     pub async fn list_vms(&self) -> Result<VmPoolListResponse> {
         let url = format!("{}/api/vm-pool", self.base);
         let res = self.http.get(url).send().await?;
@@ -525,7 +526,7 @@ impl ApiClient {
         Ok(body)
     }
 
-    #[allow(dead_code)]
+    #[allow(dead_code)] // Firecracker VM management — call sites removed pending re-gating under vm feature flag
     pub async fn get_vm_pool_stats(&self) -> Result<VmPoolStatsResponse> {
         let url = format!("{}/api/vm-pool/stats", self.base);
         let res = self.http.get(url).send().await?;
@@ -536,7 +537,7 @@ impl ApiClient {
         Ok(body)
     }
 
-    #[allow(dead_code)]
+    #[allow(dead_code)] // Firecracker VM management — call sites removed pending re-gating under vm feature flag
     pub async fn get_vm_status(&self, vm_id: &str) -> Result<VmStatusResponse> {
         let url = format!("{}/api/vms/{}", self.base, urlencoding::encode(vm_id));
         let res = self.http.get(url).send().await?;
@@ -544,7 +545,7 @@ impl ApiClient {
         Ok(body)
     }
 
-    #[allow(dead_code)]
+    #[allow(dead_code)] // Firecracker VM management — call sites removed pending re-gating under vm feature flag
     pub async fn execute_vm_code(
         &self,
         code: &str,
@@ -564,7 +565,7 @@ impl ApiClient {
         Ok(body)
     }
 
-    #[allow(dead_code)]
+    #[allow(dead_code)] // Firecracker VM management — call sites removed pending re-gating under vm feature flag
     pub async fn list_vm_tasks(&self, vm_id: &str) -> Result<VmTasksResponse> {
         let url = format!("{}/api/vms/{}/tasks", self.base, urlencoding::encode(vm_id));
         let res = self.http.get(url).send().await?;
@@ -572,7 +573,7 @@ impl ApiClient {
         Ok(body)
     }
 
-    #[allow(dead_code)]
+    #[allow(dead_code)] // Firecracker VM management — call sites removed pending re-gating under vm feature flag
     pub async fn allocate_vm_ip(&self, vm_id: &str) -> Result<VmAllocateResponse> {
         let url = format!("{}/api/vm-pool/allocate", self.base);
         let req = VmAllocateRequest {
@@ -583,7 +584,7 @@ impl ApiClient {
         Ok(body)
     }
 
-    #[allow(dead_code)]
+    #[allow(dead_code)] // Firecracker VM management — call sites removed pending re-gating under vm feature flag
     pub async fn release_vm_ip(&self, vm_id: &str) -> Result<()> {
         let url = format!(
             "{}/api/vm-pool/release/{}",
@@ -595,7 +596,7 @@ impl ApiClient {
         Ok(())
     }
 
-    #[allow(dead_code)]
+    #[allow(dead_code)] // Firecracker VM management — call sites removed pending re-gating under vm feature flag
     pub async fn get_vm_metrics(&self, vm_id: &str) -> Result<VmMetricsResponse> {
         let url = format!(
             "{}/api/vms/{}/metrics",
@@ -607,7 +608,7 @@ impl ApiClient {
         Ok(body)
     }
 
-    #[allow(dead_code)]
+    #[allow(dead_code)] // Firecracker VM management — call sites removed pending re-gating under vm feature flag
     pub async fn get_all_vm_metrics(&self) -> Result<Vec<VmMetricsResponse>> {
         let url = format!("{}/api/vms/metrics", self.base);
         let res = self.http.get(url).send().await?;
@@ -618,7 +619,7 @@ impl ApiClient {
         Ok(body)
     }
 
-    #[allow(dead_code)]
+    #[allow(dead_code)] // Firecracker VM management — call sites removed pending re-gating under vm feature flag
     pub async fn execute_agent_task(
         &self,
         agent_id: &str,
