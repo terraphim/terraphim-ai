@@ -296,8 +296,10 @@ pub struct SerializableRoleGraph {
     /// reverse lookup - matched id into normalized term
     pub ac_reverse_nterm: AHashMap<u64, NormalizedTermValue>,
     /// Trigger descriptions for each node_id (used to rebuild TriggerIndex)
+    #[serde(default)]
     pub trigger_descriptions: AHashMap<u64, String>,
     /// Node IDs that are pinned (always included in results)
+    #[serde(default)]
     pub pinned_node_ids: Vec<u64>,
     /// Document IDs that were indexed from shared learnings
     #[serde(default)]
@@ -2301,5 +2303,31 @@ mod tests {
         // Verify trigger index is functional after restore
         let results = restored.find_matching_node_ids_with_fallback("trigger one text", false);
         assert!(results.contains(&1u64));
+    }
+
+    #[tokio::test]
+    async fn serializable_rolegraph_deserializes_without_trigger_fields() {
+        // Regression: JSON persisted before trigger_descriptions/pinned_node_ids were added
+        // must deserialise successfully with those fields defaulting to empty collections.
+        let thesaurus = Thesaurus::new("test".to_string());
+        let rg = RoleGraph::new("test".into(), thesaurus).await.unwrap();
+        let mut json_value: serde_json::Value =
+            serde_json::from_str(&rg.to_serializable().to_json().unwrap()).unwrap();
+
+        // Simulate old persisted format by removing the fields added by issue #84
+        let obj = json_value.as_object_mut().unwrap();
+        obj.remove("trigger_descriptions");
+        obj.remove("pinned_node_ids");
+        let old_json = json_value.to_string();
+
+        let result = SerializableRoleGraph::from_json(&old_json);
+        assert!(
+            result.is_ok(),
+            "deserialising old JSON without trigger_descriptions/pinned_node_ids failed: {:?}",
+            result.err()
+        );
+        let sg = result.unwrap();
+        assert!(sg.trigger_descriptions.is_empty());
+        assert!(sg.pinned_node_ids.is_empty());
     }
 }
