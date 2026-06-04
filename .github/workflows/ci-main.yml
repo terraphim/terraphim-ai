@@ -293,6 +293,18 @@ jobs:
           # slow-timeout and fail-fast are configured in .config/nextest.toml [profile.ci]
           /home/alex/.local/bin/rch exec -- cargo nextest run --release --target ${{ matrix.target }} --workspace --profile ci --features "self_update/signatures,zlob,terraphim_automata/medical"
 
+      - name: Test enrichment feature (terraphim_sessions)
+        run: |
+          # enrichment is feature-gated and not in the default nextest run.
+          # Without this step all 5 tests in the enrichment module are silently skipped.
+          /home/alex/.local/bin/rch exec -- cargo nextest run --release --target ${{ matrix.target }} -p terraphim_sessions --profile ci --features enrichment
+
+      - name: Test code-search feature (terraphim_grep)
+        run: |
+          # code-search is feature-gated and not in the default nextest run.
+          # Without this step the graceful-degradation regression guard is silently skipped.
+          /home/alex/.local/bin/rch exec -- cargo nextest run --release --target ${{ matrix.target }} -p terraphim_grep --profile ci --features code-search
+
       - name: sccache stats
         if: always()
         run: /home/alex/.local/bin/sccache --show-stats
