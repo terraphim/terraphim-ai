@@ -38,12 +38,13 @@ async fn shared_list_empty_store() {
 async fn shared_list_with_trust_level_filter() {
     let store = create_store().await;
 
-    let l1 = SharedLearning::new(
+    let mut l1 = SharedLearning::new(
         "L1 learning".to_string(),
         "content".to_string(),
         SharedLearningSource::Manual,
         "test-agent".to_string(),
     );
+    l1.promote_to_l1();
     store.insert(l1).await.expect("insert l1");
 
     let mut l2 = SharedLearning::new(
@@ -52,6 +53,7 @@ async fn shared_list_with_trust_level_filter() {
         SharedLearningSource::Manual,
         "test-agent".to_string(),
     );
+    l2.promote_to_l1();
     l2.promote_to_l2();
     store.insert(l2).await.expect("insert l2");
 
@@ -92,6 +94,7 @@ async fn shared_promote_l1_to_l2() {
     let id = learning.id.clone();
     store.insert(learning).await.expect("insert");
 
+    store.promote_to_l1(&id).await.expect("promote to l1");
     store.promote_to_l2(&id).await.expect("promote to l2");
 
     let fetched = store.get(&id).await.expect("get after promote");
@@ -124,12 +127,13 @@ async fn shared_stats_counts() {
 
     // Insert 2 L1, 1 L2
     for i in 0..2 {
-        let l = SharedLearning::new(
+        let mut l = SharedLearning::new(
             format!("L1 item {}", i),
             "content".to_string(),
             SharedLearningSource::Manual,
             "agent".to_string(),
         );
+        l.promote_to_l1();
         store.insert(l).await.expect("insert l1");
     }
 
@@ -139,6 +143,7 @@ async fn shared_stats_counts() {
         SharedLearningSource::Manual,
         "agent".to_string(),
     );
+    l2.promote_to_l1();
     l2.promote_to_l2();
     store.insert(l2).await.expect("insert l2");
 
@@ -173,7 +178,7 @@ async fn shared_import_creates_l1_entries() {
     let error = "remote: error: denied".to_string();
     let tags = vec!["git".to_string(), "push".to_string()];
 
-    let shared = SharedLearning::new(
+    let mut shared = SharedLearning::new(
         command.clone(),
         error.clone(),
         SharedLearningSource::BashHook,
@@ -182,6 +187,7 @@ async fn shared_import_creates_l1_entries() {
     .with_original_command(command)
     .with_error_context(error)
     .with_keywords(tags);
+    shared.promote_to_l1();
 
     store
         .insert(shared)
@@ -236,7 +242,8 @@ async fn shared_store_survives_restart() {
     let id = learning.id.clone();
     store.insert(learning).await.expect("insert");
 
-    // 3. Promote it to L2
+    // 3. Promote it to L2 via L1 (required promotion path: L0 → L1 → L2)
+    store.promote_to_l1(&id).await.expect("promote to l1");
     store.promote_to_l2(&id).await.expect("promote to l2");
 
     // 4. Drop the store (simulating process exit)

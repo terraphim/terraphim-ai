@@ -1,8 +1,38 @@
-# Handover: 2026-04-17 -- FFF Epic #222 Complete + Rust 1.95 Clippy Fixes
+# Handover: 2026-06-04 — Issue #2046 SharedLearningStore test fix — PR submitted
 
-**Branch**: main (clean, up to date with origin at `0cae8f77f`)
-**Previous Handover**: 2026-04-16 - Sprint Planning + 4 Feature PRs Merged + Issue Housekeeping
-**Full handover**: `.docs/handover-2026-04-17.md`
+**Agent**: Echo (implementation-swarm-1ab30634)
+**Branch**: `task/2046-fix-shared-learning-trust-levels-gh` (origin/main + 2 commits)
+**PR**: Gitea #2155 — open, awaiting review
+
+## Completed
+
+### Issue #2046 — 5 SharedLearningStore tests fail with --features shared-learning
+
+Root cause: cli tests skipped the required `L0 → promote_to_l1() → L1` step
+before calling `promote_to_l2()`. The `SharedLearning::new()` correctly
+initialises to `TrustLevel::L0`; `promote_to_l2()` requires `L1` as documented
+in `terraphim_types::shared_learning::test_promote_to_l2_requires_l1`.
+
+Fix: Added `promote_to_l1()` calls in 5 failing tests.
+Single file: `crates/terraphim_agent/tests/shared_learning_cli_tests.rs`
+
+Verification: 9/9 pass, no regressions in terraphim_types, clippy clean.
+
+## Critical context for next agent
+
+### Polyrepo split (E1-E5 complete)
+- `gitea/main` ≈ 15 crates (server, firecracker, DSM, tinyclaw, etc.)
+- `origin/main` (GitHub) ≈ 58 crates (full monorepo)
+- `terraphim_agent`, `terraphim_types`, `terraphim_sessions` are **GitHub only**
+- Any worktree based on gitea/main will be MISSING these crates
+
+### SharedLearning trust level API (strictly sequential)
+```
+L0 → promote_to_l1() → L1 → promote_to_l2() → L2 → promote_to_l3() → L3
+```
+`promote_to_l2()` is a no-op from L0. `promote_to_l3()` works unconditionally.
+
+## Previous handover (2026-04-17)
 
 ## Session Summary
 
