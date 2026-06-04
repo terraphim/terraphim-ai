@@ -1,8 +1,8 @@
-# Handover: 2026-06-03 07:20 CEST — Issue #2046 SharedLearningStore test fix
+# Handover: 2026-06-04 — Issue #2046 SharedLearningStore test fix — PR submitted
 
-**Agent**: Echo (implementation-swarm)
-**Branch**: `task/2046-fix-shared-learning-trust-levels-gh` (GitHub origin/main based)
-**PR**: GitHub #894 — open, awaiting review
+**Agent**: Echo (implementation-swarm-1ab30634)
+**Branch**: `task/2046-fix-shared-learning-trust-levels-gh` (origin/main + 2 commits)
+**PR**: Gitea #2155 — open, awaiting review
 
 ## Completed
 
