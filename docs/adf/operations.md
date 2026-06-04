@@ -53,6 +53,84 @@ journalctl -u adf-orchestrator --since '24h ago' --no-pager \
 
 ---
 
+## Rebuilding and redeploying the adf binary
+
+`systemctl restart` only reloads config; it does **not** rebuild the
+binary. After merging an orchestrator code change you must rebuild and
+reinstall `/usr/local/bin/adf`.
+
+The `adf` binary is built from the `terraphim_orchestrator` crate,
+which lives in the **terraphim-agents** repo (extracted from this
+monorepo in #1910) -- not in `terraphim-ai`. The service runs as user
+`alex` with `WorkingDirectory=/opt/ai-dark-factory` and
+`ExecStart=/usr/local/bin/adf orchestrator.toml`; the binary itself is
+`root`-owned.
+
+### Procedure
+
+```bash
+# 1. Build from a DEDICATED clone/worktree, never the agent working dir.
+#    /data/projects/terraphim/terraphim-agents is also the orchestrator's
+#    terraphim-agents project working dir; verdict agents auto-commit there
+#    and diverge `main` from origin, breaking `git merge --ff-only`
+#    (see terraphim/terraphim-ai#2199). A worktree at origin/main is clean.
+cd /data/projects/terraphim/terraphim-agents
+git fetch origin main
+git worktree add --force /home/alex/adf-build-clean origin/main
+cd /home/alex/adf-build-clean
+
+# Reuse the warm target dir so the build is incremental (~1-1.5 min).
+export PATH=$HOME/.cargo/bin:$PATH
+export CARGO_INCREMENTAL=0
+export CARGO_TARGET_DIR=/data/projects/terraphim/terraphim-agents/target
+cargo build --release --bin adf
+
+# 2. Validate the merged config BEFORE restarting. A bad agent field
+#    (e.g. an extra_projects entry referencing an unknown Project.id)
+#    makes the orchestrator refuse to start, so always --check first.
+#    The GITEA_TOKEN is a systemd Environment= directive, not a file.
+cd /opt/ai-dark-factory
+GITEA_TOKEN=$(systemctl cat adf-orchestrator.service \
+  | grep -oP 'Environment=GITEA_TOKEN=\K\S+') \
+  /usr/local/bin/adf --check orchestrator.toml
+# Expect the routing table, not "FAILED validation".
+
+# 3. Install over the running (busy) binary with an atomic rename.
+#    Plain `cp` over a running executable fails with "Text file busy".
+sudo cp -p /usr/local/bin/adf /usr/local/bin/adf.bak
+sudo cp "$CARGO_TARGET_DIR/release/adf" /usr/local/bin/adf.new
+sudo mv -f /usr/local/bin/adf.new /usr/local/bin/adf
+
+# 4. Restart (synchronous) and verify health.
+sudo systemctl restart adf-orchestrator.service
+systemctl is-active adf-orchestrator.service
+journalctl -u adf-orchestrator --since '30 sec ago' --no-pager \
+  | grep -E 'entering reconciliation loop|webhook server listening|panic|UnknownAgentProject'
+
+# 5. Clean up the build worktree.
+cd /data/projects/terraphim/terraphim-agents
+git worktree remove --force /home/alex/adf-build-clean
+```
+
+### Rollback
+
+```bash
+sudo mv -f /usr/local/bin/adf.bak /usr/local/bin/adf
+sudo systemctl restart adf-orchestrator.service
+```
+
+### Notes
+
+- `adf --check` validation runs only via the file-load path
+  (`load_and_validate`), not `from_toml`; the in-memory parse accepts
+  unknown agent fields silently, so `--check` is the gate that catches
+  a bad `Project.id` reference before it wedges startup.
+- Webhook gotcha: Gitea emits the PR action `synchronized` (past
+  tense), not `synchronize`. The handler matches both; if you add new
+  PR-action handling, use `synchronized`.
+
+---
+
 ## adf-ctl trigger
 
 `adf-ctl trigger` sends a synthetic webhook to the orchestrator. The
