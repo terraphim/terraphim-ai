@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Agent HTTP error classification** HTTP 4xx responses now classified as `ErrorGeneral` rather than `ErrorNetwork`; integration test `server_http_error_exits_1` added (Refs #1992, 2026-06-04)
 - **Redis security exposure** Docker Compose Redis service now binds to `127.0.0.1:6379` instead of `0.0.0.0:6379` to prevent unintended public exposure of the cache (Refs #1313, 2026-05-31)
 - **Nested `cargo run` in exit-code tests** replaced with `cargo_bin!` macro to avoid file-lock deadlock under concurrent `cargo test` (2026-06-01)
 - **ADF KG-router fallback respawn loop** closed after quota exit — agents no longer re-routed to `anthropic/sonnet` indefinitely when per-agent config or quota-fallback chose another provider (Refs #1793, PR#1794, 2026-05-22)

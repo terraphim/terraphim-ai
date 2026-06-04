@@ -10,6 +10,34 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tracing::{info, warn};
 
+/// Sanitise a path component, replacing dangerous characters with underscores.
+///
+/// Allows only ASCII alphanumeric characters, hyphens, underscores, and dots.
+/// Any other character (including `/`, `\`, null bytes, and `..` sequences made
+/// reachable via `/`) is replaced with `_`.  Callers that receive user-supplied
+/// strings for agent IDs or learning IDs must pass them through this function
+/// before constructing filesystem paths (CWE-22 prevention).
+fn sanitise_path_component(component: &str) -> String {
+    let sanitised: String = component
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.') {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    if sanitised != component {
+        warn!(
+            original = component,
+            sanitised = %sanitised,
+            "path component contained unsafe characters — sanitised to prevent path traversal"
+        );
+    }
+    sanitised
+}
+
 use crate::shared_learning::types::{LearningSource, QualityMetrics, SharedLearning, TrustLevel};
 
 #[derive(Error, Debug)]
@@ -111,8 +139,12 @@ impl MarkdownLearningStore {
     }
 
     /// Get the directory for a specific agent's learnings
+    ///
+    /// The `agent_id` is sanitised before joining to prevent path traversal (CWE-22).
     pub fn agent_dir(&self, agent_id: &str) -> PathBuf {
-        self.config.learnings_dir.join(agent_id)
+        self.config
+            .learnings_dir
+            .join(sanitise_path_component(agent_id))
     }
 
     /// Get the shared directory for cross-agent learnings
@@ -127,7 +159,7 @@ impl MarkdownLearningStore {
         let agent_dir = self.agent_dir(&learning.source_agent);
         tokio::fs::create_dir_all(&agent_dir).await?;
 
-        let file_path = agent_dir.join(format!("{}.md", learning.id));
+        let file_path = agent_dir.join(format!("{}.md", sanitise_path_component(&learning.id)));
         let content = Self::to_markdown(learning)?;
 
         tokio::fs::write(&file_path, content).await?;
@@ -144,7 +176,11 @@ impl MarkdownLearningStore {
         let shared_dir = self.shared_dir();
         tokio::fs::create_dir_all(&shared_dir).await?;
 
-        let file_path = shared_dir.join(format!("{}-{}.md", learning.source_agent, learning.id));
+        let file_path = shared_dir.join(format!(
+            "{}-{}.md",
+            sanitise_path_component(&learning.source_agent),
+            sanitise_path_component(&learning.id)
+        ));
         let content = Self::to_markdown(learning)?;
 
         tokio::fs::write(&file_path, content).await?;
@@ -163,7 +199,9 @@ impl MarkdownLearningStore {
         agent_id: &str,
         learning_id: &str,
     ) -> Result<SharedLearning, MarkdownStoreError> {
-        let file_path = self.agent_dir(agent_id).join(format!("{}.md", learning_id));
+        let file_path = self
+            .agent_dir(agent_id)
+            .join(format!("{}.md", sanitise_path_component(learning_id)));
         self.load_from_path(&file_path).await
     }
 
@@ -241,7 +279,9 @@ impl MarkdownLearningStore {
         agent_id: &str,
         learning_id: &str,
     ) -> Result<(), MarkdownStoreError> {
-        let file_path = self.agent_dir(agent_id).join(format!("{}.md", learning_id));
+        let file_path = self
+            .agent_dir(agent_id)
+            .join(format!("{}.md", sanitise_path_component(learning_id)));
         tokio::fs::remove_file(&file_path).await?;
         info!("Deleted learning {} from agent {}", learning_id, agent_id);
         Ok(())
@@ -637,5 +677,100 @@ This is content from an old learning.
 
         let all = store.list_all().await.unwrap();
         assert!(all.is_empty());
+    }
+
+    // -- Path traversal regression tests (CWE-22) --
+
+    #[test]
+    fn test_sanitise_path_component_strips_slashes() {
+        assert_eq!(sanitise_path_component("../../../etc"), ".._.._.._etc");
+        assert_eq!(sanitise_path_component("/etc/passwd"), "_etc_passwd");
+        assert_eq!(sanitise_path_component("a\\b"), "a_b");
+    }
+
+    #[test]
+    fn test_sanitise_path_component_preserves_safe_chars() {
+        assert_eq!(sanitise_path_component("agent-1"), "agent-1");
+        assert_eq!(sanitise_path_component("my_agent.v2"), "my_agent.v2");
+        assert_eq!(
+            sanitise_path_component("abc123-ABC_def.0"),
+            "abc123-ABC_def.0"
+        );
+    }
+
+    #[test]
+    fn test_sanitise_path_component_strips_null_bytes() {
+        let with_null = "agent\x00id";
+        let sanitised = sanitise_path_component(with_null);
+        assert!(!sanitised.contains('\x00'));
+        assert_eq!(sanitised, "agent_id");
+    }
+
+    #[tokio::test]
+    async fn test_agent_dir_is_contained_when_id_has_traversal() {
+        let temp_dir = TempDir::new().unwrap();
+        let config = MarkdownStoreConfig {
+            learnings_dir: temp_dir.path().to_path_buf(),
+            shared_dir_name: "shared".to_string(),
+        };
+        let store = MarkdownLearningStore::with_config(config);
+
+        let dir = store.agent_dir("../../../etc");
+        assert!(
+            dir.starts_with(temp_dir.path()),
+            "agent_dir must remain within learnings_dir after sanitisation, got: {:?}",
+            dir
+        );
+    }
+
+    #[tokio::test]
+    async fn test_save_with_traversal_agent_stays_inside_learnings_dir() {
+        let temp_dir = TempDir::new().unwrap();
+        let config = MarkdownStoreConfig {
+            learnings_dir: temp_dir.path().to_path_buf(),
+            shared_dir_name: "shared".to_string(),
+        };
+        let store = MarkdownLearningStore::with_config(config);
+
+        let learning = SharedLearning::new(
+            "Traversal Test".to_string(),
+            "Body".to_string(),
+            LearningSource::AutoExtract,
+            "../../../etc".to_string(),
+        );
+
+        store.save(&learning).await.unwrap();
+
+        // The file must live inside temp_dir, not escape to /etc
+        let agent_dir = store.agent_dir("../../../etc");
+        assert!(
+            agent_dir.starts_with(temp_dir.path()),
+            "Saved file must stay inside learnings_dir: {:?}",
+            agent_dir
+        );
+    }
+
+    #[tokio::test]
+    async fn test_save_to_shared_with_traversal_stays_inside_shared_dir() {
+        let temp_dir = TempDir::new().unwrap();
+        let config = MarkdownStoreConfig {
+            learnings_dir: temp_dir.path().to_path_buf(),
+            shared_dir_name: "shared".to_string(),
+        };
+        let store = MarkdownLearningStore::with_config(config);
+
+        let learning = SharedLearning::new(
+            "Shared Traversal Test".to_string(),
+            "Body".to_string(),
+            LearningSource::AutoExtract,
+            "../../passwd".to_string(),
+        );
+
+        store.save_to_shared(&learning).await.unwrap();
+
+        let shared = store.list_shared().await.unwrap();
+        assert_eq!(shared.len(), 1);
+        // The sanitised source_agent must appear in the title match, confirming the file loaded
+        assert_eq!(shared[0].title, "Shared Traversal Test");
     }
 }
