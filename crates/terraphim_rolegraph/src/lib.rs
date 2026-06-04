@@ -1493,7 +1493,6 @@ mod tests {
     use super::*;
 
     use terraphim_automata::{AutomataPath, load_thesaurus};
-    use tokio::test;
     use ulid::Ulid;
 
     async fn load_sample_thesaurus() -> Thesaurus {
@@ -1502,7 +1501,7 @@ mod tests {
             .unwrap()
     }
 
-    #[test]
+    #[tokio::test]
     async fn test_split_paragraphs() {
         let paragraph = "This is the first sentence.\n\n This is the second sentence. This is the second sentence? This is the second sentence| This is the second sentence!\n\nThis is the third sentence. Mr. John Johnson Jr. was born in the U.S.A but earned his Ph.D. in Israel before joining Nike Inc. as an engineer. He also worked at craigslist.org as a business analyst.";
         let sentences = split_paragraphs(paragraph);
@@ -1524,7 +1523,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[tokio::test]
     async fn test_find_matching_node_idss() {
         let query = "I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, project direction, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
         let role = "system operator".to_string();
@@ -1536,7 +1535,7 @@ mod tests {
         assert_eq!(matches.len(), 7);
     }
 
-    #[test]
+    #[tokio::test]
     async fn test_find_matching_node_idss_ac_values() {
         let query = "life cycle framework I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, project direction, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
         let role = "system operator".to_string();
@@ -1556,7 +1555,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[tokio::test]
     async fn test_terraphim_engineer() {
         let role_name = "Terraphim Engineer".to_string();
         const DEFAULT_HAYSTACK_PATH: &str = "docs/src/";
@@ -1663,7 +1662,7 @@ mod tests {
         println!("Edges count {:?}", rolegraph.edges.len());
     }
 
-    #[test]
+    #[tokio::test]
     async fn test_rolegraph() {
         let role = "system operator".to_string();
         let mut rolegraph = RoleGraph::new(role.into(), load_sample_thesaurus().await)
@@ -1722,7 +1721,7 @@ mod tests {
         assert_eq!(results.len(), 4);
     }
 
-    #[test]
+    #[tokio::test]
     #[ignore]
     async fn test_is_all_terms_connected_by_path_true() {
         let role = "system operator".to_string();
@@ -1733,7 +1732,7 @@ mod tests {
         assert!(rolegraph.is_all_terms_connected_by_path(text));
     }
 
-    #[test]
+    #[tokio::test]
     async fn test_is_all_terms_connected_by_path_false() {
         let role = "system operator".to_string();
         let rolegraph = RoleGraph::new(role.into(), load_sample_thesaurus().await)
@@ -2158,14 +2157,14 @@ mod tests {
     }
 
     // TriggerIndex unit tests
-    #[test]
+    #[tokio::test]
     async fn tfidf_empty_index_returns_empty() {
         let index = TriggerIndex::new(0.3);
         let results = index.query("any query");
         assert!(results.is_empty());
     }
 
-    #[test]
+    #[tokio::test]
     async fn tfidf_exact_match_scores_high() {
         let mut index = TriggerIndex::new(0.3);
         let mut triggers = AHashMap::new();
@@ -2178,7 +2177,7 @@ mod tests {
         assert!(results[0].1 >= 0.3); // Above threshold
     }
 
-    #[test]
+    #[tokio::test]
     async fn tfidf_no_match_scores_zero() {
         let mut index = TriggerIndex::new(0.3);
         let mut triggers = AHashMap::new();
@@ -2190,7 +2189,7 @@ mod tests {
         assert!(results.is_empty() || results.iter().all(|(_, score)| *score < 0.3));
     }
 
-    #[test]
+    #[tokio::test]
     async fn tfidf_partial_match() {
         let mut index = TriggerIndex::new(0.1); // Lower threshold for partial match
         let mut triggers = AHashMap::new();
@@ -2203,7 +2202,7 @@ mod tests {
         assert!(results[0].1 > 0.0 && results[0].1 < 1.0);
     }
 
-    #[test]
+    #[tokio::test]
     async fn tfidf_threshold_filters() {
         let mut index = TriggerIndex::new(0.8); // High threshold
         let mut triggers = AHashMap::new();
@@ -2219,7 +2218,7 @@ mod tests {
     }
 
     // Integration tests for two-pass search
-    #[test]
+    #[tokio::test]
     async fn two_pass_aho_corasick_first() {
         // Create a simple scenario where Aho-Corasick finds matches
         let mut index = TriggerIndex::new(0.3);
@@ -2305,7 +2304,7 @@ mod tests {
         assert!(results.contains(&1u64));
     }
 
-    #[test]
+    #[tokio::test]
     async fn serde_default_round_trip_old_json_without_trigger_fields() {
         // Simulate a persisted SerializableRoleGraph written before issue #84 was merged.
         // We serialise a fresh RoleGraph, strip trigger_descriptions and pinned_node_ids
