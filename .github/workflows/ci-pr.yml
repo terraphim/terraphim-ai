@@ -442,6 +442,13 @@ jobs:
           # slow-timeout and fail-fast are configured in .config/nextest.toml [profile.ci]
           /home/alex/.local/bin/rch exec -- cargo nextest run --workspace --profile ci --lib --bins --features zlob
 
+      - name: Run terraphim_grep code-search feature tests
+        # The code-search feature is excluded from terraphim_grep's default features;
+        # the workspace nextest run above never exercises it. This step ensures the
+        # graceful-degradation guard (D005) is verified on every PR. Refs #2172.
+        run: |
+          /home/alex/.local/bin/rch exec -- cargo nextest run -p terraphim_grep --features code-search --profile ci
+
       - name: sccache stats
         if: always()
         run: /home/alex/.local/bin/sccache --show-stats
