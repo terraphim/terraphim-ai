@@ -3,12 +3,12 @@
 //! This module provides smart execution mode selection based on risk assessment,
 //! command type, and available infrastructure.
 
+#[cfg(feature = "firecracker")]
+use super::FirecrackerExecutor;
 use super::{
     CommandDefinition, CommandExecutionError, CommandExecutionResult, ExecutionMode,
     ExecutorCapabilities, LocalExecutor,
 };
-#[cfg(feature = "firecracker")]
-use super::FirecrackerExecutor;
 use crate::commands::RiskLevel;
 use std::collections::HashMap;
 
