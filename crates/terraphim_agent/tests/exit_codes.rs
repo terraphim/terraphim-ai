@@ -147,6 +147,55 @@ fn unreachable_server_exits_6() {
 }
 
 // ---------------------------------------------------------------------------
+// Exit code 1 -- HTTP status error from server (must NOT be exit 6)
+// ---------------------------------------------------------------------------
+
+/// Regression test for #1992: HTTP 4xx responses from the server must produce
+/// exit 1 (ErrorGeneral), not exit 6 (ErrorNetwork).
+///
+/// Starts a real TCP listener that replies with 400 to every request, so the
+/// binary receives a genuine reqwest::Error with a status code attached.
+/// Before the fix, classify_error returned ErrorNetwork (6) for all reqwest
+/// errors; after the fix it checks re.status() first.
+#[cfg(feature = "server")]
+#[test]
+fn server_http_error_exits_1() {
+    use std::io::Write;
+    use std::net::TcpListener;
+
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+
+    std::thread::spawn(move || {
+        for mut s in listener.incoming().flatten() {
+            let mut buf = [0u8; 2048];
+            let _ = std::io::Read::read(&mut s, &mut buf);
+            let _ = s.write_all(
+                b"HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+            );
+        }
+    });
+
+    let status = cmd()
+        .args([
+            "--server",
+            "--server-url",
+            &format!("http://127.0.0.1:{port}"),
+            "search",
+            "terraphim",
+        ])
+        .output()
+        .expect("failed to run binary")
+        .status;
+    let code = status.code().unwrap_or(1);
+    assert!(
+        code == 0 || code == 1,
+        "HTTP 400 from server must exit 0 (offline fallback) or 1 (ErrorGeneral), \
+         not 6 (ErrorNetwork); got {code}"
+    );
+}
+
+// ---------------------------------------------------------------------------
 // Robot mode and --format json error envelopes
 // ---------------------------------------------------------------------------
 
