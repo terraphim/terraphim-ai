@@ -6351,7 +6351,12 @@ impl AgentOrchestrator {
                 .map(|s| pr_gate::CommitStatusSummary {
                     context: s.context,
                     state: pr_gate::CommitStatusState::from_api_str(&s.state),
-                    created_at_unix: s.created_at.and_then(|ts| ts.parse::<i64>().ok()),
+                    created_at_unix: s.created_at.and_then(|ts| {
+                        // Gitea returns RFC 3339 strings, not bare i64.
+                        chrono::DateTime::parse_from_rfc3339(&ts)
+                            .ok()
+                            .map(|dt| dt.timestamp())
+                    }),
                 })
                 .collect();
 

@@ -254,9 +254,55 @@ pub fn latest_reviewer_comment(comments: &[PrComment]) -> Option<&PrComment> {
         })
 }
 
+/// C3 defence-in-depth: scan a comment body for an explicit `Verdict: PASS`
+/// or `Verdict: FAIL` line emitted by ADF agents.
+///
+/// Returns `Some(true)` when the body contains `Verdict: PASS` (case-
+/// insensitive prefix match on trimmed lines), `Some(false)` when it contains
+/// `Verdict: FAIL`, and `None` when no such line is present.
+///
+/// When both a PASS and a FAIL line appear (malformed comment), FAIL wins.
+pub fn parse_verdict_text(body: &str) -> Option<bool> {
+    let mut found_pass = false;
+    let mut found_fail = false;
+    for line in body.lines() {
+        let t = line.trim().to_ascii_lowercase();
+        if t.starts_with("verdict: fail") {
+            found_fail = true;
+        } else if t.starts_with("verdict: pass") {
+            found_pass = true;
+        }
+    }
+    if found_fail {
+        return Some(false);
+    }
+    if found_pass {
+        return Some(true);
+    }
+    None
+}
+
 /// Pure evaluator: given a PR + its comments + the merge policy, decide
 /// whether to enqueue an auto-merge, ask for human review, or report a
 /// parsing issue.
+///
+/// # C3 defence-in-depth
+///
+/// In addition to the structural parse/evaluate gate, this function checks for
+/// an explicit `Verdict: FAIL` line in the reviewer comment body. When found,
+/// the PR is blocked even if the structural parse would otherwise pass. This
+/// prevents a scenario where an agent exits 0 but embeds a failure verdict in
+/// its comment.
+///
+/// Fail-safe: if no `Verdict: PASS/FAIL` line is present, the function falls
+/// through to the structural evaluation as before (no regression).
+///
+/// # C2 caveat
+///
+/// `pr.mergeable` from Gitea is unreliable for PRs that pre-date the
+/// `required_merge_contexts` opt-in: a never-reported required context is not
+/// treated as blocking by Gitea's `mergeable` flag. Callers must NOT treat
+/// `mergeable=true` as a sufficient gate for pre-opt-in PRs.
 pub fn evaluate_pr_verdict(
     pr: &PrSummary,
     comments: &[PrComment],
@@ -265,6 +311,14 @@ pub fn evaluate_pr_verdict(
     let Some(latest) = latest_reviewer_comment(comments) else {
         return EvaluationOutcome::NoReviewerComment;
     };
+
+    // C3: check for explicit Verdict: FAIL before structural parse.
+    if let Some(false) = parse_verdict_text(&latest.body) {
+        return EvaluationOutcome::HumanReviewNeeded {
+            reason: "agent posted explicit `Verdict: FAIL` in review comment (C3 cross-check)"
+                .to_string(),
+        };
+    }
 
     let verdict: ReviewVerdict = match pr_review::parse_verdict(&latest.body, latest.id) {
         Ok(v) => v,
@@ -537,6 +591,84 @@ mod tests {
         let c = comment(7, PR_REVIEWER_LOGIN, "garbage", "2026-01-01T00:00:00Z");
         let out = evaluate_pr_verdict(&p, &[c], &AutoMergeCriteria::default());
         assert!(matches!(out, EvaluationOutcome::ParseError { .. }));
+    }
+
+    // --- C3 verdict-TEXT cross-check tests ---
+
+    #[test]
+    fn parse_verdict_text_returns_none_when_absent() {
+        assert_eq!(parse_verdict_text("No verdict line here"), None);
+        assert_eq!(parse_verdict_text(""), None);
+        assert_eq!(parse_verdict_text("Verdict:"), None); // no PASS/FAIL
+    }
+
+    #[test]
+    fn parse_verdict_text_detects_pass() {
+        assert_eq!(parse_verdict_text("Verdict: PASS"), Some(true));
+        assert_eq!(parse_verdict_text("verdict: pass"), Some(true));
+        assert_eq!(
+            parse_verdict_text("some preamble\nVerdict: PASS\ntrailing"),
+            Some(true)
+        );
+    }
+
+    #[test]
+    fn parse_verdict_text_detects_fail() {
+        assert_eq!(parse_verdict_text("Verdict: FAIL"), Some(false));
+        assert_eq!(parse_verdict_text("verdict: fail"), Some(false));
+        assert_eq!(
+            parse_verdict_text("some preamble\nVerdict: FAIL\ntrailing"),
+            Some(false)
+        );
+    }
+
+    #[test]
+    fn parse_verdict_text_fail_wins_when_both_present() {
+        // Malformed comment: FAIL beats PASS.
+        assert_eq!(
+            parse_verdict_text("Verdict: PASS\nVerdict: FAIL"),
+            Some(false)
+        );
+    }
+
+    #[test]
+    fn evaluate_verdict_blocks_on_explicit_fail_text() {
+        let p = pr(1, "claude-code", "abc", 10);
+        // A reviewer comment that contains an explicit Verdict: FAIL line.
+        // The structural fields are valid but C3 should block before they're evaluated.
+        let body = "<h3>Confidence Score: 5/5</h3>\n<h3>Inline Findings</h3>\nVerdict: FAIL\n<sub>Last reviewed commit: abc123</sub>";
+        let c = comment(1, PR_REVIEWER_LOGIN, body, "2026-01-01T00:00:00Z");
+        let out = evaluate_pr_verdict(&p, &[c], &AutoMergeCriteria::default());
+        assert!(
+            matches!(&out, EvaluationOutcome::HumanReviewNeeded { reason } if reason.contains("C3")),
+            "expected C3 HumanReviewNeeded, got: {out:?}"
+        );
+    }
+
+    #[test]
+    fn evaluate_verdict_allows_on_explicit_pass_text() {
+        let p = pr(1, "claude-code", "abc", 10);
+        // Valid structural body + explicit Verdict: PASS — must not block.
+        let body = "<h3>Confidence Score: 5/5</h3>\n<h3>Inline Findings</h3>\nVerdict: PASS\n<sub>Last reviewed commit: abc123</sub>";
+        let c = comment(1, PR_REVIEWER_LOGIN, body, "2026-01-01T00:00:00Z");
+        let out = evaluate_pr_verdict(&p, &[c], &AutoMergeCriteria::default());
+        assert!(
+            matches!(out, EvaluationOutcome::Merge { .. }),
+            "expected Merge, got: {out:?}"
+        );
+    }
+
+    #[test]
+    fn evaluate_verdict_allows_without_verdict_text() {
+        let p = pr(1, "claude-code", "abc", 10);
+        // No Verdict: line at all — fail-safe, falls through to structural eval.
+        let body = "<h3>Confidence Score: 5/5</h3>\n<h3>Inline Findings</h3>\n<sub>Last reviewed commit: abc123</sub>";
+        let c = comment(1, PR_REVIEWER_LOGIN, body, "2026-01-01T00:00:00Z");
+        let out = evaluate_pr_verdict(&p, &[c], &AutoMergeCriteria::default());
+        assert!(
+            matches!(out, EvaluationOutcome::Merge { .. }),
+            "expected Merge (fail-safe), got: {out:?}"
+        );
     }
 
     #[test]
