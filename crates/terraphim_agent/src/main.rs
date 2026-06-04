@@ -1319,7 +1319,7 @@ fn emit_robot_error_and_exit(
     if robot || !matches!(format, OutputFormat::Human) {
         use crate::robot::schema::{ResponseMeta, RobotError, RobotResponse};
         let meta = ResponseMeta::new("unknown");
-        let robot_error = RobotError::new(format!("E{:03}", code.code()), format!("{:#}", err));
+        let robot_error = RobotError::new(format!("E{:03}", code.code()), format!("{}", err));
         let response = RobotResponse::<()>::error(vec![robot_error], meta);
         if let Ok(json) = serde_json::to_string(&response) {
             println!("{}", json);
