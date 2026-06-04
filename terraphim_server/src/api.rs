@@ -81,6 +81,13 @@ pub(crate) async fn search_documents(
 ) -> Result<Json<SearchResponse>> {
     log::debug!("search_document called with {:?}", search_query);
 
+    if search_query.0.search_term.as_str().is_empty() {
+        return Err(crate::error::ApiError(
+            StatusCode::BAD_REQUEST,
+            anyhow::anyhow!("search_term must not be empty"),
+        ));
+    }
+
     let mut terraphim_service = TerraphimService::new(app_state.config_state);
     let results = terraphim_service.search(&search_query.0).await?;
     let total = results.len();
@@ -99,6 +106,13 @@ pub(crate) async fn search_documents_post(
     search_query: Json<SearchQuery>,
 ) -> Result<Json<SearchResponse>> {
     log::debug!("POST Searching documents with query: {search_query:?}");
+
+    if search_query.search_term.as_str().is_empty() {
+        return Err(crate::error::ApiError(
+            StatusCode::BAD_REQUEST,
+            anyhow::anyhow!("search_term must not be empty"),
+        ));
+    }
 
     let mut terraphim_service = TerraphimService::new(app_state.config_state);
     let results = terraphim_service.search(&search_query).await?;

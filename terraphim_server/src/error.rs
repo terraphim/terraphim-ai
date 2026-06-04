@@ -86,6 +86,16 @@ fn status_code_from_category(category: ErrorCategory) -> StatusCode {
 }
 
 fn status_code_from_error(error: &anyhow::Error) -> StatusCode {
+    // anyhow's own downcast_ref is more reliable than dyn Error chain inspection
+    // because it uses anyhow's internal type tracking rather than dyn Any.
+    if let Some(service_err) = error.downcast_ref::<terraphim_service::ServiceError>() {
+        return status_code_from_category(service_err.category());
+    }
+    if let Some(common_err) = error.downcast_ref::<CommonError>() {
+        return status_code_from_category(common_err.category());
+    }
+
+    // Walk the source chain for errors wrapped inside other errors.
     for cause in error.chain() {
         if let Some(service_err) = cause.downcast_ref::<terraphim_service::ServiceError>() {
             return status_code_from_category(service_err.category());
