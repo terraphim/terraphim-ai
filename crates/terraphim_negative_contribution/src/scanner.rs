@@ -10,21 +10,30 @@ const SUPPRESSION_MARKER: &str = "terraphim: allow(stub)";
 const SCANNER_AGENT_NAME: &str = "edm-scanner";
 
 #[derive(Debug, Clone)]
+/// Scans Rust source files for Explicit Deferral Markers (EDMs).
+///
+/// Uses an Aho-Corasick automaton built from the bundled `edm_tier1.json`
+/// thesaurus to locate `todo!`, `unimplemented!`, `#[allow(dead_code)]`,
+/// and similar markers. Non-production files (tests, examples, benches) are
+/// skipped automatically.
 pub struct NegativeContributionScanner {
     thesaurus: Thesaurus,
 }
 
 impl NegativeContributionScanner {
+    /// Creates a scanner using the bundled EDM tier-1 thesaurus.
     pub fn new() -> Self {
         let thesaurus = load_thesaurus_from_json(DEFAULT_EDM_TIER1_JSON)
             .expect("Failed to load embedded edm_tier1.json");
         Self { thesaurus }
     }
 
+    /// Creates a scanner with a custom thesaurus.
     pub fn from_thesaurus(thesaurus: Thesaurus) -> Self {
         Self { thesaurus }
     }
 
+    /// Scans a single file, returning one [`ReviewFinding`] per EDM match.
     pub fn scan_file(&self, path: &str, content: &str) -> Vec<ReviewFinding> {
         if is_non_production(path, content) {
             return Vec::new();
@@ -68,6 +77,7 @@ impl NegativeContributionScanner {
         findings
     }
 
+    /// Scans a batch of `(path, content)` pairs, aggregating all findings.
     pub fn scan_files(&self, files: &[(String, String)]) -> Vec<ReviewFinding> {
         files
             .iter()
@@ -75,6 +85,7 @@ impl NegativeContributionScanner {
             .collect()
     }
 
+    /// Scans a batch of files and returns a [`ReviewAgentOutput`] ready for agent consumption.
     pub fn scan_to_output(&self, files: &[(String, String)]) -> ReviewAgentOutput {
         let findings = self.scan_files(files);
         let pass = findings.is_empty();
@@ -100,6 +111,7 @@ impl NegativeContributionScanner {
         }
     }
 
+    /// Returns a reference to the underlying EDM thesaurus.
     pub fn thesaurus(&self) -> &Thesaurus {
         &self.thesaurus
     }

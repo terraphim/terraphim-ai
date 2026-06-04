@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+/// A Discourse forum post returned by the search API, normalised for indexing.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Post {
     pub id: u64,

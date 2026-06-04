@@ -4,6 +4,10 @@ use url::Url;
 
 use crate::models::{Post, PostDetailsResponse, SearchResponse};
 
+/// HTTP client for the Discourse search API.
+///
+/// Authenticates via API key and converts search results into
+/// [`terraphim_types::Document`]s for indexing.
 pub struct DiscourseClient {
     client: Client,
     base_url: Url,
@@ -12,6 +16,7 @@ pub struct DiscourseClient {
 }
 
 impl DiscourseClient {
+    /// Creates a new `DiscourseClient` authenticated with the given API key and username.
     pub fn new(base_url: &str, api_key: &str, api_username: &str) -> Result<Self> {
         let base_url = Url::parse(base_url).context("Failed to parse base URL")?;
         println!("Initializing Discourse client for URL: {}", base_url);
