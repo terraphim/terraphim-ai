@@ -442,6 +442,12 @@ jobs:
           # slow-timeout and fail-fast are configured in .config/nextest.toml [profile.ci]
           /home/alex/.local/bin/rch exec -- cargo nextest run --workspace --profile ci --lib --bins --features zlob
 
+      - name: Run terraphim_sessions feature-gated tests (tsa-full)
+        run: |
+          # tsa-full gates ClaCursorConnector and its unit test; without this flag
+          # the cursor connector stub compiles and the real test silently skips.
+          /home/alex/.local/bin/rch exec -- cargo nextest run -p terraphim_sessions --profile ci --features tsa-full
+
       - name: sccache stats
         if: always()
         run: /home/alex/.local/bin/sccache --show-stats
