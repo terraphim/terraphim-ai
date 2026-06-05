@@ -386,6 +386,13 @@ step_create_github() {
             --clone=false
     fi
 
+    # Ensure crates.io token is available on GitHub for publish workflow
+    if [ -n "${CARGO_REGISTRY_TOKEN:-}" ]; then
+        log "Setting CARGO_REGISTRY_TOKEN secret on GitHub repo"
+        printf '%s\n' "$CARGO_REGISTRY_TOKEN" | gh secret set CARGO_REGISTRY_TOKEN \
+            --repo "$GITHUB_OWNER/$REPO" 2>/dev/null || log "WARNING: could not set CARGO_REGISTRY_TOKEN secret"
+    fi
+
     cd "$REPO_DIR"
     git checkout "$PUBLISH_BRANCH"
 }
