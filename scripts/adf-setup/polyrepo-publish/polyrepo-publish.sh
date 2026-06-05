@@ -159,12 +159,17 @@ step_rewrite_cargo() {
 }
 
 # ---------------------------------------------------------------------------
-# Step 4: Commit rewrite to publish branch, push to Gitea
+# Step 4: Commit rewrite + workflows to publish branch, push to Gitea
 # ---------------------------------------------------------------------------
 step_prepare_gitea_branch() {
     cd "$REPO_DIR"
 
     git checkout -B "$PUBLISH_BRANCH"
+
+    # Inject GitHub Actions workflows now so they are part of the same
+    # publish branch that Gitea CI validates and that later merges back
+    # to Gitea main. This keeps both remotes in sync.
+    inject_github_workflows
 
     local changed
     changed=$(git diff --name-only | wc -l)
@@ -184,6 +189,112 @@ step_prepare_gitea_branch() {
     git push "$push_url" "$PUBLISH_BRANCH" --force
 
     log "Pushed $PUBLISH_BRANCH to Gitea"
+}
+
+# ---------------------------------------------------------------------------
+# Helper: inject GitHub Actions CI and publish-crates workflows
+# ---------------------------------------------------------------------------
+inject_github_workflows() {
+    mkdir -p .github/workflows
+
+    cat > .github/workflows/ci.yml << 'WORKFLOW'
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo build --workspace
+      - run: cargo test --workspace --lib --no-fail-fast
+WORKFLOW
+
+    cat > .github/workflows/publish-crates.yml << 'WORKFLOW'
+name: Publish Crates
+on:
+  workflow_dispatch:
+    inputs:
+      crate_list:
+        description: Space-separated crate package names to publish in order
+        required: true
+        type: string
+      dry_run:
+        description: Run cargo publish --dry-run only
+        required: false
+        default: "true"
+        type: choice
+        options: ["true", "false"]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: 1password/install-cli-action@v2
+      - name: Verify 1Password service account secret
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+        run: |
+          if [ -z "$OP_SERVICE_ACCOUNT_TOKEN" ]; then
+            echo "ERROR: OP_SERVICE_ACCOUNT_TOKEN secret is not configured." >&2
+            echo "Set it as a repository or organisation secret to enable crates.io publishing." >&2
+            exit 1
+          fi
+      - name: Get crates.io token from 1Password
+        id: token
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+        run: |
+          TOKEN=$(op read "op://TerraphimPlatform/crates.io.token/token")
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+      - name: Publish crates in dependency order
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.token.outputs.token }}
+          CRATE_LIST: ${{ inputs.crate_list }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          for crate in $CRATE_LIST; do
+            manifest="crates/$crate/Cargo.toml"
+            if [ ! -f "$manifest" ]; then
+              echo "Missing manifest for $crate at $manifest" >&2
+              exit 1
+            fi
+            version=$(grep -m1 '^version' "$manifest" | sed 's/.*"\(.*\)".*/\1/')
+            if curl -fsS "https://crates.io/api/v1/crates/$crate/$version" >/dev/null 2>&1; then
+              echo "$crate $version already exists on crates.io; skipping"
+              continue
+            fi
+            if [ "$DRY_RUN" = "true" ]; then
+              cargo publish --manifest-path "$manifest" --dry-run
+            else
+              cargo publish --manifest-path "$manifest"
+            fi
+          done
+WORKFLOW
 }
 
 # ---------------------------------------------------------------------------
@@ -263,92 +374,6 @@ step_create_github() {
 
     cd "$REPO_DIR"
     git checkout "$PUBLISH_BRANCH"
-    mkdir -p .github/workflows
-
-    cat > .github/workflows/ci.yml << 'WORKFLOW'
-name: CI
-on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-  workflow_dispatch:
-
-env:
-  CARGO_TERM_COLOR: always
-  RUST_BACKTRACE: 1
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-      - uses: Swatinem/rust-cache@v2
-      - run: cargo fmt --all -- --check
-      - run: cargo clippy --workspace --all-targets -- -D warnings
-      - run: cargo build --workspace
-      - run: cargo test --workspace --lib --no-fail-fast
-WORKFLOW
-
-    cat > .github/workflows/publish-crates.yml << 'WORKFLOW'
-name: Publish Crates
-on:
-  workflow_dispatch:
-    inputs:
-      crate_list:
-        description: Space-separated crate package names to publish in order
-        required: true
-        type: string
-      dry_run:
-        description: Run cargo publish --dry-run only
-        required: false
-        default: "true"
-        type: choice
-        options: ["true", "false"]
-
-env:
-  CARGO_TERM_COLOR: always
-
-jobs:
-  publish:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - name: Publish crates in dependency order
-        env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-          CRATE_LIST: ${{ inputs.crate_list }}
-          DRY_RUN: ${{ inputs.dry_run }}
-        run: |
-          set -euo pipefail
-          for crate in $CRATE_LIST; do
-            manifest="crates/$crate/Cargo.toml"
-            if [ ! -f "$manifest" ]; then
-              echo "Missing manifest for $crate at $manifest" >&2
-              exit 1
-            fi
-            version=$(grep -m1 '^version' "$manifest" | sed 's/.*"\(.*\)".*/\1/')
-            if curl -fsS "https://crates.io/api/v1/crates/$crate/$version" >/dev/null 2>&1; then
-              echo "$crate $version already exists on crates.io; skipping"
-              continue
-            fi
-            if [ "$DRY_RUN" = "true" ]; then
-              cargo publish --manifest-path "$manifest" --dry-run
-            else
-              cargo publish --manifest-path "$manifest"
-            fi
-          done
-WORKFLOW
-
-    git add .github/workflows/ci.yml .github/workflows/publish-crates.yml
-    git diff --cached --quiet || git commit -m "ci: add GitHub Actions CI and crates publish workflows"
 }
 
 # ---------------------------------------------------------------------------
