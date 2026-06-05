@@ -10,8 +10,11 @@ use std::fmt;
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExitCode {
+    /// All PRs evaluated and merged without errors.
     Success = 0,
+    /// One or more PR evaluations failed; non-critical.
     EvaluationFailures = 1,
+    /// A critical failure occurred; manual intervention required.
     Critical = 2,
 }
 
@@ -103,7 +106,7 @@ mod tests {
     }
 }
 
-/// Error type for the merge-coordinator surface.
+/// Describes merge-coordinator failure variants.
 #[derive(Debug, thiserror::Error)]
 pub enum MergeCoordinatorError {
     #[error("PID lock held by another instance (pid={pid}, age_secs={age_secs})")]

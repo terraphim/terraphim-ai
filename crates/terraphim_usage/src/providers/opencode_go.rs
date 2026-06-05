@@ -1,11 +1,13 @@
 use crate::{MetricLine, ProgressFormat, ProviderUsage, Result, UsageError, UsageProvider};
 use std::path::PathBuf;
 
+/// Represents a usage provider that reads usage data from the OpenCode Go SQLite database.
 pub struct OpenCodeGoProvider {
     db_path: PathBuf,
 }
 
 impl OpenCodeGoProvider {
+    /// Creates a new `OpenCodeGoProvider` using the default database path.
     pub fn new() -> Self {
         let home = std::env::var("HOME").unwrap_or_default();
         Self {
@@ -13,6 +15,7 @@ impl OpenCodeGoProvider {
         }
     }
 
+    /// Creates an `OpenCodeGoProvider` using the specified SQLite database path.
     pub fn with_db_path(path: PathBuf) -> Self {
         Self { db_path: path }
     }

@@ -8,6 +8,7 @@ use terraphim_service::llm::LlmClient;
 use crate::error::Result;
 use crate::signatures::NewConcept;
 
+/// Represents the RLM-based knowledge-graph curation pipeline (requires the `llm` feature).
 #[cfg(feature = "llm")]
 pub struct KgCurationRlm {
     llm_client: Arc<dyn LlmClient>,
@@ -16,6 +17,7 @@ pub struct KgCurationRlm {
 
 #[cfg(feature = "llm")]
 impl KgCurationRlm {
+    /// Builds a new `KgCurationRlm` backed by the supplied LLM client.
     pub fn new(llm_client: Arc<dyn LlmClient>) -> Self {
         Self {
             llm_client,
@@ -23,11 +25,13 @@ impl KgCurationRlm {
         }
     }
 
+    /// Sets the filesystem path where extracted concept markdown files are persisted.
     pub fn with_kg_path(mut self, path: std::path::PathBuf) -> Self {
         self.kg_path = Some(path);
         self
     }
 
+    /// Extracts new KG concepts from the query and RLM answer, then persists them to disk.
     pub async fn extract_and_index(
         &self,
         query: &str,
@@ -124,6 +128,7 @@ impl KgCurationRlm {
     }
 }
 
+/// Represents a stub `KgCurationRlm` used when the `llm` feature is disabled.
 #[cfg(not(feature = "llm"))]
 pub struct KgCurationRlm;
 
@@ -136,10 +141,12 @@ impl Default for KgCurationRlm {
 
 #[cfg(not(feature = "llm"))]
 impl KgCurationRlm {
+    /// Builds a new no-op `KgCurationRlm` stub when the `llm` feature is disabled.
     pub fn new() -> Self {
         Self
     }
 
+    /// Returns an error indicating that the `llm` feature is not enabled.
     pub async fn extract_and_index(
         &self,
         _query: &str,

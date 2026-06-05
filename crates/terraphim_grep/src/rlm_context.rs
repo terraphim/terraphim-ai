@@ -2,21 +2,30 @@ use std::collections::HashMap;
 
 use super::hybrid_searcher::{KgConcept, RetrievedChunk};
 
+/// Represents the assembled context passed to the RLM for synthesis or concept extraction.
 #[derive(Debug, Clone)]
 pub struct RlmContext {
+    /// The original user query string.
     pub query: String,
+    /// The text chunks retrieved from the search pipeline.
     pub retrieved_chunks: Vec<RetrievedChunk>,
+    /// The knowledge-graph concepts matched for this query.
     pub kg_concepts: Vec<KgConcept>,
+    /// Per-source metadata keyed by the source path or URL.
     pub source_metadata: HashMap<String, DocumentMetadata>,
 }
 
+/// Represents metadata describing the origin and recency of a retrieved document.
 #[derive(Debug, Clone)]
 pub struct DocumentMetadata {
+    /// The haystack type label (e.g. `"code"` or `"docs"`) for this source.
     pub source_type: String,
+    /// The last-modified timestamp of the source document, if available.
     pub last_modified: Option<String>,
 }
 
 impl RlmContext {
+    /// Builds a new empty `RlmContext` for the given query string.
     pub fn new(query: String) -> Self {
         Self {
             query,
@@ -26,6 +35,7 @@ impl RlmContext {
         }
     }
 
+    /// Attaches the retrieved chunks and populates source metadata from them.
     pub fn with_chunks(mut self, chunks: Vec<RetrievedChunk>) -> Self {
         self.retrieved_chunks = chunks;
         for chunk in &self.retrieved_chunks {
@@ -40,11 +50,13 @@ impl RlmContext {
         self
     }
 
+    /// Attaches the knowledge-graph concepts matched for this context.
     pub fn with_concepts(mut self, concepts: Vec<KgConcept>) -> Self {
         self.kg_concepts = concepts;
         self
     }
 
+    /// Builds the formatted prompt string from the query, chunks, and KG concepts.
     pub fn build_prompt(&self) -> String {
         let mut prompt = format!("Query: {}\n\n", self.query);
 
@@ -75,10 +87,12 @@ impl RlmContext {
         prompt
     }
 
+    /// Returns the character length of the rendered prompt for this context.
     pub fn context_length(&self) -> usize {
         self.build_prompt().len()
     }
 
+    /// Truncates the retrieved chunks so the rendered prompt fits within `max_chars`.
     pub fn truncate(&mut self, max_chars: usize) {
         if self.context_length() > max_chars {
             let mut remaining = max_chars;

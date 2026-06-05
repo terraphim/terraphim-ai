@@ -8,21 +8,27 @@ pub const DEFAULT_RANKING_CANDIDATE_LIMIT: usize = 1000;
 
 /// Candidate metadata available immediately after fff-search candidate retrieval.
 pub struct FileRankCandidate<'a> {
+    /// The relative file path from the haystack root.
     pub relative_path: &'a str,
+    /// Optional document title extracted from the file.
     pub title: Option<&'a str>,
+    /// Optional document body text for content-based scoring.
     pub body: Option<&'a str>,
 }
 
 /// Scores file/search candidates for Terraphim-specific ranking.
 pub trait FileRanker {
+    /// Returns a ranking score for the given candidate; higher values rank first.
     fn score_candidate(&self, candidate: &FileRankCandidate<'_>) -> i32;
 }
 
+/// Ranks file candidates using knowledge-graph path scoring.
 pub struct KgFileRanker<'a> {
     scorer: &'a KgPathScorer,
 }
 
 impl<'a> KgFileRanker<'a> {
+    /// Creates a new `KgFileRanker` backed by the given `KgPathScorer`.
     pub fn new(scorer: &'a KgPathScorer) -> Self {
         Self { scorer }
     }

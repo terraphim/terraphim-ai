@@ -18,9 +18,13 @@ use crate::{
 /// Message router configuration
 #[derive(Debug, Clone)]
 pub struct RouterConfig {
+    /// Delivery guarantee settings used for all routed messages.
     pub delivery_config: DeliveryConfig,
+    /// How often the background task checks for messages to retry.
     pub retry_interval: Duration,
+    /// Maximum number of in-flight deliveries processed concurrently.
     pub max_concurrent_deliveries: usize,
+    /// Whether to collect routing metrics.
     pub enable_metrics: bool,
 }
 
@@ -38,10 +42,15 @@ impl Default for RouterConfig {
 /// Router statistics
 #[derive(Debug, Default, Clone)]
 pub struct RouterStats {
+    /// Total messages submitted to the router.
     pub messages_routed: u64,
+    /// Total messages successfully delivered.
     pub messages_delivered: u64,
+    /// Total messages that failed all delivery attempts.
     pub messages_failed: u64,
+    /// Number of currently registered agent routes.
     pub active_routes: usize,
+    /// Total retry attempts made by the background retry task.
     pub retry_attempts: u64,
 }
 

@@ -1,11 +1,13 @@
 use crate::{MetricLine, ProgressFormat, ProviderUsage, Result, UsageError, UsageProvider};
 use std::time::Duration;
 
+/// Represents a usage provider backed by the `ccusage` local Claude Code log parser.
 pub struct CcusageProvider {
     client: std::sync::Mutex<terraphim_ccusage::CcusageClient>,
 }
 
 impl CcusageProvider {
+    /// Creates a new `CcusageProvider` with a 5-minute cache TTL.
     pub fn new() -> Self {
         let client =
             terraphim_ccusage::CcusageClient::new(terraphim_ccusage::CcusageProvider::Claude)

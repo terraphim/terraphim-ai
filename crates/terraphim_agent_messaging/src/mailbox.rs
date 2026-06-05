@@ -37,17 +37,26 @@ impl Default for MailboxConfig {
 /// Mailbox statistics
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MailboxStats {
+    /// The identifier of the agent owning this mailbox.
     pub agent_id: AgentPid,
+    /// Total number of messages received since creation.
     pub total_messages_received: u64,
+    /// Total number of messages processed since creation.
     pub total_messages_processed: u64,
+    /// Current number of messages waiting in the queue.
     pub current_queue_size: usize,
+    /// Peak queue depth observed since creation.
     pub max_queue_size_reached: usize,
+    /// Timestamp of the most recently received message.
     pub last_message_received: Option<DateTime<Utc>>,
+    /// Timestamp of the most recently processed message.
     pub last_message_processed: Option<DateTime<Utc>>,
+    /// Running average time taken to process each message.
     pub average_processing_time: std::time::Duration,
 }
 
 impl MailboxStats {
+    /// Creates zeroed statistics for the given agent.
     pub fn new(agent_id: AgentPid) -> Self {
         Self {
             agent_id,
@@ -61,6 +70,7 @@ impl MailboxStats {
         }
     }
 
+    /// Records the receipt of a new message and updates queue-depth counters.
     pub fn record_message_received(&mut self) {
         self.total_messages_received += 1;
         self.current_queue_size += 1;
@@ -68,6 +78,7 @@ impl MailboxStats {
         self.last_message_received = Some(Utc::now());
     }
 
+    /// Records a processed message and updates the running average processing time.
     pub fn record_message_processed(&mut self, processing_time: std::time::Duration) {
         self.total_messages_processed += 1;
         self.current_queue_size = self.current_queue_size.saturating_sub(1);

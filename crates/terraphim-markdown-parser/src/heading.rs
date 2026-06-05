@@ -15,11 +15,16 @@ pub enum MatchStrategy {
     Contains,
 }
 
+/// Describes the semantic role of a heading section in a document.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SectionType {
+    /// The primary body content of the section.
     Main,
+    /// A named sidebar or callout box, identified by its label.
     Sidebar(String),
+    /// A career-focused section (e.g. "Selling U" textbook sections).
     Career,
+    /// An assessment or review section (e.g. key takeaways, quizzes).
     Assessment,
 }
 
@@ -34,19 +39,26 @@ impl std::fmt::Display for SectionType {
     }
 }
 
+/// Represents a single rule that maps a heading title pattern to a [`SectionType`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SectionPattern {
+    /// The string pattern to match against a heading title.
     pub pattern: String,
+    /// The section type to assign when the pattern matches.
     pub section_type: SectionType,
+    /// The strategy used to compare the heading title against `pattern`.
     pub match_strategy: MatchStrategy,
 }
 
+/// Represents an ordered collection of [`SectionPattern`] rules for classifying headings.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SectionConfig {
+    /// The ordered list of pattern rules; first match wins.
     pub rules: Vec<SectionPattern>,
 }
 
 impl SectionConfig {
+    /// Returns a default [`SectionConfig`] with common textbook section patterns pre-configured.
     pub fn textbook_default() -> Self {
         Self {
             rules: vec![
@@ -86,6 +98,7 @@ impl SectionConfig {
         }
     }
 
+    /// Classifies a heading `title` against the configured rules, returning the matched [`SectionType`].
     pub fn classify(&self, title: &str) -> SectionType {
         let title_trimmed = title.trim();
         for rule in &self.rules {
@@ -107,21 +120,31 @@ impl Default for SectionConfig {
     }
 }
 
+/// Represents a single node in the heading hierarchy tree.
 #[derive(Debug, Clone)]
 pub struct HeadingNode {
+    /// The heading depth level (1 for `#`, 2 for `##`, etc.).
     pub level: u8,
+    /// The plain-text title extracted from the heading.
     pub title: String,
+    /// The classified section type for this heading.
     pub section_type: SectionType,
+    /// The ULIDs of blocks whose content falls directly under this heading.
     pub blocks: Vec<Ulid>,
+    /// The child heading nodes nested beneath this heading.
     pub children: Vec<HeadingNode>,
+    /// The byte range in the source covering this heading and its content.
     pub byte_range: Range<usize>,
 }
 
+/// Represents the full heading hierarchy extracted from a normalised markdown document.
 #[derive(Debug, Clone)]
 pub struct HeadingTree {
+    /// The top-level heading nodes (depth-1 headings or document roots).
     pub roots: Vec<HeadingNode>,
 }
 
+/// Builds a [`HeadingTree`] from the AST embedded in a [`NormalizedMarkdown`] value.
 pub fn build_heading_tree(
     normalized: &NormalizedMarkdown,
 ) -> Result<HeadingTree, MarkdownParserError> {
@@ -134,6 +157,7 @@ pub fn build_heading_tree(
     Ok(tree)
 }
 
+/// Classifies every node in the heading tree in-place using the provided [`SectionConfig`].
 pub fn classify_sections(tree: &mut HeadingTree, config: &SectionConfig) {
     for root in &mut tree.roots {
         classify_node(root, config);
