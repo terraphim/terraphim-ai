@@ -1,0 +1,180 @@
+# polyrepo-publish flow -- ADF flow configuration
+#
+# Append to /opt/ai-dark-factory/orchestrator.toml on bigbox.
+#
+# Safety model:
+# - Gitea remains authoritative.
+# - Each repo runs a COMPLETE publish cycle before the next repo starts.
+# - Gitea native-ci is Gate 1 (internal runner: terraphim-native).
+# - GitHub Actions is Gate 2 (public runner: ubuntu-latest).
+# - Upstream crates are published before downstream GitHub CI resolves them.
+#
+# Trigger:
+#   adf-ctl trigger polyrepo-publish
+#   POLYREPO_DRY_RUN=1 adf-ctl trigger polyrepo-publish
+#
+# Publish modes:
+#   POLYREPO_PUBLISH_MODE=dependency  # default, publishes all downstream-needed crates
+#   POLYREPO_PUBLISH_MODE=approved    # only selected community-ready crates
+
+[[flows]]
+name = "polyrepo-publish"
+project = "terraphim"
+repo_path = "/opt/ai-dark-factory/workspace"
+base_branch = "main"
+timeout_secs = 14400
+
+# ============================================================
+# Phase 0: Operator Preflight
+# ============================================================
+
+[[flows.steps]]
+name = "preflight"
+kind = "action"
+command = """
+set -euo pipefail
+test -n "${GITEA_TOKEN:-}"
+gh auth status
+test -x /opt/ai-dark-factory/scripts/polyrepo-publish/polyrepo-publish.sh
+bash -n /opt/ai-dark-factory/scripts/polyrepo-publish/polyrepo-publish.sh
+mkdir -p /opt/ai-dark-factory/polyrepo-staging
+echo "POLYREPO_DRY_RUN=${POLYREPO_DRY_RUN:-0}"
+echo "POLYREPO_PUBLISH_MODE=${POLYREPO_PUBLISH_MODE:-dependency}"
+"""
+timeout_secs = 60
+on_fail = "abort"
+
+[[flows.steps]]
+name = "report-monorepo-divergence"
+kind = "action"
+command = """
+set -euo pipefail
+cd /opt/ai-dark-factory/workspace
+git fetch origin main
+git fetch gitea main
+echo "=== origin/main..gitea/main ==="
+git log --oneline origin/main..gitea/main | head -50 || true
+echo "=== gitea/main..origin/main ==="
+git log --oneline gitea/main..origin/main | head -50 || true
+echo "=== diff stat ==="
+git diff origin/main gitea/main --stat || true
+"""
+timeout_secs = 120
+on_fail = "continue"
+
+# ============================================================
+# Phase 1: Full per-repo publish cycles in topological order
+# ============================================================
+
+[[flows.steps]]
+name = "publish-terraphim-core"
+kind = "action"
+command = """
+export POLYREPO_WORK_DIR="/opt/ai-dark-factory/polyrepo-staging"
+export POLYREPO_DRY_RUN="${POLYREPO_DRY_RUN:-0}"
+export POLYREPO_PUBLISH_MODE="${POLYREPO_PUBLISH_MODE:-dependency}"
+bash /opt/ai-dark-factory/scripts/polyrepo-publish/polyrepo-publish.sh full terraphim-core
+"""
+timeout_secs = 3600
+on_fail = "abort"
+
+[[flows.steps]]
+name = "publish-terraphim-config-persistence"
+kind = "action"
+command = """
+export POLYREPO_WORK_DIR="/opt/ai-dark-factory/polyrepo-staging"
+export POLYREPO_DRY_RUN="${POLYREPO_DRY_RUN:-0}"
+export POLYREPO_PUBLISH_MODE="${POLYREPO_PUBLISH_MODE:-dependency}"
+bash /opt/ai-dark-factory/scripts/polyrepo-publish/polyrepo-publish.sh full terraphim-config-persistence
+"""
+timeout_secs = 3600
+on_fail = "abort"
+
+[[flows.steps]]
+name = "publish-terraphim-service"
+kind = "action"
+command = """
+export POLYREPO_WORK_DIR="/opt/ai-dark-factory/polyrepo-staging"
+export POLYREPO_DRY_RUN="${POLYREPO_DRY_RUN:-0}"
+export POLYREPO_PUBLISH_MODE="${POLYREPO_PUBLISH_MODE:-dependency}"
+bash /opt/ai-dark-factory/scripts/polyrepo-publish/polyrepo-publish.sh full terraphim-service
+"""
+timeout_secs = 3600
+on_fail = "abort"
+
+[[flows.steps]]
+name = "publish-terraphim-agents"
+kind = "action"
+command = """
+export POLYREPO_WORK_DIR="/opt/ai-dark-factory/polyrepo-staging"
+export POLYREPO_DRY_RUN="${POLYREPO_DRY_RUN:-0}"
+export POLYREPO_PUBLISH_MODE="${POLYREPO_PUBLISH_MODE:-dependency}"
+bash /opt/ai-dark-factory/scripts/polyrepo-publish/polyrepo-publish.sh full terraphim-agents
+"""
+timeout_secs = 3600
+on_fail = "abort"
+
+[[flows.steps]]
+name = "publish-terraphim-kg-agents"
+kind = "action"
+command = """
+export POLYREPO_WORK_DIR="/opt/ai-dark-factory/polyrepo-staging"
+export POLYREPO_DRY_RUN="${POLYREPO_DRY_RUN:-0}"
+export POLYREPO_PUBLISH_MODE="${POLYREPO_PUBLISH_MODE:-dependency}"
+bash /opt/ai-dark-factory/scripts/polyrepo-publish/polyrepo-publish.sh full terraphim-kg-agents
+"""
+timeout_secs = 3600
+on_fail = "abort"
+
+[[flows.steps]]
+name = "publish-terraphim-clients"
+kind = "action"
+command = """
+export POLYREPO_WORK_DIR="/opt/ai-dark-factory/polyrepo-staging"
+export POLYREPO_DRY_RUN="${POLYREPO_DRY_RUN:-0}"
+export POLYREPO_PUBLISH_MODE="${POLYREPO_PUBLISH_MODE:-dependency}"
+bash /opt/ai-dark-factory/scripts/polyrepo-publish/polyrepo-publish.sh full terraphim-clients
+"""
+timeout_secs = 3600
+on_fail = "abort"
+
+# ============================================================
+# Phase 2: Public terraphim-ai landing documentation
+# ============================================================
+
+[[flows.steps]]
+name = "update-readme"
+kind = "agent"
+cli_tool = "claude"
+model = "sonnet"
+task = """
+Update the public terraphim/terraphim-ai README.md, ARCHITECTURE.md, and CONTRIBUTING.md for the polyrepo topology.
+
+Use these public repositories:
+- terraphim-core
+- terraphim-config-persistence
+- terraphim-service
+- terraphim-agents
+- terraphim-kg-agents
+- terraphim-clients
+
+Explain that Gitea remains authoritative for internal CI and GitHub is the public community surface. Include a Mermaid dependency diagram and contribution routing guidance.
+
+Do not push. Make local edits only.
+"""
+timeout_secs = 600
+on_fail = "skip_failed"
+
+[[flows.steps]]
+name = "push-public-docs"
+kind = "action"
+command = """
+set -euo pipefail
+cd /opt/ai-dark-factory/workspace
+git add README.md ARCHITECTURE.md CONTRIBUTING.md 2>/dev/null || true
+git diff --cached --quiet || git commit -m "docs: describe public polyrepo topology"
+git push origin main
+git push gitea main
+"""
+timeout_secs = 120
+on_fail = "abort"
