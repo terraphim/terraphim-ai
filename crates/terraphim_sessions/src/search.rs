@@ -15,6 +15,32 @@ const MAX_BODY_LENGTH: usize = 50_000;
 const MAX_SEARCH_RESULTS: usize = 50;
 const MIN_SCORE_FRACTION: f64 = 0.1;
 
+/// Normalise code identifiers to improve cross-convention search matching.
+///
+/// Splits `camelCase` at lower-to-upper boundaries and replaces `_` with space,
+/// so `getUserData` and `get_user_data` both produce tokens `get user data`.
+/// Case is preserved so BM25's own case-folding is unaffected.
+pub fn normalise_code_tokens(text: &str) -> String {
+    let mut result = String::with_capacity(text.len() + text.len() / 4);
+    let chars: Vec<char> = text.chars().collect();
+    let len = chars.len();
+    let mut i = 0;
+    while i < len {
+        let c = chars[i];
+        if c == '_' {
+            result.push(' ');
+        } else {
+            // Insert space before uppercase that directly follows a lowercase (camelCase boundary).
+            if i > 0 && c.is_uppercase() && chars[i - 1].is_lowercase() {
+                result.push(' ');
+            }
+            result.push(c);
+        }
+        i += 1;
+    }
+    result
+}
+
 /// Score multiplier applied to sessions with KG concept matches.
 #[cfg(feature = "enrichment")]
 const KG_BOOST_MULTIPLIER: f64 = 10_000.0;
@@ -76,7 +102,9 @@ fn build_body(session: &Session) -> String {
         parts.push(format!("{}{}", prefix, msg.content));
     }
 
-    let body = parts.join("\n");
+    let raw = parts.join("\n");
+    // Normalise code identifiers so camelCase and snake_case produce the same tokens.
+    let body = normalise_code_tokens(&raw);
     if body.len() > MAX_BODY_LENGTH {
         let mut end = MAX_BODY_LENGTH;
         while !body.is_char_boundary(end) {
@@ -102,7 +130,9 @@ pub fn search_sessions(sessions: &[Session], query: &str) -> Vec<Scored<Session>
     let mut bm25 = OkapiBM25Scorer::new();
     bm25.initialize(&documents);
 
-    let mut q = Query::new(query);
+    // Normalise the query so `getUserData` and `get_user_data` both hit the same tokens.
+    let normalised_query = normalise_code_tokens(query);
+    let mut q = Query::new(&normalised_query);
     q.name_scorer = QueryScorer::BM25;
     q.size = MAX_SEARCH_RESULTS;
 
@@ -389,6 +419,60 @@ mod tests {
         let body = build_body(&session);
         assert!(body.contains("/my/project"));
         assert!(body.contains("claude-3"));
+    }
+
+    #[test]
+    fn test_normalise_code_tokens_snake_case() {
+        assert_eq!(normalise_code_tokens("get_user_data"), "get user data");
+        assert_eq!(normalise_code_tokens("snake_case_fn"), "snake case fn");
+    }
+
+    #[test]
+    fn test_normalise_code_tokens_camel_case() {
+        assert_eq!(normalise_code_tokens("getUserData"), "get User Data");
+        assert_eq!(normalise_code_tokens("camelCaseType"), "camel Case Type");
+    }
+
+    #[test]
+    fn test_normalise_code_tokens_passthrough() {
+        assert_eq!(normalise_code_tokens("plain text"), "plain text");
+        assert_eq!(normalise_code_tokens(""), "");
+    }
+
+    #[test]
+    fn test_search_cross_convention_snake_to_camel() {
+        // Session contains camelCase, query uses snake_case
+        let sessions = vec![make_session(
+            "s1",
+            "API methods",
+            vec![("user", MessageRole::User, "I used getUserData to fetch the profile")],
+        )];
+        let results = search_sessions(&sessions, "get_user_data");
+        assert!(!results.is_empty(), "snake_case query should match camelCase session content");
+    }
+
+    #[test]
+    fn test_search_cross_convention_camel_to_snake() {
+        // Session contains snake_case, query uses camelCase
+        let sessions = vec![make_session(
+            "s1",
+            "Backend functions",
+            vec![("user", MessageRole::User, "called get_user_data to load user info")],
+        )];
+        let results = search_sessions(&sessions, "getUserData");
+        assert!(!results.is_empty(), "camelCase query should match snake_case session content");
+    }
+
+    #[test]
+    fn test_search_cross_convention_camel_to_camel() {
+        // Both query and session use camelCase — must still work
+        let sessions = vec![make_session(
+            "s1",
+            "Code review",
+            vec![("user", MessageRole::User, "refactored camelCaseMethod for clarity")],
+        )];
+        let results = search_sessions(&sessions, "camelCaseMethod");
+        assert!(!results.is_empty(), "camelCase query should match camelCase session content");
     }
 
     #[test]
