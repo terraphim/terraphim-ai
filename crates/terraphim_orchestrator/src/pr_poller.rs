@@ -184,6 +184,30 @@ impl AutoMergeExecutor for GiteaPrTracker {
         body: &str,
         labels: &[&str],
     ) -> Result<u64, String> {
+        // Idempotency guard: search for an existing open issue with the same
+        // title before creating. This makes the call survive orchestrator
+        // restarts — if the orchestrator crashes and restarts, the in-memory
+        // AutoMergeFailureDedupe is lost but Gitea still has the issue, so
+        // we find it here and avoid spawning a duplicate.
+        match self.inner.search_issues_by_title(title).await {
+            Ok(ids) if !ids.is_empty() => {
+                tracing::info!(
+                    existing = ?ids,
+                    title,
+                    "open_failure_issue: existing open issue found; returning it instead of creating duplicate"
+                );
+                return Ok(*ids.first().unwrap());
+            }
+            Ok(_) => {} // no existing issue; proceed to create
+            Err(e) => {
+                // Search failure: fail-open (create anyway rather than silently drop)
+                tracing::warn!(
+                    error = %e,
+                    title,
+                    "open_failure_issue: title search failed; proceeding with create"
+                );
+            }
+        }
         self.inner
             .create_issue(title, body, labels)
             .await

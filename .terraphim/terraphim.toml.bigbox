@@ -61,12 +61,66 @@ export GITEA_URL=https://git.terraphim.cloud
 export PATH=$HOME/.cargo/bin:$HOME/.local/bin:$HOME/bin:$HOME/.bun/bin:/usr/local/bin:/usr/bin:/bin:$PATH
 ## ADF Meta-Coordinator: Monitoring and Health Checks
 
+# Dedup helper: search Gitea for open issues containing SIGNATURE in the title.
+# Prints the first matching issue number, or empty string if none found.
+# Usage: EXISTING=$(gitea_find_open_issue "SIGNATURE_SUBSTRING")
+gitea_find_open_issue() {
+  local sig="$1"
+  local encoded_sig
+  encoded_sig=$(python3 -c "import urllib.parse, sys; print(urllib.parse.quote(sys.argv[1]))" "$sig" 2>/dev/null || echo "$sig")
+  curl -sf -H "Authorization: token $GITEA_TOKEN" \
+    "$GITEA_URL/api/v1/repos/terraphim/terraphim-ai/issues?state=open&type=issues&q=$encoded_sig&limit=10" 2>/dev/null \
+  | python3 -c "
+import sys, json
+try:
+    issues = json.load(sys.stdin)
+    matches = [i['number'] for i in issues if sys.argv[1] in i.get('title', '')]
+    print(matches[0] if matches else '')
+except Exception:
+    print('')
+" "$sig" 2>/dev/null || echo ''
+}
+
+# Dedup helper: count open issues containing SIGNATURE in the title.
+gitea_count_open_issues() {
+  local sig="$1"
+  local encoded_sig
+  encoded_sig=$(python3 -c "import urllib.parse, sys; print(urllib.parse.quote(sys.argv[1]))" "$sig" 2>/dev/null || echo "$sig")
+  curl -sf -H "Authorization: token $GITEA_TOKEN" \
+    "$GITEA_URL/api/v1/repos/terraphim/terraphim-ai/issues?state=open&type=issues&q=$encoded_sig&limit=50" 2>/dev/null \
+  | python3 -c "
+import sys, json
+try:
+    issues = json.load(sys.stdin)
+    count = sum(1 for i in issues if sys.argv[1] in i.get('title', ''))
+    print(count)
+except Exception:
+    print(0)
+" "$sig" 2>/dev/null || echo 0
+}
+
+# Post a comment on an existing issue.
+gitea_comment_issue() {
+  local issue_num="$1"
+  local comment_body="$2"
+  curl -sf -H "Authorization: token $GITEA_TOKEN" -H "Content-Type: application/json" \
+    -X POST "$GITEA_URL/api/v1/repos/terraphim/terraphim-ai/issues/$issue_num/comments" \
+    -d "{\"body\": $(python3 -c "import json, sys; print(json.dumps(sys.argv[1]))" "$comment_body")}" \
+    2>/dev/null || echo "WARNING: failed to post comment on #$issue_num"
+}
+
 ### 1. Tick-Stall Detection
 STALL_COUNT=$(sudo journalctl -u adf-orchestrator --since '4 hours ago' | grep -c 'reconcile_tick SLOW' || true)
 if [ "$STALL_COUNT" -gt 0 ]; then
   echo "WARNING: $STALL_COUNT tick stalls detected in last 4h"
-  gtr create-issue --owner terraphim --repo terraphim-ai --title "[ADF] Tick-stall detected: $STALL_COUNT in 4h" --body "$STALL_COUNT reconcile_tick SLOW events detected.
+  EXISTING_STALL=$(gitea_find_open_issue "[ADF] Tick-stall")
+  if [ -n "$EXISTING_STALL" ]; then
+    echo "Dedup: existing stall issue #$EXISTING_STALL; posting comment"
+    gitea_comment_issue "$EXISTING_STALL" "Update $(date -u +%Y-%m-%dT%H:%M:%SZ): $STALL_COUNT reconcile_tick SLOW events detected in last 4h. Theme-ID: adf-health-alert"
+  else
+    gtr create-issue --owner terraphim --repo terraphim-ai --title "[ADF] Tick-stall detected: $STALL_COUNT in 4h" --body "$STALL_COUNT reconcile_tick SLOW events detected.
 Theme-ID: adf-health-alert"
+  fi
 fi
 
 ### 2. Agent Failure Report
@@ -75,8 +129,14 @@ FAILURE_COUNT=$(echo "$FAILURES" | grep -c 'exit_class=' || true)
 if [ "$FAILURE_COUNT" -gt 3 ]; then
   echo "WARNING: $FAILURE_COUNT non-success agent exits in last 4h"
   echo "$FAILURES" | tail -20 > /tmp/adf-failures.txt
-  gtr create-issue --owner terraphim --repo terraphim-ai --title "[ADF] $FAILURE_COUNT agent failures in 4h" --body "$(cat /tmp/adf-failures.txt)
+  EXISTING_FAIL=$(gitea_find_open_issue "[ADF] agent failures in 4h")
+  if [ -n "$EXISTING_FAIL" ]; then
+    echo "Dedup: existing failure issue #$EXISTING_FAIL; posting comment"
+    gitea_comment_issue "$EXISTING_FAIL" "Update $(date -u +%Y-%m-%dT%H:%M:%SZ): $FAILURE_COUNT non-success exits in last 4h. Theme-ID: adf-health-alert"
+  else
+    gtr create-issue --owner terraphim --repo terraphim-ai --title "[ADF] $FAILURE_COUNT agent failures in 4h" --body "$(cat /tmp/adf-failures.txt)
 Theme-ID: adf-health-alert"
+  fi
 fi
 
 ### 2b. Agents Exceeding max_cpu_seconds
@@ -85,28 +145,70 @@ TIMEOUT_COUNT=$(echo "$TIMEOUTS" | grep -c 'AGENT EXCEEDED' || true)
 if [ "$TIMEOUT_COUNT" -gt 0 ]; then
   echo "WARNING: $TIMEOUT_COUNT agents exceeded max_cpu_seconds in last 4h"
   echo "$TIMEOUTS" | tail -10 > /tmp/adf-timeouts.txt
-  gtr create-issue --owner terraphim --repo terraphim-ai --title "[ADF] $TIMEOUT_COUNT agents exceeded max_cpu_seconds" --body "Agents killed after exceeding their configured max_cpu_seconds:
+  EXISTING_TIMEOUT=$(gitea_find_open_issue "[ADF] agents exceeded max_cpu_seconds")
+  if [ -n "$EXISTING_TIMEOUT" ]; then
+    echo "Dedup: existing timeout issue #$EXISTING_TIMEOUT; posting comment"
+    gitea_comment_issue "$EXISTING_TIMEOUT" "Update $(date -u +%Y-%m-%dT%H:%M:%SZ): $TIMEOUT_COUNT agents exceeded max_cpu_seconds. Theme-ID: adf-health-alert"
+  else
+    gtr create-issue --owner terraphim --repo terraphim-ai --title "[ADF] $TIMEOUT_COUNT agents exceeded max_cpu_seconds" --body "Agents killed after exceeding their configured max_cpu_seconds:
 $(cat /tmp/adf-timeouts.txt)
 
 Consider increasing max_cpu_seconds or investigating why these agents are running long.
 Theme-ID: adf-health-alert"
+  fi
 fi
 
-### 3. Disk Usage Check (worktrees)
+### 3. Disk Usage Check (worktrees) - singleton issue, update body if exists
 WORKTREE_SIZE=$(du -sm /data/projects/terraphim/terraphim-ai/.worktrees/ 2>/dev/null | cut -f1 || echo 0)
 if [ "$WORKTREE_SIZE" -gt 10240 ]; then
   echo "WARNING: worktrees using $WORKTREE_SIZE MB (>10GB)"
-  gtr create-issue --owner terraphim --repo terraphim-ai --title "[ADF] Worktree disk usage: $WORKTREE_SIZE MB" --body "Worktree directory exceeds 10GB threshold.
+  DISK_ISSUE_COUNT=$(gitea_count_open_issues "[ADF] Worktree disk")
+  if [ "$DISK_ISSUE_COUNT" -ge 3 ]; then
+    # Hard cap: too many already open, don't spam further
+    echo "Dedup: $DISK_ISSUE_COUNT open worktree-disk issues already exist (cap=3); skipping"
+  else
+    EXISTING_DISK=$(gitea_find_open_issue "[ADF] Worktree disk")
+    if [ -n "$EXISTING_DISK" ]; then
+      echo "Dedup: existing disk issue #$EXISTING_DISK; posting update comment"
+      WORKTREE_BREAKDOWN=$(du -sm /data/projects/terraphim/terraphim-ai/.worktrees/*/ 2>/dev/null | sort -rn | head -5 | awk '{print "| "$2" | "$1" |"}' || echo "| (unavailable) | - |")
+      gitea_comment_issue "$EXISTING_DISK" "Update $(date -u +%Y-%m-%dT%H:%M:%SZ): Total worktree size now $WORKTREE_SIZE MB.
+
+**Top worktrees:**
+| Worktree | Size (MB) |
+|----------|-----------|
+$WORKTREE_BREAKDOWN
+
 Theme-ID: adf-health-alert"
+    else
+      WORKTREE_BREAKDOWN=$(du -sm /data/projects/terraphim/terraphim-ai/.worktrees/*/ 2>/dev/null | sort -rn | head -5 | awk '{print "| "$2" | "$1" |"}' || echo "| (unavailable) | - |")
+      gtr create-issue --owner terraphim --repo terraphim-ai \
+        --title "[ADF] Worktree disk usage: $WORKTREE_SIZE MB" \
+        --body "Worktree directory exceeds 10GB threshold.
+
+**Total size:** $WORKTREE_SIZE MB
+
+**Top worktrees:**
+| Worktree | Size (MB) |
+|----------|-----------|
+$WORKTREE_BREAKDOWN
+
+Theme-ID: adf-health-alert"
+    fi
+  fi
 fi
 
 ### 4. Binary Version Check
 ADF_VERSION=$(/usr/local/bin/adf --version 2>/dev/null || echo 'unknown')
 if [ "$ADF_VERSION" != 'adf 1.20.2' ]; then
   echo "WARNING: adf binary version mismatch: $ADF_VERSION"
-  gtr create-issue --owner terraphim --repo terraphim-ai --title "[ADF] Binary version mismatch: $ADF_VERSION" --body "Expected: adf 1.20.2
+  EXISTING_VER=$(gitea_find_open_issue "[ADF] Binary version mismatch")
+  if [ -n "$EXISTING_VER" ]; then
+    echo "Dedup: existing version issue #$EXISTING_VER; skipping"
+  else
+    gtr create-issue --owner terraphim --repo terraphim-ai --title "[ADF] Binary version mismatch: $ADF_VERSION" --body "Expected: adf 1.20.2
 Actual: $ADF_VERSION
 Theme-ID: adf-health-alert"
+  fi
 fi
 
 ### 5. Orphaned Worktree Check
@@ -119,8 +221,14 @@ fi
 GITEA_STATUS=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: token $GITEA_TOKEN" "$GITEA_URL/api/v1/user" || echo 000)
 if [ "$GITEA_STATUS" != '200' ]; then
   echo "WARNING: Gitea API returned HTTP $GITEA_STATUS"
-  gtr create-issue --owner terraphim --repo terraphim-ai --title "[ADF] Gitea API unhealthy: HTTP $GITEA_STATUS" --body "Gitea API health check failed.
+  EXISTING_API=$(gitea_find_open_issue "[ADF] Gitea API unhealthy")
+  if [ -n "$EXISTING_API" ]; then
+    echo "Dedup: existing Gitea API health issue #$EXISTING_API; posting comment"
+    gitea_comment_issue "$EXISTING_API" "Update $(date -u +%Y-%m-%dT%H:%M:%SZ): Gitea API returned HTTP $GITEA_STATUS. Theme-ID: adf-health-alert"
+  else
+    gtr create-issue --owner terraphim --repo terraphim-ai --title "[ADF] Gitea API unhealthy: HTTP $GITEA_STATUS" --body "Gitea API health check failed.
 Theme-ID: adf-health-alert"
+  fi
 fi
 
 echo "=== Meta-coordinator health check complete ==="

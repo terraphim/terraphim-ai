@@ -428,6 +428,39 @@ async fn auto_merge_marks_dedupe_set_on_success() {
     );
 }
 
+// -------- Test 5b: in-memory dedup blocks duplicate failure issues --------
+
+#[tokio::test]
+async fn auto_merge_failure_dedup_blocks_second_issue_within_ttl() {
+    let mut orch =
+        AgentOrchestrator::new(minimal_config(tempfile::tempdir().unwrap().keep())).unwrap();
+
+    let executor = RecordingExecutor::new(
+        vec![pr(606, "dedup-sha", 42)],
+        MergeReply::Err("conflict".to_string()),
+    );
+
+    // First failure → issue created
+    orch.handle_auto_merge_for_project(auto_merge_task(606, PROJECT, "dedup-sha"), &executor)
+        .await
+        .expect("first failure returns Ok(())");
+    assert_eq!(
+        executor.failure_issues().len(),
+        1,
+        "first failure must open exactly one [ADF] issue"
+    );
+
+    // Second failure with the same PR + head SHA within TTL → dedup suppresses
+    orch.handle_auto_merge_for_project(auto_merge_task(606, PROJECT, "dedup-sha"), &executor)
+        .await
+        .expect("second failure returns Ok(())");
+    assert_eq!(
+        executor.failure_issues().len(),
+        1,
+        "in-memory dedup must suppress the second [ADF] issue for the same PR/SHA within TTL"
+    );
+}
+
 // -------- Test 5: PR no longer open -> skip merge silently --------
 
 #[tokio::test]
