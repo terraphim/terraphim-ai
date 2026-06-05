@@ -170,3 +170,65 @@ jobs:
       - name: sccache stats
         if: always()
         run: /home/alex/.local/bin/sccache --show-stats
+
+  check-all-features:
+    runs-on: [self-hosted, bigbox]
+    timeout-minutes: 15
+    needs: [setup]
+    # Verify that enabling all workspace features compiles cleanly.
+    # Prevents the regression class identified in issue #1266 (and tracked by #1295)
+    # where `cargo build` passes but `cargo build --all-features` silently fails
+    # due to feature-gated type mismatches or missing optional dependencies.
+    env:
+      RUSTC_WRAPPER: /home/alex/.local/bin/sccache
+      SCCACHE_BUCKET: rust-cache
+      SCCACHE_SERVER_PORT: "4231"
+      SCCACHE_ENDPOINT: http://172.26.0.1:8333
+      SCCACHE_S3_USE_SSL: "false"
+      SCCACHE_REGION: us-east-1
+      SCCACHE_S3_KEY_PREFIX: terraphim-ai
+      AWS_ACCESS_KEY_ID: any
+      AWS_SECRET_ACCESS_KEY: any
+      CARGO_INCREMENTAL: "0"
+    steps:
+      - name: Pre-checkout cleanup
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo rm -rf "${WORKDIR}/target" || true
+          sudo rm -rf "${WORKDIR}/.cargo" || true
+
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          clean: true
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.87.0
+
+      - name: Cache Cargo dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ needs.setup.outputs.cache-key }}-cargo-all-features-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ needs.setup.outputs.cache-key }}-cargo-all-features-
+
+      - name: sccache start and zero stats
+        run: |
+          /home/alex/.local/bin/sccache --start-server || true
+          /home/alex/.local/bin/sccache --zero-stats
+
+      - name: Check workspace with all features
+        # cargo check (not cargo test) keeps this under 3 minutes.
+        # This gate catches feature-gated compilation regressions without
+        # running the full test suite a second time.
+        run: cargo check --workspace --all-features
+
+      - name: sccache stats
+        if: always()
+        run: /home/alex/.local/bin/sccache --show-stats

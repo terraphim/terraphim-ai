@@ -1338,12 +1338,23 @@ fn classify_error(err: &anyhow::Error) -> robot::exit_codes::ExitCode {
 
     #[cfg(feature = "server")]
     if err.chain().any(|e| e.is::<reqwest::Error>()) {
-        let is_timeout = err
-            .chain()
-            .filter_map(|e| e.downcast_ref::<reqwest::Error>())
-            .any(|re| re.is_timeout());
-        if is_timeout {
-            return ExitCode::ErrorTimeout;
+        for e in err.chain() {
+            if let Some(re) = e.downcast_ref::<reqwest::Error>() {
+                if re.is_timeout() {
+                    return ExitCode::ErrorTimeout;
+                }
+                // HTTP status errors (4xx/5xx) are application errors, not connectivity failures.
+                // A 400 from a misconfigured role must not masquerade as a network error.
+                if let Some(status) = re.status() {
+                    return match status.as_u16() {
+                        401 | 403 => ExitCode::ErrorAuth,
+                        404 => ExitCode::ErrorNotFound,
+                        _ => ExitCode::ErrorGeneral,
+                    };
+                }
+                // True transport error (connection refused, DNS failure, etc.)
+                return ExitCode::ErrorNetwork;
+            }
         }
         return ExitCode::ErrorNetwork;
     }
@@ -1504,6 +1515,103 @@ mod classify_error_tests {
             classify_error(&err("network error connecting to host")),
             ExitCode::ErrorNetwork
         );
+    }
+}
+
+/// Regression tests for classify_error with real reqwest HTTP status errors.
+/// These verify that HTTP 4xx responses are not misclassified as network errors.
+#[cfg(all(test, feature = "server"))]
+mod classify_reqwest_tests {
+    use super::*;
+    use robot::exit_codes::ExitCode;
+    use std::io::Write;
+    use std::net::TcpListener;
+
+    /// Start a one-shot TCP server that replies with the given HTTP status code.
+    fn start_status_server(status: u16, reason: &'static str) -> u16 {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        std::thread::spawn(move || {
+            if let Ok((mut stream, _)) = listener.accept() {
+                let mut buf = [0u8; 2048];
+                let _ = std::io::Read::read(&mut stream, &mut buf);
+                let response = format!(
+                    "HTTP/1.1 {} {}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+                    status, reason
+                );
+                let _ = stream.write_all(response.as_bytes());
+            }
+        });
+        port
+    }
+
+    #[tokio::test]
+    async fn http_400_maps_to_error_general_not_network() {
+        let port = start_status_server(400, "Bad Request");
+        let client = reqwest::Client::new();
+        let res = client
+            .get(format!("http://127.0.0.1:{}/", port))
+            .send()
+            .await
+            .unwrap();
+        let reqwest_err: anyhow::Error = res.error_for_status().unwrap_err().into();
+        assert_eq!(
+            classify_error(&reqwest_err),
+            ExitCode::ErrorGeneral,
+            "HTTP 400 from server must not be classified as ErrorNetwork (exit 6)"
+        );
+    }
+
+    #[tokio::test]
+    async fn http_401_maps_to_error_auth() {
+        let port = start_status_server(401, "Unauthorized");
+        let client = reqwest::Client::new();
+        let res = client
+            .get(format!("http://127.0.0.1:{}/", port))
+            .send()
+            .await
+            .unwrap();
+        let reqwest_err: anyhow::Error = res.error_for_status().unwrap_err().into();
+        assert_eq!(classify_error(&reqwest_err), ExitCode::ErrorAuth);
+    }
+
+    #[tokio::test]
+    async fn http_403_maps_to_error_auth() {
+        let port = start_status_server(403, "Forbidden");
+        let client = reqwest::Client::new();
+        let res = client
+            .get(format!("http://127.0.0.1:{}/", port))
+            .send()
+            .await
+            .unwrap();
+        let reqwest_err: anyhow::Error = res.error_for_status().unwrap_err().into();
+        assert_eq!(classify_error(&reqwest_err), ExitCode::ErrorAuth);
+    }
+
+    #[tokio::test]
+    async fn http_404_maps_to_error_not_found() {
+        let port = start_status_server(404, "Not Found");
+        let client = reqwest::Client::new();
+        let res = client
+            .get(format!("http://127.0.0.1:{}/", port))
+            .send()
+            .await
+            .unwrap();
+        let reqwest_err: anyhow::Error = res.error_for_status().unwrap_err().into();
+        assert_eq!(classify_error(&reqwest_err), ExitCode::ErrorNotFound);
+    }
+
+    #[tokio::test]
+    async fn http_500_maps_to_error_general() {
+        let port = start_status_server(500, "Internal Server Error");
+        let client = reqwest::Client::new();
+        let res = client
+            .get(format!("http://127.0.0.1:{}/", port))
+            .send()
+            .await
+            .unwrap();
+        let reqwest_err: anyhow::Error = res.error_for_status().unwrap_err().into();
+        assert_eq!(classify_error(&reqwest_err), ExitCode::ErrorGeneral);
     }
 }
 

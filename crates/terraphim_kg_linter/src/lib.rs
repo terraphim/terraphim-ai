@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use walkdir::WalkDir;
 
+/// Errors produced during KG markdown scanning or validation.
 #[derive(Error, Debug)]
 pub enum LintError {
     #[error("IO error: {0}")]
@@ -31,6 +32,7 @@ pub enum LintError {
 
 pub type Result<T> = std::result::Result<T, LintError>;
 
+/// A typed argument definition for a KG command.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CommandArg {
     pub name: String,
@@ -46,6 +48,7 @@ pub struct CommandArg {
     pub pattern: Option<String>,
 }
 
+/// A permission reference embedded in a command definition.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CommandPermissionRef {
     pub can: String,
@@ -53,6 +56,7 @@ pub struct CommandPermissionRef {
     pub on: Option<String>, // resource or scope
 }
 
+/// A KG command declaration parsed from a `kg-commands` fenced block.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CommandDef {
     pub name: String,
@@ -64,12 +68,14 @@ pub struct CommandDef {
     pub permissions: Vec<CommandPermissionRef>,
 }
 
+/// Wrapper for a YAML map of type names to field definitions.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TypesBlock(
     #[serde(with = "serde_yaml::with::singleton_map_recursive")]
     pub  BTreeMap<String, BTreeMap<String, String>>,
 );
 
+/// A single allow or deny rule within a role permission block.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PermissionRule {
     pub action: String,
@@ -79,6 +85,7 @@ pub struct PermissionRule {
     pub resource: Option<String>,
 }
 
+/// Permission set for a named role, containing allow and deny rules.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RolePermissions {
     pub name: String,
@@ -88,6 +95,7 @@ pub struct RolePermissions {
     pub deny: Vec<PermissionRule>,
 }
 
+/// Accumulated schema fragments collected from all scanned markdown files.
 #[derive(Debug, Clone, Default)]
 pub struct SchemaFragments {
     pub commands: Vec<CommandDef>,
@@ -95,6 +103,7 @@ pub struct SchemaFragments {
     pub roles: Vec<RolePermissions>,
 }
 
+/// A single diagnostic issue found during linting.
 #[derive(Debug, Clone, Serialize)]
 pub struct LintIssue {
     pub path: PathBuf,
@@ -103,6 +112,7 @@ pub struct LintIssue {
     pub message: String,
 }
 
+/// Severity level of a lint issue.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Severity {
@@ -111,6 +121,7 @@ pub enum Severity {
     Info,
 }
 
+/// Complete report produced by a lint run over a directory.
 #[derive(Debug, Clone, Serialize)]
 pub struct LintReport {
     pub scanned_files: usize,
@@ -118,6 +129,7 @@ pub struct LintReport {
     pub stats: ReportStats,
 }
 
+/// Aggregate statistics from a lint run.
 #[derive(Debug, Clone, Serialize, Default)]
 pub struct ReportStats {
     pub command_count: usize,
@@ -147,6 +159,7 @@ fn parse_yaml<T: for<'de> Deserialize<'de>>(body: &str, path: &Path) -> Result<T
     })
 }
 
+/// Parses KG schema fragments (commands, types, permissions) from fenced code blocks in a markdown file.
 pub fn load_schema_fragments_from_markdown(path: &Path) -> Result<SchemaFragments> {
     let contents = std::fs::read_to_string(path)?;
     let mut fragments = SchemaFragments::default();
@@ -320,6 +333,7 @@ async fn build_thesaurus_from_dir(name: &str, dir: &Path) -> Result<terraphim_ty
     Ok(thesaurus)
 }
 
+/// Lints all KG markdown files under `path`, returning a report of issues and statistics.
 pub async fn lint_path(path: &Path) -> Result<LintReport> {
     let mut issues = Vec::<LintIssue>::new();
     let mut fragments = SchemaFragments::default();

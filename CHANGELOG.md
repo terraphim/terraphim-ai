@@ -30,6 +30,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Firecracker feature gate** `terraphim_agent` firecracker module and `ApiClient` VM methods now compiled only with `cfg(feature = "firecracker")`, preventing link errors in non-Firecracker builds (2026-06-04)
+- **Clippy `manual_flatten`** `server_http_error` test flattened to satisfy the `manual_flatten` lint (Fixes #2133, 2026-06-04)
+- **RoleGraph serde defaults** `serde(default)` added to `trigger_descriptions` and `pinned_node_ids` fields in `SerializableRoleGraph`, fixing round-trip deserialisation of configs that omit these fields (Refs #2039, 2026-06-04)
+- **Agent HTTP error classification** HTTP 4xx responses now classified as `ErrorGeneral` rather than `ErrorNetwork`; integration test `server_http_error_exits_1` added (Refs #1992, 2026-06-04)
 - **Redis security exposure** Docker Compose Redis service now binds to `127.0.0.1:6379` instead of `0.0.0.0:6379` to prevent unintended public exposure of the cache (Refs #1313, 2026-05-31)
 - **Nested `cargo run` in exit-code tests** replaced with `cargo_bin!` macro to avoid file-lock deadlock under concurrent `cargo test` (2026-06-01)
 - **ADF KG-router fallback respawn loop** closed after quota exit — agents no longer re-routed to `anthropic/sonnet` indefinitely when per-agent config or quota-fallback chose another provider (Refs #1793, PR#1794, 2026-05-22)
@@ -61,6 +65,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Docs
 
+- **Rustdoc coverage: zero-coverage crates resolved** item-level `///` doc comments added to all public items in `haystack_atlassian`, `haystack_core`, `haystack_discourse`, `terraphim_ccusage`, `terraphim_kg_linter`, and `terraphim_negative_contribution`; workspace coverage now 81 % (up from 30 % at previous scan on 2026-06-04, Refs #2136)
 - **`BUILD.md`** build instructions and troubleshooting guide
 - **`CONTRIBUTING.md`** contribution guidelines and code of conduct
 - **Architecture Decision Records (ADRs)** in `docs/architecture/`
