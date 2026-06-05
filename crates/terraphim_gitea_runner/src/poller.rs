@@ -55,12 +55,30 @@ impl<C: GiteaRunnerClient + 'static, P: PolicyPlanner + 'static> Poller<C, P> {
         let Some(task) = resp.task else {
             return Ok(resp.tasks_version);
         };
+        // Log the task id so distinct runs for the same SHA are
+        // distinguishable (the "double-fetch" observation was two distinct
+        // runs, not one task fetched twice -- Gitea's claim is guarded).
+        log::info!("fetched task id={}", task.id);
 
         // Coexistence guard: skip repos not in the active allowlist.
         if let Some(full) = workflow_payload::repository(&task) {
             let name = full.rsplit('/').next().unwrap_or(&full);
             if !self.config.accepts_repo(name) {
-                log::info!("skipping task for repo `{name}` (not in active_repos)");
+                // #2185: FetchTask already CLAIMED this task (StatusRunning,
+                // assigned to this runner). Report it skipped (terminal) so
+                // Gitea marks it done instead of orphaning it until the zombie
+                // timeout. Best-effort: a release failure must not crash the loop.
+                log::info!(
+                    "releasing task id={} for repo `{name}` (not in active_repos)",
+                    task.id
+                );
+                if let Err(e) = self
+                    .client
+                    .update_task(state, skip_task_state(task.id))
+                    .await
+                {
+                    log::warn!("failed to release skipped task id={}: {e}", task.id);
+                }
                 return Ok(resp.tasks_version);
             }
         }
@@ -82,14 +100,37 @@ impl<C: GiteaRunnerClient + 'static, P: PolicyPlanner + 'static> Poller<C, P> {
     }
 
     /// Poll forever at the configured interval.
+    ///
+    /// #2185: always poll with `tasks_version = 0` so Gitea runs `PickTask`
+    /// every iteration. Gitea gates `PickTask` on `tasks_version != latestVersion`
+    /// and bumps the version at run *creation* -- before the job becomes
+    /// `Waiting`. If we cached the returned version, a job that becomes Waiting
+    /// after our last poll would never be offered (no further version change)
+    /// until an unrelated bump or a runner restart -- the stuck-run race. Sending
+    /// 0 forces a pick each poll; the extra `PickTask` query is negligible.
     pub async fn run_forever(&self, state: &RunnerState) -> Result<()> {
-        let mut tasks_version = 0i64;
         loop {
-            match self.poll_once(state, tasks_version).await {
-                Ok(v) => tasks_version = v,
-                Err(e) => log::error!("poll error: {e}"),
+            if let Err(e) = self.poll_once(state, 0).await {
+                log::error!("poll error: {e}");
             }
             tokio::time::sleep(self.config.poll_interval).await;
         }
+    }
+}
+
+/// #2185: minimal `UpdateTask` payload marking a task SKIPPED. Result code 4
+/// maps to Gitea `StatusSkipped`, which is terminal (`Status::IsDone`) and not
+/// counted as a run (`HasRun` is false) -- it releases a claimed-but-unservable
+/// task without recording a misleading failure.
+fn skip_task_state(task_id: i64) -> crate::types::UpdateTaskRequest {
+    crate::types::UpdateTaskRequest {
+        state: crate::types::TaskState {
+            id: task_id,
+            result: 4,
+            started_at: None,
+            stopped_at: None,
+            steps: Vec::new(),
+        },
+        outputs: std::collections::BTreeMap::new(),
     }
 }
