@@ -160,7 +160,24 @@ step_rewrite_cargo() {
 }
 
 # ---------------------------------------------------------------------------
-# Step 4: Commit rewrite + workflows to publish branch, push to Gitea
+# Step 3b: Commit Cargo rewrite after Gitea CI has passed
+# ---------------------------------------------------------------------------
+step_commit_rewrite() {
+    cd "$REPO_DIR"
+
+    local changed
+    changed=$(git diff --name-only | wc -l)
+    if [ "$changed" -ne 0 ]; then
+        git add -A
+        git commit -m "chore: strip Gitea registry refs for crates.io publish"
+        log "Committed Cargo.toml rewrite (${changed} files changed)"
+    else
+        log "No Cargo rewrite changes to commit"
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Step 4: Commit workflows to publish branch, push to Gitea
 # ---------------------------------------------------------------------------
 step_prepare_gitea_branch() {
     cd "$REPO_DIR"
@@ -254,26 +271,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - uses: 1password/install-cli-action@v2
-      - name: Verify 1Password service account secret
-        env:
-          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
-        run: |
-          if [ -z "$OP_SERVICE_ACCOUNT_TOKEN" ]; then
-            echo "ERROR: OP_SERVICE_ACCOUNT_TOKEN secret is not configured." >&2
-            echo "Set it as a repository or organisation secret to enable crates.io publishing." >&2
-            exit 1
-          fi
-      - name: Get crates.io token from 1Password
-        id: token
-        env:
-          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
-        run: |
-          TOKEN=$(op read "op://TerraphimPlatform/crates.io.token/token")
-          echo "token=$TOKEN" >> $GITHUB_OUTPUT
       - name: Publish crates in dependency order
         env:
-          CARGO_REGISTRY_TOKEN: ${{ steps.token.outputs.token }}
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
           CRATE_LIST: ${{ inputs.crate_list }}
           DRY_RUN: ${{ inputs.dry_run }}
         run: |
@@ -630,6 +630,7 @@ case "$STEP" in
     clone)                step_clone ;;
     scrub)                step_scrub ;;
     rewrite-cargo)        step_rewrite_cargo ;;
+    commit-rewrite)       step_commit_rewrite ;;
     prepare-gitea-branch) step_prepare_gitea_branch ;;
     wait-gitea-ci)        step_wait_gitea_ci ;;
     create-github)        step_create_github ;;
@@ -640,14 +641,15 @@ case "$STEP" in
     full)
         step_clone
         step_scrub
-        step_rewrite_cargo
-        step_prepare_gitea_branch
-        step_wait_gitea_ci
-        step_create_github
-        step_push_github
-        step_wait_github_ci
-        step_merge_back
-        step_crates_publish
+        step_prepare_gitea_branch   # push to Gitea with registry refs intact
+        step_wait_gitea_ci          # Gate 1: validate on Gitea runner
+        step_rewrite_cargo          # strip registry refs for public mirror
+        step_commit_rewrite         # commit the rewrite before GitHub push
+        step_create_github          # create GitHub repo if needed
+        step_push_github            # push scrubbed code to GitHub
+        step_wait_github_ci         # Gate 2: validate on GitHub Actions
+        step_merge_back             # merge publish branch back to Gitea main
+        step_crates_publish         # publish to crates.io
         log "FULL PIPELINE COMPLETE for $REPO"
         ;;
     *) die "unknown step: $STEP" ;;
