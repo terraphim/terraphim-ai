@@ -147,6 +147,11 @@ step_rewrite_cargo() {
         if grep -q '\[registries\.terraphim\]' "$f" 2>/dev/null; then
             sed -i '/\[registries\.terraphim\]/,/^[[:space:]]*$/{ d; }' "$f"
         fi
+        # Strip publish restrictions to terraphim registry only
+        if grep -q 'publish = \["terraphim"\]' "$f" 2>/dev/null; then
+            log "  Stripping publish restriction from $f"
+            sed -i 's/publish = \["terraphim"\]//g' "$f"
+        fi
     done
 
     if [ -f '.cargo/config.toml' ]; then
