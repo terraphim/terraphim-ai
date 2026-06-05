@@ -329,7 +329,6 @@ fn test_rolegraph_response_deserialization() {
     assert_eq!(edge.rank, 50);
 }
 
-
 /// Test error response handling
 #[test]
 fn test_error_response_deserialization() {
