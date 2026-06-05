@@ -23,14 +23,109 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
 
-// Use fcctl-core for VM and snapshot management
-// Note: SnapshotType must come from firecracker::models to match SnapshotManager's expected type
-use fcctl_core::firecracker::models::SnapshotType;
-use fcctl_core::snapshot::SnapshotManager;
-use fcctl_core::vm::VmManager;
-
-// Keep terraphim_firecracker for pool management
+// Pool management from the workspace crate (CI-safe).
 use terraphim_firecracker::{PoolConfig, Sub2SecondOptimizer, VmPoolManager};
+
+// Compile-time stubs replacing fcctl_core (private repo, not available on CI).
+// To use the real implementation:
+//   1. Uncomment fcctl-core in Cargo.toml [dependencies]
+//   2. Replace these stubs with: use fcctl_core::firecracker::models::SnapshotType;
+//                                 use fcctl_core::snapshot::SnapshotManager;
+//                                 use fcctl_core::vm::VmManager;
+
+/// VM snapshot type.  Stub for `fcctl_core::firecracker::models::SnapshotType`.
+#[allow(dead_code)]
+enum SnapshotType {
+    Full,
+}
+
+/// Opaque client returned by `VmManager::get_vm_client`.
+/// Stub for the real type from fcctl_core.
+#[allow(dead_code)]
+struct FcVmClient;
+
+/// VM configuration passed to `VmManager::create_vm`.
+/// Stub for `fcctl_core::firecracker::VmConfig`.
+#[allow(dead_code)]
+struct FcVmConfig {
+    kernel_path: String,
+    rootfs_path: String,
+    vcpus: u32,
+    memory_mb: u32,
+    initrd_path: Option<PathBuf>,
+    boot_args: Option<String>,
+    vm_type: FcVmType,
+}
+
+/// VM type selector.  Stub for `fcctl_core::firecracker::VmType`.
+#[allow(dead_code)]
+enum FcVmType {
+    Minimal,
+}
+
+/// VM lifecycle manager.  Stub for `fcctl_core::vm::VmManager`.
+/// All methods return errors; real functionality requires the private crate.
+#[allow(dead_code)]
+struct VmManager;
+
+#[allow(dead_code)]
+impl VmManager {
+    fn new(_bin: &PathBuf, _socket: &PathBuf, _opts: Option<()>) -> Result<Self, String> {
+        Err("fcctl_core not available — see Cargo.toml comments".to_string())
+    }
+    fn get_vm_ip(&self, _id: &str) -> Result<String, String> {
+        Err("not available".to_string())
+    }
+    async fn get_vm_client(&mut self, _id: &str) -> Result<FcVmClient, String> {
+        Err("not available".to_string())
+    }
+    async fn create_vm(&mut self, _config: &FcVmConfig, _opts: Option<()>) -> Result<String, String> {
+        Err("not available".to_string())
+    }
+}
+
+/// Snapshot info entry returned by `SnapshotManager::list_snapshots`.
+#[allow(dead_code)]
+struct FcSnapshotInfo {
+    pub id: String,
+}
+
+/// Snapshot lifecycle manager.  Stub for `fcctl_core::snapshot::SnapshotManager`.
+#[allow(dead_code)]
+struct SnapshotManager;
+
+#[allow(dead_code)]
+impl SnapshotManager {
+    fn new(_dir: &PathBuf, _opts: Option<()>) -> Result<Self, String> {
+        Err("fcctl_core not available — see Cargo.toml comments".to_string())
+    }
+    async fn create_snapshot(
+        &mut self,
+        _client: FcVmClient,
+        _vm_id: &str,
+        _name: &str,
+        _snap_type: SnapshotType,
+        _opts: Option<()>,
+    ) -> Result<String, String> {
+        Err("not available".to_string())
+    }
+    async fn restore_snapshot(
+        &mut self,
+        _client: FcVmClient,
+        _snapshot_id: &str,
+    ) -> Result<(), String> {
+        Err("not available".to_string())
+    }
+    async fn list_snapshots(
+        &mut self,
+        _filter: Option<&str>,
+    ) -> Result<Vec<FcSnapshotInfo>, String> {
+        Ok(vec![])
+    }
+    async fn delete_snapshot(&mut self, _id: &str, _force: bool) -> Result<(), String> {
+        Err("not available".to_string())
+    }
+}
 
 use super::ssh::SshExecutor;
 use super::{Capability, ExecutionContext, ExecutionResult, SnapshotId, ValidationResult};
@@ -247,14 +342,14 @@ impl FirecrackerExecutor {
                 "console=ttyS0 reboot=k panic=1 pci=off".to_string()
             };
 
-            let vm_config = fcctl_core::firecracker::VmConfig {
+            let vm_config = FcVmConfig {
                 kernel_path: "/tmp/vmlinux-5.10.225".to_string(),
                 rootfs_path: "/tmp/ubuntu-22.04.ext4".to_string(),
                 vcpus: 2,
                 memory_mb: 1024,
                 initrd_path: None,
                 boot_args: Some(boot_args),
-                vm_type: fcctl_core::firecracker::VmType::Minimal,
+                vm_type: FcVmType::Minimal,
             };
 
             match vm_manager.create_vm(&vm_config, None).await {
@@ -425,7 +520,7 @@ impl FirecrackerExecutor {
                         match result {
                             Ok(mut res) => {
                                 res.metadata.insert("vm_id".to_string(), id.clone());
-                                res.metadata.insert("vm_ip".to_string(), ip);
+                                res.metadata.insert("vm_ip".to_string(), ip.to_string());
                                 res.metadata
                                     .insert("backend".to_string(), "firecracker".to_string());
                                 Ok(res)

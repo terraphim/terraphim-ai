@@ -30,6 +30,9 @@ terraphim_automata = { path = "../terraphim_automata", optional = true }
 terraphim_types = { path = "../terraphim_types", optional = true }
 terraphim_rolegraph = { path = "../terraphim_rolegraph", optional = true }
 terraphim_agent_supervisor = { path = "../terraphim_agent_supervisor", optional = true }
+# Pool management for Firecracker VMs (workspace crate, CI-safe).
+# Note: package name uses a hyphen; Rust code uses underscores as the crate name.
+terraphim-firecracker = { path = "../../terraphim_firecracker", optional = true }
 
 # Firecracker-rust core for VM and snapshot management (private repo).
 # Uncomment when building with --features firecracker on a machine with
@@ -72,7 +75,7 @@ kg-validation = ["dep:terraphim_automata", "dep:terraphim_types", "dep:terraphim
 supervision = ["dep:terraphim_agent_supervisor"]
 llm-bridge = ["dep:hyper", "dep:hyper-util"]
 docker-backend = ["dep:bollard"]
-firecracker = []
+firecracker = ["dep:terraphim-firecracker"]
 e2b-backend = ["dep:reqwest"]
 mcp = ["dep:rmcp"]
 cli = ["dep:clap", "dep:env_logger"]

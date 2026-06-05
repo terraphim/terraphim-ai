@@ -9278,6 +9278,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
+ "terraphim-firecracker",
  "terraphim_agent_supervisor",
  "terraphim_automata",
  "terraphim_config",
