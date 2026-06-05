@@ -460,14 +460,28 @@ pub trait Persistable: Serialize + DeserializeOwned {
 
     fn get_key(&self) -> String;
     fn normalize_key(&self, key: &str) -> String {
-        // Replace non-alphanumeric characters with underscores to preserve semantic meaning
-        let re = regex::Regex::new(r"[^a-zA-Z0-9]+").expect("Failed to create regex");
-        let normalized = re.replace_all(key, "_").to_lowercase();
+        // Map non-ASCII-alphanumeric characters to underscores, lowercase in one pass.
+        // Matches the original regex r"[^a-zA-Z0-9]+" semantics (ASCII-only alphanumeric).
+        // Avoids per-call regex compilation which caused O(n) regex-engine overhead per key.
+        let mapped: String = key
+            .chars()
+            .map(|c| {
+                if c.is_ascii_alphanumeric() {
+                    c.to_ascii_lowercase()
+                } else {
+                    '_'
+                }
+            })
+            .collect();
 
-        // Remove leading/trailing underscores and collapse multiple underscores
-        let cleaned = normalized.trim_matches('_').to_string();
-        let re_multi = regex::Regex::new(r"_+").expect("Failed to create regex");
-        let final_key = re_multi.replace_all(&cleaned, "_").to_string();
+        // Split on underscore, drop empty segments (handles runs of separators and
+        // leading/trailing separators), then rejoin — equivalent to the former
+        // trim_matches + regex-collapse step but without a second regex compile.
+        let final_key: String = mapped
+            .split('_')
+            .filter(|s| !s.is_empty())
+            .collect::<Vec<_>>()
+            .join("_");
 
         log::debug!("Key normalization: '{}' → '{}'", key, final_key);
 

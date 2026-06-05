@@ -398,7 +398,6 @@ async fn test_empty_and_edge_case_keys() -> Result<()> {
 
 #[tokio::test]
 #[serial]
-#[ignore] // Flaky test - performance depends on environment (regex-based key normalization)
 async fn test_key_generation_performance() -> Result<()> {
     init_test_persistence().await?;
 
@@ -421,10 +420,11 @@ async fn test_key_generation_performance() -> Result<()> {
     let duration = start.elapsed();
     println!("Generated 2000 keys in {:?}", duration);
 
-    // Performance should be reasonable (less than 5 seconds for 2000 keys)
+    // normalize_key uses pure iterator logic (no regex compilation per call),
+    // so 2000 key generations must complete well within 100 ms on any modern machine.
     assert!(
-        duration.as_millis() < 5000,
-        "Key generation should be fast, took {:?}",
+        duration.as_millis() < 100,
+        "Key generation should be fast (< 100 ms), took {:?}",
         duration
     );
 

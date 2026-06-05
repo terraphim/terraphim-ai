@@ -9237,7 +9237,6 @@ dependencies = [
  "chrono",
  "log",
  "opendal",
- "regex",
  "rusqlite",
  "serde",
  "serde_json",
