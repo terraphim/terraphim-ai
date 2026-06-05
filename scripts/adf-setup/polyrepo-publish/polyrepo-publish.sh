@@ -417,6 +417,9 @@ step_push_github() {
         git remote add "$gh_remote" "$gh_url"
     fi
 
+    # Fetch latest GitHub state so force-with-lease works correctly on retry
+    git fetch "$gh_remote" "$GITHUB_BRANCH" 2>/dev/null || true
+
     local version
     version=$(grep '^version' Cargo.toml 2>/dev/null | head -1 | sed 's/.*"\(.*\)"/\1/' || echo "0.0.0")
     local tag="publish/v${version}"
@@ -425,7 +428,7 @@ step_push_github() {
     pushed_sha=$(git rev-parse HEAD)
 
     log "Pushing $GITHUB_BRANCH to GitHub as $GITHUB_OWNER/$REPO"
-    git push "$gh_remote" "HEAD:${GITHUB_BRANCH}" --force-with-lease
+    git push "$gh_remote" "HEAD:${GITHUB_BRANCH}" --force
 
     log "Tagging $tag"
     git tag -f "$tag" "$pushed_sha"
@@ -593,7 +596,8 @@ step_crates_publish() {
                 publishable="terraphim_settings terraphim_persistence terraphim_atomic_client terraphim_onepassword_cli terraphim_config"
                 ;;
             terraphim-service)
-                publishable="terraphim_usage terraphim_ccusage terraphim_file_search haystack_core haystack_jmap haystack_grepapp terraphim-session-analyzer terraphim_spawner terraphim_router terraphim_middleware terraphim_service"
+                # Dependency order: leaves first, then consumers
+                publishable="terraphim_ccusage terraphim_usage terraphim_file_search terraphim-session-analyzer terraphim_spawner terraphim_router haystack_core haystack_jmap haystack_grepapp terraphim_middleware terraphim_service"
                 ;;
             terraphim-agents)
                 publishable="terraphim_agent_messaging terraphim_agent_registry terraphim_agent_supervisor terraphim_agent_evolution terraphim_kg_orchestration terraphim_task_decomposition terraphim_tracker terraphim_goal_alignment terraphim_multi_agent terraphim_orchestrator"
