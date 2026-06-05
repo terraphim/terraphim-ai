@@ -80,17 +80,18 @@ step_scrub() {
     # These always block publication.
     local secret_patterns=(
         'Bearer [a-f0-9]{20,}'
-        'op://TerraphimPlatform'
     )
 
     # Patterns that indicate internal infrastructure references.
-    # These are env-var names and URLs, not literal secrets, but they
-    # reveal Terraphim-specific infrastructure. They warn and are
-    # tracked for future generalisation; they do not block the pipeline.
+    # These are env-var names, vault paths, and URLs -- not literal
+    # secrets -- but they reveal Terraphim-specific infrastructure.
+    # They warn and are tracked for future generalisation; they do not
+    # block the pipeline.
     local infra_patterns=(
         'GITEA_TOKEN'
         'ADF_WEBHOOK_SECRET'
         'CARGO_REGISTRIES_TERRAPHIM_TOKEN'
+        'op://TerraphimPlatform'
     )
 
     for pat in "${secret_patterns[@]}"; do
