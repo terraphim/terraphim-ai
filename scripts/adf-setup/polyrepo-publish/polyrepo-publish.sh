@@ -285,14 +285,27 @@ jobs:
               exit 1
             fi
             version=$(grep -m1 '^version' "$manifest" | sed 's/.*"\(.*\)".*/\1/')
-            if curl -fsS "https://crates.io/api/v1/crates/$crate/$version" >/dev/null 2>&1; then
+            # Check crates.io with auth to avoid rate limits
+            if curl -fsS -H "Authorization: ${CARGO_REGISTRY_TOKEN}" "https://crates.io/api/v1/crates/$crate/$version" >/dev/null 2>&1; then
               echo "$crate $version already exists on crates.io; skipping"
               continue
             fi
             if [ "$DRY_RUN" = "true" ]; then
               cargo publish --manifest-path "$manifest" --dry-run
             else
-              cargo publish --manifest-path "$manifest"
+              set +e
+              output=$(cargo publish --manifest-path "$manifest" 2>&1)
+              exit_code=$?
+              set -e
+              if [ "$exit_code" -ne 0 ]; then
+                if echo "$output" | grep -qi "already exists"; then
+                  echo "$crate $version already exists on crates.io; skipping"
+                  continue
+                fi
+                echo "$output" >&2
+                echo "ERROR: Failed to publish $crate" >&2
+                exit 1
+              fi
             fi
           done
 WORKFLOW
