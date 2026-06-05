@@ -21,6 +21,7 @@ pub use heading::{
     build_heading_tree, classify_sections,
 };
 
+/// The prefix used inside HTML comments to identify Terraphim block-id anchors.
 pub const TERRAPHIM_BLOCK_ID_PREFIX: &str = "terraphim:block-id:";
 
 /// Extract the first H1 heading from markdown content using AST parsing.
@@ -69,15 +70,21 @@ pub(crate) fn collect_text_content(nodes: &[Node]) -> String {
     text
 }
 
+/// Describes the structural kind of a Terraphim block.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BlockKind {
+    /// A standalone markdown paragraph block.
     Paragraph,
+    /// A markdown list-item block.
     ListItem,
 }
 
+/// Represents a single annotated content block extracted from normalised markdown.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Block {
+    /// The stable unique identifier assigned to this block.
     pub id: Ulid,
+    /// The structural kind of this block (paragraph or list item).
     pub kind: BlockKind,
 
     /// Byte span of the block in the markdown buffer.
@@ -93,13 +100,18 @@ pub struct Block {
     pub id_span: Range<usize>,
 }
 
+/// Represents markdown content that has been normalised with stable Terraphim block-id anchors.
 #[derive(Debug, Clone)]
 pub struct NormalizedMarkdown {
+    /// The normalised markdown source with all block-id comments inserted.
     pub markdown: String,
+    /// The ordered list of blocks extracted from the normalised source.
     pub blocks: Vec<Block>,
+    /// The parsed AST of the normalised markdown, if available.
     pub ast: Option<markdown::mdast::Node>,
 }
 
+/// Describes errors that can occur during markdown parsing and normalisation.
 #[derive(Debug, Error)]
 pub enum MarkdownParserError {
     #[error("failed to parse markdown: {0}")]

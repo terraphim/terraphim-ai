@@ -17,10 +17,12 @@ use crate::AgentPid;
 pub struct MessageId(pub Uuid);
 
 impl MessageId {
+    /// Creates a new randomly-generated `MessageId`.
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
 
+    /// Returns the string representation of the message ID.
     pub fn as_str(&self) -> String {
         self.0.to_string()
     }
@@ -295,13 +297,18 @@ impl MessageEnvelope {
 
 /// Typed message wrapper for type-safe messaging
 pub struct TypedMessage<T> {
+    /// The unique identifier for this message.
     pub id: MessageId,
+    /// The sending agent, if known.
     pub from: Option<AgentPid>,
+    /// The typed message payload.
     pub payload: T,
+    /// The UTC timestamp when this message was created.
     pub created_at: DateTime<Utc>,
 }
 
 impl<T> TypedMessage<T> {
+    /// Creates a new `TypedMessage` wrapping the given payload.
     pub fn new(payload: T) -> Self {
         Self {
             id: MessageId::new(),
@@ -311,6 +318,7 @@ impl<T> TypedMessage<T> {
         }
     }
 
+    /// Sets the sending agent for this message.
     pub fn with_from(mut self, from: AgentPid) -> Self {
         self.from = Some(from);
         self

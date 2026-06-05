@@ -59,12 +59,14 @@ struct ZaiSubscriptionItem {
     next_renew_time: Option<String>,
 }
 
+/// Represents a usage provider for the Z.ai (GLM) coding subscription API.
 pub struct ZaiProvider {
     api_key: Option<String>,
     client: reqwest::Client,
 }
 
 impl ZaiProvider {
+    /// Creates a new `ZaiProvider`, reading the API key from environment variables.
     pub fn new() -> Self {
         Self {
             api_key: std::env::var("ZAI_API_KEY")
@@ -77,6 +79,7 @@ impl ZaiProvider {
         }
     }
 
+    /// Creates a `ZaiProvider` with an explicit API key.
     pub fn with_api_key(api_key: String) -> Self {
         Self {
             api_key: Some(api_key),

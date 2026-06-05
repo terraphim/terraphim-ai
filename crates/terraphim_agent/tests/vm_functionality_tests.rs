@@ -1,3 +1,4 @@
+#![cfg(feature = "firecracker")]
 use terraphim_agent::client::*;
 
 /// Test VM command parsing with feature gates

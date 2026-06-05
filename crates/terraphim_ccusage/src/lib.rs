@@ -9,26 +9,33 @@ use std::path::PathBuf;
 use std::time::{Duration, Instant};
 use thiserror::Error;
 
+/// Errors that can occur during ccusage invocation or output parsing.
 #[derive(Error, Debug)]
 pub enum CcusageError {
+    /// No supported package runner (`bun`, `pnpm`, `yarn`, `npm`, `npx`) was found in `PATH`.
     #[error("No package runner found (bun, pnpm, yarn, npm, npx)")]
     NoRunner,
 
+    /// The package runner exited with a non-zero status.
     #[error("Runner execution failed: {0}")]
     RunnerFailed(String),
 
+    /// Failed to deserialise the JSON output from ccusage.
     #[error("Failed to parse ccusage output: {0}")]
     ParseError(String),
 
+    /// An I/O error occurred while spawning or reading the process.
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
 
+    /// The ccusage process did not complete within the allowed duration.
     #[error("Timeout after {0:?}")]
     Timeout(Duration),
 }
 
 pub type Result<T> = std::result::Result<T, CcusageError>;
 
+/// Token and cost totals for a single calendar day.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DailyUsage {
     pub date: String,
@@ -50,14 +57,18 @@ pub struct DailyUsage {
     pub cost_usd: Option<f64>,
 }
 
+/// Collection of daily usage entries as returned by ccusage.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DailyUsageReport {
     pub daily: Vec<DailyUsage>,
 }
 
+/// Selects which ccusage variant to invoke.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum CcusageProvider {
+    /// Use the `ccusage` package for Claude Code session data.
     Claude,
+    /// Use the `@ccusage/codex` package for Codex session data.
     Codex,
 }
 
@@ -70,6 +81,7 @@ impl std::fmt::Display for CcusageProvider {
     }
 }
 
+/// Thin wrapper around the ccusage CLI with an in-process TTL cache.
 pub struct CcusageClient {
     provider: CcusageProvider,
     home_path: Option<PathBuf>,
@@ -78,6 +90,7 @@ pub struct CcusageClient {
 }
 
 impl CcusageClient {
+    /// Creates a new client for the given provider with a 5-minute cache TTL.
     pub fn new(provider: CcusageProvider) -> Self {
         Self {
             provider,
@@ -87,16 +100,19 @@ impl CcusageClient {
         }
     }
 
+    /// Overrides the home directory path forwarded to ccusage via `--home`.
     pub fn with_home_path(mut self, path: PathBuf) -> Self {
         self.home_path = Some(path);
         self
     }
 
+    /// Sets the TTL for cached query results.
     pub fn with_cache_ttl(mut self, ttl: Duration) -> Self {
         self.cache_ttl = ttl;
         self
     }
 
+    /// Runs ccusage for the given date range, returning cached results when available.
     pub fn query(&mut self, since: &str, until: Option<&str>) -> Result<DailyUsageReport> {
         let cache_key = format!("{}:{}:{}", self.provider, since, until.unwrap_or("now"));
 
@@ -168,6 +184,7 @@ impl CcusageClient {
         Ok(report)
     }
 
+    /// Evicts all cached entries.
     pub fn clear_cache(&mut self) {
         self.cache.clear();
     }

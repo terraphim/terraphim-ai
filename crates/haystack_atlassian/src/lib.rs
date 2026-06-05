@@ -9,19 +9,28 @@ use terraphim_types::{Document, SearchQuery};
 pub mod confluence;
 pub mod jira;
 
+/// HTTP client for searching Confluence spaces via CQL.
 pub struct ConfluenceClient {
+    /// Base URL of the Confluence instance, e.g. `https://example.atlassian.net`.
     pub base_url: String,
+    /// Atlassian account e-mail used for Basic auth.
     pub username: String,
+    /// Atlassian API token for Basic auth.
     pub token: String,
 }
 
+/// HTTP client for searching Jira issues via JQL.
 pub struct JiraClient {
+    /// Base URL of the Jira instance.
     pub base_url: String,
+    /// Atlassian account e-mail used for Basic auth.
     pub username: String,
+    /// Atlassian API token for Basic auth.
     pub token: String,
 }
 
 impl ConfluenceClient {
+    /// Creates a new `ConfluenceClient` with the given credentials.
     pub fn new(base_url: String, username: String, token: String) -> Self {
         Self {
             base_url,
@@ -32,6 +41,7 @@ impl ConfluenceClient {
 }
 
 impl JiraClient {
+    /// Creates a new `JiraClient` with the given credentials.
     pub fn new(base_url: String, username: String, token: String) -> Self {
         Self {
             base_url,
@@ -141,7 +151,7 @@ impl HaystackProvider for JiraClient {
     }
 }
 
-// Legacy client for backward compatibility
+/// Legacy placeholder client. Prefer [`ConfluenceClient`] or [`JiraClient`].
 pub struct AtlassianClient;
 
 impl HaystackProvider for AtlassianClient {

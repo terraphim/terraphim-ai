@@ -274,7 +274,8 @@ pub struct AgentOrchestrator {
     active_flows: HashMap<String, tokio::task::JoinHandle<flow::state::FlowRunState>>,
     /// Active compound review execution (spawned in background to avoid
     /// blocking reconcile_tick). None when no compound review is running.
-    active_compound_review: Option<tokio::task::JoinHandle<Result<CompoundReviewResult, OrchestratorError>>>,
+    active_compound_review:
+        Option<tokio::task::JoinHandle<Result<CompoundReviewResult, OrchestratorError>>>,
     /// Per-project mention cursors, keyed by project id.
     ///
     /// Each project gets its own cursor so repo-wide polls can advance
@@ -6208,14 +6209,12 @@ impl AgentOrchestrator {
         if elapsed > std::time::Duration::from_secs(5) {
             warn!(
                 tick = self.tick_count,
-                elapsed_ms,
-                "reconcile_tick SLOW: took > 5s, likely blocking agent polling"
+                elapsed_ms, "reconcile_tick SLOW: took > 5s, likely blocking agent polling"
             );
         } else {
             info!(
                 tick = self.tick_count,
-                elapsed_ms,
-                "reconcile_tick complete"
+                elapsed_ms, "reconcile_tick complete"
             );
         }
     }
@@ -8036,9 +8035,7 @@ Remove the pause flag once the underlying failure is resolved:\n\n\
                 let git_ref = "HEAD".to_string();
                 let base_ref = self.config.compound_review.base_branch.clone();
                 let workflow = self.compound_workflow.clone();
-                let handle = tokio::spawn(async move {
-                    workflow.run(&git_ref, &base_ref).await
-                });
+                let handle = tokio::spawn(async move { workflow.run(&git_ref, &base_ref).await });
                 self.active_compound_review = Some(handle);
             }
             ScheduleEvent::Flow(flow_def) => {

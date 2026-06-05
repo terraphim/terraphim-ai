@@ -24,10 +24,15 @@ pub struct GiteaClient {
 /// PR list response item (subset of Gitea fields used here).
 #[derive(Debug, Clone, Deserialize)]
 pub struct PrSummary {
+    /// The Gitea PR index number.
     pub number: u64,
+    /// The PR title.
     pub title: String,
+    /// The PR description body, if present.
     pub body: Option<String>,
+    /// The current PR state (e.g. `"open"`).
     pub state: String,
+    /// Whether the PR is mergeable according to Gitea.
     pub mergeable: Option<bool>,
 }
 

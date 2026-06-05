@@ -135,7 +135,7 @@ impl FirecrackerExecutor {
             stdout: response.stdout.clone(),
             stderr: response.stderr.clone(),
             duration_ms,
-            resource_usage: Some(self.calculate_resource_usage(&response)),
+            resource_usage: Some(self.calculate_resource_usage()),
         })
     }
 
@@ -158,12 +158,7 @@ impl FirecrackerExecutor {
     }
 
     /// Calculate resource usage from VM response
-    fn calculate_resource_usage(
-        &self,
-        _response: &crate::client::VmExecuteResponse,
-    ) -> ResourceUsage {
-        // This would be enhanced in a real implementation
-        // For now, return default values
+    fn calculate_resource_usage(&self) -> ResourceUsage {
         default_resource_usage()
     }
 

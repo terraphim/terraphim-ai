@@ -13,9 +13,13 @@ use crate::types::{EvalVerdict, MergeCoordinatorError, MergeOutcome};
 /// One evaluation of one open PR.
 #[derive(Debug, Clone)]
 pub struct PrEvaluation {
+    /// The Gitea PR index number.
     pub pr_index: u64,
+    /// Whether the PR is mergeable according to the Gitea API.
     pub mergeable: bool,
+    /// Issue numbers referenced by `Fixes #N` in the PR body.
     pub fixes_issues: Vec<u64>,
+    /// The verdict reached for this PR.
     pub verdict: EvalVerdict,
 }
 

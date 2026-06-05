@@ -4,23 +4,30 @@ use clap::{Parser, Subcommand};
 use jiff::Zoned;
 use std::collections::BTreeMap;
 
+/// Represents the top-level CLI entry point for the Terraphim AI command.
 #[derive(Parser)]
 #[command(name = "terraphim", about = "Terraphim AI CLI")]
 pub struct Cli {
+    /// The subcommand to execute.
     #[command(subcommand)]
     pub command: Commands,
 }
 
+/// Describes the top-level subcommands available in the CLI.
 #[derive(Subcommand)]
 pub enum Commands {
+    /// Display or manage LLM usage information.
     Usage {
+        /// The usage action to perform.
         #[command(subcommand)]
         action: UsageAction,
     },
 }
 
+/// Describes the available usage subcommand actions.
 #[derive(Subcommand)]
 pub enum UsageAction {
+    /// Show current live usage for one or all providers.
     Show {
         #[arg(short, long)]
         provider: Option<String>,
@@ -139,6 +146,7 @@ struct ModelAggregation {
     count: usize,
 }
 
+/// Executes a `UsageAction` against the provided registry and returns formatted output.
 pub async fn execute_usage_action(
     action: UsageAction,
     registry: &UsageRegistry,

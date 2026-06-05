@@ -3,15 +3,24 @@ use ulid::Ulid;
 use crate::NormalizedMarkdown;
 use crate::heading::{HeadingNode, HeadingTree, SectionType};
 
+/// Represents a semantically coherent chunk of content under a heading, ready for indexing.
 #[derive(Debug, Clone)]
 pub struct ContentChunk {
+    /// The composite identifier combining content source, section path, and first block ULID.
     pub chunk_id: String,
+    /// The identifier of the source document this chunk belongs to.
     pub content_id: String,
+    /// The ordered list of block ULIDs whose text makes up this chunk.
     pub block_ids: Vec<Ulid>,
+    /// The chapter number assigned by depth-first traversal order, if applicable.
     pub chapter_number: Option<u8>,
+    /// The dot-separated path of section indices, e.g. `"1.2.3"`.
     pub section_path: String,
+    /// The classified section type for this chunk (main body, sidebar, career, assessment).
     pub chunk_type: SectionType,
+    /// The plain text content of the chunk with block-id comments stripped.
     pub text: String,
+    /// The approximate token count based on whitespace-delimited words.
     pub token_count: u32,
 }
 
@@ -19,6 +28,7 @@ struct ChunkState {
     chapter_counter: u8,
 }
 
+/// Builds a flat list of [`ContentChunk`]s by traversing the heading tree depth-first.
 pub fn chunk_by_headings(
     content_id: &str,
     tree: &HeadingTree,

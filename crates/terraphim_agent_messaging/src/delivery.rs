@@ -37,19 +37,30 @@ pub enum DeliveryStatus {
 /// Delivery record for tracking message delivery
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DeliveryRecord {
+    /// The unique identifier of the tracked message.
     pub message_id: MessageId,
+    /// The sending agent, if known.
     pub from: Option<AgentPid>,
+    /// The intended recipient agent.
     pub to: AgentPid,
+    /// The current delivery status.
     pub status: DeliveryStatus,
+    /// Number of delivery attempts made so far.
     pub attempts: u32,
+    /// The UTC timestamp when the record was created.
     pub created_at: DateTime<Utc>,
+    /// The UTC timestamp of the most recent delivery attempt.
     pub last_attempt: Option<DateTime<Utc>>,
+    /// The UTC timestamp when the message was delivered.
     pub delivered_at: Option<DateTime<Utc>>,
+    /// The UTC timestamp when the message was acknowledged.
     pub acknowledged_at: Option<DateTime<Utc>>,
+    /// The error description from the most recent failed attempt.
     pub error_message: Option<String>,
 }
 
 impl DeliveryRecord {
+    /// Creates a new pending delivery record for the given message.
     pub fn new(message_id: MessageId, from: Option<AgentPid>, to: AgentPid) -> Self {
         Self {
             message_id,
@@ -65,31 +76,37 @@ impl DeliveryRecord {
         }
     }
 
+    /// Transitions the record to `InTransit` and increments the attempt counter.
     pub fn mark_in_transit(&mut self) {
         self.status = DeliveryStatus::InTransit;
         self.attempts += 1;
         self.last_attempt = Some(Utc::now());
     }
 
+    /// Transitions the record to `Delivered` and records the delivery timestamp.
     pub fn mark_delivered(&mut self) {
         self.status = DeliveryStatus::Delivered;
         self.delivered_at = Some(Utc::now());
     }
 
+    /// Transitions the record to `Acknowledged` and records the acknowledgement timestamp.
     pub fn mark_acknowledged(&mut self) {
         self.status = DeliveryStatus::Acknowledged;
         self.acknowledged_at = Some(Utc::now());
     }
 
+    /// Transitions the record to `Failed` and stores the error description.
     pub fn mark_failed(&mut self, error: String) {
         self.status = DeliveryStatus::Failed(error.clone());
         self.error_message = Some(error);
     }
 
+    /// Transitions the record to `Expired`.
     pub fn mark_expired(&mut self) {
         self.status = DeliveryStatus::Expired;
     }
 
+    /// Returns `true` if the record is in a terminal state (acknowledged, failed, or expired).
     pub fn is_final_state(&self) -> bool {
         matches!(
             self.status,
@@ -390,6 +407,7 @@ pub struct DeliveryStats {
 }
 
 impl DeliveryStats {
+    /// Returns the fraction of messages that were successfully acknowledged.
     pub fn success_rate(&self) -> f64 {
         if self.total_messages == 0 {
             0.0
@@ -398,6 +416,7 @@ impl DeliveryStats {
         }
     }
 
+    /// Returns the fraction of messages that failed delivery.
     pub fn failure_rate(&self) -> f64 {
         if self.total_messages == 0 {
             0.0
@@ -406,6 +425,7 @@ impl DeliveryStats {
         }
     }
 
+    /// Returns the average number of delivery attempts per message.
     pub fn average_attempts(&self) -> f64 {
         if self.total_messages == 0 {
             0.0

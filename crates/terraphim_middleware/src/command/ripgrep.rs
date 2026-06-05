@@ -247,6 +247,7 @@ impl RipgrepCommand {
         )
     }
 
+    /// Runs ripgrep to find `needle` in `haystack` with additional command-line arguments.
     pub async fn run_with_extra_args(
         &self,
         needle: &str,
