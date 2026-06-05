@@ -11,8 +11,6 @@ mod tests {
     use terraphim_types::{
         ChatMessage, ContextItem, ContextType, ConversationId, Document, DocumentType, RoleName,
     };
-    use tokio::test;
-
     // Test fixtures
     fn create_test_config() -> ContextConfig {
         ContextConfig {
@@ -69,7 +67,7 @@ mod tests {
 
     // Core functionality tests
 
-    #[test]
+    #[tokio::test]
     async fn test_create_conversation() {
         let mut manager = ContextManager::new(create_test_config());
         let title = "Test Conversation".to_string();
@@ -92,7 +90,7 @@ mod tests {
         assert!(conv.global_context.is_empty());
     }
 
-    #[test]
+    #[tokio::test]
     async fn test_create_conversation_with_empty_title() {
         let mut manager = ContextManager::new(create_test_config());
         let title = "".to_string();
@@ -109,7 +107,7 @@ mod tests {
         assert_eq!(conversation.unwrap().title, "");
     }
 
-    #[test]
+    #[tokio::test]
     async fn test_list_conversations() {
         let mut manager = ContextManager::new(create_test_config());
 
@@ -142,7 +140,7 @@ mod tests {
         assert_eq!(conversations[2].id, conv1);
     }
 
-    #[test]
+    #[tokio::test]
     async fn test_get_conversation() {
         let mut manager = ContextManager::new(create_test_config());
         let conversation_id = manager
@@ -160,7 +158,7 @@ mod tests {
         assert!(result.is_none());
     }
 
-    #[test]
+    #[tokio::test]
     async fn test_add_message_to_conversation() {
         let mut manager = ContextManager::new(create_test_config());
         let conversation_id = manager
@@ -180,7 +178,7 @@ mod tests {
         assert_eq!(conversation.messages[0].role, "user");
     }
 
-    #[test]
+    #[tokio::test]
     async fn test_add_context_to_conversation() {
         let mut manager = ContextManager::new(create_test_config());
         let conversation_id = manager
@@ -209,7 +207,7 @@ mod tests {
         assert_eq!(conversation.global_context[0].content, context_item.content);
     }
 
-    #[test]
+    #[tokio::test]
     async fn test_create_search_context() {
         let manager = ContextManager::new(create_test_config());
         let documents = create_test_documents(3);
@@ -232,7 +230,7 @@ mod tests {
         assert_eq!(context_item.metadata.get("result_count").unwrap(), "2");
     }
 
-    #[test]
+    #[tokio::test]
     async fn test_create_search_context_with_empty_documents() {
         let manager = ContextManager::new(create_test_config());
         let documents: Vec<Document> = vec![];
@@ -245,7 +243,7 @@ mod tests {
         assert_eq!(context_item.metadata.get("result_count").unwrap(), "0");
     }
 
-    #[test]
+    #[tokio::test]
     async fn test_create_document_context() {
         let manager = ContextManager::new(create_test_config());
         let document = create_test_document();
@@ -266,7 +264,7 @@ mod tests {
         assert_eq!(context_item.metadata.get("url").unwrap(), &document.url);
     }
 
-    #[test]
+    #[tokio::test]
     async fn test_context_item_from_document() {
         let document = create_test_document();
         let context_item = ContextItem::from_document(&document);
@@ -282,7 +280,7 @@ mod tests {
         assert!(context_item.relevance_score.is_some());
     }
 
-    #[test]
+    #[tokio::test]
     async fn test_context_item_from_search_result() {
         let documents = create_test_documents(3);
         let query = "test search";
@@ -300,7 +298,7 @@ mod tests {
 
     // Edge case and error handling tests
 
-    #[test]
+    #[tokio::test]
     async fn test_add_message_to_nonexistent_conversation() {
         let mut manager = ContextManager::new(create_test_config());
         let fake_id = ConversationId::from_string("non-existent".to_string());
@@ -311,7 +309,7 @@ mod tests {
         assert!(result.is_err());
     }
 
-    #[test]
+    #[tokio::test]
     async fn test_add_context_to_nonexistent_conversation() {
         let mut manager = ContextManager::new(create_test_config());
         let fake_id = ConversationId::from_string("non-existent".to_string());
@@ -331,7 +329,7 @@ mod tests {
         assert!(result.is_err());
     }
 
-    #[test]
+    #[tokio::test]
     async fn test_conversation_limits() {
         let config = ContextConfig {
             max_conversations_cache: 2,
@@ -368,7 +366,7 @@ mod tests {
         assert_eq!(latest.unwrap().title, "Conv 3");
     }
 
-    #[test]
+    #[tokio::test]
     async fn test_max_context_exceeded() {
         let config = ContextConfig {
             max_conversations_cache: 10,
@@ -423,7 +421,7 @@ mod tests {
         assert!(result.is_err());
     }
 
-    #[test]
+    #[tokio::test]
     async fn test_max_context_length_exceeded() {
         let config = ContextConfig {
             max_conversations_cache: 10,
@@ -453,7 +451,7 @@ mod tests {
         assert!(result.is_err());
     }
 
-    #[test]
+    #[tokio::test]
     async fn test_conversation_cache_limits() {
         let config = ContextConfig {
             max_conversations_cache: 3,
@@ -497,7 +495,7 @@ mod tests {
         assert!(all_conversations.len() <= 3);
     }
 
-    #[test]
+    #[tokio::test]
     async fn test_concurrent_access() {
         use std::sync::Arc;
         use tokio::sync::Mutex;
@@ -533,7 +531,7 @@ mod tests {
         assert_eq!(conversations.len(), 10);
     }
 
-    #[test]
+    #[tokio::test]
     async fn test_default_search_results_limit() {
         let config = ContextConfig {
             max_conversations_cache: 10,
@@ -554,7 +552,7 @@ mod tests {
         assert!(!context_item.content.contains("Test Document 2"));
     }
 
-    #[test]
+    #[tokio::test]
     async fn test_context_metadata_preservation() {
         let mut document = create_test_document();
         document.tags = Some(vec!["rust".to_string(), "test".to_string()]);
@@ -571,7 +569,7 @@ mod tests {
         assert_eq!(context_item.metadata.get("rank").unwrap(), "42");
     }
 
-    #[test]
+    #[tokio::test]
     async fn test_conversation_role_assignment() {
         let mut manager = ContextManager::new(create_test_config());
 
@@ -592,7 +590,7 @@ mod tests {
         assert_eq!(res_conversation.role, RoleName::new("researcher"));
     }
 
-    #[test]
+    #[tokio::test]
     async fn test_timestamp_ordering() {
         let mut manager = ContextManager::new(create_test_config());
 
