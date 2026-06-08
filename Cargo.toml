@@ -14,6 +14,17 @@ exclude = [
     # terraphim-agents crates: consumed from the `terraphim` registry (E4a, #1910).
     # terraphim-kg-agents crates: consumed from the `terraphim` registry (E4b, #1910).
     # clients-and-integrations crates: consumed from the `terraphim` registry (E5, #1910).
+    # Empty / residual directories left after polyrepo extraction. They no longer
+    # contain a top-level Cargo.toml and must be excluded so `crates/*` does not
+    # match them (#2260).
+    "crates/terraphim_agent",
+    "crates/terraphim_agent_evolution",
+    "crates/terraphim_automata",
+    "crates/terraphim_cli",
+    "crates/terraphim_multi_agent",
+    "crates/terraphim_orchestrator",
+    "crates/terraphim_service",
+    "crates/terraphim_settings",
     # Experimental crates
     "crates/terraphim_agent_application",
     "crates/terraphim_truthforge",
