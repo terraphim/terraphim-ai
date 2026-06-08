@@ -1,0 +1,49 @@
+[package]
+name = "terraphim_update"
+version.workspace = true
+edition.workspace = true
+authors = ["Terraphim Contributors"]
+description = "Shared auto-update functionality for Terraphim AI binaries"
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
+repository = "https://github.com/terraphim/terraphim-ai"
+license = "Apache-2.0"
+
+[dependencies]
+anyhow = { workspace = true }
+
+thiserror = { workspace = true }
+
+self_update = { version = "0.42", default-features = false, features = ["archive-tar", "compression-flate2", "rustls", "signatures"] }
+tokio = { workspace = true, features = ["full"] }
+
+tracing = { workspace = true }
+
+serde = { workspace = true, features = ["derive"] }
+
+serde_json = { workspace = true }
+
+jiff = { version = "0.2", features = ["serde"] }
+chrono = { workspace = true }
+
+semver = "1.0"
+sha2 = "0.10"
+ureq = "2.9"
+dirs = "5.0"
+dialoguer = "0.12"
+# zipsign-api for signature verification (also pulled by self_update)
+zipsign-api = "0.2"
+base64 = "0.22"
+# Archive extraction
+flate2 = "1.1"
+tar = "0.4"
+zip = "8"
+tempfile = { workspace = true }
+
+
+[dev-dependencies]
+serial_test = "3.3"
+
+[features]
+# Feature to enable integration tests that require actual signing (slow, requires signing keys)
+integration-signing = []

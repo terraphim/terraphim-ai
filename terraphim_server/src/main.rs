@@ -23,8 +23,7 @@ use terraphim_config::{ConfigBuilder, ConfigId};
 use terraphim_persistence::Persistable;
 use terraphim_server::{Result, axum_server};
 use terraphim_settings::DeviceSettings;
-// TODO: Re-enable auto-update when terraphim_update is added to workspace
-// use terraphim_update::{check_for_updates, update_binary};
+use terraphim_update::{check_for_updates, update_binary};
 
 /// Terraphim AI server with role-based deployment support
 #[derive(Parser, Debug)]
@@ -66,11 +65,32 @@ async fn main() -> Result<()> {
 }
 
 /// Handle update-related commands
-#[allow(clippy::unused_async)]
-async fn handle_update_commands(_args: &Args) -> Result<()> {
-    // TODO: Re-enable when terraphim_update is added to workspace
-    eprintln!("Auto-update feature temporarily disabled");
-    std::process::exit(1);
+async fn handle_update_commands(args: &Args) -> Result<()> {
+    let bin_name = env!("CARGO_PKG_NAME");
+
+    if args.update {
+        match update_binary(bin_name).await {
+            Ok(status) => {
+                println!("{status}");
+                Ok(())
+            }
+            Err(e) => {
+                eprintln!("Update failed: {e:#}");
+                std::process::exit(1);
+            }
+        }
+    } else {
+        match check_for_updates(bin_name).await {
+            Ok(status) => {
+                println!("{status}");
+                Ok(())
+            }
+            Err(e) => {
+                eprintln!("Update check failed: {e:#}");
+                std::process::exit(1);
+            }
+        }
+    }
 }
 
 #[allow(clippy::too_many_lines)]
