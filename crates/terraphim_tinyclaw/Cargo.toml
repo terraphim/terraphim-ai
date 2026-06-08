@@ -70,7 +70,7 @@ slack-morphism = { version = "2", optional = true, features = ["hyper"] }
 
 # Voice transcription (optional)
 whisper-rs = { version = "0.16", optional = true }
-symphonia = { version = "0.5", optional = true, features = ["ogg", "pcm", "mp3", "wav"] }
+symphonia = { version = "0.6", optional = true, features = ["ogg", "pcm", "mp3", "wav"] }
 hound = { version = "3.5", optional = true }
 
 [features]
