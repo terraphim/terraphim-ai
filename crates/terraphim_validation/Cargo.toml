@@ -75,7 +75,7 @@ axum-test = "19.1.1"
 
 # Platform-specific dependencies
 [target.'cfg(unix)'.dependencies]
-nix = { version = "0.28", optional = true }
+nix = { version = "0.31", optional = true }
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = ["winuser", "processenv"], optional = true }
