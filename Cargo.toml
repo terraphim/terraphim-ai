@@ -19,6 +19,7 @@ exclude = [
     # match them (#2260).
     "crates/terraphim_agent",
     "crates/terraphim_agent_evolution",
+    "crates/terraphim_atomic_client",
     "crates/terraphim_automata",
     "crates/terraphim_cli",
     "crates/terraphim_multi_agent",
