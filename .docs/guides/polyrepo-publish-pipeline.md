@@ -1,247 +1,312 @@
-# Polyrepo Publish Pipeline Guide
+# How to Publish Polyrepo Splits to crates.io
 
-## Overview
+This guide explains how to publish the extracted polyrepo splits (terraphim-core, terraphim-service, terraphim-agents, etc.) from our private Gitea instance to the public crates.io registry.
 
-The polyrepo publish pipeline synchronises six extracted polyrepo splits from Gitea (authoritative) to GitHub (public mirror) and publishes their crates to crates.io. It uses **both CI runners as quality gates** and follows **topological dependency order** to ensure upstream crates are published before downstream crates attempt to resolve them.
+## What This Pipeline Does
 
-## Architecture
+Our code lives in two places:
+- **Gitea** (private): Where we do our daily work
+- **GitHub** (public): Mirror for the open-source community
+- **crates.io**: Where Rust developers download our libraries
 
-### Dual-Runner Quality Gates
+The pipeline automates syncing from Gitea to GitHub, then publishes crates to crates.io in the correct order so dependencies resolve correctly.
 
-```
-Gitea (terraphim-native runner)     GitHub (ubuntu-latest runner)
-        |                                    |
-   Gate 1: Validate                  Gate 2: Validate
-   with registry refs                 without registry refs
-   (internal deps resolve             (only crates.io deps)
-    from Gitea registry)              
-        |                                    |
-        +------------ Merge back ------------+
-                     |
-              Publish to crates.io
-                     |
-              Topological order
-```
+## Before You Start
 
-### Why Two Gates?
+You need three tokens ready:
 
-1. **Gitea Gate 1**: Validates the code with `registry = "terraphim"` references intact. Downstream crates can still resolve upstream crates from the Gitea registry during this phase.
-2. **GitHub Gate 2**: Validates the scrubbed code where all `registry = "terraphim"` references have been stripped. This ensures the public mirror builds correctly using only crates.io dependencies.
-3. **Publish**: Only after both gates pass are crates published to crates.io in dependency order.
-
-## Pipeline Steps
-
-The pipeline is implemented in `scripts/adf-setup/polyrepo-publish/polyrepo-publish.sh` and follows these steps:
-
-### Step 1: Clone
-Clones the Gitea repo at current `main` HEAD into `/tmp/polyrepo-publish/<repo>`.
-
-### Step 2: Scrub Secrets
-Scans for:
-- **Blocking patterns**: Actual secrets (Bearer tokens, private keys)
-- **Warning patterns**: Infrastructure references (Gitea URLs, vault paths) -- these warn but do not block
-
-### Step 3: Prepare Gitea Branch
-- Creates `publish/github-mirror` branch
-- Injects GitHub Actions workflows (CI + publish-crates)
-- Pushes to Gitea to trigger **Gate 1** (native-ci)
-
-### Step 4: Wait for Gitea CI
-Polls Gitea commit statuses for `native-ci` context. Fails if CI fails or times out (30 min).
-
-### Step 5: Rewrite Cargo.toml
-Strips all `registry = "terraphim"` references from Cargo.toml files:
 ```bash
-sed -i 's/,[[:space:]]*registry = "terraphim"//g' "$f"
-sed -i 's/registry = "terraphim",[[:space:]]*//g' "$f"
+# 1. Gitea API token (for accessing our private repos)
+export GITEA_TOKEN="your-gitea-token"
+
+# 2. GitHub CLI auth (should already be configured)
+gh auth status  # Should show "Logged in"
+
+# 3. crates.io publish token
+export CARGO_REGISTRY_TOKEN="your-crates-io-token"
 ```
 
-Also strips `publish = ["terraphim"]` restrictions:
+## Quick Start
+
+To publish a complete polyrepo split:
+
 ```bash
-sed -i '/publish = \["terraphim"\]/d' "$f"
+bash scripts/adf-setup/polyrepo-publish/polyrepo-publish.sh full terraphim-service
 ```
 
-### Step 6: Commit Rewrite
-Commits the Cargo.toml changes with message: `chore: strip Gitea registry refs for crates.io publish`
+This one command does everything:
+1. Clones the repo from Gitea
+2. Checks for leaked secrets
+3. Runs tests on our private CI
+4. Strips internal registry references
+5. Pushes to GitHub
+6. Runs tests on GitHub Actions
+7. Publishes all crates to crates.io
 
-### Step 7: Create GitHub Repo
-Creates the GitHub repo if it doesn't exist and sets the `CARGO_REGISTRY_TOKEN` secret.
+The whole process takes about 10-15 minutes depending on CI queue times.
 
-### Step 8: Push to GitHub
-Pushes the scrubbed code to GitHub `main` and tags `publish/v<version>`.
+## Available Repos
 
-### Step 9: Wait for GitHub CI
-Polls GitHub Actions for CI completion. Fails if CI fails or times out (30 min).
+You can publish any of these six splits:
 
-### Step 10: Merge Back
-Merges the `publish/github-mirror` branch back to Gitea `main` via PR (with temporary status check bypass).
+- `terraphim-core` - Core types and parsers
+- `terraphim-config-persistence` - Configuration and persistence layer
+- `terraphim-service` - Service layer, middleware, and haystack providers
+- `terraphim-agents` - Agent orchestration and messaging
+- `terraphim-kg-agents` - Knowledge graph agents
+- `terraphim-clients` - CLI tools, MCP server, and integrations
 
-### Step 11: Publish Crates
-Dispatches the GitHub `publish-crates.yml` workflow with the crate list in topological order.
+## How It Works (Step by Step)
 
-## Dependency Ordering
+### Step 1: Clone from Gitea
 
-Crates must be published in topological order (leaves first, consumers last). The pipeline defines this per repo:
+The pipeline clones the latest code from our private Gitea instance.
+
+### Step 2: Security Scan
+
+Checks for accidentally committed secrets:
+- **Blocking**: Actual secrets (API keys, tokens) -- stops the pipeline
+- **Warning**: Infrastructure references (Gitea URLs, vault paths) -- logs a warning but continues
+
+### Step 3: Test on Private CI (Gate 1)
+
+Creates a `publish/github-mirror` branch and pushes it to Gitea. This triggers our private CI runner (`terraphim-native`) which:
+- Compiles all crates
+- Runs `cargo clippy` (linting)
+- Runs unit tests
+
+The pipeline waits up to 30 minutes for this to pass. If it fails, the pipeline stops.
+
+### Step 4: Prepare for Public Release
+
+Strips internal references from `Cargo.toml` files:
+
+```toml
+# Before (internal Gitea registry reference)
+terraphim_types = { version = "1.0.0", registry = "terraphim" }
+
+# After (clean, public-facing)
+terraphim_types = { version = "1.0.0" }
+```
+
+Also removes `publish = ["terraphim"]` restrictions that prevent publishing to crates.io.
+
+### Step 5: Test on Public CI (Gate 2)
+
+Pushes the cleaned code to GitHub and triggers GitHub Actions. This validates that the code builds using **only** crates.io dependencies (no private registry).
+
+### Step 6: Merge Back
+
+Merges the publish branch back to Gitea `main` so both remotes stay in sync.
+
+### Step 7: Publish to crates.io
+
+Dispatches the publish workflow on GitHub, which uploads crates in dependency order.
+
+## Crate Publish Order
+
+Crates must be published in dependency order. If crate A depends on crate B, crate B must publish first.
 
 ### terraphim-service
 ```
-terraphim_ccusage -> terraphim_usage -> terraphim_file_search ->
-terraphim-session-analyzer -> terraphim_spawner -> terraphim_router ->
-haystack_core -> haystack_jmap -> haystack_grepapp ->
-terraphim_middleware -> terraphim_service
+1. terraphim_ccusage
+2. terraphim_usage
+3. terraphim_file_search
+4. terraphim-session-analyzer
+5. terraphim_spawner
+6. terraphim_router
+7. haystack_core
+8. haystack_jmap
+9. haystack_grepapp
+10. terraphim_middleware
+11. terraphim_service
 ```
 
 ### terraphim-agents
 ```
-terraphim_agent_supervisor -> terraphim_agent_evolution -> terraphim_tracker ->
-terraphim_task_decomposition -> terraphim_agent_messaging -> terraphim_agent_registry ->
-terraphim_goal_alignment -> terraphim_kg_orchestration -> terraphim_multi_agent ->
-terraphim_orchestrator
+1. terraphim_agent_supervisor
+2. terraphim_agent_evolution
+3. terraphim_tracker
+4. terraphim_task_decomposition
+5. terraphim_agent_messaging
+6. terraphim_agent_registry
+7. terraphim_goal_alignment
+8. terraphim_kg_orchestration
+9. terraphim_multi_agent
+10. terraphim_orchestrator
 ```
 
 ### terraphim-clients
 ```
-terraphim_sessions -> terraphim_hooks -> terraphim_update ->
-terraphim_negative_contribution -> terraphim_command_runtime -> terraphim_grep ->
-terraphim_mcp_server -> terraphim_agent -> terraphim_cli -> terraphim_lsp
+1. terraphim_sessions
+2. terraphim_hooks
+3. terraphim_update
+4. terraphim_negative_contribution
+5. terraphim_command_runtime
+6. terraphim_grep
+7. terraphim_mcp_server
+8. terraphim_agent
+9. terraphim_cli
+10. terraphim_lsp
 ```
 
-## Common Failure Modes
+## Common Problems and Solutions
 
-### 1. Publish Restrictions Not Fully Stripped
-**Symptom**: `error: registry index was not found in any configuration: terraphim`
+### "registry index was not found in any configuration: terraphim"
 
-**Cause**: The old sed pattern `s/publish = ["terraphim"]//g` replaced the directive with nothing but left the rest of the line (including comments). Cargo still interpreted the remaining comment.
+**What it means**: A `publish = ["terraphim"]` restriction wasn't fully removed.
 
-**Fix**: Use `/publish = ["terraphim"]/d` to delete the entire line.
+**How to fix**: Check that the sed pattern in the pipeline script deletes the entire line, not just replaces the directive. The old pattern `s/publish = ["terraphim"]//g` left comments that cargo still interpreted.
 
-### 2. Long Keywords
-**Symptom**: `"model-context-protocol" is an invalid keyword (keywords must have less than 20 characters)`
+**Current fix**: `sed -i '/publish = ["terraphim"]/d'` (deletes the whole line)
 
-**Fix**: Shorten or remove keywords exceeding 20 characters.
+### "keywords must have less than 20 characters"
 
-### 3. API Mismatch Between Published and Expected
-**Symptom**: `no method named 'with_stderr_log' found for struct 'terraphim_spawner::SpawnContext'`
+**What it means**: A keyword in `Cargo.toml` is too long for crates.io.
 
-**Cause**: The published version on crates.io (1.20.3) differed from the source code that included `with_stderr_log`. This happens when the published artifact was built from different code than expected.
+**Example**: `"model-context-protocol"` is 21 characters.
 
-**Fix**: Bump the version number and republish.
+**How to fix**: Shorten or remove the keyword. Good alternatives: `"mcp"`, `"protocol"`.
 
-### 4. Missing Dependencies on crates.io
-**Symptom**: `no matching package named 'terraphim_command_runtime' found`
+### "no method named 'X' found"
 
-**Cause**: The publish list was not in topological order. A consumer crate was published before its dependency.
+**What it means**: The published crate version doesn't match what downstream expects.
 
-**Fix**: Reorder the crate list so dependencies publish first.
+**How to fix**: Bump the version number in the upstream crate and republish. For example, if `terraphim_spawner v1.20.3` is missing a method, bump to `v1.20.4`.
 
-### 5. crates.io Rate Limiting
-**Symptom**: `status 429 Too Many Requests: You have published too many new crates in a short period of time`
+### "no matching package named 'X' found"
 
-**Cause**: crates.io limits new crate publishes per time window. Publishing 10+ crates in rapid succession triggers this.
+**What it means**: A dependency crate hasn't been published yet.
 
-**Fix**: Wait for the rate limit window to expire (usually 5-10 minutes), then retry publishing the remaining crates. The workflow is idempotent -- already-published crates are skipped.
+**How to fix**: The publish list is in the wrong order. Update `polyrepo-publish.sh` to put dependencies before consumers.
 
-### 6. Branch Protection Blocks Merge
-**Symptom**: `error: Not allowed to push to protected branch main`
+### "429 Too Many Requests"
 
-**Fix**: The pipeline creates a PR and temporarily disables required status checks to merge it, then re-enables them.
+**What it means**: crates.io rate-limits new crate publishes. Publishing many crates quickly triggers this.
 
-## Running the Pipeline
+**How to fix**: Wait 5-10 minutes and retry. The pipeline is idempotent -- already-published crates are skipped automatically.
 
-### Full Pipeline (all steps)
+**Tip**: You can trigger just the remaining crates:
 ```bash
-export GITEA_TOKEN="your-token"
-export GITHUB_TOKEN="your-token"  # via gh auth
-export CARGO_REGISTRY_TOKEN="your-crates-io-token"
-
-bash scripts/adf-setup/polyrepo-publish/polyrepo-publish.sh full <repo-name>
+gh workflow run publish-crates.yml -R terraphim/<repo> --ref main \
+  -f crate_list="terraphim_agent terraphim_cli" \
+  -f dry_run="false"
 ```
 
-### Individual Steps
-```bash
-bash scripts/adf-setup/polyrepo-publish/polyrepo-publish.sh clone <repo>
-bash scripts/adf-setup/polyrepo-publish/polyrepo-publish.sh scrub <repo>
-bash scripts/adf-setup/polyrepo-publish/polyrepo-publish.sh prepare-gitea-branch <repo>
-bash scripts/adf-setup/polyrepo-publish/polyrepo-publish.sh wait-gitea-ci <repo>
-bash scripts/adf-setup/polyrepo-publish/polyrepo-publish.sh rewrite-cargo <repo>
-bash scripts/adf-setup/polyrepo-publish/polyrepo-publish.sh commit-rewrite <repo>
-bash scripts/adf-setup/polyrepo-publish/polyrepo-publish.sh create-github <repo>
-bash scripts/adf-setup/polyrepo-publish/polyrepo-publish.sh push-github <repo>
-bash scripts/adf-setup/polyrepo-publish/polyrepo-publish.sh wait-github-ci <repo>
-bash scripts/adf-setup/polyrepo-publish/polyrepo-publish.sh merge-back <repo>
-bash scripts/adf-setup/polyrepo-publish/polyrepo-publish.sh crates-publish <repo>
-```
+### "Not allowed to push to protected branch main"
 
-### Dry Run
+**What it means**: Branch protection prevents direct pushes.
+
+**How to fix**: The pipeline handles this automatically by creating a PR and temporarily disabling status checks for the merge.
+
+## Dry Run (Test Without Publishing)
+
+To test the entire pipeline without actually publishing:
+
 ```bash
 export POLYREPO_DRY_RUN=1
-bash scripts/adf-setup/polyrepo-publish/polyrepo-publish.sh full <repo>
+bash scripts/adf-setup/polyrepo-publish/polyrepo-publish.sh full terraphim-service
 ```
 
-## Workflow File
+This runs all steps except the actual push and publish.
 
-The pipeline injects two workflows into each polyrepo:
+## Running Individual Steps
 
-### `.github/workflows/ci.yml`
-Runs on every push/PR:
-- `cargo fmt --all -- --check`
-- `cargo clippy --workspace --all-targets -- -D warnings`
-- `cargo build --workspace`
-- `cargo test --workspace --lib --no-fail-fast`
-
-### `.github/workflows/publish-crates.yml`
-Triggered manually via `workflow_dispatch`:
-- Takes `crate_list` (space-separated package names)
-- Takes `dry_run` ("true" or "false")
-- Publishes crates in order, skipping already-published versions
-- Uses `CARGO_REGISTRY_TOKEN` secret for authentication
-
-## Remote Sync Protocol
-
-After pushing to origin (GitHub), the pipeline pushes to gitea (Gitea) to maintain convergence:
+Sometimes you need to run just one step:
 
 ```bash
-git fetch origin
-git merge origin/main --no-edit
-git push origin main
-git push gitea main
-git diff origin/main gitea/main --stat  # Must be empty
+# Just clone and scan
+bash scripts/adf-setup/polyrepo-publish/polyrepo-publish.sh clone terraphim-service
+bash scripts/adf-setup/polyrepo-publish/polyrepo-publish.sh scrub terraphim-service
+
+# Just run the Gitea CI gate
+bash scripts/adf-setup/polyrepo-publish/polyrepo-publish.sh prepare-gitea-branch terraphim-service
+bash scripts/adf-setup/polyrepo-publish/polyrepo-publish.sh wait-gitea-ci terraphim-service
+
+# Just publish crates (after CI passed)
+bash scripts/adf-setup/polyrepo-publish/polyrepo-publish.sh crates-publish terraphim-service
 ```
 
-## Idempotency
+## Monitoring a Running Pipeline
 
-The publish loop is idempotent:
-1. Checks if crate version already exists on crates.io
-2. Skips if already published
-3. Publishes if not present
-4. Retries on "already exists" errors
+The pipeline runs in the foreground and prints progress:
 
-This means partial publishes (e.g., due to rate limits) can be safely retried without republishing already-uploaded crates.
+```
+[2026-06-09T10:30:06] [terraphim-service] Waiting for GitHub Actions CI
+[2026-06-09T10:30:37] [terraphim-service]   GitHub CI pending (30s / 1800s)
+[2026-06-09T10:32:00] [terraphim-service] GitHub CI PASSED
+[2026-06-09T10:32:05] [terraphim-service] Dispatching GitHub Publish Crates workflow
+```
 
-## Environment Variables
+You can also check GitHub Actions directly:
+```bash
+gh run list -R terraphim/terraphim-service --limit 5
+```
 
-| Variable | Required | Purpose |
-|----------|----------|---------|
-| `GITEA_TOKEN` | Yes | Gitea API authentication |
-| `GITHUB_TOKEN` | Yes | GitHub CLI authentication (via `gh auth`) |
-| `CARGO_REGISTRY_TOKEN` | Yes | crates.io publish token |
-| `POLYREPO_DRY_RUN` | No | Set to "1" to skip all pushes/publishes |
-| `POLYREPO_WORK_DIR` | No | Working directory (default: `/tmp/polyrepo-publish`) |
-| `POLYREPO_PUBLISH_MODE` | No | "approved" or "dependency" (default: "dependency") |
+## After Publishing
+
+### Verify crates are live
+```bash
+cargo search terraphim_service --limit 5
+```
+
+### Check both remotes are in sync
+```bash
+git fetch origin && git fetch gitea
+git diff origin/main gitea/main --stat  # Should be empty
+```
+
+### Update the monorepo
+If you published a new version of a crate that the monorepo uses, update the version in the monorepo's `Cargo.toml`.
+
+## Tips and Best Practices
+
+**Start with dependency repos first.** Always publish upstream repos before downstream repos. For example:
+1. terraphim-core (types, basic crates)
+2. terraphim-config-persistence (depends on core)
+3. terraphim-service (depends on persistence)
+4. terraphim-agents (depends on service)
+5. terraphim-kg-agents (depends on agents)
+6. terraphim-clients (depends on everything)
+
+**Check keywords before publishing.** Run this to find long keywords:
+```bash
+grep -r 'keywords = ' /tmp/polyrepo-publish/<repo>/crates/*/Cargo.toml
+```
+
+**Use tmux for long runs.** The pipeline can take 10-15 minutes:
+```bash
+tmux new-session -d -s polyrepo \
+  "bash scripts/adf-setup/polyrepo-publish/polyrepo-publish.sh full terraphim-service"
+tmux attach -t polyrepo
+```
+
+**If a publish fails mid-way, retry with remaining crates.** The workflow skips already-published crates automatically.
+
+## Environment Variables Reference
+
+| Variable | Required | What It Does |
+|----------|----------|--------------|
+| `GITEA_TOKEN` | Yes | Authenticates with our private Gitea instance |
+| `GITHUB_TOKEN` | Yes | Used by `gh` CLI (run `gh auth status` to verify) |
+| `CARGO_REGISTRY_TOKEN` | Yes | Authenticates with crates.io for publishing |
+| `POLYREPO_DRY_RUN` | No | Set to `1` to test without publishing |
+| `POLYREPO_WORK_DIR` | No | Where repos are cloned (default: `/tmp/polyrepo-publish`) |
 
 ## Troubleshooting Checklist
 
-- [ ] `GITEA_TOKEN` is set and valid
-- [ ] `gh auth status` shows logged in
-- [ ] `CARGO_REGISTRY_TOKEN` is set on GitHub repos (check with `gh secret list`)
-- [ ] Gitea native-ci workflow exists and is triggered on `publish/github-mirror` branch
-- [ ] Crate versions are correct (no `version.workspace = true` in published manifests)
-- [ ] Keywords are under 20 characters
-- [ ] No `publish = ["terraphim"]` restrictions remain after rewrite
-- [ ] Dependency order is correct (leaves first)
+Before running the pipeline, verify:
 
-## References
+- [ ] `GITEA_TOKEN` is exported in your shell
+- [ ] `gh auth status` shows you are logged in to github.com
+- [ ] `CARGO_REGISTRY_TOKEN` secret exists on the GitHub repo (`gh secret list -R terraphim/<repo>`)
+- [ ] No crate keywords exceed 20 characters
+- [ ] Dependency order is correct in `polyrepo-publish.sh`
+- [ ] You have push access to both Gitea and GitHub repos
 
-- Original ADR: `docs/architecture/adr/0002-polyrepo-github-publish-pipeline.md`
-- Pipeline script: `scripts/adf-setup/polyrepo-publish/polyrepo-publish.sh`
-- Tracking issue: Gitea #2260
+## Getting Help
+
+- **Pipeline script**: `scripts/adf-setup/polyrepo-publish/polyrepo-publish.sh`
+- **Architecture details**: `docs/architecture/adr/0002-polyrepo-github-publish-pipeline.md`
+- **Tracking issue**: Gitea issue #2260
+- **crates.io rate limits**: https://crates.io/docs/rate-limits
