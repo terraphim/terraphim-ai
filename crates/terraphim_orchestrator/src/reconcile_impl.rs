@@ -1457,30 +1457,7 @@ Remove the pause flag once the underlying failure is resolved:\n\n\
         cli_tool: &str,
         output_poster: Option<&crate::output_poster::OutputPoster>,
     ) -> Option<(terraphim_tracker::StatusState, String)> {
-        let extracted = crate::pr_gate_result::extract_assistant_text(drain_lines, cli_tool);
-        if extracted.trim().is_empty() {
-            return Some((
-                terraphim_tracker::StatusState::Failure,
-                format!("{}: no assistant output to parse", meta.context),
-            ));
-        }
-
-        let gate = match crate::pr_gate_result::extract_gate_result(&extracted) {
-            Ok(gate) => gate,
-            Err(e) => {
-                return Some((
-                    terraphim_tracker::StatusState::Failure,
-                    format!("{}: gate result parse failed: {e}", meta.context),
-                ));
-            }
-        };
-
-        if let Err(e) = crate::pr_gate_result::validate_gate_result(&gate, meta) {
-            return Some((
-                terraphim_tracker::StatusState::Failure,
-                format!("{}: gate result invalid: {e}", meta.context),
-            ));
-        }
+        let (status, extracted) = derive_pr_gate_status_from_output(meta, drain_lines, cli_tool);
 
         if let Some(poster) = output_poster {
             if let Err(e) = poster
@@ -1502,6 +1479,130 @@ Remove the pause flag once the underlying failure is resolved:\n\n\
             }
         }
 
-        Some(crate::pr_gate_result::status_from_gate_result(&gate))
+        Some(status)
+    }
+}
+
+fn derive_pr_gate_status_from_output(
+    meta: &crate::pr_gate_result::PrGateMeta,
+    drain_lines: &[String],
+    cli_tool: &str,
+) -> ((terraphim_tracker::StatusState, String), String) {
+    let extracted = crate::pr_gate_result::extract_assistant_text(drain_lines, cli_tool);
+    if extracted.trim().is_empty() {
+        return (
+            (
+                terraphim_tracker::StatusState::Failure,
+                format!("{}: no assistant output to parse", meta.context),
+            ),
+            extracted,
+        );
+    }
+
+    let gate = match crate::pr_gate_result::extract_gate_result(&extracted) {
+        Ok(gate) => gate,
+        Err(e) => {
+            return (
+                (
+                    terraphim_tracker::StatusState::Failure,
+                    format!("{}: gate result parse failed: {e}", meta.context),
+                ),
+                extracted,
+            );
+        }
+    };
+
+    if let Err(e) = crate::pr_gate_result::validate_gate_result(&gate, meta) {
+        return (
+            (
+                terraphim_tracker::StatusState::Failure,
+                format!("{}: gate result invalid: {e}", meta.context),
+            ),
+            extracted,
+        );
+    }
+
+    (
+        crate::pr_gate_result::status_from_gate_result(&gate),
+        extracted,
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn meta() -> crate::pr_gate_result::PrGateMeta {
+        crate::pr_gate_result::PrGateMeta {
+            pr_number: 2318,
+            project: "terraphim-ai".to_string(),
+            agent_name: "pr-validator".to_string(),
+            context: "adf/validation".to_string(),
+            head_sha: "b71332d".to_string(),
+        }
+    }
+
+    fn valid_output() -> Vec<String> {
+        vec![
+            "Validation report".to_string(),
+            r#"<!-- adf:gate-result
+{
+  "schema_version": 1,
+  "agent": "pr-validator",
+  "context": "adf/validation",
+  "pr_number": 2318,
+  "head_sha": "b71332d",
+  "status": "pass",
+  "confidence": 5,
+  "blocking_findings": 0,
+  "summary": "Validation passed"
+}
+-->"#
+                .to_string(),
+        ]
+    }
+
+    #[test]
+    fn pr_gate_status_fails_closed_when_output_is_empty() {
+        let ((state, description), extracted) = derive_pr_gate_status_from_output(&meta(), &[], "");
+
+        assert_eq!(state, terraphim_tracker::StatusState::Failure);
+        assert!(description.contains("no assistant output"));
+        assert!(extracted.is_empty());
+    }
+
+    #[test]
+    fn pr_gate_status_fails_closed_when_gate_block_is_missing() {
+        let lines = vec!["Human report without the machine-readable block".to_string()];
+        let ((state, description), extracted) =
+            derive_pr_gate_status_from_output(&meta(), &lines, "unknown-cli");
+
+        assert_eq!(state, terraphim_tracker::StatusState::Failure);
+        assert!(description.contains("gate result parse failed"));
+        assert!(description.contains("missing adf:gate-result block"));
+        assert_eq!(extracted, lines[0]);
+    }
+
+    #[test]
+    fn pr_gate_status_fails_closed_when_gate_head_is_stale() {
+        let mut gate_meta = meta();
+        gate_meta.head_sha = "new-head".to_string();
+
+        let ((state, description), _) =
+            derive_pr_gate_status_from_output(&gate_meta, &valid_output(), "unknown-cli");
+
+        assert_eq!(state, terraphim_tracker::StatusState::Failure);
+        assert!(description.contains("gate result invalid"));
+        assert!(description.contains("head_sha"));
+    }
+
+    #[test]
+    fn pr_gate_status_uses_valid_gate_result() {
+        let ((state, description), extracted) =
+            derive_pr_gate_status_from_output(&meta(), &valid_output(), "unknown-cli");
+
+        assert_eq!(state, terraphim_tracker::StatusState::Success);
+        assert_eq!(description, "adf/validation pass (5/5)");
+        assert!(extracted.contains("adf:gate-result"));
     }
 }

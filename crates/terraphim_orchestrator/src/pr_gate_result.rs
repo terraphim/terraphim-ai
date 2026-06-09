@@ -20,7 +20,7 @@ const GATE_RESULT_OPEN: &str = "<!-- adf:gate-result";
 const GATE_RESULT_CLOSE: &str = "-->";
 
 /// Machine-readable gate result emitted by every PR gate agent.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 pub struct PrGateResult {
     pub schema_version: u8,
     pub agent: String,
@@ -35,7 +35,7 @@ pub struct PrGateResult {
 
 /// Status declared by the gate agent. Maps to a commit status with the help
 /// of [`status_from_gate_result`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum GateStatus {
     Pass,
@@ -84,7 +84,7 @@ pub struct PrGateMeta {
 /// object. Trailing prose is allowed (it can contain the human-readable
 /// report) but the JSON must be the only thing between the markers.
 pub fn extract_gate_result(markdown: &str) -> Result<PrGateResult, PrGateResultError> {
-    let Some(start) = markdown.find(GATE_RESULT_OPEN) else {
+    let Some(start) = markdown.rfind(GATE_RESULT_OPEN) else {
         return Err(PrGateResultError::MissingBlock);
     };
     let after_open = start + GATE_RESULT_OPEN.len();
@@ -238,7 +238,7 @@ pub fn extract_assistant_text(lines: &[String], cli_tool: &str) -> String {
         .iter()
         .filter_map(|line| {
             let trimmed = line.trim();
-            if trimmed.is_empty() || trimmed.starts_with('{') || trimmed.starts_with('#') {
+            if trimmed.is_empty() || trimmed.starts_with('{') {
                 None
             } else {
                 Some(trimmed)
@@ -319,6 +319,30 @@ Trailing prose."#
     fn extract_gate_result_rejects_missing_block() {
         let err = extract_gate_result("no block here").unwrap_err();
         assert_eq!(err, PrGateResultError::MissingBlock);
+    }
+
+    #[test]
+    fn extract_gate_result_uses_last_block_when_report_mentions_placeholder() {
+        let body = format!(
+            "Report mentions `{} {{ ... }} -->` before the real result.\n\n{}",
+            GATE_RESULT_OPEN,
+            sample_block()
+        );
+
+        let result = extract_gate_result(&body).expect("last real block must parse");
+
+        assert_eq!(result.agent, "pr-validator");
+        assert_eq!(result.head_sha, "deadbeefcafebabe");
+    }
+
+    #[test]
+    fn pr_gate_result_serializes_as_canonical_json() {
+        let result = extract_gate_result(sample_block()).expect("valid block must parse");
+
+        let json = serde_json::to_string(&result).expect("contract should serialize");
+
+        assert!(json.contains(r#""status":"concerns""#));
+        assert!(json.contains(r#""schema_version":1"#));
     }
 
     #[test]
@@ -504,6 +528,6 @@ Trailing prose."#
             "report line 2".to_string(),
         ];
         let text = extract_assistant_text(&lines, "unknown-cli");
-        assert_eq!(text, "report line 1\nreport line 2");
+        assert_eq!(text, "# header\nreport line 1\nreport line 2");
     }
 }
