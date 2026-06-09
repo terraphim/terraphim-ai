@@ -1461,15 +1461,18 @@ Remove the pause flag once the underlying failure is resolved:\n\n\
         cli_tool: &str,
         output_poster: Option<&crate::output_poster::OutputPoster>,
     ) -> Option<(terraphim_tracker::StatusState, String)> {
-        let (status, extracted) = derive_pr_gate_status_from_output(meta, drain_lines, cli_tool);
+        let GateEvaluation {
+            status,
+            comment_body,
+        } = derive_pr_gate_status_from_output(meta, drain_lines, cli_tool);
 
-        if let Some(poster) = output_poster.filter(|_| !extracted.trim().is_empty()) {
+        if let Some(poster) = output_poster.filter(|_| !comment_body.trim().is_empty()) {
             if let Err(e) = poster
                 .post_raw_as_agent_for_project(
                     meta.project.as_str(),
                     meta.agent_name.as_str(),
                     meta.pr_number,
-                    &extracted,
+                    &comment_body,
                 )
                 .await
             {
@@ -1487,6 +1490,11 @@ Remove the pause flag once the underlying failure is resolved:\n\n\
     }
 }
 
+struct GateEvaluation {
+    status: (terraphim_tracker::StatusState, String),
+    comment_body: String,
+}
+
 fn read_non_empty_log_lines(path: &Path) -> Option<Vec<String>> {
     let body = std::fs::read_to_string(path).ok()?;
     let lines: Vec<String> = body.lines().map(str::to_string).collect();
@@ -1501,45 +1509,122 @@ fn derive_pr_gate_status_from_output(
     meta: &crate::pr_gate_result::PrGateMeta,
     drain_lines: &[String],
     cli_tool: &str,
-) -> ((terraphim_tracker::StatusState, String), String) {
+) -> GateEvaluation {
     let extracted = crate::pr_gate_result::extract_assistant_text(drain_lines, cli_tool);
     if extracted.trim().is_empty() {
-        return (
-            (
-                terraphim_tracker::StatusState::Failure,
-                format!("{}: no assistant output to parse", meta.context),
-            ),
-            extracted,
-        );
+        let reason = "no assistant output to parse";
+        return GateEvaluation {
+            status: failure_status(meta, reason),
+            comment_body: canonical_failure_gate_comment(meta, reason, ""),
+        };
     }
 
     let gate = match crate::pr_gate_result::extract_gate_result(&extracted) {
         Ok(gate) => gate,
         Err(e) => {
-            return (
-                (
-                    terraphim_tracker::StatusState::Failure,
-                    format!("{}: gate result parse failed: {e}", meta.context),
-                ),
-                extracted,
-            );
+            let reason = format!("gate result parse failed: {e}");
+            return GateEvaluation {
+                status: failure_status(meta, &reason),
+                comment_body: canonical_failure_gate_comment(meta, &reason, &extracted),
+            };
         }
     };
 
     if let Err(e) = crate::pr_gate_result::validate_gate_result(&gate, meta) {
-        return (
-            (
-                terraphim_tracker::StatusState::Failure,
-                format!("{}: gate result invalid: {e}", meta.context),
-            ),
-            extracted,
-        );
+        let reason = format!("gate result invalid: {e}");
+        return GateEvaluation {
+            status: failure_status(meta, &reason),
+            comment_body: canonical_failure_gate_comment(meta, &reason, &extracted),
+        };
     }
 
+    GateEvaluation {
+        status: crate::pr_gate_result::status_from_gate_result(&gate),
+        comment_body: limit_gate_comment(&extracted),
+    }
+}
+
+fn failure_status(
+    meta: &crate::pr_gate_result::PrGateMeta,
+    reason: &str,
+) -> (terraphim_tracker::StatusState, String) {
     (
-        crate::pr_gate_result::status_from_gate_result(&gate),
-        extracted,
+        terraphim_tracker::StatusState::Failure,
+        format!("{}: {reason}", meta.context),
     )
+}
+
+fn canonical_failure_gate_comment(
+    meta: &crate::pr_gate_result::PrGateMeta,
+    reason: &str,
+    extracted: &str,
+) -> String {
+    let summary = truncate_for_summary(reason, 180);
+    let result = crate::pr_gate_result::PrGateResult {
+        schema_version: crate::pr_gate_result::GATE_RESULT_SCHEMA_VERSION,
+        agent: meta.agent_name.clone(),
+        context: meta.context.clone(),
+        pr_number: meta.pr_number,
+        head_sha: meta.head_sha.clone(),
+        status: crate::pr_gate_result::GateStatus::Fail,
+        confidence: 1,
+        blocking_findings: 1,
+        summary,
+    };
+    let json = serde_json::to_string_pretty(&result)
+        .unwrap_or_else(|_| String::from(r#"{"schema_version":1,"status":"fail"}"#));
+    let evidence = truncate_for_comment(extracted, 8_000);
+    let evidence_section = if evidence.trim().is_empty() {
+        "No assistant output was captured.".to_string()
+    } else {
+        format!("Captured output excerpt:\n\n```text\n{}\n```", evidence)
+    };
+
+    format!(
+        "ADF PR gate failed closed.\n\nReason: {}\n\n{}\n\n<!-- adf:gate-result\n{}\n-->",
+        reason, evidence_section, json
+    )
+}
+
+fn limit_gate_comment(comment: &str) -> String {
+    const MAX_COMMENT_CHARS: usize = 60_000;
+    if comment.chars().count() <= MAX_COMMENT_CHARS {
+        return comment.to_string();
+    }
+    let marker = "<!-- adf:gate-result";
+    let suffix = comment
+        .rfind(marker)
+        .map(|idx| &comment[idx..])
+        .unwrap_or_default();
+    let prefix_budget = MAX_COMMENT_CHARS.saturating_sub(suffix.chars().count() + 80);
+    let prefix = truncate_for_comment(comment, prefix_budget);
+    if suffix.is_empty() {
+        format!(
+            "{}\n\n[ADF: comment truncated to {} characters]",
+            prefix, MAX_COMMENT_CHARS
+        )
+    } else {
+        format!(
+            "{}\n\n[ADF: comment truncated to {} characters; canonical gate block preserved]\n\n{}",
+            prefix, MAX_COMMENT_CHARS, suffix
+        )
+    }
+}
+
+fn truncate_for_comment(text: &str, max_chars: usize) -> String {
+    let mut out: String = text.chars().take(max_chars).collect();
+    if text.chars().count() > max_chars {
+        out.push_str("\n...[truncated]");
+    }
+    out
+}
+
+fn truncate_for_summary(text: &str, max_chars: usize) -> String {
+    let mut out: String = text.chars().take(max_chars).collect();
+    if text.chars().count() > max_chars {
+        out.push_str("...");
+    }
+    out
 }
 
 #[cfg(test)]
@@ -1578,23 +1663,31 @@ mod tests {
 
     #[test]
     fn pr_gate_status_fails_closed_when_output_is_empty() {
-        let ((state, description), extracted) = derive_pr_gate_status_from_output(&meta(), &[], "");
+        let evaluation = derive_pr_gate_status_from_output(&meta(), &[], "");
 
+        let (state, description) = evaluation.status;
         assert_eq!(state, terraphim_tracker::StatusState::Failure);
         assert!(description.contains("no assistant output"));
-        assert!(extracted.is_empty());
+        assert!(evaluation
+            .comment_body
+            .contains("ADF PR gate failed closed"));
+        assert!(evaluation.comment_body.contains("adf:gate-result"));
     }
 
     #[test]
     fn pr_gate_status_fails_closed_when_gate_block_is_missing() {
         let lines = vec!["Human report without the machine-readable block".to_string()];
-        let ((state, description), extracted) =
-            derive_pr_gate_status_from_output(&meta(), &lines, "unknown-cli");
+        let evaluation = derive_pr_gate_status_from_output(&meta(), &lines, "unknown-cli");
 
+        let (state, description) = evaluation.status;
         assert_eq!(state, terraphim_tracker::StatusState::Failure);
         assert!(description.contains("gate result parse failed"));
         assert!(description.contains("missing adf:gate-result block"));
-        assert_eq!(extracted, lines[0]);
+        assert!(evaluation.comment_body.contains(&lines[0]));
+        let gate = crate::pr_gate_result::extract_gate_result(&evaluation.comment_body)
+            .expect("orchestrator-owned failure block must be valid");
+        assert_eq!(gate.status, crate::pr_gate_result::GateStatus::Fail);
+        assert_eq!(gate.blocking_findings, 1);
     }
 
     #[test]
@@ -1602,22 +1695,57 @@ mod tests {
         let mut gate_meta = meta();
         gate_meta.head_sha = "new-head".to_string();
 
-        let ((state, description), _) =
+        let evaluation =
             derive_pr_gate_status_from_output(&gate_meta, &valid_output(), "unknown-cli");
 
+        let (state, description) = evaluation.status;
         assert_eq!(state, terraphim_tracker::StatusState::Failure);
         assert!(description.contains("gate result invalid"));
         assert!(description.contains("head_sha"));
+        let gate = crate::pr_gate_result::extract_gate_result(&evaluation.comment_body)
+            .expect("orchestrator-owned invalid-result block must be valid");
+        assert_eq!(gate.head_sha, "new-head");
     }
 
     #[test]
     fn pr_gate_status_uses_valid_gate_result() {
-        let ((state, description), extracted) =
-            derive_pr_gate_status_from_output(&meta(), &valid_output(), "unknown-cli");
+        let evaluation = derive_pr_gate_status_from_output(&meta(), &valid_output(), "unknown-cli");
 
+        let (state, description) = evaluation.status;
         assert_eq!(state, terraphim_tracker::StatusState::Success);
         assert_eq!(description, "adf/validation pass (5/5)");
-        assert!(extracted.contains("adf:gate-result"));
+        assert!(evaluation.comment_body.contains("adf:gate-result"));
+    }
+
+    #[test]
+    fn invalid_gate_comment_is_bounded_and_preserves_canonical_failure_block() {
+        let oversized = format!("{}\n{}", "x".repeat(20_000), "<!-- adf:gate-result { -->");
+        let lines = vec![oversized];
+
+        let evaluation = derive_pr_gate_status_from_output(&meta(), &lines, "unknown-cli");
+
+        assert!(evaluation.comment_body.len() < 12_000);
+        let gate = crate::pr_gate_result::extract_gate_result(&evaluation.comment_body)
+            .expect("synthesised failure block must parse");
+        assert_eq!(gate.agent, "pr-validator");
+        assert_eq!(gate.context, "adf/validation");
+        assert_eq!(gate.status, crate::pr_gate_result::GateStatus::Fail);
+    }
+
+    #[test]
+    fn oversized_valid_gate_comment_preserves_trailing_gate_block() {
+        let body = format!(
+            "{}\n{}",
+            "large report\n".repeat(10_000),
+            valid_output().join("\n")
+        );
+
+        let limited = limit_gate_comment(&body);
+
+        assert!(limited.len() < body.len());
+        let gate = crate::pr_gate_result::extract_gate_result(&limited)
+            .expect("valid gate block should survive truncation");
+        assert_eq!(gate.status, crate::pr_gate_result::GateStatus::Pass);
     }
 
     #[test]
