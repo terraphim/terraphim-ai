@@ -12,7 +12,7 @@ use tracing::{debug, info, warn};
 use crate::config;
 use crate::{
     agent_key, build_spawn_context_for_agent, control_plane, dispatcher, pr_dispatch,
-    AgentOrchestrator, ManagedAgent, OrchestratorError,
+    pr_gate_context, pr_gate_prompt, AgentOrchestrator, ManagedAgent, OrchestratorError,
 };
 
 impl AgentOrchestrator {
@@ -257,16 +257,23 @@ impl AgentOrchestrator {
             }
         });
 
-        // Issue #1020: pass the TOML `task` body (script / system prompt)
-        // to the spawner -- not the runtime informational summary.
-        // The summary is layered as ADF_TASK_SUMMARY env so future TOML
-        // scripts can reference it without a code change.
-        // Bug #2450 fix: pr-reviewer agent was receiving `def.task` ("review")
-        // instead of `task_string` (the full PR review description), causing
-        // the agent to exit with empty_success in 2s. The TOML `task` field
-        // is a label/placeholder for pr-reviewer; the actual work is built
-        // by build_review_task(req) into task_string.
-        let mut request = SpawnRequest::new(primary_provider, &task_string);
+        // Keep the compact PR summary for routing/telemetry only. The spawned
+        // gate receives a native bounded evidence prompt so it does not have to
+        // discover PR context, read skills dynamically, or post statuses.
+        let working_dir = self.config.working_dir_for_agent(&def);
+        let evidence = match pr_gate_context::build_pr_gate_evidence_pack(
+            req,
+            Some(working_dir.as_path()),
+            pr_gate_context::PrGateEvidenceLimits::default(),
+        )
+        .await
+        {
+            Ok(evidence) => evidence,
+            Err(e) => pr_gate_context::fallback_evidence_pack(req, &e.to_string()),
+        };
+        let gate_kind = pr_gate_prompt::PrGateKind::for_agent(&def.name);
+        let gate_prompt = pr_gate_prompt::build_pr_gate_prompt(gate_kind, &evidence);
+        let mut request = SpawnRequest::new(primary_provider, gate_prompt).with_stdin();
         if !routed_model.is_empty() {
             request = request.with_primary_model(&routed_model);
         }

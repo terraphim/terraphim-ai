@@ -67,6 +67,8 @@ pub mod persona;
 pub mod post_merge_gate;
 pub mod pr_dispatch;
 pub mod pr_gate;
+pub mod pr_gate_context;
+pub mod pr_gate_prompt;
 pub mod pr_gate_result;
 mod pr_handlers_impl;
 pub mod pr_poller;
