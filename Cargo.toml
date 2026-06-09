@@ -17,6 +17,7 @@ exclude = [
     # Empty / residual directories left after polyrepo extraction. They no longer
     # contain a top-level Cargo.toml and must be excluded so `crates/*` does not
     # match them (#2260).
+    "crates/terraphim_atomic_client",
     "crates/terraphim_agent",
     "crates/terraphim_agent_evolution",
     "crates/terraphim_automata",
