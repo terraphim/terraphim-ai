@@ -605,13 +605,15 @@ step_crates_publish() {
                 publishable="terraphim_ccusage terraphim_usage terraphim_file_search terraphim-session-analyzer terraphim_spawner terraphim_router haystack_core haystack_jmap haystack_grepapp terraphim_middleware terraphim_service"
                 ;;
             terraphim-agents)
-                publishable="terraphim_agent_messaging terraphim_agent_registry terraphim_agent_supervisor terraphim_agent_evolution terraphim_kg_orchestration terraphim_task_decomposition terraphim_tracker terraphim_goal_alignment terraphim_multi_agent terraphim_orchestrator"
+                # Dependency order: leaves first, then consumers
+                publishable="terraphim_agent_supervisor terraphim_agent_evolution terraphim_tracker terraphim_task_decomposition terraphim_agent_messaging terraphim_agent_registry terraphim_goal_alignment terraphim_kg_orchestration terraphim_multi_agent terraphim_orchestrator"
                 ;;
             terraphim-kg-agents)
                 publishable="terraphim_codebase_eval terraphim_kg_linter terraphim_kg_agents"
                 ;;
             terraphim-clients)
-                publishable="terraphim_sessions terraphim_hooks terraphim_update terraphim_negative_contribution terraphim_grep terraphim_mcp_server terraphim_agent terraphim_cli terraphim_lsp terraphim_command_runtime"
+                # Dependency order: leaves first, then consumers
+                publishable="terraphim_sessions terraphim_hooks terraphim_update terraphim_negative_contribution terraphim_command_runtime terraphim_grep terraphim_mcp_server terraphim_agent terraphim_cli terraphim_lsp"
                 ;;
         esac
     fi
