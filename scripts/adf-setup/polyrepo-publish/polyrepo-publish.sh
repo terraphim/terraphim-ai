@@ -150,7 +150,7 @@ step_rewrite_cargo() {
         # Strip publish restrictions to terraphim registry only
         if grep -q 'publish = \["terraphim"\]' "$f" 2>/dev/null; then
             log "  Stripping publish restriction from $f"
-            sed -i 's/publish = \["terraphim"\]//g' "$f"
+            sed -i '/publish = \["terraphim"\]/d' "$f"
         fi
     done
 
