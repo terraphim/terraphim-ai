@@ -566,6 +566,7 @@ impl AgentOrchestrator {
                 mention_parent_agent: None,
                 concurrency_permit: permit,
                 commit_status_post: None,
+                gate_meta: None,
                 output_tmp_path,
             },
         );

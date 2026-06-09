@@ -512,13 +512,16 @@ impl AgentOrchestrator {
         let mut quota_exits: std::collections::HashSet<String> = std::collections::HashSet::new();
         let mut exit_telemetry: Vec<(String, control_plane::telemetry::CompletionEvent)> =
             Vec::new();
+        let mut drained_outputs: std::collections::HashMap<String, (Vec<String>, String)> =
+            std::collections::HashMap::new();
         for (name, def, status) in &exited {
             let mut stdout_lines: Vec<String> = Vec::new();
             let mut stderr_lines: Vec<String> = Vec::new();
             let mut output_lines: Vec<String> = Vec::new();
             let mut agent_tmp_path: Option<PathBuf> = None;
+            let mut cli_tool = String::new();
             if let Some(managed) = self.active_agents.get_mut(name) {
-                let cli_tool = managed.definition.cli_tool.clone();
+                cli_tool = managed.definition.cli_tool.clone();
                 let session_id = managed.session_id.clone();
                 let model = managed
                     .routed_model
@@ -555,6 +558,10 @@ impl AgentOrchestrator {
                     }
                 }
             }
+
+            drained_outputs
+                .entry(name.clone())
+                .or_insert((output_lines.clone(), cli_tool.clone()));
 
             // Classify the exit using KG-boosted pattern matching
             let classification =
@@ -964,26 +971,53 @@ impl AgentOrchestrator {
         // NOW remove from active_agents and handle exits.
         // Capture worktree_path before removing so we can commit + clean up.
         for (name, def, status) in exited {
-            let (worktree_path, commit_status_post) = {
+            let (worktree_path, commit_status_post, gate_meta) = {
                 let agent = self.active_agents.get(&name);
                 (
                     agent.and_then(|m| m.worktree_path.clone()),
                     agent.and_then(|m| m.commit_status_post.clone()),
+                    agent.and_then(|m| m.gate_meta.clone()),
                 )
             };
 
             // Post terminal commit status if this agent was dispatched with one.
+            let mut status_override: Option<(terraphim_tracker::StatusState, String)> = None;
             if let Some((ref head_sha, ref context)) = commit_status_post {
-                let exit_success = status.success();
-                let state = if exit_success {
-                    terraphim_tracker::StatusState::Success
+                if let Some(ref meta) = gate_meta {
+                    if meta.context == *context && meta.head_sha == *head_sha {
+                        let (drain_lines, drain_cli) = drained_outputs
+                            .get(&name)
+                            .map(|(lines, cli)| (lines.as_slice(), cli.as_str()))
+                            .unwrap_or((&[], ""));
+                        if let Some(override_status) = self
+                            .derive_pr_gate_status(
+                                meta,
+                                drain_lines,
+                                drain_cli,
+                                self.output_poster.as_ref(),
+                            )
+                            .await
+                        {
+                            status_override = Some(override_status);
+                        }
+                    }
+                }
+
+                let (state, description) = if let Some((state, desc)) = status_override.take() {
+                    (state, desc)
                 } else {
-                    terraphim_tracker::StatusState::Failure
-                };
-                let description = if exit_success {
-                    format!("{} passed", def.name)
-                } else {
-                    format!("{} failed (exit {})", def.name, status.code().unwrap_or(-1))
+                    let exit_success = status.success();
+                    let state = if exit_success {
+                        terraphim_tracker::StatusState::Success
+                    } else {
+                        terraphim_tracker::StatusState::Failure
+                    };
+                    let description = if exit_success {
+                        format!("{} passed", def.name)
+                    } else {
+                        format!("{} failed (exit {})", def.name, status.code().unwrap_or(-1))
+                    };
+                    (state, description)
                 };
                 self.post_terminal_commit_status(head_sha, context, state, &description)
                     .await;
@@ -1408,5 +1442,66 @@ Remove the pause flag once the underlying failure is resolved:\n\n\
                 error!(agent = %def.name, error = %e, "failed to restart safety agent");
             }
         }
+    }
+
+    /// Derive a terminal commit status override for a PR gate agent.
+    ///
+    /// Returns `None` when the agent has no `gate_meta` (handled by the
+    /// caller falling back to exit-code status) or when the gate result
+    /// cannot be extracted/validated (treated as gate failure to keep
+    /// branch protection trustworthy).
+    async fn derive_pr_gate_status(
+        &self,
+        meta: &crate::pr_gate_result::PrGateMeta,
+        drain_lines: &[String],
+        cli_tool: &str,
+        output_poster: Option<&crate::output_poster::OutputPoster>,
+    ) -> Option<(terraphim_tracker::StatusState, String)> {
+        let extracted = crate::pr_gate_result::extract_assistant_text(drain_lines, cli_tool);
+        if extracted.trim().is_empty() {
+            return Some((
+                terraphim_tracker::StatusState::Failure,
+                format!("{}: no assistant output to parse", meta.context),
+            ));
+        }
+
+        let gate = match crate::pr_gate_result::extract_gate_result(&extracted) {
+            Ok(gate) => gate,
+            Err(e) => {
+                return Some((
+                    terraphim_tracker::StatusState::Failure,
+                    format!("{}: gate result parse failed: {e}", meta.context),
+                ));
+            }
+        };
+
+        if let Err(e) = crate::pr_gate_result::validate_gate_result(&gate, meta) {
+            return Some((
+                terraphim_tracker::StatusState::Failure,
+                format!("{}: gate result invalid: {e}", meta.context),
+            ));
+        }
+
+        if let Some(poster) = output_poster {
+            if let Err(e) = poster
+                .post_raw_as_agent_for_project(
+                    meta.project.as_str(),
+                    meta.agent_name.as_str(),
+                    meta.pr_number,
+                    &extracted,
+                )
+                .await
+            {
+                warn!(
+                    project = %meta.project,
+                    agent = %meta.agent_name,
+                    pr_number = meta.pr_number,
+                    error = %e,
+                    "pr gate result comment post failed; status still posted"
+                );
+            }
+        }
+
+        Some(crate::pr_gate_result::status_from_gate_result(&gate))
     }
 }

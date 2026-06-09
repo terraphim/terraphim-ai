@@ -67,6 +67,7 @@ pub mod persona;
 pub mod post_merge_gate;
 pub mod pr_dispatch;
 pub mod pr_gate;
+pub mod pr_gate_result;
 mod pr_handlers_impl;
 pub mod pr_poller;
 pub mod pr_review;
@@ -201,6 +202,10 @@ struct ManagedAgent {
     /// When set, post a terminal commit status on agent exit.
     /// Tuple of (head_sha, context).
     commit_status_post: Option<(String, String)>,
+    /// When set, derive the terminal commit status from a parsed
+    /// `adf:gate-result` block in the agent's drain log instead of the
+    /// process exit code. Populated for PR gate agents only.
+    gate_meta: Option<crate::pr_gate_result::PrGateMeta>,
     /// Temp file path for streaming agent output. Renamed to final path on exit.
     output_tmp_path: Option<PathBuf>,
     /// Worktree guard for automatic cleanup on agent crash.

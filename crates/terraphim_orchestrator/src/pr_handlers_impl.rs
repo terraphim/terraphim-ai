@@ -330,6 +330,13 @@ impl AgentOrchestrator {
                 mention_parent_agent: None,
                 concurrency_permit: None,
                 commit_status_post: Some((head_sha.clone(), commit_status_context.to_string())),
+                gate_meta: Some(crate::pr_gate_result::PrGateMeta {
+                    pr_number,
+                    project: project.clone(),
+                    agent_name: def.name.clone(),
+                    context: commit_status_context.to_string(),
+                    head_sha: head_sha.clone(),
+                }),
                 output_tmp_path,
             },
         );
@@ -529,6 +536,7 @@ impl AgentOrchestrator {
                 mention_parent_agent: None,
                 concurrency_permit: None,
                 commit_status_post: Some((head_sha.clone(), commit_status_context.to_string())),
+                gate_meta: None,
                 output_tmp_path,
             },
         );
@@ -852,6 +860,7 @@ impl AgentOrchestrator {
                 mention_parent_agent: None,
                 concurrency_permit: None,
                 commit_status_post: Some((after_sha.clone(), "adf/build".to_string())),
+                gate_meta: None,
                 output_tmp_path,
             },
         );
