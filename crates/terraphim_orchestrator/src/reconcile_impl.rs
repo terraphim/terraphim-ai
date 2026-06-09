@@ -22,6 +22,8 @@ use crate::{
     AgentOrchestrator, DEFAULT_RATE_LIMIT_BLOCK,
 };
 
+const DEFAULT_PR_GATE_TIMEOUT_SECS: u64 = 300;
+
 impl AgentOrchestrator {
     /// Periodic reconciliation: detect exits, check cron, evaluate drift, drain output.
     pub(crate) async fn reconcile_tick(&mut self) {
@@ -385,14 +387,15 @@ impl AgentOrchestrator {
     async fn poll_wall_timeouts(&mut self) {
         let mut timed_out: Vec<String> = Vec::new();
         for (name, managed) in &self.active_agents {
-            if let Some(max_secs) = managed.definition.max_cpu_seconds {
+            if let Some(max_secs) = effective_wall_timeout_secs(managed) {
                 let elapsed = managed.started_at.elapsed();
                 if elapsed > Duration::from_secs(max_secs) {
                     warn!(
                         agent = %name,
                         elapsed_secs = elapsed.as_secs(),
-                        max_cpu_seconds = max_secs,
-                        "AGENT EXCEEDED max_cpu_seconds: killing for fallback respawn"
+                        max_wall_seconds = max_secs,
+                        pr_gate = managed.gate_meta.is_some(),
+                        "AGENT EXCEEDED wall-clock limit: killing"
                     );
                     timed_out.push(name.clone());
                 }
@@ -400,12 +403,56 @@ impl AgentOrchestrator {
         }
 
         for name in timed_out {
-            if let Some(managed) = self.active_agents.remove(&name) {
+            if let Some(mut managed) = self.active_agents.remove(&name) {
                 let def = managed.definition.clone();
+                let gate_meta = managed.gate_meta.clone();
+                let output_excerpt = managed
+                    .output_tmp_path
+                    .as_ref()
+                    .and_then(|path| read_non_empty_log_lines(path))
+                    .map(|lines| lines.join("\n"))
+                    .unwrap_or_default();
 
-                // Kill the process
-                if let Err(e) = managed.handle.kill().await {
+                let grace = Duration::from_secs(def.grace_period_secs.unwrap_or(5));
+                if let Err(e) = managed.handle.shutdown(grace).await {
                     error!(agent = %name, error = %e, "failed to kill timed-out agent");
+                }
+
+                if let Some(meta) = gate_meta {
+                    let reason = format!(
+                        "agent exceeded {}s PR gate wall-clock limit",
+                        DEFAULT_PR_GATE_TIMEOUT_SECS
+                    );
+                    if let Some(poster) = self.output_poster.as_ref() {
+                        let comment =
+                            canonical_failure_gate_comment(&meta, &reason, &output_excerpt);
+                        if let Err(e) = poster
+                            .post_raw_as_agent_for_project(
+                                meta.project.as_str(),
+                                meta.agent_name.as_str(),
+                                meta.pr_number,
+                                &comment,
+                            )
+                            .await
+                        {
+                            warn!(
+                                project = %meta.project,
+                                agent = %meta.agent_name,
+                                pr_number = meta.pr_number,
+                                error = %e,
+                                "pr gate timeout comment post failed; status still posted"
+                            );
+                        }
+                    }
+                    self.post_terminal_commit_status(
+                        &meta.head_sha,
+                        &meta.context,
+                        terraphim_tracker::StatusState::Failure,
+                        &failure_status(&meta, &reason).1,
+                    )
+                    .await;
+                    info!(agent = %name, context = %meta.context, "PR gate timed out and failed closed");
+                    continue;
                 }
 
                 // Try respawn with fallback if configured
@@ -457,13 +504,14 @@ impl AgentOrchestrator {
                 }
                 Ok(None) => {
                     // Still running -- check wall-clock timeout
-                    if let Some(max_secs) = managed.definition.max_cpu_seconds {
+                    if let Some(max_secs) = effective_wall_timeout_secs(managed) {
                         let elapsed = managed.started_at.elapsed();
                         if elapsed > Duration::from_secs(max_secs) {
                             warn!(
                                 agent = %name,
                                 elapsed_secs = elapsed.as_secs(),
-                                max_cpu_seconds = max_secs,
+                                max_wall_seconds = max_secs,
+                                pr_gate = managed.gate_meta.is_some(),
                                 "AGENT EXCEEDED max_cpu_seconds: killing"
                             );
                             timed_out.push(name.clone());
@@ -1493,6 +1541,20 @@ Remove the pause flag once the underlying failure is resolved:\n\n\
 struct GateEvaluation {
     status: (terraphim_tracker::StatusState, String),
     comment_body: String,
+}
+
+fn effective_wall_timeout_secs(managed: &crate::ManagedAgent) -> Option<u64> {
+    if managed.gate_meta.is_some() {
+        return Some(
+            managed
+                .definition
+                .max_cpu_seconds
+                .map_or(DEFAULT_PR_GATE_TIMEOUT_SECS, |secs| {
+                    secs.min(DEFAULT_PR_GATE_TIMEOUT_SECS)
+                }),
+        );
+    }
+    managed.definition.max_cpu_seconds
 }
 
 fn read_non_empty_log_lines(path: &Path) -> Option<Vec<String>> {
