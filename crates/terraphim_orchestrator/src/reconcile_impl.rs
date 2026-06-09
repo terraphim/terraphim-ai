@@ -559,9 +559,13 @@ impl AgentOrchestrator {
                 }
             }
 
+            let gate_drain_lines = agent_tmp_path
+                .as_deref()
+                .and_then(read_non_empty_log_lines)
+                .unwrap_or_else(|| output_lines.clone());
             drained_outputs
                 .entry(name.clone())
-                .or_insert((output_lines.clone(), cli_tool.clone()));
+                .or_insert((gate_drain_lines, cli_tool.clone()));
 
             // Classify the exit using KG-boosted pattern matching
             let classification =
@@ -1459,7 +1463,7 @@ Remove the pause flag once the underlying failure is resolved:\n\n\
     ) -> Option<(terraphim_tracker::StatusState, String)> {
         let (status, extracted) = derive_pr_gate_status_from_output(meta, drain_lines, cli_tool);
 
-        if let Some(poster) = output_poster {
+        if let Some(poster) = output_poster.filter(|_| !extracted.trim().is_empty()) {
             if let Err(e) = poster
                 .post_raw_as_agent_for_project(
                     meta.project.as_str(),
@@ -1480,6 +1484,16 @@ Remove the pause flag once the underlying failure is resolved:\n\n\
         }
 
         Some(status)
+    }
+}
+
+fn read_non_empty_log_lines(path: &Path) -> Option<Vec<String>> {
+    let body = std::fs::read_to_string(path).ok()?;
+    let lines: Vec<String> = body.lines().map(str::to_string).collect();
+    if lines.is_empty() {
+        None
+    } else {
+        Some(lines)
     }
 }
 
@@ -1604,5 +1618,25 @@ mod tests {
         assert_eq!(state, terraphim_tracker::StatusState::Success);
         assert_eq!(description, "adf/validation pass (5/5)");
         assert!(extracted.contains("adf:gate-result"));
+    }
+
+    #[test]
+    fn read_non_empty_log_lines_uses_file_backed_drain_log() {
+        let dir = tempfile::tempdir().expect("tempdir should be created");
+        let path = dir.path().join("agent.log");
+        std::fs::write(&path, "line 1\nline 2\n").expect("log should be written");
+
+        let lines = read_non_empty_log_lines(&path).expect("log lines should be loaded");
+
+        assert_eq!(lines, vec!["line 1".to_string(), "line 2".to_string()]);
+    }
+
+    #[test]
+    fn read_non_empty_log_lines_ignores_empty_file() {
+        let dir = tempfile::tempdir().expect("tempdir should be created");
+        let path = dir.path().join("agent.log");
+        std::fs::write(&path, "").expect("log should be written");
+
+        assert!(read_non_empty_log_lines(&path).is_none());
     }
 }
