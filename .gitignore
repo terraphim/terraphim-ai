@@ -133,3 +133,11 @@ pi-session-*.html
 # Client project data - never track
 projects/odilo/
 # CI test fix verification
+
+# PR-reviewer agent artefacts -- snapshot files used during diff-comparison workflows
+.pr_gate_result*.rs
+.reconcile_impl*.rs
+reconcile_impl_new.rs
+reconcile_impl_old.rs
+reconcile_impl_*.rs
+pr_review_files/
