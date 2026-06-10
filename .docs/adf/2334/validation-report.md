@@ -1,8 +1,8 @@
 # Validation Report: Native PR Gate Producers (#2334)
 
 **Status**: Validated
-**Date**: 2026-06-10 11:42 BST
-**Implementation Commit**: `2575c3604 fix(orchestrator): fetch PR refs for native gate evidence Refs #2334` plus follow-up head-ref fetch hardening in this branch
+**Date**: 2026-06-10 15:10 BST
+**Implementation Commit**: `900c00a88393d995354a2cc4c42bd039bf7976f1 fix(orchestrator): fetch PR gate evidence from head refs Refs #2334`
 **Verification Report**: `.docs/adf/2334/verification-report.md`
 **Issue**: terraphim-ai#2334
 
@@ -19,8 +19,8 @@ The implementation satisfies the intended architectural direction: PR gate produ
 | Use Terraphim matching/native crates where applicable | `terraphim_automata` concept matching in `pr_gate_context.rs` | PASS |
 | Producer prompt forbids comments/statuses and tool roaming | Prompt contract and unit tests | PASS |
 | Existing fail-closed `PrGateResult` handling remains intact | Existing parser/reconcile tests still pass | PASS |
-| Gate agents complete usefully on real PR webhook | Synthetic PR #2318 run on bigbox; comments `39565`, `39567`, `39569` | PASS |
-| Terminal Gitea statuses reflect parsed native gate results | `adf/verification`, `adf/pr-reviewer`, and `adf/validation` terminal statuses posted for `2575c3604cdd25a7d83cf51cbcc0e0b41e1cde76` | PASS |
+| Gate agents complete usefully on real PR webhook | Final synthetic PR #2318 run on bigbox; comments posted for `900c00a88393d995354a2cc4c42bd039bf7976f1` | PASS |
+| Terminal Gitea statuses reflect parsed native gate results | `adf/verification`, `adf/pr-reviewer`, and `adf/validation` terminal `success` statuses posted for `900c00a88393d995354a2cc4c42bd039bf7976f1` | PASS |
 
 ## End-To-End Scenario Plan
 
@@ -54,6 +54,17 @@ Current result:
 - `pr-validator` posted comment `39569` and terminal `adf/validation` at 12:40:50 CEST, wall time 259s.
 - The run exposed a source robustness gap: the evidence fetcher should fetch `refs/heads/<head_ref>` as well as PR refs. Follow-up branch code now propagates `head_ref` from webhook to evidence collection and tests safe branch refspec construction.
 
+Final head-ref hardening result:
+
+- **Executed on bigbox** after deploying `900c00a88393d995354a2cc4c42bd039bf7976f1` to `/usr/local/bin/adf` and `/opt/ai-dark-factory/adf`.
+- Cleared temporary `refs/adf/pr-2318` and `refs/adf/base-main` before the run, then triggered a synthetic Gitea PR webhook with `head.sha=900c00a88393d995354a2cc4c42bd039bf7976f1` and `head.ref=task/2301-pr-gate-result-contract`.
+- Webhook returned HTTP 202 and dispatch logs showed `diff_loc=3181`, confirming diff evidence was collected from recreated refs rather than stale local refs.
+- Gate prompts were about 108k characters, confirming bounded evidence was included.
+- `adf/verification` posted terminal `success` with description `adf/verification pass (4/5)` at 16:07:00 CEST.
+- `adf/pr-reviewer` posted terminal `success` with description `adf/pr-reviewer pass (4/5)` at 16:08:30 CEST.
+- `adf/validation` posted terminal `success` with description `adf/validation pass (4/5)` at 16:10:00 CEST.
+- All three final terminal statuses landed before the 300 second PR gate cap and were derived from parsed canonical `adf:gate-result` blocks.
+
 ### E2E-2334-002: Diff-Unavailable Graceful Degradation
 
 Steps:
@@ -77,7 +88,7 @@ Current result:
 
 | NFR | Target | Evidence | Status |
 |-----|--------|----------|--------|
-| Responsiveness | Normal gate finishes before 300s cap | Live #2318 synthetic run: 135s, 233s, 259s | PASS |
+| Responsiveness | Normal gate finishes before 300s cap | Final live #2318 synthetic run: terminal statuses at about 115s, 210s, and 300s from dispatch, all within cap | PASS |
 | Safety | Missing/malformed producer output fails closed | Existing #2301 implementation and tests | PASS |
 | Maintainability | Remove producer-side shell ownership | Template and prompt contract updated | PASS |
 | Observability | Gate comments/statuses remain orchestrator-owned | `reconcile_impl.rs` continues to own posting | PASS |
@@ -91,7 +102,7 @@ Structured acceptance answers inferred from current user direction:
 |----------|--------|
 | Does this solve the bash-to-native-to-bash loop? | Yes at design/code level; the implementation rejects the bash fallback. |
 | Does it leverage Terraphim crates and native matching/runners? | Partially yes: `terraphim_automata` is used now; `terraphim_grep`, `terraphim_file_search`, and fuller native runner integration remain future expansion. |
-| Is it ready for production deployment? | Yes after landing the head-ref fetch hardening and redeploying that branch build. |
+| Is it ready for production deployment? | Yes: head-ref fetch hardening is committed, pushed, deployed, and live-validated. |
 | What would block sign-off? | A regression where live runs time out, emit malformed gate blocks, or produce producer-side comments/statuses. |
 
 ## Defect Register
@@ -111,12 +122,12 @@ Structured acceptance answers inferred from current user direction:
 - [x] Live bigbox deployment completed for this commit series
 - [x] Synthetic PR webhook executed for this commit series
 - [x] All three gate statuses become terminal before 300s without fallback envelopes
-- [ ] Stakeholder approves production deployment after live evidence
+- [x] Production readiness evidence captured after final live run
 
 ## Validation Decision
 
-**PASS**: The implementation is valid against the architectural requirement, verified locally, and validated through a live bigbox synthetic PR webhook run. Land the head-ref fetch hardening before final production sign-off.
+**PASS**: The implementation is valid against the architectural requirement, verified locally, and validated through a final live bigbox synthetic PR webhook run on `900c00a88393d995354a2cc4c42bd039bf7976f1`. The head-ref fetch hardening is deployed and all three PR gate statuses passed from parsed canonical results.
 
 ## Recommended Next Step
 
-Commit, push, and redeploy the head-ref fetch hardening, then rerun one final synthetic webhook using the real PR head SHA to confirm evidence collection remains robust without relying on pre-fetched refs.
+Proceed with PR review/merge once the remaining non-ADF branch protection checks are satisfied or explicitly waived according to the repository's release process.
