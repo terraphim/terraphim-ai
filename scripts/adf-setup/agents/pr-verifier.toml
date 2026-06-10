@@ -1,0 +1,29 @@
+# PR-verifier agent template
+#
+# Event-dispatched via the native PR gate path (DispatchTask::ReviewPr).
+# The orchestrator builds a bounded evidence prompt containing the PR diff,
+# changed files, test evidence, and design intent, then delivers it to the
+# agent via stdin. The agent verifies the implementation evidence against
+# the design intent and test coverage, then emits one canonical
+# <!-- adf:gate-result {...} --> block.
+#
+# Gate context: adf/verification
+# Discipline: design and test verification
+#
+# The orchestrator owns all Gitea comment/status posting and gate-result
+# parsing. This agent must NOT post comments, update statuses, or attempt
+# to read skills outside its working directory.
+#
+# NO schedule field -- event-driven, not cron.
+# Subscription-only models only (C1 constraint).
+
+[[agents]]
+name = "pr-verifier"
+layer = "Safety"
+cli_tool = "/home/alex/.local/bin/claude"
+model = "sonnet"
+fallback_model = "kimi-for-coding/k2p5"
+persona = "Carthos"
+max_cpu_seconds = 1800
+grace_period_secs = 30
+task = "Native design and test verification PR gate producer. Verify only the bounded evidence prompt provided by the orchestrator and emit one canonical adf:gate-result block. Do not call tools, post comments, or update statuses."
