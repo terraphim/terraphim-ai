@@ -22,12 +22,10 @@ async fn test_terraphim_graph_search_comprehensive() -> Result<(), Box<dyn std::
     // Initialize logging for debugging
     env_logger::try_init().ok();
 
-    let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .expect("workspace root")
-        .to_path_buf();
-    let docs_src_dir = workspace_root.join("docs/src");
-    let kg_dir = docs_src_dir.join("kg");
+    // Use test-local fixtures so the test works in any worktree environment,
+    // not just when docs/src/kg exists relative to the workspace root.
+    let fixtures_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
+    let kg_dir = fixtures_dir.join("kg");
 
     // Initialize memory-only persistence for testing
     DeviceStorage::init_memory_only().await?;
@@ -126,7 +124,7 @@ async fn test_terraphim_graph_search_comprehensive() -> Result<(), Box<dyn std::
         shortname: Some("test-terraphim".to_string()),
         name: role_name.clone(),
         haystacks: vec![Haystack {
-            location: docs_src_dir.to_string_lossy().into_owned(),
+            location: fixtures_dir.to_string_lossy().into_owned(),
             service: ServiceType::Ripgrep,
             read_only: true,
             atomic_server_secret: None,
@@ -360,7 +358,7 @@ async fn test_empty_rolegraph_search() -> Result<(), Box<dyn std::error::Error>>
             automata_path: None,
             knowledge_graph_local: Some(KnowledgeGraphLocal {
                 input_type: terraphim_types::KnowledgeGraphInputType::Markdown,
-                path: PathBuf::from("docs/src/kg"),
+                path: PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/kg"),
             }),
             public: true,
             publish: true,
