@@ -22,7 +22,12 @@ async fn test_terraphim_graph_search_comprehensive() -> Result<(), Box<dyn std::
     // Initialize logging for debugging
     env_logger::try_init().ok();
 
-    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    // Use runtime env var (set by cargo test) to get the current manifest dir.
+    // env!("CARGO_MANIFEST_DIR") is baked at compile time and breaks when tests
+    // are run from a different worktree than where they were compiled (#2346).
+    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| PathBuf::from(env!("CARGO_MANIFEST_DIR")));
     let kg_dir = manifest_dir.join("fixtures/kg");
     let docs_src_dir = manifest_dir.join("fixtures");
 
@@ -357,7 +362,10 @@ async fn test_empty_rolegraph_search() -> Result<(), Box<dyn std::error::Error>>
             automata_path: None,
             knowledge_graph_local: Some(KnowledgeGraphLocal {
                 input_type: terraphim_types::KnowledgeGraphInputType::Markdown,
-                path: PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("fixtures/kg"),
+                path: std::env::var("CARGO_MANIFEST_DIR")
+                    .map(PathBuf::from)
+                    .unwrap_or_else(|_| PathBuf::from(env!("CARGO_MANIFEST_DIR")))
+                    .join("fixtures/kg"),
             }),
             public: true,
             publish: true,
