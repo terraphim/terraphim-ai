@@ -28,12 +28,38 @@ pub struct RunnerConfig {
 }
 
 /// Configuration for the optional legacy commit-status mirror.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct LegacyStatusMirrorConfig {
     /// Gitea API token used to POST commit statuses.
     pub token: String,
     /// Status context to write (e.g. `adf/build`).
     pub context: String,
+}
+
+impl std::fmt::Debug for LegacyStatusMirrorConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LegacyStatusMirrorConfig")
+            .field("token", &"[REDACTED]")
+            .field("context", &self.context)
+            .finish()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn legacy_status_mirror_debug_redacts_token() {
+        let cfg = LegacyStatusMirrorConfig {
+            token: "super-secret-gitea-token".to_string(),
+            context: "adf/build".to_string(),
+        };
+        let output = format!("{:?}", cfg);
+        assert!(!output.contains("super-secret-gitea-token"), "token must not appear in Debug output");
+        assert!(output.contains("[REDACTED]"), "Debug output must contain [REDACTED]");
+        assert!(output.contains("adf/build"), "context must appear in Debug output");
+    }
 }
 
 impl Default for RunnerConfig {

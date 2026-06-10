@@ -140,3 +140,6 @@ projects/odilo/
 
 # Session files (machine-local agent state)
 .sessions/
+
+# Gitea runner state file (persisted on first registration; machine-local)
+.runner
