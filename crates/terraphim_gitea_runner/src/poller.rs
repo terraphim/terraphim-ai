@@ -9,6 +9,7 @@ use crate::state::RunnerState;
 use crate::status::SingleStatusWriter;
 use crate::task_worker::TaskWorker;
 use crate::workflow_payload;
+use sd_notify;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -108,10 +109,37 @@ impl<C: GiteaRunnerClient + 'static, P: PolicyPlanner + 'static> Poller<C, P> {
     /// after our last poll would never be offered (no further version change)
     /// until an unrelated bump or a runner restart -- the stuck-run race. Sending
     /// 0 forces a pick each poll; the extra `PickTask` query is negligible.
+    ///
+    /// Each `poll_once` call is wrapped in `config.poll_timeout`. If it does not
+    /// return within that window the stall is logged and the loop continues.
+    /// `config.http_request_timeout` (set on the reqwest client) is the primary
+    /// guard; `poll_timeout` is belt-and-suspenders for kernel-level hangs.
+    ///
+    /// After every successful poll a `WATCHDOG=1` notification is sent to systemd
+    /// if `$NOTIFY_SOCKET` is set. Set `WatchdogSec=` in the `.service` unit to
+    /// auto-restart when no heartbeat arrives within the window.
     pub async fn run_forever(&self, state: &RunnerState) -> Result<()> {
+        let mut consecutive_errors = 0u32;
         loop {
-            if let Err(e) = self.poll_once(state, 0).await {
-                log::error!("poll error: {e}");
+            match tokio::time::timeout(self.config.poll_timeout, self.poll_once(state, 0)).await {
+                Ok(Ok(_tasks_version)) => {
+                    consecutive_errors = 0;
+                    // Heartbeat: no-op when $NOTIFY_SOCKET is unset.
+                    let _ = sd_notify::notify(false, &[sd_notify::NotifyState::Watchdog]);
+                }
+                Ok(Err(e)) => {
+                    consecutive_errors += 1;
+                    log::error!("poll error (streak={consecutive_errors}): {e}");
+                }
+                Err(_elapsed) => {
+                    consecutive_errors += 1;
+                    log::error!(
+                        "poll timed out after {:?} (streak={consecutive_errors}); \
+                         verify Gitea is reachable at {}",
+                        self.config.poll_timeout,
+                        self.config.instance_url,
+                    );
+                }
             }
             tokio::time::sleep(self.config.poll_interval).await;
         }
