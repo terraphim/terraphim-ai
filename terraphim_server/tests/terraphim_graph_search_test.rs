@@ -22,12 +22,9 @@ async fn test_terraphim_graph_search_comprehensive() -> Result<(), Box<dyn std::
     // Initialize logging for debugging
     env_logger::try_init().ok();
 
-    let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .expect("workspace root")
-        .to_path_buf();
-    let docs_src_dir = workspace_root.join("docs/src");
-    let kg_dir = docs_src_dir.join("kg");
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let kg_dir = manifest_dir.join("fixtures/kg");
+    let docs_src_dir = manifest_dir.join("fixtures");
 
     // Initialize memory-only persistence for testing
     DeviceStorage::init_memory_only().await?;
@@ -360,7 +357,7 @@ async fn test_empty_rolegraph_search() -> Result<(), Box<dyn std::error::Error>>
             automata_path: None,
             knowledge_graph_local: Some(KnowledgeGraphLocal {
                 input_type: terraphim_types::KnowledgeGraphInputType::Markdown,
-                path: PathBuf::from("docs/src/kg"),
+                path: PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("fixtures/kg"),
             }),
             public: true,
             publish: true,
