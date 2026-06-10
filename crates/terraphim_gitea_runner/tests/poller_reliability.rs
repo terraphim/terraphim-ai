@@ -1,19 +1,26 @@
-//! #2185 reliability tests against a fake Gitea `RunnerService` (Connect-JSON
-//! over a real axum server). No internal mocks -- the real client/poller run.
+//! #2185/#2189 reliability tests against a fake Gitea `RunnerService`
+//! (Connect-JSON over a real axum server). No internal mocks -- the real
+//! client/poller run.
 //!
-//! - Fix A (stuck runs): a fake server that GATES like Gitea (only offers the
-//!   Waiting job when the runner's `tasks_version` differs from latest) proves
-//!   that polling with version 0 picks a job a cached-version poll would miss.
-//! - Fix B (orphan-on-skip): a task for a repo not in `active_repos` is reported
-//!   SKIPPED via UpdateTask (result 4) rather than silently dropped.
+//! - Fix A (stuck runs / #2185): polling with version 0 picks a job a
+//!   cached-version poll would miss.
+//! - Fix B (orphan-on-skip / #2185): a task for a repo not in `active_repos`
+//!   is reported SKIPPED (result 4) rather than silently dropped.
+//! - P1-1 (#2189): run_forever aborts after MAX_CONSECUTIVE_FAILURES so systemd
+//!   can restart the runner instead of spinning silently while appearing online.
+//! - P1-2 (#2189): pre-execution claim (UpdateTask UNSPECIFIED) is posted before
+//!   any workflow step runs, providing Gitea's atomic guard against double-fetch.
+//! - P1-4 (#2189): malformed workflow payloads report FAILURE to Gitea rather
+//!   than leaving the task pending indefinitely.
+//! - P2-1 (#2189): the reqwest client times out on hung servers (not infinite).
 
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use axum::{Json, Router, extract::State, routing::post};
+use axum::{Json, Router, extract::State, http::StatusCode, routing::post};
 use base64::Engine;
 use serde_json::{Value, json};
-use terraphim_gitea_runner::client::ReqwestRunnerClient;
+use terraphim_gitea_runner::client::{GiteaRunnerClient, ReqwestRunnerClient};
 use terraphim_gitea_runner::config::RunnerConfig;
 use terraphim_gitea_runner::policy::DeterministicPlanner;
 use terraphim_gitea_runner::poller::Poller;
@@ -70,6 +77,18 @@ async fn fetch_gated(State(s): State<Shared>, Json(body): Json<Value>) -> Json<V
         // Cached-version poll: server reports no new work (the stuck-run gate).
         Json(json!({"tasksVersion": LATEST_VERSION}))
     }
+}
+
+// --- P1-1 server: FetchTask always returns HTTP 500 ---
+async fn fetch_always_500(
+    State(s): State<Shared>,
+    Json(_): Json<Value>,
+) -> (StatusCode, Json<Value>) {
+    s.lock().unwrap().fetch_calls += 1;
+    (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(json!({"error": "injected failure"})),
+    )
 }
 
 // --- Fix B server: always offer a task for a repo NOT in active_repos ---
@@ -244,4 +263,146 @@ async fn skipped_repo_task_is_released_not_orphaned() {
         "the unservable task must be reported SKIPPED (result 4), not orphaned"
     );
     assert_eq!(g.executed_log_rows, 0, "the skipped task must NOT execute");
+}
+
+// ── #2189 tests ─────────────────────────────────────────────────────────────
+
+/// P1-1: run_forever must abort and return Err after MAX_CONSECUTIVE_FAILURES
+/// (10) consecutive FetchTask errors. Without this the runner spins silently
+/// while appearing online to Gitea; systemd can only restart it if the process
+/// actually exits.
+#[tokio::test]
+async fn run_forever_aborts_after_max_consecutive_failures() {
+    let shared: Shared = Arc::new(Mutex::new(Recorded::default()));
+    let url = spawn(shared.clone(), post(fetch_always_500)).await;
+    let (p, _tmp) = poller(url);
+    let st = state();
+
+    // With poll_interval = 10ms, as_secs() = 0, so backoff is 0 and all 10
+    // failures fire immediately. A 5-second wall-clock timeout is generous.
+    let result = tokio::time::timeout(Duration::from_secs(5), p.run_forever(&st)).await;
+    assert!(
+        result.is_ok(),
+        "run_forever must exit after consecutive failures, not hang indefinitely"
+    );
+    assert!(
+        result.unwrap().is_err(),
+        "run_forever must return Err once MAX_CONSECUTIVE_FAILURES is reached"
+    );
+    assert_eq!(
+        shared.lock().unwrap().fetch_calls,
+        10,
+        "exactly MAX_CONSECUTIVE_FAILURES (10) polls should be attempted before aborting"
+    );
+}
+
+/// P1-2: the pre-execution claim (UpdateTask with result UNSPECIFIED = 0) must
+/// be posted to Gitea before any workflow step executes. Gitea uses this
+/// in-progress transition to atomically prevent a second runner instance from
+/// picking up the same task (the double-fetch race documented in #2189 P1-2).
+#[tokio::test]
+async fn pre_execution_claim_is_unspecified_before_terminal_result() {
+    let shared: Shared = Arc::new(Mutex::new(Recorded::default()));
+    let url = spawn(shared.clone(), post(fetch_gated)).await;
+    let (p, _tmp) = poller(url);
+    let st = state();
+
+    p.poll_once(&st, 0).await.unwrap();
+
+    let g = shared.lock().unwrap();
+    assert!(
+        g.task_results.len() >= 2,
+        "expected at least two UpdateTask calls (in-progress + terminal); got {:?}",
+        g.task_results
+    );
+    assert_eq!(
+        g.task_results[0],
+        0, // result::UNSPECIFIED -- the pre-execution claim
+        "first UpdateTask must be UNSPECIFIED (0) -- pre-execution claim; got {:?}",
+        g.task_results
+    );
+    assert_ne!(
+        g.task_results[1], 0,
+        "second UpdateTask must be a terminal result (not another UNSPECIFIED); got {:?}",
+        g.task_results
+    );
+}
+
+/// P1-4: a task whose workflow payload cannot be compiled (malformed base64 or
+/// unparseable YAML) must be reported to Gitea as FAILURE (result 2) so the
+/// task does not remain pending indefinitely with no user-visible explanation.
+#[tokio::test]
+async fn compile_error_reports_failure_not_stuck_pending() {
+    // Payload that is not valid base64 -- compile_task returns Compile error.
+    let bad_task = json!({
+        "id": 42,
+        "workflowPayload": "not!!valid!!base64!!",
+        "context": {},
+        "secrets": {}, "vars": {}, "needs": {}
+    });
+    let shared: Shared = Arc::new(Mutex::new(Recorded::default()));
+    let shared2 = shared.clone();
+    let url = spawn(
+        shared.clone(),
+        post(move |_s: State<Shared>, Json(body): Json<Value>| {
+            let task_val = bad_task.clone();
+            let s2 = shared2.clone();
+            async move {
+                let mut g = s2.lock().unwrap();
+                g.fetch_calls += 1;
+                let _ = body["tasksVersion"].as_i64();
+                if g.fetch_calls == 1 {
+                    drop(g);
+                    Json(json!({"task": task_val, "tasksVersion": 3}))
+                } else {
+                    drop(g);
+                    Json(json!({"tasksVersion": 3}))
+                }
+            }
+        }),
+    )
+    .await;
+    let (p, _tmp) = poller(url);
+    let st = state();
+
+    // poll_once returns Ok (task error is logged, not propagated); the FAILURE
+    // must have been posted to Gitea by post_pre_run_failure.
+    p.poll_once(&st, 0).await.unwrap();
+    let g = shared.lock().unwrap();
+    assert!(
+        g.task_results.contains(&2), // result::FAILURE
+        "compile error must be reported as FAILURE (result 2); got {:?}",
+        g.task_results
+    );
+}
+
+/// P2-1: the reqwest client must not hang indefinitely when a server accepts
+/// the TCP connection but never sends an HTTP response. The fix sets a 30-second
+/// request timeout (and 10-second connect timeout) on the default client.
+/// This test uses a 200ms custom timeout to keep the suite fast while verifying
+/// the mechanism: a hung server produces Err within the configured deadline.
+#[tokio::test]
+async fn client_times_out_on_hung_server() {
+    // Bind a listener and accept connections but never send a response.
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    tokio::spawn(async move {
+        loop {
+            let _ = listener.accept().await;
+            // Accept the TCP handshake but send no HTTP bytes.
+        }
+    });
+
+    let http = reqwest::Client::builder()
+        .timeout(Duration::from_millis(200))
+        .build()
+        .expect("reqwest client build must not fail");
+    let client = ReqwestRunnerClient::with_http(format!("http://{addr}"), http);
+    let st = state();
+
+    let result = client.fetch_task(&st, 0).await;
+    assert!(
+        result.is_err(),
+        "a hung server must produce a timeout error, not hang the runner forever"
+    );
 }
