@@ -109,6 +109,7 @@ impl<C: GiteaRunnerClient + 'static, P: PolicyPlanner + 'static> Poller<C, P> {
     /// until an unrelated bump or a runner restart -- the stuck-run race. Sending
     /// 0 forces a pick each poll; the extra `PickTask` query is negligible.
     pub async fn run_forever(&self, state: &RunnerState) -> Result<()> {
+        eprintln!("DEBUG: run_forever entered");
         loop {
             if let Err(e) = self.poll_once(state, 0).await {
                 log::error!("poll error: {e}");
