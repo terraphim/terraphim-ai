@@ -1,0 +1,46 @@
+name: runner-health
+on:
+  schedule:
+    # Every 15 minutes — external monitor (e.g. healthchecks.io) alerts if no
+    # ping arrives within the window, catching runner-offline failures early.
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+jobs:
+  # Job 1: heartbeat — the fact that this job executes proves the native runner
+  # is online.  It pings RUNNER_HEALTH_PING_URL (set as a Gitea repo secret)
+  # so an external service can alert when the ping stops arriving.
+  heartbeat:
+    runs-on: terraphim-native
+    timeout-minutes: 3
+    steps:
+      - name: runner-alive
+        run: echo "runner ok at $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+      - name: ping-healthchecks
+        env:
+          RUNNER_HEALTH_PING_URL: ${{ secrets.RUNNER_HEALTH_PING_URL }}
+        run: |
+          if [ -n "$RUNNER_HEALTH_PING_URL" ]; then
+            curl -fsS --retry 3 --retry-delay 2 "$RUNNER_HEALTH_PING_URL"
+          else
+            echo "RUNNER_HEALTH_PING_URL not set - skipping external ping"
+          fi
+
+  # Job 2: runner-registration — queries the Gitea API to verify that at least
+  # one native runner remains registered.  Catches the case where a runner was
+  # removed from the Gitea org UI while still appearing functional on the host.
+  runner-registration:
+    runs-on: terraphim-native
+    timeout-minutes: 3
+    steps:
+      - name: check-online-runner-count
+        env:
+          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+        run: |
+          response=$(curl -fs -H "Authorization: token $GITEA_TOKEN" \
+            "https://git.terraphim.cloud/api/v1/orgs/terraphim/actions/runners")
+          online=$(echo "$response" | python3 -c "import sys,json; d=json.load(sys.stdin); print(sum(1 for r in d.get('runners',[]) if r.get('status')=='online'))")
+          echo "Online runners: $online"
+          if [ "$online" -eq 0 ]; then
+            echo "ALERT: no online runners registered for org terraphim"
+            exit 1
+          fi
