@@ -133,3 +133,10 @@ pi-session-*.html
 # Client project data - never track
 projects/odilo/
 # CI test fix verification
+
+# Agent review working directories (auto-generated, never commit)
+.pr_review_temp/
+*.diff
+
+# Session files (machine-local agent state)
+.sessions/
