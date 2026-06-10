@@ -127,39 +127,96 @@ async fn collect_git_evidence(
     limits: &PrGateEvidenceLimits,
 ) -> Result<GitEvidence, PrGateContextError> {
     let pr_ref = format!("pull/{}/head:refs/adf/pr-{}", req.pr_number, req.pr_number);
-    let fetch_result = Command::new("git")
-        .current_dir(working_dir)
-        .args(["fetch", "gitea", &pr_ref])
-        .output()
-        .await;
+    fetch_first_available(working_dir, &["origin", "gitea"], &pr_ref, req.pr_number).await;
+    fetch_first_available(
+        working_dir,
+        &["origin", "gitea"],
+        "main:refs/adf/base-main",
+        req.pr_number,
+    )
+    .await;
 
-    if let Ok(output) = fetch_result {
-        if !output.status.success() {
-            tracing::debug!(
-                stderr = %String::from_utf8_lossy(&output.stderr),
-                pr_number = req.pr_number,
-                "native PR gate fetch failed; trying existing refs"
-            );
+    let pr_branch = format!("refs/adf/pr-{}", req.pr_number);
+    let ranges = build_diff_ranges(&pr_branch, &req.head_sha);
+    let mut last_error = None;
+    for range in ranges {
+        match git_output(working_dir, &["diff", "--no-ext-diff", &range]).await {
+            Ok(diff) if !diff.trim().is_empty() => {
+                return Ok(GitEvidence {
+                    changed_files: extract_changed_files(&diff),
+                    diff_excerpt: limit_lines(&diff, limits.max_diff_lines),
+                });
+            }
+            Ok(_) => {
+                last_error = Some(format!("git diff {range} returned no changes"));
+            }
+            Err(e) => {
+                last_error = Some(e.to_string());
+            }
         }
     }
 
-    let pr_branch = format!("refs/adf/pr-{}", req.pr_number);
-    let diff_range = format!("main...{pr_branch}");
-    let diff = git_output(working_dir, &["diff", "--no-ext-diff", &diff_range]).await;
-    let diff = match diff {
-        Ok(diff) if !diff.trim().is_empty() => diff,
-        _ => {
-            let head_range = format!("main...{}", req.head_sha);
-            git_output(working_dir, &["diff", "--no-ext-diff", &head_range])
-                .await
-                .unwrap_or_else(|e| format!("Diff unavailable: {e}"))
-        }
-    };
-
     Ok(GitEvidence {
-        changed_files: extract_changed_files(&diff),
-        diff_excerpt: limit_lines(&diff, limits.max_diff_lines),
+        changed_files: Vec::new(),
+        diff_excerpt: format!(
+            "Diff unavailable: {}",
+            last_error.unwrap_or_else(|| "no usable git diff range".to_string())
+        ),
     })
+}
+
+async fn fetch_first_available(
+    working_dir: &Path,
+    remotes: &[&str],
+    refspec: &str,
+    pr_number: u64,
+) {
+    for remote in remotes {
+        let output = Command::new("git")
+            .current_dir(working_dir)
+            .args(["fetch", remote, refspec])
+            .output()
+            .await;
+
+        match output {
+            Ok(output) if output.status.success() => return,
+            Ok(output) => {
+                tracing::debug!(
+                    stderr = %String::from_utf8_lossy(&output.stderr),
+                    remote,
+                    refspec,
+                    pr_number,
+                    "native PR gate fetch failed; trying next remote"
+                );
+            }
+            Err(e) => {
+                tracing::debug!(
+                    error = %e,
+                    remote,
+                    refspec,
+                    pr_number,
+                    "native PR gate fetch errored; trying next remote"
+                );
+            }
+        }
+    }
+}
+
+fn build_diff_ranges(pr_branch: &str, head_sha: &str) -> Vec<String> {
+    [
+        format!("refs/adf/base-main...{pr_branch}"),
+        format!("origin/main...{pr_branch}"),
+        format!("main...{pr_branch}"),
+        format!("refs/adf/base-main...{head_sha}"),
+        format!("origin/main...{head_sha}"),
+        format!("main...{head_sha}"),
+        format!("refs/adf/base-main..{pr_branch}"),
+        format!("refs/adf/base-main..{head_sha}"),
+        format!("origin/main..{pr_branch}"),
+        format!("origin/main..{head_sha}"),
+    ]
+    .into_iter()
+    .collect()
 }
 
 async fn git_output(working_dir: &Path, args: &[&str]) -> Result<String, PrGateContextError> {
@@ -289,6 +346,14 @@ mod tests {
     fn limit_lines_marks_truncation() {
         let limited = limit_lines("a\nb\nc", 2);
         assert_eq!(limited, "a\nb\n[diff truncated]");
+    }
+
+    #[test]
+    fn build_diff_ranges_prefers_fetched_base_and_pr_refs() {
+        let ranges = build_diff_ranges("refs/adf/pr-2318", "abc123");
+        assert_eq!(ranges[0], "refs/adf/base-main...refs/adf/pr-2318");
+        assert!(ranges.contains(&"origin/main...refs/adf/pr-2318".to_string()));
+        assert!(ranges.contains(&"refs/adf/base-main..abc123".to_string()));
     }
 
     #[test]
