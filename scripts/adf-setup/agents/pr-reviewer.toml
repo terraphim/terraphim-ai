@@ -1,10 +1,16 @@
 # PR-reviewer agent template
 #
-# Event-dispatched via DispatchTask::ReviewPr.
-# The orchestrator builds the bounded native PR gate prompt, owns Gitea
-# comment/status posting, and validates the final PrGateResult block.
+# Event-dispatched via the native PR gate path (DispatchTask::ReviewPr).
+# The orchestrator builds a bounded evidence prompt containing the PR diff,
+# changed files, linked issue, and Terraphim concept matches, then delivers
+# it to the agent via stdin. The agent produces a structural review report
+# and emits one canonical <!-- adf:gate-result {...} --> block.
 #
-# NO schedule field -- this is event-driven, not cron.
+# The orchestrator owns all Gitea comment/status posting and gate-result
+# parsing. This agent must NOT post comments, update statuses, or attempt
+# to read skills outside its working directory.
+#
+# NO schedule field -- event-driven, not cron.
 # Subscription-only models only (C1 constraint).
 
 [[agents]]
@@ -14,7 +20,6 @@ cli_tool = "/home/alex/.local/bin/claude"
 model = "sonnet"
 fallback_model = "kimi-for-coding/k2p5"
 persona = "Carthos"
-skill_chain = ["structural-pr-review"]
 max_cpu_seconds = 1800
 grace_period_secs = 30
-task = "Native structural PR gate producer. Review only the bounded evidence prompt provided by the orchestrator and emit one canonical adf:gate-result block. Do not post comments or statuses."
+task = "Native structural PR gate producer. Review only the bounded evidence prompt provided by the orchestrator and emit one canonical adf:gate-result block. Do not call tools, post comments, or update statuses."
