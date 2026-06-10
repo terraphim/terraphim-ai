@@ -73,7 +73,11 @@ impl AgentOrchestrator {
                 claim_strategy: terraphim_tracker::gitea::ClaimStrategy::PreferRobot,
             };
             let tracker = match terraphim_tracker::GiteaTracker::new(tracker_cfg) {
-                Ok(t) => pr_poller::GiteaPrTracker::new(t),
+                Ok(t) => pr_poller::GiteaPrTracker::new(
+                    t,
+                    gitea_cfg.owner.clone(),
+                    gitea_cfg.repo.clone(),
+                ),
                 Err(e) => {
                     tracing::warn!(
                         project = %project_id,
@@ -135,7 +139,21 @@ impl AgentOrchestrator {
                 }
             };
 
-            let outcome = pr_poller::evaluate_pr_verdict(&pr, &comments, criteria);
+            let head_statuses = match tracker.fetch_head_commit_statuses(&pr.head_sha).await {
+                Ok(statuses) => statuses,
+                Err(e) => {
+                    tracing::warn!(
+                        project = %project_id,
+                        pr = pr.number,
+                        error = %e,
+                        "failed to fetch commit statuses"
+                    );
+                    continue;
+                }
+            };
+
+            let outcome =
+                pr_poller::evaluate_pr_gates(&pr, &comments, &head_statuses, project_id, criteria);
 
             // Emit PrReviewed for any outcome that resolved a parsed verdict.
             #[cfg(feature = "quickwit")]
@@ -203,19 +221,28 @@ impl AgentOrchestrator {
                         "PR requires human review"
                     );
                 }
-                pr_poller::EvaluationOutcome::NoReviewerComment => {
+                pr_poller::EvaluationOutcome::AwaitingGates { reason } => {
                     tracing::debug!(
                         project = %project_id,
                         pr = pr.number,
-                        "no pr-reviewer comment yet; skipping"
+                        reason = %reason,
+                        "PR gates not ready for auto-merge yet"
                     );
                 }
-                pr_poller::EvaluationOutcome::ParseError { reason } => {
+                pr_poller::EvaluationOutcome::StaleGates { reason } => {
+                    tracing::debug!(
+                        project = %project_id,
+                        pr = pr.number,
+                        reason = %reason,
+                        "stale gate results; waiting for re-review"
+                    );
+                }
+                pr_poller::EvaluationOutcome::GateParseError { reason } => {
                     tracing::warn!(
                         project = %project_id,
                         pr = pr.number,
                         reason = %reason,
-                        "reviewer comment failed to parse; skipping"
+                        "gate-result comment failed to parse; skipping"
                     );
                 }
             }
@@ -299,7 +326,9 @@ impl AgentOrchestrator {
             claim_strategy: terraphim_tracker::gitea::ClaimStrategy::PreferRobot,
         };
         let tracker = match terraphim_tracker::GiteaTracker::new(tracker_cfg) {
-            Ok(t) => pr_poller::GiteaPrTracker::new(t),
+            Ok(t) => {
+                pr_poller::GiteaPrTracker::new(t, gitea_cfg.owner.clone(), gitea_cfg.repo.clone())
+            }
             Err(e) => {
                 warn!(
                     pr_number,

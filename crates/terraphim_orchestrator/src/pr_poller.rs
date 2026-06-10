@@ -3,10 +3,10 @@
 //!
 //! The orchestrator invokes [`crate::AgentOrchestrator::poll_pending_reviews`] once
 //! per `reconcile_tick`. That method walks every project with a Gitea config,
-//! lists open PRs, looks for the latest structural-pr-review comment, calls
-//! [`crate::pr_review::parse_verdict`] + [`crate::pr_review::evaluate`], and
-//! enqueues a [`crate::dispatcher::DispatchTask::AutoMerge`] when — and only when — every gate
-//! in [`crate::pr_review::AutoMergeCriteria::default`] is satisfied.
+//! lists open PRs, reads commit statuses and canonical `adf:gate-result`
+//! blocks, and enqueues a [`crate::dispatcher::DispatchTask::AutoMerge`] when
+//! every required context is green and every gate result is fresh with no
+//! blocking findings.
 //!
 //! The module is split into:
 //!
@@ -15,9 +15,9 @@
 //! - [`PrTracker`]: async trait with one real implementation
 //!   ([`GiteaPrTracker`]) wrapping [`terraphim_tracker::GiteaTracker`] and any
 //!   number of in-memory test implementations.
-//! - [`evaluate_pr_verdict`]: pure function that turns a [`PrSummary`] + the
-//!   latest [`PrComment`] into an [`EvaluationOutcome`] (parse, evaluate,
-//!   classify). Extracted so tests drive it without any dispatcher state.
+//! - [`evaluate_pr_gates`]: pure function that turns a [`PrSummary`], PR
+//!   comments, and head commit statuses into an [`EvaluationOutcome`].
+//!   Extracted so tests drive it without any dispatcher state.
 //! - [`PrPollRateLimiter`] / [`AutoMergeDedupeSet`]: in-memory guards that
 //!   keep the poller from hammering Gitea and from double-enqueuing the same
 //!   (PR, head-SHA).
@@ -30,9 +30,9 @@ use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
 
-use crate::pr_review::{
-    self, AutoMergeCriteria, AutoMergeDecision, PrMetadata, ReviewVerdict, VerdictParseError,
-};
+use crate::pr_gate::{CommitStatusState, CommitStatusSummary};
+use crate::pr_gate_result::{self, GateStatus, PrGateResultError};
+use crate::pr_review::{author_is_agent, AutoMergeCriteria};
 
 /// Login that identifies the structural-pr-review agent.
 ///
@@ -45,6 +45,29 @@ pub const PR_REVIEWER_LOGIN: &str = "pr-reviewer";
 /// loop from re-hitting Gitea for the same PR every tick when the tick
 /// cadence is short (<60s).
 pub const PR_POLL_MIN_INTERVAL: Duration = Duration::from_secs(60);
+
+/// Native CI context emitted by `terraphim-gitea-runner`.
+pub const NATIVE_CI_CONTEXT: &str = "native-ci / build (push)";
+
+/// ADF PR gate commit-status contexts required before auto-merge.
+pub const ADF_REVIEWER_CONTEXT: &str = "adf/pr-reviewer";
+pub const ADF_VALIDATION_CONTEXT: &str = "adf/validation";
+pub const ADF_VERIFICATION_CONTEXT: &str = "adf/verification";
+
+/// All contexts that must be terminal `success` on the current head SHA.
+pub const MERGE_REQUIRED_CONTEXTS: &[&str] = &[
+    NATIVE_CI_CONTEXT,
+    ADF_REVIEWER_CONTEXT,
+    ADF_VALIDATION_CONTEXT,
+    ADF_VERIFICATION_CONTEXT,
+];
+
+/// ADF contexts whose PR comments carry an `adf:gate-result` block.
+pub const ADF_GATE_CONTEXTS: &[&str] = &[
+    ADF_REVIEWER_CONTEXT,
+    ADF_VALIDATION_CONTEXT,
+    ADF_VERIFICATION_CONTEXT,
+];
 
 /// Summary of an open pull request, decoupled from [`terraphim_tracker`] so
 /// that tests can construct it without a live Gitea server.
@@ -76,6 +99,10 @@ pub struct PrComment {
 pub trait PrTracker: Send + Sync {
     async fn list_open_prs(&self) -> Result<Vec<PrSummary>, String>;
     async fn fetch_pr_comments(&self, pr_number: u64) -> Result<Vec<PrComment>, String>;
+    async fn fetch_head_commit_statuses(
+        &self,
+        head_sha: &str,
+    ) -> Result<Vec<CommitStatusSummary>, String>;
 }
 
 /// Outcome of a successful merge call, decoupled from
@@ -118,11 +145,13 @@ pub trait AutoMergeExecutor: PrTracker {
 /// Real [`PrTracker`] backed by [`terraphim_tracker::GiteaTracker`].
 pub struct GiteaPrTracker {
     inner: terraphim_tracker::GiteaTracker,
+    owner: String,
+    repo: String,
 }
 
 impl GiteaPrTracker {
-    pub fn new(inner: terraphim_tracker::GiteaTracker) -> Self {
-        Self { inner }
+    pub fn new(inner: terraphim_tracker::GiteaTracker, owner: String, repo: String) -> Self {
+        Self { inner, owner, repo }
     }
 }
 
@@ -157,6 +186,26 @@ impl PrTracker for GiteaPrTracker {
                         user_login: c.user.login,
                         body: c.body,
                         updated_at: c.updated_at,
+                    })
+                    .collect()
+            })
+            .map_err(|e| e.to_string())
+    }
+
+    async fn fetch_head_commit_statuses(
+        &self,
+        head_sha: &str,
+    ) -> Result<Vec<CommitStatusSummary>, String> {
+        self.inner
+            .list_commit_statuses(&self.owner, &self.repo, head_sha)
+            .await
+            .map(|entries| {
+                entries
+                    .into_iter()
+                    .map(|entry| CommitStatusSummary {
+                        context: entry.context,
+                        state: CommitStatusState::from_api_str(&entry.state),
+                        created_at_unix: None,
                     })
                     .collect()
             })
@@ -200,10 +249,12 @@ pub enum EvaluationOutcome {
     /// At least one gate failed. The reason is a short human-readable string
     /// suitable for logging or posting back to the PR.
     HumanReviewNeeded { reason: String },
-    /// No pr-reviewer comment found yet — nothing to evaluate this tick.
-    NoReviewerComment,
-    /// A reviewer comment exists but did not parse as a structural verdict.
-    ParseError { reason: String },
+    /// Required commit statuses or gate-result comments are not yet present.
+    AwaitingGates { reason: String },
+    /// Gate results exist but target an older head SHA — wait for re-review.
+    StaleGates { reason: String },
+    /// A gate-result comment exists but did not parse as canonical JSON.
+    GateParseError { reason: String },
 }
 
 /// Return `true` when `comment.user_login == PR_REVIEWER_LOGIN` **or** the
@@ -254,56 +305,149 @@ pub fn latest_reviewer_comment(comments: &[PrComment]) -> Option<&PrComment> {
         })
 }
 
-/// Pure evaluator: given a PR + its comments + the merge policy, decide
-/// whether to enqueue an auto-merge, ask for human review, or report a
-/// parsing issue.
-pub fn evaluate_pr_verdict(
+/// Return `true` when `concerns` gate results should block auto-merge for this
+/// project. `terraphim-ai` holds for human review; sub-repos may merge.
+pub fn hold_concerns_for_project(project_id: &str) -> bool {
+    project_id == "terraphim-ai"
+}
+
+/// Pure evaluator: given a PR, its comments, head commit statuses, and merge
+/// policy, decide whether to enqueue auto-merge.
+pub fn evaluate_pr_gates(
     pr: &PrSummary,
     comments: &[PrComment],
+    head_statuses: &[CommitStatusSummary],
+    project_id: &str,
     criteria: &AutoMergeCriteria,
 ) -> EvaluationOutcome {
-    let Some(latest) = latest_reviewer_comment(comments) else {
-        return EvaluationOutcome::NoReviewerComment;
-    };
+    if criteria.require_agent_author && !author_is_agent(&pr.author_login) {
+        return EvaluationOutcome::HumanReviewNeeded {
+            reason: format!(
+                "author `{}` is not a recognised agent; human-authored PRs require manual merge",
+                pr.author_login
+            ),
+        };
+    }
+    if pr.diff_loc > criteria.max_diff_loc {
+        return EvaluationOutcome::HumanReviewNeeded {
+            reason: format!(
+                "diff size {} LoC exceeds cap {} LoC",
+                pr.diff_loc, criteria.max_diff_loc
+            ),
+        };
+    }
 
-    let verdict: ReviewVerdict = match pr_review::parse_verdict(&latest.body, latest.id) {
-        Ok(v) => v,
-        Err(e) => {
-            return EvaluationOutcome::ParseError {
-                reason: describe_parse_error(e),
+    let status_map = status_by_context(head_statuses);
+    for context in MERGE_REQUIRED_CONTEXTS {
+        match status_map.get(*context) {
+            None => {
+                return EvaluationOutcome::AwaitingGates {
+                    reason: format!("missing commit status for `{context}`"),
+                };
             }
+            Some(state) if !matches!(state, CommitStatusState::Success) => {
+                return EvaluationOutcome::AwaitingGates {
+                    reason: format!("commit status `{context}` is not success"),
+                };
+            }
+            Some(_) => {}
         }
-    };
+    }
 
-    let metadata = PrMetadata {
-        pr_number: pr.number,
-        author_login: pr.author_login.clone(),
-        diff_loc: pr.diff_loc,
+    let hold_concerns = hold_concerns_for_project(project_id);
+    for context in ADF_GATE_CONTEXTS {
+        let Some(comment) = latest_gate_result_comment(comments, context) else {
+            return EvaluationOutcome::AwaitingGates {
+                reason: format!("no `adf:gate-result` comment for `{context}` yet"),
+            };
+        };
+        let result = match pr_gate_result::extract_gate_result(&comment.body) {
+            Ok(result) => result,
+            Err(err) => {
+                return EvaluationOutcome::GateParseError {
+                    reason: describe_gate_parse_error(context, err),
+                };
+            }
+        };
+        if result.head_sha != pr.head_sha {
+            return EvaluationOutcome::StaleGates {
+                reason: format!(
+                    "`{context}` gate result targets {} but PR head is {}",
+                    result.head_sha, pr.head_sha
+                ),
+            };
+        }
+        if result.pr_number != pr.number {
+            return EvaluationOutcome::StaleGates {
+                reason: format!(
+                    "`{context}` gate result targets PR #{} but evaluating #{}",
+                    result.pr_number, pr.number
+                ),
+            };
+        }
+        if result.blocking_findings > 0 {
+            return EvaluationOutcome::HumanReviewNeeded {
+                reason: format!(
+                    "`{context}` reported {} blocking finding(s)",
+                    result.blocking_findings
+                ),
+            };
+        }
+        match result.status {
+            GateStatus::Fail => {
+                return EvaluationOutcome::HumanReviewNeeded {
+                    reason: format!("`{context}` gate status is fail"),
+                };
+            }
+            GateStatus::Concerns if hold_concerns => {
+                return EvaluationOutcome::HumanReviewNeeded {
+                    reason: format!(
+                        "`{context}` reported concerns; terraphim-ai requires human review"
+                    ),
+                };
+            }
+            GateStatus::Pass | GateStatus::Concerns => {}
+        }
+    }
+
+    EvaluationOutcome::Merge {
         head_sha: pr.head_sha.clone(),
-        base_branch: pr.base_ref.clone(),
-    };
-
-    match pr_review::evaluate(&verdict, &metadata, criteria) {
-        AutoMergeDecision::Merge => EvaluationOutcome::Merge {
-            head_sha: pr.head_sha.clone(),
-        },
-        AutoMergeDecision::HumanReviewNeeded(reason) => {
-            EvaluationOutcome::HumanReviewNeeded { reason }
-        }
     }
 }
 
-fn describe_parse_error(err: VerdictParseError) -> String {
-    match err {
-        VerdictParseError::MissingConfidence => "missing confidence score header".to_string(),
-        VerdictParseError::ConfidenceOutOfRange(n) => {
-            format!("confidence {n}/5 out of range (expected 1..=5)")
-        }
-        VerdictParseError::MissingFindings => "missing Inline Findings section".to_string(),
-        VerdictParseError::MalformedFooter => {
-            "malformed `Last reviewed commit:` footer".to_string()
-        }
+fn status_by_context(
+    statuses: &[CommitStatusSummary],
+) -> std::collections::HashMap<&str, CommitStatusState> {
+    let mut map = std::collections::HashMap::new();
+    for status in statuses {
+        map.insert(status.context.as_str(), status.state);
     }
+    map
+}
+
+/// Return the latest PR comment whose body contains a parseable
+/// `adf:gate-result` block for `context`.
+pub fn latest_gate_result_comment<'a>(
+    comments: &'a [PrComment],
+    context: &str,
+) -> Option<&'a PrComment> {
+    comments
+        .iter()
+        .filter(|comment| comment.body.contains("adf:gate-result"))
+        .filter(|comment| {
+            pr_gate_result::extract_gate_result(&comment.body)
+                .map(|result| result.context == context)
+                .unwrap_or(false)
+        })
+        .max_by(|a, b| {
+            a.updated_at
+                .cmp(&b.updated_at)
+                .then_with(|| a.id.cmp(&b.id))
+        })
+}
+
+fn describe_gate_parse_error(context: &str, err: PrGateResultError) -> String {
+    format!("`{context}` gate-result parse error: {err}")
 }
 
 /// Per-(project, PR) rate limiter used to cap how often the poller hits
@@ -524,19 +668,93 @@ mod tests {
         assert_eq!(latest.id, 2);
     }
 
-    #[test]
-    fn evaluate_verdict_returns_no_reviewer_comment_when_empty() {
-        let p = pr(1, "claude-code", "abc", 10);
-        let out = evaluate_pr_verdict(&p, &[], &AutoMergeCriteria::default());
-        assert_eq!(out, EvaluationOutcome::NoReviewerComment);
+    fn green_status(context: &str) -> CommitStatusSummary {
+        CommitStatusSummary {
+            context: context.to_string(),
+            state: CommitStatusState::Success,
+            created_at_unix: None,
+        }
+    }
+
+    fn gate_body(context: &str, head: &str, status: &str, blocking: u32) -> String {
+        format!(
+            "<!-- adf:gate-result\n{{\n  \"schema_version\": 1,\n  \"agent\": \"agent\",\n  \"context\": \"{context}\",\n  \"pr_number\": 1,\n  \"head_sha\": \"{head}\",\n  \"status\": \"{status}\",\n  \"confidence\": 4,\n  \"blocking_findings\": {blocking},\n  \"summary\": \"ok\"\n}}\n-->"
+        )
+    }
+
+    fn all_green_statuses() -> Vec<CommitStatusSummary> {
+        MERGE_REQUIRED_CONTEXTS
+            .iter()
+            .map(|context| green_status(context))
+            .collect()
     }
 
     #[test]
-    fn evaluate_verdict_returns_parse_error_on_malformed_body() {
+    fn evaluate_gates_returns_awaiting_when_statuses_missing() {
         let p = pr(1, "claude-code", "abc", 10);
-        let c = comment(7, PR_REVIEWER_LOGIN, "garbage", "2026-01-01T00:00:00Z");
-        let out = evaluate_pr_verdict(&p, &[c], &AutoMergeCriteria::default());
-        assert!(matches!(out, EvaluationOutcome::ParseError { .. }));
+        let out = evaluate_pr_gates(
+            &p,
+            &[],
+            &[],
+            "terraphim-core",
+            &AutoMergeCriteria::default(),
+        );
+        assert!(matches!(out, EvaluationOutcome::AwaitingGates { .. }));
+    }
+
+    #[test]
+    fn evaluate_gates_merges_when_every_context_is_green() {
+        let p = pr(1, "claude-code", "abc", 10);
+        let comments = ADF_GATE_CONTEXTS
+            .iter()
+            .enumerate()
+            .map(|(idx, context)| {
+                comment(
+                    idx as u64 + 1,
+                    "agent",
+                    &gate_body(context, "abc", "pass", 0),
+                    "2026-01-01T00:00:00Z",
+                )
+            })
+            .collect::<Vec<_>>();
+        let out = evaluate_pr_gates(
+            &p,
+            &comments,
+            &all_green_statuses(),
+            "terraphim-core",
+            &AutoMergeCriteria::default(),
+        );
+        assert_eq!(
+            out,
+            EvaluationOutcome::Merge {
+                head_sha: "abc".to_string()
+            }
+        );
+    }
+
+    #[test]
+    fn evaluate_gates_returns_stale_when_head_sha_mismatches() {
+        let p = pr(1, "claude-code", "fresh", 10);
+        let comments = ADF_GATE_CONTEXTS
+            .iter()
+            .enumerate()
+            .map(|(idx, context)| {
+                comment(
+                    idx as u64 + 1,
+                    "agent",
+                    &gate_body(context, "stale", "pass", 0),
+                    "2026-01-01T00:00:00Z",
+                )
+            })
+            .collect::<Vec<_>>();
+        let out = evaluate_pr_gates(
+            &p,
+            &comments,
+            &all_green_statuses(),
+            "terraphim-core",
+            &AutoMergeCriteria::default(),
+        );
+        assert!(matches!(out, EvaluationOutcome::StaleGates { .. }));
     }
 
     #[test]

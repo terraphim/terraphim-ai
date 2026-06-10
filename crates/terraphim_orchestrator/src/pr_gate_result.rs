@@ -6,10 +6,9 @@
 //! orchestrator parses this block to post branch-protection commit
 //! statuses that reflect the actual current gate outcome.
 //!
-//! The structural review parser in [`crate::pr_review`] is unchanged and
-//! remains the source of truth for the auto-merge engine. The gate result
-//! contract here is intentionally narrow: it does not understand the
-//! human report and only validates the machine-readable block.
+//! The structural review parser in [`crate::pr_review`] remains scoped to
+//! human report parsing only. Auto-merge eligibility is derived from commit
+//! statuses plus these canonical gate-result blocks in [`crate::pr_poller`].
 
 use thiserror::Error;
 

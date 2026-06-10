@@ -154,6 +154,13 @@ impl PrTracker for RecordingExecutor {
     async fn fetch_pr_comments(&self, _pr_number: u64) -> Result<Vec<PrComment>, String> {
         Ok(vec![])
     }
+
+    async fn fetch_head_commit_statuses(
+        &self,
+        _head_sha: &str,
+    ) -> Result<Vec<terraphim_orchestrator::pr_gate::CommitStatusSummary>, String> {
+        Ok(vec![])
+    }
 }
 
 #[async_trait]
