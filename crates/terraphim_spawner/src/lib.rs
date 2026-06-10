@@ -117,6 +117,8 @@ pub struct SpawnRequest {
     pub task: String,
     /// Whether to deliver task via stdin (for large prompts)
     pub use_stdin: bool,
+    /// Whether to remove broad default tool permissions from supported CLIs.
+    pub disable_default_tools: bool,
     /// Resource limits for the spawned process.
     pub resource_limits: ResourceLimits,
 }
@@ -131,6 +133,7 @@ impl SpawnRequest {
             fallback_model: None,
             task: task.into(),
             use_stdin: false,
+            disable_default_tools: false,
             resource_limits: ResourceLimits::default(),
         }
     }
@@ -156,6 +159,12 @@ impl SpawnRequest {
     /// Use stdin for task delivery (for large prompts).
     pub fn with_stdin(mut self) -> Self {
         self.use_stdin = true;
+        self
+    }
+
+    /// Remove broad default tool permissions from supported CLIs.
+    pub fn with_default_tools_disabled(mut self) -> Self {
+        self.disable_default_tools = true;
         self
     }
 
@@ -501,17 +510,21 @@ impl AgentSpawner {
         provider: &Provider,
         task: &str,
         model: Option<&str>,
-        use_stdin: bool,
-        resource_limits: ResourceLimits,
+        request: &SpawnRequest,
         ctx: &SpawnContext,
     ) -> Result<AgentHandle, SpawnerError> {
         let config = AgentConfig::from_provider(provider)?;
-        let config = config.with_resource_limits(resource_limits);
+        let config = config.with_resource_limits(request.resource_limits.clone());
         let config = match model {
             Some(m) => config.with_model(m),
             None => config,
         };
-        self.spawn_config(provider, &config, task, use_stdin, ctx)
+        let config = if request.disable_default_tools {
+            config.without_default_tools()
+        } else {
+            config
+        };
+        self.spawn_config(provider, &config, task, request.use_stdin, ctx)
             .await
     }
 
@@ -542,8 +555,7 @@ impl AgentSpawner {
                 &request.primary_provider,
                 &request.task,
                 request.primary_model.as_deref(),
-                request.use_stdin,
-                request.resource_limits.clone(),
+                request,
                 &ctx,
             )
             .await;
@@ -570,8 +582,7 @@ impl AgentSpawner {
                             fallback,
                             &request.task,
                             request.fallback_model.as_deref(),
-                            request.use_stdin,
-                            request.resource_limits.clone(),
+                            request,
                             &ctx,
                         )
                         .await;

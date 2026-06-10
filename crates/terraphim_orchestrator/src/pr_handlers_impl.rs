@@ -271,9 +271,18 @@ impl AgentOrchestrator {
             Ok(evidence) => evidence,
             Err(e) => pr_gate_context::fallback_evidence_pack(req, &e.to_string()),
         };
+        let gate_meta = crate::pr_gate_result::PrGateMeta {
+            pr_number,
+            project: project.clone(),
+            agent_name: def.name.clone(),
+            context: commit_status_context.to_string(),
+            head_sha: head_sha.clone(),
+        };
         let gate_kind = pr_gate_prompt::PrGateKind::for_agent(&def.name);
-        let gate_prompt = pr_gate_prompt::build_pr_gate_prompt(gate_kind, &evidence);
-        let mut request = SpawnRequest::new(primary_provider, gate_prompt).with_stdin();
+        let gate_prompt = pr_gate_prompt::build_pr_gate_prompt(gate_kind, &gate_meta, &evidence);
+        let mut request = SpawnRequest::new(primary_provider, gate_prompt)
+            .with_stdin()
+            .with_default_tools_disabled();
         if !routed_model.is_empty() {
             request = request.with_primary_model(&routed_model);
         }
@@ -337,13 +346,7 @@ impl AgentOrchestrator {
                 mention_parent_agent: None,
                 concurrency_permit: None,
                 commit_status_post: Some((head_sha.clone(), commit_status_context.to_string())),
-                gate_meta: Some(crate::pr_gate_result::PrGateMeta {
-                    pr_number,
-                    project: project.clone(),
-                    agent_name: def.name.clone(),
-                    context: commit_status_context.to_string(),
-                    head_sha: head_sha.clone(),
-                }),
+                gate_meta: Some(gate_meta),
                 output_tmp_path,
             },
         );

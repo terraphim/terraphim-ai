@@ -1,6 +1,7 @@
 //! Gate-specific prompt rendering for native PR gate producers.
 
 use crate::pr_gate_context::PrGateEvidencePack;
+use crate::pr_gate_result::PrGateMeta;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PrGateKind {
@@ -57,7 +58,11 @@ impl PrGateKind {
     }
 }
 
-pub fn build_pr_gate_prompt(gate: PrGateKind, evidence: &PrGateEvidencePack) -> String {
+pub fn build_pr_gate_prompt(
+    gate: PrGateKind,
+    meta: &PrGateMeta,
+    evidence: &PrGateEvidencePack,
+) -> String {
     let changed_files = if evidence.changed_files.is_empty() {
         "- No changed file list available".to_string()
     } else {
@@ -126,7 +131,12 @@ Diff evidence:
 
 Required output:
 1. Human report with Summary, Findings, Evidence, and Verdict sections.
-2. Exactly one final HTML comment block on its own lines:
+2. Exactly one final HTML comment block on its own lines.
+3. In the JSON block, choose exactly one status value: "pass", "concerns", or "fail".
+4. Set confidence to an integer from 1 to 5 and blocking_findings to the count of P0/P1 findings.
+5. Replace the summary text with a specific one-line summary of your verdict.
+
+Required final block shape:
 <!-- adf:gate-result
 {{
   "schema_version": 1,
@@ -134,22 +144,22 @@ Required output:
   "context": "{context}",
   "pr_number": {pr_number},
   "head_sha": "{head_sha}",
-  "status": "pass|concerns|fail",
-  "confidence": 1,
+  "status": "pass",
+  "confidence": 4,
   "blocking_findings": 0,
-  "summary": "one line summary"
+  "summary": "replace with one line summary"
 }}
 -->
 "#,
         gate_title = gate.title(),
-        agent = gate.agent_name(),
-        context = gate.context(),
+        agent = &meta.agent_name,
+        context = &meta.context,
         instructions = gate.instructions(),
         project = &evidence.project,
-        pr_number = evidence.pr_number,
+        pr_number = meta.pr_number,
         title = &evidence.title,
         author = &evidence.author,
-        head_sha = &evidence.head_sha,
+        head_sha = &meta.head_sha,
         diff_loc = evidence.diff_loc,
         linked_issue = linked_issue,
         changed_files = changed_files,
@@ -162,6 +172,7 @@ Required output:
 mod tests {
     use super::*;
     use crate::pr_gate_context::PrGateEvidencePack;
+    use crate::pr_gate_result::PrGateMeta;
 
     fn evidence() -> PrGateEvidencePack {
         PrGateEvidencePack {
@@ -176,6 +187,16 @@ mod tests {
             linked_issue: None,
             matched_concepts: vec!["PrGateResult".to_string()],
             relevant_context: Vec::new(),
+        }
+    }
+
+    fn meta(agent_name: &str, context: &str) -> PrGateMeta {
+        PrGateMeta {
+            pr_number: 2334,
+            project: "terraphim-ai".to_string(),
+            agent_name: agent_name.to_string(),
+            context: context.to_string(),
+            head_sha: "abcdef".to_string(),
         }
     }
 
@@ -200,7 +221,8 @@ mod tests {
             PrGateKind::Validation,
             PrGateKind::Verification,
         ] {
-            let prompt = build_pr_gate_prompt(gate, &evidence());
+            let meta = meta(gate.agent_name(), gate.context());
+            let prompt = build_pr_gate_prompt(gate, &meta, &evidence());
             assert!(prompt.contains("<!-- adf:gate-result"));
             assert!(prompt.contains("\"schema_version\": 1"));
             assert!(prompt.contains(gate.agent_name()));
@@ -210,9 +232,19 @@ mod tests {
 
     #[test]
     fn prompt_disallows_tools_and_status_posts() {
-        let prompt = build_pr_gate_prompt(PrGateKind::Review, &evidence());
+        let meta = meta("custom-reviewer", "adf/custom-reviewer");
+        let prompt = build_pr_gate_prompt(PrGateKind::Review, &meta, &evidence());
         assert!(prompt.contains("Do not call tools"));
         assert!(prompt.contains("Do not post comments or statuses"));
         assert!(!prompt.contains("gtr comment"));
+    }
+
+    #[test]
+    fn prompt_uses_dispatch_metadata_for_canonical_block() {
+        let meta = meta("renamed-gate", "adf/renamed-gate");
+        let prompt = build_pr_gate_prompt(PrGateKind::Review, &meta, &evidence());
+        assert!(prompt.contains("\"agent\": \"renamed-gate\""));
+        assert!(prompt.contains("\"context\": \"adf/renamed-gate\""));
+        assert!(!prompt.contains("pass|concerns|fail"));
     }
 }
