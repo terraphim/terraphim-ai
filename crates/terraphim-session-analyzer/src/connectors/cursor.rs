@@ -239,7 +239,14 @@ impl CursorConnector {
         )?;
 
         let rows = stmt.query_map([], |row| {
-            Ok((row.get::<_, String>(0)?, row.get::<_, Vec<u8>>(1)?))
+            let key: String = row.get(0)?;
+            // value column may be TEXT or BLOB depending on Cursor version (fixes #2314)
+            let value: Vec<u8> = match row.get_ref(1)? {
+                rusqlite::types::ValueRef::Text(t) => t.to_vec(),
+                rusqlite::types::ValueRef::Blob(b) => b.to_vec(),
+                _ => Vec::new(),
+            };
+            Ok((key, value))
         })?;
 
         for row in rows {
@@ -449,6 +456,8 @@ struct LegacyMessage {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rusqlite::Connection;
+    use std::collections::HashSet;
 
     #[test]
     fn test_normalize_role() {
@@ -467,5 +476,77 @@ mod tests {
         let connector = CursorConnector;
         assert_eq!(connector.source_id(), "cursor");
         assert_eq!(connector.display_name(), "Cursor IDE");
+    }
+
+    /// Regression test for #2314: legacy ItemTable with TEXT-typed value column must not error.
+    /// Some Cursor versions store value as TEXT; the connector previously called
+    /// `row.get::<_, Vec<u8>>(1)?` which fails with InvalidColumnType when the column is TEXT.
+    #[test]
+    fn test_parse_legacy_format_text_value_column() {
+        let conn = Connection::open_in_memory().unwrap();
+
+        // Create ItemTable with TEXT-typed value column (reproduces the #2314 scenario)
+        conn.execute_batch(
+            "CREATE TABLE ItemTable (key TEXT, value TEXT);
+             INSERT INTO ItemTable VALUES ('aichat.chatdata.1', '{\"messages\":[{\"role\":\"user\",\"content\":\"hello\"}]}');",
+        )
+        .unwrap();
+
+        let connector = CursorConnector;
+        let mut seen_ids = HashSet::new();
+        let db_path = std::path::PathBuf::from("/test/state.vscdb");
+
+        // This must not return an error — it previously panicked with
+        // "Invalid column type Text at index: 1, name: value"
+        let result = connector.parse_legacy_format(&conn, &db_path, &mut seen_ids);
+        assert!(
+            result.is_ok(),
+            "parse_legacy_format failed: {:?}",
+            result.err()
+        );
+
+        let sessions = result.unwrap();
+        assert_eq!(
+            sessions.len(),
+            1,
+            "expected 1 session, got {}",
+            sessions.len()
+        );
+        assert_eq!(sessions[0].source, "cursor");
+        assert_eq!(sessions[0].messages.len(), 1);
+        assert_eq!(sessions[0].messages[0].role, "user");
+        assert_eq!(sessions[0].messages[0].content, "hello");
+    }
+
+    /// Regression test for #2314: BLOB-typed value column must still work correctly.
+    #[test]
+    fn test_parse_legacy_format_blob_value_column() {
+        let conn = Connection::open_in_memory().unwrap();
+
+        // Create ItemTable with BLOB-typed value column (original expected format)
+        let json = b"{\"messages\":[{\"role\":\"assistant\",\"content\":\"hi there\"}]}";
+        conn.execute_batch("CREATE TABLE ItemTable (key TEXT, value BLOB);")
+            .unwrap();
+        conn.execute(
+            "INSERT INTO ItemTable VALUES ('aichat.chatdata.2', ?1)",
+            rusqlite::params![json.as_slice()],
+        )
+        .unwrap();
+
+        let connector = CursorConnector;
+        let mut seen_ids = HashSet::new();
+        let db_path = std::path::PathBuf::from("/test/state.vscdb");
+
+        let result = connector.parse_legacy_format(&conn, &db_path, &mut seen_ids);
+        assert!(
+            result.is_ok(),
+            "parse_legacy_format failed: {:?}",
+            result.err()
+        );
+
+        let sessions = result.unwrap();
+        assert_eq!(sessions.len(), 1);
+        assert_eq!(sessions[0].messages[0].role, "assistant");
+        assert_eq!(sessions[0].messages[0].content, "hi there");
     }
 }
