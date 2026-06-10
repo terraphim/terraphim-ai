@@ -35,15 +35,24 @@ impl AgentOrchestrator {
         &mut self,
         task: dispatcher::DispatchTask,
     ) -> Result<(), OrchestratorError> {
-        let (pr_number, project, head_sha, author_login, title, diff_loc) = match task {
+        let (pr_number, project, head_sha, head_ref, author_login, title, diff_loc) = match task {
             dispatcher::DispatchTask::ReviewPr {
                 pr_number,
                 project,
                 head_sha,
+                head_ref,
                 author_login,
                 title,
                 diff_loc,
-            } => (pr_number, project, head_sha, author_login, title, diff_loc),
+            } => (
+                pr_number,
+                project,
+                head_sha,
+                head_ref,
+                author_login,
+                title,
+                diff_loc,
+            ),
             other => {
                 warn!(task = ?other, "handle_review_pr invoked with non-ReviewPr task; ignoring");
                 return Ok(());
@@ -54,6 +63,7 @@ impl AgentOrchestrator {
             pr_number,
             project: project.clone(),
             head_sha: head_sha.clone(),
+            head_ref,
             author_login,
             title,
             diff_loc,

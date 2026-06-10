@@ -128,6 +128,15 @@ async fn collect_git_evidence(
 ) -> Result<GitEvidence, PrGateContextError> {
     let pr_ref = format!("pull/{}/head:refs/adf/pr-{}", req.pr_number, req.pr_number);
     fetch_first_available(working_dir, &["origin", "gitea"], &pr_ref, req.pr_number).await;
+    if let Some(branch_ref) = build_head_branch_refspec(&req.head_ref, req.pr_number) {
+        fetch_first_available(
+            working_dir,
+            &["origin", "gitea"],
+            &branch_ref,
+            req.pr_number,
+        )
+        .await;
+    }
     fetch_first_available(
         working_dir,
         &["origin", "gitea"],
@@ -163,6 +172,14 @@ async fn collect_git_evidence(
             last_error.unwrap_or_else(|| "no usable git diff range".to_string())
         ),
     })
+}
+
+fn is_safe_head_ref(head_ref: &str) -> bool {
+    !head_ref.trim().is_empty() && !head_ref.contains(':') && !head_ref.starts_with('-')
+}
+
+fn build_head_branch_refspec(head_ref: &str, pr_number: u64) -> Option<String> {
+    is_safe_head_ref(head_ref).then(|| format!("refs/heads/{head_ref}:refs/adf/pr-{pr_number}"))
 }
 
 async fn fetch_first_available(
@@ -362,6 +379,7 @@ mod tests {
             pr_number: 1,
             project: "terraphim-ai".to_string(),
             head_sha: "abc".to_string(),
+            head_ref: "task/2334-native-gates".to_string(),
             author_login: "alice".to_string(),
             title: "Fix #2334: PrGateResult validation timeout".to_string(),
             diff_loc: 10,
@@ -370,5 +388,19 @@ mod tests {
         assert!(pack.matched_concepts.contains(&"validation".to_string()));
         assert!(pack.matched_concepts.contains(&"timeout".to_string()));
         assert_eq!(pack.linked_issue.as_ref().map(|i| i.number), Some(2334));
+    }
+
+    #[test]
+    fn build_head_branch_refspec_rejects_unsafe_refs() {
+        assert_eq!(
+            build_head_branch_refspec("task/2301-pr-gate-result-contract", 2318),
+            Some("refs/heads/task/2301-pr-gate-result-contract:refs/adf/pr-2318".to_string())
+        );
+        assert_eq!(build_head_branch_refspec("", 2318), None);
+        assert_eq!(
+            build_head_branch_refspec("--upload-pack=/bin/sh", 2318),
+            None
+        );
+        assert_eq!(build_head_branch_refspec("feature:x", 2318), None);
     }
 }

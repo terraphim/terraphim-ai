@@ -318,6 +318,7 @@ pub fn normalize_webhook_dispatch(
             pr_number,
             project,
             head_sha,
+            head_ref,
             author_login,
             title,
             diff_loc,
@@ -340,7 +341,7 @@ pub fn normalize_webhook_dispatch(
                 comment_body: String::new(),
                 target_agent_name: format!("review-pr/{}", project),
                 command_kind: CommandKind::ReviewPr,
-                context: format!("sha={} diff_loc={}", head_sha, diff_loc),
+                context: format!("sha={} ref={} diff_loc={}", head_sha, head_ref, diff_loc),
                 raw_command,
             }
         }

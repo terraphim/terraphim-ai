@@ -24,6 +24,7 @@ pub struct ReviewPrRequest {
     pub pr_number: u64,
     pub project: String,
     pub head_sha: String,
+    pub head_ref: String,
     pub author_login: String,
     pub title: String,
     pub diff_loc: u32,
@@ -52,8 +53,14 @@ pub fn find_pr_reviewer<'a>(
 /// reading environment variables.
 pub fn build_review_task(req: &ReviewPrRequest) -> String {
     format!(
-        "Structural review of PR #{}: {} (project={}, size={} LOC, author={}, head={})",
-        req.pr_number, req.title, req.project, req.diff_loc, req.author_login, req.head_sha,
+        "Structural review of PR #{}: {} (project={}, size={} LOC, author={}, head={}, ref={})",
+        req.pr_number,
+        req.title,
+        req.project,
+        req.diff_loc,
+        req.author_login,
+        req.head_sha,
+        req.head_ref,
     )
 }
 
@@ -65,6 +72,7 @@ pub fn pr_env_overrides(req: &ReviewPrRequest) -> HashMap<String, String> {
     let mut env = HashMap::new();
     env.insert("ADF_PR_NUMBER".to_string(), req.pr_number.to_string());
     env.insert("ADF_PR_HEAD_SHA".to_string(), req.head_sha.clone());
+    env.insert("ADF_PR_HEAD_REF".to_string(), req.head_ref.clone());
     env.insert("ADF_PR_PROJECT".to_string(), req.project.clone());
     env.insert("ADF_PR_AUTHOR".to_string(), req.author_login.clone());
     env.insert("ADF_PR_DIFF_LOC".to_string(), req.diff_loc.to_string());
@@ -91,6 +99,7 @@ mod tests {
             pr_number: 641,
             project: "terraphim".to_string(),
             head_sha: "deadbeef1234".to_string(),
+            head_ref: "task/641-review".to_string(),
             author_login: "claude-code".to_string(),
             title: "fix(kg): short synonyms".to_string(),
             diff_loc: 42,
@@ -150,6 +159,7 @@ project = "alpha"
         assert!(t.contains("project=terraphim"));
         assert!(t.contains("42 LOC"));
         assert!(t.contains("deadbeef1234"));
+        assert!(t.contains("task/641-review"));
     }
 
     #[test]
@@ -157,6 +167,10 @@ project = "alpha"
         let e = pr_env_overrides(&sample_request());
         assert_eq!(e.get("ADF_PR_NUMBER"), Some(&"641".to_string()));
         assert_eq!(e.get("ADF_PR_HEAD_SHA"), Some(&"deadbeef1234".to_string()));
+        assert_eq!(
+            e.get("ADF_PR_HEAD_REF"),
+            Some(&"task/641-review".to_string())
+        );
         assert_eq!(e.get("ADF_PR_PROJECT"), Some(&"terraphim".to_string()));
         assert_eq!(e.get("ADF_PR_AUTHOR"), Some(&"claude-code".to_string()));
         assert_eq!(e.get("ADF_PR_DIFF_LOC"), Some(&"42".to_string()));

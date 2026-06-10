@@ -1653,6 +1653,7 @@ fn review_pr_task() -> dispatcher::DispatchTask {
         pr_number: 641,
         project: "alpha".to_string(),
         head_sha: "deadbeef1234".to_string(),
+        head_ref: "task/641-review".to_string(),
         author_login: "claude-code".to_string(),
         title: "fix(kg): short synonyms".to_string(),
         diff_loc: 42,
