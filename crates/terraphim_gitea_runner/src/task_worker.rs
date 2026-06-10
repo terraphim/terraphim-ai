@@ -77,14 +77,40 @@ impl<C: GiteaRunnerClient, P: PolicyPlanner> TaskWorker<C, P> {
         }
     }
 
+    /// Post a FAILURE result and a one-line log to Gitea when a task fails before
+    /// execution begins (compile, policy, or checkout phase). Best-effort: errors
+    /// from the reporting itself are silently discarded so the caller can still
+    /// propagate the original error cleanly.
+    async fn post_pre_run_failure(&self, state: &RunnerState, task_id: i64, msg: &str) {
+        let mut logs = LogStreamer::new(task_id);
+        logs.add_line(msg.to_string());
+        let _ = logs.flush(&*self.client, state, true).await;
+        let now = chrono::Utc::now().to_rfc3339();
+        let _ = self
+            .client
+            .update_task(
+                state,
+                UpdateTaskRequest {
+                    state: TaskState {
+                        id: task_id,
+                        result: result::FAILURE,
+                        started_at: Some(now.clone()),
+                        stopped_at: Some(now),
+                        steps: Vec::new(),
+                    },
+                    outputs: BTreeMap::new(),
+                },
+            )
+            .await;
+    }
+
     /// Resolve the working directory the build should run in.
     ///
-    /// If the task carries `owner/repo` + sha, the target repo is checked out at
-    /// that commit under `checkout_dir` and the resolved tree is returned. If the
-    /// task carries no repository/sha, or the checkout fails, the bare
-    /// `checkout_dir` is returned and a message is logged so existing
-    /// proof/one-step tasks (which have no repo to fetch) still run.
-    async fn resolve_work_dir(&self, state: &RunnerState, task: &Task) -> PathBuf {
+    /// Returns `Ok(checkout_dir)` for tasks that carry no repository/sha (e.g.
+    /// proof/one-step tasks). Returns `Err` if a checkout was required but failed
+    /// so the caller can report FAILURE to Gitea rather than risking a build
+    /// against stale or wrong code.
+    async fn resolve_work_dir(&self, state: &RunnerState, task: &Task) -> Result<PathBuf> {
         let (Some(full), Some(sha)) = (
             workflow_payload::repository(task),
             workflow_payload::head_sha(task),
@@ -100,16 +126,15 @@ impl<C: GiteaRunnerClient, P: PolicyPlanner> TaskWorker<C, P> {
                 task.id,
                 keys
             );
-            return self.checkout_dir.clone();
+            return Ok(self.checkout_dir.clone());
         };
 
         let mut parts = full.splitn(2, '/');
         let (Some(owner), Some(repo)) = (parts.next(), parts.next()) else {
-            log::warn!(
-                "task {} repository `{full}` is not `owner/repo`; skipping checkout",
+            return Err(RunnerError::Compile(format!(
+                "task {} repository `{full}` is not `owner/repo`",
                 task.id
-            );
-            return self.checkout_dir.clone();
+            )));
         };
 
         // Authenticate the checkout with the per-job repository token Gitea puts
@@ -129,29 +154,45 @@ impl<C: GiteaRunnerClient, P: PolicyPlanner> TaskWorker<C, P> {
         {
             Ok(dir) => {
                 log::info!("checked out {owner}/{repo}@{sha} into {}", dir.display());
-                dir
+                Ok(dir)
             }
-            Err(e) => {
-                // Surface the failure but degrade gracefully: the build then runs
-                // in the bare checkout_dir and will fail loudly if it needs repo
-                // content, rather than the runner crashing here.
-                log::warn!("checkout of {owner}/{repo}@{sha} failed: {e}; using checkout_dir");
-                self.checkout_dir.clone()
-            }
+            Err(e) => Err(RunnerError::Execution(format!(
+                "checkout of {owner}/{repo}@{sha} failed: {e}"
+            ))),
         }
     }
 
     /// Run `task` to completion; returns whether it succeeded.
     pub async fn run(&self, state: &RunnerState, task: Task) -> Result<bool> {
-        // Compile the workflow payload, then apply policy (allowlist + cargo->rch).
-        let workflow = workflow_payload::compile_task(&task)?;
-        let plan = self.planner.compile(workflow).await?;
+        // P1-4: compile the workflow payload and apply policy. On error, report
+        // FAILURE to Gitea so the task does not stay pending indefinitely.
+        let workflow = match workflow_payload::compile_task(&task) {
+            Ok(w) => w,
+            Err(e) => {
+                self.post_pre_run_failure(state, task.id, &format!("workflow compile failed: {e}"))
+                    .await;
+                return Err(e);
+            }
+        };
+        let plan = match self.planner.compile(workflow).await {
+            Ok(p) => p,
+            Err(e) => {
+                self.post_pre_run_failure(state, task.id, &format!("policy rejected: {e}"))
+                    .await;
+                return Err(e);
+            }
+        };
 
-        // Check out the target repo at the task's sha so the build runs against
-        // real repo content. Tasks that carry no repository/sha (e.g. existing
-        // protocol-proof / one-step tasks) skip checkout gracefully and run in
-        // the bare `checkout_dir`, preserving prior behaviour.
-        let work_dir = self.resolve_work_dir(state, &task).await;
+        // P1-3: check out the target repo. On checkout failure, report FAILURE to
+        // Gitea rather than silently degrading to a potentially stale work dir.
+        let work_dir = match self.resolve_work_dir(state, &task).await {
+            Ok(d) => d,
+            Err(e) => {
+                self.post_pre_run_failure(state, task.id, &e.to_string())
+                    .await;
+                return Err(e);
+            }
+        };
 
         // Build the reused host execution stack (no VM, no snapshots) rooted at
         // the resolved per-repo working tree.

@@ -30,6 +30,7 @@ type Shared = Arc<Mutex<Recorded>>;
 
 const LATEST_VERSION: i64 = 5;
 
+/// A task that includes a repository + SHA, triggering a checkout attempt.
 fn echo_task(repo: &str) -> Value {
     let yaml = "name: CI\njobs:\n  build:\n    runs-on: terraphim-native\n    steps:\n      - name: Greet\n        run: echo hello-2185\n";
     let payload = base64::engine::general_purpose::STANDARD.encode(yaml);
@@ -37,6 +38,20 @@ fn echo_task(repo: &str) -> Value {
         "id": 77,
         "workflowPayload": payload,
         "context": {"github": {"repository": repo, "sha": "cafef00d"}},
+        "secrets": {}, "vars": {}, "needs": {}
+    })
+}
+
+/// A task with no repository/SHA: runs directly in `checkout_dir` without a
+/// checkout step. Used in tests that verify polling mechanics, not checkout
+/// behaviour, so they do not require a real git server.
+fn echo_task_no_repo() -> Value {
+    let yaml = "name: CI\njobs:\n  build:\n    runs-on: terraphim-native\n    steps:\n      - name: Greet\n        run: echo hello-2185\n";
+    let payload = base64::engine::general_purpose::STANDARD.encode(yaml);
+    json!({
+        "id": 77,
+        "workflowPayload": payload,
+        "context": {},
         "secrets": {}, "vars": {}, "needs": {}
     })
 }
@@ -49,7 +64,8 @@ async fn fetch_gated(State(s): State<Shared>, Json(body): Json<Value>) -> Json<V
     g.fetch_versions.push(incoming);
     if incoming != LATEST_VERSION {
         // Runner's version differs from latest -> a Waiting job is offered.
-        Json(json!({"task": echo_task("terraphim/proof"), "tasksVersion": LATEST_VERSION}))
+        // Use a no-repo task so the test doesn't require a real git server.
+        Json(json!({"task": echo_task_no_repo(), "tasksVersion": LATEST_VERSION}))
     } else {
         // Cached-version poll: server reports no new work (the stuck-run gate).
         Json(json!({"tasksVersion": LATEST_VERSION}))
@@ -166,6 +182,47 @@ async fn version_zero_poll_picks_job_a_cached_version_poll_misses() {
     assert!(
         g.executed_log_rows > 0,
         "the job actually executed (logs streamed)"
+    );
+}
+
+/// P1-3: a task that includes repository + SHA but whose checkout fails (no real
+/// git server) is reported as FAILURE (result 2) rather than silently degrading
+/// to the bare checkout_dir and potentially building the wrong code.
+#[tokio::test]
+async fn checkout_failure_reports_failure_not_silent_degradation() {
+    let shared: Shared = Arc::new(Mutex::new(Recorded::default()));
+    // Use a task WITH a real-looking repo/sha so checkout is attempted.
+    let task_with_repo = echo_task("terraphim/proof");
+    let shared2 = shared.clone();
+    let url = spawn(
+        shared.clone(),
+        post(move |_s: State<Shared>, Json(body): Json<Value>| {
+            let task_val = task_with_repo.clone();
+            let s2 = shared2.clone();
+            async move {
+                let incoming = body["tasksVersion"].as_i64().unwrap_or(0);
+                let mut g = s2.lock().unwrap();
+                g.fetch_calls += 1;
+                if incoming != LATEST_VERSION {
+                    Json(json!({"task": task_val, "tasksVersion": LATEST_VERSION}))
+                } else {
+                    Json(json!({"tasksVersion": LATEST_VERSION}))
+                }
+            }
+        }),
+    )
+    .await;
+    let (p, _tmp) = poller(url);
+    let st = state();
+
+    // The poll should succeed (poll_once returns Ok), but the task itself must
+    // be reported as FAILURE (result 2) because checkout failed.
+    p.poll_once(&st, 0).await.unwrap();
+    let g = shared.lock().unwrap();
+    assert!(
+        g.task_results.contains(&2),
+        "checkout failure must be reported as FAILURE (result 2); results: {:?}",
+        g.task_results
     );
 }
 

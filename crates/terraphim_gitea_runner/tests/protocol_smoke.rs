@@ -45,13 +45,15 @@ async fn fetch_task(State(s): State<Shared>, Json(_body): Json<Value>) -> Json<V
     if g.fetch_calls == 1 {
         // SingleWorkflow YAML with one host step + one cargo step (cargo routes to rch,
         // but `rch` may be absent on the test host -> we use a plain echo to assert success).
+        // No repository/sha in context: the task runs directly in checkout_dir without
+        // a checkout step so the test does not require a real git server.
         let yaml = "name: CI\njobs:\n  build:\n    runs-on: terraphim-native\n    steps:\n      - name: Greet\n        run: echo hello-from-native-runner\n";
         let payload = base64::engine::general_purpose::STANDARD.encode(yaml);
         Json(json!({
             "task": {
                 "id": 42,
                 "workflowPayload": payload,
-                "context": {"github": {"repository": "terraphim/proof", "sha": "deadbeef"}},
+                "context": {},
                 "secrets": {}, "vars": {}, "needs": {}
             },
             "tasksVersion": 2

@@ -51,7 +51,10 @@ impl RunnerState {
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            let _ = std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600));
+            if let Err(e) = std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)) {
+                // Non-fatal: warn so operators know the file may be world-readable.
+                log::warn!("could not set 0600 permissions on {}: {e}", path.display());
+            }
         }
         Ok(())
     }

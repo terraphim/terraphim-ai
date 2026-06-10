@@ -1,7 +1,6 @@
 //! Fetch/dispatch loop: poll `FetchTask`, run one task at a time, advance the
 //! org `tasks_version`.
 
-use crate::Result;
 use crate::client::GiteaRunnerClient;
 use crate::config::RunnerConfig;
 use crate::policy::PolicyPlanner;
@@ -9,8 +8,10 @@ use crate::state::RunnerState;
 use crate::status::SingleStatusWriter;
 use crate::task_worker::TaskWorker;
 use crate::workflow_payload;
+use crate::{Result, RunnerError};
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
 
 /// Drives the runner: registers/declares, then polls for tasks.
 pub struct Poller<C: GiteaRunnerClient, P: PolicyPlanner> {
@@ -108,12 +109,38 @@ impl<C: GiteaRunnerClient + 'static, P: PolicyPlanner + 'static> Poller<C, P> {
     /// after our last poll would never be offered (no further version change)
     /// until an unrelated bump or a runner restart -- the stuck-run race. Sending
     /// 0 forces a pick each poll; the extra `PickTask` query is negligible.
+    ///
+    /// #2189 P1-1: consecutive errors apply capped exponential backoff and abort
+    /// after `MAX_CONSECUTIVE_FAILURES` so systemd can restart the runner rather
+    /// than spinning silently while appearing online to Gitea.
     pub async fn run_forever(&self, state: &RunnerState) -> Result<()> {
+        const MAX_CONSECUTIVE_FAILURES: u32 = 10;
+        const MAX_BACKOFF_SECS: u64 = 60;
+        let mut consecutive_failures: u32 = 0;
+
         loop {
-            if let Err(e) = self.poll_once(state, 0).await {
-                log::error!("poll error: {e}");
+            match self.poll_once(state, 0).await {
+                Ok(_) => {
+                    consecutive_failures = 0;
+                    tokio::time::sleep(self.config.poll_interval).await;
+                }
+                Err(e) => {
+                    consecutive_failures += 1;
+                    log::error!(
+                        "poll error ({consecutive_failures}/{MAX_CONSECUTIVE_FAILURES}): {e}"
+                    );
+                    if consecutive_failures >= MAX_CONSECUTIVE_FAILURES {
+                        return Err(RunnerError::Protocol(format!(
+                            "aborting after {MAX_CONSECUTIVE_FAILURES} consecutive poll failures; last: {e}"
+                        )));
+                    }
+                    // Exponential backoff: base_interval * 2^(failures-1), capped.
+                    let backoff_secs = (self.config.poll_interval.as_secs()
+                        * (1u64 << (consecutive_failures - 1).min(5)))
+                    .min(MAX_BACKOFF_SECS);
+                    tokio::time::sleep(Duration::from_secs(backoff_secs)).await;
+                }
             }
-            tokio::time::sleep(self.config.poll_interval).await;
         }
     }
 }
