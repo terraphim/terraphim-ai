@@ -1,14 +1,14 @@
 # Validation Report: Native PR Gate Producers (#2334)
 
-**Status**: Conditional
-**Date**: 2026-06-10 09:40 BST
-**Implementation Commit**: `dae72cb98 feat(orchestrator): build native PR gate prompts Refs #2334`
+**Status**: Validated
+**Date**: 2026-06-10 11:42 BST
+**Implementation Commit**: `2575c3604 fix(orchestrator): fetch PR refs for native gate evidence Refs #2334` plus follow-up head-ref fetch hardening in this branch
 **Verification Report**: `.docs/adf/2334/verification-report.md`
 **Issue**: terraphim-ai#2334
 
 ## Executive Summary
 
-The implementation satisfies the intended architectural direction: PR gate producers no longer depend on shell-owned fetch/comment/status logic, and the orchestrator now builds bounded native prompts. Full end-to-end validation is conditional because this new native slice has not yet been deployed to bigbox and exercised through a synthetic PR webhook.
+The implementation satisfies the intended architectural direction: PR gate producers no longer depend on shell-owned fetch/comment/status logic, and the orchestrator now builds bounded native prompts. Live bigbox validation on PR #2318 confirmed all three native gates produced terminal comments/statuses on the correct head commit before the 300 second cap.
 
 ## Acceptance Criteria Validation
 
@@ -19,8 +19,8 @@ The implementation satisfies the intended architectural direction: PR gate produ
 | Use Terraphim matching/native crates where applicable | `terraphim_automata` concept matching in `pr_gate_context.rs` | PASS |
 | Producer prompt forbids comments/statuses and tool roaming | Prompt contract and unit tests | PASS |
 | Existing fail-closed `PrGateResult` handling remains intact | Existing parser/reconcile tests still pass | PASS |
-| Gate agents complete usefully on real PR webhook | Requires live deployment and synthetic webhook | CONDITIONAL |
-| Terminal Gitea statuses reflect parsed native gate results | Requires live deployment and synthetic webhook | CONDITIONAL |
+| Gate agents complete usefully on real PR webhook | Synthetic PR #2318 run on bigbox; comments `39565`, `39567`, `39569` | PASS |
+| Terminal Gitea statuses reflect parsed native gate results | `adf/verification`, `adf/pr-reviewer`, and `adf/validation` terminal statuses posted for `2575c3604cdd25a7d83cf51cbcc0e0b41e1cde76` | PASS |
 
 ## End-To-End Scenario Plan
 
@@ -45,7 +45,14 @@ Expected outcome:
 
 Current result:
 
-- **Not yet executed** for `dae72cb98`.
+- **Executed on bigbox** after deploying `2575c3604cdd25a7d83cf51cbcc0e0b41e1cde76` and live PR gate role stubs.
+- Initial synthetic payload used an invalid head SHA and correctly failed to post commit statuses because the object did not exist.
+- Corrected synthetic payload for PR #2318 was accepted with HTTP 202 and spawned all three gates.
+- Prompt sizes increased from about 1.7k to about 107k characters, confirming bounded diff evidence was included instead of `Diff unavailable` fallback.
+- `pr-verifier` posted comment `39565` and terminal `adf/verification` at 12:38:50 CEST, wall time 135s.
+- `pr-reviewer` posted comment `39567` and terminal `adf/pr-reviewer` at 12:40:21 CEST, wall time 233s.
+- `pr-validator` posted comment `39569` and terminal `adf/validation` at 12:40:50 CEST, wall time 259s.
+- The run exposed a source robustness gap: the evidence fetcher should fetch `refs/heads/<head_ref>` as well as PR refs. Follow-up branch code now propagates `head_ref` from webhook to evidence collection and tests safe branch refspec construction.
 
 ### E2E-2334-002: Diff-Unavailable Graceful Degradation
 
@@ -63,13 +70,14 @@ Expected outcome:
 
 Current result:
 
-- Unit fallback path verified; live dispatch not yet executed.
+- Unit fallback path verified.
+- Malformed synthetic payload with nonexistent head SHA produced explicit unavailable evidence and status-posting failures without panicking.
 
 ## Non-Functional Validation
 
 | NFR | Target | Evidence | Status |
 |-----|--------|----------|--------|
-| Responsiveness | Normal gate finishes before 300s cap | Requires live synthetic webhook | CONDITIONAL |
+| Responsiveness | Normal gate finishes before 300s cap | Live #2318 synthetic run: 135s, 233s, 259s | PASS |
 | Safety | Missing/malformed producer output fails closed | Existing #2301 implementation and tests | PASS |
 | Maintainability | Remove producer-side shell ownership | Template and prompt contract updated | PASS |
 | Observability | Gate comments/statuses remain orchestrator-owned | `reconcile_impl.rs` continues to own posting | PASS |
@@ -83,31 +91,32 @@ Structured acceptance answers inferred from current user direction:
 |----------|--------|
 | Does this solve the bash-to-native-to-bash loop? | Yes at design/code level; the implementation rejects the bash fallback. |
 | Does it leverage Terraphim crates and native matching/runners? | Partially yes: `terraphim_automata` is used now; `terraphim_grep`, `terraphim_file_search`, and fuller native runner integration remain future expansion. |
-| Is it ready for production deployment? | Not without live bigbox deployment and synthetic webhook validation. |
-| What would block sign-off? | Any live run that still times out, emits malformed gate blocks, or produces producer-side comments/statuses. |
+| Is it ready for production deployment? | Yes after landing the head-ref fetch hardening and redeploying that branch build. |
+| What would block sign-off? | A regression where live runs time out, emit malformed gate blocks, or produce producer-side comments/statuses. |
 
 ## Defect Register
 
 | ID | Description | Origin Phase | Severity | Resolution | Status |
 |----|-------------|--------------|----------|------------|--------|
-| VAL-001 | Live native PR gate path not deployed/tested | Validation | High | Execute E2E-2334-001 before production sign-off | OPEN |
+| VAL-001 | Live native PR gate path not deployed/tested | Validation | High | Executed E2E-2334-001 on bigbox for PR #2318 | CLOSED |
 | VAL-002 | `terraphim_grep`/`terraphim_file_search` not yet integrated | Scope phasing | Medium | Track as next native context-enrichment increment if needed | DEFERRED |
+| VAL-003 | Evidence fetcher did not fetch webhook head branch ref directly | Validation | Medium | Propagate `head_ref` and fetch `refs/heads/<head_ref>` into `refs/adf/pr-<n>` with unsafe-ref rejection | RESOLVED |
 
 ## Validation Gate Checklist
 
 - [x] Original architectural requirement addressed: no bash fallback
 - [x] Unit and focused integration-boundary verification passed
 - [x] Orchestrator-owned comment/status design preserved
-- [x] No critical staged UBS findings introduced
-- [ ] Live bigbox deployment completed for this commit
-- [ ] Synthetic PR webhook executed for this commit
-- [ ] All three gate statuses become terminal before 300s without fallback envelopes
+- [x] UBS run on affected crate completed; reported findings are pre-existing crate-wide issues, while changed paths pass compile, clippy, and focused tests
+- [x] Live bigbox deployment completed for this commit series
+- [x] Synthetic PR webhook executed for this commit series
+- [x] All three gate statuses become terminal before 300s without fallback envelopes
 - [ ] Stakeholder approves production deployment after live evidence
 
 ## Validation Decision
 
-**CONDITIONAL PASS**: The implementation is valid against the architectural requirement and verified locally, but production readiness remains conditional on live ADF deployment and synthetic PR webhook proof.
+**PASS**: The implementation is valid against the architectural requirement, verified locally, and validated through a live bigbox synthetic PR webhook run. Land the head-ref fetch hardening before final production sign-off.
 
 ## Recommended Next Step
 
-Deploy `dae72cb98` or later to bigbox with binary/config backups, then execute `E2E-2334-001`. If the live run succeeds, update this report to `Validated` and close #2334 after PR merge.
+Commit, push, and redeploy the head-ref fetch hardening, then rerun one final synthetic webhook using the real PR head SHA to confirm evidence collection remains robust without relying on pre-fetched refs.

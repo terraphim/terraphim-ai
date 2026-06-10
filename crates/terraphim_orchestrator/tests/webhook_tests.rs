@@ -40,6 +40,7 @@ async fn webhook_pr_opened_enqueues_review_dispatch() {
             pr_number,
             project,
             head_sha,
+            head_ref,
             author_login,
             title,
             diff_loc,
@@ -47,6 +48,7 @@ async fn webhook_pr_opened_enqueues_review_dispatch() {
             assert_eq!(pr_number, 42);
             assert_eq!(project, "terraphim-ai");
             assert_eq!(head_sha, "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2");
+            assert_eq!(head_ref, "task/42-semantic-search");
             assert_eq!(author_login, "alex");
             assert_eq!(title, "feat: add semantic search endpoint");
             assert_eq!(diff_loc, 180 + 12);

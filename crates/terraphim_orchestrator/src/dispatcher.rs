@@ -63,6 +63,8 @@ pub enum DispatchTask {
         project: String,
         /// HEAD commit SHA at dispatch time.
         head_sha: String,
+        /// Source branch/ref name at dispatch time.
+        head_ref: String,
         /// GitHub/Gitea login of the PR author.
         author_login: String,
         /// PR title.
@@ -484,6 +486,7 @@ mod tests {
             pr_number: 1,
             project: "odilo".to_string(),
             head_sha: "abc".to_string(),
+            head_ref: "task/1-fix".to_string(),
             author_login: "claude-code".to_string(),
             title: "fix".to_string(),
             diff_loc: 10,
