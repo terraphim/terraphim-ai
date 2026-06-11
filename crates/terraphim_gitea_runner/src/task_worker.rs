@@ -273,8 +273,23 @@ impl<C: GiteaRunnerClient, P: PolicyPlanner> TaskWorker<C, P> {
             }
         };
 
-        // Close the log stream and report the final result.
+        // Close the log stream, then post terminal commit status *before* marking the
+        // task complete. Gitea revokes the per-job `github.token` once UpdateTask
+        // reports SUCCESS/FAILURE; posting status afterward yields HTTP 401 (Refs #2464).
         logs.flush(&*self.client, state, true).await?;
+        let terminal_state = if success {
+            StatusState::Success
+        } else {
+            StatusState::Failure
+        };
+        let terminal_desc = if success {
+            "native build passed"
+        } else {
+            "native build failed"
+        };
+        self.mirror(&task, terminal_state, terminal_desc).await;
+        self.post_native_commit_status(&task, &status_workflow, terminal_state, terminal_desc)
+            .await;
         self.client
             .update_task(
                 state,
@@ -294,21 +309,28 @@ impl<C: GiteaRunnerClient, P: PolicyPlanner> TaskWorker<C, P> {
                 },
             )
             .await?;
-        let terminal_state = if success {
-            StatusState::Success
-        } else {
-            StatusState::Failure
-        };
-        let terminal_desc = if success {
-            "native build passed"
-        } else {
-            "native build failed"
-        };
-        self.mirror(&task, terminal_state, terminal_desc).await;
-        self.post_native_commit_status(&task, &status_workflow, terminal_state, terminal_desc)
-            .await;
 
         let _ = session_manager.release_session(&session.id).await;
         Ok(success)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    /// Regression guard for #2464: terminal commit status must use the per-job token
+    /// while it is still valid (before UpdateTask reports SUCCESS/FAILURE).
+    #[test]
+    fn terminal_commit_status_precedes_task_completion() {
+        let src = include_str!("task_worker.rs");
+        let marker = "// Close the log stream, then post terminal commit status";
+        let block = src.split(marker).nth(1).expect("terminal close block");
+        let status_pos = block
+            .find("post_native_commit_status")
+            .expect("terminal status post");
+        let update_pos = block.find("update_task").expect("terminal update_task");
+        assert!(
+            status_pos < update_pos,
+            "post_native_commit_status must run before terminal update_task (Refs #2464)"
+        );
     }
 }
