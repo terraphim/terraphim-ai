@@ -8478,6 +8478,7 @@ dependencies = [
  "base64",
  "chrono",
  "env_logger",
+ "flate2",
  "log",
  "reqwest 0.12.28",
  "serde",

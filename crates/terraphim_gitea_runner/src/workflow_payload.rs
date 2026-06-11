@@ -70,6 +70,65 @@ pub fn job_token(task: &Task) -> Option<String> {
     context_str(task, &["token"]).or_else(|| task.secrets.get("GITHUB_TOKEN").cloned())
 }
 
+/// Workflow trigger name for commit-status context (e.g. `push`, `workflow_dispatch`).
+pub fn event_name(task: &Task) -> String {
+    context_str(task, &["event_name", "event"]).unwrap_or_else(|| "push".to_string())
+}
+
+/// First job id under `jobs:` in the SingleWorkflow YAML (e.g. `build`).
+pub fn first_job_id(task: &Task) -> Option<String> {
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(task.workflow_payload.trim())
+        .ok()?;
+    let yaml = if bytes.len() >= 2 && bytes[0] == 0x1f && bytes[1] == 0x8b {
+        use std::io::Read;
+        let mut decoder = flate2::read::GzDecoder::new(bytes.as_slice());
+        let mut s = String::new();
+        decoder.read_to_string(&mut s).ok()?;
+        s
+    } else {
+        String::from_utf8(bytes).ok()?
+    };
+    parse_first_job_id(&yaml)
+}
+
+fn parse_first_job_id(yaml: &str) -> Option<String> {
+    let mut in_jobs = false;
+    for line in yaml.lines() {
+        if line.trim() == "jobs:" {
+            in_jobs = true;
+            continue;
+        }
+        if !in_jobs {
+            continue;
+        }
+        // Top-level job key: exactly two leading spaces, no third.
+        if line.starts_with("  ") && !line.starts_with("   ") {
+            let key = line.trim().trim_end_matches(':').trim();
+            if !key.is_empty()
+                && key
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+            {
+                return Some(key.to_string());
+            }
+        }
+    }
+    None
+}
+
+/// Gitea branch-protection context for native-ci (e.g. `native-ci / build (push)`).
+pub fn commit_status_context(task: &Task, workflow: &ParsedWorkflow) -> String {
+    let wf_name = if workflow.name.is_empty() {
+        "native-ci".to_string()
+    } else {
+        workflow.name.clone()
+    };
+    let job = first_job_id(task).unwrap_or_else(|| "build".to_string());
+    let event = event_name(task);
+    format!("{wf_name} / {job} ({event})")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -91,5 +150,21 @@ mod tests {
             Some("terraphim/terraphim-core")
         );
         assert_eq!(head_sha(&task).as_deref(), Some("abc123"));
+    }
+
+    #[test]
+    fn commit_status_context_matches_gitea_format() {
+        let yaml = "name: native-ci\njobs:\n  build:\n    runs-on: terraphim-native\n    steps:\n      - run: cargo fmt --all -- --check\n";
+        let task = Task {
+            id: 2,
+            workflow_payload: base64::engine::general_purpose::STANDARD.encode(yaml),
+            context: serde_json::json!({"event_name": "workflow_dispatch"}),
+            ..Task::default()
+        };
+        let wf = compile_task(&task).unwrap();
+        assert_eq!(
+            commit_status_context(&task, &wf),
+            "native-ci / build (workflow_dispatch)"
+        );
     }
 }
