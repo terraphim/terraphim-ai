@@ -327,8 +327,8 @@ mod tests {
     fn token_never_in_cmd_args() {
         let token = "super-secret-token-DO-NOT-EXPOSE";
         let cmd = git_command(None, Some(token));
-        let basic = base64::engine::general_purpose::STANDARD
-            .encode(format!("x-access-token:{token}"));
+        let basic =
+            base64::engine::general_purpose::STANDARD.encode(format!("x-access-token:{token}"));
         for arg in cmd.as_std().get_args() {
             let s = arg.to_string_lossy();
             assert!(
