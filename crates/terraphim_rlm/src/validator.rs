@@ -471,21 +471,38 @@ impl KnowledgeGraphValidator {
     }
 }
 
+/// Noise words excluded from KG word extraction.
+///
+/// Two-character shell commands (rm, ls, mv, cp, etc.) are intentionally NOT
+/// in this list — they must reach the KG validator so dangerous commands are
+/// caught. Only genuine grammatical stop-words are excluded.
+const STOP_WORDS: &[&str] = &["a", "an", "or", "to", "of", "in", "is", "at", "by", "on"];
+
 /// Extract words from a command string.
+///
+/// Splits on non-word characters and filters grammatical stop-words.
+/// Two-character shell commands (rm, ls, mv, cp) are preserved.
 fn extract_words(text: &str) -> Vec<String> {
-    // Split on any non-word character (not alphanumeric, underscore, or hyphen)
     text.split(|c: char| !c.is_alphanumeric() && c != '_' && c != '-')
+        .filter(|s| !s.is_empty() && !STOP_WORDS.contains(s))
         .map(|s| s.to_string())
-        .filter(|s| !s.is_empty() && s.len() > 2) // Skip very short words
         .collect()
 }
 
-/// Truncate a string for logging (max 100 chars).
+/// Truncate a string for logging (max 100 bytes), respecting UTF-8 char boundaries.
 fn truncate_for_log(s: &str) -> String {
-    if s.len() > 100 {
-        format!("{}...", &s[..97])
-    } else {
+    const LIMIT: usize = 100;
+    if s.len() <= LIMIT {
         s.to_string()
+    } else {
+        // Walk char boundaries to find the last safe cut point before byte 97.
+        let end = s
+            .char_indices()
+            .take_while(|&(i, _)| i < 97)
+            .last()
+            .map(|(i, ch)| i + ch.len_utf8())
+            .unwrap_or(0);
+        format!("{}...", &s[..end])
     }
 }
 
@@ -608,13 +625,43 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_words_filters_short() {
-        let words = extract_words("a b cd this_is_longer");
-        // Should filter out "a", "b", "cd" (2 chars or less)
+    fn test_extract_words_filters_stop_words() {
+        let words = extract_words("a an or to this_is_longer");
+        // Grammatical stop-words are filtered
         assert!(!words.contains(&"a".to_string()));
-        assert!(!words.contains(&"b".to_string()));
-        assert!(!words.contains(&"cd".to_string()));
+        assert!(!words.contains(&"an".to_string()));
+        assert!(!words.contains(&"or".to_string()));
+        assert!(!words.contains(&"to".to_string()));
         assert!(words.contains(&"this_is_longer".to_string()));
+    }
+
+    /// Regression test for #2412: 2-char shell commands must NOT be filtered.
+    #[test]
+    fn test_extract_words_does_not_skip_rm() {
+        let words = extract_words("rm -rf /tmp/test");
+        assert!(
+            words.contains(&"rm".to_string()),
+            "rm must not be filtered by extract_words; got: {:?}",
+            words
+        );
+        // The flag "-rf" is preserved as a single token (hyphens are not delimiters)
+        assert!(
+            words.contains(&"-rf".to_string()),
+            "-rf must not be filtered by extract_words; got: {:?}",
+            words
+        );
+    }
+
+    #[test]
+    fn test_extract_words_preserves_two_char_commands() {
+        for cmd in &["ls", "mv", "cp", "cd", "dd", "su", "ps"] {
+            let words = extract_words(cmd);
+            assert!(
+                words.contains(&cmd.to_string()),
+                "2-char shell command '{}' must not be filtered",
+                cmd
+            );
+        }
     }
 
     #[test]
@@ -626,6 +673,34 @@ mod tests {
         let truncated = truncate_for_log(&long);
         assert!(truncated.len() < 150);
         assert!(truncated.ends_with("..."));
+    }
+
+    /// Regression test for #2411: must not panic on non-ASCII input.
+    #[test]
+    fn test_truncate_for_log_unicode_no_panic() {
+        // Japanese chars are 3 bytes each; 34 * 3 = 102 bytes > 100
+        let s = "\u{3042}".repeat(34);
+        let result = truncate_for_log(&s);
+        assert!(
+            result.ends_with("..."),
+            "truncated result must end with ..."
+        );
+        // Must not panic (the test reaching this point proves it)
+    }
+
+    #[test]
+    fn test_truncate_for_log_emoji_no_panic() {
+        // Emoji are 4 bytes each; 26 * 4 = 104 bytes > 100
+        let s = "\u{1F600}".repeat(26);
+        let result = truncate_for_log(&s);
+        assert!(result.ends_with("..."));
+    }
+
+    #[test]
+    fn test_truncate_for_log_mixed_ascii_unicode_no_panic() {
+        // Mix of ASCII and multi-byte chars near the 97-byte boundary
+        let s = "hello ".repeat(10) + "\u{3042}".repeat(10).as_str();
+        let _ = truncate_for_log(&s);
     }
 
     #[test]
