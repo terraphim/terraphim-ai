@@ -79,6 +79,9 @@ pub struct FirecrackerExecutor {
 
     /// Snapshot count per session (for limit enforcement).
     snapshot_counts: parking_lot::RwLock<HashMap<SessionId, u32>>,
+
+    #[cfg(feature = "kg-validation")]
+    validator: Option<std::sync::Arc<crate::validator::KnowledgeGraphValidator>>,
 }
 
 impl FirecrackerExecutor {
@@ -128,7 +131,16 @@ impl FirecrackerExecutor {
             session_to_vm: parking_lot::RwLock::new(HashMap::new()),
             current_snapshot: parking_lot::RwLock::new(HashMap::new()),
             snapshot_counts: parking_lot::RwLock::new(HashMap::new()),
+            #[cfg(feature = "kg-validation")]
+            validator: None,
         })
+    }
+
+    /// Attach a knowledge-graph validator for real term matching.
+    #[cfg(feature = "kg-validation")]
+    pub fn with_validator(mut self, validator: crate::validator::KnowledgeGraphValidator) -> Self {
+        self.validator = Some(std::sync::Arc::new(validator));
+        self
     }
 
     /// Initialize the VM and snapshot managers.
@@ -498,12 +510,23 @@ impl super::ExecutionEnvironment for FirecrackerExecutor {
     }
 
     async fn validate(&self, input: &str) -> Result<ValidationResult, Self::Error> {
-        // TODO: Implement KG validation using terraphim_automata
+        #[cfg(feature = "kg-validation")]
+        if let Some(validator) = &self.validator {
+            let kg_result = validator.validate(input).map_err(|e| RlmError::ConfigError {
+                message: format!("KG validation error: {e}"),
+            })?;
+            return Ok(ValidationResult {
+                is_valid: kg_result.passed,
+                matched_terms: kg_result.matched_terms,
+                unknown_terms: kg_result.unmatched_words,
+                suggestions: std::collections::HashMap::new(),
+                strictness: crate::config::KgStrictness::Normal,
+            });
+        }
         log::debug!(
-            "FirecrackerExecutor::validate called for {} bytes",
+            "FirecrackerExecutor::validate: no validator configured for {} bytes",
             input.len()
         );
-
         Ok(ValidationResult::valid(Vec::new()))
     }
 

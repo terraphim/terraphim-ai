@@ -31,17 +31,31 @@ const BACKEND_NAME: &str = "local";
 
 pub struct LocalExecutor {
     python_path: String,
+    #[cfg(feature = "kg-validation")]
+    validator: Option<std::sync::Arc<crate::validator::KnowledgeGraphValidator>>,
 }
 
 impl LocalExecutor {
     pub fn new() -> Self {
         Self {
             python_path: "python3".to_string(),
+            #[cfg(feature = "kg-validation")]
+            validator: None,
         }
     }
 
     pub fn with_python(mut self, path: impl Into<String>) -> Self {
         self.python_path = path.into();
+        self
+    }
+
+    /// Attach a knowledge-graph validator.
+    ///
+    /// When set, `validate()` performs real term matching via
+    /// `terraphim_automata` instead of returning always-valid.
+    #[cfg(feature = "kg-validation")]
+    pub fn with_validator(mut self, validator: crate::validator::KnowledgeGraphValidator) -> Self {
+        self.validator = Some(std::sync::Arc::new(validator));
         self
     }
 
@@ -156,7 +170,20 @@ impl ExecutionEnvironment for LocalExecutor {
         self.run_command(command, ctx).await
     }
 
-    async fn validate(&self, _input: &str) -> Result<ValidationResult, Self::Error> {
+    async fn validate(&self, input: &str) -> Result<ValidationResult, Self::Error> {
+        #[cfg(feature = "kg-validation")]
+        if let Some(validator) = &self.validator {
+            let kg_result = validator.validate(input).map_err(|e| RlmError::ConfigError {
+                message: format!("KG validation error: {e}"),
+            })?;
+            return Ok(ValidationResult {
+                is_valid: kg_result.passed,
+                matched_terms: kg_result.matched_terms,
+                unknown_terms: kg_result.unmatched_words,
+                suggestions: std::collections::HashMap::new(),
+                strictness: crate::config::KgStrictness::Normal,
+            });
+        }
         Ok(ValidationResult::valid(vec![]))
     }
 
@@ -350,5 +377,34 @@ mod tests {
         let executor = LocalExecutor::new();
         let session = SessionId::new();
         assert!(executor.end_session(&session).await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_validate_without_validator_is_always_valid() {
+        let executor = LocalExecutor::new();
+        let result = executor.validate("unknown-command --xyz").await.unwrap();
+        assert!(result.is_valid);
+        assert!(result.matched_terms.is_empty());
+    }
+
+    #[cfg(feature = "kg-validation")]
+    #[tokio::test]
+    async fn test_validate_with_disabled_validator_is_always_valid() {
+        use crate::validator::KnowledgeGraphValidator;
+        let validator = KnowledgeGraphValidator::disabled();
+        let executor = LocalExecutor::new().with_validator(validator);
+        let result = executor.validate("any command here").await.unwrap();
+        assert!(result.is_valid);
+    }
+
+    #[cfg(feature = "kg-validation")]
+    #[tokio::test]
+    async fn test_validate_with_no_thesaurus_normal_passes() {
+        use crate::validator::{KnowledgeGraphValidator, ValidatorConfig};
+        let validator = KnowledgeGraphValidator::new(ValidatorConfig::default());
+        let executor = LocalExecutor::new().with_validator(validator);
+        // Without a thesaurus, Normal mode always passes (no terms to check against)
+        let result = executor.validate("print hello world").await.unwrap();
+        assert!(result.is_valid);
     }
 }

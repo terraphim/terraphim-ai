@@ -53,6 +53,8 @@ pub struct DockerExecutor {
     /// via `with_host_config`.
     host_config: HostConfig,
     capabilities: Vec<Capability>,
+    #[cfg(feature = "kg-validation")]
+    validator: Option<std::sync::Arc<crate::validator::KnowledgeGraphValidator>>,
 }
 
 /// Build the default `HostConfig` applied to every session container.
@@ -105,7 +107,16 @@ impl DockerExecutor {
             image: DEFAULT_IMAGE.to_string(),
             host_config: default_host_config(),
             capabilities,
+            #[cfg(feature = "kg-validation")]
+            validator: None,
         })
+    }
+
+    /// Attach a knowledge-graph validator for real term matching.
+    #[cfg(feature = "kg-validation")]
+    pub fn with_validator(mut self, validator: crate::validator::KnowledgeGraphValidator) -> Self {
+        self.validator = Some(std::sync::Arc::new(validator));
+        self
     }
 
     pub fn with_image(config: RlmConfig, image: &str) -> Result<Self, RlmError> {
@@ -368,7 +379,20 @@ impl super::ExecutionEnvironment for DockerExecutor {
         self.exec_in_container(&container_id, bash_cmd, ctx).await
     }
 
-    async fn validate(&self, _input: &str) -> Result<ValidationResult, Self::Error> {
+    async fn validate(&self, input: &str) -> Result<ValidationResult, Self::Error> {
+        #[cfg(feature = "kg-validation")]
+        if let Some(validator) = &self.validator {
+            let kg_result = validator.validate(input).map_err(|e| RlmError::ConfigError {
+                message: format!("KG validation error: {e}"),
+            })?;
+            return Ok(ValidationResult {
+                is_valid: kg_result.passed,
+                matched_terms: kg_result.matched_terms,
+                unknown_terms: kg_result.unmatched_words,
+                suggestions: std::collections::HashMap::new(),
+                strictness: crate::config::KgStrictness::Normal,
+            });
+        }
         Ok(ValidationResult::valid(vec![]))
     }
 

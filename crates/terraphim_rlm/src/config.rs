@@ -81,6 +81,9 @@ pub struct RlmConfig {
     pub kg_strictness: KgStrictness,
 
     /// Maximum retries for KG validation before escalation.
+    ///
+    /// Reserved for a future retry loop in the Normal strictness path.
+    /// Currently the hot path blocks immediately for Normal | Strict.
     pub kg_max_retries: u32,
 
     // ============================================
@@ -349,8 +352,11 @@ pub enum KgStrictness {
 
 impl KgStrictness {
     /// Check if unknown terms should block execution.
+    ///
+    /// Returns `true` for `Normal` and `Strict`, matching the hot-path
+    /// behaviour in `query_loop.rs` and `rlm.rs`.
     pub fn blocks_unknown(&self) -> bool {
-        matches!(self, KgStrictness::Strict)
+        matches!(self, KgStrictness::Normal | KgStrictness::Strict)
     }
 
     /// Check if retries are allowed.
@@ -492,5 +498,19 @@ mod tests {
             debug_output.contains("pool_min_size"),
             "Non-sensitive fields must be visible"
         );
+    }
+
+    #[test]
+    fn test_kg_strictness_blocks_unknown() {
+        assert!(!KgStrictness::Permissive.blocks_unknown());
+        assert!(KgStrictness::Normal.blocks_unknown());
+        assert!(KgStrictness::Strict.blocks_unknown());
+    }
+
+    #[test]
+    fn test_kg_strictness_allows_retry() {
+        assert!(!KgStrictness::Permissive.allows_retry());
+        assert!(KgStrictness::Normal.allows_retry());
+        assert!(!KgStrictness::Strict.allows_retry());
     }
 }
