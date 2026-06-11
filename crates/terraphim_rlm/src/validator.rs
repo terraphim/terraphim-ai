@@ -674,4 +674,81 @@ mod tests {
                 .any(|s| s.contains("known terms") || s.contains("term1"))
         );
     }
+
+    /// Tests that verify `KnowledgeGraphValidator` with a real `Thesaurus`.
+    ///
+    /// These tests cover the "valid input passes / unknown terms fail" contract
+    /// that `FirecrackerExecutor::validate()` relies on. They run under the
+    /// default `full` feature set (which includes `kg-validation`).
+    mod with_thesaurus {
+        use std::sync::atomic::{AtomicU64, Ordering};
+
+        use terraphim_types::{NormalizedTerm, NormalizedTermValue, Thesaurus};
+
+        use super::*;
+
+        static TERM_ID: AtomicU64 = AtomicU64::new(10_000);
+
+        fn build_thesaurus(terms: &[&str]) -> Thesaurus {
+            let mut thesaurus = Thesaurus::new("rlm-test-kg".to_string());
+            for &term in terms {
+                let id = TERM_ID.fetch_add(1, Ordering::SeqCst);
+                let value = NormalizedTermValue::new(term.to_string());
+                thesaurus.insert(value.clone(), NormalizedTerm::new(id, value));
+            }
+            thesaurus
+        }
+
+        #[test]
+        fn test_valid_input_passes() {
+            let thesaurus = build_thesaurus(&["python", "execute", "firecracker"]);
+            let validator =
+                KnowledgeGraphValidator::new(ValidatorConfig::default()).with_thesaurus(thesaurus);
+            let result = validator.validate("execute python script").unwrap();
+            assert!(result.passed, "input containing known KG terms should pass");
+            assert!(
+                !result.matched_terms.is_empty(),
+                "matched_terms must include recognised terms"
+            );
+        }
+
+        #[test]
+        fn test_unknown_terms_fail_in_normal_mode() {
+            let thesaurus = build_thesaurus(&["python", "execute", "firecracker"]);
+            let validator =
+                KnowledgeGraphValidator::new(ValidatorConfig::default()).with_thesaurus(thesaurus);
+            // "malware" and "rootkit" are not in the thesaurus
+            let result = validator.validate("install malware rootkit").unwrap();
+            assert!(
+                !result.passed,
+                "input with no known KG terms should fail in normal mode"
+            );
+            assert!(
+                !result.unmatched_words.is_empty(),
+                "unmatched_words must list the unrecognised terms"
+            );
+        }
+
+        #[test]
+        fn test_empty_input_always_passes() {
+            let thesaurus = build_thesaurus(&["python", "execute"]);
+            let validator =
+                KnowledgeGraphValidator::new(ValidatorConfig::default()).with_thesaurus(thesaurus);
+            let result = validator.validate("").unwrap();
+            assert!(result.passed, "empty input should always pass");
+        }
+
+        #[test]
+        fn test_permissive_mode_passes_unknown_terms() {
+            let thesaurus = build_thesaurus(&["python", "execute"]);
+            let validator = KnowledgeGraphValidator::new(ValidatorConfig::permissive())
+                .with_thesaurus(thesaurus);
+            // "malware" not in thesaurus, but permissive = warn only
+            let result = validator.validate("install malware rootkit").unwrap();
+            assert!(
+                result.passed,
+                "permissive mode should pass even unknown terms"
+            );
+        }
+    }
 }

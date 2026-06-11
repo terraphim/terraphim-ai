@@ -79,6 +79,14 @@ pub struct FirecrackerExecutor {
 
     /// Snapshot count per session (for limit enforcement).
     snapshot_counts: parking_lot::RwLock<HashMap<SessionId, u32>>,
+
+    /// Knowledge graph validator for command validation.
+    ///
+    /// Defaults to a disabled (permissive) validator until a thesaurus is
+    /// injected via `with_validator()`. When the `kg-validation` feature is
+    /// disabled this field is absent and `validate()` always returns valid.
+    #[cfg(feature = "kg-validation")]
+    validator: crate::validator::KnowledgeGraphValidator,
 }
 
 impl FirecrackerExecutor {
@@ -118,6 +126,19 @@ impl FirecrackerExecutor {
             .with_private_key("/tmp/ubuntu-22.04.id_rsa")
             .with_output_dir(std::env::temp_dir().join("terraphim_rlm_output"));
 
+        // Build a KG validator from the config's strictness and retry settings.
+        // No thesaurus is loaded here -- callers inject one via `with_validator()`.
+        // Without a thesaurus the validator operates in permissive mode.
+        #[cfg(feature = "kg-validation")]
+        let validator = {
+            use crate::validator::{KnowledgeGraphValidator, ValidatorConfig};
+            KnowledgeGraphValidator::new(ValidatorConfig {
+                strictness: config.kg_strictness.clone(),
+                max_retries: config.kg_max_retries,
+                ..ValidatorConfig::default()
+            })
+        };
+
         Ok(Self {
             config,
             vm_manager: tokio::sync::Mutex::new(None),
@@ -128,6 +149,8 @@ impl FirecrackerExecutor {
             session_to_vm: parking_lot::RwLock::new(HashMap::new()),
             current_snapshot: parking_lot::RwLock::new(HashMap::new()),
             snapshot_counts: parking_lot::RwLock::new(HashMap::new()),
+            #[cfg(feature = "kg-validation")]
+            validator,
         })
     }
 
@@ -182,6 +205,50 @@ impl FirecrackerExecutor {
 
         log::info!("FirecrackerExecutor initialized successfully");
         Ok(())
+    }
+
+    /// Override the knowledge graph validator used for command validation.
+    ///
+    /// By default a validator is created from the config's `kg_strictness` and
+    /// `kg_max_retries` without a thesaurus (permissive until one is provided).
+    /// Use this method to inject a validator backed by a real thesaurus for
+    /// production use, or a configured fixture in tests.
+    #[cfg(feature = "kg-validation")]
+    pub fn with_validator(mut self, validator: crate::validator::KnowledgeGraphValidator) -> Self {
+        self.validator = validator;
+        self
+    }
+
+    /// Perform knowledge-graph validation on `input`.
+    ///
+    /// Converts `crate::validator::ValidationResult` into the executor-level
+    /// `context::ValidationResult` type.  When the `kg-validation` feature is
+    /// disabled this function always returns `ValidationResult::valid`.
+    #[cfg(feature = "kg-validation")]
+    fn kg_validate(&self, input: &str) -> Result<ValidationResult, RlmError> {
+        let result = self
+            .validator
+            .validate(input)
+            .map_err(|e| RlmError::ConfigError {
+                message: format!("KG validation error: {}", e),
+            })?;
+        if result.passed {
+            Ok(ValidationResult::valid(result.matched_terms))
+        } else {
+            Ok(ValidationResult::invalid(
+                result.matched_terms,
+                result.unmatched_words,
+            ))
+        }
+    }
+
+    #[cfg(not(feature = "kg-validation"))]
+    fn kg_validate(&self, input: &str) -> Result<ValidationResult, RlmError> {
+        log::debug!(
+            "FirecrackerExecutor::validate: {} bytes (kg-validation feature disabled)",
+            input.len()
+        );
+        Ok(ValidationResult::valid(Vec::new()))
     }
 
     /// Initialize the VM pool for pre-warmed VMs.
@@ -498,13 +565,7 @@ impl super::ExecutionEnvironment for FirecrackerExecutor {
     }
 
     async fn validate(&self, input: &str) -> Result<ValidationResult, Self::Error> {
-        // TODO: Implement KG validation using terraphim_automata
-        log::debug!(
-            "FirecrackerExecutor::validate called for {} bytes",
-            input.len()
-        );
-
-        Ok(ValidationResult::valid(Vec::new()))
+        self.kg_validate(input)
     }
 
     async fn create_snapshot(
@@ -908,5 +969,89 @@ mod tests {
         // Health check should fail if not initialized
         let result = executor.health_check().await.unwrap();
         assert!(!result);
+    }
+
+    /// Tests for the KG validation delegation logic.
+    ///
+    /// These tests exercise the `validate()` → `kg_validate()` → result-type
+    /// conversion path without requiring KVM or a running Firecracker instance.
+    /// They rely only on `KnowledgeGraphValidator` and the `terraphim_types`
+    /// thesaurus API, both of which are available whenever the
+    /// `kg-validation` feature is enabled.
+    #[cfg(feature = "kg-validation")]
+    mod kg_validation_tests {
+        use std::sync::atomic::{AtomicU64, Ordering};
+
+        use terraphim_types::{NormalizedTerm, NormalizedTermValue, Thesaurus};
+
+        use super::ValidationResult;
+        use crate::validator::{KnowledgeGraphValidator, ValidatorConfig};
+
+        static TERM_ID: AtomicU64 = AtomicU64::new(1_000);
+
+        fn build_thesaurus(terms: &[&str]) -> Thesaurus {
+            let mut thesaurus = Thesaurus::new("firecracker-test-kg".to_string());
+            for &term in terms {
+                let id = TERM_ID.fetch_add(1, Ordering::SeqCst);
+                let value = NormalizedTermValue::new(term.to_string());
+                thesaurus.insert(value.clone(), NormalizedTerm::new(id, value));
+            }
+            thesaurus
+        }
+
+        fn to_context(r: crate::validator::ValidationResult) -> ValidationResult {
+            if r.passed {
+                ValidationResult::valid(r.matched_terms)
+            } else {
+                ValidationResult::invalid(r.matched_terms, r.unmatched_words)
+            }
+        }
+
+        #[test]
+        fn test_validate_valid_input_passes() {
+            let thesaurus = build_thesaurus(&["python", "execute", "firecracker"]);
+            let validator =
+                KnowledgeGraphValidator::new(ValidatorConfig::default()).with_thesaurus(thesaurus);
+            let raw = validator.validate("execute python script").unwrap();
+            let result = to_context(raw);
+            assert!(result.is_valid, "input with known KG terms should pass");
+            assert!(
+                !result.matched_terms.is_empty(),
+                "matched_terms should contain known terms"
+            );
+        }
+
+        #[test]
+        fn test_validate_unknown_terms_fail() {
+            let thesaurus = build_thesaurus(&["python", "execute", "firecracker"]);
+            let validator =
+                KnowledgeGraphValidator::new(ValidatorConfig::default()).with_thesaurus(thesaurus);
+            // "malware" and "rootkit" are not in the thesaurus
+            let raw = validator.validate("install malware rootkit").unwrap();
+            let result = to_context(raw);
+            assert!(!result.is_valid, "input with no KG terms should fail");
+            assert!(
+                !result.unknown_terms.is_empty(),
+                "unknown_terms should list unrecognised words"
+            );
+        }
+
+        #[test]
+        fn test_validate_empty_input_passes() {
+            let thesaurus = build_thesaurus(&["python", "execute"]);
+            let validator =
+                KnowledgeGraphValidator::new(ValidatorConfig::default()).with_thesaurus(thesaurus);
+            let raw = validator.validate("").unwrap();
+            let result = to_context(raw);
+            assert!(result.is_valid, "empty input should always pass");
+        }
+
+        #[test]
+        fn test_validate_disabled_validator_always_passes() {
+            let validator = KnowledgeGraphValidator::disabled();
+            let raw = validator.validate("rm -rf /").unwrap();
+            let result = to_context(raw);
+            assert!(result.is_valid, "disabled validator should always pass");
+        }
     }
 }
