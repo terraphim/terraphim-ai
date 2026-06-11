@@ -2,9 +2,47 @@
 # Gitea act-runner health check
 # Usage: runner-health-check.sh [--gitea-url URL] [--stale-minutes N]
 # Exits 0 if runner is active and not stale, non-zero otherwise.
+# Also repairs rustup toolchain bin/* missing +x (Refs #2463).
 # Designed for systemd timer or cron execution.
 
 set -euo pipefail
+
+check_rust_toolchain_perms() {
+    local rustup_home="${RUSTUP_HOME:-$HOME/.rustup}"
+    local fix_script="${FIX_RUST_PERMS_SCRIPT:-$HOME/.local/bin/fix-rust-toolchain-perms.sh}"
+    local sample="${rustup_home}/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo"
+
+    if [[ ! -d "${rustup_home}/toolchains" ]]; then
+        return 0
+    fi
+
+    local non_exec
+    non_exec="$(find "${rustup_home}/toolchains" -path '*/bin/*' -type f ! -perm -111 2>/dev/null | wc -l | tr -d ' ')"
+    if [[ "$non_exec" -eq 0 ]]; then
+        return 0
+    fi
+
+    echo "WARN: $non_exec rust toolchain bin file(s) missing +x under $rustup_home" >&2
+    if [[ -f "$sample" ]]; then
+        echo "WARN: example: $(stat -c '%a %n' "$sample" 2>/dev/null || ls -la "$sample")" >&2
+    fi
+
+    if [[ -x "$fix_script" ]]; then
+        "$fix_script" || {
+            echo "ERROR: $fix_script failed" >&2
+            return 1
+        }
+        non_exec="$(find "${rustup_home}/toolchains" -path '*/bin/*' -type f ! -perm -111 2>/dev/null | wc -l | tr -d ' ')"
+        if [[ "$non_exec" -gt 0 ]]; then
+            echo "ERROR: $non_exec toolchain bin file(s) still missing +x after repair" >&2
+            return 1
+        fi
+        echo "OK: rust toolchain permissions repaired"
+    else
+        echo "ERROR: fix script missing: $fix_script" >&2
+        return 1
+    fi
+}
 
 GITEA_URL="${GITEA_URL:-https://git.terraphim.cloud}"
 GITEA_TOKEN="${GITEA_TOKEN:-}"
@@ -81,6 +119,8 @@ if [[ "$STALE_COUNT" -gt 0 ]] && [[ "$STALE_COUNT" -eq "$ONLINE" ]]; then
     echo "ERROR: All $ONLINE online runners are stale (>${STALE_MINUTES}min)" >&2
     exit 1
 fi
+
+check_rust_toolchain_perms
 
 echo "OK: $ONLINE runner(s) online, $STALE_COUNT stale"
 exit 0
