@@ -82,6 +82,8 @@ This installs pre-commit hooks that will:
 - Check for secrets and large files
 - Ensure consistent code style
 
+It also installs a **pre-push hook** that runs `cargo check --workspace --all-features` before every push, catching feature-gated compilation breaks locally before they reach CI. This saves an 8-15 minute CI round-trip for a compile error. To bypass on a WIP push: `SKIP_ALL_FEATURES_CHECK=1 git push`.
+
 **No Python required!** The script supports multiple hook managers (prek, lefthook, or native Git hooks).
 
 ### Commit Standards

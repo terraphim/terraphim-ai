@@ -73,6 +73,14 @@ install_native_hooks() {
     else
         print_status "WARN" "Native commit-msg hook not found at scripts/hooks/commit-msg"
     fi
+
+    if [ -f "scripts/pre-push-check.sh" ]; then
+        cp scripts/pre-push-check.sh .git/hooks/pre-push
+        chmod +x .git/hooks/pre-push
+        print_status "SUCCESS" "Installed pre-push --all-features check hook"
+    else
+        print_status "WARN" "Pre-push check script not found at scripts/pre-push-check.sh"
+    fi
 }
 
 # Function to setup Biome
@@ -355,6 +363,7 @@ echo "  - JavaScript/TypeScript: Biome check"
 echo "  - Security: Secret detection, large file blocking"
 echo "  - Syntax: YAML, TOML validation"
 echo "  - Ultimate Bug Scanner (UBS): AST-based bug detection (if installed)"
+echo "  - Pre-push: cargo check --workspace --all-features (SKIP_ALL_FEATURES_CHECK=1 to bypass)"
 echo ""
 print_status "INFO" "Pre-commit/Prek/Lefthook enhancements (if installed):"
 echo "  ✓ Automatic whitespace fixing (trailing spaces, EOF)"
