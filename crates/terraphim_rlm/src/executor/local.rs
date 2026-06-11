@@ -173,9 +173,11 @@ impl ExecutionEnvironment for LocalExecutor {
     async fn validate(&self, input: &str) -> Result<ValidationResult, Self::Error> {
         #[cfg(feature = "kg-validation")]
         if let Some(validator) = &self.validator {
-            let kg_result = validator.validate(input).map_err(|e| RlmError::ConfigError {
-                message: format!("KG validation error: {e}"),
-            })?;
+            let kg_result = validator
+                .validate(input)
+                .map_err(|e| RlmError::ConfigError {
+                    message: format!("KG validation error: {e}"),
+                })?;
             return Ok(ValidationResult {
                 is_valid: kg_result.passed,
                 matched_terms: kg_result.matched_terms,

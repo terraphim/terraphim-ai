@@ -442,8 +442,11 @@ mod tests {
 
     #[test]
     fn test_kg_strictness_behavior() {
+        // Permissive: never blocks, no retry needed
         assert!(!KgStrictness::Permissive.blocks_unknown());
-        assert!(!KgStrictness::Normal.blocks_unknown());
+        // Normal: blocks unknown inputs AND allows one retry before hard-failing
+        assert!(KgStrictness::Normal.blocks_unknown());
+        // Strict: blocks unknown inputs, no retry (immediate hard-fail)
         assert!(KgStrictness::Strict.blocks_unknown());
 
         assert!(!KgStrictness::Permissive.allows_retry());
