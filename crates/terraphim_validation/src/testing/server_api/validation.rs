@@ -36,6 +36,8 @@ pub enum ValidationError {
     },
     /// Response time exceeded limit
     ResponseTimeExceeded { max_ms: u64, actual_ms: u64 },
+    /// JSON Schema violation
+    SchemaViolation(String),
 }
 
 impl fmt::Display for ValidationError {
@@ -56,6 +58,9 @@ impl fmt::Display for ValidationError {
                     "Response time {}ms exceeded limit {}ms",
                     actual_ms, max_ms
                 )
+            }
+            ValidationError::SchemaViolation(msg) => {
+                write!(f, "JSON Schema violation: {}", msg)
             }
         }
     }
@@ -140,14 +145,103 @@ impl ResponseValidator for axum_test::TestResponse {
     }
 }
 
+/// Validate a `serde_json::Value` against a JSON Schema draft-7 string.
+///
+/// Separated from the HTTP layer so it can be unit-tested without a real server.
+fn validate_value_against_schema(
+    value: &serde_json::Value,
+    schema: &str,
+) -> Result<(), ValidationError> {
+    let schema_value: serde_json::Value = serde_json::from_str(schema).map_err(|e| {
+        ValidationError::SchemaViolation(format!("Invalid schema JSON: {}", e))
+    })?;
+
+    let validator = jsonschema::validator_for(&schema_value)
+        .map_err(|e| ValidationError::SchemaViolation(format!("Schema compilation error: {}", e)))?;
+
+    let errors: Vec<String> = validator.iter_errors(value).map(|e| e.to_string()).collect();
+    if !errors.is_empty() {
+        return Err(ValidationError::SchemaViolation(errors.join("; ")));
+    }
+
+    Ok(())
+}
+
 /// Validate that a JSON response matches a JSON schema
 pub fn validate_json_schema<T: DeserializeOwned>(
     response: Response,
-    _schema: &str,
+    schema: &str,
 ) -> Result<T, ValidationError> {
-    // For now, just validate that it can be deserialized
-    // TODO: Implement full JSON schema validation
-    response.validate_json()
+    let body_text = tokio::runtime::Handle::current().block_on(response.text())?;
+    let body_value: serde_json::Value =
+        serde_json::from_str(&body_text).map_err(ValidationError::Json)?;
+
+    validate_value_against_schema(&body_value, schema)?;
+
+    serde_json::from_value(body_value).map_err(ValidationError::Json)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const PERSON_SCHEMA: &str = r#"{
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+            "name": {"type": "string"},
+            "age": {"type": "integer"}
+        }
+    }"#;
+
+    #[test]
+    fn schema_validation_passes_for_matching_response() {
+        let value = serde_json::json!({"name": "Alice", "age": 30});
+        assert!(validate_value_against_schema(&value, PERSON_SCHEMA).is_ok());
+    }
+
+    #[test]
+    fn schema_validation_passes_with_only_required_fields() {
+        let value = serde_json::json!({"name": "Bob"});
+        assert!(validate_value_against_schema(&value, PERSON_SCHEMA).is_ok());
+    }
+
+    #[test]
+    fn schema_validation_fails_for_missing_required_field() {
+        let value = serde_json::json!({"age": 42});
+        let result = validate_value_against_schema(&value, PERSON_SCHEMA);
+        assert!(
+            matches!(result, Err(ValidationError::SchemaViolation(_))),
+            "expected SchemaViolation, got {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn schema_validation_fails_for_wrong_type() {
+        let value = serde_json::json!({"name": 123});
+        let result = validate_value_against_schema(&value, PERSON_SCHEMA);
+        assert!(matches!(result, Err(ValidationError::SchemaViolation(_))));
+    }
+
+    #[test]
+    fn schema_validation_fails_for_invalid_schema_string() {
+        let value = serde_json::json!({"name": "Alice"});
+        let result = validate_value_against_schema(&value, "not valid json{{{");
+        assert!(matches!(result, Err(ValidationError::SchemaViolation(_))));
+    }
+
+    #[test]
+    fn schema_violation_error_contains_details() {
+        let value = serde_json::json!({"age": 42});
+        let err = validate_value_against_schema(&value, PERSON_SCHEMA).unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("Schema violation") || msg.contains("schema") || msg.contains("name"),
+            "error message should describe the violation: {}",
+            msg
+        );
+    }
 }
 
 /// Assert that two JSON values are equal (ignoring ordering)
