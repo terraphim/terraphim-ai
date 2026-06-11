@@ -58,6 +58,40 @@ impl<C: GiteaRunnerClient, P: PolicyPlanner> TaskWorker<C, P> {
         self
     }
 
+    /// Post branch-protection commit status using the per-job token (Refs #2464).
+    ///
+    /// Context format matches Gitea Actions: `{workflow} / {job} ({event})`.
+    async fn post_native_commit_status(
+        &self,
+        task: &Task,
+        workflow: &terraphim_github_runner::ParsedWorkflow,
+        state: StatusState,
+        desc: &str,
+    ) {
+        let (Some(full), Some(sha)) = (
+            workflow_payload::repository(task),
+            workflow_payload::head_sha(task),
+        ) else {
+            return;
+        };
+        let Some(token) = workflow_payload::job_token(task) else {
+            log::warn!(
+                "native commit status skipped: no per-job token on task {}",
+                task.id
+            );
+            return;
+        };
+        let mut parts = full.splitn(2, '/');
+        let (Some(owner), Some(repo)) = (parts.next(), parts.next()) else {
+            return;
+        };
+        let context = workflow_payload::commit_status_context(task, workflow);
+        let writer = SingleStatusWriter::new(&self.instance_url, token);
+        if let Err(e) = writer.post(owner, repo, &sha, state, &context, desc).await {
+            log::warn!("native commit status post failed for {owner}/{repo}@{sha}: {e}");
+        }
+    }
+
     /// Post to the legacy mirror if configured and the task carries `owner/repo`+sha.
     async fn mirror(&self, task: &Task, state: StatusState, desc: &str) {
         let Some((writer, context)) = &self.legacy else {
@@ -145,6 +179,7 @@ impl<C: GiteaRunnerClient, P: PolicyPlanner> TaskWorker<C, P> {
     pub async fn run(&self, state: &RunnerState, task: Task) -> Result<bool> {
         // Compile the workflow payload, then apply policy (allowlist + cargo->rch).
         let workflow = workflow_payload::compile_task(&task)?;
+        let status_workflow = workflow.clone();
         let plan = self.planner.compile(workflow).await?;
 
         // Check out the target repo at the task's sha so the build runs against
@@ -198,6 +233,13 @@ impl<C: GiteaRunnerClient, P: PolicyPlanner> TaskWorker<C, P> {
             .await?;
         self.mirror(&task, StatusState::Pending, "build started")
             .await;
+        self.post_native_commit_status(
+            &task,
+            &status_workflow,
+            StatusState::Pending,
+            "build started",
+        )
+        .await;
 
         // Execute, then stream logs in per-step batches (multi-batch UpdateLog).
         let mut logs = LogStreamer::new(task.id);
@@ -231,8 +273,23 @@ impl<C: GiteaRunnerClient, P: PolicyPlanner> TaskWorker<C, P> {
             }
         };
 
-        // Close the log stream and report the final result.
+        // Close the log stream, then post terminal commit status *before* marking the
+        // task complete. Gitea revokes the per-job `github.token` once UpdateTask
+        // reports SUCCESS/FAILURE; posting status afterward yields HTTP 401 (Refs #2464).
         logs.flush(&*self.client, state, true).await?;
+        let terminal_state = if success {
+            StatusState::Success
+        } else {
+            StatusState::Failure
+        };
+        let terminal_desc = if success {
+            "native build passed"
+        } else {
+            "native build failed"
+        };
+        self.mirror(&task, terminal_state, terminal_desc).await;
+        self.post_native_commit_status(&task, &status_workflow, terminal_state, terminal_desc)
+            .await;
         self.client
             .update_task(
                 state,
@@ -252,22 +309,28 @@ impl<C: GiteaRunnerClient, P: PolicyPlanner> TaskWorker<C, P> {
                 },
             )
             .await?;
-        self.mirror(
-            &task,
-            if success {
-                StatusState::Success
-            } else {
-                StatusState::Failure
-            },
-            if success {
-                "native build passed"
-            } else {
-                "native build failed"
-            },
-        )
-        .await;
 
         let _ = session_manager.release_session(&session.id).await;
         Ok(success)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    /// Regression guard for #2464: terminal commit status must use the per-job token
+    /// while it is still valid (before UpdateTask reports SUCCESS/FAILURE).
+    #[test]
+    fn terminal_commit_status_precedes_task_completion() {
+        let src = include_str!("task_worker.rs");
+        let marker = "// Close the log stream, then post terminal commit status";
+        let block = src.split(marker).nth(1).expect("terminal close block");
+        let status_pos = block
+            .find("post_native_commit_status")
+            .expect("terminal status post");
+        let update_pos = block.find("update_task").expect("terminal update_task");
+        assert!(
+            status_pos < update_pos,
+            "post_native_commit_status must run before terminal update_task (Refs #2464)"
+        );
     }
 }
