@@ -616,12 +616,21 @@ model = "llama3.2"
 
     #[test]
     fn test_env_var_expansion() {
+        // SAFETY: TEST_VAR is a unique name not read by any other test in this binary.
+        // Cargo runs tests in the same process with multiple threads by default, so
+        // set_var is inherently racy; we accept this for this single isolated test
+        // because no other test observes or modifies TEST_VAR.
         unsafe {
             std::env::set_var("TEST_VAR", "test_value");
         }
         let input = "key = \"$TEST_VAR\"";
         let expanded = expand_env_vars(input);
         assert!(expanded.contains("test_value"));
+        // Clean up to avoid leaking env state to other tests.
+        unsafe {
+            // SAFETY: same invariant as set_var above.
+            std::env::remove_var("TEST_VAR");
+        }
     }
 
     #[test]
