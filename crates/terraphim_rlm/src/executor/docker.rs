@@ -678,6 +678,64 @@ mod tests {
         let _ = exec.release_session_container(&ctx.session_id).await;
     }
 
+    #[tokio::test]
+    async fn test_docker_validate_without_validator_is_always_valid() {
+        if !is_docker_available() {
+            eprintln!("Skipping test: Docker not available");
+            return;
+        }
+        let exec = DockerExecutor::new(RlmConfig::minimal()).unwrap();
+        let result = exec.validate("unknown-command --xyz").await.unwrap();
+        assert!(result.is_valid);
+        assert!(result.matched_terms.is_empty());
+    }
+
+    #[cfg(feature = "kg-validation")]
+    #[tokio::test]
+    async fn test_docker_validate_with_disabled_validator_is_always_valid() {
+        if !is_docker_available() {
+            eprintln!("Skipping test: Docker not available");
+            return;
+        }
+        use crate::validator::KnowledgeGraphValidator;
+        let exec = DockerExecutor::new(RlmConfig::minimal())
+            .unwrap()
+            .with_validator(KnowledgeGraphValidator::disabled());
+        let result = exec.validate("any command here").await.unwrap();
+        assert!(result.is_valid);
+    }
+
+    #[cfg(feature = "kg-validation")]
+    #[tokio::test]
+    async fn test_docker_validate_with_no_thesaurus_normal_passes() {
+        if !is_docker_available() {
+            eprintln!("Skipping test: Docker not available");
+            return;
+        }
+        use crate::validator::{KnowledgeGraphValidator, ValidatorConfig};
+        let exec = DockerExecutor::new(RlmConfig::minimal())
+            .unwrap()
+            .with_validator(KnowledgeGraphValidator::new(ValidatorConfig::default()));
+        let result = exec.validate("print hello world").await.unwrap();
+        assert!(result.is_valid);
+    }
+
+    #[cfg(feature = "kg-validation")]
+    #[tokio::test]
+    async fn test_docker_validate_propagates_strictness_normal() {
+        if !is_docker_available() {
+            eprintln!("Skipping test: Docker not available");
+            return;
+        }
+        use crate::config::KgStrictness;
+        use crate::validator::{KnowledgeGraphValidator, ValidatorConfig};
+        let exec = DockerExecutor::new(RlmConfig::minimal())
+            .unwrap()
+            .with_validator(KnowledgeGraphValidator::new(ValidatorConfig::default()));
+        let result = exec.validate("some command").await.unwrap();
+        assert_eq!(result.strictness, KgStrictness::Normal);
+    }
+
     #[cfg(feature = "kg-validation")]
     #[tokio::test]
     async fn test_docker_validate_propagates_strictness_strict() {

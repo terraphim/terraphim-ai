@@ -935,6 +935,64 @@ mod tests {
         assert!(!result);
     }
 
+    #[tokio::test]
+    async fn test_firecracker_validate_without_validator_is_always_valid() {
+        if !super::super::is_kvm_available() {
+            eprintln!("Skipping test: KVM not available");
+            return;
+        }
+        let executor = FirecrackerExecutor::new(RlmConfig::default()).unwrap();
+        let result = executor.validate("unknown-command --xyz").await.unwrap();
+        assert!(result.is_valid);
+        assert!(result.matched_terms.is_empty());
+    }
+
+    #[cfg(feature = "kg-validation")]
+    #[tokio::test]
+    async fn test_firecracker_validate_with_disabled_validator_is_always_valid() {
+        if !super::super::is_kvm_available() {
+            eprintln!("Skipping test: KVM not available");
+            return;
+        }
+        use crate::validator::KnowledgeGraphValidator;
+        let executor = FirecrackerExecutor::new(RlmConfig::default())
+            .unwrap()
+            .with_validator(KnowledgeGraphValidator::disabled());
+        let result = executor.validate("any command here").await.unwrap();
+        assert!(result.is_valid);
+    }
+
+    #[cfg(feature = "kg-validation")]
+    #[tokio::test]
+    async fn test_firecracker_validate_with_no_thesaurus_normal_passes() {
+        if !super::super::is_kvm_available() {
+            eprintln!("Skipping test: KVM not available");
+            return;
+        }
+        use crate::validator::{KnowledgeGraphValidator, ValidatorConfig};
+        let executor = FirecrackerExecutor::new(RlmConfig::default())
+            .unwrap()
+            .with_validator(KnowledgeGraphValidator::new(ValidatorConfig::default()));
+        let result = executor.validate("print hello world").await.unwrap();
+        assert!(result.is_valid);
+    }
+
+    #[cfg(feature = "kg-validation")]
+    #[tokio::test]
+    async fn test_firecracker_validate_propagates_strictness_normal() {
+        if !super::super::is_kvm_available() {
+            eprintln!("Skipping test: KVM not available");
+            return;
+        }
+        use crate::config::KgStrictness;
+        use crate::validator::{KnowledgeGraphValidator, ValidatorConfig};
+        let executor = FirecrackerExecutor::new(RlmConfig::default())
+            .unwrap()
+            .with_validator(KnowledgeGraphValidator::new(ValidatorConfig::default()));
+        let result = executor.validate("some command").await.unwrap();
+        assert_eq!(result.strictness, KgStrictness::Normal);
+    }
+
     #[cfg(feature = "kg-validation")]
     #[tokio::test]
     async fn test_firecracker_validate_propagates_strictness_strict() {
