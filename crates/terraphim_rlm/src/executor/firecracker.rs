@@ -522,7 +522,7 @@ impl super::ExecutionEnvironment for FirecrackerExecutor {
                 matched_terms: kg_result.matched_terms,
                 unknown_terms: kg_result.unmatched_words,
                 suggestions: std::collections::HashMap::new(),
-                strictness: crate::config::KgStrictness::Normal,
+                strictness: validator.config().strictness,
             });
         }
         log::debug!(
@@ -933,5 +933,37 @@ mod tests {
         // Health check should fail if not initialized
         let result = executor.health_check().await.unwrap();
         assert!(!result);
+    }
+
+    #[cfg(feature = "kg-validation")]
+    #[tokio::test]
+    async fn test_firecracker_validate_propagates_strictness_strict() {
+        if !super::super::is_kvm_available() {
+            eprintln!("Skipping test: KVM not available");
+            return;
+        }
+        use crate::config::KgStrictness;
+        use crate::validator::{KnowledgeGraphValidator, ValidatorConfig};
+        let executor = FirecrackerExecutor::new(RlmConfig::default())
+            .unwrap()
+            .with_validator(KnowledgeGraphValidator::new(ValidatorConfig::strict()));
+        let result = executor.validate("some command").await.unwrap();
+        assert_eq!(result.strictness, KgStrictness::Strict);
+    }
+
+    #[cfg(feature = "kg-validation")]
+    #[tokio::test]
+    async fn test_firecracker_validate_propagates_strictness_permissive() {
+        if !super::super::is_kvm_available() {
+            eprintln!("Skipping test: KVM not available");
+            return;
+        }
+        use crate::config::KgStrictness;
+        use crate::validator::{KnowledgeGraphValidator, ValidatorConfig};
+        let executor = FirecrackerExecutor::new(RlmConfig::default())
+            .unwrap()
+            .with_validator(KnowledgeGraphValidator::new(ValidatorConfig::permissive()));
+        let result = executor.validate("some command").await.unwrap();
+        assert_eq!(result.strictness, KgStrictness::Permissive);
     }
 }

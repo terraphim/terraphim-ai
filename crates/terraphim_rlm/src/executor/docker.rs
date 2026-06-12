@@ -392,7 +392,7 @@ impl super::ExecutionEnvironment for DockerExecutor {
                 matched_terms: kg_result.matched_terms,
                 unknown_terms: kg_result.unmatched_words,
                 suggestions: std::collections::HashMap::new(),
-                strictness: crate::config::KgStrictness::Normal,
+                strictness: validator.config().strictness,
             });
         }
         Ok(ValidationResult::valid(vec![]))
@@ -676,6 +676,38 @@ mod tests {
         assert!(result2.is_success());
 
         let _ = exec.release_session_container(&ctx.session_id).await;
+    }
+
+    #[cfg(feature = "kg-validation")]
+    #[tokio::test]
+    async fn test_docker_validate_propagates_strictness_strict() {
+        if !is_docker_available() {
+            eprintln!("Skipping test: Docker not available");
+            return;
+        }
+        use crate::config::KgStrictness;
+        use crate::validator::{KnowledgeGraphValidator, ValidatorConfig};
+        let exec = DockerExecutor::new(RlmConfig::minimal())
+            .unwrap()
+            .with_validator(KnowledgeGraphValidator::new(ValidatorConfig::strict()));
+        let result = exec.validate("some command").await.unwrap();
+        assert_eq!(result.strictness, KgStrictness::Strict);
+    }
+
+    #[cfg(feature = "kg-validation")]
+    #[tokio::test]
+    async fn test_docker_validate_propagates_strictness_permissive() {
+        if !is_docker_available() {
+            eprintln!("Skipping test: Docker not available");
+            return;
+        }
+        use crate::config::KgStrictness;
+        use crate::validator::{KnowledgeGraphValidator, ValidatorConfig};
+        let exec = DockerExecutor::new(RlmConfig::minimal())
+            .unwrap()
+            .with_validator(KnowledgeGraphValidator::new(ValidatorConfig::permissive()));
+        let result = exec.validate("some command").await.unwrap();
+        assert_eq!(result.strictness, KgStrictness::Permissive);
     }
 
     #[tokio::test]

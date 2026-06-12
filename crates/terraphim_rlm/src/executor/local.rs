@@ -183,7 +183,7 @@ impl ExecutionEnvironment for LocalExecutor {
                 matched_terms: kg_result.matched_terms,
                 unknown_terms: kg_result.unmatched_words,
                 suggestions: std::collections::HashMap::new(),
-                strictness: crate::config::KgStrictness::Normal,
+                strictness: validator.config().strictness,
             });
         }
         Ok(ValidationResult::valid(vec![]))
@@ -408,5 +408,38 @@ mod tests {
         // Without a thesaurus, Normal mode always passes (no terms to check against)
         let result = executor.validate("print hello world").await.unwrap();
         assert!(result.is_valid);
+    }
+
+    #[cfg(feature = "kg-validation")]
+    #[tokio::test]
+    async fn test_validate_propagates_strictness_normal() {
+        use crate::config::KgStrictness;
+        use crate::validator::{KnowledgeGraphValidator, ValidatorConfig};
+        let validator = KnowledgeGraphValidator::new(ValidatorConfig::default());
+        let executor = LocalExecutor::new().with_validator(validator);
+        let result = executor.validate("some command").await.unwrap();
+        assert_eq!(result.strictness, KgStrictness::Normal);
+    }
+
+    #[cfg(feature = "kg-validation")]
+    #[tokio::test]
+    async fn test_validate_propagates_strictness_strict() {
+        use crate::config::KgStrictness;
+        use crate::validator::{KnowledgeGraphValidator, ValidatorConfig};
+        let validator = KnowledgeGraphValidator::new(ValidatorConfig::strict());
+        let executor = LocalExecutor::new().with_validator(validator);
+        let result = executor.validate("some command").await.unwrap();
+        assert_eq!(result.strictness, KgStrictness::Strict);
+    }
+
+    #[cfg(feature = "kg-validation")]
+    #[tokio::test]
+    async fn test_validate_propagates_strictness_permissive() {
+        use crate::config::KgStrictness;
+        use crate::validator::{KnowledgeGraphValidator, ValidatorConfig};
+        let validator = KnowledgeGraphValidator::new(ValidatorConfig::permissive());
+        let executor = LocalExecutor::new().with_validator(validator);
+        let result = executor.validate("some command").await.unwrap();
+        assert_eq!(result.strictness, KgStrictness::Permissive);
     }
 }
