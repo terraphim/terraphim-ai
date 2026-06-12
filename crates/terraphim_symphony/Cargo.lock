@@ -1816,7 +1816,9 @@ dependencies = [
 
 [[package]]
 name = "terraphim_tracker"
-version = "1.13.0"
+version = "1.20.2"
+source = "sparse+https://git.terraphim.cloud/api/packages/terraphim/cargo/"
+checksum = "0e3b6920410921b19e522d918a2f04ceb2e902b78274200280a896efd0c50fcf"
 dependencies = [
  "async-trait",
  "jiff",
