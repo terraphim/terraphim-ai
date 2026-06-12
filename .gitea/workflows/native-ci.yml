@@ -10,3 +10,4 @@ jobs:
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo build --workspace
       - run: cargo test --workspace --lib --no-fail-fast
+      - run: cargo test -p terraphim_gitea_runner --no-fail-fast
