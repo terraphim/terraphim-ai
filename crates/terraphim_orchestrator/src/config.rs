@@ -187,6 +187,10 @@ pub struct OrchestratorConfig {
     /// `None`, the orchestrator falls back to [`GiteaOutputConfig::repo`].
     #[serde(default)]
     pub fleet_escalation_repo: Option<String>,
+    /// Auto-merge policy overrides (Gitea terraphim-ai#2285). When omitted,
+    /// [`AutoMergeConfig::default`] applies in `poll_pending_reviews`.
+    #[serde(default)]
+    pub auto_merge: Option<AutoMergeConfig>,
     /// Optional post-merge test gate configuration (ROC v1 Step H).
     ///
     /// When omitted the orchestrator uses all defaults — 10 minute test
@@ -427,6 +431,53 @@ impl Default for EvolutionConfig {
             max_memory_tokens: default_evolution_max_memory_tokens(),
             max_snapshots_per_agent: default_evolution_max_snapshots(),
             consolidation_interval_ticks: default_evolution_consolidation_ticks(),
+        }
+    }
+}
+
+/// Operator-tunable auto-merge thresholds (Gitea terraphim-ai#2285).
+///
+/// Maps into [`crate::pr_review::AutoMergeCriteria`] in `poll_pending_reviews`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AutoMergeConfig {
+    /// Bounded remediation attempts per `(project, pr)` before escalating.
+    /// Reserved for remediation-enabled fleets; ignored on minimal pollers.
+    #[serde(default = "default_auto_merge_max_attempts")]
+    pub max_remediation_attempts: u32,
+    /// Fleet-wide cap on remediation dispatches per `poll_pending_reviews` tick.
+    #[serde(default = "default_auto_merge_max_dispatches_per_tick")]
+    pub max_dispatches_per_tick: u32,
+    /// Minimum coordinator confidence (1-5) for auto-merge.
+    #[serde(default = "default_auto_merge_min_confidence")]
+    pub min_confidence: u8,
+    /// Maximum PR diff size (additions + deletions) eligible for auto-merge.
+    #[serde(default = "default_auto_merge_max_diff_loc")]
+    pub max_diff_loc: u32,
+}
+
+fn default_auto_merge_max_attempts() -> u32 {
+    3
+}
+
+fn default_auto_merge_max_dispatches_per_tick() -> u32 {
+    2
+}
+
+fn default_auto_merge_min_confidence() -> u8 {
+    5
+}
+
+fn default_auto_merge_max_diff_loc() -> u32 {
+    10_000
+}
+
+impl Default for AutoMergeConfig {
+    fn default() -> Self {
+        Self {
+            max_remediation_attempts: default_auto_merge_max_attempts(),
+            max_dispatches_per_tick: default_auto_merge_max_dispatches_per_tick(),
+            min_confidence: default_auto_merge_min_confidence(),
+            max_diff_loc: default_auto_merge_max_diff_loc(),
         }
     }
 }
@@ -3559,5 +3610,36 @@ task = "test"
             dbg.contains("***REDACTED***"),
             "Debug output should mark api_key as redacted, got: {dbg}"
         );
+    }
+
+    #[test]
+    fn auto_merge_block_omitted_yields_none_and_defaults() {
+        let toml = r#"
+working_dir = "/tmp/t"
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 2 * * *"
+repo_path = "/tmp/repo"
+"#;
+        let config = OrchestratorConfig::from_toml(toml).unwrap();
+        assert!(config.auto_merge.is_none());
+        let effective = config.auto_merge.clone().unwrap_or_default();
+        assert_eq!(effective.max_diff_loc, 10_000);
+        assert_eq!(effective.min_confidence, 5);
+    }
+
+    #[test]
+    fn auto_merge_config_maps_into_criteria() {
+        use crate::pr_review::AutoMergeCriteria;
+        let cfg = AutoMergeConfig {
+            min_confidence: 4,
+            max_diff_loc: 12_000,
+            ..AutoMergeConfig::default()
+        };
+        let criteria = AutoMergeCriteria::from(&cfg);
+        assert_eq!(criteria.min_confidence, 4);
+        assert_eq!(criteria.max_diff_loc, 12_000);
     }
 }

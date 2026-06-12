@@ -212,10 +212,22 @@ pub enum EvaluationOutcome {
 /// comments posted by agents running under an alternative login during
 /// migration.
 pub fn is_pr_reviewer_comment(comment: &PrComment) -> bool {
+    if crate::pr_gate_result::is_gate_failure_envelope(&comment.body) {
+        return false;
+    }
     if comment.user_login == PR_REVIEWER_LOGIN {
         return true;
     }
+    if is_pr_reviewer_gate_result_comment(&comment.body) {
+        return true;
+    }
     comment.body.contains("Last reviewed commit:") && !is_non_reviewer_agent_comment(&comment.body)
+}
+
+fn is_pr_reviewer_gate_result_comment(body: &str) -> bool {
+    crate::pr_gate_result::extract_gate_result(body)
+        .ok()
+        .is_some_and(|gate| gate.agent == "pr-reviewer" || gate.context == "adf/pr-reviewer")
 }
 
 /// Known heading prefixes emitted by non-reviewer ADF agents (security,
@@ -244,14 +256,105 @@ fn is_non_reviewer_agent_comment(body: &str) -> bool {
 /// when there is no such comment. "Latest" is `updated_at` ordering with
 /// comment id as a tie-break.
 pub fn latest_reviewer_comment(comments: &[PrComment]) -> Option<&PrComment> {
-    comments
+    reviewer_comments_newest_first(comments).into_iter().next()
+}
+
+fn reviewer_comments_newest_first(comments: &[PrComment]) -> Vec<&PrComment> {
+    let mut out: Vec<&PrComment> = comments
         .iter()
         .filter(|c| is_pr_reviewer_comment(c))
-        .max_by(|a, b| {
-            a.updated_at
-                .cmp(&b.updated_at)
-                .then_with(|| a.id.cmp(&b.id))
-        })
+        .collect();
+    out.sort_by(|a, b| {
+        b.updated_at
+            .cmp(&a.updated_at)
+            .then_with(|| b.id.cmp(&a.id))
+    });
+    out
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum VerdictResolveError {
+    NoReviewerComment,
+    ParseError { reason: String },
+}
+
+fn resolve_reviewer_verdict(
+    comments: &[PrComment],
+    pr_number: u64,
+    head_sha: &str,
+) -> Result<(ReviewVerdict, u64), VerdictResolveError> {
+    let candidates = reviewer_comments_newest_first(comments);
+    if candidates.is_empty() {
+        return Err(VerdictResolveError::NoReviewerComment);
+    }
+
+    let mut last_parse_reason = "no parseable reviewer verdict".to_string();
+    for comment in candidates {
+        if let Ok(verdict) = pr_review::parse_verdict(&comment.body, comment.id) {
+            return Ok((verdict, comment.id));
+        }
+        match crate::pr_gate_result::extract_gate_result(&comment.body) {
+            Ok(gate) if gate.agent == "pr-reviewer" || gate.context == "adf/pr-reviewer" => {
+                if gate.pr_number != pr_number {
+                    last_parse_reason = format!(
+                        "gate result PR #{} does not match PR #{}",
+                        gate.pr_number, pr_number
+                    );
+                    continue;
+                }
+                if !head_matches_footer(head_sha, &gate.head_sha) {
+                    last_parse_reason = format!(
+                        "gate result head {} does not match PR head {}",
+                        gate.head_sha, head_sha
+                    );
+                    continue;
+                }
+                return Ok((verdict_from_gate_result(&gate, comment.id), comment.id));
+            }
+            Ok(_) => {
+                last_parse_reason = "gate result is not from pr-reviewer".to_string();
+            }
+            Err(e) => {
+                last_parse_reason = format!("{e}");
+            }
+        }
+    }
+    Err(VerdictResolveError::ParseError {
+        reason: last_parse_reason,
+    })
+}
+
+fn verdict_from_gate_result(
+    gate: &crate::pr_gate_result::PrGateResult,
+    comment_id: u64,
+) -> ReviewVerdict {
+    use crate::pr_gate_result::GateStatus;
+
+    let p0_count = match gate.status {
+        GateStatus::Fail => gate.blocking_findings.max(1),
+        _ => gate.blocking_findings,
+    };
+    let all_criteria_met = matches!(gate.status, GateStatus::Pass | GateStatus::Concerns)
+        && gate.blocking_findings == 0;
+    let commit_short_hash = gate.head_sha.chars().take(7).collect::<String>();
+
+    ReviewVerdict {
+        confidence: gate.confidence,
+        p0_count,
+        p1_count: 0,
+        p2_count: 0,
+        all_criteria_met,
+        comment_id,
+        commit_short_hash,
+    }
+}
+
+pub fn head_matches_footer(head: &str, footer: &str) -> bool {
+    let f = footer.trim();
+    !f.is_empty()
+        && head
+            .to_ascii_lowercase()
+            .starts_with(&f.to_ascii_lowercase())
 }
 
 /// Pure evaluator: given a PR + its comments + the merge policy, decide
@@ -262,16 +365,13 @@ pub fn evaluate_pr_verdict(
     comments: &[PrComment],
     criteria: &AutoMergeCriteria,
 ) -> EvaluationOutcome {
-    let Some(latest) = latest_reviewer_comment(comments) else {
-        return EvaluationOutcome::NoReviewerComment;
-    };
-
-    let verdict: ReviewVerdict = match pr_review::parse_verdict(&latest.body, latest.id) {
+    let (verdict, _comment_id) = match resolve_reviewer_verdict(comments, pr.number, &pr.head_sha) {
         Ok(v) => v,
-        Err(e) => {
-            return EvaluationOutcome::ParseError {
-                reason: describe_parse_error(e),
-            }
+        Err(VerdictResolveError::NoReviewerComment) => {
+            return EvaluationOutcome::NoReviewerComment;
+        }
+        Err(VerdictResolveError::ParseError { reason }) => {
+            return EvaluationOutcome::ParseError { reason };
         }
     };
 
@@ -289,19 +389,6 @@ pub fn evaluate_pr_verdict(
         },
         AutoMergeDecision::HumanReviewNeeded(reason) => {
             EvaluationOutcome::HumanReviewNeeded { reason }
-        }
-    }
-}
-
-fn describe_parse_error(err: VerdictParseError) -> String {
-    match err {
-        VerdictParseError::MissingConfidence => "missing confidence score header".to_string(),
-        VerdictParseError::ConfidenceOutOfRange(n) => {
-            format!("confidence {n}/5 out of range (expected 1..=5)")
-        }
-        VerdictParseError::MissingFindings => "missing Inline Findings section".to_string(),
-        VerdictParseError::MalformedFooter => {
-            "malformed `Last reviewed commit:` footer".to_string()
         }
     }
 }

@@ -19,6 +19,15 @@ pub const GATE_RESULT_SCHEMA_VERSION: u8 = 1;
 const GATE_RESULT_OPEN: &str = "<!-- adf:gate-result";
 const GATE_RESULT_CLOSE: &str = "-->";
 
+/// Prefix of orchestrator-owned failure envelopes posted when a PR gate agent
+/// produces missing or malformed output.
+pub const GATE_FAILURE_ENVELOPE_PREFIX: &str = "ADF PR gate failed closed";
+
+/// Return `true` when `body` is an orchestrator-owned PR gate failure envelope.
+pub fn is_gate_failure_envelope(body: &str) -> bool {
+    body.trim_start().starts_with(GATE_FAILURE_ENVELOPE_PREFIX)
+}
+
 /// Machine-readable gate result emitted by every PR gate agent.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 pub struct PrGateResult {

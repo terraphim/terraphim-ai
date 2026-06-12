@@ -153,7 +153,7 @@ async fn collect_git_evidence(
             Ok(diff) if !diff.trim().is_empty() => {
                 return Ok(GitEvidence {
                     changed_files: extract_changed_files(&diff),
-                    diff_excerpt: limit_lines(&diff, limits.max_diff_lines),
+                    diff_excerpt: build_bounded_diff_excerpt(&diff, limits.max_diff_lines),
                 });
             }
             Ok(_) => {
@@ -297,6 +297,120 @@ pub fn limit_lines(text: &str, max_lines: usize) -> String {
     out
 }
 
+/// Split a unified diff into per-file chunks keyed by the post-image path.
+fn split_diff_into_file_chunks(diff: &str) -> Vec<(String, String)> {
+    let mut chunks = Vec::new();
+    let mut current_path: Option<String> = None;
+    let mut current_lines: Vec<&str> = Vec::new();
+
+    for line in diff.lines() {
+        if let Some(rest) = line.strip_prefix("diff --git a/") {
+            if let Some((_, right)) = rest.split_once(" b/") {
+                if let Some(path) = current_path.take() {
+                    chunks.push((path, current_lines.join("\n")));
+                    current_lines.clear();
+                }
+                current_path = Some(right.to_string());
+            }
+        }
+        if current_path.is_some() {
+            current_lines.push(line);
+        }
+    }
+
+    if let Some(path) = current_path {
+        chunks.push((path, current_lines.join("\n")));
+    }
+
+    chunks
+}
+
+/// Higher-priority paths are included before large deletion hunks so validators
+/// still see security-sensitive removals when the excerpt budget is tight.
+fn file_evidence_priority(path: &str) -> u8 {
+    if path.starts_with('~')
+        || path.contains("private")
+        || path.contains(".env")
+        || path.contains("secret")
+    {
+        0
+    } else if path == ".gitignore" {
+        1
+    } else {
+        2
+    }
+}
+
+fn summarize_omitted_file_chunk(path: &str, chunk: &str) -> String {
+    let deleted = chunk.contains("deleted file mode");
+    let added = chunk.contains("new file mode");
+    let mode = if deleted {
+        "deleted"
+    } else if added {
+        "added"
+    } else {
+        "modified"
+    };
+    format!(
+        "### {path}\n({mode}, {} diff lines omitted from excerpt)\n",
+        chunk.lines().count()
+    )
+}
+
+/// Build a bounded diff excerpt that always retains high-priority file hunks
+/// (e.g. literal `~/…` paths) even when large cleanup deletions dominate LoC.
+pub fn build_bounded_diff_excerpt(diff: &str, max_lines: usize) -> String {
+    let chunks = split_diff_into_file_chunks(diff);
+    if chunks.is_empty() {
+        return limit_lines(diff, max_lines);
+    }
+
+    let mut ordered: Vec<(u8, usize, String, String)> = chunks
+        .into_iter()
+        .map(|(path, body)| {
+            let priority = file_evidence_priority(&path);
+            let line_count = body.lines().count().max(1);
+            (priority, line_count, path, body)
+        })
+        .collect();
+    ordered.sort_by(|a, b| (a.0, a.1).cmp(&(b.0, b.1)));
+
+    let mut parts = Vec::new();
+    let mut used_lines = 0usize;
+    let mut included = Vec::new();
+
+    for (priority, _, path, body) in &ordered {
+        if used_lines >= max_lines {
+            break;
+        }
+        let remaining = max_lines.saturating_sub(used_lines);
+        let chunk = if *priority == 0 || body.lines().count() <= remaining {
+            body.clone()
+        } else {
+            limit_lines(body, remaining)
+        };
+        used_lines += chunk.lines().count();
+        included.push(path.clone());
+        parts.push(chunk);
+    }
+
+    let omitted: Vec<_> = ordered
+        .iter()
+        .filter(|(_, _, path, _)| !included.contains(path))
+        .collect();
+    if !omitted.is_empty() {
+        parts.push(format!(
+            "\n## Files omitted from truncated excerpt ({})\n",
+            omitted.len()
+        ));
+        for (_, _, path, body) in omitted {
+            parts.push(summarize_omitted_file_chunk(path, body));
+        }
+    }
+
+    parts.join("\n")
+}
+
 fn extract_builtin_concepts(text: &str) -> Vec<String> {
     let terms = [
         "PrGateResult",
@@ -363,6 +477,24 @@ mod tests {
     fn limit_lines_marks_truncation() {
         let limited = limit_lines("a\nb\nc", 2);
         assert_eq!(limited, "a\nb\n[diff truncated]");
+    }
+
+    #[test]
+    fn build_bounded_diff_excerpt_prioritizes_tilde_paths() {
+        let mut large = String::from("diff --git a/session-ses.md b/session-ses.md\n");
+        for i in 0..2000 {
+            large.push_str(&format!("-{i}\n"));
+        }
+        large.push_str(
+            "diff --git a/~/projects/personal/private_agents_settings/bin/tool b/~/projects/personal/private_agents_settings/bin/tool\n",
+        );
+        large.push_str("deleted file mode 100755\n-old content\n");
+
+        let excerpt = build_bounded_diff_excerpt(&large, 50);
+        assert!(
+            excerpt.contains("~/projects/personal/private_agents_settings"),
+            "security-sensitive tilde path must appear in excerpt: {excerpt}"
+        );
     }
 
     #[test]

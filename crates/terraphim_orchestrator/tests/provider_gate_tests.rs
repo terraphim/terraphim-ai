@@ -365,6 +365,7 @@ fn budget_aware_config(
         project_circuit_breaker_threshold: 3,
         fleet_escalation_owner: None,
         fleet_escalation_repo: None,
+        auto_merge: None,
         post_merge_gate: None,
         learning: terraphim_orchestrator::LearningConfig::default(),
         evolution: terraphim_orchestrator::EvolutionConfig::default(),

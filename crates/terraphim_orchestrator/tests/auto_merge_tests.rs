@@ -80,6 +80,7 @@ fn minimal_config(working_dir: PathBuf) -> OrchestratorConfig {
         project_circuit_breaker_threshold: 3,
         fleet_escalation_owner: None,
         fleet_escalation_repo: None,
+        auto_merge: None,
         post_merge_gate: None,
         learning: terraphim_orchestrator::LearningConfig::default(),
         evolution: terraphim_orchestrator::EvolutionConfig::default(),
@@ -246,13 +247,17 @@ async fn auto_merge_blocked_on_large_diff() {
     let mut orch =
         AgentOrchestrator::new(minimal_config(tempfile::tempdir().unwrap().keep())).unwrap();
 
-    // 5/5 clean review, agent author, but diff_loc exceeds the 500 LoC cap.
+    // 5/5 clean review, agent author, but diff_loc exceeds a strict LoC cap.
+    let strict_cap = AutoMergeCriteria {
+        max_diff_loc: 500,
+        ..AutoMergeCriteria::default()
+    };
     let tracker = InMemoryPrTracker::new().with_pr(
         pr_summary(404, "claude-code", "2ef451d8", 501),
         vec![reviewer_comment(4, GO_5_5_CLEAN, "2026-01-02T00:00:00Z")],
     );
 
-    orch.poll_pending_reviews_for_project(PROJECT, &tracker, &AutoMergeCriteria::default())
+    orch.poll_pending_reviews_for_project(PROJECT, &tracker, &strict_cap)
         .await;
 
     assert_eq!(

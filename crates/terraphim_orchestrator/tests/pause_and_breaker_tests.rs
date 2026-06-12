@@ -102,6 +102,7 @@ fn test_config_with_pause(
         project_circuit_breaker_threshold: threshold,
         fleet_escalation_owner: None,
         fleet_escalation_repo: None,
+        auto_merge: None,
         post_merge_gate: None,
         learning: terraphim_orchestrator::LearningConfig::default(),
         evolution: terraphim_orchestrator::EvolutionConfig::default(),

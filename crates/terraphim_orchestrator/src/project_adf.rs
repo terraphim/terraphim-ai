@@ -604,6 +604,7 @@ context = "adf/build"
             project_circuit_breaker_threshold: 5,
             fleet_escalation_owner: None,
             fleet_escalation_repo: None,
+            auto_merge: None,
             post_merge_gate: None,
             learning: crate::config::LearningConfig::default(),
             evolution: crate::config::EvolutionConfig::default(),

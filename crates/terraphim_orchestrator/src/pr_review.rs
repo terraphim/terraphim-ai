@@ -66,8 +66,19 @@ impl Default for AutoMergeCriteria {
             max_p0: 0,
             max_p1: 0,
             require_all_criteria: true,
-            max_diff_loc: 500,
+            max_diff_loc: 10_000,
             require_agent_author: true,
+        }
+    }
+}
+
+/// Map operator-facing [`crate::config::AutoMergeConfig`] into policy criteria.
+impl From<&crate::config::AutoMergeConfig> for AutoMergeCriteria {
+    fn from(cfg: &crate::config::AutoMergeConfig) -> Self {
+        Self {
+            min_confidence: cfg.min_confidence,
+            max_diff_loc: cfg.max_diff_loc,
+            ..Self::default()
         }
     }
 }
@@ -363,7 +374,7 @@ mod tests {
         assert_eq!(c.max_p0, 0);
         assert_eq!(c.max_p1, 0);
         assert!(c.require_all_criteria);
-        assert_eq!(c.max_diff_loc, 500);
+        assert_eq!(c.max_diff_loc, 10_000);
         assert!(c.require_agent_author);
     }
 

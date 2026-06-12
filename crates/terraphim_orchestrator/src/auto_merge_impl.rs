@@ -58,7 +58,8 @@ impl AgentOrchestrator {
             return Ok(());
         }
 
-        let criteria = pr_review::AutoMergeCriteria::default();
+        let auto_merge_cfg = self.config.auto_merge.clone().unwrap_or_default();
+        let criteria = pr_review::AutoMergeCriteria::from(&auto_merge_cfg);
 
         for (project_id, gitea_cfg) in targets {
             let tracker_cfg = terraphim_tracker::GiteaConfig {
