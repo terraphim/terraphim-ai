@@ -67,7 +67,9 @@ fn linear_missing_project_slug() {
 #[test]
 fn linear_missing_api_key() {
     // Clear any env var that might provide the key
-    // SAFETY: test-specific env var name, single-threaded test context
+    // SAFETY: No other test in this binary reads or writes LINEAR_API_KEY.
+    // Cargo runs tests in parallel threads by default; we accept this because
+    // only this test touches this variable.
     unsafe { std::env::remove_var("LINEAR_API_KEY") };
 
     let cfg = config_from_yaml("tracker:\n  kind: linear\n  project_slug: proj");
