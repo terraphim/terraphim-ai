@@ -44,6 +44,7 @@ tower-http = { version = "0.5", features = ["cors", "trace"] }
 # Security and validation
 sha2 = "0.10"
 hex = "0.4"
+jsonschema = { version = "0.46", default-features = false }
 
 # Testing and assertions
 tempfile = { workspace = true }
