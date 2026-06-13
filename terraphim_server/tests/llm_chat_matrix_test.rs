@@ -1,6 +1,8 @@
 //! Comprehensive LLM Chat Matrix Tests using real services
 //! Uses configuration from .env file - no mocks, all real services
 
+mod common;
+
 use serde_json::json;
 use std::env;
 use std::fs;
@@ -176,12 +178,23 @@ async fn run_openrouter_smoke(role_name: &str, prompt: &str, expected_terms: &[&
     }
 }
 
-/// Check if a service is available
-async fn is_service_available(url: &str) -> bool {
-    if let Ok(response) = reqwest::get(format!("{}/api/tags", url)).await {
-        response.status().is_success()
-    } else {
-        false
+/// Check if the Ollama service is reachable (2-second deadline).
+/// Delegates to the shared reachability helper.
+async fn is_ollama_available(base_url: &str) -> bool {
+    let url = format!("{}/api/tags", base_url);
+    let client = match reqwest::Client::builder()
+        .timeout(Duration::from_secs(2))
+        .build()
+    {
+        Ok(c) => c,
+        Err(_) => return false,
+    };
+    match client.get(&url).send().await {
+        Ok(resp) if resp.status().is_success() => true,
+        _ => {
+            eprintln!("skip: Ollama unreachable at {}", base_url);
+            false
+        }
     }
 }
 
@@ -225,7 +238,7 @@ async fn test_default_ripgrep_ollama() {
 
     // Skip if Ollama not available
     let ollama_url = env::var("OLLAMA_BASE_URL").unwrap_or("http://127.0.0.1:11434".to_string());
-    if !is_service_available(&ollama_url).await {
+    if !is_ollama_available(&ollama_url).await {
         println!("Skipping test: Ollama not available at {}", ollama_url);
         return;
     }
@@ -270,7 +283,7 @@ async fn test_rust_engineer_ripgrep_ollama() {
     load_env_config();
 
     let ollama_url = env::var("OLLAMA_BASE_URL").unwrap_or("http://127.0.0.1:11434".to_string());
-    if !is_service_available(&ollama_url).await {
+    if !is_ollama_available(&ollama_url).await {
         println!("Skipping test: Ollama not available");
         return;
     }
@@ -328,7 +341,7 @@ async fn test_ai_engineer_ripgrep_ollama() {
     load_env_config();
 
     let ollama_url = env::var("OLLAMA_BASE_URL").unwrap_or("http://127.0.0.1:11434".to_string());
-    if !is_service_available(&ollama_url).await {
+    if !is_ollama_available(&ollama_url).await {
         println!("Skipping test: Ollama not available");
         return;
     }
@@ -374,7 +387,7 @@ async fn test_terraphim_engineer_knowledgegraph_ollama() {
     load_env_config();
 
     let ollama_url = env::var("OLLAMA_BASE_URL").unwrap_or("http://127.0.0.1:11434".to_string());
-    if !is_service_available(&ollama_url).await {
+    if !is_ollama_available(&ollama_url).await {
         println!("Skipping test: Ollama not available");
         return;
     }
@@ -428,7 +441,7 @@ async fn test_system_operator_ripgrep_ollama() {
     load_env_config();
 
     let ollama_url = env::var("OLLAMA_BASE_URL").unwrap_or("http://127.0.0.1:11434".to_string());
-    if !is_service_available(&ollama_url).await {
+    if !is_ollama_available(&ollama_url).await {
         println!("Skipping test: Ollama not available");
         return;
     }
@@ -534,7 +547,7 @@ async fn test_all_roles_with_ollama() {
     load_env_config();
 
     let ollama_url = env::var("OLLAMA_BASE_URL").unwrap_or("http://127.0.0.1:11434".to_string());
-    if !is_service_available(&ollama_url).await {
+    if !is_ollama_available(&ollama_url).await {
         println!("Skipping comprehensive test: Ollama not available");
         return;
     }
@@ -637,7 +650,7 @@ async fn test_performance_benchmarks() {
     load_env_config();
 
     let ollama_url = env::var("OLLAMA_BASE_URL").unwrap_or("http://127.0.0.1:11434".to_string());
-    if !is_service_available(&ollama_url).await {
+    if !is_ollama_available(&ollama_url).await {
         println!("Skipping performance test: Ollama not available");
         return;
     }

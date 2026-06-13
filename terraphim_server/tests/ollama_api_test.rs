@@ -1,20 +1,13 @@
+mod common;
+
 use axum_test::TestServer;
 use serde_json::json;
 
-/// Test the /chat endpoint with real Ollama backend
+/// Test the /chat endpoint with real Ollama backend.
+/// Skips within 2 seconds if Ollama is not reachable rather than hanging.
 #[tokio::test]
-#[ignore] // Only run when Ollama is available
 async fn test_chat_endpoint_with_ollama() {
-    // Check if Ollama is running
-    let ollama_url = "http://127.0.0.1:11434";
-    let client = reqwest::Client::new();
-    if client
-        .get(format!("{}/api/tags", ollama_url))
-        .send()
-        .await
-        .is_err()
-    {
-        eprintln!("Skipping test: Ollama not running on {}", ollama_url);
+    if !common::llm_reachability::require_ollama().await {
         return;
     }
 
