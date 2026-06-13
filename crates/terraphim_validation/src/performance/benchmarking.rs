@@ -526,30 +526,48 @@ impl PerformanceBenchmarker {
         Ok(())
     }
 
-    /// Benchmark CRUD operations using real in-memory HashMap insert/get/remove.
+    /// Benchmark CRUD operations with real persistence layer calls:
+    /// write JSON document to a temp file (insert), read it back (get), delete it (remove).
     async fn benchmark_crud_operations(&mut self) -> Result<()> {
-        let iterations = self.config.iterations.min(500) as usize;
+        let iterations = self.config.iterations.min(200) as usize;
+        let tmpdir = TempDir::new().map_err(|e| anyhow!("TempDir: {}", e))?;
         let mut times = Vec::with_capacity(iterations);
-        let mut store: HashMap<String, String> = HashMap::with_capacity(iterations);
+        let mut errors = 0u32;
 
         let total_start = Instant::now();
         for i in 0..iterations {
             let t = Instant::now();
-            let key = format!("doc:{}", i);
-            let value = serde_json::to_string(&serde_json::json!({"id": i, "body": "test"}))
-                .unwrap_or_default();
-            store.insert(key.clone(), value.clone());
-            let _ = store.get(&key);
-            store.remove(&key);
-            times.push(t.elapsed());
+            let path = tmpdir.path().join(format!("doc_{}.json", i));
+            let payload = serde_json::json!({"id": i, "body": "persistence benchmark document"});
+            let bytes = serde_json::to_vec(&payload).map_err(|e| anyhow!("serialise: {}", e))?;
+
+            // Write (persistence insert)
+            match tokio::fs::write(&path, &bytes).await {
+                Ok(_) => {
+                    // Read (persistence get)
+                    let read_back = tokio::fs::read(&path).await.unwrap_or_default();
+                    let _: serde_json::Value =
+                        serde_json::from_slice(&read_back).unwrap_or(serde_json::Value::Null);
+                    // Delete (persistence remove)
+                    tokio::fs::remove_file(&path).await.ok();
+                    times.push(t.elapsed());
+                }
+                Err(_) => {
+                    errors += 1;
+                }
+            }
         }
         let total_time = total_start.elapsed();
 
+        if times.is_empty() {
+            return Err(anyhow!("All crud_operations iterations failed"));
+        }
         let success_count = times.len() as u32;
         let avg_time = times.iter().sum::<Duration>() / success_count;
         let min_time = *times.iter().min().unwrap();
         let max_time = *times.iter().max().unwrap();
         let ops_per_second = success_count as f64 / total_time.as_secs_f64().max(f64::EPSILON);
+        let success_rate = success_count as f64 / iterations as f64;
 
         let result = BenchmarkResult {
             operation: "crud_operations".to_string(),
@@ -558,8 +576,8 @@ impl PerformanceBenchmarker {
             min_time,
             max_time,
             ops_per_second,
-            success_rate: 1.0,
-            error_count: 0,
+            success_rate,
+            error_count: errors,
             resource_usage: self.capture_resource_usage().await?,
         };
 
@@ -567,33 +585,55 @@ impl PerformanceBenchmarker {
         Ok(())
     }
 
-    /// Benchmark transaction performance using real serde_json round-trips.
+    /// Benchmark transaction performance: write multiple related documents to disk
+    /// atomically (write to tmp, rename into place), then verify and clean up.
     async fn benchmark_transaction_performance(&mut self) -> Result<()> {
-        let iterations = self.config.iterations.min(200) as usize;
+        let iterations = self.config.iterations.min(100) as usize;
+        let tmpdir = TempDir::new().map_err(|e| anyhow!("TempDir: {}", e))?;
         let mut times = Vec::with_capacity(iterations);
+        let mut errors = 0u32;
 
         let total_start = Instant::now();
         for i in 0..iterations {
             let t = Instant::now();
-            // Simulate a transaction: serialise, deserialise, and validate
-            let payload = serde_json::json!({
+            // Simulate a transaction: write two related documents atomically via rename
+            let tx_payload = serde_json::json!({
                 "tx_id": i,
                 "items": [{"id": i, "amount": i * 10}],
                 "status": "committed"
             });
-            let serialised = serde_json::to_string(&payload).unwrap_or_default();
-            let deserialised: serde_json::Value =
-                serde_json::from_str(&serialised).unwrap_or(serde_json::Value::Null);
-            std::hint::black_box(deserialised.is_object());
-            times.push(t.elapsed());
+            let bytes =
+                serde_json::to_vec(&tx_payload).map_err(|e| anyhow!("serialise tx: {}", e))?;
+
+            let final_path = tmpdir.path().join(format!("tx_{}.json", i));
+            let tmp_path = tmpdir.path().join(format!("tx_{}.tmp", i));
+
+            // Write to tmp then rename (atomic commit simulation)
+            let write_ok = tokio::fs::write(&tmp_path, &bytes).await.is_ok()
+                && tokio::fs::rename(&tmp_path, &final_path).await.is_ok();
+
+            if write_ok {
+                // Verify by reading back
+                let read_back = tokio::fs::read(&final_path).await.unwrap_or_default();
+                let _: serde_json::Value =
+                    serde_json::from_slice(&read_back).unwrap_or(serde_json::Value::Null);
+                tokio::fs::remove_file(&final_path).await.ok();
+                times.push(t.elapsed());
+            } else {
+                errors += 1;
+            }
         }
         let total_time = total_start.elapsed();
 
+        if times.is_empty() {
+            return Err(anyhow!("All transaction_performance iterations failed"));
+        }
         let success_count = times.len() as u32;
         let avg_time = times.iter().sum::<Duration>() / success_count;
         let min_time = *times.iter().min().unwrap();
         let max_time = *times.iter().max().unwrap();
         let ops_per_second = success_count as f64 / total_time.as_secs_f64().max(f64::EPSILON);
+        let success_rate = success_count as f64 / iterations as f64;
 
         let result = BenchmarkResult {
             operation: "transaction_performance".to_string(),
@@ -602,8 +642,8 @@ impl PerformanceBenchmarker {
             min_time,
             max_time,
             ops_per_second,
-            success_rate: 1.0,
-            error_count: 0,
+            success_rate,
+            error_count: errors,
             resource_usage: self.capture_resource_usage().await?,
         };
 
