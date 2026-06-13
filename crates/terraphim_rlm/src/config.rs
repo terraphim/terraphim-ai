@@ -348,7 +348,9 @@ pub enum KgStrictness {
 }
 
 impl KgStrictness {
-    /// Check if unknown terms should block execution.
+    /// Returns `true` only for `Strict` mode.
+    ///
+    /// Hot-path wiring in `query_loop.rs` and `rlm.rs` is tracked in #2415.
     pub fn blocks_unknown(&self) -> bool {
         matches!(self, KgStrictness::Strict)
     }
