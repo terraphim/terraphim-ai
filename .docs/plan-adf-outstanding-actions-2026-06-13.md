@@ -1,6 +1,6 @@
 # Outstanding Actions: ADF Flow Fix
 
-**Status**: In progress (2026-06-13 session)
+**Status**: In progress (2026-06-13 session, bigbox actions 2/4/5 deployed)
 **Author**: Terraphim AI
 **Date**: 2026-06-13 10:31 BST
 **Supersedes**: `.docs/plan-adf-flow-fix-2026-06-10.md` (original plan — preserved for reference)
@@ -220,3 +220,17 @@ curl -s -H "Authorization: token $GITEA_TOKEN" \
   "${GITEA_URL}/api/v1/repos/terraphim/terraphim-ai/commits/{HEAD_SHA}/statuses" \
   | python3 -c "import sys,json; [print(s['context'], s['state']) for s in json.load(sys.stdin)]"
 ```
+
+---
+
+## Verification table (2026-06-13 bigbox session)
+
+| Action | Evidence | Status |
+|---|---|---|
+| 0 Architecture | `terraphim-agents` + `task/2465-auto-merge-blocker-kind` verified | Done |
+| 1 Issue dedup | PR #43; binary on bigbox built from `task/2596-adf-issue-dedup` | Deployed (merge PR pending) |
+| 2 min_confidence=4 | `adf --check` → `min_confidence 4`; journald `threshold 4/5` after binary rebuild | Done |
+| 3 Branch protection | terraphim-ai: 4 status contexts | Done |
+| 4 Swarm cadence | `schedule */20`, `pre_check` after `project`; orchestrator active | Config done; 60m dispatch count pending |
+| 5 Batch-close dupes | 65 closed; 1 skipped (#1971 dep on #2596) | Done (partial) |
+| 6 Live proof | — | Pending |
