@@ -259,6 +259,7 @@ pub struct BatchSummarizeResponse {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[allow(dead_code)]
+#[cfg(feature = "firecracker")]
 pub struct VmWithIp {
     pub vm_id: String,
     pub ip_address: String,
@@ -266,6 +267,7 @@ pub struct VmWithIp {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[allow(dead_code)]
+#[cfg(feature = "firecracker")]
 pub struct VmPoolListResponse {
     pub vms: Vec<VmWithIp>,
     pub stats: VmPoolStatsResponse,
@@ -273,6 +275,7 @@ pub struct VmPoolListResponse {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[allow(dead_code)]
+#[cfg(feature = "firecracker")]
 pub struct VmPoolStatsResponse {
     pub total_ips: usize,
     pub allocated_ips: usize,
@@ -282,6 +285,7 @@ pub struct VmPoolStatsResponse {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[allow(dead_code)]
+#[cfg(feature = "firecracker")]
 pub struct VmStatusResponse {
     pub vm_id: String,
     pub status: String,
@@ -292,6 +296,7 @@ pub struct VmStatusResponse {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[allow(dead_code)]
+#[cfg(feature = "firecracker")]
 pub struct VmExecuteRequest {
     pub code: String,
     pub language: String,
@@ -302,6 +307,7 @@ pub struct VmExecuteRequest {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[allow(dead_code)]
+#[cfg(feature = "firecracker")]
 pub struct VmExecuteResponse {
     pub execution_id: String,
     pub vm_id: String,
@@ -316,6 +322,7 @@ pub struct VmExecuteResponse {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[allow(dead_code)]
+#[cfg(feature = "firecracker")]
 pub struct VmTask {
     pub id: String,
     pub vm_id: String,
@@ -326,6 +333,7 @@ pub struct VmTask {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[allow(dead_code)]
+#[cfg(feature = "firecracker")]
 pub struct VmTasksResponse {
     pub tasks: Vec<VmTask>,
     pub vm_id: String,
@@ -334,12 +342,14 @@ pub struct VmTasksResponse {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[allow(dead_code)]
+#[cfg(feature = "firecracker")]
 pub struct VmAllocateRequest {
     pub vm_id: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[allow(dead_code)]
+#[cfg(feature = "firecracker")]
 pub struct VmAllocateResponse {
     pub vm_id: String,
     pub ip_address: String,
@@ -347,6 +357,7 @@ pub struct VmAllocateResponse {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[allow(dead_code)]
+#[cfg(feature = "firecracker")]
 pub struct VmMetricsResponse {
     pub vm_id: String,
     pub status: String,
@@ -361,6 +372,7 @@ pub struct VmMetricsResponse {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[allow(dead_code)]
+#[cfg(feature = "firecracker")]
 pub struct VmAgentRequest {
     pub agent_id: String,
     pub task: String,
@@ -370,6 +382,7 @@ pub struct VmAgentRequest {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[allow(dead_code)]
+#[cfg(feature = "firecracker")]
 pub struct VmAgentResponse {
     pub task_id: String,
     pub agent_id: String,
@@ -518,6 +531,7 @@ impl ApiClient {
     // VM Management APIs
 
     #[allow(dead_code)]
+    #[cfg(feature = "firecracker")]
     pub async fn list_vms(&self) -> Result<VmPoolListResponse> {
         let url = format!("{}/api/vm-pool", self.base);
         let res = self.http.get(url).send().await?;
@@ -526,6 +540,7 @@ impl ApiClient {
     }
 
     #[allow(dead_code)]
+    #[cfg(feature = "firecracker")]
     pub async fn get_vm_pool_stats(&self) -> Result<VmPoolStatsResponse> {
         let url = format!("{}/api/vm-pool/stats", self.base);
         let res = self.http.get(url).send().await?;
@@ -537,6 +552,7 @@ impl ApiClient {
     }
 
     #[allow(dead_code)]
+    #[cfg(feature = "firecracker")]
     pub async fn get_vm_status(&self, vm_id: &str) -> Result<VmStatusResponse> {
         let url = format!("{}/api/vms/{}", self.base, urlencoding::encode(vm_id));
         let res = self.http.get(url).send().await?;
@@ -544,6 +560,7 @@ impl ApiClient {
         Ok(body)
     }
 
+    #[cfg(feature = "firecracker")]
     #[allow(dead_code)]
     pub async fn execute_vm_code(
         &self,
@@ -564,6 +581,7 @@ impl ApiClient {
         Ok(body)
     }
 
+    #[cfg(feature = "firecracker")]
     #[allow(dead_code)]
     pub async fn list_vm_tasks(&self, vm_id: &str) -> Result<VmTasksResponse> {
         let url = format!("{}/api/vms/{}/tasks", self.base, urlencoding::encode(vm_id));
@@ -572,6 +590,7 @@ impl ApiClient {
         Ok(body)
     }
 
+    #[cfg(feature = "firecracker")]
     #[allow(dead_code)]
     pub async fn allocate_vm_ip(&self, vm_id: &str) -> Result<VmAllocateResponse> {
         let url = format!("{}/api/vm-pool/allocate", self.base);
@@ -583,6 +602,7 @@ impl ApiClient {
         Ok(body)
     }
 
+    #[cfg(feature = "firecracker")]
     #[allow(dead_code)]
     pub async fn release_vm_ip(&self, vm_id: &str) -> Result<()> {
         let url = format!(
@@ -595,6 +615,7 @@ impl ApiClient {
         Ok(())
     }
 
+    #[cfg(feature = "firecracker")]
     #[allow(dead_code)]
     pub async fn get_vm_metrics(&self, vm_id: &str) -> Result<VmMetricsResponse> {
         let url = format!(
@@ -607,6 +628,7 @@ impl ApiClient {
         Ok(body)
     }
 
+    #[cfg(feature = "firecracker")]
     #[allow(dead_code)]
     pub async fn get_all_vm_metrics(&self) -> Result<Vec<VmMetricsResponse>> {
         let url = format!("{}/api/vms/metrics", self.base);
@@ -619,6 +641,8 @@ impl ApiClient {
     }
 
     #[allow(dead_code)]
+    #[allow(dead_code)]
+    #[cfg(feature = "firecracker")]
     pub async fn execute_agent_task(
         &self,
         agent_id: &str,

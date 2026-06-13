@@ -5,10 +5,12 @@
 //! - Firecracker: Isolated execution in microVMs
 //! - Hybrid: Smart mode selection based on risk assessment
 
+#[cfg(feature = "firecracker")]
 pub mod firecracker;
 pub mod hybrid;
 pub mod local;
 
+#[cfg(feature = "firecracker")]
 pub use firecracker::FirecrackerExecutor;
 pub use hybrid::HybridExecutor;
 pub use local::LocalExecutor;
@@ -53,7 +55,10 @@ pub struct ExecutorCapabilities {
 pub fn create_executor(mode: ExecutionMode) -> Box<dyn CommandExecutor> {
     match mode {
         ExecutionMode::Local => Box::new(LocalExecutor::new()),
+        #[cfg(feature = "firecracker")]
         ExecutionMode::Firecracker => Box::new(FirecrackerExecutor::new()),
+        #[cfg(not(feature = "firecracker"))]
+        ExecutionMode::Firecracker => Box::new(LocalExecutor::new()),
         ExecutionMode::Hybrid => Box::new(HybridExecutor::new()),
     }
 }

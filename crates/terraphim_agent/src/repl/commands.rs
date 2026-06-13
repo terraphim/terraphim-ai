@@ -156,6 +156,11 @@ pub enum FileSubcommand {
 pub enum SessionsSubcommand {
     /// Detect available session sources
     Sources,
+    /// Import sessions from a specific source
+    Import {
+        source: Option<String>,
+        path: Option<String>,
+    },
     /// List imported sessions (auto-imports if cache is empty)
     List {
         source: Option<String>,
@@ -167,8 +172,8 @@ pub enum SessionsSubcommand {
     Stats,
     /// Show details of a specific session
     Show { session_id: String },
-    /// Search sessions by concept (Phase 3 - requires enrichment)
-    Concepts { concept: String },
+    /// Expand a session to full context for inspection
+    Expand { session_id: String },
     /// Find sessions related to a given session
     Related {
         session_id: String,
@@ -1119,9 +1124,37 @@ impl FromStr for ReplCommand {
                     "sources" | "detect" => Ok(ReplCommand::Sessions {
                         subcommand: SessionsSubcommand::Sources,
                     }),
-                    "import" => Err(anyhow!(
-                        "The 'import' command has been removed. Sessions are now automatically imported when needed. Use '/sessions list' or '/sessions search <query>' instead."
-                    )),
+                    "import" => {
+                        let mut source = None;
+                        let mut path = None;
+                        let mut i = 2;
+
+                        while i < parts.len() {
+                            match parts[i] {
+                                "--source" => {
+                                    if i + 1 < parts.len() {
+                                        source = Some(parts[i + 1].to_string());
+                                        i += 2;
+                                    } else {
+                                        return Err(anyhow!("--source requires a value"));
+                                    }
+                                }
+                                "--path" => {
+                                    if i + 1 < parts.len() {
+                                        path = Some(parts[i + 1].to_string());
+                                        i += 2;
+                                    } else {
+                                        return Err(anyhow!("--path requires a value"));
+                                    }
+                                }
+                                _ => i += 1,
+                            }
+                        }
+
+                        Ok(ReplCommand::Sessions {
+                            subcommand: SessionsSubcommand::Import { source, path },
+                        })
+                    }
                     "list" | "ls" => {
                         let mut source = None;
                         let mut limit = None;
@@ -1178,13 +1211,13 @@ impl FromStr for ReplCommand {
                             subcommand: SessionsSubcommand::Show { session_id },
                         })
                     }
-                    "concepts" | "by-concept" => {
+                    "expand" => {
                         if parts.len() < 3 {
-                            return Err(anyhow!("Sessions concepts requires a concept name"));
+                            return Err(anyhow!("Sessions expand requires a session ID"));
                         }
-                        let concept = parts[2..].join(" ");
+                        let session_id = parts[2].to_string();
                         Ok(ReplCommand::Sessions {
-                            subcommand: SessionsSubcommand::Concepts { concept },
+                            subcommand: SessionsSubcommand::Expand { session_id },
                         })
                     }
                     "related" => {
@@ -1526,7 +1559,7 @@ impl ReplCommand {
 
             #[cfg(feature = "repl-sessions")]
             "sessions" => Some(
-                "/sessions <subcommand> - AI coding session history (sources, list, search, stats, show, concepts, related, timeline, export, enrich, files, by-file)",
+                "/sessions <subcommand> - AI coding session history (sources, import, list, search, stats, show, expand, concepts, related, timeline, export, enrich, files, by-file)",
             ),
 
             _ => None,

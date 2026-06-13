@@ -5,7 +5,7 @@
 
 use super::{
     CommandDefinition, CommandExecutionError, CommandExecutionResult, ExecutionMode,
-    ExecutorCapabilities, FirecrackerExecutor, LocalExecutor,
+    ExecutorCapabilities, LocalExecutor,
 };
 use crate::commands::RiskLevel;
 use std::collections::HashMap;
@@ -15,7 +15,8 @@ pub struct HybridExecutor {
     /// Local executor for safe commands
     local_executor: LocalExecutor,
     /// Firecracker executor for isolated execution
-    firecracker_executor: FirecrackerExecutor,
+    #[cfg(feature = "firecracker")]
+    firecracker_executor: super::FirecrackerExecutor,
     /// Risk assessment settings
     risk_settings: RiskAssessmentSettings,
 }
@@ -149,7 +150,8 @@ impl HybridExecutor {
     pub fn new() -> Self {
         Self {
             local_executor: LocalExecutor::new(),
-            firecracker_executor: FirecrackerExecutor::new(),
+            #[cfg(feature = "firecracker")]
+            firecracker_executor: super::FirecrackerExecutor::new(),
             risk_settings: RiskAssessmentSettings::default(),
         }
     }
@@ -158,16 +160,27 @@ impl HybridExecutor {
     pub fn with_settings(risk_settings: RiskAssessmentSettings) -> Self {
         Self {
             local_executor: LocalExecutor::new(),
-            firecracker_executor: FirecrackerExecutor::new(),
+            #[cfg(feature = "firecracker")]
+            firecracker_executor: super::FirecrackerExecutor::new(),
             risk_settings,
         }
     }
 
     /// Create a hybrid executor with API client for VM operations
+    #[cfg(feature = "firecracker")]
     pub fn with_api_client(api_client: crate::client::ApiClient) -> Self {
         Self {
             local_executor: LocalExecutor::new(),
-            firecracker_executor: FirecrackerExecutor::with_api_client(api_client),
+            firecracker_executor: super::FirecrackerExecutor::with_api_client(api_client),
+            risk_settings: RiskAssessmentSettings::default(),
+        }
+    }
+
+    /// Create a hybrid executor without VM operations when firecracker is disabled
+    #[cfg(not(feature = "firecracker"))]
+    pub fn with_api_client(_api_client: crate::client::ApiClient) -> Self {
+        Self {
+            local_executor: LocalExecutor::new(),
             risk_settings: RiskAssessmentSettings::default(),
         }
     }
@@ -190,7 +203,13 @@ impl HybridExecutor {
                 }
             }
             ExecutionMode::Firecracker => {
+                #[cfg(feature = "firecracker")]
                 return ExecutionMode::Firecracker;
+                #[cfg(not(feature = "firecracker"))]
+                {
+                    log::warn!("Firecracker requested but feature disabled; falling back to local");
+                    return ExecutionMode::Local;
+                }
             }
             ExecutionMode::Hybrid => {
                 // Perform risk assessment
@@ -211,13 +230,21 @@ impl HybridExecutor {
         // Check command risk level
         match definition.risk_level {
             RiskLevel::Critical | RiskLevel::High => {
+                #[cfg(feature = "firecracker")]
                 return ExecutionMode::Firecracker;
+                #[cfg(not(feature = "firecracker"))]
+                {
+                    log::warn!("High-risk command but firecracker disabled; falling back to local");
+                    return ExecutionMode::Local;
+                }
             }
             RiskLevel::Medium => {
                 // Medium risk: check other factors
                 if self.has_high_risk_indicators(command_str) {
+                    #[cfg(feature = "firecracker")]
                     return ExecutionMode::Firecracker;
                 }
+                #[cfg(feature = "firecracker")]
                 if definition.resource_limits.is_some() {
                     return ExecutionMode::Firecracker;
                 }
@@ -230,8 +257,11 @@ impl HybridExecutor {
             }
         }
 
-        // Default to Firecracker for safety
-        ExecutionMode::Firecracker
+        // Default to Firecracker for safety when available, otherwise local
+        #[cfg(feature = "firecracker")]
+        return ExecutionMode::Firecracker;
+        #[cfg(not(feature = "firecracker"))]
+        return ExecutionMode::Local;
     }
 
     /// Check if command is safe for local execution
@@ -413,9 +443,19 @@ impl super::CommandExecutor for HybridExecutor {
                     .await
             }
             ExecutionMode::Firecracker => {
-                self.firecracker_executor
-                    .execute_command(definition, parameters)
-                    .await
+                #[cfg(feature = "firecracker")]
+                {
+                    self.firecracker_executor
+                        .execute_command(definition, parameters)
+                        .await
+                }
+                #[cfg(not(feature = "firecracker"))]
+                {
+                    Err(CommandExecutionError::ExecutionFailed(
+                        "hybrid".to_string(),
+                        "Firecracker execution requested but feature is not enabled".to_string(),
+                    ))
+                }
             }
             ExecutionMode::Hybrid => {
                 // This shouldn't happen with proper risk assessment, but handle it
@@ -430,7 +470,12 @@ impl super::CommandExecutor for HybridExecutor {
         // Hybrid executor supports all modes by delegating to appropriate executors
         match mode {
             ExecutionMode::Local => self.local_executor.supports_mode(mode),
-            ExecutionMode::Firecracker => self.firecracker_executor.supports_mode(mode),
+            ExecutionMode::Firecracker => {
+                #[cfg(feature = "firecracker")]
+                return self.firecracker_executor.supports_mode(mode);
+                #[cfg(not(feature = "firecracker"))]
+                return false;
+            }
             ExecutionMode::Hybrid => true, // Hybrid mode is what this executor provides
         }
     }
@@ -438,17 +483,33 @@ impl super::CommandExecutor for HybridExecutor {
     fn capabilities(&self) -> ExecutorCapabilities {
         // Combine capabilities from both executors
         let local_caps = self.local_executor.capabilities();
+        #[cfg(feature = "firecracker")]
         let vm_caps = self.firecracker_executor.capabilities();
 
         ExecutorCapabilities {
+            #[cfg(feature = "firecracker")]
             supports_resource_limits: vm_caps.supports_resource_limits, // VMs have better resource limiting
+            #[cfg(not(feature = "firecracker"))]
+            supports_resource_limits: local_caps.supports_resource_limits,
+            #[cfg(feature = "firecracker")]
             supports_network_access: vm_caps.supports_network_access,
+            #[cfg(not(feature = "firecracker"))]
+            supports_network_access: local_caps.supports_network_access,
+            #[cfg(feature = "firecracker")]
             supports_file_system: local_caps.supports_file_system || vm_caps.supports_file_system,
+            #[cfg(not(feature = "firecracker"))]
+            supports_file_system: local_caps.supports_file_system,
+            #[cfg(feature = "firecracker")]
             max_concurrent_commands: Some(
                 local_caps.max_concurrent_commands.unwrap_or(0)
                     + vm_caps.max_concurrent_commands.unwrap_or(0),
             ),
+            #[cfg(not(feature = "firecracker"))]
+            max_concurrent_commands: local_caps.max_concurrent_commands,
+            #[cfg(feature = "firecracker")]
             default_timeout: vm_caps.default_timeout, // Use VM timeout as default for safety
+            #[cfg(not(feature = "firecracker"))]
+            default_timeout: local_caps.default_timeout,
         }
     }
 }
@@ -505,7 +566,10 @@ mod tests {
         };
 
         let mode = hybrid.assess_command_risk("rm -rf /", &risky_definition);
+        #[cfg(feature = "firecracker")]
         assert_eq!(mode, ExecutionMode::Firecracker);
+        #[cfg(not(feature = "firecracker"))]
+        assert_eq!(mode, ExecutionMode::Local);
     }
 
     #[test]

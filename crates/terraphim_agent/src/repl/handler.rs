@@ -251,6 +251,15 @@ impl ReplHandler {
             "  {} - Manage updates (check, install, rollback, list)",
             "/update <subcommand>".yellow()
         );
+
+        #[cfg(feature = "repl-sessions")]
+        {
+            println!(
+                "  {} - AI coding session history (import, search, list, expand)",
+                "/sessions <subcommand>".yellow()
+            );
+        }
+
         println!("  {} - Show help", "/help [command]".yellow());
         println!("  {} - Exit REPL", "/quit".yellow());
     }
@@ -438,9 +447,16 @@ impl ReplHandler {
                 self.handle_web(subcommand).await?;
             }
 
-            #[cfg(feature = "firecracker")]
+            #[cfg(all(feature = "firecracker", feature = "server"))]
             ReplCommand::Vm { subcommand } => {
                 self.handle_vm(subcommand).await?;
+            }
+
+            #[cfg(all(feature = "firecracker", not(feature = "server")))]
+            ReplCommand::Vm { .. } => {
+                return Err(anyhow::anyhow!(
+                    "VM commands require the `server` feature to be enabled"
+                ));
             }
 
             ReplCommand::Robot { subcommand } => {
@@ -1311,7 +1327,7 @@ impl ReplHandler {
         Ok(())
     }
 
-    #[cfg(feature = "firecracker")]
+    #[cfg(all(feature = "firecracker", feature = "server"))]
     async fn handle_vm(&self, subcommand: super::commands::VmSubcommand) -> Result<()> {
         #[cfg(feature = "repl")]
         {
@@ -1956,6 +1972,44 @@ impl ReplHandler {
                 println!("{}", table);
             }
 
+            SessionsSubcommand::Import { source, path } => {
+                use terraphim_sessions::ImportOptions;
+
+                let options = if let Some(path) = path {
+                    ImportOptions::new().with_path(std::path::PathBuf::from(path))
+                } else {
+                    ImportOptions::new()
+                };
+
+                let imported = if let Some(source_id) = source {
+                    println!(
+                        "\n{} Importing sessions from '{}'...",
+                        "📥".bold(),
+                        source_id.cyan()
+                    );
+                    svc.import_from(&source_id, &options).await
+                } else {
+                    println!(
+                        "\n{} Importing sessions from all available sources...",
+                        "📥".bold()
+                    );
+                    svc.import_all(&options).await
+                };
+
+                match imported {
+                    Ok(sessions) => {
+                        println!(
+                            "{} Imported {} session(s)",
+                            "✓".green().bold(),
+                            sessions.len().to_string().green()
+                        );
+                    }
+                    Err(e) => {
+                        println!("{} Import failed: {}", "✗".red().bold(), e);
+                    }
+                }
+            }
+
             SessionsSubcommand::List { source, limit } => {
                 let sessions = if let Some(source_id) = source {
                     svc.sessions_by_source(&source_id).await
@@ -2183,69 +2237,39 @@ impl ReplHandler {
                 }
             }
 
-            SessionsSubcommand::Concepts { concept } => {
-                println!(
-                    "\n{} Searching sessions by concept: '{}'",
-                    "🔍".bold(),
-                    concept.cyan()
-                );
-                println!(
-                    "{} This feature requires enrichment. Searching by text match...",
-                    "ℹ".blue()
-                );
+            SessionsSubcommand::Expand { session_id } => {
+                let session = svc.get_session(&session_id).await;
 
-                // Fall back to text search for now (enrichment requires thesaurus)
-                let sessions = svc.search(&concept).await;
-
-                if sessions.is_empty() {
+                if let Some(session) = session {
+                    println!("\n{} Session: {}", "📋".bold(), session.id.cyan());
+                    println!("  Source:       {}", session.source.yellow());
                     println!(
-                        "{} No sessions contain concept '{}'",
-                        "ℹ".blue().bold(),
-                        concept
+                        "  Title:        {}",
+                        session.title.as_ref().unwrap_or(&"-".to_string())
                     );
-                    return Ok(());
+                    println!(
+                        "  Messages:     {}",
+                        session.message_count().to_string().green()
+                    );
+                    if let Some(duration) = session.duration_ms() {
+                        let minutes = duration / 60000;
+                        println!("  Duration:     {} min", minutes);
+                    }
+
+                    println!("\n  {} Full Message Context:", "💬".bold());
+                    for (i, msg) in session.messages.iter().enumerate() {
+                        let role_color = match msg.role.to_string().as_str() {
+                            "user" => msg.role.to_string().blue(),
+                            "assistant" => msg.role.to_string().green(),
+                            "system" => msg.role.to_string().yellow(),
+                            "tool" => msg.role.to_string().magenta(),
+                            _ => msg.role.to_string().white(),
+                        };
+                        println!("    [{}] {}: {}", i + 1, role_color, msg.content);
+                    }
+                } else {
+                    println!("{} Session '{}' not found", "⚠".yellow().bold(), session_id);
                 }
-
-                let mut table = Table::new();
-                table
-                    .load_preset(UTF8_FULL)
-                    .apply_modifier(UTF8_ROUND_CORNERS)
-                    .set_header(vec![
-                        Cell::new("ID").fg(comfy_table::Color::Cyan),
-                        Cell::new("Source").fg(comfy_table::Color::Yellow),
-                        Cell::new("Matches").fg(comfy_table::Color::Green),
-                        Cell::new("Title").fg(comfy_table::Color::White),
-                    ]);
-
-                for session in sessions.iter().take(10) {
-                    let title = session
-                        .title
-                        .as_ref()
-                        .map(|t| {
-                            if t.len() > 40 {
-                                format!("{}...", &t[..40])
-                            } else {
-                                t.clone()
-                            }
-                        })
-                        .unwrap_or_else(|| "-".to_string());
-
-                    // Count occurrences of concept
-                    let count: usize = session
-                        .messages
-                        .iter()
-                        .filter(|m| m.content.to_lowercase().contains(&concept.to_lowercase()))
-                        .count();
-
-                    table.add_row(vec![
-                        Cell::new(&session.id[..8]),
-                        Cell::new(&session.source),
-                        Cell::new(count.to_string()),
-                        Cell::new(title),
-                    ]);
-                }
-
-                println!("{}", table);
             }
 
             SessionsSubcommand::Related {
