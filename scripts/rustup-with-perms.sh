@@ -3,6 +3,10 @@
 #
 # rustup 1.29.0 on Linux can leave toolchains/*/bin/* as 644 after update/install,
 # breaking CI (cargo fmt: Permission denied os error 13). Refs #2463.
+#
+# argv[0] fix (Refs #2462): exec -a preserves the proxy name (cargo, rustfmt, etc.)
+# so rustup.real dispatches to the correct toolchain binary. Shell scripts cannot
+# receive argv[0] via exec -a, so the caller must export RUSTUP_INVOKE_AS first.
 set -euo pipefail
 
 if [[ -z "${RUSTUP_REAL:-}" ]]; then
@@ -25,15 +29,22 @@ rustup_needs_perm_fix() {
   return 1
 }
 
-"$RUSTUP_REAL" "$@"
-status=$?
-
-if [[ $status -eq 0 ]] && rustup_needs_perm_fix "$@"; then
-  if [[ -x "$FIX_SCRIPT" ]]; then
-    "$FIX_SCRIPT" || echo "rustup-with-perms: warn: $FIX_SCRIPT failed" >&2
-  else
-    echo "rustup-with-perms: warn: fix script not found: $FIX_SCRIPT" >&2
+if rustup_needs_perm_fix "$@"; then
+  # Actual rustup command: run normally so we can repair perms afterwards.
+  "$RUSTUP_REAL" "$@"
+  status=$?
+  if [[ $status -eq 0 ]]; then
+    if [[ -x "$FIX_SCRIPT" ]]; then
+      "$FIX_SCRIPT" || echo "rustup-with-perms: warn: $FIX_SCRIPT failed" >&2
+    else
+      echo "rustup-with-perms: warn: fix script not found: $FIX_SCRIPT" >&2
+    fi
   fi
+  exit "$status"
+else
+  # Proxy dispatch (cargo, rustfmt, …): must preserve argv[0] so rustup.real
+  # dispatches to the correct toolchain binary instead of treating args as a
+  # toolchain override. RUSTUP_INVOKE_AS is exported by the ~./cargo/bin/rustup
+  # wrapper because exec -a does not cross shell-script boundaries.
+  exec -a "${RUSTUP_INVOKE_AS:-$(basename "$0")}" "$RUSTUP_REAL" "$@"
 fi
-
-exit "$status"
