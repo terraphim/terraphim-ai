@@ -13,6 +13,7 @@ use jiff::Timestamp;
 use tokio::sync::mpsc;
 
 use crate::budget::BudgetTracker;
+use crate::config::KgStrictness;
 use crate::error::{RlmError, RlmResult};
 use crate::executor::{ExecutionContext, ExecutionEnvironment, ExecutionResult};
 use crate::llm_bridge::{LlmBridge, QueryRequest, QueryResponse};
@@ -77,6 +78,8 @@ pub struct QueryLoopConfig {
     pub strict_parsing: bool,
     /// Timeout for individual command execution (ms).
     pub command_timeout_ms: u64,
+    /// KG validation strictness applied before each command execution.
+    pub kg_strictness: KgStrictness,
 }
 
 impl Default for QueryLoopConfig {
@@ -87,6 +90,7 @@ impl Default for QueryLoopConfig {
             max_recursion_depth: crate::DEFAULT_MAX_RECURSION_DEPTH,
             strict_parsing: false,
             command_timeout_ms: 30_000,
+            kg_strictness: KgStrictness::Normal,
         }
     }
 }
@@ -381,6 +385,36 @@ impl<E: ExecutionEnvironment + ?Sized> QueryLoop<E> {
             }
 
             Command::Run(bash_cmd) => {
+                let validation = self
+                    .executor
+                    .validate(&bash_cmd.command)
+                    .await
+                    .map_err(|e| RlmError::ExecutionFailed {
+                        message: e.to_string(),
+                        exit_code: None,
+                        stdout: None,
+                        stderr: None,
+                    })?;
+
+                if !validation.is_valid && self.config.kg_strictness.blocks_unknown() {
+                    let error_msg = format!(
+                        "KG validation blocked command: unknown terms {:?}. Please use domain-specific terminology.",
+                        validation.unknown_terms
+                    );
+                    history.push(CommandHistoryEntry {
+                        command: command.clone(),
+                        success: false,
+                        stdout: String::new(),
+                        stderr: error_msg.clone(),
+                        exit_code: Some(1),
+                        execution_time_ms: 0,
+                        executed_at: start,
+                    });
+                    return Ok(ExecuteResult::Continue {
+                        output: format!("Error: {error_msg}"),
+                    });
+                }
+
                 let result = self
                     .executor
                     .execute_command(&bash_cmd.command, ctx)
@@ -409,6 +443,36 @@ impl<E: ExecutionEnvironment + ?Sized> QueryLoop<E> {
             }
 
             Command::Code(python_code) => {
+                let validation = self
+                    .executor
+                    .validate(&python_code.code)
+                    .await
+                    .map_err(|e| RlmError::ExecutionFailed {
+                        message: e.to_string(),
+                        exit_code: None,
+                        stdout: None,
+                        stderr: None,
+                    })?;
+
+                if !validation.is_valid && self.config.kg_strictness.blocks_unknown() {
+                    let error_msg = format!(
+                        "KG validation blocked code: unknown terms {:?}. Please use domain-specific terminology.",
+                        validation.unknown_terms
+                    );
+                    history.push(CommandHistoryEntry {
+                        command: command.clone(),
+                        success: false,
+                        stdout: String::new(),
+                        stderr: error_msg.clone(),
+                        exit_code: Some(1),
+                        execution_time_ms: 0,
+                        executed_at: start,
+                    });
+                    return Ok(ExecuteResult::Continue {
+                        output: format!("Error: {error_msg}"),
+                    });
+                }
+
                 let result = self
                     .executor
                     .execute_code(&python_code.code, ctx)
@@ -624,12 +688,289 @@ fn truncate(s: &str, max_len: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::{BackendType, RlmConfig};
+    use crate::executor::{Capability, ExecutionContext, ExecutionResult, SnapshotId};
+    use crate::llm_bridge::{LlmBridge, LlmBridgeConfig};
+    use crate::session::SessionManager;
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicU32, Ordering};
+
+    /// A real ExecutionEnvironment stub that counts validate() and
+    /// execute_command() calls. Uses atomics so it is safe across await points.
+    struct SpyExecutor {
+        validate_count: Arc<AtomicU32>,
+        execute_command_count: Arc<AtomicU32>,
+        execute_code_count: Arc<AtomicU32>,
+        /// When true, validate() returns is_valid=false.
+        validation_fails: bool,
+    }
+
+    impl SpyExecutor {
+        fn new() -> Self {
+            Self {
+                validate_count: Arc::new(AtomicU32::new(0)),
+                execute_command_count: Arc::new(AtomicU32::new(0)),
+                execute_code_count: Arc::new(AtomicU32::new(0)),
+                validation_fails: false,
+            }
+        }
+
+        fn with_failing_validation(mut self) -> Self {
+            self.validation_fails = true;
+            self
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl ExecutionEnvironment for SpyExecutor {
+        type Error = RlmError;
+
+        async fn validate(
+            &self,
+            _input: &str,
+        ) -> Result<crate::executor::ValidationResult, Self::Error> {
+            self.validate_count.fetch_add(1, Ordering::Relaxed);
+            if self.validation_fails {
+                Ok(crate::executor::ValidationResult::invalid(
+                    vec![],
+                    vec!["unknown_term".to_string()],
+                ))
+            } else {
+                Ok(crate::executor::ValidationResult::valid(vec![
+                    "known_term".to_string(),
+                ]))
+            }
+        }
+
+        async fn execute_command(
+            &self,
+            _cmd: &str,
+            _ctx: &ExecutionContext,
+        ) -> Result<ExecutionResult, Self::Error> {
+            self.execute_command_count.fetch_add(1, Ordering::Relaxed);
+            Ok(ExecutionResult::success("spy output"))
+        }
+
+        async fn execute_code(
+            &self,
+            _code: &str,
+            _ctx: &ExecutionContext,
+        ) -> Result<ExecutionResult, Self::Error> {
+            self.execute_code_count.fetch_add(1, Ordering::Relaxed);
+            Ok(ExecutionResult::success("spy code output"))
+        }
+
+        async fn create_snapshot(
+            &self,
+            _session_id: &SessionId,
+            _name: &str,
+        ) -> Result<SnapshotId, Self::Error> {
+            Err(RlmError::NotSupported {
+                backend: "spy".to_string(),
+                op: "create_snapshot".to_string(),
+            })
+        }
+
+        async fn restore_snapshot(&self, _id: &SnapshotId) -> Result<(), Self::Error> {
+            Err(RlmError::NotSupported {
+                backend: "spy".to_string(),
+                op: "restore_snapshot".to_string(),
+            })
+        }
+
+        async fn list_snapshots(
+            &self,
+            _session_id: &SessionId,
+        ) -> Result<Vec<SnapshotId>, Self::Error> {
+            Ok(vec![])
+        }
+
+        async fn delete_snapshot(&self, _id: &SnapshotId) -> Result<(), Self::Error> {
+            Ok(())
+        }
+
+        async fn delete_session_snapshots(
+            &self,
+            _session_id: &SessionId,
+        ) -> Result<(), Self::Error> {
+            Ok(())
+        }
+
+        fn capabilities(&self) -> &[Capability] {
+            &[Capability::BashExecution, Capability::PythonExecution]
+        }
+
+        fn backend_type(&self) -> BackendType {
+            BackendType::Local
+        }
+
+        async fn health_check(&self) -> Result<bool, Self::Error> {
+            Ok(true)
+        }
+
+        async fn cleanup(&self) -> Result<(), Self::Error> {
+            Ok(())
+        }
+    }
+
+    fn make_query_loop(
+        executor: SpyExecutor,
+        kg_strictness: KgStrictness,
+    ) -> QueryLoop<SpyExecutor> {
+        let config = RlmConfig::default();
+        let session_manager = Arc::new(SessionManager::new(config.clone()));
+        let budget_tracker = Arc::new(crate::budget::BudgetTracker::new(&config));
+        let llm_bridge = Arc::new(LlmBridge::new(
+            LlmBridgeConfig::default(),
+            session_manager.clone(),
+        ));
+        let session_id = SessionId::new();
+        let loop_config = QueryLoopConfig {
+            kg_strictness,
+            ..QueryLoopConfig::default()
+        };
+        QueryLoop::new(
+            session_id,
+            session_manager,
+            budget_tracker,
+            llm_bridge,
+            Arc::new(executor),
+            loop_config,
+        )
+    }
+
+    fn make_exec_ctx() -> ExecutionContext {
+        ExecutionContext::default()
+    }
 
     #[test]
     fn test_query_loop_config_default() {
         let config = QueryLoopConfig::default();
         assert_eq!(config.max_iterations, DEFAULT_MAX_ITERATIONS);
         assert!(config.allow_recursion);
+    }
+
+    #[test]
+    fn test_query_loop_config_kg_strictness_default() {
+        let config = QueryLoopConfig::default();
+        assert_eq!(config.kg_strictness, KgStrictness::Normal);
+    }
+
+    #[tokio::test]
+    async fn test_validate_called_before_execute_command() {
+        let spy = SpyExecutor::new();
+        let validate_count = spy.validate_count.clone();
+        let execute_count = spy.execute_command_count.clone();
+
+        let ql = make_query_loop(spy, KgStrictness::Normal);
+        let mut history = CommandHistory::new();
+        let ctx = make_exec_ctx();
+
+        let cmd = Command::Run(crate::types::BashCommand::new("echo hello"));
+
+        let result = ql.execute_command(&cmd, &ctx, &mut history).await;
+        assert!(result.is_ok(), "execute_command should succeed");
+
+        assert_eq!(
+            validate_count.load(Ordering::Relaxed),
+            1,
+            "validate() must be called once per Command::Run"
+        );
+        assert_eq!(
+            execute_count.load(Ordering::Relaxed),
+            1,
+            "execute_command() must be called once when validation passes"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_validate_called_before_execute_code() {
+        let spy = SpyExecutor::new();
+        let validate_count = spy.validate_count.clone();
+        let execute_count = spy.execute_code_count.clone();
+
+        let ql = make_query_loop(spy, KgStrictness::Normal);
+        let mut history = CommandHistory::new();
+        let ctx = make_exec_ctx();
+
+        let cmd = Command::Code(crate::types::PythonCode::new("print('hello')"));
+
+        let result = ql.execute_command(&cmd, &ctx, &mut history).await;
+        assert!(result.is_ok(), "execute_command should succeed for Code");
+
+        assert_eq!(
+            validate_count.load(Ordering::Relaxed),
+            1,
+            "validate() must be called once per Command::Code"
+        );
+        assert_eq!(
+            execute_count.load(Ordering::Relaxed),
+            1,
+            "execute_code() must be called once when validation passes"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_strict_validation_blocks_unknown_command() {
+        let spy = SpyExecutor::new().with_failing_validation();
+        let validate_count = spy.validate_count.clone();
+        let execute_count = spy.execute_command_count.clone();
+
+        let ql = make_query_loop(spy, KgStrictness::Strict);
+        let mut history = CommandHistory::new();
+        let ctx = make_exec_ctx();
+
+        let cmd = Command::Run(crate::types::BashCommand::new("rm -rf /"));
+
+        let result = ql.execute_command(&cmd, &ctx, &mut history).await;
+        assert!(result.is_ok(), "blocked command returns Ok(Continue)");
+
+        if let Ok(ExecuteResult::Continue { output }) = result {
+            assert!(
+                output.contains("KG validation blocked"),
+                "output should explain the block: {output}"
+            );
+        } else {
+            panic!("expected ExecuteResult::Continue");
+        }
+
+        assert_eq!(
+            validate_count.load(Ordering::Relaxed),
+            1,
+            "validate() must be called even for blocked commands"
+        );
+        assert_eq!(
+            execute_count.load(Ordering::Relaxed),
+            0,
+            "execute_command() must NOT be called when KG validation blocks"
+        );
+
+        // History should record the blocked command as a failure
+        assert_eq!(history.entries.len(), 1);
+        assert!(!history.entries[0].success);
+    }
+
+    #[tokio::test]
+    async fn test_normal_strictness_does_not_block_unknown_terms() {
+        // Normal mode: validation failure is not a block (only Strict blocks)
+        let spy = SpyExecutor::new().with_failing_validation();
+        let execute_count = spy.execute_command_count.clone();
+
+        let ql = make_query_loop(spy, KgStrictness::Normal);
+        let mut history = CommandHistory::new();
+        let ctx = make_exec_ctx();
+
+        let cmd = Command::Run(crate::types::BashCommand::new("echo test"));
+
+        let result = ql.execute_command(&cmd, &ctx, &mut history).await;
+        assert!(result.is_ok());
+
+        // In Normal mode, execute_command() should still run despite invalid validation
+        assert_eq!(
+            execute_count.load(Ordering::Relaxed),
+            1,
+            "Normal mode must not block execution on unknown terms"
+        );
     }
 
     #[test]
