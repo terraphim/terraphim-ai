@@ -8339,7 +8339,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_ai_nodejs"
-version = "1.19.2"
+version = "1.20.3"
 dependencies = [
  "ahash",
  "anyhow",
@@ -9094,7 +9094,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_workspace"
-version = "1.13.0"
+version = "1.20.3"
 dependencies = [
  "jiff",
  "serde",

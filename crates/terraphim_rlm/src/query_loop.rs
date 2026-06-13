@@ -617,13 +617,31 @@ fn truncate(s: &str, max_len: usize) -> String {
     if s.len() <= max_len {
         s.to_string()
     } else {
-        format!("{}...", &s[..max_len])
+        let boundary = s.floor_char_boundary(max_len);
+        format!("{}...", &s[..boundary])
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_truncate_multibyte() {
+        // Each CJK char is 3 bytes; 200 of them = 600 bytes, > 500 limit.
+        // Without floor_char_boundary, slicing at byte 500 panics mid-char.
+        let cjk = "中".repeat(200);
+        let result = truncate(&cjk, 500);
+        assert!(result.ends_with("..."));
+        assert!(std::str::from_utf8(result.as_bytes()).is_ok());
+    }
+
+    #[test]
+    fn test_truncate_ascii() {
+        let s = "hello world";
+        assert_eq!(truncate(s, 5), "hello...");
+        assert_eq!(truncate(s, 100), "hello world");
+    }
 
     #[test]
     fn test_query_loop_config_default() {

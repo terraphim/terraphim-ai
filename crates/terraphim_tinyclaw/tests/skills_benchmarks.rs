@@ -111,14 +111,15 @@ fn benchmark_execution_small_skill() {
     let temp_dir = TempDir::new().unwrap();
     let executor = SkillExecutor::new(temp_dir.path()).unwrap();
 
+    // Use Shell step so the benchmark measures skill execution overhead, not LLM latency.
     let skill = Skill {
         name: "exec-benchmark".to_string(),
         version: "1.0.0".to_string(),
         description: "Execution benchmark".to_string(),
         author: None,
-        steps: vec![SkillStep::Llm {
-            prompt: "Step 1".to_string(),
-            use_context: false,
+        steps: vec![SkillStep::Shell {
+            command: "echo ok".to_string(),
+            working_dir: None,
         }],
         inputs: vec![],
     };

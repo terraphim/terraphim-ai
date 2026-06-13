@@ -46,6 +46,7 @@ wrap_rustup_in() {
   cat >"$rustup" <<EOF
 #!/usr/bin/env bash
 export RUSTUP_REAL="$real"
+export RUSTUP_INVOKE_AS="\$(basename "\$0")"
 exec "$LOCAL_BIN/rustup-with-perms.sh" "\$@"
 EOF
   chmod +x "$rustup"

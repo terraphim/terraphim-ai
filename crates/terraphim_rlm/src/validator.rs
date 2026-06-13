@@ -483,7 +483,8 @@ fn extract_words(text: &str) -> Vec<String> {
 /// Truncate a string for logging (max 100 chars).
 fn truncate_for_log(s: &str) -> String {
     if s.len() > 100 {
-        format!("{}...", &s[..97])
+        let boundary = s.floor_char_boundary(97);
+        format!("{}...", &s[..boundary])
     } else {
         s.to_string()
     }
@@ -626,6 +627,16 @@ mod tests {
         let truncated = truncate_for_log(&long);
         assert!(truncated.len() < 150);
         assert!(truncated.ends_with("..."));
+    }
+
+    #[test]
+    fn test_truncate_for_log_multibyte() {
+        // Each emoji is 4 bytes; 26 of them = 104 bytes, triggering truncation.
+        // The byte boundary at 97 falls mid-emoji without floor_char_boundary.
+        let emoji_str = "😀".repeat(26);
+        let result = truncate_for_log(&emoji_str);
+        assert!(result.ends_with("..."));
+        assert!(result.is_char_boundary(result.len() - 3)); // valid UTF-8
     }
 
     #[test]

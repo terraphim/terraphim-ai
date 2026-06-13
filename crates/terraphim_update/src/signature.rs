@@ -23,16 +23,11 @@ pub use zipsign_api::ZipsignError;
 ///
 /// # Returns
 /// Base64-encoded Ed25519 public key bytes
-///
-/// # Note
-/// TODO: Replace with actual Terraphim AI public key after key generation
-/// Run: ./scripts/generate-zipsign-keypair.sh
-/// Then add the public key here
 pub fn get_embedded_public_key() -> &'static str {
     // Ed25519 public key for verifying Terraphim AI release signatures
     // Generated: 2025-01-12
     // Key type: Ed25519 (32 bytes, base64-encoded)
-    // Fingerprint: Calculate with: echo -n "1uLjooBMO+HlpKeiD16WOtT3COWeC8J/o2ERmDiEMc4=" | base64 -d | sha256sum
+    // Private key stored in 1Password vault TerraphimPlatform, item jbhgblc7m2pluxe6ahqdfr5b6a
     "1uLjooBMO+HlpKeiD16WOtT3COWeC8J/o2ERmDiEMc4="
 }
 
