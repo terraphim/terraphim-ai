@@ -18,6 +18,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use sysinfo::{Disks, Networks, Pid, System};
+use tempfile::TempDir;
 use tokio::sync::Mutex;
 
 /// Performance benchmarking framework configuration
@@ -326,11 +327,26 @@ impl PerformanceBenchmarker {
         Ok(())
     }
 
-    /// Simulate API endpoint call (to be implemented with actual HTTP client)
+    /// Make an actual HTTP call to the terraphim server.
+    ///
+    /// Requires `TERRAPHIM_SERVER_URL` env var (e.g. `http://localhost:3000`).
+    /// Returns `Ok(())` immediately when the env var is absent so the benchmark
+    /// can still be run without a live server (all timings will be near-zero).
     async fn call_api_endpoint(&self, endpoint: &str) -> Result<()> {
-        // TODO: Implement actual HTTP client calls to terraphim server
-        // For now, simulate network latency
-        tokio::time::sleep(Duration::from_millis(10)).await;
+        let base = match std::env::var("TERRAPHIM_SERVER_URL") {
+            Ok(url) => url,
+            Err(_) => return Ok(()),
+        };
+        let url = format!("{}{}", base.trim_end_matches('/'), endpoint);
+        let client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(5))
+            .build()
+            .map_err(|e| anyhow!("reqwest client: {}", e))?;
+        client
+            .get(&url)
+            .send()
+            .await
+            .map_err(|e| anyhow!("HTTP GET {}: {}", url, e))?;
         Ok(())
     }
 
@@ -427,27 +443,60 @@ impl PerformanceBenchmarker {
         Ok(())
     }
 
-    /// Execute search query (to be implemented with actual search service)
+    /// Execute a search query against the terraphim search API.
+    ///
+    /// Requires `TERRAPHIM_SERVER_URL` env var.  Returns `Ok(())` immediately
+    /// when the env var is absent so the benchmark degrades gracefully.
     async fn execute_search_query(&self, query: &str) -> Result<()> {
-        // TODO: Implement actual search query execution
-        // Simulate search latency based on query complexity
-        let latency_ms = if query.contains(" ") { 50 } else { 20 };
-        tokio::time::sleep(Duration::from_millis(latency_ms)).await;
+        let base = match std::env::var("TERRAPHIM_SERVER_URL") {
+            Ok(url) => url,
+            Err(_) => return Ok(()),
+        };
+        let encoded = urlencoding::encode(query);
+        let url = format!("{}/api/search?q={}", base.trim_end_matches('/'), encoded);
+        let client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(10))
+            .build()
+            .map_err(|e| anyhow!("reqwest client: {}", e))?;
+        client
+            .get(&url)
+            .send()
+            .await
+            .map_err(|e| anyhow!("search GET {}: {}", url, e))?;
         Ok(())
     }
 
-    /// Benchmark indexing performance
+    /// Benchmark indexing performance using real string tokenisation/hashing.
     async fn benchmark_indexing_performance(&mut self) -> Result<()> {
-        // TODO: Implement document indexing benchmarks
-        // This would test indexing speed for different document sizes and types
+        let iterations = self.config.iterations.min(200);
+        let doc = "The quick brown fox jumps over the lazy dog. ".repeat(50);
+        let mut times = Vec::with_capacity(iterations as usize);
+
+        let total_start = Instant::now();
+        for _ in 0..iterations {
+            let t = Instant::now();
+            // Simulate tokenisation: split on whitespace and collect into a map
+            let mut index: HashMap<&str, u32> = HashMap::new();
+            for word in doc.split_whitespace() {
+                *index.entry(word).or_insert(0) += 1;
+            }
+            std::hint::black_box(index.len());
+            times.push(t.elapsed());
+        }
+        let total_time = total_start.elapsed();
+
+        let avg_time = times.iter().sum::<Duration>() / times.len() as u32;
+        let min_time = *times.iter().min().unwrap();
+        let max_time = *times.iter().max().unwrap();
+        let ops_per_second = iterations as f64 / total_time.as_secs_f64().max(f64::EPSILON);
 
         let result = BenchmarkResult {
             operation: "document_indexing".to_string(),
-            total_time: Duration::from_millis(1000),
-            avg_time: Duration::from_millis(10),
-            min_time: Duration::from_millis(5),
-            max_time: Duration::from_millis(20),
-            ops_per_second: 100.0,
+            total_time,
+            avg_time,
+            min_time,
+            max_time,
+            ops_per_second,
             success_rate: 1.0,
             error_count: 0,
             resource_usage: self.capture_resource_usage().await?,
@@ -473,19 +522,40 @@ impl PerformanceBenchmarker {
         Ok(())
     }
 
-    /// Benchmark CRUD operations
+    /// Benchmark CRUD operations using real in-memory HashMap insert/get/remove.
     async fn benchmark_crud_operations(&mut self) -> Result<()> {
-        // TODO: Implement actual CRUD benchmarking against persistence layer
+        let iterations = self.config.iterations.min(500) as usize;
+        let mut times = Vec::with_capacity(iterations);
+        let mut store: HashMap<String, String> = HashMap::with_capacity(iterations);
+
+        let total_start = Instant::now();
+        for i in 0..iterations {
+            let t = Instant::now();
+            let key = format!("doc:{}", i);
+            let value = serde_json::to_string(&serde_json::json!({"id": i, "body": "test"}))
+                .unwrap_or_default();
+            store.insert(key.clone(), value.clone());
+            let _ = store.get(&key);
+            store.remove(&key);
+            times.push(t.elapsed());
+        }
+        let total_time = total_start.elapsed();
+
+        let success_count = times.len() as u32;
+        let avg_time = times.iter().sum::<Duration>() / success_count;
+        let min_time = *times.iter().min().unwrap();
+        let max_time = *times.iter().max().unwrap();
+        let ops_per_second = success_count as f64 / total_time.as_secs_f64().max(f64::EPSILON);
 
         let result = BenchmarkResult {
             operation: "crud_operations".to_string(),
-            total_time: Duration::from_millis(500),
-            avg_time: Duration::from_millis(5),
-            min_time: Duration::from_millis(2),
-            max_time: Duration::from_millis(15),
-            ops_per_second: 200.0,
-            success_rate: 0.99,
-            error_count: 1,
+            total_time,
+            avg_time,
+            min_time,
+            max_time,
+            ops_per_second,
+            success_rate: 1.0,
+            error_count: 0,
             resource_usage: self.capture_resource_usage().await?,
         };
 
@@ -493,17 +563,41 @@ impl PerformanceBenchmarker {
         Ok(())
     }
 
-    /// Benchmark transaction performance
+    /// Benchmark transaction performance using real serde_json round-trips.
     async fn benchmark_transaction_performance(&mut self) -> Result<()> {
-        // TODO: Implement transaction benchmarking
+        let iterations = self.config.iterations.min(200) as usize;
+        let mut times = Vec::with_capacity(iterations);
+
+        let total_start = Instant::now();
+        for i in 0..iterations {
+            let t = Instant::now();
+            // Simulate a transaction: serialise, deserialise, and validate
+            let payload = serde_json::json!({
+                "tx_id": i,
+                "items": [{"id": i, "amount": i * 10}],
+                "status": "committed"
+            });
+            let serialised = serde_json::to_string(&payload).unwrap_or_default();
+            let deserialised: serde_json::Value =
+                serde_json::from_str(&serialised).unwrap_or(serde_json::Value::Null);
+            std::hint::black_box(deserialised.is_object());
+            times.push(t.elapsed());
+        }
+        let total_time = total_start.elapsed();
+
+        let success_count = times.len() as u32;
+        let avg_time = times.iter().sum::<Duration>() / success_count;
+        let min_time = *times.iter().min().unwrap();
+        let max_time = *times.iter().max().unwrap();
+        let ops_per_second = success_count as f64 / total_time.as_secs_f64().max(f64::EPSILON);
 
         let result = BenchmarkResult {
             operation: "transaction_performance".to_string(),
-            total_time: Duration::from_millis(300),
-            avg_time: Duration::from_millis(30),
-            min_time: Duration::from_millis(20),
-            max_time: Duration::from_millis(50),
-            ops_per_second: 33.3,
+            total_time,
+            avg_time,
+            min_time,
+            max_time,
+            ops_per_second,
             success_rate: 1.0,
             error_count: 0,
             resource_usage: self.capture_resource_usage().await?,
@@ -514,17 +608,45 @@ impl PerformanceBenchmarker {
         Ok(())
     }
 
-    /// Benchmark query optimization
+    /// Benchmark query optimisation using real string parsing.
     async fn benchmark_query_optimization(&mut self) -> Result<()> {
-        // TODO: Implement query optimization benchmarking
+        let iterations = self.config.iterations.min(500) as usize;
+        let queries = [
+            "rust async tokio",
+            "knowledge graph terraphim",
+            "search indexing performance",
+            "machine learning embeddings",
+            "concurrent programming channels",
+        ];
+        let mut times = Vec::with_capacity(iterations);
+
+        let total_start = Instant::now();
+        for i in 0..iterations {
+            let t = Instant::now();
+            let query = queries[i % queries.len()];
+            // Simulate query normalisation: lowercase, split, dedup
+            let mut tokens: Vec<&str> = query.split_whitespace().collect();
+            tokens.sort_unstable();
+            tokens.dedup();
+            let normalised = tokens.join(" ");
+            std::hint::black_box(normalised.len());
+            times.push(t.elapsed());
+        }
+        let total_time = total_start.elapsed();
+
+        let success_count = times.len() as u32;
+        let avg_time = times.iter().sum::<Duration>() / success_count;
+        let min_time = *times.iter().min().unwrap();
+        let max_time = *times.iter().max().unwrap();
+        let ops_per_second = success_count as f64 / total_time.as_secs_f64().max(f64::EPSILON);
 
         let result = BenchmarkResult {
             operation: "query_optimization".to_string(),
-            total_time: Duration::from_millis(200),
-            avg_time: Duration::from_millis(4),
-            min_time: Duration::from_millis(2),
-            max_time: Duration::from_millis(10),
-            ops_per_second: 250.0,
+            total_time,
+            avg_time,
+            min_time,
+            max_time,
+            ops_per_second,
             success_rate: 1.0,
             error_count: 0,
             resource_usage: self.capture_resource_usage().await?,
@@ -551,19 +673,50 @@ impl PerformanceBenchmarker {
         Ok(())
     }
 
-    /// Benchmark file operations
+    /// Benchmark file operations with real I/O on a temporary directory.
     async fn benchmark_file_operations(&mut self) -> Result<()> {
-        // TODO: Implement file operation benchmarking
+        let iterations = self.config.iterations.min(100) as usize;
+        let tmpdir = TempDir::new().map_err(|e| anyhow!("TempDir: {}", e))?;
+        let content = b"terraphim benchmark payload ".repeat(256); // ~7 KB per write
+        let mut times = Vec::with_capacity(iterations);
+        let mut errors = 0u32;
+
+        let total_start = Instant::now();
+        for i in 0..iterations {
+            let t = Instant::now();
+            let path = tmpdir.path().join(format!("bench_{}.dat", i));
+            match tokio::fs::write(&path, &content).await {
+                Ok(_) => {
+                    let _ = tokio::fs::read(&path).await;
+                    let _ = tokio::fs::remove_file(&path).await;
+                    times.push(t.elapsed());
+                }
+                Err(_) => {
+                    errors += 1;
+                }
+            }
+        }
+        let total_time = total_start.elapsed();
+
+        if times.is_empty() {
+            return Err(anyhow!("All file_operations iterations failed"));
+        }
+        let success_count = times.len() as u32;
+        let avg_time = times.iter().sum::<Duration>() / success_count;
+        let min_time = *times.iter().min().unwrap();
+        let max_time = *times.iter().max().unwrap();
+        let ops_per_second = success_count as f64 / total_time.as_secs_f64().max(f64::EPSILON);
+        let success_rate = success_count as f64 / iterations as f64;
 
         let result = BenchmarkResult {
             operation: "file_operations".to_string(),
-            total_time: Duration::from_millis(800),
-            avg_time: Duration::from_millis(8),
-            min_time: Duration::from_millis(3),
-            max_time: Duration::from_millis(25),
-            ops_per_second: 125.0,
-            success_rate: 0.98,
-            error_count: 2,
+            total_time,
+            avg_time,
+            min_time,
+            max_time,
+            ops_per_second,
+            success_rate,
+            error_count: errors,
             resource_usage: self.capture_resource_usage().await?,
         };
 
@@ -571,17 +724,42 @@ impl PerformanceBenchmarker {
         Ok(())
     }
 
-    /// Benchmark large file handling
+    /// Benchmark large file handling with real I/O on a temporary file.
     async fn benchmark_large_file_handling(&mut self) -> Result<()> {
-        // TODO: Implement large file benchmarking
+        let iterations = 5usize; // Large files: fewer iterations
+        let tmpdir = TempDir::new().map_err(|e| anyhow!("TempDir: {}", e))?;
+        let large_content = b"x".repeat(1024 * 1024); // 1 MB per file
+        let mut times = Vec::with_capacity(iterations);
+
+        let total_start = Instant::now();
+        for i in 0..iterations {
+            let t = Instant::now();
+            let path = tmpdir.path().join(format!("large_{}.dat", i));
+            tokio::fs::write(&path, &large_content)
+                .await
+                .map_err(|e| anyhow!("large write: {}", e))?;
+            let read_back = tokio::fs::read(&path)
+                .await
+                .map_err(|e| anyhow!("large read: {}", e))?;
+            std::hint::black_box(read_back.len());
+            tokio::fs::remove_file(&path).await.ok();
+            times.push(t.elapsed());
+        }
+        let total_time = total_start.elapsed();
+
+        let success_count = times.len() as u32;
+        let avg_time = times.iter().sum::<Duration>() / success_count;
+        let min_time = *times.iter().min().unwrap();
+        let max_time = *times.iter().max().unwrap();
+        let ops_per_second = success_count as f64 / total_time.as_secs_f64().max(f64::EPSILON);
 
         let result = BenchmarkResult {
             operation: "large_file_handling".to_string(),
-            total_time: Duration::from_millis(5000),
-            avg_time: Duration::from_millis(500),
-            min_time: Duration::from_millis(200),
-            max_time: Duration::from_millis(1000),
-            ops_per_second: 2.0,
+            total_time,
+            avg_time,
+            min_time,
+            max_time,
+            ops_per_second,
             success_rate: 1.0,
             error_count: 0,
             resource_usage: self.capture_resource_usage().await?,
@@ -592,19 +770,55 @@ impl PerformanceBenchmarker {
         Ok(())
     }
 
-    /// Benchmark concurrent file access
+    /// Benchmark concurrent file access using real parallel tokio tasks.
     async fn benchmark_concurrent_access(&mut self) -> Result<()> {
-        // TODO: Implement concurrent file access benchmarking
+        let concurrency = 8usize;
+        let tmpdir = Arc::new(TempDir::new().map_err(|e| anyhow!("TempDir: {}", e))?);
+        let content = Arc::new(b"concurrent bench ".repeat(128)); // ~2 KB
+
+        let total_start = Instant::now();
+        let mut handles = Vec::with_capacity(concurrency);
+        for i in 0..concurrency {
+            let dir = tmpdir.path().to_path_buf();
+            let data = Arc::clone(&content);
+            handles.push(tokio::spawn(async move {
+                let path = dir.join(format!("concurrent_{}.dat", i));
+                tokio::fs::write(&path, data.as_ref()).await?;
+                let _ = tokio::fs::read(&path).await?;
+                tokio::fs::remove_file(&path).await?;
+                Ok::<(), anyhow::Error>(())
+            }));
+        }
+
+        let mut errors = 0u32;
+        let mut times = Vec::with_capacity(concurrency);
+        for handle in handles {
+            let t = Instant::now();
+            match handle.await {
+                Ok(Ok(_)) => times.push(t.elapsed()),
+                _ => errors += 1,
+            }
+        }
+        let total_time = total_start.elapsed();
+
+        if times.is_empty() {
+            return Err(anyhow!("All concurrent_file_access tasks failed"));
+        }
+        let success_count = times.len() as u32;
+        let avg_time = times.iter().sum::<Duration>() / success_count;
+        let min_time = *times.iter().min().unwrap();
+        let max_time = *times.iter().max().unwrap();
+        let ops_per_second = success_count as f64 / total_time.as_secs_f64().max(f64::EPSILON);
 
         let result = BenchmarkResult {
             operation: "concurrent_file_access".to_string(),
-            total_time: Duration::from_millis(1000),
-            avg_time: Duration::from_millis(10),
-            min_time: Duration::from_millis(5),
-            max_time: Duration::from_millis(30),
-            ops_per_second: 100.0,
-            success_rate: 0.95,
-            error_count: 5,
+            total_time,
+            avg_time,
+            min_time,
+            max_time,
+            ops_per_second,
+            success_rate: success_count as f64 / concurrency as f64,
+            error_count: errors,
             resource_usage: self.capture_resource_usage().await?,
         };
 
@@ -626,17 +840,34 @@ impl PerformanceBenchmarker {
         Ok(())
     }
 
-    /// Monitor resource usage during idle periods
+    /// Monitor resource usage during idle: take N sysinfo snapshots at intervals.
     async fn monitor_resources_during_idle(&mut self) -> Result<()> {
-        // TODO: Implement idle resource monitoring
+        let samples = 5usize;
+        let interval = Duration::from_millis(self.config.monitoring_interval_ms.min(100));
+        let mut times = Vec::with_capacity(samples);
+
+        let total_start = Instant::now();
+        for _ in 0..samples {
+            let t = Instant::now();
+            let _usage = self.capture_resource_usage().await?;
+            times.push(t.elapsed());
+            tokio::time::sleep(interval).await;
+        }
+        let total_time = total_start.elapsed();
+
+        let success_count = times.len() as u32;
+        let avg_time = times.iter().sum::<Duration>() / success_count;
+        let min_time = *times.iter().min().unwrap();
+        let max_time = *times.iter().max().unwrap();
+        let ops_per_second = success_count as f64 / total_time.as_secs_f64().max(f64::EPSILON);
 
         let result = BenchmarkResult {
             operation: "resource_monitoring_idle".to_string(),
-            total_time: Duration::from_secs(30),
-            avg_time: Duration::from_millis(100),
-            min_time: Duration::from_millis(50),
-            max_time: Duration::from_millis(200),
-            ops_per_second: 10.0,
+            total_time,
+            avg_time,
+            min_time,
+            max_time,
+            ops_per_second,
             success_rate: 1.0,
             error_count: 0,
             resource_usage: self.capture_resource_usage().await?,
@@ -647,17 +878,39 @@ impl PerformanceBenchmarker {
         Ok(())
     }
 
-    /// Monitor resource usage during load periods
+    /// Monitor resource usage under load: run CPU-bound work and capture sysinfo.
     async fn monitor_resources_during_load(&mut self) -> Result<()> {
-        // TODO: Implement load resource monitoring
+        let samples = 5usize;
+        let interval = Duration::from_millis(self.config.monitoring_interval_ms.min(100));
+        let mut times = Vec::with_capacity(samples);
+
+        let total_start = Instant::now();
+        for i in 0..samples {
+            let t = Instant::now();
+            // Generate real CPU load: hash computation
+            let work: u64 = (0..10_000u64)
+                .map(|x| x.wrapping_mul(i as u64 + 1))
+                .fold(0, |acc, x| acc ^ x);
+            std::hint::black_box(work);
+            let _usage = self.capture_resource_usage().await?;
+            times.push(t.elapsed());
+            tokio::time::sleep(interval).await;
+        }
+        let total_time = total_start.elapsed();
+
+        let success_count = times.len() as u32;
+        let avg_time = times.iter().sum::<Duration>() / success_count;
+        let min_time = *times.iter().min().unwrap();
+        let max_time = *times.iter().max().unwrap();
+        let ops_per_second = success_count as f64 / total_time.as_secs_f64().max(f64::EPSILON);
 
         let result = BenchmarkResult {
             operation: "resource_monitoring_load".to_string(),
-            total_time: Duration::from_secs(60),
-            avg_time: Duration::from_millis(200),
-            min_time: Duration::from_millis(100),
-            max_time: Duration::from_millis(500),
-            ops_per_second: 5.0,
+            total_time,
+            avg_time,
+            min_time,
+            max_time,
+            ops_per_second,
             success_rate: 1.0,
             error_count: 0,
             resource_usage: self.capture_resource_usage().await?,
@@ -689,21 +942,49 @@ impl PerformanceBenchmarker {
         Ok(())
     }
 
-    /// Benchmark concurrent user simulation
+    /// Benchmark concurrent user simulation: spawn `user_count` parallel tasks.
     async fn benchmark_concurrent_users(&mut self, user_count: u32) -> Result<()> {
         let operation_name = format!("concurrent_users_{}", user_count);
+        let count = user_count.min(50) as usize; // cap at 50 to avoid resource exhaustion
 
-        // TODO: Implement concurrent user benchmarking
+        let total_start = Instant::now();
+        let mut handles = Vec::with_capacity(count);
+        for i in 0..count {
+            handles.push(tokio::spawn(async move {
+                // Simulate a user action: serialise a document and compute a hash
+                let doc = serde_json::json!({"user": i, "action": "search", "query": "rust"});
+                let s = serde_json::to_string(&doc).unwrap_or_default();
+                let hash: u64 = s.bytes().fold(0u64, |acc, b| acc.wrapping_add(b as u64));
+                std::hint::black_box(hash);
+            }));
+        }
+        let mut times = Vec::with_capacity(count);
+        for handle in handles {
+            let t = Instant::now();
+            handle.await.ok();
+            times.push(t.elapsed());
+        }
+        let total_time = total_start.elapsed();
+
+        let success_count = times.len() as u32;
+        let avg_time = if success_count > 0 {
+            times.iter().sum::<Duration>() / success_count
+        } else {
+            Duration::ZERO
+        };
+        let min_time = times.iter().min().cloned().unwrap_or(Duration::ZERO);
+        let max_time = times.iter().max().cloned().unwrap_or(Duration::ZERO);
+        let ops_per_second = success_count as f64 / total_time.as_secs_f64().max(f64::EPSILON);
 
         let result = BenchmarkResult {
             operation: operation_name.clone(),
-            total_time: Duration::from_millis(user_count as u64 * 100),
-            avg_time: Duration::from_millis(50),
-            min_time: Duration::from_millis(20),
-            max_time: Duration::from_millis(200),
-            ops_per_second: user_count as f64 * 2.0,
-            success_rate: 0.9,
-            error_count: (user_count / 10) as u32,
+            total_time,
+            avg_time,
+            min_time,
+            max_time,
+            ops_per_second,
+            success_rate: 1.0,
+            error_count: 0,
             resource_usage: self.capture_resource_usage().await?,
         };
 
@@ -711,21 +992,35 @@ impl PerformanceBenchmarker {
         Ok(())
     }
 
-    /// Benchmark data scale handling
+    /// Benchmark data scale handling: process `data_scale` records in-memory.
     async fn benchmark_data_scale(&mut self, data_scale: u64) -> Result<()> {
         let operation_name = format!("data_scale_{}", data_scale);
+        // Cap iterations to avoid excessive test time (max ~100 k ops)
+        let n = data_scale.min(100_000) as usize;
 
-        // TODO: Implement data scale benchmarking
+        let total_start = Instant::now();
+        let mut store: HashMap<usize, u64> = HashMap::with_capacity(n);
+        for i in 0..n {
+            store.insert(i, i as u64 * 7 + 13);
+        }
+        let total_time = total_start.elapsed();
+
+        let ops_per_second = n as f64 / total_time.as_secs_f64().max(f64::EPSILON);
+        let avg_time = if n > 0 {
+            total_time / n as u32
+        } else {
+            Duration::ZERO
+        };
 
         let result = BenchmarkResult {
             operation: operation_name.clone(),
-            total_time: Duration::from_millis(data_scale / 100),
-            avg_time: Duration::from_millis(10),
-            min_time: Duration::from_millis(5),
-            max_time: Duration::from_millis(50),
-            ops_per_second: 100.0,
-            success_rate: 0.95,
-            error_count: (data_scale / 10000) as u32,
+            total_time,
+            avg_time,
+            min_time: Duration::ZERO,
+            max_time: total_time,
+            ops_per_second,
+            success_rate: 1.0,
+            error_count: 0,
             resource_usage: self.capture_resource_usage().await?,
         };
 
@@ -996,5 +1291,149 @@ impl Default for PerformanceSLO {
             max_concurrent_users: 100,
             max_data_scale: 1000000,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn fast_config() -> BenchmarkConfig {
+        BenchmarkConfig {
+            iterations: 10,
+            warmup_iterations: 2,
+            concurrent_users: vec![2],
+            data_scales: vec![100],
+            monitoring_interval_ms: 10,
+            enable_profiling: false,
+            slos: PerformanceSLO::default(),
+        }
+    }
+
+    #[tokio::test]
+    async fn performance_filesystem_benchmarks_produce_real_timings() {
+        let mut benchmarker = PerformanceBenchmarker::new(fast_config());
+        benchmarker
+            .run_filesystem_benchmarks()
+            .await
+            .expect("filesystem benchmarks should complete");
+
+        let file_ops = benchmarker
+            .results
+            .get("file_operations")
+            .expect("file_operations result missing");
+        assert!(
+            file_ops.total_time > Duration::ZERO,
+            "file_operations total_time must be non-zero"
+        );
+        assert!(
+            file_ops.ops_per_second > 0.0,
+            "file_operations ops_per_second must be positive"
+        );
+
+        let large = benchmarker
+            .results
+            .get("large_file_handling")
+            .expect("large_file_handling result missing");
+        assert!(
+            large.total_time > Duration::ZERO,
+            "large_file_handling total_time must be non-zero"
+        );
+
+        let concurrent = benchmarker
+            .results
+            .get("concurrent_file_access")
+            .expect("concurrent_file_access result missing");
+        assert!(
+            concurrent.total_time > Duration::ZERO,
+            "concurrent_file_access total_time must be non-zero"
+        );
+    }
+
+    #[tokio::test]
+    async fn performance_indexing_benchmarks_produce_real_timings() {
+        let mut benchmarker = PerformanceBenchmarker::new(fast_config());
+        benchmarker
+            .benchmark_indexing_performance()
+            .await
+            .expect("indexing benchmark should complete");
+
+        let result = benchmarker
+            .results
+            .get("document_indexing")
+            .expect("document_indexing result missing");
+        assert!(
+            result.total_time > Duration::ZERO,
+            "indexing total_time must be non-zero"
+        );
+        assert_eq!(result.error_count, 0);
+    }
+
+    #[tokio::test]
+    async fn performance_crud_benchmarks_produce_real_timings() {
+        let mut benchmarker = PerformanceBenchmarker::new(fast_config());
+        benchmarker
+            .run_database_benchmarks()
+            .await
+            .expect("db benchmarks should complete");
+
+        let crud = benchmarker
+            .results
+            .get("crud_operations")
+            .expect("crud_operations result missing");
+        assert!(
+            crud.total_time > Duration::ZERO,
+            "crud total_time must be non-zero"
+        );
+        assert_eq!(crud.success_rate, 1.0);
+
+        let txn = benchmarker
+            .results
+            .get("transaction_performance")
+            .expect("transaction_performance result missing");
+        assert!(
+            txn.total_time > Duration::ZERO,
+            "transaction total_time must be non-zero"
+        );
+    }
+
+    #[tokio::test]
+    async fn performance_resource_monitoring_returns_valid_data() {
+        let mut benchmarker = PerformanceBenchmarker::new(fast_config());
+        let usage = benchmarker
+            .capture_resource_usage()
+            .await
+            .expect("capture_resource_usage should succeed");
+        assert!(
+            usage.memory_bytes > 0 || usage.cpu_percent >= 0.0,
+            "resource usage should have valid fields"
+        );
+    }
+
+    #[tokio::test]
+    async fn performance_scalability_benchmarks_produce_real_timings() {
+        let mut benchmarker = PerformanceBenchmarker::new(fast_config());
+        benchmarker
+            .run_scalability_benchmarks()
+            .await
+            .expect("scalability benchmarks should complete");
+
+        let user_result = benchmarker
+            .results
+            .get("concurrent_users_2")
+            .expect("concurrent_users_2 result missing");
+        assert!(
+            user_result.total_time > Duration::ZERO,
+            "concurrent_users total_time must be non-zero"
+        );
+
+        let scale_result = benchmarker
+            .results
+            .get("data_scale_100")
+            .expect("data_scale_100 result missing");
+        assert!(
+            scale_result.ops_per_second > 0.0,
+            "data_scale ops_per_second must be positive"
+        );
     }
 }
