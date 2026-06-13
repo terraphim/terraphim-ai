@@ -23,7 +23,12 @@ wrap_rustup_in() {
   [[ -d "$bindir" ]] || return 0
   [[ -e "$rustup" || -L "$rustup" ]] || return 0
 
-  if [[ -f "$rustup" ]] && grep -q 'rustup-with-perms.sh' "$rustup" 2>/dev/null; then
+  # Wrapper is current only if it already delegates to rustup-with-perms.sh
+  # AND exports RUSTUP_INVOKE_AS (added in Refs #2605 to preserve argv[0]
+  # through the shell-script boundary so rustdoc/rustfmt proxying works).
+  if [[ -f "$rustup" ]] \
+    && grep -q 'rustup-with-perms.sh' "$rustup" 2>/dev/null \
+    && grep -q 'RUSTUP_INVOKE_AS' "$rustup" 2>/dev/null; then
     return 0
   fi
 
