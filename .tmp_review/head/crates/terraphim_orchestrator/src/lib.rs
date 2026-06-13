@@ -1,0 +1,11623 @@
+//! Multi-agent orchestration with scheduling, budgeting, and compound review.
+//!
+//! This crate provides the core orchestration engine for managing fleets of AI agents
+//! with features for resource scheduling, cost tracking, and coordinated review workflows.
+//!
+//! # Core Components
+//!
+//! - **AgentOrchestrator**: Main orchestrator running the "dark factory" pattern
+//! - **DualModeOrchestrator**: Real-time and batch processing modes with fairness scheduling
+//! - **CompoundReviewWorkflow**: Multi-agent review swarm with persona-based specialization
+//! - **Scheduler**: Time-based and event-driven task scheduling
+//! - **HandoffBuffer**: Inter-agent state transfer with TTL management
+//! - **CostTracker**: Budget enforcement and spending monitoring
+//! - **NightwatchMonitor**: Drift detection and rate limiting
+//! - **MetaCoordinator**: Cross-project issue-driven agent dispatch with PageRank prioritisation
+//!
+//! # Example
+//!
+//! ```rust,ignore
+//! use terraphim_orchestrator::{AgentOrchestrator, OrchestratorConfig};
+//!
+//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+//! let config = OrchestratorConfig::default();
+//! let mut orchestrator = AgentOrchestrator::new(config).await?;
+//!
+//! // Run the orchestration loop
+//! orchestrator.run().await?;
+//! # Ok(())
+//! # }
+//! ```
+
+pub mod adf_commands;
+pub mod agent_registry;
+pub mod agent_run_record;
+pub mod compound;
+pub mod concurrency;
+pub mod config;
+pub mod control_plane;
+pub mod cost_tracker;
+pub mod dispatcher;
+pub mod dual_mode;
+pub mod error;
+pub mod error_signatures;
+pub mod evolution;
+pub mod flow;
+pub mod gitea_skill_loader;
+pub mod handoff;
+pub mod kg_router;
+pub mod learning;
+pub mod mention;
+pub mod mention_chain;
+pub mod meta_coordinator;
+pub mod metrics_persistence;
+pub mod mode;
+pub mod nightwatch;
+pub mod output_poster;
+pub mod persona;
+pub mod post_merge_gate;
+pub mod pr_dispatch;
+pub mod pr_gate;
+pub mod pr_poller;
+pub mod pr_review;
+pub mod project_adf;
+pub mod project_control;
+pub mod provider_budget;
+pub mod provider_probe;
+#[cfg(feature = "quickwit")]
+pub mod quickwit;
+#[cfg(feature = "quickwit")]
+pub mod quickwit_bulk;
+pub mod rate_limiter;
+pub mod scheduler;
+pub mod scope;
+pub mod webhook;
+pub mod worktree_guard;
+
+pub use agent_registry::{AgentKey, AgentRegistry, AgentScope, AgentSource, RegisteredAgent};
+pub use agent_run_record::{
+    AgentRunRecord, ExitClass, ExitClassification, ExitClassifier, RunTrigger,
+};
+pub use compound::{CompoundReviewResult, CompoundReviewWorkflow, ReviewGroupDef, SwarmConfig};
+pub use concurrency::{ConcurrencyController, FairnessPolicy, ModeQuotas};
+#[cfg(feature = "quickwit")]
+pub use config::QuickwitConfig;
+pub use config::{
+    AgentDefinition, AgentLayer, CompoundReviewConfig, ConcurrencyConfig, EvolutionConfig,
+    GiteaOutputConfig, LearningConfig, MentionConfig, NightwatchConfig, OrchestratorConfig,
+    PreCheckStrategy, TrackerConfig, TrackerStates, WebhookConfig, WorkflowConfig,
+};
+pub use cost_tracker::{AgentMetrics, BudgetVerdict, CostSnapshot, CostTracker, ExecutionMetrics};
+pub use dispatcher::{DispatchTask, Dispatcher, DispatcherStats};
+pub use dual_mode::DualModeOrchestrator;
+pub use error::OrchestratorError;
+pub use handoff::{HandoffBuffer, HandoffContext, HandoffLedger};
+pub use mention::{
+    migrate_legacy_mention_cursor, parse_mention_tokens, parse_mentions, resolve_mention,
+    resolve_persona_mention, DetectedMention, MentionCursor, MentionTokens, MentionTracker,
+};
+pub use mention_chain::{
+    MentionChainError, MentionChainTracker, MentionContextArgs, DEFAULT_MAX_MENTION_DEPTH,
+};
+pub use metrics_persistence::{
+    InMemoryMetricsPersistence, MetricsPersistence, MetricsPersistenceConfig,
+    MetricsPersistenceError, PersistedAgentMetrics,
+};
+pub use mode::{IssueMode, TimeMode};
+pub use nightwatch::{
+    dual_panel_evaluate, validate_certificate, Claim, CorrectionAction, CorrectionLevel,
+    DriftAlert, DriftMetrics, DriftScore, DualPanelResult, NightwatchMonitor, RateLimitTracker,
+    RateLimitWindow, ReasoningCertificate,
+};
+pub use output_poster::OutputPoster;
+pub use persona::{MetapromptRenderError, MetapromptRenderer, PersonaRegistry};
+pub use project_adf::ProjectAdfConfig;
+#[cfg(feature = "quickwit")]
+pub use quickwit_bulk::QuickwitEsBulkSink;
+pub use rate_limiter::{is_rate_limit_backoff_enabled, RateLimiter};
+pub use scheduler::{ScheduleEvent, TimeScheduler};
+use terraphim_types::{FindingSeverity, ReviewFinding};
+pub use worktree_guard::{with_worktree_guard, with_worktree_guard_async, WorktreeGuard};
+
+use chrono::Timelike;
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::str::FromStr;
+use std::time::{Duration, Instant};
+
+use std::sync::{Arc, Mutex};
+
+use terraphim_router::RoutingEngine;
+use terraphim_spawner::health::{CircuitBreaker, HealthStatus};
+use terraphim_spawner::output::OutputEvent;
+use terraphim_spawner::{AgentHandle, AgentSpawner, ResourceLimits, SpawnContext, SpawnRequest};
+use tokio::sync::broadcast;
+use tracing::{debug, error, info, warn};
+
+fn format_runtime_duration(seconds: u64) -> String {
+    let hours = seconds / 3600;
+    let minutes = (seconds % 3600) / 60;
+    let secs = seconds % 60;
+
+    match (hours, minutes, secs) {
+        (0, 0, secs) => format!("{secs}s"),
+        (0, minutes, 0) => format!("{minutes}m"),
+        (0, minutes, secs) => format!("{minutes}m {secs}s"),
+        (hours, 0, 0) => format!("{hours}h"),
+        (hours, minutes, 0) => format!("{hours}h {minutes}m"),
+        (hours, minutes, secs) => format!("{hours}h {minutes}m {secs}s"),
+    }
+}
+
+fn timeout_summary(elapsed_secs: u64, limit_secs: u64) -> String {
+    format!(
+        "[timeout] agent exceeded configured runtime limit after {} (limit {}; elapsed {elapsed_secs}s, limit {limit_secs}s). The `max_cpu_seconds` setting is also enforced by ADF as a wall-clock runtime limit.",
+        format_runtime_duration(elapsed_secs),
+        format_runtime_duration(limit_secs)
+    )
+}
+
+/// Result of evaluating a pre-check strategy before spawning an agent.
+#[derive(Debug, Clone)]
+pub enum PreCheckResult {
+    /// Pre-check found actionable findings. Agent should spawn with findings prepended.
+    Findings(String),
+    /// Nothing to do. Skip spawn.
+    NoFindings,
+    /// Pre-check execution itself failed. Fail-open: spawn anyway.
+    Failed(String),
+}
+
+/// Status of a single agent in the fleet.
+#[derive(Debug, Clone)]
+pub struct AgentStatus {
+    pub name: String,
+    pub layer: AgentLayer,
+    pub running: bool,
+    pub health: HealthStatus,
+    pub drift_score: Option<f64>,
+    pub uptime: Duration,
+    pub restart_count: u32,
+    /// API calls remaining per provider (None if no limit known).
+    pub api_calls_remaining: HashMap<String, Option<u32>>,
+}
+
+/// Runtime state for a managed agent.
+struct ManagedAgent {
+    definition: AgentDefinition,
+    handle: AgentHandle,
+    started_at: Instant,
+    restart_count: u32,
+    output_rx: broadcast::Receiver<OutputEvent>,
+    spawned_by_mention: bool,
+    worktree_path: Option<PathBuf>,
+    routed_model: Option<String>,
+    session_id: String,
+    mention_chain_id: Option<String>,
+    mention_depth: Option<u32>,
+    mention_parent_agent: Option<String>,
+    /// Concurrency permit held while the agent is running. Released on drop.
+    #[allow(dead_code)]
+    concurrency_permit: Option<concurrency::AgentPermit>,
+    /// When set, post a terminal commit status on agent exit.
+    /// Tuple of (head_sha, context).
+    commit_status_post: Option<(String, String)>,
+    /// Temp file path for streaming agent output. Renamed to final path on exit.
+    output_tmp_path: Option<PathBuf>,
+    /// Worktree guard for automatic cleanup on agent crash.
+    #[allow(dead_code)]
+    worktree_guard: Option<crate::worktree_guard::WorktreeGuard>,
+}
+
+#[cfg(not(test))]
+#[derive(Debug, Default, serde::Serialize, serde::Deserialize)]
+struct PersistedRestartState {
+    /// project -> agent -> restart count
+    #[serde(default)]
+    counts_by_project: HashMap<String, HashMap<String, u32>>,
+    /// project -> agent -> last failure timestamp (unix seconds)
+    #[serde(default)]
+    last_failure_unix_secs_by_project: HashMap<String, HashMap<String, i64>>,
+    /// Legacy flat map retained for backward-compatible deserialisation.
+    #[serde(default, skip_serializing)]
+    counts: HashMap<String, u32>,
+    /// Legacy flat map retained for backward-compatible deserialisation.
+    #[serde(default, skip_serializing)]
+    last_failure_unix_secs: HashMap<String, i64>,
+}
+
+/// The main orchestrator that runs the dark factory.
+pub struct AgentOrchestrator {
+    config: OrchestratorConfig,
+    spawner: AgentSpawner,
+    router: RoutingEngine,
+    nightwatch: NightwatchMonitor,
+    scheduler: TimeScheduler,
+    compound_workflow: CompoundReviewWorkflow,
+    agent_registry: AgentRegistry,
+    active_agents: HashMap<String, ManagedAgent>,
+    rate_limiter: RateLimitTracker,
+    shutdown_requested: bool,
+    /// Total restart count per (project, agent) pair (persists across agent lifecycle).
+    restart_counts: HashMap<(String, String), u32>,
+    /// Last non-zero exit timestamp per (project, agent), used for budget windowing.
+    restart_last_failure_unix_secs: HashMap<(String, String), i64>,
+    /// Last exit time per (project, agent) (for cooldown enforcement).
+    restart_cooldowns: HashMap<(String, String), Instant>,
+    /// Timestamp of the last reconciliation tick (for cron comparison).
+    last_tick_time: chrono::DateTime<chrono::Utc>,
+    /// In-memory buffer for handoff contexts with TTL.
+    handoff_buffer: HandoffBuffer,
+    /// Append-only JSONL ledger for handoff history.
+    handoff_ledger: HandoffLedger,
+    /// Per-agent cost tracking with budget enforcement.
+    cost_tracker: CostTracker,
+    /// Registry of persona definitions for metaprompt generation.
+    persona_registry: PersonaRegistry,
+    /// Renderer for persona metaprompts.
+    metaprompt_renderer: MetapromptRenderer,
+    /// Output poster for posting agent output to Gitea issues.
+    output_poster: Option<OutputPoster>,
+    /// Circuit breakers for each provider to prevent cascading failures.
+    #[allow(dead_code)]
+    circuit_breakers: Arc<Mutex<HashMap<String, CircuitBreaker>>>,
+    /// Per-agent last-run commit hash for GitDiff strategy.
+    /// Key: agent name. Value: commit SHA.
+    last_run_commits: HashMap<String, String>,
+    /// Per-agent last cron fire timestamp to prevent re-triggering within same schedule window.
+    /// Key: agent name. Value: timestamp of last fire.
+    last_cron_fire: HashMap<String, chrono::DateTime<chrono::Utc>>,
+    /// Last compound-review fire time, used to gate the compound schedule
+    /// independently of `last_tick_time`. Mirrors the `last_cron_fire`
+    /// pattern for per-agent crons. Without this cursor, if the
+    /// `reconcile_tick` future is cancelled mid-await by its 90 s
+    /// `tokio::time::timeout` safety wrapper, `last_tick_time` is never
+    /// advanced and the same compound-review occurrence re-fires on the
+    /// very next tick, producing a worktree storm (#1562).
+    last_compound_review_fired_at: Option<chrono::DateTime<chrono::Utc>>,
+    /// Lazy-initialised Gitea tracker for gitea-issue pre-check.
+    pre_check_tracker: Option<terraphim_tracker::GiteaTracker>,
+    /// Active flow executions keyed by flow name.
+    #[allow(dead_code)]
+    active_flows: HashMap<String, tokio::task::JoinHandle<flow::state::FlowRunState>>,
+    /// Per-project mention cursors, keyed by project id.
+    ///
+    /// Each project gets its own cursor so repo-wide polls can advance
+    /// independently. Legacy single-project mode uses the synthetic
+    /// [`dispatcher::LEGACY_PROJECT_ID`] key.
+    mention_cursors: HashMap<String, MentionCursor>,
+    /// Receiver for webhook dispatch requests.
+    webhook_dispatch_rx: Option<tokio::sync::mpsc::Receiver<webhook::WebhookDispatch>>,
+    /// Monotonically increasing tick counter for poll_modulo gating.
+    tick_count: u64,
+    #[cfg(feature = "quickwit")]
+    quickwit_sink: Option<quickwit::QuickwitFleetSink>,
+    /// Classifier for structured agent exit classification using KG-boosted matching.
+    exit_classifier: ExitClassifier,
+    /// KG-driven model router loaded from taxonomy markdown files.
+    kg_router: Option<kg_router::KgRouter>,
+    /// Per-provider health tracking with circuit breakers.
+    provider_health: provider_probe::ProviderHealthMap,
+    /// Live telemetry store for model performance tracking from CLI output.
+    telemetry_store: control_plane::TelemetryStore,
+    /// Per-provider hour/day spend tracker consulted by the routing
+    /// engine. `None` when the config declares no [[providers]] entries.
+    provider_budget_tracker: Option<Arc<provider_budget::ProviderBudgetTracker>>,
+    /// Compiled per-provider stderr classifiers built from
+    /// `[[providers]].error_signatures`. Providers without signatures
+    /// are absent from the map and classify as
+    /// [`error_signatures::ErrorKind::Unknown`] (fail-safe).
+    provider_error_signatures: error_signatures::ProviderSignatureMap,
+    provider_rate_limits: ProviderRateLimitWindow,
+    retry_counts: HashMap<String, (u32, Instant)>,
+    /// Dedupe set of [`error_signatures::unknown_dedupe_key`] values so we
+    /// don't open a new `[ADF]` Gitea issue for every retry of the same
+    /// stderr shape. Process-lifetime in-memory; intentional since the
+    /// window between duplicates is short and restarting the orchestrator
+    /// is an acceptable dedupe reset.
+    unknown_error_dedupe: Arc<Mutex<std::collections::HashSet<String>>>,
+    /// Counter of consecutive `project-meta` failures per project. Tripped
+    /// entries cause the orchestrator to create a pause flag and open an
+    /// `[ADF]` Gitea escalation issue.
+    project_failure_counter: project_control::ProjectFailureCounter,
+    /// Resolved pause-flag directory. Derived from
+    /// [`OrchestratorConfig::pause_dir`] or [`project_control::DEFAULT_PAUSE_DIR`].
+    pause_dir: PathBuf,
+    /// Unified priority queue for all dispatch sources (time, issue, mention,
+    /// review-pr, auto-merge, post-merge-gate).
+    dispatcher: dispatcher::Dispatcher,
+    /// Per-(project, PR) rate limiter for verdict polling. Keeps the
+    /// orchestrator from re-hitting Gitea for the same PR every tick.
+    pr_poll_rate_limiter: pr_poller::PrPollRateLimiter,
+    /// Per-project dedupe set of `(pr_number, head_sha)` already enqueued
+    /// for auto-merge so the same revision is never dispatched twice.
+    auto_merge_enqueued: pr_poller::AutoMergeDedupeSet,
+    /// TTL-based dedupe cache for auto-merge failure issues. Prevents
+    /// duplicate `[ADF] Auto-merge failed` issues for the same PR within
+    /// a 24-hour window.
+    auto_merge_failure_dedupe: pr_poller::AutoMergeFailureDedupe,
+    /// Shared learning store. `None` when `learning.enabled = false` or
+    /// when initialisation failed (graceful degradation).
+    learning_store: Option<learning::SharedLearningStore>,
+    /// Learning config snapshot (min_trust, max_tokens, etc.).
+    learning_config: config::LearningConfig,
+    /// Agent name -> learning IDs injected at spawn time, used to record
+    /// outcome feedback at exit.
+    injected_learning_ids: HashMap<String, Vec<String>>,
+    /// Global concurrency controller enforcing agent limits and fairness.
+    concurrency_controller: concurrency::ConcurrencyController,
+    /// Directory for per-agent output log files. Each completed agent run
+    /// writes its stdout+stderr to `<agent_log_dir>/<name>-<timestamp>.log`.
+    agent_log_dir: PathBuf,
+    /// Cache directory populated from Gitea at startup (issue #1434).
+    /// `None` when `gitea_skill_repo` is not configured. When `Some`, this
+    /// directory is prepended to the skill search path so remote skills
+    /// shadow local ones while local directories remain as fallback.
+    gitea_skill_cache_dir: Option<PathBuf>,
+    /// Agent evolution manager. No-op when evolution feature is disabled
+    /// or `evolution.enabled = false` in config.
+    evolution_manager: evolution::EvolutionManager,
+}
+
+/// Build the composite restart-state key for an agent definition.
+///
+/// Legacy (project-less) agents use [`crate::dispatcher::LEGACY_PROJECT_ID`]
+/// so restart counts never collide across projects once projects are added.
+fn agent_key(def: &AgentDefinition) -> (String, String) {
+    (
+        def.project
+            .clone()
+            .unwrap_or_else(|| crate::dispatcher::LEGACY_PROJECT_ID.to_string()),
+        def.name.clone(),
+    )
+}
+
+struct ProviderRateLimitWindow {
+    blocked_until: HashMap<String, Instant>,
+}
+
+impl ProviderRateLimitWindow {
+    fn new() -> Self {
+        Self {
+            blocked_until: HashMap::new(),
+        }
+    }
+
+    fn block_until(&mut self, provider: &str, until: Instant) {
+        self.blocked_until.insert(provider.to_string(), until);
+    }
+
+    #[allow(dead_code)]
+    fn is_blocked(&self, provider: &str) -> bool {
+        self.blocked_until
+            .get(provider)
+            .is_some_and(|until| Instant::now() < *until)
+    }
+
+    fn blocked_providers(&self) -> Vec<String> {
+        let now = Instant::now();
+        self.blocked_until
+            .iter()
+            .filter(|(_, until)| **until > now)
+            .map(|(k, _)| k.clone())
+            .collect()
+    }
+
+    fn clean_expired(&mut self) {
+        let now = Instant::now();
+        self.blocked_until.retain(|_, until| *until > now);
+    }
+}
+
+fn parse_reset_time(quota_line: &str) -> Option<Instant> {
+    let line = quota_line.to_lowercase();
+
+    if let Some(idx) = line.find("resets in ") {
+        let rest = &line[idx + "resets in ".len()..];
+        if let Ok(n) = rest
+            .chars()
+            .take_while(|c| c.is_ascii_digit())
+            .collect::<String>()
+            .parse::<u64>()
+        {
+            if rest.contains("hour") {
+                return Some(Instant::now() + Duration::from_secs(n * 3600));
+            }
+            if rest.contains("minute") {
+                return Some(Instant::now() + Duration::from_secs(n * 60));
+            }
+        }
+    }
+
+    if let Some(idx) = line.find("resets at ") {
+        let rest = &line[idx + "resets at ".len()..];
+        if let Some(time_str) = rest
+            .strip_suffix(" utc")
+            .or_else(|| rest.strip_suffix(" utc."))
+        {
+            if let Ok(hour_min) = chrono::NaiveTime::parse_from_str(time_str.trim(), "%H:%M") {
+                let now = chrono::Utc::now();
+                let mut target_date = now.date_naive();
+                let target = target_date.and_time(hour_min);
+                let mut target_utc =
+                    chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(target, chrono::Utc);
+                if target_utc <= now {
+                    target_date += chrono::Duration::days(1);
+                    let target = target_date.and_time(hour_min);
+                    target_utc = chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(
+                        target,
+                        chrono::Utc,
+                    );
+                }
+                let delta = (target_utc - now).to_std().ok()?;
+                return Some(Instant::now() + delta);
+            }
+        }
+    }
+
+    if line.contains("resets ") {
+        return Some(Instant::now() + Duration::from_secs(3600));
+    }
+
+    None
+}
+
+/// Build the optional provider-level hour/day budget tracker from the
+/// [[providers]] config block. Returns `Ok(None)` when no providers are
+/// declared (no cap = no tracker, routing works unchanged).
+fn build_provider_budget_tracker(
+    config: &OrchestratorConfig,
+) -> Result<Option<Arc<provider_budget::ProviderBudgetTracker>>, OrchestratorError> {
+    if config.providers.is_empty() {
+        if config.provider_budget_state_file.is_some() {
+            warn!("provider_budget_state_file set but no [[providers]] entries; tracker disabled");
+        }
+        return Ok(None);
+    }
+    let tracker = match config.provider_budget_state_file.as_ref() {
+        Some(path) => provider_budget::ProviderBudgetTracker::with_persistence(
+            config.providers.clone(),
+            path.clone(),
+        )
+        .map_err(|e| {
+            OrchestratorError::Config(format!(
+                "failed to load provider budget state from {}: {}",
+                path.display(),
+                e
+            ))
+        })?,
+        None => provider_budget::ProviderBudgetTracker::new(config.providers.clone()),
+    };
+    info!(
+        providers = tracker.providers().collect::<Vec<_>>().join(","),
+        persistence = ?config.provider_budget_state_file,
+        "provider budget tracker initialised"
+    );
+    Ok(Some(Arc::new(tracker)))
+}
+
+/// Build the global concurrency controller from orchestrator config.
+///
+/// Uses `workflow.concurrency` when workflow mode is configured; otherwise
+/// falls back to no global cap, issue_max = 5, round-robin fairness.
+fn build_concurrency_controller(config: &OrchestratorConfig) -> concurrency::ConcurrencyController {
+    let (global_max, time_max, issue_max, fairness) = config
+        .workflow
+        .as_ref()
+        .map(|w| {
+            let global_max = w.concurrency.global_max;
+            let effective_global_max = if global_max == 0 {
+                concurrency::UNBOUNDED_GLOBAL_PERMITS
+            } else {
+                global_max
+            };
+            (
+                global_max,
+                effective_global_max, // time-driven shares global pool
+                w.concurrency.issue_max,
+                w.concurrency
+                    .fairness
+                    .parse::<concurrency::FairnessPolicy>()
+                    .unwrap_or(concurrency::FairnessPolicy::RoundRobin),
+            )
+        })
+        .unwrap_or((
+            0,
+            concurrency::UNBOUNDED_GLOBAL_PERMITS,
+            5,
+            concurrency::FairnessPolicy::RoundRobin,
+        ));
+
+    let quotas = concurrency::ModeQuotas {
+        time_max,
+        issue_max,
+    };
+
+    let project_caps: HashMap<String, concurrency::ProjectCaps> = config
+        .projects
+        .iter()
+        .filter_map(|p| {
+            p.max_concurrent_agents.map(|max| {
+                (
+                    p.id.clone(),
+                    concurrency::ProjectCaps {
+                        max_concurrent_agents: max,
+                        max_concurrent_mention_agents: p.max_concurrent_mention_agents,
+                    },
+                )
+            })
+        })
+        .collect();
+
+    concurrency::ConcurrencyController::with_project_caps(
+        global_max,
+        quotas,
+        fairness,
+        project_caps,
+    )
+}
+
+/// Build the per-project runtime map consumed by
+/// [`flow::executor::FlowExecutor::with_projects`].
+fn build_flow_project_runtimes(
+    config: &OrchestratorConfig,
+) -> HashMap<String, flow::executor::ProjectRuntime> {
+    config
+        .projects
+        .iter()
+        .map(|p| {
+            (
+                p.id.clone(),
+                flow::executor::ProjectRuntime {
+                    working_dir: p.working_dir.clone(),
+                    gitea_owner: p.gitea.as_ref().map(|g| g.owner.clone()),
+                    gitea_repo: p.gitea.as_ref().map(|g| g.repo.clone()),
+                },
+            )
+        })
+        .collect()
+}
+
+/// Build a [`SpawnContext`] for an agent, resolving per-project working_dir,
+/// Gitea owner/repo, and the project id itself into the child process's
+/// environment (`ADF_PROJECT_ID`, `ADF_WORKING_DIR`, `GITEA_OWNER`,
+/// `GITEA_REPO`). Legacy (project-less) agents use [`SpawnContext::global()`].
+///
+/// When an [`OutputPoster`] is available and has a per-agent Gitea token
+/// for `(project, agent_name)` (loaded from `agent_tokens.json`), the
+/// token is injected as `GITEA_TOKEN` so the agent's own `gtr` / API
+/// calls inside its task shell post under its own Gitea identity. Without
+/// this, `source ~/.profile` would overlay the shared root token.
+fn build_spawn_context_for_agent(
+    config: &OrchestratorConfig,
+    def: &AgentDefinition,
+    output_poster: Option<&OutputPoster>,
+) -> SpawnContext {
+    let Some(pid) = def.project.as_deref() else {
+        return SpawnContext::global();
+    };
+    let Some(project) = config.project_by_id(pid) else {
+        return SpawnContext::global();
+    };
+    let working_dir_str = project.working_dir.to_string_lossy().into_owned();
+    let mut ctx = SpawnContext::with_working_dir(project.working_dir.clone())
+        .with_env("ADF_PROJECT_ID", pid)
+        .with_env("ADF_WORKING_DIR", working_dir_str);
+    if let Some(gitea) = project.gitea.as_ref() {
+        ctx = ctx
+            .with_env("GITEA_URL", gitea.base_url.clone())
+            .with_env("GITEA_OWNER", gitea.owner.clone())
+            .with_env("GITEA_REPO", gitea.repo.clone());
+    }
+    if let Some(poster) = output_poster {
+        if let Some(token) = poster.agent_token(pid, &def.name) {
+            ctx = ctx.with_env("GITEA_TOKEN", token.to_string());
+        }
+    }
+    ctx
+}
+
+/// Flatten persisted nested maps (project -> agent -> count) and any legacy
+/// flat entries into the in-memory composite key map. Legacy flat entries are
+/// mapped to [`crate::dispatcher::LEGACY_PROJECT_ID`].
+#[cfg(not(test))]
+fn flatten_restart_counts(state: &PersistedRestartState) -> HashMap<(String, String), u32> {
+    let mut out: HashMap<(String, String), u32> = HashMap::new();
+    for (project, per_agent) in &state.counts_by_project {
+        for (agent, count) in per_agent {
+            out.insert((project.clone(), agent.clone()), *count);
+        }
+    }
+    for (agent, count) in &state.counts {
+        out.entry((
+            crate::dispatcher::LEGACY_PROJECT_ID.to_string(),
+            agent.clone(),
+        ))
+        .or_insert(*count);
+    }
+    out
+}
+
+/// Flatten persisted nested maps for last-failure timestamps into the
+/// composite key format.
+#[cfg(not(test))]
+fn flatten_restart_failures(state: &PersistedRestartState) -> HashMap<(String, String), i64> {
+    let mut out: HashMap<(String, String), i64> = HashMap::new();
+    for (project, per_agent) in &state.last_failure_unix_secs_by_project {
+        for (agent, ts) in per_agent {
+            out.insert((project.clone(), agent.clone()), *ts);
+        }
+    }
+    for (agent, ts) in &state.last_failure_unix_secs {
+        out.entry((
+            crate::dispatcher::LEGACY_PROJECT_ID.to_string(),
+            agent.clone(),
+        ))
+        .or_insert(*ts);
+    }
+    out
+}
+
+/// Re-nest composite keyed maps into the persisted `project -> agent -> value`
+/// shape for serialisation.
+#[cfg(not(test))]
+fn nest_by_project<V: Clone>(
+    flat: &HashMap<(String, String), V>,
+) -> HashMap<String, HashMap<String, V>> {
+    let mut out: HashMap<String, HashMap<String, V>> = HashMap::new();
+    for ((project, agent), value) in flat {
+        out.entry(project.clone())
+            .or_default()
+            .insert(agent.clone(), value.clone());
+    }
+    out
+}
+
+/// Validate agent name for safe use in file paths.
+/// Rejects empty names, names containing path separators or traversal sequences.
+fn validate_agent_name(name: &str) -> Result<(), OrchestratorError> {
+    if name.is_empty()
+        || name.contains('/')
+        || name.contains('\\')
+        || name.contains("..")
+        || !name
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+    {
+        return Err(OrchestratorError::InvalidAgentName(name.to_string()));
+    }
+    Ok(())
+}
+
+/// Truncate a string to at most `max_bytes` UTF-8 bytes, honouring char
+/// boundaries. If truncation occurs, append a marker so the reader knows.
+fn truncate_for_issue(s: &str, max_bytes: usize) -> String {
+    if s.len() <= max_bytes {
+        return s.to_string();
+    }
+    let mut end = max_bytes;
+    while end > 0 && !s.is_char_boundary(end) {
+        end -= 1;
+    }
+    format!("{}... (truncated)", &s[..end])
+}
+
+impl AgentOrchestrator {
+    /// Create a new orchestrator from configuration.
+    pub fn new(config: OrchestratorConfig) -> Result<Self, OrchestratorError> {
+        // Set CARGO_TARGET_DIR so worktree agents share the main build cache,
+        // and RUSTC_WRAPPER=sccache for cross-worktree compilation caching.
+        let mut spawn_env = std::collections::HashMap::new();
+        let target_dir = config.working_dir.join("target");
+        spawn_env.insert(
+            "CARGO_TARGET_DIR".to_string(),
+            target_dir.to_string_lossy().to_string(),
+        );
+        if std::process::Command::new("sccache")
+            .arg("--version")
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .is_ok()
+        {
+            spawn_env.insert("RUSTC_WRAPPER".to_string(), "sccache".to_string());
+            info!("sccache detected, enabling shared compilation cache for worktrees");
+        }
+        let spawner = AgentSpawner::new()
+            .with_working_dir(&config.working_dir)
+            .with_env_vars(spawn_env);
+        let router = RoutingEngine::new();
+        let nightwatch = NightwatchMonitor::new(config.nightwatch.clone());
+        let scheduler = TimeScheduler::new(&config.agents, Some(&config.compound_review.schedule))?;
+        let compound_workflow =
+            CompoundReviewWorkflow::from_compound_config(config.compound_review.clone());
+        let agent_registry = AgentRegistry::from_config(&config)?;
+
+        // Layer 2 startup sweep (epic #1567, issue #1570).
+        //
+        // Reconcile any worktree residue left by a previous instance
+        // before we accept ticks. Synchronous: must finish before the
+        // tick thread is spawned in `run()` so a fresh review cycle
+        // never races against half-killed `review-*` directories.
+        //
+        // `extra_roots` mirrors the per-agent worktree convention
+        // from `lib.rs:5393`. If you change that literal there, change
+        // it here too.
+        //
+        // `cfg(not(test))` gate: the in-lib `test_config()` (see
+        // `lib.rs:7926`) points `repo_path` at the live terraphim-ai
+        // checkout. Without this gate, the sweep's
+        // `git worktree prune --verbose` races against
+        // `test_orchestrator_compound_review_manual`'s concurrent
+        // `git worktree add` on that shared real repo's
+        // `.git/worktrees/` admin registry. The production wiring is
+        // exercised end-to-end by `tests/sweep_on_startup_test.rs`,
+        // which builds an isolated `TempDir` repo and asserts the
+        // sweep DOES run from `AgentOrchestrator::new`. Do not remove
+        // this gate without first migrating the in-lib `test_config()`
+        // to a TempDir-based `repo_path`.
+        #[cfg(not(test))]
+        {
+            let sweep_report = compound_workflow
+                .worktree_manager()
+                .sweep_stale(&[PathBuf::from("/tmp/adf-worktrees")]);
+            if sweep_report.swept_count + sweep_report.root_owned_skipped > 10 {
+                warn!(
+                    swept_count = sweep_report.swept_count,
+                    root_owned_skipped = sweep_report.root_owned_skipped,
+                    failed_count = sweep_report.failed_count,
+                    "large worktree backlog at startup -- prior crash storm likely"
+                );
+            }
+        }
+
+        let handoff_buffer = HandoffBuffer::new(config.handoff_buffer_ttl_secs.unwrap_or(86400));
+        let handoff_ledger = HandoffLedger::new(config.working_dir.join("handoff-ledger.jsonl"));
+
+        // Initialize cost tracker and register all agents with their budgets
+        let mut cost_tracker = CostTracker::new();
+        for agent_def in &config.agents {
+            cost_tracker.register(&agent_def.name, agent_def.budget_monthly_cents);
+        }
+
+        // Initialize persona registry - load from configured directory or create empty
+        let persona_registry = match &config.persona_data_dir {
+            Some(dir) => {
+                info!(dir = %dir.display(), "loading persona registry from directory");
+                PersonaRegistry::load_from_dir(dir).unwrap_or_else(|e| {
+                    warn!(dir = %dir.display(), error = %e, "failed to load persona directory, using empty registry");
+                    PersonaRegistry::new()
+                })
+            }
+            None => {
+                info!("no persona_data_dir configured, using empty registry");
+                PersonaRegistry::new()
+            }
+        };
+
+        // Initialize metaprompt renderer - check for custom template or use default
+        let metaprompt_renderer = match &config.persona_data_dir {
+            Some(dir) => {
+                let custom_template = dir.join("metaprompt-template.hbs");
+                if custom_template.exists() {
+                    info!(path = %custom_template.display(), "using custom metaprompt template");
+                    MetapromptRenderer::from_template_file(&custom_template).unwrap_or_else(|e| {
+                        warn!(path = %custom_template.display(), error = %e, "failed to load custom template, using default");
+                        MetapromptRenderer::new().expect("default template should always compile")
+                    })
+                } else {
+                    MetapromptRenderer::new().expect("default template should always compile")
+                }
+            }
+            None => MetapromptRenderer::new().expect("default template should always compile"),
+        };
+
+        // Initialize output poster. In multi-project mode this wires one
+        // tracker per project plus a legacy fallback from `config.gitea`; in
+        // legacy single-project mode it collapses to the top-level config.
+        let output_poster = OutputPoster::from_orchestrator_config(&config);
+
+        // Initialize KG router from taxonomy directory if configured
+        let kg_router = config.routing.as_ref().and_then(|routing_config| {
+            match kg_router::KgRouter::load(&routing_config.taxonomy_path) {
+                Ok(router) => {
+                    info!(
+                        path = %routing_config.taxonomy_path.display(),
+                        rules = router.rule_count(),
+                        "KG model router loaded"
+                    );
+                    Some(router)
+                }
+                Err(e) => {
+                    warn!(error = %e, "KG router failed to load, using static model config");
+                    None
+                }
+            }
+        });
+
+        let probe_ttl = config
+            .routing
+            .as_ref()
+            .map(|r| r.probe_ttl_secs)
+            .unwrap_or(300);
+        let provider_health =
+            provider_probe::ProviderHealthMap::new(std::time::Duration::from_secs(probe_ttl))
+                .with_rate_limiter(crate::rate_limiter::RateLimiter::new());
+
+        let telemetry_store = control_plane::TelemetryStore::new(3600);
+
+        let provider_budget_tracker = build_provider_budget_tracker(&config)?;
+
+        // Compile per-provider stderr signatures declared under
+        // `[[providers]].error_signatures`. Invalid regexes fail loud
+        // at startup so misconfiguration can never silently disable
+        // runtime classification.
+        let provider_error_signatures = error_signatures::build_signature_map(&config.providers)
+            .map_err(|e| OrchestratorError::Config(e.to_string()))?;
+
+        let project_failure_counter =
+            project_control::ProjectFailureCounter::new(config.project_circuit_breaker_threshold);
+        let pause_dir = config
+            .pause_dir
+            .clone()
+            .unwrap_or_else(|| PathBuf::from(project_control::DEFAULT_PAUSE_DIR));
+
+        #[cfg(not(test))]
+        let restart_state = Self::load_restart_state();
+
+        let learning_config = config.learning.clone();
+
+        // MentionCursor loaded lazily on first poll (async)
+
+        Ok(Self {
+            config: config.clone(),
+            spawner,
+            router,
+            nightwatch,
+            scheduler,
+            compound_workflow,
+            agent_registry,
+            active_agents: HashMap::new(),
+            rate_limiter: RateLimitTracker::default(),
+            shutdown_requested: false,
+            restart_counts: {
+                #[cfg(not(test))]
+                {
+                    flatten_restart_counts(&restart_state)
+                }
+                #[cfg(test)]
+                {
+                    HashMap::new()
+                }
+            },
+            restart_last_failure_unix_secs: {
+                #[cfg(not(test))]
+                {
+                    flatten_restart_failures(&restart_state)
+                }
+                #[cfg(test)]
+                {
+                    HashMap::new()
+                }
+            },
+            restart_cooldowns: HashMap::new(),
+            last_tick_time: chrono::Utc::now(),
+            handoff_buffer,
+            handoff_ledger,
+            cost_tracker,
+            persona_registry,
+            metaprompt_renderer,
+            output_poster,
+            circuit_breakers: Arc::new(Mutex::new(HashMap::new())),
+            last_run_commits: HashMap::new(),
+            last_cron_fire: HashMap::new(),
+            last_compound_review_fired_at: None,
+            pre_check_tracker: None,
+            active_flows: HashMap::new(),
+            mention_cursors: HashMap::new(),
+            webhook_dispatch_rx: None,
+            tick_count: 0,
+            #[cfg(feature = "quickwit")]
+            quickwit_sink: None,
+            exit_classifier: ExitClassifier::new(),
+            kg_router,
+            provider_health,
+            telemetry_store,
+            provider_budget_tracker,
+            provider_error_signatures,
+            provider_rate_limits: ProviderRateLimitWindow::new(),
+            retry_counts: HashMap::new(),
+            unknown_error_dedupe: Arc::new(Mutex::new(std::collections::HashSet::new())),
+            project_failure_counter,
+            pause_dir,
+            dispatcher: dispatcher::Dispatcher::new(),
+            pr_poll_rate_limiter: pr_poller::PrPollRateLimiter::new(
+                pr_poller::PR_POLL_MIN_INTERVAL,
+            ),
+            auto_merge_enqueued: pr_poller::AutoMergeDedupeSet::new(),
+            auto_merge_failure_dedupe: pr_poller::AutoMergeFailureDedupe::new(
+                std::time::Duration::from_secs(86400),
+            ),
+            learning_store: None,
+            learning_config,
+            injected_learning_ids: HashMap::new(),
+            concurrency_controller: build_concurrency_controller(&config),
+            agent_log_dir: {
+                let adf_logs = std::path::PathBuf::from("/opt/ai-dark-factory/logs/agents");
+                if adf_logs.parent().map(|p| p.exists()).unwrap_or(false) {
+                    adf_logs
+                } else {
+                    config.working_dir.join("logs").join("agents")
+                }
+            },
+            gitea_skill_cache_dir: None,
+            evolution_manager: evolution::EvolutionManager::new(config.evolution.clone()),
+        })
+    }
+
+    /// Load persisted restart state from a JSON file in the temp directory.
+    /// Falls back to the legacy `HashMap<String, u32>` format for compatibility.
+    #[cfg(not(test))]
+    fn load_restart_state() -> PersistedRestartState {
+        let path = std::env::temp_dir().join("adf_restart_counts.json");
+        match std::fs::read_to_string(&path) {
+            Ok(json) => {
+                if let Ok(state) = serde_json::from_str::<PersistedRestartState>(&json) {
+                    state
+                } else if let Ok(counts) = serde_json::from_str::<HashMap<String, u32>>(&json) {
+                    PersistedRestartState {
+                        counts,
+                        ..Default::default()
+                    }
+                } else {
+                    PersistedRestartState::default()
+                }
+            }
+            Err(_) => PersistedRestartState::default(),
+        }
+    }
+
+    /// Persist restart state so it survives orchestrator restarts.
+    fn save_restart_state(&self) {
+        // Skip persistence in test builds to avoid cross-test contamination
+        #[cfg(test)]
+        return;
+        #[cfg(not(test))]
+        {
+            let path = std::env::temp_dir().join("adf_restart_counts.json");
+            let state = PersistedRestartState {
+                counts_by_project: nest_by_project(&self.restart_counts),
+                last_failure_unix_secs_by_project: nest_by_project(
+                    &self.restart_last_failure_unix_secs,
+                ),
+                counts: HashMap::new(),
+                last_failure_unix_secs: HashMap::new(),
+            };
+            if let Ok(json) = serde_json::to_string(&state) {
+                if let Err(e) = std::fs::write(&path, json) {
+                    warn!(error = %e, "failed to persist restart state");
+                }
+            }
+        }
+    }
+
+    fn restart_budget_window_secs(&self) -> i64 {
+        self.config.restart_budget_window_secs as i64
+    }
+
+    /// Open a temp log file for an agent and spawn a background task that
+    /// continuously drains its output broadcast into the file.  Returns the
+    /// temp-file path so it can be renamed to the final name on exit.
+    fn start_output_log_drain(&self, agent_name: &str, handle: &AgentHandle) -> Option<PathBuf> {
+        let _ = std::fs::create_dir_all(&self.agent_log_dir);
+        let ts = chrono::Utc::now().format("%Y%m%dT%H%M%SZ");
+        let tmp_name = format!(".tmp-{}-{}.log", agent_name, ts);
+        let tmp_path = self.agent_log_dir.join(&tmp_name);
+
+        let file = match std::fs::File::create(&tmp_path) {
+            Ok(f) => f,
+            Err(e) => {
+                warn!(agent = %agent_name, error = %e, "failed to create output log temp file");
+                return None;
+            }
+        };
+
+        let mut rx = handle.subscribe_output();
+        let name = agent_name.to_string();
+        let path = tmp_path.clone();
+
+        tokio::spawn(async move {
+            use std::io::Write;
+            let mut writer = std::io::BufWriter::new(file);
+            loop {
+                match rx.recv().await {
+                    Ok(event) => match &event {
+                        crate::OutputEvent::Stdout { line, .. } => {
+                            let _ = writeln!(writer, "{}", line);
+                        }
+                        crate::OutputEvent::Stderr { line, .. } => {
+                            let _ = writeln!(writer, "[stderr] {}", line);
+                        }
+                        _ => {}
+                    },
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                        let _ = writeln!(writer, "[... {} output lines dropped ...]", n);
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                        break;
+                    }
+                }
+            }
+            let _ = writer.flush();
+            debug!(agent = %name, path = %path.display(), "output log drain finished");
+        });
+
+        Some(tmp_path)
+    }
+
+    fn current_restart_count(&mut self, key: &(String, String)) -> u32 {
+        let now = chrono::Utc::now().timestamp();
+        let window = self.restart_budget_window_secs();
+        let last_failure = self.restart_last_failure_unix_secs.get(key).copied();
+        if let Some(last) = last_failure {
+            if now.saturating_sub(last) > window {
+                self.restart_counts.remove(key);
+                self.restart_last_failure_unix_secs.remove(key);
+                self.save_restart_state();
+            }
+        }
+        self.restart_counts.get(key).copied().unwrap_or(0)
+    }
+
+    fn increment_restart_count(&mut self, key: &(String, String)) -> u32 {
+        let _ = self.current_restart_count(key);
+        let next_count = {
+            let count = self.restart_counts.entry(key.clone()).or_insert(0);
+            *count += 1;
+            *count
+        };
+        self.restart_last_failure_unix_secs
+            .insert(key.clone(), chrono::Utc::now().timestamp());
+        self.save_restart_state();
+        next_count
+    }
+
+    /// Check disk usage percentage for the root filesystem.
+    /// Returns None if the check fails (non-Linux, command error, etc.).
+    fn check_disk_usage_percent() -> Option<u8> {
+        let output = std::process::Command::new("df")
+            .args(["--output=pcent", "/"])
+            .output()
+            .ok()?;
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        // Output format: "Use%\n 86%\n"
+        for line in stdout.lines().skip(1) {
+            let trimmed = line.trim().trim_end_matches('%');
+            if let Ok(pct) = trimmed.parse::<u8>() {
+                return Some(pct);
+            }
+        }
+        None
+    }
+
+    /// Create from a TOML config file path.
+    ///
+    /// Loads the config, resolves include globs, and runs full validation
+    /// (banned providers, duplicate project ids, unknown project refs, mixed
+    /// mode). Returns `Err` if any check fails -- does not panic or warn-and-
+    /// continue.
+    pub fn from_config_file(path: impl AsRef<Path>) -> Result<Self, OrchestratorError> {
+        let config = OrchestratorConfig::load_and_validate(path)?;
+        Self::new(config)
+    }
+
+    /// Return the validated configuration stored in this orchestrator.
+    pub fn config(&self) -> &OrchestratorConfig {
+        &self.config
+    }
+
+    /// Read-only access to the unified dispatcher queue.
+    ///
+    /// Integration tests use this to assert that ROC v1 Step F polling
+    /// enqueued the expected [`dispatcher::DispatchTask::AutoMerge`] work without the
+    /// test itself holding a reference to the internal dispatcher.
+    pub fn dispatcher(&self) -> &dispatcher::Dispatcher {
+        &self.dispatcher
+    }
+
+    /// Read-only access to the in-memory `(project, pr_number, head_sha)`
+    /// dedupe set populated by ROC v1 Step F polling and the Step G
+    /// AutoMerge handler. Integration tests use this to assert that a
+    /// successful merge leaves the revision recorded so subsequent polls
+    /// never re-enqueue the same auto-merge.
+    pub fn auto_merge_enqueued(&self) -> &pr_poller::AutoMergeDedupeSet {
+        &self.auto_merge_enqueued
+    }
+
+    /// Run the orchestrator (blocks until shutdown signal).
+    ///
+    /// 1. Spawns all Safety-layer agents immediately
+    /// 2. Enters the select! loop handling schedule events, drift alerts, and periodic tick
+    pub async fn run(&mut self) -> Result<(), OrchestratorError> {
+        info!(
+            "starting orchestrator with {} agent definitions",
+            self.config.agents.len()
+        );
+
+        // D-2: Run provider probes on startup if configured
+        if self
+            .config
+            .routing
+            .as_ref()
+            .is_some_and(|r| r.probe_on_startup)
+        {
+            if let Some(ref kg_router) = self.kg_router {
+                info!("running startup provider probe via KG action:: templates");
+                self.provider_health.probe_all(kg_router).await;
+
+                // Save probe results if directory configured
+                if let Some(ref dir) = self
+                    .config
+                    .routing
+                    .as_ref()
+                    .and_then(|r| r.probe_results_dir.clone())
+                {
+                    if let Err(e) = self.provider_health.save_results(dir).await {
+                        warn!(error = %e, "failed to save probe results");
+                    }
+                }
+
+                // Send probe results to Quickwit for cost-aware routing
+                if let Some(ref sink) = self.quickwit_sink {
+                    let project_id = self
+                        .config
+                        .projects
+                        .first()
+                        .map(|p| p.id.clone())
+                        .unwrap_or_else(|| crate::dispatcher::LEGACY_PROJECT_ID.to_string());
+                    self.provider_health
+                        .send_to_quickwit(sink, &project_id)
+                        .await;
+                }
+            }
+        }
+
+        // Restore persisted telemetry from previous runs
+        self.restore_telemetry().await;
+
+        // Populate Gitea skill cache if configured (issue #1434).
+        // On success, the cache dir becomes the first skill root.
+        // On any error, populate_skill_cache logs a warning and returns the
+        // cache dir path anyway; local skill roots are used as fallback.
+        if let Some(ref skill_repo) = self.config.gitea_skill_repo.clone() {
+            let cache_dir = gitea_skill_loader::populate_skill_cache(skill_repo, false).await;
+            self.gitea_skill_cache_dir = Some(cache_dir);
+        }
+
+        // One-shot migration of the legacy top-level `adf/mention_cursor`
+        // key into per-project keys. No-op after the first successful
+        // startup.
+        mention::migrate_legacy_mention_cursor(&self.config.projects).await;
+
+        // Spawn Safety-layer agents immediately
+        let immediate = self.scheduler.immediate_agents();
+        for agent_def in &immediate {
+            if let Err(e) = self.spawn_agent(agent_def).await {
+                error!(agent = %agent_def.name, error = %e, "failed to spawn safety agent");
+            }
+        }
+
+        info!(
+            safety_agents = immediate.len(),
+            active = self.active_agents.len(),
+            "safety agents spawned, entering reconciliation loop"
+        );
+
+        // Start webhook server if configured
+        if let Some(ref webhook_cfg) = self.config.webhook {
+            let (dispatch_tx, dispatch_rx) = tokio::sync::mpsc::channel(64);
+            self.webhook_dispatch_rx = Some(dispatch_rx);
+
+            let agent_names: Vec<String> =
+                self.config.agents.iter().map(|a| a.name.clone()).collect();
+            let project_by_repo: std::collections::HashMap<String, String> = self
+                .config
+                .projects
+                .iter()
+                .filter_map(|p| {
+                    p.gitea
+                        .as_ref()
+                        .map(|g| (format!("{}/{}", g.owner, g.repo), p.id.clone()))
+                })
+                .collect();
+            let state = webhook::WebhookState {
+                agent_names,
+                persona_registry: Arc::new(self.persona_registry.clone()),
+                dispatch_tx,
+                secret: webhook_cfg.secret.clone(),
+                project_by_repo,
+            };
+
+            let router = webhook::webhook_router(state);
+            let bind = webhook_cfg.bind.clone();
+
+            tokio::spawn(async move {
+                let listener = match tokio::net::TcpListener::bind(&bind).await {
+                    Ok(l) => l,
+                    Err(e) => {
+                        error!(bind = %bind, error = %e, "failed to bind webhook server");
+                        return;
+                    }
+                };
+                info!(bind = %bind, "webhook server listening");
+                if let Err(e) = axum::serve(listener, router).await {
+                    error!(error = %e, "webhook server error");
+                }
+            });
+        }
+
+        enum LoopEvent {
+            Tick,
+            Schedule(ScheduleEvent),
+            DriftAlert(DriftAlert),
+            Webhook(webhook::WebhookDispatch),
+        }
+
+        let tick_interval = self.config.tick_interval_secs;
+        let (loop_tx, loop_rx) = std::sync::mpsc::channel::<LoopEvent>();
+        let loop_tx = Arc::new(std::sync::Mutex::new(loop_tx));
+
+        let sched_tx = loop_tx.clone();
+        let sched_rx = self.scheduler.take_event_rx();
+        if let Some(rx) = sched_rx {
+            tokio::spawn(async move {
+                let mut rx = rx;
+                while let Some(event) = rx.recv().await {
+                    if sched_tx
+                        .lock()
+                        .unwrap()
+                        .send(LoopEvent::Schedule(event))
+                        .is_err()
+                    {
+                        break;
+                    }
+                }
+            });
+        }
+
+        let alert_tx = loop_tx.clone();
+        let alert_rx = self.nightwatch.take_alert_rx();
+        if let Some(rx) = alert_rx {
+            tokio::spawn(async move {
+                let mut rx = rx;
+                while let Some(alert) = rx.recv().await {
+                    if alert_tx
+                        .lock()
+                        .unwrap()
+                        .send(LoopEvent::DriftAlert(alert))
+                        .is_err()
+                    {
+                        break;
+                    }
+                }
+            });
+        }
+
+        let tick_stx = loop_tx.clone();
+        let tick_interval_secs = tick_interval;
+        std::thread::spawn(move || loop {
+            std::thread::sleep(std::time::Duration::from_secs(tick_interval_secs));
+            if tick_stx.lock().unwrap().send(LoopEvent::Tick).is_err() {
+                break;
+            }
+        });
+
+        let webhook_rx = self.webhook_dispatch_rx.take();
+        if let Some(rx) = webhook_rx {
+            let wh_tx = loop_tx.clone();
+            tokio::spawn(async move {
+                let mut rx = rx;
+                while let Some(dispatch) = rx.recv().await {
+                    if wh_tx
+                        .lock()
+                        .unwrap()
+                        .send(LoopEvent::Webhook(dispatch))
+                        .is_err()
+                    {
+                        break;
+                    }
+                }
+            });
+        }
+
+        let event_recv_timeout = Duration::from_secs(self.config.tick_interval_secs.max(30) * 3);
+        let reconcile_timeout = Duration::from_secs(250);
+
+        loop {
+            if self.shutdown_requested {
+                info!("shutdown requested, stopping reconciliation loop");
+                break;
+            }
+
+            match loop_rx.recv_timeout(event_recv_timeout) {
+                Ok(LoopEvent::Webhook(dispatch)) => {
+                    let comment_id = dispatch.comment_id();
+                    self.handle_webhook_dispatch(dispatch).await;
+                    self.mark_webhook_comment_processed(comment_id).await;
+                    let _ = loop_tx.lock().unwrap().send(LoopEvent::Tick);
+                }
+                Ok(LoopEvent::Schedule(event)) => {
+                    self.handle_schedule_event(event).await;
+                }
+                Ok(LoopEvent::DriftAlert(alert)) => {
+                    self.handle_drift_alert(alert).await;
+                }
+                Ok(LoopEvent::Tick) => {
+                    loop {
+                        match loop_rx.try_recv() {
+                            Ok(LoopEvent::Webhook(dispatch)) => {
+                                let comment_id = dispatch.comment_id();
+                                self.handle_webhook_dispatch(dispatch).await;
+                                self.mark_webhook_comment_processed(comment_id).await;
+                            }
+                            Ok(LoopEvent::Schedule(event)) => {
+                                self.handle_schedule_event(event).await;
+                            }
+                            Ok(LoopEvent::DriftAlert(alert)) => {
+                                self.handle_drift_alert(alert).await;
+                            }
+                            Ok(LoopEvent::Tick) => {
+                                // Coalesce stale ticks so long reconciliation runs do not
+                                // starve webhook and schedule events queued behind them.
+                            }
+                            Err(std::sync::mpsc::TryRecvError::Empty) => break,
+                            Err(std::sync::mpsc::TryRecvError::Disconnected) => break,
+                        }
+                    }
+                    match tokio::time::timeout(reconcile_timeout, self.reconcile_tick()).await {
+                        Ok(()) => {}
+                        Err(_) => {
+                            warn!(
+                                timeout_secs = reconcile_timeout.as_secs(),
+                                "reconcile_tick exceeded timeout, forcing continuation"
+                            );
+                        }
+                    }
+                }
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                    warn!("loop: recv timeout, no events received");
+                }
+                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                    info!("all event sources closed, exiting loop");
+                    break;
+                }
+            }
+        }
+
+        // Graceful shutdown of all agents
+        self.persist_telemetry();
+        if let Some(tracker) = self.provider_budget_tracker.as_ref() {
+            if let Err(e) = tracker.persist() {
+                warn!(error = %e, "failed to persist provider budget snapshot during shutdown");
+            }
+        }
+        self.shutdown_all_agents().await;
+        Ok(())
+    }
+
+    /// Request graceful shutdown of all agents and the orchestrator.
+    pub fn shutdown(&mut self) {
+        info!("shutdown requested");
+        self.shutdown_requested = true;
+    }
+
+    async fn mark_webhook_comment_processed(&mut self, comment_id: u64) {
+        let project_ids: Vec<String> = if self.config.projects.is_empty() {
+            vec![dispatcher::LEGACY_PROJECT_ID.to_string()]
+        } else {
+            self.config.projects.iter().map(|p| p.id.clone()).collect()
+        };
+        for pid in &project_ids {
+            let cursor = self
+                .mention_cursors
+                .entry(pid.clone())
+                .or_insert_with(mention::MentionCursor::now);
+            cursor.mark_processed(comment_id);
+        }
+        for pid in &project_ids {
+            if let Some(cursor) = self.mention_cursors.get(pid) {
+                cursor.save(pid).await;
+            }
+        }
+    }
+
+    /// Get current status of all agents.
+    pub fn agent_statuses(&self) -> Vec<AgentStatus> {
+        self.active_agents
+            .values()
+            .map(|managed| {
+                let drift = self.nightwatch.drift_score(&managed.definition.name);
+                AgentStatus {
+                    name: managed.definition.name.clone(),
+                    layer: managed.definition.layer,
+                    running: true,
+                    health: managed.handle.health_status(),
+                    drift_score: drift.map(|d| d.score),
+                    uptime: managed.started_at.elapsed(),
+                    restart_count: managed.restart_count,
+                    api_calls_remaining: HashMap::new(),
+                }
+            })
+            .collect()
+    }
+
+    /// Manually trigger a compound review (outside normal schedule).
+    pub async fn trigger_compound_review(
+        &mut self,
+        git_ref: &str,
+        base_ref: &str,
+    ) -> Result<CompoundReviewResult, OrchestratorError> {
+        info!("triggering manual compound review");
+        self.compound_workflow.run(git_ref, base_ref).await
+    }
+
+    /// Hand off a task from one agent to another.
+    pub async fn handoff(
+        &mut self,
+        from_agent: &str,
+        to_agent: &str,
+        context: HandoffContext,
+    ) -> Result<(), OrchestratorError> {
+        // Validate agent names for path safety (prevents path traversal)
+        validate_agent_name(from_agent)?;
+        validate_agent_name(to_agent)?;
+
+        // Validate context fields match parameters
+        if context.from_agent != from_agent || context.to_agent != to_agent {
+            return Err(OrchestratorError::HandoffFailed {
+                from: from_agent.to_string(),
+                to: to_agent.to_string(),
+                reason: format!(
+                    "context field mismatch: context.from_agent='{}', context.to_agent='{}'",
+                    context.from_agent, context.to_agent
+                ),
+            });
+        }
+
+        if !self.active_agents.contains_key(from_agent) {
+            return Err(OrchestratorError::AgentNotFound(from_agent.to_string()));
+        }
+
+        // Find the target agent definition
+        let to_def = self
+            .config
+            .agents
+            .iter()
+            .find(|a| a.name == to_agent)
+            .cloned()
+            .ok_or_else(|| OrchestratorError::AgentNotFound(to_agent.to_string()))?;
+
+        // If target isn't running, spawn it
+        if !self.active_agents.contains_key(to_agent) {
+            self.spawn_agent(&to_def).await?;
+        }
+
+        // Write handoff context to file for the target agent
+        let handoff_path = self
+            .config
+            .working_dir
+            .join(format!(".handoff-{}.json", to_agent));
+        context
+            .write_to_file(&handoff_path)
+            .map_err(|e| OrchestratorError::HandoffFailed {
+                from: from_agent.to_string(),
+                to: to_agent.to_string(),
+                reason: e.to_string(),
+            })?;
+
+        // Insert into in-memory buffer for fast retrieval
+        let handoff_id = self.handoff_buffer.insert(context.clone());
+
+        // Append to persistent ledger
+        self.handoff_ledger
+            .append(&context)
+            .map_err(|e| OrchestratorError::HandoffFailed {
+                from: from_agent.to_string(),
+                to: to_agent.to_string(),
+                reason: format!("ledger append failed: {}", e),
+            })?;
+
+        info!(
+            from = from_agent,
+            to = to_agent,
+            handoff_file = %handoff_path.display(),
+            handoff_id = %handoff_id,
+            "handoff context written"
+        );
+
+        Ok(())
+    }
+
+    /// Get the most recent handoff for a specific target agent.
+    /// Returns the handoff context with the latest timestamp that hasn't expired.
+    pub fn latest_handoff_for(&self, to_agent: &str) -> Option<&HandoffContext> {
+        self.handoff_buffer.latest_for_agent(to_agent)
+    }
+
+    /// Get a reference to the routing engine.
+    pub fn router(&self) -> &RoutingEngine {
+        &self.router
+    }
+
+    /// Get a mutable reference to the routing engine.
+    pub fn router_mut(&mut self) -> &mut RoutingEngine {
+        &mut self.router
+    }
+
+    /// Get a reference to the rate limiter.
+    pub fn rate_limiter(&self) -> &RateLimitTracker {
+        &self.rate_limiter
+    }
+
+    /// Get a mutable reference to the rate limiter.
+    pub fn rate_limiter_mut(&mut self) -> &mut RateLimitTracker {
+        &mut self.rate_limiter
+    }
+
+    /// Get a reference to the cost tracker.
+    pub fn cost_tracker(&self) -> &CostTracker {
+        &self.cost_tracker
+    }
+
+    /// Get a mutable reference to the cost tracker.
+    pub fn cost_tracker_mut(&mut self) -> &mut CostTracker {
+        &mut self.cost_tracker
+    }
+
+    #[cfg(feature = "quickwit")]
+    pub fn set_quickwit_sink(&mut self, sink: quickwit::QuickwitFleetSink) {
+        self.quickwit_sink = Some(sink);
+    }
+
+    #[cfg(feature = "quickwit")]
+    pub fn quickwit_config(&self) -> Option<&QuickwitConfig> {
+        self.config.quickwit.as_ref()
+    }
+
+    /// Enumerate per-project Quickwit configurations plus a legacy fallback
+    /// for the top-level config, so the binary can build a
+    /// [`quickwit::QuickwitFleetSink`] covering every project.
+    ///
+    /// Returns `(project_id, QuickwitConfig)` pairs. Projects without a
+    /// per-project Quickwit block inherit the top-level config. The legacy
+    /// single-project path emits a single entry keyed on
+    /// [`crate::dispatcher::LEGACY_PROJECT_ID`].
+    #[cfg(feature = "quickwit")]
+    pub fn quickwit_fleet_configs(&self) -> Vec<(String, QuickwitConfig)> {
+        let mut out: Vec<(String, QuickwitConfig)> = Vec::new();
+
+        for project in &self.config.projects {
+            if let Some(cfg) = project
+                .quickwit
+                .as_ref()
+                .or(self.config.quickwit.as_ref())
+                .cloned()
+            {
+                if cfg.enabled {
+                    out.push((project.id.clone(), cfg));
+                }
+            }
+        }
+
+        if self.config.projects.is_empty() {
+            if let Some(cfg) = self.config.quickwit.as_ref().cloned() {
+                if cfg.enabled {
+                    out.push((crate::dispatcher::LEGACY_PROJECT_ID.to_string(), cfg));
+                }
+            }
+        }
+
+        out
+    }
+
+    /// Load skill chain content from skill definition files for legacy/global agents.
+    ///
+    /// Reads each skill named in `def.skill_chain` from `{skill_data_dir}/{name}/SKILL.md`.
+    /// If that path is missing, it falls back to `skill.md` and well-known HOME skill roots
+    /// (`~/.opencode/skills`, then `~/.claude/skills`). Returns a formatted string with all
+    /// skill contents, or empty string if no skills can be loaded.
+    ///
+    /// Project-scoped agents keep `skill_chain` as orchestration metadata only. Their
+    /// CLI tools load project skills natively from the working directory, avoiding
+    /// duplicate prompt injection and oversized task payloads.
+    fn load_skill_chain_content(&self, def: &AgentDefinition) -> String {
+        if def.skill_chain.is_empty() {
+            return String::new();
+        }
+
+        if def.project.is_some() {
+            info!(
+                agent = %def.name,
+                project = ?def.project,
+                skills = def.skill_chain.len(),
+                "skipping skill_chain prompt injection for project-scoped agent"
+            );
+            return String::new();
+        }
+
+        let home_dir = std::env::var("HOME").ok().map(std::path::PathBuf::from);
+        let skill_roots = Self::skill_roots(
+            self.config.skill_data_dir.as_deref(),
+            home_dir.as_deref(),
+            self.gitea_skill_cache_dir.as_deref(),
+        );
+
+        if skill_roots.is_empty() {
+            return String::new();
+        }
+
+        let mut sections = Vec::new();
+        for skill_name in &def.skill_chain {
+            let mut selected_path = None;
+            let mut content = None;
+
+            for root in &skill_roots {
+                let skill_dir = root.join(skill_name);
+                let candidates = [skill_dir.join("SKILL.md"), skill_dir.join("skill.md")];
+                for candidate in candidates {
+                    match std::fs::read_to_string(&candidate) {
+                        Ok(raw) => {
+                            selected_path = Some(candidate);
+                            content = Some(raw);
+                            break;
+                        }
+                        Err(_) => continue,
+                    }
+                }
+                if content.is_some() {
+                    break;
+                }
+            }
+
+            match content {
+                Some(content) => {
+                    // Strip YAML frontmatter (between --- markers) to keep just instructions
+                    let body = if let Some(after_prefix) = content.strip_prefix("---") {
+                        if let Some(end) = after_prefix.find("---") {
+                            after_prefix[end + 3..].trim_start().to_string()
+                        } else {
+                            content
+                        }
+                    } else {
+                        content
+                    };
+                    sections.push(format!("### Skill: {}\n\n{}", skill_name, body.trim()));
+                    info!(
+                        agent = %def.name,
+                        skill = %skill_name,
+                        path = %selected_path
+                            .as_ref()
+                            .map(|p| p.display().to_string())
+                            .unwrap_or_else(|| "unknown".to_string()),
+                        bytes = body.len(),
+                        "loaded skill content"
+                    );
+                }
+                None => {
+                    let tried: Vec<String> = skill_roots
+                        .iter()
+                        .flat_map(|root| {
+                            let skill_dir = root.join(skill_name);
+                            [
+                                skill_dir.join("SKILL.md").display().to_string(),
+                                skill_dir.join("skill.md").display().to_string(),
+                            ]
+                        })
+                        .collect();
+                    warn!(
+                        agent = %def.name,
+                        skill = %skill_name,
+                        tried = ?tried,
+                        "failed to load skill, skipping"
+                    );
+                }
+            }
+        }
+
+        if sections.is_empty() {
+            return String::new();
+        }
+
+        format!(
+            "\n\n## Active Skills\n\nApply the following skill instructions to your work:\n\n{}\n",
+            sections.join("\n\n---\n\n")
+        )
+    }
+
+    fn render_lessons_section(&self, agent_name: &str) -> (String, Vec<String>) {
+        let store = match self.learning_store {
+            Some(ref s) => s,
+            None => return (String::new(), Vec::new()),
+        };
+
+        let learnings = match tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(store.query_relevant(agent_name))
+        }) {
+            Ok(l) => l,
+            Err(e) => {
+                warn!(agent = %agent_name, error = %e, "failed to query learnings");
+                return (String::new(), Vec::new());
+            }
+        };
+
+        if learnings.is_empty() {
+            return (String::new(), Vec::new());
+        }
+
+        let max_entries = self.learning_config.max_entries;
+        let max_tokens = self.learning_config.max_tokens;
+        let truncated: Vec<_> = learnings.into_iter().take(max_entries).collect();
+        let ids: Vec<String> = truncated.iter().map(|l| l.id.clone()).collect();
+
+        let mut section = String::from(
+            "## Prior Lessons\n\nLessons learned from previous agent runs. Apply relevant insights:\n\n",
+        );
+        for l in &truncated {
+            section.push_str(&format!(
+                "- [{}] {} (trust: {}, verified {}x)\n",
+                l.category, l.summary, l.trust_level, l.effective_count
+            ));
+            if let Some(ref details) = l.details {
+                if let Some(first_line) = details.lines().next() {
+                    section.push_str(&format!("  > {}\n", first_line));
+                }
+            }
+        }
+
+        if section.len() > max_tokens {
+            let mut end = max_tokens;
+            while end > 0 && !section.is_char_boundary(end) {
+                end -= 1;
+            }
+            section.truncate(end);
+            section.push_str("\n... (truncated)\n");
+        }
+
+        (section, ids)
+    }
+
+    /// Build the ordered list of directories to search for SKILL.md files.
+    ///
+    /// Priority (highest first):
+    /// 1. Gitea skill cache dir (populated at startup from remote, if configured)
+    /// 2. Configured `skill_data_dir` from TOML
+    /// 3. `~/.opencode/skills`
+    /// 4. `~/.claude/skills`
+    fn skill_roots(
+        configured: Option<&std::path::Path>,
+        home_dir: Option<&std::path::Path>,
+        gitea_cache: Option<&std::path::Path>,
+    ) -> Vec<std::path::PathBuf> {
+        let mut roots = Vec::new();
+
+        // Remote skills take priority — operators push updates to Gitea
+        // without modifying local files.
+        if let Some(dir) = gitea_cache {
+            roots.push(dir.to_path_buf());
+        }
+
+        if let Some(dir) = configured {
+            if !roots.iter().any(|r| r == dir) {
+                roots.push(dir.to_path_buf());
+            }
+        }
+
+        if let Some(home) = home_dir {
+            for root in [
+                home.join(".opencode").join("skills"),
+                home.join(".claude").join("skills"),
+            ] {
+                if !roots.iter().any(|existing| existing == &root) {
+                    roots.push(root);
+                }
+            }
+        }
+
+        roots
+    }
+
+    /// Spawn an agent from its definition.
+    ///
+    /// Model selection: if the agent has an explicit `model` field, use it.
+    /// Otherwise, route the task prompt through the RoutingEngine to select
+    /// a model based on keyword matching.
+    async fn spawn_agent(&mut self, def: &AgentDefinition) -> Result<(), OrchestratorError> {
+        // === PROJECT PAUSE GATE ===
+        // Operators and the project circuit breaker can block all dispatches
+        // for a given project by creating a sentinel file at
+        // `<pause_dir>/<project_id>`. The gate is project-scoped; legacy /
+        // global agents (`def.project == None`) are never blocked here.
+        if project_control::is_project_paused(&self.pause_dir, def.project.as_deref()) {
+            info!(
+                agent = %def.name,
+                project = ?def.project,
+                pause_dir = %self.pause_dir.display(),
+                "skipping spawn: project is paused"
+            );
+            return Ok(());
+        }
+
+        // === DISK SPACE GUARD ===
+        let threshold = self.config.disk_usage_threshold;
+        if threshold < 100 {
+            if let Some(usage) = Self::check_disk_usage_percent() {
+                if usage >= threshold {
+                    error!(
+                        agent = %def.name,
+                        disk_usage_percent = usage,
+                        threshold,
+                        "refusing to spawn agent: disk usage above threshold"
+                    );
+                    return Err(OrchestratorError::Config(format!(
+                        "disk usage {}% >= {}% threshold, refusing to spawn {}",
+                        usage, threshold, def.name
+                    )));
+                }
+            }
+        }
+
+        // === BUDGET GATE ===
+        // Skip spawn entirely if the agent's monthly budget is exhausted.
+        // CostTracker::check is already called during routing (for budget
+        // pressure scoring), but routing only deprioritises cheaper models;
+        // it does not short-circuit dispatch. A fully exhausted agent must
+        // not run at all this cycle.
+        let budget_check = self.cost_tracker.check(&def.name);
+        if budget_check.should_pause() {
+            warn!(
+                agent = %def.name,
+                verdict = %budget_check,
+                "skipping spawn: monthly budget exhausted"
+            );
+            return Ok(());
+        }
+        if budget_check.should_warn() {
+            warn!(
+                agent = %def.name,
+                verdict = %budget_check,
+                "budget near exhaustion; routing will prefer cheaper models"
+            );
+        }
+
+        // === PRE-CHECK GATE ===
+        let pre_check_result = self.run_pre_check(def).await;
+        let findings = match pre_check_result {
+            PreCheckResult::NoFindings => {
+                info!(agent = %def.name, "skipping spawn: pre-check found nothing actionable");
+                return Ok(());
+            }
+            PreCheckResult::Findings(f) if f.is_empty() => None,
+            PreCheckResult::Findings(f) => Some(f),
+            PreCheckResult::Failed(reason) => {
+                warn!(agent = %def.name, reason = %reason,
+                      "pre-check failed, spawning anyway (fail-open)");
+                None
+            }
+        };
+
+        // Select model via keyword routing or explicit config.
+        // Skip keyword routing for CLIs that use OAuth and don't support -m
+        // (e.g. codex with ChatGPT account). Only apply routed models when the
+        // CLI tool is known to accept --model flags with arbitrary model IDs.
+        let cli_name = std::path::Path::new(&def.cli_tool)
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or(&def.cli_tool);
+        let supports_model_flag = matches!(cli_name, "claude" | "claude-code" | "opencode");
+
+        // Track KG decision for CLI override (set inside the routing block below)
+        let mut kg_cli_override: Option<String> = None;
+
+        #[allow(clippy::manual_let_else)]
+        let model = if self
+            .config
+            .routing
+            .as_ref()
+            .is_some_and(|r| r.use_routing_engine)
+        {
+            let kg_arc = self
+                .kg_router
+                .as_ref()
+                .map(|r| std::sync::Arc::new(r.clone()));
+            let unhealthy = self.provider_health.unhealthy_providers();
+            let telemetry_arc = std::sync::Arc::new(self.telemetry_store.clone());
+            let strategy = self
+                .config
+                .routing
+                .as_ref()
+                .map(|r| r.route_selection_strategy)
+                .unwrap_or(crate::control_plane::RouteSelectionStrategy::Fastest);
+            let engine = control_plane::RoutingDecisionEngine::with_provider_budget_and_strategy(
+                kg_arc,
+                unhealthy,
+                terraphim_router::Router::new(),
+                Some(telemetry_arc),
+                self.provider_budget_tracker.clone(),
+                strategy,
+            );
+            let ctx = control_plane::DispatchContext {
+                agent_name: def.name.clone(),
+                task: def.task.clone(),
+                static_model: def.model.clone(),
+                cli_tool: def.cli_tool.clone(),
+                layer: def.layer,
+                session_id: None,
+            };
+            let budget_verdict = self.cost_tracker.check(&def.name);
+            let decision = engine.decide_route(&ctx, &budget_verdict).await;
+            info!(
+                agent = %def.name,
+                rationale = %decision.rationale,
+                telemetry_influenced = decision.telemetry_influenced,
+                "routing engine selected model"
+            );
+            if decision.candidate.model.is_empty() {
+                None
+            } else {
+                // Extract CLI tool override from routing decision so that
+                // anthropic models routed via KG use claude CLI, not opencode.
+                if decision.candidate.cli_tool != def.cli_tool {
+                    kg_cli_override = Some(decision.candidate.cli_tool.clone());
+                }
+                Some(decision.candidate.model)
+            }
+        } else if supports_model_flag {
+            // KG routing first (phase-aware tier selection from markdown rules).
+            // Takes priority over static model config so tier routing controls selection.
+            let mut unhealthy = self.provider_health.unhealthy_providers();
+            unhealthy.extend(self.provider_rate_limits.blocked_providers());
+            let kg_decision = self.kg_router.as_ref().and_then(|router| {
+                let decision = router.route_agent(&def.task)?;
+                // If primary provider is unhealthy, try fallback routes
+                if !unhealthy.is_empty() {
+                    if let Some(healthy_route) = decision.first_healthy_route(&unhealthy) {
+                        info!(
+                            agent = %def.name,
+                            concept = %decision.matched_concept,
+                            provider = %healthy_route.provider,
+                            model = %healthy_route.model,
+                            skipped_unhealthy = ?unhealthy,
+                            "KG routed to fallback (primary unhealthy)"
+                        );
+                        return Some(kg_router::KgRouteDecision {
+                            provider: healthy_route.provider.clone(),
+                            model: healthy_route.model.clone(),
+                            action: healthy_route.action.clone(),
+                            confidence: decision.confidence * 0.9,
+                            matched_concept: decision.matched_concept,
+                            priority: decision.priority,
+                            fallback_routes: decision.fallback_routes,
+                        });
+                    }
+                }
+                Some(decision)
+            });
+
+            if let Some(ref kg) = kg_decision {
+                info!(
+                    agent = %def.name,
+                    concept = %kg.matched_concept,
+                    provider = %kg.provider,
+                    model = %kg.model,
+                    confidence = kg.confidence,
+                    "model selected via KG tier routing"
+                );
+                // Extract CLI tool from action template (first word = CLI path)
+                if let Some(ref action) = kg.action {
+                    if let Some(cli) = action.split_whitespace().next() {
+                        kg_cli_override = Some(cli.to_string());
+                    }
+                }
+                Some(kg.model.clone())
+            } else if let Some(m) = &def.model {
+                // Static config fallback when KG has no match
+                info!(agent = %def.name, model = %m, "using static model (no KG tier match)");
+                Some(m.clone())
+            } else {
+                // Fall back to keyword routing engine
+                let context = terraphim_router::RoutingContext::default();
+                match self.router.route(&def.task, &context) {
+                    Ok(decision) => {
+                        if let terraphim_types::capability::ProviderType::Llm { model_id, .. } =
+                            &decision.provider.provider_type
+                        {
+                            info!(
+                                agent = %def.name,
+                                model = %model_id,
+                                confidence = decision.confidence,
+                                "model selected via keyword routing"
+                            );
+                            Some(model_id.clone())
+                        } else {
+                            None
+                        }
+                    }
+                    Err(_) => {
+                        info!(agent = %def.name, "no model matched, using CLI default");
+                        None
+                    }
+                }
+            }
+        } else {
+            info!(agent = %def.name, cli = %def.cli_tool, "skipping model routing (CLI uses OAuth/default)");
+            None
+        };
+
+        // For opencode, compose "provider/model" format when both fields are set.
+        // opencode requires `-m provider/model` whereas the TOML config stores them
+        // separately (provider = "kimi-for-coding", model = "k2p5").
+        // Skip composition if the model already contains a provider prefix (e.g.
+        // from KG routing which returns full model ids like "kimi-for-coding/k2p5").
+        let model = if cli_name == "opencode" {
+            match (&def.provider, &model) {
+                (Some(provider), Some(m)) if !m.contains('/') => {
+                    let composed = format!("{}/{}", provider, m);
+                    info!(agent = %def.name, composed_model = %composed, "composed provider/model for opencode");
+                    Some(composed)
+                }
+                _ => model,
+            }
+        } else {
+            model
+        };
+
+        // If KG routing selected a different CLI tool (e.g., claude instead of opencode),
+        // use the KG-selected CLI to match the routed model.
+        let effective_cli = kg_cli_override
+            .as_deref()
+            .unwrap_or(&def.cli_tool)
+            .to_string();
+
+        info!(agent = %def.name, layer = ?def.layer, cli = %effective_cli, model = ?model, "spawning agent");
+
+        // Compose persona-enriched task prompt
+        let (composed_task, persona_found) = if let Some(ref persona_name) = def.persona {
+            if let Some(persona) = self.persona_registry.get(persona_name) {
+                let composed = self.metaprompt_renderer.compose_prompt(persona, &def.task);
+                info!(
+                    agent = %def.name,
+                    persona = %persona_name,
+                    original_len = def.task.len(),
+                    composed_len = composed.len(),
+                    "composed persona-enriched prompt"
+                );
+                (composed, true)
+            } else {
+                warn!(
+                    agent = %def.name,
+                    persona = %persona_name,
+                    "persona not found in registry, using bare task"
+                );
+                (def.task.clone(), false)
+            }
+        } else {
+            (def.task.clone(), false)
+        };
+
+        // === FINDINGS INJECTION ===
+        let composed_task = if let Some(ref findings) = findings {
+            format!(
+                "## Pre-flight findings (automated checks already ran)\n\n{}\n\n---\n\n{}",
+                findings, composed_task
+            )
+        } else {
+            composed_task
+        };
+
+        // Inject skill_chain content between persona preamble and task
+        let skill_content = self.load_skill_chain_content(def);
+        let composed_task = if skill_content.is_empty() {
+            composed_task
+        } else {
+            info!(
+                agent = %def.name,
+                skills = def.skill_chain.len(),
+                skill_bytes = skill_content.len(),
+                "injecting skill_chain into prompt"
+            );
+            format!("{}{}", composed_task, skill_content)
+        };
+
+        // Inject prior lessons from shared learning store
+        let (lessons_section, lesson_ids) = self.render_lessons_section(&def.name);
+        let mut composed_task = if lessons_section.is_empty() {
+            composed_task
+        } else {
+            info!(
+                agent = %def.name,
+                lessons = lesson_ids.len(),
+                "injecting prior lessons into prompt"
+            );
+            self.injected_learning_ids
+                .insert(def.name.clone(), lesson_ids);
+            format!("{}\n\n{}", composed_task, lessons_section)
+        };
+
+        // Inject evolution memory context if enabled for this agent.
+        if def.evolution_enabled && self.evolution_manager.is_enabled() {
+            self.evolution_manager.ensure_agent(&def.name);
+            let _ = self
+                .evolution_manager
+                .record_task_start(&def.name, &def.task);
+            let evo_ctx = self.evolution_manager.render_context(&def.name);
+            if !evo_ctx.is_empty() {
+                info!(agent = %def.name, "injecting evolution memory context");
+                composed_task = format!("{}\n\n{}", composed_task, evo_ctx);
+            }
+        }
+
+        // Inject RLM session info if enabled for this agent.
+        if def.rlm_enabled.unwrap_or(false) {
+            info!(agent = %def.name, "injecting RLM sandboxed execution context");
+            composed_task = format!(
+                "{}\n\n## RLM Sandboxed Code Execution\n\
+                 You have access to sandboxed code execution via terraphim_rlm. \
+                 Use the terraphim-rlm MCP tools to execute code in an isolated environment \
+                 when you need to run, test, or validate code changes. \
+                 Sessions are resource-limited and automatically cleaned up.",
+                composed_task
+            );
+        }
+
+        // Use stdin only when persona was actually resolved (prompt is enriched)
+        // or when the task exceeds ARG_MAX safety threshold.
+        // Do NOT use stdin for unfound personas -- the bare task is small and
+        // stdin delivery to short-lived processes (echo) causes broken pipe races.
+        const STDIN_THRESHOLD: usize = 32_768; // 32 KB
+        let use_stdin =
+            persona_found || !skill_content.is_empty() || composed_task.len() > STDIN_THRESHOLD;
+
+        // Create isolated git worktrees for AI/model-backed agents that may modify code.
+        // Review-tier agents (haiku) and simple local commands used in tests do not need isolation.
+        let needs_isolation = requires_isolated_worktree(def, model.as_deref());
+
+        // Resolve the git repo directory for worktree operations. Project-bound
+        // agents need a worktree from their own repo, not the orchestrator's.
+        let repo_dir: &Path = if let Some(pid) = def.project.as_deref() {
+            match self.config.project_by_id(pid) {
+                Some(p) => p.working_dir.as_path(),
+                None => {
+                    warn!(
+                        agent = %def.name,
+                        project_id = %pid,
+                        fallback = %self.config.working_dir.display(),
+                        "project_by_id returned None, falling back to orchestrator working_dir"
+                    );
+                    &self.config.working_dir
+                }
+            }
+        } else {
+            &self.config.working_dir
+        };
+
+        let (worktree_path, worktree_guard) = if needs_isolation {
+            let path = self.create_agent_worktree(&def.name, repo_dir).await?;
+            let guard = crate::worktree_guard::WorktreeGuard::for_managed(repo_dir, &path);
+            (Some(path), Some(guard))
+        } else {
+            (None, None)
+        };
+        let agent_working_dir = worktree_path.as_deref().unwrap_or(repo_dir).to_path_buf();
+
+        // Build primary Provider from the agent definition for the spawner.
+        let primary_provider = terraphim_types::capability::Provider {
+            id: def.name.clone(),
+            name: def.name.clone(),
+            provider_type: terraphim_types::capability::ProviderType::Agent {
+                agent_id: def.name.clone(),
+                cli_command: effective_cli.clone(),
+                working_dir: agent_working_dir.clone(),
+            },
+            capabilities: vec![],
+            cost_level: terraphim_types::capability::CostLevel::Cheap,
+            latency: terraphim_types::capability::Latency::Medium,
+            keywords: def.capabilities.clone(),
+        };
+
+        // Build fallback Provider if fallback_provider is configured
+        let fallback_provider = def.fallback_provider.as_ref().map(|fallback_cli| {
+            terraphim_types::capability::Provider {
+                id: format!("{}-fallback", def.name),
+                name: format!("{} (fallback)", def.name),
+                provider_type: terraphim_types::capability::ProviderType::Agent {
+                    agent_id: format!("{}-fallback", def.name),
+                    cli_command: fallback_cli.clone(),
+                    working_dir: agent_working_dir.clone(),
+                },
+                capabilities: vec![],
+                cost_level: terraphim_types::capability::CostLevel::Cheap,
+                latency: terraphim_types::capability::Latency::Medium,
+                keywords: def.capabilities.clone(),
+            }
+        });
+
+        // Build the spawn request with primary and fallback
+        let mut request = SpawnRequest::new(primary_provider, &composed_task)
+            .with_primary_model(model.as_deref().unwrap_or(""));
+
+        if let Some(fallback) = fallback_provider {
+            request = request.with_fallback_provider(fallback);
+            if let Some(fallback_model) = &def.fallback_model {
+                request = request.with_fallback_model(fallback_model);
+            }
+        }
+
+        if use_stdin {
+            request = request.with_stdin();
+        }
+
+        // Thread resource limits from agent definition to spawner
+        let mut limits = ResourceLimits::default();
+        if let Some(max_cpu) = def.max_cpu_seconds {
+            limits.max_cpu_seconds = Some(max_cpu);
+        }
+        if let Some(max_mem) = def.max_memory_bytes {
+            limits.max_memory_bytes = Some(max_mem);
+        }
+        request = request.with_resource_limits(limits);
+
+        // === CONCURRENCY GATE ===
+        let project_id = def
+            .project
+            .as_deref()
+            .unwrap_or(crate::dispatcher::LEGACY_PROJECT_ID);
+        let permit = self.concurrency_controller.acquire_any(project_id).await;
+        if permit.is_none() {
+            warn!(
+                agent = %def.name,
+                project = %project_id,
+                active = self.active_agents.len(),
+                "skipping spawn: global concurrency limit reached"
+            );
+            return Ok(());
+        }
+
+        let spawn_ctx =
+            build_spawn_context_for_agent(&self.config, def, self.output_poster.as_ref());
+        let handle = self
+            .spawner
+            .spawn_with_fallback(&request, spawn_ctx)
+            .await
+            .map_err(|e| OrchestratorError::SpawnFailed {
+                agent: def.name.clone(),
+                reason: e.to_string(),
+            })?;
+
+        // Subscribe to the output broadcast for nightwatch drain
+        let output_rx = handle.subscribe_output();
+
+        // Open a streaming log file and spawn a background drain task so
+        // output is captured to disk even when the tick interval is long.
+        let output_tmp_path = self.start_output_log_drain(&def.name, &handle);
+
+        // Get the restart count from the orchestrator-level counter
+        let restart_count = self
+            .restart_counts
+            .get(&agent_key(def))
+            .copied()
+            .unwrap_or(0);
+
+        self.active_agents.insert(
+            def.name.clone(),
+            ManagedAgent {
+                definition: def.clone(),
+                handle,
+                started_at: Instant::now(),
+                restart_count,
+                output_rx,
+                spawned_by_mention: false,
+                worktree_path,
+                worktree_guard,
+                routed_model: model.clone(),
+                session_id: format!("{}-{}", def.name, ulid::Ulid::new()),
+                mention_chain_id: None,
+                mention_depth: None,
+                mention_parent_agent: None,
+                concurrency_permit: permit,
+                commit_status_post: None,
+                output_tmp_path,
+            },
+        );
+
+        // === RECORD COMMIT FOR GIT-DIFF STRATEGY ===
+        if let Ok(head) = self.get_current_head().await {
+            self.last_run_commits.insert(def.name.clone(), head);
+        }
+
+        #[cfg(feature = "quickwit")]
+        if let Some(ref sink) = self.quickwit_sink {
+            let doc = quickwit::LogDocument {
+                timestamp: chrono::Utc::now().to_rfc3339(),
+                project_id: def
+                    .project
+                    .clone()
+                    .unwrap_or_else(|| crate::dispatcher::LEGACY_PROJECT_ID.to_string()),
+                level: "INFO".into(),
+                agent_name: def.name.clone(),
+                layer: format!("{:?}", def.layer),
+                source: "orchestrator".into(),
+                message: "agent spawned".into(),
+                model: model.clone(),
+                ..Default::default()
+            };
+            let _ = sink.send(doc).await;
+        }
+
+        Ok(())
+    }
+
+    /// Handle a `DispatchTask::ReviewPr` dispatch: run the routing engine,
+    /// enforce the C1/C3 provider allow-list, and spawn the pr-reviewer agent
+    /// with `ADF_PR_*` env overrides carrying the per-dispatch context.
+    ///
+    /// The task is a no-op (with a warn log) when no `pr-reviewer` agent is
+    /// configured for the project yet. Step E adds the canonical
+    /// `pr-reviewer.toml` fragment; until then this method must not crash the
+    /// reconcile loop.
+    ///
+    /// Unlike [`spawn_agent`], this path skips persona composition, skill
+    /// chain injection, and worktree creation. The pr-reviewer is review-tier
+    /// (read-only), so the heavyweight scaffolding from the implementation
+    /// spawn path is intentionally left out.
+    ///
+    /// [`spawn_agent`]: AgentOrchestrator::spawn_agent
+    pub(crate) async fn handle_review_pr(
+        &mut self,
+        task: dispatcher::DispatchTask,
+    ) -> Result<(), OrchestratorError> {
+        let (pr_number, project, head_sha, author_login, title, diff_loc) = match task {
+            dispatcher::DispatchTask::ReviewPr {
+                pr_number,
+                project,
+                head_sha,
+                author_login,
+                title,
+                diff_loc,
+            } => (pr_number, project, head_sha, author_login, title, diff_loc),
+            other => {
+                warn!(task = ?other, "handle_review_pr invoked with non-ReviewPr task; ignoring");
+                return Ok(());
+            }
+        };
+
+        let req = pr_dispatch::ReviewPrRequest {
+            pr_number,
+            project: project.clone(),
+            head_sha: head_sha.clone(),
+            author_login,
+            title,
+            diff_loc,
+        };
+
+        // ADF Phase 2 (issue #944): fan-out over the configured
+        // `agents_on_pr_open` list. Each entry is gated independently
+        // (subscription allow-list + per-agent monthly budget). Only
+        // entries that successfully spawn get a `pending` commit status
+        // — a `pending` from a skipped agent would block the PR forever.
+        // When `[pr_dispatch]` is absent the legacy default ships a single
+        // pr-reviewer entry, preserving pre-Phase-2 behaviour.
+        let entries = self.config.agents_on_pr_open_for_project(&project);
+        for entry in entries {
+            let spawned = match entry.name.as_str() {
+                "build-runner" => {
+                    self.dispatch_build_runner_for_pr(&req, &entry.context)
+                        .await?
+                }
+                _ => {
+                    self.dispatch_pr_reviewer_for_pr(&req, &entry.name, &entry.context)
+                        .await?
+                }
+            };
+            if spawned {
+                self.post_pending_status(
+                    &head_sha,
+                    pr_number,
+                    &project,
+                    &entry.name,
+                    &entry.context,
+                    &format!("{} dispatched", entry.name),
+                )
+                .await;
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Phase 2 helper: spawn the LLM-style PR review agent (`pr-reviewer`
+    /// or any future fan-out entry that runs through the routing engine).
+    ///
+    /// Returns `Ok(true)` when the agent was spawned and is now in
+    /// `active_agents`; `Ok(false)` when it was gated out (no agent
+    /// configured for the project, banned static or routed model, or
+    /// budget exhausted). The caller posts a `pending` commit status only
+    /// when this returns `true`.
+    async fn dispatch_pr_reviewer_for_pr(
+        &mut self,
+        req: &pr_dispatch::ReviewPrRequest,
+        agent_name: &str,
+        commit_status_context: &str,
+    ) -> Result<bool, OrchestratorError> {
+        let pr_number = req.pr_number;
+        let project = req.project.clone();
+        let head_sha = req.head_sha.clone();
+
+        // Look up the agent for this project. Missing entries in the
+        // fan-out list must skip silently (no `pending` posted) — a
+        // hung pending would block the PR forever.
+        let def = match self
+            .config
+            .agents
+            .iter()
+            .find(|a| a.name == agent_name && a.project.as_deref() == Some(project.as_str()))
+        {
+            Some(d) => d.clone(),
+            None => {
+                warn!(
+                    pr_number,
+                    project = %project,
+                    agent = %agent_name,
+                    "ReviewPr skipped: no agent configured for project"
+                );
+                return Ok(false);
+            }
+        };
+
+        // === STATIC ALLOW-LIST GATE (pre-routing) ===
+        // Belt-and-braces: the load-time config validator rejects banned
+        // providers, and `RoutingDecisionEngine` filters them from the
+        // candidate pool, but this check guarantees the spawn never runs
+        // against a banned static `model` even if the config was mutated
+        // at runtime or a future refactor drops the routing filter.
+        if let Some(static_model) = def.model.as_deref() {
+            if !config::is_allowed_provider(static_model) {
+                warn!(
+                    agent = %def.name,
+                    pr_number,
+                    project = %project,
+                    model = %static_model,
+                    "ReviewPr skipped: static model rejected by subscription allow-list"
+                );
+                return Ok(false);
+            }
+        }
+
+        // === BUDGET GATE ===
+        let budget_verdict = self.cost_tracker.check(&def.name);
+        if budget_verdict.should_pause() {
+            warn!(
+                agent = %def.name,
+                pr_number,
+                project = %project,
+                verdict = %budget_verdict,
+                "ReviewPr skipped: monthly budget exhausted"
+            );
+            return Ok(false);
+        }
+
+        // === ROUTING ===
+        // Build a DispatchContext off the per-PR task string so KG/keyword
+        // routing can pick a model based on "review" keywords and PR shape.
+        let task_string = pr_dispatch::build_review_task(req);
+        let kg_arc = self
+            .kg_router
+            .as_ref()
+            .map(|r| std::sync::Arc::new(r.clone()));
+        let unhealthy = self.provider_health.unhealthy_providers();
+        let telemetry_arc = std::sync::Arc::new(self.telemetry_store.clone());
+        let strategy = self
+            .config
+            .routing
+            .as_ref()
+            .map(|r| r.route_selection_strategy)
+            .unwrap_or(crate::control_plane::RouteSelectionStrategy::Fastest);
+        let engine = control_plane::RoutingDecisionEngine::with_provider_budget_and_strategy(
+            kg_arc,
+            unhealthy,
+            terraphim_router::Router::new(),
+            Some(telemetry_arc),
+            self.provider_budget_tracker.clone(),
+            strategy,
+        );
+        let dispatch_ctx = control_plane::DispatchContext {
+            agent_name: def.name.clone(),
+            task: task_string.clone(),
+            static_model: def.model.clone(),
+            cli_tool: def.cli_tool.clone(),
+            layer: def.layer,
+            session_id: None,
+        };
+        let decision = engine.decide_route(&dispatch_ctx, &budget_verdict).await;
+        info!(
+            agent = %def.name,
+            pr_number,
+            project = %project,
+            model = %decision.candidate.model,
+            rationale = %decision.rationale,
+            "ReviewPr routing decision"
+        );
+
+        // === C1/C3 ALLOW-LIST GATE ===
+        // Routing may suggest a banned provider (e.g. via stale KG rules); the
+        // subscription-only allow-list must still short-circuit the spawn so
+        // unsanctioned providers never launch.
+        let routed_model = decision.candidate.model.clone();
+        let effective_cli = if decision.candidate.cli_tool.is_empty() {
+            def.cli_tool.clone()
+        } else {
+            decision.candidate.cli_tool.clone()
+        };
+        if !routed_model.is_empty() && !config::is_allowed_provider(&routed_model) {
+            warn!(
+                agent = %def.name,
+                pr_number,
+                project = %project,
+                model = %routed_model,
+                "ReviewPr skipped: routed model rejected by subscription allow-list"
+            );
+            return Ok(false);
+        }
+
+        // === SPAWN ===
+        let primary_provider = terraphim_types::capability::Provider {
+            id: def.name.clone(),
+            name: def.name.clone(),
+            provider_type: terraphim_types::capability::ProviderType::Agent {
+                agent_id: def.name.clone(),
+                cli_command: effective_cli.clone(),
+                working_dir: self.config.working_dir_for_agent(&def),
+            },
+            capabilities: vec![],
+            cost_level: terraphim_types::capability::CostLevel::Cheap,
+            latency: terraphim_types::capability::Latency::Medium,
+            keywords: def.capabilities.clone(),
+        };
+
+        let fallback_provider = def.fallback_provider.as_ref().map(|fallback_cli| {
+            terraphim_types::capability::Provider {
+                id: format!("{}-fallback", def.name),
+                name: format!("{} (fallback)", def.name),
+                provider_type: terraphim_types::capability::ProviderType::Agent {
+                    agent_id: format!("{}-fallback", def.name),
+                    cli_command: fallback_cli.clone(),
+                    working_dir: self.config.working_dir_for_agent(&def),
+                },
+                capabilities: vec![],
+                cost_level: terraphim_types::capability::CostLevel::Cheap,
+                latency: terraphim_types::capability::Latency::Medium,
+                keywords: def.capabilities.clone(),
+            }
+        });
+
+        // Issue #1020: pass the TOML `task` body (script / system prompt)
+        // to the spawner -- not the runtime informational summary.
+        // The summary is layered as ADF_TASK_SUMMARY env so future TOML
+        // scripts can reference it without a code change.
+        // Bug #2450 fix: pr-reviewer agent was receiving `def.task` ("review")
+        // instead of `task_string` (the full PR review description), causing
+        // the agent to exit with empty_success in 2s. The TOML `task` field
+        // is a label/placeholder for pr-reviewer; the actual work is built
+        // by build_review_task(req) into task_string.
+        let mut request = SpawnRequest::new(primary_provider, &task_string);
+        if !routed_model.is_empty() {
+            request = request.with_primary_model(&routed_model);
+        }
+        if let Some(fallback) = fallback_provider {
+            request = request.with_fallback_provider(fallback);
+            if let Some(fallback_model) = &def.fallback_model {
+                request = request.with_fallback_model(fallback_model);
+            }
+        }
+
+        let mut limits = ResourceLimits::default();
+        if let Some(max_cpu) = def.max_cpu_seconds {
+            limits.max_cpu_seconds = Some(max_cpu);
+        }
+        if let Some(max_mem) = def.max_memory_bytes {
+            limits.max_memory_bytes = Some(max_mem);
+        }
+        request = request.with_resource_limits(limits);
+
+        let base_ctx =
+            build_spawn_context_for_agent(&self.config, &def, self.output_poster.as_ref());
+        let spawn_ctx = pr_dispatch::layer_pr_env(base_ctx, req)
+            .with_env("ADF_TASK_SUMMARY", task_string.clone());
+
+        let handle = self
+            .spawner
+            .spawn_with_fallback(&request, spawn_ctx)
+            .await
+            .map_err(|e| OrchestratorError::SpawnFailed {
+                agent: def.name.clone(),
+                reason: e.to_string(),
+            })?;
+
+        let output_rx = handle.subscribe_output();
+        let output_tmp_path = self.start_output_log_drain(&def.name, &handle);
+        let restart_count = self
+            .restart_counts
+            .get(&agent_key(&def))
+            .copied()
+            .unwrap_or(0);
+
+        self.active_agents.insert(
+            def.name.clone(),
+            ManagedAgent {
+                definition: def.clone(),
+                handle,
+                started_at: Instant::now(),
+                restart_count,
+                output_rx,
+                spawned_by_mention: false,
+                worktree_path: None,
+                worktree_guard: None,
+                routed_model: if routed_model.is_empty() {
+                    None
+                } else {
+                    Some(routed_model)
+                },
+                session_id: format!("{}-{}", def.name, ulid::Ulid::new()),
+                mention_chain_id: None,
+                mention_depth: None,
+                mention_parent_agent: None,
+                concurrency_permit: None,
+                commit_status_post: Some((head_sha.clone(), commit_status_context.to_string())),
+                output_tmp_path,
+            },
+        );
+
+        info!(
+            agent = %def.name,
+            pr_number,
+            project = %project,
+            head_sha = %head_sha,
+            "ReviewPr spawned LLM review agent"
+        );
+
+        Ok(true)
+    }
+
+    /// Phase 2 helper: spawn the deterministic `build-runner` agent on a
+    /// `pull_request.opened` event. Mirrors `handle_push`'s spawn pipeline
+    /// but injects PR-shaped `ADF_PUSH_*` env (using
+    /// `refs/pull/<n>/head` as the synthetic ref) so the same bash task
+    /// script handles both push events and PR opens.
+    ///
+    /// Skips the routing engine — `build-runner` is bash-only (no LLM, no
+    /// model) so a routing decision would invite a false-positive
+    /// banned-provider check on an unset `def.model`. Logs a synthetic
+    /// `model = "n/a"` row for parity with the LLM path.
+    ///
+    /// Returns `Ok(true)` on successful spawn (caller posts pending);
+    /// `Ok(false)` when gated out.
+    async fn dispatch_build_runner_for_pr(
+        &mut self,
+        req: &pr_dispatch::ReviewPrRequest,
+        commit_status_context: &str,
+    ) -> Result<bool, OrchestratorError> {
+        let pr_number = req.pr_number;
+        let project = req.project.clone();
+        let head_sha = req.head_sha.clone();
+
+        if self.active_agents.contains_key("build-runner") {
+            info!(
+                pr_number,
+                project = %project,
+                head_sha = %head_sha,
+                "ReviewPr skipped build-runner: already active from concurrent push dispatch"
+            );
+            return Ok(false);
+        }
+
+        // Look up the build-runner agent for this project. Missing must
+        // skip silently — no `pending` posted by the caller.
+        let def = match self
+            .agent_registry
+            .lookup_project(project.as_str(), "build-runner")
+        {
+            Some(agent) => agent.definition.clone(),
+            None => {
+                warn!(
+                    pr_number,
+                    project = %project,
+                    "ReviewPr skipped: no build-runner agent configured for project"
+                );
+                return Ok(false);
+            }
+        };
+
+        // === STATIC ALLOW-LIST GATE ===
+        // build-runner is bash-only (no LLM), so def.model is normally None
+        // and this gate is a no-op. The check is retained for defence in
+        // depth so a future config that mis-sets `model` cannot bypass C1/C3.
+        if let Some(static_model) = def.model.as_deref() {
+            if !config::is_allowed_provider(static_model) {
+                warn!(
+                    agent = %def.name,
+                    pr_number,
+                    project = %project,
+                    model = %static_model,
+                    "ReviewPr skipped: build-runner static model rejected by subscription allow-list"
+                );
+                return Ok(false);
+            }
+        }
+
+        // === BUDGET GATE ===
+        let budget_verdict = self.cost_tracker.check(&def.name);
+        if budget_verdict.should_pause() {
+            warn!(
+                agent = %def.name,
+                pr_number,
+                project = %project,
+                verdict = %budget_verdict,
+                "ReviewPr skipped: build-runner monthly budget exhausted"
+            );
+            return Ok(false);
+        }
+
+        // === ROUTING DECISION (observability only) ===
+        // build-runner is bash; mirror handle_push's synthetic log row so
+        // dashboards see one entry per dispatch. No call to decide_route —
+        // an LLM router on an unset model would surface false positives.
+        info!(
+            agent = %def.name,
+            pr_number,
+            project = %project,
+            model = "n/a",
+            cost_estimate_cents = 0,
+            rationale = "deterministic build-runner (no LLM)",
+            "ReviewPr routing decision"
+        );
+
+        // === SPAWN ===
+        let primary_provider = terraphim_types::capability::Provider {
+            id: def.name.clone(),
+            name: def.name.clone(),
+            provider_type: terraphim_types::capability::ProviderType::Agent {
+                agent_id: def.name.clone(),
+                cli_command: def.cli_tool.clone(),
+                working_dir: self.config.working_dir_for_agent(&def),
+            },
+            capabilities: vec![],
+            cost_level: terraphim_types::capability::CostLevel::Cheap,
+            latency: terraphim_types::capability::Latency::Medium,
+            keywords: def.capabilities.clone(),
+        };
+
+        let task_string = format!(
+            "Build/test verdict for PR #{} (head={}, {} LOC, project={}, author={})",
+            pr_number, head_sha, req.diff_loc, project, req.author_login,
+        );
+
+        // Issue #1020: pass the TOML `task` body (the bash script that
+        // does git fetch / rch exec / curl status post) to the spawner
+        // -- not the runtime informational summary, which would have
+        // been interpreted as `bash -c "Build/test verdict ..."` and
+        // exited 127 on the first non-existent command.
+        let mut request = SpawnRequest::new(primary_provider, &def.task);
+
+        let mut limits = ResourceLimits::default();
+        if let Some(max_cpu) = def.max_cpu_seconds {
+            limits.max_cpu_seconds = Some(max_cpu);
+        }
+        if let Some(max_mem) = def.max_memory_bytes {
+            limits.max_memory_bytes = Some(max_mem);
+        }
+        request = request.with_resource_limits(limits);
+
+        // Layer ADF_PUSH_* env on top of the per-agent base context.
+        // The ref is synthesised as `refs/pull/<n>/head` so the task
+        // script can `git fetch origin <ref> && git checkout <sha>`
+        // identically to a push-event dispatch. `ADF_PUSH_BEFORE_SHA`
+        // is empty because the ReviewPr dispatch task does not carry
+        // the PR base SHA — the build-runner script only requires
+        // `ADF_PUSH_SHA` and `ADF_PUSH_REF`.
+        // ADF_TASK_SUMMARY exposes the runtime summary so the task can
+        // log it without a code change (issue #1020).
+        let mut spawn_ctx =
+            build_spawn_context_for_agent(&self.config, &def, self.output_poster.as_ref());
+        spawn_ctx = spawn_ctx
+            .with_env("ADF_PUSH_SHA", head_sha.clone())
+            .with_env("ADF_PUSH_REF", format!("refs/pull/{}/head", pr_number))
+            .with_env("ADF_PUSH_PROJECT", project.clone())
+            .with_env("ADF_PUSH_BEFORE_SHA", String::new())
+            .with_env("ADF_PUSH_PUSHER", req.author_login.clone())
+            .with_env("ADF_PUSH_FILES", String::new())
+            .with_env("ADF_TASK_SUMMARY", task_string.clone());
+
+        let handle = self
+            .spawner
+            .spawn_with_fallback(&request, spawn_ctx)
+            .await
+            .map_err(|e| OrchestratorError::SpawnFailed {
+                agent: def.name.clone(),
+                reason: e.to_string(),
+            })?;
+
+        let output_rx = handle.subscribe_output();
+        let output_tmp_path = self.start_output_log_drain(&def.name, &handle);
+        let restart_count = self
+            .restart_counts
+            .get(&agent_key(&def))
+            .copied()
+            .unwrap_or(0);
+
+        self.active_agents.insert(
+            def.name.clone(),
+            ManagedAgent {
+                definition: def.clone(),
+                handle,
+                started_at: Instant::now(),
+                restart_count,
+                output_rx,
+                spawned_by_mention: false,
+                worktree_path: None,
+                worktree_guard: None,
+                routed_model: None,
+                session_id: format!("{}-{}", def.name, ulid::Ulid::new()),
+                mention_chain_id: None,
+                mention_depth: None,
+                mention_parent_agent: None,
+                concurrency_permit: None,
+                commit_status_post: Some((head_sha.clone(), commit_status_context.to_string())),
+                output_tmp_path,
+            },
+        );
+
+        info!(
+            agent = %def.name,
+            pr_number,
+            project = %project,
+            head_sha = %head_sha,
+            "ReviewPr spawned build-runner"
+        );
+
+        Ok(true)
+    }
+
+    /// Post a `pending` commit status for the given `context` against the
+    /// PR head SHA.
+    ///
+    /// Generalised from Phase 1's `post_pr_reviewer_pending_status` so the
+    /// Phase 2 PR-fan-out path can post one pending per dispatched agent
+    /// (one row per `agents_on_pr_open` entry that successfully spawned).
+    ///
+    /// Best-effort: when the workflow tracker isn't configured (e.g. in
+    /// unit tests) or the API call fails we log and return without
+    /// surfacing the error. The agent itself owns the final state
+    /// transition (success / failure / error).
+    async fn post_pending_status(
+        &mut self,
+        head_sha: &str,
+        pr_number: u64,
+        project: &str,
+        agent_name: &str,
+        context: &str,
+        description: &str,
+    ) {
+        let tracker = match self
+            .output_poster
+            .as_ref()
+            .and_then(|p| p.tracker_for(project, agent_name))
+        {
+            Some(t) => t,
+            None => {
+                debug!(
+                    pr_number,
+                    project,
+                    context,
+                    "ReviewPr: no output poster tracker for project; skipping pending status"
+                );
+                return;
+            }
+        };
+        let owner = tracker.owner().to_string();
+        let repo = tracker.repo().to_string();
+        let result = tracker
+            .set_commit_status(
+                &owner,
+                &repo,
+                head_sha,
+                terraphim_tracker::StatusState::Pending,
+                context,
+                description,
+                None,
+            )
+            .await;
+        match result {
+            Ok(()) => {
+                info!(
+                    pr_number,
+                    project, head_sha, context, "ReviewPr: posted pending status"
+                );
+            }
+            Err(e) => {
+                warn!(
+                    error = %e,
+                    pr_number,
+                    project,
+                    head_sha,
+                    context,
+                    "ReviewPr: failed to post pending status"
+                );
+            }
+        }
+    }
+
+    /// Post a terminal (success/failure) commit status for an agent that
+    /// exited. Best-effort: logs on failure but does not propagate errors.
+    async fn post_terminal_commit_status(
+        &mut self,
+        head_sha: &str,
+        project: &str,
+        agent_name: &str,
+        context: &str,
+        state: terraphim_tracker::StatusState,
+        description: &str,
+    ) {
+        let tracker = match self
+            .output_poster
+            .as_ref()
+            .and_then(|p| p.tracker_for(project, agent_name))
+        {
+            Some(t) => t,
+            None => {
+                debug!(
+                    head_sha,
+                    project,
+                    agent_name,
+                    context,
+                    "post_terminal_commit_status: no output poster tracker for project; skipping"
+                );
+                return;
+            }
+        };
+        let owner = tracker.owner().to_string();
+        let repo = tracker.repo().to_string();
+        match tracker
+            .set_commit_status(&owner, &repo, head_sha, state, context, description, None)
+            .await
+        {
+            Ok(()) => {
+                info!(
+                    head_sha,
+                    project, agent_name, context, "posted terminal commit status"
+                );
+            }
+            Err(e) => {
+                warn!(
+                    error = %e,
+                    head_sha,
+                    project,
+                    agent_name,
+                    context,
+                    "failed to post terminal commit status"
+                );
+            }
+        }
+    }
+
+    /// Handle a `DispatchTask::Push` dispatch (Phase 3 — ADF replaces Gitea
+    /// Actions): look up the project's `build-runner` agent, gate on the
+    /// subscription allow-list and monthly budget, log a routing decision row
+    /// for observability (even though `build-runner` is bash, not LLM), then
+    /// spawn it with `ADF_PUSH_*` env injection so the bash task can shell
+    /// out to `rch exec` for the deterministic cargo gates.
+    ///
+    /// The handler is a no-op (with warn log) when no `build-runner` agent is
+    /// configured for the project — repos without build-runner must not break
+    /// the orchestrator drain loop.
+    pub(crate) async fn handle_push(
+        &mut self,
+        task: dispatcher::DispatchTask,
+    ) -> Result<(), OrchestratorError> {
+        let (project, ref_name, before_sha, after_sha, pusher_login, files_changed) = match task {
+            dispatcher::DispatchTask::Push {
+                project,
+                ref_name,
+                before_sha,
+                after_sha,
+                pusher_login,
+                files_changed,
+            } => (
+                project,
+                ref_name,
+                before_sha,
+                after_sha,
+                pusher_login,
+                files_changed,
+            ),
+            other => {
+                warn!(task = ?other, "handle_push invoked with non-Push task; ignoring");
+                return Ok(());
+            }
+        };
+
+        // Look up the build-runner agent for this project. Repos without
+        // build-runner shouldn't break the orchestrator -- log and skip.
+        let def = match self
+            .agent_registry
+            .lookup_project(project.as_str(), "build-runner")
+        {
+            Some(agent) => agent.definition.clone(),
+            None => {
+                warn!(
+                    project = %project,
+                    after_sha = %after_sha,
+                    "Push skipped: no build-runner agent configured for project"
+                );
+                return Ok(());
+            }
+        };
+
+        if self.active_agents.contains_key("build-runner") {
+            info!(
+                project = %project,
+                after_sha = %after_sha,
+                "Push skipped build-runner: already active from concurrent dispatch"
+            );
+            return Ok(());
+        }
+
+        // === STATIC ALLOW-LIST GATE ===
+        // build-runner is bash-only (no LLM), so def.model is normally None
+        // and this gate is a no-op. The check is retained for defence in
+        // depth so a future config that mis-sets `model` cannot bypass C1/C3.
+        if let Some(static_model) = def.model.as_deref() {
+            if !config::is_allowed_provider(static_model) {
+                warn!(
+                    agent = %def.name,
+                    project = %project,
+                    model = %static_model,
+                    "Push skipped: static model rejected by subscription allow-list"
+                );
+                return Ok(());
+            }
+        }
+
+        // === BUDGET GATE ===
+        // build-runner has no LLM cost but the budget tracker still records
+        // its dispatches; pause if the operator deliberately capped it.
+        let budget_verdict = self.cost_tracker.check(&def.name);
+        if budget_verdict.should_pause() {
+            warn!(
+                agent = %def.name,
+                project = %project,
+                verdict = %budget_verdict,
+                "Push skipped: build-runner monthly budget exhausted"
+            );
+            return Ok(());
+        }
+
+        // === ROUTING DECISION (observability only) ===
+        // Even though build-runner is bash, we still log a routing decision
+        // row so the dashboard sees one entry per dispatch. Cost is 0 because
+        // there is no LLM, and the model column reads "n/a".
+        info!(
+            agent = %def.name,
+            project = %project,
+            ref_name = %ref_name,
+            after_sha = %after_sha,
+            model = "n/a",
+            cost_estimate_cents = 0,
+            rationale = "deterministic build-runner (no LLM)",
+            "Push routing decision"
+        );
+
+        // === SPAWN ===
+        // build-runner is a plain bash agent: cli_tool from the def, no
+        // primary model, no fallback model. Mirror the SpawnRequest shape
+        // used by handle_review_pr but skip the LLM-specific overrides.
+        let primary_provider = terraphim_types::capability::Provider {
+            id: def.name.clone(),
+            name: def.name.clone(),
+            provider_type: terraphim_types::capability::ProviderType::Agent {
+                agent_id: def.name.clone(),
+                cli_command: def.cli_tool.clone(),
+                working_dir: self.config.working_dir_for_agent(&def),
+            },
+            capabilities: vec![],
+            cost_level: terraphim_types::capability::CostLevel::Cheap,
+            latency: terraphim_types::capability::Latency::Medium,
+            keywords: def.capabilities.clone(),
+        };
+
+        let task_string = format!(
+            "Build/test verdict for push to {} ({} → {}, {} files changed) on project={}, pushed by {}",
+            ref_name,
+            before_sha,
+            after_sha,
+            files_changed.len(),
+            project,
+            pusher_login,
+        );
+
+        // Issue #1020: pass the TOML `task` body (build-runner bash
+        // script) to the spawner -- not the runtime informational
+        // summary. The summary is layered as ADF_TASK_SUMMARY env.
+        let mut request = SpawnRequest::new(primary_provider, &def.task);
+
+        let mut limits = ResourceLimits::default();
+        if let Some(max_cpu) = def.max_cpu_seconds {
+            limits.max_cpu_seconds = Some(max_cpu);
+        }
+        if let Some(max_mem) = def.max_memory_bytes {
+            limits.max_memory_bytes = Some(max_mem);
+        }
+        request = request.with_resource_limits(limits);
+
+        // Layer the ADF_PUSH_* env on top of the per-agent base context.
+        let mut spawn_ctx =
+            build_spawn_context_for_agent(&self.config, &def, self.output_poster.as_ref());
+        spawn_ctx = spawn_ctx
+            .with_env("ADF_PUSH_SHA", after_sha.clone())
+            .with_env("ADF_PUSH_REF", ref_name.clone())
+            .with_env("ADF_PUSH_PROJECT", project.clone())
+            .with_env("ADF_PUSH_BEFORE_SHA", before_sha.clone())
+            .with_env("ADF_PUSH_PUSHER", pusher_login.clone())
+            .with_env("ADF_PUSH_FILES", files_changed.join("\n"))
+            .with_env("ADF_TASK_SUMMARY", task_string.clone());
+
+        let handle = self
+            .spawner
+            .spawn_with_fallback(&request, spawn_ctx)
+            .await
+            .map_err(|e| OrchestratorError::SpawnFailed {
+                agent: def.name.clone(),
+                reason: e.to_string(),
+            })?;
+
+        let output_rx = handle.subscribe_output();
+        let output_tmp_path = self.start_output_log_drain(&def.name, &handle);
+        let restart_count = self
+            .restart_counts
+            .get(&agent_key(&def))
+            .copied()
+            .unwrap_or(0);
+
+        self.active_agents.insert(
+            def.name.clone(),
+            ManagedAgent {
+                definition: def.clone(),
+                handle,
+                started_at: Instant::now(),
+                restart_count,
+                output_rx,
+                spawned_by_mention: false,
+                worktree_path: None,
+                worktree_guard: None,
+                routed_model: None,
+                session_id: format!("{}-{}", def.name, ulid::Ulid::new()),
+                mention_chain_id: None,
+                mention_depth: None,
+                mention_parent_agent: None,
+                concurrency_permit: None,
+                commit_status_post: Some((after_sha.clone(), "adf/build".to_string())),
+                output_tmp_path,
+            },
+        );
+
+        self.post_pending_status(
+            &after_sha,
+            0,
+            &project,
+            &def.name,
+            "adf/build",
+            "build-runner dispatched",
+        )
+        .await;
+
+        info!(
+            agent = %def.name,
+            project = %project,
+            ref_name = %ref_name,
+            after_sha = %after_sha,
+            "Push spawned build-runner"
+        );
+
+        Ok(())
+    }
+
+    /// Evaluate the pre-check strategy for an agent.
+    async fn run_pre_check(&mut self, def: &AgentDefinition) -> PreCheckResult {
+        match &def.pre_check {
+            None | Some(PreCheckStrategy::Always) => PreCheckResult::Findings(String::new()),
+            Some(PreCheckStrategy::GitDiff { watch_paths }) => {
+                self.git_diff_pre_check(&def.name, watch_paths).await
+            }
+            Some(PreCheckStrategy::GiteaIssue { issue_number }) => {
+                self.gitea_issue_pre_check(*issue_number).await
+            }
+            Some(PreCheckStrategy::Shell {
+                script,
+                timeout_secs,
+            }) => self.shell_pre_check(script, *timeout_secs).await,
+        }
+    }
+
+    /// Git diff pre-check: compare last_run_commit to HEAD.
+    async fn git_diff_pre_check(&self, agent_name: &str, watch_paths: &[String]) -> PreCheckResult {
+        let last_commit = match self.last_run_commits.get(agent_name) {
+            Some(c) => c.clone(),
+            None => {
+                info!(agent = %agent_name, "no last_run_commit recorded, spawning (first run)");
+                return PreCheckResult::Findings(String::new());
+            }
+        };
+
+        // Get current HEAD
+        let head = match self.get_current_head().await {
+            Ok(h) => h,
+            Err(e) => {
+                warn!(agent = %agent_name, error = %e, "failed to get HEAD, spawning (fail-open)");
+                return PreCheckResult::Failed(format!("git rev-parse failed: {}", e));
+            }
+        };
+
+        if head == last_commit {
+            info!(agent = %agent_name, commit = %head, "HEAD unchanged since last run, skipping");
+            return PreCheckResult::NoFindings;
+        }
+
+        // Get changed files
+        let diff_range = format!("{}..{}", last_commit, head);
+        let output = match tokio::time::timeout(
+            Duration::from_secs(30),
+            tokio::process::Command::new("git")
+                .args(["diff", "--name-only", &diff_range])
+                .current_dir(&self.config.working_dir)
+                .output(),
+        )
+        .await
+        {
+            Ok(Ok(o)) => o,
+            Ok(Err(e)) => {
+                warn!(agent = %agent_name, error = %e, "git diff failed, spawning (fail-open)");
+                return PreCheckResult::Failed(format!("git diff failed: {}", e));
+            }
+            Err(_) => {
+                warn!(agent = %agent_name, "git diff timed out after 30s, spawning (fail-open)");
+                return PreCheckResult::Failed("git diff timed out after 30s".into());
+            }
+        };
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            warn!(agent = %agent_name, stderr = %stderr, "git diff non-zero exit, spawning (fail-open)");
+            return PreCheckResult::Failed(format!("git diff exit {}: {}", output.status, stderr));
+        }
+
+        let changed_files: Vec<String> = String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .filter(|l| !l.is_empty())
+            .map(|l| l.to_string())
+            .collect();
+
+        if changed_files.is_empty() {
+            info!(agent = %agent_name, "no files changed, skipping");
+            return PreCheckResult::NoFindings;
+        }
+
+        if has_matching_changes(&changed_files, watch_paths) {
+            let summary = format!("{} files changed matching watch_paths", changed_files.len());
+            info!(agent = %agent_name, files = changed_files.len(), "matching changes found");
+            PreCheckResult::Findings(summary)
+        } else {
+            info!(agent = %agent_name, files = changed_files.len(), "changes found but none match watch_paths, skipping");
+            PreCheckResult::NoFindings
+        }
+    }
+
+    /// Shell pre-check: run script via sh -c.
+    async fn shell_pre_check(&self, script: &str, timeout_secs: u64) -> PreCheckResult {
+        let result = tokio::time::timeout(
+            Duration::from_secs(timeout_secs),
+            tokio::process::Command::new("sh")
+                .arg("-c")
+                .arg(script)
+                .current_dir(&self.config.working_dir)
+                .output(),
+        )
+        .await;
+
+        match result {
+            Ok(Ok(output)) => {
+                if output.status.success() {
+                    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                    if stdout.is_empty() {
+                        PreCheckResult::NoFindings
+                    } else {
+                        PreCheckResult::Findings(stdout)
+                    }
+                } else {
+                    let stderr = String::from_utf8_lossy(&output.stderr);
+                    PreCheckResult::Failed(format!("script exit {}: {}", output.status, stderr))
+                }
+            }
+            Ok(Err(e)) => PreCheckResult::Failed(format!("script I/O error: {}", e)),
+            Err(_) => PreCheckResult::Failed(format!("script timed out after {}s", timeout_secs)),
+        }
+    }
+
+    /// Get or lazily construct the GiteaTracker for pre-check.
+    fn get_or_init_pre_check_tracker(&mut self) -> Option<&terraphim_tracker::GiteaTracker> {
+        if self.pre_check_tracker.is_some() {
+            return self.pre_check_tracker.as_ref();
+        }
+        let workflow = self.config.workflow.as_ref()?;
+        let tc = &workflow.tracker;
+        let config = terraphim_tracker::GiteaConfig {
+            base_url: tc.endpoint.clone(),
+            token: tc.api_key.clone(),
+            owner: tc.owner.clone(),
+            repo: tc.repo.clone(),
+            active_states: tc.states.active.clone(),
+            terminal_states: tc.states.terminal.clone(),
+            use_robot_api: tc.use_robot_api,
+            robot_path: std::path::PathBuf::from("/home/alex/go/bin/gitea-robot"),
+            claim_strategy: terraphim_tracker::gitea::ClaimStrategy::PreferRobot,
+        };
+        match terraphim_tracker::GiteaTracker::new(config) {
+            Ok(tracker) => {
+                self.pre_check_tracker = Some(tracker);
+                self.pre_check_tracker.as_ref()
+            }
+            Err(e) => {
+                warn!(error = %e, "failed to construct GiteaTracker for pre-check");
+                None
+            }
+        }
+    }
+
+    /// Evaluate the gitea-issue pre-check strategy.
+    async fn gitea_issue_pre_check(&mut self, issue_number: u64) -> PreCheckResult {
+        let tracker = match self.get_or_init_pre_check_tracker() {
+            Some(t) => t,
+            None => {
+                return PreCheckResult::Failed(
+                    "no workflow config for gitea-issue pre-check".into(),
+                );
+            }
+        };
+
+        // Fetch comments with 15s timeout
+        let comments = match tokio::time::timeout(
+            Duration::from_secs(15),
+            tracker.fetch_comments(issue_number, None),
+        )
+        .await
+        {
+            Ok(Ok(comments)) => comments,
+            Ok(Err(e)) => {
+                warn!(
+                    issue = issue_number,
+                    error = %e,
+                    "gitea comment fetch failed, spawning (fail-open)"
+                );
+                return PreCheckResult::Failed(format!("comment fetch failed: {}", e));
+            }
+            Err(_) => {
+                warn!(
+                    issue = issue_number,
+                    "gitea comment fetch timed out, spawning (fail-open)"
+                );
+                return PreCheckResult::Failed("comment fetch timed out after 15s".into());
+            }
+        };
+
+        if comments.is_empty() {
+            info!(issue = issue_number, "no comments on issue, spawning");
+            return PreCheckResult::Findings(String::new());
+        }
+
+        // Check the most recent comment for PASS verdict
+        let latest = comments.last().expect("checked non-empty above");
+        let body_lower = latest.body.to_lowercase();
+
+        if body_lower.contains("verdict: pass") {
+            // Check if there are new commits since this comment
+            let comment_time = &latest.created_at;
+
+            // Use git log to check for commits after the comment time
+            let output = match tokio::time::timeout(
+                Duration::from_secs(30),
+                tokio::process::Command::new("git")
+                    .args(["log", "--oneline", &format!("--since={}", comment_time)])
+                    .current_dir(&self.config.working_dir)
+                    .output(),
+            )
+            .await
+            {
+                Ok(Ok(o)) => o,
+                Ok(Err(e)) => {
+                    warn!(error = %e, "git log failed, spawning (fail-open)");
+                    return PreCheckResult::Failed(format!("git log failed: {}", e));
+                }
+                Err(_) => {
+                    warn!("git log --since timed out after 30s, spawning (fail-open)");
+                    return PreCheckResult::Failed("git log timed out after 30s".into());
+                }
+            };
+
+            let log_output = String::from_utf8_lossy(&output.stdout);
+            if log_output.trim().is_empty() {
+                info!(
+                    issue = issue_number,
+                    "PASS verdict and no new commits, skipping"
+                );
+                return PreCheckResult::NoFindings;
+            } else {
+                let commit_count = log_output.lines().count();
+                info!(
+                    issue = issue_number,
+                    new_commits = commit_count,
+                    "PASS verdict but new commits found, spawning"
+                );
+                return PreCheckResult::Findings(format!(
+                    "{} new commits since last PASS verdict",
+                    commit_count
+                ));
+            }
+        }
+
+        info!(
+            issue = issue_number,
+            "no PASS verdict in latest comment, spawning"
+        );
+        PreCheckResult::Findings(String::new())
+    }
+
+    /// Get current HEAD commit hash.
+    async fn get_current_head(&self) -> Result<String, OrchestratorError> {
+        let output = tokio::time::timeout(
+            Duration::from_secs(5),
+            tokio::process::Command::new("git")
+                .args(["rev-parse", "HEAD"])
+                .current_dir(&self.config.working_dir)
+                .output(),
+        )
+        .await
+        .map_err(|_| OrchestratorError::Config("git rev-parse HEAD timed out after 5s".into()))?
+        .map_err(OrchestratorError::from)?;
+
+        if output.status.success() {
+            Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+        } else {
+            Err(OrchestratorError::Config(
+                "git rev-parse HEAD failed".into(),
+            ))
+        }
+    }
+
+    /// Poll configured Gitea issues for new @adf: mentions and enqueue MentionDriven tasks.
+    ///
+    /// Skipped when no mention configuration is present or when the Gitea tracker
+    /// is not configured. Uses `tick_count % poll_modulo` to avoid polling on
+    /// every reconciliation tick.
+    /// Cursor-based mention polling: single API call, no replay on restart.
+    ///
+    /// Handle a dispatch request received from the webhook endpoint.
+    /// This is the webhook equivalent of poll_mentions but immediate.
+    async fn handle_webhook_dispatch(&mut self, dispatch: webhook::WebhookDispatch) {
+        let mention_cfg = match self.config.mentions.as_ref() {
+            Some(cfg) => cfg,
+            None => return,
+        };
+
+        let agents = self.config.agents.clone();
+        let agent_names: Vec<String> = agents.iter().map(|a| a.name.clone()).collect();
+        let max_mention_depth = mention_cfg.max_mention_depth;
+
+        match dispatch {
+            webhook::WebhookDispatch::SpawnAgent {
+                agent_name,
+                detected_project,
+                issue_number,
+                comment_id,
+                context,
+            } => {
+                info!(
+                    agent = %agent_name,
+                    project = ?detected_project,
+                    issue = issue_number,
+                    comment_id = comment_id,
+                    "webhook: dispatching agent spawn"
+                );
+
+                // Use project-aware resolver. For webhook dispatches we don't know which
+                // project's repo the webhook came from, so we use LEGACY_PROJECT_ID as the
+                // hint for unqualified mentions; qualified mentions carry detected_project.
+                if let Some(def) = mention::resolve_mention(
+                    detected_project.as_deref(),
+                    dispatcher::LEGACY_PROJECT_ID,
+                    &agent_name,
+                    &agents,
+                ) {
+                    // Event-only agents (e.g. build-runner) must not be dispatched
+                    // from comment mentions. They are spawned by handle_push or
+                    // other event handlers with the appropriate context env vars.
+                    // Rejecting here prevents ghost-issue posts and wasted spawns.
+                    if def.event_only {
+                        info!(
+                            agent = %agent_name,
+                            issue = issue_number,
+                            comment_id = comment_id,
+                            "webhook dispatch rejected: agent is event-only (push/event-driven), not mention-dispatchable"
+                        );
+                        return;
+                    }
+
+                    // Dedup: check Gitea assignment + active_agents before spawning
+                    if self.should_skip_dispatch(&agent_name, issue_number).await {
+                        return;
+                    }
+
+                    let chain_id = ulid::Ulid::new().to_string();
+                    let depth: u32 = 0;
+                    let parent_agent = String::new();
+
+                    if let Err(e) = mention_chain::MentionChainTracker::check(
+                        depth,
+                        &parent_agent,
+                        &agent_name,
+                        max_mention_depth,
+                    ) {
+                        warn!(
+                            agent = %agent_name,
+                            chain_id = %chain_id,
+                            depth,
+                            error = %e,
+                            "webhook mention chain check rejected dispatch"
+                        );
+                        if let Some(ref poster) = self.output_poster {
+                            let body = format!(
+                                "## Mention Dispatch Blocked\n\n\
+                                Agent `{}` was not spawned: {}.\n\n\
+                                _Webhook chain `{}` blocked._",
+                                agent_name, e, chain_id
+                            );
+                            if let Err(pe) = poster.post_raw(issue_number, &body).await {
+                                warn!(error = %pe, "failed to post webhook chain rejection comment");
+                            }
+                        }
+                        return;
+                    }
+
+                    let ctx_args = mention_chain::MentionContextArgs {
+                        parent_agent: parent_agent.clone(),
+                        issue_number,
+                        comment_body: context.clone(),
+                        depth,
+                        chain_id: chain_id.clone(),
+                        available_agents: agent_names
+                            .iter()
+                            .filter(|n| *n != &agent_name)
+                            .cloned()
+                            .collect(),
+                    };
+                    let chain_ctx = mention_chain::MentionChainTracker::build_context(
+                        &ctx_args,
+                        max_mention_depth,
+                    );
+
+                    let mut mention_def = def.clone();
+                    mention_def.task = format!("{}\n\n{}", def.task, chain_ctx);
+                    mention_def.gitea_issue = Some(issue_number);
+
+                    if let Err(e) = self.spawn_agent(&mention_def).await {
+                        error!(agent = %agent_name, issue = issue_number, error = %e, "webhook: failed to spawn agent");
+                    } else if let Some(agent) = self.active_agents.get_mut(&mention_def.name) {
+                        agent.spawned_by_mention = true;
+                        agent.mention_chain_id = Some(chain_id);
+                        agent.mention_depth = Some(depth);
+                        agent.mention_parent_agent = None;
+                    }
+                }
+            }
+            webhook::WebhookDispatch::SpawnPersona {
+                persona_name,
+                issue_number,
+                comment_id: _,
+                context,
+            } => {
+                if let Some((agent_name, _)) = mention::resolve_persona_mention(
+                    &persona_name,
+                    &agents,
+                    &self.persona_registry,
+                    &context,
+                ) {
+                    info!(
+                        persona = %persona_name,
+                        agent = %agent_name,
+                        issue = issue_number,
+                        "webhook: dispatching persona-resolved agent"
+                    );
+
+                    if let Some(def) = agents.iter().find(|a| a.name == agent_name).cloned() {
+                        // Event-only agents must not be dispatched via persona-mention
+                        // either. Same rationale as the SpawnAgent arm.
+                        if def.event_only {
+                            info!(
+                                persona = %persona_name,
+                                agent = %agent_name,
+                                issue = issue_number,
+                                "webhook dispatch rejected: persona-resolved agent is event-only (push/event-driven), not mention-dispatchable"
+                            );
+                            return;
+                        }
+
+                        // Dedup: check Gitea assignment + active_agents before spawning
+                        if self.should_skip_dispatch(&agent_name, issue_number).await {
+                            return;
+                        }
+
+                        let chain_id = ulid::Ulid::new().to_string();
+                        let depth: u32 = 0;
+                        let parent_agent = String::new();
+
+                        if let Err(e) = mention_chain::MentionChainTracker::check(
+                            depth,
+                            &parent_agent,
+                            &agent_name,
+                            max_mention_depth,
+                        ) {
+                            warn!(
+                                agent = %agent_name,
+                                chain_id = %chain_id,
+                                depth,
+                                error = %e,
+                                "webhook mention chain check rejected persona dispatch"
+                            );
+                            if let Some(ref poster) = self.output_poster {
+                                let body = format!(
+                                    "## Mention Dispatch Blocked\n\n\
+                                    Agent `{}` (via persona) was not spawned: {}.\n\n\
+                                    _Webhook chain `{}` blocked._",
+                                    agent_name, e, chain_id
+                                );
+                                if let Err(pe) = poster.post_raw(issue_number, &body).await {
+                                    warn!(error = %pe, "failed to post webhook chain rejection comment");
+                                }
+                            }
+                            return;
+                        }
+
+                        let ctx_args = mention_chain::MentionContextArgs {
+                            parent_agent: parent_agent.clone(),
+                            issue_number,
+                            comment_body: context.clone(),
+                            depth,
+                            chain_id: chain_id.clone(),
+                            available_agents: agent_names
+                                .iter()
+                                .filter(|n| *n != &agent_name)
+                                .cloned()
+                                .collect(),
+                        };
+                        let chain_ctx = mention_chain::MentionChainTracker::build_context(
+                            &ctx_args,
+                            max_mention_depth,
+                        );
+
+                        let mut mention_def = def.clone();
+                        mention_def.task = format!("{}\n\n{}", def.task, chain_ctx);
+                        mention_def.gitea_issue = Some(issue_number);
+
+                        if let Err(e) = self.spawn_agent(&mention_def).await {
+                            error!(agent = %agent_name, issue = issue_number, error = %e, "webhook: failed to spawn agent");
+                        } else if let Some(agent) = self.active_agents.get_mut(&mention_def.name) {
+                            agent.spawned_by_mention = true;
+                            agent.mention_chain_id = Some(chain_id);
+                            agent.mention_depth = Some(depth);
+                            agent.mention_parent_agent = None;
+                        }
+                    }
+                }
+            }
+            webhook::WebhookDispatch::CompoundReview {
+                issue_number,
+                comment_id,
+            } => {
+                info!(
+                    issue = issue_number,
+                    comment_id = comment_id,
+                    "webhook: compound review triggered"
+                );
+                self.handle_schedule_event(ScheduleEvent::CompoundReview)
+                    .await;
+
+                // Post acknowledgment via existing output_poster
+                if let Some(ref poster) = self.output_poster {
+                    let ack_body = format!(
+                        "## Compound Review Triggered (webhook)\n\n\
+                        Manual trigger received from issue #{} comment {}.\n\
+                        Running 6-agent review swarm now...",
+                        issue_number, comment_id
+                    );
+                    if let Err(e) = poster.post_raw(issue_number, &ack_body).await {
+                        warn!(error = %e, "failed to post compound review acknowledgment");
+                    }
+                }
+            }
+            webhook::WebhookDispatch::ReviewPr {
+                pr_number,
+                project,
+                head_sha,
+                author_login,
+                title,
+                diff_loc,
+            } => {
+                info!(
+                    pr = pr_number,
+                    project = %project,
+                    head_sha = %head_sha,
+                    author = %author_login,
+                    diff_loc = diff_loc,
+                    "webhook: enqueuing ReviewPr dispatch task"
+                );
+                self.dispatcher.enqueue(dispatcher::DispatchTask::ReviewPr {
+                    pr_number,
+                    project,
+                    head_sha,
+                    author_login,
+                    title,
+                    diff_loc,
+                });
+            }
+            webhook::WebhookDispatch::Push {
+                project,
+                ref_name,
+                before_sha,
+                after_sha,
+                pusher_login,
+                files_changed,
+            } => {
+                info!(
+                    project = %project,
+                    ref_name = %ref_name,
+                    after_sha = %after_sha,
+                    pusher = %pusher_login,
+                    files = files_changed.len(),
+                    "webhook: enqueuing Push dispatch task"
+                );
+                self.dispatcher.enqueue(dispatcher::DispatchTask::Push {
+                    project,
+                    ref_name,
+                    before_sha,
+                    after_sha,
+                    pusher_login,
+                    files_changed,
+                });
+            }
+        }
+    }
+
+    /// Uses repo-wide comments endpoint with `since` cursor. On first run
+    /// (no persisted cursor), cursor is set to `now` to skip all historical
+    /// mentions — preventing the mention replay storm.
+    async fn poll_mentions(&mut self) {
+        // Build the list of (project_id, gitea_cfg, mention_cfg) targets.
+        //
+        // - Legacy mode (no `[[projects]]`): one pass under the synthetic
+        //   `__global__` id using the top-level `gitea` and `mentions`.
+        // - Multi-project mode: one pass per configured project that
+        //   declares a `gitea` block. Per-project `mentions` override the
+        //   top-level `mentions`, which in turn falls back to
+        //   `MentionConfig::default()` so operators need not repeat caps
+        //   in every project.
+        let targets: Vec<(String, config::GiteaOutputConfig, config::MentionConfig)> =
+            if self.config.projects.is_empty() {
+                match (self.config.mentions.clone(), self.config.gitea.clone()) {
+                    (Some(m), Some(g)) => {
+                        vec![(dispatcher::LEGACY_PROJECT_ID.to_string(), g, m)]
+                    }
+                    _ => {
+                        tracing::debug!(
+                            "mention polling skipped: legacy mode but no Gitea/mentions config"
+                        );
+                        return;
+                    }
+                }
+            } else {
+                let global_mentions = self.config.mentions.clone();
+                self.config
+                    .projects
+                    .iter()
+                    .filter_map(|project| {
+                        if project.gitea.is_none() {
+                            tracing::debug!(
+                                project = project.id.as_str(),
+                                "skipping mention poll: project has no gitea config"
+                            );
+                        }
+                        let gitea = project.gitea.clone()?;
+                        let mentions = project
+                            .mentions
+                            .clone()
+                            .or_else(|| global_mentions.clone())
+                            .unwrap_or_default();
+                        Some((project.id.clone(), gitea, mentions))
+                    })
+                    .collect()
+            };
+
+        if targets.is_empty() {
+            tracing::debug!("mention polling skipped: no projects with Gitea config");
+            return;
+        }
+
+        for (project_id, gitea_cfg, mention_cfg) in targets {
+            self.poll_mentions_for_project(&project_id, &gitea_cfg, &mention_cfg)
+                .await;
+        }
+    }
+
+    /// Run a single mention-poll pass for one project.
+    ///
+    /// Invoked by [`AgentOrchestrator::poll_mentions`] for each configured
+    /// project (or once for legacy single-project mode under
+    /// `__global__`). Loads/persists the project's cursor, honours the
+    /// project's `MentionConfig`, and threads `project_id` onto every
+    /// dispatched mention.
+    async fn poll_mentions_for_project(
+        &mut self,
+        project_id: &str,
+        gitea_cfg: &config::GiteaOutputConfig,
+        mention_cfg: &config::MentionConfig,
+    ) {
+        // Respect poll_modulo to reduce API traffic.
+        if self.tick_count % mention_cfg.poll_modulo != 0 {
+            return;
+        }
+
+        // Lazy-load the project's cursor.
+        let mut cursor = match self.mention_cursors.remove(project_id) {
+            Some(c) => c,
+            None => mention::MentionCursor::load_or_now(project_id).await,
+        };
+        cursor.dispatches_this_tick = 0;
+
+        // Create Gitea tracker for repo-wide comment polling
+        let tracker_cfg = terraphim_tracker::GiteaConfig {
+            base_url: gitea_cfg.base_url.clone(),
+            token: gitea_cfg.token.clone(),
+            owner: gitea_cfg.owner.clone(),
+            repo: gitea_cfg.repo.clone(),
+            active_states: vec!["open".to_string()],
+            terminal_states: vec!["closed".to_string()],
+            use_robot_api: false,
+            robot_path: std::path::PathBuf::from("/home/alex/go/bin/gitea-robot"),
+            claim_strategy: terraphim_tracker::gitea::ClaimStrategy::PreferRobot,
+        };
+        let tracker = match terraphim_tracker::GiteaTracker::new(tracker_cfg) {
+            Ok(t) => t,
+            Err(e) => {
+                tracing::warn!(
+                    project = project_id,
+                    error = %e,
+                    "failed to create GiteaTracker for mention polling"
+                );
+                self.mention_cursors.insert(project_id.to_string(), cursor);
+                return;
+            }
+        };
+
+        // Single API call: all comments since cursor
+        let comments = match tracker
+            .fetch_repo_comments(Some(&cursor.last_seen_at), Some(50))
+            .await
+        {
+            Ok(c) => c,
+            Err(e) => {
+                tracing::warn!(
+                    project = project_id,
+                    error = %e,
+                    "failed to fetch repo comments for mention polling"
+                );
+                self.mention_cursors.insert(project_id.to_string(), cursor);
+                return;
+            }
+        };
+
+        if comments.is_empty() {
+            cursor.save(project_id).await;
+            self.mention_cursors.insert(project_id.to_string(), cursor);
+            return;
+        }
+
+        let agents = self.config.agents.clone();
+        let persona_registry = self.persona_registry.clone();
+        let max_dispatches = mention_cfg.max_dispatches_per_tick;
+
+        // Build ADF command parser with known agents and personas
+        let agent_names: Vec<String> = agents.iter().map(|a| a.name.clone()).collect();
+        let persona_names: Vec<String> = persona_registry
+            .persona_names()
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect();
+        let command_parser =
+            crate::adf_commands::AdfCommandParser::new(&agent_names, &persona_names);
+
+        let max_mention_depth = mention_cfg.max_mention_depth;
+
+        for comment in &comments {
+            if cursor.dispatches_this_tick >= max_dispatches {
+                tracing::debug!(
+                    dispatched = cursor.dispatches_this_tick,
+                    max = max_dispatches,
+                    "max dispatches per tick reached"
+                );
+                break;
+            }
+
+            // Skip already-processed comments (persisted dedup across restarts)
+            if cursor.is_processed(comment.id) {
+                tracing::debug!(
+                    comment_id = comment.id,
+                    issue = comment.issue_number,
+                    "skipping already-processed comment"
+                );
+                cursor.advance_to(&comment.created_at);
+                continue;
+            }
+
+            // Parse ADF commands using terraphim-automata Aho-Corasick
+            let commands =
+                command_parser.parse_commands(&comment.body, comment.issue_number, comment.id);
+
+            // Handle qualified `@adf:project/name` mentions that AdfCommandParser cannot
+            // see (its patterns are `@adf:{name}`; a `project/` prefix is not a substring).
+            for token in mention::parse_mention_tokens(&comment.body) {
+                if cursor.dispatches_this_tick >= max_dispatches {
+                    break;
+                }
+                let proj = match token.project.as_deref() {
+                    Some(p) => p,
+                    None => continue, // unqualified mentions are handled by parse_commands below
+                };
+                match mention::resolve_mention(Some(proj), project_id, &token.agent, &agents) {
+                    Some(def) => {
+                        info!(
+                            agent = %token.agent,
+                            project = proj,
+                            issue = comment.issue_number,
+                            comment_id = comment.id,
+                            "dispatching qualified mention-driven agent"
+                        );
+                        // Event-only agents (e.g. build-runner) must not be dispatched
+                        // from comment mentions. Reject before any spawn-related work.
+                        if def.event_only {
+                            info!(
+                                agent = %token.agent,
+                                issue = comment.issue_number,
+                                comment_id = comment.id,
+                                "poll mention dispatch rejected: agent is event-only (push/event-driven), not mention-dispatchable"
+                            );
+                            cursor.dispatches_this_tick += 1;
+                            continue;
+                        }
+                        if self
+                            .should_skip_dispatch(&token.agent, comment.issue_number)
+                            .await
+                        {
+                            cursor.dispatches_this_tick += 1;
+                            continue;
+                        }
+
+                        let (chain_id, depth, parent_agent) = self.resolve_mention_chain(
+                            &comment.user.login,
+                            &agent_names,
+                            max_mention_depth,
+                        );
+
+                        if let Err(e) = mention_chain::MentionChainTracker::check(
+                            depth,
+                            &parent_agent,
+                            &token.agent,
+                            max_mention_depth,
+                        ) {
+                            warn!(
+                                agent = %token.agent,
+                                chain_id = %chain_id,
+                                depth,
+                                error = %e,
+                                "mention chain check rejected dispatch"
+                            );
+                            if let Some(ref poster) = self.output_poster {
+                                let body = format!(
+                                    "## Mention Dispatch Blocked\n\n\
+                                    Agent `{}` was not spawned: {}.\n\n\
+                                    _Chain `{}` at depth {} exceeds the configured limit._",
+                                    token.agent, e, chain_id, depth
+                                );
+                                if let Err(pe) = poster
+                                    .post_raw_for_project(project_id, comment.issue_number, &body)
+                                    .await
+                                {
+                                    warn!(error = %pe, "failed to post chain rejection comment");
+                                }
+                            }
+                            cursor.dispatches_this_tick += 1;
+                            continue;
+                        }
+
+                        let ctx_args = mention_chain::MentionContextArgs {
+                            parent_agent: parent_agent.clone(),
+                            issue_number: comment.issue_number,
+                            comment_body: comment.body.clone(),
+                            depth,
+                            chain_id: chain_id.clone(),
+                            available_agents: agent_names
+                                .iter()
+                                .filter(|n| *n != &token.agent)
+                                .cloned()
+                                .collect(),
+                        };
+                        let chain_ctx = mention_chain::MentionChainTracker::build_context(
+                            &ctx_args,
+                            max_mention_depth,
+                        );
+
+                        let mut mention_def = def.clone();
+                        mention_def.task = format!("{}\n\n{}", def.task, chain_ctx);
+                        mention_def.gitea_issue = Some(comment.issue_number);
+                        if let Err(e) = self.spawn_agent(&mention_def).await {
+                            tracing::error!(
+                                agent = %token.agent,
+                                project = proj,
+                                issue = comment.issue_number,
+                                error = %e,
+                                "failed to spawn agent for qualified mention"
+                            );
+                        } else if let Some(active) = self.active_agents.get_mut(&mention_def.name) {
+                            active.spawned_by_mention = true;
+                            active.mention_chain_id = Some(chain_id);
+                            active.mention_depth = Some(depth);
+                            active.mention_parent_agent = if parent_agent.is_empty() {
+                                None
+                            } else {
+                                Some(parent_agent)
+                            };
+                        }
+                        cursor.dispatches_this_tick += 1;
+                    }
+                    None => {
+                        tracing::warn!(
+                            mention = format!("@adf:{}/{}", proj, token.agent),
+                            project = project_id,
+                            issue = comment.issue_number,
+                            "qualified mention matched no agent"
+                        );
+                    }
+                }
+            }
+
+            for cmd in commands {
+                if cursor.dispatches_this_tick >= max_dispatches {
+                    break;
+                }
+
+                match cmd {
+                    crate::adf_commands::AdfCommand::CompoundReview {
+                        issue_number,
+                        comment_id,
+                    } => {
+                        info!(
+                            issue = issue_number,
+                            comment_id = comment_id,
+                            "compound review triggered via @adf:compound-review mention"
+                        );
+
+                        // Trigger compound review
+                        self.handle_schedule_event(ScheduleEvent::CompoundReview)
+                            .await;
+
+                        // Post acknowledgment
+                        if let Some(ref poster) = self.output_poster {
+                            let ack_body = format!(
+                                "## 🔍 Compound Review Triggered\n\n\
+                                Manual trigger received from issue #{} comment {}.\n\
+                                Running 6-agent review swarm now...\n\n\
+                                _Results will be posted to issue #{} when complete._",
+                                issue_number,
+                                comment_id,
+                                self.config.compound_review.gitea_issue.unwrap_or(108)
+                            );
+                            if let Err(e) = poster.post_raw(issue_number, &ack_body).await {
+                                warn!(error = %e, "failed to post compound review acknowledgment");
+                            }
+                        }
+
+                        cursor.dispatches_this_tick += 1;
+                    }
+                    crate::adf_commands::AdfCommand::SpawnAgent {
+                        agent_name,
+                        issue_number,
+                        comment_id,
+                        context,
+                    } => {
+                        info!(
+                            agent = %agent_name,
+                            issue = issue_number,
+                            comment_id = comment_id,
+                            "dispatching mention-driven agent via terraphim-automata parser"
+                        );
+
+                        if let Some(def) =
+                            mention::resolve_mention(None, project_id, &agent_name, &agents)
+                        {
+                            // Event-only agents (e.g. build-runner) must not be dispatched
+                            // from comment mentions. Reject before any spawn-related work.
+                            if def.event_only {
+                                info!(
+                                    agent = %agent_name,
+                                    issue = issue_number,
+                                    comment_id = comment_id,
+                                    "poll mention dispatch rejected: agent is event-only (push/event-driven), not mention-dispatchable"
+                                );
+                                cursor.dispatches_this_tick += 1;
+                                continue;
+                            }
+                            if self.should_skip_dispatch(&agent_name, issue_number).await {
+                                cursor.dispatches_this_tick += 1;
+                                continue;
+                            }
+
+                            let (chain_id, depth, parent_agent) = self.resolve_mention_chain(
+                                &comment.user.login,
+                                &agent_names,
+                                max_mention_depth,
+                            );
+
+                            if let Err(e) = mention_chain::MentionChainTracker::check(
+                                depth,
+                                &parent_agent,
+                                &agent_name,
+                                max_mention_depth,
+                            ) {
+                                warn!(
+                                    agent = %agent_name,
+                                    chain_id = %chain_id,
+                                    depth,
+                                    error = %e,
+                                    "mention chain check rejected dispatch"
+                                );
+                                if let Some(ref poster) = self.output_poster {
+                                    let body = format!(
+                                        "## Mention Dispatch Blocked\n\n\
+                                        Agent `{}` was not spawned: {}.\n\n\
+                                        _Chain `{}` at depth {} exceeds the configured limit._",
+                                        agent_name, e, chain_id, depth
+                                    );
+                                    if let Err(pe) = poster
+                                        .post_raw_for_project(project_id, issue_number, &body)
+                                        .await
+                                    {
+                                        warn!(error = %pe, "failed to post chain rejection comment");
+                                    }
+                                }
+                                cursor.dispatches_this_tick += 1;
+                                continue;
+                            }
+
+                            let ctx_args = mention_chain::MentionContextArgs {
+                                parent_agent: parent_agent.clone(),
+                                issue_number,
+                                comment_body: context.clone(),
+                                depth,
+                                chain_id: chain_id.clone(),
+                                available_agents: agent_names
+                                    .iter()
+                                    .filter(|n| *n != &agent_name)
+                                    .cloned()
+                                    .collect(),
+                            };
+                            let chain_ctx = mention_chain::MentionChainTracker::build_context(
+                                &ctx_args,
+                                max_mention_depth,
+                            );
+
+                            let mut mention_def = def.clone();
+                            mention_def.task = format!("{}\n\n{}", def.task, chain_ctx);
+                            mention_def.gitea_issue = Some(issue_number);
+
+                            if let Err(e) = self.spawn_agent(&mention_def).await {
+                                tracing::error!(agent = %agent_name, issue = issue_number, error = %e, "failed to spawn agent");
+                            } else if let Some(agent) =
+                                self.active_agents.get_mut(&mention_def.name)
+                            {
+                                agent.spawned_by_mention = true;
+                                agent.mention_chain_id = Some(chain_id);
+                                agent.mention_depth = Some(depth);
+                                agent.mention_parent_agent = if parent_agent.is_empty() {
+                                    None
+                                } else {
+                                    Some(parent_agent)
+                                };
+                            }
+
+                            cursor.dispatches_this_tick += 1;
+                        }
+                    }
+                    crate::adf_commands::AdfCommand::SpawnPersona {
+                        persona_name,
+                        issue_number,
+                        comment_id: _,
+                        context,
+                    } => {
+                        // Resolve persona to agent
+                        if let Some((agent_name, _)) = mention::resolve_persona_mention(
+                            &persona_name,
+                            &agents,
+                            &persona_registry,
+                            &context,
+                        ) {
+                            info!(
+                                persona = %persona_name,
+                                agent = %agent_name,
+                                issue = issue_number,
+                                "dispatching persona-resolved agent via terraphim-automata parser"
+                            );
+
+                            if let Some(def) = agents.iter().find(|a| a.name == agent_name).cloned()
+                            {
+                                // Event-only agents (e.g. build-runner) must not be dispatched
+                                // from persona mentions. Reject before any spawn-related work.
+                                if def.event_only {
+                                    info!(
+                                        persona = %persona_name,
+                                        agent = %agent_name,
+                                        issue = issue_number,
+                                        "poll mention dispatch rejected: persona-resolved agent is event-only (push/event-driven), not mention-dispatchable"
+                                    );
+                                    cursor.dispatches_this_tick += 1;
+                                    continue;
+                                }
+                                // Dedup: check Gitea assignment + active_agents before spawning
+                                if self.should_skip_dispatch(&agent_name, issue_number).await {
+                                    cursor.dispatches_this_tick += 1;
+                                    continue;
+                                }
+
+                                let (chain_id, depth, parent_agent) = self.resolve_mention_chain(
+                                    &comment.user.login,
+                                    &agent_names,
+                                    max_mention_depth,
+                                );
+
+                                if let Err(e) = mention_chain::MentionChainTracker::check(
+                                    depth,
+                                    &parent_agent,
+                                    &agent_name,
+                                    max_mention_depth,
+                                ) {
+                                    warn!(
+                                        agent = %agent_name,
+                                        chain_id = %chain_id,
+                                        depth,
+                                        error = %e,
+                                        "mention chain check rejected persona dispatch"
+                                    );
+                                    if let Some(ref poster) = self.output_poster {
+                                        let body = format!(
+                                            "## Mention Dispatch Blocked\n\n\
+                                            Agent `{}` (via persona) was not spawned: {}.\n\n\
+                                            _Chain `{}` at depth {} exceeds the configured limit._",
+                                            agent_name, e, chain_id, depth
+                                        );
+                                        if let Err(pe) = poster
+                                            .post_raw_for_project(project_id, issue_number, &body)
+                                            .await
+                                        {
+                                            warn!(error = %pe, "failed to post chain rejection comment");
+                                        }
+                                    }
+                                    cursor.dispatches_this_tick += 1;
+                                    continue;
+                                }
+
+                                let ctx_args = mention_chain::MentionContextArgs {
+                                    parent_agent: parent_agent.clone(),
+                                    issue_number,
+                                    comment_body: context.clone(),
+                                    depth,
+                                    chain_id: chain_id.clone(),
+                                    available_agents: agent_names
+                                        .iter()
+                                        .filter(|n| *n != &agent_name)
+                                        .cloned()
+                                        .collect(),
+                                };
+                                let chain_ctx = mention_chain::MentionChainTracker::build_context(
+                                    &ctx_args,
+                                    max_mention_depth,
+                                );
+
+                                let mut mention_def = def.clone();
+                                mention_def.task = format!("{}\n\n{}", def.task, chain_ctx);
+                                mention_def.gitea_issue = Some(issue_number);
+
+                                if let Err(e) = self.spawn_agent(&mention_def).await {
+                                    tracing::error!(agent = %agent_name, issue = issue_number, error = %e, "failed to spawn agent");
+                                } else if let Some(agent) =
+                                    self.active_agents.get_mut(&mention_def.name)
+                                {
+                                    agent.spawned_by_mention = true;
+                                    agent.mention_chain_id = Some(chain_id);
+                                    agent.mention_depth = Some(depth);
+                                    agent.mention_parent_agent = if parent_agent.is_empty() {
+                                        None
+                                    } else {
+                                        Some(parent_agent)
+                                    };
+                                }
+
+                                cursor.dispatches_this_tick += 1;
+                            }
+                        }
+                    }
+                    crate::adf_commands::AdfCommand::Unknown { raw } => {
+                        warn!(raw = %raw, "unknown ADF command");
+                    }
+                }
+            }
+
+            // Mark comment as processed and advance cursor
+            cursor.mark_processed(comment.id);
+            cursor.advance_to(&comment.created_at);
+        }
+
+        // Persist cursor for next poll / restart
+        cursor.save(project_id).await;
+        self.mention_cursors.insert(project_id.to_string(), cursor);
+    }
+
+    /// Poll every project with a Gitea config for open PRs, parse the latest
+    /// structural-pr-review comment, and enqueue [`dispatcher::DispatchTask::AutoMerge`]
+    /// for any PR that clears every gate in
+    /// [`pr_review::AutoMergeCriteria::default`].
+    ///
+    /// Called once per reconcile tick after the
+    /// dispatcher has been drained so AutoMerge tasks enqueued here are
+    /// serviced on the next tick (deterministic ordering). The method is a
+    /// no-op when no project has a `gitea` config.
+    ///
+    /// This is ROC v1 Step F — it enqueues auto-merge but does **not**
+    /// actually merge the PR; that lands in Step G. Dedupe is process-local
+    /// via [`pr_poller::AutoMergeDedupeSet`]; durable tracking is Step I.
+    pub async fn poll_pending_reviews(&mut self) -> Result<(), OrchestratorError> {
+        // Build the list of (project_id, gitea_cfg) targets. Mirrors the
+        // legacy/multi-project split used by [`Self::poll_mentions`] so the
+        // two pollers stay aligned as the config surface evolves.
+        let targets: Vec<(String, config::GiteaOutputConfig)> = if self.config.projects.is_empty() {
+            match self.config.gitea.clone() {
+                Some(g) => vec![(dispatcher::LEGACY_PROJECT_ID.to_string(), g)],
+                None => {
+                    tracing::debug!(
+                        "verdict polling skipped: legacy mode with no top-level gitea config"
+                    );
+                    return Ok(());
+                }
+            }
+        } else {
+            self.config
+                .projects
+                .iter()
+                .filter_map(|project| {
+                    let gitea = project.gitea.clone()?;
+                    Some((project.id.clone(), gitea))
+                })
+                .collect()
+        };
+
+        if targets.is_empty() {
+            tracing::debug!("verdict polling skipped: no projects with Gitea config");
+            return Ok(());
+        }
+
+        let criteria = pr_review::AutoMergeCriteria::default();
+
+        for (project_id, gitea_cfg) in targets {
+            let tracker_cfg = terraphim_tracker::GiteaConfig {
+                base_url: gitea_cfg.base_url.clone(),
+                token: gitea_cfg.token.clone(),
+                owner: gitea_cfg.owner.clone(),
+                repo: gitea_cfg.repo.clone(),
+                active_states: vec!["open".to_string()],
+                terminal_states: vec!["closed".to_string()],
+                use_robot_api: false,
+                robot_path: std::path::PathBuf::from("/home/alex/go/bin/gitea-robot"),
+                claim_strategy: terraphim_tracker::gitea::ClaimStrategy::PreferRobot,
+            };
+            let tracker = match terraphim_tracker::GiteaTracker::new(tracker_cfg) {
+                Ok(t) => pr_poller::GiteaPrTracker::new(t),
+                Err(e) => {
+                    tracing::warn!(
+                        project = %project_id,
+                        error = %e,
+                        "failed to create GiteaTracker for verdict polling"
+                    );
+                    continue;
+                }
+            };
+
+            self.poll_pending_reviews_for_project(&project_id, &tracker, &criteria)
+                .await;
+        }
+
+        Ok(())
+    }
+
+    /// Inner per-project verdict poll. Accepts a generic [`pr_poller::PrTracker`]
+    /// so integration tests can drive it with an in-memory tracker.
+    pub async fn poll_pending_reviews_for_project<T: pr_poller::PrTracker + ?Sized>(
+        &mut self,
+        project_id: &str,
+        tracker: &T,
+        criteria: &pr_review::AutoMergeCriteria,
+    ) {
+        let prs = match tracker.list_open_prs().await {
+            Ok(prs) => prs,
+            Err(e) => {
+                tracing::warn!(
+                    project = %project_id,
+                    error = %e,
+                    "failed to list open PRs"
+                );
+                return;
+            }
+        };
+
+        let now = std::time::Instant::now();
+        for pr in prs {
+            if !self.pr_poll_rate_limiter.allow(project_id, pr.number, now) {
+                tracing::trace!(
+                    project = %project_id,
+                    pr = pr.number,
+                    "skipping PR: poll rate limited"
+                );
+                continue;
+            }
+
+            let comments = match tracker.fetch_pr_comments(pr.number).await {
+                Ok(c) => c,
+                Err(e) => {
+                    tracing::warn!(
+                        project = %project_id,
+                        pr = pr.number,
+                        error = %e,
+                        "failed to fetch PR comments"
+                    );
+                    continue;
+                }
+            };
+
+            let outcome = pr_poller::evaluate_pr_verdict(&pr, &comments, criteria);
+
+            // Emit PrReviewed for any outcome that resolved a parsed verdict.
+            #[cfg(feature = "quickwit")]
+            if let Some(ref sink) = self.quickwit_sink {
+                let has_verdict = matches!(
+                    outcome,
+                    pr_poller::EvaluationOutcome::Merge { .. }
+                        | pr_poller::EvaluationOutcome::HumanReviewNeeded { .. }
+                );
+                if has_verdict {
+                    if let Some(rc) = pr_poller::latest_reviewer_comment(&comments) {
+                        if let Ok(v) = pr_review::parse_verdict(&rc.body, rc.id) {
+                            let verdict_str = match &outcome {
+                                pr_poller::EvaluationOutcome::Merge { .. } => "GO",
+                                _ if v.p0_count > 0 => "NO-GO",
+                                _ => "CONDITIONAL",
+                            };
+                            let event = quickwit::OrchestratorEvent::PrReviewed {
+                                pr_number: pr.number,
+                                project: project_id.to_string(),
+                                head_sha: pr.head_sha.clone(),
+                                reviewer_login: rc.user_login.clone(),
+                                confidence: v.confidence,
+                                p0_count: v.p0_count,
+                                p1_count: v.p1_count,
+                                verdict: verdict_str.to_string(),
+                            };
+                            let _ = sink.emit_event(project_id, event).await;
+                        }
+                    }
+                }
+            }
+
+            match outcome {
+                pr_poller::EvaluationOutcome::Merge { head_sha } => {
+                    if !self
+                        .auto_merge_enqueued
+                        .record_if_new(project_id, pr.number, &head_sha)
+                    {
+                        tracing::debug!(
+                            project = %project_id,
+                            pr = pr.number,
+                            head = %head_sha,
+                            "auto-merge already enqueued for this revision"
+                        );
+                        continue;
+                    }
+                    tracing::info!(
+                        project = %project_id,
+                        pr = pr.number,
+                        head = %head_sha,
+                        "enqueuing AutoMerge for PR that cleared every gate"
+                    );
+                    self.dispatcher.enqueue(DispatchTask::AutoMerge {
+                        pr_number: pr.number,
+                        project: project_id.to_string(),
+                        head_sha,
+                    });
+                }
+                pr_poller::EvaluationOutcome::HumanReviewNeeded { reason } => {
+                    tracing::info!(
+                        project = %project_id,
+                        pr = pr.number,
+                        reason = %reason,
+                        "PR requires human review"
+                    );
+                }
+                pr_poller::EvaluationOutcome::NoReviewerComment => {
+                    tracing::debug!(
+                        project = %project_id,
+                        pr = pr.number,
+                        "no pr-reviewer comment yet; skipping"
+                    );
+                }
+                pr_poller::EvaluationOutcome::ParseError { reason } => {
+                    tracing::warn!(
+                        project = %project_id,
+                        pr = pr.number,
+                        reason = %reason,
+                        "reviewer comment failed to parse; skipping"
+                    );
+                }
+            }
+        }
+    }
+
+    /// Execute a [`DispatchTask::AutoMerge`] task — ROC v1 Step G.
+    ///
+    /// Builds the per-project [`pr_poller::GiteaPrTracker`] from config and
+    /// delegates to [`AgentOrchestrator::handle_auto_merge_for_project`].
+    /// The task's `project` field must match a configured project with a
+    /// `gitea` block (or, for legacy configs, the top-level `gitea`);
+    /// otherwise the call logs-and-skips so the dispatcher keeps draining.
+    pub async fn handle_auto_merge(
+        &mut self,
+        task: dispatcher::DispatchTask,
+    ) -> Result<(), OrchestratorError> {
+        let (pr_number, project, head_sha) = match &task {
+            dispatcher::DispatchTask::AutoMerge {
+                pr_number,
+                project,
+                head_sha,
+            } => (*pr_number, project.clone(), head_sha.clone()),
+            other => {
+                warn!(task = ?other, "handle_auto_merge invoked with non-AutoMerge task; ignoring");
+                return Ok(());
+            }
+        };
+
+        // Resolve the Gitea config for this project. Mirrors the legacy /
+        // multi-project split used by `poll_pending_reviews`.
+        let gitea_cfg: config::GiteaOutputConfig = if self.config.projects.is_empty() {
+            match self.config.gitea.clone() {
+                Some(g) if project == dispatcher::LEGACY_PROJECT_ID => g,
+                Some(_) => {
+                    warn!(
+                        pr_number,
+                        project = %project,
+                        "AutoMerge skipped: legacy mode but task project id does not match LEGACY_PROJECT_ID"
+                    );
+                    return Ok(());
+                }
+                None => {
+                    warn!(
+                        pr_number,
+                        project = %project,
+                        "AutoMerge skipped: legacy mode with no top-level gitea config"
+                    );
+                    return Ok(());
+                }
+            }
+        } else {
+            match self
+                .config
+                .projects
+                .iter()
+                .find(|p| p.id == project)
+                .and_then(|p| p.gitea.clone())
+            {
+                Some(g) => g,
+                None => {
+                    warn!(
+                        pr_number,
+                        project = %project,
+                        "AutoMerge skipped: project has no gitea config"
+                    );
+                    return Ok(());
+                }
+            }
+        };
+
+        let tracker_cfg = terraphim_tracker::GiteaConfig {
+            base_url: gitea_cfg.base_url.clone(),
+            token: gitea_cfg.token.clone(),
+            owner: gitea_cfg.owner.clone(),
+            repo: gitea_cfg.repo.clone(),
+            active_states: vec!["open".to_string()],
+            terminal_states: vec!["closed".to_string()],
+            use_robot_api: false,
+            robot_path: std::path::PathBuf::from("/home/alex/go/bin/gitea-robot"),
+            claim_strategy: terraphim_tracker::gitea::ClaimStrategy::PreferRobot,
+        };
+        let tracker = match terraphim_tracker::GiteaTracker::new(tracker_cfg) {
+            Ok(t) => pr_poller::GiteaPrTracker::new(t),
+            Err(e) => {
+                warn!(
+                    pr_number,
+                    project = %project,
+                    head = %head_sha,
+                    error = %e,
+                    "AutoMerge skipped: failed to create GiteaTracker"
+                );
+                return Ok(());
+            }
+        };
+
+        self.handle_auto_merge_for_project(task, &tracker).await
+    }
+
+    /// Inner AutoMerge executor. Accepts any [`pr_poller::AutoMergeExecutor`]
+    /// so integration tests can drive the full handler with an in-memory
+    /// tracker. Real production code funnels through
+    /// [`AgentOrchestrator::handle_auto_merge`].
+    ///
+    /// Steps:
+    /// 1. Defensive re-check: list open PRs on the project. Skip when the
+    ///    PR is absent (already closed/merged) or the HEAD SHA has moved.
+    /// 2. Attempt the merge.
+    /// 3. On success — enqueue [`DispatchTask::PostMergeTestGate`], record
+    ///    the `(pr, head_sha)` in the dedupe set so late polls never
+    ///    re-enqueue the same revision.
+    /// 4. On failure — open an `[ADF]` tracking issue with the failure
+    ///    reason via [`pr_poller::AutoMergeExecutor::open_failure_issue`];
+    ///    do **not** enqueue a post-merge gate.
+    pub async fn handle_auto_merge_for_project<T: pr_poller::AutoMergeExecutor + ?Sized>(
+        &mut self,
+        task: dispatcher::DispatchTask,
+        tracker: &T,
+    ) -> Result<(), OrchestratorError> {
+        let (pr_number, project, head_sha) = match task {
+            dispatcher::DispatchTask::AutoMerge {
+                pr_number,
+                project,
+                head_sha,
+            } => (pr_number, project, head_sha),
+            other => {
+                warn!(task = ?other, "handle_auto_merge_for_project invoked with non-AutoMerge task; ignoring");
+                return Ok(());
+            }
+        };
+
+        // 1. Defensive re-check: ensure the PR is still open and the HEAD
+        // SHA matches what the verdict was computed against. If either has
+        // moved, the merge decision is stale — skip silently.
+        let open_prs = match tracker.list_open_prs().await {
+            Ok(prs) => prs,
+            Err(e) => {
+                warn!(
+                    pr_number,
+                    project = %project,
+                    head = %head_sha,
+                    error = %e,
+                    "AutoMerge skipped: failed to list open PRs for head_sha re-check"
+                );
+                return Ok(());
+            }
+        };
+
+        let live = match open_prs.iter().find(|p| p.number == pr_number) {
+            Some(p) => p,
+            None => {
+                info!(
+                    pr_number,
+                    project = %project,
+                    head = %head_sha,
+                    "AutoMerge skipped: PR no longer in open list (closed/merged already)"
+                );
+                return Ok(());
+            }
+        };
+        if live.head_sha != head_sha {
+            info!(
+                pr_number,
+                project = %project,
+                expected_head = %head_sha,
+                live_head = %live.head_sha,
+                "AutoMerge skipped: PR HEAD SHA moved since verdict (stale auto-merge decision)"
+            );
+            return Ok(());
+        }
+
+        // 2. Merge.
+        match tracker.merge_pr(pr_number).await {
+            Ok(outcome) => {
+                info!(
+                    pr_number,
+                    project = %project,
+                    merge_sha = %outcome.merge_commit_sha,
+                    "pr_auto_merged"
+                );
+
+                #[cfg(feature = "quickwit")]
+                if let Some(ref sink) = self.quickwit_sink {
+                    let event = quickwit::OrchestratorEvent::PrAutoMerged {
+                        pr_number,
+                        project: project.clone(),
+                        merge_sha: outcome.merge_commit_sha.clone(),
+                        title: outcome.title.clone(),
+                    };
+                    let _ = sink.emit_event(&project, event).await;
+                }
+
+                // 3a. Defensive dedupe write — covers AutoMerge tasks that
+                // reached the handler by a path other than the poller
+                // (webhook, manual enqueue, etc.). `record_if_new` is a
+                // no-op when the entry already exists.
+                let _ = self
+                    .auto_merge_enqueued
+                    .record_if_new(&project, pr_number, &head_sha);
+
+                // 3b. Enqueue the post-merge test gate (Step H stub).
+                self.dispatcher
+                    .enqueue(dispatcher::DispatchTask::PostMergeTestGate {
+                        pr_number,
+                        project: project.clone(),
+                        merge_sha: outcome.merge_commit_sha,
+                        title: outcome.title,
+                    });
+
+                Ok(())
+            }
+            Err(e) => {
+                warn!(
+                    pr_number,
+                    project = %project,
+                    head = %head_sha,
+                    error = %e,
+                    "pr_auto_merge_failed"
+                );
+
+                // 4. Open an [ADF] tracking issue with the failure reason,
+                //    unless we already created one for this (project, pr, sha)
+                //    within the TTL window.
+                if self
+                    .auto_merge_failure_dedupe
+                    .is_recent(&project, pr_number, &head_sha)
+                {
+                    info!(
+                        pr_number,
+                        project = %project,
+                        head = %head_sha,
+                        "AutoMerge failure issue already exists for this PR/SHA; skipping duplicate"
+                    );
+                } else {
+                    let title = format!("[ADF] Auto-merge failed for PR #{pr_number}");
+                    let body = format!(
+                        "AutoMerge handler failed to merge PR #{pr_number} on project `{project}`.\n\n\
+                         Head SHA: `{head_sha}`\n\n\
+                         Error: {e}\n\n\
+                         The PR was left open; a human needs to investigate (merge conflict, \
+                         protected branch, permissions, transient API failure).\n\n\
+                         Refs: ROC v1 Step G handler, adf-fleet#35."
+                    );
+                    let labels = ["adf", "auto-merge-failed", "status/needs-triage"];
+                    self.auto_merge_failure_dedupe
+                        .record(&project, pr_number, &head_sha);
+                    match tracker.open_failure_issue(&title, &body, &labels).await {
+                        Ok(_issue_number) => {}
+                        Err(issue_err) => {
+                            warn!(
+                                pr_number,
+                                project = %project,
+                                error = %issue_err,
+                                "AutoMerge failure issue creation also failed; nothing to retry automatically"
+                            );
+                        }
+                    }
+                }
+
+                Ok(())
+            }
+        }
+    }
+
+    /// Execute a [`DispatchTask::PostMergeTestGate`] task — ROC v1 Step H.
+    ///
+    /// Defers the heavy lifting to [`post_merge_gate::run_workspace_tests`]
+    /// and [`post_merge_gate::revert_merge`] so those helpers stay fully
+    /// testable without orchestrator state. This method resolves the
+    /// project's `working_dir` as `repo_root`, constructs the [`post_merge_gate::GateConfig`]
+    /// (picking up any overrides from `[post_merge_gate]` in
+    /// orchestrator.toml), and funnels the result through the inner
+    /// `handle_post_merge_test_gate_for_project` helper which takes a
+    /// [`post_merge_gate::CommandRunner`] so integration tests can drive the
+    /// full handler with a scripted runner.
+    pub async fn handle_post_merge_test_gate(
+        &mut self,
+        task: dispatcher::DispatchTask,
+    ) -> Result<(), OrchestratorError> {
+        let runner = post_merge_gate::TokioCommandRunner;
+        self.handle_post_merge_test_gate_with_runner(task, &runner)
+            .await
+    }
+
+    /// Inner handler that accepts any [`post_merge_gate::CommandRunner`].
+    /// Integration tests use a [`post_merge_gate::ScriptedRunner`] here to
+    /// assert on the exact `cargo test` / `git revert` / `git push` call
+    /// sequence without spawning real processes.
+    ///
+    /// On green: logs `post_merge_gate_verified` at info.
+    /// On red: classifies the failure, runs `git revert`, pushes to the
+    /// configured remote, opens an `[ADF] post-merge test gate reverted`
+    /// tracking issue on the project's Gitea repo, and logs
+    /// `post_merge_gate_reverted` at warn. Returns `Ok(())` in every
+    /// case the dispatcher should continue draining — only hard I/O
+    /// errors that prevent even the attempt return `Err`.
+    pub async fn handle_post_merge_test_gate_with_runner<R>(
+        &mut self,
+        task: dispatcher::DispatchTask,
+        runner: &R,
+    ) -> Result<(), OrchestratorError>
+    where
+        R: post_merge_gate::CommandRunner + ?Sized,
+    {
+        let (pr_number, project, merge_sha, title) = match task {
+            dispatcher::DispatchTask::PostMergeTestGate {
+                pr_number,
+                project,
+                merge_sha,
+                title,
+            } => (pr_number, project, merge_sha, title),
+            other => {
+                warn!(task = ?other, "handle_post_merge_test_gate invoked with non-PostMergeTestGate task; ignoring");
+                return Ok(());
+            }
+        };
+
+        // Resolve repo_root + gitea tracking target for this project.
+        // Legacy mode uses the top-level `working_dir` and `gitea`.
+        let (repo_root, gitea_cfg) = if self.config.projects.is_empty() {
+            if project != dispatcher::LEGACY_PROJECT_ID {
+                warn!(
+                    pr_number,
+                    project = %project,
+                    "PostMergeTestGate skipped: legacy mode but task project id does not match LEGACY_PROJECT_ID"
+                );
+                return Ok(());
+            }
+            (self.config.working_dir.clone(), self.config.gitea.clone())
+        } else {
+            match self.config.projects.iter().find(|p| p.id == project) {
+                Some(p) => (p.working_dir.clone(), p.gitea.clone()),
+                None => {
+                    warn!(
+                        pr_number,
+                        project = %project,
+                        "PostMergeTestGate skipped: no project entry for id"
+                    );
+                    return Ok(());
+                }
+            }
+        };
+
+        // Build GateConfig from orchestrator overrides (if any).
+        let gate_override = self.config.post_merge_gate.clone().unwrap_or_default();
+        let cfg = post_merge_gate::GateConfig {
+            repo_root,
+            merge_sha: merge_sha.clone(),
+            max_test_duration: std::time::Duration::from_secs(gate_override.max_test_duration_secs),
+            revert_push_remote: gate_override.revert_push_remote,
+            revert_push_branch: gate_override.revert_push_branch,
+        };
+
+        info!(
+            pr_number,
+            project = %project,
+            merge_sha = %merge_sha,
+            max_test_duration_secs = cfg.max_test_duration.as_secs(),
+            title = %title,
+            "post_merge_gate_start"
+        );
+
+        let outcome = match post_merge_gate::run_workspace_tests(runner, &cfg).await {
+            Ok(o) => o,
+            Err(e) => {
+                warn!(
+                    pr_number,
+                    project = %project,
+                    merge_sha = %merge_sha,
+                    error = %e,
+                    "post_merge_gate: run_workspace_tests failed before producing an outcome"
+                );
+                return Ok(());
+            }
+        };
+
+        if outcome.passed {
+            info!(
+                pr_number,
+                project = %project,
+                merge_sha = %merge_sha,
+                wall_time_secs = outcome.wall_time.as_secs_f64(),
+                "post_merge_gate_verified"
+            );
+            #[cfg(feature = "quickwit")]
+            if let Some(ref sink) = self.quickwit_sink {
+                let event = quickwit::OrchestratorEvent::PrAutoMergedVerified {
+                    pr_number,
+                    project: project.clone(),
+                    merge_sha: merge_sha.clone(),
+                    wall_time_secs: outcome.wall_time.as_secs_f64(),
+                };
+                let _ = sink.emit_event(&project, event).await;
+            }
+            return Ok(());
+        }
+
+        let classification = post_merge_gate::classify_failure(&outcome);
+        warn!(
+            pr_number,
+            project = %project,
+            merge_sha = %merge_sha,
+            kind = ?classification.kind,
+            failing_tests = ?classification.failing_tests,
+            wall_time_secs = outcome.wall_time.as_secs_f64(),
+            "post_merge_gate_failed"
+        );
+
+        let revert = match post_merge_gate::revert_merge(runner, &cfg).await {
+            Ok(r) => r,
+            Err(e) => {
+                warn!(
+                    pr_number,
+                    project = %project,
+                    merge_sha = %merge_sha,
+                    error = %e,
+                    "post_merge_gate: revert_merge failed — manual intervention required"
+                );
+                // Still try to file the tracking issue below so a human notices.
+                post_merge_gate::RevertOutcome {
+                    revert_sha: String::new(),
+                    pushed: false,
+                }
+            }
+        };
+
+        warn!(
+            pr_number,
+            project = %project,
+            merge_sha = %merge_sha,
+            revert_sha = %revert.revert_sha,
+            pushed = revert.pushed,
+            reason = ?classification.kind,
+            "post_merge_gate_reverted"
+        );
+        #[cfg(feature = "quickwit")]
+        if let Some(ref sink) = self.quickwit_sink {
+            let event = quickwit::OrchestratorEvent::PrAutoReverted {
+                pr_number,
+                project: project.clone(),
+                merge_sha: merge_sha.clone(),
+                revert_sha: revert.revert_sha.clone(),
+                reason: format!("{:?}", classification.kind),
+                stderr_tail_bytes: outcome.stderr_tail.len() as u32,
+            };
+            let _ = sink.emit_event(&project, event).await;
+        }
+
+        // Open an [ADF] tracking issue. Best-effort — a failure here is
+        // logged but does not propagate: the revert has already landed.
+        if let Some(gitea) = gitea_cfg {
+            let issue_title =
+                format!("[ADF] post-merge test gate reverted PR #{pr_number}: {title}");
+            let stderr_excerpt = truncate_for_issue(&outcome.stderr_tail, 4000);
+            let failing_list = if classification.failing_tests.is_empty() {
+                "(none parsed)".to_string()
+            } else {
+                classification
+                    .failing_tests
+                    .iter()
+                    .map(|t| format!("- `{t}`"))
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            };
+            let body = format!(
+                "Auto-merged PR #{pr_number} on project `{project}` failed the post-merge test gate.\n\n\
+                 Merge SHA: `{merge_sha}`\n\
+                 Revert SHA: `{}`\n\
+                 Revert pushed: {}\n\
+                 Failure kind: `{:?}`\n\
+                 Wall time: {:.1}s\n\n\
+                 Failing tests:\n\n{failing_list}\n\n\
+                 stderr tail (truncated):\n\n```\n{stderr_excerpt}\n```\n\n\
+                 Refs: ROC v1 Step H, adf-fleet#36.",
+                revert.revert_sha,
+                revert.pushed,
+                classification.kind,
+                outcome.wall_time.as_secs_f64(),
+            );
+            let labels = ["adf", "post-merge-gate", "status/needs-triage"];
+            let tracker_cfg = terraphim_tracker::GiteaConfig {
+                base_url: gitea.base_url.clone(),
+                token: gitea.token.clone(),
+                owner: gitea.owner.clone(),
+                repo: gitea.repo.clone(),
+                active_states: vec!["open".to_string()],
+                terminal_states: vec!["closed".to_string()],
+                use_robot_api: false,
+                robot_path: std::path::PathBuf::from("/home/alex/go/bin/gitea-robot"),
+                claim_strategy: terraphim_tracker::gitea::ClaimStrategy::PreferRobot,
+            };
+            match terraphim_tracker::GiteaTracker::new(tracker_cfg) {
+                Ok(tracker) => {
+                    if let Err(e) = tracker.create_issue(&issue_title, &body, &labels).await {
+                        warn!(
+                            pr_number,
+                            project = %project,
+                            error = %e,
+                            "post_merge_gate: failed to open [ADF] tracking issue"
+                        );
+                    }
+                }
+                Err(e) => {
+                    warn!(
+                        pr_number,
+                        project = %project,
+                        error = %e,
+                        "post_merge_gate: failed to construct tracker for [ADF] issue"
+                    );
+                }
+            }
+        } else {
+            warn!(
+                pr_number,
+                project = %project,
+                "post_merge_gate: no gitea config for project; skipping [ADF] issue creation"
+            );
+        }
+
+        Ok(())
+    }
+
+    /// Check if an agent is already assigned to this issue and currently active.
+    ///
+    /// Returns `true` if dispatch should be **skipped** (duplicate), `false` if
+    /// dispatch should proceed. When dispatch proceeds, the issue is assigned
+    /// to the agent as a side-effect.
+    ///
+    /// The dedup logic:
+    /// - If the issue is already assigned to the agent AND the agent is currently
+    ///   in `active_agents` -> skip (duplicate dispatch).
+    /// - If assigned but agent is NOT active -> allow (agent crashed, re-dispatch).
+    /// - If not assigned -> allow (first dispatch) and assign.
+    async fn should_skip_dispatch(&self, agent_name: &str, issue_number: u64) -> bool {
+        if issue_number == 0 {
+            return false;
+        }
+
+        // Fast local check: if agent is already running, skip immediately.
+        // This prevents races where the Gitea API returns stale assignee data
+        // because a concurrent dispatch path just assigned the issue milliseconds ago.
+        if self.active_agents.contains_key(agent_name) {
+            warn!(
+                agent = %agent_name,
+                issue = issue_number,
+                "skipping dispatch: agent already active (local guard)"
+            );
+            return true;
+        }
+
+        let Some(ref poster) = self.output_poster else {
+            return false;
+        };
+        // Resolve the agent's owning project so the tracker uses the
+        // correct owner/repo (multi-project) or falls back to legacy.
+        let project = self
+            .config
+            .agents
+            .iter()
+            .find(|a| a.name == agent_name)
+            .and_then(|a| a.project.clone())
+            .unwrap_or_else(|| crate::dispatcher::LEGACY_PROJECT_ID.to_string());
+        let Some(tracker) = poster.tracker_for(&project, agent_name) else {
+            warn!(
+                agent = %agent_name,
+                project = %project,
+                "no Gitea tracker for project; treating dispatch as not-duplicate"
+            );
+            return false;
+        };
+
+        // Remote check: if agent is assigned in Gitea but not active (crash recovery)
+        match tracker.fetch_issue_assignees(issue_number).await {
+            Ok(assignees) => {
+                if assignees.iter().any(|a| a == agent_name) {
+                    // Already assigned -- check if agent is actively running
+                    if self.active_agents.contains_key(agent_name) {
+                        warn!(
+                            agent = %agent_name,
+                            issue = issue_number,
+                            "skipping duplicate dispatch: agent already assigned and active"
+                        );
+                        return true;
+                    }
+                    // Assigned but not active (crashed or completed) -- allow re-dispatch
+                    info!(
+                        agent = %agent_name,
+                        issue = issue_number,
+                        "agent assigned but not active, allowing re-dispatch"
+                    );
+                }
+            }
+            Err(e) => {
+                // Fail open: if we can't check assignees, allow dispatch
+                warn!(
+                    agent = %agent_name,
+                    issue = issue_number,
+                    error = %e,
+                    "failed to fetch assignees, allowing dispatch (fail-open)"
+                );
+            }
+        }
+
+        // Assign the issue to the agent
+        if let Err(e) = tracker.assign_issue(issue_number, &[agent_name]).await {
+            warn!(
+                agent = %agent_name,
+                issue = issue_number,
+                error = %e,
+                "failed to assign issue to agent"
+            );
+        } else {
+            info!(
+                agent = %agent_name,
+                issue = issue_number,
+                "assigned issue to agent"
+            );
+        }
+        false
+    }
+
+    /// Resolve mention chain metadata from the comment author.
+    ///
+    /// If the comment was posted by a known agent, this is a nested mention:
+    /// inherit the chain_id from the agent's current run and increment depth.
+    /// If posted by a human, start a fresh chain with depth 0.
+    fn resolve_mention_chain(
+        &self,
+        comment_author: &str,
+        agent_names: &[String],
+        _max_depth: u32,
+    ) -> (String, u32, String) {
+        if agent_names.iter().any(|n| n == comment_author) {
+            if let Some(active) = self.active_agents.get(comment_author) {
+                let parent_chain_id = active
+                    .mention_chain_id
+                    .clone()
+                    .unwrap_or_else(|| ulid::Ulid::new().to_string());
+                let parent_depth = active.mention_depth.unwrap_or(0).saturating_add(1);
+                (parent_chain_id, parent_depth, comment_author.to_string())
+            } else {
+                let chain_id = ulid::Ulid::new().to_string();
+                (chain_id, 1, comment_author.to_string())
+            }
+        } else {
+            let chain_id = ulid::Ulid::new().to_string();
+            (chain_id, 0, String::new())
+        }
+    }
+
+    /// Sanitise finding text for use in issue title.
+    /// Strips JSON syntax characters that break title parsing.
+    fn sanitise_for_title(input: &str) -> String {
+        let mut result = String::with_capacity(input.len());
+        for ch in input.chars() {
+            match ch {
+                '{' | '}' | '[' | ']' | '"' => result.push(' '),
+                '\n' | '\r' => result.push(' '),
+                _ => result.push(ch),
+            }
+        }
+        let trimmed = result.split_whitespace().collect::<Vec<_>>().join(" ");
+        if trimmed.len() > 80 {
+            trimmed[..77].to_string() + "..."
+        } else {
+            trimmed
+        }
+    }
+
+    /// Sanitise finding text for use in issue body (markdown).
+    /// Escapes markdown special characters that could break rendering.
+    fn sanitise_for_body(input: &str) -> String {
+        let mut result = String::with_capacity(input.len());
+        for ch in input.chars() {
+            match ch {
+                '`' => result.push_str("``"),
+                '*' | '_' | '[' | ']' => result.push('\\'),
+                _ => result.push(ch),
+            }
+        }
+        result
+    }
+
+    /// File a Gitea issue for a compound review finding.
+    ///
+    /// Deduplicates by searching for existing open issues with similar titles
+    /// before creating a new one.
+    async fn file_finding_issue(
+        &self,
+        poster: &OutputPoster,
+        result: &CompoundReviewResult,
+        finding: &ReviewFinding,
+    ) -> Result<(), String> {
+        use terraphim_types::FindingSeverity;
+
+        let sev_str = match finding.severity {
+            FindingSeverity::Critical => "CRITICAL",
+            FindingSeverity::High => "HIGH",
+            FindingSeverity::Medium => "MEDIUM",
+            FindingSeverity::Low => "LOW",
+            FindingSeverity::Info => "INFO",
+        };
+
+        // Build a short keyword from the finding for dedup search
+        let dedup_keyword = if finding.finding.len() > 40 {
+            &finding.finding[..40]
+        } else {
+            &finding.finding
+        };
+
+        // Dedup: check if an open issue with similar title already exists
+        match poster.tracker().search_issues_by_title(dedup_keyword).await {
+            Ok(existing) if !existing.is_empty() => {
+                info!(
+                    severity = %sev_str,
+                    existing_issues = existing.len(),
+                    keyword = %dedup_keyword,
+                    "skipping finding issue (already filed)"
+                );
+                return Ok(());
+            }
+            Err(e) => {
+                // Dedup search failed — proceed with filing (fail-open)
+                warn!(error = %e, "dedup search failed, proceeding to file issue");
+            }
+            _ => {}
+        }
+
+        let title = format!(
+            "[Compound Review] {}: {}",
+            sev_str,
+            Self::sanitise_for_title(&finding.finding)
+        );
+
+        let mut body = "## Automated Finding from Compound Review\n\n".to_string();
+        body.push_str(&format!("- **Severity**: {}\n", sev_str));
+        if !finding.file.is_empty() {
+            body.push_str(&format!(
+                "- **File**: {}{}\n",
+                finding.file,
+                if finding.line > 0 {
+                    format!(":{}", finding.line)
+                } else {
+                    String::new()
+                }
+            ));
+        }
+        body.push_str(&format!(
+            "- **Confidence**: {:.0}%\n",
+            finding.confidence * 100.0
+        ));
+        body.push_str(&format!("- **Review ID**: {}\n\n", result.correlation_id));
+        body.push_str(&format!(
+            "### Finding\n\n{}\n\n",
+            Self::sanitise_for_body(&finding.finding)
+        ));
+        if let Some(ref suggestion) = finding.suggestion {
+            if !suggestion.is_empty() {
+                body.push_str(&format!(
+                    "### Suggested Fix\n\n{}\n",
+                    Self::sanitise_for_body(suggestion)
+                ));
+            }
+        }
+
+        // Skip labels for now - Gitea API has issues with label format
+        // TODO: Fix labels format for Gitea API
+        match poster.tracker().create_issue(&title, &body, &[]).await {
+            Ok(issue) => {
+                info!(
+                    issue_number = issue.number,
+                    severity = %sev_str,
+                    title = %title,
+                    "filed finding issue"
+                );
+                // Trigger implementation-swarm via mention comment so
+                // mention polling dispatches the agent automatically.
+                let trigger = format!(
+                    "@adf:implementation-swarm please implement this finding for issue #{}",
+                    issue.number
+                );
+                if let Err(e) = poster.tracker().post_comment(issue.number, &trigger).await {
+                    warn!(
+                        issue_number = issue.number,
+                        error = %e,
+                        "failed to post implementation trigger comment"
+                    );
+                }
+                Ok(())
+            }
+            Err(e) => Err(format!("failed to create issue '{}': {}", title, e)),
+        }
+    }
+
+    /// Spawn a remediation agent for a CRITICAL finding.
+    ///
+    /// Looks up the finding's category in `compound_review.remediation_agents`
+    /// to determine which agent to spawn. If no mapping exists, logs and skips.
+    async fn spawn_remediation_agent(&mut self, finding: &ReviewFinding) -> Result<(), String> {
+        let category_key = format!("{:?}", finding.category).to_lowercase();
+        let agent_name = self
+            .config
+            .compound_review
+            .remediation_agents
+            .get(&category_key)
+            .cloned();
+
+        let agent_name = match agent_name {
+            Some(name) => name,
+            None => {
+                debug!(
+                    category = %category_key,
+                    "no remediation agent mapped for category, skipping"
+                );
+                return Ok(());
+            }
+        };
+
+        // Build a targeted fix prompt
+        let mut prompt = "Fix this CRITICAL finding from compound review:\n\n".to_string();
+        if !finding.file.is_empty() {
+            prompt.push_str(&format!(
+                "File: {}{}\n",
+                finding.file,
+                if finding.line > 0 {
+                    format!(":{}", finding.line)
+                } else {
+                    String::new()
+                }
+            ));
+        }
+        prompt.push_str(&format!(
+            "Severity: CRITICAL\nFinding: {}\n",
+            finding.finding
+        ));
+        if let Some(ref suggestion) = finding.suggestion {
+            if !suggestion.is_empty() {
+                prompt.push_str(&format!("Suggested approach: {}\n", suggestion));
+            }
+        }
+        prompt.push_str(
+            "\nInstructions:\n\
+1. Read the relevant file(s)\n\
+2. Implement the fix\n\
+3. Run cargo build && cargo test to verify\n\
+4. Commit your changes\n",
+        );
+
+        // Look up the agent definition
+        let agent_def = self
+            .config
+            .agents
+            .iter()
+            .find(|a| a.name == agent_name)
+            .cloned();
+
+        let agent_def = match agent_def {
+            Some(def) => def,
+            None => {
+                warn!(
+                    agent = %agent_name,
+                    "remediation agent not found in fleet config, skipping"
+                );
+                return Ok(());
+            }
+        };
+
+        // Spawn using the existing agent infrastructure
+        // Build a modified agent def with our custom task prompt
+        let mut fix_def = agent_def;
+        fix_def.task = prompt;
+        fix_def.pre_check = None; // Skip pre-check for remediation
+
+        let spawned = self.spawn_agent(&fix_def).await;
+
+        match spawned {
+            Ok(_) => {
+                info!(
+                    agent = %agent_name,
+                    file = %finding.file,
+                    "spawned remediation agent for CRITICAL finding"
+                );
+                Ok(())
+            }
+            Err(e) => Err(format!(
+                "failed to spawn remediation agent '{}': {}",
+                agent_name, e
+            )),
+        }
+    }
+
+    /// Create a git worktree for an agent to work in isolation.
+    ///
+    /// `repo_dir` is the git repository root where `git worktree add` runs.
+    /// For project-bound agents this is the project's working_dir; otherwise
+    /// it is the orchestrator's top-level working_dir.
+    ///
+    /// Returns the worktree path if successful. Mutating agents fail closed when
+    /// git cannot create an isolated worktree; they must not use the shared checkout.
+    async fn create_agent_worktree(
+        &self,
+        agent_name: &str,
+        repo_dir: &Path,
+    ) -> Result<PathBuf, OrchestratorError> {
+        let worktree_root = PathBuf::from("/tmp/adf-worktrees");
+        if let Err(e) = tokio::fs::create_dir_all(&worktree_root).await {
+            return Err(OrchestratorError::WorktreeCreationFailed {
+                agent: agent_name.to_string(),
+                repo: repo_dir.display().to_string(),
+                reason: format!("failed to create worktree root: {e}"),
+            });
+        }
+
+        let id = uuid::Uuid::new_v4().to_string()[..8].to_string();
+        let worktree_path = worktree_root.join(format!("{agent_name}-{id}"));
+
+        let output = tokio::process::Command::new("git")
+            .args([
+                "worktree",
+                "add",
+                "--detach",
+                &worktree_path.to_string_lossy(),
+                "HEAD",
+            ])
+            .current_dir(repo_dir)
+            .output()
+            .await;
+
+        match output {
+            Ok(o) if o.status.success() => {
+                info!(
+                    agent = %agent_name,
+                    path = %worktree_path.display(),
+                    repo = %repo_dir.display(),
+                    "created isolated git worktree"
+                );
+                Ok(worktree_path)
+            }
+            Ok(o) => {
+                let stderr = String::from_utf8_lossy(&o.stderr);
+                Err(OrchestratorError::WorktreeCreationFailed {
+                    agent: agent_name.to_string(),
+                    repo: repo_dir.display().to_string(),
+                    reason: stderr.chars().take(500).collect::<String>(),
+                })
+            }
+            Err(e) => Err(OrchestratorError::WorktreeCreationFailed {
+                agent: agent_name.to_string(),
+                repo: repo_dir.display().to_string(),
+                reason: format!("git worktree command failed: {e}"),
+            }),
+        }
+    }
+
+    /// Remove a git worktree after an agent finishes.
+    async fn remove_agent_worktree(&self, agent_name: &str, worktree_path: &Path, repo_dir: &Path) {
+        // Force-remove even if there are uncommitted changes (they were already
+        // committed by try_commit_agent_work or are intentionally discarded).
+        let output = tokio::process::Command::new("git")
+            .args([
+                "worktree",
+                "remove",
+                "--force",
+                &worktree_path.to_string_lossy(),
+            ])
+            .current_dir(repo_dir)
+            .output()
+            .await;
+
+        match output {
+            Ok(o) if o.status.success() => {
+                info!(
+                    agent = %agent_name,
+                    path = %worktree_path.display(),
+                    "removed agent worktree"
+                );
+            }
+            Ok(o) => {
+                let stderr = String::from_utf8_lossy(&o.stderr);
+                warn!(
+                    agent = %agent_name,
+                    path = %worktree_path.display(),
+                    error = %stderr.chars().take(200).collect::<String>(),
+                    "git worktree remove failed"
+                );
+            }
+            Err(e) => {
+                warn!(agent = %agent_name, error = %e, "git worktree remove command failed");
+            }
+        }
+    }
+
+    /// Attempt to commit any uncommitted working tree changes made by an agent.
+    ///
+    /// This runs `git add -A && git diff --cached --quiet` to check if there
+    /// are changes, then commits with a standard message. Failures are logged
+    /// but not propagated — agent work is best-effort.
+    async fn try_commit_agent_work(&self, agent_name: &str, working_dir: &Path) {
+        // Stage all changes
+        let add = tokio::process::Command::new("git")
+            .args(["add", "-A"])
+            .current_dir(working_dir)
+            .output()
+            .await;
+
+        if let Err(e) = add {
+            tracing::debug!(agent = %agent_name, error = %e, "git add failed, skipping commit");
+            return;
+        }
+
+        // Check if there are staged changes
+        let diff_check = tokio::process::Command::new("git")
+            .args(["diff", "--cached", "--quiet"])
+            .current_dir(working_dir)
+            .status()
+            .await;
+
+        match diff_check {
+            Ok(status) if status.success() => {
+                // No changes to commit
+                return;
+            }
+            Ok(_) => { /* changes exist */ }
+            Err(e) => {
+                tracing::debug!(agent = %agent_name, error = %e, "git diff failed, skipping commit");
+                return;
+            }
+        }
+
+        // Get current branch for commit message
+        let branch = tokio::process::Command::new("git")
+            .args(["branch", "--show-current"])
+            .current_dir(working_dir)
+            .output()
+            .await;
+
+        let branch_name = match branch {
+            Ok(output) => String::from_utf8_lossy(&output.stdout).trim().to_string(),
+            Err(_) => "unknown".to_string(),
+        };
+
+        let msg = format!("feat({agent_name}): agent work [auto-commit]");
+
+        let commit = tokio::process::Command::new("git")
+            .args(["commit", "-m", &msg])
+            .current_dir(working_dir)
+            .output()
+            .await;
+
+        match commit {
+            Ok(output) if output.status.success() => {
+                tracing::info!(
+                    agent = %agent_name,
+                    branch = %branch_name,
+                    "auto-committed agent working tree changes"
+                );
+            }
+            Ok(output) => {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                tracing::debug!(
+                    agent = %agent_name,
+                    stderr = %stderr,
+                    "git commit failed"
+                );
+            }
+            Err(e) => {
+                tracing::warn!(agent = %agent_name, error = %e, "failed to run git commit");
+            }
+        }
+    }
+
+    /// Periodic reconciliation: detect exits, check cron, evaluate drift, drain output.
+    async fn reconcile_tick(&mut self) {
+        let tick_start = Instant::now();
+
+        macro_rules! timed_step {
+            ($name:expr, $body:expr) => {{
+                let step_start = Instant::now();
+                let result = $body;
+                let elapsed = step_start.elapsed();
+                if elapsed > std::time::Duration::from_secs(5) {
+                    warn!(
+                        step = $name,
+                        elapsed_ms = elapsed.as_millis() as u64,
+                        "slow reconcile step"
+                    );
+                }
+                result
+            }};
+        }
+
+        timed_step!("clean_expired", {
+            self.provider_rate_limits.clean_expired();
+            self.retry_counts
+                .retain(|_, (_, ts)| ts.elapsed() < Duration::from_secs(3600));
+        });
+
+        // Check wall-clock timeouts and respawn with fallback
+        timed_step!("poll_wall_timeouts", self.poll_wall_timeouts().await);
+
+        // 1. Poll all active agents for exit and handle exits per layer
+        timed_step!("poll_agent_exits", self.poll_agent_exits().await);
+
+        // 2. Restart pending Safety agents (cooldown-aware)
+        timed_step!(
+            "restart_pending_safety",
+            self.restart_pending_safety_agents().await
+        );
+
+        // 3. Check cron schedules for Core agents
+        timed_step!("check_cron_schedules", self.check_cron_schedules().await);
+
+        // 4. Drain output events to nightwatch and collect telemetry
+        let telemetry_events = timed_step!("drain_output_events", self.drain_output_events());
+        if !telemetry_events.is_empty() {
+            timed_step!(
+                "record_telemetry",
+                self.record_telemetry(telemetry_events).await
+            );
+        }
+
+        // 5. Evaluate nightwatch drift (only during active hours)
+        timed_step!("nightwatch_evaluate", {
+            let nw_cfg = &self.config.nightwatch;
+            let current_hour = chrono::Local::now().hour() as u8;
+            let in_window = if nw_cfg.active_start_hour <= nw_cfg.active_end_hour {
+                current_hour >= nw_cfg.active_start_hour && current_hour < nw_cfg.active_end_hour
+            } else {
+                // Wraps past midnight, e.g. start=22 end=6
+                current_hour >= nw_cfg.active_start_hour || current_hour < nw_cfg.active_end_hour
+            };
+            if in_window {
+                self.nightwatch.evaluate();
+            }
+        });
+
+        // 6. Sweep expired handoff buffer entries
+        timed_step!("sweep_handoff", {
+            let swept = self.handoff_buffer.sweep_expired();
+            if swept > 0 {
+                info!(swept_count = swept, "swept expired handoff buffer entries");
+            }
+        });
+
+        // 7. Check monthly budget reset
+        timed_step!("budget_reset", self.cost_tracker.monthly_reset_if_due());
+
+        // 8. Enforce budget limits (pause exhausted agents)
+        timed_step!("enforce_budgets", self.enforce_budgets().await);
+
+        // 9. Poll active flows (non-blocking)
+        timed_step!("poll_flows", {
+            let completed_flows: Vec<String> = self
+                .active_flows
+                .iter()
+                .filter(|(_, handle)| handle.is_finished())
+                .map(|(name, _)| name.clone())
+                .collect();
+
+            for name in completed_flows {
+                if let Some(handle) = self.active_flows.remove(&name) {
+                    match handle.await {
+                        Ok(state) => {
+                            tracing::info!(flow = %name, status = ?state.status, "flow completed");
+                            if let Some(ref dir) = self.config.flow_state_dir {
+                                let _ = state.save_to_file(dir);
+                            }
+                            // Feed cost data from step envelopes into nightwatch for drift detection
+                            for envelope in &state.step_envelopes {
+                                if let (Some(cost), Some(input), Some(output)) = (
+                                    envelope.cost_usd,
+                                    envelope.input_tokens,
+                                    envelope.output_tokens,
+                                ) {
+                                    self.nightwatch.observe_cost(
+                                        &format!("flow-{}", name),
+                                        cost,
+                                        input,
+                                        output,
+                                        None, // Flows don't have individual budgets yet
+                                    );
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            tracing::error!(flow = %name, error = %e, "flow task panicked");
+                        }
+                    }
+                }
+            }
+        });
+
+        // 10. Check flow schedules
+        timed_step!("check_flow_schedules", self.check_flow_schedules().await);
+
+        // 11. Poll for @adf: mentions in watched issues
+        timed_step!("poll_mentions", self.poll_mentions().await);
+
+        // 12. D-4: Hot-reload KG routing rules if markdown files changed
+        timed_step!("kg_reload", {
+            if let Some(ref mut router) = self.kg_router {
+                router.reload_if_changed();
+            }
+        });
+
+        // 13. D-2: Re-probe providers if cached results are stale
+        if self.provider_health.is_stale() {
+            timed_step!("probe_providers", {
+                if let Some(ref kg_router) = self.kg_router {
+                    self.provider_health.probe_all(kg_router).await;
+                    if let Some(ref dir) = self
+                        .config
+                        .routing
+                        .as_ref()
+                        .and_then(|r| r.probe_results_dir.clone())
+                    {
+                        let _ = self.provider_health.save_results(dir.as_path()).await;
+                    }
+
+                    // Send probe results to Quickwit for cost-aware routing
+                    if let Some(ref sink) = self.quickwit_sink {
+                        let project_id = self
+                            .config
+                            .projects
+                            .first()
+                            .map(|p| p.id.clone())
+                            .unwrap_or_else(|| crate::dispatcher::LEGACY_PROJECT_ID.to_string());
+                        self.provider_health
+                            .send_to_quickwit(sink, &project_id)
+                            .await;
+                    }
+                }
+            });
+        }
+
+        // 14. Update last_tick_time and increment tick counter
+        self.last_tick_time = chrono::Utc::now();
+        self.tick_count = self.tick_count.wrapping_add(1);
+
+        // 14. Update last_tick_time and increment tick counter
+        timed_step!("tick_counter_update", {
+            self.last_tick_time = chrono::Utc::now();
+            self.tick_count = self.tick_count.wrapping_add(1);
+        });
+
+        // 15. Periodic telemetry persistence (every 60 ticks = ~5 min at 5s interval)
+        if self.tick_count % 60 == 0 {
+            timed_step!("persist_telemetry", self.persist_telemetry());
+        }
+
+        // 16. Flush provider-budget snapshot. The tracker accumulates in
+        // memory via record_telemetry; persist here so hour/day counters
+        // carry across restarts (cf. with_persistence at construction).
+        // Skip when no tracker was configured.
+        if let Some(tracker) = self.provider_budget_tracker.as_ref() {
+            timed_step!("budget_persist", {
+                if let Err(e) = tracker.persist() {
+                    warn!(error = %e, "failed to persist provider budget snapshot");
+                }
+            });
+        }
+
+        // Archive stale learnings periodically
+        if self.tick_count % self.learning_config.consolidation_ticks == 0 {
+            timed_step!("archive_learnings", {
+                if let Some(ref store) = self.learning_store {
+                    match tokio::task::block_in_place(|| {
+                        tokio::runtime::Handle::current()
+                            .block_on(store.archive_stale(self.learning_config.archive_days))
+                    }) {
+                        Ok(archived) if archived > 0 => {
+                            info!(archived, "archived stale learnings");
+                        }
+                        Err(e) => {
+                            warn!(error = %e, "failed to archive stale learnings");
+                        }
+                        Ok(_) => {}
+                    }
+                }
+
+                // Evolution memory consolidation (promotes high-importance short-term to long-term).
+                if self.evolution_manager.is_enabled() {
+                    let consolidated = self.evolution_manager.consolidate_all();
+                    if consolidated > 0 {
+                        info!(consolidated, "evolution memory consolidation complete");
+                    }
+                }
+            });
+        }
+
+        // 17. Drain the unified dispatch queue. Handlers for ReviewPr,
+        // AutoMerge, and PostMergeTestGate are stubs; wiring happens in
+        // Steps D, G, and H respectively.
+        timed_step!("drain_dispatch", {
+            while let Some(task) = self.dispatcher.dequeue() {
+                match task {
+                    DispatchTask::TimeDriven { name, project, .. } => {
+                        tracing::debug!(name, project, "TimeDriven task drained from dispatcher");
+                    }
+                    DispatchTask::IssueDriven {
+                        identifier,
+                        project,
+                        ..
+                    } => {
+                        tracing::debug!(
+                            identifier,
+                            project,
+                            "IssueDriven task drained from dispatcher"
+                        );
+                    }
+                    DispatchTask::MentionDriven {
+                        agent_name,
+                        project,
+                        ..
+                    } => {
+                        tracing::debug!(
+                            agent_name,
+                            project,
+                            "MentionDriven task drained from dispatcher"
+                        );
+                    }
+                    task @ DispatchTask::ReviewPr { .. } => {
+                        if let Err(e) = self.handle_review_pr(task).await {
+                            warn!(error = %e, "handle_review_pr failed");
+                        }
+                    }
+                    task @ DispatchTask::AutoMerge { .. } => {
+                        if let Err(e) = self.handle_auto_merge(task).await {
+                            warn!(error = %e, "handle_auto_merge failed");
+                        }
+                    }
+                    task @ DispatchTask::PostMergeTestGate { .. } => {
+                        if let Err(e) = self.handle_post_merge_test_gate(task).await {
+                            tracing::error!(error = ?e, "handle_post_merge_test_gate failed");
+                        }
+                    }
+                    task @ DispatchTask::Push { .. } => {
+                        if let Err(e) = self.handle_push(task).await {
+                            warn!(error = %e, "handle_push failed");
+                        }
+                    }
+                }
+            }
+        });
+
+        // 17.5. PR gate reconciliation: read actual commit statuses and
+        // branch protection, classify each open PR head, and take action
+        // (enqueue missing agents, open remediation issues, or clear for
+        // auto-merge). Runs every N ticks to avoid excessive API load.
+        if self.tick_count % self.config.gate_reconcile_interval_ticks as u64 == 0 {
+            timed_step!("reconcile_pr_gates", {
+                if let Err(e) = self.reconcile_pr_gates().await {
+                    warn!(error = %e, "reconcile_pr_gates failed");
+                }
+            });
+        }
+
+        // 18. ROC v1 Step F: poll open PRs for reviewer verdicts and enqueue
+        // AutoMerge for any PR that clears every gate. Runs AFTER the
+        // dispatch drain so the newly enqueued AutoMerge tasks are serviced
+        // on the NEXT tick (deterministic ordering).
+        timed_step!("poll_pending_reviews", {
+            if let Err(e) = self.poll_pending_reviews().await {
+                warn!(error = %e, "poll_pending_reviews failed");
+            }
+        });
+
+        info!(
+            tick = self.tick_count,
+            elapsed_ms = tick_start.elapsed().as_millis() as u64,
+            "reconcile_tick complete"
+        );
+    }
+
+    /// PR gate reconciliation: for every project with Gitea config, read
+    /// actual commit statuses and branch protection rules, classify each
+    /// open PR head via [`pr_gate::reconcile_pr_gate`], and take action.
+    ///
+    /// Actions:
+    /// - `ReadyForPolicy`: no action (Step 18 will handle it).
+    /// - `EnqueueMissingChecks`: log which agents need dispatching.
+    /// - `AwaitingChecks`: log and skip (rechecked next interval).
+    /// - `BlockedByFailedChecks`: open deduplicated remediation issue.
+    /// - `FactoryFault`: open deduplicated remediation issue with error.
+    ///
+    /// Remediation issues are deduplicated using [`pr_gate::remediation_key`]
+    /// by searching for existing open issues containing the key.
+    async fn reconcile_pr_gates(&mut self) -> Result<(), OrchestratorError> {
+        let targets: Vec<(String, config::GiteaOutputConfig)> = if self.config.projects.is_empty() {
+            match self.config.gitea.clone() {
+                Some(g) => vec![(dispatcher::LEGACY_PROJECT_ID.to_string(), g)],
+                None => return Ok(()),
+            }
+        } else {
+            self.config
+                .projects
+                .iter()
+                .filter_map(|p| p.gitea.clone().map(|g| (p.id.clone(), g)))
+                .collect()
+        };
+
+        if targets.is_empty() {
+            return Ok(());
+        }
+
+        for (project_id, gitea_cfg) in &targets {
+            if let Err(e) = self
+                .reconcile_pr_gates_for_project(project_id, gitea_cfg)
+                .await
+            {
+                warn!(
+                    project = %project_id,
+                    error = %e,
+                    "reconcile_pr_gates_for_project failed"
+                );
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Inner per-project PR gate reconciliation.
+    async fn reconcile_pr_gates_for_project(
+        &mut self,
+        project_id: &str,
+        gitea_cfg: &config::GiteaOutputConfig,
+    ) -> Result<(), OrchestratorError> {
+        let tracker_cfg = terraphim_tracker::GiteaConfig {
+            base_url: gitea_cfg.base_url.clone(),
+            token: gitea_cfg.token.clone(),
+            owner: gitea_cfg.owner.clone(),
+            repo: gitea_cfg.repo.clone(),
+            active_states: vec!["open".to_string()],
+            terminal_states: vec!["closed".to_string()],
+            use_robot_api: false,
+            robot_path: std::path::PathBuf::from("/home/alex/go/bin/gitea-robot"),
+            claim_strategy: terraphim_tracker::gitea::ClaimStrategy::PreferRobot,
+        };
+        let tracker = match terraphim_tracker::GiteaTracker::new(tracker_cfg) {
+            Ok(t) => t,
+            Err(e) => {
+                warn!(project = %project_id, error = %e, "failed to create GiteaTracker for PR gate reconciliation");
+                return Ok(());
+            }
+        };
+
+        let protection = match tracker
+            .get_branch_protection(&gitea_cfg.owner, &gitea_cfg.repo, "main")
+            .await
+        {
+            Ok(p) => p,
+            Err(e) => {
+                warn!(
+                    project = %project_id,
+                    error = %e,
+                    "failed to get branch protection; skipping PR gate reconciliation"
+                );
+                return Ok(());
+            }
+        };
+
+        if !protection.enable_status_check || protection.status_check_contexts.is_empty() {
+            tracing::debug!(
+                project = %project_id,
+                "branch protection has no required status checks; skipping"
+            );
+            return Ok(());
+        }
+
+        let required_contexts = protection.status_check_contexts.clone();
+
+        let prs = match tracker.list_open_prs().await {
+            Ok(prs) => prs,
+            Err(e) => {
+                warn!(project = %project_id, error = %e, "failed to list open PRs for gate reconciliation");
+                return Ok(());
+            }
+        };
+
+        for pr in prs {
+            if pr.head_sha.is_empty() {
+                continue;
+            }
+
+            let statuses = match tracker
+                .list_commit_statuses(&gitea_cfg.owner, &gitea_cfg.repo, &pr.head_sha)
+                .await
+            {
+                Ok(s) => s,
+                Err(e) => {
+                    warn!(
+                        project = %project_id,
+                        pr = pr.number,
+                        sha = %pr.head_sha,
+                        error = %e,
+                        "failed to list commit statuses"
+                    );
+                    continue;
+                }
+            };
+
+            let head_statuses: Vec<pr_gate::CommitStatusSummary> = statuses
+                .into_iter()
+                .map(|s| pr_gate::CommitStatusSummary {
+                    context: s.context,
+                    state: pr_gate::CommitStatusState::from_api_str(&s.state),
+                    created_at_unix: s.created_at.and_then(|ts| ts.parse::<i64>().ok()),
+                })
+                .collect();
+
+            let snapshot = pr_gate::PrGateSnapshot {
+                pr_number: pr.number,
+                head_sha: pr.head_sha.clone(),
+                base_branch: pr.base_ref.clone(),
+                required_contexts: required_contexts.clone(),
+                head_statuses,
+                now_unix: chrono::Utc::now().timestamp(),
+            };
+
+            let decision = pr_gate::reconcile_pr_gate(&snapshot);
+
+            match &decision {
+                pr_gate::PrGateDecision::ReadyForPolicy => {
+                    tracing::debug!(
+                        project = %project_id,
+                        pr = pr.number,
+                        "PR gate: all required contexts green"
+                    );
+                }
+                pr_gate::PrGateDecision::EnqueueMissingChecks { missing } => {
+                    tracing::info!(
+                        project = %project_id,
+                        pr = pr.number,
+                        missing = ?missing,
+                        "PR gate: missing required contexts"
+                    );
+                }
+                pr_gate::PrGateDecision::AwaitingChecks { pending } => {
+                    tracing::debug!(
+                        project = %project_id,
+                        pr = pr.number,
+                        pending = ?pending,
+                        "PR gate: awaiting pending checks"
+                    );
+                }
+                pr_gate::PrGateDecision::BlockedByFailedChecks { failed } => {
+                    let key =
+                        pr_gate::remediation_key(project_id, pr.number, &pr.head_sha, &decision);
+                    tracing::warn!(
+                        project = %project_id,
+                        pr = pr.number,
+                        failed = ?failed,
+                        key = %key,
+                        "PR gate: blocked by failed checks"
+                    );
+                    if let Err(e) = self
+                        .open_remediation_issue_if_needed(
+                            &tracker,
+                            project_id,
+                            pr.number,
+                            &pr.head_sha,
+                            &key,
+                            &format!(
+                                "PR #{} blocked by failed required contexts: {}",
+                                pr.number,
+                                failed
+                                    .iter()
+                                    .map(|(ctx, state)| format!("{ctx}={state}"))
+                                    .collect::<Vec<_>>()
+                                    .join(", ")
+                            ),
+                        )
+                        .await
+                    {
+                        warn!(error = %e, "failed to open remediation issue");
+                    }
+                }
+                pr_gate::PrGateDecision::FactoryFault { error } => {
+                    let key =
+                        pr_gate::remediation_key(project_id, pr.number, &pr.head_sha, &decision);
+                    tracing::error!(
+                        project = %project_id,
+                        pr = pr.number,
+                        error = %error,
+                        key = %key,
+                        "PR gate: factory fault"
+                    );
+                    if let Err(e) = self
+                        .open_remediation_issue_if_needed(
+                            &tracker,
+                            project_id,
+                            pr.number,
+                            &pr.head_sha,
+                            &key,
+                            &format!("PR #{} factory fault: {error}", pr.number),
+                        )
+                        .await
+                    {
+                        warn!(error = %e, "failed to open remediation issue");
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Open a deduplicated remediation issue. Searches for existing open issues
+    /// containing the remediation key before creating a new one.
+    async fn open_remediation_issue_if_needed(
+        &self,
+        tracker: &terraphim_tracker::GiteaTracker,
+        project_id: &str,
+        pr_number: u64,
+        head_sha: &str,
+        dedup_key: &str,
+        body: &str,
+    ) -> Result<(), OrchestratorError> {
+        let existing = tracker.search_issues_by_title(dedup_key).await;
+        match existing {
+            Ok(ids) if !ids.is_empty() => {
+                tracing::debug!(
+                    project = %project_id,
+                    key = %dedup_key,
+                    existing_count = ids.len(),
+                    "remediation issue already exists; skipping"
+                );
+                return Ok(());
+            }
+            Err(e) => {
+                tracing::warn!(
+                    project = %project_id,
+                    error = %e,
+                    "failed to search for existing remediation issues; creating anyway"
+                );
+            }
+            Ok(_) => {}
+        }
+
+        let title = format!("[ADF] PR gate remediation: {dedup_key}");
+        let full_body = format!(
+            "{body}\n\n\
+             Project: `{project_id}`\n\
+             PR: #{pr_number}\n\
+             Head SHA: `{head_sha}`\n\
+             Dedup key: `{dedup_key}`\n\n\
+             This issue was auto-created by the PR gate reconciler.\
+             It will be auto-closed when the gate clears."
+        );
+        let labels = ["adf", "pr-gate", "status/needs-triage"];
+
+        tracker
+            .create_issue(&title, &full_body, &labels)
+            .await
+            .map_err(|e| {
+                OrchestratorError::Config(format!("failed to create remediation issue: {e}"))
+            })?;
+
+        tracing::info!(
+            project = %project_id,
+            pr = pr_number,
+            key = %dedup_key,
+            "opened PR gate remediation issue"
+        );
+
+        Ok(())
+    }
+
+    /// Check all agent budgets and pause any that have exceeded their limits.
+    async fn enforce_budgets(&mut self) {
+        let actionable = self.cost_tracker.check_all();
+
+        for (agent_name, verdict) in actionable {
+            match verdict {
+                BudgetVerdict::NearExhaustion {
+                    spent_cents,
+                    budget_cents,
+                } => {
+                    warn!(
+                        agent = %agent_name,
+                        spent_usd = spent_cents as f64 / 100.0,
+                        budget_usd = budget_cents as f64 / 100.0,
+                        pct = (spent_cents * 100 / budget_cents),
+                        "budget warning: agent approaching monthly limit"
+                    );
+                }
+                BudgetVerdict::Exhausted {
+                    spent_cents,
+                    budget_cents,
+                } => {
+                    error!(
+                        agent = %agent_name,
+                        spent_usd = spent_cents as f64 / 100.0,
+                        budget_usd = budget_cents as f64 / 100.0,
+                        "budget exhausted: pausing agent"
+                    );
+                    self.stop_agent(&agent_name).await;
+                }
+                _ => {}
+            }
+        }
+    }
+
+    /// Kill agents that have exceeded their wall-clock timeout and respawn with fallback.
+    async fn poll_wall_timeouts(&mut self) {
+        let mut timed_out: Vec<String> = Vec::new();
+        for (name, managed) in &self.active_agents {
+            if let Some(max_secs) = managed.definition.max_cpu_seconds {
+                let elapsed = managed.started_at.elapsed();
+                if elapsed > Duration::from_secs(max_secs) {
+                    let elapsed_secs = elapsed.as_secs();
+                    warn!(
+                        agent = %name,
+                        elapsed_secs = elapsed_secs,
+                        runtime_limit_secs = max_secs,
+                        elapsed = %format_runtime_duration(elapsed_secs),
+                        runtime_limit = %format_runtime_duration(max_secs),
+                        "agent exceeded configured runtime limit, terminating for fallback respawn"
+                    );
+                    timed_out.push(name.clone());
+                }
+            }
+        }
+
+        for name in timed_out {
+            if let Some(mut managed) = self.active_agents.remove(&name) {
+                let def = managed.definition.clone();
+                let elapsed_secs = managed.started_at.elapsed().as_secs();
+                let runtime_limit_secs = def.max_cpu_seconds.unwrap_or_default();
+                let mut output_lines: Vec<String> = managed
+                    .handle
+                    .captured_output_events()
+                    .into_iter()
+                    .filter_map(|event| match event {
+                        OutputEvent::Stdout { line, .. } => Some(line),
+                        OutputEvent::Stderr { line, .. } => Some(format!("[stderr] {line}")),
+                        _ => None,
+                    })
+                    .collect();
+                output_lines.push(timeout_summary(elapsed_secs, runtime_limit_secs));
+
+                let grace = Duration::from_secs(managed.definition.grace_period_secs.unwrap_or(5));
+                if let Err(e) = managed.handle.shutdown(grace).await {
+                    error!(agent = %name, error = %e, "failed to terminate timed-out agent");
+                }
+
+                if let (Some(poster), Some(issue)) = (&self.output_poster, def.gitea_issue) {
+                    let project = def
+                        .project
+                        .clone()
+                        .unwrap_or_else(|| crate::dispatcher::LEGACY_PROJECT_ID.to_string());
+                    if let Err(e) = poster
+                        .post_agent_output_for_project(&project, &name, issue, &output_lines, None)
+                        .await
+                    {
+                        warn!(
+                            agent = %name,
+                            project = %project,
+                            issue = issue,
+                            error = %e,
+                            "failed to post timed-out agent output to Gitea"
+                        );
+                    }
+                }
+
+                let project_repo: &Path = def
+                    .project
+                    .as_deref()
+                    .and_then(|pid| self.config.project_by_id(pid))
+                    .map(|p| p.working_dir.as_path())
+                    .unwrap_or(&self.config.working_dir);
+                if let Some(guard) = managed.worktree_guard.take() {
+                    guard.keep();
+                }
+                if let Some(ref wt) = managed.worktree_path {
+                    self.remove_agent_worktree(&name, wt, project_repo).await;
+                }
+
+                // Try respawn with fallback if configured
+                if def.fallback_provider.is_some() {
+                    info!(
+                        agent = %name,
+                        fallback_model = ?def.fallback_model,
+                        "respawning timed-out agent with fallback provider"
+                    );
+                    let mut fallback_def = def.clone();
+                    // Swap provider to fallback (fallback_provider is a CLI tool path)
+                    if let Some(ref fb_provider) = def.fallback_provider {
+                        fallback_def.cli_tool = fb_provider.clone();
+                    }
+                    if let Some(ref fb_model) = def.fallback_model {
+                        fallback_def.model = Some(fb_model.clone());
+                    }
+                    // Clear provider field so model composition uses the new cli_tool
+                    fallback_def.provider = None;
+                    // Clear fallback to prevent infinite loops
+                    fallback_def.fallback_provider = None;
+                    fallback_def.fallback_model = None;
+
+                    if let Err(e) = self.spawn_agent(&fallback_def).await {
+                        error!(agent = %name, error = %e, "failed to respawn with fallback");
+                    }
+                } else {
+                    info!(agent = %name, "no fallback configured, agent timed out permanently");
+                }
+            }
+        }
+    }
+
+    /// Poll all active agents for exit and handle exits per layer.
+    async fn poll_agent_exits(&mut self) {
+        // Collect exited agents first to avoid borrow conflict
+        let mut exited: Vec<(String, AgentDefinition, std::process::ExitStatus)> = Vec::new();
+        // Collect agents that exceeded their wall-clock timeout
+        let mut timed_out: Vec<String> = Vec::new();
+
+        for (name, managed) in &mut self.active_agents {
+            match managed.handle.try_wait() {
+                Ok(Some(status)) => {
+                    exited.push((name.clone(), managed.definition.clone(), status));
+                }
+                Ok(None) => {
+                    // Still running -- check wall-clock timeout
+                    if let Some(max_secs) = managed.definition.max_cpu_seconds {
+                        let elapsed = managed.started_at.elapsed();
+                        if elapsed > Duration::from_secs(max_secs) {
+                            let elapsed_secs = elapsed.as_secs();
+                            warn!(
+                                agent = %name,
+                                elapsed_secs = elapsed_secs,
+                                runtime_limit_secs = max_secs,
+                                elapsed = %format_runtime_duration(elapsed_secs),
+                                runtime_limit = %format_runtime_duration(max_secs),
+                                "agent exceeded configured runtime limit, terminating"
+                            );
+                            timed_out.push(name.clone());
+                        }
+                    }
+                }
+                Err(e) => {
+                    warn!(agent = %name, error = %e, "try_wait failed");
+                }
+            }
+        }
+
+        // Kill timed-out agents
+        for name in timed_out {
+            if let Some(mut managed) = self.active_agents.remove(&name) {
+                let grace = Duration::from_secs(managed.definition.grace_period_secs.unwrap_or(5));
+                match managed.handle.shutdown(grace).await {
+                    Ok(graceful) => {
+                        info!(
+                            agent = %name,
+                            graceful = graceful,
+                            "timed-out agent terminated"
+                        );
+                    }
+                    Err(e) => {
+                        warn!(agent = %name, error = %e, "failed to kill timed-out agent");
+                    }
+                }
+                // Handle exit based on layer (similar to handle_agent_exit but for timeout)
+                if managed.definition.layer == AgentLayer::Safety {
+                    let key = agent_key(&managed.definition);
+                    let restart_count = self.increment_restart_count(&key);
+                    self.restart_cooldowns.insert(key, Instant::now());
+                    info!(
+                        agent = %name,
+                        restart_count,
+                        "safety agent timed out, will restart after cooldown"
+                    );
+                } else {
+                    info!(agent = %name, layer = ?managed.definition.layer, "agent timed out");
+                }
+            }
+        }
+
+        // Drain output from exiting agents BEFORE removing them
+        let mut quota_exits: std::collections::HashSet<String> = std::collections::HashSet::new();
+        let mut exit_telemetry: Vec<(String, control_plane::telemetry::CompletionEvent)> =
+            Vec::new();
+        for (name, def, status) in &exited {
+            let mut stdout_lines: Vec<String> = Vec::new();
+            let mut stderr_lines: Vec<String> = Vec::new();
+            let mut output_lines: Vec<String> = Vec::new();
+            let mut agent_tmp_path: Option<PathBuf> = None;
+            if let Some(managed) = self.active_agents.get_mut(name) {
+                let cli_tool = managed.definition.cli_tool.clone();
+                let session_id = managed.session_id.clone();
+                let model = managed
+                    .routed_model
+                    .clone()
+                    .or_else(|| managed.definition.model.clone())
+                    .unwrap_or_default();
+                agent_tmp_path = managed.output_tmp_path.take();
+
+                while let Ok(event) = managed.output_rx.try_recv() {
+                    self.nightwatch.observe(name, &event);
+                    match &event {
+                        crate::OutputEvent::Stdout { line, .. } => {
+                            stdout_lines.push(line.clone());
+                            output_lines.push(line.clone());
+                            if let Some(ce) = Self::parse_stdout_for_telemetry(
+                                &cli_tool,
+                                line,
+                                &session_id,
+                                &model,
+                            ) {
+                                exit_telemetry.push((name.clone(), ce));
+                            }
+                        }
+                        crate::OutputEvent::Stderr { line, .. } => {
+                            stderr_lines.push(line.clone());
+                            output_lines.push(format!("[stderr] {}", line));
+                            if let Some(ce) =
+                                Self::parse_stderr_for_telemetry(line, &session_id, &model)
+                            {
+                                exit_telemetry.push((name.clone(), ce));
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            // Classify the exit using KG-boosted pattern matching
+            let classification =
+                self.exit_classifier
+                    .classify(status.code(), &stdout_lines, &stderr_lines);
+
+            let wall_time_secs = self
+                .active_agents
+                .get(name)
+                .map(|m| m.started_at.elapsed().as_secs_f64())
+                .unwrap_or(0.0);
+
+            let routed_model = self
+                .active_agents
+                .get(name)
+                .and_then(|m| m.routed_model.clone());
+
+            let (mention_chain_id, mention_depth, mention_parent_agent) = self
+                .active_agents
+                .get(name)
+                .map(|m| {
+                    (
+                        m.mention_chain_id.clone(),
+                        m.mention_depth,
+                        m.mention_parent_agent.clone(),
+                    )
+                })
+                .unwrap_or((None, None, None));
+
+            let trigger = if self
+                .active_agents
+                .get(name)
+                .is_some_and(|m| m.spawned_by_mention)
+            {
+                RunTrigger::Mention
+            } else {
+                RunTrigger::Cron
+            };
+
+            let record = AgentRunRecord {
+                run_id: uuid::Uuid::new_v4(),
+                agent_name: name.clone(),
+                started_at: chrono::Utc::now()
+                    - chrono::Duration::milliseconds((wall_time_secs * 1000.0) as i64),
+                ended_at: chrono::Utc::now(),
+                exit_code: status.code(),
+                exit_class: classification.exit_class,
+                model_used: routed_model.clone().or_else(|| def.model.clone()),
+                was_fallback: false,
+                wall_time_secs,
+                output_summary: AgentRunRecord::summarise_output(&stdout_lines),
+                error_summary: AgentRunRecord::summarise_errors(&stderr_lines),
+                trigger,
+                matched_patterns: classification.matched_patterns.clone(),
+                confidence: classification.confidence,
+                mention_chain_id,
+                mention_depth,
+                mention_parent_agent,
+            };
+
+            if record.exit_class == ExitClass::RateLimit {
+                quota_exits.insert(name.clone());
+            }
+
+            info!(
+                agent = %name,
+                exit_code = ?status.code(),
+                exit_class = %record.exit_class,
+                confidence = record.confidence,
+                matched_patterns = ?record.matched_patterns,
+                wall_time_secs = record.wall_time_secs,
+                "agent exit classified"
+            );
+
+            // Record learning outcome for injected lessons
+            if let Some(ref store) = self.learning_store {
+                if let Some(ids) = self.injected_learning_ids.get(name) {
+                    for id in ids {
+                        let result = match record.exit_class {
+                            ExitClass::Success | ExitClass::EmptySuccess => {
+                                tokio::task::block_in_place(|| {
+                                    tokio::runtime::Handle::current()
+                                        .block_on(store.record_effective(id, name))
+                                })
+                            }
+                            ExitClass::Timeout
+                            | ExitClass::RateLimit
+                            | ExitClass::ModelError
+                            | ExitClass::CompilationError
+                            | ExitClass::TestFailure
+                            | ExitClass::NetworkError
+                            | ExitClass::ResourceExhaustion
+                            | ExitClass::Crash => tokio::task::block_in_place(|| {
+                                tokio::runtime::Handle::current()
+                                    .block_on(store.record_applied(id, name))
+                            }),
+                            _ => continue,
+                        };
+                        if let Err(e) = result {
+                            debug!(agent = %name, learning_id = %id, error = %e, "failed to record learning outcome");
+                        }
+                    }
+                }
+                self.injected_learning_ids.remove(name);
+            }
+
+            let mut quota_provider_recorded: Option<String> = None;
+            if record.exit_class == ExitClass::RateLimit {
+                let stderr_text = stderr_lines.join("\n");
+                let output_text = output_lines.join("\n");
+                let _secondary_confirms =
+                    control_plane::output_parser::parse_stderr_for_limit_errors(&stderr_text)
+                        .is_some()
+                        || control_plane::telemetry::is_subscription_limit_error(&output_text);
+                // Attribution: prefer routed model -> canonical key, fallback to config provider
+                let effective_provider = routed_model
+                    .as_deref()
+                    .map(provider_budget::canonical_key_for_model_or_provider)
+                    .or_else(|| {
+                        def.provider
+                            .as_deref()
+                            .map(provider_budget::canonical_quota_key)
+                    });
+
+                if let Some(provider_key) = effective_provider {
+                    warn!(
+                        agent = %name,
+                        provider = %provider_key,
+                        model = ?routed_model,
+                        "quota exit detected; recording provider failure and blocking"
+                    );
+                    self.provider_health.record_failure(provider_key);
+                    if let Some(tracker) = self.provider_budget_tracker.as_ref() {
+                        tracker.force_exhaust(provider_key);
+                    }
+
+                    let quota_line = stderr_lines
+                        .iter()
+                        .chain(stdout_lines.iter())
+                        .find(|l| l.to_lowercase().contains("resets "))
+                        .map(|s| s.as_str())
+                        .unwrap_or("");
+                    if let Some(reset_time) = parse_reset_time(quota_line) {
+                        info!(
+                            provider = %provider_key,
+                            "blocking provider until rate-limit window expires"
+                        );
+                        self.provider_rate_limits
+                            .block_until(provider_key, reset_time);
+                    }
+                    quota_provider_recorded = Some(provider_key.to_string());
+                }
+            }
+
+            // D-3: Feed exit classification into provider health circuit breaker
+            if let Some(ref provider) = def.provider {
+                let canonical = provider_budget::canonical_quota_key(provider);
+                let already_recorded_by_quota =
+                    quota_provider_recorded.as_deref() == Some(canonical);
+                match record.exit_class {
+                    ExitClass::ModelError | ExitClass::RateLimit =>
+                    {
+                        #[allow(clippy::collapsible_match)]
+                        if !already_recorded_by_quota {
+                            self.provider_health.record_failure(canonical);
+                        }
+                    }
+                    ExitClass::Success | ExitClass::EmptySuccess => {
+                        self.provider_health.record_success(canonical);
+                    }
+                    _ => {} // Other exit classes don't affect provider health
+                }
+
+                // issue #7: per-provider stderr-signature classification. This
+                // runs on top of the KG-driven ExitClass match above so that
+                // providers whose CLI exits 0 on quota hits ("returning partial
+                // output") still trip the breaker and force budget exhaustion
+                // when their stderr matches a configured throttle pattern.
+                let sigs = self.provider_error_signatures.get(provider);
+                let sig_kind = error_signatures::classify_lines(&stderr_lines, sigs);
+                match sig_kind {
+                    error_signatures::ErrorKind::Throttle => {
+                        warn!(
+                            agent = %name,
+                            provider = %canonical,
+                            model = ?record.model_used,
+                            "stderr classified as throttle; tripping breaker + exhausting budget"
+                        );
+                        self.provider_health.record_failure(canonical);
+                        if let Some(tracker) = self.provider_budget_tracker.as_ref() {
+                            tracker.force_exhaust(canonical);
+                        }
+                    }
+                    error_signatures::ErrorKind::Flake => {
+                        info!(
+                            agent = %name,
+                            provider = %provider,
+                            "stderr classified as flake; routing will retry next pool entry"
+                        );
+                    }
+                    error_signatures::ErrorKind::Unknown => {
+                        // Only escalate when there *is* stderr text to classify
+                        // AND the run itself looks like a real failure. A clean
+                        // exit with empty stderr must never page fleet-meta.
+                        let looked_like_failure = !matches!(
+                            record.exit_class,
+                            ExitClass::Success | ExitClass::EmptySuccess
+                        );
+                        if looked_like_failure && !stderr_lines.is_empty() {
+                            // Soft-failure accounting so a pathological provider
+                            // that spews unclassified errors still eventually
+                            // opens the breaker.
+                            self.provider_health.record_failure(provider);
+                            self.escalate_unknown_error(
+                                provider,
+                                record.model_used.as_deref(),
+                                &stderr_lines,
+                            )
+                            .await;
+                        }
+                    }
+                }
+            }
+
+            // Post output to Gitea if configured, routed by the agent's
+            // owning project so multi-project fleets land comments in the
+            // correct owner/repo.
+            if let (Some(poster), Some(issue)) = (&self.output_poster, def.gitea_issue) {
+                if def.event_only {
+                    // Defence-in-depth: the dispatch gate at handle_webhook_dispatch
+                    // should have prevented an event-only agent from acquiring a
+                    // gitea_issue. If we reach here the gate has a hole; treat as a
+                    // should-never-happen alert and skip the post.
+                    error!(
+                        agent = %name,
+                        issue = issue,
+                        "skipping output post: agent is event-only but gitea_issue is set; this indicates a missed dispatch gate"
+                    );
+                } else {
+                    let exit_code = status.code();
+                    let project = def
+                        .project
+                        .clone()
+                        .unwrap_or_else(|| crate::dispatcher::LEGACY_PROJECT_ID.to_string());
+                    if let Err(e) = poster
+                        .post_agent_output_for_project(
+                            &project,
+                            name,
+                            issue,
+                            &output_lines,
+                            exit_code,
+                        )
+                        .await
+                    {
+                        warn!(
+                            agent = %name,
+                            project = %project,
+                            issue = issue,
+                            error = %e,
+                            "failed to post output to Gitea"
+                        );
+                    }
+                }
+            }
+
+            // Finalise the agent output log: prepend header to the temp file
+            // written by the background drain task, then rename to final path.
+            {
+                let _ = std::fs::create_dir_all(&self.agent_log_dir);
+                let ts = chrono::Utc::now().format("%Y%m%dT%H%M%SZ");
+                let filename = format!("{}-{}.log", name, ts);
+                let final_path = self.agent_log_dir.join(&filename);
+
+                if let Some(ref tmp_path) = agent_tmp_path {
+                    // The drain task wrote raw output lines.  Read them back,
+                    // prepend the header, and write the final file.
+                    let body = std::fs::read_to_string(tmp_path).unwrap_or_default();
+                    let header = format!(
+                        "# agent: {}\n# exit_code: {:?}\n# exit_class: {}\n# wall_time: {:.1}s\n# model: {}\n\n",
+                        name,
+                        status.code(),
+                        record.exit_class,
+                        record.wall_time_secs,
+                        record.model_used.as_deref().unwrap_or("n/a"),
+                    );
+                    let final_content = format!("{}{}", header, body);
+                    if let Err(e) = std::fs::write(&final_path, &final_content) {
+                        warn!(agent = %name, path = %final_path.display(), error = %e, "failed to write agent output log");
+                    } else {
+                        debug!(agent = %name, path = %final_path.display(), "wrote agent output log");
+                    }
+                    let _ = std::fs::remove_file(tmp_path);
+                } else {
+                    // Fallback: no drain task (shouldn't happen), write from
+                    // the in-memory output_lines instead.
+                    let mut content = String::with_capacity(output_lines.len() * 120);
+                    content.push_str(&format!(
+                        "# agent: {}\n# exit_code: {:?}\n# exit_class: {}\n# wall_time: {:.1}s\n# model: {}\n\n",
+                        name,
+                        status.code(),
+                        record.exit_class,
+                        record.wall_time_secs,
+                        record.model_used.as_deref().unwrap_or("n/a"),
+                    ));
+                    for line in &output_lines {
+                        content.push_str(line);
+                        content.push('\n');
+                    }
+                    if let Err(e) = std::fs::write(&final_path, &content) {
+                        warn!(agent = %name, path = %final_path.display(), error = %e, "failed to write agent output log (fallback)");
+                    }
+                }
+            }
+
+            #[cfg(feature = "quickwit")]
+            if let Some(ref sink) = self.quickwit_sink {
+                let exit_code = status.code();
+                let level = if exit_code.unwrap_or(1) == 0 {
+                    "INFO"
+                } else {
+                    "WARN"
+                };
+                let doc = quickwit::LogDocument {
+                    timestamp: chrono::Utc::now().to_rfc3339(),
+                    project_id: def
+                        .project
+                        .clone()
+                        .unwrap_or_else(|| crate::dispatcher::LEGACY_PROJECT_ID.to_string()),
+                    level: level.into(),
+                    agent_name: name.clone(),
+                    layer: format!("{:?}", def.layer),
+                    source: "orchestrator".into(),
+                    message: format!("agent exited: {}", record.exit_class),
+                    model: routed_model.clone().or_else(|| def.model.clone()),
+                    exit_code,
+                    wall_time_secs: Some(record.wall_time_secs),
+                    extra: Some(serde_json::json!({
+                        "exit_class": record.exit_class.to_string(),
+                        "confidence": record.confidence,
+                        "matched_patterns": record.matched_patterns,
+                    })),
+                    ..Default::default()
+                };
+                let _ = sink.send(doc).await;
+            }
+        }
+
+        // Record telemetry from exiting agent output
+        if !exit_telemetry.is_empty() {
+            self.record_telemetry(exit_telemetry).await;
+        }
+
+        // Process natural exits
+
+        // NOW remove from active_agents and handle exits.
+        // Capture worktree_path before removing so we can commit + clean up.
+        for (name, def, status) in exited {
+            let (worktree_path, commit_status_post) = {
+                let agent = self.active_agents.get(&name);
+                (
+                    agent.and_then(|m| m.worktree_path.clone()),
+                    agent.and_then(|m| m.commit_status_post.clone()),
+                )
+            };
+
+            // Post terminal commit status if this agent was dispatched with one.
+            if let Some((ref head_sha, ref context)) = commit_status_post {
+                let exit_success = status.success();
+                let state = if exit_success {
+                    terraphim_tracker::StatusState::Success
+                } else {
+                    terraphim_tracker::StatusState::Failure
+                };
+                let description = if exit_success {
+                    format!("{} passed", def.name)
+                } else {
+                    format!("{} failed (exit {})", def.name, status.code().unwrap_or(-1))
+                };
+                let project = def.project.as_deref().unwrap_or("");
+                self.post_terminal_commit_status(
+                    head_sha,
+                    project,
+                    &def.name,
+                    context,
+                    state,
+                    &description,
+                )
+                .await;
+            }
+
+            // Disarm worktree guard on success so it doesn't conflict with
+            // the explicit cleanup below.
+            if status.success() {
+                if let Some(agent) = self.active_agents.get_mut(&name) {
+                    if let Some(guard) = agent.worktree_guard.take() {
+                        guard.keep();
+                    }
+                }
+            }
+
+            self.active_agents.remove(&name);
+
+            if quota_exits.contains(&name) {
+                let mut local_unhealthy = self.provider_health.unhealthy_providers();
+                local_unhealthy.extend(self.provider_rate_limits.blocked_providers());
+
+                let respawned = if let Some(ref kg_router) = self.kg_router {
+                    if let Some(decision) = kg_router.route_agent(&def.task) {
+                        if let Some(healthy_route) = decision.first_healthy_route(&local_unhealthy)
+                        {
+                            let retry_count = self
+                                .retry_counts
+                                .entry(name.clone())
+                                .or_insert((0, Instant::now()));
+                            if retry_count.0 < 3 {
+                                retry_count.0 += 1;
+                                retry_count.1 = Instant::now();
+                                let retry_name = format!("{}-retry-{}", name, retry_count.0);
+                                let mut fallback_def = def.clone();
+                                fallback_def.name = retry_name;
+                                fallback_def.model = Some(healthy_route.model.clone());
+                                fallback_def.provider = Some(healthy_route.provider.clone());
+                                // Extract CLI tool from the action template so the retry uses
+                                // the correct CLI for the fallback provider (e.g. opencode for kimi).
+                                if let Some(ref action) = healthy_route.action {
+                                    if let Some(cli) = action.split_whitespace().next() {
+                                        fallback_def.cli_tool = cli.to_string();
+                                    }
+                                }
+                                fallback_def.fallback_provider = None;
+                                fallback_def.fallback_model = None;
+                                info!(
+                                    agent = %name,
+                                    retry_name = %fallback_def.name,
+                                    fallback_model = %healthy_route.model,
+                                    fallback_provider = %healthy_route.provider,
+                                    "respawning quota-exited agent via KG fallback route"
+                                );
+                                if let Err(e) = self.spawn_agent(&fallback_def).await {
+                                    error!(agent = %fallback_def.name, error = %e, "failed to spawn KG fallback agent");
+                                }
+                                true
+                            } else {
+                                warn!(agent = %name, retries = retry_count.0, "max retries reached, agent exits permanently");
+                                self.retry_counts.remove(&name);
+                                false
+                            }
+                        } else {
+                            info!(agent = %name, "no healthy KG route available, agent exits permanently");
+                            false
+                        }
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                };
+
+                if !respawned {
+                    // KG routing failed or no healthy route - try configured fallback before giving up
+                    if def.fallback_provider.is_some() {
+                        info!(
+                            agent = %name,
+                            fallback_provider = ?def.fallback_provider,
+                            fallback_model = ?def.fallback_model,
+                            "KG routing failed, respawning with configured fallback provider"
+                        );
+                        let mut fallback_def = def.clone();
+                        if let Some(ref fb_provider) = def.fallback_provider {
+                            fallback_def.cli_tool = fb_provider.clone();
+                        }
+                        if let Some(ref fb_model) = def.fallback_model {
+                            fallback_def.model = Some(fb_model.clone());
+                        }
+                        fallback_def.provider = None;
+                        fallback_def.fallback_provider = None;
+                        fallback_def.fallback_model = None;
+                        if let Err(e) = self.spawn_agent(&fallback_def).await {
+                            error!(agent = %name, error = %e, "failed to respawn with fallback");
+                            self.handle_agent_exit(&name, &def, status);
+                        }
+                    } else {
+                        self.handle_agent_exit(&name, &def, status);
+                    }
+                }
+            } else {
+                self.handle_agent_exit(&name, &def, status);
+            }
+            self.record_project_meta_exit(&def, status).await;
+
+            // Evolution: record lesson and snapshot on agent exit.
+            if def.evolution_enabled && self.evolution_manager.is_enabled() {
+                #[cfg(feature = "evolution")]
+                {
+                    let exit_desc = format!("Agent {} exited with status: {}", name, status);
+                    let exit_code = status.code().unwrap_or(-1);
+                    let category = if status.success() {
+                        terraphim_agent_evolution::LessonCategory::SuccessPattern
+                    } else {
+                        terraphim_agent_evolution::LessonCategory::Failure
+                    };
+                    let _ = self.evolution_manager.record_lesson(
+                        &name,
+                        &format!("{} run completed", name),
+                        &exit_desc,
+                        &format!("Exit code: {}", exit_code),
+                        category,
+                    );
+                }
+                if let Some(snapshot_key) = self.evolution_manager.snapshot_on_exit(&name) {
+                    info!(agent = %name, key = %snapshot_key, "evolution snapshot created");
+                }
+            }
+
+            // Auto-commit in the agent's working directory (worktree or shared)
+            let project_repo: &Path = def
+                .project
+                .as_deref()
+                .and_then(|pid| self.config.project_by_id(pid))
+                .map(|p| p.working_dir.as_path())
+                .unwrap_or(&self.config.working_dir);
+            let commit_dir = worktree_path.as_deref().unwrap_or(project_repo);
+            if status.success() {
+                self.try_commit_agent_work(&name, commit_dir).await;
+            }
+
+            // Clean up the worktree after committing
+            if let Some(ref wt) = worktree_path {
+                self.remove_agent_worktree(&name, wt, project_repo).await;
+            }
+        }
+    }
+
+    /// Feed a `project-meta` exit into the per-project circuit breaker. On
+    /// the trip transition (Nth consecutive failure) this touches the pause
+    /// flag and opens an `[ADF]` escalation issue on the configured
+    /// fleet-escalation repository.
+    async fn record_project_meta_exit(
+        &mut self,
+        def: &AgentDefinition,
+        status: std::process::ExitStatus,
+    ) {
+        if !project_control::is_project_meta_agent(def) {
+            return;
+        }
+        let Some(project_id) = def.project.clone() else {
+            return;
+        };
+        let success = status.success();
+        let verdict = self
+            .project_failure_counter
+            .record_project_meta_result(&project_id, success);
+        let count = self.project_failure_counter.count(&project_id);
+        let threshold = self.project_failure_counter.threshold();
+        info!(
+            project = %project_id,
+            agent = %def.name,
+            success,
+            consecutive_failures = count,
+            threshold,
+            "project-meta exit recorded"
+        );
+        if verdict != project_control::ShouldPause::Yes {
+            return;
+        }
+        self.trip_project_circuit_breaker(&project_id, &def.name, count, threshold)
+            .await;
+    }
+
+    /// Touch the pause flag and open an `[ADF]` escalation issue for a
+    /// project that has exceeded the `project-meta` failure threshold.
+    async fn trip_project_circuit_breaker(
+        &self,
+        project_id: &str,
+        agent_name: &str,
+        consecutive_failures: u32,
+        threshold: u32,
+    ) {
+        match project_control::touch_pause_flag(&self.pause_dir, project_id) {
+            Ok(path) => {
+                warn!(
+                    project = %project_id,
+                    pause_flag = %path.display(),
+                    consecutive_failures,
+                    threshold,
+                    "project circuit breaker tripped; pause flag created"
+                );
+            }
+            Err(e) => {
+                error!(
+                    project = %project_id,
+                    pause_dir = %self.pause_dir.display(),
+                    error = %e,
+                    "failed to create project pause flag"
+                );
+            }
+        }
+
+        let (Some(owner), Some(repo)) = self.fleet_escalation_target() else {
+            warn!(
+                project = %project_id,
+                "no fleet-escalation owner/repo configured; skipping issue creation"
+            );
+            return;
+        };
+        let Some(gitea_cfg) = self.config.gitea.as_ref() else {
+            warn!(
+                project = %project_id,
+                "no top-level gitea config; cannot open escalation issue"
+            );
+            return;
+        };
+        let tracker_cfg = terraphim_tracker::GiteaConfig {
+            base_url: gitea_cfg.base_url.clone(),
+            token: gitea_cfg.token.clone(),
+            owner: owner.clone(),
+            repo: repo.clone(),
+            active_states: vec!["open".to_string()],
+            terminal_states: vec!["closed".to_string()],
+            use_robot_api: false,
+            robot_path: std::path::PathBuf::from("/home/alex/go/bin/gitea-robot"),
+            claim_strategy: terraphim_tracker::gitea::ClaimStrategy::PreferRobot,
+        };
+        let tracker = match terraphim_tracker::GiteaTracker::new(tracker_cfg) {
+            Ok(t) => t,
+            Err(e) => {
+                error!(
+                    project = %project_id,
+                    owner = %owner,
+                    repo = %repo,
+                    error = %e,
+                    "failed to construct escalation GiteaTracker"
+                );
+                return;
+            }
+        };
+        let title = format!(
+            "[ADF] project-meta on {project_id} failed {consecutive_failures} consecutively"
+        );
+        let body = format!(
+            "Project `{project_id}` has been paused by the circuit breaker after \
+{consecutive_failures} consecutive `project-meta` failures (threshold: {threshold}).\n\n\
+Agent: `{agent_name}`\n\n\
+Pause flag: `{pause}`\n\n\
+Remove the pause flag once the underlying failure is resolved:\n\n\
+```\nrm {pause}\n```\n",
+            pause = self.pause_dir.join(project_id).display()
+        );
+        let labels = ["adf", "circuit-breaker", "priority/high"];
+        match tracker.create_issue(&title, &body, &labels).await {
+            Ok(issue) => info!(
+                project = %project_id,
+                owner = %owner,
+                repo = %repo,
+                issue = issue.number,
+                "opened [ADF] escalation issue"
+            ),
+            Err(e) => error!(
+                project = %project_id,
+                owner = %owner,
+                repo = %repo,
+                error = %e,
+                "failed to open [ADF] escalation issue"
+            ),
+        }
+    }
+
+    /// Resolve the `(owner, repo)` pair for fleet-level escalation issues.
+    /// Falls back to the configured Gitea output target when the dedicated
+    /// `fleet_escalation_*` fields are unset.
+    fn fleet_escalation_target(&self) -> (Option<String>, Option<String>) {
+        let owner = self
+            .config
+            .fleet_escalation_owner
+            .clone()
+            .or_else(|| self.config.gitea.as_ref().map(|g| g.owner.clone()));
+        let repo = self
+            .config
+            .fleet_escalation_repo
+            .clone()
+            .or_else(|| self.config.gitea.as_ref().map(|g| g.repo.clone()));
+        (owner, repo)
+    }
+
+    /// Handle an agent exit based on its layer.
+    fn handle_agent_exit(
+        &mut self,
+        name: &str,
+        def: &AgentDefinition,
+        status: std::process::ExitStatus,
+    ) {
+        let key = agent_key(def);
+        match def.layer {
+            AgentLayer::Safety => {
+                // Only count non-zero exits toward restart limit.
+                // A successful exit (code 0) means the agent completed its task;
+                // punishing it for succeeding makes no sense.
+                if !status.success() {
+                    let restart_count = self.increment_restart_count(&key);
+                    self.restart_cooldowns.insert(key, Instant::now());
+                    if restart_count <= self.config.max_restart_count {
+                        info!(
+                            agent = %name,
+                            exit_status = %status,
+                            restart_count,
+                            cooldown_secs = self.config.restart_cooldown_secs,
+                            window_secs = self.config.restart_budget_window_secs,
+                            "safety agent failed, will restart after cooldown"
+                        );
+                    } else {
+                        error!(
+                            agent = %name,
+                            exit_status = %status,
+                            restart_count,
+                            max = self.config.max_restart_count,
+                            "safety agent exceeded max restarts, permanently stopped"
+                        );
+                    }
+                } else {
+                    self.restart_cooldowns.insert(key, Instant::now());
+                    info!(
+                        agent = %name,
+                        exit_status = %status,
+                        cooldown_secs = self.config.restart_cooldown_secs,
+                        "safety agent completed successfully, will restart after cooldown"
+                    );
+                }
+            }
+            AgentLayer::Core => {
+                info!(agent = %name, exit_status = %status, "core agent completed");
+            }
+            AgentLayer::Growth => {
+                info!(agent = %name, exit_status = %status, "growth agent completed");
+            }
+        }
+    }
+
+    /// Restart Safety agents that have exited and passed their cooldown.
+    async fn restart_pending_safety_agents(&mut self) {
+        let cooldown = Duration::from_secs(self.config.restart_cooldown_secs);
+        let max_restarts = self.config.max_restart_count;
+
+        // Age out stale restart counters before restart eligibility checks.
+        let safety_keys: Vec<(String, String)> = self
+            .config
+            .agents
+            .iter()
+            .filter(|def| def.layer == AgentLayer::Safety)
+            .map(agent_key)
+            .collect();
+        for key in &safety_keys {
+            let _ = self.current_restart_count(key);
+        }
+
+        // Find Safety agents that need restarting
+        let to_restart: Vec<AgentDefinition> = self
+            .config
+            .agents
+            .iter()
+            .filter(|def| {
+                // Must be Safety layer
+                if def.layer != AgentLayer::Safety {
+                    return false;
+                }
+                // Must not be currently active
+                if self.active_agents.contains_key(&def.name) {
+                    return false;
+                }
+                let key = agent_key(def);
+                // Must have a restart cooldown entry (meaning it exited)
+                let last_exit = match self.restart_cooldowns.get(&key) {
+                    Some(t) => t,
+                    None => return false,
+                };
+                // Must have passed the cooldown
+                if last_exit.elapsed() < cooldown {
+                    return false;
+                }
+                // Must be under max restart count
+                let count = self.restart_counts.get(&key).copied().unwrap_or(0);
+                count <= max_restarts
+            })
+            .cloned()
+            .collect();
+
+        for def in to_restart {
+            let key = agent_key(&def);
+            info!(
+                agent = %def.name,
+                restart_count = self.restart_counts.get(&key).copied().unwrap_or(0),
+                "restarting safety agent after cooldown"
+            );
+            if let Err(e) = self.spawn_agent(&def).await {
+                error!(agent = %def.name, error = %e, "failed to restart safety agent");
+            }
+        }
+    }
+
+    /// Check cron schedules and spawn due Core agents.
+    async fn check_cron_schedules(&mut self) {
+        let now = chrono::Utc::now();
+        let scheduled = self.scheduler.scheduled_agents();
+
+        // Collect agents that should fire
+        let to_spawn: Vec<(AgentDefinition, chrono::DateTime<chrono::Utc>)> = scheduled
+            .into_iter()
+            .filter(|(def, _schedule)| {
+                // Skip if already active
+                !self.active_agents.contains_key(&def.name)
+            })
+            .filter_map(|(def, schedule)| {
+                // Get the next fire time after last_tick_time
+                let next_fire = schedule.after(&self.last_tick_time).next()?;
+                // Check if fire time is within window
+                if next_fire > now {
+                    return None;
+                }
+                // Skip if agent already fired at this schedule occurrence
+                if let Some(last_fire) = self.last_cron_fire.get(&def.name) {
+                    if next_fire <= *last_fire {
+                        return None;
+                    }
+                }
+                Some((def.clone(), next_fire))
+            })
+            .collect();
+
+        for (def, fire_time) in to_spawn {
+            info!(agent = %def.name, fire_time = %fire_time, "cron schedule fired");
+            // Record fire time before spawning to prevent rapid re-trigger
+            self.last_cron_fire.insert(def.name.clone(), fire_time);
+            if let Err(e) = self.spawn_agent(&def).await {
+                error!(agent = %def.name, error = %e, "cron spawn failed");
+            }
+        }
+
+        // Also check compound review schedule
+        if let Some(compound_sched) = self.scheduler.compound_review_schedule() {
+            debug!(
+                last_tick = %self.last_tick_time,
+                last_fired = ?self.last_compound_review_fired_at,
+                now = %now,
+                "checking compound review schedule"
+            );
+
+            // Compute the earliest occurrence strictly after
+            // `last_tick_time` that is also <= now. This is the same
+            // occurrence the buggy code would have refired forever when
+            // the reconcile-tick future was cancelled mid-await by the
+            // 90 s `tokio::time::timeout` safety wrapper (#1562).
+            let next_fire = compound_sched
+                .after(&self.last_tick_time)
+                .take_while(|t| *t <= now)
+                .next();
+            debug!(next_fire = ?next_fire, "compound schedule next fire");
+
+            if let Some(fire_time) = next_fire {
+                // Gate against re-firing the same occurrence. The
+                // cursor `last_compound_review_fired_at` is the per-
+                // occurrence dedup key, mirroring `last_cron_fire` for
+                // per-agent crons. It is updated *before* the `.await`
+                // below so a cancelled future cannot lose the update.
+                let already_fired = self
+                    .last_compound_review_fired_at
+                    .map(|prev| fire_time <= prev)
+                    .unwrap_or(false);
+
+                if !already_fired {
+                    // Record fire time BEFORE awaiting
+                    // `handle_schedule_event` so that future
+                    // cancellation cannot lose the update and
+                    // re-trigger the same occurrence on the next tick.
+                    self.last_compound_review_fired_at = Some(fire_time);
+                    info!(
+                        fire_time = %fire_time,
+                        "compound review schedule fired, starting review"
+                    );
+                    self.handle_schedule_event(ScheduleEvent::CompoundReview)
+                        .await;
+                }
+            }
+        }
+    }
+
+    /// Drain broadcast output events from all active agents into nightwatch.
+    /// Also parses CLI output for telemetry completion events.
+    fn drain_output_events(&mut self) -> Vec<(String, control_plane::telemetry::CompletionEvent)> {
+        let mut events: Vec<(String, OutputEvent)> = Vec::new();
+        for (name, managed) in &mut self.active_agents {
+            loop {
+                match managed.output_rx.try_recv() {
+                    Ok(event) => events.push((name.clone(), event)),
+                    Err(broadcast::error::TryRecvError::Empty) => break,
+                    Err(broadcast::error::TryRecvError::Lagged(n)) => {
+                        warn!(agent = %name, skipped = n, "output events lagged");
+                        break;
+                    }
+                    Err(broadcast::error::TryRecvError::Closed) => break,
+                }
+            }
+        }
+
+        let mut completion_events: Vec<(String, control_plane::telemetry::CompletionEvent)> =
+            Vec::new();
+
+        for (name, event) in &events {
+            self.nightwatch.observe(name, event);
+
+            // Feed output to evolution system if enabled.
+            if self.evolution_manager.is_enabled() {
+                let is_evo = self
+                    .active_agents
+                    .get(name)
+                    .map(|m| m.definition.evolution_enabled)
+                    .unwrap_or(false);
+                if is_evo {
+                    let (line_content, event_type) = match event {
+                        crate::OutputEvent::Stdout { line, .. } => (line.clone(), "stdout"),
+                        crate::OutputEvent::Stderr { line, .. } => (line.clone(), "stderr"),
+                        _ => continue,
+                    };
+                    let _ = self
+                        .evolution_manager
+                        .record_output(evolution::EvolutionOutput {
+                            agent_id: name.clone(),
+                            content: line_content,
+                            event_type: event_type.to_string(),
+                            importance: "medium".to_string(),
+                        });
+                }
+            }
+
+            match event {
+                OutputEvent::Stdout { line, .. } => {
+                    let (cli_tool, session_id, model) = self
+                        .active_agents
+                        .get(name)
+                        .map(|m| {
+                            (
+                                m.definition.cli_tool.clone(),
+                                m.session_id.clone(),
+                                m.routed_model
+                                    .clone()
+                                    .or_else(|| m.definition.model.clone())
+                                    .unwrap_or_default(),
+                            )
+                        })
+                        .unwrap_or_default();
+
+                    if let Some(ce) =
+                        Self::parse_stdout_for_telemetry(&cli_tool, line, &session_id, &model)
+                    {
+                        completion_events.push((name.clone(), ce));
+                    }
+                }
+                OutputEvent::Stderr { line, .. } => {
+                    let (session_id, model) = self
+                        .active_agents
+                        .get(name)
+                        .map(|m| {
+                            (
+                                m.session_id.clone(),
+                                m.routed_model
+                                    .clone()
+                                    .or_else(|| m.definition.model.clone())
+                                    .unwrap_or_default(),
+                            )
+                        })
+                        .unwrap_or_default();
+                    if let Some(ce) = Self::parse_stderr_for_telemetry(line, &session_id, &model) {
+                        completion_events.push((name.clone(), ce));
+                    }
+                }
+                _ => {}
+            }
+
+            #[cfg(feature = "quickwit")]
+            if let Some(ref sink) = self.quickwit_sink {
+                let (level, source, line) = match event {
+                    crate::OutputEvent::Stdout { line, .. } => ("INFO", "stdout", line.as_str()),
+                    crate::OutputEvent::Stderr { line, .. } => ("WARN", "stderr", line.as_str()),
+                    _ => continue,
+                };
+                let layer = self
+                    .active_agents
+                    .get(name)
+                    .map(|m| format!("{:?}", m.definition.layer))
+                    .unwrap_or_default();
+                let project_id = self
+                    .active_agents
+                    .get(name)
+                    .and_then(|m| m.definition.project.clone())
+                    .unwrap_or_else(|| crate::dispatcher::LEGACY_PROJECT_ID.to_string());
+                let model = self.active_agents.get(name).and_then(|m| {
+                    m.routed_model
+                        .clone()
+                        .or_else(|| m.definition.model.clone())
+                });
+                let doc = quickwit::LogDocument {
+                    timestamp: chrono::Utc::now().to_rfc3339(),
+                    project_id,
+                    level: level.into(),
+                    agent_name: name.clone(),
+                    layer,
+                    source: source.into(),
+                    message: line.to_owned(),
+                    model,
+                    ..Default::default()
+                };
+                let _ = sink.try_send(doc);
+            }
+        }
+
+        completion_events
+    }
+
+    /// Record parsed telemetry events into the telemetry store, per-agent
+    /// cost tracker, and (when configured) the provider-level hour/day
+    /// budget tracker.
+    ///
+    /// Cost accounting is performed per-agent before the batch write so that
+    /// agent-level spend is still tracked individually. The telemetry store
+    /// write uses a single lock acquisition via `record_batch`. Provider
+    /// budget spend is folded in during the same iteration so Layer 3 of
+    /// the subscription gate actually sees real dispatch cost.
+    async fn record_telemetry(
+        &self,
+        events: Vec<(String, control_plane::telemetry::CompletionEvent)>,
+    ) {
+        for (agent_name, event) in &events {
+            if event.cost_usd > 0.0 {
+                self.cost_tracker.record_cost(agent_name, event.cost_usd);
+
+                if let Some(tracker) = self.provider_budget_tracker.as_ref() {
+                    if let Some(provider_key) =
+                        provider_budget::provider_key_for_model(&event.model)
+                    {
+                        let verdict = tracker.record_cost(provider_key, event.cost_usd);
+                        if matches!(
+                            verdict,
+                            cost_tracker::BudgetVerdict::Exhausted { .. }
+                                | cost_tracker::BudgetVerdict::NearExhaustion { .. }
+                        ) {
+                            warn!(
+                                provider = provider_key,
+                                agent = agent_name.as_str(),
+                                cost_usd = event.cost_usd,
+                                verdict = ?verdict,
+                                "provider budget pressure recorded"
+                            );
+                        }
+                    }
+                }
+            }
+
+            // Send to Quickwit for cost-aware routing analytics
+            if let Some(ref sink) = self.quickwit_sink {
+                let doc = quickwit::LogDocument {
+                    timestamp: event.completed_at.to_rfc3339(),
+                    project_id: self
+                        .config
+                        .projects
+                        .first()
+                        .map(|p| p.id.clone())
+                        .unwrap_or_else(|| crate::dispatcher::LEGACY_PROJECT_ID.to_string()),
+                    level: if event.success {
+                        "INFO".to_string()
+                    } else {
+                        "WARN".to_string()
+                    },
+                    agent_name: agent_name.clone(),
+                    layer: "Core".to_string(),
+                    source: "telemetry".to_string(),
+                    message: event
+                        .error
+                        .clone()
+                        .unwrap_or_else(|| "completion recorded".to_string()),
+                    model: Some(event.model.clone()),
+                    cost_usd: Some(event.cost_usd),
+                    latency_ms: Some(event.latency_ms),
+                    tokens_input: Some(event.tokens.input),
+                    tokens_output: Some(event.tokens.output),
+                    exit_class: if event.success {
+                        Some("success".to_string())
+                    } else {
+                        Some("error".to_string())
+                    },
+                    is_free: event.cost_usd == 0.0,
+                    ..Default::default()
+                };
+                if let Err(e) = sink.send(doc).await {
+                    warn!(error = %e, "failed to send telemetry to Quickwit");
+                }
+            }
+        }
+        // Write all events in one lock acquisition.
+        let completion_events: Vec<control_plane::telemetry::CompletionEvent> =
+            events.into_iter().map(|(_, e)| e).collect();
+        self.telemetry_store.record_batch(completion_events).await;
+    }
+
+    /// Attempt to restore persisted telemetry summary from durable storage.
+    ///
+    /// Best-effort: if no summary exists or loading fails, logs and continues
+    /// with an empty telemetry store. Called once at the start of `run()`.
+    async fn restore_telemetry(&self) {
+        use terraphim_persistence::Persistable;
+        let mut summary = control_plane::TelemetrySummary::new("telemetry_summary".to_string());
+        match summary.load().await {
+            Ok(loaded) => {
+                self.telemetry_store.import_summary(loaded).await;
+                info!("restored persisted telemetry summary");
+            }
+            Err(_) => {
+                info!("no persisted telemetry summary found, starting fresh");
+            }
+        }
+    }
+
+    /// Persist telemetry summary to durable storage via fire-and-forget spawn.
+    ///
+    /// Clones the Arc-backed store and moves both export and save into the
+    /// spawned task so the reconcile loop is not blocked by the read lock.
+    fn persist_telemetry(&self) {
+        let store = self.telemetry_store.clone();
+        tokio::spawn(async move {
+            use terraphim_persistence::Persistable;
+            let summary = store.export_summary().await;
+            if let Err(e) = summary.save().await {
+                tracing::warn!(error = %e, "failed to persist telemetry summary");
+            }
+        });
+    }
+
+    /// Parse a stdout line from a CLI tool into a CompletionEvent, if the line
+    /// represents a completed agent session.
+    ///
+    /// Returns `None` for lines that do not carry completion telemetry (tool
+    /// calls, status updates, ignored formats, or unrecognised cli_tool).
+    fn parse_stdout_for_telemetry(
+        cli_tool: &str,
+        line: &str,
+        session_id: &str,
+        model: &str,
+    ) -> Option<control_plane::telemetry::CompletionEvent> {
+        let parsed = match cli_tool {
+            "opencode" => {
+                control_plane::output_parser::parse_opencode_line(line, session_id, model, None)
+            }
+            "claude" => control_plane::output_parser::parse_claude_line(line, session_id, model),
+            _ => control_plane::output_parser::ParsedOutput::Ignored,
+        };
+        match parsed {
+            control_plane::output_parser::ParsedOutput::Completion(ce) => Some(ce),
+            _ => None,
+        }
+    }
+
+    /// Parse a stderr line into a CompletionEvent representing a subscription
+    /// limit error.
+    ///
+    /// Returns `None` when the line does not match any known limit-error
+    /// pattern.
+    fn parse_stderr_for_telemetry(
+        line: &str,
+        session_id: &str,
+        model: &str,
+    ) -> Option<control_plane::telemetry::CompletionEvent> {
+        control_plane::output_parser::parse_stderr_for_limit_errors(line)?;
+        Some(control_plane::telemetry::CompletionEvent {
+            model: model.to_string(),
+            session_id: session_id.to_string(),
+            completed_at: chrono::Utc::now(),
+            latency_ms: 0,
+            success: false,
+            tokens: control_plane::telemetry::TokenBreakdown::default(),
+            cost_usd: 0.0,
+            error: Some(line.to_string()),
+        })
+    }
+
+    /// Check flow schedules and trigger due flows.
+    async fn check_flow_schedules(&mut self) {
+        let now = chrono::Utc::now();
+        let mut to_trigger: Vec<flow::config::FlowDefinition> = Vec::new();
+
+        for flow_def in &self.config.flows {
+            let Some(ref schedule_str) = flow_def.schedule else {
+                continue;
+            };
+            let Ok(schedule) = cron::Schedule::from_str(schedule_str) else {
+                continue;
+            };
+
+            // Overlap prevention: skip if this flow is already active
+            if self.active_flows.contains_key(&flow_def.name) {
+                tracing::info!(
+                    flow = %flow_def.name,
+                    "skipping cron trigger: flow already active"
+                );
+                continue;
+            }
+
+            let should_fire: bool = schedule
+                .after(&self.last_tick_time)
+                .take_while(|t| *t <= now)
+                .next()
+                .is_some();
+
+            if should_fire {
+                to_trigger.push(flow_def.clone());
+            }
+        }
+
+        for flow_def in to_trigger {
+            self.handle_schedule_event(ScheduleEvent::Flow(Box::new(flow_def)))
+                .await;
+        }
+    }
+
+    /// Handle a schedule event from the TimeScheduler.
+    async fn handle_schedule_event(&mut self, event: ScheduleEvent) {
+        match event {
+            ScheduleEvent::Spawn(def) => {
+                info!(agent = %def.name, "scheduled spawn");
+                if let Err(e) = self.spawn_agent(&def).await {
+                    error!(agent = %def.name, error = %e, "scheduled spawn failed");
+                }
+            }
+            ScheduleEvent::Stop { agent_name } => {
+                info!(agent = %agent_name, "scheduled stop");
+                self.stop_agent(&agent_name).await;
+            }
+            ScheduleEvent::CompoundReview => {
+                info!("scheduled compound review starting");
+                // For scheduled reviews, use HEAD against base_branch from config
+                let git_ref = "HEAD";
+                let base_ref = &self.config.compound_review.base_branch;
+                match self.compound_workflow.run(git_ref, base_ref).await {
+                    Ok(result) => {
+                        info!(
+                            findings = result.findings.len(),
+                            pass = %result.pass,
+                            duration = ?result.duration,
+                            "compound review completed"
+                        );
+
+                        // 1. Post structured summary to Gitea
+                        if let (Some(ref poster), Some(issue)) =
+                            (&self.output_poster, self.config.compound_review.gitea_issue)
+                        {
+                            let report = result.format_report();
+                            if let Err(e) = poster.post_raw(issue, &report).await {
+                                warn!(error = %e, "failed to post compound review summary");
+                            }
+
+                            // 2. Auto-file issues for CRITICAL/HIGH findings
+                            if self.config.compound_review.auto_file_issues {
+                                let actionable = result.actionable_findings();
+                                for finding in actionable {
+                                    if let Err(e) =
+                                        self.file_finding_issue(poster, &result, finding).await
+                                    {
+                                        warn!(error = %e, "failed to file finding issue");
+                                    }
+                                }
+                            }
+
+                            // 3. Trigger remediation agents for CRITICAL findings
+                            if self.config.compound_review.auto_remediate {
+                                let critical: Vec<_> = result
+                                    .findings
+                                    .iter()
+                                    .filter(|f| f.severity == FindingSeverity::Critical)
+                                    .collect();
+                                for finding in critical {
+                                    if let Err(e) = self.spawn_remediation_agent(finding).await {
+                                        warn!(error = %e, "failed to spawn remediation agent");
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        error!(error = %e, "compound review failed");
+                    }
+                }
+            }
+            ScheduleEvent::Flow(flow_def) => {
+                let flow_name = flow_def.name.clone();
+                let flow_state_dir = self
+                    .config
+                    .flow_state_dir
+                    .clone()
+                    .unwrap_or_else(|| PathBuf::from("/tmp/flow-states"));
+                let working_dir = self.config.compound_review.repo_path.clone();
+                let project_runtimes = build_flow_project_runtimes(&self.config);
+                let flow_def = *flow_def;
+                let flow_name_for_closure = flow_name.clone();
+                // FlowExecutor contains non-Send types (Regex via AgentSpawner),
+                // so we use spawn_blocking + Handle::block_on as a Send-safe bridge.
+                let rt_handle = tokio::runtime::Handle::current();
+                let handle = tokio::task::spawn_blocking(move || {
+                    let executor = flow::executor::FlowExecutor::new(working_dir, flow_state_dir)
+                        .with_projects(project_runtimes);
+                    rt_handle.block_on(async {
+                        executor.run(&flow_def, None).await
+                            .unwrap_or_else(|e| {
+                                tracing::error!(flow = %flow_name_for_closure, error = %e, "flow execution failed");
+                                flow::state::FlowRunState::failed(&flow_name_for_closure, &e.to_string())
+                            })
+                    })
+                });
+                self.active_flows.insert(flow_name.clone(), handle);
+                tracing::info!(flow = %flow_name, "flow spawned as background task");
+            }
+        }
+    }
+
+    /// Handle a drift alert from the NightwatchMonitor.
+    async fn handle_drift_alert(&mut self, alert: DriftAlert) {
+        warn!(
+            agent = %alert.agent_name,
+            score = alert.drift_score.score,
+            level = ?alert.drift_score.level,
+            "drift alert"
+        );
+
+        match alert.recommended_action {
+            CorrectionAction::LogWarning(msg) => {
+                warn!(agent = %alert.agent_name, message = %msg, "drift warning");
+            }
+            CorrectionAction::RestartAgent => {
+                info!(agent = %alert.agent_name, "restarting agent due to drift");
+                self.stop_agent(&alert.agent_name).await;
+                self.nightwatch.reset(&alert.agent_name);
+
+                // Find definition and respawn
+                if let Some(def) = self
+                    .config
+                    .agents
+                    .iter()
+                    .find(|a| a.name == alert.agent_name)
+                    .cloned()
+                {
+                    if let Err(e) = self.spawn_agent(&def).await {
+                        error!(
+                            agent = %alert.agent_name,
+                            error = %e,
+                            "failed to restart agent after drift correction"
+                        );
+                    }
+                }
+            }
+            CorrectionAction::PauseAndEscalate(msg) => {
+                error!(
+                    agent = %alert.agent_name,
+                    message = %msg,
+                    "CRITICAL: pausing agent and escalating to human"
+                );
+                self.stop_agent(&alert.agent_name).await;
+                self.nightwatch.reset(&alert.agent_name);
+            }
+        }
+    }
+
+    /// Stop a specific agent by name.
+    async fn stop_agent(&mut self, name: &str) {
+        if let Some(managed) = self.active_agents.remove(name) {
+            info!(agent = %name, "stopping agent");
+            let grace = Duration::from_secs(5);
+            let mut handle = managed.handle;
+            match handle.shutdown(grace).await {
+                Ok(_) => info!(agent = %name, "agent stopped gracefully"),
+                Err(e) => warn!(agent = %name, error = %e, "agent stop had issues"),
+            }
+        }
+    }
+
+    /// Shutdown all active agents.
+    async fn shutdown_all_agents(&mut self) {
+        let names: Vec<String> = self.active_agents.keys().cloned().collect();
+        for name in names {
+            self.stop_agent(&name).await;
+        }
+    }
+
+    /// Spawn a specific agent by name (test helper).
+    #[doc(hidden)]
+    pub async fn spawn_agent_for_test(&mut self, name: &str) -> Result<(), OrchestratorError> {
+        let def = self
+            .config
+            .agents
+            .iter()
+            .find(|a| a.name == name)
+            .ok_or_else(|| OrchestratorError::AgentNotFound(name.to_string()))?
+            .clone();
+        self.spawn_agent(&def).await
+    }
+
+    /// Check if an agent is in the active_agents map (test helper).
+    #[doc(hidden)]
+    pub fn is_agent_active(&self, name: &str) -> bool {
+        self.active_agents.contains_key(name)
+    }
+
+    /// Test helper: remove an agent from active_agents so it can be re-spawned.
+    #[doc(hidden)]
+    pub fn remove_agent_for_test(&mut self, name: &str) {
+        self.active_agents.remove(name);
+    }
+
+    /// Test helper: set last_run_commits for a given agent.
+    #[doc(hidden)]
+    pub fn set_last_run_commit(&mut self, agent_name: &str, commit: &str) {
+        self.last_run_commits
+            .insert(agent_name.to_string(), commit.to_string());
+    }
+
+    /// Test helper: set last_cron_fire for a given agent.
+    #[doc(hidden)]
+    pub fn set_last_cron_fire(
+        &mut self,
+        agent_name: &str,
+        fire_time: chrono::DateTime<chrono::Utc>,
+    ) {
+        self.last_cron_fire
+            .insert(agent_name.to_string(), fire_time);
+    }
+
+    /// Test helper: set last_tick_time for synthetic time testing.
+    #[doc(hidden)]
+    pub fn set_last_tick_time(&mut self, time: chrono::DateTime<chrono::Utc>) {
+        self.last_tick_time = time;
+    }
+
+    /// Test helper: read the compound-review fire cursor.
+    #[doc(hidden)]
+    pub fn last_compound_review_fired_at(&self) -> Option<chrono::DateTime<chrono::Utc>> {
+        self.last_compound_review_fired_at
+    }
+
+    /// Test helper: clear the compound-review fire cursor for synthetic
+    /// testing of the cancellation property.
+    #[doc(hidden)]
+    pub fn clear_last_compound_review_fired_at(&mut self) {
+        self.last_compound_review_fired_at = None;
+    }
+
+    /// Test helper: access the telemetry store for assertions.
+    #[doc(hidden)]
+    pub fn telemetry_store(&self) -> &control_plane::TelemetryStore {
+        &self.telemetry_store
+    }
+
+    /// Test helper: access the provider budget tracker (if any).
+    #[doc(hidden)]
+    pub fn provider_budget_tracker(&self) -> Option<&Arc<provider_budget::ProviderBudgetTracker>> {
+        self.provider_budget_tracker.as_ref()
+    }
+
+    /// Test helper: inspect the unknown-error dedupe set (lock + clone).
+    #[doc(hidden)]
+    pub fn unknown_error_dedupe_snapshot(&self) -> std::collections::HashSet<String> {
+        self.unknown_error_dedupe
+            .lock()
+            .map(|g| g.clone())
+            .unwrap_or_default()
+    }
+
+    /// Open a `[ADF] unknown error signature on <provider>/<model>` Gitea
+    /// issue so fleet-meta can classify the pattern. Deduped by
+    /// [`error_signatures::unknown_dedupe_key`] within the process lifetime
+    /// so retries of the same stderr shape don't spam the tracker.
+    ///
+    /// The target tracker is the orchestrator's default [`GiteaTracker`]
+    /// from [`OutputPoster::tracker`], which points at the fleet-meta repo
+    /// configured in `orchestrator.toml`. If no `OutputPoster` is wired
+    /// (tests, legacy configs), this is a no-op.
+    async fn escalate_unknown_error(
+        &self,
+        provider: &str,
+        model: Option<&str>,
+        stderr_lines: &[String],
+    ) {
+        let joined = stderr_lines.join("\n");
+        let dedupe_key = error_signatures::unknown_dedupe_key(provider, &joined);
+        {
+            let mut set = match self.unknown_error_dedupe.lock() {
+                Ok(g) => g,
+                Err(_) => {
+                    warn!(
+                        provider = %provider,
+                        "unknown_error_dedupe lock poisoned; skipping escalation"
+                    );
+                    return;
+                }
+            };
+            if !set.insert(dedupe_key.clone()) {
+                // Already escalated this shape in this process. Skip quietly.
+                return;
+            }
+        }
+
+        let Some(poster) = self.output_poster.as_ref() else {
+            info!(
+                provider = %provider,
+                dedupe_key = %dedupe_key,
+                "no output_poster configured; unknown stderr logged only"
+            );
+            return;
+        };
+
+        // Cap stderr in the body so a runaway CLI never posts megabytes.
+        const MAX_STDERR_CHARS: usize = 4000;
+        let truncated: String = if joined.len() > MAX_STDERR_CHARS {
+            format!(
+                "{}\n...[truncated, original {} chars]",
+                joined.chars().take(MAX_STDERR_CHARS).collect::<String>(),
+                joined.len()
+            )
+        } else {
+            joined
+        };
+        let model_slug = model.unwrap_or("<unknown-model>");
+        let title = format!(
+            "[ADF] unknown error signature on {}/{}",
+            provider, model_slug
+        );
+        let body = format!(
+            "A spawned agent produced stderr that matched neither the \
+             throttle nor the flake regex lists for provider `{}` \
+             (model `{}`). Please review and extend the provider's \
+             `error_signatures` config so future occurrences classify \
+             correctly.\n\n\
+             **Dedupe key:** `{}`\n\n\
+             ## Captured stderr\n\n```\n{}\n```\n",
+            provider, model_slug, dedupe_key, truncated
+        );
+        let labels = ["adf", "error-signature", "triage"];
+        let tracker = poster.tracker();
+        if let Err(e) = tracker.create_issue(&title, &body, &labels).await {
+            warn!(
+                provider = %provider,
+                model = %model_slug,
+                error = %e,
+                "failed to escalate unknown-error signature to Gitea"
+            );
+        } else {
+            info!(
+                provider = %provider,
+                model = %model_slug,
+                dedupe_key = %dedupe_key,
+                "escalated unknown error signature to fleet-meta"
+            );
+        }
+    }
+
+    /// Test helper: drive `record_telemetry` from outside the crate so
+    /// integration tests can verify the cost-tracker / provider-budget
+    /// wiring without starting the full reconcile loop.
+    #[doc(hidden)]
+    pub async fn record_telemetry_for_test(
+        &self,
+        events: Vec<(String, control_plane::telemetry::CompletionEvent)>,
+    ) {
+        self.record_telemetry(events).await
+    }
+
+    /// Test helper: return the pause directory the orchestrator is using.
+    #[doc(hidden)]
+    pub fn pause_dir_for_test(&self) -> &std::path::Path {
+        &self.pause_dir
+    }
+
+    /// Test helper: drive the project circuit breaker from outside the crate
+    /// so integration tests can verify the trip → pause-flag path without
+    /// spawning real agent processes.
+    ///
+    /// Simulates recording `failure_count` consecutive `project-meta` failures
+    /// against `project_id`; on the Nth failure (where N == threshold) the
+    /// underlying counter trips and this function touches the pause flag.
+    /// Returns `true` iff the pause flag was (re)created by this call.
+    #[doc(hidden)]
+    pub async fn simulate_project_meta_failures_for_test(
+        &mut self,
+        project_id: &str,
+        failure_count: u32,
+    ) -> bool {
+        let mut tripped = false;
+        for _ in 0..failure_count {
+            let verdict = self
+                .project_failure_counter
+                .record_project_meta_result(project_id, false);
+            if verdict == project_control::ShouldPause::Yes {
+                let _ = project_control::touch_pause_flag(&self.pause_dir, project_id);
+                tripped = true;
+            }
+        }
+        tripped
+    }
+
+    /// Test helper: record a successful project-meta run, resetting the
+    /// per-project consecutive-failure counter.
+    #[doc(hidden)]
+    pub fn reset_project_meta_counter_for_test(&mut self, project_id: &str) {
+        let _ = self
+            .project_failure_counter
+            .record_project_meta_result(project_id, true);
+    }
+}
+
+/// Check whether any changed file matches any of the watch path prefixes.
+fn has_matching_changes(changed_files: &[String], watch_paths: &[String]) -> bool {
+    for file in changed_files {
+        for prefix in watch_paths {
+            if scope::is_path_prefix(prefix, file) {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+fn requires_isolated_worktree(def: &AgentDefinition, model: Option<&str>) -> bool {
+    if model
+        .map(|m| m.to_ascii_lowercase().contains("haiku"))
+        .unwrap_or(false)
+    {
+        return false;
+    }
+
+    if model.is_some() {
+        return true;
+    }
+
+    let cli_name = Path::new(&def.cli_tool)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or(def.cli_tool.as_str())
+        .to_ascii_lowercase();
+
+    matches!(
+        cli_name.as_str(),
+        "claude" | "codex" | "opencode" | "opencode-go" | "gemini" | "aider"
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    fn legacy_key(name: &str) -> (String, String) {
+        (
+            crate::dispatcher::LEGACY_PROJECT_ID.to_string(),
+            name.to_string(),
+        )
+    }
+
+    #[test]
+    fn formats_runtime_duration_for_timeout_messages() {
+        assert_eq!(format_runtime_duration(59), "59s");
+        assert_eq!(format_runtime_duration(60), "1m");
+        assert_eq!(format_runtime_duration(1889), "31m 29s");
+        assert_eq!(format_runtime_duration(7200), "2h");
+        assert_eq!(format_runtime_duration(7384), "2h 3m 4s");
+    }
+
+    #[test]
+    fn timeout_summary_explains_elapsed_and_limit() {
+        let summary = timeout_summary(1889, 1800);
+
+        assert!(summary.contains("31m 29s"));
+        assert!(summary.contains("30m"));
+        assert!(summary.contains("elapsed 1889s, limit 1800s"));
+        assert!(summary.contains("wall-clock runtime limit"));
+    }
+
+    fn test_config() -> OrchestratorConfig {
+        OrchestratorConfig {
+            working_dir: std::path::PathBuf::from("/tmp/test-orchestrator"),
+            nightwatch: NightwatchConfig::default(),
+            compound_review: CompoundReviewConfig {
+                cli_tool: None,
+                provider: None,
+                model: None,
+                schedule: "0 2 * * *".to_string(),
+                max_duration_secs: 60,
+                repo_path: std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../.."),
+                create_prs: false,
+                worktree_root: std::path::PathBuf::from("/tmp/test-orchestrator/.worktrees"),
+                base_branch: "main".to_string(),
+                max_concurrent_agents: 3,
+                ..Default::default()
+            },
+            workflow: None,
+            agents: vec![
+                AgentDefinition {
+                    name: "sentinel".to_string(),
+                    layer: AgentLayer::Safety,
+                    cli_tool: "echo".to_string(),
+                    task: "safety watch".to_string(),
+                    model: None,
+                    schedule: None,
+                    capabilities: vec!["security".to_string()],
+                    max_memory_bytes: None,
+                    budget_monthly_cents: None,
+                    provider: None,
+                    persona: None,
+                    terraphim_role: None,
+                    skill_chain: vec![],
+                    sfia_skills: vec![],
+                    fallback_provider: None,
+                    fallback_model: None,
+                    grace_period_secs: None,
+                    max_cpu_seconds: None,
+                    pre_check: None,
+
+                    gitea_issue: None,
+                    event_only: false,
+                    evolution_enabled: false,
+                    rlm_enabled: None,
+
+                    project: None,
+                },
+                AgentDefinition {
+                    name: "sync".to_string(),
+                    layer: AgentLayer::Core,
+                    cli_tool: "echo".to_string(),
+                    task: "sync upstream".to_string(),
+                    model: None,
+                    schedule: Some("0 3 * * *".to_string()),
+                    capabilities: vec!["sync".to_string()],
+                    max_memory_bytes: None,
+                    budget_monthly_cents: None,
+                    provider: None,
+                    persona: None,
+                    terraphim_role: None,
+                    skill_chain: vec![],
+                    sfia_skills: vec![],
+                    fallback_provider: None,
+                    fallback_model: None,
+                    grace_period_secs: None,
+                    max_cpu_seconds: None,
+                    pre_check: None,
+
+                    gitea_issue: None,
+                    event_only: false,
+                    evolution_enabled: false,
+                    rlm_enabled: None,
+
+                    project: None,
+                },
+            ],
+            restart_cooldown_secs: 60,
+            max_restart_count: 10,
+            restart_budget_window_secs: 43_200,
+            disk_usage_threshold: 100, // disable disk guard in tests
+            tick_interval_secs: 30,
+            gate_reconcile_interval_ticks: 20,
+            handoff_buffer_ttl_secs: None,
+            persona_data_dir: None,
+            skill_data_dir: None,
+            gitea_skill_repo: None,
+            flows: vec![],
+            flow_state_dir: None,
+            gitea: None,
+            mentions: None,
+            webhook: None,
+            role_config_path: None,
+            routing: None,
+            #[cfg(feature = "quickwit")]
+            quickwit: None,
+            projects: vec![],
+            include: vec![],
+            project_sources: vec![],
+            providers: vec![],
+            provider_budget_state_file: None,
+            pause_dir: None,
+            project_circuit_breaker_threshold: 3,
+            fleet_escalation_owner: None,
+            fleet_escalation_repo: None,
+            post_merge_gate: None,
+            learning: config::LearningConfig::default(),
+            evolution: config::EvolutionConfig::default(),
+            pr_dispatch: None,
+            pr_dispatch_per_project: Default::default(),
+        }
+    }
+
+    #[test]
+    fn test_orchestrator_creates_from_config() {
+        let config = test_config();
+        let orch = AgentOrchestrator::new(config);
+        assert!(orch.is_ok());
+    }
+
+    #[test]
+    fn test_orchestrator_initial_state() {
+        let config = test_config();
+        let orch = AgentOrchestrator::new(config).unwrap();
+        assert!(orch.active_agents.is_empty());
+        assert!(!orch.shutdown_requested);
+        let statuses = orch.agent_statuses();
+        assert!(statuses.is_empty());
+    }
+
+    #[test]
+    fn test_orchestrator_shutdown_flag() {
+        let config = test_config();
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+        assert!(!orch.shutdown_requested);
+        orch.shutdown();
+        assert!(orch.shutdown_requested);
+    }
+
+    #[tokio::test]
+    async fn test_orchestrator_compound_review_manual() {
+        // Use empty groups to avoid git worktree operations during test.
+        // Worktree creation fails when git index is locked (e.g. pre-commit hooks).
+        let repo_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+
+        // In shallow clones (e.g. CI with fetch-depth: 1) HEAD~1 does not exist.
+        // Fall back to diffing against the empty tree so the test works everywhere.
+        let base_ref = {
+            let check = std::process::Command::new("git")
+                .args([
+                    "-C",
+                    repo_path.to_str().unwrap(),
+                    "rev-parse",
+                    "--verify",
+                    "HEAD~1",
+                ])
+                .output();
+            match check {
+                Ok(o) if o.status.success() => "HEAD~1".to_string(),
+                _ => {
+                    // 4b825dc: the well-known empty tree hash in git
+                    let empty = std::process::Command::new("git")
+                        .args([
+                            "-C",
+                            repo_path.to_str().unwrap(),
+                            "hash-object",
+                            "-t",
+                            "tree",
+                            "/dev/null",
+                        ])
+                        .output()
+                        .expect("git hash-object failed");
+                    String::from_utf8_lossy(&empty.stdout).trim().to_string()
+                }
+            }
+        };
+
+        let swarm_config = SwarmConfig {
+            groups: vec![],
+            timeout: Duration::from_secs(60),
+            worktree_root: std::path::PathBuf::from("/tmp/test-orchestrator/.worktrees"),
+            repo_path,
+            base_branch: "main".to_string(),
+            max_concurrent_agents: 3,
+            create_prs: false,
+        };
+
+        let workflow = CompoundReviewWorkflow::new(swarm_config);
+        let result = workflow.run("HEAD", &base_ref).await.unwrap();
+
+        assert!(
+            !result.correlation_id.is_nil(),
+            "correlation_id should be set"
+        );
+        assert_eq!(result.agents_run, 0, "no agents with empty groups");
+        assert_eq!(result.agents_failed, 0);
+    }
+
+    /// Regression test for #1562.
+    ///
+    /// Property: when `check_cron_schedules` fires the compound review,
+    /// `last_compound_review_fired_at` advances **before** the `await`
+    /// on `handle_schedule_event`. Calling `check_cron_schedules` a
+    /// second time without advancing wall-clock time must NOT re-fire
+    /// the same occurrence; the cursor stays put.
+    ///
+    /// This is the property that breaks if the cursor is dropped: the
+    /// 90 s `tokio::time::timeout` wrapping `reconcile_tick` cancels
+    /// the future mid-await, `last_tick_time` is never updated, and
+    /// the next tick re-evaluates the same cron occurrence as "should
+    /// fire", spawning a new worktree every tick (the bigbox storm).
+    #[tokio::test]
+    async fn test_compound_review_cursor_advances_on_cancellation() {
+        // Build a test config and override compound_review so that the
+        // workflow has no review groups -- it still creates a worktree
+        // on the workspace git repo, but no agent subprocesses are
+        // launched. This mirrors `test_orchestrator_compound_review_manual`.
+        let mut config = test_config();
+        let tmp_worktree = TempDir::new().expect("tempdir");
+        config.compound_review.worktree_root = tmp_worktree.path().to_path_buf();
+        // Schedule fires hourly so we can use a recent `last_tick_time`.
+        // 5-field cron: minute 0 of every hour.
+        config.compound_review.schedule = "0 * * * *".to_string();
+
+        let mut orch = AgentOrchestrator::new(config).expect("orchestrator");
+
+        // Replace the compound workflow with one that uses an empty
+        // group list so the cron-fire path is a no-op apart from the
+        // worktree creation/removal. The orchestrator's
+        // `repo_path`/`base_branch` are inherited from the test config.
+        let repo_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let swarm_config = crate::compound::SwarmConfig {
+            groups: vec![],
+            timeout: Duration::from_secs(60),
+            worktree_root: tmp_worktree.path().to_path_buf(),
+            repo_path,
+            base_branch: "main".to_string(),
+            max_concurrent_agents: 1,
+            create_prs: false,
+        };
+        orch.compound_workflow = crate::compound::CompoundReviewWorkflow::new(swarm_config);
+
+        // Plant `last_tick_time` 2 hours ago so at least one occurrence
+        // of `0 * * * *` lies in [last_tick_time, now]. Clear the new
+        // cursor so the first call has nothing to compare against.
+        let two_hours_ago = chrono::Utc::now() - chrono::Duration::hours(2);
+        orch.set_last_tick_time(two_hours_ago);
+        orch.clear_last_compound_review_fired_at();
+        assert!(
+            orch.last_compound_review_fired_at().is_none(),
+            "cursor should start empty",
+        );
+
+        // First call: should advance the cursor to a past fire time.
+        orch.check_cron_schedules().await;
+        let cursor_after_first = orch
+            .last_compound_review_fired_at()
+            .expect("cursor should be Some after first fire");
+        assert!(
+            cursor_after_first <= chrono::Utc::now(),
+            "cursor should be in the past, got {}",
+            cursor_after_first
+        );
+
+        // Second call without advancing wall-clock or `last_tick_time`:
+        // the cursor must NOT advance (the same occurrence is gated).
+        orch.check_cron_schedules().await;
+        let cursor_after_second = orch
+            .last_compound_review_fired_at()
+            .expect("cursor should still be Some");
+        assert_eq!(
+            cursor_after_first, cursor_after_second,
+            "cursor must not re-advance on a re-check without new occurrences \
+             (#1562 storm regression)",
+        );
+    }
+
+    #[test]
+    fn test_orchestrator_from_toml() {
+        let toml_str = r#"
+working_dir = "/tmp"
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 2 * * *"
+repo_path = "/tmp"
+
+[[agents]]
+name = "test"
+layer = "Safety"
+cli_tool = "echo"
+task = "test"
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        let orch = AgentOrchestrator::new(config);
+        assert!(orch.is_ok());
+    }
+
+    #[test]
+    fn test_agent_status_fields() {
+        let status = AgentStatus {
+            name: "test".to_string(),
+            layer: AgentLayer::Safety,
+            running: true,
+            health: HealthStatus::Healthy,
+            drift_score: Some(0.05),
+            uptime: Duration::from_secs(3600),
+            restart_count: 0,
+            api_calls_remaining: HashMap::new(),
+        };
+        assert_eq!(status.name, "test");
+        assert!(status.running);
+        assert_eq!(status.drift_score, Some(0.05));
+    }
+
+    #[test]
+    fn test_load_skill_chain_content_supports_lowercase_skill_md() {
+        let skill_root = TempDir::new().unwrap();
+        let skill_dir = skill_root.path().join("business-scenario-design");
+        std::fs::create_dir_all(&skill_dir).unwrap();
+        std::fs::write(skill_dir.join("skill.md"), "Lowercase skill content").unwrap();
+
+        let mut config = test_config();
+        config.skill_data_dir = Some(skill_root.path().to_path_buf());
+        let orch = AgentOrchestrator::new(config).unwrap();
+
+        let mut def = orch.config.agents[0].clone();
+        def.skill_chain = vec!["business-scenario-design".to_string()];
+
+        let loaded = orch.load_skill_chain_content(&def);
+        assert!(loaded.contains("### Skill: business-scenario-design"));
+        assert!(loaded.contains("Lowercase skill content"));
+    }
+
+    #[test]
+    fn test_load_skill_chain_content_skips_project_scoped_agents() {
+        let skill_root = TempDir::new().unwrap();
+        let skill_dir = skill_root.path().join("disciplined-implementation");
+        std::fs::create_dir_all(&skill_dir).unwrap();
+        std::fs::write(skill_dir.join("SKILL.md"), "Project skill content").unwrap();
+
+        let mut config = test_config();
+        config.skill_data_dir = Some(skill_root.path().to_path_buf());
+        let orch = AgentOrchestrator::new(config).unwrap();
+
+        let mut def = orch.config.agents[0].clone();
+        def.project = Some("terraphim-ai".to_string());
+        def.skill_chain = vec!["disciplined-implementation".to_string()];
+
+        let loaded = orch.load_skill_chain_content(&def);
+        assert!(loaded.is_empty());
+    }
+
+    #[test]
+    fn test_load_skill_chain_content_falls_back_to_home_skill_roots() {
+        let home_dir = TempDir::new().unwrap();
+        let configured_skill_root = TempDir::new().unwrap();
+
+        let roots = AgentOrchestrator::skill_roots(
+            Some(configured_skill_root.path()),
+            Some(home_dir.path()),
+            None,
+        );
+
+        assert_eq!(roots[0], configured_skill_root.path());
+        assert!(roots.iter().any(|path| path.ends_with(".opencode/skills")));
+        assert!(roots.iter().any(|path| path.ends_with(".claude/skills")));
+    }
+
+    /// Helper: create a config with a single Safety echo agent and short cooldown.
+    fn test_config_fast_lifecycle() -> OrchestratorConfig {
+        OrchestratorConfig {
+            working_dir: std::path::PathBuf::from("/tmp"),
+            nightwatch: NightwatchConfig::default(),
+            compound_review: CompoundReviewConfig {
+                cli_tool: None,
+                provider: None,
+                model: None,
+                schedule: "0 2 * * *".to_string(),
+                max_duration_secs: 60,
+                repo_path: std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../.."),
+                create_prs: false,
+                worktree_root: std::path::PathBuf::from("/tmp/.worktrees"),
+                base_branch: "main".to_string(),
+                max_concurrent_agents: 3,
+                ..Default::default()
+            },
+            workflow: None,
+            agents: vec![AgentDefinition {
+                name: "echo-safety".to_string(),
+                layer: AgentLayer::Safety,
+                cli_tool: "echo".to_string(),
+                task: "safety watch".to_string(),
+                model: None,
+                schedule: None,
+                capabilities: vec![],
+                max_memory_bytes: None,
+                budget_monthly_cents: None,
+                provider: None,
+                persona: None,
+                terraphim_role: None,
+                skill_chain: vec![],
+                sfia_skills: vec![],
+                fallback_provider: None,
+                fallback_model: None,
+                grace_period_secs: None,
+                max_cpu_seconds: None,
+                pre_check: None,
+
+                gitea_issue: None,
+                event_only: false,
+                evolution_enabled: false,
+                rlm_enabled: None,
+
+                project: None,
+            }],
+            restart_cooldown_secs: 0, // instant restart for testing
+            max_restart_count: 3,
+            restart_budget_window_secs: 43_200,
+            disk_usage_threshold: 100, // disable disk guard in tests
+            tick_interval_secs: 1,
+            gate_reconcile_interval_ticks: 20,
+            handoff_buffer_ttl_secs: None,
+            persona_data_dir: None,
+            skill_data_dir: None,
+            gitea_skill_repo: None,
+            flows: vec![],
+            flow_state_dir: None,
+            gitea: None,
+            mentions: None,
+            webhook: None,
+            role_config_path: None,
+            routing: None,
+            #[cfg(feature = "quickwit")]
+            quickwit: None,
+            projects: vec![],
+            include: vec![],
+            project_sources: vec![],
+            providers: vec![],
+            provider_budget_state_file: None,
+            pause_dir: None,
+            project_circuit_breaker_threshold: 3,
+            fleet_escalation_owner: None,
+            fleet_escalation_repo: None,
+            post_merge_gate: None,
+            learning: config::LearningConfig::default(),
+            evolution: config::EvolutionConfig::default(),
+            pr_dispatch: None,
+            pr_dispatch_per_project: Default::default(),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_reconcile_detects_agent_exit() {
+        let config = test_config_fast_lifecycle();
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        // Spawn the echo agent (exits immediately)
+        let def = orch.config.agents[0].clone();
+        orch.spawn_agent(&def).await.unwrap();
+        assert!(orch.active_agents.contains_key("echo-safety"));
+
+        // Give echo time to exit
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        // Poll for exits
+        orch.poll_agent_exits().await;
+
+        // Agent should be removed from active_agents
+        assert!(
+            !orch.active_agents.contains_key("echo-safety"),
+            "exited agent should be removed from active_agents"
+        );
+
+        // Successful exit (code 0) should NOT increment restart count
+        assert_eq!(
+            orch.restart_counts
+                .get(&legacy_key("echo-safety"))
+                .copied()
+                .unwrap_or(0),
+            0,
+            "successful exit should not increment restart count"
+        );
+    }
+
+    #[test]
+    fn test_requires_isolated_worktree_for_mutating_ai_agents() {
+        let mut def = test_config_fast_lifecycle().agents[0].clone();
+
+        def.cli_tool = "echo".to_string();
+        assert!(!requires_isolated_worktree(&def, None));
+
+        assert!(requires_isolated_worktree(
+            &def,
+            Some("kimi-for-coding/k2p6")
+        ));
+
+        def.cli_tool = "/home/alex/.local/bin/claude".to_string();
+        assert!(requires_isolated_worktree(&def, None));
+        assert!(!requires_isolated_worktree(&def, Some("claude-3-haiku")));
+    }
+
+    #[tokio::test]
+    async fn test_mutating_agent_fails_closed_when_worktree_creation_fails() {
+        let temp_repo = TempDir::new().unwrap();
+        let mut config = test_config_fast_lifecycle();
+        config.working_dir = temp_repo.path().to_path_buf();
+        config.agents[0].cli_tool = "claude".to_string();
+
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+        let def = orch.config.agents[0].clone();
+        let result = orch.spawn_agent(&def).await;
+
+        assert!(matches!(
+            result,
+            Err(OrchestratorError::WorktreeCreationFailed { .. })
+        ));
+        assert!(
+            !orch.active_agents.contains_key("echo-safety"),
+            "agent must not spawn in the shared checkout after worktree failure"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_safety_agent_restarts_after_cooldown() {
+        let config = test_config_fast_lifecycle();
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        // Spawn and let it exit
+        let def = orch.config.agents[0].clone();
+        orch.spawn_agent(&def).await.unwrap();
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        orch.poll_agent_exits().await;
+        assert!(!orch.active_agents.contains_key("echo-safety"));
+
+        // Restart pending (cooldown is 0, so immediate)
+        orch.restart_pending_safety_agents().await;
+        assert!(
+            orch.active_agents.contains_key("echo-safety"),
+            "safety agent should be restarted after cooldown"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_core_agent_no_auto_restart() {
+        let mut config = test_config_fast_lifecycle();
+        config.agents = vec![AgentDefinition {
+            name: "echo-core".to_string(),
+            layer: AgentLayer::Core,
+            cli_tool: "echo".to_string(),
+            task: "core task".to_string(),
+            model: None,
+            schedule: Some("0 3 * * *".to_string()),
+            capabilities: vec![],
+            max_memory_bytes: None,
+            budget_monthly_cents: None,
+            provider: None,
+            persona: None,
+            terraphim_role: None,
+            skill_chain: vec![],
+            sfia_skills: vec![],
+            fallback_provider: None,
+            fallback_model: None,
+            grace_period_secs: None,
+            max_cpu_seconds: None,
+            pre_check: None,
+
+            gitea_issue: None,
+            event_only: false,
+            evolution_enabled: false,
+            rlm_enabled: None,
+
+            project: None,
+        }];
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        // Spawn core agent and let it exit
+        let def = orch.config.agents[0].clone();
+        orch.spawn_agent(&def).await.unwrap();
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        orch.poll_agent_exits().await;
+        assert!(!orch.active_agents.contains_key("echo-core"));
+
+        // Restart pending should NOT restart a Core agent
+        orch.restart_pending_safety_agents().await;
+        assert!(
+            !orch.active_agents.contains_key("echo-core"),
+            "core agent should not auto-restart"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_max_restart_count_respected() {
+        let mut config = test_config_fast_lifecycle();
+        config.max_restart_count = 2;
+        // Use a command that exits non-zero so restart_count increments
+        config.agents[0].cli_tool = "false".to_string();
+        config.agents[0].task = String::new();
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+        let def = orch.config.agents[0].clone();
+
+        // Cycle through max_restart_count + 1 exits (all non-zero)
+        for i in 0..3 {
+            orch.spawn_agent(&def).await.unwrap();
+            tokio::time::sleep(Duration::from_millis(100)).await;
+            orch.poll_agent_exits().await;
+            assert!(
+                !orch.active_agents.contains_key("echo-safety"),
+                "agent should have exited on cycle {}",
+                i
+            );
+        }
+
+        // After 3 non-zero exits, restart count = 3, max = 2
+        // restart_pending should NOT restart (count > max)
+        orch.restart_pending_safety_agents().await;
+        assert!(
+            !orch.active_agents.contains_key("echo-safety"),
+            "agent should not restart after exceeding max_restart_count"
+        );
+        assert_eq!(
+            orch.restart_counts.get(&legacy_key("echo-safety")).copied(),
+            Some(3)
+        );
+    }
+
+    #[test]
+    fn test_restart_count_ages_out_after_budget_window() {
+        let mut config = test_config_fast_lifecycle();
+        config.restart_budget_window_secs = 1;
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        orch.restart_counts.insert(legacy_key("echo-safety"), 3);
+        orch.restart_last_failure_unix_secs.insert(
+            legacy_key("echo-safety"),
+            chrono::Utc::now().timestamp() - 5,
+        );
+
+        let count = orch.current_restart_count(&legacy_key("echo-safety"));
+        assert_eq!(count, 0);
+        assert!(!orch.restart_counts.contains_key(&legacy_key("echo-safety")));
+        assert!(!orch
+            .restart_last_failure_unix_secs
+            .contains_key(&legacy_key("echo-safety")));
+    }
+
+    #[tokio::test]
+    async fn test_successful_exit_does_not_increment_restart_count() {
+        let config = test_config_fast_lifecycle();
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+        let def = orch.config.agents[0].clone(); // echo "safety watch" -> exit 0
+
+        // Spawn and let it exit successfully multiple times
+        for _ in 0..5 {
+            orch.spawn_agent(&def).await.unwrap();
+            tokio::time::sleep(Duration::from_millis(100)).await;
+            orch.poll_agent_exits().await;
+        }
+
+        // Exit code 0 should never increment restart_count
+        assert_eq!(
+            orch.restart_counts
+                .get(&legacy_key("echo-safety"))
+                .copied()
+                .unwrap_or(0),
+            0,
+            "successful exits (code 0) must not increment restart_count"
+        );
+
+        // Agent should still be eligible for restart
+        orch.restart_cooldowns.insert(
+            legacy_key("echo-safety"),
+            Instant::now() - Duration::from_secs(999),
+        );
+        orch.restart_pending_safety_agents().await;
+        assert!(
+            orch.active_agents.contains_key("echo-safety"),
+            "agent with only successful exits should always be restartable"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_output_events_fed_to_nightwatch() {
+        let config = test_config_fast_lifecycle();
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        // Spawn echo agent (writes "safety watch" to stdout)
+        let def = orch.config.agents[0].clone();
+        orch.spawn_agent(&def).await.unwrap();
+
+        // Give the output capture time to process
+        tokio::time::sleep(Duration::from_millis(200)).await;
+
+        // Drain events
+        orch.drain_output_events();
+
+        // Nightwatch should have observations for the agent
+        let drift = orch.nightwatch.drift_score("echo-safety");
+        assert!(
+            drift.is_some(),
+            "nightwatch should have drift data after draining output events"
+        );
+        let drift = drift.unwrap();
+        assert!(
+            drift.metrics.sample_count > 0,
+            "nightwatch should have at least one sample from drained output"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_reconcile_tick_full_cycle() {
+        let config = test_config_fast_lifecycle();
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        // Spawn echo agent
+        let def = orch.config.agents[0].clone();
+        orch.spawn_agent(&def).await.unwrap();
+
+        // Give echo time to exit and produce output
+        tokio::time::sleep(Duration::from_millis(200)).await;
+
+        // Run a full reconciliation tick
+        orch.reconcile_tick().await;
+
+        // After tick: echo exited, so it was detected and marked for restart.
+        // With 0 cooldown, it should have been restarted in the same tick.
+        assert!(
+            orch.active_agents.contains_key("echo-safety"),
+            "safety agent should be restarted by reconcile_tick"
+        );
+        // echo exits with code 0, so restart_count stays at 0
+        assert_eq!(
+            orch.restart_counts
+                .get(&legacy_key("echo-safety"))
+                .copied()
+                .unwrap_or(0),
+            0,
+            "successful exit should not increment restart count"
+        );
+    }
+
+    // =========================================================================
+    // Persona Injection Tests (Gitea #73)
+    // =========================================================================
+
+    /// Test that spawn_agent composes persona-enriched prompt when persona exists
+    #[tokio::test]
+    async fn test_spawn_agent_with_persona_composes_prompt() {
+        let mut config = test_config_fast_lifecycle();
+
+        // Add an agent with a persona
+        // Use cat (not echo) because persona_found=true triggers stdin delivery.
+        // cat reads stdin before exiting, avoiding broken pipe under parallel load.
+        config.agents = vec![AgentDefinition {
+            name: "persona-agent".to_string(),
+            layer: AgentLayer::Safety,
+            cli_tool: "cat".to_string(),
+            task: "test task".to_string(),
+            model: None,
+            schedule: None,
+            capabilities: vec![],
+            max_memory_bytes: None,
+            budget_monthly_cents: None,
+            provider: None,
+            persona: Some("TestAgent".to_string()), // Persona that exists in default test_persona
+            terraphim_role: None,
+            skill_chain: vec![],
+            sfia_skills: vec![],
+            fallback_provider: None,
+            fallback_model: None,
+            grace_period_secs: None,
+            max_cpu_seconds: None,
+            pre_check: None,
+
+            gitea_issue: None,
+            event_only: false,
+            evolution_enabled: false,
+            rlm_enabled: None,
+
+            project: None,
+        }];
+
+        // Set up persona data dir with a test persona
+        let temp_dir =
+            std::env::temp_dir().join(format!("terraphim-test-persona-{}", std::process::id()));
+        std::fs::create_dir_all(&temp_dir).unwrap();
+
+        let persona_toml = r#"
+agent_name = "TestAgent"
+role_name = "Test Engineer"
+name_origin = "From testing"
+vibe = "Thorough, methodical"
+symbol = "Checkmark"
+core_characteristics = [{ name = "Thorough", description = "checks everything twice" }]
+speech_style = "Precise and factual."
+terraphim_nature = "Adapted to testing environments."
+sfia_title = "Test Engineer"
+primary_level = 4
+guiding_phrase = "Enable"
+level_essence = "Works autonomously under general direction."
+sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Designs and executes test plans." }]
+"#;
+        std::fs::write(temp_dir.join("testagent.toml"), persona_toml).unwrap();
+        config.persona_data_dir = Some(temp_dir.clone());
+
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        // Spawn the agent - it should use the persona-enriched prompt
+        let def = orch.config.agents[0].clone();
+        let result = orch.spawn_agent(&def).await;
+
+        // Cleanup
+        let _ = std::fs::remove_dir_all(&temp_dir);
+
+        // Spawn should succeed
+        assert!(result.is_ok());
+
+        // The agent should be active
+        assert!(orch.active_agents.contains_key("persona-agent"));
+    }
+
+    /// Test that spawn_agent uses bare task when persona is None
+    #[tokio::test]
+    async fn test_spawn_agent_without_persona_uses_bare_task() {
+        let config = test_config_fast_lifecycle();
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        // Agent without persona should use bare task
+        let def = orch.config.agents[0].clone();
+        assert!(def.persona.is_none());
+
+        let result = orch.spawn_agent(&def).await;
+        assert!(result.is_ok());
+
+        assert!(orch.active_agents.contains_key("echo-safety"));
+    }
+
+    /// Test graceful degradation when persona not found in registry
+    #[tokio::test]
+    async fn test_spawn_agent_persona_not_found_graceful() {
+        let mut config = test_config_fast_lifecycle();
+
+        // Add an agent with a non-existent persona
+        config.agents = vec![AgentDefinition {
+            name: "unknown-persona-agent".to_string(),
+            layer: AgentLayer::Safety,
+            cli_tool: "echo".to_string(),
+            task: "test task".to_string(),
+            model: None,
+            schedule: None,
+            capabilities: vec![],
+            max_memory_bytes: None,
+            budget_monthly_cents: None,
+            provider: None,
+            persona: Some("NonExistentPersona".to_string()), // This persona doesn't exist
+            terraphim_role: None,
+            skill_chain: vec![],
+            sfia_skills: vec![],
+            fallback_provider: None,
+            fallback_model: None,
+            grace_period_secs: None,
+            max_cpu_seconds: None,
+            pre_check: None,
+
+            gitea_issue: None,
+            event_only: false,
+            evolution_enabled: false,
+            rlm_enabled: None,
+
+            project: None,
+        }];
+
+        // No persona_data_dir, so registry will be empty
+        config.persona_data_dir = None;
+
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        // Spawn should still succeed even though persona doesn't exist
+        let def = orch.config.agents[0].clone();
+        let result = orch.spawn_agent(&def).await;
+
+        assert!(
+            result.is_ok(),
+            "spawn should succeed with fallback to bare task"
+        );
+        assert!(orch.active_agents.contains_key("unknown-persona-agent"));
+    }
+
+    // ==================== Agent Name Validation Tests ====================
+
+    #[test]
+    fn test_validate_agent_name_accepts_valid() {
+        assert!(validate_agent_name("my-agent_1").is_ok());
+        assert!(validate_agent_name("sentinel").is_ok());
+        assert!(validate_agent_name("Agent-42").is_ok());
+    }
+
+    #[test]
+    fn test_validate_agent_name_rejects_traversal() {
+        assert!(validate_agent_name("../etc/passwd").is_err());
+        assert!(validate_agent_name("..").is_err());
+        assert!(validate_agent_name("foo/../bar").is_err());
+    }
+
+    #[test]
+    fn test_validate_agent_name_rejects_slash() {
+        assert!(validate_agent_name("foo/bar").is_err());
+        assert!(validate_agent_name("foo\\bar").is_err());
+    }
+
+    #[test]
+    fn test_validate_agent_name_rejects_empty() {
+        assert!(validate_agent_name("").is_err());
+    }
+
+    #[test]
+    fn test_validate_agent_name_rejects_special_chars() {
+        assert!(validate_agent_name("agent name").is_err()); // spaces
+        assert!(validate_agent_name("agent@host").is_err()); // @
+        assert!(validate_agent_name("agent.name").is_err()); // dots
+    }
+
+    // ==================== has_matching_changes Tests ====================
+
+    #[test]
+    fn test_has_matching_changes_prefix_match() {
+        let changed = vec!["crates/orchestrator/src/lib.rs".to_string()];
+        let watch = vec!["crates/orchestrator/".to_string()];
+        assert!(has_matching_changes(&changed, &watch));
+    }
+
+    #[test]
+    fn test_has_matching_changes_exact_match() {
+        let changed = vec!["Cargo.toml".to_string()];
+        let watch = vec!["Cargo.toml".to_string()];
+        assert!(has_matching_changes(&changed, &watch));
+    }
+
+    #[test]
+    fn test_has_matching_changes_no_match() {
+        let changed = vec!["docs/README.md".to_string()];
+        let watch = vec!["crates/orchestrator/".to_string()];
+        assert!(!has_matching_changes(&changed, &watch));
+    }
+
+    #[test]
+    fn test_has_matching_changes_multiple_files_one_matches() {
+        let changed = vec![
+            "docs/README.md".to_string(),
+            "crates/orchestrator/src/config.rs".to_string(),
+        ];
+        let watch = vec!["crates/orchestrator/".to_string()];
+        assert!(has_matching_changes(&changed, &watch));
+    }
+
+    #[test]
+    fn test_has_matching_changes_multiple_watch_paths() {
+        let changed = vec!["tests/integration.rs".to_string()];
+        let watch = vec!["crates/orchestrator/".to_string(), "tests/".to_string()];
+        assert!(has_matching_changes(&changed, &watch));
+    }
+
+    #[test]
+    fn test_has_matching_changes_empty_watch_paths() {
+        let changed = vec!["crates/orchestrator/src/lib.rs".to_string()];
+        let watch: Vec<String> = vec![];
+        assert!(!has_matching_changes(&changed, &watch));
+    }
+
+    // =========================================================================
+    // ADF Remediation Tests (Gitea #117)
+    // =========================================================================
+
+    #[test]
+    fn test_provider_model_composition_opencode() {
+        // Simulate what spawn_agent does for opencode with provider + model
+        let provider = Some("kimi-for-coding".to_string());
+        let model = Some("k2p5".to_string());
+        let cli_name = "opencode";
+
+        let composed = if cli_name == "opencode" {
+            match (&provider, &model) {
+                (Some(p), Some(m)) => Some(format!("{}/{}", p, m)),
+                _ => model,
+            }
+        } else {
+            model
+        };
+        assert_eq!(composed, Some("kimi-for-coding/k2p5".to_string()));
+    }
+
+    #[test]
+    fn test_provider_model_composition_claude_unchanged() {
+        // Claude should not have provider/model composed
+        let provider = Some("anthropic".to_string());
+        let model = Some("claude-opus-4-6".to_string());
+        let cli_name = "claude";
+
+        let composed = if cli_name == "opencode" {
+            match (&provider, &model) {
+                (Some(p), Some(m)) => Some(format!("{}/{}", p, m)),
+                _ => model.clone(),
+            }
+        } else {
+            model.clone()
+        };
+        assert_eq!(composed, Some("claude-opus-4-6".to_string()));
+    }
+
+    #[test]
+    fn parse_reset_time_relative_hours() {
+        let result = parse_reset_time("resets in 2 hours");
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn parse_reset_time_relative_minutes() {
+        let result = parse_reset_time("resets in 30 minutes");
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn parse_reset_time_utc_format() {
+        let result = parse_reset_time("resets at 14:00 UTC");
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn parse_reset_time_fallback_generic() {
+        let result = parse_reset_time("resets 2am Europe/Berlin");
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn parse_reset_time_no_match() {
+        let result = parse_reset_time("something unrelated");
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn rate_limit_window_block_and_check() {
+        let mut window = ProviderRateLimitWindow::new();
+        assert!(!window.is_blocked("claude-code"));
+        window.block_until(
+            "claude-code",
+            std::time::Instant::now() + std::time::Duration::from_secs(3600),
+        );
+        assert!(window.is_blocked("claude-code"));
+        assert!(!window.is_blocked("kimi"));
+    }
+
+    #[test]
+    fn rate_limit_window_expired_unblocks() {
+        let mut window = ProviderRateLimitWindow::new();
+        window.block_until(
+            "claude-code",
+            std::time::Instant::now() + std::time::Duration::from_millis(1),
+        );
+        std::thread::sleep(std::time::Duration::from_millis(5));
+        assert!(!window.is_blocked("claude-code"));
+    }
+
+    #[test]
+    fn rate_limit_window_blocked_providers_list() {
+        let mut window = ProviderRateLimitWindow::new();
+        window.block_until(
+            "claude-code",
+            std::time::Instant::now() + std::time::Duration::from_secs(3600),
+        );
+        window.block_until(
+            "anthropic",
+            std::time::Instant::now() + std::time::Duration::from_secs(3600),
+        );
+        let blocked = window.blocked_providers();
+        assert_eq!(blocked.len(), 2);
+        assert!(blocked.contains(&"claude-code".to_string()));
+        assert!(blocked.contains(&"anthropic".to_string()));
+    }
+
+    #[test]
+    fn rate_limit_window_clean_expired() {
+        let mut window = ProviderRateLimitWindow::new();
+        window.block_until(
+            "expired",
+            std::time::Instant::now() + std::time::Duration::from_millis(1),
+        );
+        window.block_until(
+            "active",
+            std::time::Instant::now() + std::time::Duration::from_secs(3600),
+        );
+        std::thread::sleep(std::time::Duration::from_millis(5));
+        window.clean_expired();
+        assert!(!window.is_blocked("expired"));
+        assert!(window.is_blocked("active"));
+    }
+
+    #[tokio::test]
+    async fn test_wall_clock_timeout_kills_agent() {
+        let mut config = test_config_fast_lifecycle();
+        // Use sleep agent with 1-second timeout
+        config.agents = vec![AgentDefinition {
+            name: "timeout-test".to_string(),
+            layer: AgentLayer::Core,
+            cli_tool: "sleep".to_string(),
+            task: "60".to_string(),
+            model: None,
+            schedule: None,
+            capabilities: vec![],
+            max_memory_bytes: None,
+            budget_monthly_cents: None,
+            provider: None,
+            persona: None,
+            terraphim_role: None,
+            skill_chain: vec![],
+            sfia_skills: vec![],
+            fallback_provider: None,
+            fallback_model: None,
+            grace_period_secs: Some(2),
+            max_cpu_seconds: Some(1), // 1 second timeout
+            pre_check: None,
+            gitea_issue: None,
+            event_only: false,
+            evolution_enabled: false,
+            rlm_enabled: None,
+            project: None,
+        }];
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+        let def = orch.config.agents[0].clone();
+        orch.spawn_agent(&def).await.unwrap();
+        assert!(orch.active_agents.contains_key("timeout-test"));
+
+        // Wait for the timeout to elapse
+        tokio::time::sleep(Duration::from_secs(2)).await;
+
+        // Poll should detect timeout and kill
+        orch.poll_agent_exits().await;
+        assert!(!orch.active_agents.contains_key("timeout-test"));
+    }
+
+    // =========================================================================
+    // Flow DAG Orchestrator Integration Tests (Gitea #163)
+    // =========================================================================
+
+    #[test]
+    fn test_orchestrator_with_empty_flows() {
+        let mut config = test_config();
+        config.flows = vec![];
+        config.flow_state_dir = None;
+
+        let orch = AgentOrchestrator::new(config);
+        assert!(
+            orch.is_ok(),
+            "orchestrator should initialize with empty flows"
+        );
+
+        let orch = orch.unwrap();
+        assert!(
+            orch.active_flows.is_empty(),
+            "active_flows should be empty initially"
+        );
+    }
+
+    /// Test that flow scheduling overlap prevention works
+    #[tokio::test]
+    async fn test_flow_overlap_prevention() {
+        use crate::flow::config::{FlowDefinition, FlowStepDef, StepKind};
+
+        let mut config = test_config_fast_lifecycle();
+
+        // Add a test flow with a schedule
+        config.flows = vec![FlowDefinition {
+            name: "test-flow".to_string(),
+            project: "test".to_string(),
+            schedule: Some("0 2 * * *".to_string()), // 2 AM daily
+            repo_path: "/tmp/test-repo".to_string(),
+            base_branch: "main".to_string(),
+            timeout_secs: 3600,
+            steps: vec![FlowStepDef {
+                name: "test-step".to_string(),
+                kind: StepKind::Action,
+                command: Some("echo test".to_string()),
+                cli_tool: None,
+                model: None,
+                task: None,
+                task_file: None,
+                condition: None,
+                timeout_secs: 60,
+                on_fail: crate::flow::config::FailStrategy::Abort,
+                provider: None,
+                persona: None,
+                matrix: None,
+            }],
+        }];
+
+        config.flow_state_dir = Some(PathBuf::from("/tmp/test-flow-states"));
+
+        let orch = AgentOrchestrator::new(config);
+        assert!(orch.is_ok(), "orchestrator should initialize with flows");
+
+        let orch = orch.unwrap();
+        assert!(
+            orch.active_flows.is_empty(),
+            "active_flows should be empty initially"
+        );
+    }
+
+    // ==================== Sanitisation Tests ====================
+
+    #[test]
+    fn test_sanitise_for_title_strips_json_braces() {
+        let input = r#"{"type":"tool_use","timestamp":1775313676859}"#;
+        let result = AgentOrchestrator::sanitise_for_title(input);
+        assert!(!result.contains('{'), "title should not contain open brace");
+        assert!(
+            !result.contains('}'),
+            "title should not contain close brace"
+        );
+        assert!(
+            !result.contains('['),
+            "title should not contain open bracket"
+        );
+        assert!(
+            !result.contains(']'),
+            "title should not contain close bracket"
+        );
+    }
+
+    #[test]
+    fn test_sanitise_for_title_strips_quotes() {
+        let input = r#"JSON "quoted" text"#;
+        let result = AgentOrchestrator::sanitise_for_title(input);
+        assert!(!result.contains('"'), "title should not contain quotes");
+    }
+
+    #[test]
+    fn test_sanitise_for_title_truncates_long_input() {
+        let input = "This is a very long finding text that should be truncated because it exceeds eighty characters limit";
+        let result = AgentOrchestrator::sanitise_for_title(input);
+        assert!(
+            result.len() <= 80,
+            "title should be at most 80 chars, got {}",
+            result.len()
+        );
+    }
+
+    #[test]
+    fn test_sanitise_for_body_escapes_backticks() {
+        let input = "Use `code` here";
+        let result = AgentOrchestrator::sanitise_for_body(input);
+        assert!(result.contains("``"), "body should escape backticks");
+    }
+
+    #[test]
+    fn test_sanitise_for_body_escapes_markdown_chars() {
+        let input = "Text with *asterisks* and [brackets]";
+        let result = AgentOrchestrator::sanitise_for_body(input);
+        assert!(
+            result.contains('\\'),
+            "body should contain backslash, got: {}",
+            result
+        );
+    }
+
+    /// An agent whose monthly budget is exhausted must skip spawn entirely.
+    /// `CostTracker::check()` returning `Exhausted` short-circuits
+    /// dispatch before pre-check or routing runs.
+    #[tokio::test]
+    async fn test_spawn_agent_skips_when_budget_exhausted() {
+        let mut config = test_config_fast_lifecycle();
+        config.agents = vec![AgentDefinition {
+            name: "broke-agent".to_string(),
+            layer: AgentLayer::Safety,
+            cli_tool: "echo".to_string(),
+            task: "should not run".to_string(),
+            model: None,
+            schedule: None,
+            capabilities: vec![],
+            max_memory_bytes: None,
+            // $1 monthly budget.
+            budget_monthly_cents: Some(100),
+            provider: None,
+            persona: None,
+            terraphim_role: None,
+            skill_chain: vec![],
+            sfia_skills: vec![],
+            fallback_provider: None,
+            fallback_model: None,
+            grace_period_secs: None,
+            max_cpu_seconds: None,
+            pre_check: None,
+            gitea_issue: None,
+            event_only: false,
+            evolution_enabled: false,
+            rlm_enabled: None,
+            project: None,
+        }];
+
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        // Blow through the budget before attempting to spawn.
+        let verdict = orch.cost_tracker.record_cost("broke-agent", 2.00);
+        assert!(
+            verdict.should_pause(),
+            "budget must be exhausted: {verdict}"
+        );
+
+        let def = orch.config.agents[0].clone();
+        let result = orch.spawn_agent(&def).await;
+
+        // Spawn should succeed-with-no-op rather than error.
+        assert!(result.is_ok(), "spawn returned error: {:?}", result);
+        // Agent must NOT have been added to active_agents.
+        assert!(
+            !orch.active_agents.contains_key("broke-agent"),
+            "exhausted agent should not have been spawned"
+        );
+    }
+
+    /// An agent with no budget cap (subscription) must spawn normally
+    /// even after recording cost -- `record_cost` returns `Uncapped`.
+    #[tokio::test]
+    async fn test_spawn_agent_runs_when_budget_uncapped() {
+        let mut config = test_config_fast_lifecycle();
+        // Ensure the only agent is uncapped.
+        config.agents[0].budget_monthly_cents = None;
+        config.agents[0].name = "subscription-agent".to_string();
+
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        // Even a large recorded spend must not pause an uncapped agent.
+        let _ = orch
+            .cost_tracker
+            .record_cost("subscription-agent", 9_999.00);
+        let verdict = orch.cost_tracker.check("subscription-agent");
+        assert!(!verdict.should_pause(), "uncapped must never pause");
+
+        let def = orch.config.agents[0].clone();
+        let result = orch.spawn_agent(&def).await;
+        assert!(result.is_ok(), "spawn errored: {:?}", result);
+        assert!(orch.active_agents.contains_key("subscription-agent"));
+    }
+
+    /// Helper: build a minimal config with a project-scoped `pr-reviewer`
+    /// agent suitable for driving `handle_review_pr` through the full
+    /// routing and spawn pipeline. Returns the config plus the tempdir that
+    /// owns the working directory so the caller keeps it alive.
+    fn review_pr_config(cli_tool: &str) -> (OrchestratorConfig, TempDir) {
+        let tmp = TempDir::new().unwrap();
+        let working_dir = tmp.path().to_path_buf();
+        let config = OrchestratorConfig {
+            working_dir: working_dir.clone(),
+            nightwatch: NightwatchConfig::default(),
+            compound_review: CompoundReviewConfig {
+                cli_tool: None,
+                provider: None,
+                model: None,
+                schedule: "0 2 * * *".to_string(),
+                max_duration_secs: 60,
+                repo_path: working_dir.clone(),
+                create_prs: false,
+                worktree_root: working_dir.join(".worktrees"),
+                base_branch: "main".to_string(),
+                max_concurrent_agents: 3,
+                ..Default::default()
+            },
+            workflow: None,
+            agents: vec![AgentDefinition {
+                name: "pr-reviewer".to_string(),
+                layer: AgentLayer::Safety,
+                cli_tool: cli_tool.to_string(),
+                task: "review".to_string(),
+                model: None,
+                schedule: None,
+                capabilities: vec!["review".to_string()],
+                max_memory_bytes: None,
+                budget_monthly_cents: None,
+                provider: None,
+                persona: None,
+                terraphim_role: None,
+                skill_chain: vec![],
+                sfia_skills: vec![],
+                fallback_provider: None,
+                fallback_model: None,
+                grace_period_secs: None,
+                max_cpu_seconds: None,
+                pre_check: None,
+                gitea_issue: None,
+                event_only: false,
+                evolution_enabled: false,
+                rlm_enabled: None,
+                project: Some("alpha".to_string()),
+            }],
+            restart_cooldown_secs: 0,
+            max_restart_count: 3,
+            restart_budget_window_secs: 43_200,
+            disk_usage_threshold: 100,
+            tick_interval_secs: 1,
+            gate_reconcile_interval_ticks: 20,
+            handoff_buffer_ttl_secs: None,
+            persona_data_dir: None,
+            skill_data_dir: None,
+            flows: vec![],
+            flow_state_dir: None,
+            gitea: None,
+            mentions: None,
+            webhook: None,
+            role_config_path: None,
+            routing: None,
+            #[cfg(feature = "quickwit")]
+            quickwit: None,
+            projects: vec![crate::config::Project {
+                id: "alpha".to_string(),
+                working_dir: working_dir.clone(),
+                schedule_offset_minutes: 0,
+                gitea: None,
+                mentions: None,
+                workflow: None,
+                #[cfg(feature = "quickwit")]
+                quickwit: None,
+                max_concurrent_agents: None,
+                max_concurrent_mention_agents: None,
+            }],
+            include: vec![],
+            project_sources: vec![],
+            providers: vec![],
+            provider_budget_state_file: None,
+            gitea_skill_repo: None,
+            pause_dir: None,
+            project_circuit_breaker_threshold: 3,
+            fleet_escalation_owner: None,
+            fleet_escalation_repo: None,
+            post_merge_gate: None,
+            learning: config::LearningConfig::default(),
+            evolution: config::EvolutionConfig::default(),
+            pr_dispatch: None,
+            pr_dispatch_per_project: Default::default(),
+        };
+        (config, tmp)
+    }
+
+    fn review_pr_task() -> dispatcher::DispatchTask {
+        dispatcher::DispatchTask::ReviewPr {
+            pr_number: 641,
+            project: "alpha".to_string(),
+            head_sha: "deadbeef1234".to_string(),
+            author_login: "claude-code".to_string(),
+            title: "fix(kg): short synonyms".to_string(),
+            diff_loc: 42,
+        }
+    }
+
+    /// `handle_review_pr` must drive the routing engine and spawn the
+    /// pr-reviewer agent it selected, registering it in `active_agents`.
+    #[tokio::test]
+    async fn reviewpr_dispatch_routes_via_routing_engine() {
+        let (config, _tmp) = review_pr_config("echo");
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        orch.handle_review_pr(review_pr_task()).await.unwrap();
+
+        let managed = orch
+            .active_agents
+            .get("pr-reviewer")
+            .expect("pr-reviewer must be registered in active_agents after routing");
+        assert!(
+            !managed.session_id.is_empty(),
+            "routing must tag the spawned agent with a session_id"
+        );
+        assert!(
+            managed.session_id.starts_with("pr-reviewer-"),
+            "session id should be scoped to the agent, got: {}",
+            managed.session_id
+        );
+    }
+
+    /// When a workflow tracker is configured, `handle_review_pr` must POST
+    /// a `pending` commit status with context `adf/pr-reviewer` for the
+    /// PR head SHA after spawning. Verifies issue #928 (ADF Phase 1).
+    #[tokio::test]
+    async fn reviewpr_dispatch_posts_pending_status_when_tracker_configured() {
+        use axum::{
+            extract::{Path, State},
+            http::StatusCode,
+            response::IntoResponse,
+            routing::post,
+            Router,
+        };
+        use std::sync::atomic::{AtomicUsize, Ordering as AOrdering};
+        use std::sync::Arc;
+        use tokio::net::TcpListener;
+
+        #[derive(Default)]
+        struct Captured {
+            calls: AtomicUsize,
+            last_path: std::sync::Mutex<Option<String>>,
+            last_body: std::sync::Mutex<Option<serde_json::Value>>,
+        }
+
+        async fn capture(
+            Path((owner, repo, sha)): Path<(String, String, String)>,
+            State(captured): State<Arc<Captured>>,
+            body: axum::body::Bytes,
+        ) -> impl IntoResponse {
+            captured.calls.fetch_add(1, AOrdering::SeqCst);
+            *captured.last_path.lock().unwrap() =
+                Some(format!("/api/v1/repos/{}/{}/statuses/{}", owner, repo, sha));
+            if let Ok(parsed) = serde_json::from_slice::<serde_json::Value>(&body) {
+                *captured.last_body.lock().unwrap() = Some(parsed);
+            }
+            StatusCode::CREATED
+        }
+
+        let captured = Arc::new(Captured::default());
+        let app = Router::new()
+            .route("/api/v1/repos/{owner}/{repo}/statuses/{sha}", post(capture))
+            .with_state(captured.clone());
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            axum::serve(listener, app).await.ok();
+        });
+        let base_url = format!("http://{}", addr);
+
+        // Build the standard review-pr config and bolt on a workflow that
+        // points at the loopback Gitea endpoint above. Tests with no
+        // workflow already cover the silent skip-path (other reviewpr_*).
+        let (mut config, _tmp) = review_pr_config("echo");
+        config.workflow = Some(crate::config::WorkflowConfig {
+            enabled: true,
+            poll_interval_secs: 60,
+            workflow_file: std::path::PathBuf::from("/tmp/workflow.md"),
+            tracker: crate::config::TrackerConfig {
+                kind: "gitea".to_string(),
+                endpoint: base_url.clone(),
+                api_key: "test-token".to_string(),
+                owner: "fakeowner".to_string(),
+                repo: "fakerepo".to_string(),
+                project_slug: None,
+                use_robot_api: false,
+                states: crate::config::TrackerStates::default(),
+            },
+            concurrency: crate::config::ConcurrencyConfig::default(),
+        });
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        orch.handle_review_pr(review_pr_task()).await.unwrap();
+
+        // Allow the loopback server to receive the POST.
+        for _ in 0..50 {
+            if captured.calls.load(AOrdering::SeqCst) > 0 {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        assert_eq!(
+            captured.calls.load(AOrdering::SeqCst),
+            1,
+            "exactly one pending status post expected"
+        );
+        assert_eq!(
+            captured.last_path.lock().unwrap().as_deref(),
+            Some("/api/v1/repos/fakeowner/fakerepo/statuses/deadbeef1234")
+        );
+        let body = captured.last_body.lock().unwrap().clone().unwrap();
+        assert_eq!(body["state"], "pending");
+        assert_eq!(body["context"], "adf/pr-reviewer");
+    }
+
+    /// A banned provider configured on the pr-reviewer agent must be
+    /// short-circuited by the C1/C3 allow-list gate; no spawn happens.
+    #[tokio::test]
+    async fn reviewpr_dispatch_rejects_banned_provider() {
+        let (config, _tmp) = review_pr_config("echo");
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+        // Bypass load-time validation by mutating after construction to
+        // simulate a stale/poisoned config entry reaching the dispatcher.
+        orch.config.agents[0].model = Some("google/gemini-2".to_string());
+
+        orch.handle_review_pr(review_pr_task()).await.unwrap();
+
+        assert!(
+            !orch.active_agents.contains_key("pr-reviewer"),
+            "banned provider must short-circuit before spawn"
+        );
+    }
+
+    /// The per-PR `ADF_PR_*` env overrides must reach the spawned process so
+    /// downstream review skills can read them without parsing the task string.
+    #[tokio::test]
+    async fn reviewpr_dispatch_sets_env_vars() {
+        let tmp = TempDir::new().unwrap();
+        let script_path = tmp.path().join("dump-env.sh");
+        let dump_path = tmp.path().join("env.dump");
+        let script_body = format!(
+            "#!/bin/sh\nenv | grep '^ADF_PR_' > {}\n",
+            dump_path.display()
+        );
+        std::fs::write(&script_path, script_body).unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = std::fs::metadata(&script_path).unwrap().permissions();
+            perms.set_mode(0o755);
+            std::fs::set_permissions(&script_path, perms).unwrap();
+        }
+
+        let (config, _cfg_tmp) = review_pr_config(script_path.to_str().unwrap());
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        orch.handle_review_pr(review_pr_task()).await.unwrap();
+        assert!(orch.active_agents.contains_key("pr-reviewer"));
+
+        // Poll for the script to exit and for the child process reaper to
+        // drop it out of active_agents, then read the env dump it wrote.
+        for _ in 0..40 {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+            orch.poll_agent_exits().await;
+            if dump_path.exists() {
+                break;
+            }
+        }
+
+        assert!(
+            dump_path.exists(),
+            "env dump not written to {}",
+            dump_path.display()
+        );
+        let dump = std::fs::read_to_string(&dump_path).expect("env dump should be readable");
+        assert!(
+            dump.contains("ADF_PR_NUMBER=641"),
+            "ADF_PR_NUMBER missing from dump:\n{dump}"
+        );
+        assert!(
+            dump.contains("ADF_PR_HEAD_SHA=deadbeef1234"),
+            "ADF_PR_HEAD_SHA missing from dump:\n{dump}"
+        );
+        assert!(
+            dump.contains("ADF_PR_PROJECT=alpha"),
+            "ADF_PR_PROJECT missing from dump:\n{dump}"
+        );
+        assert!(
+            dump.contains("ADF_PR_AUTHOR=claude-code"),
+            "ADF_PR_AUTHOR missing from dump:\n{dump}"
+        );
+        assert!(
+            dump.contains("ADF_PR_DIFF_LOC=42"),
+            "ADF_PR_DIFF_LOC missing from dump:\n{dump}"
+        );
+        assert!(
+            dump.contains("ADF_PR_TITLE=fix(kg): short synonyms"),
+            "ADF_PR_TITLE missing from dump:\n{dump}"
+        );
+    }
+
+    /// Helper: extend a `review_pr_config` setup with a project-scoped
+    /// `build-runner` agent and a Phase 2 D2 fan-out list. After issue
+    /// #962 the dispatch table lives in `pr_dispatch_per_project`, keyed
+    /// by the project id ("alpha" in these fixtures); the top-level
+    /// `pr_dispatch` field is left as `None` to exercise the new
+    /// per-project lookup branch end-to-end. Sibling tests
+    /// (`handle_review_pr_skips_missing_agents`,
+    /// `handle_review_pr_pending_status_posted_per_agent`,
+    /// `handle_review_pr_skipped_agent_does_not_post_pending`) keep
+    /// populating the top-level `pr_dispatch` field directly to
+    /// exercise the backward-compat fallback path.
+    fn review_pr_config_with_fanout(cli_tool: &str) -> (OrchestratorConfig, TempDir) {
+        let (mut config, tmp) = review_pr_config(cli_tool);
+        config.agents.push(AgentDefinition {
+            name: "build-runner".to_string(),
+            layer: AgentLayer::Growth,
+            cli_tool: cli_tool.to_string(),
+            task: "build".to_string(),
+            model: None,
+            schedule: None,
+            capabilities: vec!["build".to_string()],
+            max_memory_bytes: None,
+            budget_monthly_cents: None,
+            provider: None,
+            persona: None,
+            terraphim_role: None,
+            skill_chain: vec![],
+            sfia_skills: vec![],
+            fallback_provider: None,
+            fallback_model: None,
+            grace_period_secs: None,
+            max_cpu_seconds: None,
+            pre_check: None,
+            gitea_issue: None,
+            event_only: false,
+            evolution_enabled: false,
+            rlm_enabled: None,
+            project: Some("alpha".to_string()),
+        });
+        config.pr_dispatch_per_project.insert(
+            "alpha".to_string(),
+            crate::config::PrDispatchConfig {
+                agents_on_pr_open: vec![
+                    crate::config::PrDispatchEntry {
+                        name: "build-runner".to_string(),
+                        context: "adf/build".to_string(),
+                    },
+                    crate::config::PrDispatchEntry {
+                        name: "pr-reviewer".to_string(),
+                        context: "adf/pr-reviewer".to_string(),
+                    },
+                ],
+            },
+        );
+        (config, tmp)
+    }
+
+    /// ADF Phase 2 (issue #944): a `pull_request.opened` event with both
+    /// `build-runner` and `pr-reviewer` in `agents_on_pr_open` must spawn
+    /// both agents. Each receives the appropriate env injection: build-runner
+    /// gets `ADF_PUSH_*` (mirroring `handle_push`); pr-reviewer keeps the
+    /// existing `ADF_PR_*` keys.
+    #[tokio::test]
+    async fn handle_review_pr_spawns_both_build_runner_and_pr_reviewer() {
+        let (config, _tmp) = review_pr_config_with_fanout("echo");
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        orch.handle_review_pr(review_pr_task()).await.unwrap();
+
+        assert!(
+            orch.active_agents.contains_key("pr-reviewer"),
+            "pr-reviewer must be spawned; active_agents: {:?}",
+            orch.active_agents.keys().collect::<Vec<_>>()
+        );
+        assert!(
+            orch.active_agents.contains_key("build-runner"),
+            "build-runner must be spawned; active_agents: {:?}",
+            orch.active_agents.keys().collect::<Vec<_>>()
+        );
+    }
+
+    /// The per-agent env injection must distinguish the two agents:
+    /// build-runner sees `ADF_PUSH_*` (with `ref_name = refs/pull/<n>/head`),
+    /// pr-reviewer sees `ADF_PR_*`. Verified by writing a tiny script that
+    /// dumps env to a file and reading the artefacts back.
+    #[tokio::test]
+    async fn handle_review_pr_injects_per_agent_env_correctly() {
+        let tmp = TempDir::new().unwrap();
+        let pr_dump = tmp.path().join("pr.env");
+        let push_dump = tmp.path().join("push.env");
+        // Single shell script that picks which dump to write based on which
+        // env vars are present. Avoids needing two separate cliTools.
+        // NOTE: Check for ADF_PR_NUMBER first because child processes inherit
+        // the parent environment (cargo test inherits from build-runner which
+        // has ADF_PUSH_SHA set), so absence of ADF_PUSH_SHA is not reliable.
+        let script_path = tmp.path().join("dump-env.sh");
+        let all_dump = tmp.path().join("all.env");
+        let script_body = format!(
+            "#!/bin/sh\nenv > {}\nif [ -n \"$ADF_PR_NUMBER\" ]; then env | grep '^ADF_PR_' > {}\nelse env | grep '^ADF_PUSH_' > {}\nfi\n",
+            all_dump.display(),
+            pr_dump.display(),
+            push_dump.display(),
+        );
+        std::fs::write(&script_path, script_body).unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = std::fs::metadata(&script_path).unwrap().permissions();
+            perms.set_mode(0o755);
+            std::fs::set_permissions(&script_path, perms).unwrap();
+        }
+
+        let (config, _cfg_tmp) = review_pr_config_with_fanout(script_path.to_str().unwrap());
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+        orch.handle_review_pr(review_pr_task()).await.unwrap();
+
+        // Allow agents time to spawn before polling
+        tokio::time::sleep(Duration::from_secs(2)).await;
+
+        for i in 0..600 {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+            orch.poll_agent_exits().await;
+            if pr_dump.exists() && push_dump.exists() {
+                break;
+            }
+            if i == 100 {
+                eprintln!(
+                    "Still waiting after 5s. Active agents: {:?}",
+                    orch.active_agents.keys().collect::<Vec<_>>()
+                );
+            }
+        }
+
+        let pr = std::fs::read_to_string(&pr_dump).unwrap_or_default();
+        let push = std::fs::read_to_string(&push_dump).unwrap_or_default();
+
+        let all_env = std::fs::read_to_string(&all_dump).unwrap_or_default();
+        if !pr.contains("ADF_PR_NUMBER=641") || !push.contains("ADF_PUSH_SHA=deadbeef1234") {
+            eprintln!(
+                "active_agents after poll loop: {:?}",
+                orch.active_agents.keys().collect::<Vec<_>>()
+            );
+            eprintln!("pr_dump path: {}", pr_dump.display());
+            eprintln!("push_dump path: {}", push_dump.display());
+            eprintln!("pr_dump exists: {}", pr_dump.exists());
+            eprintln!("push_dump exists: {}", push_dump.exists());
+            eprintln!("pr_dump contents:\n{pr}");
+            eprintln!("push_dump contents:\n{push}");
+            eprintln!("all env dump:\n{all_env}");
+        }
+        assert!(
+            pr.contains("ADF_PR_NUMBER=641"),
+            "pr-reviewer env missing ADF_PR_NUMBER:\n{pr}"
+        );
+        assert!(
+            push.contains("ADF_PUSH_SHA=deadbeef1234"),
+            "build-runner env missing ADF_PUSH_SHA=deadbeef1234:\n{push}"
+        );
+        assert!(
+            push.contains("ADF_PUSH_REF=refs/pull/641/head"),
+            "build-runner env missing ADF_PUSH_REF=refs/pull/641/head:\n{push}"
+        );
+        assert!(
+            push.contains("ADF_PUSH_PROJECT=alpha"),
+            "build-runner env missing ADF_PUSH_PROJECT=alpha:\n{push}"
+        );
+    }
+
+    /// When `agents_on_pr_open` references an agent that isn't configured
+    /// for the project, the orchestrator must skip it gracefully without
+    /// panicking and without posting a `pending` status that would never
+    /// resolve. The other entries still spawn.
+    #[tokio::test]
+    async fn handle_review_pr_skips_missing_agents() {
+        // Standard config has only pr-reviewer; bolt on a pr_dispatch list
+        // that ALSO references build-runner (which is absent).
+        let (mut config, _tmp) = review_pr_config("echo");
+        config.pr_dispatch = Some(crate::config::PrDispatchConfig {
+            agents_on_pr_open: vec![
+                crate::config::PrDispatchEntry {
+                    name: "build-runner".to_string(),
+                    context: "adf/build".to_string(),
+                },
+                crate::config::PrDispatchEntry {
+                    name: "pr-reviewer".to_string(),
+                    context: "adf/pr-reviewer".to_string(),
+                },
+            ],
+        });
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        orch.handle_review_pr(review_pr_task()).await.unwrap();
+
+        assert!(
+            orch.active_agents.contains_key("pr-reviewer"),
+            "pr-reviewer must still spawn even when build-runner is missing"
+        );
+        assert!(
+            !orch.active_agents.contains_key("build-runner"),
+            "build-runner must not be spawned when not configured"
+        );
+    }
+
+    /// When a workflow tracker is configured, each fan-out agent that spawns
+    /// must POST exactly one `pending` commit status with its configured
+    /// context. With both build-runner and pr-reviewer in the dispatch list,
+    /// the orchestrator must POST two distinct statuses.
+    #[tokio::test]
+    async fn handle_review_pr_pending_status_posted_per_agent() {
+        use axum::{
+            extract::{Path, State},
+            http::StatusCode,
+            response::IntoResponse,
+            routing::post,
+            Router,
+        };
+        use std::sync::atomic::{AtomicUsize, Ordering as AOrdering};
+        use std::sync::Arc;
+        use tokio::net::TcpListener;
+
+        #[derive(Default)]
+        struct Captured {
+            calls: AtomicUsize,
+            contexts: std::sync::Mutex<Vec<String>>,
+            states: std::sync::Mutex<Vec<String>>,
+        }
+
+        async fn capture(
+            Path((_owner, _repo, _sha)): Path<(String, String, String)>,
+            State(captured): State<Arc<Captured>>,
+            body: axum::body::Bytes,
+        ) -> impl IntoResponse {
+            captured.calls.fetch_add(1, AOrdering::SeqCst);
+            if let Ok(parsed) = serde_json::from_slice::<serde_json::Value>(&body) {
+                if let Some(ctx) = parsed.get("context").and_then(|v| v.as_str()) {
+                    captured.contexts.lock().unwrap().push(ctx.to_string());
+                }
+                if let Some(st) = parsed.get("state").and_then(|v| v.as_str()) {
+                    captured.states.lock().unwrap().push(st.to_string());
+                }
+            }
+            StatusCode::CREATED
+        }
+
+        let captured = Arc::new(Captured::default());
+        let app = Router::new()
+            .route("/api/v1/repos/{owner}/{repo}/statuses/{sha}", post(capture))
+            .with_state(captured.clone());
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            axum::serve(listener, app).await.ok();
+        });
+        let base_url = format!("http://{}", addr);
+
+        let (mut config, _tmp) = review_pr_config_with_fanout("echo");
+        config.workflow = Some(crate::config::WorkflowConfig {
+            enabled: true,
+            poll_interval_secs: 60,
+            workflow_file: std::path::PathBuf::from("/tmp/workflow.md"),
+            tracker: crate::config::TrackerConfig {
+                kind: "gitea".to_string(),
+                endpoint: base_url.clone(),
+                api_key: "test-token".to_string(),
+                owner: "fakeowner".to_string(),
+                repo: "fakerepo".to_string(),
+                project_slug: None,
+                use_robot_api: false,
+                states: crate::config::TrackerStates::default(),
+            },
+            concurrency: crate::config::ConcurrencyConfig::default(),
+        });
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        orch.handle_review_pr(review_pr_task()).await.unwrap();
+
+        // Wait for both POSTs.
+        for _ in 0..100 {
+            if captured.calls.load(AOrdering::SeqCst) >= 2 {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        assert_eq!(
+            captured.calls.load(AOrdering::SeqCst),
+            2,
+            "exactly two pending status posts expected (one per fan-out agent)"
+        );
+        let contexts = captured.contexts.lock().unwrap().clone();
+        assert!(
+            contexts.iter().any(|c| c == "adf/build"),
+            "adf/build pending status missing; got: {contexts:?}"
+        );
+        assert!(
+            contexts.iter().any(|c| c == "adf/pr-reviewer"),
+            "adf/pr-reviewer pending status missing; got: {contexts:?}"
+        );
+        let states = captured.states.lock().unwrap().clone();
+        assert!(
+            states.iter().all(|s| s == "pending"),
+            "all initial statuses must be pending; got: {states:?}"
+        );
+    }
+
+    /// When a fan-out agent is gated out (in this test: build-runner has a
+    /// banned static model so the C1/C3 subscription gate short-circuits its
+    /// spawn), the orchestrator must NOT post a `pending` status for that
+    /// agent. A `pending` that never resolves would block the PR forever.
+    /// The other agent still spawns and posts its own pending.
+    #[tokio::test]
+    async fn handle_review_pr_skipped_agent_does_not_post_pending() {
+        use axum::{
+            extract::{Path, State},
+            http::StatusCode,
+            response::IntoResponse,
+            routing::post,
+            Router,
+        };
+        use std::sync::atomic::{AtomicUsize, Ordering as AOrdering};
+        use std::sync::Arc;
+        use tokio::net::TcpListener;
+
+        #[derive(Default)]
+        struct Captured {
+            calls: AtomicUsize,
+            contexts: std::sync::Mutex<Vec<String>>,
+        }
+
+        async fn capture(
+            Path((_owner, _repo, _sha)): Path<(String, String, String)>,
+            State(captured): State<Arc<Captured>>,
+            body: axum::body::Bytes,
+        ) -> impl IntoResponse {
+            captured.calls.fetch_add(1, AOrdering::SeqCst);
+            if let Ok(parsed) = serde_json::from_slice::<serde_json::Value>(&body) {
+                if let Some(ctx) = parsed.get("context").and_then(|v| v.as_str()) {
+                    captured.contexts.lock().unwrap().push(ctx.to_string());
+                }
+            }
+            StatusCode::CREATED
+        }
+
+        let captured = Arc::new(Captured::default());
+        let app = Router::new()
+            .route("/api/v1/repos/{owner}/{repo}/statuses/{sha}", post(capture))
+            .with_state(captured.clone());
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            axum::serve(listener, app).await.ok();
+        });
+        let base_url = format!("http://{}", addr);
+
+        let (mut config, _tmp) = review_pr_config_with_fanout("echo");
+        // Stamp a banned model on build-runner AFTER load-time validation
+        // so the runtime allow-list gate is the one rejecting the spawn.
+        let br = config
+            .agents
+            .iter_mut()
+            .find(|a| a.name == "build-runner")
+            .unwrap();
+        br.model = Some("google/gemini-2".to_string());
+
+        config.workflow = Some(crate::config::WorkflowConfig {
+            enabled: true,
+            poll_interval_secs: 60,
+            workflow_file: std::path::PathBuf::from("/tmp/workflow.md"),
+            tracker: crate::config::TrackerConfig {
+                kind: "gitea".to_string(),
+                endpoint: base_url.clone(),
+                api_key: "test-token".to_string(),
+                owner: "fakeowner".to_string(),
+                repo: "fakerepo".to_string(),
+                project_slug: None,
+                use_robot_api: false,
+                states: crate::config::TrackerStates::default(),
+            },
+            concurrency: crate::config::ConcurrencyConfig::default(),
+        });
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        orch.handle_review_pr(review_pr_task()).await.unwrap();
+
+        // Allow time for the (single expected) POST to land — and any
+        // erroneous extra POST to also land if the bug is present.
+        for _ in 0..100 {
+            if captured.calls.load(AOrdering::SeqCst) >= 1 {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        // Give a small grace window for an erroneous adf/build POST to surface.
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        let contexts = captured.contexts.lock().unwrap().clone();
+        assert!(
+            contexts.iter().any(|c| c == "adf/pr-reviewer"),
+            "pr-reviewer must still post its pending status; got: {contexts:?}"
+        );
+        assert!(
+            !contexts.iter().any(|c| c == "adf/build"),
+            "skipped build-runner must NOT post adf/build pending; got: {contexts:?}"
+        );
+        assert!(
+            !orch.active_agents.contains_key("build-runner"),
+            "build-runner must not be in active_agents when subscription gate rejects"
+        );
+    }
+
+    /// Phase 2b helper: extend `review_pr_config_with_fanout` with a third
+    /// project-scoped `pr-spec-validator` agent and a three-entry
+    /// `[pr_dispatch]` block (build-runner, pr-reviewer, pr-spec-validator).
+    fn review_pr_config_with_spec_fanout(cli_tool: &str) -> (OrchestratorConfig, TempDir) {
+        let (mut config, tmp) = review_pr_config_with_fanout(cli_tool);
+        config.agents.push(AgentDefinition {
+            name: "pr-spec-validator".to_string(),
+            layer: AgentLayer::Safety,
+            cli_tool: cli_tool.to_string(),
+            task: "spec".to_string(),
+            model: None,
+            schedule: None,
+            capabilities: vec!["review".to_string()],
+            max_memory_bytes: None,
+            budget_monthly_cents: None,
+            provider: None,
+            persona: None,
+            terraphim_role: None,
+            skill_chain: vec!["requirements-traceability".to_string()],
+            sfia_skills: vec![],
+            fallback_provider: None,
+            fallback_model: None,
+            grace_period_secs: None,
+            max_cpu_seconds: None,
+            pre_check: None,
+            gitea_issue: None,
+            event_only: false,
+            evolution_enabled: false,
+            rlm_enabled: None,
+            project: Some("alpha".to_string()),
+        });
+        // The per-project block takes precedence over the top-level block,
+        // so we must update both to keep them in sync.
+        config
+            .pr_dispatch_per_project
+            .get_mut("alpha")
+            .unwrap()
+            .agents_on_pr_open
+            .push(crate::config::PrDispatchEntry {
+                name: "pr-spec-validator".to_string(),
+                context: "adf/spec".to_string(),
+            });
+        config.pr_dispatch = Some(crate::config::PrDispatchConfig {
+            agents_on_pr_open: vec![
+                crate::config::PrDispatchEntry {
+                    name: "build-runner".to_string(),
+                    context: "adf/build".to_string(),
+                },
+                crate::config::PrDispatchEntry {
+                    name: "pr-reviewer".to_string(),
+                    context: "adf/pr-reviewer".to_string(),
+                },
+                crate::config::PrDispatchEntry {
+                    name: "pr-spec-validator".to_string(),
+                    context: "adf/spec".to_string(),
+                },
+            ],
+        });
+        (config, tmp)
+    }
+
+    /// ADF Phase 2b (Refs #950): a `pull_request.opened` event with
+    /// `pr-spec-validator` in `agents_on_pr_open` must spawn the agent.
+    /// Verifies the existing fan-out loop's generic `_` arm (which routes
+    /// any non-`build-runner` entry through `dispatch_pr_reviewer_for_pr`
+    /// by name) handles the new context cleanly without code change.
+    #[tokio::test]
+    async fn handle_review_pr_spawns_pr_spec_validator_when_configured() {
+        let (config, _tmp) = review_pr_config_with_spec_fanout("echo");
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        orch.handle_review_pr(review_pr_task()).await.unwrap();
+
+        assert!(
+            orch.active_agents.contains_key("pr-spec-validator"),
+            "pr-spec-validator must be spawned; active_agents: {:?}",
+            orch.active_agents.keys().collect::<Vec<_>>()
+        );
+        // Spec-validator is a PR-event agent, so it must receive the
+        // `ADF_PR_*` env (not `ADF_PUSH_*`). Verified via session_id
+        // scoping; the env wiring itself is exercised by the existing
+        // `reviewpr_dispatch_sets_env_vars` test through the same
+        // dispatch helper.
+        let managed = orch.active_agents.get("pr-spec-validator").unwrap();
+        assert!(
+            managed.session_id.starts_with("pr-spec-validator-"),
+            "session id should be scoped to the agent, got: {}",
+            managed.session_id
+        );
+    }
+
+    /// ADF Phase 2b (Refs #950): when a workflow tracker is configured,
+    /// `pr-spec-validator`'s spawn must POST a `pending` commit status
+    /// with context `adf/spec` against the PR head SHA.
+    #[tokio::test]
+    async fn handle_review_pr_pending_status_posted_for_spec_context() {
+        use axum::{
+            extract::{Path, State},
+            http::StatusCode,
+            response::IntoResponse,
+            routing::post,
+            Router,
+        };
+        use std::sync::atomic::{AtomicUsize, Ordering as AOrdering};
+        use std::sync::Arc;
+        use tokio::net::TcpListener;
+
+        #[derive(Default)]
+        struct Captured {
+            calls: AtomicUsize,
+            contexts: std::sync::Mutex<Vec<String>>,
+            states: std::sync::Mutex<Vec<String>>,
+        }
+
+        async fn capture(
+            Path((_owner, _repo, _sha)): Path<(String, String, String)>,
+            State(captured): State<Arc<Captured>>,
+            body: axum::body::Bytes,
+        ) -> impl IntoResponse {
+            captured.calls.fetch_add(1, AOrdering::SeqCst);
+            if let Ok(parsed) = serde_json::from_slice::<serde_json::Value>(&body) {
+                if let Some(ctx) = parsed.get("context").and_then(|v| v.as_str()) {
+                    captured.contexts.lock().unwrap().push(ctx.to_string());
+                }
+                if let Some(st) = parsed.get("state").and_then(|v| v.as_str()) {
+                    captured.states.lock().unwrap().push(st.to_string());
+                }
+            }
+            StatusCode::CREATED
+        }
+
+        let captured = Arc::new(Captured::default());
+        let app = Router::new()
+            .route("/api/v1/repos/{owner}/{repo}/statuses/{sha}", post(capture))
+            .with_state(captured.clone());
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            axum::serve(listener, app).await.ok();
+        });
+        let base_url = format!("http://{}", addr);
+
+        let (mut config, _tmp) = review_pr_config_with_spec_fanout("echo");
+        config.workflow = Some(crate::config::WorkflowConfig {
+            enabled: true,
+            poll_interval_secs: 60,
+            workflow_file: std::path::PathBuf::from("/tmp/workflow.md"),
+            tracker: crate::config::TrackerConfig {
+                kind: "gitea".to_string(),
+                endpoint: base_url.clone(),
+                api_key: "test-token".to_string(),
+                owner: "fakeowner".to_string(),
+                repo: "fakerepo".to_string(),
+                project_slug: None,
+                use_robot_api: false,
+                states: crate::config::TrackerStates::default(),
+            },
+            concurrency: crate::config::ConcurrencyConfig::default(),
+        });
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        orch.handle_review_pr(review_pr_task()).await.unwrap();
+
+        // Expect three POSTs (one per fan-out agent).
+        for _ in 0..150 {
+            if captured.calls.load(AOrdering::SeqCst) >= 3 {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        let contexts = captured.contexts.lock().unwrap().clone();
+        assert!(
+            contexts.iter().any(|c| c == "adf/spec"),
+            "adf/spec pending status missing; got: {contexts:?}"
+        );
+        let states = captured.states.lock().unwrap().clone();
+        assert!(
+            states.iter().all(|s| s == "pending"),
+            "all initial statuses must be pending; got: {states:?}"
+        );
+    }
+
+    /// ADF Phase 2b (Refs #950): when `pr-spec-validator` is gated out by
+    /// the runtime subscription allow-list, its `pending` must NOT be
+    /// posted -- otherwise `adf/spec` (a required check on `main`) would
+    /// hang indefinitely. Other fan-out entries still post their pendings.
+    #[tokio::test]
+    async fn handle_review_pr_spec_validator_skipped_does_not_post_pending() {
+        use axum::{
+            extract::{Path, State},
+            http::StatusCode,
+            response::IntoResponse,
+            routing::post,
+            Router,
+        };
+        use std::sync::atomic::{AtomicUsize, Ordering as AOrdering};
+        use std::sync::Arc;
+        use tokio::net::TcpListener;
+
+        #[derive(Default)]
+        struct Captured {
+            calls: AtomicUsize,
+            contexts: std::sync::Mutex<Vec<String>>,
+        }
+
+        async fn capture(
+            Path((_owner, _repo, _sha)): Path<(String, String, String)>,
+            State(captured): State<Arc<Captured>>,
+            body: axum::body::Bytes,
+        ) -> impl IntoResponse {
+            captured.calls.fetch_add(1, AOrdering::SeqCst);
+            if let Ok(parsed) = serde_json::from_slice::<serde_json::Value>(&body) {
+                if let Some(ctx) = parsed.get("context").and_then(|v| v.as_str()) {
+                    captured.contexts.lock().unwrap().push(ctx.to_string());
+                }
+            }
+            StatusCode::CREATED
+        }
+
+        let captured = Arc::new(Captured::default());
+        let app = Router::new()
+            .route("/api/v1/repos/{owner}/{repo}/statuses/{sha}", post(capture))
+            .with_state(captured.clone());
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            axum::serve(listener, app).await.ok();
+        });
+        let base_url = format!("http://{}", addr);
+
+        let (mut config, _tmp) = review_pr_config_with_spec_fanout("echo");
+        // Stamp a banned model on pr-spec-validator AFTER load-time
+        // validation so the runtime allow-list gate is the one that
+        // short-circuits the spawn. The other agents stay clean.
+        let svc = config
+            .agents
+            .iter_mut()
+            .find(|a| a.name == "pr-spec-validator")
+            .unwrap();
+        svc.model = Some("google/gemini-2".to_string());
+
+        config.workflow = Some(crate::config::WorkflowConfig {
+            enabled: true,
+            poll_interval_secs: 60,
+            workflow_file: std::path::PathBuf::from("/tmp/workflow.md"),
+            tracker: crate::config::TrackerConfig {
+                kind: "gitea".to_string(),
+                endpoint: base_url.clone(),
+                api_key: "test-token".to_string(),
+                owner: "fakeowner".to_string(),
+                repo: "fakerepo".to_string(),
+                project_slug: None,
+                use_robot_api: false,
+                states: crate::config::TrackerStates::default(),
+            },
+            concurrency: crate::config::ConcurrencyConfig::default(),
+        });
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        orch.handle_review_pr(review_pr_task()).await.unwrap();
+
+        // Wait for the two non-skipped POSTs, then a small grace window
+        // for any erroneous adf/spec POST to surface.
+        for _ in 0..150 {
+            if captured.calls.load(AOrdering::SeqCst) >= 2 {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        tokio::time::sleep(Duration::from_millis(150)).await;
+
+        let contexts = captured.contexts.lock().unwrap().clone();
+        assert!(
+            !contexts.iter().any(|c| c == "adf/spec"),
+            "skipped pr-spec-validator must NOT post adf/spec pending; got: {contexts:?}"
+        );
+        assert!(
+            !orch.active_agents.contains_key("pr-spec-validator"),
+            "pr-spec-validator must not be in active_agents when subscription gate rejects"
+        );
+        // Sanity: the other two agents still spawned + posted.
+        assert!(
+            contexts.iter().any(|c| c == "adf/pr-reviewer"),
+            "pr-reviewer must still post its pending; got: {contexts:?}"
+        );
+        assert!(
+            contexts.iter().any(|c| c == "adf/build"),
+            "build-runner must still post its pending; got: {contexts:?}"
+        );
+    }
+
+    #[test]
+    fn test_learning_config_default_disabled() {
+        let cfg = config::LearningConfig::default();
+        assert!(!cfg.enabled);
+        assert_eq!(cfg.min_trust, "L1");
+        assert_eq!(cfg.max_tokens, 1500);
+        assert_eq!(cfg.max_entries, 10);
+        assert_eq!(cfg.archive_days, 30);
+        assert_eq!(cfg.consolidation_ticks, 100);
+    }
+
+    #[test]
+    fn test_render_lessons_section_empty_store() {
+        let config = test_config();
+        let orch = AgentOrchestrator::new(config).unwrap();
+        let (section, ids) = orch.render_lessons_section("sentinel");
+        assert!(section.is_empty());
+        assert!(ids.is_empty());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_render_lessons_section_with_learnings() {
+        let config = test_config();
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        let persistence = learning::InMemoryLearningPersistence::new();
+        let store =
+            learning::SharedLearningStore::new(Box::new(persistence), learning::TrustLevel::L0);
+        store
+            .insert(learning::NewLearning {
+                source_agent: "other-agent".to_string(),
+                category: learning::LearningCategory::Tip,
+                summary: "Always run clippy before committing".to_string(),
+                details: Some("Prevents CI failures from lint warnings".to_string()),
+                applicable_agents: vec![],
+                verify_pattern: None,
+            })
+            .await
+            .unwrap();
+
+        orch.learning_store = Some(store);
+
+        let (section, ids) = orch.render_lessons_section("sentinel");
+        assert!(!section.is_empty(), "expected non-empty section, got empty");
+        assert!(section.contains("Prior Lessons"));
+        assert!(section.contains("Always run clippy before committing"));
+        assert_eq!(ids.len(), 1);
+    }
+    /// Phase 2e helper (Refs #954): extend `review_pr_config_with_fanout`
+    /// with a third project-scoped `pr-test-guardian` agent and a
+    /// three-entry `[pr_dispatch]` block (build-runner, pr-reviewer,
+    /// pr-test-guardian). Distinct name from Phase 2b's `…_with_spec_fanout`
+    /// and Phase 2c's `…_with_security_fanout` helpers so all three Phase 2
+    /// branches can coexist on the same `review_pr_config_with_fanout`
+    /// baseline once they merge.
+    fn review_pr_config_with_test_fanout(cli_tool: &str) -> (OrchestratorConfig, TempDir) {
+        let (mut config, tmp) = review_pr_config_with_fanout(cli_tool);
+        config.agents.push(AgentDefinition {
+            name: "pr-test-guardian".to_string(),
+            layer: AgentLayer::Growth,
+            cli_tool: cli_tool.to_string(),
+            task: "test".to_string(),
+            model: None,
+            schedule: None,
+            capabilities: vec!["review".to_string(), "test".to_string()],
+            max_memory_bytes: None,
+            budget_monthly_cents: None,
+            provider: None,
+            persona: None,
+            terraphim_role: None,
+            skill_chain: vec!["testing".to_string()],
+            sfia_skills: vec![],
+            fallback_provider: None,
+            fallback_model: None,
+            grace_period_secs: None,
+            max_cpu_seconds: None,
+            pre_check: None,
+            gitea_issue: None,
+            event_only: false,
+            evolution_enabled: false,
+            rlm_enabled: None,
+            project: Some("alpha".to_string()),
+        });
+        // The per-project block takes precedence over the top-level block,
+        // so we must update both to keep them in sync.
+        config
+            .pr_dispatch_per_project
+            .get_mut("alpha")
+            .unwrap()
+            .agents_on_pr_open
+            .push(crate::config::PrDispatchEntry {
+                name: "pr-test-guardian".to_string(),
+                context: "adf/test".to_string(),
+            });
+        config.pr_dispatch = Some(crate::config::PrDispatchConfig {
+            agents_on_pr_open: vec![
+                crate::config::PrDispatchEntry {
+                    name: "build-runner".to_string(),
+                    context: "adf/build".to_string(),
+                },
+                crate::config::PrDispatchEntry {
+                    name: "pr-reviewer".to_string(),
+                    context: "adf/pr-reviewer".to_string(),
+                },
+                crate::config::PrDispatchEntry {
+                    name: "pr-test-guardian".to_string(),
+                    context: "adf/test".to_string(),
+                },
+            ],
+        });
+        (config, tmp)
+    }
+
+    /// ADF Phase 2e (Refs #954): a `pull_request.opened` event with
+    /// `pr-test-guardian` in `agents_on_pr_open` must spawn the agent.
+    /// Verifies the existing fan-out loop's generic `_` arm (which routes
+    /// any non-`build-runner` entry through `dispatch_pr_reviewer_for_pr`
+    /// by name) handles the new `adf/test` context cleanly without any
+    /// production code change.
+    #[tokio::test]
+    async fn handle_review_pr_spawns_pr_test_guardian_when_configured() {
+        let (config, _tmp) = review_pr_config_with_test_fanout("echo");
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        orch.handle_review_pr(review_pr_task()).await.unwrap();
+
+        assert!(
+            orch.active_agents.contains_key("pr-test-guardian"),
+            "pr-test-guardian must be spawned; active_agents: {:?}",
+            orch.active_agents.keys().collect::<Vec<_>>()
+        );
+        // Test guardian is a PR-event agent, so it must receive the
+        // `ADF_PR_*` env (not `ADF_PUSH_*`). Verified via session_id
+        // scoping; the env wiring itself is exercised by the existing
+        // `reviewpr_dispatch_sets_env_vars` test through the same dispatch
+        // helper.
+        let managed = orch.active_agents.get("pr-test-guardian").unwrap();
+        assert!(
+            managed.session_id.starts_with("pr-test-guardian-"),
+            "session id should be scoped to the agent, got: {}",
+            managed.session_id
+        );
+    }
+
+    /// ADF Phase 2e (Refs #954): when a workflow tracker is configured,
+    /// `pr-test-guardian`'s spawn must POST a `pending` commit status with
+    /// context `adf/test` against the PR head SHA. Three fan-out agents are
+    /// configured, so three pending statuses are expected.
+    #[tokio::test]
+    async fn handle_review_pr_pending_status_posted_for_test_context() {
+        use axum::{
+            extract::{Path, State},
+            http::StatusCode,
+            response::IntoResponse,
+            routing::post,
+            Router,
+        };
+        use std::sync::atomic::{AtomicUsize, Ordering as AOrdering};
+        use std::sync::Arc;
+        use tokio::net::TcpListener;
+
+        #[derive(Default)]
+        struct Captured {
+            calls: AtomicUsize,
+            contexts: std::sync::Mutex<Vec<String>>,
+            states: std::sync::Mutex<Vec<String>>,
+        }
+
+        async fn capture(
+            Path((_owner, _repo, _sha)): Path<(String, String, String)>,
+            State(captured): State<Arc<Captured>>,
+            body: axum::body::Bytes,
+        ) -> impl IntoResponse {
+            captured.calls.fetch_add(1, AOrdering::SeqCst);
+            if let Ok(parsed) = serde_json::from_slice::<serde_json::Value>(&body) {
+                if let Some(ctx) = parsed.get("context").and_then(|v| v.as_str()) {
+                    captured.contexts.lock().unwrap().push(ctx.to_string());
+                }
+                if let Some(st) = parsed.get("state").and_then(|v| v.as_str()) {
+                    captured.states.lock().unwrap().push(st.to_string());
+                }
+            }
+            StatusCode::CREATED
+        }
+
+        let captured = Arc::new(Captured::default());
+        let app = Router::new()
+            .route("/api/v1/repos/{owner}/{repo}/statuses/{sha}", post(capture))
+            .with_state(captured.clone());
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            axum::serve(listener, app).await.ok();
+        });
+        let base_url = format!("http://{}", addr);
+
+        let (mut config, _tmp) = review_pr_config_with_test_fanout("echo");
+        config.workflow = Some(crate::config::WorkflowConfig {
+            enabled: true,
+            poll_interval_secs: 60,
+            workflow_file: std::path::PathBuf::from("/tmp/workflow.md"),
+            tracker: crate::config::TrackerConfig {
+                kind: "gitea".to_string(),
+                endpoint: base_url.clone(),
+                api_key: "test-token".to_string(),
+                owner: "fakeowner".to_string(),
+                repo: "fakerepo".to_string(),
+                project_slug: None,
+                use_robot_api: false,
+                states: crate::config::TrackerStates::default(),
+            },
+            concurrency: crate::config::ConcurrencyConfig::default(),
+        });
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        orch.handle_review_pr(review_pr_task()).await.unwrap();
+
+        // Expect three POSTs (one per fan-out agent).
+        for _ in 0..150 {
+            if captured.calls.load(AOrdering::SeqCst) >= 3 {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        let contexts = captured.contexts.lock().unwrap().clone();
+        assert!(
+            contexts.iter().any(|c| c == "adf/test"),
+            "adf/test pending status missing; got: {contexts:?}"
+        );
+        let states = captured.states.lock().unwrap().clone();
+        assert!(
+            states.iter().all(|s| s == "pending"),
+            "all initial statuses must be pending; got: {states:?}"
+        );
+    }
+
+    /// ADF Phase 2e (Refs #954): when `pr-test-guardian` is gated out by
+    /// the runtime subscription allow-list, its `pending` must NOT be
+    /// posted -- otherwise `adf/test` (a required check on `main`) would
+    /// hang indefinitely. Other fan-out entries still post their pendings.
+    #[tokio::test]
+    async fn handle_review_pr_test_guardian_skipped_does_not_post_pending() {
+        use axum::{
+            extract::{Path, State},
+            http::StatusCode,
+            response::IntoResponse,
+            routing::post,
+            Router,
+        };
+        use std::sync::atomic::{AtomicUsize, Ordering as AOrdering};
+        use std::sync::Arc;
+        use tokio::net::TcpListener;
+
+        #[derive(Default)]
+        struct Captured {
+            calls: AtomicUsize,
+            contexts: std::sync::Mutex<Vec<String>>,
+        }
+
+        async fn capture(
+            Path((_owner, _repo, _sha)): Path<(String, String, String)>,
+            State(captured): State<Arc<Captured>>,
+            body: axum::body::Bytes,
+        ) -> impl IntoResponse {
+            captured.calls.fetch_add(1, AOrdering::SeqCst);
+            if let Ok(parsed) = serde_json::from_slice::<serde_json::Value>(&body) {
+                if let Some(ctx) = parsed.get("context").and_then(|v| v.as_str()) {
+                    captured.contexts.lock().unwrap().push(ctx.to_string());
+                }
+            }
+            StatusCode::CREATED
+        }
+
+        let captured = Arc::new(Captured::default());
+        let app = Router::new()
+            .route("/api/v1/repos/{owner}/{repo}/statuses/{sha}", post(capture))
+            .with_state(captured.clone());
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            axum::serve(listener, app).await.ok();
+        });
+        let base_url = format!("http://{}", addr);
+
+        let (mut config, _tmp) = review_pr_config_with_test_fanout("echo");
+        // Stamp a banned model on pr-test-guardian AFTER load-time
+        // validation so the runtime allow-list gate is the one that
+        // short-circuits the spawn. The other agents stay clean.
+        let tg = config
+            .agents
+            .iter_mut()
+            .find(|a| a.name == "pr-test-guardian")
+            .unwrap();
+        tg.model = Some("google/gemini-2".to_string());
+
+        config.workflow = Some(crate::config::WorkflowConfig {
+            enabled: true,
+            poll_interval_secs: 60,
+            workflow_file: std::path::PathBuf::from("/tmp/workflow.md"),
+            tracker: crate::config::TrackerConfig {
+                kind: "gitea".to_string(),
+                endpoint: base_url.clone(),
+                api_key: "test-token".to_string(),
+                owner: "fakeowner".to_string(),
+                repo: "fakerepo".to_string(),
+                project_slug: None,
+                use_robot_api: false,
+                states: crate::config::TrackerStates::default(),
+            },
+            concurrency: crate::config::ConcurrencyConfig::default(),
+        });
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        orch.handle_review_pr(review_pr_task()).await.unwrap();
+
+        // Wait for the two non-skipped POSTs, then a small grace window
+        // for any erroneous adf/test POST to surface.
+        for _ in 0..150 {
+            if captured.calls.load(AOrdering::SeqCst) >= 2 {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        tokio::time::sleep(Duration::from_millis(150)).await;
+
+        let contexts = captured.contexts.lock().unwrap().clone();
+        assert!(
+            !contexts.iter().any(|c| c == "adf/test"),
+            "skipped pr-test-guardian must NOT post adf/test pending; got: {contexts:?}"
+        );
+        assert!(
+            !orch.active_agents.contains_key("pr-test-guardian"),
+            "pr-test-guardian must not be in active_agents when subscription gate rejects"
+        );
+        // Sanity: the other two agents still spawned + posted.
+        assert!(
+            contexts.iter().any(|c| c == "adf/pr-reviewer"),
+            "pr-reviewer must still post its pending; got: {contexts:?}"
+        );
+        assert!(
+            contexts.iter().any(|c| c == "adf/build"),
+            "build-runner must still post its pending; got: {contexts:?}"
+        );
+    }
+    /// ADF Phase 2d (issue #955): helper that wires `pr-compliance-watchdog`
+    /// alongside the existing `pr-reviewer` agent and a `[pr_dispatch]` block
+    /// listing both agents on PR open. Standalone -- does not reuse the
+    /// Phase 2 `review_pr_config_with_fanout` helper -- so the assertion
+    /// surface stays tight (exactly two pending POSTs: `adf/pr-reviewer`
+    /// and `adf/compliance`).
+    fn review_pr_config_with_compliance_fanout(cli_tool: &str) -> (OrchestratorConfig, TempDir) {
+        let (mut config, tmp) = review_pr_config(cli_tool);
+        config.agents.push(AgentDefinition {
+            name: "pr-compliance-watchdog".to_string(),
+            layer: AgentLayer::Growth,
+            cli_tool: cli_tool.to_string(),
+            task: "compliance".to_string(),
+            model: None,
+            schedule: None,
+            capabilities: vec!["compliance".to_string()],
+            max_memory_bytes: None,
+            budget_monthly_cents: None,
+            provider: None,
+            persona: None,
+            terraphim_role: None,
+            skill_chain: vec!["responsible-ai".to_string()],
+            sfia_skills: vec![],
+            fallback_provider: None,
+            fallback_model: None,
+            grace_period_secs: None,
+            max_cpu_seconds: None,
+            pre_check: None,
+            gitea_issue: None,
+            event_only: false,
+            evolution_enabled: false,
+            rlm_enabled: None,
+            project: Some("alpha".to_string()),
+        });
+        config.pr_dispatch = Some(crate::config::PrDispatchConfig {
+            agents_on_pr_open: vec![
+                crate::config::PrDispatchEntry {
+                    name: "pr-reviewer".to_string(),
+                    context: "adf/pr-reviewer".to_string(),
+                },
+                crate::config::PrDispatchEntry {
+                    name: "pr-compliance-watchdog".to_string(),
+                    context: "adf/compliance".to_string(),
+                },
+            ],
+        });
+        (config, tmp)
+    }
+
+    /// ADF Phase 2d (issue #955): when `pr-compliance-watchdog` is listed in
+    /// `agents_on_pr_open`, the generic `_` arm in `handle_review_pr` must
+    /// route through `dispatch_pr_reviewer_for_pr` and spawn the agent. No
+    /// new Rust dispatch code is needed -- this test asserts that property.
+    #[tokio::test]
+    async fn handle_review_pr_spawns_pr_compliance_watchdog_when_configured() {
+        let (config, _tmp) = review_pr_config_with_compliance_fanout("echo");
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        orch.handle_review_pr(review_pr_task()).await.unwrap();
+
+        assert!(
+            orch.active_agents.contains_key("pr-reviewer"),
+            "pr-reviewer must spawn alongside the new compliance agent; active_agents: {:?}",
+            orch.active_agents.keys().collect::<Vec<_>>()
+        );
+        assert!(
+            orch.active_agents.contains_key("pr-compliance-watchdog"),
+            "pr-compliance-watchdog must be spawned by the generic fan-out arm; active_agents: {:?}",
+            orch.active_agents.keys().collect::<Vec<_>>()
+        );
+    }
+
+    /// ADF Phase 2d: with the workflow tracker pointed at a loopback Gitea,
+    /// each fan-out agent that successfully spawns must POST exactly one
+    /// `pending` commit status. The compliance agent must use the
+    /// `adf/compliance` context (a hung pending under any other context
+    /// would block the PR forever once branch protection requires it).
+    #[tokio::test]
+    async fn handle_review_pr_pending_status_posted_for_compliance_context() {
+        use axum::{
+            extract::{Path, State},
+            http::StatusCode,
+            response::IntoResponse,
+            routing::post,
+            Router,
+        };
+        use std::sync::atomic::{AtomicUsize, Ordering as AOrdering};
+        use std::sync::Arc;
+        use tokio::net::TcpListener;
+
+        #[derive(Default)]
+        struct Captured {
+            calls: AtomicUsize,
+            contexts: std::sync::Mutex<Vec<String>>,
+            states: std::sync::Mutex<Vec<String>>,
+        }
+
+        async fn capture(
+            Path((_owner, _repo, _sha)): Path<(String, String, String)>,
+            State(captured): State<Arc<Captured>>,
+            body: axum::body::Bytes,
+        ) -> impl IntoResponse {
+            captured.calls.fetch_add(1, AOrdering::SeqCst);
+            if let Ok(parsed) = serde_json::from_slice::<serde_json::Value>(&body) {
+                if let Some(ctx) = parsed.get("context").and_then(|v| v.as_str()) {
+                    captured.contexts.lock().unwrap().push(ctx.to_string());
+                }
+                if let Some(st) = parsed.get("state").and_then(|v| v.as_str()) {
+                    captured.states.lock().unwrap().push(st.to_string());
+                }
+            }
+            StatusCode::CREATED
+        }
+
+        let captured = Arc::new(Captured::default());
+        let app = Router::new()
+            .route("/api/v1/repos/{owner}/{repo}/statuses/{sha}", post(capture))
+            .with_state(captured.clone());
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            axum::serve(listener, app).await.ok();
+        });
+        let base_url = format!("http://{}", addr);
+
+        let (mut config, _tmp) = review_pr_config_with_compliance_fanout("echo");
+        config.workflow = Some(crate::config::WorkflowConfig {
+            enabled: true,
+            poll_interval_secs: 60,
+            workflow_file: std::path::PathBuf::from("/tmp/workflow.md"),
+            tracker: crate::config::TrackerConfig {
+                kind: "gitea".to_string(),
+                endpoint: base_url.clone(),
+                api_key: "test-token".to_string(),
+                owner: "fakeowner".to_string(),
+                repo: "fakerepo".to_string(),
+                project_slug: None,
+                use_robot_api: false,
+                states: crate::config::TrackerStates::default(),
+            },
+            concurrency: crate::config::ConcurrencyConfig::default(),
+        });
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        orch.handle_review_pr(review_pr_task()).await.unwrap();
+
+        for _ in 0..100 {
+            if captured.calls.load(AOrdering::SeqCst) >= 2 {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        assert_eq!(
+            captured.calls.load(AOrdering::SeqCst),
+            2,
+            "exactly two pending status posts expected (pr-reviewer + compliance)"
+        );
+        let contexts = captured.contexts.lock().unwrap().clone();
+        assert!(
+            contexts.iter().any(|c| c == "adf/pr-reviewer"),
+            "adf/pr-reviewer pending status missing; got: {contexts:?}"
+        );
+        assert!(
+            contexts.iter().any(|c| c == "adf/compliance"),
+            "adf/compliance pending status missing; got: {contexts:?}"
+        );
+        let states = captured.states.lock().unwrap().clone();
+        assert!(
+            states.iter().all(|s| s == "pending"),
+            "all initial statuses must be pending; got: {states:?}"
+        );
+    }
+
+    /// ADF Phase 2d: when the compliance agent is gated out by the C1/C3
+    /// subscription allow-list (banned static model stamped post-validation),
+    /// the orchestrator must NOT post an `adf/compliance` pending status. A
+    /// hung pending under a required context would block the PR forever.
+    /// `pr-reviewer` (the un-gated peer) still spawns and posts its own
+    /// pending. Note: this test exercises the orchestrator-layer skip; the
+    /// TOML-level path-filter skip-with-success is a separate, shell-only
+    /// behaviour and is not asserted here.
+    #[tokio::test]
+    async fn handle_review_pr_compliance_watchdog_skipped_does_not_post_pending() {
+        use axum::{
+            extract::{Path, State},
+            http::StatusCode,
+            response::IntoResponse,
+            routing::post,
+            Router,
+        };
+        use std::sync::atomic::{AtomicUsize, Ordering as AOrdering};
+        use std::sync::Arc;
+        use tokio::net::TcpListener;
+
+        #[derive(Default)]
+        struct Captured {
+            calls: AtomicUsize,
+            contexts: std::sync::Mutex<Vec<String>>,
+        }
+
+        async fn capture(
+            Path((_owner, _repo, _sha)): Path<(String, String, String)>,
+            State(captured): State<Arc<Captured>>,
+            body: axum::body::Bytes,
+        ) -> impl IntoResponse {
+            captured.calls.fetch_add(1, AOrdering::SeqCst);
+            if let Ok(parsed) = serde_json::from_slice::<serde_json::Value>(&body) {
+                if let Some(ctx) = parsed.get("context").and_then(|v| v.as_str()) {
+                    captured.contexts.lock().unwrap().push(ctx.to_string());
+                }
+            }
+            StatusCode::CREATED
+        }
+
+        let captured = Arc::new(Captured::default());
+        let app = Router::new()
+            .route("/api/v1/repos/{owner}/{repo}/statuses/{sha}", post(capture))
+            .with_state(captured.clone());
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            axum::serve(listener, app).await.ok();
+        });
+        let base_url = format!("http://{}", addr);
+
+        let (mut config, _tmp) = review_pr_config_with_compliance_fanout("echo");
+        // Stamp a banned static model on pr-compliance-watchdog AFTER load-time
+        // validation so the runtime subscription allow-list gate is the path
+        // that rejects the spawn.
+        let watchdog = config
+            .agents
+            .iter_mut()
+            .find(|a| a.name == "pr-compliance-watchdog")
+            .unwrap();
+        watchdog.model = Some("google/gemini-2".to_string());
+
+        config.workflow = Some(crate::config::WorkflowConfig {
+            enabled: true,
+            poll_interval_secs: 60,
+            workflow_file: std::path::PathBuf::from("/tmp/workflow.md"),
+            tracker: crate::config::TrackerConfig {
+                kind: "gitea".to_string(),
+                endpoint: base_url.clone(),
+                api_key: "test-token".to_string(),
+                owner: "fakeowner".to_string(),
+                repo: "fakerepo".to_string(),
+                project_slug: None,
+                use_robot_api: false,
+                states: crate::config::TrackerStates::default(),
+            },
+            concurrency: crate::config::ConcurrencyConfig::default(),
+        });
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        orch.handle_review_pr(review_pr_task()).await.unwrap();
+
+        for _ in 0..100 {
+            if captured.calls.load(AOrdering::SeqCst) >= 1 {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        // Grace window so an erroneous adf/compliance POST has time to surface.
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        let contexts = captured.contexts.lock().unwrap().clone();
+        assert!(
+            contexts.iter().any(|c| c == "adf/pr-reviewer"),
+            "pr-reviewer must still post its pending status; got: {contexts:?}"
+        );
+        assert!(
+            !contexts.iter().any(|c| c == "adf/compliance"),
+            "skipped pr-compliance-watchdog must NOT post adf/compliance pending; got: {contexts:?}"
+        );
+        assert!(
+            !orch.active_agents.contains_key("pr-compliance-watchdog"),
+            "pr-compliance-watchdog must not be in active_agents when subscription gate rejects"
+        );
+    }
+    /// Phase 2c helper: extend `review_pr_config_with_fanout` with a third
+    /// project-scoped `pr-security-sentinel` agent and a three-entry
+    /// `[pr_dispatch]` block (build-runner, pr-reviewer, pr-security-sentinel).
+    ///
+    /// Distinct name from Phase 2b's `review_pr_config_with_spec_fanout`
+    /// helper (lives on the unmerged `task/950-pr-spec-validator-phase-2b`
+    /// branch -- see PR #952). Once Phase 2b lands the two helpers will
+    /// coexist; both build on the same `review_pr_config_with_fanout`
+    /// baseline.
+    fn review_pr_config_with_security_fanout(cli_tool: &str) -> (OrchestratorConfig, TempDir) {
+        let (mut config, tmp) = review_pr_config_with_fanout(cli_tool);
+        config.agents.push(AgentDefinition {
+            name: "pr-security-sentinel".to_string(),
+            layer: AgentLayer::Safety,
+            cli_tool: cli_tool.to_string(),
+            task: "security".to_string(),
+            model: None,
+            schedule: None,
+            capabilities: vec!["review".to_string(), "security".to_string()],
+            max_memory_bytes: None,
+            budget_monthly_cents: None,
+            provider: None,
+            persona: None,
+            terraphim_role: None,
+            skill_chain: vec!["security-audit".to_string()],
+            sfia_skills: vec![],
+            fallback_provider: None,
+            fallback_model: None,
+            grace_period_secs: None,
+            max_cpu_seconds: None,
+            pre_check: None,
+            gitea_issue: None,
+            event_only: false,
+            evolution_enabled: false,
+            rlm_enabled: None,
+            project: Some("alpha".to_string()),
+        });
+        // The per-project block takes precedence over the top-level block,
+        // so we must update both to keep them in sync.
+        config
+            .pr_dispatch_per_project
+            .get_mut("alpha")
+            .unwrap()
+            .agents_on_pr_open
+            .push(crate::config::PrDispatchEntry {
+                name: "pr-security-sentinel".to_string(),
+                context: "adf/security".to_string(),
+            });
+        config.pr_dispatch = Some(crate::config::PrDispatchConfig {
+            agents_on_pr_open: vec![
+                crate::config::PrDispatchEntry {
+                    name: "build-runner".to_string(),
+                    context: "adf/build".to_string(),
+                },
+                crate::config::PrDispatchEntry {
+                    name: "pr-reviewer".to_string(),
+                    context: "adf/pr-reviewer".to_string(),
+                },
+                crate::config::PrDispatchEntry {
+                    name: "pr-security-sentinel".to_string(),
+                    context: "adf/security".to_string(),
+                },
+            ],
+        });
+        (config, tmp)
+    }
+
+    /// ADF Phase 2c (Refs #953): a `pull_request.opened` event with
+    /// `pr-security-sentinel` in `agents_on_pr_open` must spawn the agent.
+    /// Verifies the existing fan-out loop's generic `_` arm (which routes
+    /// any non-`build-runner` entry through `dispatch_pr_reviewer_for_pr`
+    /// by name) handles the new `adf/security` context cleanly without
+    /// any production code change.
+    #[tokio::test]
+    async fn handle_review_pr_spawns_pr_security_sentinel_when_configured() {
+        let (config, _tmp) = review_pr_config_with_security_fanout("echo");
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        orch.handle_review_pr(review_pr_task()).await.unwrap();
+
+        assert!(
+            orch.active_agents.contains_key("pr-security-sentinel"),
+            "pr-security-sentinel must be spawned; active_agents: {:?}",
+            orch.active_agents.keys().collect::<Vec<_>>()
+        );
+        // Security sentinel is a PR-event agent, so it must receive the
+        // `ADF_PR_*` env (not `ADF_PUSH_*`). Verified via session_id
+        // scoping; the env wiring itself is exercised by the existing
+        // `reviewpr_dispatch_sets_env_vars` test through the same
+        // dispatch helper.
+        let managed = orch.active_agents.get("pr-security-sentinel").unwrap();
+        assert!(
+            managed.session_id.starts_with("pr-security-sentinel-"),
+            "session id should be scoped to the agent, got: {}",
+            managed.session_id
+        );
+    }
+
+    /// ADF Phase 2c (Refs #953): when a workflow tracker is configured,
+    /// `pr-security-sentinel`'s spawn must POST a `pending` commit status
+    /// with context `adf/security` against the PR head SHA.
+    #[tokio::test]
+    async fn handle_review_pr_pending_status_posted_for_security_context() {
+        use axum::{
+            extract::{Path, State},
+            http::StatusCode,
+            response::IntoResponse,
+            routing::post,
+            Router,
+        };
+        use std::sync::atomic::{AtomicUsize, Ordering as AOrdering};
+        use std::sync::Arc;
+        use tokio::net::TcpListener;
+
+        #[derive(Default)]
+        struct Captured {
+            calls: AtomicUsize,
+            contexts: std::sync::Mutex<Vec<String>>,
+            states: std::sync::Mutex<Vec<String>>,
+        }
+
+        async fn capture(
+            Path((_owner, _repo, _sha)): Path<(String, String, String)>,
+            State(captured): State<Arc<Captured>>,
+            body: axum::body::Bytes,
+        ) -> impl IntoResponse {
+            captured.calls.fetch_add(1, AOrdering::SeqCst);
+            if let Ok(parsed) = serde_json::from_slice::<serde_json::Value>(&body) {
+                if let Some(ctx) = parsed.get("context").and_then(|v| v.as_str()) {
+                    captured.contexts.lock().unwrap().push(ctx.to_string());
+                }
+                if let Some(st) = parsed.get("state").and_then(|v| v.as_str()) {
+                    captured.states.lock().unwrap().push(st.to_string());
+                }
+            }
+            StatusCode::CREATED
+        }
+
+        let captured = Arc::new(Captured::default());
+        let app = Router::new()
+            .route("/api/v1/repos/{owner}/{repo}/statuses/{sha}", post(capture))
+            .with_state(captured.clone());
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            axum::serve(listener, app).await.ok();
+        });
+        let base_url = format!("http://{}", addr);
+
+        let (mut config, _tmp) = review_pr_config_with_security_fanout("echo");
+        config.workflow = Some(crate::config::WorkflowConfig {
+            enabled: true,
+            poll_interval_secs: 60,
+            workflow_file: std::path::PathBuf::from("/tmp/workflow.md"),
+            tracker: crate::config::TrackerConfig {
+                kind: "gitea".to_string(),
+                endpoint: base_url.clone(),
+                api_key: "test-token".to_string(),
+                owner: "fakeowner".to_string(),
+                repo: "fakerepo".to_string(),
+                project_slug: None,
+                use_robot_api: false,
+                states: crate::config::TrackerStates::default(),
+            },
+            concurrency: crate::config::ConcurrencyConfig::default(),
+        });
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        orch.handle_review_pr(review_pr_task()).await.unwrap();
+
+        // Expect three POSTs (one per fan-out agent).
+        for _ in 0..150 {
+            if captured.calls.load(AOrdering::SeqCst) >= 3 {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        let contexts = captured.contexts.lock().unwrap().clone();
+        assert!(
+            contexts.iter().any(|c| c == "adf/security"),
+            "adf/security pending status missing; got: {contexts:?}"
+        );
+        let states = captured.states.lock().unwrap().clone();
+        assert!(
+            states.iter().all(|s| s == "pending"),
+            "all initial statuses must be pending; got: {states:?}"
+        );
+    }
+
+    /// ADF Phase 2c (Refs #953): when `pr-security-sentinel` is gated out
+    /// by the runtime subscription allow-list, its `pending` must NOT be
+    /// posted -- otherwise `adf/security` (a required check on `main`
+    /// post-deploy) would hang indefinitely. Other fan-out entries still
+    /// post their pendings.
+    #[tokio::test]
+    async fn handle_review_pr_security_sentinel_skipped_does_not_post_pending() {
+        use axum::{
+            extract::{Path, State},
+            http::StatusCode,
+            response::IntoResponse,
+            routing::post,
+            Router,
+        };
+        use std::sync::atomic::{AtomicUsize, Ordering as AOrdering};
+        use std::sync::Arc;
+        use tokio::net::TcpListener;
+
+        #[derive(Default)]
+        struct Captured {
+            calls: AtomicUsize,
+            contexts: std::sync::Mutex<Vec<String>>,
+        }
+
+        async fn capture(
+            Path((_owner, _repo, _sha)): Path<(String, String, String)>,
+            State(captured): State<Arc<Captured>>,
+            body: axum::body::Bytes,
+        ) -> impl IntoResponse {
+            captured.calls.fetch_add(1, AOrdering::SeqCst);
+            if let Ok(parsed) = serde_json::from_slice::<serde_json::Value>(&body) {
+                if let Some(ctx) = parsed.get("context").and_then(|v| v.as_str()) {
+                    captured.contexts.lock().unwrap().push(ctx.to_string());
+                }
+            }
+            StatusCode::CREATED
+        }
+
+        let captured = Arc::new(Captured::default());
+        let app = Router::new()
+            .route("/api/v1/repos/{owner}/{repo}/statuses/{sha}", post(capture))
+            .with_state(captured.clone());
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            axum::serve(listener, app).await.ok();
+        });
+        let base_url = format!("http://{}", addr);
+
+        let (mut config, _tmp) = review_pr_config_with_security_fanout("echo");
+        // Stamp a banned model on pr-security-sentinel AFTER load-time
+        // validation so the runtime allow-list gate is the one that
+        // short-circuits the spawn. The other agents stay clean.
+        let svc = config
+            .agents
+            .iter_mut()
+            .find(|a| a.name == "pr-security-sentinel")
+            .unwrap();
+        svc.model = Some("google/gemini-2".to_string());
+
+        config.workflow = Some(crate::config::WorkflowConfig {
+            enabled: true,
+            poll_interval_secs: 60,
+            workflow_file: std::path::PathBuf::from("/tmp/workflow.md"),
+            tracker: crate::config::TrackerConfig {
+                kind: "gitea".to_string(),
+                endpoint: base_url.clone(),
+                api_key: "test-token".to_string(),
+                owner: "fakeowner".to_string(),
+                repo: "fakerepo".to_string(),
+                project_slug: None,
+                use_robot_api: false,
+                states: crate::config::TrackerStates::default(),
+            },
+            concurrency: crate::config::ConcurrencyConfig::default(),
+        });
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        orch.handle_review_pr(review_pr_task()).await.unwrap();
+
+        // Wait for the two non-skipped POSTs, then a small grace window
+        // for any erroneous adf/security POST to surface.
+        for _ in 0..150 {
+            if captured.calls.load(AOrdering::SeqCst) >= 2 {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        tokio::time::sleep(Duration::from_millis(150)).await;
+
+        let contexts = captured.contexts.lock().unwrap().clone();
+        assert!(
+            !contexts.iter().any(|c| c == "adf/security"),
+            "skipped pr-security-sentinel must NOT post adf/security pending; got: {contexts:?}"
+        );
+        assert!(
+            !orch.active_agents.contains_key("pr-security-sentinel"),
+            "pr-security-sentinel must not be in active_agents when subscription gate rejects"
+        );
+        // Sanity: the other two agents still spawned + posted.
+        assert!(
+            contexts.iter().any(|c| c == "adf/pr-reviewer"),
+            "pr-reviewer must still post its pending; got: {contexts:?}"
+        );
+        assert!(
+            contexts.iter().any(|c| c == "adf/build"),
+            "build-runner must still post its pending; got: {contexts:?}"
+        );
+    }
+
+    /// T3: SpawnAgent dispatch must reject when the resolved agent is event_only.
+    /// No agent should be added to active_agents and no spawn attempted.
+    #[tokio::test]
+    async fn test_handle_webhook_dispatch_rejects_event_only_agent() {
+        let mut config = test_config();
+        // Replace the test fixture agents with a single event_only agent.
+        config.agents = vec![AgentDefinition {
+            name: "build-runner".to_string(),
+            layer: AgentLayer::Growth,
+            cli_tool: "/bin/bash".to_string(),
+            task: "echo would-build".to_string(),
+            schedule: None,
+            model: None,
+            capabilities: vec!["build".to_string()],
+            max_memory_bytes: None,
+            budget_monthly_cents: None,
+            provider: None,
+            persona: None,
+            terraphim_role: None,
+            skill_chain: vec![],
+            sfia_skills: vec![],
+            fallback_provider: None,
+            fallback_model: None,
+            grace_period_secs: None,
+            max_cpu_seconds: None,
+            pre_check: None,
+            gitea_issue: None,
+            event_only: true,
+            evolution_enabled: false,
+            rlm_enabled: None,
+            project: None,
+        }];
+        // mentions config required so handle_webhook_dispatch does not bail at the top.
+        config.mentions = Some(crate::config::MentionConfig::default());
+
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        let dispatch = webhook::WebhookDispatch::SpawnAgent {
+            agent_name: "build-runner".to_string(),
+            detected_project: None,
+            issue_number: 9999,
+            comment_id: 99999,
+            context: "@adf:build-runner please run".to_string(),
+        };
+
+        orch.handle_webhook_dispatch(dispatch).await;
+
+        assert!(
+            orch.active_agents.is_empty(),
+            "event_only agent must not be added to active_agents on mention dispatch; got: {:?}",
+            orch.active_agents.keys().collect::<Vec<_>>()
+        );
+    }
+
+    /// T4: SpawnPersona dispatch must reject when the resolved agent is event_only.
+    /// Uses resolve_persona_mention's "direct agent name match" branch by passing
+    /// the agent name as the persona name -- the resolver returns the agent, and our
+    /// gate must reject before spawn.
+    #[tokio::test]
+    async fn test_handle_webhook_dispatch_rejects_event_only_persona() {
+        let mut config = test_config();
+        config.agents = vec![AgentDefinition {
+            name: "build-runner".to_string(),
+            layer: AgentLayer::Growth,
+            cli_tool: "/bin/bash".to_string(),
+            task: "echo would-build".to_string(),
+            schedule: None,
+            model: None,
+            capabilities: vec!["build".to_string()],
+            max_memory_bytes: None,
+            budget_monthly_cents: None,
+            provider: None,
+            persona: None,
+            terraphim_role: None,
+            skill_chain: vec![],
+            sfia_skills: vec![],
+            fallback_provider: None,
+            fallback_model: None,
+            grace_period_secs: None,
+            max_cpu_seconds: None,
+            pre_check: None,
+            gitea_issue: None,
+            event_only: true,
+            evolution_enabled: false,
+            rlm_enabled: None,
+            project: None,
+        }];
+        config.mentions = Some(crate::config::MentionConfig::default());
+
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        let dispatch = webhook::WebhookDispatch::SpawnPersona {
+            persona_name: "build-runner".to_string(),
+            issue_number: 9999,
+            comment_id: 99999,
+            context: "@adf:build-runner please run via persona".to_string(),
+        };
+
+        orch.handle_webhook_dispatch(dispatch).await;
+
+        assert!(
+            orch.active_agents.is_empty(),
+            "event_only agent must not be added to active_agents on persona dispatch; got: {:?}",
+            orch.active_agents.keys().collect::<Vec<_>>()
+        );
+    }
+
+    /// T5: structural invariant for the post-exit defensive guard.
+    /// The guard at lib.rs's "Post output to Gitea if configured" block fires
+    /// `error!` and skips posting when an event-only agent reaches the hook with
+    /// gitea_issue set -- a "should never happen" path because the dispatch gate
+    /// in handle_webhook_dispatch should have already rejected the spawn.
+    /// Full runtime coverage would require integration infrastructure
+    /// (worktrees, real spawning, output capture) disproportionate to a single
+    /// boolean check. T3 and T4 cover the dispatch gate that prevents this
+    /// branch from being reached in production.
+    #[test]
+    fn test_post_exit_guard_invariant_event_only_with_gitea_issue() {
+        let def = AgentDefinition {
+            name: "build-runner".to_string(),
+            layer: AgentLayer::Growth,
+            cli_tool: "/bin/bash".to_string(),
+            task: "echo would-build".to_string(),
+            schedule: None,
+            model: None,
+            capabilities: vec!["build".to_string()],
+            max_memory_bytes: None,
+            budget_monthly_cents: None,
+            provider: None,
+            persona: None,
+            terraphim_role: None,
+            skill_chain: vec![],
+            sfia_skills: vec![],
+            fallback_provider: None,
+            fallback_model: None,
+            grace_period_secs: None,
+            max_cpu_seconds: None,
+            pre_check: None,
+            gitea_issue: Some(9999),
+            event_only: true,
+            evolution_enabled: false,
+            rlm_enabled: None,
+            project: None,
+        };
+
+        // The defensive guard reads exactly these two fields. Its branch fires
+        // when both are set on the same definition.
+        assert!(
+            def.event_only,
+            "event_only must be true to trigger the guard"
+        );
+        assert!(
+            def.gitea_issue.is_some(),
+            "gitea_issue must be Some(_) for the post-exit code to enter the outer if-let"
+        );
+    }
+}

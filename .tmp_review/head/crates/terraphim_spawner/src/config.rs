@@ -1,0 +1,466 @@
+//! Agent configuration and validation
+
+use std::collections::HashMap;
+use std::path::PathBuf;
+use terraphim_types::capability::{Provider, ProviderType};
+
+/// Resource limits for spawned agent processes.
+///
+/// These are lightweight process-level limits applied via `setrlimit(2)`.
+/// For full sandboxing (VM isolation), use the `terraphim_firecracker` crate.
+#[derive(Debug, Clone, Default)]
+pub struct ResourceLimits {
+    /// Maximum virtual memory (bytes). Maps to RLIMIT_AS.
+    pub max_memory_bytes: Option<u64>,
+    /// Maximum CPU time (seconds). Maps to RLIMIT_CPU.
+    pub max_cpu_seconds: Option<u64>,
+    /// Maximum file size the process can create (bytes). Maps to RLIMIT_FSIZE.
+    pub max_file_size_bytes: Option<u64>,
+    /// Maximum number of open file descriptors. Maps to RLIMIT_NOFILE.
+    pub max_open_files: Option<u64>,
+}
+
+/// Configuration for an agent
+#[derive(Debug, Clone)]
+pub struct AgentConfig {
+    /// Agent identifier
+    pub agent_id: String,
+    /// CLI command to spawn the agent
+    pub cli_command: String,
+    /// Arguments to pass to the CLI
+    pub args: Vec<String>,
+    /// Working directory
+    pub working_dir: Option<PathBuf>,
+    /// Environment variables
+    pub env_vars: HashMap<String, String>,
+    /// Required API keys
+    pub required_api_keys: Vec<String>,
+    /// Resource limits for the spawned process
+    pub resource_limits: ResourceLimits,
+    /// Whether to deliver the task prompt via stdin instead of CLI arg
+    pub use_stdin: bool,
+    /// Whether the CLI tool supports reading the task from stdin.
+    /// When false, the task is always passed as a positional argument.
+    pub supports_stdin: bool,
+}
+
+impl AgentConfig {
+    /// Create agent config from a provider
+    pub fn from_provider(provider: &Provider) -> Result<Self, ValidationError> {
+        match &provider.provider_type {
+            ProviderType::Agent {
+                agent_id,
+                cli_command,
+                working_dir,
+            } => Ok(Self {
+                agent_id: agent_id.clone(),
+                cli_command: cli_command.clone(),
+                args: Self::infer_args(cli_command),
+                working_dir: Some(working_dir.clone()),
+                env_vars: HashMap::new(),
+                required_api_keys: Self::infer_api_keys(cli_command),
+                resource_limits: ResourceLimits::default(),
+                use_stdin: false,
+                supports_stdin: Self::infer_supports_stdin(cli_command),
+            }),
+            ProviderType::Llm { .. } => Err(ValidationError::NotAnAgent(provider.id.clone())),
+        }
+    }
+
+    /// Set the model for this agent, adding appropriate CLI flags.
+    pub fn with_model(mut self, model: &str) -> Self {
+        let model_args = Self::model_args(&self.cli_command, model);
+        self.args.extend(model_args);
+        self
+    }
+
+    /// Set whether to deliver the task prompt via stdin.
+    pub fn with_stdin(mut self, use_stdin: bool) -> Self {
+        self.use_stdin = use_stdin;
+        self
+    }
+
+    /// Set resource limits for this agent configuration.
+    pub fn with_resource_limits(mut self, limits: ResourceLimits) -> Self {
+        self.resource_limits = limits;
+        self
+    }
+
+    /// Extract the binary name from a CLI command (handles full paths).
+    fn cli_name(cli_command: &str) -> &str {
+        std::path::Path::new(cli_command)
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or(cli_command)
+    }
+
+    /// Whether the CLI tool supports stdin delivery.
+    ///
+    /// opencode hangs on stdin for large tasks (>~50KB), so it must
+    /// always receive the task as a positional argument.
+    fn infer_supports_stdin(cli_command: &str) -> bool {
+        !matches!(Self::cli_name(cli_command), "opencode")
+    }
+
+    /// Infer CLI-specific arguments for non-interactive execution.
+    ///
+    /// Each CLI tool has its own subcommand/flag for non-interactive mode:
+    /// - codex: `exec <prompt>` runs a single task and exits
+    /// - claude: `-p <prompt>` prints output without interactive UI
+    /// - opencode: `run --format json` runs in non-interactive mode
+    fn infer_args(cli_command: &str) -> Vec<String> {
+        match Self::cli_name(cli_command) {
+            "codex" => vec!["exec".to_string(), "--full-auto".to_string()],
+            "claude" | "claude-code" => vec![
+                "-p".to_string(),
+                "--allowedTools".to_string(),
+                "Bash,Read,Write,Edit,Glob,Grep".to_string(),
+            ],
+            "opencode" => vec![
+                "run".to_string(),
+                "--format".to_string(),
+                "json".to_string(),
+            ],
+            // Shell interpreters: pass the task as an inline script. Enables
+            // shell-script agents like fleet-meta to run `cli_tool = "/bin/bash"`
+            // with the task body as the script source.
+            "bash" | "sh" => vec!["-c".to_string()],
+            _ => Vec::new(),
+        }
+    }
+
+    /// Normalise a model name for Claude CLI.
+    ///
+    /// Claude CLI requires the `claude-` prefix for versioned model names
+    /// (e.g. `opus-4-6` -> `claude-opus-4-6`). Short aliases like `opus`
+    /// or `sonnet` are passed through unchanged.
+    fn normalise_claude_model(model: &str) -> String {
+        if model.starts_with("claude-") {
+            return model.to_string();
+        }
+        // Versioned names contain hyphens (e.g. "opus-4-6", "sonnet-4-6")
+        // Short aliases do not (e.g. "opus", "sonnet", "haiku")
+        if model.contains('-') {
+            format!("claude-{}", model)
+        } else {
+            model.to_string()
+        }
+    }
+
+    /// Generate model-specific CLI arguments.
+    fn model_args(cli_command: &str, model: &str) -> Vec<String> {
+        match Self::cli_name(cli_command) {
+            "codex" => vec!["-m".to_string(), model.to_string()],
+            "claude" | "claude-code" => {
+                let normalised = Self::normalise_claude_model(model);
+                vec!["--model".to_string(), normalised]
+            }
+            "opencode" => vec!["-m".to_string(), model.to_string()],
+            _ => vec![],
+        }
+    }
+
+    /// Infer required API keys from CLI command.
+    ///
+    /// Note: codex uses OAuth (ChatGPT login) and does not require OPENAI_API_KEY.
+    /// Note: opencode manages its own provider auth via its config file
+    /// (supports Moonshot/Kimi, Anthropic, etc.) — not just OpenAI.
+    fn infer_api_keys(cli_command: &str) -> Vec<String> {
+        match Self::cli_name(cli_command) {
+            // Claude CLI uses OAuth (browser flow), not API keys.
+            // Do NOT require ANTHROPIC_API_KEY -- it poisons Claude CLI
+            // by forcing API-key auth mode with an invalid value.
+            "claude" | "claude-code" => Vec::new(),
+            // opencode manages its own per-provider auth (kimi, glm, etc.).
+            // Do NOT require OPENAI_API_KEY -- it blocks non-OpenAI providers.
+            "opencode" => Vec::new(),
+            _ => Vec::new(),
+        }
+    }
+}
+
+/// Errors during agent validation
+#[derive(thiserror::Error, Debug)]
+pub enum ValidationError {
+    #[error("Provider {0} is not an agent")]
+    NotAnAgent(String),
+
+    #[error("CLI command not found: {0}")]
+    CliNotFound(String),
+
+    #[error("Required API key not set: {0}")]
+    ApiKeyNotSet(String),
+
+    #[error("Working directory does not exist: {0}")]
+    WorkingDirNotFound(PathBuf),
+}
+
+/// Validator for agent configuration
+pub struct AgentValidator {
+    config: AgentConfig,
+}
+
+impl AgentValidator {
+    /// Create a new validator
+    pub fn new(config: &AgentConfig) -> Self {
+        Self {
+            config: config.clone(),
+        }
+    }
+
+    /// Validate the agent configuration
+    pub async fn validate(&self) -> Result<(), ValidationError> {
+        // Check CLI command exists
+        self.validate_cli().await?;
+
+        // Check required API keys
+        self.validate_api_keys().await?;
+
+        // Check working directory
+        self.validate_working_dir().await?;
+
+        Ok(())
+    }
+
+    /// Validate CLI command exists
+    async fn validate_cli(&self) -> Result<(), ValidationError> {
+        let cmd = &self.config.cli_command;
+
+        // If the command is a full path, check the file directly
+        let path = std::path::Path::new(cmd);
+        if path.is_absolute() {
+            if path.exists() {
+                return Ok(());
+            }
+            return Err(ValidationError::CliNotFound(cmd.clone()));
+        }
+
+        // Otherwise check if command exists in PATH
+        let check = tokio::process::Command::new("which")
+            .arg(cmd)
+            .output()
+            .await;
+
+        match check {
+            Ok(output) if output.status.success() => Ok(()),
+            _ => Err(ValidationError::CliNotFound(cmd.clone())),
+        }
+    }
+
+    /// Validate API keys are set
+    async fn validate_api_keys(&self) -> Result<(), ValidationError> {
+        for key in &self.config.required_api_keys {
+            if std::env::var(key).is_err() {
+                return Err(ValidationError::ApiKeyNotSet(key.clone()));
+            }
+        }
+        Ok(())
+    }
+
+    /// Validate working directory exists
+    async fn validate_working_dir(&self) -> Result<(), ValidationError> {
+        if let Some(dir) = &self.config.working_dir {
+            if !dir.exists() {
+                return Err(ValidationError::WorkingDirNotFound(dir.clone()));
+            }
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_resource_limits_default() {
+        let limits = ResourceLimits::default();
+        assert!(limits.max_memory_bytes.is_none());
+        assert!(limits.max_cpu_seconds.is_none());
+        assert!(limits.max_file_size_bytes.is_none());
+        assert!(limits.max_open_files.is_none());
+    }
+
+    #[test]
+    fn test_infer_api_keys() {
+        // Claude CLI uses OAuth, not API keys -- should return empty
+        let keys = AgentConfig::infer_api_keys("claude");
+        assert!(
+            keys.is_empty(),
+            "claude uses OAuth, should not require API key"
+        );
+
+        // opencode manages its own provider auth -- should return empty
+        let keys = AgentConfig::infer_api_keys("opencode");
+        assert!(
+            keys.is_empty(),
+            "opencode manages its own per-provider auth"
+        );
+
+        let keys = AgentConfig::infer_api_keys("unknown");
+        assert!(keys.is_empty());
+    }
+
+    #[test]
+    fn test_infer_api_keys_full_path() {
+        // Full paths should extract the binary name correctly
+        let keys = AgentConfig::infer_api_keys("/home/alex/.local/bin/claude");
+        assert!(keys.is_empty(), "claude via full path uses OAuth");
+
+        let keys = AgentConfig::infer_api_keys("/home/alex/.bun/bin/opencode");
+        assert!(
+            keys.is_empty(),
+            "opencode via full path manages its own auth"
+        );
+    }
+
+    #[test]
+    fn test_normalise_claude_model() {
+        // Already prefixed -- pass through
+        assert_eq!(
+            AgentConfig::normalise_claude_model("claude-opus-4-6"),
+            "claude-opus-4-6"
+        );
+        assert_eq!(
+            AgentConfig::normalise_claude_model("claude-sonnet-4-6"),
+            "claude-sonnet-4-6"
+        );
+
+        // Versioned without prefix -- add prefix
+        assert_eq!(
+            AgentConfig::normalise_claude_model("opus-4-6"),
+            "claude-opus-4-6"
+        );
+        assert_eq!(
+            AgentConfig::normalise_claude_model("sonnet-4-6"),
+            "claude-sonnet-4-6"
+        );
+
+        // Short aliases -- pass through (no hyphens)
+        assert_eq!(AgentConfig::normalise_claude_model("opus"), "opus");
+        assert_eq!(AgentConfig::normalise_claude_model("sonnet"), "sonnet");
+        assert_eq!(AgentConfig::normalise_claude_model("haiku"), "haiku");
+    }
+
+    #[test]
+    fn test_model_args_claude_normalises() {
+        let args = AgentConfig::model_args("claude", "opus-4-6");
+        assert_eq!(
+            args,
+            vec!["--model".to_string(), "claude-opus-4-6".to_string()]
+        );
+
+        let args = AgentConfig::model_args("claude", "claude-opus-4-6");
+        assert_eq!(
+            args,
+            vec!["--model".to_string(), "claude-opus-4-6".to_string()]
+        );
+
+        let args = AgentConfig::model_args("claude", "sonnet");
+        assert_eq!(args, vec!["--model".to_string(), "sonnet".to_string()]);
+    }
+
+    #[test]
+    fn test_cli_name_extraction() {
+        assert_eq!(
+            AgentConfig::cli_name("/home/alex/.local/bin/claude"),
+            "claude"
+        );
+        assert_eq!(
+            AgentConfig::cli_name("/home/alex/.bun/bin/opencode"),
+            "opencode"
+        );
+        assert_eq!(AgentConfig::cli_name("claude"), "claude");
+        assert_eq!(AgentConfig::cli_name("/usr/bin/codex"), "codex");
+    }
+
+    #[test]
+    fn test_infer_supports_stdin() {
+        // opencode does NOT support stdin (hangs on large tasks)
+        assert!(!AgentConfig::infer_supports_stdin("opencode"));
+        assert!(!AgentConfig::infer_supports_stdin(
+            "/home/alex/.bun/bin/opencode"
+        ));
+
+        // claude and codex DO support stdin
+        assert!(AgentConfig::infer_supports_stdin("claude"));
+        assert!(AgentConfig::infer_supports_stdin("claude-code"));
+        assert!(AgentConfig::infer_supports_stdin("/usr/local/bin/claude"));
+        assert!(AgentConfig::infer_supports_stdin("codex"));
+
+        // Unknown tools default to true (stdin is the safe assumption)
+        assert!(AgentConfig::infer_supports_stdin("unknown-tool"));
+    }
+
+    #[test]
+    fn test_from_provider_sets_supports_stdin() {
+        let provider = terraphim_types::capability::Provider {
+            id: "test-opencode".into(),
+            name: "test-opencode".into(),
+            provider_type: terraphim_types::capability::ProviderType::Agent {
+                agent_id: "test".into(),
+                cli_command: "opencode".into(),
+                working_dir: std::env::current_dir().unwrap(),
+            },
+            capabilities: vec![],
+            cost_level: terraphim_types::capability::CostLevel::Cheap,
+            latency: terraphim_types::capability::Latency::Medium,
+            keywords: vec![],
+        };
+        let config = AgentConfig::from_provider(&provider).unwrap();
+        assert!(
+            !config.supports_stdin,
+            "opencode config should have supports_stdin=false"
+        );
+
+        let provider_claude = terraphim_types::capability::Provider {
+            id: "test-claude".into(),
+            name: "test-claude".into(),
+            provider_type: terraphim_types::capability::ProviderType::Agent {
+                agent_id: "test".into(),
+                cli_command: "claude".into(),
+                working_dir: std::env::current_dir().unwrap(),
+            },
+            capabilities: vec![],
+            cost_level: terraphim_types::capability::CostLevel::Cheap,
+            latency: terraphim_types::capability::Latency::Medium,
+            keywords: vec![],
+        };
+        let config_claude = AgentConfig::from_provider(&provider_claude).unwrap();
+        assert!(
+            config_claude.supports_stdin,
+            "claude config should have supports_stdin=true"
+        );
+    }
+
+    #[test]
+    fn test_infer_args_opencode() {
+        let args = AgentConfig::infer_args("opencode");
+        assert_eq!(args, vec!["run", "--format", "json"]);
+    }
+
+    #[test]
+    fn test_infer_args_opencode_full_path() {
+        let args = AgentConfig::infer_args("/home/alex/.bun/bin/opencode");
+        assert_eq!(args, vec!["run", "--format", "json"]);
+    }
+
+    #[test]
+    fn test_model_args_opencode() {
+        let args = AgentConfig::model_args("opencode", "kimi-for-coding/k2p5");
+        assert_eq!(args, vec!["-m", "kimi-for-coding/k2p5"]);
+    }
+
+    #[test]
+    fn test_model_args_opencode_full_path() {
+        let args = AgentConfig::model_args("/home/alex/.bun/bin/opencode", "opencode-go/kimi-k2.5");
+        assert_eq!(args, vec!["-m", "opencode-go/kimi-k2.5"]);
+    }
+
+    #[test]
+    fn test_infer_args_bash_uses_dash_c() {
+        assert_eq!(AgentConfig::infer_args("/bin/bash"), vec!["-c"]);
+        assert_eq!(AgentConfig::infer_args("bash"), vec!["-c"]);
+        assert_eq!(AgentConfig::infer_args("/usr/bin/sh"), vec!["-c"]);
+    }
+}
