@@ -3,9 +3,8 @@
 //! Testing framework for end-to-end integration scenarios including
 //! server communication, file operations, external links, and keyboard shortcuts.
 
-use crate::testing::{Result, ValidationResult, ValidationStatus};
+use crate::testing::{Result, ValidationResult};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::path::PathBuf;
 
 /// Integration test configuration

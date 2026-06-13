@@ -3,9 +3,8 @@
 //! Testing framework for accessibility compliance, keyboard navigation,
 //! screen reader compatibility, and WCAG guidelines validation.
 
-use crate::testing::{Result, ValidationResult, ValidationStatus};
+use crate::testing::{Result, ValidationResult};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// Accessibility test configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -21,7 +20,7 @@ pub struct AccessibilityTestConfig {
 pub enum WCAGLevel {
     A,
     AA,
-    AAA,
+    Aaa,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -95,7 +94,7 @@ impl AccessibilityTester {
 
         for screen_reader in &self.config.screen_readers {
             if screen_reader.enabled {
-                results.push(self.test_screen_reader(&screen_reader).await?);
+                results.push(self.test_screen_reader(screen_reader).await?);
             }
         }
 
@@ -132,7 +131,7 @@ impl AccessibilityTester {
                 results.extend(self.test_wcag_a().await?);
                 results.extend(self.test_wcag_aa().await?);
             }
-            WCAGLevel::AAA => {
+            WCAGLevel::Aaa => {
                 results.extend(self.test_wcag_a().await?);
                 results.extend(self.test_wcag_aa().await?);
                 results.extend(self.test_wcag_aaa().await?);
@@ -253,9 +252,9 @@ impl AccessibilityTester {
     }
 
     async fn test_wcag_aaa(&self) -> Result<Vec<ValidationResult>> {
-        // Test WCAG AAA level requirements
+        // Test WCAG Aaa level requirements
         let mut result = ValidationResult::new(
-            "WCAG AAA - Contrast Enhanced".to_string(),
+            "WCAG Aaa - Contrast Enhanced".to_string(),
             "accessibility".to_string(),
         );
         result.pass(100);

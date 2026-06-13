@@ -2,7 +2,7 @@
 //!
 //! Testing utilities for individual UI components and interactions.
 
-use crate::testing::{Result, ValidationResult, ValidationStatus};
+use crate::testing::{Result, ValidationResult};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::Duration;
@@ -24,6 +24,8 @@ pub struct ComponentTimeouts {
 
 /// UI Component Tester
 pub struct UIComponentTester {
+    // stub: config will be used when test implementations are complete
+    #[allow(dead_code)]
     config: ComponentTestConfig,
 }
 

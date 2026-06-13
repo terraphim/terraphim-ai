@@ -8,9 +8,12 @@ pub mod server_api;
 pub mod tui;
 pub mod utils;
 
+#[allow(ambiguous_glob_reexports)]
 pub use desktop_ui::*;
 pub use fixtures::*;
+#[allow(ambiguous_glob_reexports)]
 pub use server_api::*;
+#[allow(ambiguous_glob_reexports)]
 pub use tui::*;
 pub use utils::*;
 

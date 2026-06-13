@@ -131,7 +131,7 @@ impl ValidationReport {
         // Results section
         content.push_str("## Detailed Results\n\n");
 
-        for (id, result) in &self.summary.results {
+        for result in self.summary.results.values() {
             content.push_str(&format!("### {}\n\n", result.name));
             content.push_str(&format!("- **Category**: {}\n", result.category));
             content.push_str(&format!("- **Status**: {:?}\n", result.status));
@@ -230,7 +230,7 @@ impl ValidationReport {
 
         // Detailed results
         content.push_str("<h2>Detailed Results</h2>\n");
-        for (id, result) in &self.summary.results {
+        for result in self.summary.results.values() {
             content.push_str("<h3>");
             content.push_str(&result.name);
             content.push_str("</h3>\n");

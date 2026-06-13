@@ -4,7 +4,7 @@
 //! realistic test scenarios.
 
 use ahash::AHashMap;
-use terraphim_config::{Config, Role};
+use terraphim_config::Config;
 use terraphim_types::{ChatMessage, Document, Layer, NormalizedTermValue, RoleName, SearchQuery};
 
 /// Test fixtures for API testing

@@ -4,7 +4,6 @@
 //! and terminal types to ensure consistent behavior.
 
 use anyhow::{Result, anyhow};
-use std::collections::HashMap;
 use std::env;
 
 /// Platform-specific test results
@@ -113,7 +112,7 @@ impl CrossPlatformTester {
             recommendations
                 .push("Consider implementing fallback rendering for limited terminals".to_string());
         }
-        if blocking_issues.len() > 0 {
+        if !blocking_issues.is_empty() {
             recommendations
                 .push("Address blocking compatibility issues before release".to_string());
         }
@@ -158,10 +157,7 @@ impl CrossPlatformTester {
         // Test color support
         tests_total += 1;
         let color_support = self.detect_color_support().await?;
-        let color_supported = match color_support {
-            ColorSupport::None => false,
-            _ => true,
-        };
+        let color_supported = !matches!(color_support, ColorSupport::None);
         if color_supported {
             tests_passed += 1;
         } else {
@@ -381,7 +377,7 @@ impl CrossPlatformTester {
             );
         }
 
-        if results.blocking_issues.len() > 0 {
+        if !results.blocking_issues.is_empty() {
             recommendations
                 .push("Address blocking compatibility issues before release".to_string());
         }

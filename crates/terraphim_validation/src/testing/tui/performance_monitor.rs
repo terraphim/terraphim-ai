@@ -6,7 +6,7 @@
 use anyhow::{Result, anyhow};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
-use sysinfo::{Process, System};
+use sysinfo::System;
 
 /// Performance metrics for TUI operations
 #[derive(Debug, Clone)]
@@ -91,7 +91,7 @@ impl PerformanceMonitor {
     pub fn record_command_time(&mut self, command: &str, duration: Duration) {
         self.command_times
             .entry(command.to_string())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(duration);
     }
 

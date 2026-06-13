@@ -4,7 +4,7 @@
 //! screenshot comparison, element waiting, and test data management.
 
 use crate::testing::{Result, ValidationResult, ValidationStatus};
-use image::{DynamicImage, GenericImageView, ImageBuffer, Rgba};
+use image::{GenericImageView, ImageBuffer, Rgba};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -109,7 +109,7 @@ pub struct ElementUtils;
 
 impl ElementUtils {
     /// Wait for element to be visible with timeout
-    pub async fn wait_for_element_visible(selector: &str, timeout: Duration) -> Result<bool> {
+    pub async fn wait_for_element_visible(_selector: &str, _timeout: Duration) -> Result<bool> {
         // Implementation would use Playwright to wait for element
         tokio::time::sleep(Duration::from_millis(100)).await;
         Ok(true)
@@ -117,9 +117,9 @@ impl ElementUtils {
 
     /// Wait for element to contain specific text
     pub async fn wait_for_text(
-        selector: &str,
-        expected_text: &str,
-        timeout: Duration,
+        _selector: &str,
+        _expected_text: &str,
+        _timeout: Duration,
     ) -> Result<bool> {
         // Implementation would wait for text to appear
         tokio::time::sleep(Duration::from_millis(100)).await;
@@ -127,7 +127,7 @@ impl ElementUtils {
     }
 
     /// Wait for element to be clickable
-    pub async fn wait_for_clickable(selector: &str, timeout: Duration) -> Result<bool> {
+    pub async fn wait_for_clickable(_selector: &str, _timeout: Duration) -> Result<bool> {
         // Implementation would wait for element to be clickable
         tokio::time::sleep(Duration::from_millis(100)).await;
         Ok(true)

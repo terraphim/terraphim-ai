@@ -6,8 +6,7 @@
 use crate::testing::ValidationResult;
 use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::{Duration, Instant};
 use tokio::process::Command;
@@ -194,12 +193,12 @@ impl DesktopUITestHarness {
     }
 
     /// Add platform-specific command arguments
-    fn add_platform_args(&self, command: &mut Command) {
+    fn add_platform_args(&self, _command: &mut Command) {
         #[cfg(target_os = "macos")]
         {
             if let Some(macos_config) = &self.config.platform_config.macos {
                 if let Some(bundle_id) = &macos_config.bundle_id {
-                    command.arg("--bundle-id").arg(bundle_id);
+                    _command.arg("--bundle-id").arg(bundle_id);
                 }
             }
         }
@@ -240,6 +239,8 @@ impl DesktopUITestHarness {
 /// Playwright client wrapper
 pub struct PlaywrightClient {
     // Placeholder for actual Playwright client implementation
+    // stub: config will be used when test implementations are complete
+    #[allow(dead_code)]
     config: PlaywrightConfig,
 }
 
@@ -261,7 +262,7 @@ impl PlaywrightClient {
         Ok(vec!["main".to_string()])
     }
 
-    async fn take_screenshot(&self, path: &PathBuf) -> Result<()> {
+    async fn take_screenshot(&self, _path: &Path) -> Result<()> {
         // Take screenshot using Playwright
         Ok(())
     }

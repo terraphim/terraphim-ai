@@ -36,6 +36,12 @@ struct ValidationPattern {
     description: String,
 }
 
+impl Default for OutputValidator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl OutputValidator {
     /// Create a new output validator
     pub fn new() -> Self {

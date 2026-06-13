@@ -4,13 +4,6 @@
 //! including download testing, installation validation, functional verification, and
 //! security scanning across multiple platforms and package formats.
 
-// Allow various lints in this validation/testing crate - this is test infrastructure
-// with flexible utilities prepared for future use and extensibility.
-// TODO: Gradually remove these allows as the crate matures
-#![allow(unused)]
-#![allow(ambiguous_glob_reexports)]
-#![allow(clippy::all)]
-
 pub mod artifacts;
 pub mod orchestrator;
 pub mod performance;
@@ -61,7 +54,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_validation_system_creation() {
-        let system = ValidationSystem::new().unwrap();
+        let _system = ValidationSystem::new().unwrap();
         assert!(true); // Basic creation test
     }
 }

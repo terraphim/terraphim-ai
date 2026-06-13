@@ -402,13 +402,13 @@ impl DesktopUITestOrchestrator {
                 format!(
                     r#"<div class="test-result {}">
                         <h3>{}</h3>
-                        <p><strong>Status:</strong> {}</p>
+                        <p><strong>Status:</strong> {:?}</p>
                         {}
                         {}
                     </div>"#,
                     css_class,
                     result.name,
-                    format!("{:?}", result.status),
+                    result.status,
                     result
                         .message
                         .as_ref()

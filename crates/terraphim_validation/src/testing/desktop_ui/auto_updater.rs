@@ -3,10 +3,8 @@
 //! Testing framework for application auto-update functionality including
 //! version checking, download progress, installation, and rollback scenarios.
 
-use crate::testing::{Result, ValidationResult, ValidationStatus};
+use crate::testing::{Result, ValidationResult};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::path::PathBuf;
 use std::time::Duration;
 
 /// Configuration for auto-updater testing
@@ -19,6 +17,8 @@ pub struct AutoUpdaterTestConfig {
 
 /// Auto-updater testing harness
 pub struct AutoUpdaterTester {
+    // stub: config will be used when test implementations are complete
+    #[allow(dead_code)]
     config: AutoUpdaterTestConfig,
 }
 

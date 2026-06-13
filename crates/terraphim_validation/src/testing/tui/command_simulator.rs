@@ -6,11 +6,8 @@
 
 use anyhow::{Result, anyhow};
 use std::collections::VecDeque;
-use std::process::Stdio;
 use std::time::Duration;
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-use tokio::process::{Child, Command};
-use tokio::time;
+use tokio::process::Command;
 
 /// Command execution result
 #[derive(Debug, Clone)]
@@ -86,7 +83,7 @@ impl CommandSimulator {
     async fn run_interactive_command(
         &self,
         command: &str,
-        timeout_seconds: u64,
+        _timeout_seconds: u64,
     ) -> Result<CommandExecutionResult> {
         let start_time = std::time::Instant::now();
 
@@ -230,7 +227,7 @@ impl CommandSimulator {
         if tokio::fs::metadata("crates/terraphim_repl").await.is_ok() {
             println!("Building terraphim-repl for testing...");
             let build_result = Command::new("cargo")
-                .args(&["build", "--bin", "terraphim-repl"])
+                .args(["build", "--bin", "terraphim-repl"])
                 .current_dir("crates/terraphim_repl")
                 .status()
                 .await;

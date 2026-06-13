@@ -76,7 +76,7 @@ impl From<serde_json::Error> for ValidationError {
 }
 
 impl ResponseValidator for Response {
-    fn validate_status(mut self, expected: reqwest::StatusCode) -> Self {
+    fn validate_status(self, expected: reqwest::StatusCode) -> Self {
         let actual = self.status();
         if actual != expected {
             // Use blocking text extraction for panic message
@@ -105,7 +105,7 @@ impl ResponseValidator for Response {
         }
     }
 
-    fn validate_response_time(self, max_ms: u64) -> Self {
+    fn validate_response_time(self, _max_ms: u64) -> Self {
         // Note: Response time validation would require timing the request
         // This is a placeholder for future implementation
         self
