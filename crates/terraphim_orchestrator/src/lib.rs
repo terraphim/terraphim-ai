@@ -1759,7 +1759,9 @@ impl AgentOrchestrator {
         let truncated: Vec<_> = learnings.into_iter().take(max_entries).collect();
         let ids: Vec<String> = truncated.iter().map(|l| l.id.clone()).collect();
 
-        let mut section = String::from("## Prior Lessons\n\nLessons learned from previous agent runs. Apply relevant insights:\n\n");
+        let mut section = String::from(
+            "## Prior Lessons\n\nLessons learned from previous agent runs. Apply relevant insights:\n\n",
+        );
         for l in &truncated {
             section.push_str(&format!(
                 "- [{}] {} (trust: {}, verified {}x)\n",
@@ -2421,6 +2423,7 @@ impl AgentOrchestrator {
                     &head_sha,
                     pr_number,
                     &project,
+                    &entry.name,
                     &entry.context,
                     &format!("{} dispatched", entry.name),
                 )
@@ -2899,17 +2902,22 @@ impl AgentOrchestrator {
         head_sha: &str,
         pr_number: u64,
         project: &str,
+        agent_name: &str,
         context: &str,
         description: &str,
     ) {
-        let tracker = match self.get_or_init_pre_check_tracker() {
+        let tracker = match self
+            .output_poster
+            .as_ref()
+            .and_then(|p| p.tracker_for(project, agent_name))
+        {
             Some(t) => t,
             None => {
                 debug!(
                     pr_number,
                     project,
                     context,
-                    "ReviewPr: no workflow tracker configured; skipping pending status"
+                    "ReviewPr: no output poster tracker for project; skipping pending status"
                 );
                 return;
             }
@@ -2952,16 +2960,25 @@ impl AgentOrchestrator {
     async fn post_terminal_commit_status(
         &mut self,
         head_sha: &str,
+        project: &str,
+        agent_name: &str,
         context: &str,
         state: terraphim_tracker::StatusState,
         description: &str,
     ) {
-        let tracker = match self.get_or_init_pre_check_tracker() {
+        let tracker = match self
+            .output_poster
+            .as_ref()
+            .and_then(|p| p.tracker_for(project, agent_name))
+        {
             Some(t) => t,
             None => {
                 debug!(
                     head_sha,
-                    context, "post_terminal_commit_status: no workflow tracker; skipping"
+                    project,
+                    agent_name,
+                    context,
+                    "post_terminal_commit_status: no output poster tracker for project; skipping"
                 );
                 return;
             }
@@ -2973,12 +2990,17 @@ impl AgentOrchestrator {
             .await
         {
             Ok(()) => {
-                info!(head_sha, context, "posted terminal commit status");
+                info!(
+                    head_sha,
+                    project, agent_name, context, "posted terminal commit status"
+                );
             }
             Err(e) => {
                 warn!(
                     error = %e,
                     head_sha,
+                    project,
+                    agent_name,
                     context,
                     "failed to post terminal commit status"
                 );
@@ -3190,6 +3212,7 @@ impl AgentOrchestrator {
             &after_sha,
             0,
             &project,
+            &def.name,
             "adf/build",
             "build-runner dispatched",
         )
@@ -6864,8 +6887,16 @@ impl AgentOrchestrator {
                 } else {
                     format!("{} failed (exit {})", def.name, status.code().unwrap_or(-1))
                 };
-                self.post_terminal_commit_status(head_sha, context, state, &description)
-                    .await;
+                let project = def.project.as_deref().unwrap_or("");
+                self.post_terminal_commit_status(
+                    head_sha,
+                    project,
+                    &def.name,
+                    context,
+                    state,
+                    &description,
+                )
+                .await;
             }
 
             // Disarm worktree guard on success so it doesn't conflict with
