@@ -355,4 +355,27 @@ mod tests {
         assert!(!invalid.is_valid);
         assert_eq!(invalid.unknown_terms.len(), 1);
     }
+
+    #[test]
+    fn test_validation_result_default_strictness_is_normal() {
+        let valid = ValidationResult::valid(vec![]);
+        assert_eq!(valid.strictness, crate::config::KgStrictness::Normal);
+
+        let invalid = ValidationResult::invalid(vec![], vec!["unknown".to_string()]);
+        assert_eq!(invalid.strictness, crate::config::KgStrictness::Normal);
+    }
+
+    #[test]
+    fn test_validation_result_with_strictness_overrides() {
+        let strict =
+            ValidationResult::valid(vec![]).with_strictness(crate::config::KgStrictness::Strict);
+        assert_eq!(strict.strictness, crate::config::KgStrictness::Strict);
+
+        let permissive = ValidationResult::invalid(vec![], vec!["x".to_string()])
+            .with_strictness(crate::config::KgStrictness::Permissive);
+        assert_eq!(
+            permissive.strictness,
+            crate::config::KgStrictness::Permissive
+        );
+    }
 }

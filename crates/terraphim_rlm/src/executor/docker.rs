@@ -29,7 +29,7 @@ use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
 
 use super::{Capability, ExecutionContext, ExecutionResult, SnapshotId, ValidationResult};
-use crate::config::{BackendType, RlmConfig};
+use crate::config::{BackendType, KgStrictness, RlmConfig};
 use crate::error::{RlmError, RlmResult};
 use crate::types::SessionId;
 
@@ -53,6 +53,8 @@ pub struct DockerExecutor {
     /// via `with_host_config`.
     host_config: HostConfig,
     capabilities: Vec<Capability>,
+    /// Knowledge graph validation strictness level from the RLM config.
+    kg_strictness: KgStrictness,
 }
 
 /// Build the default `HostConfig` applied to every session container.
@@ -82,7 +84,7 @@ fn unsupported(op: &'static str) -> RlmError {
 }
 
 impl DockerExecutor {
-    pub fn new(_config: RlmConfig) -> Result<Self, RlmError> {
+    pub fn new(config: RlmConfig) -> Result<Self, RlmError> {
         let docker =
             Docker::connect_with_local_defaults().map_err(|e| RlmError::BackendInitFailed {
                 backend: BACKEND_NAME.to_string(),
@@ -105,6 +107,7 @@ impl DockerExecutor {
             image: DEFAULT_IMAGE.to_string(),
             host_config: default_host_config(),
             capabilities,
+            kg_strictness: config.kg_strictness,
         })
     }
 
@@ -369,7 +372,7 @@ impl super::ExecutionEnvironment for DockerExecutor {
     }
 
     async fn validate(&self, _input: &str) -> Result<ValidationResult, Self::Error> {
-        Ok(ValidationResult::valid(vec![]))
+        Ok(ValidationResult::valid(vec![]).with_strictness(self.kg_strictness))
     }
 
     async fn create_snapshot(

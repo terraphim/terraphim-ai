@@ -19,7 +19,7 @@ use async_trait::async_trait;
 use tokio::process::Command;
 use tokio::time::timeout;
 
-use crate::config::BackendType;
+use crate::config::{BackendType, KgStrictness};
 use crate::error::{RlmError, RlmResult};
 use crate::executor::ExecutionEnvironment;
 use crate::executor::context::{
@@ -31,17 +31,25 @@ const BACKEND_NAME: &str = "local";
 
 pub struct LocalExecutor {
     python_path: String,
+    /// Knowledge graph validation strictness level.
+    kg_strictness: KgStrictness,
 }
 
 impl LocalExecutor {
     pub fn new() -> Self {
         Self {
             python_path: "python3".to_string(),
+            kg_strictness: KgStrictness::default(),
         }
     }
 
     pub fn with_python(mut self, path: impl Into<String>) -> Self {
         self.python_path = path.into();
+        self
+    }
+
+    pub fn with_kg_strictness(mut self, strictness: KgStrictness) -> Self {
+        self.kg_strictness = strictness;
         self
     }
 
@@ -157,7 +165,7 @@ impl ExecutionEnvironment for LocalExecutor {
     }
 
     async fn validate(&self, _input: &str) -> Result<ValidationResult, Self::Error> {
-        Ok(ValidationResult::valid(vec![]))
+        Ok(ValidationResult::valid(vec![]).with_strictness(self.kg_strictness))
     }
 
     async fn create_snapshot(
@@ -350,5 +358,26 @@ mod tests {
         let executor = LocalExecutor::new();
         let session = SessionId::new();
         assert!(executor.end_session(&session).await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_local_validate_propagates_normal_strictness() {
+        let executor = LocalExecutor::new();
+        let result = executor.validate("some command").await.unwrap();
+        assert_eq!(result.strictness, KgStrictness::Normal);
+    }
+
+    #[tokio::test]
+    async fn test_local_validate_propagates_strict_strictness() {
+        let executor = LocalExecutor::new().with_kg_strictness(KgStrictness::Strict);
+        let result = executor.validate("some command").await.unwrap();
+        assert_eq!(result.strictness, KgStrictness::Strict);
+    }
+
+    #[tokio::test]
+    async fn test_local_validate_propagates_permissive_strictness() {
+        let executor = LocalExecutor::new().with_kg_strictness(KgStrictness::Permissive);
+        let result = executor.validate("some command").await.unwrap();
+        assert_eq!(result.strictness, KgStrictness::Permissive);
     }
 }

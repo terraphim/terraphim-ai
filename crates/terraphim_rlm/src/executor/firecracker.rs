@@ -504,7 +504,7 @@ impl super::ExecutionEnvironment for FirecrackerExecutor {
             input.len()
         );
 
-        Ok(ValidationResult::valid(Vec::new()))
+        Ok(ValidationResult::valid(Vec::new()).with_strictness(self.config.kg_strictness))
     }
 
     async fn create_snapshot(
