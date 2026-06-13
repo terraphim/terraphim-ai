@@ -231,6 +231,6 @@ curl -s -H "Authorization: token $GITEA_TOKEN" \
 | 1 Issue dedup | PR #43; binary on bigbox built from `task/2596-adf-issue-dedup` | Deployed (merge PR pending) |
 | 2 min_confidence=4 | `adf --check` → `min_confidence 4`; journald `threshold 4/5` after binary rebuild | Done |
 | 3 Branch protection | terraphim-ai: 4 status contexts | Done |
-| 4 Swarm cadence | `schedule */20`, `pre_check` after `project`; orchestrator active | Config done; 60m dispatch count pending |
-| 5 Batch-close dupes | 65 closed; 1 skipped (#1971 dep on #2596) | Done (partial) |
+| 4 Swarm cadence | Central terraphim-ai `*/20` + pre_check; polyrepo staggered (`agents` 10/30/50, `core` :35, `service` :45, `clients` :55) with per-repo `gtr ready` pre_check; orchestrator active after reload | Done |
+| 5 Batch-close dupes | 65 closed; #1971 closed after removing dep on #2596 (superseded by #2641) | Done |
 | 6 Live proof | PR #2402 auto-merged; `.docs/validation-report-adf-flow-fix-2026-06-13.md` | Done |
