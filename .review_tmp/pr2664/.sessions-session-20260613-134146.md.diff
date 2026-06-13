@@ -1,0 +1,33 @@
+diff --git a/.sessions/session-20260613-134146.md b/.sessions/session-20260613-134146.md
+new file mode 100644
+index 000000000..bb7180b12
+--- /dev/null
++++ b/.sessions/session-20260613-134146.md
+@@ -0,0 +1,27 @@
++# Session: feat: wire learn shared CLI subcommands #2366
++
++**Agent**: Echo (implementation-swarm)
++**Started**: 2026-06-13
++**Issue**: #2366 - feat: wire learn shared CLI subcommands (Phase G — SharedLearning not exposed)
++**Branch**: task/2366-wire-shared-learning-cli
++
++## Task Description
++Wire `learn shared` CLI subcommands to the existing `SharedLearningStore` implementation.
++The store is implemented but not exposed in `main.rs`.
++
++## Subtasks
++1. Research: Understand existing SharedLearningStore API and CLI structure (S)
++2. Design: Plan CLI arg structure, command routing (S)
++3. Implement: Add `learn shared list`, `promote`, `import`, `sync` subcommands (M)
++4. Implement: `import_from_local()` in shared_learning/store.rs (M)
++5. Test & verify: cargo test -p terraphim_agent --features shared-learning (S)
++
++## Decisions Log
++- Starting with research to understand existing code
++
++## Progress
++- [ ] Research complete
++- [ ] Design approved
++- [ ] Implementation complete
++- [ ] Tests passing
++- [ ] PR created

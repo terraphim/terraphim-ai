@@ -1,0 +1,84 @@
+diff --git a/crates/terraphim_rlm/src/executor/local.rs b/crates/terraphim_rlm/src/executor/local.rs
+index 7a7f2db2d..507276c62 100644
+--- a/crates/terraphim_rlm/src/executor/local.rs
++++ b/crates/terraphim_rlm/src/executor/local.rs
+@@ -31,12 +31,16 @@ const BACKEND_NAME: &str = "local";
+ 
+ pub struct LocalExecutor {
+     python_path: String,
++    #[cfg(feature = "kg-validation")]
++    validator: Option<crate::validator::KnowledgeGraphValidator>,
+ }
+ 
+ impl LocalExecutor {
+     pub fn new() -> Self {
+         Self {
+             python_path: "python3".to_string(),
++            #[cfg(feature = "kg-validation")]
++            validator: None,
+         }
+     }
+ 
+@@ -45,6 +49,12 @@ impl LocalExecutor {
+         self
+     }
+ 
++    #[cfg(feature = "kg-validation")]
++    pub fn with_validator(mut self, validator: crate::validator::KnowledgeGraphValidator) -> Self {
++        self.validator = Some(validator);
++        self
++    }
++
+     fn build_command(&self, cmd: &str, ctx: &ExecutionContext) -> Command {
+         let mut command = Command::new("bash");
+         command
+@@ -156,7 +166,22 @@ impl ExecutionEnvironment for LocalExecutor {
+         self.run_command(command, ctx).await
+     }
+ 
+-    async fn validate(&self, _input: &str) -> Result<ValidationResult, Self::Error> {
++    async fn validate(&self, input: &str) -> Result<ValidationResult, Self::Error> {
++        #[cfg(feature = "kg-validation")]
++        if let Some(ref validator) = self.validator {
++            let vr = validator
++                .validate(input)
++                .map_err(|e| RlmError::ConfigError {
++                    message: format!("KG validation error: {}", e),
++                })?;
++            return Ok(ValidationResult {
++                is_valid: vr.passed,
++                matched_terms: vr.matched_terms,
++                unknown_terms: vr.unmatched_words,
++                suggestions: std::collections::HashMap::new(),
++                strictness: validator.strictness(),
++            });
++        }
+         Ok(ValidationResult::valid(vec![]))
+     }
+ 
+@@ -351,4 +376,25 @@ mod tests {
+         let session = SessionId::new();
+         assert!(executor.end_session(&session).await.is_ok());
+     }
++
++    #[tokio::test]
++    async fn test_local_validate_without_validator_always_valid() {
++        let executor = LocalExecutor::new();
++        let result = executor.validate("some unknown command xyz").await.unwrap();
++        assert!(result.is_valid);
++        assert!(result.matched_terms.is_empty());
++    }
++
++    #[cfg(feature = "kg-validation")]
++    #[tokio::test]
++    async fn test_local_validate_with_permissive_validator_always_passes() {
++        use crate::validator::{KnowledgeGraphValidator, ValidatorConfig};
++        let validator = KnowledgeGraphValidator::new(ValidatorConfig::permissive());
++        let executor = LocalExecutor::new().with_validator(validator);
++        let result = executor
++            .validate("arbitrary text with no kg match")
++            .await
++            .unwrap();
++        assert!(result.is_valid);
++    }
+ }

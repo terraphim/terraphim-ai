@@ -1,0 +1,13 @@
+diff --git a/terraphim_ai_nodejs/Cargo.toml b/terraphim_ai_nodejs/Cargo.toml
+index d5de7a7db..af7a67814 100644
+--- a/terraphim_ai_nodejs/Cargo.toml
++++ b/terraphim_ai_nodejs/Cargo.toml
+@@ -1,7 +1,7 @@
+ [package]
+ edition.workspace = true
+ name = "terraphim_ai_nodejs"
+-version = "1.19.2"
++version.workspace = true
+ description = "Node.js bindings for Terraphim AI"
+ documentation = "https://terraphim.ai"
+ homepage = "https://terraphim.ai"

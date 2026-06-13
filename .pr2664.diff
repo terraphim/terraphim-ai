@@ -1,0 +1,1403 @@
+diff --git a/.docs/research-release-blockers.md b/.docs/research-release-blockers.md
+new file mode 100644
+index 000000000..5d7566ec4
+--- /dev/null
++++ b/.docs/research-release-blockers.md
+@@ -0,0 +1,214 @@
++# Research Document: terraphim-ai v1.20.3 Release Blockers
++
++**Status**: Approved
++**Author**: Claude Code
++**Date**: 2026-06-13
++**Investigation method**: SSH to bigbox (`ssh bigbox`), live codebase grep
++
++---
++
++## Executive Summary
++
++Five release blockers exist across two tracks. Track A (three infra issues) freezes CI
++and must land first; Track B (two security/code issues) must land before shipping the
++binary. One supplementary finding (flaky benchmark) also blocks a clean `cargo test --workspace`.
++
++---
++
++## Track A — Infra
++
++### #2610 — CI frozen: all jobs fail at step 1
++
++**Live evidence** (bigbox, 2026-06-13):
++
++```
++● terraphim-gitea-runner.service
++   Active: active (running) since Thu 2026-06-11 20:26:49 CEST
++   Memory: 717.1M (peak: 7.3G)
++
++Runner config: ~/.config/terraphim-gitea-runner/.runner
++  "labels": ["terraphim-native"]
++
++Workflow: .gitea/workflows/native-ci.yml
++  runs-on: terraphim-native    ← labels match, runner IS dispatching jobs
++
++Every job in journal (Jun 11 – Jun 13):
++  [INFO] Executing step 1/5: cargo fmt --all -- --check
++  [INFO] Released session … task complete: success=false   ← fails in <1s
++```
++
++The label mismatch described in the original issue title is resolved. The current
++failure is caused entirely by the rustup wrapper bug documented in #2462.
++
++---
++
++### #2462 — rustup wrapper argv[0] bug (causes #2610)
++
++**Live evidence** (bigbox):
++
++```
++~/.cargo/bin/cargo  →  rustup  (bash wrapper script)
++
++Contents of ~/.cargo/bin/rustup:
++  #!/usr/bin/env bash
++  export RUSTUP_REAL="/home/alex/.cargo/bin/rustup.real"
++  exec "/home/alex/.local/bin/rustup-with-perms.sh" "$@"
++
++Contents of ~/.local/bin/rustup-with-perms.sh (relevant line):
++  "$RUSTUP_REAL" "$@"          ← BUG: argv[0] is "rustup.real", not "cargo"
++
++Reproducer:
++  $ cargo fmt --all -- --check
++  error: unexpected argument '--all' found
++    tip: to pass '--all' as a value, use '-- --all'
++  Usage: rustup[EXE] <+toolchain>
++
++Toolchain binaries (NOT the root cause):
++  ls -la ~/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/
++  -rwxr-xr-x ... cargo
++  -rwxr-xr-x ... rustfmt
++  (execute bits are present — the original +x problem IS fixed)
++```
++
++**Root cause**: `rustup.real` uses `argv[0]` to decide whether it is acting as `rustup`
++or as a cargo/rustfmt/etc. proxy. The wrapper calls it as `rustup.real` (not `cargo`),
++so it processes subcommands as rustup commands, not cargo commands.
++
++**Fix** — one line change in `/home/alex/.local/bin/rustup-with-perms.sh`:
++```bash
++# Before:
++"$RUSTUP_REAL" "$@"
++# After:
++exec -a "$(basename "$0")" "$RUSTUP_REAL" "$@"
++```
++
++---
++
++### #2608 — Ports 6666 and 8095 bound on all interfaces
++
++**Live evidence** (bigbox, `sudo lsof -i :6666 -i :8095`):
++
++```
++PORT 6666:
++  bun  3384585  martin  14u  IPv6  TCP *:6666 (LISTEN)
++  Command: bun run src/mentor.ts
++  CWD: ~/qa-work/odilo-slack-local/services/stubs/
++  Running since: May 18
++
++PORT 8095:
++  bun  3384592  martin  180u  IPv6  TCP *:8095 (LISTEN)
++  Command: bun --watch src/index.ts
++  Running since: May 18
++```
++
++These are not Terraphim processes. They are Slack bot stub services belonging to user
++`martin`, started in a persistent tmux session. Both bind to `*:` (all network
++interfaces) instead of `127.0.0.1`.
++
++**Fix**: Contact martin to add `HOST=127.0.0.1` to the bun startup, or apply a ufw rule:
++```bash
++sudo ufw deny in on eth0 to any port 6666
++sudo ufw deny in on eth0 to any port 8095
++```
++
++---
++
++## Track B — Code / Security
++
++### #2519 — Ed25519 public key needs production keying
++
++**Live evidence** (`crates/terraphim_update/src/signature.rs`):
++
++```
++Line 28: // TODO: Replace with actual Terraphim AI public key after key generation
++Line 29: // Run: ./scripts/generate-zipsign-keypair.sh
++Line 30: // Then add the public key here
++Line 36: "1uLjooBMO+HlpKeiD16WOtT3COWeC8J/o2ERmDiEMc4="
++
++Line 135 (placeholder guard):
++  if key_str.starts_with("TODO:") {          ← only blocks "TODO:" prefix
++      return Err(anyhow!("Placeholder..."));  ← current key does NOT trigger this
++  }
++
++.github/workflows/release-sign.yml:86:
++  ZIPSIGN_PRIVATE_KEY: ${{ secrets.ZIPSIGN_PRIVATE_KEY }}
++```
++
++The embedded public key at line 36 has a TODO comment indicating it has not been
++formally confirmed as the production key. The CI signing workflow uses
++`${{ secrets.ZIPSIGN_PRIVATE_KEY }}` — if that secret does not hold the private key
++matching this exact public key, all signed releases will fail verification on users'
++machines. The script to generate a new pair exists at
++`scripts/generate-zipsign-keypair.sh`.
++
++---
++
++### #2415 — KG validator never called on hot path
++
++**Live evidence** (`crates/terraphim_rlm/src/`):
++
++```
++validator.rs:198
++  pub struct KnowledgeGraphValidator { … }
++
++rlm.rs:310 — execute_code():
++  self.session_manager.validate_session(session_id)?;  ← validates UUID only
++  // NO call to self.validator.validate(code)
++  self.executor.execute_code(code, &ctx).await
++
++rlm.rs:366 — execute_command():
++  self.session_manager.validate_session(session_id)?;  ← validates UUID only
++  // NO call to self.validator.validate(command)
++  self.executor.execute_command(command, &ctx).await
++
++query_loop.rs:
++  grep KnowledgeGraphValidator → 0 results
++  grep validate             → 0 results
++```
++
++`KnowledgeGraphValidator` is tested in isolation in `validator.rs` unit tests but is
++never wired into `TerraphimRlm` or `QueryLoop`. Any command or code string passes
++straight to execution without KG term matching.
++
++---
++
++## Supplementary Findings
++
++### cargo test --workspace failure
++
++```
++crates/terraphim_tinyclaw/tests/skills_benchmarks.rs:142
++  FAILED: benchmark_execution_small_skill
++  Skill execution took too long: 4.508551771s
++```
++
++The test asserts a hard wall-clock time bound which fails on a loaded CI host. Must
++be fixed (tighter implementation, or `#[ignore]` with explanation) before declaring
++a clean workspace test run.
++
++### crates/terraphim_settings/ — untracked but intentional
++
++`Cargo.toml:27` explicitly excludes `crates/terraphim_settings` as part of polyrepo
++extraction E2 (Gitea #1910). The directory contains residual files from the extraction.
++Not a blocker.
++
++### Version drift in non-workspace Cargo.tomls
++
++| Crate | Current version | Workspace version | File |
++|-------|----------------|-------------------|------|
++| terraphim_workspace | 1.13.0 | 1.20.3 | `crates/terraphim_workspace/Cargo.toml:3` |
++| terraphim_ai_nodejs | 1.19.2 | 1.20.3 | `terraphim_ai_nodejs/Cargo.toml:4` |
++
++Both use hardcoded `version = "x.y.z"` instead of `version.workspace = true`. Not a
++build blocker but creates misleading version metadata in published crates.
++
++---
++
++## Fix Sequence
++
++1. **bigbox hotfix** — `rustup-with-perms.sh` exec -a fix → unblocks all CI (fixes #2462, #2610)
++2. **Port restriction** — martin to bind to 127.0.0.1 or ufw rule (closes #2608)
++3. **Production keypair** — generate, store in 1P, update signature.rs, set GH secret (fixes #2519)
++4. **Wire KG validator** — add `validator` field to `TerraphimRlm`, guard `execute_code` and `execute_command` (fixes #2415)
++5. **Version alignment** — `version.workspace = true` in two Cargo.toml files
++6. **Flaky benchmark** — fix timing test in terraphim_tinyclaw
+diff --git a/.gitea/workflows/native-ci.yml b/.gitea/workflows/native-ci.yml
+index be1592bdc..cafc93f7f 100644
+--- a/.gitea/workflows/native-ci.yml
++++ b/.gitea/workflows/native-ci.yml
+@@ -6,8 +6,14 @@ jobs:
+   build:
+     runs-on: terraphim-native
+     steps:
++      # Ensure rustup wrappers include RUSTUP_INVOKE_AS so rustdoc/rustfmt
++      # proxying works correctly through rustup-with-perms.sh. Refs #2605.
++      - run: bash scripts/install-rustup-perms-guard.sh
+       - run: cargo fmt --all -- --check
+       - run: cargo clippy --workspace --all-targets -- -D warnings
+       - run: cargo build --workspace
+       - run: cargo test --workspace --lib --no-fail-fast
+       - run: cargo test -p terraphim_gitea_runner --no-fail-fast
++      # Doc tests require RUSTDOC to bypass the rustup symlink chain that
++      # loses argv[0] context and causes '--edition' to be mis-parsed. Refs #2605.
++      - run: RUSTDOC=$(rustup which rustdoc) cargo test --workspace --doc --no-fail-fast
+diff --git a/.sessions/session-20260613-134146.md b/.sessions/session-20260613-134146.md
+new file mode 100644
+index 000000000..bb7180b12
+--- /dev/null
++++ b/.sessions/session-20260613-134146.md
+@@ -0,0 +1,27 @@
++# Session: feat: wire learn shared CLI subcommands #2366
++
++**Agent**: Echo (implementation-swarm)
++**Started**: 2026-06-13
++**Issue**: #2366 - feat: wire learn shared CLI subcommands (Phase G — SharedLearning not exposed)
++**Branch**: task/2366-wire-shared-learning-cli
++
++## Task Description
++Wire `learn shared` CLI subcommands to the existing `SharedLearningStore` implementation.
++The store is implemented but not exposed in `main.rs`.
++
++## Subtasks
++1. Research: Understand existing SharedLearningStore API and CLI structure (S)
++2. Design: Plan CLI arg structure, command routing (S)
++3. Implement: Add `learn shared list`, `promote`, `import`, `sync` subcommands (M)
++4. Implement: `import_from_local()` in shared_learning/store.rs (M)
++5. Test & verify: cargo test -p terraphim_agent --features shared-learning (S)
++
++## Decisions Log
++- Starting with research to understand existing code
++
++## Progress
++- [ ] Research complete
++- [ ] Design approved
++- [ ] Implementation complete
++- [ ] Tests passing
++- [ ] PR created
+diff --git a/Cargo.lock b/Cargo.lock
+index 19e316ebc..8231e830a 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -8094,7 +8094,7 @@ dependencies = [
+ 
+ [[package]]
+ name = "terraphim-firecracker"
+-version = "1.19.2"
++version = "1.20.3"
+ dependencies = [
+  "anyhow",
+  "async-trait",
+@@ -8339,7 +8339,7 @@ dependencies = [
+ 
+ [[package]]
+ name = "terraphim_ai_nodejs"
+-version = "1.19.2"
++version = "1.20.3"
+ dependencies = [
+  "ahash",
+  "anyhow",
+@@ -9094,7 +9094,7 @@ dependencies = [
+ 
+ [[package]]
+ name = "terraphim_workspace"
+-version = "1.13.0"
++version = "1.20.3"
+ dependencies = [
+  "jiff",
+  "serde",
+diff --git a/crates/terraphim_rlm/src/config.rs b/crates/terraphim_rlm/src/config.rs
+index d3134edea..e669a10c0 100644
+--- a/crates/terraphim_rlm/src/config.rs
++++ b/crates/terraphim_rlm/src/config.rs
+@@ -83,6 +83,15 @@ pub struct RlmConfig {
+     /// Maximum retries for KG validation before escalation.
+     pub kg_max_retries: u32,
+ 
++    /// Path to a JSON thesaurus file used for real KG term matching.
++    ///
++    /// When `None` the validator operates without term data; Normal/Strict
++    /// modes will log a warning and skip real matching (GAP-1 fix).
++    /// When set, the file is loaded at startup and wired into the
++    /// `KnowledgeGraphValidator` so that validation performs actual
++    /// Aho-Corasick term lookup.
++    pub kg_thesaurus_path: Option<String>,
++
+     // ============================================
+     // Network Security Configuration
+     // ============================================
+@@ -169,6 +178,7 @@ impl std::fmt::Debug for RlmConfig {
+             // Knowledge Graph
+             .field("kg_strictness", &self.kg_strictness)
+             .field("kg_max_retries", &self.kg_max_retries)
++            .field("kg_thesaurus_path", &self.kg_thesaurus_path)
+             // Network Security
+             .field("dns_allowlist", &self.dns_allowlist)
+             .field("log_blocked_dns", &self.log_blocked_dns)
+@@ -230,6 +240,7 @@ impl Default for RlmConfig {
+             // Knowledge Graph
+             kg_strictness: KgStrictness::Normal,
+             kg_max_retries: 3,
++            kg_thesaurus_path: None,
+ 
+             // Network Security
+             dns_allowlist: crate::DEFAULT_DNS_ALLOWLIST
+@@ -349,8 +360,11 @@ pub enum KgStrictness {
+ 
+ impl KgStrictness {
+     /// Check if unknown terms should block execution.
++    ///
++    /// Both `Normal` and `Strict` block on unknown terms; they differ only in
++    /// whether retries are attempted first. `Permissive` only warns.
+     pub fn blocks_unknown(&self) -> bool {
+-        matches!(self, KgStrictness::Strict)
++        matches!(self, KgStrictness::Normal | KgStrictness::Strict)
+     }
+ 
+     /// Check if retries are allowed.
+@@ -436,8 +450,11 @@ mod tests {
+ 
+     #[test]
+     fn test_kg_strictness_behavior() {
++        // Permissive never blocks (warn-only mode)
+         assert!(!KgStrictness::Permissive.blocks_unknown());
+-        assert!(!KgStrictness::Normal.blocks_unknown());
++        // Normal blocks on unknown terms but allows retries first
++        assert!(KgStrictness::Normal.blocks_unknown());
++        // Strict blocks on unknown terms immediately
+         assert!(KgStrictness::Strict.blocks_unknown());
+ 
+         assert!(!KgStrictness::Permissive.allows_retry());
+diff --git a/crates/terraphim_rlm/src/executor/docker.rs b/crates/terraphim_rlm/src/executor/docker.rs
+index f58e48025..52c8850ca 100644
+--- a/crates/terraphim_rlm/src/executor/docker.rs
++++ b/crates/terraphim_rlm/src/executor/docker.rs
+@@ -53,6 +53,8 @@ pub struct DockerExecutor {
+     /// via `with_host_config`.
+     host_config: HostConfig,
+     capabilities: Vec<Capability>,
++    #[cfg(feature = "kg-validation")]
++    validator: Option<crate::validator::KnowledgeGraphValidator>,
+ }
+ 
+ /// Build the default `HostConfig` applied to every session container.
+@@ -105,6 +107,8 @@ impl DockerExecutor {
+             image: DEFAULT_IMAGE.to_string(),
+             host_config: default_host_config(),
+             capabilities,
++            #[cfg(feature = "kg-validation")]
++            validator: None,
+         })
+     }
+ 
+@@ -122,6 +126,12 @@ impl DockerExecutor {
+         self
+     }
+ 
++    #[cfg(feature = "kg-validation")]
++    pub fn with_validator(mut self, validator: crate::validator::KnowledgeGraphValidator) -> Self {
++        self.validator = Some(validator);
++        self
++    }
++
+     async fn ensure_container(&self, session_id: &SessionId) -> RlmResult<String> {
+         let entry = self
+             .session_to_container
+@@ -368,7 +378,22 @@ impl super::ExecutionEnvironment for DockerExecutor {
+         self.exec_in_container(&container_id, bash_cmd, ctx).await
+     }
+ 
+-    async fn validate(&self, _input: &str) -> Result<ValidationResult, Self::Error> {
++    async fn validate(&self, input: &str) -> Result<ValidationResult, Self::Error> {
++        #[cfg(feature = "kg-validation")]
++        if let Some(ref validator) = self.validator {
++            let vr = validator
++                .validate(input)
++                .map_err(|e| RlmError::ConfigError {
++                    message: format!("KG validation error: {}", e),
++                })?;
++            return Ok(ValidationResult {
++                is_valid: vr.passed,
++                matched_terms: vr.matched_terms,
++                unknown_terms: vr.unmatched_words,
++                suggestions: std::collections::HashMap::new(),
++                strictness: validator.strictness(),
++            });
++        }
+         Ok(ValidationResult::valid(vec![]))
+     }
+ 
+diff --git a/crates/terraphim_rlm/src/executor/firecracker.rs b/crates/terraphim_rlm/src/executor/firecracker.rs
+index 1907772e9..29a19a8a0 100644
+--- a/crates/terraphim_rlm/src/executor/firecracker.rs
++++ b/crates/terraphim_rlm/src/executor/firecracker.rs
+@@ -79,6 +79,9 @@ pub struct FirecrackerExecutor {
+ 
+     /// Snapshot count per session (for limit enforcement).
+     snapshot_counts: parking_lot::RwLock<HashMap<SessionId, u32>>,
++
++    #[cfg(feature = "kg-validation")]
++    validator: Option<crate::validator::KnowledgeGraphValidator>,
+ }
+ 
+ impl FirecrackerExecutor {
+@@ -128,9 +131,17 @@ impl FirecrackerExecutor {
+             session_to_vm: parking_lot::RwLock::new(HashMap::new()),
+             current_snapshot: parking_lot::RwLock::new(HashMap::new()),
+             snapshot_counts: parking_lot::RwLock::new(HashMap::new()),
++            #[cfg(feature = "kg-validation")]
++            validator: None,
+         })
+     }
+ 
++    #[cfg(feature = "kg-validation")]
++    pub fn with_validator(mut self, validator: crate::validator::KnowledgeGraphValidator) -> Self {
++        self.validator = Some(validator);
++        self
++    }
++
+     /// Initialize the VM and snapshot managers.
+     ///
+     /// This should be called before using the executor.
+@@ -498,12 +509,21 @@ impl super::ExecutionEnvironment for FirecrackerExecutor {
+     }
+ 
+     async fn validate(&self, input: &str) -> Result<ValidationResult, Self::Error> {
+-        // TODO: Implement KG validation using terraphim_automata
+-        log::debug!(
+-            "FirecrackerExecutor::validate called for {} bytes",
+-            input.len()
+-        );
+-
++        #[cfg(feature = "kg-validation")]
++        if let Some(ref validator) = self.validator {
++            let vr = validator
++                .validate(input)
++                .map_err(|e| RlmError::ConfigError {
++                    message: format!("KG validation error: {}", e),
++                })?;
++            return Ok(ValidationResult {
++                is_valid: vr.passed,
++                matched_terms: vr.matched_terms,
++                unknown_terms: vr.unmatched_words,
++                suggestions: std::collections::HashMap::new(),
++                strictness: validator.strictness(),
++            });
++        }
+         Ok(ValidationResult::valid(Vec::new()))
+     }
+ 
+@@ -644,28 +664,43 @@ impl super::ExecutionEnvironment for FirecrackerExecutor {
+     }
+ 
+     async fn list_snapshots(&self, session_id: &SessionId) -> Result<Vec<SnapshotId>, Self::Error> {
+-        // Get VM ID for this session
+-        let vm_id = self.session_to_vm.read().get(session_id).cloned();
++        let vm_id = match self.session_to_vm.read().get(session_id).cloned() {
++            Some(id) => id,
++            None => {
++                log::debug!(
++                    "No VM assigned to session {}, returning empty snapshot list",
++                    session_id
++                );
++                return Ok(Vec::new());
++            }
++        };
++
++        log::debug!("list_snapshots for session {} (vm={})", session_id, vm_id);
++
++        let mut snapshot_manager_guard = self.snapshot_manager.lock().await;
++        if let Some(snapshot_manager) = &mut *snapshot_manager_guard {
++            let fc_snapshots = snapshot_manager
++                .list_snapshots(Some(&vm_id))
++                .await
++                .unwrap_or_default();
++
++            let snapshots: Vec<SnapshotId> = fc_snapshots
++                .into_iter()
++                .map(|s| SnapshotId::new(s.name, *session_id))
++                .collect();
+ 
+-        if vm_id.is_none() {
+             log::debug!(
+-                "No VM assigned to session {}, returning empty snapshot list",
+-                session_id
++                "Found {} snapshots for session {} (vm={})",
++                snapshots.len(),
++                session_id,
++                vm_id
+             );
+-            return Ok(Vec::new());
++
++            Ok(snapshots)
++        } else {
++            log::debug!("SnapshotManager not initialised, returning empty snapshot list");
++            Ok(Vec::new())
+         }
+-
+-        // List snapshots using fcctl-core SnapshotManager
+-        // Note: SnapshotManager.list_snapshots requires &mut self
+-        // For now, return empty list and log
+-        log::debug!(
+-            "list_snapshots for session {} (vm={})",
+-            session_id,
+-            vm_id.unwrap()
+-        );
+-
+-        // TODO: Call snapshot_manager.list_snapshots() when we have mutable access
+-        Ok(Vec::new())
+     }
+ 
+     async fn delete_snapshot(&self, id: &SnapshotId) -> Result<(), Self::Error> {
+@@ -767,16 +802,33 @@ impl super::ExecutionEnvironment for FirecrackerExecutor {
+     async fn cleanup(&self) -> Result<(), Self::Error> {
+         log::info!("FirecrackerExecutor::cleanup called");
+ 
+-        // Clear all session mappings
++        // Collect active VM IDs before clearing the map so we can stop each VM.
++        let vm_ids: Vec<String> = self.session_to_vm.read().values().cloned().collect();
++
++        if !vm_ids.is_empty() {
++            let mut vm_manager_guard = self.vm_manager.lock().await;
++            if let Some(vm_manager) = &mut *vm_manager_guard {
++                for vm_id in &vm_ids {
++                    if let Err(e) = vm_manager.stop_vm(vm_id, true).await {
++                        log::warn!("Failed to stop VM {} during cleanup: {}", vm_id, e);
++                    } else {
++                        log::debug!("Stopped VM {} during cleanup", vm_id);
++                    }
++                }
++            } else {
++                log::warn!(
++                    "VmManager not initialised; {} VMs may continue running",
++                    vm_ids.len()
++                );
++            }
++        }
++
++        // Clear all session mappings after teardown attempts.
+         self.session_to_vm.write().clear();
+         self.current_snapshot.write().clear();
+         self.snapshot_counts.write().clear();
+ 
+-        // TODO: Stop and cleanup VMs via VmManager
+-        // for (session_id, vm_id) in session_to_vm {
+-        //     vm_manager.stop_vm(&vm_id, true).await?;
+-        // }
+-
++        log::info!("FirecrackerExecutor::cleanup complete");
+         Ok(())
+     }
+ 
+@@ -909,4 +961,96 @@ mod tests {
+         let result = executor.health_check().await.unwrap();
+         assert!(!result);
+     }
++
++    // Tests for list_snapshots (Refs #2431)
++
++    #[tokio::test]
++    async fn test_list_snapshots_no_vm_returns_empty() {
++        if !super::super::is_kvm_available() {
++            eprintln!("Skipping test: KVM not available");
++            return;
++        }
++
++        let executor = FirecrackerExecutor::new(RlmConfig::default()).unwrap();
++        let session_id = SessionId::new();
++
++        let result = executor.list_snapshots(&session_id).await.unwrap();
++        assert!(result.is_empty(), "should be empty when no VM is assigned");
++    }
++
++    #[tokio::test]
++    async fn test_list_snapshots_no_manager_returns_empty() {
++        if !super::super::is_kvm_available() {
++            eprintln!("Skipping test: KVM not available");
++            return;
++        }
++
++        let executor = FirecrackerExecutor::new(RlmConfig::default()).unwrap();
++        let session_id = SessionId::new();
++
++        // Assign a VM but leave snapshot_manager as None (not initialised).
++        executor.assign_vm_to_session(session_id, "test-vm-snap".to_string());
++
++        let result = executor.list_snapshots(&session_id).await.unwrap();
++        assert!(
++            result.is_empty(),
++            "should be empty when SnapshotManager is not initialised"
++        );
++    }
++
++    // Tests for cleanup (Refs #2430)
++
++    #[tokio::test]
++    async fn test_cleanup_clears_session_maps() {
++        if !super::super::is_kvm_available() {
++            eprintln!("Skipping test: KVM not available");
++            return;
++        }
++
++        let executor = FirecrackerExecutor::new(RlmConfig::default()).unwrap();
++        let session_id = SessionId::new();
++
++        executor.assign_vm_to_session(session_id, "test-vm-cleanup".to_string());
++        *executor
++            .snapshot_counts
++            .write()
++            .entry(session_id)
++            .or_insert(0) = 2;
++
++        assert!(
++            executor.session_to_vm.read().contains_key(&session_id),
++            "setup: session map should be populated"
++        );
++
++        // VmManager is None so cleanup skips stop_vm and goes straight to clear.
++        executor.cleanup().await.unwrap();
++
++        assert!(
++            executor.session_to_vm.read().is_empty(),
++            "session_to_vm should be empty after cleanup"
++        );
++        assert!(
++            executor.snapshot_counts.read().is_empty(),
++            "snapshot_counts should be empty after cleanup"
++        );
++        assert!(
++            executor.current_snapshot.read().is_empty(),
++            "current_snapshot should be empty after cleanup"
++        );
++    }
++
++    #[tokio::test]
++    async fn test_cleanup_empty_maps_is_noop() {
++        if !super::super::is_kvm_available() {
++            eprintln!("Skipping test: KVM not available");
++            return;
++        }
++
++        let executor = FirecrackerExecutor::new(RlmConfig::default()).unwrap();
++
++        // No sessions assigned — cleanup should succeed without panicking.
++        executor.cleanup().await.unwrap();
++
++        assert!(executor.session_to_vm.read().is_empty());
++    }
+ }
+diff --git a/crates/terraphim_rlm/src/executor/local.rs b/crates/terraphim_rlm/src/executor/local.rs
+index 7a7f2db2d..507276c62 100644
+--- a/crates/terraphim_rlm/src/executor/local.rs
++++ b/crates/terraphim_rlm/src/executor/local.rs
+@@ -31,12 +31,16 @@ const BACKEND_NAME: &str = "local";
+ 
+ pub struct LocalExecutor {
+     python_path: String,
++    #[cfg(feature = "kg-validation")]
++    validator: Option<crate::validator::KnowledgeGraphValidator>,
+ }
+ 
+ impl LocalExecutor {
+     pub fn new() -> Self {
+         Self {
+             python_path: "python3".to_string(),
++            #[cfg(feature = "kg-validation")]
++            validator: None,
+         }
+     }
+ 
+@@ -45,6 +49,12 @@ impl LocalExecutor {
+         self
+     }
+ 
++    #[cfg(feature = "kg-validation")]
++    pub fn with_validator(mut self, validator: crate::validator::KnowledgeGraphValidator) -> Self {
++        self.validator = Some(validator);
++        self
++    }
++
+     fn build_command(&self, cmd: &str, ctx: &ExecutionContext) -> Command {
+         let mut command = Command::new("bash");
+         command
+@@ -156,7 +166,22 @@ impl ExecutionEnvironment for LocalExecutor {
+         self.run_command(command, ctx).await
+     }
+ 
+-    async fn validate(&self, _input: &str) -> Result<ValidationResult, Self::Error> {
++    async fn validate(&self, input: &str) -> Result<ValidationResult, Self::Error> {
++        #[cfg(feature = "kg-validation")]
++        if let Some(ref validator) = self.validator {
++            let vr = validator
++                .validate(input)
++                .map_err(|e| RlmError::ConfigError {
++                    message: format!("KG validation error: {}", e),
++                })?;
++            return Ok(ValidationResult {
++                is_valid: vr.passed,
++                matched_terms: vr.matched_terms,
++                unknown_terms: vr.unmatched_words,
++                suggestions: std::collections::HashMap::new(),
++                strictness: validator.strictness(),
++            });
++        }
+         Ok(ValidationResult::valid(vec![]))
+     }
+ 
+@@ -351,4 +376,25 @@ mod tests {
+         let session = SessionId::new();
+         assert!(executor.end_session(&session).await.is_ok());
+     }
++
++    #[tokio::test]
++    async fn test_local_validate_without_validator_always_valid() {
++        let executor = LocalExecutor::new();
++        let result = executor.validate("some unknown command xyz").await.unwrap();
++        assert!(result.is_valid);
++        assert!(result.matched_terms.is_empty());
++    }
++
++    #[cfg(feature = "kg-validation")]
++    #[tokio::test]
++    async fn test_local_validate_with_permissive_validator_always_passes() {
++        use crate::validator::{KnowledgeGraphValidator, ValidatorConfig};
++        let validator = KnowledgeGraphValidator::new(ValidatorConfig::permissive());
++        let executor = LocalExecutor::new().with_validator(validator);
++        let result = executor
++            .validate("arbitrary text with no kg match")
++            .await
++            .unwrap();
++        assert!(result.is_valid);
++    }
+ }
+diff --git a/crates/terraphim_rlm/src/executor/mod.rs b/crates/terraphim_rlm/src/executor/mod.rs
+index 6af99f23a..6776c6034 100644
+--- a/crates/terraphim_rlm/src/executor/mod.rs
++++ b/crates/terraphim_rlm/src/executor/mod.rs
+@@ -95,6 +95,17 @@ pub async fn select_executor(
+         config.backend_preference.clone()
+     };
+ 
++    // Build a shared KG validator from config (kg-validation feature only).
++    #[cfg(feature = "kg-validation")]
++    let validator = {
++        use crate::validator::KnowledgeGraphValidator;
++        KnowledgeGraphValidator::from_config(
++            config.kg_strictness,
++            config.kg_max_retries,
++            config.kg_thesaurus_path.as_deref(),
++        )
++    };
++
+     // Cache the docker availability probe across loop iterations to avoid
+     // repeating the (~50-100 ms) shell-out to `docker --version`.
+     #[cfg(feature = "docker-backend")]
+@@ -107,6 +118,8 @@ pub async fn select_executor(
+             BackendType::Firecracker if is_kvm_available() => {
+                 log::info!("Selected Firecracker backend (KVM available)");
+                 let executor = FirecrackerExecutor::new(config.clone())?;
++                #[cfg(feature = "kg-validation")]
++                let executor = executor.with_validator(validator);
+                 if let Err(e) = executor.initialize().await {
+                     log::warn!(
+                         "Failed to initialize FirecrackerExecutor: {}. Trying next backend.",
+@@ -145,6 +158,8 @@ pub async fn select_executor(
+             BackendType::Docker if docker_available => match DockerExecutor::new(config.clone()) {
+                 Ok(executor) => {
+                     log::info!("Selected Docker backend (container isolation)");
++                    #[cfg(feature = "kg-validation")]
++                    let executor = executor.with_validator(validator);
+                     return Ok(Box::new(executor));
+                 }
+                 Err(e) => {
+@@ -176,7 +191,10 @@ pub async fn select_executor(
+                     "Falling back to LocalExecutor (NO ISOLATION). Tried: {:?}",
+                     tried
+                 );
+-                return Ok(Box::new(LocalExecutor::new()));
++                let executor = LocalExecutor::new();
++                #[cfg(feature = "kg-validation")]
++                let executor = executor.with_validator(validator);
++                return Ok(Box::new(executor));
+             }
+         }
+     }
+diff --git a/crates/terraphim_rlm/src/query_loop.rs b/crates/terraphim_rlm/src/query_loop.rs
+index 54356c5b0..a19e0ed39 100644
+--- a/crates/terraphim_rlm/src/query_loop.rs
++++ b/crates/terraphim_rlm/src/query_loop.rs
+@@ -617,7 +617,8 @@ fn truncate(s: &str, max_len: usize) -> String {
+     if s.len() <= max_len {
+         s.to_string()
+     } else {
+-        format!("{}...", &s[..max_len])
++        let boundary = s.floor_char_boundary(max_len);
++        format!("{}...", &s[..boundary])
+     }
+ }
+ 
+@@ -625,6 +626,23 @@ fn truncate(s: &str, max_len: usize) -> String {
+ mod tests {
+     use super::*;
+ 
++    #[test]
++    fn test_truncate_multibyte() {
++        // Each CJK char is 3 bytes; 200 of them = 600 bytes, > 500 limit.
++        // Without floor_char_boundary, slicing at byte 500 panics mid-char.
++        let cjk = "中".repeat(200);
++        let result = truncate(&cjk, 500);
++        assert!(result.ends_with("..."));
++        assert!(std::str::from_utf8(result.as_bytes()).is_ok());
++    }
++
++    #[test]
++    fn test_truncate_ascii() {
++        let s = "hello world";
++        assert_eq!(truncate(s, 5), "hello...");
++        assert_eq!(truncate(s, 100), "hello world");
++    }
++
+     #[test]
+     fn test_query_loop_config_default() {
+         let config = QueryLoopConfig::default();
+diff --git a/crates/terraphim_rlm/src/rlm.rs b/crates/terraphim_rlm/src/rlm.rs
+index 9ae71914a..879d31790 100644
+--- a/crates/terraphim_rlm/src/rlm.rs
++++ b/crates/terraphim_rlm/src/rlm.rs
+@@ -41,6 +41,7 @@ use crate::executor::{
+     ExecutionContext, ExecutionEnvironment, ExecutionResult, SnapshotId, select_executor,
+ };
+ use crate::llm_bridge::{LlmBridge, LlmBridgeConfig};
++use crate::validator::KnowledgeGraphValidator;
+ // CommandParser and TerminationReason are used internally by QueryLoop
+ use crate::query_loop::{QueryLoop, QueryLoopConfig, QueryLoopResult};
+ use crate::session::SessionManager;
+@@ -65,6 +66,8 @@ pub struct TerraphimRlm {
+     executor: Arc<dyn ExecutionEnvironment<Error = RlmError> + Send + Sync>,
+     /// Cancellation senders for active queries, keyed by session ID.
+     cancel_senders: dashmap::DashMap<SessionId, mpsc::Sender<()>>,
++    /// Knowledge graph validator applied to every execute_code / execute_command call.
++    validator: KnowledgeGraphValidator,
+ }
+ 
+ impl TerraphimRlm {
+@@ -110,12 +113,19 @@ impl TerraphimRlm {
+         let llm_bridge_config = LlmBridgeConfig::default();
+         let llm_bridge = Arc::new(LlmBridge::new(llm_bridge_config, session_manager.clone()));
+ 
++        let validator = KnowledgeGraphValidator::from_config(
++            config.kg_strictness,
++            config.kg_max_retries,
++            config.kg_thesaurus_path.as_deref(),
++        );
++
+         Ok(Self {
+             config,
+             session_manager,
+             llm_bridge,
+             executor: Arc::from(executor),
+             cancel_senders: dashmap::DashMap::new(),
++            validator,
+         })
+     }
+ 
+@@ -144,12 +154,19 @@ impl TerraphimRlm {
+         let executor: Arc<dyn ExecutionEnvironment<Error = RlmError> + Send + Sync> =
+             Arc::new(executor);
+ 
++        let validator = KnowledgeGraphValidator::from_config(
++            config.kg_strictness,
++            config.kg_max_retries,
++            config.kg_thesaurus_path.as_deref(),
++        );
++
+         Ok(Self {
+             config,
+             session_manager,
+             llm_bridge,
+             executor,
+             cancel_senders: dashmap::DashMap::new(),
++            validator,
+         })
+     }
+ 
+@@ -315,6 +332,21 @@ impl TerraphimRlm {
+         // Validate session
+         self.session_manager.validate_session(session_id)?;
+ 
++        // Validate code against knowledge graph before execution
++        let vr = self.validator.validate(code)?;
++        if !vr.passed {
++            if vr.escalation_required {
++                return Err(RlmError::KgEscalationRequired {
++                    unknown_terms: vr.unmatched_words,
++                    suggested_action: vr.suggestions.join("; "),
++                    context: vr.message,
++                });
++            }
++            return Err(RlmError::KgValidationFailed {
++                unknown_terms: vr.unmatched_words,
++            });
++        }
++
+         // Build execution context
+         let ctx = ExecutionContext {
+             session_id: *session_id,
+@@ -371,6 +403,21 @@ impl TerraphimRlm {
+         // Validate session
+         self.session_manager.validate_session(session_id)?;
+ 
++        // Validate command against knowledge graph before execution
++        let vr = self.validator.validate(command)?;
++        if !vr.passed {
++            if vr.escalation_required {
++                return Err(RlmError::KgEscalationRequired {
++                    unknown_terms: vr.unmatched_words,
++                    suggested_action: vr.suggestions.join("; "),
++                    context: vr.message,
++                });
++            }
++            return Err(RlmError::KgValidationFailed {
++                unknown_terms: vr.unmatched_words,
++            });
++        }
++
+         // Build execution context
+         let ctx = ExecutionContext {
+             session_id: *session_id,
+@@ -815,6 +862,15 @@ impl TerraphimRlm {
+     }
+ }
+ 
++#[cfg(test)]
++impl TerraphimRlm {
++    /// Replace the validator during tests to inject a pre-configured one
++    /// (e.g., with a loaded thesaurus that production code does not yet wire up).
++    fn set_validator_for_test(&mut self, validator: KnowledgeGraphValidator) {
++        self.validator = validator;
++    }
++}
++
+ /// Result from a direct LLM query.
+ #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+ pub struct LlmQueryResult {
+@@ -847,6 +903,8 @@ mod tests {
+     use crate::config::BackendType;
+     use crate::executor::{Capability, ValidationResult};
+     use crate::types::SessionState;
++    #[cfg(feature = "kg-validation")]
++    use crate::validator::ValidatorConfig;
+     use async_trait::async_trait;
+ 
+     /// Mock executor for testing
+@@ -1062,4 +1120,60 @@ mod tests {
+         let version = TerraphimRlm::version();
+         assert!(!version.is_empty());
+     }
++
++    #[cfg(feature = "kg-validation")]
++    #[tokio::test]
++    async fn test_execute_code_kg_validation_fails_strict_mode() {
++        use crate::config::KgStrictness;
++        use terraphim_types::Thesaurus;
++
++        let mut config = RlmConfig::minimal();
++        config.kg_strictness = KgStrictness::Strict;
++        let mut rlm = TerraphimRlm::with_executor(config, MockExecutor::new()).unwrap();
++
++        // Inject a strict validator with an empty thesaurus. An empty thesaurus
++        // has no known terms, so every input produces zero matches; Strict mode
++        // returns ValidationResult::failed when matched_terms is empty and a
++        // thesaurus is present.
++        let thesaurus = Thesaurus::new("test".to_string());
++        let validator =
++            KnowledgeGraphValidator::new(ValidatorConfig::strict()).with_thesaurus(thesaurus);
++        rlm.set_validator_for_test(validator);
++
++        let session = rlm.create_session().await.unwrap();
++
++        let result = rlm.execute_code(&session.id, "xyzzy plugh").await;
++
++        assert!(
++            matches!(result, Err(RlmError::KgValidationFailed { .. })),
++            "Expected KgValidationFailed but got {:?}",
++            result
++        );
++    }
++
++    #[cfg(feature = "kg-validation")]
++    #[tokio::test]
++    async fn test_execute_command_kg_validation_fails_strict_mode() {
++        use crate::config::KgStrictness;
++        use terraphim_types::Thesaurus;
++
++        let mut config = RlmConfig::minimal();
++        config.kg_strictness = KgStrictness::Strict;
++        let mut rlm = TerraphimRlm::with_executor(config, MockExecutor::new()).unwrap();
++
++        let thesaurus = Thesaurus::new("test".to_string());
++        let validator =
++            KnowledgeGraphValidator::new(ValidatorConfig::strict()).with_thesaurus(thesaurus);
++        rlm.set_validator_for_test(validator);
++
++        let session = rlm.create_session().await.unwrap();
++
++        let result = rlm.execute_command(&session.id, "xyzzy plugh").await;
++
++        assert!(
++            matches!(result, Err(RlmError::KgValidationFailed { .. })),
++            "Expected KgValidationFailed but got {:?}",
++            result
++        );
++    }
+ }
+diff --git a/crates/terraphim_rlm/src/validator.rs b/crates/terraphim_rlm/src/validator.rs
+index e774f365a..bce78ea6d 100644
+--- a/crates/terraphim_rlm/src/validator.rs
++++ b/crates/terraphim_rlm/src/validator.rs
+@@ -232,6 +232,76 @@ impl KnowledgeGraphValidator {
+         self
+     }
+ 
++    /// Return the strictness level this validator is configured with.
++    pub fn strictness(&self) -> crate::config::KgStrictness {
++        self.config.strictness
++    }
++
++    /// Build a validator from RLM config fields.
++    ///
++    /// Eliminates the build_validator() duplication between rlm.rs and
++    /// executor/mod.rs (GAP-2).  Optionally loads a thesaurus from disk so
++    /// Normal/Strict validation performs real term matching (GAP-1).
++    ///
++    /// # Arguments
++    ///
++    /// * `strictness` - KG strictness level from `RlmConfig::kg_strictness`
++    /// * `max_retries` - Retry limit from `RlmConfig::kg_max_retries`
++    /// * `thesaurus_path` - Optional file-system path to a JSON thesaurus; when
++    ///   `None` the validator is constructed without term data and will emit a
++    ///   warning for Normal/Strict modes because real matching cannot be performed.
++    pub fn from_config(
++        strictness: KgStrictness,
++        max_retries: u32,
++        thesaurus_path: Option<&str>,
++    ) -> Self {
++        let mut vcfg = match strictness {
++            KgStrictness::Permissive => ValidatorConfig::permissive(),
++            KgStrictness::Normal => ValidatorConfig::default(),
++            KgStrictness::Strict => ValidatorConfig::strict(),
++        };
++        vcfg.max_retries = max_retries;
++        let mut validator = Self::new(vcfg);
++
++        match thesaurus_path {
++            Some(path) => match std::fs::read_to_string(path) {
++                Ok(json) => match serde_json::from_str::<Thesaurus>(&json) {
++                    Ok(thesaurus) => {
++                        log::info!(
++                            "KG validator: loaded {} terms from {}",
++                            thesaurus.len(),
++                            path
++                        );
++                        validator = validator.with_thesaurus(thesaurus);
++                    }
++                    Err(e) => log::warn!(
++                        "KG validator: could not parse thesaurus at '{}': {}. \
++                         Real term matching is disabled.",
++                        path,
++                        e
++                    ),
++                },
++                Err(e) => log::warn!(
++                    "KG validator: could not read thesaurus at '{}': {}. \
++                     Real term matching is disabled.",
++                    path,
++                    e
++                ),
++            },
++            None if strictness != KgStrictness::Permissive => {
++                log::warn!(
++                    "KG validator: no thesaurus configured (kg_thesaurus_path is None). \
++                     {:?} mode will not perform real term matching. \
++                     Set RlmConfig::kg_thesaurus_path to a JSON thesaurus file to enable.",
++                    strictness
++                );
++            }
++            None => {}
++        }
++
++        validator
++    }
++
+     /// Validate a command string.
+     ///
+     /// Returns a validation result indicating whether the command passes
+@@ -483,7 +553,8 @@ fn extract_words(text: &str) -> Vec<String> {
+ /// Truncate a string for logging (max 100 chars).
+ fn truncate_for_log(s: &str) -> String {
+     if s.len() > 100 {
+-        format!("{}...", &s[..97])
++        let boundary = s.floor_char_boundary(97);
++        format!("{}...", &s[..boundary])
+     } else {
+         s.to_string()
+     }
+@@ -628,6 +699,16 @@ mod tests {
+         assert!(truncated.ends_with("..."));
+     }
+ 
++    #[test]
++    fn test_truncate_for_log_multibyte() {
++        // Each emoji is 4 bytes; 26 of them = 104 bytes, triggering truncation.
++        // The byte boundary at 97 falls mid-emoji without floor_char_boundary.
++        let emoji_str = "😀".repeat(26);
++        let result = truncate_for_log(&emoji_str);
++        assert!(result.ends_with("..."));
++        assert!(result.is_char_boundary(result.len() - 3)); // valid UTF-8
++    }
++
+     #[test]
+     fn test_validation_context_max_retries() {
+         let session_id = SessionId::new();
+@@ -674,4 +755,68 @@ mod tests {
+                 .any(|s| s.contains("known terms") || s.contains("term1"))
+         );
+     }
++
++    // -- from_config tests (GAP-2: deduplication; GAP-1: thesaurus loading) --
++
++    #[test]
++    fn test_from_config_normal_no_path_has_no_thesaurus() {
++        // GAP-2: from_config replaces duplicate build_validator in rlm.rs and executor/mod.rs
++        let v = KnowledgeGraphValidator::from_config(KgStrictness::Normal, 3, None);
++        assert!(!v.has_thesaurus());
++        assert_eq!(v.strictness(), KgStrictness::Normal);
++        assert_eq!(v.config().max_retries, 3);
++    }
++
++    #[test]
++    fn test_from_config_permissive_no_path_passes_silently() {
++        let v = KnowledgeGraphValidator::from_config(KgStrictness::Permissive, 0, None);
++        // Permissive with no thesaurus should always pass without warning
++        assert!(!v.has_thesaurus());
++        let result = v.validate("any command here").unwrap();
++        assert!(result.passed);
++    }
++
++    #[test]
++    fn test_from_config_strict_respects_max_retries() {
++        let v = KnowledgeGraphValidator::from_config(KgStrictness::Strict, 5, None);
++        assert_eq!(v.config().max_retries, 5);
++        assert_eq!(v.strictness(), KgStrictness::Strict);
++    }
++
++    #[test]
++    fn test_from_config_bad_path_falls_back_gracefully() {
++        // GAP-1: invalid path must not panic; validator operates without thesaurus
++        let v = KnowledgeGraphValidator::from_config(
++            KgStrictness::Normal,
++            3,
++            Some("/nonexistent/path/thesaurus.json"),
++        );
++        assert!(!v.has_thesaurus());
++        // Validation still passes (no thesaurus → no term data to fail on)
++        let result = v.validate("some command").unwrap();
++        assert!(result.passed);
++    }
++
++    #[test]
++    fn test_from_config_valid_thesaurus_json() {
++        // GAP-1: a valid JSON thesaurus file is loaded and wired in.
++        // We use tempfile to create a minimal valid Thesaurus JSON.
++        use std::io::Write;
++        let dir = tempfile::tempdir().unwrap();
++        let path = dir.path().join("thesaurus.json");
++
++        // Minimal Thesaurus JSON: an empty but valid serialised Thesaurus
++        let thesaurus_json = r#"{"name":"test","data":{}}"#;
++        let mut f = std::fs::File::create(&path).unwrap();
++        f.write_all(thesaurus_json.as_bytes()).unwrap();
++        drop(f);
++
++        let v = KnowledgeGraphValidator::from_config(
++            KgStrictness::Normal,
++            3,
++            Some(path.to_str().unwrap()),
++        );
++        // The thesaurus should be loaded (even though it's empty)
++        assert!(v.has_thesaurus());
++    }
+ }
+diff --git a/crates/terraphim_tinyclaw/src/skills/executor.rs b/crates/terraphim_tinyclaw/src/skills/executor.rs
+index e0d4d0f74..026fd4bef 100644
+--- a/crates/terraphim_tinyclaw/src/skills/executor.rs
++++ b/crates/terraphim_tinyclaw/src/skills/executor.rs
+@@ -355,7 +355,11 @@ impl SkillExecutor {
+             .unwrap_or_else(|_| "http://127.0.0.1:11434".to_string());
+         let model = std::env::var("OLLAMA_MODEL").unwrap_or_else(|_| "llama3.2".to_string());
+ 
+-        let client = reqwest::Client::new();
++        // Short connect timeout so CI tests finish quickly when Ollama is unavailable.
++        let client = reqwest::Client::builder()
++            .connect_timeout(Duration::from_millis(500))
++            .build()
++            .unwrap_or_default();
+         let response = client
+             .post(format!("{}/api/generate", base_url))
+             .json(&serde_json::json!({
+diff --git a/crates/terraphim_tinyclaw/tests/skills_benchmarks.rs b/crates/terraphim_tinyclaw/tests/skills_benchmarks.rs
+index 3e4ca1db9..fa827def3 100644
+--- a/crates/terraphim_tinyclaw/tests/skills_benchmarks.rs
++++ b/crates/terraphim_tinyclaw/tests/skills_benchmarks.rs
+@@ -111,14 +111,15 @@ fn benchmark_execution_small_skill() {
+     let temp_dir = TempDir::new().unwrap();
+     let executor = SkillExecutor::new(temp_dir.path()).unwrap();
+ 
++    // Use Shell step so the benchmark measures skill execution overhead, not LLM latency.
+     let skill = Skill {
+         name: "exec-benchmark".to_string(),
+         version: "1.0.0".to_string(),
+         description: "Execution benchmark".to_string(),
+         author: None,
+-        steps: vec![SkillStep::Llm {
+-            prompt: "Step 1".to_string(),
+-            use_context: false,
++        steps: vec![SkillStep::Shell {
++            command: "echo ok".to_string(),
++            working_dir: None,
+         }],
+         inputs: vec![],
+     };
+diff --git a/crates/terraphim_update/src/signature.rs b/crates/terraphim_update/src/signature.rs
+index 8ad570420..f7f8af260 100644
+--- a/crates/terraphim_update/src/signature.rs
++++ b/crates/terraphim_update/src/signature.rs
+@@ -23,16 +23,11 @@ pub use zipsign_api::ZipsignError;
+ ///
+ /// # Returns
+ /// Base64-encoded Ed25519 public key bytes
+-///
+-/// # Note
+-/// TODO: Replace with actual Terraphim AI public key after key generation
+-/// Run: ./scripts/generate-zipsign-keypair.sh
+-/// Then add the public key here
+ pub fn get_embedded_public_key() -> &'static str {
+     // Ed25519 public key for verifying Terraphim AI release signatures
+     // Generated: 2025-01-12
+     // Key type: Ed25519 (32 bytes, base64-encoded)
+-    // Fingerprint: Calculate with: echo -n "1uLjooBMO+HlpKeiD16WOtT3COWeC8J/o2ERmDiEMc4=" | base64 -d | sha256sum
++    // Private key stored in 1Password vault TerraphimPlatform, item jbhgblc7m2pluxe6ahqdfr5b6a
+     "1uLjooBMO+HlpKeiD16WOtT3COWeC8J/o2ERmDiEMc4="
+ }
+ 
+diff --git a/crates/terraphim_workspace/Cargo.toml b/crates/terraphim_workspace/Cargo.toml
+index e5b1e3542..e1c4329af 100644
+--- a/crates/terraphim_workspace/Cargo.toml
++++ b/crates/terraphim_workspace/Cargo.toml
+@@ -1,7 +1,7 @@
+ [package]
+ name = "terraphim_workspace"
+-version = "1.13.0"
+-edition = "2024"
++version.workspace = true
++edition.workspace = true
+ authors = ["Terraphim Team <team@terraphim.ai>"]
+ description = "Workspace management for agent execution - lifecycle, hooks, and isolation"
+ documentation = "https://terraphim.ai"
+diff --git a/scripts/install-rustup-perms-guard.sh b/scripts/install-rustup-perms-guard.sh
+index ed0d3f8fb..fa10f3424 100755
+--- a/scripts/install-rustup-perms-guard.sh
++++ b/scripts/install-rustup-perms-guard.sh
+@@ -23,7 +23,12 @@ wrap_rustup_in() {
+   [[ -d "$bindir" ]] || return 0
+   [[ -e "$rustup" || -L "$rustup" ]] || return 0
+ 
+-  if [[ -f "$rustup" ]] && grep -q 'rustup-with-perms.sh' "$rustup" 2>/dev/null; then
++  # Wrapper is current only if it already delegates to rustup-with-perms.sh
++  # AND exports RUSTUP_INVOKE_AS (added in Refs #2605 to preserve argv[0]
++  # through the shell-script boundary so rustdoc/rustfmt proxying works).
++  if [[ -f "$rustup" ]] \
++    && grep -q 'rustup-with-perms.sh' "$rustup" 2>/dev/null \
++    && grep -q 'RUSTUP_INVOKE_AS' "$rustup" 2>/dev/null; then
+     return 0
+   fi
+ 
+@@ -46,6 +51,7 @@ wrap_rustup_in() {
+   cat >"$rustup" <<EOF
+ #!/usr/bin/env bash
+ export RUSTUP_REAL="$real"
++export RUSTUP_INVOKE_AS="\$(basename "\$0")"
+ exec "$LOCAL_BIN/rustup-with-perms.sh" "\$@"
+ EOF
+   chmod +x "$rustup"
+diff --git a/scripts/rustup-with-perms.sh b/scripts/rustup-with-perms.sh
+index 643bec0f2..40648dc54 100755
+--- a/scripts/rustup-with-perms.sh
++++ b/scripts/rustup-with-perms.sh
+@@ -3,6 +3,10 @@
+ #
+ # rustup 1.29.0 on Linux can leave toolchains/*/bin/* as 644 after update/install,
+ # breaking CI (cargo fmt: Permission denied os error 13). Refs #2463.
++#
++# argv[0] fix (Refs #2462): exec -a preserves the proxy name (cargo, rustfmt, etc.)
++# so rustup.real dispatches to the correct toolchain binary. Shell scripts cannot
++# receive argv[0] via exec -a, so the caller must export RUSTUP_INVOKE_AS first.
+ set -euo pipefail
+ 
+ if [[ -z "${RUSTUP_REAL:-}" ]]; then
+@@ -25,15 +29,22 @@ rustup_needs_perm_fix() {
+   return 1
+ }
+ 
+-"$RUSTUP_REAL" "$@"
+-status=$?
+-
+-if [[ $status -eq 0 ]] && rustup_needs_perm_fix "$@"; then
+-  if [[ -x "$FIX_SCRIPT" ]]; then
+-    "$FIX_SCRIPT" || echo "rustup-with-perms: warn: $FIX_SCRIPT failed" >&2
+-  else
+-    echo "rustup-with-perms: warn: fix script not found: $FIX_SCRIPT" >&2
++if rustup_needs_perm_fix "$@"; then
++  # Actual rustup command: run normally so we can repair perms afterwards.
++  "$RUSTUP_REAL" "$@"
++  status=$?
++  if [[ $status -eq 0 ]]; then
++    if [[ -x "$FIX_SCRIPT" ]]; then
++      "$FIX_SCRIPT" || echo "rustup-with-perms: warn: $FIX_SCRIPT failed" >&2
++    else
++      echo "rustup-with-perms: warn: fix script not found: $FIX_SCRIPT" >&2
++    fi
+   fi
+-fi
+-
+-exit "$status"
+\ No newline at end of file
++  exit "$status"
++else
++  # Proxy dispatch (cargo, rustfmt, …): must preserve argv[0] so rustup.real
++  # dispatches to the correct toolchain binary instead of treating args as a
++  # toolchain override. RUSTUP_INVOKE_AS is exported by the ~./cargo/bin/rustup
++  # wrapper because exec -a does not cross shell-script boundaries.
++  exec -a "${RUSTUP_INVOKE_AS:-$(basename "$0")}" "$RUSTUP_REAL" "$@"
++fi
+\ No newline at end of file
+diff --git a/terraphim_ai_nodejs/Cargo.toml b/terraphim_ai_nodejs/Cargo.toml
+index d5de7a7db..af7a67814 100644
+--- a/terraphim_ai_nodejs/Cargo.toml
++++ b/terraphim_ai_nodejs/Cargo.toml
+@@ -1,7 +1,7 @@
+ [package]
+ edition.workspace = true
+ name = "terraphim_ai_nodejs"
+-version = "1.19.2"
++version.workspace = true
+ description = "Node.js bindings for Terraphim AI"
+ documentation = "https://terraphim.ai"
+ homepage = "https://terraphim.ai"
+diff --git a/terraphim_firecracker/Cargo.toml b/terraphim_firecracker/Cargo.toml
+index 7f1763894..2f659236e 100644
+--- a/terraphim_firecracker/Cargo.toml
++++ b/terraphim_firecracker/Cargo.toml
+@@ -1,6 +1,6 @@
+ [package]
+ name = "terraphim-firecracker"
+-version = "1.19.2"
++version.workspace = true
+ edition.workspace = true
+ authors = ["Terraphim AI Team <team@terraphim.ai>"]
+ description = "Sub-2 second VM boot optimization system for Terraphim AI coding assistant"

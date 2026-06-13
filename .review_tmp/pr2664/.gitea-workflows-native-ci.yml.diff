@@ -1,0 +1,19 @@
+diff --git a/.gitea/workflows/native-ci.yml b/.gitea/workflows/native-ci.yml
+index be1592bdc..cafc93f7f 100644
+--- a/.gitea/workflows/native-ci.yml
++++ b/.gitea/workflows/native-ci.yml
+@@ -6,8 +6,14 @@ jobs:
+   build:
+     runs-on: terraphim-native
+     steps:
++      # Ensure rustup wrappers include RUSTUP_INVOKE_AS so rustdoc/rustfmt
++      # proxying works correctly through rustup-with-perms.sh. Refs #2605.
++      - run: bash scripts/install-rustup-perms-guard.sh
+       - run: cargo fmt --all -- --check
+       - run: cargo clippy --workspace --all-targets -- -D warnings
+       - run: cargo build --workspace
+       - run: cargo test --workspace --lib --no-fail-fast
+       - run: cargo test -p terraphim_gitea_runner --no-fail-fast
++      # Doc tests require RUSTDOC to bypass the rustup symlink chain that
++      # loses argv[0] context and causes '--edition' to be mis-parsed. Refs #2605.
++      - run: RUSTDOC=$(rustup which rustdoc) cargo test --workspace --doc --no-fail-fast

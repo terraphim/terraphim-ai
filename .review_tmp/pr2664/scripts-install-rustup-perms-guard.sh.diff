@@ -1,0 +1,26 @@
+diff --git a/scripts/install-rustup-perms-guard.sh b/scripts/install-rustup-perms-guard.sh
+index ed0d3f8fb..fa10f3424 100755
+--- a/scripts/install-rustup-perms-guard.sh
++++ b/scripts/install-rustup-perms-guard.sh
+@@ -23,7 +23,12 @@ wrap_rustup_in() {
+   [[ -d "$bindir" ]] || return 0
+   [[ -e "$rustup" || -L "$rustup" ]] || return 0
+ 
+-  if [[ -f "$rustup" ]] && grep -q 'rustup-with-perms.sh' "$rustup" 2>/dev/null; then
++  # Wrapper is current only if it already delegates to rustup-with-perms.sh
++  # AND exports RUSTUP_INVOKE_AS (added in Refs #2605 to preserve argv[0]
++  # through the shell-script boundary so rustdoc/rustfmt proxying works).
++  if [[ -f "$rustup" ]] \
++    && grep -q 'rustup-with-perms.sh' "$rustup" 2>/dev/null \
++    && grep -q 'RUSTUP_INVOKE_AS' "$rustup" 2>/dev/null; then
+     return 0
+   fi
+ 
+@@ -46,6 +51,7 @@ wrap_rustup_in() {
+   cat >"$rustup" <<EOF
+ #!/usr/bin/env bash
+ export RUSTUP_REAL="$real"
++export RUSTUP_INVOKE_AS="\$(basename "\$0")"
+ exec "$LOCAL_BIN/rustup-with-perms.sh" "\$@"
+ EOF
+   chmod +x "$rustup"

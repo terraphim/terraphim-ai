@@ -1,0 +1,191 @@
+diff --git a/crates/terraphim_rlm/src/rlm.rs b/crates/terraphim_rlm/src/rlm.rs
+index 9ae71914a..879d31790 100644
+--- a/crates/terraphim_rlm/src/rlm.rs
++++ b/crates/terraphim_rlm/src/rlm.rs
+@@ -41,6 +41,7 @@ use crate::executor::{
+     ExecutionContext, ExecutionEnvironment, ExecutionResult, SnapshotId, select_executor,
+ };
+ use crate::llm_bridge::{LlmBridge, LlmBridgeConfig};
++use crate::validator::KnowledgeGraphValidator;
+ // CommandParser and TerminationReason are used internally by QueryLoop
+ use crate::query_loop::{QueryLoop, QueryLoopConfig, QueryLoopResult};
+ use crate::session::SessionManager;
+@@ -65,6 +66,8 @@ pub struct TerraphimRlm {
+     executor: Arc<dyn ExecutionEnvironment<Error = RlmError> + Send + Sync>,
+     /// Cancellation senders for active queries, keyed by session ID.
+     cancel_senders: dashmap::DashMap<SessionId, mpsc::Sender<()>>,
++    /// Knowledge graph validator applied to every execute_code / execute_command call.
++    validator: KnowledgeGraphValidator,
+ }
+ 
+ impl TerraphimRlm {
+@@ -110,12 +113,19 @@ impl TerraphimRlm {
+         let llm_bridge_config = LlmBridgeConfig::default();
+         let llm_bridge = Arc::new(LlmBridge::new(llm_bridge_config, session_manager.clone()));
+ 
++        let validator = KnowledgeGraphValidator::from_config(
++            config.kg_strictness,
++            config.kg_max_retries,
++            config.kg_thesaurus_path.as_deref(),
++        );
++
+         Ok(Self {
+             config,
+             session_manager,
+             llm_bridge,
+             executor: Arc::from(executor),
+             cancel_senders: dashmap::DashMap::new(),
++            validator,
+         })
+     }
+ 
+@@ -144,12 +154,19 @@ impl TerraphimRlm {
+         let executor: Arc<dyn ExecutionEnvironment<Error = RlmError> + Send + Sync> =
+             Arc::new(executor);
+ 
++        let validator = KnowledgeGraphValidator::from_config(
++            config.kg_strictness,
++            config.kg_max_retries,
++            config.kg_thesaurus_path.as_deref(),
++        );
++
+         Ok(Self {
+             config,
+             session_manager,
+             llm_bridge,
+             executor,
+             cancel_senders: dashmap::DashMap::new(),
++            validator,
+         })
+     }
+ 
+@@ -315,6 +332,21 @@ impl TerraphimRlm {
+         // Validate session
+         self.session_manager.validate_session(session_id)?;
+ 
++        // Validate code against knowledge graph before execution
++        let vr = self.validator.validate(code)?;
++        if !vr.passed {
++            if vr.escalation_required {
++                return Err(RlmError::KgEscalationRequired {
++                    unknown_terms: vr.unmatched_words,
++                    suggested_action: vr.suggestions.join("; "),
++                    context: vr.message,
++                });
++            }
++            return Err(RlmError::KgValidationFailed {
++                unknown_terms: vr.unmatched_words,
++            });
++        }
++
+         // Build execution context
+         let ctx = ExecutionContext {
+             session_id: *session_id,
+@@ -371,6 +403,21 @@ impl TerraphimRlm {
+         // Validate session
+         self.session_manager.validate_session(session_id)?;
+ 
++        // Validate command against knowledge graph before execution
++        let vr = self.validator.validate(command)?;
++        if !vr.passed {
++            if vr.escalation_required {
++                return Err(RlmError::KgEscalationRequired {
++                    unknown_terms: vr.unmatched_words,
++                    suggested_action: vr.suggestions.join("; "),
++                    context: vr.message,
++                });
++            }
++            return Err(RlmError::KgValidationFailed {
++                unknown_terms: vr.unmatched_words,
++            });
++        }
++
+         // Build execution context
+         let ctx = ExecutionContext {
+             session_id: *session_id,
+@@ -815,6 +862,15 @@ impl TerraphimRlm {
+     }
+ }
+ 
++#[cfg(test)]
++impl TerraphimRlm {
++    /// Replace the validator during tests to inject a pre-configured one
++    /// (e.g., with a loaded thesaurus that production code does not yet wire up).
++    fn set_validator_for_test(&mut self, validator: KnowledgeGraphValidator) {
++        self.validator = validator;
++    }
++}
++
+ /// Result from a direct LLM query.
+ #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+ pub struct LlmQueryResult {
+@@ -847,6 +903,8 @@ mod tests {
+     use crate::config::BackendType;
+     use crate::executor::{Capability, ValidationResult};
+     use crate::types::SessionState;
++    #[cfg(feature = "kg-validation")]
++    use crate::validator::ValidatorConfig;
+     use async_trait::async_trait;
+ 
+     /// Mock executor for testing
+@@ -1062,4 +1120,60 @@ mod tests {
+         let version = TerraphimRlm::version();
+         assert!(!version.is_empty());
+     }
++
++    #[cfg(feature = "kg-validation")]
++    #[tokio::test]
++    async fn test_execute_code_kg_validation_fails_strict_mode() {
++        use crate::config::KgStrictness;
++        use terraphim_types::Thesaurus;
++
++        let mut config = RlmConfig::minimal();
++        config.kg_strictness = KgStrictness::Strict;
++        let mut rlm = TerraphimRlm::with_executor(config, MockExecutor::new()).unwrap();
++
++        // Inject a strict validator with an empty thesaurus. An empty thesaurus
++        // has no known terms, so every input produces zero matches; Strict mode
++        // returns ValidationResult::failed when matched_terms is empty and a
++        // thesaurus is present.
++        let thesaurus = Thesaurus::new("test".to_string());
++        let validator =
++            KnowledgeGraphValidator::new(ValidatorConfig::strict()).with_thesaurus(thesaurus);
++        rlm.set_validator_for_test(validator);
++
++        let session = rlm.create_session().await.unwrap();
++
++        let result = rlm.execute_code(&session.id, "xyzzy plugh").await;
++
++        assert!(
++            matches!(result, Err(RlmError::KgValidationFailed { .. })),
++            "Expected KgValidationFailed but got {:?}",
++            result
++        );
++    }
++
++    #[cfg(feature = "kg-validation")]
++    #[tokio::test]
++    async fn test_execute_command_kg_validation_fails_strict_mode() {
++        use crate::config::KgStrictness;
++        use terraphim_types::Thesaurus;
++
++        let mut config = RlmConfig::minimal();
++        config.kg_strictness = KgStrictness::Strict;
++        let mut rlm = TerraphimRlm::with_executor(config, MockExecutor::new()).unwrap();
++
++        let thesaurus = Thesaurus::new("test".to_string());
++        let validator =
++            KnowledgeGraphValidator::new(ValidatorConfig::strict()).with_thesaurus(thesaurus);
++        rlm.set_validator_for_test(validator);
++
++        let session = rlm.create_session().await.unwrap();
++
++        let result = rlm.execute_command(&session.id, "xyzzy plugh").await;
++
++        assert!(
++            matches!(result, Err(RlmError::KgValidationFailed { .. })),
++            "Expected KgValidationFailed but got {:?}",
++            result
++        );
++    }
+ }

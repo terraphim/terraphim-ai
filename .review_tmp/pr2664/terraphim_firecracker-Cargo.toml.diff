@@ -1,0 +1,12 @@
+diff --git a/terraphim_firecracker/Cargo.toml b/terraphim_firecracker/Cargo.toml
+index 7f1763894..2f659236e 100644
+--- a/terraphim_firecracker/Cargo.toml
++++ b/terraphim_firecracker/Cargo.toml
+@@ -1,6 +1,6 @@
+ [package]
+ name = "terraphim-firecracker"
+-version = "1.19.2"
++version.workspace = true
+ edition.workspace = true
+ authors = ["Terraphim AI Team <team@terraphim.ai>"]
+ description = "Sub-2 second VM boot optimization system for Terraphim AI coding assistant"

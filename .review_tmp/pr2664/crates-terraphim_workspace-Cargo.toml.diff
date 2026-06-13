@@ -1,0 +1,14 @@
+diff --git a/crates/terraphim_workspace/Cargo.toml b/crates/terraphim_workspace/Cargo.toml
+index e5b1e3542..e1c4329af 100644
+--- a/crates/terraphim_workspace/Cargo.toml
++++ b/crates/terraphim_workspace/Cargo.toml
+@@ -1,7 +1,7 @@
+ [package]
+ name = "terraphim_workspace"
+-version = "1.13.0"
+-edition = "2024"
++version.workspace = true
++edition.workspace = true
+ authors = ["Terraphim Team <team@terraphim.ai>"]
+ description = "Workspace management for agent execution - lifecycle, hooks, and isolation"
+ documentation = "https://terraphim.ai"

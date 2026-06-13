@@ -1,0 +1,259 @@
+diff --git a/crates/terraphim_rlm/src/executor/firecracker.rs b/crates/terraphim_rlm/src/executor/firecracker.rs
+index 1907772e9..29a19a8a0 100644
+--- a/crates/terraphim_rlm/src/executor/firecracker.rs
++++ b/crates/terraphim_rlm/src/executor/firecracker.rs
+@@ -79,6 +79,9 @@ pub struct FirecrackerExecutor {
+ 
+     /// Snapshot count per session (for limit enforcement).
+     snapshot_counts: parking_lot::RwLock<HashMap<SessionId, u32>>,
++
++    #[cfg(feature = "kg-validation")]
++    validator: Option<crate::validator::KnowledgeGraphValidator>,
+ }
+ 
+ impl FirecrackerExecutor {
+@@ -128,9 +131,17 @@ impl FirecrackerExecutor {
+             session_to_vm: parking_lot::RwLock::new(HashMap::new()),
+             current_snapshot: parking_lot::RwLock::new(HashMap::new()),
+             snapshot_counts: parking_lot::RwLock::new(HashMap::new()),
++            #[cfg(feature = "kg-validation")]
++            validator: None,
+         })
+     }
+ 
++    #[cfg(feature = "kg-validation")]
++    pub fn with_validator(mut self, validator: crate::validator::KnowledgeGraphValidator) -> Self {
++        self.validator = Some(validator);
++        self
++    }
++
+     /// Initialize the VM and snapshot managers.
+     ///
+     /// This should be called before using the executor.
+@@ -498,12 +509,21 @@ impl super::ExecutionEnvironment for FirecrackerExecutor {
+     }
+ 
+     async fn validate(&self, input: &str) -> Result<ValidationResult, Self::Error> {
+-        // TODO: Implement KG validation using terraphim_automata
+-        log::debug!(
+-            "FirecrackerExecutor::validate called for {} bytes",
+-            input.len()
+-        );
+-
++        #[cfg(feature = "kg-validation")]
++        if let Some(ref validator) = self.validator {
++            let vr = validator
++                .validate(input)
++                .map_err(|e| RlmError::ConfigError {
++                    message: format!("KG validation error: {}", e),
++                })?;
++            return Ok(ValidationResult {
++                is_valid: vr.passed,
++                matched_terms: vr.matched_terms,
++                unknown_terms: vr.unmatched_words,
++                suggestions: std::collections::HashMap::new(),
++                strictness: validator.strictness(),
++            });
++        }
+         Ok(ValidationResult::valid(Vec::new()))
+     }
+ 
+@@ -644,28 +664,43 @@ impl super::ExecutionEnvironment for FirecrackerExecutor {
+     }
+ 
+     async fn list_snapshots(&self, session_id: &SessionId) -> Result<Vec<SnapshotId>, Self::Error> {
+-        // Get VM ID for this session
+-        let vm_id = self.session_to_vm.read().get(session_id).cloned();
++        let vm_id = match self.session_to_vm.read().get(session_id).cloned() {
++            Some(id) => id,
++            None => {
++                log::debug!(
++                    "No VM assigned to session {}, returning empty snapshot list",
++                    session_id
++                );
++                return Ok(Vec::new());
++            }
++        };
++
++        log::debug!("list_snapshots for session {} (vm={})", session_id, vm_id);
++
++        let mut snapshot_manager_guard = self.snapshot_manager.lock().await;
++        if let Some(snapshot_manager) = &mut *snapshot_manager_guard {
++            let fc_snapshots = snapshot_manager
++                .list_snapshots(Some(&vm_id))
++                .await
++                .unwrap_or_default();
++
++            let snapshots: Vec<SnapshotId> = fc_snapshots
++                .into_iter()
++                .map(|s| SnapshotId::new(s.name, *session_id))
++                .collect();
+ 
+-        if vm_id.is_none() {
+             log::debug!(
+-                "No VM assigned to session {}, returning empty snapshot list",
+-                session_id
++                "Found {} snapshots for session {} (vm={})",
++                snapshots.len(),
++                session_id,
++                vm_id
+             );
+-            return Ok(Vec::new());
++
++            Ok(snapshots)
++        } else {
++            log::debug!("SnapshotManager not initialised, returning empty snapshot list");
++            Ok(Vec::new())
+         }
+-
+-        // List snapshots using fcctl-core SnapshotManager
+-        // Note: SnapshotManager.list_snapshots requires &mut self
+-        // For now, return empty list and log
+-        log::debug!(
+-            "list_snapshots for session {} (vm={})",
+-            session_id,
+-            vm_id.unwrap()
+-        );
+-
+-        // TODO: Call snapshot_manager.list_snapshots() when we have mutable access
+-        Ok(Vec::new())
+     }
+ 
+     async fn delete_snapshot(&self, id: &SnapshotId) -> Result<(), Self::Error> {
+@@ -767,16 +802,33 @@ impl super::ExecutionEnvironment for FirecrackerExecutor {
+     async fn cleanup(&self) -> Result<(), Self::Error> {
+         log::info!("FirecrackerExecutor::cleanup called");
+ 
+-        // Clear all session mappings
++        // Collect active VM IDs before clearing the map so we can stop each VM.
++        let vm_ids: Vec<String> = self.session_to_vm.read().values().cloned().collect();
++
++        if !vm_ids.is_empty() {
++            let mut vm_manager_guard = self.vm_manager.lock().await;
++            if let Some(vm_manager) = &mut *vm_manager_guard {
++                for vm_id in &vm_ids {
++                    if let Err(e) = vm_manager.stop_vm(vm_id, true).await {
++                        log::warn!("Failed to stop VM {} during cleanup: {}", vm_id, e);
++                    } else {
++                        log::debug!("Stopped VM {} during cleanup", vm_id);
++                    }
++                }
++            } else {
++                log::warn!(
++                    "VmManager not initialised; {} VMs may continue running",
++                    vm_ids.len()
++                );
++            }
++        }
++
++        // Clear all session mappings after teardown attempts.
+         self.session_to_vm.write().clear();
+         self.current_snapshot.write().clear();
+         self.snapshot_counts.write().clear();
+ 
+-        // TODO: Stop and cleanup VMs via VmManager
+-        // for (session_id, vm_id) in session_to_vm {
+-        //     vm_manager.stop_vm(&vm_id, true).await?;
+-        // }
+-
++        log::info!("FirecrackerExecutor::cleanup complete");
+         Ok(())
+     }
+ 
+@@ -909,4 +961,96 @@ mod tests {
+         let result = executor.health_check().await.unwrap();
+         assert!(!result);
+     }
++
++    // Tests for list_snapshots (Refs #2431)
++
++    #[tokio::test]
++    async fn test_list_snapshots_no_vm_returns_empty() {
++        if !super::super::is_kvm_available() {
++            eprintln!("Skipping test: KVM not available");
++            return;
++        }
++
++        let executor = FirecrackerExecutor::new(RlmConfig::default()).unwrap();
++        let session_id = SessionId::new();
++
++        let result = executor.list_snapshots(&session_id).await.unwrap();
++        assert!(result.is_empty(), "should be empty when no VM is assigned");
++    }
++
++    #[tokio::test]
++    async fn test_list_snapshots_no_manager_returns_empty() {
++        if !super::super::is_kvm_available() {
++            eprintln!("Skipping test: KVM not available");
++            return;
++        }
++
++        let executor = FirecrackerExecutor::new(RlmConfig::default()).unwrap();
++        let session_id = SessionId::new();
++
++        // Assign a VM but leave snapshot_manager as None (not initialised).
++        executor.assign_vm_to_session(session_id, "test-vm-snap".to_string());
++
++        let result = executor.list_snapshots(&session_id).await.unwrap();
++        assert!(
++            result.is_empty(),
++            "should be empty when SnapshotManager is not initialised"
++        );
++    }
++
++    // Tests for cleanup (Refs #2430)
++
++    #[tokio::test]
++    async fn test_cleanup_clears_session_maps() {
++        if !super::super::is_kvm_available() {
++            eprintln!("Skipping test: KVM not available");
++            return;
++        }
++
++        let executor = FirecrackerExecutor::new(RlmConfig::default()).unwrap();
++        let session_id = SessionId::new();
++
++        executor.assign_vm_to_session(session_id, "test-vm-cleanup".to_string());
++        *executor
++            .snapshot_counts
++            .write()
++            .entry(session_id)
++            .or_insert(0) = 2;
++
++        assert!(
++            executor.session_to_vm.read().contains_key(&session_id),
++            "setup: session map should be populated"
++        );
++
++        // VmManager is None so cleanup skips stop_vm and goes straight to clear.
++        executor.cleanup().await.unwrap();
++
++        assert!(
++            executor.session_to_vm.read().is_empty(),
++            "session_to_vm should be empty after cleanup"
++        );
++        assert!(
++            executor.snapshot_counts.read().is_empty(),
++            "snapshot_counts should be empty after cleanup"
++        );
++        assert!(
++            executor.current_snapshot.read().is_empty(),
++            "current_snapshot should be empty after cleanup"
++        );
++    }
++
++    #[tokio::test]
++    async fn test_cleanup_empty_maps_is_noop() {
++        if !super::super::is_kvm_available() {
++            eprintln!("Skipping test: KVM not available");
++            return;
++        }
++
++        let executor = FirecrackerExecutor::new(RlmConfig::default()).unwrap();
++
++        // No sessions assigned — cleanup should succeed without panicking.
++        executor.cleanup().await.unwrap();
++
++        assert!(executor.session_to_vm.read().is_empty());
++    }
+ }

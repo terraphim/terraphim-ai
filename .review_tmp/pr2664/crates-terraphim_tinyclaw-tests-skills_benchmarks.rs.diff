@@ -1,0 +1,23 @@
+diff --git a/crates/terraphim_tinyclaw/tests/skills_benchmarks.rs b/crates/terraphim_tinyclaw/tests/skills_benchmarks.rs
+index 3e4ca1db9..fa827def3 100644
+--- a/crates/terraphim_tinyclaw/tests/skills_benchmarks.rs
++++ b/crates/terraphim_tinyclaw/tests/skills_benchmarks.rs
+@@ -111,14 +111,15 @@ fn benchmark_execution_small_skill() {
+     let temp_dir = TempDir::new().unwrap();
+     let executor = SkillExecutor::new(temp_dir.path()).unwrap();
+ 
++    // Use Shell step so the benchmark measures skill execution overhead, not LLM latency.
+     let skill = Skill {
+         name: "exec-benchmark".to_string(),
+         version: "1.0.0".to_string(),
+         description: "Execution benchmark".to_string(),
+         author: None,
+-        steps: vec![SkillStep::Llm {
+-            prompt: "Step 1".to_string(),
+-            use_context: false,
++        steps: vec![SkillStep::Shell {
++            command: "echo ok".to_string(),
++            working_dir: None,
+         }],
+         inputs: vec![],
+     };

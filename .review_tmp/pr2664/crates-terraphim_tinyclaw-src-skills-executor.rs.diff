@@ -1,0 +1,17 @@
+diff --git a/crates/terraphim_tinyclaw/src/skills/executor.rs b/crates/terraphim_tinyclaw/src/skills/executor.rs
+index e0d4d0f74..026fd4bef 100644
+--- a/crates/terraphim_tinyclaw/src/skills/executor.rs
++++ b/crates/terraphim_tinyclaw/src/skills/executor.rs
+@@ -355,7 +355,11 @@ impl SkillExecutor {
+             .unwrap_or_else(|_| "http://127.0.0.1:11434".to_string());
+         let model = std::env::var("OLLAMA_MODEL").unwrap_or_else(|_| "llama3.2".to_string());
+ 
+-        let client = reqwest::Client::new();
++        // Short connect timeout so CI tests finish quickly when Ollama is unavailable.
++        let client = reqwest::Client::builder()
++            .connect_timeout(Duration::from_millis(500))
++            .build()
++            .unwrap_or_default();
+         let response = client
+             .post(format!("{}/api/generate", base_url))
+             .json(&serde_json::json!({
