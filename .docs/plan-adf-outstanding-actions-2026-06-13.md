@@ -233,4 +233,4 @@ curl -s -H "Authorization: token $GITEA_TOKEN" \
 | 3 Branch protection | terraphim-ai: 4 status contexts | Done |
 | 4 Swarm cadence | `schedule */20`, `pre_check` after `project`; orchestrator active | Config done; 60m dispatch count pending |
 | 5 Batch-close dupes | 65 closed; 1 skipped (#1971 dep on #2596) | Done (partial) |
-| 6 Live proof | — | Pending |
+| 6 Live proof | PR #2402 auto-merged; `.docs/validation-report-adf-flow-fix-2026-06-13.md` | Done |
