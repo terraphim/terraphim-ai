@@ -346,7 +346,9 @@ impl PerformanceBenchmarker {
             .get(&url)
             .send()
             .await
-            .map_err(|e| anyhow!("HTTP GET {}: {}", url, e))?;
+            .map_err(|e| anyhow!("HTTP GET {}: {}", url, e))?
+            .error_for_status()
+            .map_err(|e| anyhow!("HTTP GET {} returned error status: {}", url, e))?;
         Ok(())
     }
 
@@ -462,7 +464,9 @@ impl PerformanceBenchmarker {
             .get(&url)
             .send()
             .await
-            .map_err(|e| anyhow!("search GET {}: {}", url, e))?;
+            .map_err(|e| anyhow!("search GET {}: {}", url, e))?
+            .error_for_status()
+            .map_err(|e| anyhow!("search GET {} returned error status: {}", url, e))?;
         Ok(())
     }
 
@@ -959,14 +963,23 @@ impl PerformanceBenchmarker {
             }));
         }
         let mut times = Vec::with_capacity(count);
+        let mut errors = 0u32;
         for handle in handles {
             let t = Instant::now();
-            handle.await.ok();
-            times.push(t.elapsed());
+            match handle.await {
+                Ok(_) => times.push(t.elapsed()),
+                Err(_) => errors += 1,
+            }
         }
         let total_time = total_start.elapsed();
 
         let success_count = times.len() as u32;
+        let total_ops = success_count + errors;
+        let success_rate = if total_ops > 0 {
+            success_count as f64 / total_ops as f64
+        } else {
+            1.0
+        };
         let avg_time = if success_count > 0 {
             times.iter().sum::<Duration>() / success_count
         } else {
@@ -983,8 +996,8 @@ impl PerformanceBenchmarker {
             min_time,
             max_time,
             ops_per_second,
-            success_rate: 1.0,
-            error_count: 0,
+            success_rate,
+            error_count: errors,
             resource_usage: self.capture_resource_usage().await?,
         };
 
