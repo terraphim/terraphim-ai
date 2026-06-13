@@ -25,6 +25,14 @@ pub struct RunnerConfig {
     /// Optional legacy commit-status mirror (e.g. `adf/build`) posted alongside
     /// the native result during migration. `None` disables the mirror.
     pub legacy_status_mirror: Option<LegacyStatusMirrorConfig>,
+    /// Timeout applied to each HTTP request to the Gitea RunnerService.
+    /// A hung `FetchTask` call is aborted after this duration rather than
+    /// blocking the poll loop indefinitely.
+    pub http_request_timeout: Duration,
+    /// Belt-and-suspenders timeout wrapping each `poll_once` call in
+    /// `run_forever`. Should exceed `http_request_timeout` so reqwest's own
+    /// timeout fires first; defaults to `2 × http_request_timeout`.
+    pub poll_timeout: Duration,
 }
 
 /// Configuration for the optional legacy commit-status mirror.
@@ -47,6 +55,8 @@ impl Default for RunnerConfig {
             poll_interval: Duration::from_secs(3),
             active_repos: Vec::new(),
             legacy_status_mirror: None,
+            http_request_timeout: Duration::from_secs(30),
+            poll_timeout: Duration::from_secs(60),
         }
     }
 }

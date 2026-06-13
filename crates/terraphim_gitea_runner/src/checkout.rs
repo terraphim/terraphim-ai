@@ -7,15 +7,15 @@
 //! `sha`, reusing the on-disk clone across tasks for the same repository.
 //!
 //! ## Authentication
-//! The per-job repository token is passed to git via a transient
-//! `-c http.extraHeader=Authorization: Basic <base64(x-access-token:TOKEN)>`
-//! argument, never embedded in the remote URL. Gitea's git-over-HTTP backend
+//! The per-job repository token is injected via `GIT_CONFIG_COUNT` /
+//! `GIT_CONFIG_KEY_0` / `GIT_CONFIG_VALUE_0` environment variables rather than
+//! a `-c http.extraHeader=...` command-line argument. Environment variables are
+//! not visible in `/proc/PID/cmdline` or `ps` output, so the token cannot be
+//! read by other local users on the runner host. Gitea's git-over-HTTP backend
 //! expects HTTP Basic auth (not the `Authorization: token` API scheme), so we
 //! mirror `actions/checkout`: synthetic user `x-access-token`, token as the
-//! password. This keeps the token out of `.git/config` and out of any
-//! argv-visible remote URL. The token only ever appears in the single `-c`
-//! argument we pass per invocation; captured stderr never echoes the full
-//! command, so it is not leaked on failure.
+//! password. This keeps the token out of `.git/config`, out of any remote URL,
+//! and out of process arguments.
 
 use crate::{Result, RunnerError};
 use base64::Engine;
@@ -30,8 +30,9 @@ struct GitOutput {
 }
 
 /// Build a `git` command rooted at `dir` with a clean, non-interactive
-/// environment. The token (when present) is supplied via `http.extraHeader` so
-/// it never lands in `.git/config` or in a remote URL.
+/// environment. The token (when present) is injected via `GIT_CONFIG_COUNT`
+/// environment variables so it never appears in process arguments, `.git/config`,
+/// or any remote URL.
 fn git_command(dir: Option<&Path>, token: Option<&str>) -> Command {
     let mut cmd = Command::new("git");
     // Never prompt for credentials interactively; a missing/invalid credential
@@ -43,13 +44,19 @@ fn git_command(dir: Option<&Path>, token: Option<&str>) -> Command {
         cmd.arg("-C").arg(dir);
     }
     if let Some(token) = token {
-        // Basic auth header carried in-memory for this invocation only. Gitea
-        // smart-HTTP requires Basic (not `Authorization: token`); the synthetic
-        // `x-access-token` user with the token as password matches actions/checkout.
+        // Inject auth via git's env-var config protocol instead of a `-c` argument.
+        // Environment variables are not visible in /proc/PID/cmdline or `ps`,
+        // so the token cannot be read by other local users on the runner host.
+        // Gitea smart-HTTP requires Basic (not `Authorization: token`); the
+        // synthetic `x-access-token` user matches actions/checkout.
         let basic =
             base64::engine::general_purpose::STANDARD.encode(format!("x-access-token:{token}"));
-        cmd.arg("-c")
-            .arg(format!("http.extraHeader=Authorization: Basic {basic}"));
+        cmd.env("GIT_CONFIG_COUNT", "1");
+        cmd.env("GIT_CONFIG_KEY_0", "http.extraHeader");
+        cmd.env(
+            "GIT_CONFIG_VALUE_0",
+            format!("Authorization: Basic {basic}"),
+        );
     }
     cmd.stdin(Stdio::null());
     cmd
@@ -311,6 +318,28 @@ mod tests {
                 .unwrap(),
             "payload\n"
         );
+    }
+
+    /// Verify that the token and its base64 encoding are absent from every
+    /// process argument. Environment variable injection must be used instead
+    /// of `-c http.extraHeader=...` to prevent `/proc/PID/cmdline` exposure.
+    #[test]
+    fn token_never_in_cmd_args() {
+        let token = "super-secret-token-DO-NOT-EXPOSE";
+        let cmd = git_command(None, Some(token));
+        let basic =
+            base64::engine::general_purpose::STANDARD.encode(format!("x-access-token:{token}"));
+        for arg in cmd.as_std().get_args() {
+            let s = arg.to_string_lossy();
+            assert!(
+                !s.contains(token),
+                "raw token must not appear in process args: {s}"
+            );
+            assert!(
+                !s.contains(basic.as_str()),
+                "base64 token must not appear in process args: {s}"
+            );
+        }
     }
 
     #[tokio::test]

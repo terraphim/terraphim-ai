@@ -14,6 +14,7 @@
 //! - `RUNNER_LEGACY_TOKEN`  enable the legacy commit-status mirror with this API token
 //! - `RUNNER_LEGACY_CONTEXT` legacy mirror context, default `adf/build`
 //! - `RUNNER_CHECKOUT_DIR`  checkout root; per-repo trees at `<root>/<owner>/<repo>` (default `.`)
+//! - `RUNNER_HTTP_TIMEOUT`  per-request HTTP timeout in seconds (default 30)
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -60,6 +61,12 @@ async fn main() -> anyhow::Result<()> {
                 context: env_or("RUNNER_LEGACY_CONTEXT", "adf/build"),
             });
 
+    let http_timeout_secs: u64 = std::env::var("RUNNER_HTTP_TIMEOUT")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(30);
+    let http_request_timeout = Duration::from_secs(http_timeout_secs);
+
     let config = RunnerConfig {
         instance_url: env_or("GITEA_URL", "https://git.terraphim.cloud"),
         org: env_or("GITEA_ORG", "terraphim"),
@@ -69,11 +76,16 @@ async fn main() -> anyhow::Result<()> {
         poll_interval: Duration::from_secs(3),
         active_repos,
         legacy_status_mirror,
+        http_request_timeout,
+        poll_timeout: Duration::from_secs(http_timeout_secs * 2),
     };
     let checkout_dir = env_or("RUNNER_CHECKOUT_DIR", ".");
     let version = env!("CARGO_PKG_VERSION").to_string();
 
-    let client = Arc::new(ReqwestRunnerClient::new(config.instance_url.clone()));
+    let client = Arc::new(ReqwestRunnerClient::new_with_timeout(
+        config.instance_url.clone(),
+        config.http_request_timeout,
+    ));
 
     // Register if we have no persisted state.
     let state = match RunnerState::load(&config.state_file)? {

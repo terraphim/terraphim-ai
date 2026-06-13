@@ -133,3 +133,21 @@ pi-session-*.html
 # Client project data - never track
 projects/odilo/
 # CI test fix verification
+
+# Agent artefact files accidentally committed to repo root (#2342, #2364)
+# These patterns match working-copy snapshots and review outputs from
+# PR-reviewer/verifier/validator agents that should not be committed.
+/pr_review_*.md
+/*.pr_gate_result*.rs
+/*.reconcile_impl*.rs
+/*_new.rs
+/*_old.rs
+/cursor_*.rs
+/session-ses_*.md
+/security_audit_report_*.md
+/pr_review_files/
+# Heredoc accidents (bare EOF/PYEOF files created by malformed shell heredocs)
+/EOF
+/PYEOF
+# Home-directory stubs (literal '~' dir created by unexpanded tilde in git commands)
+~/

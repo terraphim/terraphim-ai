@@ -9,6 +9,7 @@ use crate::state::RunnerState;
 use crate::types::*;
 use crate::{Result, RunnerError};
 use async_trait::async_trait;
+use std::time::Duration;
 
 const SERVICE: &str = "api/actions/runner.v1.RunnerService";
 
@@ -46,11 +47,24 @@ pub struct ReqwestRunnerClient {
 }
 
 impl ReqwestRunnerClient {
-    /// Create a client for the given Gitea instance base URL.
+    /// Create a client with a 30-second per-request timeout.
     pub fn new(instance_url: impl Into<String>) -> Self {
+        Self::new_with_timeout(instance_url, Duration::from_secs(30))
+    }
+
+    /// Create a client with an explicit per-request timeout.
+    ///
+    /// Pass the value from [`crate::config::RunnerConfig::http_request_timeout`].
+    /// A hung `FetchTask` call returns an error within the timeout window rather
+    /// than blocking the poll loop indefinitely.
+    pub fn new_with_timeout(instance_url: impl Into<String>, timeout: Duration) -> Self {
+        let http = reqwest::Client::builder()
+            .timeout(timeout)
+            .build()
+            .expect("failed to build reqwest client");
         Self {
             base_url: instance_url.into().trim_end_matches('/').to_string(),
-            http: reqwest::Client::new(),
+            http,
         }
     }
 
