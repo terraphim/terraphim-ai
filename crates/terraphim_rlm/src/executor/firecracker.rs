@@ -79,6 +79,9 @@ pub struct FirecrackerExecutor {
 
     /// Snapshot count per session (for limit enforcement).
     snapshot_counts: parking_lot::RwLock<HashMap<SessionId, u32>>,
+
+    #[cfg(feature = "kg-validation")]
+    validator: Option<crate::validator::KnowledgeGraphValidator>,
 }
 
 impl FirecrackerExecutor {
@@ -128,7 +131,15 @@ impl FirecrackerExecutor {
             session_to_vm: parking_lot::RwLock::new(HashMap::new()),
             current_snapshot: parking_lot::RwLock::new(HashMap::new()),
             snapshot_counts: parking_lot::RwLock::new(HashMap::new()),
+            #[cfg(feature = "kg-validation")]
+            validator: None,
         })
+    }
+
+    #[cfg(feature = "kg-validation")]
+    pub fn with_validator(mut self, validator: crate::validator::KnowledgeGraphValidator) -> Self {
+        self.validator = Some(validator);
+        self
     }
 
     /// Initialize the VM and snapshot managers.
@@ -498,12 +509,21 @@ impl super::ExecutionEnvironment for FirecrackerExecutor {
     }
 
     async fn validate(&self, input: &str) -> Result<ValidationResult, Self::Error> {
-        // TODO: Implement KG validation using terraphim_automata
-        log::debug!(
-            "FirecrackerExecutor::validate called for {} bytes",
-            input.len()
-        );
-
+        #[cfg(feature = "kg-validation")]
+        if let Some(ref validator) = self.validator {
+            let vr = validator
+                .validate(input)
+                .map_err(|e| RlmError::ConfigError {
+                    message: format!("KG validation error: {}", e),
+                })?;
+            return Ok(ValidationResult {
+                is_valid: vr.passed,
+                matched_terms: vr.matched_terms,
+                unknown_terms: vr.unmatched_words,
+                suggestions: std::collections::HashMap::new(),
+                strictness: validator.strictness(),
+            });
+        }
         Ok(ValidationResult::valid(Vec::new()))
     }
 

@@ -53,6 +53,8 @@ pub struct DockerExecutor {
     /// via `with_host_config`.
     host_config: HostConfig,
     capabilities: Vec<Capability>,
+    #[cfg(feature = "kg-validation")]
+    validator: Option<crate::validator::KnowledgeGraphValidator>,
 }
 
 /// Build the default `HostConfig` applied to every session container.
@@ -105,6 +107,8 @@ impl DockerExecutor {
             image: DEFAULT_IMAGE.to_string(),
             host_config: default_host_config(),
             capabilities,
+            #[cfg(feature = "kg-validation")]
+            validator: None,
         })
     }
 
@@ -119,6 +123,12 @@ impl DockerExecutor {
     /// default profile.
     pub fn with_host_config(mut self, host_config: HostConfig) -> Self {
         self.host_config = host_config;
+        self
+    }
+
+    #[cfg(feature = "kg-validation")]
+    pub fn with_validator(mut self, validator: crate::validator::KnowledgeGraphValidator) -> Self {
+        self.validator = Some(validator);
         self
     }
 
@@ -368,7 +378,22 @@ impl super::ExecutionEnvironment for DockerExecutor {
         self.exec_in_container(&container_id, bash_cmd, ctx).await
     }
 
-    async fn validate(&self, _input: &str) -> Result<ValidationResult, Self::Error> {
+    async fn validate(&self, input: &str) -> Result<ValidationResult, Self::Error> {
+        #[cfg(feature = "kg-validation")]
+        if let Some(ref validator) = self.validator {
+            let vr = validator
+                .validate(input)
+                .map_err(|e| RlmError::ConfigError {
+                    message: format!("KG validation error: {}", e),
+                })?;
+            return Ok(ValidationResult {
+                is_valid: vr.passed,
+                matched_terms: vr.matched_terms,
+                unknown_terms: vr.unmatched_words,
+                suggestions: std::collections::HashMap::new(),
+                strictness: validator.strictness(),
+            });
+        }
         Ok(ValidationResult::valid(vec![]))
     }
 

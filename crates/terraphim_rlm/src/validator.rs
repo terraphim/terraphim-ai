@@ -232,6 +232,11 @@ impl KnowledgeGraphValidator {
         self
     }
 
+    /// Return the strictness level this validator is configured with.
+    pub fn strictness(&self) -> crate::config::KgStrictness {
+        self.config.strictness
+    }
+
     /// Validate a command string.
     ///
     /// Returns a validation result indicating whether the command passes

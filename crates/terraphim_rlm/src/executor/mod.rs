@@ -95,6 +95,20 @@ pub async fn select_executor(
         config.backend_preference.clone()
     };
 
+    // Build a shared KG validator from config (kg-validation feature only).
+    #[cfg(feature = "kg-validation")]
+    let validator = {
+        use crate::config::KgStrictness;
+        use crate::validator::{KnowledgeGraphValidator, ValidatorConfig};
+        let mut vcfg = match config.kg_strictness {
+            KgStrictness::Permissive => ValidatorConfig::permissive(),
+            KgStrictness::Normal => ValidatorConfig::default(),
+            KgStrictness::Strict => ValidatorConfig::strict(),
+        };
+        vcfg.max_retries = config.kg_max_retries;
+        KnowledgeGraphValidator::new(vcfg)
+    };
+
     // Cache the docker availability probe across loop iterations to avoid
     // repeating the (~50-100 ms) shell-out to `docker --version`.
     #[cfg(feature = "docker-backend")]
@@ -107,6 +121,8 @@ pub async fn select_executor(
             BackendType::Firecracker if is_kvm_available() => {
                 log::info!("Selected Firecracker backend (KVM available)");
                 let executor = FirecrackerExecutor::new(config.clone())?;
+                #[cfg(feature = "kg-validation")]
+                let executor = executor.with_validator(validator);
                 if let Err(e) = executor.initialize().await {
                     log::warn!(
                         "Failed to initialize FirecrackerExecutor: {}. Trying next backend.",
@@ -145,6 +161,8 @@ pub async fn select_executor(
             BackendType::Docker if docker_available => match DockerExecutor::new(config.clone()) {
                 Ok(executor) => {
                     log::info!("Selected Docker backend (container isolation)");
+                    #[cfg(feature = "kg-validation")]
+                    let executor = executor.with_validator(validator);
                     return Ok(Box::new(executor));
                 }
                 Err(e) => {
@@ -176,7 +194,10 @@ pub async fn select_executor(
                     "Falling back to LocalExecutor (NO ISOLATION). Tried: {:?}",
                     tried
                 );
-                return Ok(Box::new(LocalExecutor::new()));
+                let executor = LocalExecutor::new();
+                #[cfg(feature = "kg-validation")]
+                let executor = executor.with_validator(validator);
+                return Ok(Box::new(executor));
             }
         }
     }

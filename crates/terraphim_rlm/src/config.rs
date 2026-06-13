@@ -349,8 +349,11 @@ pub enum KgStrictness {
 
 impl KgStrictness {
     /// Check if unknown terms should block execution.
+    ///
+    /// Both `Normal` and `Strict` block on unknown terms; they differ only in
+    /// whether retries are attempted first. `Permissive` only warns.
     pub fn blocks_unknown(&self) -> bool {
-        matches!(self, KgStrictness::Strict)
+        matches!(self, KgStrictness::Normal | KgStrictness::Strict)
     }
 
     /// Check if retries are allowed.
@@ -436,8 +439,11 @@ mod tests {
 
     #[test]
     fn test_kg_strictness_behavior() {
+        // Permissive never blocks (warn-only mode)
         assert!(!KgStrictness::Permissive.blocks_unknown());
-        assert!(!KgStrictness::Normal.blocks_unknown());
+        // Normal blocks on unknown terms but allows retries first
+        assert!(KgStrictness::Normal.blocks_unknown());
+        // Strict blocks on unknown terms immediately
         assert!(KgStrictness::Strict.blocks_unknown());
 
         assert!(!KgStrictness::Permissive.allows_retry());

@@ -50,11 +50,12 @@ use crate::types::{SessionId, SessionInfo};
 /// Build a `KnowledgeGraphValidator` from the RLM configuration.
 fn build_validator(config: &RlmConfig) -> KnowledgeGraphValidator {
     use crate::config::KgStrictness;
-    let vcfg = match config.kg_strictness {
+    let mut vcfg = match config.kg_strictness {
         KgStrictness::Permissive => ValidatorConfig::permissive(),
         KgStrictness::Normal => ValidatorConfig::default(),
         KgStrictness::Strict => ValidatorConfig::strict(),
     };
+    vcfg.max_retries = config.kg_max_retries;
     KnowledgeGraphValidator::new(vcfg)
 }
 
