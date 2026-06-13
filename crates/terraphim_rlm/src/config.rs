@@ -83,6 +83,15 @@ pub struct RlmConfig {
     /// Maximum retries for KG validation before escalation.
     pub kg_max_retries: u32,
 
+    /// Path to a JSON thesaurus file used for real KG term matching.
+    ///
+    /// When `None` the validator operates without term data; Normal/Strict
+    /// modes will log a warning and skip real matching (GAP-1 fix).
+    /// When set, the file is loaded at startup and wired into the
+    /// `KnowledgeGraphValidator` so that validation performs actual
+    /// Aho-Corasick term lookup.
+    pub kg_thesaurus_path: Option<String>,
+
     // ============================================
     // Network Security Configuration
     // ============================================
@@ -169,6 +178,7 @@ impl std::fmt::Debug for RlmConfig {
             // Knowledge Graph
             .field("kg_strictness", &self.kg_strictness)
             .field("kg_max_retries", &self.kg_max_retries)
+            .field("kg_thesaurus_path", &self.kg_thesaurus_path)
             // Network Security
             .field("dns_allowlist", &self.dns_allowlist)
             .field("log_blocked_dns", &self.log_blocked_dns)
@@ -230,6 +240,7 @@ impl Default for RlmConfig {
             // Knowledge Graph
             kg_strictness: KgStrictness::Normal,
             kg_max_retries: 3,
+            kg_thesaurus_path: None,
 
             // Network Security
             dns_allowlist: crate::DEFAULT_DNS_ALLOWLIST

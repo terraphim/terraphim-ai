@@ -41,23 +41,11 @@ use crate::executor::{
     ExecutionContext, ExecutionEnvironment, ExecutionResult, SnapshotId, select_executor,
 };
 use crate::llm_bridge::{LlmBridge, LlmBridgeConfig};
-use crate::validator::{KnowledgeGraphValidator, ValidatorConfig};
+use crate::validator::KnowledgeGraphValidator;
 // CommandParser and TerminationReason are used internally by QueryLoop
 use crate::query_loop::{QueryLoop, QueryLoopConfig, QueryLoopResult};
 use crate::session::SessionManager;
 use crate::types::{SessionId, SessionInfo};
-
-/// Build a `KnowledgeGraphValidator` from the RLM configuration.
-fn build_validator(config: &RlmConfig) -> KnowledgeGraphValidator {
-    use crate::config::KgStrictness;
-    let mut vcfg = match config.kg_strictness {
-        KgStrictness::Permissive => ValidatorConfig::permissive(),
-        KgStrictness::Normal => ValidatorConfig::default(),
-        KgStrictness::Strict => ValidatorConfig::strict(),
-    };
-    vcfg.max_retries = config.kg_max_retries;
-    KnowledgeGraphValidator::new(vcfg)
-}
 
 /// The main RLM orchestrator.
 ///
@@ -125,7 +113,11 @@ impl TerraphimRlm {
         let llm_bridge_config = LlmBridgeConfig::default();
         let llm_bridge = Arc::new(LlmBridge::new(llm_bridge_config, session_manager.clone()));
 
-        let validator = build_validator(&config);
+        let validator = KnowledgeGraphValidator::from_config(
+            config.kg_strictness,
+            config.kg_max_retries,
+            config.kg_thesaurus_path.as_deref(),
+        );
 
         Ok(Self {
             config,
@@ -162,7 +154,11 @@ impl TerraphimRlm {
         let executor: Arc<dyn ExecutionEnvironment<Error = RlmError> + Send + Sync> =
             Arc::new(executor);
 
-        let validator = build_validator(&config);
+        let validator = KnowledgeGraphValidator::from_config(
+            config.kg_strictness,
+            config.kg_max_retries,
+            config.kg_thesaurus_path.as_deref(),
+        );
 
         Ok(Self {
             config,
@@ -907,6 +903,8 @@ mod tests {
     use crate::config::BackendType;
     use crate::executor::{Capability, ValidationResult};
     use crate::types::SessionState;
+    #[cfg(feature = "kg-validation")]
+    use crate::validator::ValidatorConfig;
     use async_trait::async_trait;
 
     /// Mock executor for testing

@@ -98,15 +98,12 @@ pub async fn select_executor(
     // Build a shared KG validator from config (kg-validation feature only).
     #[cfg(feature = "kg-validation")]
     let validator = {
-        use crate::config::KgStrictness;
-        use crate::validator::{KnowledgeGraphValidator, ValidatorConfig};
-        let mut vcfg = match config.kg_strictness {
-            KgStrictness::Permissive => ValidatorConfig::permissive(),
-            KgStrictness::Normal => ValidatorConfig::default(),
-            KgStrictness::Strict => ValidatorConfig::strict(),
-        };
-        vcfg.max_retries = config.kg_max_retries;
-        KnowledgeGraphValidator::new(vcfg)
+        use crate::validator::KnowledgeGraphValidator;
+        KnowledgeGraphValidator::from_config(
+            config.kg_strictness,
+            config.kg_max_retries,
+            config.kg_thesaurus_path.as_deref(),
+        )
     };
 
     // Cache the docker availability probe across loop iterations to avoid
