@@ -1,6 +1,6 @@
 [package]
 name = "terraphim-firecracker"
-version = "1.19.2"
+version.workspace = true
 edition.workspace = true
 authors = ["Terraphim AI Team <team@terraphim.ai>"]
 description = "Sub-2 second VM boot optimization system for Terraphim AI coding assistant"

@@ -1,7 +1,7 @@
 [package]
 edition.workspace = true
 name = "terraphim_ai_nodejs"
-version = "1.19.2"
+version.workspace = true
 description = "Node.js bindings for Terraphim AI"
 documentation = "https://terraphim.ai"
 homepage = "https://terraphim.ai"
