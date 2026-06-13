@@ -150,10 +150,7 @@ fn consume_assignment_value(s: &str) -> usize {
 /// Gitea may inline step `env:` into `run:` (e.g. `RUSTDOC=$(rustup which rustdoc) cargo doc`).
 fn strip_env_assignments(cmd: &str) -> &str {
     let mut rest = cmd.trim_start();
-    loop {
-        let Some(eq_pos) = rest.find('=') else {
-            break;
-        };
+    while let Some(eq_pos) = rest.find('=') {
         let name = &rest[..eq_pos];
         if !is_env_name(name) {
             break;
