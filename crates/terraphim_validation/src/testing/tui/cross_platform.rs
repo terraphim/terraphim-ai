@@ -113,7 +113,7 @@ impl CrossPlatformTester {
             recommendations
                 .push("Consider implementing fallback rendering for limited terminals".to_string());
         }
-        if blocking_issues.len() > 0 {
+        if !blocking_issues.is_empty() {
             recommendations
                 .push("Address blocking compatibility issues before release".to_string());
         }
@@ -381,7 +381,7 @@ impl CrossPlatformTester {
             );
         }
 
-        if results.blocking_issues.len() > 0 {
+        if !results.blocking_issues.is_empty() {
             recommendations
                 .push("Address blocking compatibility issues before release".to_string());
         }

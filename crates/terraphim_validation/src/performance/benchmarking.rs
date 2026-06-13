@@ -1080,11 +1080,8 @@ impl PerformanceBenchmarker {
         let disk_write_bytes = 0; // Not easily available from sysinfo
 
         let networks = Networks::new_with_refreshed_list();
-        let network_rx_bytes = networks.iter().map(|(_, network)| network.received()).sum();
-        let network_tx_bytes = networks
-            .iter()
-            .map(|(_, network)| network.transmitted())
-            .sum();
+        let network_rx_bytes = networks.values().map(|network| network.received()).sum();
+        let network_tx_bytes = networks.values().map(|network| network.transmitted()).sum();
 
         Ok(ResourceUsage {
             cpu_percent,
@@ -1175,18 +1172,16 @@ impl PerformanceBenchmarker {
                         });
                     }
                 }
-                "resource_monitoring_load" => {
-                    if result.resource_usage.cpu_percent > self.config.slos.max_cpu_load_percent {
-                        violations.push(SLOViolation {
-                            metric: "CPU usage during load".to_string(),
-                            actual_value: format!("{:.1}%", result.resource_usage.cpu_percent),
-                            threshold_value: format!(
-                                "{:.1}%",
-                                self.config.slos.max_cpu_load_percent
-                            ),
-                            severity: ViolationSeverity::Warning,
-                        });
-                    }
+                "resource_monitoring_load"
+                    if result.resource_usage.cpu_percent
+                        > self.config.slos.max_cpu_load_percent =>
+                {
+                    violations.push(SLOViolation {
+                        metric: "CPU usage during load".to_string(),
+                        actual_value: format!("{:.1}%", result.resource_usage.cpu_percent),
+                        threshold_value: format!("{:.1}%", self.config.slos.max_cpu_load_percent),
+                        severity: ViolationSeverity::Warning,
+                    });
                 }
                 _ => {} // Other operations don't have specific SLOs yet
             }

@@ -82,11 +82,15 @@ impl CommandSimulator {
         Ok(output)
     }
 
-    /// Run an interactive command by simulating REPL input/output
+    /// Run an interactive command by simulating REPL input/output.
+    ///
+    /// # Stub status
+    /// `_timeout_seconds` is not yet enforced; the stub always returns within
+    /// the fixed simulation delay.  Wire in a real process runner to honour it.
     async fn run_interactive_command(
         &self,
         command: &str,
-        timeout_seconds: u64,
+        _timeout_seconds: u64,
     ) -> Result<CommandExecutionResult> {
         let start_time = std::time::Instant::now();
 
@@ -230,7 +234,7 @@ impl CommandSimulator {
         if tokio::fs::metadata("crates/terraphim_repl").await.is_ok() {
             println!("Building terraphim-repl for testing...");
             let build_result = Command::new("cargo")
-                .args(&["build", "--bin", "terraphim-repl"])
+                .args(["build", "--bin", "terraphim-repl"])
                 .current_dir("crates/terraphim_repl")
                 .status()
                 .await;

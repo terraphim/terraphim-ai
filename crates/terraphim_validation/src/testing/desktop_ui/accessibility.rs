@@ -95,7 +95,7 @@ impl AccessibilityTester {
 
         for screen_reader in &self.config.screen_readers {
             if screen_reader.enabled {
-                results.push(self.test_screen_reader(&screen_reader).await?);
+                results.push(self.test_screen_reader(screen_reader).await?);
             }
         }
 
