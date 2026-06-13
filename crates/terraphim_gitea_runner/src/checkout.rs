@@ -19,7 +19,7 @@
 
 use crate::{Result, RunnerError};
 use base64::Engine;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::process::Stdio;
 use tokio::process::Command;
 
@@ -92,6 +92,32 @@ fn clone_url(instance_url: &str, owner: &str, repo: &str) -> String {
     }
 }
 
+/// Validate that a path component (`owner` or `repo`) contains only plain
+/// directory names — no `..`, no absolute paths, no empty strings.
+///
+/// Gitea repository names are typically simple identifiers, but a compromised
+/// or forged task payload could supply `"../../sensitive"` as the `repo` field.
+/// Rejecting anything other than [`Component::Normal`] at each segment prevents
+/// the checkout path from escaping `checkout_root`.
+fn validate_path_component(label: &str, value: &str) -> Result<()> {
+    if value.is_empty() {
+        return Err(RunnerError::Execution(format!(
+            "invalid {label}: must not be empty"
+        )));
+    }
+    for component in Path::new(value).components() {
+        match component {
+            Component::Normal(_) => {}
+            other => {
+                return Err(RunnerError::Execution(format!(
+                    "invalid {label} `{value}`: contains disallowed path component {other:?}"
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Ensure a working tree for `owner/repo` exists at `sha` under `checkout_root`,
 /// and return the resolved target directory.
 ///
@@ -112,7 +138,25 @@ pub async fn ensure_checkout(
     token: Option<&str>,
     checkout_root: &Path,
 ) -> Result<PathBuf> {
+    // Guard against path-traversal in owner/repo before any filesystem access.
+    // A forged payload such as `repository: "../../sensitive"` would otherwise
+    // escape checkout_root; only plain directory name segments are permitted.
+    validate_path_component("owner", owner)?;
+    validate_path_component("repo", repo)?;
+
     let target = checkout_root.join(owner).join(repo);
+
+    // Defence-in-depth: even after per-component validation, verify the resolved
+    // path is still under checkout_root (guards against edge cases on exotic OSes
+    // or future refactors that alter how the path is constructed).
+    if !target.starts_with(checkout_root) {
+        return Err(RunnerError::Execution(format!(
+            "checkout path `{}` escapes root `{}`",
+            target.display(),
+            checkout_root.display()
+        )));
+    }
+
     if let Some(parent) = target.parent() {
         tokio::fs::create_dir_all(parent).await.map_err(|e| {
             RunnerError::Execution(format!("create checkout parent {}: {e}", parent.display()))
@@ -369,6 +413,95 @@ mod tests {
         assert!(
             !config.contains(token),
             "token must not appear in .git/config: {config}"
+        );
+    }
+
+    // --- Path-traversal regression tests (Refs #2398) ---
+
+    #[tokio::test]
+    async fn owner_with_parent_dir_traversal_is_rejected() {
+        let tmp = tempfile::tempdir().unwrap();
+        let checkout_root = tmp.path().join("checkouts");
+        let result = ensure_checkout(
+            "http://localhost",
+            "..",
+            "repo",
+            "abc123",
+            None,
+            &checkout_root,
+        )
+        .await;
+        assert!(result.is_err(), "expected error for owner='..'");
+        let msg = result.unwrap_err().to_string();
+        assert!(
+            msg.contains("owner"),
+            "error should mention 'owner', got: {msg}"
+        );
+    }
+
+    #[tokio::test]
+    async fn repo_with_path_traversal_is_rejected() {
+        let tmp = tempfile::tempdir().unwrap();
+        let checkout_root = tmp.path().join("checkouts");
+        let result = ensure_checkout(
+            "http://localhost",
+            "acme",
+            "../../etc/passwd",
+            "abc123",
+            None,
+            &checkout_root,
+        )
+        .await;
+        assert!(
+            result.is_err(),
+            "expected error for repo='../../etc/passwd'"
+        );
+        let msg = result.unwrap_err().to_string();
+        assert!(
+            msg.contains("repo"),
+            "error should mention 'repo', got: {msg}"
+        );
+    }
+
+    #[tokio::test]
+    async fn absolute_repo_path_is_rejected() {
+        let tmp = tempfile::tempdir().unwrap();
+        let checkout_root = tmp.path().join("checkouts");
+        let result = ensure_checkout(
+            "http://localhost",
+            "acme",
+            "/etc/passwd",
+            "abc123",
+            None,
+            &checkout_root,
+        )
+        .await;
+        assert!(result.is_err(), "expected error for repo='/etc/passwd'");
+        let msg = result.unwrap_err().to_string();
+        assert!(
+            msg.contains("repo"),
+            "error should mention 'repo', got: {msg}"
+        );
+    }
+
+    #[tokio::test]
+    async fn empty_owner_is_rejected() {
+        let tmp = tempfile::tempdir().unwrap();
+        let checkout_root = tmp.path().join("checkouts");
+        let result = ensure_checkout(
+            "http://localhost",
+            "",
+            "repo",
+            "abc123",
+            None,
+            &checkout_root,
+        )
+        .await;
+        assert!(result.is_err(), "expected error for empty owner");
+        let msg = result.unwrap_err().to_string();
+        assert!(
+            msg.contains("owner"),
+            "error should mention 'owner', got: {msg}"
         );
     }
 }
