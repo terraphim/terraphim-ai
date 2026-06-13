@@ -4,16 +4,20 @@
 //! orchestrator state, per-issue details, and triggering refresh.
 
 use crate::orchestrator::state::StateSnapshot;
+use crate::outcomes::{DispatchOutcomeEntry, OutcomeStore};
 use axum::{
     Json, Router,
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     response::{Html, IntoResponse},
     routing::{get, post},
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::{Mutex, Notify};
+
+/// Default number of recent outcomes returned by /meta/dispatch-stats.
+const DEFAULT_DISPATCH_STATS_LIMIT: usize = 100;
 
 /// Shared state for the API server.
 pub struct ApiState {
@@ -21,6 +25,8 @@ pub struct ApiState {
     snapshot_fn: Box<dyn Fn() -> StateSnapshot + Send + Sync>,
     /// Signal to trigger an immediate poll refresh.
     refresh_notify: Arc<Notify>,
+    /// Shared dispatch outcome store.
+    outcome_store: Arc<OutcomeStore>,
 }
 
 impl ApiState {
@@ -28,10 +34,12 @@ impl ApiState {
     pub fn new(
         snapshot_fn: Box<dyn Fn() -> StateSnapshot + Send + Sync>,
         refresh_notify: Arc<Notify>,
+        outcome_store: Arc<OutcomeStore>,
     ) -> Self {
         Self {
             snapshot_fn,
             refresh_notify,
+            outcome_store,
         }
     }
 }
@@ -43,6 +51,7 @@ pub fn router(state: Arc<Mutex<ApiState>>) -> Router {
         .route("/api/v1/state", get(get_state))
         .route("/api/v1/refresh", post(post_refresh))
         .route("/api/v1/{issue_identifier}", get(get_issue))
+        .route("/meta/dispatch-stats", get(get_dispatch_stats))
         .with_state(state)
 }
 
@@ -116,6 +125,36 @@ async fn get_issue(
         Json(serde_json::to_value(err).unwrap()),
     )
         .into_response()
+}
+
+/// Query parameters for GET /meta/dispatch-stats.
+#[derive(Debug, Deserialize)]
+struct DispatchStatsQuery {
+    /// Maximum number of entries to return (default: 100).
+    #[serde(default)]
+    limit: Option<usize>,
+}
+
+/// Response body for GET /meta/dispatch-stats.
+#[derive(Debug, Serialize, Deserialize)]
+struct DispatchStatsResponse {
+    count: usize,
+    entries: Vec<DispatchOutcomeEntry>,
+}
+
+/// GET /meta/dispatch-stats - return recent dispatch outcomes (newest first).
+async fn get_dispatch_stats(
+    State(state): State<Arc<Mutex<ApiState>>>,
+    Query(query): Query<DispatchStatsQuery>,
+) -> impl IntoResponse {
+    let limit = query.limit.unwrap_or(DEFAULT_DISPATCH_STATS_LIMIT);
+    let locked = state.lock().await;
+    let entries = locked.outcome_store.recent(limit).await;
+    let count = entries.len();
+    (
+        StatusCode::OK,
+        Json(DispatchStatsResponse { count, entries }),
+    )
 }
 
 /// GET / - human-readable dashboard.
@@ -231,7 +270,11 @@ async fn dashboard(State(state): State<Arc<Mutex<ApiState>>>) -> impl IntoRespon
 mod tests {
     use super::*;
     use crate::orchestrator::state::{SnapshotCounts, StateSnapshot};
+    use crate::outcomes::{DispatchOutcomeKind, OutcomeStore};
     use crate::runner::TokenTotals;
+    use axum::body::to_bytes;
+    use axum::http::Request;
+    use tower::ServiceExt as _;
 
     fn empty_snapshot() -> StateSnapshot {
         StateSnapshot {
@@ -247,13 +290,17 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn api_state_endpoint() {
-        let api_state = Arc::new(Mutex::new(ApiState::new(
+    fn make_api_state() -> Arc<Mutex<ApiState>> {
+        Arc::new(Mutex::new(ApiState::new(
             Box::new(empty_snapshot),
             Arc::new(Notify::new()),
-        )));
+            Arc::new(OutcomeStore::new(100, None)),
+        )))
+    }
 
+    #[tokio::test]
+    async fn api_state_endpoint() {
+        let api_state = make_api_state();
         let app = router(api_state);
 
         let response = axum::serve(
@@ -267,10 +314,84 @@ mod tests {
 
     #[tokio::test]
     async fn api_router_builds() {
+        let _app = router(make_api_state());
+    }
+
+    #[tokio::test]
+    async fn dispatch_stats_empty() {
+        let app = router(make_api_state());
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/meta/dispatch-stats")
+                    .body(axum::body::Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        let json: DispatchStatsResponse = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json.count, 0);
+        assert!(json.entries.is_empty());
+    }
+
+    #[tokio::test]
+    async fn dispatch_stats_returns_entries() {
+        let store = Arc::new(OutcomeStore::new(100, None));
+        let ts = chrono::Utc::now();
+
+        // Push two entries: one Success, one EmptySuccess
+        store
+            .push(DispatchOutcomeEntry {
+                ts,
+                issue_id: "id1".into(),
+                identifier: "MT-1".into(),
+                outcome: DispatchOutcomeKind::Success,
+                elapsed_ms: 500,
+                turn_count: 2,
+                total_tokens: 100,
+                reason: None,
+            })
+            .await;
+        store
+            .push(DispatchOutcomeEntry {
+                ts,
+                issue_id: "id2".into(),
+                identifier: "MT-2".into(),
+                outcome: DispatchOutcomeKind::EmptySuccess,
+                elapsed_ms: 200,
+                turn_count: 1,
+                total_tokens: 0,
+                reason: None,
+            })
+            .await;
+
         let api_state = Arc::new(Mutex::new(ApiState::new(
             Box::new(empty_snapshot),
             Arc::new(Notify::new()),
+            Arc::clone(&store),
         )));
-        let _app = router(api_state);
+        let app = router(api_state);
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/meta/dispatch-stats")
+                    .body(axum::body::Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        let json: DispatchStatsResponse = serde_json::from_slice(&body).unwrap();
+
+        assert_eq!(json.count, 2);
+        // Newest first
+        assert_eq!(json.entries[0].outcome, DispatchOutcomeKind::EmptySuccess);
+        assert_eq!(json.entries[1].outcome, DispatchOutcomeKind::Success);
     }
 }

@@ -12,6 +12,7 @@ pub use state::{OrchestratorRuntimeState, StateSnapshot};
 use crate::config::ServiceConfig;
 use crate::config::template::render_prompt;
 use crate::error::Result;
+use crate::outcomes::{OutcomeStore, classify as classify_outcome};
 use crate::runner::TokenCounts;
 use crate::runner::claude_code::ClaudeCodeSession;
 use crate::runner::protocol::AgentEvent;
@@ -22,6 +23,7 @@ use crate::workspace::WorkspaceManager;
 use chrono::Utc;
 use state::{LiveSession, RetryEntry, RunningEntry};
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc;
 use tracing::{debug, error, info, warn};
@@ -51,14 +53,27 @@ pub struct SymphonyOrchestrator {
     /// Channel for retry timer fires.
     retry_fire_tx: mpsc::Sender<String>,
     retry_fire_rx: mpsc::Receiver<String>,
+    /// Shared dispatch outcome store (ring buffer + JSONL file).
+    outcome_store: Arc<OutcomeStore>,
 }
 
 impl SymphonyOrchestrator {
-    /// Create a new orchestrator.
+    /// Create a new orchestrator with the default `OutcomeStore`.
     pub fn new(
         config: ServiceConfig,
         tracker: Box<dyn IssueTracker>,
         workspace_mgr: WorkspaceManager,
+    ) -> Self {
+        let outcome_store = Arc::new(OutcomeStore::new(1000, OutcomeStore::default_path()));
+        Self::with_outcome_store(config, tracker, workspace_mgr, outcome_store)
+    }
+
+    /// Create a new orchestrator with an explicit `OutcomeStore` (useful in tests).
+    pub fn with_outcome_store(
+        config: ServiceConfig,
+        tracker: Box<dyn IssueTracker>,
+        workspace_mgr: WorkspaceManager,
+        outcome_store: Arc<OutcomeStore>,
     ) -> Self {
         let (worker_exit_tx, worker_exit_rx) = mpsc::channel(64);
         let (agent_event_tx, agent_event_rx) = mpsc::channel(256);
@@ -80,7 +95,13 @@ impl SymphonyOrchestrator {
             agent_event_rx,
             retry_fire_tx,
             retry_fire_rx,
+            outcome_store,
         }
+    }
+
+    /// Return a clone of the shared outcome store (for wiring into the API).
+    pub fn outcome_store(&self) -> Arc<OutcomeStore> {
+        Arc::clone(&self.outcome_store)
     }
 
     /// Run the orchestrator main loop.
@@ -445,8 +466,10 @@ impl SymphonyOrchestrator {
         let issue_id = &exit.issue_id;
 
         // Calculate runtime from the exit's started_at timestamp
-        let elapsed = (Utc::now() - exit.started_at).num_milliseconds().max(0) as f64 / 1000.0;
-        self.state.add_runtime_seconds(elapsed);
+        let now = Utc::now();
+        let elapsed_ms = (now - exit.started_at).num_milliseconds().max(0) as u64;
+        let elapsed_secs = elapsed_ms as f64 / 1000.0;
+        self.state.add_runtime_seconds(elapsed_secs);
 
         // Remove from running
         self.state.running.remove(issue_id);
@@ -464,6 +487,21 @@ impl SymphonyOrchestrator {
                 .run_after_run_hook(&ws_info, &exit.issue_env)
                 .await;
         }
+
+        // Classify outcome and emit structured telemetry
+        let entry = classify_outcome(&exit.outcome, elapsed_ms, issue_id, &exit.identifier, now);
+        info!(
+            target: "meta_coordinator.dispatch",
+            issue_id = %exit.issue_id,
+            identifier = %exit.identifier,
+            outcome = %entry.outcome,
+            elapsed_ms,
+            turn_count = entry.turn_count,
+            total_tokens = entry.total_tokens,
+            reason = entry.reason.as_deref().unwrap_or(""),
+            "dispatch completed"
+        );
+        self.outcome_store.push(entry).await;
 
         match &exit.outcome {
             WorkerOutcome::Normal { turn_count, tokens } => {

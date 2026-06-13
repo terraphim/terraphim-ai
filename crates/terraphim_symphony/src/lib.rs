@@ -9,12 +9,14 @@ pub mod api;
 pub mod config;
 pub mod error;
 pub mod orchestrator;
+pub mod outcomes;
 pub mod runner;
 pub mod tracker;
 pub mod workspace;
 
 pub use error::{Result, SymphonyError};
 pub use orchestrator::{OrchestratorRuntimeState, StateSnapshot, SymphonyOrchestrator};
+pub use outcomes::{DispatchOutcomeEntry, DispatchOutcomeKind, OutcomeStore};
 pub use runner::{
     AdfEnvelope, AgentEvent, CodexSession, FindingCategory, FindingSeverity, ReviewAgentOutput,
     ReviewFinding, TokenCounts, TokenTotals, WorkerOutcome, deduplicate_findings,
