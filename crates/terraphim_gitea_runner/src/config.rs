@@ -25,6 +25,10 @@ pub struct RunnerConfig {
     /// Optional legacy commit-status mirror (e.g. `adf/build`) posted alongside
     /// the native result during migration. `None` disables the mirror.
     pub legacy_status_mirror: Option<LegacyStatusMirrorConfig>,
+    /// API token for native commit-status posts when the per-job `github.token`
+    /// lacks `statuses` scope (common on private repos). Set via
+    /// `RUNNER_STATUS_TOKEN` or `GITEA_TOKEN`. `None` falls back to job token only.
+    pub status_token: Option<String>,
     /// Timeout applied to each HTTP request to the Gitea RunnerService.
     /// A hung `FetchTask` call is aborted after this duration rather than
     /// blocking the poll loop indefinitely.
@@ -55,6 +59,7 @@ impl Default for RunnerConfig {
             poll_interval: Duration::from_secs(3),
             active_repos: Vec::new(),
             legacy_status_mirror: None,
+            status_token: None,
             http_request_timeout: Duration::from_secs(30),
             poll_timeout: Duration::from_secs(60),
         }

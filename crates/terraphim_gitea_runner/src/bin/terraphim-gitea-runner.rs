@@ -13,6 +13,9 @@
 //! - `RUNNER_ACCEPT_ALL`    set `1` to accept every terraphim-native job (no allowlist)
 //! - `RUNNER_LEGACY_TOKEN`  enable the legacy commit-status mirror with this API token
 //! - `RUNNER_LEGACY_CONTEXT` legacy mirror context, default `adf/build`
+//! - `RUNNER_STATUS_TOKEN`  API token for native commit-status posts (preferred over
+//!   per-job `github.token`, which often returns HTTP 401 on private repos)
+//! - `GITEA_TOKEN`          fallback for `RUNNER_STATUS_TOKEN` when unset
 //! - `RUNNER_CHECKOUT_DIR`  checkout root; per-repo trees at `<root>/<owner>/<repo>` (default `.`)
 //! - `RUNNER_HTTP_TIMEOUT`  per-request HTTP timeout in seconds (default 30)
 
@@ -67,6 +70,10 @@ async fn main() -> anyhow::Result<()> {
         .unwrap_or(30);
     let http_request_timeout = Duration::from_secs(http_timeout_secs);
 
+    let status_token = std::env::var("RUNNER_STATUS_TOKEN")
+        .ok()
+        .or_else(|| std::env::var("GITEA_TOKEN").ok());
+
     let config = RunnerConfig {
         instance_url: env_or("GITEA_URL", "https://git.terraphim.cloud"),
         org: env_or("GITEA_ORG", "terraphim"),
@@ -76,6 +83,7 @@ async fn main() -> anyhow::Result<()> {
         poll_interval: Duration::from_secs(3),
         active_repos,
         legacy_status_mirror,
+        status_token,
         http_request_timeout,
         poll_timeout: Duration::from_secs(http_timeout_secs * 2),
     };
