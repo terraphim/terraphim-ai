@@ -484,7 +484,7 @@ jobs:
         uses: actions/github-script@v9
         continue-on-error: true
         with:
-          github-token: ${{ secrets.DESKTOP_REPO_TOKEN }}
+          github-token: ${{ secrets.TERRAPHIM_ORG_GITHUB_TOKEN || secrets.DESKTOP_REPO_TOKEN }}
           script: |
             const tag = context.ref.replace('refs/tags/', '');
             console.log(`Triggering desktop release for tag: ${tag}`);
@@ -511,9 +511,9 @@ jobs:
       - name: Dispatch terraphim-clients release-binaries workflow
         uses: actions/github-script@v9
         with:
-          # Org-level PAT (same secret as desktop dispatch). GITHUB_TOKEN cannot
+          # Org-level PAT for cross-repo workflow dispatch. GITHUB_TOKEN cannot
           # dispatch workflows in other repos regardless of job permissions.
-          github-token: ${{ secrets.DESKTOP_REPO_TOKEN }}
+          github-token: ${{ secrets.TERRAPHIM_ORG_GITHUB_TOKEN || secrets.DESKTOP_REPO_TOKEN || secrets.CLIENTS_REPO_TOKEN }}
           script: |
             const version = context.ref.replace('refs/tags/v', '');
             const releaseTag = context.ref.replace('refs/tags/', '');

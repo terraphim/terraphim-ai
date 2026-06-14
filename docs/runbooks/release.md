@@ -119,10 +119,13 @@ Do **not** force-push tags. Fix workflows, bump to next patch (e.g. v1.20.4 → 
 | Secret | Repo | Purpose |
 |--------|------|---------|
 | `CARGO_REGISTRIES_TERRAPHIM_TOKEN` | terraphim-clients | Private registry during build |
-| `DESKTOP_REPO_TOKEN` | terraphim-ai (org PAT) | Cross-repo workflow dispatch (desktop + clients) |
+| `TERRAPHIM_ORG_GITHUB_TOKEN` | terraphim-ai (org PAT) | Cross-repo workflow dispatch (desktop + clients) |
+| `DESKTOP_REPO_TOKEN` | terraphim-ai | Legacy alias — same value as `TERRAPHIM_ORG_GITHUB_TOKEN` |
+| `CLIENTS_REPO_TOKEN` | terraphim-ai | Legacy alias — same value as `TERRAPHIM_ORG_GITHUB_TOKEN` |
 | `TERRAPHIM_AI_RELEASE_TOKEN` | terraphim-clients (org PAT) | Upload client binaries to terraphim-ai release |
 | `OP_SERVICE_ACCOUNT_TOKEN` | terraphim-ai, terraphim-clients | macOS signing via 1Password |
 
-`DESKTOP_REPO_TOKEN` and `TERRAPHIM_AI_RELEASE_TOKEN` should be the same org-level
-fine-grained PAT (or classic PAT) with `actions:write` and `contents:write` on
-`terraphim/*` repos. The per-job `GITHUB_TOKEN` cannot replace them for cross-repo calls.
+`TERRAPHIM_ORG_GITHUB_TOKEN`, `DESKTOP_REPO_TOKEN`, `CLIENTS_REPO_TOKEN`, and
+`TERRAPHIM_AI_RELEASE_TOKEN` should share one org-level fine-grained PAT (or classic
+PAT) with `actions:write` and `contents:write` on `terraphim/*` repos. The per-job
+`GITHUB_TOKEN` cannot replace them for cross-repo calls.
