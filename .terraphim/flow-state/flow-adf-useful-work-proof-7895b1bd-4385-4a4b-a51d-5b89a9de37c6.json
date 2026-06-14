@@ -1,0 +1,56 @@
+{
+  "flow_name": "adf-useful-work-proof",
+  "correlation_id": "7895b1bd-4385-4a4b-a51d-5b89a9de37c6",
+  "status": "completed",
+  "started_at": "2026-06-13T22:39:07.618910453Z",
+  "finished_at": "2026-06-13T22:39:07.930403950Z",
+  "next_step_index": 3,
+  "issue": "2668",
+  "step_envelopes": [
+    {
+      "step_name": "require-one-slot",
+      "started_at": "2026-06-13T22:39:07.772823428Z",
+      "finished_at": "2026-06-13T22:39:07.772823810Z",
+      "exit_code": 0,
+      "stdout": "gate passed",
+      "stderr": "",
+      "cost_usd": null,
+      "session_id": null,
+      "input_tokens": null,
+      "output_tokens": null,
+      "stdout_file": "/tmp/flow-7895b1bd-4385-4a4b-a51d-5b89a9de37c6-require-one-slot.stdout"
+    },
+    {
+      "step_name": "assemble-proof",
+      "started_at": "2026-06-13T22:39:07.773379537Z",
+      "finished_at": "2026-06-13T22:39:07.930189730Z",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": "",
+      "cost_usd": null,
+      "session_id": null,
+      "input_tokens": null,
+      "output_tokens": null,
+      "stdout_file": "/tmp/flow-7895b1bd-4385-4a4b-a51d-5b89a9de37c6-assemble-proof.stdout"
+    }
+  ],
+  "matrix_envelopes": {
+    "matrix-slot-work": [
+      {
+        "step_name": "matrix-slot-work-matrix-0",
+        "started_at": "2026-06-13T22:39:07.620691377Z",
+        "finished_at": "2026-06-13T22:39:07.772340862Z",
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": "",
+        "cost_usd": null,
+        "session_id": null,
+        "input_tokens": null,
+        "output_tokens": null,
+        "stdout_file": null
+      }
+    ]
+  },
+  "error": null,
+  "iteration_count": 0
+}

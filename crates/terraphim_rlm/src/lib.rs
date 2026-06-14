@@ -72,6 +72,9 @@ pub mod rlm;
 // Trajectory logging (Phase 5)
 pub mod logger;
 
+// Event hooks for external agent capture (learning, security)
+pub mod hooks;
+
 // Knowledge graph validation (Phase 5)
 #[cfg(feature = "kg-validation")]
 pub mod validator;
@@ -95,6 +98,7 @@ pub use executor::{
     Capability, ExecutionContext, ExecutionEnvironment, ExecutionResult, LocalExecutor, SnapshotId,
     SshExecutor, ValidationResult,
 };
+pub use hooks::{ValidationEvent, emit_validation_event};
 pub use llm_bridge::{LlmBridge, LlmBridgeConfig, QueryRequest, QueryResponse};
 pub use logger::{TrajectoryEvent, TrajectoryLogger, TrajectoryLoggerConfig, read_trajectory_file};
 #[cfg(feature = "mcp")]

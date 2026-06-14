@@ -42,10 +42,15 @@ async fn main() {
 }
 
 async fn run(cli: Cli) -> Result<CliResponse, Box<dyn std::error::Error>> {
-    // Initialize RLM with default config
-    // This will fall back to LocalExecutor if Firecracker/Docker unavailable
     let config = RlmConfig::default();
-    let rlm = TerraphimRlm::new(config).await?;
+    let mut rlm = TerraphimRlm::new(config).await?;
+
+    #[cfg(feature = "llm")]
+    {
+        if let Err(e) = rlm.auto_configure_llm().await {
+            log::warn!("LLM auto-configuration failed: {}. rlm_query will be unavailable.", e);
+        }
+    }
 
     match cli.command {
         Commands::Session { action } => handle_session(&rlm, action).await,

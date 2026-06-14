@@ -289,6 +289,14 @@ jobs:
           # slow-timeout and fail-fast are configured in .config/nextest.toml [profile.ci]
           /home/alex/.local/bin/rch exec -- cargo nextest run --release --target ${{ matrix.target }} --workspace --profile ci --features "self_update/signatures,zlob,terraphim_automata/medical"
 
+      - name: Test terraphim_grep with code-search feature
+        run: |
+          /home/alex/.local/bin/rch exec -- cargo test -p terraphim_grep --features code-search
+
+      - name: Check terraphim_grep benchmarks with code-search feature
+        run: |
+          /home/alex/.local/bin/rch exec -- cargo check -p terraphim_grep --benches --features code-search
+
       - name: sccache stats
         if: always()
         run: /home/alex/.local/bin/sccache --show-stats

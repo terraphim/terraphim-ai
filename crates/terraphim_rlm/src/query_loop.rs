@@ -7,6 +7,7 @@
 //! 4. Feeds results back to the LLM
 //! 5. Repeats until FINAL or budget exhaustion
 
+use std::cell::Cell;
 use std::sync::Arc;
 
 use jiff::Timestamp;
@@ -14,7 +15,7 @@ use tokio::sync::mpsc;
 
 use crate::budget::BudgetTracker;
 use crate::error::{RlmError, RlmResult};
-use crate::executor::{ExecutionContext, ExecutionEnvironment, ExecutionResult};
+use crate::executor::{ExecutionContext, ExecutionEnvironment, ExecutionResult, ValidationResult};
 use crate::llm_bridge::{LlmBridge, QueryRequest, QueryResponse};
 use crate::parser::CommandParser;
 use crate::session::SessionManager;
@@ -109,6 +110,10 @@ pub struct QueryLoop<E: ExecutionEnvironment + ?Sized> {
     session_id: SessionId,
     /// Cancellation receiver.
     cancel_rx: Option<mpsc::Receiver<()>>,
+
+    /// Per-command validation retry counter.
+    /// Uses Cell for interior mutability so validation methods can be `&self`.
+    validation_retries: Cell<u32>,
 }
 
 impl<E: ExecutionEnvironment + ?Sized> QueryLoop<E> {
@@ -136,6 +141,7 @@ impl<E: ExecutionEnvironment + ?Sized> QueryLoop<E> {
             config,
             session_id,
             cancel_rx: None,
+            validation_retries: Cell::new(0),
         }
     }
 
@@ -332,6 +338,39 @@ impl<E: ExecutionEnvironment + ?Sized> QueryLoop<E> {
         self.llm_bridge.query(&self.session_id, request).await
     }
 
+    /// Validate a command and handle retries with escalation.
+    async fn validate_command(&self, input: &str) -> RlmResult<ValidationResult> {
+        let mut vr =
+            self.executor
+                .validate(input)
+                .await
+                .map_err(|e| RlmError::ExecutionFailed {
+                    message: format!("Validation error: {}", e),
+                    exit_code: None,
+                    stdout: None,
+                    stderr: None,
+                })?;
+
+        if !vr.is_valid {
+            let retries = self.validation_retries.get() + 1;
+            self.validation_retries.set(retries);
+            vr = vr.with_retry_count(retries);
+
+            // Log the validation failure for agent learning/security hooks
+            log::warn!(
+                "RLM validation failure: retry={}, unknown={:?}, matched={:?}",
+                retries,
+                vr.unknown_terms,
+                vr.matched_terms,
+            );
+        } else {
+            // Reset retries on successful validation
+            self.validation_retries.set(0);
+        }
+
+        Ok(vr)
+    }
+
     /// Execute a single command.
     async fn execute_command(
         &self,
@@ -381,6 +420,23 @@ impl<E: ExecutionEnvironment + ?Sized> QueryLoop<E> {
             }
 
             Command::Run(bash_cmd) => {
+                let vr = self.validate_command(&bash_cmd.command).await?;
+                if !vr.is_valid {
+                    let feedback = vr.feedback_message();
+                    log::warn!(
+                        "QueryLoop: KG validation failed for RUN command. Feeding back to LLM."
+                    );
+                    history.push(CommandHistoryEntry {
+                        command: command.clone(),
+                        success: false,
+                        stdout: feedback.clone(),
+                        stderr: String::new(),
+                        exit_code: Some(-1),
+                        execution_time_ms: 0,
+                        executed_at: start,
+                    });
+                    return Ok(ExecuteResult::Continue { output: feedback });
+                }
                 let result = self
                     .executor
                     .execute_command(&bash_cmd.command, ctx)
@@ -409,6 +465,23 @@ impl<E: ExecutionEnvironment + ?Sized> QueryLoop<E> {
             }
 
             Command::Code(python_code) => {
+                let vr = self.validate_command(&python_code.code).await?;
+                if !vr.is_valid {
+                    let feedback = vr.feedback_message();
+                    log::warn!(
+                        "QueryLoop: KG validation failed for CODE command. Feeding back to LLM."
+                    );
+                    history.push(CommandHistoryEntry {
+                        command: command.clone(),
+                        success: false,
+                        stdout: feedback.clone(),
+                        stderr: String::new(),
+                        exit_code: Some(-1),
+                        execution_time_ms: 0,
+                        executed_at: start,
+                    });
+                    return Ok(ExecuteResult::Continue { output: feedback });
+                }
                 let result = self
                     .executor
                     .execute_code(&python_code.code, ctx)
