@@ -131,7 +131,7 @@ RUN --mount=type=secret,id=cargo_registry_token \
     export CARGO_REGISTRIES_TERRAPHIM_TOKEN="$(cat /run/secrets/cargo_registry_token)" && \
     . /root/.profile && \
     RUST_TARGET=$(cat /tmp/rust-target) && \
-    cargo build --release --target=$RUST_TARGET --package terraphim_server
+    cargo build --locked --release --target=$RUST_TARGET --package terraphim_server
 
 # Test the binaries
 RUN . /root/.profile && \

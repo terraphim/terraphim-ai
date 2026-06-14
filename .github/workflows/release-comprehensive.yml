@@ -133,7 +133,17 @@ jobs:
             use_cross: false
 
     runs-on: ${{ matrix.os }}
+    env:
+      CARGO_REGISTRIES_TERRAPHIM_TOKEN: ${{ secrets.CARGO_REGISTRIES_TERRAPHIM_TOKEN }}
     steps:
+      - name: Repair rustup toolchain permissions (self-hosted)
+        if: contains(matrix.os, 'self-hosted')
+        run: |
+          FIX="${HOME}/.local/bin/fix-rust-toolchain-perms.sh"
+          if [[ -x "$FIX" ]]; then
+            "$FIX" || true
+          fi
+
       - name: Cleanup self-hosted runner
         if: contains(matrix.os, 'self-hosted')
         run: |
@@ -205,7 +215,7 @@ jobs:
           key: ${{ matrix.os }}-${{ matrix.target }}
 
       - name: Setup Node.js (for frontend build)
-        if: "!matrix.use_cross"
+        if: matrix.os != 'windows-latest'
         uses: actions/setup-node@v5
         with:
           node-version: 20
@@ -213,14 +223,14 @@ jobs:
           cache-dependency-path: desktop/yarn.lock
 
       - name: Build frontend assets
-        if: "!matrix.use_cross"
+        if: matrix.os != 'windows-latest'
         working-directory: ./desktop
         run: |
           yarn install --frozen-lockfile
           yarn build
 
       - name: Copy frontend to server dist for rust-embed (Unix)
-        if: "!matrix.use_cross && matrix.os != 'windows-latest'"
+        if: matrix.os != 'windows-latest'
         run: |
           rm -r terraphim_server/dist/assets 2>/dev/null || true
           cp -a desktop/dist/. terraphim_server/dist/
@@ -256,11 +266,20 @@ jobs:
         shell: bash
         run: |
           # Clean to ensure fresh UI embedding
-          cargo clean -p terraphim_server --target ${{ matrix.target }}
+          rustup run stable cargo clean -p terraphim_server --target ${{ matrix.target }}
           
           # Build with fresh UI
-          cargo build --release \
+          rustup run stable cargo build --release \
             --target ${{ matrix.target }} -p terraphim_server --bin terraphim_server
+
+      - name: Build server binary (cross / musl)
+        if: matrix.use_cross
+        shell: bash
+        run: |
+          rustup run stable cargo clean -p terraphim_server --target ${{ matrix.target }}
+          rustup run stable cross build --release \
+            --target ${{ matrix.target }} -p terraphim_server --bin terraphim_server
+          ls -la "target/${{ matrix.target }}/release/terraphim_server"
 
       - name: Verify binary versions (native builds only)
         if: matrix.target == 'x86_64-unknown-linux-gnu'
@@ -285,14 +304,15 @@ jobs:
           VERSION: ${{ needs.verify-versions.outputs.version }}
         run: |
           mkdir -p artifacts
-          # Create tar.gz archives with version in filename for auto-update compatibility
-          # Server binary only exists for non-cross builds
-          if [ -f "target/${{ matrix.target }}/release/terraphim_server" ]; then
-            tar -czf "artifacts/terraphim_server-${VERSION}-${{ matrix.target }}.tar.gz" \
-              -C "target/${{ matrix.target }}/release" terraphim_server
-            cp target/${{ matrix.target }}/release/terraphim_server artifacts/terraphim_server-${{ matrix.target }}
-            chmod +x artifacts/*
+          BIN="target/${{ matrix.target }}/release/terraphim_server"
+          if [ ! -f "$BIN" ]; then
+            echo "::error::Missing server binary at $BIN"
+            exit 1
           fi
+          tar -czf "artifacts/terraphim_server-${VERSION}-${{ matrix.target }}.tar.gz" \
+            -C "target/${{ matrix.target }}/release" terraphim_server
+          cp "$BIN" "artifacts/terraphim_server-${{ matrix.target }}"
+          chmod +x artifacts/*
 
       - name: Prepare artifacts (Windows)
         if: matrix.os == 'windows-latest'
@@ -698,8 +718,11 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           name: ${{ steps.release-notes.outputs.title }}
+          tag_name: ${{ github.ref_name }}
           draft: false
           prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
+          overwrite: true
+          make_latest: true
           files: release-assets/*
           body: |
             ## Release Assets
@@ -759,17 +782,26 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="${{ github.ref_name }}"
+          # Require at least one asset matching each client binary family.
+          REQUIRED_PATTERNS=('terraphim-agent' 'terraphim-cli' 'terraphim-grep')
           echo "Waiting for client binaries on release $TAG ..."
-          for attempt in $(seq 1 60); do
-            COUNT=$(gh release view "$TAG" --repo terraphim/terraphim-ai --json assets -q '.assets | length' 2>/dev/null || echo 0)
-            echo "Attempt $attempt: $COUNT assets on release"
-            if [ "$COUNT" -ge 8 ]; then
-              echo "Client binaries appear present"
+          for attempt in $(seq 1 120); do
+            ASSETS=$(gh release view "$TAG" --repo terraphim/terraphim-ai --json assets -q '.assets[].name' 2>/dev/null || true)
+            MISSING=0
+            for pattern in "${REQUIRED_PATTERNS[@]}"; do
+              if ! echo "$ASSETS" | grep -q "$pattern"; then
+                echo "  missing pattern: $pattern"
+                MISSING=$((MISSING + 1))
+              fi
+            done
+            echo "Attempt $attempt: missing $MISSING client families"
+            if [ "$MISSING" -eq 0 ]; then
+              echo "Client binaries present on release"
               exit 0
             fi
             sleep 30
           done
-          echo "::error::Timed out waiting for terraphim-clients to attach binaries"
+          echo "::error::Timed out waiting for terraphim-clients to attach agent/cli/grep binaries"
           exit 1
 
   update-homebrew:

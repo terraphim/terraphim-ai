@@ -19,7 +19,7 @@ on:
         default: 'latest'
   push:
     tags:
-      - 'v*'
+      # Monorepo server releases use bare v* tags; npm publishes on nodejs-v* only.
       - 'nodejs-v*'
 
 permissions:
@@ -478,7 +478,7 @@ jobs:
           echo "GitHub Packages URL: https://github.com/terraphim/terraphim-ai/packages"
 
       - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/') && inputs.dry_run != 'true'
+        if: startsWith(github.ref, 'refs/tags/nodejs-') && inputs.dry_run != 'true'
         uses: softprops/action-gh-release@v2
         continue-on-error: true
         with:
