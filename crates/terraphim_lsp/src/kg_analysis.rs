@@ -75,10 +75,7 @@ pub fn analyse_kg_document(text: &str, thesaurus: &Thesaurus) -> KgAnalysis {
             matched_terms.push(TermMatch {
                 term: term.clone(),
                 range: (start, end),
-                description: normalized_term
-                    .display_value
-                    .clone()
-                    .filter(|s| !s.is_empty()),
+                description: Some(normalized_term.display().to_string()).filter(|s| !s.is_empty()),
             });
         }
     }
