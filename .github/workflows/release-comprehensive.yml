@@ -511,7 +511,9 @@ jobs:
       - name: Dispatch terraphim-clients release-binaries workflow
         uses: actions/github-script@v9
         with:
-          github-token: ${{ secrets.CLIENTS_REPO_TOKEN || secrets.GITHUB_TOKEN }}
+          # Org-level PAT (same secret as desktop dispatch). GITHUB_TOKEN cannot
+          # dispatch workflows in other repos regardless of job permissions.
+          github-token: ${{ secrets.DESKTOP_REPO_TOKEN }}
           script: |
             const version = context.ref.replace('refs/tags/v', '');
             const releaseTag = context.ref.replace('refs/tags/', '');

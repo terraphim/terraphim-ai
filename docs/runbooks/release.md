@@ -119,6 +119,10 @@ Do **not** force-push tags. Fix workflows, bump to next patch (e.g. v1.20.4 → 
 | Secret | Repo | Purpose |
 |--------|------|---------|
 | `CARGO_REGISTRIES_TERRAPHIM_TOKEN` | terraphim-clients | Private registry during build |
-| `CLIENTS_REPO_TOKEN` | terraphim-ai | Dispatch clients workflow |
-| `TERRAPHIM_AI_RELEASE_TOKEN` | terraphim-clients | Upload binaries to terraphim-ai release |
+| `DESKTOP_REPO_TOKEN` | terraphim-ai (org PAT) | Cross-repo workflow dispatch (desktop + clients) |
+| `TERRAPHIM_AI_RELEASE_TOKEN` | terraphim-clients (org PAT) | Upload client binaries to terraphim-ai release |
 | `OP_SERVICE_ACCOUNT_TOKEN` | terraphim-ai, terraphim-clients | macOS signing via 1Password |
+
+`DESKTOP_REPO_TOKEN` and `TERRAPHIM_AI_RELEASE_TOKEN` should be the same org-level
+fine-grained PAT (or classic PAT) with `actions:write` and `contents:write` on
+`terraphim/*` repos. The per-job `GITHUB_TOKEN` cannot replace them for cross-repo calls.
