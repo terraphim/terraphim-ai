@@ -25,7 +25,7 @@ log = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 uuid = { workspace = true, features = ["v4"] }
 reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
-sd-notify = "0.4"
+sd-notify = "0.5"
 base64 = "0.22"
 flate2 = "1.0"
 env_logger = "0.11"
