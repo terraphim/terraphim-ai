@@ -7,7 +7,7 @@ use serde_json::json;
 /// Skips within 2 seconds if Ollama is not reachable rather than hanging.
 #[tokio::test]
 async fn test_chat_endpoint_with_ollama() {
-    if !common::llm_reachability::require_ollama().await {
+    if !common::llm_reachability::require_ollama_with_model("llama3.2:3b").await {
         return;
     }
 
