@@ -19,6 +19,7 @@ use crate::llm_bridge::{LlmBridge, QueryRequest, QueryResponse};
 use crate::parser::CommandParser;
 use crate::session::SessionManager;
 use crate::types::{Command, CommandHistory, CommandHistoryEntry, QueryMetadata, SessionId};
+use crate::validator::KnowledgeGraphValidator;
 
 // Re-export QueryResponse for external use
 pub use crate::llm_bridge::QueryResponse as LlmResponse;
@@ -109,6 +110,8 @@ pub struct QueryLoop<E: ExecutionEnvironment + ?Sized> {
     session_id: SessionId,
     /// Cancellation receiver.
     cancel_rx: Option<mpsc::Receiver<()>>,
+    /// Knowledge graph validator applied before every Run/Code command.
+    validator: Arc<KnowledgeGraphValidator>,
 }
 
 impl<E: ExecutionEnvironment + ?Sized> QueryLoop<E> {
@@ -120,6 +123,7 @@ impl<E: ExecutionEnvironment + ?Sized> QueryLoop<E> {
         llm_bridge: Arc<LlmBridge>,
         executor: Arc<E>,
         config: QueryLoopConfig,
+        validator: Arc<KnowledgeGraphValidator>,
     ) -> Self {
         let parser = if config.strict_parsing {
             CommandParser::strict()
@@ -136,6 +140,7 @@ impl<E: ExecutionEnvironment + ?Sized> QueryLoop<E> {
             config,
             session_id,
             cancel_rx: None,
+            validator,
         }
     }
 
@@ -381,6 +386,19 @@ impl<E: ExecutionEnvironment + ?Sized> QueryLoop<E> {
             }
 
             Command::Run(bash_cmd) => {
+                let vr = self.validator.validate(&bash_cmd.command)?;
+                if !vr.passed {
+                    if vr.escalation_required {
+                        return Err(RlmError::KgEscalationRequired {
+                            unknown_terms: vr.unmatched_words,
+                            suggested_action: vr.suggestions.join("; "),
+                            context: vr.message,
+                        });
+                    }
+                    return Err(RlmError::KgValidationFailed {
+                        unknown_terms: vr.unmatched_words,
+                    });
+                }
                 let result = self
                     .executor
                     .execute_command(&bash_cmd.command, ctx)
@@ -409,6 +427,19 @@ impl<E: ExecutionEnvironment + ?Sized> QueryLoop<E> {
             }
 
             Command::Code(python_code) => {
+                let vr = self.validator.validate(&python_code.code)?;
+                if !vr.passed {
+                    if vr.escalation_required {
+                        return Err(RlmError::KgEscalationRequired {
+                            unknown_terms: vr.unmatched_words,
+                            suggested_action: vr.suggestions.join("; "),
+                            context: vr.message,
+                        });
+                    }
+                    return Err(RlmError::KgValidationFailed {
+                        unknown_terms: vr.unmatched_words,
+                    });
+                }
                 let result = self
                     .executor
                     .execute_code(&python_code.code, ctx)
@@ -575,6 +606,7 @@ impl<E: ExecutionEnvironment + ?Sized> QueryLoop<E> {
 }
 
 /// Result of executing a single command.
+#[derive(Debug)]
 enum ExecuteResult {
     /// FINAL was reached with a result.
     Final(String),
@@ -697,5 +729,187 @@ mod tests {
         let output = format_execution_output(&result);
         // Even with empty stdout/stderr, we still show exit_code
         assert!(output.contains("exit_code: 0"));
+    }
+
+    // -----------------------------------------------------------------------
+    // KG validation wiring tests (require kg-validation feature)
+    // -----------------------------------------------------------------------
+
+    #[cfg(feature = "kg-validation")]
+    mod validation {
+        use super::*;
+        use crate::budget::BudgetTracker;
+        use crate::config::{BackendType, RlmConfig};
+        use crate::executor::{
+            Capability, ExecutionContext, ExecutionEnvironment, ExecutionResult, SnapshotId,
+            ValidationResult,
+        };
+        use crate::llm_bridge::{LlmBridge, LlmBridgeConfig};
+        use crate::session::SessionManager;
+        use crate::types::{BashCommand, Command, CommandHistory, PythonCode, SessionId};
+        use crate::validator::{KnowledgeGraphValidator, ValidatorConfig};
+        use async_trait::async_trait;
+        use terraphim_types::Thesaurus;
+
+        /// Minimal stub executor that returns fixed success results.
+        struct StubExecutor;
+
+        #[async_trait]
+        impl ExecutionEnvironment for StubExecutor {
+            type Error = crate::error::RlmError;
+
+            async fn execute_code(
+                &self,
+                code: &str,
+                _ctx: &ExecutionContext,
+            ) -> Result<ExecutionResult, Self::Error> {
+                Ok(ExecutionResult::success(format!("stub_code:{code}")))
+            }
+
+            async fn execute_command(
+                &self,
+                cmd: &str,
+                _ctx: &ExecutionContext,
+            ) -> Result<ExecutionResult, Self::Error> {
+                Ok(ExecutionResult::success(format!("stub_run:{cmd}")))
+            }
+
+            async fn validate(&self, _input: &str) -> Result<ValidationResult, Self::Error> {
+                Ok(ValidationResult::valid(vec![]))
+            }
+
+            async fn create_snapshot(
+                &self,
+                session_id: &SessionId,
+                name: &str,
+            ) -> Result<SnapshotId, Self::Error> {
+                Ok(SnapshotId::new(name, *session_id))
+            }
+
+            async fn restore_snapshot(&self, _id: &SnapshotId) -> Result<(), Self::Error> {
+                Ok(())
+            }
+
+            async fn list_snapshots(
+                &self,
+                _session_id: &SessionId,
+            ) -> Result<Vec<SnapshotId>, Self::Error> {
+                Ok(vec![])
+            }
+
+            async fn delete_snapshot(&self, _id: &SnapshotId) -> Result<(), Self::Error> {
+                Ok(())
+            }
+
+            async fn delete_session_snapshots(
+                &self,
+                _session_id: &SessionId,
+            ) -> Result<(), Self::Error> {
+                Ok(())
+            }
+
+            fn capabilities(&self) -> &[Capability] {
+                &[Capability::PythonExecution, Capability::BashExecution]
+            }
+
+            fn backend_type(&self) -> BackendType {
+                BackendType::Local
+            }
+
+            async fn health_check(&self) -> Result<bool, Self::Error> {
+                Ok(true)
+            }
+
+            async fn cleanup(&self) -> Result<(), Self::Error> {
+                Ok(())
+            }
+        }
+
+        fn make_loop(validator: Arc<KnowledgeGraphValidator>) -> QueryLoop<StubExecutor> {
+            let config = RlmConfig::minimal();
+            let session_id = SessionId::new();
+            let session_manager = Arc::new(SessionManager::new(config.clone()));
+            let budget_tracker = Arc::new(BudgetTracker::new(&config));
+            let llm_bridge = Arc::new(LlmBridge::new(
+                LlmBridgeConfig::default(),
+                session_manager.clone(),
+            ));
+            QueryLoop::new(
+                session_id,
+                session_manager,
+                budget_tracker,
+                llm_bridge,
+                Arc::new(StubExecutor),
+                QueryLoopConfig::default(),
+                validator,
+            )
+        }
+
+        fn strict_validator_empty_thesaurus() -> Arc<KnowledgeGraphValidator> {
+            let thesaurus = Thesaurus::new("test".to_string());
+            Arc::new(
+                KnowledgeGraphValidator::new(ValidatorConfig::strict()).with_thesaurus(thesaurus),
+            )
+        }
+
+        fn permissive_validator() -> Arc<KnowledgeGraphValidator> {
+            Arc::new(KnowledgeGraphValidator::disabled())
+        }
+
+        #[tokio::test]
+        async fn run_command_blocked_by_strict_validator() {
+            let ql = make_loop(strict_validator_empty_thesaurus());
+            let ctx = ExecutionContext::default();
+            let mut history = CommandHistory::new();
+            let cmd = Command::Run(BashCommand::new("rm -rf /"));
+            let result = ql.execute_command(&cmd, &ctx, &mut history).await;
+            assert!(
+                matches!(result, Err(RlmError::KgValidationFailed { .. })),
+                "Expected KgValidationFailed, got: {result:?}"
+            );
+            assert!(
+                history.entries.is_empty(),
+                "History must be empty on validation failure"
+            );
+        }
+
+        #[tokio::test]
+        async fn code_blocked_by_strict_validator() {
+            let ql = make_loop(strict_validator_empty_thesaurus());
+            let ctx = ExecutionContext::default();
+            let mut history = CommandHistory::new();
+            let cmd = Command::Code(PythonCode::new("import os; os.system('rm -rf /')"));
+            let result = ql.execute_command(&cmd, &ctx, &mut history).await;
+            assert!(
+                matches!(result, Err(RlmError::KgValidationFailed { .. })),
+                "Expected KgValidationFailed, got: {result:?}"
+            );
+            assert!(
+                history.entries.is_empty(),
+                "History must be empty on validation failure"
+            );
+        }
+
+        #[tokio::test]
+        async fn run_command_passes_with_permissive_validator() {
+            let ql = make_loop(permissive_validator());
+            let ctx = ExecutionContext::default();
+            let mut history = CommandHistory::new();
+            let cmd = Command::Run(BashCommand::new("ls -la"));
+            let result = ql.execute_command(&cmd, &ctx, &mut history).await;
+            assert!(result.is_ok(), "Expected Ok, got: {result:?}");
+            assert_eq!(history.entries.len(), 1, "History must record the command");
+        }
+
+        #[tokio::test]
+        async fn code_passes_with_permissive_validator() {
+            let ql = make_loop(permissive_validator());
+            let ctx = ExecutionContext::default();
+            let mut history = CommandHistory::new();
+            let cmd = Command::Code(PythonCode::new("print('hello')"));
+            let result = ql.execute_command(&cmd, &ctx, &mut history).await;
+            assert!(result.is_ok(), "Expected Ok, got: {result:?}");
+            assert_eq!(history.entries.len(), 1, "History must record the command");
+        }
     }
 }

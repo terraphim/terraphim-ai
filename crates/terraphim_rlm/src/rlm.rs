@@ -67,7 +67,7 @@ pub struct TerraphimRlm {
     /// Cancellation senders for active queries, keyed by session ID.
     cancel_senders: dashmap::DashMap<SessionId, mpsc::Sender<()>>,
     /// Knowledge graph validator applied to every execute_code / execute_command call.
-    validator: KnowledgeGraphValidator,
+    validator: Arc<KnowledgeGraphValidator>,
 }
 
 impl TerraphimRlm {
@@ -113,11 +113,11 @@ impl TerraphimRlm {
         let llm_bridge_config = LlmBridgeConfig::default();
         let llm_bridge = Arc::new(LlmBridge::new(llm_bridge_config, session_manager.clone()));
 
-        let validator = KnowledgeGraphValidator::from_config(
+        let validator = Arc::new(KnowledgeGraphValidator::from_config(
             config.kg_strictness,
             config.kg_max_retries,
             config.kg_thesaurus_path.as_deref(),
-        );
+        ));
 
         Ok(Self {
             config,
@@ -154,11 +154,11 @@ impl TerraphimRlm {
         let executor: Arc<dyn ExecutionEnvironment<Error = RlmError> + Send + Sync> =
             Arc::new(executor);
 
-        let validator = KnowledgeGraphValidator::from_config(
+        let validator = Arc::new(KnowledgeGraphValidator::from_config(
             config.kg_strictness,
             config.kg_max_retries,
             config.kg_thesaurus_path.as_deref(),
-        );
+        ));
 
         Ok(Self {
             config,
@@ -510,6 +510,7 @@ impl TerraphimRlm {
             self.llm_bridge.clone(),
             self.executor.clone(),
             loop_config,
+            Arc::clone(&self.validator),
         )
         .with_cancel_channel(cancel_rx);
 
@@ -867,7 +868,7 @@ impl TerraphimRlm {
     /// Replace the validator during tests to inject a pre-configured one
     /// (e.g., with a loaded thesaurus that production code does not yet wire up).
     fn set_validator_for_test(&mut self, validator: KnowledgeGraphValidator) {
-        self.validator = validator;
+        self.validator = Arc::new(validator);
     }
 }
 
