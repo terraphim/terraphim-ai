@@ -21,6 +21,8 @@ pub struct Poller<C: GiteaRunnerClient, P: PolicyPlanner> {
     checkout_dir: PathBuf,
     /// Built once from `config.legacy_status_mirror`: (writer, context).
     legacy: Option<(Arc<SingleStatusWriter>, String)>,
+    /// Built once from `config.status_token` for native commit-status posts.
+    status_fallback: Option<Arc<SingleStatusWriter>>,
 }
 
 impl<C: GiteaRunnerClient + 'static, P: PolicyPlanner + 'static> Poller<C, P> {
@@ -40,12 +42,19 @@ impl<C: GiteaRunnerClient + 'static, P: PolicyPlanner + 'static> Poller<C, P> {
                 m.context.clone(),
             )
         });
+        let status_fallback = config.status_token.as_ref().map(|token| {
+            Arc::new(SingleStatusWriter::new(
+                config.instance_url.clone(),
+                token.clone(),
+            ))
+        });
         Self {
             client,
             planner,
             config,
             checkout_dir: checkout_dir.into(),
             legacy,
+            status_fallback,
         }
     }
 
@@ -92,6 +101,9 @@ impl<C: GiteaRunnerClient + 'static, P: PolicyPlanner + 'static> Poller<C, P> {
         );
         if let Some((writer, context)) = &self.legacy {
             worker = worker.with_legacy_mirror(writer.clone(), context.clone());
+        }
+        if let Some(writer) = &self.status_fallback {
+            worker = worker.with_status_fallback(writer.clone());
         }
         match worker.run(state, task).await {
             Ok(ok) => log::info!("task complete: success={ok}"),
