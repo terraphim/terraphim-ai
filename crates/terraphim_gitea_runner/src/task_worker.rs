@@ -28,6 +28,9 @@ pub struct TaskWorker<C: GiteaRunnerClient, P: PolicyPlanner> {
     checkout_dir: PathBuf,
     /// Optional legacy commit-status mirror (writer, context) for migration.
     legacy: Option<(Arc<SingleStatusWriter>, String)>,
+    /// Dedicated API token for native commit-status posts (RUNNER_STATUS_TOKEN /
+    /// GITEA_TOKEN). Per-job `github.token` often lacks statuses scope on private repos.
+    status_fallback: Option<Arc<SingleStatusWriter>>,
 }
 
 impl<C: GiteaRunnerClient, P: PolicyPlanner> TaskWorker<C, P> {
@@ -48,6 +51,7 @@ impl<C: GiteaRunnerClient, P: PolicyPlanner> TaskWorker<C, P> {
             instance_url: instance_url.into(),
             checkout_dir: checkout_dir.into(),
             legacy: None,
+            status_fallback: None,
         }
     }
 
@@ -55,6 +59,13 @@ impl<C: GiteaRunnerClient, P: PolicyPlanner> TaskWorker<C, P> {
     /// the native protocol result during migration.
     pub fn with_legacy_mirror(mut self, writer: Arc<SingleStatusWriter>, context: String) -> Self {
         self.legacy = Some((writer, context));
+        self
+    }
+
+    /// Attach a fallback writer for native commit-status posts when the per-job
+    /// token is missing or returns HTTP 401.
+    pub fn with_status_fallback(mut self, writer: Arc<SingleStatusWriter>) -> Self {
+        self.status_fallback = Some(writer);
         self
     }
 
@@ -74,18 +85,35 @@ impl<C: GiteaRunnerClient, P: PolicyPlanner> TaskWorker<C, P> {
         ) else {
             return;
         };
-        let Some(token) = workflow_payload::job_token(task) else {
-            log::warn!(
-                "native commit status skipped: no per-job token on task {}",
-                task.id
-            );
-            return;
-        };
         let mut parts = full.splitn(2, '/');
         let (Some(owner), Some(repo)) = (parts.next(), parts.next()) else {
             return;
         };
         let context = workflow_payload::commit_status_context(task, workflow);
+
+        // Prefer the dedicated status token when configured: per-job github.token
+        // can authenticate checkout but still return HTTP 401 on /statuses for private repos.
+        if let Some(fallback) = &self.status_fallback {
+            match fallback
+                .post(owner, repo, &sha, state, &context, desc)
+                .await
+            {
+                Ok(()) => return,
+                Err(e) => log::warn!(
+                    "native commit status post via runner status token failed for {owner}/{repo}@{sha}: {e}"
+                ),
+            }
+        }
+
+        let Some(token) = workflow_payload::job_token(task) else {
+            if self.status_fallback.is_none() {
+                log::warn!(
+                    "native commit status skipped: no per-job token on task {}",
+                    task.id
+                );
+            }
+            return;
+        };
         let writer = SingleStatusWriter::new(&self.instance_url, token);
         if let Err(e) = writer.post(owner, repo, &sha, state, &context, desc).await {
             log::warn!("native commit status post failed for {owner}/{repo}@{sha}: {e}");
