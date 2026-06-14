@@ -55,15 +55,11 @@ fn build_validator(config: &RlmConfig) -> KnowledgeGraphValidator {
         KgStrictness::Normal => ValidatorConfig::default(),
         KgStrictness::Strict => ValidatorConfig::strict(),
     };
-<<<<<<< HEAD
-    KnowledgeGraphValidator::new(vcfg)
-=======
     let mut validator = KnowledgeGraphValidator::new(vcfg);
     if let Some(ref thesaurus) = config.thesaurus {
         validator = validator.with_thesaurus(thesaurus.clone());
     }
     validator
->>>>>>> task/2668-terraphim-lsp-foundation
 }
 
 /// The main RLM orchestrator.
