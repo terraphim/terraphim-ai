@@ -44,10 +44,21 @@ impl TerraphimLspServer {
         Self::new(client, Thesaurus::new("empty".to_string()))
     }
 
-    /// Run the LSP server over stdio.
-    pub async fn run_stdio(self) {
+    /// Run the LSP server over stdio using an empty thesaurus.
+    ///
+    /// This is the entry point for the `terraphim-lsp` binary. For programmatic
+    /// use with a custom thesaurus, construct the server via [`LspService::new`]
+    /// and [`Self::new`].
+    pub async fn run_stdio() {
         let (stdin, stdout) = (tokio::io::stdin(), tokio::io::stdout());
         let (service, socket) = LspService::new(Self::new_with_empty_thesaurus);
+        Server::new(stdin, stdout, socket).serve(service).await;
+    }
+
+    /// Run the LSP server over stdio with the given thesaurus.
+    pub async fn run_stdio_with_thesaurus(thesaurus: Thesaurus) {
+        let (stdin, stdout) = (tokio::io::stdin(), tokio::io::stdout());
+        let (service, socket) = LspService::new(move |client| Self::new(client, thesaurus.clone()));
         Server::new(stdin, stdout, socket).serve(service).await;
     }
 
