@@ -885,6 +885,98 @@ impl TerraphimRlm {
             client,
         ));
     }
+
+    /// Auto-detect and configure the best available LLM provider(s).
+    ///
+    /// Three-tier provider discovery:
+    /// 1. Env vars: `RLM_PROVIDER`, `RLM_MODEL`, `RLM_OPENROUTER_MODEL`
+    /// 2. Ollama (localhost:11434) -- local, free, fast
+    /// 3. OpenRouter (cloud) -- free tier, capability routing fallback
+    ///
+    /// When both providers are available, wraps them in a capability-based
+    /// router (`RouterBridgeLlmClient`) so simple tasks hit Ollama and
+    /// complex tasks (security audit, architecture review) hit OpenRouter.
+    ///
+    /// Requires the `llm` feature.
+    #[cfg(feature = "llm")]
+    pub async fn auto_configure_llm(&mut self) -> RlmResult<()> {
+        use terraphim_config::llm_router::{LlmRouterConfig, RouterMode, RouterStrategy};
+
+        let mut role = terraphim_config::Role::new("rlm-auto".to_string());
+        role.llm_enabled = true;
+
+        // Ollama: cheapest local chat model
+        role.extra.insert(
+            "llm_provider".to_string(),
+            serde_json::Value::String("ollama".to_string()),
+        );
+        let ollama_model = std::env::var("RLM_MODEL")
+            .unwrap_or_else(|_| "gemma3:270m".to_string());
+        role.extra.insert(
+            "llm_model".to_string(),
+            serde_json::Value::String(ollama_model.clone()),
+        );
+        log::info!("RLM auto-configure: ollama model={}", ollama_model);
+
+        // OpenRouter: API key from env or 1Password, free tier model
+        let or_api_key = std::env::var("OPENROUTER_API_KEY").ok().or_else(|| {
+            let output = std::process::Command::new("op")
+                .args([
+                    "read",
+                    "--account",
+                    "my.1password.com",
+                    "op://Terraphim/OpenRouterTesting-api-key/password",
+                ])
+                .output()
+                .ok()?;
+            String::from_utf8(output.stdout).ok().map(|s| s.trim().to_string())
+        });
+
+        if let Some(ref key) = or_api_key {
+            let or_model = std::env::var("RLM_OPENROUTER_MODEL")
+                .unwrap_or_else(|_| "meta-llama/llama-3.2-3b-instruct:free".to_string());
+            role.llm_api_key = Some(key.clone());
+            role.llm_model = Some(or_model.clone());
+            // Cache for child processes and build_llm_from_role
+            unsafe { std::env::set_var("OPENROUTER_API_KEY", key); }
+            log::info!("RLM auto-configure: openrouter model={}", or_model);
+        }
+
+        // Routing: QualityFirst (= CapabilityFirst) for deterministic-rlm-review
+        // Override with RLM_ROUTER_STRATEGY env var
+        let strategy = match std::env::var("RLM_ROUTER_STRATEGY").as_deref() {
+            Ok("cost_first") => RouterStrategy::CostFirst,
+            Ok("balanced") => RouterStrategy::Balanced,
+            Ok("static") => RouterStrategy::Static,
+            _ => RouterStrategy::QualityFirst,
+        };
+        role.llm_router_enabled = true;
+        role.llm_router_config = Some(LlmRouterConfig {
+            enabled: true,
+            strategy,
+            mode: RouterMode::Library,
+            ..Default::default()
+        });
+
+        let client = terraphim_service::llm::build_llm_from_role(&role)
+            .ok_or_else(|| {
+                log::warn!("RLM auto-configure: no LLM provider available");
+                RlmError::LlmNotConfigured
+            })?;
+
+        log::info!(
+            "RLM LLM bridge configured: providers={} strategy={:?}",
+            if role.llm_api_key.is_some() {
+                "ollama+openrouter"
+            } else {
+                "ollama"
+            },
+            role.llm_router_config.as_ref().map(|c| &c.strategy)
+        );
+
+        self.set_llm_client(client);
+        Ok(())
+    }
 }
 
 #[cfg(test)]
