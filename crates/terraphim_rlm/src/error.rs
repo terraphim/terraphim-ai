@@ -95,6 +95,10 @@ pub enum RlmError {
     #[error("Failed to restore snapshot: {message}")]
     SnapshotRestoreFailed { message: String },
 
+    /// Snapshot list failed.
+    #[error("Failed to list snapshots: {message}")]
+    SnapshotListFailed { message: String },
+
     // Backend errors
     /// No execution backend available.
     #[error("No execution backend available. Tried: {tried:?}")]
