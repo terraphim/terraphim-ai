@@ -1,8 +1,13 @@
-# .terraphim/adf.toml -- Local ADF test config for skills validation
-# Per-project format: project_id + name + agents (inline, no include support)
-
-project_id = "terraphim-ai"
-name = "Terraphim AI Local"
+# conf.d/skills-installer.toml
+# ADF Agent: installs and validates Terraphim Skills across all agent CLIs.
+#
+# This is a shell-script agent that uses tsm (Terraphim Skills Manager) to
+# install and verify sentinel skills against Claude Code, Codex, Pi, pi-rust,
+# and Grok. The runner renders a red/green skills-by-CLI status matrix and
+# posts evidence to Gitea through the built-in gitea_issue field.
+#
+# Do not add .gitea/workflows/* for this work. Use ADF ci-native for PR-side
+# validation, and this agent for live multi-CLI validation on the ADF host.
 
 [[agents]]
 name = "skills-installer"
@@ -20,7 +25,7 @@ export TSM_API_URL="$TERRAPHIM_SKILLS_API_URL"
 export TERRAPHIM_SKILLS_MANAGER_BIN="${TERRAPHIM_SKILLS_MANAGER_BIN:-tsm}"
 export TERRAPHIM_SKILLS_SENTINEL_SKILLS="${TERRAPHIM_SKILLS_SENTINEL_SKILLS:-code-review,testing,security-audit}"
 export TERRAPHIM_SKILLS_GROK_DIR="${TERRAPHIM_SKILLS_GROK_DIR:-$HOME/.grok/skills}"
-export TERRAPHIM_SKILLS_PI_DIR="${TERRAPHIM_SKILLS_PI_DIR:-$HOME/.pi/agent/skills}"
+export TERRAPHIM_SKILLS_PI_DIR="${TERRAPHIM_SKILLS_PI_DIR:-}"
 
 "$TERRAPHIM_SKILLS_MANAGER_BIN" --version
 test -n "${TSM_TOKEN:-}" || test -s "$HOME/.terraphim/token" || {
@@ -29,17 +34,4 @@ test -n "${TSM_TOKEN:-}" || test -s "$HOME/.terraphim/token" || {
 }
 
 scripts/skill-installer-validation.sh
-"""
-
-[[agents]]
-name = "skills-cli-ci-native"
-layer = "Safety"
-cli_tool = "/bin/bash"
-event_only = false
-capabilities = ["ci-native", "skills-validation", "repository-inventory"]
-gitea_issue = 0
-task = """
-set -euo pipefail
-export TERRAPHIM_SKILLS_DRY_RUN=1
-scripts/skill-installer-ci-native.sh
 """

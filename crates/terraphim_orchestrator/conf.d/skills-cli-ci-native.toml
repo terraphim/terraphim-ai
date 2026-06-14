@@ -1,0 +1,34 @@
+# conf.d/skills-cli-ci-native.toml
+# ADF ci-native agent: validates Terraphim Skills repository-side artefacts
+# on PRs and branch updates before any live host validation runs.
+#
+# This must NOT use .gitea/workflows/* or Forgejo/Gitea Actions.
+# Branch protection checks such as adf/build and adf/pr-reviewer remain
+# ADF-posted commit statuses and are independent of this job.
+#
+# Checks:
+#   1. Shell syntax on validation scripts
+#   2. Dry-run matrix rendering (no secrets, no model calls)
+#   3. ADF TOML config validation
+#   4. Repository ownership inventory against required terraphim/* repos
+
+[[agents]]
+name = "skills-cli-ci-native"
+layer = "Safety"
+cli_tool = "/bin/bash"
+event_only = false
+capabilities = ["ci-native", "skills-validation", "repository-inventory"]
+project = "terraphim-ai"
+gitea_issue = 0
+task = """
+set -euo pipefail
+
+export TERRAPHIM_SKILLS_DRY_RUN=1
+
+scripts/skill-installer-ci-native.sh
+"""
+
+[agents.pre_check]
+kind = "shell"
+script = """test -f scripts/skill-installer-ci-native.sh && test -f scripts/skill-installer-validation.sh"""
+timeout_secs = 10
