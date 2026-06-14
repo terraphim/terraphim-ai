@@ -149,6 +149,7 @@ desktop/package-lock.json
 # Keep essential rust configuration
 !rust-toolchain.toml
 !.github/rust-toolchain.toml
+!.cargo/config.toml
 
 # Exclude crates with private git dependencies (firecracker)
 crates/terraphim_rlm/

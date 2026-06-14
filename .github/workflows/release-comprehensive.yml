@@ -417,6 +417,7 @@ jobs:
 
   build-debian-packages:
     name: Build Debian packages
+    continue-on-error: true
     runs-on: [self-hosted, bigbox]
     steps:
       - name: Checkout repository
@@ -431,7 +432,7 @@ jobs:
             cargo-deb --version
           else
             # Self-hosted runners may alias `cargo` via rustup; use stable explicitly.
-            rustup run stable cargo install cargo-deb --locked --version 3.1.1
+            rustup run stable cargo install cargo-deb --locked
           fi
 
       - name: Cache dependencies
@@ -535,6 +536,7 @@ jobs:
 
   build-docker:
     name: Build and push Docker images
+    continue-on-error: true
     uses: ./.github/workflows/docker-multiarch.yml
     with:
       platforms: linux/amd64,linux/arm64
@@ -633,23 +635,24 @@ jobs:
           merge-multiple: true
 
       - name: Retry artifact download if needed
-        if: steps.download.outcome == 'failure' || steps.download_debian.outcome == 'failure'
+        if: steps.download.outcome == 'failure'
         run: |
-          echo "Artifact download failed, retrying with gh CLI..."
+          echo "Binary artifact download failed, retrying with gh CLI..."
           for attempt in 1 2 3; do
             echo "Download attempt $attempt..."
             sleep 30
 
-            rm -rf binaries-* debian-packages
+            rm -rf binaries-* release-assets
+            mkdir -p release-assets
 
-            gh run download ${{ github.run_id }} --dir . -n debian-packages
+            gh run download ${{ github.run_id }} --dir release-assets -n debian-packages || true
 
             gh api \
               repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts \
               --jq '.artifacts[].name' \
               | grep '^binaries-' \
               | while read artifact_name; do
-                  gh run download ${{ github.run_id }} --dir . -n "$artifact_name"
+                  gh run download ${{ github.run_id }} --dir release-assets -n "$artifact_name"
                 done && break
 
             if [ $attempt -eq 3 ]; then
