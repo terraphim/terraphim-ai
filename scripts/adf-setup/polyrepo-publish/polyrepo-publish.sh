@@ -314,6 +314,199 @@ jobs:
             fi
           done
 WORKFLOW
+
+    if [ "$REPO" = "terraphim-clients" ]; then
+        cat > .github/workflows/release-binaries.yml << 'WORKFLOW'
+name: Release Client Binaries
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version without v prefix (e.g. 1.20.5)'
+        required: true
+        type: string
+      release_tag:
+        description: 'GitHub release tag (e.g. v1.20.5)'
+        required: true
+        type: string
+      target_repo:
+        description: 'GitHub repo to attach binaries to'
+        required: false
+        default: terraphim-ai
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-binaries:
+    name: Build client binaries for ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: [self-hosted, bigbox]
+            target: x86_64-unknown-linux-gnu
+            use_cross: false
+          - os: [self-hosted, bigbox]
+            target: x86_64-unknown-linux-musl
+            use_cross: true
+          - os: [self-hosted, bigbox]
+            target: aarch64-unknown-linux-musl
+            use_cross: true
+          - os: [self-hosted, macOS]
+            target: x86_64-apple-darwin
+            use_cross: false
+          - os: [self-hosted, macOS]
+            target: aarch64-apple-darwin
+            use_cross: false
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            use_cross: false
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - name: Install zig
+        if: contains(matrix.target, 'apple-darwin') || contains(matrix.target, 'windows')
+        shell: bash
+        run: |
+          if command -v zig &>/dev/null; then exit 0; fi
+          if command -v brew &>/dev/null; then brew install zig; fi
+          if command -v choco &>/dev/null; then choco install zig -y; fi
+      - name: Install cross
+        if: matrix.use_cross
+        run: cargo install cross
+      - uses: Swatinem/rust-cache@v2
+        if: matrix.target != 'x86_64-unknown-linux-gnu'
+        with:
+          key: clients-${{ matrix.target }}
+      - name: Build client binaries
+        env:
+          CARGO_REGISTRIES_TERRAPHIM_TOKEN: ${{ secrets.CARGO_REGISTRIES_TERRAPHIM_TOKEN }}
+        run: |
+          BUILD="${{ matrix.use_cross && 'cross' || 'cargo' }}"
+          $BUILD build --release --target ${{ matrix.target }} -p terraphim_agent --bin terraphim-agent
+          $BUILD build --release --target ${{ matrix.target }} -p terraphim_cli --bin terraphim-cli
+          $BUILD build --release --target ${{ matrix.target }} -p terraphim_grep --bin terraphim-grep --features "code-search openrouter"
+      - name: Package artifacts (Unix)
+        if: matrix.os != 'windows-latest'
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          mkdir -p artifacts
+          tar -czf "artifacts/terraphim-agent-${VERSION}-${{ matrix.target }}.tar.gz" -C "target/${{ matrix.target }}/release" terraphim-agent
+          tar -czf "artifacts/terraphim-cli-${VERSION}-${{ matrix.target }}.tar.gz" -C "target/${{ matrix.target }}/release" terraphim-cli
+          tar -czf "artifacts/terraphim-grep-${VERSION}-${{ matrix.target }}.tar.gz" -C "target/${{ matrix.target }}/release" terraphim-grep
+          cp target/${{ matrix.target }}/release/terraphim-agent artifacts/terraphim-agent-${{ matrix.target }}
+          cp target/${{ matrix.target }}/release/terraphim-cli artifacts/terraphim-cli-${{ matrix.target }}
+          cp target/${{ matrix.target }}/release/terraphim-grep artifacts/terraphim-grep-${{ matrix.target }}
+          chmod +x artifacts/*
+      - name: Package artifacts (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          mkdir -p artifacts
+          cd "target/${{ matrix.target }}/release"
+          7z a -tzip "../../../artifacts/terraphim-agent-${VERSION}-${{ matrix.target }}.zip" terraphim-agent.exe
+          7z a -tzip "../../../artifacts/terraphim-cli-${VERSION}-${{ matrix.target }}.zip" terraphim-cli.exe
+          7z a -tzip "../../../artifacts/terraphim-grep-${VERSION}-${{ matrix.target }}.zip" terraphim-grep.exe
+          cd -
+          cp target/${{ matrix.target }}/release/terraphim-agent.exe artifacts/terraphim-agent-${{ matrix.target }}.exe
+          cp target/${{ matrix.target }}/release/terraphim-cli.exe artifacts/terraphim-cli-${{ matrix.target }}.exe
+          cp target/${{ matrix.target }}/release/terraphim-grep.exe artifacts/terraphim-grep-${{ matrix.target }}.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: client-binaries-${{ matrix.target }}
+          path: artifacts/*
+
+  create-universal-macos:
+    name: Create macOS universal client binaries
+    needs: build-binaries
+    if: always() && needs.build-binaries.result != 'cancelled'
+    runs-on: [self-hosted, macOS]
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: client-binaries-x86_64-apple-darwin
+          path: x86_64
+      - uses: actions/download-artifact@v4
+        with:
+          name: client-binaries-aarch64-apple-darwin
+          path: aarch64
+      - run: |
+          mkdir -p universal
+          lipo -create x86_64/terraphim-agent-x86_64-apple-darwin aarch64/terraphim-agent-aarch64-apple-darwin -output universal/terraphim-agent-universal-apple-darwin
+          lipo -create x86_64/terraphim-grep-x86_64-apple-darwin aarch64/terraphim-grep-aarch64-apple-darwin -output universal/terraphim-grep-universal-apple-darwin
+          chmod +x universal/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: client-binaries-universal-apple-darwin
+          path: universal/*
+
+  sign-and-notarize-macos:
+    name: Sign and notarize macOS client binaries
+    needs: create-universal-macos
+    if: always() && needs.create-universal-macos.result == 'success'
+    runs-on: [self-hosted, macOS]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: client-binaries-universal-apple-darwin
+          path: universal
+      - uses: 1password/install-cli-action@v2
+      - name: Load signing credentials
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+        run: |
+          echo "APPLE_ID=$(op read 'op://TerraphimPlatform/apple.developer.credentials/username' --no-newline)" >> $GITHUB_ENV
+          echo "APPLE_TEAM_ID=$(op read 'op://TerraphimPlatform/apple.developer.credentials/APPLE_TEAM_ID' --no-newline)" >> $GITHUB_ENV
+          echo "APPLE_APP_PASSWORD=$(op read 'op://TerraphimPlatform/apple.developer.credentials/APPLE_APP_SPECIFIC_PASSWORD' --no-newline)" >> $GITHUB_ENV
+          echo "CERT_BASE64=$(op read 'op://TerraphimPlatform/apple.developer.certificate/base64' --no-newline)" >> $GITHUB_ENV
+          echo "CERT_PASSWORD=$(op read 'op://TerraphimPlatform/apple.developer.certificate/password' --no-newline)" >> $GITHUB_ENV
+      - name: Sign and notarize agent and grep
+        env:
+          RUNNER_TEMP: ${{ runner.temp }}
+        run: |
+          chmod +x scripts/sign-macos-binary.sh
+          ./scripts/sign-macos-binary.sh universal/terraphim-agent-universal-apple-darwin "$APPLE_ID" "$APPLE_TEAM_ID" "$APPLE_APP_PASSWORD" "$CERT_BASE64" "$CERT_PASSWORD"
+          ./scripts/sign-macos-binary.sh universal/terraphim-grep-universal-apple-darwin "$APPLE_ID" "$APPLE_TEAM_ID" "$APPLE_APP_PASSWORD" "$CERT_BASE64" "$CERT_PASSWORD"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: client-binaries-signed-universal-apple-darwin
+          path: universal/*
+
+  upload-to-target-release:
+    name: Attach client binaries to terraphim-ai release
+    needs: [build-binaries, sign-and-notarize-macos]
+    if: always() && needs.build-binaries.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: client-binaries*
+          path: release-assets
+          merge-multiple: true
+      - name: Upload to target GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.TERRAPHIM_AI_RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ inputs.release_tag }}"
+          REPO="terraphim/${{ inputs.target_repo }}"
+          find release-assets -type f | sort
+          gh release upload "$TAG" release-assets/* --repo "$REPO" --clobber
+          echo "Uploaded client binaries to $REPO release $TAG"
+WORKFLOW
+    fi
 }
 
 # ---------------------------------------------------------------------------

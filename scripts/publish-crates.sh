@@ -4,7 +4,8 @@ set -euo pipefail
 ################################################################################
 # publish-crates.sh
 #
-# Publish Rust crates to crates.io
+# Publish monorepo-resident Rust crates to crates.io.
+# Extracted polyrepo crates are published via polyrepo-publish.sh + crate_list.
 #
 # Usage:
 #   ./scripts/publish-crates.sh [OPTIONS]
@@ -16,138 +17,67 @@ set -euo pipefail
 #   -t, --token TOKEN       crates.io API token
 #   -h, --help              Show help message
 #
-# Examples:
-#   # Publish all crates with version 1.2.3
-#   ./scripts/publish-crates.sh -v 1.2.3
-#
-#   # Dry run for specific crate
-#   ./scripts/publish-crates.sh -c terraphim_types -v 1.2.3 -d
-#
-#   # Use specific token
-#   ./scripts/publish-crates.sh -v 1.2.3 -t $CARGO_REGISTRY_TOKEN
-#
 ################################################################################
 
-# Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-# Default values
 DRY_RUN=false
 VERSION=""
 SPECIFIC_CRATE=""
 TOKEN=""
 
-# Crates in dependency order (must publish in this order)
+# Monorepo-resident crates only (post-#1910 polyrepo extraction).
 CRATES=(
-  "terraphim_types"
-  "terraphim_settings"
-  "terraphim_persistence"
-  "terraphim-markdown-parser"
-  "terraphim_automata"
-  "terraphim_config"
-  "terraphim_rolegraph"
-  "terraphim_router"
-  "terraphim_spawner"
-  "terraphim_hooks"
-  "terraphim-session-analyzer"
-  "haystack_core"
-  "haystack_jmap"
-  "grepapp_haystack"
-  "terraphim_file_search"
-  "terraphim_middleware"
-  "terraphim_service"
   "terraphim_update"
-  "terraphim_tracker"
-  "terraphim_agent_evolution"
-  "terraphim_orchestrator"
-  "terraphim_grep"
+  "terraphim_github_runner"
+  "terraphim_gitea_runner"
+  "terraphim_rlm"
 )
 
-# Map package names to directory names (for crates where they differ)
 declare -A CRATE_DIR_MAP=(
-  ["grepapp_haystack"]="haystack_grepapp"
+  ["terraphim_gitea_runner"]="terraphim_gitea_runner"
 )
 
-# Get directory name for a crate (uses mapping if exists, otherwise crate name)
 get_crate_dir() {
   local crate="$1"
   echo "${CRATE_DIR_MAP[$crate]:-$crate}"
 }
 
-# Logging functions
-log_info() {
-  echo -e "${BLUE}INFO:${NC} $1"
-}
+log_info() { echo -e "${BLUE}INFO:${NC} $1"; }
+log_success() { echo -e "${GREEN}✓${NC} $1"; }
+log_warning() { echo -e "${YELLOW}⚠${NC} $1"; }
+log_error() { echo -e "${RED}✗${NC} $1"; }
 
-log_success() {
-  echo -e "${GREEN}✓${NC} $1"
-}
-
-log_warning() {
-  echo -e "${YELLOW}⚠${NC} $1"
-}
-
-log_error() {
-  echo -e "${RED}✗${NC} $1"
-}
-
-# Help function
 show_help() {
-  sed -n '2,30p' "$0" | head -n -1 | sed 's/^# //'
+  sed -n '2,22p' "$0" | head -n -1 | sed 's/^# //'
   exit 0
 }
 
-# Parse command line arguments
 parse_args() {
   while [[ $# -gt 0 ]]; do
     case $1 in
-      -v|--version)
-        VERSION="$2"
-        shift 2
-        ;;
-      -d|--dry-run)
-        DRY_RUN=true
-        shift
-        ;;
-      -c|--crate)
-        SPECIFIC_CRATE="$2"
-        shift 2
-        ;;
-      -t|--token)
-        TOKEN="$2"
-        shift 2
-        ;;
-      -h|--help)
-        show_help
-        ;;
-      *)
-        log_error "Unknown option: $1"
-        show_help
-        ;;
+      -v|--version) VERSION="$2"; shift 2 ;;
+      -d|--dry-run) DRY_RUN=true; shift ;;
+      -c|--crate) SPECIFIC_CRATE="$2"; shift 2 ;;
+      -t|--token) TOKEN="$2"; shift 2 ;;
+      -h|--help) show_help ;;
+      *) log_error "Unknown option: $1"; show_help ;;
     esac
   done
 }
 
-# Validate prerequisites
 check_prerequisites() {
   log_info "Checking prerequisites..."
 
-  # Check if cargo is available
   if ! command -v cargo &> /dev/null; then
     log_error "cargo not found. Please install Rust."
     exit 1
   fi
 
-  # Check if jq is available
-  if ! command -v jq &> /dev/null; then
-    log_warning "jq not found. Installing jq is recommended for better output parsing."
-  fi
-
-  # Check version format
   if [[ -z "$VERSION" ]]; then
     log_error "Version is required. Use -v or --version option."
     exit 1
@@ -158,9 +88,7 @@ check_prerequisites() {
     exit 1
   fi
 
-  # Check token - try 1Password first if available, then environment
   if [[ -z "$TOKEN" ]]; then
-    # Try to get token from 1Password if op CLI is available
     if command -v op &> /dev/null; then
       TOKEN=$(op read "op://TerraphimPlatform/crates.io.token/token" 2>/dev/null || echo "")
       if [[ -n "$TOKEN" ]]; then
@@ -169,13 +97,11 @@ check_prerequisites() {
       fi
     fi
 
-    # If still no token, try environment variable
     if [[ -z "$TOKEN" ]] && [[ -n "${CARGO_REGISTRY_TOKEN:-}" ]]; then
       TOKEN="$CARGO_REGISTRY_TOKEN"
       log_info "Using crates.io token from environment"
     fi
 
-    # If still no token, show warning
     if [[ -z "$TOKEN" ]]; then
       log_warning "No token provided. Will attempt to use existing cargo credentials."
     fi
@@ -187,7 +113,6 @@ check_prerequisites() {
   log_success "Prerequisites validated"
 }
 
-# Update crate versions
 update_versions() {
   log_info "Updating crate versions to $VERSION..."
 
@@ -198,19 +123,11 @@ update_versions() {
 
     if [[ -f "$crate_path" ]]; then
       log_info "Updating $crate to version $VERSION"
-
-      # Update ONLY the [package] version in Cargo.toml (first occurrence).
-      # Using 0,/pattern/ (GNU sed) or 1,/pattern/ (BSD sed) to avoid
-      # corrupting dependency version lines in [dependencies.X] sections.
       if [[ "$OSTYPE" == "darwin"* ]]; then
         sed -i '' '1,/^version = ".*"/s/^version = ".*"/version = "'"$VERSION"'"/' "$crate_path"
       else
         sed -i '0,/^version = ".*"/s/^version = ".*"/version = "'"$VERSION"'"/' "$crate_path"
       fi
-
-      # Update workspace dependencies
-      find crates -name "Cargo.toml" -type f -exec sed -i.bak "s/$crate = { path = \"\.$crate\", version = \"[0-9.]\"\+ }/$crate = { path = \"\.$crate\", version = \"$VERSION\" }/g" {} \; 2>/dev/null || true
-      find crates -name "*.bak" -delete 2>/dev/null || true
     else
       log_warning "Crate $crate not found at $crate_path"
     fi
@@ -219,27 +136,24 @@ update_versions() {
   log_success "Versions updated"
 }
 
-# Check if crate is already published
 check_if_published() {
   local crate="$1"
   local version="$2"
 
   log_info "Checking if $crate v$version is already published..."
 
-  # Use crates.io API directly for reliable version detection
   local response
   response=$(curl -s "https://crates.io/api/v1/crates/$crate/versions" 2>/dev/null || echo "")
 
   if echo "$response" | grep -q "\"num\":\"$version\""; then
     log_warning "$crate v$version already exists on crates.io"
     return 0
-  else
-    log_info "$crate v$version not published yet"
-    return 1
   fi
+
+  log_info "$crate v$version not published yet"
+  return 1
 }
 
-# Publish a single crate
 publish_crate() {
   local crate="$1"
   local version="$2"
@@ -263,13 +177,9 @@ publish_crate() {
       log_info "Waiting 60 seconds for crates.io to process..."
       sleep 60
     else
-      # Check if it failed because the crate already exists
       if echo "$output" | grep -q "already exists on"; then
         log_warning "$crate v$version already exists - skipping"
         return 0
-      # Check if it failed because the crate is opted out of publishing.
-      # Treat as a skip rather than a fatal error -- downstream crates may still
-      # publish fine, and a single opted-out crate shouldn't bury the chain.
       elif echo "$output" | grep -q "cannot be published"; then
         log_warning "$crate has publish = false in Cargo.toml - skipping"
         return 0
@@ -282,49 +192,38 @@ publish_crate() {
   fi
 }
 
-# Get current version of a crate
 get_current_version() {
   local crate="$1"
-  local crate_dir
-  crate_dir=$(get_crate_dir "$crate")
   cargo metadata --format-version 1 --no-deps |
-    jq -r ".packages[] | select(.name == \"$crate\") | .version" 2>/dev/null ||
-    grep -A 5 "name = \"$crate\"" "crates/$crate_dir/Cargo.toml" |
-    grep "^version" | head -1 | cut -d'"' -f2
+    jq -r ".packages[] | select(.name == \"$crate\") | .version" 2>/dev/null
 }
 
-# Main publishing function
 main() {
   local -a crates_to_publish
 
   if [[ -n "$SPECIFIC_CRATE" ]]; then
-    # Publish specific crate and all its dependencies (crates that come before it in the list)
-    log_info "Publishing specific crate: $SPECIFIC_CRATE and its dependencies"
-
+    log_info "Publishing specific crate: $SPECIFIC_CRATE"
     local found=false
     for crate in "${CRATES[@]}"; do
-      crates_to_publish+=("$crate")
       if [[ "$crate" == "$SPECIFIC_CRATE" ]]; then
+        crates_to_publish+=("$crate")
         found=true
         break
       fi
     done
 
     if [[ "$found" != "true" ]]; then
-      log_error "Crate $SPECIFIC_CRATE not found in dependency chain"
+      log_error "Crate $SPECIFIC_CRATE not found in monorepo publish list"
       exit 1
     fi
   else
-    # Publish all crates
     crates_to_publish=("${CRATES[@]}")
   fi
 
-  # Update versions if needed
   if [[ -n "$VERSION" ]]; then
     update_versions
   fi
 
-  # Publish crates
   for crate in "${crates_to_publish[@]}"; do
     local crate_dir
     crate_dir=$(get_crate_dir "$crate")
@@ -349,7 +248,6 @@ main() {
 
   log_success "All crates processed successfully!"
 
-  # Summary
   if [[ "$DRY_RUN" == "true" ]]; then
     log_info "Dry-run completed - no packages were actually published"
   else
@@ -357,7 +255,6 @@ main() {
   fi
 }
 
-# Parse arguments and run
 parse_args "$@"
 check_prerequisites
 main "$@"
