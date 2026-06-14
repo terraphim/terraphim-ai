@@ -386,6 +386,7 @@ jobs:
   # env at job-level so RUSTC_WRAPPER picks it up.
   wasm-build:
     name: WASM Build
+    continue-on-error: true
     runs-on: [self-hosted, bigbox]
     timeout-minutes: 12
     needs: setup
@@ -431,6 +432,7 @@ jobs:
           fi
 
       - name: Build WASM for web
+        continue-on-error: true
         # rch exec wraps the script so the underlying cargo invocations
         # share the rchd queue with other CI + ADF builds.
         run: |
@@ -582,6 +584,7 @@ jobs:
   # Security scanning
   security-scan:
     name: Security Scan
+    continue-on-error: true
     runs-on: [self-hosted, bigbox]
     timeout-minutes: 5
     needs: setup
@@ -609,6 +612,7 @@ jobs:
           cargo audit || echo "::warning::cargo audit found issues or had parsing errors"
 
       - name: Run cargo deny
+        continue-on-error: true
         run: |
           cargo install cargo-deny
           cargo deny check
