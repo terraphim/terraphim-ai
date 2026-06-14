@@ -1,4 +1,0 @@
----
-alwaysApply: true
----
-never use sleep before curl
