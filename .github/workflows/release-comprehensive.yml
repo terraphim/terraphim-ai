@@ -27,7 +27,6 @@ jobs:
   verify-versions:
     name: Verify version consistency
     runs-on: ubuntu-22.04
-    continue-on-error: true
     outputs:
       version: ${{ steps.extract.outputs.version }}
     steps:
@@ -71,8 +70,9 @@ jobs:
           WORKSPACE_VERSION=$(cargo metadata --no-deps --format-version=1 | jq -r '.packages[] | select(.name == "terraphim_server") | .version')
           echo "Workspace version (from terraphim_server): $WORKSPACE_VERSION"
 
-          # Check key binaries
-          BINARIES=("terraphim_server" "terraphim_agent" "terraphim-cli" "terraphim_grep")
+          # Client binaries (agent/cli/grep) are built in terraphim-clients and
+          # attached to this release by release-binaries.yml.
+          BINARIES=("terraphim_server")
           FAILED=0
 
           for pkg in "${BINARIES[@]}"; do
@@ -256,50 +256,14 @@ jobs:
           cargo build --release \
             --target ${{ matrix.target }} -p terraphim_server --bin terraphim_server
 
-      - name: Build TUI binary
-        shell: bash
-        run: |
-          ${{ matrix.use_cross && 'cross' || 'cargo' }} build --release \
-            --target ${{ matrix.target }} -p terraphim_agent --bin terraphim-agent
-
-      - name: Build CLI binary
-        shell: bash
-        run: |
-          ${{ matrix.use_cross && 'cross' || 'cargo' }} build --release \
-            --target ${{ matrix.target }} -p terraphim-cli --bin terraphim-cli
-
-      - name: Build Grep binary
-        shell: bash
-        run: |
-          ${{ matrix.use_cross && 'cross' || 'cargo' }} build --release \
-            --target ${{ matrix.target }} -p terraphim_grep --bin terraphim-grep \
-            --features "code-search openrouter"
-
       - name: Verify binary versions (native builds only)
         if: matrix.target == 'x86_64-unknown-linux-gnu'
         shell: bash
         env:
           EXPECTED_VERSION: ${{ needs.verify-versions.outputs.version }}
         run: |
-          echo "Verifying binary --version output matches expected: $EXPECTED_VERSION"
+          echo "Verifying terraphim_server --version matches expected: $EXPECTED_VERSION"
 
-          # Verify terraphim-agent
-          AGENT_VERSION=$(./target/${{ matrix.target }}/release/terraphim-agent --version 2>&1 | head -1)
-          echo "terraphim-agent: $AGENT_VERSION"
-          if [[ "$AGENT_VERSION" != *"$EXPECTED_VERSION"* ]]; then
-            echo "::error::terraphim-agent version mismatch: expected $EXPECTED_VERSION in '$AGENT_VERSION'"
-            exit 1
-          fi
-
-          # Verify terraphim-cli
-          CLI_VERSION=$(./target/${{ matrix.target }}/release/terraphim-cli --version 2>&1 | head -1)
-          echo "terraphim-cli: $CLI_VERSION"
-          if [[ "$CLI_VERSION" != *"$EXPECTED_VERSION"* ]]; then
-            echo "::error::terraphim-cli version mismatch: expected $EXPECTED_VERSION in '$CLI_VERSION'"
-            exit 1
-          fi
-
-          # Verify terraphim_server
           SERVER_VERSION=$(./target/${{ matrix.target }}/release/terraphim_server --version 2>&1 | head -1)
           echo "terraphim_server: $SERVER_VERSION"
           if [[ "$SERVER_VERSION" != *"$EXPECTED_VERSION"* ]]; then
@@ -307,15 +271,7 @@ jobs:
             exit 1
           fi
 
-          # Verify terraphim-grep
-          GREP_VERSION=$(./target/${{ matrix.target }}/release/terraphim-grep --version 2>&1 | head -1)
-          echo "terraphim-grep: $GREP_VERSION"
-          if [[ "$GREP_VERSION" != *"$EXPECTED_VERSION"* ]]; then
-            echo "::error::terraphim-grep version mismatch: expected $EXPECTED_VERSION in '$GREP_VERSION'"
-            exit 1
-          fi
-
-          echo "All binary versions verified successfully!"
+          echo "Server binary version verified successfully!"
 
       - name: Prepare artifacts (Unix)
         if: matrix.os != 'windows-latest'
@@ -328,21 +284,9 @@ jobs:
           if [ -f "target/${{ matrix.target }}/release/terraphim_server" ]; then
             tar -czf "artifacts/terraphim_server-${VERSION}-${{ matrix.target }}.tar.gz" \
               -C "target/${{ matrix.target }}/release" terraphim_server
-          fi
-          tar -czf "artifacts/terraphim-agent-${VERSION}-${{ matrix.target }}.tar.gz" \
-            -C "target/${{ matrix.target }}/release" terraphim-agent
-          tar -czf "artifacts/terraphim-cli-${VERSION}-${{ matrix.target }}.tar.gz" \
-            -C "target/${{ matrix.target }}/release" terraphim-cli
-          tar -czf "artifacts/terraphim-grep-${VERSION}-${{ matrix.target }}.tar.gz" \
-            -C "target/${{ matrix.target }}/release" terraphim-grep
-          # Also copy raw binaries for backward compatibility
-          if [ -f "target/${{ matrix.target }}/release/terraphim_server" ]; then
             cp target/${{ matrix.target }}/release/terraphim_server artifacts/terraphim_server-${{ matrix.target }}
+            chmod +x artifacts/*
           fi
-          cp target/${{ matrix.target }}/release/terraphim-agent artifacts/terraphim-agent-${{ matrix.target }}
-          cp target/${{ matrix.target }}/release/terraphim-cli artifacts/terraphim-cli-${{ matrix.target }}
-          cp target/${{ matrix.target }}/release/terraphim-grep artifacts/terraphim-grep-${{ matrix.target }}
-          chmod +x artifacts/*
 
       - name: Prepare artifacts (Windows)
         if: matrix.os == 'windows-latest'
@@ -356,16 +300,9 @@ jobs:
           cd "target/${{ matrix.target }}/release"
           if [ -f "terraphim_server.exe" ]; then
             7z a -tzip "../../../artifacts/terraphim_server-${VERSION}-${{ matrix.target }}.zip" terraphim_server.exe
+            cp terraphim_server.exe "../../../artifacts/terraphim_server-${{ matrix.target }}.exe"
           fi
-          7z a -tzip "../../../artifacts/terraphim-agent-${VERSION}-${{ matrix.target }}.zip" terraphim-agent.exe
-          7z a -tzip "../../../artifacts/terraphim-cli-${VERSION}-${{ matrix.target }}.zip" terraphim-cli.exe
-          7z a -tzip "../../../artifacts/terraphim-grep-${VERSION}-${{ matrix.target }}.zip" terraphim-grep.exe
           cd -
-          # Also copy raw binaries for backward compatibility
-          cp target/${{ matrix.target }}/release/terraphim_server.exe artifacts/terraphim_server-${{ matrix.target }}.exe || true
-          cp target/${{ matrix.target }}/release/terraphim-agent.exe artifacts/terraphim-agent-${{ matrix.target }}.exe || true
-          cp target/${{ matrix.target }}/release/terraphim-cli.exe artifacts/terraphim-cli-${{ matrix.target }}.exe || true
-          cp target/${{ matrix.target }}/release/terraphim-grep.exe artifacts/terraphim-grep-${{ matrix.target }}.exe || true
 
       - name: Upload binary artifacts
         uses: actions/upload-artifact@v5
@@ -396,35 +333,16 @@ jobs:
         run: |
           mkdir -p universal
 
-          # Create universal binary for terraphim_server
           lipo -create \
             x86_64/terraphim_server-x86_64-apple-darwin \
             aarch64/terraphim_server-aarch64-apple-darwin \
             -output universal/terraphim_server-universal-apple-darwin
 
-          # Create universal binary for terraphim-agent
-          lipo -create \
-            x86_64/terraphim-agent-x86_64-apple-darwin \
-            aarch64/terraphim-agent-aarch64-apple-darwin \
-            -output universal/terraphim-agent-universal-apple-darwin
-
-          # Create universal binary for terraphim-grep
-          lipo -create \
-            x86_64/terraphim-grep-x86_64-apple-darwin \
-            aarch64/terraphim-grep-aarch64-apple-darwin \
-            -output universal/terraphim-grep-universal-apple-darwin
-
           chmod +x universal/*
 
-          # Verify universal binaries
-          echo "Verifying universal binaries:"
+          echo "Verifying universal server binary:"
           file universal/terraphim_server-universal-apple-darwin
-          file universal/terraphim-agent-universal-apple-darwin
-          file universal/terraphim-grep-universal-apple-darwin
-
           lipo -info universal/terraphim_server-universal-apple-darwin
-          lipo -info universal/terraphim-agent-universal-apple-darwin
-          lipo -info universal/terraphim-grep-universal-apple-darwin
 
       - name: Upload universal binaries
         uses: actions/upload-artifact@v5
@@ -479,43 +397,11 @@ jobs:
             "$CERT_BASE64" \
             "$CERT_PASSWORD"
 
-      - name: Sign and notarize terraphim-agent
-        env:
-          RUNNER_TEMP: ${{ runner.temp }}
-        run: |
-          ./scripts/sign-macos-binary.sh \
-            "universal/terraphim-agent-universal-apple-darwin" \
-            "$APPLE_ID" \
-            "$APPLE_TEAM_ID" \
-            "$APPLE_APP_PASSWORD" \
-            "$CERT_BASE64" \
-            "$CERT_PASSWORD"
-
-      - name: Sign and notarize terraphim-grep
-        env:
-          RUNNER_TEMP: ${{ runner.temp }}
-        run: |
-          ./scripts/sign-macos-binary.sh \
-            "universal/terraphim-grep-universal-apple-darwin" \
-            "$APPLE_ID" \
-            "$APPLE_TEAM_ID" \
-            "$APPLE_APP_PASSWORD" \
-            "$CERT_BASE64" \
-            "$CERT_PASSWORD"
-
       - name: Verify signed binaries
         run: |
           echo "==> Verifying terraphim_server"
           codesign --verify --deep --strict --verbose=2 universal/terraphim_server-universal-apple-darwin
           file universal/terraphim_server-universal-apple-darwin
-
-          echo "==> Verifying terraphim-agent"
-          codesign --verify --deep --strict --verbose=2 universal/terraphim-agent-universal-apple-darwin
-          file universal/terraphim-agent-universal-apple-darwin
-
-          echo "==> Verifying terraphim-grep"
-          codesign --verify --deep --strict --verbose=2 universal/terraphim-grep-universal-apple-darwin
-          file universal/terraphim-grep-universal-apple-darwin
 
       - name: Upload signed binaries
         uses: actions/upload-artifact@v5
@@ -534,7 +420,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install cargo-deb
-        run: cargo install cargo-deb
+        run: cargo install cargo-deb --locked --version 3.1.1
 
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
@@ -569,18 +455,7 @@ jobs:
           # Clean terraphim_server to ensure fresh UI embedding
           cargo clean -p terraphim_server
           
-          # Build server package (requires desktop/dist from frontend build)
           cargo deb -p terraphim_server --output target/debian/
-
-          # Build agent package
-          cargo deb -p terraphim_agent --output target/debian/
-
-          # Build grep package (requires code-search + openrouter features for the
-          # hybrid pipeline; cargo-deb reads [package.metadata.deb] from the crate's
-          # Cargo.toml). The compile step uses the same features the release binary
-          # build uses so behaviour parity with the tarball artefacts is preserved.
-          cargo deb -p terraphim_grep --output target/debian/ \
-            -- --features "code-search openrouter"
 
       - name: Upload Debian packages
         uses: actions/upload-artifact@v5
@@ -611,6 +486,35 @@ jobs:
             });
             
             console.log('Desktop release workflow triggered successfully');
+
+  trigger-clients-release:
+    name: Trigger Client Binary Release
+    needs: verify-versions
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Dispatch terraphim-clients release-binaries workflow
+        uses: actions/github-script@v9
+        with:
+          github-token: ${{ secrets.CLIENTS_REPO_TOKEN || secrets.GITHUB_TOKEN }}
+          script: |
+            const version = context.ref.replace('refs/tags/v', '');
+            const releaseTag = context.ref.replace('refs/tags/', '');
+            console.log(`Triggering client binaries for ${releaseTag} (version ${version})`);
+
+            await github.rest.actions.createWorkflowDispatch({
+              owner: 'terraphim',
+              repo: 'terraphim-clients',
+              workflow_id: 'release-binaries.yml',
+              ref: 'main',
+              inputs: {
+                version: version,
+                release_tag: releaseTag,
+                target_repo: 'terraphim-ai'
+              }
+            });
+
+            console.log('Client binary release workflow dispatched');
 
   build-docker:
     name: Build and push Docker images
@@ -652,12 +556,9 @@ jobs:
 
           # Critical macOS assets that must exist for auto-update to work
           CRITICAL_ASSETS=(
-            "terraphim-agent-x86_64-apple-darwin"
-            "terraphim-agent-aarch64-apple-darwin"
-            "terraphim-agent-universal-apple-darwin"
-            "terraphim-grep-x86_64-apple-darwin"
-            "terraphim-grep-aarch64-apple-darwin"
-            "terraphim-grep-universal-apple-darwin"
+            "terraphim_server-x86_64-apple-darwin"
+            "terraphim_server-aarch64-apple-darwin"
+            "terraphim_server-universal-apple-darwin"
           )
 
           MISSING=0
@@ -672,19 +573,21 @@ jobs:
 
           if [ $MISSING -gt 0 ]; then
             echo ""
-            echo "❌ Verification failed: $MISSING critical macOS assets are missing"
-            echo "This will break auto-update for macOS users. Aborting release."
+            echo "❌ Verification failed: $MISSING critical macOS server assets are missing"
+            echo "Aborting release."
             exit 1
           fi
 
           echo ""
-          echo "✅ All critical macOS assets verified"
+          echo "✅ All critical macOS server assets verified (client binaries attach via terraphim-clients workflow)"
 
   create-release:
     name: Create GitHub release
-    needs: [verify-versions, verify-release-assets]
-    # Create release if version and assets verification passed
-    if: always() && needs.verify-versions.result == 'success' && needs.verify-release-assets.result == 'success'
+    needs: [verify-versions, verify-release-assets, build-binaries]
+    if: >-
+      needs.verify-versions.result == 'success' &&
+      needs.verify-release-assets.result == 'success' &&
+      needs.build-binaries.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -778,23 +681,18 @@ jobs:
           body: |
             ## Release Assets
 
-            ### macOS Universal Binaries (Intel + Apple Silicon)
+            ### macOS Universal Server Binary (Intel + Apple Silicon)
             **Signed and Notarized** - No Gatekeeper warnings
             - `terraphim_server-universal-apple-darwin`: Server binary for all Macs
-            - `terraphim-agent-universal-apple-darwin`: TUI binary for all Macs
-            - `terraphim-grep-universal-apple-darwin`: Hybrid grep CLI for all Macs
 
             ### Server Binaries
             - `terraphim_server-*`: Server binaries for various platforms
 
-            ### TUI Binaries
-            - `terraphim-agent-*`: Terminal UI binaries for various platforms
-
-            ### Grep Binaries
+            ### Client Binaries (agent, cli, grep)
+            Built from [terraphim-clients](https://github.com/terraphim/terraphim-clients) and attached to this release:
+            - `terraphim-agent-*`: Terminal UI / REPL
+            - `terraphim-cli-*`: CLI toolkit
             - `terraphim-grep-*`: Hybrid grep CLI (knowledge-graph boost + LLM fallback)
-              for various platforms. See
-              [crates/terraphim_grep/RELEASE_NOTES_v1.20.0.md](https://github.com/terraphim/terraphim-ai/blob/main/crates/terraphim_grep/RELEASE_NOTES_v1.20.0.md)
-              for crate-focused details.
 
             ### Desktop Applications
             Desktop applications are now built and released separately in the [terraphim-ai-desktop](https://github.com/terraphim/terraphim-ai-desktop) repository.
@@ -827,9 +725,33 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  wait-for-client-binaries:
+    name: Wait for client binaries on release
+    needs: [create-release, trigger-clients-release]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v') && needs.create-release.result == 'success'
+    steps:
+      - name: Wait until terraphim-clients uploads client assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ github.ref_name }}"
+          echo "Waiting for client binaries on release $TAG ..."
+          for attempt in $(seq 1 60); do
+            COUNT=$(gh release view "$TAG" --repo terraphim/terraphim-ai --json assets -q '.assets | length' 2>/dev/null || echo 0)
+            echo "Attempt $attempt: $COUNT assets on release"
+            if [ "$COUNT" -ge 8 ]; then
+              echo "Client binaries appear present"
+              exit 0
+            fi
+            sleep 30
+          done
+          echo "::error::Timed out waiting for terraphim-clients to attach binaries"
+          exit 1
+
   update-homebrew:
     name: Update Homebrew formulas
-    needs: create-release
+    needs: wait-for-client-binaries
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
@@ -1040,60 +962,4 @@ jobs:
             echo "Ensure token exists at: op://TerraphimPlatform/homebrew-tap-token/token"
           fi
 
-  publish-crates:
-    name: Publish Rust crates to crates.io
-    needs: verify-versions
-    runs-on: ubuntu-latest
-    # Use always() to run even if some upstream jobs failed, but only for version tags
-    if: always() && startsWith(github.ref, 'refs/tags/v') && needs.verify-versions.result == 'success'
-    # NOTE: environment removed to avoid approval requirements
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-
-      - name: Install 1Password CLI
-        uses: 1password/install-cli-action@v2
-
-      - name: Cache Cargo dependencies
-        uses: Swatinem/rust-cache@v2
-
-      # NOTE: Tests are skipped here since CI workflow already validates everything
-      # The redundant test step was causing failures due to missing frontend assets
-      # All tests are run by CI before the release is created
-
-      - name: Get crates.io token from 1Password
-        id: token
-        env:
-          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
-        run: |
-          TOKEN=$(op read "op://TerraphimPlatform/crates.io.token/token")
-          echo "token=$TOKEN" >> $GITHUB_OUTPUT
-
-      - name: Publish crates in dependency order
-        env:
-          CARGO_REGISTRY_TOKEN: ${{ steps.token.outputs.token }}
-        run: |
-          # Make script executable
-          chmod +x ./scripts/publish-crates.sh
-
-          # Extract version from tag
-          VERSION=${GITHUB_REF#refs/tags/v}
-
-          # Run publish script with version
-          ./scripts/publish-crates.sh --version "$VERSION"
-
-      - name: Verify published packages
-        env:
-          CARGO_REGISTRY_TOKEN: ${{ steps.token.outputs.token }}
-        run: |
-          echo "🔍 Verifying packages are available on crates.io..."
-          # Allow some time for crates.io to index
-          sleep 30
-          cargo install --dry-run terraphim_agent || echo "⚠️  Installation dry-run failed (may need more time)"
-          echo "✅ Publishing workflow completed!"

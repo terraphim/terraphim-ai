@@ -20,7 +20,7 @@ napi = { version = "3.8.3", default-features = false, features = ["napi8", "toki
 napi-derive = "3.5.2"
 serde_json = { workspace = true }
 terraphim_automata = { version = "1.20.2", registry = "terraphim", default-features = false }
-terraphim_service = { version = "1.20.2", registry = "terraphim" }
+terraphim_service = { version = "1.20.5", registry = "terraphim" }
 terraphim_config = { version = "1.20.2",  default-features = false, registry = "terraphim" }
 terraphim_persistence = { version = "1.20.2", registry = "terraphim" }
 terraphim_settings = { version = "1.20.2", registry = "terraphim" }
