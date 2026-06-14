@@ -13,6 +13,7 @@
 
 use std::collections::HashMap;
 use std::process::Stdio;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
@@ -26,18 +27,27 @@ use crate::executor::context::{
     Capability, ExecutionContext, ExecutionResult, SnapshotId, ValidationResult,
 };
 use crate::types::SessionId;
+use crate::validator::KnowledgeGraphValidator;
 
 const BACKEND_NAME: &str = "local";
 
 pub struct LocalExecutor {
     python_path: String,
+    validator: Option<Arc<KnowledgeGraphValidator>>,
 }
 
 impl LocalExecutor {
     pub fn new() -> Self {
         Self {
             python_path: "python3".to_string(),
+            validator: None,
         }
+    }
+
+    /// Create a LocalExecutor with a knowledge graph validator.
+    pub fn with_validator(mut self, validator: Option<Arc<KnowledgeGraphValidator>>) -> Self {
+        self.validator = validator;
+        self
     }
 
     pub fn with_python(mut self, path: impl Into<String>) -> Self {
@@ -156,8 +166,17 @@ impl ExecutionEnvironment for LocalExecutor {
         self.run_command(command, ctx).await
     }
 
-    async fn validate(&self, _input: &str) -> Result<ValidationResult, Self::Error> {
-        Ok(ValidationResult::valid(vec![]))
+    async fn validate(&self, input: &str) -> Result<ValidationResult, Self::Error> {
+        match self.validator.as_ref() {
+            Some(validator) if !input.trim().is_empty() => {
+                let vr = validator.validate(input)?;
+                Ok(ValidationResult::from_validator_result(
+                    &vr,
+                    crate::config::KgStrictness::Normal,
+                ))
+            }
+            _ => Ok(ValidationResult::valid(Vec::new())),
+        }
     }
 
     async fn create_snapshot(

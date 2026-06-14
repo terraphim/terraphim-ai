@@ -40,6 +40,26 @@ pub use r#trait::ExecutionEnvironment;
 
 use crate::config::{BackendType, RlmConfig};
 use crate::error::RlmError;
+use crate::validator::{KnowledgeGraphValidator, ValidatorConfig};
+use std::sync::Arc;
+
+/// Build a `KnowledgeGraphValidator` from config for injection into executors.
+fn build_validator_for_executor(config: &RlmConfig) -> Option<Arc<KnowledgeGraphValidator>> {
+    if config.thesaurus.is_none() && config.kg_strictness == crate::config::KgStrictness::Permissive
+    {
+        return None;
+    }
+    let vcfg = match config.kg_strictness {
+        crate::config::KgStrictness::Permissive => ValidatorConfig::permissive(),
+        crate::config::KgStrictness::Normal => ValidatorConfig::default(),
+        crate::config::KgStrictness::Strict => ValidatorConfig::strict(),
+    };
+    let mut validator = KnowledgeGraphValidator::new(vcfg);
+    if let Some(ref thesaurus) = config.thesaurus {
+        validator = validator.with_thesaurus(thesaurus.clone());
+    }
+    Some(Arc::new(validator))
+}
 
 /// Check if KVM is available on this system.
 pub fn is_kvm_available() -> bool {
@@ -95,6 +115,8 @@ pub async fn select_executor(
         config.backend_preference.clone()
     };
 
+    let validator = build_validator_for_executor(config);
+
     // Cache the docker availability probe across loop iterations to avoid
     // repeating the (~50-100 ms) shell-out to `docker --version`.
     #[cfg(feature = "docker-backend")]
@@ -106,7 +128,7 @@ pub async fn select_executor(
             #[cfg(feature = "firecracker")]
             BackendType::Firecracker if is_kvm_available() => {
                 log::info!("Selected Firecracker backend (KVM available)");
-                let executor = FirecrackerExecutor::new(config.clone())?;
+                let executor = FirecrackerExecutor::new(config.clone(), validator.clone())?;
                 if let Err(e) = executor.initialize().await {
                     log::warn!(
                         "Failed to initialize FirecrackerExecutor: {}. Trying next backend.",
@@ -142,20 +164,18 @@ pub async fn select_executor(
             }
 
             #[cfg(feature = "docker-backend")]
-            BackendType::Docker if docker_available => match DockerExecutor::new(config.clone()) {
-                Ok(executor) => {
-                    log::info!("Selected Docker backend (container isolation)");
-                    return Ok(Box::new(executor));
+            BackendType::Docker if docker_available => {
+                match DockerExecutor::new(config.clone(), validator.clone()) {
+                    Ok(executor) => {
+                        log::info!("Selected Docker backend (container isolation)");
+                        return Ok(Box::new(executor));
+                    }
+                    Err(e) => {
+                        log::warn!("DockerExecutor init failed: {}. Trying next backend.", e);
+                        tried.push(format!("docker (init failed: {})", e));
+                    }
                 }
-                Err(e) => {
-                    // Previously this propagated via `?` and aborted backend
-                    // selection. Now we fall through to the next backend (e.g.
-                    // Local) so the executor stays selectable when the Docker
-                    // daemon is up but bollard's connect fails for any reason.
-                    log::warn!("DockerExecutor init failed: {}. Trying next backend.", e);
-                    tried.push(format!("docker (init failed: {})", e));
-                }
-            },
+            }
             #[cfg(feature = "docker-backend")]
             BackendType::Docker => {
                 log::debug!("Docker unavailable: CLI not present");
@@ -168,15 +188,11 @@ pub async fn select_executor(
             }
 
             BackendType::Local => {
-                // Local has no isolation - this is a security-posture
-                // downgrade from any of the sandboxed backends. Previously
-                // logged at `info`; now `warn` so production logs surface
-                // the fall-back.
                 log::warn!(
                     "Falling back to LocalExecutor (NO ISOLATION). Tried: {:?}",
                     tried
                 );
-                return Ok(Box::new(LocalExecutor::new()));
+                return Ok(Box::new(LocalExecutor::new().with_validator(validator)));
             }
         }
     }

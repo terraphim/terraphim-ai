@@ -1,3 +1,5 @@
+#![cfg(feature = "firecracker")]
+
 use terraphim_agent::client::*;
 
 /// Test VM-related API types serialization

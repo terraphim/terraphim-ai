@@ -41,10 +41,26 @@ use crate::executor::{
     ExecutionContext, ExecutionEnvironment, ExecutionResult, SnapshotId, select_executor,
 };
 use crate::llm_bridge::{LlmBridge, LlmBridgeConfig};
+use crate::validator::{KnowledgeGraphValidator, ValidatorConfig};
 // CommandParser and TerminationReason are used internally by QueryLoop
 use crate::query_loop::{QueryLoop, QueryLoopConfig, QueryLoopResult};
 use crate::session::SessionManager;
 use crate::types::{SessionId, SessionInfo};
+
+/// Build a `KnowledgeGraphValidator` from the RLM configuration.
+fn build_validator(config: &RlmConfig) -> KnowledgeGraphValidator {
+    use crate::config::KgStrictness;
+    let vcfg = match config.kg_strictness {
+        KgStrictness::Permissive => ValidatorConfig::permissive(),
+        KgStrictness::Normal => ValidatorConfig::default(),
+        KgStrictness::Strict => ValidatorConfig::strict(),
+    };
+    let mut validator = KnowledgeGraphValidator::new(vcfg);
+    if let Some(ref thesaurus) = config.thesaurus {
+        validator = validator.with_thesaurus(thesaurus.clone());
+    }
+    validator
+}
 
 /// The main RLM orchestrator.
 ///
@@ -65,6 +81,8 @@ pub struct TerraphimRlm {
     executor: Arc<dyn ExecutionEnvironment<Error = RlmError> + Send + Sync>,
     /// Cancellation senders for active queries, keyed by session ID.
     cancel_senders: dashmap::DashMap<SessionId, mpsc::Sender<()>>,
+    /// Knowledge graph validator applied to every execute_code / execute_command call.
+    validator: KnowledgeGraphValidator,
 }
 
 impl TerraphimRlm {
@@ -110,12 +128,15 @@ impl TerraphimRlm {
         let llm_bridge_config = LlmBridgeConfig::default();
         let llm_bridge = Arc::new(LlmBridge::new(llm_bridge_config, session_manager.clone()));
 
+        let validator = build_validator(&config);
+
         Ok(Self {
             config,
             session_manager,
             llm_bridge,
             executor: Arc::from(executor),
             cancel_senders: dashmap::DashMap::new(),
+            validator,
         })
     }
 
@@ -144,13 +165,34 @@ impl TerraphimRlm {
         let executor: Arc<dyn ExecutionEnvironment<Error = RlmError> + Send + Sync> =
             Arc::new(executor);
 
+        let validator = build_validator(&config);
+
         Ok(Self {
             config,
             session_manager,
             llm_bridge,
             executor,
             cancel_senders: dashmap::DashMap::new(),
+            validator,
         })
+    }
+
+    /// Create a new TerraphimRlm with a pre-loaded thesaurus for KG validation.
+    ///
+    /// This is a convenience for setting `config.thesaurus` before constructing.
+    /// The thesaurus enables term matching during `execute_code` and
+    /// `execute_command` validation.
+    ///
+    /// # Arguments
+    ///
+    /// * `config` - Configuration for the RLM system
+    /// * `thesaurus` - Knowledge graph thesaurus for term matching
+    pub async fn new_with_thesaurus(
+        mut config: RlmConfig,
+        thesaurus: terraphim_types::Thesaurus,
+    ) -> RlmResult<Self> {
+        config.thesaurus = Some(thesaurus);
+        Self::new(config).await
     }
 
     // ========================================================================
@@ -315,6 +357,21 @@ impl TerraphimRlm {
         // Validate session
         self.session_manager.validate_session(session_id)?;
 
+        // Validate code against knowledge graph before execution
+        let vr = self.validator.validate(code)?;
+        if !vr.passed {
+            if vr.escalation_required {
+                return Err(RlmError::KgEscalationRequired {
+                    unknown_terms: vr.unmatched_words,
+                    suggested_action: vr.suggestions.join("; "),
+                    context: vr.message,
+                });
+            }
+            return Err(RlmError::KgValidationFailed {
+                unknown_terms: vr.unmatched_words,
+            });
+        }
+
         // Build execution context
         let ctx = ExecutionContext {
             session_id: *session_id,
@@ -370,6 +427,21 @@ impl TerraphimRlm {
     ) -> RlmResult<ExecutionResult> {
         // Validate session
         self.session_manager.validate_session(session_id)?;
+
+        // Validate command against knowledge graph before execution
+        let vr = self.validator.validate(command)?;
+        if !vr.passed {
+            if vr.escalation_required {
+                return Err(RlmError::KgEscalationRequired {
+                    unknown_terms: vr.unmatched_words,
+                    suggested_action: vr.suggestions.join("; "),
+                    context: vr.message,
+                });
+            }
+            return Err(RlmError::KgValidationFailed {
+                unknown_terms: vr.unmatched_words,
+            });
+        }
 
         // Build execution context
         let ctx = ExecutionContext {
@@ -813,6 +885,107 @@ impl TerraphimRlm {
             client,
         ));
     }
+
+    /// Auto-detect and configure the best available LLM provider(s).
+    ///
+    /// Three-tier provider discovery:
+    /// 1. Env vars: `RLM_PROVIDER`, `RLM_MODEL`, `RLM_OPENROUTER_MODEL`
+    /// 2. Ollama (localhost:11434) -- local, free, fast
+    /// 3. OpenRouter (cloud) -- free tier, capability routing fallback
+    ///
+    /// When both providers are available, wraps them in a capability-based
+    /// router (`RouterBridgeLlmClient`) so simple tasks hit Ollama and
+    /// complex tasks (security audit, architecture review) hit OpenRouter.
+    ///
+    /// Requires the `llm` feature.
+    #[cfg(feature = "llm")]
+    pub async fn auto_configure_llm(&mut self) -> RlmResult<()> {
+        use terraphim_config::llm_router::{LlmRouterConfig, RouterMode, RouterStrategy};
+
+        let mut role = terraphim_config::Role::new("rlm-auto".to_string());
+        role.llm_enabled = true;
+
+        // Ollama: cheapest local chat model
+        role.extra.insert(
+            "llm_provider".to_string(),
+            serde_json::Value::String("ollama".to_string()),
+        );
+        let ollama_model = std::env::var("RLM_MODEL")
+            .unwrap_or_else(|_| "gemma3:270m".to_string());
+        role.extra.insert(
+            "llm_model".to_string(),
+            serde_json::Value::String(ollama_model.clone()),
+        );
+        log::info!("RLM auto-configure: ollama model={}", ollama_model);
+
+        // OpenRouter: API key from env or 1Password, free tier model
+        let or_api_key = std::env::var("OPENROUTER_API_KEY").ok().or_else(|| {
+            let output = std::process::Command::new("op")
+                .args([
+                    "read",
+                    "--account",
+                    "my.1password.com",
+                    "op://Terraphim/OpenRouterTesting-api-key/password",
+                ])
+                .output()
+                .ok()?;
+            String::from_utf8(output.stdout).ok().map(|s| s.trim().to_string())
+        });
+
+        if let Some(ref key) = or_api_key {
+            let or_model = std::env::var("RLM_OPENROUTER_MODEL")
+                .unwrap_or_else(|_| "meta-llama/llama-3.2-3b-instruct:free".to_string());
+            role.llm_api_key = Some(key.clone());
+            role.llm_model = Some(or_model.clone());
+            // Cache for child processes and build_llm_from_role
+            unsafe { std::env::set_var("OPENROUTER_API_KEY", key); }
+            log::info!("RLM auto-configure: openrouter model={}", or_model);
+        }
+
+        // Routing: QualityFirst (= CapabilityFirst) for deterministic-rlm-review
+        // Override with RLM_ROUTER_STRATEGY env var
+        let strategy = match std::env::var("RLM_ROUTER_STRATEGY").as_deref() {
+            Ok("cost_first") => RouterStrategy::CostFirst,
+            Ok("balanced") => RouterStrategy::Balanced,
+            Ok("static") => RouterStrategy::Static,
+            _ => RouterStrategy::QualityFirst,
+        };
+        role.llm_router_enabled = true;
+        role.llm_router_config = Some(LlmRouterConfig {
+            enabled: true,
+            strategy,
+            mode: RouterMode::Library,
+            ..Default::default()
+        });
+
+        let client = terraphim_service::llm::build_llm_from_role(&role)
+            .ok_or_else(|| {
+                log::warn!("RLM auto-configure: no LLM provider available");
+                RlmError::LlmNotConfigured
+            })?;
+
+        log::info!(
+            "RLM LLM bridge configured: providers={} strategy={:?}",
+            if role.llm_api_key.is_some() {
+                "ollama+openrouter"
+            } else {
+                "ollama"
+            },
+            role.llm_router_config.as_ref().map(|c| &c.strategy)
+        );
+
+        self.set_llm_client(client);
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+impl TerraphimRlm {
+    /// Replace the validator during tests to inject a pre-configured one
+    /// (e.g., with a loaded thesaurus that production code does not yet wire up).
+    fn set_validator_for_test(&mut self, validator: KnowledgeGraphValidator) {
+        self.validator = validator;
+    }
 }
 
 /// Result from a direct LLM query.
@@ -1061,5 +1234,61 @@ mod tests {
     fn test_version() {
         let version = TerraphimRlm::version();
         assert!(!version.is_empty());
+    }
+
+    #[cfg(feature = "kg-validation")]
+    #[tokio::test]
+    async fn test_execute_code_kg_validation_fails_strict_mode() {
+        use crate::config::KgStrictness;
+        use terraphim_types::Thesaurus;
+
+        let mut config = RlmConfig::minimal();
+        config.kg_strictness = KgStrictness::Strict;
+        let mut rlm = TerraphimRlm::with_executor(config, MockExecutor::new()).unwrap();
+
+        // Inject a strict validator with an empty thesaurus. An empty thesaurus
+        // has no known terms, so every input produces zero matches; Strict mode
+        // returns ValidationResult::failed when matched_terms is empty and a
+        // thesaurus is present.
+        let thesaurus = Thesaurus::new("test".to_string());
+        let validator =
+            KnowledgeGraphValidator::new(ValidatorConfig::strict()).with_thesaurus(thesaurus);
+        rlm.set_validator_for_test(validator);
+
+        let session = rlm.create_session().await.unwrap();
+
+        let result = rlm.execute_code(&session.id, "xyzzy plugh").await;
+
+        assert!(
+            matches!(result, Err(RlmError::KgValidationFailed { .. })),
+            "Expected KgValidationFailed but got {:?}",
+            result
+        );
+    }
+
+    #[cfg(feature = "kg-validation")]
+    #[tokio::test]
+    async fn test_execute_command_kg_validation_fails_strict_mode() {
+        use crate::config::KgStrictness;
+        use terraphim_types::Thesaurus;
+
+        let mut config = RlmConfig::minimal();
+        config.kg_strictness = KgStrictness::Strict;
+        let mut rlm = TerraphimRlm::with_executor(config, MockExecutor::new()).unwrap();
+
+        let thesaurus = Thesaurus::new("test".to_string());
+        let validator =
+            KnowledgeGraphValidator::new(ValidatorConfig::strict()).with_thesaurus(thesaurus);
+        rlm.set_validator_for_test(validator);
+
+        let session = rlm.create_session().await.unwrap();
+
+        let result = rlm.execute_command(&session.id, "xyzzy plugh").await;
+
+        assert!(
+            matches!(result, Err(RlmError::KgValidationFailed { .. })),
+            "Expected KgValidationFailed but got {:?}",
+            result
+        );
     }
 }

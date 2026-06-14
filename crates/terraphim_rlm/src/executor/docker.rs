@@ -43,16 +43,11 @@ const DEFAULT_PIDS_LIMIT: i64 = 256;
 
 pub struct DockerExecutor {
     docker: Docker,
-    /// Per-session container map. Each entry holds a `Mutex<Option<String>>`:
-    /// the lock serialises creation for that session, and the inner `Option`
-    /// is `None` until the container is created and published.
     session_to_container: DashMap<SessionId, Arc<Mutex<Option<String>>>>,
     image: String,
-    /// HostConfig applied to every session container. Defaults to
-    /// `default_host_config()` (permissive profile); override per executor
-    /// via `with_host_config`.
     host_config: HostConfig,
     capabilities: Vec<Capability>,
+    validator: Option<Arc<crate::validator::KnowledgeGraphValidator>>,
 }
 
 /// Build the default `HostConfig` applied to every session container.
@@ -82,7 +77,10 @@ fn unsupported(op: &'static str) -> RlmError {
 }
 
 impl DockerExecutor {
-    pub fn new(_config: RlmConfig) -> Result<Self, RlmError> {
+    pub fn new(
+        _config: RlmConfig,
+        validator: Option<Arc<crate::validator::KnowledgeGraphValidator>>,
+    ) -> Result<Self, RlmError> {
         let docker =
             Docker::connect_with_local_defaults().map_err(|e| RlmError::BackendInitFailed {
                 backend: BACKEND_NAME.to_string(),
@@ -105,11 +103,12 @@ impl DockerExecutor {
             image: DEFAULT_IMAGE.to_string(),
             host_config: default_host_config(),
             capabilities,
+            validator,
         })
     }
 
     pub fn with_image(config: RlmConfig, image: &str) -> Result<Self, RlmError> {
-        let mut executor = Self::new(config)?;
+        let mut executor = Self::new(config, None)?;
         executor.image = image.to_string();
         Ok(executor)
     }
@@ -368,8 +367,17 @@ impl super::ExecutionEnvironment for DockerExecutor {
         self.exec_in_container(&container_id, bash_cmd, ctx).await
     }
 
-    async fn validate(&self, _input: &str) -> Result<ValidationResult, Self::Error> {
-        Ok(ValidationResult::valid(vec![]))
+    async fn validate(&self, input: &str) -> Result<ValidationResult, Self::Error> {
+        match self.validator.as_ref() {
+            Some(validator) if !input.trim().is_empty() => {
+                let vr = validator.validate(input)?;
+                Ok(ValidationResult::from_validator_result(
+                    &vr,
+                    crate::config::KgStrictness::Normal,
+                ))
+            }
+            _ => Ok(ValidationResult::valid(Vec::new())),
+        }
     }
 
     async fn create_snapshot(
@@ -533,7 +541,7 @@ mod tests {
             readonly_rootfs: Some(true),
             ..Default::default()
         };
-        let exec = DockerExecutor::new(RlmConfig::minimal())
+        let exec = DockerExecutor::new(RlmConfig::minimal(), None)
             .unwrap()
             .with_host_config(strict.clone());
         assert_eq!(exec.host_config.memory, strict.memory);
@@ -560,7 +568,7 @@ mod tests {
         }
 
         let config = RlmConfig::minimal();
-        let executor = DockerExecutor::new(config);
+        let executor = DockerExecutor::new(config, None);
         assert!(executor.is_ok());
     }
 
@@ -572,7 +580,7 @@ mod tests {
         }
 
         let config = RlmConfig::minimal();
-        let executor = DockerExecutor::new(config).unwrap();
+        let executor = DockerExecutor::new(config, None).unwrap();
 
         assert!(executor.has_capability(Capability::ContainerIsolation));
         assert!(executor.has_capability(Capability::PythonExecution));
@@ -588,7 +596,7 @@ mod tests {
         }
 
         let config = RlmConfig::minimal();
-        let executor = DockerExecutor::new(config).unwrap();
+        let executor = DockerExecutor::new(config, None).unwrap();
         let result = executor.health_check().await.unwrap();
         assert!(result);
     }
@@ -603,7 +611,7 @@ mod tests {
             eprintln!("Skipping test: Docker not available");
             return;
         }
-        let exec = DockerExecutor::new(cfg).unwrap();
+        let exec = DockerExecutor::new(cfg, None).unwrap();
         let session = SessionId::new();
 
         assert!(matches!(
@@ -622,7 +630,7 @@ mod tests {
             eprintln!("Skipping test: Docker not available");
             return;
         }
-        let exec = DockerExecutor::new(RlmConfig::minimal()).unwrap();
+        let exec = DockerExecutor::new(RlmConfig::minimal(), None).unwrap();
         let unknown = SessionId::new();
         assert!(exec.release_session_container(&unknown).await.is_none());
     }
@@ -632,7 +640,7 @@ mod tests {
         if !skip_unless_image_ready("test_docker_release_session_container_removes") {
             return;
         }
-        let exec = DockerExecutor::new(RlmConfig::minimal()).unwrap();
+        let exec = DockerExecutor::new(RlmConfig::minimal(), None).unwrap();
         let ctx = ExecutionContext {
             session_id: SessionId::new(),
             timeout_ms: 30_000,
@@ -657,7 +665,7 @@ mod tests {
         if !skip_unless_image_ready("test_docker_concurrent_ensure_no_leak") {
             return;
         }
-        let exec = std::sync::Arc::new(DockerExecutor::new(RlmConfig::minimal()).unwrap());
+        let exec = std::sync::Arc::new(DockerExecutor::new(RlmConfig::minimal(), None).unwrap());
         let session_id = SessionId::new();
 
         // Fire 8 concurrent calls with the same session id.
