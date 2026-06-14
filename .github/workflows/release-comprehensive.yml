@@ -536,7 +536,6 @@ jobs:
 
   build-docker:
     name: Build and push Docker images
-    continue-on-error: true
     uses: ./.github/workflows/docker-multiarch.yml
     with:
       platforms: linux/amd64,linux/arm64
