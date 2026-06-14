@@ -553,7 +553,7 @@ fn extract_words(text: &str) -> Vec<String> {
 /// Truncate a string for logging (max 100 chars).
 fn truncate_for_log(s: &str) -> String {
     if s.len() > 100 {
-        let boundary = s.floor_char_boundary(97);
+        let boundary = crate::floor_char_boundary(s, 97);
         format!("{}...", &s[..boundary])
     } else {
         s.to_string()

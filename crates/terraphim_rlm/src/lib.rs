@@ -142,3 +142,16 @@ pub const TARGET_BOOT_TIME_MS: u64 = 2000;
 
 /// Default DNS allowlist
 pub const DEFAULT_DNS_ALLOWLIST: &[&str] = &["pypi.org", "github.com", "raw.githubusercontent.com"];
+
+/// Find the largest byte index <= `index` that is a valid UTF-8 char boundary.
+/// Polyfill for `str::floor_char_boundary` (stable since Rust 1.91, MSRV here is 1.80).
+pub(crate) fn floor_char_boundary(s: &str, index: usize) -> usize {
+    if index >= s.len() {
+        return s.len();
+    }
+    let mut i = index;
+    while i > 0 && !s.is_char_boundary(i) {
+        i -= 1;
+    }
+    i
+}
