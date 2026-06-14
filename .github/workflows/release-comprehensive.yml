@@ -426,7 +426,12 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install cargo-deb
-        run: cargo install cargo-deb --locked --version 3.1.1
+        run: |
+          if command -v cargo-deb &>/dev/null; then
+            cargo-deb --version
+          else
+            cargo install cargo-deb --version 3.1.1
+          fi
 
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2

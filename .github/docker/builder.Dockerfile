@@ -83,7 +83,7 @@ ENV CARGO_TERM_COLOR=always \
 WORKDIR /workspace
 
 # Install cargo-deb for package creation
-RUN cargo install cargo-deb --locked
+RUN cargo install cargo-deb
 
 # Labels for metadata
 LABEL org.opencontainers.image.title="Terraphim AI Builder" \

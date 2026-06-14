@@ -128,18 +128,13 @@ COPY --from=frontend-builder /app/dist ./terraphim_server/dist
 # Build the application
 RUN . /root/.profile && \
     RUST_TARGET=$(cat /tmp/rust-target) && \
-    cargo build --release --target=$RUST_TARGET \
-    --package terraphim_server \
-    --package terraphim_mcp_server \
-    --package terraphim_agent
+    cargo build --release --target=$RUST_TARGET --package terraphim_server
 
 # Test the binaries
 RUN . /root/.profile && \
     RUST_TARGET=$(cat /tmp/rust-target) && \
     if echo "$RUST_TARGET" | grep -q "$(uname -m)"; then \
-      ./target/$RUST_TARGET/release/terraphim_server --version && \
-      ./target/$RUST_TARGET/release/terraphim_mcp_server --version && \
-      ./target/$RUST_TARGET/release/terraphim-agent --version; \
+      ./target/$RUST_TARGET/release/terraphim_server --version; \
     else \
       echo "Skipping version check for cross-compiled target: $RUST_TARGET"; \
     fi
@@ -148,9 +143,7 @@ RUN . /root/.profile && \
 RUN . /root/.profile && \
     RUST_TARGET=$(cat /tmp/rust-target) && \
     mkdir -p /usr/local/bin && \
-    cp target/$RUST_TARGET/release/terraphim_server /usr/local/bin/ && \
-    cp target/$RUST_TARGET/release/terraphim_mcp_server /usr/local/bin/ && \
-    cp target/$RUST_TARGET/release/terraphim-agent /usr/local/bin/
+    cp target/$RUST_TARGET/release/terraphim_server /usr/local/bin/
 
 # ================================
 # Runtime Stage
@@ -182,13 +175,9 @@ RUN useradd --create-home --shell /bin/bash terraphim
 
 # Copy binaries from builder
 COPY --from=rust-builder --chown=terraphim:terraphim /usr/local/bin/terraphim_server /usr/local/bin/
-COPY --from=rust-builder --chown=terraphim:terraphim /usr/local/bin/terraphim_mcp_server /usr/local/bin/
-COPY --from=rust-builder --chown=terraphim:terraphim /usr/local/bin/terraphim-agent /usr/local/bin/
 
 # Set executable permissions
-RUN chmod +x /usr/local/bin/terraphim_server \
-    /usr/local/bin/terraphim_mcp_server \
-    /usr/local/bin/terraphim-agent
+RUN chmod +x /usr/local/bin/terraphim_server
 
 # Create application directories
 RUN mkdir -p /home/terraphim/.config/terraphim && \
