@@ -430,7 +430,8 @@ jobs:
           if command -v cargo-deb &>/dev/null; then
             cargo-deb --version
           else
-            cargo install cargo-deb --version 3.1.1
+            # Self-hosted runners may alias `cargo` via rustup; use stable explicitly.
+            rustup run stable cargo install cargo-deb --locked --version 3.1.1
           fi
 
       - name: Cache dependencies
@@ -464,9 +465,8 @@ jobs:
       - name: Build Debian packages
         run: |
           # Clean terraphim_server to ensure fresh UI embedding
-          cargo clean -p terraphim_server
-          
-          cargo deb -p terraphim_server --output target/debian/
+          rustup run stable cargo clean -p terraphim_server
+          rustup run stable cargo deb -p terraphim_server --output target/debian/
 
       - name: Upload Debian packages
         uses: actions/upload-artifact@v5
@@ -600,9 +600,13 @@ jobs:
 
   create-release:
     name: Create GitHub release
-    needs: [verify-versions, verify-release-assets, build-binaries]
+    needs: [verify-versions, verify-release-assets, build-binaries, sign-and-notarize-macos]
     if: >-
+      always() &&
+      !cancelled() &&
       needs.verify-versions.result == 'success' &&
+      needs.build-binaries.result == 'success' &&
+      needs.sign-and-notarize-macos.result == 'success' &&
       needs.verify-release-assets.result == 'success'
     runs-on: ubuntu-latest
     permissions:
@@ -622,6 +626,7 @@ jobs:
       - name: Download Debian package artifacts
         uses: actions/download-artifact@v4
         id: download_debian
+        continue-on-error: true
         with:
           name: debian-packages
           path: release-assets

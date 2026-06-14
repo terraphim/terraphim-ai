@@ -116,6 +116,7 @@ WORKDIR /code
 
 # Copy the workspace pieces required to resolve local path dependencies.
 COPY Cargo.toml Cargo.lock ./
+COPY .cargo/config.toml .cargo/config.toml
 COPY crates ./crates
 COPY terraphim_server ./terraphim_server
 COPY terraphim_ai_nodejs ./terraphim_ai_nodejs
@@ -125,8 +126,10 @@ COPY terraphim_firecracker/Cargo.toml terraphim_firecracker/
 RUN rm -rf terraphim_server/dist && mkdir -p terraphim_server/dist
 COPY --from=frontend-builder /app/dist ./terraphim_server/dist
 
-# Build the application
-RUN . /root/.profile && \
+# Build the application (Terraphim registry auth via BuildKit secret)
+RUN --mount=type=secret,id=cargo_registry_token \
+    export CARGO_REGISTRIES_TERRAPHIM_TOKEN="$(cat /run/secrets/cargo_registry_token)" && \
+    . /root/.profile && \
     RUST_TARGET=$(cat /tmp/rust-target) && \
     cargo build --release --target=$RUST_TARGET --package terraphim_server
 

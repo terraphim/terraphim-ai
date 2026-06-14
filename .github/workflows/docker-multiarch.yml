@@ -40,6 +40,9 @@ on:
       OP_SERVICE_ACCOUNT_TOKEN:
         description: '1Password service account token'
         required: false
+      CARGO_REGISTRIES_TERRAPHIM_TOKEN:
+        description: 'Bearer token for the Terraphim Gitea cargo registry'
+        required: false
 
 env:
   REGISTRY: ghcr.io
@@ -197,6 +200,29 @@ jobs:
             org.opencontainers.image.vendor=Terraphim AI
             ubuntu.version=${{ matrix.ubuntu-version }}
 
+      - name: Prepare Terraphim cargo registry token for Docker build
+        id: cargo-registry-token
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          CARGO_REGISTRIES_TERRAPHIM_TOKEN: ${{ secrets.CARGO_REGISTRIES_TERRAPHIM_TOKEN }}
+        run: |
+          TOKEN=""
+          if [ -n "${CARGO_REGISTRIES_TERRAPHIM_TOKEN}" ]; then
+            TOKEN="${CARGO_REGISTRIES_TERRAPHIM_TOKEN}"
+          elif [ -n "${OP_SERVICE_ACCOUNT_TOKEN}" ]; then
+            GITEA_TOKEN="$(op read "op://TerraphimPlatform/gitea-test-token/credential" 2>/dev/null || true)"
+            if [ -n "${GITEA_TOKEN}" ]; then
+              TOKEN="Bearer ${GITEA_TOKEN}"
+            fi
+          fi
+          if [ -z "${TOKEN}" ]; then
+            echo "::error::Terraphim cargo registry token unavailable (set CARGO_REGISTRIES_TERRAPHIM_TOKEN or OP_SERVICE_ACCOUNT_TOKEN)"
+            exit 1
+          fi
+          echo "::add-mask::${TOKEN}"
+          printf '%s' "${TOKEN}" > "${RUNNER_TEMP}/cargo_registry_token"
+          echo "token_file=${RUNNER_TEMP}/cargo_registry_token" >> "${GITHUB_OUTPUT}"
+
       - name: Build and push to GHCR
         uses: docker/build-push-action@v7
         with:
@@ -209,6 +235,8 @@ jobs:
           build-args: |
             UBUNTU_VERSION=${{ matrix.ubuntu-version }}
             RUST_VERSION=1.92.0
+          secret-files: |
+            cargo_registry_token=${{ steps.cargo-registry-token.outputs.token_file }}
           no-cache: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -229,6 +257,8 @@ jobs:
           build-args: |
             UBUNTU_VERSION=${{ matrix.ubuntu-version }}
             RUST_VERSION=1.92.0
+          secret-files: |
+            cargo_registry_token=${{ steps.cargo-registry-token.outputs.token_file }}
           no-cache: true
           cache-from: type=gha
           provenance: false
