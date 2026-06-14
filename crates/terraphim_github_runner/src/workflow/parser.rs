@@ -6,6 +6,7 @@ use crate::error::{GitHubRunnerError, Result};
 use crate::models::{GitHubEvent, GitHubEventType};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+#[cfg(feature = "github-runner")]
 use terraphim_service::llm::{ChatOptions, LlmClient};
 
 /// System prompt for workflow understanding
@@ -284,10 +285,12 @@ mod payload_tests {
 }
 
 /// Workflow parser using LLM for understanding
+#[cfg(feature = "github-runner")]
 pub struct WorkflowParser {
     llm_client: Arc<dyn LlmClient>,
 }
 
+#[cfg(feature = "github-runner")]
 impl WorkflowParser {
     /// Create a new workflow parser with the given LLM client
     pub fn new(llm_client: Arc<dyn LlmClient>) -> Self {
@@ -571,6 +574,7 @@ impl WorkflowParser {
     }
 }
 
+#[cfg(feature = "github-runner")]
 impl Clone for WorkflowParser {
     fn clone(&self) -> Self {
         Self {
@@ -579,7 +583,7 @@ impl Clone for WorkflowParser {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "github-runner"))]
 mod tests {
     use super::*;
 

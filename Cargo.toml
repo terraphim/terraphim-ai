@@ -25,7 +25,6 @@ exclude = [
     # Firecracker-based crates (private git dependency fcctl-core)
     # terraphim_rlm temporarily included for full configuration
     # "crates/terraphim_rlm",
-    "crates/terraphim_github_runner_server",
     "terraphim_firecracker",
     # Directories without Cargo.toml (extracted to polyrepo)
     "crates/terraphim_agent",

@@ -64,8 +64,10 @@ pub use session::{
 pub use workflow::{
     CommandExecutor, CommandResult, HostCommandExecutor, MockCommandExecutor, ParsedWorkflow,
     SimulatedVmExecutor, VmCommandExecutor, WorkflowExecutor, WorkflowExecutorConfig,
-    WorkflowParser, WorkflowStep, parse_single_workflow_yaml, parse_workflow_payload,
+    WorkflowStep, parse_single_workflow_yaml, parse_workflow_payload,
 };
+#[cfg(feature = "github-runner")]
+pub use workflow::WorkflowParser;
 
 #[cfg(feature = "github-runner")]
 pub use learning::EvolutionLearningCoordinator;
