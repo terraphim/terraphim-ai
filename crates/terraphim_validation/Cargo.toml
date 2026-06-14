@@ -59,7 +59,7 @@ sysinfo = "0.30"
 term_size = "0.3"
 
  # Additional dependencies for reporting and metadata
- gethostname = "0.4"
+ gethostname = "1.1"
  os_info = "3.0"
  rustc_version = "0.4"
  serde_yaml = "0.9"
