@@ -23,13 +23,10 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
 
-// Use fcctl-core for VM and snapshot management
-// Note: SnapshotType must come from firecracker::models to match SnapshotManager's expected type
 use fcctl_core::firecracker::models::SnapshotType;
 use fcctl_core::snapshot::SnapshotManager;
 use fcctl_core::vm::VmManager;
 
-// Keep terraphim_firecracker for pool management
 use terraphim_firecracker::{PoolConfig, Sub2SecondOptimizer, VmPoolManager};
 
 use super::ssh::SshExecutor;
@@ -37,6 +34,7 @@ use super::{Capability, ExecutionContext, ExecutionResult, SnapshotId, Validatio
 use crate::config::{BackendType, RlmConfig};
 use crate::error::{RlmError, RlmResult};
 use crate::types::SessionId;
+use crate::validator::KnowledgeGraphValidator;
 
 /// Firecracker execution backend.
 ///
@@ -79,6 +77,10 @@ pub struct FirecrackerExecutor {
 
     /// Snapshot count per session (for limit enforcement).
     snapshot_counts: parking_lot::RwLock<HashMap<SessionId, u32>>,
+
+    /// Knowledge graph validator for command validation.
+    /// When `None`, validation passes unconditionally.
+    validator: Option<Arc<KnowledgeGraphValidator>>,
 }
 
 impl FirecrackerExecutor {
@@ -87,11 +89,15 @@ impl FirecrackerExecutor {
     /// # Arguments
     ///
     /// * `config` - RLM configuration
+    /// * `validator` - Optional knowledge graph validator for command validation
     ///
     /// # Errors
     ///
     /// Returns an error if KVM is not available.
-    pub fn new(config: RlmConfig) -> Result<Self, RlmError> {
+    pub fn new(
+        config: RlmConfig,
+        validator: Option<Arc<KnowledgeGraphValidator>>,
+    ) -> Result<Self, RlmError> {
         if !super::is_kvm_available() {
             return Err(RlmError::BackendInitFailed {
                 backend: "firecracker".to_string(),
@@ -128,6 +134,7 @@ impl FirecrackerExecutor {
             session_to_vm: parking_lot::RwLock::new(HashMap::new()),
             current_snapshot: parking_lot::RwLock::new(HashMap::new()),
             snapshot_counts: parking_lot::RwLock::new(HashMap::new()),
+            validator,
         })
     }
 
@@ -498,13 +505,16 @@ impl super::ExecutionEnvironment for FirecrackerExecutor {
     }
 
     async fn validate(&self, input: &str) -> Result<ValidationResult, Self::Error> {
-        // TODO: Implement KG validation using terraphim_automata
-        log::debug!(
-            "FirecrackerExecutor::validate called for {} bytes",
-            input.len()
-        );
-
-        Ok(ValidationResult::valid(Vec::new()))
+        match self.validator.as_ref() {
+            Some(validator) if !input.trim().is_empty() => {
+                let vr = validator.validate(input)?;
+                Ok(ValidationResult::from_validator_result(
+                    &vr,
+                    self.config.kg_strictness,
+                ))
+            }
+            _ => Ok(ValidationResult::valid(Vec::new())),
+        }
     }
 
     async fn create_snapshot(

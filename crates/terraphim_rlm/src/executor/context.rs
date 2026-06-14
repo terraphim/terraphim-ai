@@ -238,6 +238,15 @@ pub struct ValidationResult {
 
     /// Validation strictness level used.
     pub strictness: crate::config::KgStrictness,
+
+    /// Human-readable message explaining the validation result.
+    pub message: String,
+
+    /// Number of retries attempted (for LLM rephrase tracking).
+    pub retry_count: u32,
+
+    /// Whether escalation to user is required.
+    pub escalation_required: bool,
 }
 
 impl ValidationResult {
@@ -249,6 +258,9 @@ impl ValidationResult {
             unknown_terms: Vec::new(),
             suggestions: HashMap::new(),
             strictness: crate::config::KgStrictness::Normal,
+            message: String::new(),
+            retry_count: 0,
+            escalation_required: false,
         }
     }
 
@@ -260,6 +272,9 @@ impl ValidationResult {
             unknown_terms,
             suggestions: HashMap::new(),
             strictness: crate::config::KgStrictness::Normal,
+            message: String::new(),
+            retry_count: 0,
+            escalation_required: false,
         }
     }
 
@@ -273,6 +288,75 @@ impl ValidationResult {
     pub fn with_strictness(mut self, strictness: crate::config::KgStrictness) -> Self {
         self.strictness = strictness;
         self
+    }
+
+    /// Set the validation message.
+    pub fn with_message(mut self, message: String) -> Self {
+        self.message = message;
+        self
+    }
+
+    /// Set the retry count.
+    pub fn with_retry_count(mut self, count: u32) -> Self {
+        self.retry_count = count;
+        self
+    }
+
+    /// Mark as requiring escalation.
+    pub fn with_escalation(mut self) -> Self {
+        self.escalation_required = true;
+        self
+    }
+
+    /// Build a feedback message suitable for feeding back to the LLM for rephrasing.
+    pub fn feedback_message(&self) -> String {
+        let mut msg = "Command validation warning:\n".to_string();
+        if !self.unknown_terms.is_empty() {
+            msg.push_str(&format!("  Unknown terms: {:?}\n", self.unknown_terms));
+        }
+        if !self.matched_terms.is_empty() {
+            msg.push_str(&format!(
+                "  Known terms you could use: {:?}\n",
+                self.matched_terms
+            ));
+        }
+        if !self.suggestions.is_empty() {
+            for (term, alternatives) in &self.suggestions {
+                msg.push_str(&format!(
+                    "  Instead of '{}', consider: {:?}\n",
+                    term, alternatives
+                ));
+            }
+        }
+        if !self.message.is_empty() {
+            msg.push_str(&format!("  {}\n", self.message));
+        }
+        msg.push_str("Please rephrase to use only known domain terminology.");
+        msg
+    }
+
+    /// Convert from the validator module's `ValidationResult` to the executor's `ValidationResult`.
+    #[cfg(feature = "kg-validation")]
+    pub fn from_validator_result(
+        vr: &crate::validator::ValidationResult,
+        strictness: crate::config::KgStrictness,
+    ) -> Self {
+        let mut suggestions: HashMap<String, Vec<String>> = HashMap::new();
+        if !vr.suggestions.is_empty() {
+            for unknown in &vr.unmatched_words {
+                suggestions.insert(unknown.clone(), vr.suggestions.clone());
+            }
+        }
+        Self {
+            is_valid: vr.passed,
+            matched_terms: vr.matched_terms.clone(),
+            unknown_terms: vr.unmatched_words.clone(),
+            suggestions,
+            strictness,
+            message: vr.message.clone(),
+            retry_count: vr.retry_count,
+            escalation_required: vr.escalation_required,
+        }
     }
 }
 

@@ -139,6 +139,15 @@ pub struct RlmConfig {
 
     /// Default model for LLM calls.
     pub default_model: Option<String>,
+
+    // ============================================
+    // Knowledge Graph Thesaurus (runtime, not serialised)
+    // ============================================
+    /// Knowledge graph thesaurus for term matching during validation.
+    /// Set via `TerraphimRlm::new_with_thesaurus` or programmatically.
+    /// When `None`, KG validation passes without term matching.
+    #[serde(skip, default)]
+    pub thesaurus: Option<terraphim_types::Thesaurus>,
 }
 
 impl std::fmt::Debug for RlmConfig {
@@ -194,6 +203,8 @@ impl std::fmt::Debug for RlmConfig {
             // LLM
             .field("llm_provider", &self.llm_provider)
             .field("default_model", &self.default_model)
+            // Thesaurus
+            .field("has_thesaurus", &self.thesaurus.is_some())
             .finish()
     }
 }
@@ -279,6 +290,9 @@ impl Default for RlmConfig {
             // LLM
             llm_provider: None,
             default_model: None,
+
+            // Thesaurus
+            thesaurus: None,
         }
     }
 }
