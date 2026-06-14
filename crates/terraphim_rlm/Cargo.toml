@@ -25,11 +25,12 @@ anyhow.workspace = true
 log.workspace = true
 
 # Terraphim crates
-terraphim_service = { version = "1.20.5", optional = true, registry = "terraphim" }
-terraphim_automata = { version = "1.20.2", registry = "terraphim", optional = true }
-terraphim_types = { version = "1.20.2", registry = "terraphim", optional = true }
-terraphim_rolegraph = { version = "1.20.2", registry = "terraphim", optional = true }
-terraphim_agent_supervisor = { version = "1.19.2",  optional = true, registry = "terraphim" }
+terraphim_service = { version = "1.20.4", optional = true }
+terraphim_config = { version = "1.20.4", optional = true }
+terraphim_automata = { version = "1.20.4", optional = true }
+terraphim_types = { version = "1.20.4", optional = true }
+terraphim_rolegraph = { version = "1.20.4", optional = true }
+terraphim_agent_supervisor = { version = "1.19.2", optional = true, registry = "terraphim" }
 
 # Firecracker-rust core for VM and snapshot management (private repo).
 # Uncomment when building with --features firecracker on a machine with
@@ -67,7 +68,7 @@ required-features = ["cli"]
 [features]
 default = ["full"]
 full = ["llm", "kg-validation", "supervision", "llm-bridge", "docker-backend", "e2b-backend", "mcp", "cli"]
-llm = ["dep:terraphim_service"]
+llm = ["dep:terraphim_service", "dep:terraphim_config"]
 kg-validation = ["dep:terraphim_automata", "dep:terraphim_types", "dep:terraphim_rolegraph"]
 supervision = ["dep:terraphim_agent_supervisor"]
 llm-bridge = ["dep:hyper", "dep:hyper-util"]
@@ -82,4 +83,4 @@ tokio-test = "0.4"
 tempfile = "3.0"
 test-log = "0.2"
 ahash = "0.8"
-terraphim_config = { version = "1.20.2", registry = "terraphim" }
+terraphim_config = { version = "1.20.4" }

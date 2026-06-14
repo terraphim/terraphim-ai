@@ -990,15 +990,6 @@ impl TerraphimRlm {
     }
 }
 
-#[cfg(test)]
-impl TerraphimRlm {
-    /// Replace the validator during tests to inject a pre-configured one
-    /// (e.g., with a loaded thesaurus that production code does not yet wire up).
-    fn set_validator_for_test(&mut self, validator: KnowledgeGraphValidator) {
-        self.validator = validator;
-    }
-}
-
 /// Result from a direct LLM query.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct LlmQueryResult {

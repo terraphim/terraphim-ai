@@ -40,17 +40,17 @@ flate2 = "1.0"
 reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
 
 # Internal dependencies (feature-gated)
-terraphim_multi_agent = { version = "1.0.0",  optional = true, registry = "terraphim" }
-terraphim_agent_evolution = { version = "1.20.2",  optional = true, registry = "terraphim" }
+terraphim_multi_agent = { version = "1.0.0", optional = true }
+terraphim_agent_evolution = { version = "1.20.2", optional = true, registry = "terraphim" }
 
 # LLM integration for workflow understanding
-terraphim_service = { version = "1.20.5", registry = "terraphim" }
+terraphim_service = { version = "1.20.4" }
 
 # Always needed for types
-terraphim_types = { version = "1.20.2", registry = "terraphim" }
+terraphim_types = { version = "1.20.4" }
 
 # Knowledge graph for learning
-terraphim_rolegraph = { version = "1.20.2", registry = "terraphim" }
+terraphim_rolegraph = { version = "1.20.4" }
 
 # Firecracker VM integration -- Linux-only (Firecracker is a Linux/KVM technology).
 # Not directly imported in M1 (the host + rch routes need no VM), but carried on
