@@ -13,10 +13,9 @@ pub use executor::{
     CommandExecutor, CommandResult, HostCommandExecutor, MockCommandExecutor, WorkflowExecutor,
     WorkflowExecutorConfig,
 };
-pub use parser::{
-    ParsedWorkflow, WorkflowStep, parse_single_workflow_yaml,
-    parse_workflow_payload,
-};
 #[cfg(feature = "github-runner")]
 pub use parser::WorkflowParser;
+pub use parser::{
+    ParsedWorkflow, WorkflowStep, parse_single_workflow_yaml, parse_workflow_payload,
+};
 pub use vm_executor::{SimulatedVmExecutor, VmCommandExecutor};
