@@ -130,7 +130,7 @@ jobs:
         run: /home/alex/.local/bin/rch exec -- cargo fmt --all -- --check
 
       - name: Clippy Check
-        run: /home/alex/.local/bin/rch exec -- cargo clippy --workspace --all-targets --features zlob -- -D warnings
+        run: /home/alex/.local/bin/rch exec -- cargo clippy --workspace --all-targets -- -D warnings
         env:
           RUST_BACKTRACE: 1
 
@@ -244,10 +244,9 @@ jobs:
       - name: Build release binaries
         # Dispatched through rch so this build queues alongside ADF agents
         # via rchd's slot accounting. Fail-open: if rchd is down, rch falls
-        # through to local cargo. zlob feature required: fff-search build.rs
-        # panics when CI=true unless zlob is explicitly enabled.
+        # through to local cargo.
         run: |
-          /home/alex/.local/bin/rch exec -- cargo build --release --target ${{ matrix.target }} --workspace --features zlob
+          /home/alex/.local/bin/rch exec -- cargo build --release --target ${{ matrix.target }} --workspace
 
           # Verify key binaries exist
           ls -la target/${{ matrix.target }}/release/terraphim*
@@ -282,12 +281,10 @@ jobs:
 
       - name: Run tests
         run: |
-          # Run unit and integration tests via nextest (exclude integration-signing which requires zitsign CLI)
-          # zlob feature required: fff-search build.rs panics when CI=true without zlob.
-          # terraphim_automata/medical required: SHA-256 checksum verification tests for the
-          # deserialize_unchecked safety precondition (security finding #1313 P1-1).
+          # Run unit and integration tests via nextest
+          # terraphim_automata/medical required: SHA-256 checksum verification tests
           # slow-timeout and fail-fast are configured in .config/nextest.toml [profile.ci]
-          /home/alex/.local/bin/rch exec -- cargo nextest run --release --target ${{ matrix.target }} --workspace --profile ci --features "self_update/signatures,zlob,terraphim_automata/medical"
+          /home/alex/.local/bin/rch exec -- cargo nextest run --release --target ${{ matrix.target }} --workspace --profile ci --features "self_update/signatures,terraphim_automata/medical"
 
       - name: Test terraphim_grep with code-search feature
         run: |
