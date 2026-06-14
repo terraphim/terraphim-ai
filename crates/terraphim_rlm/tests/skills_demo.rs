@@ -6,21 +6,17 @@ use terraphim_rlm::{RlmConfig, TerraphimRlm};
 #[tokio::test]
 async fn demo_all_skills() {
     let config = RlmConfig::minimal();
-    let rlm = TerraphimRlm::with_executor(
-        config,
-        terraphim_rlm::LocalExecutor::new(),
-    )
-    .unwrap();
+    let rlm = TerraphimRlm::with_executor(config, terraphim_rlm::LocalExecutor::new()).unwrap();
 
     // 1. Session create
     let session = rlm.create_session().await.unwrap();
-    println!("[session create] id={} state={:?}", session.id, session.state);
+    println!(
+        "[session create] id={} state={:?}",
+        session.id, session.state
+    );
 
     // 2. Code execution
-    let result = rlm
-        .execute_code(&session.id, "print(2+2)")
-        .await
-        .unwrap();
+    let result = rlm.execute_code(&session.id, "print(2+2)").await.unwrap();
     println!(
         "[code: 2+2] exit={} stdout={:?}",
         result.exit_code, result.stdout
@@ -64,10 +60,7 @@ async fn demo_all_skills() {
     assert_eq!(val, None);
 
     // 8. Status
-    let status = rlm
-        .get_session_status(&session.id, false)
-        .await
-        .unwrap();
+    let status = rlm.get_session_status(&session.id, false).await.unwrap();
     println!(
         "[status] backend={:?} snapshots={}",
         status.backend_type, status.snapshot_count

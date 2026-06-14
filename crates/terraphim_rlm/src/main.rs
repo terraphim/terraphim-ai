@@ -48,7 +48,10 @@ async fn run(cli: Cli) -> Result<CliResponse, Box<dyn std::error::Error>> {
     #[cfg(feature = "llm")]
     {
         if let Err(e) = rlm.auto_configure_llm().await {
-            log::warn!("LLM auto-configuration failed: {}. rlm_query will be unavailable.", e);
+            log::warn!(
+                "LLM auto-configuration failed: {}. rlm_query will be unavailable.",
+                e
+            );
         }
     }
 

@@ -910,8 +910,7 @@ impl TerraphimRlm {
             "llm_provider".to_string(),
             serde_json::Value::String("ollama".to_string()),
         );
-        let ollama_model = std::env::var("RLM_MODEL")
-            .unwrap_or_else(|_| "gemma3:270m".to_string());
+        let ollama_model = std::env::var("RLM_MODEL").unwrap_or_else(|_| "gemma3:270m".to_string());
         role.extra.insert(
             "llm_model".to_string(),
             serde_json::Value::String(ollama_model.clone()),
@@ -929,7 +928,9 @@ impl TerraphimRlm {
                 ])
                 .output()
                 .ok()?;
-            String::from_utf8(output.stdout).ok().map(|s| s.trim().to_string())
+            String::from_utf8(output.stdout)
+                .ok()
+                .map(|s| s.trim().to_string())
         });
 
         if let Some(ref key) = or_api_key {
@@ -938,7 +939,9 @@ impl TerraphimRlm {
             role.llm_api_key = Some(key.clone());
             role.llm_model = Some(or_model.clone());
             // Cache for child processes and build_llm_from_role
-            unsafe { std::env::set_var("OPENROUTER_API_KEY", key); }
+            unsafe {
+                std::env::set_var("OPENROUTER_API_KEY", key);
+            }
             log::info!("RLM auto-configure: openrouter model={}", or_model);
         }
 
@@ -958,11 +961,10 @@ impl TerraphimRlm {
             ..Default::default()
         });
 
-        let client = terraphim_service::llm::build_llm_from_role(&role)
-            .ok_or_else(|| {
-                log::warn!("RLM auto-configure: no LLM provider available");
-                RlmError::LlmNotConfigured
-            })?;
+        let client = terraphim_service::llm::build_llm_from_role(&role).ok_or_else(|| {
+            log::warn!("RLM auto-configure: no LLM provider available");
+            RlmError::LlmNotConfigured
+        })?;
 
         log::info!(
             "RLM LLM bridge configured: providers={} strategy={:?}",

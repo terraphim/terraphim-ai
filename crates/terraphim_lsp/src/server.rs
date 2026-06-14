@@ -144,12 +144,13 @@ impl LanguageServer for TerraphimLspServer {
         let uri = params.text_document_position_params.text_document.uri;
         let position = params.text_document_position_params.position;
 
-        let documents = self.documents.read().await;
-        let text = match documents.get(&uri) {
-            Some(text) => text.clone(),
-            None => return Ok(None),
+        let text = {
+            let documents = self.documents.read().await;
+            match documents.get(&uri) {
+                Some(text) => text.clone(),
+                None => return Ok(None),
+            }
         };
-        drop(documents);
 
         let analysis = analyse_kg_document(&text, &self.thesaurus);
         let offset = position_to_byte_offset(&text, position);
@@ -181,12 +182,13 @@ impl LanguageServer for TerraphimLspServer {
         let uri = params.text_document_position.text_document.uri;
         let position = params.text_document_position.position;
 
-        let documents = self.documents.read().await;
-        let text = match documents.get(&uri) {
-            Some(text) => text.clone(),
-            None => return Ok(None),
+        let text = {
+            let documents = self.documents.read().await;
+            match documents.get(&uri) {
+                Some(text) => text.clone(),
+                None => return Ok(None),
+            }
         };
-        drop(documents);
 
         let word = word_at_position(&text, position);
         let items = build_completions(&self.thesaurus, &word);
@@ -203,22 +205,23 @@ impl LanguageServer for TerraphimLspServer {
         params: DocumentDiagnosticParams,
     ) -> Result<DocumentDiagnosticReportResult> {
         let uri = &params.text_document.uri;
-        let documents = self.documents.read().await;
-        let text = match documents.get(uri) {
-            Some(text) => text.clone(),
-            None => {
-                return Ok(DocumentDiagnosticReportResult::Report(
-                    DocumentDiagnosticReport::Full(RelatedFullDocumentDiagnosticReport {
-                        full_document_diagnostic_report: FullDocumentDiagnosticReport {
-                            result_id: None,
-                            items: vec![],
-                        },
-                        related_documents: None,
-                    }),
-                ));
+        let text = {
+            let documents = self.documents.read().await;
+            match documents.get(uri) {
+                Some(text) => text.clone(),
+                None => {
+                    return Ok(DocumentDiagnosticReportResult::Report(
+                        DocumentDiagnosticReport::Full(RelatedFullDocumentDiagnosticReport {
+                            full_document_diagnostic_report: FullDocumentDiagnosticReport {
+                                result_id: None,
+                                items: vec![],
+                            },
+                            related_documents: None,
+                        }),
+                    ));
+                }
             }
         };
-        drop(documents);
 
         let analysis = analyse_kg_document(&text, &self.thesaurus);
         let items = build_diagnostics_with_positions(&analysis, &text);
