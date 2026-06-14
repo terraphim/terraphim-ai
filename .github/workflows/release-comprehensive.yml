@@ -215,7 +215,6 @@ jobs:
           key: ${{ matrix.os }}-${{ matrix.target }}
 
       - name: Setup Node.js (for frontend build)
-        if: matrix.os != 'windows-latest'
         uses: actions/setup-node@v5
         with:
           node-version: 20
@@ -223,7 +222,6 @@ jobs:
           cache-dependency-path: desktop/yarn.lock
 
       - name: Build frontend assets
-        if: matrix.os != 'windows-latest'
         working-directory: ./desktop
         run: |
           yarn install --frozen-lockfile
@@ -592,11 +590,16 @@ jobs:
           find all-binaries -type f 2>/dev/null | sort || true
           echo ""
 
-          # Critical macOS assets that must exist for auto-update to work
+          # Critical server assets (macOS auto-update + primary Linux targets)
           CRITICAL_ASSETS=(
             "terraphim_server-x86_64-apple-darwin"
             "terraphim_server-aarch64-apple-darwin"
             "terraphim_server-universal-apple-darwin"
+          )
+          CRITICAL_PATTERNS=(
+            "terraphim_server-.*-x86_64-unknown-linux-gnu\\.tar\\.gz"
+            "terraphim_server-.*-x86_64-unknown-linux-musl\\.tar\\.gz"
+            "terraphim_server-.*-aarch64-unknown-linux-musl\\.tar\\.gz"
           )
 
           MISSING=0
@@ -609,15 +612,24 @@ jobs:
             fi
           done
 
+          for pattern in "${CRITICAL_PATTERNS[@]}"; do
+            if find all-binaries -type f 2>/dev/null | grep -E "${pattern}" | grep -q .; then
+              echo "  ✅ matches $pattern"
+            else
+              echo "  ❌ MISSING pattern: $pattern"
+              MISSING=$((MISSING + 1))
+            fi
+          done
+
           if [ $MISSING -gt 0 ]; then
             echo ""
-            echo "❌ Verification failed: $MISSING critical macOS server assets are missing"
+            echo "❌ Verification failed: $MISSING critical server assets are missing"
             echo "Aborting release."
             exit 1
           fi
 
           echo ""
-          echo "✅ All critical macOS server assets verified (client binaries attach via terraphim-clients workflow)"
+          echo "✅ All critical server assets verified (client binaries attach via terraphim-clients workflow)"
 
   create-release:
     name: Create GitHub release
@@ -626,7 +638,6 @@ jobs:
       always() &&
       !cancelled() &&
       needs.verify-versions.result == 'success' &&
-      needs.build-binaries.result == 'success' &&
       needs.sign-and-notarize-macos.result == 'success' &&
       needs.verify-release-assets.result == 'success'
     runs-on: ubuntu-latest

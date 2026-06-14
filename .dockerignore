@@ -151,9 +151,7 @@ desktop/package-lock.json
 !.github/rust-toolchain.toml
 !.cargo/config.toml
 
-# Exclude crates with private git dependencies (firecracker)
+# Exclude crates with private git dependencies (not needed for terraphim_server image)
 crates/terraphim_rlm/
 crates/terraphim_github_runner/
 crates/terraphim_github_runner_server/
-terraphim_firecracker/*
-!terraphim_firecracker/Cargo.toml

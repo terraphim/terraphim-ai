@@ -120,7 +120,7 @@ COPY .cargo/config.toml .cargo/config.toml
 COPY crates ./crates
 COPY terraphim_server ./terraphim_server
 COPY terraphim_ai_nodejs ./terraphim_ai_nodejs
-COPY terraphim_firecracker/Cargo.toml terraphim_firecracker/
+COPY terraphim_firecracker ./terraphim_firecracker
 
 # Replace any committed server assets with the CI-built frontend bundle.
 RUN rm -rf terraphim_server/dist && mkdir -p terraphim_server/dist
