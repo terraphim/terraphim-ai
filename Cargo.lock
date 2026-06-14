@@ -6743,15 +6743,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "sd-notify"
-version = "0.4.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b943eadf71d8b69e661330cb0e2656e31040acf21ee7708e2c238a0ec6af2bf4"
-dependencies = [
- "libc",
-]
-
-[[package]]
 name = "secrecy"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8613,29 +8604,6 @@ dependencies = [
  "terraphim_automata 1.20.4",
  "terraphim_types 1.20.4",
  "tracing",
-]
-
-[[package]]
-name = "terraphim_gitea_runner"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "axum 0.8.9",
- "base64",
- "chrono",
- "env_logger",
- "flate2",
- "log",
- "reqwest 0.12.28",
- "sd-notify",
- "serde",
- "serde_json",
- "tempfile",
- "terraphim_github_runner",
- "thiserror 1.0.69",
- "tokio",
- "uuid",
 ]
 
 [[package]]

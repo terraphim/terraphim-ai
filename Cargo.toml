@@ -50,6 +50,8 @@ exclude = [
     # "crates/terraphim_rlm",
     # terraphim_github_runner un-excluded for host-only reuse by terraphim_gitea_runner (#1910 M1).
     "crates/terraphim_github_runner_server",
+    # Host-only Gitea runner; depends on dockerignored terraphim_github_runner.
+    "crates/terraphim_gitea_runner",
 ]
 default-members = ["terraphim_server"]
 

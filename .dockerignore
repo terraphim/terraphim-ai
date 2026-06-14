@@ -155,3 +155,4 @@ desktop/package-lock.json
 crates/terraphim_rlm/
 crates/terraphim_github_runner/
 crates/terraphim_github_runner_server/
+crates/terraphim_gitea_runner/
