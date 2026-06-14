@@ -4,8 +4,12 @@ use axum_test::TestServer;
 use serde_json::json;
 
 /// Test the /chat endpoint with real Ollama backend.
-/// Skips within 2 seconds if Ollama is not reachable rather than hanging.
+///
+/// Requires Ollama running AND the active server role configured with
+/// `"llm_provider": "ollama"`. Run manually with:
+///   cargo test -p terraphim_server --test ollama_api_test test_chat_endpoint_with_ollama -- --ignored
 #[tokio::test]
+#[ignore = "requires Ollama running with a role configured for Ollama (llm_provider=ollama)"]
 async fn test_chat_endpoint_with_ollama() {
     if !common::llm_reachability::require_ollama().await {
         return;

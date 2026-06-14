@@ -115,8 +115,10 @@ async fn check_http_get(url: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serial_test::serial;
 
     #[test]
+    #[serial]
     fn llm_proxy_url_defaults_to_port_3456() {
         // Temporarily remove env var to test default
         let original = env::var("LLM_PROXY_URL").ok();
@@ -133,6 +135,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn llm_proxy_url_reads_env_var() {
         unsafe {
             env::set_var("LLM_PROXY_URL", "http://example.com:9999");
@@ -144,6 +147,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn ollama_url_defaults_to_port_11434() {
         let original = env::var("OLLAMA_BASE_URL").ok();
         unsafe {
@@ -158,6 +162,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn require_llm_proxy_returns_false_for_closed_port() {
         unsafe {
             env::set_var("LLM_PROXY_URL", "http://127.0.0.1:59998");
@@ -171,6 +176,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn require_ollama_returns_false_for_closed_port() {
         unsafe {
             env::set_var("OLLAMA_BASE_URL", "http://127.0.0.1:59997");
