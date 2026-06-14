@@ -28,7 +28,7 @@ chrono = { workspace = true }
 
 semver = "1.0"
 sha2 = "0.10"
-ureq = "2.9"
+ureq = "3.3"
 dirs = "5.0"
 dialoguer = "0.12"
 # zipsign-api for signature verification (also pulled by self_update)
