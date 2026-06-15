@@ -71,6 +71,7 @@ impl TuiIntegrationTester {
     }
 
     /// Create with default configuration
+    #[allow(clippy::should_implement_trait)]
     pub fn default() -> Self {
         Self::new(IntegrationTestConfig::default())
     }
@@ -160,11 +161,9 @@ impl TuiIntegrationTester {
         ];
 
         let mut commands = Vec::new();
-        let mut idx = 0;
 
-        for _ in 0..self.config.stress_test_commands {
+        for idx in 0..self.config.stress_test_commands {
             commands.push(base_commands[idx % base_commands.len()].to_string());
-            idx += 1;
         }
 
         commands

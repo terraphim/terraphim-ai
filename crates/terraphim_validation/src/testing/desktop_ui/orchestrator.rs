@@ -402,22 +402,22 @@ impl DesktopUITestOrchestrator {
                 format!(
                     r#"<div class="test-result {}">
                         <h3>{}</h3>
-                        <p><strong>Status:</strong> {}</p>
+                        <p><strong>Status:</strong> {:?}</p>
                         {}
                         {}
                     </div>"#,
                     css_class,
                     result.name,
-                    format!("{:?}", result.status),
+                    result.status,
                     result
                         .message
                         .as_ref()
-                        .map(|msg| format!("<p><strong>Message:</strong> {}</p>", msg))
+                        .map(|msg| format!("<p><strong>Message:</strong> {msg}</p>"))
                         .unwrap_or_default(),
                     result
                         .details
                         .as_ref()
-                        .map(|details| format!("<p><strong>Details:</strong> {}</p>", details))
+                        .map(|details| format!("<p><strong>Details:</strong> {details}</p>"))
                         .unwrap_or_default()
                 )
             })

@@ -108,27 +108,33 @@ pub struct ScreenshotComparison {
 pub struct ElementUtils;
 
 impl ElementUtils {
-    /// Wait for element to be visible with timeout
-    pub async fn wait_for_element_visible(selector: &str, timeout: Duration) -> Result<bool> {
-        // Implementation would use Playwright to wait for element
+    /// Wait for element to be visible with timeout.
+    ///
+    /// Not yet implemented: requires a UI test driver (e.g. Playwright).
+    /// `_selector` and `_timeout` are intentionally unused until integration is wired.
+    pub async fn wait_for_element_visible(_selector: &str, _timeout: Duration) -> Result<bool> {
         tokio::time::sleep(Duration::from_millis(100)).await;
         Ok(true)
     }
 
-    /// Wait for element to contain specific text
+    /// Wait for element to contain specific text.
+    ///
+    /// Not yet implemented: requires a UI test driver (e.g. Playwright).
+    /// `_selector`, `_expected_text`, and `_timeout` are intentionally unused until integration is wired.
     pub async fn wait_for_text(
-        selector: &str,
-        expected_text: &str,
-        timeout: Duration,
+        _selector: &str,
+        _expected_text: &str,
+        _timeout: Duration,
     ) -> Result<bool> {
-        // Implementation would wait for text to appear
         tokio::time::sleep(Duration::from_millis(100)).await;
         Ok(true)
     }
 
-    /// Wait for element to be clickable
-    pub async fn wait_for_clickable(selector: &str, timeout: Duration) -> Result<bool> {
-        // Implementation would wait for element to be clickable
+    /// Wait for element to be clickable.
+    ///
+    /// Not yet implemented: requires a UI test driver (e.g. Playwright).
+    /// `_selector` and `_timeout` are intentionally unused until integration is wired.
+    pub async fn wait_for_clickable(_selector: &str, _timeout: Duration) -> Result<bool> {
         tokio::time::sleep(Duration::from_millis(100)).await;
         Ok(true)
     }

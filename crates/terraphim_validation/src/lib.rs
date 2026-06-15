@@ -9,7 +9,6 @@
 // TODO: Gradually remove these allows as the crate matures
 #![allow(unused)]
 #![allow(ambiguous_glob_reexports)]
-#![allow(clippy::all)]
 
 pub mod artifacts;
 pub mod orchestrator;
@@ -61,7 +60,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_validation_system_creation() {
-        let system = ValidationSystem::new().unwrap();
-        assert!(true); // Basic creation test
+        let _system = ValidationSystem::new().unwrap();
     }
 }
