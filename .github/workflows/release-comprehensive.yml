@@ -279,6 +279,21 @@ jobs:
             --target ${{ matrix.target }} -p terraphim_server --bin terraphim_server
           ls -la "target/${{ matrix.target }}/release/terraphim_server"
 
+      - name: Build LSP binary
+        if: "!matrix.use_cross"
+        shell: bash
+        run: |
+          rustup run stable cargo build --release \
+            --target ${{ matrix.target }} -p terraphim_lsp --bin terraphim-lsp
+
+      - name: Build LSP binary (cross / musl)
+        if: matrix.use_cross
+        shell: bash
+        run: |
+          rustup run stable cross build --release \
+            --target ${{ matrix.target }} -p terraphim_lsp --bin terraphim-lsp
+          ls -la "target/${{ matrix.target }}/release/terraphim-lsp"
+
       - name: Verify binary versions (native builds only)
         if: matrix.target == 'x86_64-unknown-linux-gnu'
         shell: bash
@@ -310,6 +325,18 @@ jobs:
           tar -czf "artifacts/terraphim_server-${VERSION}-${{ matrix.target }}.tar.gz" \
             -C "target/${{ matrix.target }}/release" terraphim_server
           cp "$BIN" "artifacts/terraphim_server-${{ matrix.target }}"
+
+          # LSP binary (optional -- may fail on some targets, non-fatal)
+          LSP_BIN="target/${{ matrix.target }}/release/terraphim-lsp"
+          if [ -f "$LSP_BIN" ]; then
+            tar -czf "artifacts/terraphim-lsp-${VERSION}-${{ matrix.target }}.tar.gz" \
+              -C "target/${{ matrix.target }}/release" terraphim-lsp
+            cp "$LSP_BIN" "artifacts/terraphim-lsp-${{ matrix.target }}"
+            echo "LSP binary packaged successfully"
+          else
+            echo "::warning::LSP binary not found at $LSP_BIN -- skipping"
+          fi
+
           chmod +x artifacts/*
 
       - name: Prepare artifacts (Windows)
@@ -325,6 +352,11 @@ jobs:
           if [ -f "terraphim_server.exe" ]; then
             7z a -tzip "../../../artifacts/terraphim_server-${VERSION}-${{ matrix.target }}.zip" terraphim_server.exe
             cp terraphim_server.exe "../../../artifacts/terraphim_server-${{ matrix.target }}.exe"
+          fi
+          # LSP binary (optional, non-fatal if missing)
+          if [ -f "terraphim-lsp.exe" ]; then
+            7z a -tzip "../../../artifacts/terraphim-lsp-${VERSION}-${{ matrix.target }}.zip" terraphim-lsp.exe
+            cp terraphim-lsp.exe "../../../artifacts/terraphim-lsp-${{ matrix.target }}.exe"
           fi
           cd -
 
@@ -362,11 +394,26 @@ jobs:
             aarch64/terraphim_server-aarch64-apple-darwin \
             -output universal/terraphim_server-universal-apple-darwin
 
+          # LSP universal binary (optional -- non-fatal if missing)
+          if [ -f "x86_64/terraphim-lsp-x86_64-apple-darwin" ] && \
+             [ -f "aarch64/terraphim-lsp-aarch64-apple-darwin" ]; then
+            lipo -create \
+              x86_64/terraphim-lsp-x86_64-apple-darwin \
+              aarch64/terraphim-lsp-aarch64-apple-darwin \
+              -output universal/terraphim-lsp-universal-apple-darwin
+            echo "LSP universal binary created"
+          else
+            echo "::warning::LSP macOS binaries missing -- skipping universal creation"
+          fi
+
           chmod +x universal/*
 
-          echo "Verifying universal server binary:"
-          file universal/terraphim_server-universal-apple-darwin
-          lipo -info universal/terraphim_server-universal-apple-darwin
+          echo "Verifying universal binaries:"
+          for bin in universal/*; do
+            echo "  $bin:"
+            file "$bin"
+            lipo -info "$bin"
+          done
 
       - name: Upload universal binaries
         uses: actions/upload-artifact@v5
@@ -421,11 +468,35 @@ jobs:
             "$CERT_BASE64" \
             "$CERT_PASSWORD"
 
+      - name: Sign and notarize terraphim-lsp (if present)
+        continue-on-error: true
+        env:
+          RUNNER_TEMP: ${{ runner.temp }}
+        run: |
+          if [ -f "universal/terraphim-lsp-universal-apple-darwin" ]; then
+            ./scripts/sign-macos-binary.sh \
+              "universal/terraphim-lsp-universal-apple-darwin" \
+              "$APPLE_ID" \
+              "$APPLE_TEAM_ID" \
+              "$APPLE_APP_PASSWORD" \
+              "$CERT_BASE64" \
+              "$CERT_PASSWORD"
+          else
+            echo "LSP universal binary not found -- skipping signing"
+          fi
+
       - name: Verify signed binaries
         run: |
           echo "==> Verifying terraphim_server"
           codesign --verify --deep --strict --verbose=2 universal/terraphim_server-universal-apple-darwin
           file universal/terraphim_server-universal-apple-darwin
+
+          # LSP verification (optional)
+          if [ -f "universal/terraphim-lsp-universal-apple-darwin" ]; then
+            echo "==> Verifying terraphim-lsp"
+            codesign --verify --deep --strict --verbose=2 universal/terraphim-lsp-universal-apple-darwin
+            file universal/terraphim-lsp-universal-apple-darwin
+          fi
 
       - name: Upload signed binaries
         uses: actions/upload-artifact@v5
@@ -744,6 +815,9 @@ jobs:
 
             ### Server Binaries
             - `terraphim_server-*`: Server binaries for various platforms
+
+            ### LSP Binary
+            - `terraphim-lsp-*`: Language Server Protocol binary for IDE integration
 
             ### Client Binaries (agent, cli, grep)
             Built from [terraphim-clients](https://github.com/terraphim/terraphim-clients) and attached to this release:

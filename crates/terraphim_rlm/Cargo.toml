@@ -30,7 +30,7 @@ terraphim_config = { version = "1.20.4", optional = true }
 terraphim_automata = { version = "1.20.4", optional = true }
 terraphim_types = { version = "1.20.4", optional = true }
 terraphim_rolegraph = { version = "1.20.4", optional = true }
-terraphim_agent_supervisor = { version = "1.19.2", optional = true, registry = "terraphim" }
+terraphim_agent_supervisor = { version = "1.19.2", optional = true }
 
 # Firecracker-rust core for VM and snapshot management (private repo).
 # Uncomment when building with --features firecracker on a machine with
