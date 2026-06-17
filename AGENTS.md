@@ -93,6 +93,31 @@ yarn e2e              # End-to-end tests
 - Use `tmux` to spin off background tasks, read their output, and drive interaction
 - Use `tmux` instead of `sleep` to continue working on a project and then read log output
 
+## Search Tooling (use Terraphim's own, not opencode FFF)
+
+Terraphim ships its own file/content search stack (the `fff_search` crate,
+exposed via the `terraphim-grep` CLI). **Do not use opencode's bundled FFF
+`grep` / `find` / `glob` tools for Terraphim work.** That FFF has a
+directory-`path`-filter bug (it returns nothing when `path` is a directory,
+while repo-wide and exact-file paths work; tracked at
+`anomalyco/opencode#32688`) and is not under Terraphim's control.
+
+Use `terraphim-grep` via Bash for content search -- it honours directory
+`--paths`, is KG-curated, and falls back to RLM synthesis when configured:
+
+```bash
+# Directory-scoped content search (the exact case opencode FFF gets wrong)
+terraphim-grep "<query>" --paths <dir> --role rust-engineer -n 50
+
+# Limit haystack; JSON output; context lines
+terraphim-grep "<query>" --haystack code|docs --json -C 3 --role rust-engineer
+```
+
+- `--role` is required when multiple project roles are configured
+  (`rust-engineer`, `ai-engineer`, `devops`).
+- For locating files by **name** (not content), use `git ls-files`, `fd`, or
+  shell `find`/`grep -rn` -- not the opencode FFF `find`/`glob` tools.
+
 ## Documentation Management
 
 ### File Summaries
