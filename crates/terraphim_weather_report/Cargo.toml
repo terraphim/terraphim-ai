@@ -1,0 +1,32 @@
+[package]
+name = "terraphim_weather_report"
+version = "1.20.5"
+edition = "2021"
+authors = ["Terraphim Team <team@terraphim.ai>"]
+description = "Weather-report CLI for ADF model tiers: shows which LLM models are currently available across thinking / workhorse / fast-and-cheap tiers"
+license = "Apache-2.0"
+repository = "https://github.com/terraphim/terraphim-ai"
+homepage = "https://terraphim.ai"
+
+[[bin]]
+name = "weather-report"
+path = "src/main.rs"
+
+[lib]
+name = "terraphim_weather_report"
+path = "src/lib.rs"
+
+[dependencies]
+terraphim_automata = { version = "1.20.2", registry = "terraphim" }
+terraphim_orchestrator = { version = "1.20.2", registry = "terraphim" }
+terraphim_types = { version = "1.20.2", registry = "terraphim" }
+
+anyhow = "1.0"
+clap = { version = "4", features = ["derive", "env"] }
+jiff = "0.2"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1.0", features = ["rt-multi-thread", "macros", "time", "process"] }
+
+[dev-dependencies]
+tempfile = "3.27"

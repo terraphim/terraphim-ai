@@ -22,10 +22,10 @@ route:: openai-codex, gpt-5.5
 action:: /home/alex/.local/bin/pi-rust --provider openai-codex --model {{ model }} -p "{{ prompt }}"
 
 route:: openai, opencode/gpt-5.5
-action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"
+action:: opencode run -m {{ model }} --format json "{{ prompt }}"
 
 route:: kimi, kimi-for-coding/k2p6
-action:: /home/alex/.bun/bin/opencode run -m {{ model }} --format json "{{ prompt }}"
+action:: opencode run -m {{ model }} --format json "{{ prompt }}"
 
 # Z.AI Coding Plan healthy via pi-rust; broken via opencode 1.14.48
 # (opencode emits only step_start, no text). Investigation: 2026-05-23.
