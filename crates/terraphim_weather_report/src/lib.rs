@@ -591,7 +591,10 @@ mod tests {
         assert!(!entries.is_empty(), "ADF taxonomy should define tiers");
 
         // Sorted by priority descending: planning (80) should come first.
-        let priorities: Vec<u8> = entries.iter().map(|(_, d)| d.priority.unwrap_or(0)).collect();
+        let priorities: Vec<u8> = entries
+            .iter()
+            .map(|(_, d)| d.priority.unwrap_or(0))
+            .collect();
         let mut sorted = priorities.clone();
         sorted.sort_by_key(|&p| std::cmp::Reverse(p));
         assert_eq!(priorities, sorted);
