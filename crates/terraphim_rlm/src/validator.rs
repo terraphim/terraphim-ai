@@ -691,4 +691,79 @@ mod tests {
                 .any(|s| s.contains("known terms") || s.contains("term1"))
         );
     }
+
+    // --- Thesaurus fixture tests covering all three KgStrictness variants ---
+    // These tests use a minimal in-memory Thesaurus to exercise the code paths
+    // where a thesaurus is present, verifying the distinction between
+    // Permissive (always pass), Normal (fail on zero matches), and Strict
+    // (fail on zero matches, require connectivity).
+
+    #[cfg(feature = "kg-validation")]
+    #[test]
+    fn test_validator_permissive_with_empty_thesaurus_passes() {
+        // Permissive mode must always pass even when a thesaurus exists but
+        // no terms in the command match any thesaurus entry.
+        let thesaurus = Thesaurus::new("test".to_string());
+        let validator =
+            KnowledgeGraphValidator::new(ValidatorConfig::permissive()).with_thesaurus(thesaurus);
+        let result = validator
+            .validate("some command with words that do not match")
+            .unwrap();
+        assert!(
+            result.passed,
+            "Permissive mode must pass regardless of matches"
+        );
+    }
+
+    #[cfg(feature = "kg-validation")]
+    #[test]
+    fn test_validator_normal_with_empty_thesaurus_fails() {
+        // Normal mode must fail when a thesaurus is present but zero terms
+        // from the command match any thesaurus entry.
+        let thesaurus = Thesaurus::new("test".to_string());
+        let validator =
+            KnowledgeGraphValidator::new(ValidatorConfig::default()).with_thesaurus(thesaurus);
+        // All words are unknown — no matches possible from empty thesaurus.
+        let result = validator
+            .validate("unknown domain words that should not match")
+            .unwrap();
+        assert!(!result.passed, "Normal mode must fail when no terms match");
+        assert!(result.matched_terms.is_empty());
+    }
+
+    #[cfg(feature = "kg-validation")]
+    #[test]
+    fn test_validator_strict_with_empty_thesaurus_fails() {
+        // Strict mode must fail when a thesaurus is present but zero terms match.
+        let thesaurus = Thesaurus::new("test".to_string());
+        let validator =
+            KnowledgeGraphValidator::new(ValidatorConfig::strict()).with_thesaurus(thesaurus);
+        let result = validator
+            .validate("unknown domain words that should not match")
+            .unwrap();
+        assert!(!result.passed, "Strict mode must fail when no terms match");
+        assert!(result.matched_terms.is_empty());
+    }
+
+    #[cfg(feature = "kg-validation")]
+    #[test]
+    fn test_validator_normal_with_matching_thesaurus_passes() {
+        // Normal mode passes when matched terms exist.
+        // Uses NormalizedTermValue + NormalizedTerm to insert a real entry.
+        use terraphim_types::{NormalizedTerm, NormalizedTermValue};
+        let mut thesaurus = Thesaurus::new("test".to_string());
+        thesaurus.insert(
+            NormalizedTermValue::from("rust"),
+            NormalizedTerm::with_auto_id(NormalizedTermValue::from("rust")),
+        );
+        let validator =
+            KnowledgeGraphValidator::new(ValidatorConfig::default()).with_thesaurus(thesaurus);
+        // "rust" is in the thesaurus — should match and pass Normal mode.
+        let result = validator.validate("using rust for this task").unwrap();
+        assert!(
+            result.passed,
+            "Normal mode must pass when at least one term matches"
+        );
+        assert!(!result.matched_terms.is_empty());
+    }
 }
