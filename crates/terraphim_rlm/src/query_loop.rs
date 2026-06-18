@@ -690,7 +690,13 @@ fn truncate(s: &str, max_len: usize) -> String {
     if s.len() <= max_len {
         s.to_string()
     } else {
-        let boundary = s.floor_char_boundary(max_len);
+        let boundary = {
+            let mut i = max_len.min(s.len());
+            while i > 0 && !s.is_char_boundary(i) {
+                i -= 1;
+            }
+            i
+        };
         format!("{}...", &s[..boundary])
     }
 }
