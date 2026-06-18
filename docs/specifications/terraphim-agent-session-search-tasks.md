@@ -2,7 +2,7 @@
 
 > **Version**: 1.2.0
 > **Created**: 2025-12-03
-> **Updated**: 2026-06-01
+> **Updated**: 2026-06-18
 > **Status**: Phase 3 Complete — All Tasks Verified
 
 ## Overview
@@ -397,7 +397,7 @@ This document tracks implementation tasks for the Session Search and Robot Mode 
 
 **Priority**: P2 (Medium)
 **Dependencies**: Task 2.3
-**Status**: 🔄 Planned
+**Status**: ✅ Complete (Cursor implemented via CLA connector in terraphim-clients)
 
 #### Subtasks
 
@@ -407,11 +407,15 @@ This document tracks implementation tasks for the Session Search and Robot Mode 
   - Handle schema versions
   - Extract code snippets
   - Incremental import
+- [x] **2.5.4** Cursor SQLite connector — Implemented via `cla/connector.rs` in terraphim-clients
+  - Platform-aware path detection (macOS, Linux, Windows)
+  - ComposerData and legacy ItemTable format support
+  - Schema version detection
 
 #### Acceptance Criteria
 
-- [ ] Reads Cursor SQLite database
-- [ ] Handles different schema versions
+- [x] Reads Cursor SQLite database (via CLA connector in terraphim-clients)
+- [x] Handles different schema versions (ComposerData and ItemTable formats)
 
 ---
 
@@ -495,31 +499,37 @@ pub fn search_sessions_hybrid(
 **Priority**: P1 (High)
 **Dependencies**: Tasks 2.2-2.5
 **Location**: `crates/terraphim_agent/src/sessions/`
+**Status**: ✅ Complete — Implemented in terraphim-clients at `crates/terraphim_agent/src/repl/handler.rs` (`handle_sessions()` line 1914+)
 
 #### Subtasks
 
-- [ ] **2.6.1** Implement `/sessions import`
+- [x] **2.6.1** Implement `/sessions import`
   - Auto-detect sources
   - Source-specific import
   - Progress reporting
 
-- [ ] **2.6.2** Implement `/sessions search`
+- [x] **2.6.2** Implement `/sessions search`
   - Query sessions
   - Filter by source
   - Display results
 
-- [ ] **2.6.3** Implement `/sessions list`
+- [x] **2.6.3** Implement `/sessions list`
   - List imported sessions
   - Filter and sort
 
-- [ ] **2.6.4** Implement `/sessions expand`
+- [x] **2.6.4** Implement `/sessions expand`
   - Show full session
   - Context around match
 
+Note: Additional commands also implemented: `/sessions related`, `/sessions timeline`,
+`/sessions export`, `/sessions enrich`, `/sessions files`, `/sessions by-file`,
+`/sessions cluster`, `/sessions index`, `/sessions stats`, `/sessions show`,
+`/sessions sources`, `/sessions concepts`.
+
 #### Acceptance Criteria
 
-- [ ] Commands work in REPL
-- [ ] Robot mode output works
+- [x] Commands work in REPL (in terraphim-clients)
+- [x] Robot mode output works
 
 ---
 
