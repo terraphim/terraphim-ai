@@ -60,6 +60,52 @@ yarn test             # Unit tests
 yarn e2e              # End-to-end tests
 ```
 
+## Search Tooling Policy
+
+Terraphim has its own file and content search stack. Use it — do NOT rely on
+opencode's bundled FFF `grep`/`find`/`glob` tools, which have a known
+directory-`path`-filter bug (returns nothing for directory paths; tracked at
+`anomalyco/opencode#32688`) and are not under Terraphim's control.
+
+### Content Search (find text inside files)
+
+Use `terraphim-grep` via Bash:
+
+```bash
+# Search all Rust files for a symbol
+terraphim-grep "fn ensure_thesaurus_loaded" --type rust
+
+# Search with context lines
+terraphim-grep "DeviceStorage::init" --type rust -C 3
+
+# Search a specific directory
+terraphim-grep "haystack" crates/terraphim_service/src/
+```
+
+`terraphim-grep` is the `fff_search` crate CLI and is always available at
+`~/.cargo/bin/terraphim-grep` or on `$PATH` after `cargo install`.
+
+### File-Name Lookup (find files by name/pattern)
+
+Use standard POSIX tools — do NOT use opencode FFF `find_files`:
+
+```bash
+# Find Rust source files matching a pattern
+git ls-files '*.rs' | grep "haystack"
+
+# Find files by name (non-git directories)
+fd "config.toml" crates/
+
+# POSIX fallback
+find crates/ -name "*.toml" -not -path "*/target/*"
+```
+
+### What NOT to Use
+
+- **opencode FFF `grep`** — directory `path` filter is broken
+- **opencode FFF `find_files`** — same bug; use `git ls-files` or `fd` instead
+- **opencode FFF `glob`** — use `git ls-files` glob syntax instead
+
 ## Code Style Guidelines
 
 ### Rust
