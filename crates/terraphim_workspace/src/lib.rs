@@ -9,6 +9,7 @@ use std::time::Duration;
 use tokio::process::Command;
 
 pub mod config;
+use config::DANGEROUS_ENV_VARS;
 pub use config::{HooksConfig, WorkspaceConfig};
 
 /// Errors that can occur during workspace operations.
@@ -47,6 +48,13 @@ pub enum WorkspaceError {
         /// Configured timeout in milliseconds.
         timeout_ms: u64,
     },
+
+    /// A hook script contains potentially dangerous content.
+    #[error("hook script invalid: {reason}")]
+    HookScriptInvalid {
+        /// Description of the validation failure.
+        reason: String,
+    },
 }
 
 /// Result type for workspace operations.
@@ -64,6 +72,7 @@ pub struct WorkspaceInfo {
 }
 
 /// Manages per-issue workspaces on the filesystem.
+#[derive(Debug)]
 pub struct WorkspaceManager {
     root: PathBuf,
     hooks: HooksConfig,
@@ -72,8 +81,17 @@ pub struct WorkspaceManager {
 
 impl WorkspaceManager {
     /// Create a new workspace manager.
+    ///
+    /// Returns an error if the root directory cannot be created or canonicalized,
+    /// or if any hook script contains forbidden shell metacharacters.
     pub fn new(config: &WorkspaceConfig) -> Result<Self> {
         let root = &config.root;
+
+        // Validate hook scripts before accepting the configuration.
+        config
+            .hooks
+            .validate_scripts()
+            .map_err(|reason| WorkspaceError::HookScriptInvalid { reason })?;
 
         // Ensure root exists
         std::fs::create_dir_all(root).map_err(|e| WorkspaceError::Workspace {
@@ -255,13 +273,14 @@ impl WorkspaceManager {
     }
 
     /// Validate that a workspace path stays under the workspace root.
+    ///
+    /// Uses component-aware [`Path::starts_with`] rather than string comparison to
+    /// prevent prefix-confusion attacks where a root of `/tmp/ws` would incorrectly
+    /// accept `/tmp/ws_evil` under string-based matching.
     fn validate_path(&self, path: &Path, identifier: &str) -> Result<()> {
-        let path_str = path.to_string_lossy();
-        let root_str = self.root.to_string_lossy();
-
-        if !path_str.starts_with(root_str.as_ref()) {
+        if !path.starts_with(&self.root) {
             return Err(WorkspaceError::PathOutsideRoot {
-                path: path_str.into_owned(),
+                path: path.to_string_lossy().into_owned(),
             });
         }
 
@@ -269,7 +288,7 @@ impl WorkspaceManager {
         let key = sanitise_workspace_key(identifier);
         if key.contains('/') || key.contains('\\') {
             return Err(WorkspaceError::PathOutsideRoot {
-                path: path_str.into_owned(),
+                path: path.to_string_lossy().into_owned(),
             });
         }
         Ok(())
@@ -293,6 +312,15 @@ impl WorkspaceManager {
             .stderr(std::process::Stdio::piped());
 
         for (key, val) in env_vars {
+            // Strip dynamic-linker variables that enable library injection attacks.
+            if DANGEROUS_ENV_VARS.contains(&key.as_str()) {
+                tracing::warn!(
+                    hook = hook_name,
+                    env_key = key,
+                    "stripping dangerous env var from hook subprocess"
+                );
+                continue;
+            }
             cmd.env(key, val);
         }
 
@@ -353,12 +381,17 @@ impl WorkspaceManager {
     }
 }
 
+/// Maximum character count for a workspace key directory name.
+const MAX_WORKSPACE_KEY_LEN: usize = 200;
+
 /// Sanitise an issue identifier for use as a directory name.
 ///
-/// Replaces any character not in `[A-Za-z0-9._-]` with `_`.
+/// Replaces any character not in `[A-Za-z0-9._-]` with `_` and caps the output
+/// at [`MAX_WORKSPACE_KEY_LEN`] characters to prevent filesystem path-length issues.
 pub fn sanitise_workspace_key(identifier: &str) -> String {
     identifier
         .chars()
+        .take(MAX_WORKSPACE_KEY_LEN)
         .map(|c| {
             if c.is_ascii_alphanumeric() || c == '.' || c == '_' || c == '-' {
                 c
@@ -524,5 +557,93 @@ mod tests {
         let bad_path = PathBuf::from("/tmp/elsewhere/evil");
         let result = mgr.validate_path(&bad_path, "../evil");
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn path_prefix_confusion_is_rejected() {
+        // Verify that component-aware Path::starts_with is used, not string starts_with.
+        // e.g. root="/tmp/ws" must NOT accept path="/tmp/ws_evil/file".
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().to_path_buf();
+
+        // Construct a sibling path whose string representation shares the root prefix
+        // but differs at the path-component boundary.
+        let sibling_name = format!("{}_evil", tmp.path().file_name().unwrap().to_string_lossy());
+        let sibling = tmp.path().parent().unwrap().join(sibling_name).join("file");
+
+        let config = WorkspaceConfig {
+            root,
+            hooks: HooksConfig::default(),
+            hook_timeout_ms: 60000,
+        };
+        let mgr = WorkspaceManager::new(&config).unwrap();
+
+        let result = mgr.validate_path(&sibling, "file");
+        assert!(
+            result.is_err(),
+            "sibling path with shared string prefix must be rejected"
+        );
+    }
+
+    #[test]
+    fn sanitise_key_truncates_long_identifier() {
+        let long = "a".repeat(500);
+        let key = sanitise_workspace_key(&long);
+        assert_eq!(key.len(), MAX_WORKSPACE_KEY_LEN);
+    }
+
+    #[test]
+    fn sanitise_key_exact_boundary() {
+        let at_limit = "x".repeat(MAX_WORKSPACE_KEY_LEN);
+        let key = sanitise_workspace_key(&at_limit);
+        assert_eq!(key.len(), MAX_WORKSPACE_KEY_LEN);
+
+        let over_limit = "x".repeat(MAX_WORKSPACE_KEY_LEN + 1);
+        let key2 = sanitise_workspace_key(&over_limit);
+        assert_eq!(key2.len(), MAX_WORKSPACE_KEY_LEN);
+    }
+
+    #[test]
+    fn hook_script_injection_rejected_at_construction() {
+        let tmp = tempfile::tempdir().unwrap();
+        let config = WorkspaceConfig {
+            root: tmp.path().to_path_buf(),
+            hooks: HooksConfig::new().with_after_create("evil $(cmd)"),
+            hook_timeout_ms: 60000,
+        };
+        let result = WorkspaceManager::new(&config);
+        assert!(
+            result.is_err(),
+            "WorkspaceManager::new must reject scripts with injection patterns"
+        );
+        assert!(matches!(
+            result.unwrap_err(),
+            WorkspaceError::HookScriptInvalid { .. }
+        ));
+    }
+
+    #[tokio::test]
+    async fn dangerous_env_var_is_stripped_from_hook() {
+        let tmp = tempfile::tempdir().unwrap();
+        // Script writes the LD_PRELOAD value to a file; if stripped it produces an empty line.
+        let config = WorkspaceConfig {
+            root: tmp.path().to_path_buf(),
+            hooks: HooksConfig {
+                after_create: Some("printf '%s' \"$LD_PRELOAD\" > ld_preload.txt".into()),
+                ..Default::default()
+            },
+            hook_timeout_ms: 60000,
+        };
+        let mgr = WorkspaceManager::new(&config).unwrap();
+        let mut env = HashMap::new();
+        env.insert("LD_PRELOAD".into(), "libevil.so".into());
+
+        let info = mgr.prepare("SEC-TEST", &env).await.unwrap();
+        let content = std::fs::read_to_string(info.path.join("ld_preload.txt")).unwrap();
+        // LD_PRELOAD must have been stripped; the script sees an empty variable.
+        assert!(
+            content.is_empty(),
+            "LD_PRELOAD should have been stripped, got: {content:?}"
+        );
     }
 }
