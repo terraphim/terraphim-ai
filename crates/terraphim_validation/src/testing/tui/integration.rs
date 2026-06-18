@@ -3,14 +3,8 @@
 //! High-level integration tests that combine all TUI testing components
 //! to provide comprehensive validation of the complete TUI system.
 
-use crate::testing::tui::command_simulator::CommandSimulator;
-use crate::testing::tui::cross_platform::CrossPlatformTester;
 use crate::testing::tui::harness::TuiTestHarness;
-use crate::testing::tui::mock_terminal::MockTerminal;
-use crate::testing::tui::output_validator::OutputValidator;
-use crate::testing::tui::performance_monitor::{PerformanceMonitor, PerformanceSLO};
-use anyhow::{Result, anyhow};
-use std::collections::HashMap;
+use anyhow::Result;
 use std::time::Duration;
 
 /// Integration test configuration
@@ -61,6 +55,12 @@ pub struct TuiIntegrationTester {
     harness: Option<TuiTestHarness>,
 }
 
+impl Default for TuiIntegrationTester {
+    fn default() -> Self {
+        Self::new(IntegrationTestConfig::default())
+    }
+}
+
 impl TuiIntegrationTester {
     /// Create a new integration tester
     pub fn new(config: IntegrationTestConfig) -> Self {
@@ -68,11 +68,6 @@ impl TuiIntegrationTester {
             config,
             harness: None,
         }
-    }
-
-    /// Create with default configuration
-    pub fn default() -> Self {
-        Self::new(IntegrationTestConfig::default())
     }
 
     /// Run comprehensive integration tests
@@ -89,7 +84,7 @@ impl TuiIntegrationTester {
             working_dir: None,
         };
 
-        let mut harness = TuiTestHarness::new(harness_config).await?;
+        let harness = TuiTestHarness::new(harness_config).await?;
         self.harness = Some(harness);
 
         // Run comprehensive test suite
@@ -160,11 +155,9 @@ impl TuiIntegrationTester {
         ];
 
         let mut commands = Vec::new();
-        let mut idx = 0;
 
-        for _ in 0..self.config.stress_test_commands {
+        for idx in 0..self.config.stress_test_commands {
             commands.push(base_commands[idx % base_commands.len()].to_string());
-            idx += 1;
         }
 
         commands
@@ -476,6 +469,7 @@ impl TuiIntegrationTester {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
 
     #[test]
     fn test_integration_config_defaults() {
@@ -490,7 +484,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_integration_tester_creation() {
-        let tester = TuiIntegrationTester::default();
+        let _tester = TuiIntegrationTester::default();
         // Should not panic
     }
 

@@ -8,10 +8,9 @@ use crate::testing::tui::cross_platform::CrossPlatformTester;
 use crate::testing::tui::mock_terminal::MockTerminal;
 use crate::testing::tui::output_validator::OutputValidator;
 use crate::testing::tui::performance_monitor::PerformanceMonitor;
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
-use tokio::process::Command;
 
 /// TUI Test Configuration
 #[derive(Debug, Clone)]
@@ -242,7 +241,7 @@ impl TuiTestHarness {
         }
 
         // Test command history
-        let history_commands = vec![
+        let history_commands = [
             "/search history test 1",
             "/search history test 2",
             "/search history test 3",

@@ -1,7 +1,7 @@
 //! Test fixtures for validation system testing
 
 use crate::artifacts::{ArtifactType, Platform, ReleaseArtifact};
-use crate::testing::{Result, ValidationResult, ValidationStatus};
+use crate::testing::{ValidationResult, ValidationStatus};
 
 /// Create a mock release artifact for testing
 pub fn create_test_artifact(

@@ -23,8 +23,6 @@ pub struct TestValidationResult {
     pub details: Option<String>,
 }
 
-use std::collections::HashMap;
-
 /// Platform-specific test configuration
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct CrossPlatformTestConfig {

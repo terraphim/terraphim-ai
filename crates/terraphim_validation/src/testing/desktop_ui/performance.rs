@@ -3,7 +3,7 @@
 //! Testing framework for measuring application performance, memory usage,
 //! startup times, and resource consumption.
 
-use crate::testing::{Result, ValidationResult, ValidationStatus};
+use crate::testing::{Result, ValidationResult};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
@@ -266,8 +266,8 @@ impl PerformanceTester {
         }
 
         let avg_time = times.iter().sum::<Duration>() / times.len() as u32;
-        let min_time = times.iter().min().unwrap().clone();
-        let max_time = times.iter().max().unwrap().clone();
+        let min_time = *times.iter().min().unwrap();
+        let max_time = *times.iter().max().unwrap();
 
         Ok(BenchmarkResult {
             operation: operation.name.clone(),
@@ -278,7 +278,7 @@ impl PerformanceTester {
         })
     }
 
-    async fn execute_operation(&self, operation: &BenchmarkOperation) -> Result<()> {
+    async fn execute_operation(&self, _operation: &BenchmarkOperation) -> Result<()> {
         // Implementation would execute the specific benchmark operation
         // This is a placeholder - actual implementation would depend on the operation type
         tokio::time::sleep(Duration::from_millis(10)).await;

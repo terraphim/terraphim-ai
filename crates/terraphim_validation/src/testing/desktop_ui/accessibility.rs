@@ -3,9 +3,8 @@
 //! Testing framework for accessibility compliance, keyboard navigation,
 //! screen reader compatibility, and WCAG guidelines validation.
 
-use crate::testing::{Result, ValidationResult, ValidationStatus};
+use crate::testing::{Result, ValidationResult};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// Accessibility test configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -18,6 +17,7 @@ pub struct AccessibilityTestConfig {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(clippy::upper_case_acronyms)]
 pub enum WCAGLevel {
     A,
     AA,
@@ -95,7 +95,7 @@ impl AccessibilityTester {
 
         for screen_reader in &self.config.screen_readers {
             if screen_reader.enabled {
-                results.push(self.test_screen_reader(&screen_reader).await?);
+                results.push(self.test_screen_reader(screen_reader).await?);
             }
         }
 

@@ -190,16 +190,14 @@ impl TerminalState {
             }
             Some('J') => {
                 // Clear screen
-                match parts[0].trim_end_matches('J') {
-                    "2" => {
-                        // Clear entire screen
-                        for line in &mut self.buffer {
-                            *line = " ".repeat(self.size.width as usize);
-                        }
-                        self.cursor = CursorPosition::new(0, 0);
+                if parts[0].trim_end_matches('J') == "2" {
+                    // Clear entire screen
+                    for line in &mut self.buffer {
+                        *line = " ".repeat(self.size.width as usize);
                     }
-                    _ => {} // Other clear operations not implemented
+                    self.cursor = CursorPosition::new(0, 0);
                 }
+                // Other clear operations not implemented
             }
             Some('K') => {
                 // Clear line
@@ -400,7 +398,7 @@ impl Write for MockTerminal {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         let text = String::from_utf8_lossy(buf);
         // Call the MockTerminal's write method with &str
-        MockTerminal::write(self, &text).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+        MockTerminal::write(self, &text).map_err(io::Error::other)?;
         Ok(buf.len())
     }
 
