@@ -8267,13 +8267,13 @@ dependencies = [
  "terraphim_config 1.20.4",
  "terraphim_hooks",
  "terraphim_middleware",
- "terraphim_orchestrator",
+ "terraphim_orchestrator 1.20.3",
  "terraphim_persistence 1.20.4",
  "terraphim_rolegraph 1.20.4",
  "terraphim_service",
  "terraphim_sessions",
  "terraphim_settings 1.20.4",
- "terraphim_tracker",
+ "terraphim_tracker 1.20.4",
  "terraphim_types 1.20.4",
  "terraphim_update 1.20.4",
  "thiserror 1.0.69",
@@ -8281,6 +8281,26 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "urlencoding",
+ "uuid",
+]
+
+[[package]]
+name = "terraphim_agent_evolution"
+version = "1.20.2"
+source = "sparse+https://git.terraphim.cloud/api/packages/terraphim/cargo/"
+checksum = "b5a63ad3d53a09bec9eb72257c422e5575eec789935ee84722e15ff1b67f1f0c"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "futures",
+ "log",
+ "regex",
+ "serde",
+ "serde_json",
+ "terraphim_persistence 1.20.2",
+ "terraphim_types 1.20.2",
+ "thiserror 1.0.69",
+ "tokio",
  "uuid",
 ]
 
@@ -8662,7 +8682,7 @@ dependencies = [
  "reqwest 0.12.28",
  "serde",
  "serde_json",
- "terraphim_agent_evolution",
+ "terraphim_agent_evolution 1.20.4",
  "terraphim_agent_registry",
  "terraphim_automata 1.20.4",
  "terraphim_config 1.20.4",
@@ -8675,6 +8695,48 @@ dependencies = [
  "tokio",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "terraphim_orchestrator"
+version = "1.20.2"
+source = "sparse+https://git.terraphim.cloud/api/packages/terraphim/cargo/"
+checksum = "cb5a2924926c6fa6b80ea044dbdcbf18fccb5dcfc3c0be1caca19250cb82ae07"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "axum 0.8.9",
+ "chrono",
+ "clap",
+ "cron",
+ "glob",
+ "handlebars",
+ "hex",
+ "hmac 0.12.1",
+ "jiff",
+ "opendal",
+ "regex",
+ "reqwest 0.12.28",
+ "reqwest-middleware",
+ "reqwest-retry",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "terraphim_agent_evolution 1.20.2",
+ "terraphim_automata 1.20.2",
+ "terraphim_persistence 1.20.2",
+ "terraphim_router 1.20.2",
+ "terraphim_spawner 1.20.2",
+ "terraphim_tracker 1.20.2",
+ "terraphim_types 1.20.2",
+ "thiserror 1.0.69",
+ "tokio",
+ "toml 0.8.23",
+ "tracing",
+ "tracing-subscriber",
+ "ulid",
+ "uuid",
+ "which 5.0.0",
 ]
 
 [[package]]
@@ -8702,12 +8764,12 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
- "terraphim_agent_evolution",
+ "terraphim_agent_evolution 1.20.4",
  "terraphim_automata 1.20.4",
  "terraphim_persistence 1.20.4",
- "terraphim_router",
- "terraphim_spawner",
- "terraphim_tracker",
+ "terraphim_router 1.20.4",
+ "terraphim_spawner 1.20.4",
+ "terraphim_tracker 1.20.4",
  "terraphim_types 1.20.4",
  "thiserror 1.0.69",
  "tokio",
@@ -8851,6 +8913,24 @@ dependencies = [
 
 [[package]]
 name = "terraphim_router"
+version = "1.20.2"
+source = "sparse+https://git.terraphim.cloud/api/packages/terraphim/cargo/"
+checksum = "476d90f28cc70e3f1f5b76fed5309fa621087e7cce4acd2dd6f4a0384651ca50"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "dirs 5.0.1",
+ "serde",
+ "serde_yaml",
+ "terraphim_types 1.20.2",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "terraphim_router"
 version = "1.20.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c612dee853498ad8b380bf0e96e212c4a862f275c9a93ba07bb6928650a4f0cd"
@@ -8934,7 +9014,7 @@ dependencies = [
  "terraphim_middleware",
  "terraphim_persistence 1.20.4",
  "terraphim_rolegraph 1.20.4",
- "terraphim_router",
+ "terraphim_router 1.20.4",
  "terraphim_types 1.20.4",
  "thiserror 1.0.69",
  "tokio",
@@ -8994,6 +9074,20 @@ dependencies = [
 
 [[package]]
 name = "terraphim_spawner"
+version = "1.20.2"
+source = "sparse+https://git.terraphim.cloud/api/packages/terraphim/cargo/"
+checksum = "42431babc57091655682a0c9165e0e1bc4b34faab417e93e89fd3d1aa91f9452"
+dependencies = [
+ "nix 0.27.1",
+ "regex",
+ "terraphim_types 1.20.2",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "terraphim_spawner"
 version = "1.20.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e18c0ab460c3183bec958ffac6ac7c0c1cf5b16b6a1f29b16e850f01fc98b518"
@@ -9040,6 +9134,23 @@ dependencies = [
  "tracing",
  "uuid",
  "whisper-rs",
+]
+
+[[package]]
+name = "terraphim_tracker"
+version = "1.20.2"
+source = "sparse+https://git.terraphim.cloud/api/packages/terraphim/cargo/"
+checksum = "0e3b6920410921b19e522d918a2f04ceb2e902b78274200280a896efd0c50fcf"
+dependencies = [
+ "async-trait",
+ "jiff",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+ "urlencoding",
 ]
 
 [[package]]
@@ -9227,6 +9338,22 @@ dependencies = [
  "urlencoding",
  "uuid",
  "winapi",
+]
+
+[[package]]
+name = "terraphim_weather_report"
+version = "1.20.5"
+dependencies = [
+ "anyhow",
+ "clap",
+ "jiff",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "terraphim_automata 1.20.2",
+ "terraphim_orchestrator 1.20.2",
+ "terraphim_types 1.20.2",
+ "tokio",
 ]
 
 [[package]]
