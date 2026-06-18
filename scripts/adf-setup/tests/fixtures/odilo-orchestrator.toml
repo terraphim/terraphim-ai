@@ -2,7 +2,7 @@
 working_dir = "/home/alex/projects/odilo"
 restart_cooldown_secs = 300
 max_restart_count = 3
-disk_usage_threshold = 90
+disk_usage_threshold = 95
 tick_interval_secs = 60
 persona_data_dir = "/home/alex/projects/terraphim/terraphim-ai/data/personas"
 
