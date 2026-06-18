@@ -774,39 +774,56 @@ impl Default for RlmMcpService {
 /// Response from rlm_code tool.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RlmCodeResponse {
+    /// Standard output from the executed code.
     pub stdout: String,
+    /// Standard error from the executed code.
     pub stderr: String,
+    /// Process exit code (0 = success).
     pub exit_code: i32,
+    /// Wall-clock execution time in milliseconds.
     pub execution_time_ms: u64,
+    /// Whether the process exited with code 0.
     pub success: bool,
 }
 
 /// Response from rlm_bash tool.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RlmBashResponse {
+    /// Standard output from the executed command.
     pub stdout: String,
+    /// Standard error from the executed command.
     pub stderr: String,
+    /// Process exit code (0 = success).
     pub exit_code: i32,
+    /// Wall-clock execution time in milliseconds.
     pub execution_time_ms: u64,
+    /// Whether the process exited with code 0.
     pub success: bool,
 }
 
 /// Response from rlm_query tool.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RlmQueryResponse {
+    /// LLM-generated response text.
     pub response: String,
+    /// Number of tokens consumed by this query.
     pub tokens_used: u64,
+    /// Model identifier used for this query.
     pub model: String,
 }
 
 /// Response from rlm_context tool.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RlmContextResponse {
+    /// Action that was performed (`"get"`, `"set"`, `"delete"`, `"list"`).
     pub action: String,
+    /// Context variable key (present for `get`/`set`/`delete`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub key: Option<String>,
+    /// Context variable value (present for `get`/`set`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub value: Option<String>,
+    /// All context variables (present for `list`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub variables: Option<std::collections::HashMap<String, String>>,
 }
@@ -814,11 +831,15 @@ pub struct RlmContextResponse {
 /// Response from rlm_snapshot tool.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RlmSnapshotResponse {
+    /// Action that was performed (`"create"`, `"restore"`, `"list"`, `"delete"`).
     pub action: String,
+    /// Snapshot name (present for `create`/`restore`/`delete`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub snapshot_name: Option<String>,
+    /// Snapshot identifier assigned by the backend (present for `create`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub snapshot_id: Option<String>,
+    /// All snapshot names in the session (present for `list`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub snapshots: Option<Vec<String>>,
 }

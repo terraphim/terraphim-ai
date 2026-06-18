@@ -10,8 +10,11 @@ use std::fmt;
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExitCode {
+    /// All PRs processed successfully.
     Success = 0,
+    /// At least one PR evaluation failed but nothing catastrophic occurred.
     EvaluationFailures = 1,
+    /// A merge succeeded but a subsequent close call failed (Failure-1 path).
     Critical = 2,
 }
 
@@ -50,10 +53,15 @@ impl fmt::Display for EvalVerdict {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MergeOutcome {
     /// Merge succeeded and all referenced Fixes #N issues closed.
-    Merged { closed_issues: Vec<u64> },
+    Merged {
+        /// Issue numbers that were successfully closed after merging.
+        closed_issues: Vec<u64>,
+    },
     /// Merge succeeded but at least one close call failed (Failure-1 path).
     PartialFailure {
+        /// Whether the merge itself succeeded (always `true` in this variant).
         merged: bool,
+        /// Issue numbers whose close call failed after merging.
         close_errors: Vec<u64>,
     },
     /// Skipped without attempting merge (e.g. Hold verdict).
@@ -106,12 +114,20 @@ mod tests {
 /// Error type for the merge-coordinator surface.
 #[derive(Debug, thiserror::Error)]
 pub enum MergeCoordinatorError {
+    /// Another instance of the coordinator is running.
     #[error("PID lock held by another instance (pid={pid}, age_secs={age_secs})")]
-    LockHeld { pid: i32, age_secs: u64 },
+    LockHeld {
+        /// PID of the process holding the lock.
+        pid: i32,
+        /// Age of the lock file in seconds.
+        age_secs: u64,
+    },
 
+    /// Underlying I/O error.
     #[error(transparent)]
     Io(#[from] std::io::Error),
 
+    /// Gitea API returned an error or unexpected response.
     #[error("Gitea API failure: {0}")]
     Api(String),
 }

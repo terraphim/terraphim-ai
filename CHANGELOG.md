@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Rustdoc gaps resolved** doc comments added to all public items and struct/enum fields in `terraphim_rlm` (`RlmError` variants and their named fields, `LocalExecutor`, `DockerExecutor`, `SessionStats`, MCP response types), `terraphim_lsp` (module-level `//!` headers for `kg_analysis` and `server` modules), `terraphim_merge_coordinator` (`ExitCode` variants, `PrEvaluation` fields, `PrSummary` fields, `MergeOutcome` variant fields, `MergeCoordinatorError` variant fields), and `terraphim_workspace` (`WorkspaceError` variant fields) -- all four crates now build with `--warn missing-docs` at zero warnings (2026-06-18)
 - **Thesaurus matching in robot mode** `thesaurus_matched` field added to `SearchResultsData`; populated from Thesaurus entries that match query terms in both offline and server search paths (Refs #851, 2026-05-31)
 - **Context rot detection** `RotStatus` enum with `Fresh`/`Warning`/`Critical` states; `Conversation::with_token_budget()` and `Conversation::check_rot()` methods for monitoring token budget utilization in `terraphim_types` (Refs #1443, 2026-05-31)
 - **Rustdoc CI gate** `RUSTDOCFLAGS=-D warnings` enforcement added to PR validation pipeline; fixed broken intra-doc links in `terraphim_persistence`, `terraphim_rolegraph`, and `terraphim_orchestrator` (Refs #1362, 2026-05-31)

@@ -1,3 +1,8 @@
+//! LSP server implementation for Terraphim knowledge graphs.
+//!
+//! Implements the `LanguageServer` trait from `tower-lsp`, wiring up hover,
+//! completion, and diagnostics to the Terraphim KG analysis pipeline.
+
 use std::collections::HashMap;
 use std::sync::Arc;
 
