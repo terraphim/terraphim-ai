@@ -59,11 +59,11 @@ impl KnowledgeGraph {
             .filter_map(|e| e.ok())
         {
             let path = entry.path();
-            if path.extension().is_some_and(|ext| ext == "md") {
-                if let Ok(content) = std::fs::read_to_string(path) {
-                    let concept = self.parse_concept_file(path, &content);
-                    self.concepts.insert(concept.name.clone(), concept);
-                }
+            if path.extension().is_some_and(|ext| ext == "md")
+                && let Ok(content) = std::fs::read_to_string(path)
+            {
+                let concept = self.parse_concept_file(path, &content);
+                self.concepts.insert(concept.name.clone(), concept);
             }
         }
 

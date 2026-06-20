@@ -96,16 +96,17 @@ fn replace_links_to_slack(text: &str) -> String {
         let start = search_start + start;
         if let Some(close_bracket) = result[start + 1..].find(']') {
             let close_bracket = start + 1 + close_bracket;
-            if close_bracket + 1 < result.len() && result[close_bracket + 1..].starts_with('(') {
-                if let Some(close_paren) = result[close_bracket + 2..].find(')') {
-                    let close_paren = close_bracket + 2 + close_paren;
-                    let link_text = result[start + 1..close_bracket].to_string();
-                    let url = result[close_bracket + 2..close_paren].to_string();
-                    let replacement = format!("<{}|{}>", url, link_text);
-                    result.replace_range(start..close_paren + 1, &replacement);
-                    search_start = start + replacement.len();
-                    continue;
-                }
+            if close_bracket + 1 < result.len()
+                && result[close_bracket + 1..].starts_with('(')
+                && let Some(close_paren) = result[close_bracket + 2..].find(')')
+            {
+                let close_paren = close_bracket + 2 + close_paren;
+                let link_text = result[start + 1..close_bracket].to_string();
+                let url = result[close_bracket + 2..close_paren].to_string();
+                let replacement = format!("<{}|{}>", url, link_text);
+                result.replace_range(start..close_paren + 1, &replacement);
+                search_start = start + replacement.len();
+                continue;
             }
         }
         search_start = start + 1;
@@ -298,18 +299,19 @@ fn replace_links(text: &str) -> String {
         let start = search_start + start;
         if let Some(close_bracket) = result[start + 1..].find(']') {
             let close_bracket = start + 1 + close_bracket;
-            if close_bracket + 1 < result.len() && result[close_bracket + 1..].starts_with('(') {
-                if let Some(close_paren) = result[close_bracket + 2..].find(')') {
-                    let close_paren = close_bracket + 2 + close_paren;
-                    let link_text = result[start + 1..close_bracket].to_string();
-                    let url = result[close_bracket + 2..close_paren].to_string();
-                    result.replace_range(
-                        start..close_paren + 1,
-                        &format!(r#"<a href="{}">{}</a>"#, url, link_text),
-                    );
-                    search_start = start + 15 + url.len() + link_text.len();
-                    continue;
-                }
+            if close_bracket + 1 < result.len()
+                && result[close_bracket + 1..].starts_with('(')
+                && let Some(close_paren) = result[close_bracket + 2..].find(')')
+            {
+                let close_paren = close_bracket + 2 + close_paren;
+                let link_text = result[start + 1..close_bracket].to_string();
+                let url = result[close_bracket + 2..close_paren].to_string();
+                result.replace_range(
+                    start..close_paren + 1,
+                    &format!(r#"<a href="{}">{}</a>"#, url, link_text),
+                );
+                search_start = start + 15 + url.len() + link_text.len();
+                continue;
             }
         }
         search_start = start + 1;

@@ -96,37 +96,37 @@ impl MultiAgentWorkflowExecutor {
         let mut resolved = LlmConfig::default();
 
         // Start with global defaults if we have config state
-        if let Some(config_state) = &self.config_state {
-            if let Ok(config) = config_state.config.try_lock() {
-                // Check if there's a global LLM config section
-                let default_role_name = "Default".into();
-                if let Some(default_role) = config.roles.get(&default_role_name) {
-                    if let Some(s) = Self::get_role_extra_str(&default_role.extra, "llm_provider") {
-                        resolved.llm_provider = Some(s.to_string());
-                    }
-                    if let Some(s) = Self::get_role_extra_str(&default_role.extra, "llm_model") {
-                        resolved.llm_model = Some(s.to_string());
-                    }
-                    if let Some(s) = Self::get_role_extra_str(&default_role.extra, "llm_base_url") {
-                        resolved.llm_base_url = Some(s.to_string());
-                    }
+        if let Some(config_state) = &self.config_state
+            && let Ok(config) = config_state.config.try_lock()
+        {
+            // Check if there's a global LLM config section
+            let default_role_name = "Default".into();
+            if let Some(default_role) = config.roles.get(&default_role_name) {
+                if let Some(s) = Self::get_role_extra_str(&default_role.extra, "llm_provider") {
+                    resolved.llm_provider = Some(s.to_string());
                 }
+                if let Some(s) = Self::get_role_extra_str(&default_role.extra, "llm_model") {
+                    resolved.llm_model = Some(s.to_string());
+                }
+                if let Some(s) = Self::get_role_extra_str(&default_role.extra, "llm_base_url") {
+                    resolved.llm_base_url = Some(s.to_string());
+                }
+            }
 
-                // Check role-specific config
-                let role_name_key = role_name.into();
-                if let Some(role) = config.roles.get(&role_name_key) {
-                    if let Some(s) = Self::get_role_extra_str(&role.extra, "llm_provider") {
-                        resolved.llm_provider = Some(s.to_string());
-                    }
-                    if let Some(s) = Self::get_role_extra_str(&role.extra, "llm_model") {
-                        resolved.llm_model = Some(s.to_string());
-                    }
-                    if let Some(s) = Self::get_role_extra_str(&role.extra, "llm_base_url") {
-                        resolved.llm_base_url = Some(s.to_string());
-                    }
-                    if let Some(v) = Self::get_role_extra_f64(&role.extra, "llm_temperature") {
-                        resolved.llm_temperature = Some(v);
-                    }
+            // Check role-specific config
+            let role_name_key = role_name.into();
+            if let Some(role) = config.roles.get(&role_name_key) {
+                if let Some(s) = Self::get_role_extra_str(&role.extra, "llm_provider") {
+                    resolved.llm_provider = Some(s.to_string());
+                }
+                if let Some(s) = Self::get_role_extra_str(&role.extra, "llm_model") {
+                    resolved.llm_model = Some(s.to_string());
+                }
+                if let Some(s) = Self::get_role_extra_str(&role.extra, "llm_base_url") {
+                    resolved.llm_base_url = Some(s.to_string());
+                }
+                if let Some(v) = Self::get_role_extra_f64(&role.extra, "llm_temperature") {
+                    resolved.llm_temperature = Some(v);
                 }
             }
         }
@@ -1213,10 +1213,10 @@ impl MultiAgentWorkflowExecutor {
             if line.contains("score") || line.contains("Score") || line.contains("/10") {
                 for word in line.split_whitespace() {
                     let cleaned = word.trim_matches(|c: char| !c.is_ascii_digit() && c != '.');
-                    if let Ok(score) = cleaned.parse::<f64>() {
-                        if (1.0..=10.0).contains(&score) {
-                            return score;
-                        }
+                    if let Ok(score) = cleaned.parse::<f64>()
+                        && (1.0..=10.0).contains(&score)
+                    {
+                        return score;
                     }
                 }
             }
@@ -1281,11 +1281,11 @@ impl MultiAgentWorkflowExecutor {
         );
 
         // Apply custom system prompt if provided
-        if let Some(config) = custom_config {
-            if let Some(system_prompt) = config.get("llm_system_prompt") {
-                extra.insert("llm_system_prompt".to_string(), system_prompt.clone());
-                log::info!("Using custom system prompt for VM execution");
-            }
+        if let Some(config) = custom_config
+            && let Some(system_prompt) = config.get("llm_system_prompt")
+        {
+            extra.insert("llm_system_prompt".to_string(), system_prompt.clone());
+            log::info!("Using custom system prompt for VM execution");
         }
 
         let mut vm_role = agent_role.clone();

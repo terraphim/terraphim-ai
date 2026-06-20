@@ -196,12 +196,11 @@ impl SearchProvider for KimiSearchProvider {
         // Extract search results from the response
         let mut output = format!("Search results for '{}' via Kimi:\n\n", query);
 
-        if let Some(choices) = data["choices"].as_array() {
-            if let Some(first) = choices.first() {
-                if let Some(content) = first["message"]["content"].as_str() {
-                    output.push_str(content);
-                }
-            }
+        if let Some(choices) = data["choices"].as_array()
+            && let Some(first) = choices.first()
+            && let Some(content) = first["message"]["content"].as_str()
+        {
+            output.push_str(content);
         }
 
         Ok(output)
@@ -288,17 +287,17 @@ impl WebSearchTool {
     /// Internal helper to create from environment variables.
     fn from_env_inner() -> Self {
         // Check for Exa API key
-        if let Ok(api_key) = std::env::var("EXA_API_KEY") {
-            if !api_key.is_empty() {
-                return Self::with_provider(Box::new(ExaProvider::new(Some(api_key))));
-            }
+        if let Ok(api_key) = std::env::var("EXA_API_KEY")
+            && !api_key.is_empty()
+        {
+            return Self::with_provider(Box::new(ExaProvider::new(Some(api_key))));
         }
 
         // Check for Kimi API key
-        if let Ok(api_key) = std::env::var("KIMI_API_KEY") {
-            if !api_key.is_empty() {
-                return Self::with_provider(Box::new(KimiSearchProvider::new(Some(api_key))));
-            }
+        if let Ok(api_key) = std::env::var("KIMI_API_KEY")
+            && !api_key.is_empty()
+        {
+            return Self::with_provider(Box::new(KimiSearchProvider::new(Some(api_key))));
         }
 
         // Fall back to placeholder

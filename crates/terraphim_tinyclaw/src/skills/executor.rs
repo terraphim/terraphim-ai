@@ -213,15 +213,15 @@ impl SkillExecutor {
             }
 
             // Check timeout
-            if let Some(timeout) = timeout {
-                if start.elapsed() > timeout {
-                    return Ok(SkillResult {
-                        status: SkillStatus::Timeout,
-                        output: accumulated_output,
-                        execution_log,
-                        duration_ms: start.elapsed().as_millis() as u64,
-                    });
-                }
+            if let Some(timeout) = timeout
+                && start.elapsed() > timeout
+            {
+                return Ok(SkillResult {
+                    status: SkillStatus::Timeout,
+                    output: accumulated_output,
+                    execution_log,
+                    duration_ms: start.elapsed().as_millis() as u64,
+                });
             }
         }
 
@@ -304,10 +304,10 @@ impl SkillExecutor {
         mut inputs: HashMap<String, String>,
     ) -> HashMap<String, String> {
         for input_def in &skill.inputs {
-            if !inputs.contains_key(&input_def.name) {
-                if let Some(default) = &input_def.default {
-                    inputs.insert(input_def.name.clone(), default.clone());
-                }
+            if !inputs.contains_key(&input_def.name)
+                && let Some(default) = &input_def.default
+            {
+                inputs.insert(input_def.name.clone(), default.clone());
             }
         }
         inputs

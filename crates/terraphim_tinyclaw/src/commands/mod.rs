@@ -312,10 +312,10 @@ fn parse_command_steps(body: &str) -> Result<Vec<CommandStep>, CommandError> {
             // End of code block
             in_code_block = false;
 
-            if let Some(block_type) = current_block_type {
-                if let Some(step) = parse_step_from_block(block_type, &current_content) {
-                    steps.push(step);
-                }
+            if let Some(block_type) = current_block_type
+                && let Some(step) = parse_step_from_block(block_type, &current_content)
+            {
+                steps.push(step);
             }
 
             current_block_type = None;

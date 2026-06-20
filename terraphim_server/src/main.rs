@@ -148,14 +148,14 @@ async fn run_server(args: Args) -> Result<()> {
                 log::info!("ReDB database will be created by OpenDAL");
             }
             "dashmap" => {
-                if let Some(root) = profile.get("root") {
-                    if !root.is_empty() {
-                        log::info!("🔧 Creating DashMap directory: {root}");
-                        if let Err(e) = std::fs::create_dir_all(root) {
-                            log::warn!("Failed to create DashMap directory '{root}': {e}");
-                        } else {
-                            log::info!("✅ Created DashMap directory: {root}");
-                        }
+                if let Some(root) = profile.get("root")
+                    && !root.is_empty()
+                {
+                    log::info!("🔧 Creating DashMap directory: {root}");
+                    if let Err(e) = std::fs::create_dir_all(root) {
+                        log::warn!("Failed to create DashMap directory '{root}': {e}");
+                    } else {
+                        log::info!("✅ Created DashMap directory: {root}");
                     }
                 }
             }

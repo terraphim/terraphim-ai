@@ -209,12 +209,10 @@ fn format_text(
         writeln!(writer)?;
     }
 
-    if show_uncategorized {
-        if let Some(uncategorized) = groups.get("uncategorized") {
-            writeln!(writer, "[uncategorized] {} modules", uncategorized.len())?;
-            for module in uncategorized {
-                writeln!(writer, "  - {}", module)?;
-            }
+    if show_uncategorized && let Some(uncategorized) = groups.get("uncategorized") {
+        writeln!(writer, "[uncategorized] {} modules", uncategorized.len())?;
+        for module in uncategorized {
+            writeln!(writer, "  - {}", module)?;
         }
     }
 
@@ -235,11 +233,9 @@ fn format_csv(
         }
     }
 
-    if show_uncategorized {
-        if let Some(uncategorized) = groups.get("uncategorized") {
-            for module in uncategorized {
-                writeln!(writer, "uncategorized,\"{}\"", module)?;
-            }
+    if show_uncategorized && let Some(uncategorized) = groups.get("uncategorized") {
+        for module in uncategorized {
+            writeln!(writer, "uncategorized,\"{}\"", module)?;
         }
     }
 

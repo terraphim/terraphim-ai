@@ -292,10 +292,10 @@ impl VmManager for Sub2SecondVmManager {
         let max_retries = 20; // 10 seconds with 500ms intervals
 
         while retries < max_retries {
-            if let Ok(Some(vm)) = self.vm_storage.get_vm(vm_id).await {
-                if vm.state == VmState::Running {
-                    break;
-                }
+            if let Ok(Some(vm)) = self.vm_storage.get_vm(vm_id).await
+                && vm.state == VmState::Running
+            {
+                break;
             }
 
             tokio::time::sleep(Duration::from_millis(500)).await;

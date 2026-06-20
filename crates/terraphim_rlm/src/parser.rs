@@ -95,11 +95,11 @@ impl CommandParser {
         }
 
         // Try bare code blocks if allowed
-        if self.allow_bare_code_blocks {
-            if let Some(cmd) = self.try_parse_bare_code_block(input)? {
-                commands.push(cmd);
-                return Ok(commands);
-            }
+        if self.allow_bare_code_blocks
+            && let Some(cmd) = self.try_parse_bare_code_block(input)?
+        {
+            commands.push(cmd);
+            return Ok(commands);
         }
 
         // If strict mode and no command found, fail

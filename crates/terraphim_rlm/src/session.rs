@@ -167,17 +167,17 @@ impl SessionManager {
     /// Assign a VM to a session (VM affinity).
     pub fn assign_vm(&self, session_id: &SessionId, vm_instance_id: String) -> RlmResult<()> {
         // Check if VM is already assigned to another session
-        if let Some(existing_session) = self.vm_to_session.get(&vm_instance_id) {
-            if *existing_session != *session_id {
-                log::warn!(
-                    "VM {} already assigned to session {}, reassigning to {}",
-                    vm_instance_id,
-                    *existing_session,
-                    session_id
-                );
-                // Remove old mapping
-                self.session_to_vm.remove(&existing_session);
-            }
+        if let Some(existing_session) = self.vm_to_session.get(&vm_instance_id)
+            && *existing_session != *session_id
+        {
+            log::warn!(
+                "VM {} already assigned to session {}, reassigning to {}",
+                vm_instance_id,
+                *existing_session,
+                session_id
+            );
+            // Remove old mapping
+            self.session_to_vm.remove(&existing_session);
         }
 
         // Update session with VM ID

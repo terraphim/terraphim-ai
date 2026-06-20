@@ -256,12 +256,12 @@ impl SessionManager {
             let entry = entry?;
             let path = entry.path();
 
-            if path.extension().and_then(|s| s.to_str()) == Some("jsonl") {
-                if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
-                    // Convert back from sanitized format
-                    let key = stem.replace('_', ":");
-                    keys.push(key);
-                }
+            if path.extension().and_then(|s| s.to_str()) == Some("jsonl")
+                && let Some(stem) = path.file_stem().and_then(|s| s.to_str())
+            {
+                // Convert back from sanitized format
+                let key = stem.replace('_', ":");
+                keys.push(key);
             }
         }
 
