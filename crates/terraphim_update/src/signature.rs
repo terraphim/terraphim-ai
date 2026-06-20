@@ -27,7 +27,7 @@ pub fn get_embedded_public_key() -> &'static str {
     // Ed25519 public key for verifying Terraphim AI release signatures
     // Generated: 2025-01-12
     // Key type: Ed25519 (32 bytes, base64-encoded)
-    // Private key stored in 1Password vault TerraphimPlatform, item jbhgblc7m2pluxe6ahqdfr5b6a
+    // Signing key location: see internal secrets register (not committed to source)
     "1uLjooBMO+HlpKeiD16WOtT3COWeC8J/o2ERmDiEMc4="
 }
 
