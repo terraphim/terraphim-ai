@@ -26,7 +26,7 @@ async fn test_chat_endpoint_with_ollama() {
 
     // Test chat request
     let payload = json!({
-        "role": "Engineer",
+        "role": "Terraphim Engineer",
         "messages": [
             {"role": "user", "content": "What is Rust?"}
         ]
@@ -78,7 +78,7 @@ async fn test_chat_endpoint_empty_messages() {
     let server = TestServer::new(app);
 
     let payload = json!({
-        "role": "Engineer",
+        "role": "Terraphim Engineer",
         "messages": []
     });
 
