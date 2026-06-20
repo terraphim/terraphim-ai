@@ -41,6 +41,7 @@ const DEFAULT_MEMORY_BYTES: i64 = 512 * 1024 * 1024;
 /// Default container PIDs limit.
 const DEFAULT_PIDS_LIMIT: i64 = 256;
 
+/// Executes code in Docker containers, providing namespace-level isolation.
 pub struct DockerExecutor {
     docker: Docker,
     session_to_container: DashMap<SessionId, Arc<Mutex<Option<String>>>>,
@@ -77,6 +78,8 @@ fn unsupported(op: &'static str) -> RlmError {
 }
 
 impl DockerExecutor {
+    /// Connect to the local Docker daemon and build a `DockerExecutor` with the
+    /// default image and host configuration.
     pub fn new(
         _config: RlmConfig,
         validator: Option<Arc<crate::validator::KnowledgeGraphValidator>>,
@@ -107,6 +110,7 @@ impl DockerExecutor {
         })
     }
 
+    /// Build a `DockerExecutor` using a non-default container image.
     pub fn with_image(config: RlmConfig, image: &str) -> Result<Self, RlmError> {
         let mut executor = Self::new(config, None)?;
         executor.image = image.to_string();

@@ -31,12 +31,14 @@ use crate::validator::KnowledgeGraphValidator;
 
 const BACKEND_NAME: &str = "local";
 
+/// Executes code and commands in the local process without any VM isolation.
 pub struct LocalExecutor {
     python_path: String,
     validator: Option<Arc<KnowledgeGraphValidator>>,
 }
 
 impl LocalExecutor {
+    /// Create a `LocalExecutor` using the default `python3` interpreter path.
     pub fn new() -> Self {
         Self {
             python_path: "python3".to_string(),
@@ -50,6 +52,7 @@ impl LocalExecutor {
         self
     }
 
+    /// Override the Python interpreter path (default: `"python3"`).
     pub fn with_python(mut self, path: impl Into<String>) -> Self {
         self.python_path = path.into();
         self

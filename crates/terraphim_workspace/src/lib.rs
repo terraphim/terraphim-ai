@@ -14,17 +14,39 @@ pub use config::{HooksConfig, WorkspaceConfig};
 /// Errors that can occur during workspace operations.
 #[derive(thiserror::Error, Debug)]
 pub enum WorkspaceError {
+    /// A general workspace operation failed.
     #[error("workspace error for {identifier}: {reason}")]
-    Workspace { identifier: String, reason: String },
+    Workspace {
+        /// Issue identifier for the workspace being operated on.
+        identifier: String,
+        /// Description of what went wrong.
+        reason: String,
+    },
 
+    /// A path traversal safety check failed.
     #[error("path {path} is outside workspace root")]
-    PathOutsideRoot { path: String },
+    PathOutsideRoot {
+        /// The offending path that was outside the root.
+        path: String,
+    },
 
+    /// A lifecycle hook returned a non-zero exit code.
     #[error("hook '{hook}' failed: {reason}")]
-    HookFailed { hook: String, reason: String },
+    HookFailed {
+        /// Name of the hook that failed.
+        hook: String,
+        /// Description of the failure.
+        reason: String,
+    },
 
+    /// A lifecycle hook exceeded its time limit.
     #[error("hook '{hook}' timed out after {timeout_ms}ms")]
-    HookTimeout { hook: String, timeout_ms: u64 },
+    HookTimeout {
+        /// Name of the hook that timed out.
+        hook: String,
+        /// Configured timeout in milliseconds.
+        timeout_ms: u64,
+    },
 }
 
 /// Result type for workspace operations.
