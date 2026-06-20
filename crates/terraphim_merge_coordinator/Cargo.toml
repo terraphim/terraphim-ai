@@ -2,6 +2,7 @@
 name = "terraphim_merge_coordinator"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 description = "Merge coordinator for Terraphim AI - coordinates code merge operations"
 documentation = "https://terraphim.ai"
 homepage = "https://terraphim.ai"

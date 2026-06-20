@@ -2,6 +2,7 @@
 name = "terraphim_symphony"
 version = "1.13.0"
 edition = "2024"
+rust-version = "1.85"
 authors = ["Terraphim Team <team@terraphim.ai>"]
 description = "Symphony orchestration service - reads issues from trackers and dispatches coding agent sessions"
 documentation = "https://terraphim.ai"
