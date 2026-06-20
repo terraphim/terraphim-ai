@@ -2,6 +2,7 @@
 name = "terraphim_update"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 authors = ["Terraphim Contributors"]
 description = "Shared auto-update functionality for Terraphim AI binaries"
 documentation = "https://terraphim.ai"
