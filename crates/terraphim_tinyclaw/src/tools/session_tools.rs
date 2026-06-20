@@ -37,10 +37,10 @@ impl SessionListTool {
         let mut infos = Vec::new();
         for key in keys {
             // Apply filter if specified
-            if let Some(f) = filter {
-                if !key.to_lowercase().contains(&f.to_lowercase()) {
-                    continue;
-                }
+            if let Some(f) = filter
+                && !key.to_lowercase().contains(&f.to_lowercase())
+            {
+                continue;
             }
 
             // Try to get session from cache

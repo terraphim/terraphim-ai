@@ -379,15 +379,15 @@ impl PerformanceMonitor {
 
     pub fn record_metrics(&mut self, metrics: BootMetrics) {
         // Check for performance alerts
-        if let Some(threshold) = self.alert_thresholds.get(&metrics.vm_type) {
-            if metrics.total_boot_time > *threshold {
-                warn!(
-                    "Performance Alert: {} boot time {:.3}s exceeds threshold {:.3}s",
-                    metrics.vm_id,
-                    metrics.total_boot_time.as_secs_f64(),
-                    threshold.as_secs_f64()
-                );
-            }
+        if let Some(threshold) = self.alert_thresholds.get(&metrics.vm_type)
+            && metrics.total_boot_time > *threshold
+        {
+            warn!(
+                "Performance Alert: {} boot time {:.3}s exceeds threshold {:.3}s",
+                metrics.vm_id,
+                metrics.total_boot_time.as_secs_f64(),
+                threshold.as_secs_f64()
+            );
         }
 
         // Add to history

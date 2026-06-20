@@ -341,11 +341,11 @@ impl BackupManager {
     /// * `Ok(())` - Success
     /// * `Err(anyhow::Error)` - Error if deletion fails
     pub fn delete_backup(&mut self, version: &str) -> Result<()> {
-        if let Some(backup) = self.backups.remove(version) {
-            if backup.path.exists() {
-                fs::remove_file(&backup.path)?;
-                info!("Deleted backup for version {}", version);
-            }
+        if let Some(backup) = self.backups.remove(version)
+            && backup.path.exists()
+        {
+            fs::remove_file(&backup.path)?;
+            info!("Deleted backup for version {}", version);
         }
 
         Ok(())
@@ -362,10 +362,10 @@ impl BackupManager {
         info!("Cleaning up all backups in {:?}", self.backup_dir);
 
         for backup in self.backups.values() {
-            if backup.path.exists() {
-                if let Err(e) = fs::remove_file(&backup.path) {
-                    warn!("Failed to remove backup {:?}: {}", backup.path, e);
-                }
+            if backup.path.exists()
+                && let Err(e) = fs::remove_file(&backup.path)
+            {
+                warn!("Failed to remove backup {:?}: {}", backup.path, e);
             }
         }
 

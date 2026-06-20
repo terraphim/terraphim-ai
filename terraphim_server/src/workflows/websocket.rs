@@ -119,25 +119,24 @@ async fn websocket_connection(socket: WebSocket, state: AppState) {
             let sessions_read = sessions_clone.read().await;
             if let Some(session) = sessions_read.get(&session_id_clone) {
                 // Check if session is subscribed to this workflow
-                if let Some(workflow_id) = &broadcast_message.workflow_id {
-                    if session.subscribed_workflows.contains(workflow_id)
-                        || session.subscribed_workflows.is_empty()
-                    {
-                        let response = WebSocketResponse {
-                            response_type: broadcast_message.message_type,
-                            session_id: Some(session_id_clone.clone()),
-                            workflow_id: broadcast_message.workflow_id,
-                            data: broadcast_message.data,
-                            timestamp: broadcast_message.timestamp,
-                            success: true,
-                            error: None,
-                        };
+                if let Some(workflow_id) = &broadcast_message.workflow_id
+                    && (session.subscribed_workflows.contains(workflow_id)
+                        || session.subscribed_workflows.is_empty())
+                {
+                    let response = WebSocketResponse {
+                        response_type: broadcast_message.message_type,
+                        session_id: Some(session_id_clone.clone()),
+                        workflow_id: broadcast_message.workflow_id,
+                        data: broadcast_message.data,
+                        timestamp: broadcast_message.timestamp,
+                        success: true,
+                        error: None,
+                    };
 
-                        if let Ok(_msg) = serde_json::to_string(&response) {
-                            // Note: In a real implementation, we'd need to maintain sender references
-                            // per session to actually send messages back to clients
-                            // For now, this demonstrates the structure
-                        }
+                    if let Ok(_msg) = serde_json::to_string(&response) {
+                        // Note: In a real implementation, we'd need to maintain sender references
+                        // per session to actually send messages back to clients
+                        // For now, this demonstrates the structure
                     }
                 }
             }
@@ -151,14 +150,13 @@ async fn websocket_connection(socket: WebSocket, state: AppState) {
                 let response =
                     handle_websocket_message(&text, &session_id, &sessions, &state).await;
 
-                if let Ok(response_json) = serde_json::to_string(&response) {
-                    if sender
+                if let Ok(response_json) = serde_json::to_string(&response)
+                    && sender
                         .send(Message::Text(response_json.into()))
                         .await
                         .is_err()
-                    {
-                        break;
-                    }
+                {
+                    break;
                 }
             }
             Ok(Message::Binary(_)) => {
@@ -172,14 +170,13 @@ async fn websocket_connection(socket: WebSocket, state: AppState) {
                     error: Some("Binary messages not supported".to_string()),
                 };
 
-                if let Ok(response_json) = serde_json::to_string(&response) {
-                    if sender
+                if let Ok(response_json) = serde_json::to_string(&response)
+                    && sender
                         .send(Message::Text(response_json.into()))
                         .await
                         .is_err()
-                    {
-                        break;
-                    }
+                {
+                    break;
                 }
             }
             Ok(Message::Ping(ping)) => {

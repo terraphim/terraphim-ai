@@ -167,17 +167,17 @@ impl<E: ExecutionEnvironment + ?Sized> QueryLoop<E> {
 
         loop {
             // Check for cancellation
-            if let Some(ref mut rx) = self.cancel_rx {
-                if rx.try_recv().is_ok() {
-                    return Ok(QueryLoopResult {
-                        result: None,
-                        success: false,
-                        termination_reason: TerminationReason::Cancelled,
-                        iterations: metadata.iteration,
-                        history,
-                        metadata,
-                    });
-                }
+            if let Some(ref mut rx) = self.cancel_rx
+                && rx.try_recv().is_ok()
+            {
+                return Ok(QueryLoopResult {
+                    result: None,
+                    success: false,
+                    termination_reason: TerminationReason::Cancelled,
+                    iterations: metadata.iteration,
+                    history,
+                    metadata,
+                });
             }
 
             // Check iteration limit

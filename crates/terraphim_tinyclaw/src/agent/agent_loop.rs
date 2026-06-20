@@ -386,10 +386,10 @@ impl ToolCallingLoop {
                 }
             };
 
-            if let Some(msg) = msg {
-                if let Err(e) = self.process_message(msg, &outbound_tx).await {
-                    log::error!("Error processing message: {}", e);
-                }
+            if let Some(msg) = msg
+                && let Err(e) = self.process_message(msg, &outbound_tx).await
+            {
+                log::error!("Error processing message: {}", e);
             }
         }
 

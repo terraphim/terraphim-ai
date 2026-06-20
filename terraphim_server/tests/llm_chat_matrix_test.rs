@@ -190,22 +190,21 @@ fn load_test_documents() -> Vec<String> {
     let docs_dir = Path::new("./docs/src");
     let mut documents = Vec::new();
 
-    if docs_dir.exists() {
-        if let Ok(entries) = fs::read_dir(docs_dir) {
-            for entry in entries.flatten() {
-                if let Some(ext) = entry.path().extension() {
-                    if ext == "md" {
-                        if let Ok(content) = fs::read_to_string(entry.path()) {
-                            // Take first 500 chars to keep context manageable
-                            let preview = if content.len() > 500 {
-                                format!("{}...", &content[..500])
-                            } else {
-                                content
-                            };
-                            documents.push(preview);
-                        }
-                    }
-                }
+    if docs_dir.exists()
+        && let Ok(entries) = fs::read_dir(docs_dir)
+    {
+        for entry in entries.flatten() {
+            if let Some(ext) = entry.path().extension()
+                && ext == "md"
+                && let Ok(content) = fs::read_to_string(entry.path())
+            {
+                // Take first 500 chars to keep context manageable
+                let preview = if content.len() > 500 {
+                    format!("{}...", &content[..500])
+                } else {
+                    content
+                };
+                documents.push(preview);
             }
         }
     }

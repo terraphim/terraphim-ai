@@ -529,13 +529,13 @@ async fn test_error_handling_parity() {
 
     // Both should handle the invalid role gracefully
     // The exact behavior may vary (error vs empty results), but both should be consistent
-    if let Ok(tui_resp) = tui_result {
-        if let Ok(http_resp) = http_result {
-            let http_body: Value = http_resp.json().await.unwrap();
+    if let Ok(tui_resp) = tui_result
+        && let Ok(http_resp) = http_result
+    {
+        let http_body: Value = http_resp.json().await.unwrap();
 
-            // If both succeed, they should have consistent status
-            assert_eq!(tui_resp.status, http_body["status"].as_str().unwrap());
-        }
+        // If both succeed, they should have consistent status
+        assert_eq!(tui_resp.status, http_body["status"].as_str().unwrap());
     }
 
     println!("Error handling consistency verified");

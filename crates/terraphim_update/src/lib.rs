@@ -840,14 +840,14 @@ impl TerraphimUpdater {
             let path = entry.path()?;
 
             // Only extract the main binary, not directory structure
-            if let Some(file_name) = path.file_name() {
-                if file_name.to_str() == Some(bin_name) {
-                    let outpath = target_dir.join(bin_name);
-                    let mut outfile = fs::File::create(&outpath)?;
-                    std::io::copy(&mut entry, &mut outfile)?;
-                    info!("Extracted binary to {:?}", outpath);
-                    break;
-                }
+            if let Some(file_name) = path.file_name()
+                && file_name.to_str() == Some(bin_name)
+            {
+                let outpath = target_dir.join(bin_name);
+                let mut outfile = fs::File::create(&outpath)?;
+                std::io::copy(&mut entry, &mut outfile)?;
+                info!("Extracted binary to {:?}", outpath);
+                break;
             }
         }
 

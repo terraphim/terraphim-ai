@@ -104,16 +104,16 @@ impl WorkspaceManager {
             );
 
             // Run after_create hook
-            if let Some(script) = &self.hooks.after_create {
-                if let Err(e) = self.run_hook("after_create", script, &path, env_vars).await {
-                    // after_create failure is fatal: remove the directory
-                    tracing::warn!(
-                        issue_identifier = identifier,
-                        "after_create hook failed, removing workspace: {e}"
-                    );
-                    let _ = std::fs::remove_dir_all(&path);
-                    return Err(e);
-                }
+            if let Some(script) = &self.hooks.after_create
+                && let Err(e) = self.run_hook("after_create", script, &path, env_vars).await
+            {
+                // after_create failure is fatal: remove the directory
+                tracing::warn!(
+                    issue_identifier = identifier,
+                    "after_create hook failed, removing workspace: {e}"
+                );
+                let _ = std::fs::remove_dir_all(&path);
+                return Err(e);
             }
         } else {
             tracing::debug!(
@@ -149,16 +149,15 @@ impl WorkspaceManager {
         workspace: &WorkspaceInfo,
         env_vars: &HashMap<String, String>,
     ) {
-        if let Some(script) = &self.hooks.after_run {
-            if let Err(e) = self
+        if let Some(script) = &self.hooks.after_run
+            && let Err(e) = self
                 .run_hook("after_run", script, &workspace.path, env_vars)
                 .await
-            {
-                tracing::warn!(
-                    workspace_key = workspace.workspace_key,
-                    "after_run hook failed (ignored): {e}"
-                );
-            }
+        {
+            tracing::warn!(
+                workspace_key = workspace.workspace_key,
+                "after_run hook failed (ignored): {e}"
+            );
         }
     }
 
@@ -172,16 +171,15 @@ impl WorkspaceManager {
         }
 
         // Run before_remove hook (failure logged, ignored)
-        if let Some(script) = &self.hooks.before_remove {
-            if let Err(e) = self
+        if let Some(script) = &self.hooks.before_remove
+            && let Err(e) = self
                 .run_hook("before_remove", script, &path, &HashMap::new())
                 .await
-            {
-                tracing::warn!(
-                    issue_identifier = identifier,
-                    "before_remove hook failed (ignored): {e}"
-                );
-            }
+        {
+            tracing::warn!(
+                issue_identifier = identifier,
+                "before_remove hook failed (ignored): {e}"
+            );
         }
 
         std::fs::remove_dir_all(&path).map_err(|e| WorkspaceError::Workspace {

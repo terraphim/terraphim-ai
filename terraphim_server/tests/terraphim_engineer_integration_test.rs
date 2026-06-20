@@ -111,12 +111,11 @@ async fn test_terraphim_engineer_local_kg_integration() {
             }
 
             // Fix KG local path
-            if let Some(kg) = &mut role.kg {
-                if let Some(kg_local) = &mut kg.knowledge_graph_local {
-                    if kg_local.path.to_string_lossy() == "docs/src/kg" {
-                        kg_local.path = std::path::PathBuf::from("../docs/src/kg");
-                    }
-                }
+            if let Some(kg) = &mut role.kg
+                && let Some(kg_local) = &mut kg.knowledge_graph_local
+                && kg_local.path.to_string_lossy() == "docs/src/kg"
+            {
+                kg_local.path = std::path::PathBuf::from("../docs/src/kg");
             }
         }
         log::info!("✅ Adjusted config paths for test environment");
