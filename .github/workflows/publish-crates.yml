@@ -66,7 +66,7 @@ jobs:
           elif [ -n "${{ inputs.crate }}" ]; then
             echo "list=${{ inputs.crate }}" >> $GITHUB_OUTPUT
           else
-            echo "list=terraphim_update terraphim_github_runner terraphim_gitea_runner terraphim_rlm" >> $GITHUB_OUTPUT
+            echo "list=terraphim_update terraphim_github_runner terraphim_gitea_runner terraphim_rlm terraphim_lsp" >> $GITHUB_OUTPUT
           fi
 
       - name: Publish crates in dependency order

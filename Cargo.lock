@@ -8768,6 +8768,42 @@ dependencies = [
 ]
 
 [[package]]
+name = "terraphim_rlm"
+version = "1.20.5"
+dependencies = [
+ "ahash",
+ "anyhow",
+ "async-trait",
+ "bollard",
+ "clap",
+ "dashmap 6.2.1",
+ "env_logger",
+ "futures",
+ "hyper",
+ "hyper-util",
+ "jiff",
+ "log",
+ "parking_lot 0.12.5",
+ "reqwest 0.12.28",
+ "rmcp",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "terraphim_agent_supervisor",
+ "terraphim_automata 1.20.4",
+ "terraphim_config 1.20.4",
+ "terraphim_rolegraph 1.20.4",
+ "terraphim_service",
+ "terraphim_types 1.20.4",
+ "test-log",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-test",
+ "tokio-util",
+ "ulid",
+]
+
+[[package]]
 name = "terraphim_rolegraph"
 version = "1.20.2"
 source = "sparse+https://git.terraphim.cloud/api/packages/terraphim/cargo/"

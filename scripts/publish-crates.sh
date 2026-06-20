@@ -36,6 +36,7 @@ CRATES=(
   "terraphim_github_runner"
   "terraphim_gitea_runner"
   "terraphim_rlm"
+  "terraphim_lsp"
 )
 
 declare -A CRATE_DIR_MAP=(

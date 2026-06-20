@@ -45,8 +45,9 @@ exclude = [
     "crates/terraphim_repl",
     # Symphony orchestrator (build separately: cd crates/terraphim_symphony && cargo build)
     "crates/terraphim_symphony",
-    # Firecracker-based crates (private git dependency fcctl-core)
-    "crates/terraphim_rlm",
+    # Firecracker-based crates (fcctl-core is optional and commented out;
+    # crate publishes to crates.io without firecracker feature)
+    # "crates/terraphim_rlm",
     # Host-only runners (omitted from Docker build context)
     "crates/terraphim_github_runner",
     "crates/terraphim_github_runner_server",

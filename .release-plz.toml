@@ -98,3 +98,13 @@ name = "terraphim_onepassword_cli"
 release = false
 
 # terraphim-markdown-parser excluded from workspace, no release config needed
+
+[[package]]
+name = "terraphim_rlm"
+changelog_path = "./crates/terraphim_rlm/CHANGELOG.md"
+changelog_update = true
+
+[[package]]
+name = "terraphim_lsp"
+changelog_path = "./crates/terraphim_lsp/CHANGELOG.md"
+changelog_update = true
