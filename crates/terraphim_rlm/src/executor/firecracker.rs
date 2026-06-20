@@ -955,7 +955,11 @@ mod tests {
         executor.assign_vm_to_session(session_id1, "vm-cleanup-1".to_string());
         executor.assign_vm_to_session(session_id2, "vm-cleanup-2".to_string());
         executor.set_current_snapshot(&session_id1, "snap-cleanup-1".to_string());
-        *executor.snapshot_counts.write().entry(session_id1).or_insert(0) = 2;
+        *executor
+            .snapshot_counts
+            .write()
+            .entry(session_id1)
+            .or_insert(0) = 2;
 
         assert_eq!(executor.session_to_vm.read().len(), 2);
         assert_eq!(executor.current_snapshot.read().len(), 1);

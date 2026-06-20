@@ -24,9 +24,9 @@ use std::sync::Arc;
 use std::time::Duration;
 use terraphim_gitea_runner::client::{GiteaRunnerClient, ReqwestRunnerClient};
 use terraphim_gitea_runner::config::{LegacyStatusMirrorConfig, RunnerConfig};
-use terraphim_gitea_runner::policy::DeterministicPlanner;
 use terraphim_gitea_runner::poller::Poller;
 use terraphim_gitea_runner::state::RunnerState;
+use terraphim_gitea_runner::taxonomy_policy::TaxonomyPlanner;
 use terraphim_gitea_runner::types::{DeclareRequest, RegisterRequest};
 
 fn env_or(key: &str, default: &str) -> String {
@@ -74,6 +74,8 @@ async fn main() -> anyhow::Result<()> {
         .ok()
         .or_else(|| std::env::var("GITEA_TOKEN").ok());
 
+    let taxonomy_dir = std::env::var("RUNNER_TAXONOMY_DIR").ok().map(PathBuf::from);
+
     let config = RunnerConfig {
         instance_url: env_or("GITEA_URL", "https://git.terraphim.cloud"),
         org: env_or("GITEA_ORG", "terraphim"),
@@ -86,6 +88,7 @@ async fn main() -> anyhow::Result<()> {
         status_token,
         http_request_timeout,
         poll_timeout: Duration::from_secs(http_timeout_secs * 2),
+        taxonomy_dir,
     };
     let checkout_dir = env_or("RUNNER_CHECKOUT_DIR", ".");
     let version = env!("CARGO_PKG_VERSION").to_string();
@@ -143,11 +146,11 @@ async fn main() -> anyhow::Result<()> {
         .await?;
     log::info!("declared; polling for tasks (labels={:?})", state.labels);
 
-    // Probe for `rch` on the host: present -> cargo offloads to the rch farm;
-    // absent -> cargo runs directly on the host with sccache (interim-lane parity).
+    // Construct the taxonomy-driven planner. Loads command_policy.md from
+    // RUNNER_TAXONOMY_DIR if set, otherwise uses the embedded default.
     let poller = Poller::new(
         client,
-        Arc::new(DeterministicPlanner::detect()),
+        Arc::new(TaxonomyPlanner::new(&config)),
         config,
         checkout_dir,
     );

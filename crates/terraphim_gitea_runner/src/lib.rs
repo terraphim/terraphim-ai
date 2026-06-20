@@ -36,12 +36,14 @@ pub mod poller;
 pub mod state;
 pub mod status;
 pub mod task_worker;
+pub mod taxonomy_policy;
 pub mod types;
 pub mod workflow_payload;
 
 pub use config::RunnerConfig;
-pub use policy::{CommandRoute, DeterministicPlanner, ExecutionPlan, PolicyPlanner, TrustLevel};
+pub use policy::{CommandRoute, ExecutionPlan, PolicyPlanner, TrustLevel};
 pub use state::RunnerState;
+pub use taxonomy_policy::{CommandPolicy, TaxonomyPlanner};
 
 /// Errors surfaced by the native runner.
 #[derive(Debug, thiserror::Error)]

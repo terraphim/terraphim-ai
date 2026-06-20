@@ -13,9 +13,9 @@ use std::time::Duration;
 use axum::{Json, Router, extract::State, routing::post};
 use base64::Engine;
 use serde_json::{Value, json};
+use terraphim_gitea_runner::TaxonomyPlanner;
 use terraphim_gitea_runner::client::ReqwestRunnerClient;
 use terraphim_gitea_runner::config::RunnerConfig;
-use terraphim_gitea_runner::policy::DeterministicPlanner;
 use terraphim_gitea_runner::poller::Poller;
 use terraphim_gitea_runner::state::RunnerState;
 
@@ -120,7 +120,7 @@ fn state() -> RunnerState {
 fn poller(
     url: String,
 ) -> (
-    Poller<ReqwestRunnerClient, DeterministicPlanner>,
+    Poller<ReqwestRunnerClient, TaxonomyPlanner>,
     tempfile::TempDir,
 ) {
     let tmp = tempfile::tempdir().unwrap();
@@ -131,7 +131,7 @@ fn poller(
     };
     let p = Poller::new(
         Arc::new(ReqwestRunnerClient::new(url)),
-        Arc::new(DeterministicPlanner::default()),
+        Arc::new(TaxonomyPlanner::default_policy(true)),
         config,
         tmp.path(),
     );

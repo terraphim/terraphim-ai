@@ -8,9 +8,9 @@ use std::time::Duration;
 
 use axum::{Json, Router, extract::State, routing::post};
 use serde_json::{Value, json};
+use terraphim_gitea_runner::TaxonomyPlanner;
 use terraphim_gitea_runner::client::ReqwestRunnerClient;
 use terraphim_gitea_runner::config::RunnerConfig;
-use terraphim_gitea_runner::policy::DeterministicPlanner;
 use terraphim_gitea_runner::poller::Poller;
 use terraphim_gitea_runner::state::RunnerState;
 use tokio::time::Instant;
@@ -102,7 +102,7 @@ async fn poll_timeout_does_not_hang_forever() {
     let _tmpdir = tempfile::tempdir().unwrap();
     let poller = Poller::new(
         client,
-        Arc::new(DeterministicPlanner::default()),
+        Arc::new(TaxonomyPlanner::default_policy(true)),
         config,
         _tmpdir.path(),
     );
@@ -149,7 +149,7 @@ async fn new_with_timeout_sets_request_timeout() {
     let _tmpdir2 = tempfile::tempdir().unwrap();
     let poller = Poller::new(
         client,
-        Arc::new(DeterministicPlanner::default()),
+        Arc::new(TaxonomyPlanner::default_policy(true)),
         config,
         _tmpdir2.path(),
     );
@@ -183,7 +183,7 @@ async fn run_forever_polls_repeatedly_on_no_task() {
     let _tmpdir3 = tempfile::tempdir().unwrap();
     let poller = Poller::new(
         client,
-        Arc::new(DeterministicPlanner::default()),
+        Arc::new(TaxonomyPlanner::default_policy(true)),
         config,
         _tmpdir3.path(),
     );
