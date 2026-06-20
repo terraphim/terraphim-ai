@@ -685,12 +685,25 @@ fn format_execution_output(result: &ExecutionResult) -> String {
     output
 }
 
+/// Find the largest byte index <= `index` that is a valid UTF-8 char boundary.
+/// Polyfill for str::floor_char_boundary (stable since Rust 1.91, MSRV is 1.80).
+fn floor_char_boundary(s: &str, index: usize) -> usize {
+    if index >= s.len() {
+        return s.len();
+    }
+    let mut i = index;
+    while i > 0 && !s.is_char_boundary(i) {
+        i -= 1;
+    }
+    i
+}
+
 /// Truncate a string for display.
 fn truncate(s: &str, max_len: usize) -> String {
     if s.len() <= max_len {
         s.to_string()
     } else {
-        let boundary = s.floor_char_boundary(max_len);
+        let boundary = floor_char_boundary(s, max_len);
         format!("{}...", &s[..boundary])
     }
 }
