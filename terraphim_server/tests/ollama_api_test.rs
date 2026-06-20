@@ -3,28 +3,51 @@ use serde_json::json;
 
 /// Test the /chat endpoint with real Ollama backend
 #[tokio::test]
-#[ignore] // Only run when Ollama is available
+#[ignore] // Only run when Ollama is available with llama3.2:3b loaded
 async fn test_chat_endpoint_with_ollama() {
-    // Check if Ollama is running
     let ollama_url = "http://127.0.0.1:11434";
+    let required_model = "llama3.2:3b";
     let client = reqwest::Client::new();
-    if client
-        .get(format!("{}/api/tags", ollama_url))
-        .send()
-        .await
-        .is_err()
-    {
-        eprintln!("Skipping test: Ollama not running on {}", ollama_url);
+
+    let tags_resp = match client.get(format!("{}/api/tags", ollama_url)).send().await {
+        Ok(r) => r,
+        Err(_) => {
+            eprintln!("Skipping test: Ollama not running on {}", ollama_url);
+            return;
+        }
+    };
+
+    let tags: serde_json::Value = match tags_resp.json().await {
+        Ok(v) => v,
+        Err(_) => {
+            eprintln!("Skipping test: failed to parse Ollama /api/tags response");
+            return;
+        }
+    };
+
+    let model_loaded = tags["models"]
+        .as_array()
+        .map(|models| {
+            models.iter().any(|m| {
+                m["name"]
+                    .as_str()
+                    .map(|n| n.starts_with(required_model))
+                    .unwrap_or(false)
+            })
+        })
+        .unwrap_or(false);
+
+    if !model_loaded {
+        eprintln!(
+            "Skipping test: model '{}' not loaded in Ollama (run: ollama pull {})",
+            required_model, required_model
+        );
         return;
     }
 
-    // Create test server
-    let _config_path = "terraphim_server/default/terraphim_engineer_config.json";
     let app = terraphim_server::build_router_for_tests().await;
-
     let server = TestServer::new(app);
 
-    // Test chat request
     let payload = json!({
         "role": "Terraphim Engineer",
         "messages": [
@@ -34,13 +57,10 @@ async fn test_chat_endpoint_with_ollama() {
 
     let response = server.post("/chat").json(&payload).await;
 
-    // Verify response
     response.assert_status_ok();
-
     let json: serde_json::Value = response.json();
     assert_eq!(json["status"], "Success");
     assert!(json["message"].is_string());
-
     let message = json["message"].as_str().unwrap();
     assert!(!message.is_empty(), "Response should not be empty");
 }
