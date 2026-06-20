@@ -1,5 +1,5 @@
 # Optimized clippy configuration for faster CI builds
-msrv = "1.80.0"
+msrv = "1.91.0"
 avoid-breaking-exported-api = false
 allow-mixed-uninlined-format-args = true
 allow-unwrap-in-tests = true
