@@ -2,6 +2,7 @@
 name = "terraphim_tinyclaw"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 description = "Multi-channel AI assistant for Terraphim - Telegram, Discord, and CLI"
 documentation = "https://terraphim.ai"
 homepage = "https://terraphim.ai"

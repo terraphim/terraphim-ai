@@ -2,6 +2,7 @@
 name = "terraphim_validation"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 authors = ["Terraphim AI Team <team@terraphim.ai>"]
 description = "Release validation system for Terraphim AI"
 documentation = "https://terraphim.ai"

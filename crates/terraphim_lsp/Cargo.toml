@@ -2,6 +2,7 @@
 name = "terraphim_lsp"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 authors = ["Terraphim Team <team@terraphim.ai>"]
 description = "Language Server Protocol (LSP) implementation for Terraphim AI"
 documentation = "https://terraphim.ai"

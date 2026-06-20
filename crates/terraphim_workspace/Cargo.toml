@@ -2,6 +2,7 @@
 name = "terraphim_workspace"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 authors = ["Terraphim Team <team@terraphim.ai>"]
 description = "Workspace management for agent execution - lifecycle, hooks, and isolation"
 documentation = "https://terraphim.ai"

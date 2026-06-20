@@ -2,6 +2,7 @@
 name = "terraphim_server"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 authors = ["Terraphim Contributors"]
 description = "Terraphim service handling the core logic of the Terraphim AI."
 documentation = "https://terraphim.ai"
