@@ -1,7 +1,7 @@
 #!/bin/bash
 # build.sh -- produce rust-ci.ext4, a Firecracker-bootable Ubuntu 22.04
-# rootfs with systemd-as-PID-1, sshd, Rust stable, sccache, and the
-# SeaweedFS S3 cache env baked in.
+# rootfs with systemd-as-PID-1, sshd, Rust stable, cross compilers, sccache,
+# and the SeaweedFS S3 cache env baked in.
 #
 # Pattern: privileged docker run on ubuntu:22.04 image, run chroot.sh inside,
 # tar out the resulting filesystem, convert tar -> ext4 with hcsshim's
@@ -30,7 +30,11 @@ WORK=$(mktemp -d -t fc-rust-ci-XXXXXX)
 trap 'rm -rf "$WORK"' EXIT
 echo "Working dir: $WORK"
 
-cp -a "$(dirname "$0")"/{chroot.sh,overlay} "$WORK/"
+cp -a "$(dirname "$0")/chroot.sh" "$WORK/"
+mkdir -p "$WORK/overlay/root/.ssh"
+if [ -d "$(dirname "$0")/overlay" ]; then
+    cp -a "$(dirname "$0")/overlay/." "$WORK/overlay/"
+fi
 
 # Derive the matching pubkey and stage it where the overlay expects it.
 ssh-keygen -y -f "$SSH_KEY" > "$WORK/overlay/root/.ssh/authorized_keys"
@@ -86,10 +90,11 @@ if [ -z "$TAR2EXT4" ]; then
     TAR2EXT4="$WORK/tar2ext4"
 fi
 
-# 4 GB rootfs, plenty for Rust toolchain + workspace builds.
+# 12 GB rootfs, enough for vendored OpenSSL/libgit2 release builds across
+# Linux and Windows GNU targets plus baked cross toolchains.
 "$TAR2EXT4" -i "$WORK/rootfs.tar" -o "$OUT"
 tune2fs -O ^read-only "$OUT"
-dd if=/dev/zero bs=1M seek=4096 count=0 of="$OUT"
+dd if=/dev/zero bs=1M seek=12288 count=0 of="$OUT"
 e2fsck -y -f "$OUT" || true
 resize2fs "$OUT"
 

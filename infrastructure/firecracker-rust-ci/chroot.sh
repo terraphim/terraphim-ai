@@ -13,7 +13,8 @@ PS4='+\t '
 # Base packages: systemd-sysv is mandatory so PID 1 is real systemd and sshd
 # actually starts. openssh-server + iproute2 + curl give us the runtime;
 # build-essential + pkg-config + libssl-dev + ca-certificates let us actually
-# compile Rust crates.
+# compile Rust crates. Cross compilers support the tsm release targets built
+# from this image.
 packages="
   udev
   systemd-sysv
@@ -26,6 +27,11 @@ packages="
   libssl-dev
   git
   python3-minimal
+  gcc-aarch64-linux-gnu
+  libc6-dev-arm64-cross
+  linux-libc-dev-arm64-cross
+  gcc-mingw-w64-x86-64
+  zip
 "
 
 export DEBIAN_FRONTEND=noninteractive
