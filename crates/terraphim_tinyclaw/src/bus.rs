@@ -175,6 +175,41 @@ mod tests {
         assert_eq!(received.content, "Hello");
     }
 
+    #[tokio::test]
+    async fn test_message_bus_multiple_senders() {
+        let bus = MessageBus::new();
+        let sender1 = bus.inbound_sender();
+        let sender2 = bus.inbound_sender();
+
+        sender1
+            .send(InboundMessage::new("telegram", "user1", "chat1", "First"))
+            .await
+            .unwrap();
+        sender2
+            .send(InboundMessage::new("discord", "user2", "chat2", "Second"))
+            .await
+            .unwrap();
+
+        let mut rx = bus.inbound_rx.lock().await;
+        let first = rx.recv().await.unwrap();
+        let second = rx.recv().await.unwrap();
+
+        // Both messages must be delivered regardless of which sender sent them.
+        let contents: Vec<String> = vec![first.content, second.content];
+        assert!(contents.contains(&"First".to_string()));
+        assert!(contents.contains(&"Second".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_message_bus_empty_receiver_times_out() {
+        let bus = MessageBus::new();
+        let mut rx = bus.inbound_rx.lock().await;
+
+        let result = tokio::time::timeout(std::time::Duration::from_millis(50), rx.recv()).await;
+
+        assert!(result.is_err(), "empty bus should not produce messages");
+    }
+
     #[test]
     fn test_inbound_with_media() {
         let msg = InboundMessage::new("telegram", "user123", "chat456", "[Voice message]")

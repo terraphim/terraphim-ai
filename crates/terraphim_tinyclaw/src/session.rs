@@ -425,4 +425,42 @@ mod tests {
         assert!(sessions.contains(&"cli:123".to_string()));
         assert!(sessions.contains(&"telegram:456".to_string()));
     }
+
+    #[test]
+    fn test_session_state_transition() {
+        let mut session = Session::new("test:session");
+
+        session.add_message(ChatMessage::user("Hello", "user1"));
+        session.add_message(ChatMessage::assistant("Hi there!"));
+        session.add_message(ChatMessage::tool("Done", "calculator"));
+
+        assert_eq!(session.message_count(), 3);
+        assert_eq!(session.messages[0].role, MessageRole::User);
+        assert_eq!(session.messages[1].role, MessageRole::Assistant);
+        assert_eq!(session.messages[2].role, MessageRole::Tool);
+
+        let recent = session.get_recent_messages(2);
+        assert_eq!(recent.len(), 2);
+        assert_eq!(recent[0].role, MessageRole::Assistant);
+        assert_eq!(recent[1].role, MessageRole::Tool);
+    }
+
+    #[test]
+    fn test_session_manager_delete_cleans_up() {
+        let temp_dir = TempDir::new().unwrap();
+        let mut manager = SessionManager::new(temp_dir.path().to_path_buf());
+
+        let mut session = Session::new("cli:delete_me");
+        session.add_message(ChatMessage::user("Hello", "user1"));
+        manager.save(&session).unwrap();
+
+        assert!(manager.load("cli:delete_me").is_some());
+        assert!(manager.session_file_path("cli:delete_me").exists());
+
+        manager.delete("cli:delete_me").unwrap();
+
+        assert!(manager.get("cli:delete_me").is_none());
+        assert!(!manager.session_file_path("cli:delete_me").exists());
+        assert!(manager.list_sessions().unwrap().is_empty());
+    }
 }
