@@ -24,7 +24,7 @@ trigger:: code writing, review, testing, and mid-complexity development tasks
 # Z.AI Coding Plan healthy via pi-rust; broken via opencode 1.14.48
 # (opencode emits only step_start, no text). Investigation: 2026-05-23.
 # Route through pi-rust until opencode integration is fixed upstream.
-route:: zai-coding-plan, glm-5.1
+route:: zai-coding-plan, zai-coding-plan/glm-5.1
 is_free:: true
 action:: /home/alex/.local/bin/pi-rust --provider zai-coding-plan --model {{ model }} -p "{{ prompt }}"
 
