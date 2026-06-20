@@ -141,6 +141,7 @@ pub fn build_channels_from_config(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::{Arc, Mutex};
 
     struct MockChannel {
         name: String,
@@ -219,5 +220,106 @@ mod tests {
 
         let msg = OutboundMessage::new("unknown", "chat123", "Hello");
         assert!(manager.send(msg).await.is_err());
+    }
+
+    /// A mock channel that records every outbound message it receives.
+    struct RecordingChannel {
+        name: String,
+        sent: Arc<Mutex<Vec<OutboundMessage>>>,
+    }
+
+    #[async_trait]
+    impl Channel for RecordingChannel {
+        fn name(&self) -> &str {
+            &self.name
+        }
+
+        async fn start(&self, _bus: Arc<MessageBus>) -> anyhow::Result<()> {
+            Ok(())
+        }
+
+        async fn stop(&self) -> anyhow::Result<()> {
+            Ok(())
+        }
+
+        async fn send(&self, msg: OutboundMessage) -> anyhow::Result<()> {
+            self.sent.lock().unwrap().push(msg);
+            Ok(())
+        }
+
+        fn is_running(&self) -> bool {
+            true
+        }
+
+        fn is_allowed(&self, _sender_id: &str) -> bool {
+            true
+        }
+    }
+
+    #[tokio::test]
+    async fn test_channel_send_receive_roundtrip() {
+        let mut manager = ChannelManager::new();
+        let sent = Arc::new(Mutex::new(Vec::new()));
+        let channel = RecordingChannel {
+            name: "test".to_string(),
+            sent: sent.clone(),
+        };
+
+        manager.register(Box::new(channel));
+
+        let msg = OutboundMessage::new("test", "chat123", "Hello, roundtrip!");
+        manager.send(msg.clone()).await.unwrap();
+
+        let recorded = sent.lock().unwrap().clone();
+        assert_eq!(recorded.len(), 1);
+        assert_eq!(recorded[0].channel, "test");
+        assert_eq!(recorded[0].chat_id, "chat123");
+        assert_eq!(recorded[0].content, "Hello, roundtrip!");
+    }
+
+    /// A mock channel that simulates a closed/errored transport.
+    struct ClosedChannel {
+        name: String,
+    }
+
+    #[async_trait]
+    impl Channel for ClosedChannel {
+        fn name(&self) -> &str {
+            &self.name
+        }
+
+        async fn start(&self, _bus: Arc<MessageBus>) -> anyhow::Result<()> {
+            Ok(())
+        }
+
+        async fn stop(&self) -> anyhow::Result<()> {
+            Ok(())
+        }
+
+        async fn send(&self, _msg: OutboundMessage) -> anyhow::Result<()> {
+            Err(anyhow::anyhow!("channel closed"))
+        }
+
+        fn is_running(&self) -> bool {
+            false
+        }
+
+        fn is_allowed(&self, _sender_id: &str) -> bool {
+            true
+        }
+    }
+
+    #[tokio::test]
+    async fn test_channel_manager_reports_closed_channel_error() {
+        let mut manager = ChannelManager::new();
+        manager.register(Box::new(ClosedChannel {
+            name: "broken".to_string(),
+        }));
+
+        let msg = OutboundMessage::new("broken", "chat123", "Hello");
+        let result = manager.send(msg).await;
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("channel closed"));
     }
 }
