@@ -123,8 +123,8 @@ pub async fn search(
 
     let status = response.status();
     let response_text = response.text().await?;
-    eprintln!("DEBUG: Response status: {}", status);
-    eprintln!("DEBUG: Response body: {}", response_text);
+    log::debug!("Confluence response status: {}", status);
+    log::debug!("Confluence response body: {}", response_text);
 
     if !status.is_success() {
         return Err(anyhow::anyhow!(

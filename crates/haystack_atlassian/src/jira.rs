@@ -100,8 +100,8 @@ pub async fn get_issue(
 
     let status = response.status();
     let response_text = response.text().await?;
-    eprintln!("DEBUG: Response status: {}", status);
-    eprintln!("DEBUG: Response body: {}", response_text);
+    log::debug!("Jira response status: {}", status);
+    log::debug!("Jira response body: {}", response_text);
 
     if !status.is_success() {
         return Err(anyhow::anyhow!(
@@ -148,8 +148,8 @@ pub async fn search(
         max_results: limit,
     };
 
-    eprintln!("DEBUG: Request URL: {}", url);
-    eprintln!("DEBUG: Request body: {:?}", search_request);
+    log::debug!("Jira search request URL: {}", url);
+    log::debug!("Jira search request body: {:?}", search_request);
 
     let response = client
         .post(&url)
@@ -160,8 +160,8 @@ pub async fn search(
 
     let status = response.status();
     let response_text = response.text().await?;
-    eprintln!("DEBUG: Response status: {}", status);
-    eprintln!("DEBUG: Response body: {}", response_text);
+    log::debug!("Jira search response status: {}", status);
+    log::debug!("Jira search response body: {}", response_text);
 
     if !status.is_success() {
         return Err(anyhow::anyhow!(
