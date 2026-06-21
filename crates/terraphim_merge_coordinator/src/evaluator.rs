@@ -165,4 +165,24 @@ mod tests {
         assert_eq!(e.verdict, EvalVerdict::Merge);
         assert!(e.fixes_issues.is_empty());
     }
+
+    #[test]
+    fn evaluate_one_processes_51_prs_without_truncation() {
+        // Regression test for issue #2850: ensure the evaluation loop does not
+        // impose an artificial cap at position 50.  With list_open_prs returning
+        // up to OPEN_PRS_LIMIT (300) items, all PRs must receive a verdict.
+        let prs: Vec<PrSummary> = (1u64..=51)
+            .map(|n| pr(n, &format!("Fixes #{n}"), true))
+            .collect();
+        let evaluations: Vec<_> = prs.iter().map(evaluate_one).collect();
+        assert_eq!(
+            evaluations.len(),
+            51,
+            "all 51 PRs must receive an evaluation verdict"
+        );
+        // Spot-check: the PR at position 51 gets Merge (it is mergeable, clean)
+        let last = &evaluations[50];
+        assert_eq!(last.pr_index, 51);
+        assert_eq!(last.verdict, EvalVerdict::Merge);
+    }
 }
