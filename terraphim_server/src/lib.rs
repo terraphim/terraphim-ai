@@ -23,7 +23,6 @@ static NORMALIZE_REGEX: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(||
     Regex::new(r"[^a-zA-Z0-9]+").expect("Failed to create normalize regex")
 });
 
-
 use terraphim_automata::builder::{Logseq, ThesaurusBuilder};
 use terraphim_config::ConfigState;
 use terraphim_persistence::Persistable;
@@ -116,7 +115,6 @@ fn create_document_description(content: &str) -> Option<String> {
     };
 
     // Limit total length to 400 characters for more informative descriptions
-    // Use floor_char_boundary to safely truncate at a valid UTF-8 boundary
     let description = if combined.len() > 400 {
         let safe_end = combined.floor_char_boundary(397);
         format!("{}...", &combined[..safe_end])
