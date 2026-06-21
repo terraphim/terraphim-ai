@@ -84,8 +84,8 @@ pub async fn test_concurrent_requests(
     // Calculate statistics
     let total_duration: Duration = response_times.iter().sum();
     let avg_response_time = total_duration / response_times.len() as u32;
-    let min_response_time = response_times.iter().min().unwrap().clone();
-    let max_response_time = response_times.iter().max().unwrap().clone();
+    let min_response_time = *response_times.iter().min().unwrap();
+    let max_response_time = *response_times.iter().max().unwrap();
 
     // Calculate 95th percentile
     response_times.sort();

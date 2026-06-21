@@ -9,7 +9,7 @@
 // TODO: Gradually remove these allows as the crate matures
 #![allow(unused)]
 #![allow(ambiguous_glob_reexports)]
-#![allow(clippy::all)]
+// #![allow(clippy::all)] -- removed: see issue #2508
 
 pub mod artifacts;
 pub mod orchestrator;

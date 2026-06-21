@@ -146,7 +146,7 @@ impl ReleaseArtifact {
     fn extract_filename(&self) -> String {
         self.download_url
             .split('/')
-            .last()
+            .next_back()
             .unwrap_or("unknown")
             .to_string()
     }
